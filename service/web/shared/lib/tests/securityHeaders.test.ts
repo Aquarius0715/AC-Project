@@ -37,8 +37,9 @@ describe("the page Content-Security-Policy", () => {
   });
 });
 
+const cspOf = (h: Headers) => h.get("content-security-policy") ?? "";
+
 describe("the proxy's security headers", () => {
-  const cspOf = (h: Headers) => h.get("content-security-policy") ?? "";
   it("sends the CSP on every page, with the nonce also on the request Next.js renders", async () => {
     vi.stubEnv("DATA_SOURCE", "mock");
     vi.stubEnv("OIDC_ISSUER", "https://id.example.com/realms/ac");
@@ -68,8 +69,9 @@ describe("the proxy's security headers", () => {
 });
 
 // IR358: the BFF's POST routes take requests from the app's own pages only (CSRF)
+const h = (o: Record<string, string>) => new Headers(o);
+
 describe("a same-origin request", () => {
-  const h = (o: Record<string, string>) => new Headers(o);
   it("passes from the app's pages and from clients that are not browser pages", () => {
     expect([
       sameOriginRequest(h({ origin: "http://localhost:3000", host: "localhost:3000", "sec-fetch-site": "same-origin" })),

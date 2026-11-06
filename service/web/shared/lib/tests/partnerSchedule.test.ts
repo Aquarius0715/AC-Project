@@ -42,15 +42,18 @@ const cap = (id: string, date: string, avail: [string, string][], assigned: [str
   ({ membershipId: id, availableSlots: avail.map(([s, e]) => slot(s, e)), assignedSlots: assigned.map(([s, e]) => slot(s, e)), availableMinutes: am, assignedMinutes: 0, date, unavailability });
 const workday = (d: string): [string, string] => [`${d}T01:00:00Z`, `${d}T09:00:00Z`];
 
+const f = (code: string, messageKey: string, fieldErrors: Record<string, string> = {}) => assignRefusal({ code, messageKey, fieldErrors }, "tech-external-a");
+
+const rows = [
+  scheduleRowOf(summary({}), NOW, units, names),
+  scheduleRowOf(summary({ status: "assigned", scheduledSlot: visit, technicianMembershipId: "m-a", assignmentAcknowledgement: "cant_make" }), NOW, units, names),
+  scheduleRowOf(summary({ status: "in_progress", scheduledSlot: slot("2026-09-20T02:00:00Z", "2026-09-20T04:00:00Z"), technicianMembershipId: "m-a" }), NOW, units, names),
+  scheduleRowOf(summary({ status: "on_hold", accessValidUntil: "2026-09-21T01:00:00Z" }), NOW, units, names),
+  scheduleRowOf({ projection: "offer", status: "accepted", jobId: "job-2-bbbb", jobVersion: 2, offerId: "o", type: "reactive", siteAddress: "2 Demo Avenue", requestedSlot: visit, dueAt: "x", offerExpiresAt: "x", visitSlot: visit, accessValidFrom: "2026-09-22T00:00:00Z", accessValidUntil: "2026-09-26T00:00:00Z" }, NOW, units, names),
+];
+
 describe("partner schedule", () => {
   it("lists the jobs with their state and delegation window", () => {
-    const rows = [
-      scheduleRowOf(summary({}), NOW, units, names),
-      scheduleRowOf(summary({ status: "assigned", scheduledSlot: visit, technicianMembershipId: "m-a", assignmentAcknowledgement: "cant_make" }), NOW, units, names),
-      scheduleRowOf(summary({ status: "in_progress", scheduledSlot: slot("2026-09-20T02:00:00Z", "2026-09-20T04:00:00Z"), technicianMembershipId: "m-a" }), NOW, units, names),
-      scheduleRowOf(summary({ status: "on_hold", accessValidUntil: "2026-09-21T01:00:00Z" }), NOW, units, names),
-      scheduleRowOf({ projection: "offer", status: "accepted", jobId: "job-2-bbbb", jobVersion: 2, offerId: "o", type: "reactive", siteAddress: "2 Demo Avenue", requestedSlot: visit, dueAt: "x", offerExpiresAt: "x", visitSlot: visit, accessValidFrom: "2026-09-22T00:00:00Z", accessValidUntil: "2026-09-26T00:00:00Z" }, NOW, units, names),
-    ];
     expect(rows.map((r) => [r.title, r.line, r.tone ?? ""])).toEqual([
       ["Lobby AC", "Accepted · awaiting assignment", ""],
       ["Lobby AC", "Assigned · tech-external-a · can’t make it", "warn"],
@@ -119,7 +122,6 @@ describe("partner schedule", () => {
   });
 
   it("states the refusals of the assignment", () => {
-    const f = (code: string, messageKey: string, fieldErrors: Record<string, string> = {}) => assignRefusal({ code, messageKey, fieldErrors }, "tech-external-a");
     expect(f("CONFLICT", "errors.assignment_overlap")).toBe("Overlaps a confirmed schedule for tech-external-a — choose another technician.");
     expect(f("FORBIDDEN", "errors.access_window")).toMatch(/^Outside the delegation period/);
     expect(f("FORBIDDEN", "errors.qualification_missing")).toMatch(/revoked or expiring, FORBIDDEN/);

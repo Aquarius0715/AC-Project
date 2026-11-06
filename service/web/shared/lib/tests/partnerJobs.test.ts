@@ -9,7 +9,7 @@ const NOW = Date.parse("2026-09-21T01:30:00Z"); // Mon 09:30 in Kuala Lumpur
 const slot = (s: string, e: string) => ({ startAt: s, endAt: e });
 const units = new Map([["u-1", "Bedroom AC"]]);
 const names = new Map([["m-a", "tech-external-a"]]);
-const summary = (status: string, over: Record<string, unknown> = {}): ApiPartnerJob => ({ projection: "summary", id: "11111111-aaaa", version: 3, unitId: "u-1", type: "periodic", status, dueAt: "2026-09-25T10:00:00Z", requestedSlot: slot("2026-09-21T02:00:00Z", "2026-09-21T04:00:00Z"), scheduledSlot: null, assignmentId: null, displayStatus: status, technicianMembershipId: null, ...over } as ApiPartnerJob);
+const summary = (status: string, over: Partial<Extract<ApiPartnerJob, { projection: "summary" }>> = {}): ApiPartnerJob => ({ projection: "summary", id: "11111111-aaaa", version: 3, unitId: "u-1", type: "periodic", status, dueAt: "2026-09-25T10:00:00Z", requestedSlot: slot("2026-09-21T02:00:00Z", "2026-09-21T04:00:00Z"), scheduledSlot: null, assignmentId: null, displayStatus: status, technicianMembershipId: null, eventSummary: { count: 0, customerVisible: 0, notes: 0, latest: null }, ...over });
 
 describe("partner job list", () => {
   it("maps tabs, sorts and pages", () => {
@@ -31,7 +31,7 @@ describe("partner job list", () => {
       line: "Offered by HQ · visit 22 Sept, 9:00 – 11:00 am MYT (fixed)", tech: { name: "—", sub: "not assignable before acceptance" },
       slot: { main: "Answer by 22 Sept 2026, 12:30 am MYT", sub: "15 h left" }, badge: { text: "Offered", tone: "primary" },
     });
-    const proposed = jobRow({ ...offered, partnerSlotProposal: { status: "sent_to_client" } } as ApiPartnerJob, NOW, units, names);
+    const proposed = jobRow({ ...offered, partnerSlotProposal: { status: "sent_to_client" } }, NOW, units, names);
     expect(proposed.badge).toEqual({ text: "Time proposed", tone: "warn" });
     const accepted = jobRow({ ...offered, status: "accepted" }, NOW, units, names);
     expect(accepted).toMatchObject({ href: "/partner/schedule?jobId=22222222-bbbb", tech: { name: "Unassigned", tone: "warn" }, badge: { text: "Accepted" } });
@@ -39,7 +39,7 @@ describe("partner job list", () => {
 
   it("follows a delegated job from unassigned to completed", () => {
     expect(jobRow(summary("accepted"), NOW, units, names)).toMatchObject({ title: "11111111 · Bedroom AC", href: "/partner/schedule?jobId=11111111-aaaa", tech: { name: "Unassigned" }, slot: { main: "Due 25 Sept 2026, 6:00 pm MYT" }, badge: { text: "Accepted" } });
-    const assigned = { assignmentId: "as", technicianMembershipId: "m-a", assignmentAcknowledgement: "pending", scheduledSlot: slot("2026-09-21T02:00:00Z", "2026-09-21T04:00:00Z") };
+    const assigned = { assignmentId: "as", technicianMembershipId: "m-a", assignmentAcknowledgement: "pending" as const, scheduledSlot: slot("2026-09-21T02:00:00Z", "2026-09-21T04:00:00Z") };
     expect(jobRow(summary("assigned", assigned), NOW, units, names)).toMatchObject({
       line: "Assigned tech-external-a · 21 Sept, 10:00 am – 12:00 pm MYT", tech: { name: "tech-external-a", sub: "awaiting the technician’s acceptance" },
       slot: { main: "21 Sept, 10:00 am – 12:00 pm MYT", sub: "Due 25 Sept 2026, 6:00 pm MYT" }, badge: { text: "Assigned", tone: "primary" },
@@ -67,7 +67,7 @@ describe("partner job list", () => {
       line: "Ditawarkan oleh HQ · lawatan 22 Sep, 10:00 PG – 12:00 PTG GMT+9 (tetap)", tech: { sub: "tidak boleh ditugaskan sebelum diterima" },
       slot: { main: "Jawab sebelum 22 Sep 2026, 1:30 PG GMT+9", sub: "15 j lagi" }, badge: { text: "Ditawarkan" },
     });
-    const cantMake = { assignmentId: "as", technicianMembershipId: "m-a", assignmentAcknowledgement: "cant_make", scheduledSlot: slot("2026-09-21T02:00:00Z", "2026-09-21T04:00:00Z") };
+    const cantMake = { assignmentId: "as", technicianMembershipId: "m-a", assignmentAcknowledgement: "cant_make" as const, scheduledSlot: slot("2026-09-21T02:00:00Z", "2026-09-21T04:00:00Z") };
     expect(jobRow(summary("assigned", cantMake), NOW, units, names, MS_TOKYO)).toMatchObject({
       line: "Ditugaskan tech-external-a · 21 Sep, 11:00 PG – 1:00 PTG GMT+9", tech: { sub: "tidak dapat hadir — tugaskan semula", subTone: "warn" },
       slot: { sub: "Tarikh akhir 25 Sep 2026, 7:00 PTG GMT+9" }, badge: { text: "Ditugaskan" },

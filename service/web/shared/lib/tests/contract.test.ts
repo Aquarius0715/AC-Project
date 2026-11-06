@@ -86,12 +86,13 @@ function sources(): string[] {
   return files;
 }
 
+const name = (p: ts.ObjectLiteralElementLike) => (p.name ? p.name.getText().replaceAll(/^["']|["']$/g, "") : null);
+
 describe("the web's calls against the Core API contract (IR312)", () => {
   it("use only known operations, input fields, catalog filters and the values the contract fixes", () => {
     const inputs = contractInputs(), filters = catalogFilters();
     const problems: string[] = [];
     let calls = 0;
-    const name = (p: ts.ObjectLiteralElementLike) => (p.name ? p.name.getText().replaceAll(/^["']|["']$/g, "") : null);
     for (const f of sources()) {
       const sf = ts.createSourceFile(f, readFileSync(f, "utf8"), ts.ScriptTarget.Latest, true, f.endsWith("x") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
       const visit = (n: ts.Node) => {

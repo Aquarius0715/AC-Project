@@ -26,6 +26,8 @@ const sources = (directory: string): string[] => readdirSync(directory, { recurs
   .filter((f) => f.split(sep).every((part) => !["node_modules", ".next", "tests", "e2e"].includes(part)) && /\.tsx?$/.test(f) && !f.endsWith("i18n-ms.ts"))
   .map((f) => join(directory, f));
 
+const names = (text: string) => text.matchAll(/\{(\w+)\}/g).map((m) => must(m[1])).toArray().toSorted(byText);
+
 describe("Display language (FR-X01, AT-X01-N, IR258)", () => {
   it("keeps English as the key and falls back to it when Malay has no entry", () => {
     expect([translate("en", "Sign out"), translate("ms", "Sign out")]).toEqual(["Sign out", "Log keluar"]);
@@ -45,7 +47,6 @@ describe("Display language (FR-X01, AT-X01-N, IR258)", () => {
   });
 
   it("keeps every placeholder of an English key in its Malay text", () => {
-    const names = (text: string) => text.matchAll(/\{(\w+)\}/g).map((m) => must(m[1])).toArray().toSorted(byText);
     for (const [en, text] of Object.entries(ms)) expect(names(text), en).toEqual(names(en));
   });
 

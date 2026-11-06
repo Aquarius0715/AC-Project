@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { translator } from "@ac/web/lib/i18n";
+import { unitDetail } from "./unitFixture";
 import { actionText, controlLayout, historyRow, latest, setsTemperature, type ApiCommand, type ApiUnitDetail } from "@ac/web/lib/units";
 
 const ms = translator("ms");
@@ -32,10 +33,10 @@ describe("unit commands and readings in the display language and time zone (FR-X
   });
 
   it("keeps a stale reading's quality beside it and times it in the display time zone", () => {
-    const d = { latestMeasurements: [
+    const d = unitDetail({ latestMeasurements: [
       { id: "m1", unitId: "u1", sensorId: "s1", metric: "temperature", value: 28.04, unit: "°C", observedAt: "2026-09-14T01:12:00Z", origin: "measured", quality: "stale", qualityReason: null },
       { id: "m2", unitId: "u1", sensorId: "s2", metric: "humidity", value: null, unit: "%", observedAt: "2026-09-14T01:12:00Z", origin: "measured", quality: "missing", qualityReason: null },
-    ] } as unknown as ApiUnitDetail;
+    ] });
     expect(latest(d, "temperature")).toEqual({ text: "28.0 °C (stale)", at: "9:12 am MYT" });
     expect(latest(d, "temperature", ms, tokyo)).toEqual({ text: "28.0 °C (lapuk)", at: "10:12 am GMT+9" });
     expect([latest(d, "humidity"), latest(d, "power")]).toEqual([null, null]);
@@ -46,13 +47,14 @@ describe("unit commands and readings in the display language and time zone (FR-X
   });
 });
 
-describe("the remote control a model offers (deterministic contracts, AT-X06; IR524, IR530)", () => {
-  const model = (over: Partial<ApiUnitDetail["capabilities"]>): ApiUnitDetail["capabilities"] => {
-    return {
-      manufacturer: "DemoAir", model: "SPL-100", control: true, modeControl: true, fanControl: true, temperature: { min: 16, max: 30, step: 1 },
-      modes: ["cool", "dry", "fan"], fanLevels: ["low", "mid", "high"], ventilation: false, ventilationLevels: [], sensors: [], ...over,
-    };
+const model = (over: Partial<ApiUnitDetail["capabilities"]>): ApiUnitDetail["capabilities"] => {
+  return {
+    manufacturer: "DemoAir", model: "SPL-100", control: true, modeControl: true, fanControl: true, temperature: { min: 16, max: 30, step: 1 },
+    modes: ["cool", "dry", "fan"], fanLevels: ["low", "mid", "high"], ventilation: false, ventilationLevels: [], sensors: [], ...over,
   };
+};
+
+describe("the remote control a model offers (deterministic contracts, AT-X06; IR524, IR530)", () => {
 
   it("offers every setting of a full model, and the demo screen's without a model", () => {
     expect(controlLayout(model({}))).toEqual({ control: true, temperature: { min: 16, max: 30, step: 1 }, modes: ["cool", "dry", "fan"], fans: ["low", "mid", "high"], review: true });

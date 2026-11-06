@@ -54,13 +54,14 @@ function contract(): { inputs: Record<string, string[]>; results: Record<string,
   return { inputs, results };
 }
 
+const check = (file: string, value: unknown) => {
+  const text = JSON.stringify(value, null, 1) + "\n";
+  if (process.env.UPDATE_CONTRACT_INPUTS === "1") writeFileSync(file, text);
+  expect(existsSync(file) ? readFileSync(file, "utf8") : "", "regenerate with UPDATE_CONTRACT_INPUTS=1 (see the header)").toBe(text);
+};
+
 describe("the contract's field lists", () => {
   const now = contract();
-  const check = (file: string, value: unknown) => {
-    const text = JSON.stringify(value, null, 1) + "\n";
-    if (process.env.UPDATE_CONTRACT_INPUTS === "1") writeFileSync(file, text);
-    expect(existsSync(file) ? readFileSync(file, "utf8") : "", "regenerate with UPDATE_CONTRACT_INPUTS=1 (see the header)").toBe(text);
-  };
   it("contractInputs.gen.json lists the input fields of every operation", () => { check(snapshot, now.inputs); });
   it("contractResults.gen.json lists the result fields of every operation", () => { check(resultsSnapshot, now.results); });
 });

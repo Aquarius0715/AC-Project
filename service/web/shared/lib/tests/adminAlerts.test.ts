@@ -112,18 +112,19 @@ describe("HQ alerts in Malay with the display time zone (IR292)", () => {
   });
 });
 
-describe("the default policy's rules and the customers' switches (DD-A05 item 9, Figma 268:2, IR347)", () => {
-  const defaults = (over: Partial<ApiPolicy> = {}): ApiPolicy => {
-    return {
-      id: "def", version: 3, kind: "default_alert", name: "Default policy", unitIds: [], timezone: "Asia/Kuala_Lumpur", enabled: true, priority: 0, customerId: null,
-      rules: [
-        { ruleKey: "refrigerant_low_pressure", name: "Refrigerant low pressure", category: "fault", metric: "refrigerant_pressure", operator: "lte", threshold: 350, recoveryThreshold: 380, durationSeconds: 120, severity: "critical", activeWindow: null },
-        { ruleKey: "ac_offline", name: "AC offline", category: "connection", metric: "heartbeat_gap", operator: "gte", threshold: 15, recoveryThreshold: 1, durationSeconds: 1, severity: "warning", activeWindow: null },
-      ],
-      ruleSettings: [{ ruleKey: "ac_offline", customerId: "c-b", enabled: false, version: 2, reason: "rooftop unit replaced", changedByMembershipId: "m-hq", updatedAt: "2026-09-25T02:00:00Z" }],
-      ...over,
-    };
+const defaults = (over: Partial<ApiPolicy> = {}): ApiPolicy => {
+  return {
+    id: "def", version: 3, kind: "default_alert", name: "Default policy", unitIds: [], timezone: "Asia/Kuala_Lumpur", enabled: true, priority: 0, customerId: null,
+    rules: [
+      { ruleKey: "refrigerant_low_pressure", name: "Refrigerant low pressure", category: "fault", metric: "refrigerant_pressure", operator: "lte", threshold: 350, recoveryThreshold: 380, durationSeconds: 120, severity: "critical", activeWindow: null },
+      { ruleKey: "ac_offline", name: "AC offline", category: "connection", metric: "heartbeat_gap", operator: "gte", threshold: 15, recoveryThreshold: 1, durationSeconds: 1, severity: "warning", activeWindow: null },
+    ],
+    ruleSettings: [{ ruleKey: "ac_offline", customerId: "c-b", enabled: false, version: 2, reason: "rooftop unit replaced", changedByMembershipId: "m-hq", updatedAt: "2026-09-25T02:00:00Z" }],
+    ...over,
   };
+};
+
+describe("the default policy's rules and the customers' switches (DD-A05 item 9, Figma 268:2, IR347)", () => {
   const [p] = policyRows([defaults()], customers, [{ id: "m-hq", displayName: "hq-operator", role: "admin" }]);
 
   it("keeps each rule's condition and names who switched a rule for a customer", () => {
@@ -157,9 +158,10 @@ describe("the default policy's rules and the customers' switches (DD-A05 item 9,
   });
 });
 
+const d = (decision: NotificationDecision["decision"], reason: NotificationDecision["reason"] = null): NotificationDecision => ({ unitId: "u1", policyId: "pol-1", decision, reason });
+
 describe("Test with demo data (DD-A05 item 7, IR348)", () => {
   const p = { metric: "temperature", operator: "gte" as const, threshold: 30 };
-  const d = (decision: NotificationDecision["decision"], reason: NotificationDecision["reason"] = null): NotificationDecision => ({ unitId: "u1", policyId: "pol-1", decision, reason });
   it("words each decision of automations.simulate for the reading", () => {
     expect([testOutcome(d("selected"), p, 30, "Bedroom AC"), testOutcome(d("failed", "no_recipient"), p, 31, "Bedroom AC")]).toEqual([
       { tone: "ok", text: "30 °C on Bedroom AC raises an alert and notifies the recipients — simulated, nothing is stored." },

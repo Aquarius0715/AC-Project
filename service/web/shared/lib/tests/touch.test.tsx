@@ -9,8 +9,9 @@ afterEach(cleanup);
 // IR615: on a touch screen (pointer: coarse) the shared controls are at least 44 px tall and icon buttons 44×44; a
 // mouse keeps the compact sizes, and Plain takes its parent's size. jsdom has no media queries, so this checks the
 // classes; the smoke crawl's phone pass measures the controls under touch emulation.
+const coarse = (el: HTMLElement) => el.className.split(/\s+/).filter((c) => c.startsWith("pointer-coarse:"));
+
 describe("touch-sized controls", () => {
-  const coarse = (el: HTMLElement) => el.className.split(/\s+/).filter((c) => c.startsWith("pointer-coarse:"));
   it("sizes every button, input, select, tab and choice to 44 px on a touch screen", () => {
     render(<>
       <Btn>Save</Btn>

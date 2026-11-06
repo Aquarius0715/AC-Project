@@ -3,6 +3,8 @@ import { advanceTarget, clockText, demoRefusal, deviceOptions, nextSequence, ope
 
 const event = (over: Partial<ApiDeviceEvent>): ApiDeviceEvent => ({ id: "e", eventType: "communication_lost", sequence: 1, occurredAt: "2026-09-14T01:00:00Z", restoredAt: null, ...over });
 
+const f = (code: string, messageKey: string, fieldErrors: Record<string, string> = {}) => ({ code, messageKey, fieldErrors });
+
 describe("Demo controls in API mode (FR-X05, IR249)", () => {
   it("shows the scenario clock in UTC and moves it forward", () => {
     expect(clockText("2026-09-14T01:41:07.123Z")).toBe("2026-09-14 01:41 UTC");
@@ -29,7 +31,6 @@ describe("Demo controls in API mode (FR-X05, IR249)", () => {
   });
 
   it("explains refused demo operations", () => {
-    const f = (code: string, messageKey: string, fieldErrors: Record<string, string> = {}) => ({ code, messageKey, fieldErrors });
     expect([
       demoRefusal(f("UNAVAILABLE", "errors.demo_only")), demoRefusal(f("VALIDATION", "error.validation", { to: "errors.clock_backwards" })),
       demoRefusal(f("VALIDATION", "error.validation", { bindingId: "errors.binding_mismatch" })), demoRefusal(f("CONFLICT", "errors.recovery_source_not_current")),

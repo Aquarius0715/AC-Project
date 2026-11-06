@@ -18,6 +18,8 @@ const device = (over: Partial<ApiDevice>): ApiDevice => ({ id: "d1", version: 2,
 const units = [{ id: "u1", displayName: "Bedroom AC", modelId: "m1", customerOrgId: "org-a", archived: false }, { id: "u2", displayName: "Old AC", modelId: "m1", customerOrgId: "org-a", archived: true }];
 const draft = (over: Partial<CampaignDraft>): CampaignDraft => ({ modelId: "m1", targetVersion: "v2", deviceIds: ["d1"], waves: "10, 50, 100", startLocal: "02:00", endLocal: "05:00", autoPause: "5", startAt: "2026-09-16T10:00", ...over });
 
+const r = (waveIndex: number, status: ApiCampaign["results"][number]["status"]) => ({ deviceId: `d${String(waveIndex)}${status}`, reasonKey: null, at: null, waveIndex, status });
+
 describe("HQ device registry", () => {
   it("lists models and devices", () => {
     expect(modelRows([cap], units, [device({}), device({ id: "d2", unitId: null })])[0]).toMatchObject({ name: "DemoAir SPL-100", used: "1 unit · 1 device", updated: "10 Sept 2026, 10:00 am MYT" });
@@ -51,7 +53,6 @@ describe("HQ device registry", () => {
   it("words the runner's results and each wave's state (BR-A20, IR339)", () => {
     expect([resultReason("errors.device_offline"), resultReason("errors.install_timeout"), resultReason("error.checksum_mismatch"), resultReason(null)])
       .toEqual(["Skipped — offline", "Failed — no answer within 60 s; the old version is kept", "checksum mismatch", ""]);
-    const r = (waveIndex: number, status: ApiCampaign["results"][number]["status"]) => ({ deviceId: `d${String(waveIndex)}${status}`, reasonKey: null, at: null, waveIndex, status });
     const waves = [{ label: "Pilot", percent: 34 }, { label: "All", percent: 100 }, { label: "Rest", percent: 100 }];
     const results = [r(0, "succeeded"), r(0, "succeeded"), r(1, "succeeded"), r(1, "failed"), r(2, "pending")];
     expect(waveStates({ waves, results, state: "running" })).toEqual(["done", "running", "waiting"]);
@@ -66,7 +67,7 @@ describe("HQ device registry in Malay with the display time zone (IR295)", () =>
     expect(modelRows([cap], units, [], MS)[0]).toMatchObject({ used: "1 unit · 0 peranti", updated: "10 Sep 2026, 11:00 PG GMT+9" });
     expect(deviceRows([device({ unitId: null })], units, MS.t)[0]?.unit).toBe("Tidak terikat");
     expect(campaignErrors(draft({ modelId: "" }), NOW, "Asia/Tokyo", MS.t)).toEqual({ modelId: "Pilih model" });
-    expect(campaignRows([{ ...({} as ApiCampaign), id: "k", version: 1, modelId: "x", fromVersions: [], targetVersion: "v2", deviceIds: [], startAt: "2026-09-16T02:00:00Z", state: "paused" }], [], MS)[0])
+    expect(campaignRows([{ id: "k", version: 1, modelId: "x", fromVersions: [], targetVersion: "v2", deviceIds: [], waves: [], window: { startLocal: "00:00", endLocal: "23:59" }, autoPauseFailurePercent: 10, startAt: "2026-09-16T02:00:00Z", state: "paused", checksum: "", createdAt: "2026-09-15T00:00:00Z", createdByMembershipId: null, progress: { succeeded: 0, installing: 0, pending: 0, failed: 0, skipped: 0 }, results: [], reason: null }], [], MS)[0])
       .toMatchObject({ model: "model", versions: "mana-mana → v2", start: "16 Sep 2026, 11:00 PG GMT+9" });
     expect(resultReason("errors.device_busy", MS.t)).toBe("Dilangkau — unit sedang sibuk (operasi, arahan, ujian diagnostik atau sekatan)");
   });

@@ -17,6 +17,16 @@ const cells = (row: HTMLElement) => within(row).getAllByRole("cell").map((c) => 
 
 // DataTable on TanStack Table and the shadcn/ui Table (DEC-75, IR403): the same columns, rows, row keys and keyboard
 // access as before (IR294)
+function Page() {
+  const [n, setN] = useState(0);
+  return (
+    <>
+      <p>Opened {n}</p>
+      <DataTable rows={units} rowKey={(u) => u.id} cols={[{ key: "a", label: "Actions", render: (u) => <button onClick={() => { setN(n + 1); }}>Edit {u.name}</button> }]} />
+    </>
+  );
+}
+
 describe("DataTable", () => {
   it("renders a header row and one row per record, keyed and in order", () => {
     render(<DataTable cols={cols} rows={units} rowKey={(u) => u.id} />);
@@ -55,15 +65,6 @@ describe("DataTable", () => {
   // IR620: pages write their columns inline, so every render brings new render functions; the cells keep their
   // elements all the same — the focus stays on a row's button, and a dialog it opened can give the focus back to it
   it("keeps a cell's controls across renders of the page", () => {
-    function Page() {
-      const [n, setN] = useState(0);
-      return (
-        <>
-          <p>Opened {n}</p>
-          <DataTable rows={units} rowKey={(u) => u.id} cols={[{ key: "a", label: "Actions", render: (u) => <button onClick={() => { setN(n + 1); }}>Edit {u.name}</button> }]} />
-        </>
-      );
-    }
     render(<Page />);
     const edit = screen.getByRole("button", { name: "Edit Bedroom AC" });
     edit.focus();

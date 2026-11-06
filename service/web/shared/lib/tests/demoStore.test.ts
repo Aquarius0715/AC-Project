@@ -5,9 +5,10 @@ import { readDemoAs, writeDemo } from "@ac/web/lib/demoStore";
 
 const idRows = z.array(z.object({ id: z.string() }));
 
+const navigation = (type: string) => vi.spyOn(performance, "getEntriesByType").mockReturnValue([Object.assign(performance.mark("navigation"), { type })]);
+
 describe("Phase 1A demo stores (FR-X05, IR257)", () => {
   afterEach(() => { vi.restoreAllMocks(); sessionStorage.clear(); });
-  const navigation = (type: string) => vi.spyOn(performance, "getEntriesByType").mockReturnValue([{ type } as unknown as PerformanceEntry]);
 
   it("keeps the demo data in the tab across navigations", () => {
     navigation("navigate");

@@ -110,8 +110,9 @@ describe("a session from the identity provider's tokens", () => {
   });
 });
 
+const answer = (status: number, body: unknown) => vi.fn(() => Promise.resolve(Response.json(body, { status, headers: { "Content-Type": "application/json" } })));
+
 describe("refreshing the access token", () => {
-  const answer = (status: number, body: unknown) => vi.fn(() => Promise.resolve(Response.json(body, { status, headers: { "Content-Type": "application/json" } })));
 
   it("is due 30 seconds before the access token expires", () => {
     expect([needsRefresh(session({ expiresAt: NOW / 1000 + 31 })), needsRefresh(session({ expiresAt: NOW / 1000 + 30 })), needsRefresh(session({ expiresAt: NOW / 1000 - 1 }))]).toEqual([false, true, true]);

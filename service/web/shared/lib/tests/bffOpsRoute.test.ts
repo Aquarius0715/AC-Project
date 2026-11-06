@@ -40,14 +40,17 @@ describe("POST /bff/ops/<operation>", () => {
 });
 
 // IR370: the relay reads at most 1 MiB, the Core API's limit for an operation without files
+const note = (bytes: number) => {
+  const shell = JSON.stringify({ jobId: "00000000-0000-4000-8000-000000000001", message: "", visibility: "internal" });
+  return JSON.stringify({ jobId: "00000000-0000-4000-8000-000000000001", message: "x".repeat(bytes - shell.length), visibility: "internal" });
+};
+
 describe("the relay's input limit", () => {
   const same = { origin: "http://localhost:3000", host: "localhost:3000", "sec-fetch-site": "same-origin" };
-  const note = (bytes: number) => {
-    const shell = JSON.stringify({ jobId: "00000000-0000-4000-8000-000000000001", message: "", visibility: "internal" });
-    return JSON.stringify({ jobId: "00000000-0000-4000-8000-000000000001", message: "x".repeat(bytes - shell.length), visibility: "internal" });
+  const post = (body: BodyInit, headers: Record<string, string> = same) => {
+    const init = { method: "POST", duplex: "half" as const, headers, body };
+    return POST(new NextRequest("http://localhost:3000/bff/ops/jobs.addNote", init), { params: Promise.resolve({ operation: "jobs.addNote" }) });
   };
-  const post = (body: BodyInit, headers: Record<string, string> = same) =>
-    POST(new NextRequest("http://localhost:3000/bff/ops/jobs.addNote", { method: "POST", duplex: "half", headers, body } as never), { params: Promise.resolve({ operation: "jobs.addNote" }) });
 
   it("passes an input of exactly 1 MiB on and refuses one byte more without calling the Core API", async () => {
     vi.stubEnv("DATA_SOURCE", "api");

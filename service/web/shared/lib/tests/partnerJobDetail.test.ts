@@ -9,13 +9,15 @@ const MS_TOKYO = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 const NOW = Date.parse("2026-09-21T01:30:00Z"); // Mon 09:30 KL
 const slot = (s: string, e: string) => ({ startAt: s, endAt: e });
 const quals = (codes: string[], over: Record<string, unknown> = {}) => codes.map((code) => ({ code, validFrom: "2026-09-01T00:00:00Z", validUntil: "2027-03-31T00:00:00Z", revokedAt: null, ...over }));
-const members = [
+const members: ApiMember[] = [
   { id: "m-a", userId: "u-a", displayName: "tech-external-a", role: "technician", qualifications: quals(["demo_indoor", "demo_outdoor", "demo_electrical"]) },
   { id: "m-b", userId: "u-b", displayName: "tech-external-a2", role: "technician", qualifications: quals(["demo_indoor"]) },
   { id: "m-c", userId: "u-c", displayName: "coordinator", role: "contractor" },
-] as unknown as ApiMember[];
+];
 const cap = (id: string, date: string, avail: [string, string][], assigned: [string, string][], am: number | null, as = 0): ApiCapacity =>
   ({ membershipId: id, availableSlots: avail.map(([s, e]) => slot(s, e)), assignedSlots: assigned.map(([s, e]) => slot(s, e)), availableMinutes: am, assignedMinutes: as, unavailability: null, date });
+
+const event = (action: string, at: string) => ({ id: action, jobId: "j", actorUserId: null, occurredAt: at, action });
 
 describe("partner job detail", () => {
   it("checks qualifications at the visit and labels them", () => {
@@ -59,7 +61,6 @@ describe("partner job detail", () => {
   });
 
   it("builds the status timeline from the events", () => {
-    const event = (action: string, at: string) => ({ id: action, jobId: "j", actorUserId: null, occurredAt: at, action });
     const events = [event("job.created", "2026-09-13T01:00:00Z"), event("job.offered", "2026-09-13T10:20:00Z"), event("offer.accepted", "2026-09-14T02:02:00Z")];
     const t = timeline("accepted", events, false, "periodic_plan");
     expect(t[0]?.sub).toBe("periodic plan");

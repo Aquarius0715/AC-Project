@@ -79,13 +79,14 @@ describe("photos linked to a finding", () => {
   });
 });
 
+const complete = (): Draft => {
+  const d = draftFrom(report(), all);
+  d.items = d.items.map((i) => (i.result === null ? { ...i, result: "normal" } : i));
+  d.workText = "Cleaned the filter and checked the coil.";
+  return d;
+};
+
 describe("submit checks", () => {
-  const complete = (): Draft => {
-    const d = draftFrom(report(), all);
-    d.items = d.items.map((i) => (i.result === null ? { ...i, result: "normal" } : i));
-    d.workText = "Cleaned the filter and checked the coil.";
-    return d;
-  };
   it("passes a complete draft", () => { expect(submitIssues(complete(), report().attachmentRefs, NOW)).toEqual([]); });
   it("lists every blocking issue with its group", () => {
     const d = complete();

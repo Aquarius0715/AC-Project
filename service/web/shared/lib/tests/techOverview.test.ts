@@ -10,11 +10,12 @@ const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 const NOW = Date.parse("2026-09-21T03:45:00Z"); // Mon 11:45 KL
 const slot = (s: string, e: string) => ({ startAt: s, endAt: e });
 const units = new Map([["u1", "Bedroom AC"], ["u2", "Server room AC"]]);
-const row = (over: Record<string, unknown>) => {
+type SummaryRow = Extract<ApiTechJobRow, { projection: "summary" }>;
+const row = (over: Partial<SummaryRow>): SummaryRow => {
   return ({
     projection: "summary", id: "job-1-aaaa", version: 3, unitId: "u1", type: "reactive", status: "assigned", severity: "normal", dueAt: "x", requestedSlot: slot("a", "b"),
     scheduledSlot: slot("2026-09-21T06:00:00Z", "2026-09-21T08:00:00Z"), origin: "client_request", assignmentAcknowledgement: "accepted", ...over,
-  }) as unknown as ApiTechJobRow;
+  });
 };
 
 describe("technician overview", () => {

@@ -10,6 +10,8 @@ const user = (p: Partial<ApiPartnerUser>): ApiPartnerUser => {
   };
 };
 
+const revoked = (status: "active" | "disabled") => partnerUserRows([user({ id: "r", displayName: "Gone", membershipId: "m", accessUntil: "2026-10-01T00:00:00Z", revokedAt: "2026-10-01T00:00:00Z", status })], null, undefined, new Date("2026-10-02T00:00:00Z"))[0];
+
 describe("partnerUserRows (FR-P11)", () => {
   it("sorts by name, marks the caller's own account and gives it no actions", () => {
     const rows = partnerUserRows(PARTNER_USERS_SEED, "contractor-a");
@@ -38,7 +40,6 @@ describe("partnerUserRows (FR-P11)", () => {
     expect(partnerUserRows([user({ id: "e", displayName: "Old", status: "active", membershipId: "m", accessUntil: "2026-10-01T00:00:00Z" })], null, undefined, new Date("2026-09-15T00:00:00Z"))[0]?.ended).toBe(false);
   });
   it("leaves only removing to an account whose access HQ ended (IR508)", () => {
-    const revoked = (status: "active" | "disabled") => partnerUserRows([user({ id: "r", displayName: "Gone", membershipId: "m", accessUntil: "2026-10-01T00:00:00Z", revokedAt: "2026-10-01T00:00:00Z", status })], null, undefined, new Date("2026-10-02T00:00:00Z"))[0];
     expect([revoked("active")?.revoked, revoked("active")?.actions, revoked("disabled")?.actions]).toEqual([
       true, { resend: false, access: false, disable: false, enable: false, remove: true }, { resend: false, access: false, disable: false, enable: false, remove: true }]);
   });

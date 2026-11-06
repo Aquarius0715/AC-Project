@@ -3,6 +3,7 @@ import { ms } from "@ac/web/lib/i18n-ms";
 import { agreedSlots, classifyBy, contractorNames, controls, costLineOf, costTotals, delivery, extendDefault, fromZonedInput, LISTED, money, jobRequestErrors as jobRequestErrors, periodChip, reportCard, returnReason, reviewModeOf, facts, filtersOf, hqRefusal, HQ_REFUSAL_KEYS, hqRow, longSlot, offerDefaults, preferredRows, slotText, sortOf, stageOf, stepper, tomorrowIn, zonedInput, type ApiHqJob, type ApiHqRow, type Names } from "@ac/web/lib/adminJobs";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
 import { must } from "./must";
+import type { ApiWorkReport } from "@ac/web/lib/partnerReview";
 const deliveryOf = (...args: Parameters<typeof delivery>) => must(delivery(...args)); // the delivery a test expects
 
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
@@ -14,21 +15,21 @@ const names: Names = {
   people: new Map([["m-int", "tech-internal-a"], ["m-ext", "tech-external-a"]]), orgs: new Map([["org-c", "Demo Contractor A"]]),
 };
 const unitOrg = new Map([["u1", "org-a"]]);
-const row = (over: Record<string, unknown>) => {
+const row = (over: Partial<ApiHqRow>): ApiHqRow => {
   return ({
     projection: "summary", id: "job-1-aaaa", version: 3, unitId: "u1", type: "reactive", status: "requested", dueAt: "2026-09-22T04:00:00Z", requestedSlot: slot("2026-09-22T02:00:00Z", "2026-09-22T04:00:00Z"),
     scheduledSlot: null, assignmentId: null, origin: "client_request", preferredSlots: [slot("2026-09-22T02:00:00Z", "2026-09-22T04:00:00Z"), slot("2026-09-23T02:00:00Z", "2026-09-23T04:00:00Z")],
     severity: "normal", displayStatus: "requested", assignmentAcknowledgement: null, technicianMembershipId: null, accessValidFrom: null, accessValidUntil: null,
     createdAt: "2026-09-18T01:00:00Z", followUpOfJobId: null, followUpClass: null, ...over,
-  }) as unknown as ApiHqRow;
+  });
 };
-const job = (over: Record<string, unknown>) => {
+const job = (over: Partial<ApiHqJob>): ApiHqJob => {
   return ({
     projection: "detail", id: "job-1-aaaa", version: 4, unitId: "u1", type: "reactive", status: "requested", symptom: "Water dripping", contactWindow: "9:00–18:00", origin: "client_request", planId: null, occurrenceAt: null,
     requestedSlot: slot("2026-09-22T02:00:00Z", "2026-09-22T04:00:00Z"), preferredSlots: [slot("2026-09-22T02:00:00Z", "2026-09-22T04:00:00Z"), slot("2026-09-20T02:00:00Z", "2026-09-20T04:00:00Z")], preferenceRound: 1,
     slotProposal: null, partnerSlotProposal: null, scheduledSlot: null, dueAt: "2026-09-22T04:00:00Z", startedAt: null, completedAt: null, contractorOrgId: null, createdAt: "2026-09-18T01:00:00Z",
     followUpOfJobId: null, followUpClass: null, assignment: null, offer: null, reportRefs: [], draftReportRef: null, costs: [], ...over,
-  }) as unknown as ApiHqJob;
+  });
 };
 
 describe("HQ maintenance jobs", () => {
@@ -128,7 +129,7 @@ describe("HQ maintenance jobs", () => {
   });
 
   it("shows the submitted report with the HQ review mode", () => {
-    const report = {
+    const report: ApiWorkReport = {
       id: "r1", version: 1, jobId: "job-1", authorId: "u-tech", reviewAvailability: { allowed: true, reason: null }, measurements: [{ id: "m", metric: "refrigerant_pressure", value: 412, unit: "kPa", quality: "valid", observedAt: "2026-09-15T03:40:00Z" }],
       items: [
         { id: "i1", componentGroup: "indoor", componentKey: "filter", result: "normal", reason: null, evidenceIds: [], authorId: "u-tech", observedAt: "2026-09-15T03:40:00Z" },
@@ -137,7 +138,7 @@ describe("HQ maintenance jobs", () => {
       ],
       parts: [], refrigerant: [], signOff: null, workText: "Cleaned the filter", nextAction: { kind: "none" }, attachmentRefs: [{ id: "a", name: "p.jpg", mime: "image/jpeg", size: 1, status: "ready" }],
       submittedAt: "2026-09-15T03:48:00Z", acceptedAt: null, reviewHistory: [{ reviewerUserId: "u-hq", reportVersion: 1, decision: "return", reason: "Re-check", occurredAt: "2026-09-15T05:00:00Z" }],
-    } as never;
+    };
     const byUser = new Map([["u-tech", "tech-internal-a"], ["u-hq", "hq-operator"]]);
     const card = reportCard(job({ status: "submitted" }), report, byUser);
     expect([card.title, card.sub, card.mode, card.decide, card.tone]).toEqual(["Work report · version 1", "Submitted 15 Sept 2026, 11:48 am MYT by tech-internal-a · 3 checks · 1 photo", "normal", true, "primary"]);
@@ -147,12 +148,12 @@ describe("HQ maintenance jobs", () => {
     expect(reportCard(job({ status: "submitted", reportRefs: [{ reportId: "r1", reportVersion: 1 }, { reportId: "r1", reportVersion: 4 }] }), report, byUser).sub).toMatch(/^Resubmitted 15 Sept 2026, 11:48 am MYT/);
     expect(card.reviews).toEqual([{ text: "v1 returned 15 Sept 2026, 1:00 pm MYT by hq-operator — “Re-check”", tone: "warn" }]);
     expect([card.parts, card.next, card.signOff]).toEqual([[], "No follow-up needed", "Not signed"]);
-    const full = reportCard(job({ status: "submitted" }), { ...(report as object), parts: [{ name: "Drain pump", quantity: 1, source: "hq_stock", replacesComponentKey: "drain_pan" }],
-      nextAction: { kind: "follow_up", date: "2026-09-30T00:00:00Z", note: "Check the pump" }, signOff: { signerName: "Aiko", signedAt: "2026-09-15T03:50:00Z", absentReason: null } } as never, byUser);
+    const full = reportCard(job({ status: "submitted" }), { ...report, parts: [{ name: "Drain pump", quantity: 1, source: "hq_stock", replacesComponentKey: "drain_pan" }],
+      nextAction: { kind: "follow_up", date: "2026-09-30T00:00:00Z", note: "Check the pump" }, signOff: { signerName: "Aiko", signedAt: "2026-09-15T03:50:00Z", absentReason: null } }, byUser);
     expect([full.parts, full.next, full.signOff]).toEqual([[["Drain pump × 1", "hq stock · replaces drain pan"]], "Follow-up 2026-09-30 — Check the pump", "Signed by Aiko 15 Sept 2026, 11:50 am MYT"]);
     const esc = reportCard(job({ status: "submitted", contractorOrgId: "org-c" }), report, byUser);
     expect([esc.mode, esc.tone, esc.note]).toEqual(["hq_escalation", "warn", "The contractor reviews its own reports first. HQ may accept or return this one only by escalation, with a reason."]);
-    const own = reportCard(job({ status: "submitted" }), { ...(report as object), reviewAvailability: { allowed: false, reason: "self_authored" } } as never, byUser);
+    const own = reportCard(job({ status: "submitted" }), { ...report, reviewAvailability: { allowed: false, reason: "self_authored" } }, byUser);
     expect([own.decide, own.note]).toEqual([false, "You submitted this report version, so you cannot accept or return it (self-approval is rejected)."]);
     expect(reportCard(job({ status: "completed" }), report, byUser).note).toMatch(/^Accepted/);
     expect(returnReason(["Airflow — attention"], " Re-check the blower. ")).toBe("Rework: Airflow — attention. Re-check the blower.");

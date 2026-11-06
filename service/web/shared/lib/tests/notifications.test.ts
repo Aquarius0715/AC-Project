@@ -12,6 +12,12 @@ const note = (over: Partial<ApiNotification>): ApiNotification => {
   };
 };
 
+const alert = (id: string, severity: ApiAlert["severity"], status: string, over: Partial<ApiAlert> = {}): ApiAlert => {
+  return {
+    id, unitId: "u1", type: "sensor", severity, status, causeCode: "unknown", evidenceKind: "inferred", evidenceText: "Cleaning due (250 h of run time since the last cleaning). Not a fault.", detectedAt: "2026-09-14T01:00:00Z", ...over,
+  };
+};
+
 describe("inbox rows and alert rows", () => {
   it("titles by template, links the target and hides the in-app channel", () => {
     const r = inboxRow(note({}), "client");
@@ -90,11 +96,6 @@ describe("inbox rows and alert rows", () => {
   });
 
   it("lists alerts with their status and the read state of their notifications (DD-C08, IR242)", () => {
-    const alert = (id: string, severity: ApiAlert["severity"], status: string, over: Partial<ApiAlert> = {}): ApiAlert => {
-      return {
-        id, unitId: "u1", type: "sensor", severity, status, causeCode: "unknown", evidenceKind: "inferred", evidenceText: "Cleaning due (250 h of run time since the last cleaning). Not a fault.", detectedAt: "2026-09-14T01:00:00Z", ...over,
-      };
-    };
     const rows = inboxAlerts([
       alert("rem", "normal", "open", { type: "maintenance" }), alert("old", "critical", "resolved", { resolvedAt: "2026-09-14T02:00:00Z", resolutionReason: "filter cleaned" }),
       alert("win", "warning", "acknowledged", { causeCode: "window_open", acknowledgedAt: "2026-09-14T01:30:00Z", detectedAt: "2026-09-14T00:30:00Z" }), alert("hot", "critical", "open"),

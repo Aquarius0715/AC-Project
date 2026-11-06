@@ -24,12 +24,12 @@ const refusal = async (p: Promise<unknown>): Promise<CoreError> => {
 };
 const reply = (...bodies: [number, unknown][]) => {
   type Call = [string, RequestInit & { headers: Record<string, string> }];
-  const f = vi.fn(() => {
+  const f = vi.fn<(...args: Call) => Promise<Response>>(() => {
     const [status, body] = must(bodies.length > 1 ? bodies.shift() : bodies[0]);
     return Promise.resolve(new Response(typeof body === "string" ? body : JSON.stringify(body), { status }));
   });
   vi.stubGlobal("fetch", f);
-  return f as unknown as { mock: { calls: Call[] } };
+  return f;
 };
 
 beforeEach(() => {
@@ -90,6 +90,8 @@ describe("calling the Core API as the signed-in membership (IR222)", () => {
   });
 });
 
+const page = (n: number, next: string | null) => [200, { data: { items: Array.from({ length: 100 }, (_, i) => n * 100 + i), nextCursor: next } }] as [number, unknown];
+
 describe("reading whole lists (SR14)", () => {
   it("follows nextCursor with the same filters and sort, 100 per page", async () => {
     const f = reply([200, { data: { items: [1, 2], nextCursor: "c2" } }], [200, { data: { items: [3], nextCursor: null } }]);
@@ -99,7 +101,6 @@ describe("reading whole lists (SR14)", () => {
   });
 
   it("stops at the maximum, never past it", async () => {
-    const page = (n: number, next: string | null) => [200, { data: { items: Array.from({ length: 100 }, (_, i) => n * 100 + i), nextCursor: next } }] as [number, unknown];
     const f = reply(page(0, "c1"), page(1, "c2"), page(2, null));
     const all = await coreAll<number>("units.list", {}, 150);
     expect([all.length, all.at(-1), f.mock.calls.length]).toEqual([150, 149, 2]);

@@ -15,6 +15,9 @@ const m = (metric: string, value: number | null, over: Partial<ApiMeasurement> =
   };
 };
 
+// as the air-quality page passes it: whether the unit page has a temperature row
+const advice = (cap: ApiUnitDetail["capabilities"]) => metricCard("temperature", m("temperature", 27.2), true, undefined, setsTemperature(cap)).advice;
+
 describe("air-quality metric cards (FR-C07, IR44, IR99, IR213, IR260)", () => {
   it("rounds per IR44 and states a live reading, its guide and advice", () => {
     expect([airNumber("temperature", 28.05), airNumber("co2", 999.5), airNumber("pm25", 34.4), airNumber("power", 0.68)]).toEqual(["28.1", "1000", "34", "0.68"]);
@@ -32,8 +35,6 @@ describe("air-quality metric cards (FR-C07, IR44, IR99, IR213, IR260)", () => {
         modes: [], fanLevels: [], ventilation: false, ventilationLevels: [], sensors: [], ...over,
       };
     };
-    // as the air-quality page passes it: whether the unit page has a temperature row
-    const advice = (cap: ApiUnitDetail["capabilities"]) => metricCard("temperature", m("temperature", 27.2), true, undefined, setsTemperature(cap)).advice;
     expect(advice(model({}))).toBe("Setpoint is on Unit Control");
     expect(advice(model({ temperature: null }))).toBe("Set on the AC itself"); // the power alone (the live Daikin, DEC-89)
     expect(advice(model({ control: false }))).toBe("Set on the AC itself"); // monitoring only

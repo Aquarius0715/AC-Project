@@ -33,6 +33,8 @@ function fixture(): PartnerJob[] {
   return rows.map((j) => partnerJob(j, units));
 }
 
+const day = (id: string, assignedMinutes: number): ApiCapacity => ({ membershipId: id, date: "2026-09-21", availableSlots: [], assignedSlots: assignedMinutes ? [slot("2026-09-21T06:00:00Z", "2026-09-21T08:00:00Z")] : [], availableMinutes: 480, unavailability: id === "m-f" ? "annual_leave" : null, assignedMinutes });
+
 describe("partner overview", () => {
   it("defaults to the KL week and accepts a URL period up to 366 days", () => {
     expect(weekOf(NOW)).toEqual({ from: "2026-09-21", to: "2026-09-27" });
@@ -109,7 +111,6 @@ describe("partner overview", () => {
       { id: "m-f", userId: "user-f", displayName: "until next month", role: "technician", validUntil: "2026-10-21T00:00:00Z" },
     ];
     expect(onTeam(team, now).map((m) => m.id)).toEqual(["m-a", "m-b", "m-f"]); // no coordinator, no revoked or ended access
-    const day = (id: string, assignedMinutes: number): ApiCapacity => ({ membershipId: id, date: "2026-09-21", availableSlots: [], assignedSlots: assignedMinutes ? [slot("2026-09-21T06:00:00Z", "2026-09-21T08:00:00Z")] : [], availableMinutes: 480, unavailability: id === "m-f" ? "annual_leave" : null, assignedMinutes });
     const crew = onTeam(team, now);
     expect(capacity([[day("m-a", 0), day("m-b", 120), day("m-f", 0)]], crew).map((r) => r.id)).toEqual(["m-b", "m-a", "m-f"]); // most assigned first, then by name
     expect(timeline([day("m-a", 0), day("m-b", 120), day("m-f", 0)], crew, "2026-09-21").map((r) => r.id)).toEqual(["m-b", "m-f", "m-a"]); // work, then away, then free
