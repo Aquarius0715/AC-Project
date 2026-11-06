@@ -342,7 +342,7 @@ export function conditionText(p: { metric?: string; operator?: Operator; thresho
   const m = p.metric ?? "";
   const w = p.activeWindow ? `, ${days(p.activeWindow.weekdays, i)}${p.activeWindow.startLocal}–${p.activeWindow.endLocal}` : "";
   const cond = m === "heartbeat_gap" ? `${t("No heartbeat for {n} min", { n: p.threshold ?? 0 })}${w}` // the gap itself is the duration (minutes)
-    : `${textOf(metricLabel, m, t) ?? m} ${opSymbol[p.operator ?? "gte"]} ${String(p.threshold ?? 0)} ${lookup(metricUnit, m) ?? ""} ${t("for {duration}", { duration: duration(p.durationSeconds ?? 0, t) })}${w}`;
+    : `${textOf(metricLabel, m, t) ?? m} ${entryOf(opSymbol, p.operator ?? "gte")} ${String(p.threshold ?? 0)} ${lookup(metricUnit, m) ?? ""} ${t("for {duration}", { duration: duration(p.durationSeconds ?? 0, t) })}${w}`;
   return p.severity ? `${cond} → ${t(sevLabel[p.severity])}` : cond;
 }
 export interface PolicyLine { id: string; version: number; kind: "alert" | "default_alert"; name: string; type: string; condition: string; madeBy: string; units: number; enabled: boolean }

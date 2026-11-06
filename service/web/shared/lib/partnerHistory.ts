@@ -129,7 +129,7 @@ export function eventItem(e: ApiEvent, byUser: Map<string, string>, i: I18n = EN
 /** Who acted, by user: the company's members by name and the signed-in user as “you”. */
 export const byUser = (members: ApiMember[], me?: string, t: T = en) => new Map([...members.map((m) => [m.userId, m.displayName] as const), ...(me ? [[me, t("you")] as const] : [])]);
 /** The channel of a preview in a sentence (“in-app”, “email”, “WhatsApp”). */
-export const channelText = (c: string, t: T = en) => ({ inApp: t("in-app"), email: t("email"), whatsapp: "WhatsApp" })[c] ?? c;
+export const channelText = (c: string, t: T = en) => lookup({ inApp: t("in-app"), email: t("email"), whatsapp: "WhatsApp" }, c) ?? c;
 
 /** The templates and recipient roles of a job communication (DD-P07; roles map hq→admin, assigned technician→technician,
 customer contact→client, IR90). Template, role and channel codes are shown as they are (Figma 05-x). */

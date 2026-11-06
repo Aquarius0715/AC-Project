@@ -54,7 +54,7 @@ export function conditionText(c: { metric: string; operator: Operator; threshold
   if (c.metric === "heartbeat_gap") return t("No heartbeat for {n} min", { n: c.threshold });
   const unit = lookup(metricUnit, c.metric) ?? "";
   const value = `${String(c.threshold)}${unitSuffix(unit)}`;
-  return t("{metric} {op} {value} for {duration}", { metric: textOf(label, c.metric, t) ?? c.metric, op: opSymbol[c.operator], duration: durationText(c.durationSeconds), value });
+  return t("{metric} {op} {value} for {duration}", { metric: textOf(label, c.metric, t) ?? c.metric, op: entryOf(opSymbol, c.operator), duration: durationText(c.durationSeconds), value });
 }
 /** “on weekdays”, “on weekends”, “on Mon, Wed”, or "" for every day. */
 const daysText = (weekdays: number[], t: T) => {
@@ -173,7 +173,7 @@ export function summaryText(f: PolicyForm, t: T = en): string {
   const what = f.metric === "co2" || f.metric === "pm25" ? lookup(label, f.metric) ?? f.metric : (textOf(label, f.metric, t) ?? f.metric).toLowerCase();
   const isUp = f.operator === "gt" || f.operator === "gte";
   return t(isUp ? "{verb} when {what} stays {op} {value} {unit} for {duration}{window}. Clears below {recovery} {unit}." : "{verb} when {what} stays {op} {value} {unit} for {duration}{window}. Clears above {recovery} {unit}.",
-    { verb, what, unit, op: opSymbol[f.operator], value: f.threshold || "…", duration: s === null ? "…" : durationText(s), window: win, recovery: f.recovery || "…" }).replaceAll(/ +/g, " ");
+    { verb, what, unit, op: entryOf(opSymbol, f.operator), value: f.threshold || "…", duration: s === null ? "…" : durationText(s), window: win, recovery: f.recovery || "…" }).replaceAll(/ +/g, " ");
 }
 /** policies.save input (AlertPolicyInput): the form plus the hidden fields — new: the session membership as recipient,
 escalation 60, cooldown 5, the Preferences time zone, priority 50; edit: the policy's own (IR120). */

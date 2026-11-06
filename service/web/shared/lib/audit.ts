@@ -10,6 +10,7 @@ import { oneOf } from "@ac/web/lib/oneOf";
 import { eventCause, eventRows, type ApiAlertLite, type ApiDeviceEventFull } from "@ac/web/lib/techDevices";
 import { byText } from "@ac/web/lib/order";
 import { wrapped } from "@ac/web/lib/text";
+import { lookup } from "@ac/web/lib/lookup";
 
 const en = translator("en");
 export type AuditResult = "Success" | "Denied" | "Failed" | "Pending";
@@ -33,13 +34,13 @@ const KL = "Asia/Kuala_Lumpur";
 const RESULT_WORDS: [ApiAudit["result"], AuditResult][] = [["success", "Success"], ["denied", "Denied"], ["failed", "Failed"], ["pending", "Pending"]];
 const results = RESULT_WORDS.map(([, word]) => word);
 /** A result as the screen words it. */
-export const resultWord = (r: string, t: T = en) => ({ Success: t("Success"), Denied: t("Denied"), Failed: t("Failed"), Pending: t("Pending") })[r] ?? r;
+export const resultWord = (r: string, t: T = en) => lookup({ Success: t("Success"), Denied: t("Denied"), Failed: t("Failed"), Pending: t("Pending") }, r) ?? r;
 /** The badge tone of a result. */
 const RESULT_TONE = new Map<AuditResult, "ok" | "warn" | "crit">([["Success", "ok"], ["Denied", "warn"], ["Failed", "crit"]]);
 export const resultTone = (r: AuditResult) => RESULT_TONE.get(r) ?? "primary";
 /** The role an entry recorded, worded (it is never rewritten). */
 export const roleAtTimeWord = (r: string, t: T = en) =>
-  ({ admin: t("Admin"), contractor: t("Contractor"), technician: t("Technician"), client: t("Client"), system: t("System") })[r] ?? r;
+  lookup({ admin: t("Admin"), contractor: t("Contractor"), technician: t("Technician"), client: t("Client"), system: t("System") }, r) ?? r;
 const resultOf = (r: ApiAudit["result"]): AuditResult => RESULT_WORDS.find(([wire]) => wire === r)?.[1] ?? "Pending";
 
 /** The screen's filters from the URL; the default period is the 30 days up to the Core API business clock, as days of the display time zone. */

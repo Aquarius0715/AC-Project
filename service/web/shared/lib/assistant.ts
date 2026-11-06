@@ -4,7 +4,7 @@
 import { one } from "@ac/web/lib/energy";
 import { showClock, type Display, type Locale, type T } from "@ac/web/lib/i18n";
 import { actionText, controlLayout, type ApiCommand, type ApiUnitDetail } from "@ac/web/lib/units";
-import { lookup } from "@ac/web/lib/lookup";
+import { entryOf, lookup } from "@ac/web/lib/lookup";
 
 /** ResolvedIntent of service-contracts.ts. */
 export interface Measurement { value: number | null; unit: string; observedAt: string; quality: "valid" | "missing" | "stale" | "suspect" }
@@ -115,4 +115,4 @@ export function progressOf(c: ApiCommand, unit: string, celsius: number, before:
 /** The state chip of the header (Figma 09a–09g). */
 export type PanelState = "idle" | "listening" | "confirm" | "sending" | "success" | "failure";
 export const stateText = (s: PanelState, t: T) =>
-  ({ idle: t("Idle"), listening: t("Listening"), confirm: t("Needs confirmation"), sending: t("Sending"), success: t("Success"), failure: t("Failure") })[s];
+  entryOf({ idle: t("Idle"), listening: t("Listening"), confirm: t("Needs confirmation"), sending: t("Sending"), success: t("Success"), failure: t("Failure") }, s);

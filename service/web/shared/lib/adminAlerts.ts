@@ -11,7 +11,7 @@ import { oneOfOrThrow } from "@ac/web/lib/oneOf";
 import { byNumber, byText } from "@ac/web/lib/order";
 import { filled } from "@ac/web/lib/filled";
 import { wrapped } from "@ac/web/lib/text";
-import { lookup } from "@ac/web/lib/lookup";
+import { entryOf, lookup } from "@ac/web/lib/lookup";
 
 const en = translator("en");
 
@@ -93,7 +93,7 @@ export const recipientRole = (role: string, t: T = en) => (textOf(roleWord, role
 export function recoveryError(op: Operator, threshold: number, recovery: number, t: T = en): string | undefined {
   const isAbove = op === "gt" || op === "gte";
   if (isAbove ? recovery < threshold : recovery > threshold) return undefined;
-  return t(isAbove ? "Recovery {recovery} must be below the {threshold} threshold (direction for {op})" : "Recovery {recovery} must be above the {threshold} threshold (direction for {op})", { recovery, threshold, op: opSymbol[op] });
+  return t(isAbove ? "Recovery {recovery} must be below the {threshold} threshold (direction for {op})" : "Recovery {recovery} must be above the {threshold} threshold (direction for {op})", { recovery, threshold, op: entryOf(opSymbol, op) });
 }
 
 /** The alerts, unresolved first, then by severity and newest; each with its unit, customer and policy, its evidence and
@@ -145,7 +145,7 @@ export function policyRows(policies: ApiPolicy[], customers: ApiCustomerName[], 
       const rules = p.rules?.length ?? 0;
       const sub = p.kind === "default_alert"
         ? byCount(rules, { one: t("1 rule · ventilation (CO₂, PM2.5) + fault causes"), many: t("{n} rules · ventilation (CO₂, PM2.5) + fault causes", { n: rules }) })
-        : `${textOf(metricLabel, metric, t) ?? metric} ${opSymbol[op]} ${String(p.threshold ?? "—")} ${lookup(metricUnit, metric) ?? ""} ${t("for {n} s", { n: p.durationSeconds ?? 0 })}`;
+        : `${textOf(metricLabel, metric, t) ?? metric} ${entryOf(opSymbol, op)} ${String(p.threshold ?? "—")} ${lookup(metricUnit, metric) ?? ""} ${t("for {n} s", { n: p.durationSeconds ?? 0 })}`;
       const recipients = (p.recipientMembershipIds ?? []).map((id) => {
         const m = member.get(id);
         return { id, label: filled(m?.displayName) ?? id, role: m ? recipientRole(m.role, t) : "" };
@@ -330,7 +330,7 @@ function holds(op: Operator, v: number, threshold: number): boolean {
 policy did not run on the unit (no longer attached). */
 export function testOutcome(d: NotificationDecision | null, p: Pick<AdminPolicy, "metric" | "operator" | "threshold">, value: number, unitName: string, t: T = en): { tone: "ok" | "warn" | "crit" | "muted"; text: string } {
   const unit = lookup(metricUnit, p.metric) ?? "";
-  const v = { value, unit, op: opSymbol[p.operator], threshold: p.threshold, name: unitName };
+  const v = { value, unit, op: entryOf(opSymbol, p.operator), threshold: p.threshold, name: unitName };
   if (!d) return { tone: "warn", text: t("The policy did not run on {name} — it is no longer attached to it.", v) };
   if (d.decision === "selected") return { tone: "ok", text: t("{value} {unit} on {name} raises an alert and notifies the recipients — simulated, nothing is stored.", v) };
   if (d.decision === "failed") return { tone: "crit", text: t("An alert, but nobody is notified: no recipient may read {name}.", v) };

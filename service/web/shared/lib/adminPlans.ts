@@ -5,6 +5,7 @@
 // plan's dates are its instants in the user's display time zone, the zone its next date is typed in (D16, NFR-08).
 import { EN, showDate, translator, type Display, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import { actionMessage } from "@ac/web/lib/actionMessage";
+import { lookup } from "@ac/web/lib/lookup";
 
 const en = translator("en");
 
@@ -16,7 +17,7 @@ export interface ApiPlan {
 /** “Every 3 months” / “Every month”. */
 export const everyText = (n: number, t: T = en) => (n === 1 ? t("Every month") : t("Every {n} months", { n }));
 /** The plan's cadence in the title: monthly, quarterly, half-yearly, yearly or every N months. */
-export const cadence = (n: number, t: T = en) => t(({ 1: "monthly", 3: "quarterly", 6: "half-yearly", 12: "yearly" } as Record<number, string>)[n] ?? "every {n} months", { n });
+export const cadence = (n: number, t: T = en) => t(lookup({ 1: "monthly", 3: "quarterly", 6: "half-yearly", 12: "yearly" }, String(n)) ?? "every {n} months", { n });
 /** The date of a plan instant in the display zone: “8 Dec 2026”. */
 export const planDate = (iso: string, d?: Display) => showDate(iso, d);
 
