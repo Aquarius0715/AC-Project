@@ -45,7 +45,7 @@ export async function authProxy(req: NextRequest, appRole: Session["role"]) {
     }
     const res = NextResponse.next({ request: { headers } });
     if (renewed) res.cookies.set(SESSION_COOKIE, renewed, cookieOptions());
-    else if (renewed === null) res.cookies.set(SESSION_COOKIE, "", clearedCookieOptions());
+    if (renewed === null) res.cookies.set(SESSION_COOKIE, "", clearedCookieOptions());
     return secure(res);
   };
   const path = req.nextUrl.pathname;

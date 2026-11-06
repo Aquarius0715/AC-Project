@@ -141,11 +141,11 @@ export function filterLines(items: ApiFilterStatus[], units: FilterUnit[], nowMs
   const out: FilterLine[] = [];
   const placed = new Set<string>();
   for (const r of rows) {
-    if (!r.spaceId || (size.get(r.spaceId) ?? 0) < AREA_GROUP_AT) out.push({ kind: "unit", row: r });
-    else if (!placed.has(r.spaceId)) {
-      placed.add(r.spaceId);
-      out.push({ kind: "group", group: filterGroup(r.spaceId, rows.filter((x) => x.spaceId === r.spaceId), i.t) });
-    }
+    const isUnit = !r.spaceId || (size.get(r.spaceId) ?? 0) < AREA_GROUP_AT;
+    if (isUnit) out.push({ kind: "unit", row: r });
+    const groupId = isUnit ? undefined : r.spaceId;
+    if (groupId && !placed.has(groupId)) out.push({ kind: "group", group: filterGroup(groupId, rows.filter((x) => x.spaceId === groupId), i.t) });
+    if (groupId) placed.add(groupId);
   }
   return out;
 }

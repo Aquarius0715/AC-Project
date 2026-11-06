@@ -104,7 +104,7 @@ export function detailFacts(j: ApiClientJob, unit: { name: string; place: string
   if (j.scheduledSlot && j.slotProposal?.status !== "pending") out.push([t(isPlan ? "Scheduled" : "Confirmed time"), isPlan ? t("{slot} · set by HQ from your plan", { slot: slotLong(j.scheduledSlot, i) }) : slotLong(j.scheduledSlot, i)]);
   const a = j.assignment;
   if (a?.acknowledgement === "accepted") out.push([t("Technician"), `${a.technicianName ?? t("your technician")} · ${t(j.contractorOrgId ? "service partner" : "HQ")}`]);
-  else if (j.scheduledSlot && ["offered", "accepted", "assigned"].includes(j.status)) out.push([t("Technician"), t("being confirmed — the name shows once the technician accepts")]);
+  if (a?.acknowledgement !== "accepted" && j.scheduledSlot && ["offered", "accepted", "assigned"].includes(j.status)) out.push([t("Technician"), t("being confirmed — the name shows once the technician accepts")]);
   return out;
 }
 const FOLLOW_UP = new Map([["rework", "Rework (free)"], ["new_request", "New request"]]);
