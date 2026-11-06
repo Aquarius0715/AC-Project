@@ -37,7 +37,7 @@ const QUALIFICATIONS: Record<string, string> = { demo_indoor: "Indoor unit work"
 export const qualificationLabel = (code: string, t: T = en) => (textOf(QUALIFICATIONS, code, t) ?? code.replace(/^demo_/, "").replaceAll('_', " "));
 const SCOPE_QUALIFICATION: Record<string, string> = { indoor: "demo_indoor", outdoor: "demo_outdoor", electrical: "demo_electrical" }; // fixture qualificationRequirements
 /** The qualifications a delegated job requires: one per entry of the unit's maintenance scope (IR123 item 3). */
-export const requiredFor = (serviceScope: string[]) => serviceScope.map((s) => SCOPE_QUALIFICATION[s]).filter((q): q is string => !!q);
+export const requiredFor = (serviceScope: string[]) => serviceScope.map((s) => lookup(SCOPE_QUALIFICATION, s)).filter((q): q is string => !!q);
 const TYPES: Record<string, string> = { periodic: "Periodic inspection", reactive: "Repair", preventive: "Preventive maintenance" };
 export const typeLabel = (type: string, t: T = en) => (textOf(TYPES, type, t) ?? type);
 export const originLabel = (o: string, t: T = en) => t(o === "periodic_plan" ? "from the periodic plan" : "agreed with the client");
@@ -119,7 +119,7 @@ export function fits(members: ApiMember[], required: string[], visit: Slot, days
     return {
       id: m.id, name: m.displayName, sub: isOk ? quals.join(" · ") || t("qualified") : t("missing {list}", { list: lacking }),
       days: days.map((d, k) => {
-        const h = freeHours(cap[k]);
+        const h = freeHours(cap.at(k));
         return { label: new Date(`${d.date}T00:00:00Z`).toLocaleDateString(intlTag(locale), { weekday: "short", timeZone: "UTC" }), text: h === null ? "—" : hoursText(h), free: !!h };
       }),
       badge: fitBadge(isOk, isFree, "Fits", "Not qualified", t),

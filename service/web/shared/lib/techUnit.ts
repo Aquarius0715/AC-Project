@@ -145,7 +145,7 @@ export function seriesChart(metric: string, unit: string, items: Point[], p: Per
   const first = points.findIndex((v) => v !== null), last = points.findLastIndex((v) => v !== null);
   let gap: string | null = null;
   for (let k = first + 1; first !== -1 && k < last && !gap; k++) {
-    if (points[k] !== null) continue;
+    if (points.at(k) !== null) continue;
     let end = k;
     while (points[end + 1] === null) end++;
     gap = t("no data {span} (gap not connected)", { span: showSpan(new Date(from + k * slot).toISOString(), new Date(from + (end + 1) * slot).toISOString(), display) });

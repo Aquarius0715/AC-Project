@@ -199,7 +199,7 @@ export function weekGrid(dates: string[], members: ApiMember[], capacity: ApiCap
   return members.filter((m) => m.role === TECHNICIAN).map((m) => {
     let avail = 0;
     const cells = dates.map((date, k): WeekCell => {
-      const c = capacity[k]?.find((x) => x.membershipId === m.id);
+      const c = capacity.at(k)?.find((x) => x.membershipId === m.id);
       avail += c?.availableMinutes ?? 0;
       if (proposal?.technicianId === m.id && dayOf(proposal.slot.startAt) === date) return { kind: "proposal", text: `${hhmm(proposal.slot.startAt)}–${hhmm(proposal.slot.endAt)}`, sub: proposal.short };
       if (c?.unavailability) return { kind: "leave", text: t(LEAVE.has(c.unavailability) ? "Leave" : "Unavailable"), sub: unavailabilityLabel(c.unavailability, t) };
