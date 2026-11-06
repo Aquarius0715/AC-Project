@@ -5,6 +5,7 @@ import { BarChart, Btn, Card, Check, DataTable, Kpi, LinkButton, Page, Tabs, Bad
 import { ExportReportModal } from "@ac/web/components/Features";
 import { week } from "@ac/web/lib/client";
 import { Icon } from "@ac/web/components/Icon";
+import { lookup } from "@ac/web/lib/lookup";
 
 const days = ["Mon 14", "Tue 15", "Wed 16", "Thu 17", "Fri 18", "Sat 19", "Sun 20"];
 const perUnit: Record<string, { actual: number[]; base: number[] }> = {
@@ -27,8 +28,8 @@ export function EnergyDemo() {
       return s.length >= 4 ? s : [...s, u];
     });
   };
-  const actual = days.map((_, i) => +sel.reduce((a, u) => a + (perUnit[u]?.actual[i] ?? 0), 0).toFixed(1));
-  const base = days.map((_, i) => sel.reduce((a, u) => a + (perUnit[u]?.base[i] ?? 0), 0));
+  const actual = days.map((_, i) => +sel.reduce((a, u) => a + (lookup(perUnit, u)?.actual.at(i) ?? 0), 0).toFixed(1));
+  const base = days.map((_, i) => sel.reduce((a, u) => a + (lookup(perUnit, u)?.base.at(i) ?? 0), 0));
   const scopeLabel = sel.length === 1 ? sel[0] ?? "" : `${String(sel.length)} units`;
   const sumA = +actual.reduce((a, b) => a + b, 0).toFixed(1);
   const sumB = base.reduce((a, b) => a + b, 0);
@@ -54,7 +55,7 @@ export function EnergyDemo() {
           <>
             <BarChart labels={week} series={[base, actual]} names={["Baseline (normal operation)", "Actual (measured)"]} unit="kWh" height={200} />
           </>
-        ) : <DataTable rows={days.map((d, i) => ({ d, a: actual[i] ?? 0, b: base[i] ?? 0 }))} rowKey={(r) => r.d} cols={[{ key: "d", label: "Day", render: (r) => r.d }, { key: "a", label: "Actual (kWh)", render: (r) => r.a }, { key: "b", label: "Baseline (kWh)", render: (r) => r.b }, { key: "s", label: "Difference", render: (r) => (r.b - r.a).toFixed(1) }]} />}
+        ) : <DataTable rows={days.map((d, i) => ({ d, a: actual.at(i) ?? 0, b: base.at(i) ?? 0 }))} rowKey={(r) => r.d} cols={[{ key: "d", label: "Day", render: (r) => r.d }, { key: "a", label: "Actual (kWh)", render: (r) => r.a }, { key: "b", label: "Baseline (kWh)", render: (r) => r.b }, { key: "s", label: "Difference", render: (r) => (r.b - r.a).toFixed(1) }]} />}
         <p className="mt-3 text-xs text-muted-foreground"><Icon name="time" /> <b>Peak window 17:00–21:00</b> — 34% of energy used in peak · highest draw 1.2 kW (Thu 18:40) · pre-cooling before 17:00 lowers peak cost</p>
       </Card>
       <Card title="Carbon impact" sub="Same period & units as above · factor-demo-2026 (0.5 kgCO2e/kWh, demo factor)" action={<LinkButton size="sm" href="/customer/energy/offsets">Offset these emissions<Icon name="arrowRight" /></LinkButton>}>
