@@ -37,7 +37,7 @@ export function JobStatusBadge({ s, client }: Readonly<{ s: string; client?: boo
 export const RANKS = ["1st", "2nd", "3rd"];
 export function Rank({ i }: Readonly<{ i: number }>) {
   const t = useT();
-  return <span className="inline-grid w-10 shrink-0 place-items-center rounded-lg bg-primary-soft py-0.5 text-xs font-semibold text-primary">{t(RANKS[i] ?? String(i + 1))}</span>;
+  return <span className="inline-grid w-10 shrink-0 place-items-center rounded-lg bg-primary-soft py-0.5 text-xs font-semibold text-primary">{t(RANKS.at(i) ?? String(i + 1))}</span>;
 }
 
 export const WINDOWS = ["09:00–11:00", "10:00–12:00", "13:00–15:00", "14:00–16:00", "16:00–18:00"];
@@ -51,8 +51,8 @@ export function PreferredSlotsInput({ value, onChange, error, label = "Preferred
       {value.map((s, i) => (
         <div key={i} className="flex items-center gap-2">
           <Rank i={i} />
-          <Input type="date" aria-label={`${RANKS[i] ?? ""} preferred date`} value={s.date} onChange={(e) => { set(i, { date: e.target.value }); }} className="min-w-0 flex-1" />
-          <Select aria-label={`${RANKS[i] ?? ""} preferred window`} value={s.win} onChange={(e) => { set(i, { win: e.target.value }); }} className="min-w-0 flex-1">{WINDOWS.map((w) => <option key={w}>{w}</option>)}</Select>
+          <Input type="date" aria-label={`${RANKS.at(i) ?? ""} preferred date`} value={s.date} onChange={(e) => { set(i, { date: e.target.value }); }} className="min-w-0 flex-1" />
+          <Select aria-label={`${RANKS.at(i) ?? ""} preferred window`} value={s.win} onChange={(e) => { set(i, { win: e.target.value }); }} className="min-w-0 flex-1">{WINDOWS.map((w) => <option key={w}>{w}</option>)}</Select>
         </div>
       ))}
       {error ? <span className="flex items-center gap-1 text-xs font-medium text-crit"><Icon name="error" />{error}</span> : <span className="text-[11px] text-muted-foreground">{hint}</span>}
