@@ -127,6 +127,9 @@ export function webConfig(tsconfigRootDir) {
         // 4-2: a conditional suffix inside a template (`${a}${b ? \` · \${c}\` : ""}`) is the plainest way to write it; the
         // alternatives (a temporary for each suffix, or concatenation) read worse
         "sonarjs/no-nested-template-literals": "off",
+        // 4-2: a try block with a fetch or a parse, one branch and its result is small enough to read with its catch; the default
+        // (1) allows a single call. A block above 4 is split by hand
+        "unicorn/try-complexity": ["error", { max: 4 }],
         // safe-regex flags every optional group that holds a quantifier (^\d+(\.\d+)?$), which is linear; these patterns run
         // on short trimmed form values. The ones that are not linear are caught by sonarjs/slow-regex and super-linear-regex
         "security/detect-unsafe-regex": "off",
