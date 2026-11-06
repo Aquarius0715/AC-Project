@@ -156,7 +156,7 @@ export function policyErrors(f: PolicyForm, tr: T = en): Partial<Record<"name" |
   const t = toNumber(f.threshold), r = toNumber(f.recovery), s = seconds(f);
   if (t === null) e.threshold = tr("Enter a number.");
   if (r === null) e.recovery = tr("Enter a number.");
-  else if (t !== null) { const bad = recoveryError(f.operator, t, r, tr); if (bad) e.recovery = bad; }
+  if (t !== null && r !== null) { const bad = recoveryError(f.operator, t, r, tr); if (bad) e.recovery = bad; }
   if (s === null || s < 1 || s > 86_400) e.duration = tr("Between 1 s and 24 h.");
   if (f.windowOn && (f.weekdays.length === 0 || !/^([01]\d|2[0-3]):[0-5]\d$/.test(f.start) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(f.end) || f.start === f.end)) e.window = tr("Pick at least one day and two different times.");
   return e;

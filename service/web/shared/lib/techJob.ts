@@ -147,8 +147,9 @@ export function submitIssues(d: Draft, attachments: { id: string; name: string; 
   const label = (key: string) => t(lookup(componentLabel, key) ?? key);
   for (const it of d.items) {
     const where = `${t(entryOf(groupLabel, it.componentGroup))} › ${label(it.componentKey)}`;
-    if (it.result === null) out.push({ key: it.componentKey, group: it.componentGroup, text: t("{where} has no result", { where }) });
-    else if (it.result !== "normal" && !it.reason.trim()) out.push({ key: it.componentKey, group: it.componentGroup, text: t("{where} needs a reason", { where }) });
+    const text = it.result === null ? t("{where} has no result", { where }) : undefined;
+    const missing = text ?? (it.result === "normal" || it.reason.trim() ? undefined : t("{where} needs a reason", { where }));
+    if (missing) out.push({ key: it.componentKey, group: it.componentGroup, text: missing });
   }
   for (const m of d.readings) {
     if (m.value.trim() !== "" && !Number.isFinite(Number(m.value))) out.push({ key: m.componentKey, group: groupOf(m.componentKey), text: t("{name} reading is not a number", { name: label(m.componentKey) }) });

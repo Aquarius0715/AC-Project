@@ -337,8 +337,10 @@ export function draftErrors(d: Draft, tr: T = en): Record<string, string> {
       const s = minutes(d.startLocal);
       const t = minutes(d.endLocal);
       if (s === t) e.endLocal = tr("Start and end cannot be equal — not 24-hour operation");
-      else if (t < s && !d.endsNextDay) e.endsNextDay = tr("The end is before the start — tick “Ends next day” for an overnight schedule");
-      else if (t > s && d.endsNextDay) e.endsNextDay = tr("With “Ends next day” the end must be at or before the start (at most 24 hours)");
+      const overnight = t < s && !d.endsNextDay ? tr("The end is before the start — tick “Ends next day” for an overnight schedule") : undefined;
+      const sameDay = t > s && d.endsNextDay ? tr("With “Ends next day” the end must be at or before the start (at most 24 hours)") : undefined;
+      const endsNext = overnight ?? sameDay;
+      if (endsNext) e.endsNextDay = endsNext;
     }
   }
   if (d.trigger === "routine" && !hhmm.test(d.localTime)) e.localTime = "HH:mm";
