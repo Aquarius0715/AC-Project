@@ -82,15 +82,15 @@ export function filtersOf(q: Query, hqOrgId: string | null, withStage = true): R
   if (q.unitId) f.unitId = q.unitId;
   if (q.origin === "client_request" || q.origin === "periodic_plan") f.origin = q.origin;
   if (q.type && TYPE_IDS.has(q.type)) f.type = q.type;
-  if (hqOrgId && q.delivery === "internal") f.organizationId = hqOrgId;
-  else if (q.delivery && q.delivery !== "internal") f.organizationId = q.delivery;
+  const organizationId = q.delivery === "internal" ? hqOrgId : q.delivery;
+  if (organizationId) f.organizationId = organizationId;
   if (q.assignee) f.membershipId = q.assignee;
   if (q.overdue === "1") f.overdueOnly = true;
   const period = periodOfQuery(q);
   if (period) Object.assign(f, period); // jobs.list from / to: the requested slot's start (IR245)
   const stage = withStage ? STAGES.find((s) => s.id === q.stage) : undefined;
   if (stage) Object.assign(f, stage.filter);
-  else if (withStage) f.statuses = LISTED;
+  if (withStage && !stage) f.statuses = LISTED;
   return f;
 }
 
@@ -331,6 +331,17 @@ export function costLineOf(f: { kind: string; description: string; visibility: s
 /** HQ reviews internal jobs normally and contractor jobs only by escalation (reason required, IR31). */
 export const reviewModeOf = (j: Pick<ApiHqJob, "contractorOrgId">) => (j.contractorOrgId ? "hq_escalation" : "normal");
 
+/** What is wrong with the contact window, or undefined (the API's ContactWindowOK rule). */
+function contactWindowError(contact: string, t: T): string | undefined {
+  if (codePoints(contact) > 200) return t("Up to 200 characters.");
+  return contact.includes("@") || /\d{7,}/.test(contact.replaceAll(/[ \-()+\t]/g, "")) ? t("No e-mail addresses or phone numbers in the contact window.") : undefined;
+}
+/** What is wrong with one preferred time, or undefined: its length in hours, a day that is not later than today, a repeat. */
+function slotError(hours: number, notLater: boolean, repeated: boolean, t: T): string | undefined {
+  if (!(hours >= 1 && hours <= 4)) return t("Each time is 1–4 hours long.");
+  if (notLater) return t("Times start on a later day than today (Kuala Lumpur).");
+  return repeated ? t("The times must differ.") : undefined;
+}
 /** The New job form (DD-A06 item 8): symptom 10–2000, the 1st preferred time plus up to two more (IR113 item 2: future,
 on a later calendar day than today, 1–4 hours, distinct). */
 export function jobRequestErrors(f: { unitId: string; symptom: string; slots: Slot[]; contactWindow?: string }, now: number, t: T = en): Record<string, string> {
@@ -341,16 +352,15 @@ export function jobRequestErrors(f: { unitId: string; symptom: string; slots: Sl
   // the API's rule (ContactWindowOK, IR64): up to 200 characters, no e-mail address and no run of 7 digits once spaces and
   // - ( ) + tabs are removed
   const contact = (f.contactWindow ?? "").trim();
-  if (codePoints(contact) > 200) e.contactWindow = t("Up to 200 characters.");
-  else if (contact.includes("@") || /\d{7,}/.test(contact.replaceAll(/[ \-()+\t]/g, ""))) e.contactWindow = t("No e-mail addresses or phone numbers in the contact window.");
+  const contactError = contactWindowError(contact, t);
+  if (contactError) e.contactWindow = contactError;
   const today = new Date(now + 8 * 3_600_000).toISOString().slice(0, 10);
   const keys = new Set<string>();
   for (const [i, x] of f.slots.entries()) {
     const h = (Date.parse(x.endAt) - Date.parse(x.startAt)) / 3_600_000;
     const day = new Date(Date.parse(x.startAt) + 8 * 3_600_000).toISOString().slice(0, 10);
-    if (!(h >= 1 && h <= 4)) e[`slot${String(i)}`] = t("Each time is 1–4 hours long.");
-    else if (!isAfter(day, today)) e[`slot${String(i)}`] = t("Times start on a later day than today (Kuala Lumpur).");
-    else if (keys.has(x.startAt + x.endAt)) e[`slot${String(i)}`] = t("The times must differ.");
+    const slotProblem = slotError(h, !isAfter(day, today), keys.has(x.startAt + x.endAt), t);
+    if (slotProblem) e[`slot${String(i)}`] = slotProblem;
     keys.add(x.startAt + x.endAt);
   }
   return e;
