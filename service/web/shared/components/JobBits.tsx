@@ -6,6 +6,7 @@ import type { JobStatus, Origin, Slot } from "@ac/web/lib/jobs";
 import { jobStatuses, statusLabel } from "@ac/web/lib/jobs";
 import { oneOf } from "@ac/web/lib/oneOf";
 import { useT } from "./I18n";
+import { isAfter } from "@ac/web/lib/order";
 
 /** Where a job came from — shown on every role (IR113), in the display language. */
 export function OriginBadge({ origin }: { origin: Origin }) {
@@ -61,7 +62,7 @@ export function PreferredSlotsInput({ value, onChange, error, label = "Preferred
 /** Validation shared by all preferred-time inputs (IR113): 3 slots, distinct, after the demo “today”. */
 export function preferredError(v: Slot[], today = "2026-09-22"): string | undefined {
   if (v.length !== 3 || v.some((s) => !s.date)) return "Enter 3 preferred times";
-  if (v.some((s) => s.date <= today)) return "Each time must be at least 1 day ahead";
+  if (v.some((s) => !isAfter(s.date, today))) return "Each time must be at least 1 day ahead";
   if (new Set(v.map((s) => s.date + s.win)).size !== 3) return "The 3 times must be different";
   return undefined;
 }

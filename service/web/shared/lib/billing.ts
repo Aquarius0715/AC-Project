@@ -45,7 +45,7 @@ on the period start: [the first day of `from`, the first day of the month after 
 and a reversed range drops both. */
 export function billingMonths(fromM?: string, toM?: string): { from?: string; to?: string; filters: { from?: string; to?: string } } {
   const from = fromM && MONTH.test(fromM) ? fromM : undefined, to = toM && MONTH.test(toM) ? toM : undefined;
-  if (from && to && from > to) return { filters: {} };
+  if (from && to && isAfter(from, to)) return { filters: {} };
   return {
     ...(from && { from }), ...(to && { to }),
     filters: { ...(from && { from: zonedInstant(`${from}-01`, "00:00", KL) }), ...(to && { to: zonedInstant(`${nextMonth(to)}-01`, "00:00", KL) }) },
@@ -61,6 +61,7 @@ export function monthsText(from: string | undefined, to: string | undefined, i: 
 }
 export { money } from "@ac/web/lib/money";
 import { money } from "@ac/web/lib/money";
+import { isAfter } from "@ac/web/lib/order";
 /** An amount with its sign: + for an addition, a minus sign for a deduction. */
 const signedMoney = (minor: number, currency: string) => `${minor > 0 ? "+" : "−"}${money(Math.abs(minor), currency)}`;
 const methodName = (m: string | null, t: T) => {

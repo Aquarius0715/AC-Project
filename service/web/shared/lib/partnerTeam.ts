@@ -10,6 +10,7 @@ import { hhmm, unavailabilityLabel, type ApiCapacity, type ApiMember, type Slot 
 import { qualificationLabel, qualified } from "@ac/web/lib/partnerJobDetail";
 import { freeSlots } from "@ac/web/lib/partnerSchedule";
 import { codePoints } from "@ac/web/lib/text";
+import { isAfter, isBefore } from "@ac/web/lib/order";
 
 const en = translator("en");
 const DAY = 86_400_000, KL_OFFSET = 8 * 3_600_000;
@@ -175,7 +176,7 @@ export function unavailabilityErrors(f: UnavailabilityForm, t: T = en): Partial<
 /** The confirmed assignments the days overlap (Kuala Lumpur days, the whole team when no technician is chosen):
 shown before saving; saving keeps them (DD-P06). */
 export function unavailabilityConflicts(jobs: TeamJob[], f: UnavailabilityForm): TeamJob[] {
-  if (!isDate(f.from) || !isDate(f.to) || f.to < f.from) return [];
+  if (!isDate(f.from) || !isDate(f.to) || isBefore(f.to, f.from)) return [];
   const range = { startAt: klStart(f.from), endAt: new Date(Date.parse(klStart(f.to)) + DAY).toISOString() };
   return jobs.filter((j) => (!f.membershipId || j.technicianId === f.membershipId) && overlaps(j.slot, range));
 }
@@ -230,18 +231,18 @@ export function unavailabilityRows(rows: ApiUnavailability[], names: Map<string,
     return {
       id: u.id, version: u.version, who: u.membershipId ? names.get(u.membershipId) ?? t("Technician") : t("All technicians"),
       type: t(UNAVAILABILITY_TYPES.find((x) => x.id === u.type)?.text ?? "Other"), note: u.note, days: dayRange(u.from, u.to, locale),
-      from: u.from, to: u.to, first: u.from < today ? today : u.from, started: u.from < today,
+      from: u.from, to: u.to, first: isBefore(u.from, today) ? today : u.from, started: isBefore(u.from, today),
     };
   });
 }
 
 /** The remove dialog's own check before members.clearUnavailability: a day from `first` to the row's last day. */
 export function clearError(row: Pick<UnavailabilityRow, "first" | "to">, from: string, locale: Locale, t: T = en): string | null {
-  return isDate(from) && from >= row.first && from <= row.to ? null : t("Choose a day from {first} to {last}", { first: dayRange(row.first, row.first, locale), last: dayRange(row.to, row.to, locale) });
+  return isDate(from) && !isBefore(from, row.first) && !isAfter(from, row.to) ? null : t("Choose a day from {first} to {last}", { first: dayRange(row.first, row.first, locale), last: dayRange(row.to, row.to, locale) });
 }
 
 /** What removing from `from` does to the row, said before the user confirms: all of it, or the days that stay. */
 export function clearEffect(row: Pick<UnavailabilityRow, "from" | "started">, from: string, locale: Locale, t: T = en): string {
   const past = row.started ? ` ${t("Days before today stay recorded.")}` : "";
-  return from <= row.from ? t("All of these days are removed.") : `${t("Still unavailable: {days}; the days from {day} on are removed.", { days: dayRange(row.from, dayBefore(from), locale), day: dayRange(from, from, locale) })}${past}`;
+  return isAfter(from, row.from) ? `${t("Still unavailable: {days}; the days from {day} on are removed.", { days: dayRange(row.from, dayBefore(from), locale), day: dayRange(from, from, locale) })}${past}` : t("All of these days are removed.");
 }

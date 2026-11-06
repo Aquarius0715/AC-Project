@@ -13,6 +13,7 @@ import { readDemoAs, writeDemo } from "@ac/web/lib/demoStore";
 import { oneOf } from "@ac/web/lib/oneOf";
 import { useOp } from "@ac/web/lib/useOp";
 import { wrapped } from "@ac/web/lib/text";
+import { isBefore } from "@ac/web/lib/order";
 
 export interface Slot { date: string; win: string }
 export type Origin = "request" | "plan";
@@ -128,9 +129,9 @@ export const SEED: Job[] = [
 export interface Fit { hq: string; partner: string; fits: "none" | "internal" | "contractor" | "both" }
 export function fitFor(s: Slot): Fit {
   const d = s.date;
-  if (d < "2026-10-01") return { hq: "tech-internal-a: booked · tech-internal-b: not qualified (refrigerant)", partner: "contractor-a: no free hours · contractor-b: outside service area", fits: "none" };
+  if (isBefore(d, "2026-10-01")) return { hq: "tech-internal-a: booked · tech-internal-b: not qualified (refrigerant)", partner: "contractor-a: no free hours · contractor-b: outside service area", fits: "none" };
   if (d === "2026-10-02") return { hq: "tech-internal-a: overlaps job-c04 follow-up", partner: "contractor-a: tech-external-a fully booked", fits: "none" };
-  const isInternal = s.win.startsWith("14") && d >= "2026-10-01";
+  const isInternal = s.win.startsWith("14") && !isBefore(d, "2026-10-01");
   return { hq: isInternal ? "tech-internal-a: free (refrigerant qualified)" : "tech-internal-b: not qualified", partner: "contractor-a: tech-external-a free", fits: isInternal ? "both" : "contractor" };
 }
 

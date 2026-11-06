@@ -6,6 +6,7 @@ import { EN, showTime, translator, zonedInstant, zonedParts, type I18n, type T }
 import type { OpInput } from "@ac/web/lib/opTypes";
 import type { Permission } from "@ac/web/lib/contracts.gen";
 import { codePoints } from "@ac/web/lib/text";
+import { isAfter } from "@ac/web/lib/order";
 
 const en = translator("en");
 
@@ -148,7 +149,7 @@ export function memberErrors(d: MemberDraft, ctx: { selfUserId: string; current?
   if (!d.creatingUser && d.userId === ctx.selfUserId && gained.length > 0) e.permissions = t("Another identity administrator must grant {list} to you", { list: gained.join(", ") });
   if (d.role === "technician" && d.scopes.length === 0) e.scopes = t("Add at least one unit, property or customer organization");
   if (!d.validFrom) e.validFrom = t("Required");
-  if (d.validUntil && d.validFrom && d.validUntil <= d.validFrom) e.validUntil = t("Must be after valid from");
+  if (d.validUntil && d.validFrom && !isAfter(d.validUntil, d.validFrom)) e.validUntil = t("Must be after valid from");
   if (d.role === "technician" && d.employment === "external" && !d.validUntil) e.validUntil = t("External technicians need an end date");
   if (codePoints(d.reason.trim()) === 0 || d.reason.length > 1000) e.reason = t("A change reason is required (1–1000 characters)");
   return e;

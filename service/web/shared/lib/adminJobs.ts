@@ -308,6 +308,7 @@ export { money } from "@ac/web/lib/money";
 import { money } from "@ac/web/lib/money";
 import { codePoints, wrapped } from "@ac/web/lib/text";
 import { oneOf } from "@ac/web/lib/oneOf";
+import { isAfter } from "@ac/web/lib/order";
 /** Estimate and actual totals per currency, never converted (“80.00 MYR + 6.20 USD”). */
 export function costTotals(lines: CostLine[]): { estimate: string; actual: string } {
   const total = (kind: CostLine["kind"]) => {
@@ -346,7 +347,7 @@ export function jobRequestErrors(f: { unitId: string; symptom: string; slots: Sl
     const h = (Date.parse(x.endAt) - Date.parse(x.startAt)) / 3_600_000;
     const day = new Date(Date.parse(x.startAt) + 8 * 3_600_000).toISOString().slice(0, 10);
     if (!(h >= 1 && h <= 4)) e[`slot${String(i)}`] = t("Each time is 1–4 hours long.");
-    else if (day <= today) e[`slot${String(i)}`] = t("Times start on a later day than today (Kuala Lumpur).");
+    else if (!isAfter(day, today)) e[`slot${String(i)}`] = t("Times start on a later day than today (Kuala Lumpur).");
     else if (keys.has(x.startAt + x.endAt)) e[`slot${String(i)}`] = t("The times must differ.");
     keys.add(x.startAt + x.endAt);
   }

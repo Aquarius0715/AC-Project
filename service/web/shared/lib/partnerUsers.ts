@@ -5,6 +5,7 @@ import { EN, showDate, showTime, type I18n } from "@ac/web/lib/i18n";
 import { klDate, klStart } from "@ac/web/lib/partnerTeam";
 import { oneOf } from "@ac/web/lib/oneOf";
 import { codePoints } from "@ac/web/lib/text";
+import { isAfter, isBefore } from "@ac/web/lib/order";
 
 export type PartnerRole = "contractor" | "technician";
 export type PartnerStatus = "invited" | "active" | "disabled";
@@ -93,8 +94,8 @@ export const accessEnd = (date: string) => new Date(Date.parse(klStart(addDays(d
 /** An access end date from today (the business day in Kuala Lumpur) to a year ahead. */
 export function accessError(date: string, today: string, t = EN.t): string | undefined {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T00:00:00Z`))) return t("A date");
-  if (date < today) return t("Today or later");
-  if (date > addDays(today, ACCESS_MAX_DAYS)) return t("At most a year ahead");
+  if (isBefore(date, today)) return t("Today or later");
+  if (isAfter(date, addDays(today, ACCESS_MAX_DAYS))) return t("At most a year ahead");
   return undefined;
 }
 

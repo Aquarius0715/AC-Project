@@ -8,6 +8,7 @@ import type { IconName } from "@ac/web/components/Icon";
 import { codePoints, wrapped } from "@ac/web/lib/text";
 import { acModes, fanLevels } from "@ac/web/lib/automation";
 import { oneOf } from "@ac/web/lib/oneOf";
+import { isAfter } from "@ac/web/lib/order";
 
 const en = translator("en");
 
@@ -451,7 +452,7 @@ export interface TestRow { at: string; title: string; detail: string; tone: "ok"
 export function scheduleTest(runs: ApiOccurrence[], d: Draft, unit: string, i: I18n = EN): TestRow[] {
   const { t } = i;
   const start = runs.find((r) => r.phase === "schedule_start");
-  const end = start ? runs.find((r) => r.phase === "schedule_end" && r.at > start.at) : undefined;
+  const end = start ? runs.find((r) => r.phase === "schedule_end" && isAfter(r.at, start.at)) : undefined;
   const rows: TestRow[] = [];
   const would = (a: UnitAction) => t("Would send 1 command: {unit} · {action}", { unit, action: actionLabel(a, t) });
   if (start) rows.push({ at: start.at, title: t("{when} — matches", { when: runText(start.at, d.timezone, i) }), detail: would(start.action), tone: "ok" });

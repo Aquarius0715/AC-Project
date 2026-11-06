@@ -17,3 +17,9 @@ export const byCodeUnit = (a: string, b: string): number => {
   }
   return a.length - b.length;
 };
+
+/** isBefore tells whether `a` comes before `b` by character codes: for dates and times written as ISO text, which order that way. */
+export const isBefore = (a: string, b: string): boolean => byCodeUnit(a, b) < 0;
+
+/** isAfter tells whether `a` comes after `b` by character codes (see isBefore). */
+export const isAfter = (a: string, b: string): boolean => byCodeUnit(a, b) > 0;

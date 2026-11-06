@@ -4,6 +4,7 @@
 import { businessDay, money, type ApiCustomer, type ApiProperty } from "@ac/web/lib/billing";
 import { EN, translator, type I18n, type T } from "@ac/web/lib/i18n";
 import { codePoints } from "@ac/web/lib/text";
+import { isAfter } from "@ac/web/lib/order";
 
 const en = translator("en");
 
@@ -72,7 +73,7 @@ export function draftErrors(d: ContractDraft, t: T = en): Partial<Record<keyof C
   if (!d.customerId) e.customerId = t("Choose a customer");
   if (d.unitIds.length === 0) e.unitIds = t("Include at least one unit");
   if (!d.start) e.start = t("Required");
-  if (!d.end || (d.start && d.end <= d.start)) e.end = t("End must be after start");
+  if (!d.end || (d.start && !isAfter(d.end, d.start))) e.end = t("End must be after start");
   if (!/^\d+(\.\d{1,2})?$/.test(d.price.trim())) e.price = t("A price ≥ 0 with at most 2 decimals");
   if (d.restrictionEligible && d.planType !== "rto") e.restrictionEligible = t("Only RTO contracts can be restriction eligible");
   if (d.restrictionEligible && (codePoints(d.rulesVersion.trim()) === 0 || codePoints(d.rulesVersion.trim()) > 64)) e.rulesVersion = t("Required when eligible (1–64 characters)");

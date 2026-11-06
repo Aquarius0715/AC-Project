@@ -5,6 +5,7 @@
 import { klInstant } from "@ac/web/lib/energy";
 import { EN, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
 import { codePoints, wrapped } from "@ac/web/lib/text";
+import { isBefore } from "@ac/web/lib/order";
 
 const en = translator("en");
 
@@ -96,7 +97,7 @@ export function quoteErrors(d: QuoteDraft, t: T = en): Record<string, string> {
   if (!d.customerId) e.customerId = t("Choose a customer");
   if (d.unitIds.length === 0 || d.unitIds.length > 100) e.unitIds = t("Choose 1–100 units");
   if (!d.from || !d.to) e.period = t("Enter the start and the end"); // an empty period is not an end before its start (IR586)
-  else if (d.from >= d.to) e.period = t("The end must be after the start");
+  else if (!isBefore(d.from, d.to)) e.period = t("The end must be after the start");
   if (codePoints(d.purpose.trim()) === 0 || codePoints(d.purpose.trim()) > 1000) e.purpose = t("1–1000 characters");
   const n = Number(d.amountKg);
   if (!/^\d+(\.\d{1,3})?$/.test(d.amountKg.trim()) || !(n > 0 && n <= 100_000)) e.amountKg = t("Above 0, at most 100000, up to 3 decimals");

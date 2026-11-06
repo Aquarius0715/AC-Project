@@ -16,6 +16,7 @@ import { z } from "zod";
 /** The codes a certificate is filed under (Certificate.code of the contract). */
 export const certificateCode = z.enum(["demo_indoor", "demo_outdoor", "demo_electrical", "other"]);
 import { codePoints } from "@ac/web/lib/text";
+import { isAfter } from "@ac/web/lib/order";
 
 const en = translator("en");
 const DAY = 86_400_000;
@@ -208,7 +209,7 @@ export function certificateErrors(f: CertForm, t: T = en): Partial<Record<"membe
   if (number < 1 || number > 64) e.number = t("1–64 characters");
   if (!isDate(f.issued)) e.issued = t("Choose the issue date");
   if (!isDate(f.expires)) e.expires = t("Choose the expiry date");
-  else if (isDate(f.issued) && f.expires <= f.issued) e.expires = t("The expiry date must be after the issue date");
+  else if (isDate(f.issued) && !isAfter(f.expires, f.issued)) e.expires = t("The expiry date must be after the issue date");
   if (!f.file) e.file = t("Attach the certificate file");
   else if (!FILE_TYPES.includes(f.file.type)) e.file = t("Use a PDF, JPG or PNG file");
   else if (f.file.size > 10_000_000) e.file = t("The file is larger than 10 MB");

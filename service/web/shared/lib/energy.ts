@@ -4,6 +4,7 @@
 import { EN, translator, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import type { OpInput } from "@ac/web/lib/opTypes";
 import { codePoints } from "@ac/web/lib/text";
+import { isBefore } from "@ac/web/lib/order";
 
 const en = translator("en");
 
@@ -148,7 +149,7 @@ export function baselineErrors(d: BaselineDraft, t: T = en): Record<string, stri
   const e: Record<string, string> = {};
   if (d.unitIds.length === 0 || d.unitIds.length > 100) e.unitIds = t("Choose 1–100 units");
   if (!d.from || !d.to) e.period = t("Enter the start and the end"); // an empty period is not an end before its start (IR586)
-  else if (d.from >= d.to) e.period = t("The end must be after the start");
+  else if (!isBefore(d.from, d.to)) e.period = t("The end must be after the start");
   else if (Date.parse(klInstant(d.to)) - Date.parse(klInstant(d.from)) > 366 * 24 * 3600 * 1000) e.period = t("At most 366 days");
   if (d.method === "demo_fixed" && !(d.baselineKWh.trim() !== "" && Number.isFinite(+d.baselineKWh) && +d.baselineKWh >= 0)) e.baselineKWh = t("A value ≥ 0 kWh");
   if (d.method === "demo_period_comparison" && d.boundaryId === "whole_building_electricity") e.boundaryId = t("Period comparison measures AC input electricity only");
