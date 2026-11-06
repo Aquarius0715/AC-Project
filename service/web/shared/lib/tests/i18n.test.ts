@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync } from "node:fs";
-import { join, resolve, sep } from "node:path";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { intlTag, isLocale, showRecent, showSpan, showTime, translate, translator, zonedInstant, zonedParts } from "@ac/web/lib/i18n";
 import { ms } from "@ac/web/lib/i18n-ms";
@@ -27,8 +27,8 @@ function literalText(literal: string): string | null {
 }
 /** The TypeScript sources under a directory, without dependencies, builds and tests. */
 const sources = (directory: string): string[] => readdirSync(directory, { recursive: true, encoding: "utf8" })
-  .filter((f) => f.split(sep).every((part) => !["node_modules", ".next", "tests", "e2e"].includes(part)) && /\.tsx?$/.test(f) && !f.endsWith("i18n-ms.ts"))
-  .map((f) => join(directory, f));
+  .filter((f) => f.split(path.sep).every((part) => !["node_modules", ".next", "tests", "e2e"].includes(part)) && /\.tsx?$/.test(f) && !f.endsWith("i18n-ms.ts"))
+  .map((f) => path.join(directory, f));
 
 const names = (text: string) => text.matchAll(/\{(\w+)\}/g).map((m) => must(m[1])).toArray().toSorted(byText);
 
@@ -55,8 +55,8 @@ describe("Display language (FR-X01, AT-X01-N, IR258)", () => {
   });
 
   // NFR-07 / IR44 key check: the English texts the code translates and the dictionary's keys are the same set
-  const root = resolve(import.meta.dirname, "../../..");
-  const code = ["shared", "customer/app", "partner/app", "technician/app", "admin/app"].flatMap((d) => sources(join(root, d))).map((f) => readFileSync(f, "utf8")).join("\n");
+  const root = path.resolve(import.meta.dirname, "../../..");
+  const code = ["shared", "customer/app", "partner/app", "technician/app", "admin/app"].flatMap((d) => sources(path.join(root, d))).map((f) => readFileSync(f, "utf8")).join("\n");
 
   it("has a Malay text for every literal the code translates", () => {
     const literals = [
@@ -68,7 +68,7 @@ describe("Display language (FR-X01, AT-X01-N, IR258)", () => {
   });
 
   it("lists each English text once in the Malay dictionary (a renamed key can collide with an existing one)", () => {
-    const keys = readFileSync(join(root, "shared/lib/i18n-ms.ts"), "utf8").matchAll(/^\s*("(?:[^"\\]|\\.)*"):/gm).map((m) => m[1]).toArray();
+    const keys = readFileSync(path.join(root, "shared/lib/i18n-ms.ts"), "utf8").matchAll(/^\s*("(?:[^"\\]|\\.)*"):/gm).map((m) => m[1]).toArray();
     expect(keys.length).toBeGreaterThan(1000);
     expect(keys.filter((k, n) => keys.indexOf(k) !== n)).toEqual([]);
   });
@@ -80,7 +80,7 @@ describe("Display language (FR-X01, AT-X01-N, IR258)", () => {
   }, 30_000);
 
   it("speaks to customers, contractors, technicians and HQ without error codes or spec IDs (IR584, IR585, IR587, IR590, IR591, IR595, IR622, IR626)", () => {
-    const files = ["customer/app", "partner/app", "technician/app", "admin/app", "shared/lib", "shared/components", "shared/screens"].flatMap((d) => sources(join(root, d)));
+    const files = ["customer/app", "partner/app", "technician/app", "admin/app", "shared/lib", "shared/components", "shared/screens"].flatMap((d) => sources(path.join(root, d)));
     // each string literal as written in the source, read as the text it stands for
     const strings = files.flatMap((f) => readFileSync(f, "utf8").matchAll(/"((?:[^"\\\n]|\\.)*)"/g).map((m) => literalText(`"${m[1] ?? ""}"`)).filter((x) => x !== null).toArray());
     const texts = [...new Set(strings.filter((text) => Object.hasOwn(ms, text)))]; // every literal the dictionary translates, maps of texts included

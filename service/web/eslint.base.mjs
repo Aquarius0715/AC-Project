@@ -78,7 +78,8 @@ export function webConfig(tsconfigRootDir) {
         // a consistency rule: this code writes a one-line doc comment on one line (/** … */), so its option says so
         "unicorn/single-line-block-comment-style": ["error", "single-line"],
         // React components are functions whose names start with a capital (JSX reads a lower-case name as a tag)
-        "sonarjs/function-name": ["error", { format: "^(?:[_a-z][a-zA-Z0-9]*|[A-Z][a-zA-Z0-9]*)$" }],
+        // a notification type or a state code (certificate_expiry) names the method that words it, so snake_case is allowed too
+        "sonarjs/function-name": ["error", { format: "^(?:[_a-z][a-zA-Z0-9]*|[A-Z][a-zA-Z0-9]*|[a-z][a-z0-9]*(?:_[a-z0-9]+)+)$" }],
         // React and the DOM name the class attribute className
         "unicorn/no-keyword-prefix": ["error", { disallowedPrefixes: ["new"] }],
         // the Core API contract (service-contracts.ts) uses null in request and response bodies (JSON.stringify drops

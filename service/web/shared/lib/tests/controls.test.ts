@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join, relative } from "node:path";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
@@ -35,12 +35,12 @@ function sources(): string[] {
   const walk = (directory: string) => {
     for (const name of readdirSync(directory)) {
       if (["node_modules", ".next", "tests"].includes(name)) continue;
-      const path = join(directory, name);
-      if (statSync(path).isDirectory()) walk(path);
-      else if (name.endsWith(".tsx") && !path.startsWith(FACADE) && path !== FACADE + ".tsx") out.push(path);
+      const file = path.join(directory, name);
+      if (statSync(file).isDirectory()) walk(file);
+      else if (name.endsWith(".tsx") && !file.startsWith(FACADE) && file !== FACADE + ".tsx") out.push(file);
     }
   };
-  for (const d of DIRS) walk(join(root, d));
+  for (const d of DIRS) walk(path.join(root, d));
   return out;
 }
 
@@ -52,7 +52,7 @@ describe("the screens' controls are shadcn/ui components (DEC-75)", () => {
     const got: Record<string, Record<string, number>> = {};
     for (const f of sources()) {
       const c = rawElements(f);
-      if (Object.keys(c).length > 0) got[relative(root, f)] = c;
+      if (Object.keys(c).length > 0) got[path.relative(root, f)] = c;
     }
     expect(got).toEqual(BASELINE);
   });

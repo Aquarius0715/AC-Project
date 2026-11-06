@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join, relative } from "node:path";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
@@ -48,12 +48,12 @@ function sources(): string[] {
   const walk = (directory: string) => {
     for (const name of readdirSync(directory)) {
       if (["node_modules", ".next", "tests"].includes(name)) continue;
-      const path = join(directory, name);
-      if (statSync(path).isDirectory()) walk(path);
-      else if (/\.tsx?$/.test(name) && !/\.(gen|d)\.ts$/.test(name)) out.push(path);
+      const file = path.join(directory, name);
+      if (statSync(file).isDirectory()) walk(file);
+      else if (/\.tsx?$/.test(name) && !/\.(gen|d)\.ts$/.test(name)) out.push(file);
     }
   };
-  for (const d of DIRS) walk(join(root, d));
+  for (const d of DIRS) walk(path.join(root, d));
   return out;
 }
 
@@ -96,7 +96,7 @@ describe("one icon library (DEC-74)", () => {
     const problems = files.flatMap((file) => {
       return texts(file).flatMap(({ line, text, button }) => {
         const why = iconProblem(text) ?? (button && signButton(text) ? `the sign ${text.trim()} as a button's only content` : null);
-        return why ? `${relative(root, file)}:${String(line)} ${JSON.stringify(text.trim().slice(0, 60))} — ${why}; use <Icon name="…" /> (shared/components/Icon.tsx)` : [];
+        return why ? `${path.relative(root, file)}:${String(line)} ${JSON.stringify(text.trim().slice(0, 60))} — ${why}; use <Icon name="…" /> (shared/components/Icon.tsx)` : [];
       });
     });
     expect(problems).toEqual([]);

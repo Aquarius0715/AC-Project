@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { readdirSync, readFileSync } from "node:fs";
-import { join, relative } from "node:path";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
@@ -19,8 +19,8 @@ const mergeLiterals = <V>(seen: V[] | null | undefined, lit: V[]): V[] | null =>
 };
 const KEYWORD_VALUE = new Map([[ts.SyntaxKind.TrueKeyword, true], [ts.SyntaxKind.FalseKeyword, false]]);
 const web = fileURLToPath(new URL("../../../", import.meta.url));
-const contractFile = join(web, "../../docs/02-design/service-contracts.ts");
-const catalogFile = join(web, "../api/internal/ops/catalog_gen.go");
+const contractFile = path.join(web, "../../docs/02-design/service-contracts.ts");
+const catalogFile = path.join(web, "../api/internal/ops/catalog_gen.go");
 
 interface Field { literals: (string | number | boolean)[] | null } // the literal values the contract allows, null: any
 function contractInputs(): Map<string, Map<string, Field>> {
@@ -77,12 +77,12 @@ function sources(): string[] {
     const entries = readdirSync(d, { withFileTypes: true });
     for (const e of entries) {
       if (["node_modules", ".next", "tests", "e2e"].includes(e.name)) continue;
-      const p = join(d, e.name);
+      const p = path.join(d, e.name);
       if (e.isDirectory()) walk(p);
       else if (/\.tsx?$/.test(e.name)) files.push(p);
     }
   };
-  for (const d of ["customer", "partner", "technician", "admin", "shared"]) walk(join(web, d));
+  for (const d of ["customer", "partner", "technician", "admin", "shared"]) walk(path.join(web, d));
   return files;
 }
 
@@ -98,7 +98,7 @@ describe("the web's calls against the Core API contract (IR312)", () => {
       const visit = (n: ts.Node) => {
         if (ts.isCallExpression(n) && ts.isIdentifier(n.expression) && ["coreOp", "callOp", "coreAll"].includes(n.expression.text) && n.arguments[0] && ts.isStringLiteral(n.arguments[0])) {
           const op = n.arguments[0].text;
-          const where = `${relative(web, f)}:${String(sf.getLineAndCharacterOfPosition(n.getStart(sf)).line + 1)}`;
+          const where = `${path.relative(web, f)}:${String(sf.getLineAndCharacterOfPosition(n.getStart(sf)).line + 1)}`;
           const fields = inputs.get(op);
           if (!fields) problems.push(`${where} ${op}: not an operation of the contract`);
           const argument = n.arguments[1];
@@ -148,7 +148,7 @@ describe("the browser's calls through the BFF relay", () => {
           calls++;
           if (coreWrites.has(n.arguments[0].text)) {
         const line = sf.getLineAndCharacterOfPosition(n.getStart(sf)).line + 1;
-        problems.push(`${relative(web, f)}:${String(line)} ${n.arguments[0].text}`);
+        problems.push(`${path.relative(web, f)}:${String(line)} ${n.arguments[0].text}`);
       }
         }
         ts.forEachChild(n, visit);

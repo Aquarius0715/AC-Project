@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { join, relative } from "node:path";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
@@ -27,8 +27,8 @@ function check(): { checked: number; problems: string[] } {
   const problems: string[] = [];
   let checked = 0;
   for (const p of projects) {
-    const directory = join(web, p);
-    const roleConfig = ts.readConfigFile(join(directory, "tsconfig.json"), ts.sys.readFile);
+    const directory = path.join(web, p);
+    const roleConfig = ts.readConfigFile(path.join(directory, "tsconfig.json"), ts.sys.readFile);
     const parsed = ts.parseJsonConfigFileContent(roleConfig.config, ts.sys, directory);
     const program = ts.createProgram(parsed.fileNames, { ...parsed.options, noEmit: true, incremental: false });
     const c = program.getTypeChecker();
@@ -114,7 +114,7 @@ function check(): { checked: number; problems: string[] } {
       const visit = (n: ts.Node) => {
         if (ts.isCallExpression(n) && ts.isIdentifier(n.expression) && calls.has(n.expression.text) && n.arguments[0] && ts.isStringLiteral(n.arguments[0])) {
           const op = n.arguments[0].text, fn = n.expression.text;
-          const where = `${relative(web, f)}:${String(sf.getLineAndCharacterOfPosition(n.getStart(sf)).line + 1)} ${op}`;
+          const where = `${path.relative(web, f)}:${String(sf.getLineAndCharacterOfPosition(n.getStart(sf)).line + 1)} ${op}`;
           let result = resultOf(op);
           let own: ts.Type | undefined;
           if (n.typeArguments?.length) own = c.getTypeFromTypeNode(must(n.typeArguments[0]));
