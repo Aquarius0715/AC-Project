@@ -47,7 +47,7 @@ const resultOf = (r: ApiAudit["result"]): AuditResult => RESULT_WORDS.find(([wir
 
 /** The screen's filters from the URL; the default period is the 30 days up to the Core API business clock, as days of the display time zone. */
 export function auditFilters(sp: Record<string, string | string[] | undefined>, now: Date, zone = KL): AuditFilters {
-  const one = (k: string) => (typeof sp[k] === "string" ? (sp[k]) : "");
+  const one = (k: string) => { const v = lookup(sp, k); return typeof v === "string" ? v : ""; };
   const res = one("result");
   const limit = Math.min(100, Math.max(25, Number(one("limit")) || 25));
   const day = (ms: number) => zonedParts(new Date(ms).toISOString(), zone).date;
@@ -117,7 +117,7 @@ export function auditRow(a: ApiAudit, i: I18n = EN, nowMs?: number): AuditRow {
     res: resultOf(a.result),
     reason: reasonText(a, t),
     changes: fields.map((f) => {
-      const before = a.maskedBefore?.[f] ?? "null", after = a.maskedAfter?.[f] ?? "null";
+      const before = lookup(a.maskedBefore ?? {}, f) ?? "null", after = lookup(a.maskedAfter ?? {}, f) ?? "null";
       return { field: f, changed: before !== after, before, after };
     }),
   };

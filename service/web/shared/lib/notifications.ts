@@ -106,7 +106,10 @@ are worded in that language when a source above wrote them (IR481); a status the
 notification had none) is left out, and any other text stays as recorded. */
 export function inboxRow(n: ApiNotification, role: Role, display: Display = DEFAULT_DISPLAY): InboxRow {
   const title = lookup(typeTitles, n.type) ?? lookup(titles, n.templateKey) ?? "Notification — {name}";
-  const word = (words: Record<string, string>, code: string | null) => (code && words[code] ? translate(display.locale, words[code]) : code);
+  const word = (words: Record<string, string>, code: string | null) => {
+    const text = code === null ? undefined : lookup(words, code);
+    return text ? translate(display.locale, text) : code;
+  };
   const status = n.params.status === n.type ? null : word(statusWords, n.params.status);
   const message = n.params.message ? messageText(n.params.message, display) : word(reasonWords, n.params.reason);
   const text = details[n.templateKey]?.(n, display) ?? [message, status].filter(Boolean).join(" · ");
