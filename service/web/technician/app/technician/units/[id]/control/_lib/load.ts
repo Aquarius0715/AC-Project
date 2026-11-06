@@ -12,7 +12,7 @@ import type { ApiUnitDetail } from "@ac/web/lib/units";
 import {
   blockedText, capabilityText, connectionText, historyRows, observedText, restrictionText, runActive, runBanner, stateTiles, windowText, type ApiCommandRow, type ApiRun,
 } from "@ac/web/lib/techControl";
-import { orNull } from "@ac/web/lib/promises";
+import { orNull, recover } from "@ac/web/lib/promises";
 
 const NOT_STARTED = "not_started";
 
@@ -23,7 +23,7 @@ export async function loadControl(unitId: string, jobId: string | null) {
   const [now, display, perms] = await Promise.all([coreNow(), coreDisplay(), corePermissions()]);
   const i = i18nOf(display);
   const { t } = i;
-  const d = await coreOp<ApiUnitDetail>("units.get", { id: unitId }).catch((error: unknown) => {
+  const d = await recover(coreOp<ApiUnitDetail>("units.get", { id: unitId }), (error: unknown) => {
     if (error instanceof CoreError && error.error.messageKey === "errors.assignment_not_started") return "not_started" as const;
     if (gone(error)) return null;
     throw error;
@@ -47,7 +47,7 @@ export async function loadControl(unitId: string, jobId: string | null) {
   };
   const base = { kind: "live" as const, canDiagnose: perms.has("control.diagnose"), unitHref, unit };
   if (!jobId) return { ...base, job: null, run: null, banner: null, active: false, history: [] };
-  const read = await coreOp<JobRead>("jobs.get", { jobId }).catch((error: unknown) => { if (gone(error)) { return null; } throw error; });
+  const read = await recover(coreOp<JobRead>("jobs.get", { jobId }), (error: unknown) => { if (gone(error)) { return null; } throw error; });
   const job = read?.projection === "detail" ? read : null;
   if (!job) return null; // a refused job, or one whose window ended (a history snapshot): not the technician's to control
   const [runs, cmds] = await Promise.all([

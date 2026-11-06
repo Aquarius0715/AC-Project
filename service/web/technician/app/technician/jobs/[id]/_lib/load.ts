@@ -10,10 +10,11 @@ import { i18nOf } from "@ac/web/lib/i18n";
 import type { ApiUnitDetail } from "@ac/web/lib/units";
 import { componentsFor, historyCard, knownOf, timeInstants, warnAt, type ApiTechHistory, type ApiTechReport, type TimeOnSite } from "@ac/web/lib/techJob";
 import type { WorkspaceLive } from "../_components/workspace-view";
+import { recover } from "@ac/web/lib/promises";
 
 interface Refused { refused: string } // FORBIDDEN / NOT_FOUND with the reason (e.g. errors.assignment_not_started)
 const quiet = <T,>(p: Promise<T>): Promise<T | Refused> => {
-  return p.catch((error: unknown) => {
+  return recover(p, (error: unknown) => {
     if (error instanceof CoreError && (error.error.code === "FORBIDDEN" || error.error.code === "NOT_FOUND")) return { refused: error.error.messageKey };
     throw error;
   });
@@ -30,7 +31,7 @@ export async function loadWorkspace(jobId: string): Promise<WorkspaceLive | "not
   assignment: { scheduledStart: string; scheduledEnd: string; status: string; acknowledgement: "pending" | "accepted" | "cant_make"; cantMakeReason: string | null } | null;
   } | { projection: "offer" };
   interface Part { code: string; name: string; vanStockQuantity: number | null }
-  const job = await coreOp<JobRead>("jobs.get", { jobId }).catch((error: unknown) => {
+  const job = await recover(coreOp<JobRead>("jobs.get", { jobId }), (error: unknown) => {
     if (error instanceof CoreError && (error.error.code === "NOT_FOUND" || error.error.code === "FORBIDDEN" || error.error.fieldErrors.jobId)) return null;
     throw error;
   });

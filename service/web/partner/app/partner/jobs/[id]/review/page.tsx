@@ -8,12 +8,13 @@ import { apiMode, CoreError } from "@ac/web/lib/dal";
 import { loadReview } from "./_lib/load";
 import { ReviewDemo } from "./_components/review-demo";
 import { ReviewView } from "./_components/review-view";
+import { recover } from "@ac/web/lib/promises";
 
 export default async function PartnerReviewPage({ params }: Readonly<PageProps<"/partner/jobs/[id]/review">>) {
   const { id } = await params;
   await connection();
   if (!apiMode()) return <ReviewDemo id={id} />;
-  const live = await loadReview(id).catch((error: unknown) => {
+  const live = await recover(loadReview(id), (error: unknown) => {
     if (error instanceof CoreError && (error.error.code === "NOT_FOUND" || error.error.code === "FORBIDDEN" || error.error.fieldErrors.jobId)) return null;
     throw error;
   });

@@ -6,6 +6,7 @@ import { useEffect, useEffectEvent, useState } from "react";
 import { z } from "zod";
 import { callRelay, OpError } from "@ac/web/lib/ops";
 import type { OpCall } from "@ac/web/lib/opTypes";
+import { recover } from "@ac/web/lib/promises";
 
 export interface BffSession { dataSource: "mock" | "api"; signedIn: boolean; role: string | null; membershipId: string | null; clientRole: string | null; serverNow: string | null }
 
@@ -74,9 +75,8 @@ export function useOp<T, R>(...[operation, input, mock, map, enabled = true]: [.
   useEffect(() => {
     let isLive = isActive; // an inactive read does not run; its cleanup has nothing to stop
     if (isActive) {
-      read()
-        .then((data) => { if (isLive) setState({ request, data, error: null }); })
-        .catch((error: unknown) => { if (isLive) setState((s) => ({ request, data: s.data, error: error instanceof OpError ? error : null })); });
+      recover(read()
+        .then((data) => { if (isLive) setState({ request, data, error: null }); }), (error: unknown) => { if (isLive) setState((s) => ({ request, data: s.data, error: error instanceof OpError ? error : null })); });
     }
     return () => {
       isLive = false;

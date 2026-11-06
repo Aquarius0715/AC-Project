@@ -17,6 +17,7 @@ import { agreedSlots, classifyBy, controls, costTotals, delivery, facts, filters
 import { nextOccurrence, planDate, planRows, type ApiPlan } from "@ac/web/lib/adminPlans";
 import { breachRows, PERIODS, periodOf, slaRows, slaTiles, targetsByPlan, type ApiScorecard } from "@ac/web/lib/adminSla";
 import { contractorRows, kpiTiles, pendingCertificates, profileFacts, rateCardView, technicianRows, type ApiCertificate, type ApiProfile, type ApiRateCard, type ApiTechnician } from "@ac/web/lib/adminContractors";
+import { recover } from "@ac/web/lib/promises";
 
 const TECHNICIAN = "technician";
 
@@ -98,7 +99,7 @@ export async function loadJobs(sp: SP) {
   };
   const pick = one(sp.jobId) ?? rows[0]?.id;
   if (!pick) return { ...base, detail: null };
-  const job = await coreOp<ApiHqJob>("jobs.get", { jobId: pick }).catch((error: unknown) => {
+  const job = await recover(coreOp<ApiHqJob>("jobs.get", { jobId: pick }), (error: unknown) => {
     if (error instanceof CoreError && error.error.code === "NOT_FOUND") return null;
     throw error;
   });
@@ -168,7 +169,7 @@ export async function loadPlans(sp: SP) {
   const base = { ...head, q, rows, plansTotal: plans.length };
   const pick = one(sp.planId) ?? rows[0]?.id;
   if (!pick) return { ...base, detail: null };
-  const plan = await coreOp<ApiPlan>("plans.get", { id: pick }).catch((error: unknown) => {
+  const plan = await recover(coreOp<ApiPlan>("plans.get", { id: pick }), (error: unknown) => {
     if (error instanceof CoreError && error.error.code === "NOT_FOUND") return null;
     throw error;
   });

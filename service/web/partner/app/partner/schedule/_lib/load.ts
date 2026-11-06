@@ -12,6 +12,7 @@ import type { ApiUnitDetail } from "@ac/web/lib/units";
 import { requiredFor, type ApiPartnerJobDetail } from "@ac/web/lib/partnerJobDetail";
 import { klDay, weekOf, type ApiCapacity, type ApiMember, type ApiPartnerJob, type Slot } from "@ac/web/lib/partnerOverview";
 import { candidates, formMode, SCHEDULE_STATUSES, scheduleRow, scheduleTeam, sortOf, SORTS, type ScheduleRow } from "@ac/web/lib/partnerSchedule";
+import { recover } from "@ac/web/lib/promises";
 
 const KL = "Asia/Kuala_Lumpur";
 
@@ -39,7 +40,7 @@ export async function loadSchedule(sp: { jobId?: string; sort?: string }) {
   const base = { now: now.toISOString(), sorts: SORTS.map((s) => ({ id: s.id, text: t(s.text) })), zone: display.timeZone, otherZone: display.timeZone !== KL, sort, rows, members };
   const picked = rows.find((r) => r.id === sp.jobId) ?? rows[0];
   if (!picked) return { ...base, selected: null, week: null };
-  const job = await coreOp<ApiPartnerJobDetail>("jobs.get", { jobId: picked.id }).catch((error: unknown) => {
+  const job = await recover(coreOp<ApiPartnerJobDetail>("jobs.get", { jobId: picked.id }), (error: unknown) => {
     if (error instanceof CoreError && (error.error.code === "NOT_FOUND" || error.error.code === "FORBIDDEN")) return null; // delegation ended meanwhile
     throw error;
   });

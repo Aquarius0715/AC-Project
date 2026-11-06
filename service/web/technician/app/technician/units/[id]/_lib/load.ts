@@ -16,6 +16,7 @@ import {
   componentCards, controlJob, jobRows, liveTiles, metricOf, openAlerts, otherMetrics, PERIODS, periodOf, periodRange, registerRows, seriesChart, stoppedBanner,
   windowEvents, type ApiTechUnit, type Period, type Point,
 } from "@ac/web/lib/techUnit";
+import { recover } from "@ac/web/lib/promises";
 
 const NOT_STARTED = "not_started";
 const MONITORING = "monitoring";
@@ -57,7 +58,7 @@ export async function loadTechUnit(id: string, sp: { jobId?: string; metric?: st
   const i = i18nOf(display);
   const { t } = i;
   const nowMs = now.getTime();
-  const d = await coreOp<ApiTechUnit>("units.get", { id }).catch((error: unknown) => {
+  const d = await recover(coreOp<ApiTechUnit>("units.get", { id }), (error: unknown) => {
     if (error instanceof CoreError && error.error.messageKey === "errors.assignment_not_started") return "not_started" as const;
     if (gone(error)) return null;
     throw error;

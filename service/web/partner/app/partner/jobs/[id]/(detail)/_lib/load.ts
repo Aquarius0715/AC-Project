@@ -12,13 +12,14 @@ import type { ApiAlert } from "@ac/web/lib/alerts";
 import type { ApiUnitDetail } from "@ac/web/lib/units";
 import { delegationLeft, detailBanner, eventRows, fits, ordinal, qualified, requiredFor, timeline, type ApiPartnerJobDetail } from "@ac/web/lib/partnerJobDetail";
 import { until, type ApiCapacity, type ApiJobEvent, type ApiMember } from "@ac/web/lib/partnerOverview";
+import { recover } from "@ac/web/lib/promises";
 
 const optional = orWhenRefused;
 const klDate = (iso: string) => new Date(Date.parse(iso) + 8 * 3_600_000).toISOString().slice(0, 10);
 const plusDays = (date: string, n: number) => new Date(Date.parse(`${date}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 
 export async function loadJobDetail(jobId: string) {
-  const job = await coreOp<ApiPartnerJobDetail>("jobs.get", { jobId }).catch((error: unknown) => {
+  const job = await recover(coreOp<ApiPartnerJobDetail>("jobs.get", { jobId }), (error: unknown) => {
     if (error instanceof CoreError && (error.error.code === "NOT_FOUND" || error.error.code === "FORBIDDEN")) return null; // another company's job reads as absent (D01)
     throw error;
   });

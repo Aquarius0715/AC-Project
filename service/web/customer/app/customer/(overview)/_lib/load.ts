@@ -20,7 +20,7 @@ import type { ApiBaseline, ApiEnergySummary } from "@ac/web/lib/energy";
 import {
   attentionCard, bucketPoints, emissionsCard, energyCard, nextRunText, overviewRows, overviewScope, periodLabel, periodNote, periodOf, previousRange, type OverviewUnit,
 } from "@ac/web/lib/customerOverview";
-import { orNull } from "@ac/web/lib/promises";
+import { orNull, recover } from "@ac/web/lib/promises";
 
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
@@ -60,7 +60,7 @@ export async function loadOverview(sp: Record<string, string | string[] | undefi
   };
   // what is due or restricted (DEC-90, IR610): the overdue invoices and the restriction they caused, read as the payments
   // page reads them; a member without billing access sees no notice
-  const due = (async () => {
+  const due = recover((async () => {
     const [overdue, contracts] = await Promise.all([coreAll<ApiInvoice>("invoices.list", { filters: { overdueOnly: true } }), coreAll<ClientContract>("contracts.list")]);
     const k = contracts.find((c) => (c.activeRestrictionIds ?? []).length > 0 && overdue.some((x) => x.contractId === c.id));
     let restriction: { r: ApiRestriction; invoiceId: string } | null = null;
@@ -71,7 +71,7 @@ export async function loadOverview(sp: Record<string, string | string[] | undefi
       if (r) restriction = { r, invoiceId };
     }
     return dueNotice(overdue, restriction, i);
-  })().catch((error: unknown) => { if (error instanceof CoreError && (error.error.code === "FORBIDDEN" || error.error.code === "NOT_FOUND")) { return null; } throw error; });
+  })(), (error: unknown) => { if (error instanceof CoreError && (error.error.code === "FORBIDDEN" || error.error.code === "NOT_FOUND")) { return null; } throw error; });
   const inScope = automations.filter((a) => a.unitIds.some((u) => ids.includes(u))).toSorted((a, b) => Number(b.enabled) - Number(a.enabled) || a.name.localeCompare(b.name));
   const shown = inScope.slice(0, 3);
   const [summary, sums, co2, nexts, dueLines] = await Promise.all([

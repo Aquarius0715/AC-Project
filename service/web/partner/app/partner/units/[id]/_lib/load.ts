@@ -13,6 +13,7 @@ import type { ApiMember } from "@ac/web/lib/partnerOverview";
 import type { ApiPartnerJobDetail } from "@ac/web/lib/partnerJobDetail";
 import { chart, chartMetrics, contextJob, evidenceRows, jobContext, pastWork, readingRows, registerRows, snapshotRows, type ApiUnitJob } from "@ac/web/lib/partnerUnit";
 import type { OpInput } from "@ac/web/lib/opTypes";
+import { recover } from "@ac/web/lib/promises";
 
 interface Page<T> { items: T[]; nextCursor?: string | null }
 interface Point { value: number | null; observedAt: string; quality?: string; unit?: string }
@@ -34,10 +35,10 @@ export async function loadUnit(id: string, jobId?: string) {
   const i = i18nOf(display);
   const { t } = i;
   const nowMs = now.getTime();
-  const d = await coreOp<ApiUnitDetail>("units.get", { id }).catch((error: unknown) => { if (gone(error)) { return null; } throw error; });
+  const d = await recover(coreOp<ApiUnitDetail>("units.get", { id }), (error: unknown) => { if (gone(error)) { return null; } throw error; });
   if (!d) {
     if (!jobId) return null; // not one of the company's units now: not found
-    const h = await coreOp<ApiPartnerJobDetail>("jobs.get", { jobId }).catch((error: unknown) => { if (gone(error)) { return null; } throw error; });
+    const h = await recover(coreOp<ApiPartnerJobDetail>("jobs.get", { jobId }), (error: unknown) => { if (gone(error)) { return null; } throw error; });
     if (h?.projection !== "history") return null;
     return {
       kind: "snapshot" as const,

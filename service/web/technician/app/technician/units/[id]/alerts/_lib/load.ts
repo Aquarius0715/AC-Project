@@ -11,6 +11,7 @@ import type { ApiUnitDetail } from "@ac/web/lib/units";
 import { alertChoices, alertView, selectAlert, type ApiTechAlert } from "@ac/web/lib/techAlerts";
 import { evidenceRows, type ApiEvidenceCandidate } from "@ac/web/lib/alertEvidence";
 import type { TechJobRead } from "@ac/web/lib/techJob";
+import { recover } from "@ac/web/lib/promises";
 
 const optional = orWhenRefused;
 const UNAVAILABLE: Record<string, string> = {
@@ -26,7 +27,7 @@ export async function loadAlerts(unitId: string, sp: { jobId?: string; alertId?:
   const { t } = i;
   const nowMs = now.getTime();
   const unitHref = `/technician/units/${unitId}${sp.jobId ? `?jobId=${sp.jobId}` : ""}`;
-  const alerts = await coreItems<ApiTechAlert>("alerts.list", { limit: 50, filters: { unitId } }).catch((error: unknown) => {
+  const alerts = await recover(coreItems<ApiTechAlert>("alerts.list", { limit: 50, filters: { unitId } }), (error: unknown) => {
     if (error instanceof CoreError && error.status < 500) return error.error;
     throw error; // error.tsx
   });

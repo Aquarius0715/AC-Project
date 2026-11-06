@@ -26,7 +26,7 @@ import { UnitsDemo } from "./_components/units-demo";
 import { UnitsView, type CustomerLive, type UnitLive, type UnitsLive } from "./_components/units-view";
 import { queryReader } from "@ac/web/lib/searchParams";
 
-import { orNull } from "@ac/web/lib/promises";
+import { orNull, recover } from "@ac/web/lib/promises";
 
 const RESTRICTION_READ = "restriction.read";
 const DEVICE_READ = "device.read";
@@ -103,7 +103,7 @@ export default async function AdminUnitsPage({ searchParams }: Readonly<PageProp
     has("alert.read", "alert.policy.read")
       ? Promise.all((["open", "acknowledged"] as const).map((status) => coreAll<Alert>("alerts.list", { filters: { customerId: cust.id, status } }))).then((x) => x.flat())
       : Promise.resolve(null),
-    unitId ? coreOp<ApiUnitDetail>("units.get", { id: unitId }).catch((error: unknown) => (error instanceof CoreError && error.status === 404 ? null : Promise.reject(error))) : Promise.resolve(null),
+    unitId ? recover(coreOp<ApiUnitDetail>("units.get", { id: unitId }), (error: unknown) => (error instanceof CoreError && error.status === 404 ? null : Promise.reject(error))) : Promise.resolve(null),
   ]);
   const clientUsers = await coreAll<ApiClientUser>("clientUsers.list", { filters: { customerId: cust.id } });
   const d = detail?.customerOrgId === cust.orgId ? detail : null;

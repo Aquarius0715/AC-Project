@@ -16,7 +16,7 @@ import { useI18n } from "./I18n";
 import { qrMatch, qrRefusal, scanCode, type ApiQrJob, type ApiQrResolution, type ApiQrUnit, type QrMatch } from "@ac/web/lib/techQr";
 import { Icon } from "@ac/web/components/Icon";
 import { Button } from "@ac/web/components/ui/button";
-import { orNull } from "@ac/web/lib/promises";
+import { orNull, recover } from "@ac/web/lib/promises";
 
 export function QrScan({ open, onClose }: Readonly<{ open: boolean; onClose: () => void }>) {
   const OPEN = ["assigned", "in_progress", "on_hold", "rework_requested"]; // the jobs units.resolveQr opens (IR230)
@@ -42,7 +42,7 @@ export function QrScan({ open, onClose }: Readonly<{ open: boolean; onClose: () 
       const r = await callOp<ApiQrResolution>("units.resolveQr", { code: c });
       let isLocked = false;
       const [unit, job] = await Promise.all([
-        callOp<ApiQrUnit>("units.get", { id: r.unitId }).catch((error: unknown) => { isLocked = error instanceof OpError && error.error.code === "FORBIDDEN"; return null; }), // before the work window (IR94)
+        recover(callOp<ApiQrUnit>("units.get", { id: r.unitId }), (error: unknown) => { isLocked = error instanceof OpError && error.error.code === "FORBIDDEN"; return null; }), // before the work window (IR94)
         r.jobId ? orNull(callOp<ApiQrJob>("jobs.get", { jobId: r.jobId })) : Promise.resolve(null),
       ]);
       const at = (now ?? new Date()).toISOString();

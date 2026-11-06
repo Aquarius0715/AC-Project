@@ -9,6 +9,7 @@ import { partnerUserRows, statusFilter, type ApiPartnerUser } from "@ac/web/lib/
 import { klDate } from "@ac/web/lib/partnerTeam";
 import { UsersDemo } from "./_components/users-demo";
 import { UsersLive } from "./_components/users-live";
+import { recover } from "@ac/web/lib/promises";
 
 export default async function PartnerUsersPage({ searchParams }: Readonly<PageProps<"/partner/users">>) {
   await connection();
@@ -16,7 +17,7 @@ export default async function PartnerUsersPage({ searchParams }: Readonly<PagePr
   const sp = await searchParams;
   const status = statusFilter(Array.isArray(sp.status) ? sp.status[0] : sp.status);
   const [all, me, display, identity, now] = await Promise.all([
-    coreAll<ApiPartnerUser>("partnerUsers.list").catch((error: unknown) => { if (error instanceof CoreError && error.error.code === "FORBIDDEN") { return null; } throw error; }),
+    recover(coreAll<ApiPartnerUser>("partnerUsers.list"), (error: unknown) => { if (error instanceof CoreError && error.error.code === "FORBIDDEN") { return null; } throw error; }),
     corePrincipal(), coreDisplay(), coreIdentity(), coreNow(),
   ]);
   if (!all) return <UsersLive live={null} />;

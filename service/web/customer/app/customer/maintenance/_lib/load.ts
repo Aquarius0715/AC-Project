@@ -15,10 +15,11 @@ import {
   clientEventTitle, clientRows, declinedNotice, detailFacts, feedback, notesOf, planVisit, preferredLines, proposalCard, type ApiClientEvent, type ApiClientJob, type ApiClientRow,
 } from "@ac/web/lib/customerMaintenance";
 import { filterLines, reminderForm, reminderLines, type ApiFilterSettings, type ApiFilterStatus } from "@ac/web/lib/customerFilterCare";
+import { recover } from "@ac/web/lib/promises";
 
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 const quiet = <T,>(p: Promise<T>, fallback: T): Promise<T> => {
-  return p.catch((error: unknown) => {
+  return recover(p, (error: unknown) => {
     if (error instanceof CoreError && (error.error.code === "NOT_FOUND" || error.error.code === "FORBIDDEN")) return fallback;
     throw error;
   });

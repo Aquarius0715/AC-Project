@@ -11,6 +11,7 @@ import { adminAlertRows, policyRows, type AlertState, type ApiAdminAlert, type A
 import { NeedsAccess } from "@ac/web/components/NeedsAccess";
 
 import { AdminAlertsView } from "./_components/alerts-view";
+import { recover } from "@ac/web/lib/promises";
 
 const ASSET_READ = "asset.read";
 
@@ -42,7 +43,7 @@ export default async function AdminAlertsPage({ searchParams }: Readonly<PagePro
   // a read the role may not make answers the permission it needs: the first one missing names the page's state, instead
   // of a failure with Try again (IR581)
   const need = <T,>(p: Promise<T>, permission: string): Promise<T | { missing: string }> => {
-    return p.catch((error: unknown) => {
+    return recover(p, (error: unknown) => {
       if (error instanceof CoreError && error.error.code === "FORBIDDEN") return { missing: permission };
       throw error;
     });

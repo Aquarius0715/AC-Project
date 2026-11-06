@@ -13,6 +13,7 @@ import { i18nOf } from "@ac/web/lib/i18n";
 import { activePeriod, intentText, unitRows, type ApiRestriction } from "@ac/web/lib/restrictions";
 import { ExceptionDemo } from "./_components/exception-demo";
 import { ExceptionView } from "./_components/exception-view";
+import { recover } from "@ac/web/lib/promises";
 
 
 export default async function AdminRestrictionPage({ params }: Readonly<PageProps<"/admin/restrictions/[id]">>) {
@@ -27,7 +28,7 @@ export default async function AdminRestrictionPage({ params }: Readonly<PageProp
     return <Screen><EmptyState title={t("No access")}>{t("Restrictions need restriction.read, restriction.write or restriction.override.")}</EmptyState></Screen>;
   }
   const [r, units] = await Promise.all([
-    coreOp<ApiRestriction>("restrictions.get", { id }).catch((error: unknown) => {
+    recover(coreOp<ApiRestriction>("restrictions.get", { id }), (error: unknown) => {
       if (error instanceof CoreError && error.error.code === "NOT_FOUND") notFound();
       throw error;
     }),

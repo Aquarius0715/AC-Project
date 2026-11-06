@@ -13,7 +13,7 @@ import type { ApiUnitDetail } from "@ac/web/lib/units";
 import { consentCard, ruleCard, triggerOf, type ApiAutomation, type ApiConsent, type ApiOccurrence, type Caps } from "@ac/web/lib/clientAutomations";
 import { AutomationsDemo } from "./_components/automations-demo";
 import { AutomationsView, type AutomationsLive } from "./_components/automations-view";
-import { orNull } from "@ac/web/lib/promises";
+import { orNull, recover } from "@ac/web/lib/promises";
 
 export default async function CustomerAutomationsPage({ searchParams }: Readonly<PageProps<"/customer/automations">>) {
   await connection();
@@ -23,7 +23,7 @@ export default async function CustomerAutomationsPage({ searchParams }: Readonly
   const [prefs, rules, units, properties, spaces, consent, display] = await Promise.all([
     coreOp<{ timezone: string }>("preferences.get", {}), coreAll<ApiAutomation>("automations.list"), coreAll<ApiUnitRow>("units.list"),
     coreAll<ApiPropertyRow>("properties.list"), coreAll<ApiSpaceRow>("spaces.list"),
-    coreOp<ApiConsent>("consents.get", { purpose: "location_automation" }).catch((error: unknown) => {
+    recover(coreOp<ApiConsent>("consents.get", { purpose: "location_automation" }), (error: unknown) => {
       if (error instanceof CoreError && error.error.code === "NOT_FOUND") return null; // no consent record: location rules unavailable
       throw error;
     }), coreDisplay(),
