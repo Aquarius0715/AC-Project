@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Btn, Card, Field, Input, Banner } from "@ac/web/components/ui";
 import { Icon } from "@ac/web/components/Icon";
+import { isEmail } from "@ac/web/lib/text";
 
 export default function Forgot() {
   const [email, setEmail] = useState("");
@@ -11,7 +12,7 @@ export default function Forgot() {
   const [errorText, setError] = useState<string>();
   const submit = (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!/^\S+@\S+\.\S+$/.test(email)) { setError("Enter an email like name@example.com"); return; }
+    if (!isEmail(email)) { setError("Enter an email like name@example.com"); return; }
     setError(undefined);
     setSent(true);
   };

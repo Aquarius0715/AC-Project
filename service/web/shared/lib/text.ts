@@ -11,3 +11,11 @@ export const codePoints = (text: string): number => characters(text).length;
 
 /** wrapped is `value` between `before` and `after`, or nothing when there is no value (an optional part of a sentence). */
 export const wrapped = (value: string | null | undefined, before: string, after = ""): string => (value ? `${before}${value}${after}` : "");
+
+/** isEmail tells whether `text` has the shape of an address: one @, a local part, and a dot inside the domain (the same test as /^[^\s@]+@[^\s@]+\.[^\s@]+$/, without a pattern that can backtrack). */
+export const isEmail = (text: string): boolean => {
+  const parts = text.split("@");
+  if (parts.length !== 2 || /\s/.test(text)) return false;
+  const [local = "", domain = ""] = parts;
+  return local !== "" && domain.slice(1, -1).includes(".");
+};

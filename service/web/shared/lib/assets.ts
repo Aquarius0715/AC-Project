@@ -11,7 +11,7 @@ import { metricLabel, metricUnit, opSymbol, type Operator, type Severity } from 
 import { csvCell } from "@ac/web/lib/csv";
 import type { IconName } from "@ac/web/components/Icon";
 import { byText, isAfter, isBefore } from "@ac/web/lib/order";
-import { codePoints, wrapped } from "@ac/web/lib/text";
+import { codePoints, isEmail, wrapped } from "@ac/web/lib/text";
 
 export const profiles = ["rto", "general", "energy", "environment"] as const;
 export type Profile = (typeof profiles)[number];
@@ -413,7 +413,7 @@ export function clientUserRows(us: ApiClientUser[], who: (membershipId: string) 
 /** A plain address up to 254 characters, not yet a user of this customer (case-insensitive). */
 export function inviteError(email: string, us: { email: string }[], t: T = translator("en")): string | undefined {
   const e = email.trim();
-  if (e.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return t("A valid email address (up to 254 characters)");
+  if (e.length > 254 || !isEmail(e)) return t("A valid email address (up to 254 characters)");
   if (us.some((u) => u.email.toLowerCase() === e.toLowerCase())) return t("Already a user of this customer");
   return undefined;
 }

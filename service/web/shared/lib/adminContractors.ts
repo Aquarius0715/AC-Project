@@ -11,7 +11,7 @@ import { amount } from "@ac/web/lib/money";
 import { qualificationLabel } from "@ac/web/lib/partnerJobDetail";
 import type { IconName } from "@ac/web/components/Icon";
 import { byText } from "@ac/web/lib/order";
-import { codePoints } from "@ac/web/lib/text";
+import { codePoints, isEmail } from "@ac/web/lib/text";
 
 const en = translator("en");
 
@@ -127,7 +127,7 @@ export function profileErrors(f: { registrationNo: string; serviceAreas: string;
   if (r < 1 || r > 64) e.registrationNo = t("1–64 characters.");
   const areas = areasOf(f.serviceAreas);
   if (areas.length === 0 || areas.length > 20 || areas.some((a) => a.length > 80) || new Set(areas.map((a) => a.toLowerCase())).size !== areas.length) e.serviceAreas = t("1–20 different areas, comma-separated.");
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.contactEmail.trim()) || codePoints(f.contactEmail.trim()) > 254) e.contactEmail = t("A valid e-mail address.");
+  if (!isEmail(f.contactEmail.trim()) || codePoints(f.contactEmail.trim()) > 254) e.contactEmail = t("A valid e-mail address.");
   return e;
 }
 export const areasOf = (v: string) => v.split(",").map((a) => a.trim()).filter(Boolean);

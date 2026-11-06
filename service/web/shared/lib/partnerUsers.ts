@@ -4,7 +4,7 @@
 import { EN, showDate, showTime, type I18n } from "@ac/web/lib/i18n";
 import { klDate, klStart } from "@ac/web/lib/partnerTeam";
 import { oneOf } from "@ac/web/lib/oneOf";
-import { codePoints } from "@ac/web/lib/text";
+import { codePoints, isEmail } from "@ac/web/lib/text";
 import { isAfter, isBefore } from "@ac/web/lib/order";
 
 export type PartnerRole = "contractor" | "technician";
@@ -65,7 +65,7 @@ export function partnerUserRows(us: ApiPartnerUser[], self: string | null, i: I1
 /** A plain address up to 254 characters, not yet used by another account of the company (case-insensitive). */
 export function partnerInviteError(email: string, us: { id: string; email: string }[], t = EN.t, self?: string): string | undefined {
   const e = email.trim();
-  if (e.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return t("A valid email address (up to 254 characters)");
+  if (e.length > 254 || !isEmail(e)) return t("A valid email address (up to 254 characters)");
   if (us.some((u) => u.id !== self && u.email.toLowerCase() === e.toLowerCase())) return t("Already a user of your company");
   return undefined;
 }

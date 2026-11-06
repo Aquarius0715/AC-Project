@@ -5,7 +5,7 @@
 import { EN, showTime, translator, zonedInstant, zonedParts, type I18n, type T } from "@ac/web/lib/i18n";
 import type { OpInput } from "@ac/web/lib/opTypes";
 import type { Permission } from "@ac/web/lib/contracts.gen";
-import { codePoints } from "@ac/web/lib/text";
+import { codePoints, isEmail } from "@ac/web/lib/text";
 import { isAfter } from "@ac/web/lib/order";
 
 const en = translator("en");
@@ -137,7 +137,7 @@ export function memberErrors(d: MemberDraft, ctx: { selfUserId: string; current?
   const e: Record<string, string> = {};
   if (d.creatingUser) { // IR461: the person is created with the membership
     const email = d.inviteEmail.trim();
-    if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) e["newUser.email"] = t("A valid email address (up to 254 characters)");
+    if (email.length > 254 || !isEmail(email)) e["newUser.email"] = t("A valid email address (up to 254 characters)");
     const n = codePoints(d.inviteName.trim());
     if (n < 1 || n > 120) e["newUser.displayName"] = t("A name of 1–120 characters");
   } else if (!d.userId) e.userId = t("Choose a user");

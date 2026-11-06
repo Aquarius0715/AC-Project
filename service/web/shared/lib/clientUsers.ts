@@ -9,6 +9,7 @@ restores the seed, FR-X05).
 import { useSyncExternalStore } from "react";
 import { z } from "zod";
 import { readDemoAs, writeDemo } from "@ac/web/lib/demoStore";
+import { isEmail } from "@ac/web/lib/text";
 
 export type ClientRole = "owner" | "member";
 export interface ClientUser { id: string; name: string | null; email: string; role: ClientRole; status: "invited" | "active" | "disabled"; lastSignIn: string | null; invitedBy?: string; invitedAt?: string }
@@ -45,7 +46,7 @@ export const useClientUsers = () => useSyncExternalStore(subscribe, load, () => 
 export const emailError = (email: string, users: ClientUser[]) => {
   const e = email.trim();
   if (!e) return "Enter an e-mail address";
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return "Enter a valid e-mail address";
+  if (!isEmail(e)) return "Enter a valid e-mail address";
   const dup = users.find((u) => u.email.toLowerCase() === e.toLowerCase());
   if (dup) return `This person is already a user of customer-a (${dup.name ?? dup.email} · ${dup.role === "owner" ? "Owner" : "Member"}). E-mails are matched without case.`;
   return null;
