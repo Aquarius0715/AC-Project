@@ -185,6 +185,14 @@ export function webConfig(tsconfigRootDir) {
       },
     },
     {
+      // Screens read their tables with keys that are typed (a union of named tabs, fields, roles, states) or come from
+      // their own literals, so a key here is never chosen by an outside caller. Off for the component files only: keys
+      // from the API, the URL, a request or a session stay checked in lib, bff, loaders, server actions and the route
+      // files (page.tsx, route.ts), which read them
+      files: ["**/components/**", "**/_components/**"],
+      rules: { "security/detect-object-injection": "off" },
+    },
+    {
       // TypeScript resolves every reference, including the route types Next.js generates (PageProps, LayoutProps)
       files: ["**/*.{ts,tsx,mts,cts}"],
       rules: { "sonarjs/no-reference-error": "off" },

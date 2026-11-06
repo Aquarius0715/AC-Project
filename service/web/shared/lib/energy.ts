@@ -7,7 +7,6 @@ import { codePoints } from "@ac/web/lib/text";
 import { isBefore } from "@ac/web/lib/order";
 
 const DEMO_FIXED = "demo_fixed";
-const BOUNDARY_TEXT = "AC equipment input electricity (excludes shared equipment, solar and batteries)";
 const KL = "Asia/Kuala_Lumpur";
 
 const en = translator("en");
@@ -16,6 +15,7 @@ const en = translator("en");
 Number.prototype.toFixed for rounding). Never -0, which Intl shows as "-0.0" (IR265). */
 /** The API's fixed explanation of the actual-data boundary (IR11), shown in the display language like stored evidence
 (IR480); a baseline's own boundary text is the user's and stays as written. */
+const BOUNDARY_TEXT = "AC equipment input electricity (excludes shared equipment, solar and batteries)";
 
 export function roundAway(x: number, digits: number): number {
   if (!Number.isFinite(x)) return x;

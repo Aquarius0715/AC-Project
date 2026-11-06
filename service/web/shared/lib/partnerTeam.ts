@@ -66,7 +66,7 @@ export function memberRows(members: ApiTeamMember[], week: ApiCapacity[][], dayI
     const assigned = caps.reduce((a, c) => a + (c?.assignedMinutes ?? 0), 0), available = caps.reduce((a, c) => a + (c?.availableMinutes ?? 0), 0);
     const row = { id: m.id, name: m.displayName, sub: `${quals} · ${since}`, active: isActive, week: { text: t("{a} h / {b} h", { a: hours(assigned), b: hours(available) }), pct: pct(assigned, available) } };
     if (!isActive) return { ...row, week: { text: "—", pct: null }, day: { main: t("Expired — cannot be assigned"), sub: "—", tone: "crit" }, util: "—" };
-    const c = caps.at(dayIndex);
+    const c = dayIndex >= 0 ? caps.at(dayIndex) : undefined; // -1: the date is not in the week
     if (c?.unavailability) return { ...row, day: { main: t("Unavailable · {reason}", { reason: unavailabilityLabel(c.unavailability, t) }), sub: "—", tone: "warn" }, util: "—" };
     if (!c?.availableMinutes) return { ...row, day: { main: t("No available hours set"), sub: "—" }, util: "—" };
     const mine = jobs.filter((j) => j.technicianId === m.id);
@@ -105,7 +105,7 @@ export function teamStats(members: ApiTeamMember[], week: ApiCapacity[][], dayIn
   const ids = new Set(members.map((m) => m.id));
   const mine = (d: ApiCapacity[]) => d.filter((c) => ids.has(c.membershipId));
   const assigned = week.flatMap((item) => mine(item)).reduce((a, c) => a + c.assignedMinutes, 0), available = week.flatMap((item) => mine(item)).reduce((a, c) => a + (c.availableMinutes ?? 0), 0);
-  const free = mine(week.at(dayIndex) ?? []).reduce((a, c) => a + Math.max(0, (c.availableMinutes ?? 0) - c.assignedMinutes), 0);
+  const free = mine((dayIndex >= 0 ? week.at(dayIndex) : undefined) ?? []).reduce((a, c) => a + Math.max(0, (c.availableMinutes ?? 0) - c.assignedMinutes), 0);
   const usage = pct(assigned, available);
   return { assigned: t("{n} h", { n: hours(assigned) }), available: t("{n} h", { n: hours(available) }), utilization: usage === null ? "—" : `${String(usage)}%`, free: t("{n} h", { n: hours(free) }) };
 }

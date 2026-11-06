@@ -15,7 +15,6 @@ const IDENTITY_WRITE = "identity.write";
 const DEVICE_MAINTAIN = "device.maintain";
 const CONTROL_DIAGNOSE = "control.diagnose";
 const RESTRICTION_OVERRIDE = "restriction.override";
-const NO_USER = "00000000-0000-0000-0000-000000000000";
 
 const en = translator("en");
 
@@ -117,6 +116,7 @@ export const zonedLocal = (iso: string, zone: string) => {
 const zonedFrom = (local: string, zone: string) => zonedInstant(local.slice(0, 10), local.slice(11, 16), zone);
 
 /** The user ID members.save receives with newUser: none yet. */
+const NO_USER = "00000000-0000-0000-0000-000000000000";
 
 /** The form of a membership; the valid period is typed in the display time zone (NFR-08). A new one starts `now` (the
 business clock), as most do, so the period needs only its end (IR622). */

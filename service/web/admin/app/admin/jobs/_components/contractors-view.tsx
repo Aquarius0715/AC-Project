@@ -1,6 +1,5 @@
 "use client";
 const ADD_CONTRACTOR = "Add contractor";
-const NEW_COMPANY = "new";
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -23,6 +22,7 @@ import { byCount } from "@ac/web/lib/i18n";
 
 type Detail = NonNullable<ContractorsLive["detail"]>;
 /** The organization choice of a company still to create (IR465). */
+const NEW_COMPANY = "new";
 
 type ModalState = null | { kind: "profile"; organizationId: string | null } | { kind: "status" } | { kind: "rates" } | { kind: "verify" } | { kind: "job" };
 
