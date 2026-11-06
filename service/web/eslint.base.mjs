@@ -200,6 +200,14 @@ export function webConfig(tsconfigRootDir) {
         "sonarjs/cyclomatic-complexity": "off",
         "sonarjs/max-lines": "off",
         "sonarjs/max-lines-per-function": "off",
+        // the size and shape limits are for code that is read to be changed; a test lists cases, scans sources with loops
+        // and repeats the literals it checks (CLAUDE.md 4: tests are not held to them)
+        "sonarjs/nested-control-flow": "off",
+        "sonarjs/too-many-break-or-continue-in-loop": "off",
+        "sonarjs/no-duplicate-string": "off",
+        "sonarjs/regex-complexity": "off",
+        "sonarjs/expression-complexity": "off",
+        "unicorn/max-nested-calls": "off",
         // tests read the repository's own files (the catalog, the sources they check) by a computed path
         "security/detect-non-literal-fs-filename": "off",
       },
