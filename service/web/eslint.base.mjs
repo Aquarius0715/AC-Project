@@ -127,6 +127,9 @@ export function webConfig(tsconfigRootDir) {
         // 4-2: a conditional suffix inside a template (`${a}${b ? \` · \${c}\` : ""}`) is the plainest way to write it; the
         // alternatives (a temporary for each suffix, or concatenation) read worse
         "sonarjs/no-nested-template-literals": "off",
+        // safe-regex flags every optional group that holds a quantifier (^\d+(\.\d+)?$), which is linear; these patterns run
+        // on short trimmed form values. The ones that are not linear are caught by sonarjs/slow-regex and super-linear-regex
+        "security/detect-unsafe-regex": "off",
         // 2: names say what a value is, and are not lengthened only for a rule: DOM and React attributes (checked,
         // disabled), the contract's fields (enabled, online) and predicates (overlaps, fits) are not renamed is…/has…
         "unicorn/consistent-boolean-name": "off",
@@ -176,6 +179,8 @@ export function webConfig(tsconfigRootDir) {
         "sonarjs/cyclomatic-complexity": "off",
         "sonarjs/max-lines": "off",
         "sonarjs/max-lines-per-function": "off",
+        // tests read the repository's own files (the catalog, the sources they check) by a computed path
+        "security/detect-non-literal-fs-filename": "off",
       },
     },
     {
