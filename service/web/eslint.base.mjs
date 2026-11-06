@@ -120,6 +120,10 @@ export function webConfig(tsconfigRootDir) {
         // (2 members) would flag every such union. The limit is 9 members: the Core API state machines (a command, a
         // proposal, a release) have up to 6 named states, and a page's modal state (new, decline, rate, ...) has up to 9.
         "sonarjs/max-union-size": ["error", { threshold: 9 }],
+        // 4-2: a condition of four or five operators (a && b || !c ? x : y) still reads as one decision, so the limits are
+        // 5 operators per expression and 4 nested calls (the defaults are 3 and 3); longer ones are split by hand
+        "sonarjs/expression-complexity": ["error", { max: 5 }],
+        "unicorn/max-nested-calls": ["error", { max: 4 }],
         // 2: names say what a value is, and are not lengthened only for a rule: DOM and React attributes (checked,
         // disabled), the contract's fields (enabled, online) and predicates (overlaps, fits) are not renamed is…/has…
         "unicorn/consistent-boolean-name": "off",
