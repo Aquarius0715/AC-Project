@@ -29,8 +29,8 @@ export interface PropertiesLive {
 const kindLabel: Record<string, string> = { home: "Home", office: "Office", floor: "Floor", area: "Area", room: "Room", space: "Space" };
 const powerLabel: Record<PowerState, string> = { on: "Running", off: "Stopped", unknown: "Unknown" };
 // “2 units”, “1 AC” in the display language
-const units_ = (t: T, n: number) => t(n === 1 ? "{n} unit" : "{n} units", { n });
-const acs_ = (t: T, n: number) => t(n === 1 ? "{n} AC" : "{n} ACs", { n });
+const unitsText = (t: T, n: number) => t(n === 1 ? "{n} unit" : "{n} units", { n });
+const acsText = (t: T, n: number) => t(n === 1 ? "{n} AC" : "{n} ACs", { n });
 const kind = (t: T, k: string) => t(kindLabel[k] ?? k);
 
 /** Units & locations (FR-C02) in API mode: the structure is read only (HQ manages it) except renaming; a room lists its
@@ -56,7 +56,7 @@ export function PropertiesView({ live }: Readonly<{ live: PropertiesLive }>) {
                 <Row depth={0} selected={!live.filter && selId === p.id} onClick={() => { go({ propertyId: p.id }); }} icon="home" name={p.name} tag={kind(t, p.kind)}
                   onRename={() => { setRenaming({ kind: "property", id: p.id, version: p.version, name: p.name, where: t("{name} · {kind} (property)", { name: p.name, kind: kind(t, p.kind) }) }); }} />
                 {p.spaces.map((s) => <SpaceRow key={s.id} s={s} p={p} depth={1} selId={live.filter ? "" : selId} go={go} rename={setRenaming} />)}
-                {p.unassigned > 0 && <Row depth={1} selected={!live.filter && selId === `unassigned:${p.id}`} onClick={() => { go({ propertyId: p.id, unassignedOnly: "true" }); }} icon="unknown" name={t("Unassigned units")} meta={t("· {units} · placed by HQ", { units: units_(t, p.unassigned) })} />}
+                {p.unassigned > 0 && <Row depth={1} selected={!live.filter && selId === `unassigned:${p.id}`} onClick={() => { go({ propertyId: p.id, unassignedOnly: "true" }); }} icon="unknown" name={t("Unassigned units")} meta={t("· {units} · placed by HQ", { units: unitsText(t, p.unassigned) })} />}
               </div>
             ))}
           </div>
@@ -93,7 +93,7 @@ function SpaceRow({ s, p, depth, selId, go, rename }: Readonly<{ s: TreeSpace; p
   return (
     <>
       <Row depth={depth} selected={selId === s.id} onClick={() => { go({ spaceId: s.id }); }} icon={s.children.length > 0 ? "chevronDown" : "chevronRight"} name={s.name} tag={kind(t, s.kind)}
-        meta={s.direct ? `· ${units_(t, s.direct)}` : undefined} onRename={() => { rename({ kind: "space", id: s.id, version: s.version, name: s.name, where: t("{name} · {kind} in {property}", { name: s.name, kind: kind(t, s.kind), property: p.name }) }); }} />
+        meta={s.direct ? `· ${unitsText(t, s.direct)}` : undefined} onRename={() => { rename({ kind: "space", id: s.id, version: s.version, name: s.name, where: t("{name} · {kind} in {property}", { name: s.name, kind: kind(t, s.kind), property: p.name }) }); }} />
       {s.children.map((c) => <SpaceRow key={c.id} s={c} p={p} depth={depth + 1} selId={selId} go={go} rename={rename} />)}
     </>
   );
@@ -168,7 +168,7 @@ function Panel({ live, sel, rename, go }: Readonly<{ live: PropertiesLive; sel: 
         action={<Btn size="sm" onClick={() => { rename({ kind: "space", id: s.id, version: s.version, name: s.name, where: t("{name} · {kind} in {property}", { name: s.name, kind: kind(t, s.kind), property: p.name }) }); }}><Icon name="edit" />{t("Rename")}</Btn>}>
         {canGroup && (
           <div className="mb-3 flex flex-wrap items-center gap-2">
-            <span className="text-xs text-muted-foreground">{t("{acs} in {space} ·", { acs: acs_(t, direct.length), space: s.name })}</span>
+            <span className="text-xs text-muted-foreground">{t("{acs} in {space} ·", { acs: acsText(t, direct.length), space: s.name })}</span>
             {(["single", "group"] as const).map((m) => {
               return <Plain key={m} type="button" aria-pressed={mode === m} onClick={() => { go({ spaceId: s.id, mode: m === "group" ? "group" : null }); }}
                 className={cx("inline-flex items-center gap-1 rounded-control border px-3 py-1 text-xs font-semibold", mode === m ? "border-primary bg-primary-soft text-primary" : "border-line")}>{mode === m && <Icon name="check" />}{t(m === "single" ? "Single AC" : "Group control")}</Plain>;

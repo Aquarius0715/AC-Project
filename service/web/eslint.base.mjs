@@ -155,6 +155,9 @@ export function webConfig(tsconfigRootDir) {
             replacements: {
               acc: false,
               args: false,
+              // the app's button component (Btn) and shadcn/ui's lib/utils.ts keep the names their code and tooling use
+              btn: false,
+              utils: false,
               ctx: false,
               db: false,
               e: false,

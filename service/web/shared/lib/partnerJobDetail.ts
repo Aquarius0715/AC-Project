@@ -153,8 +153,8 @@ export function timeline(status: string, events: ApiJobEvent[], hasTechnician: b
     ["Submitted", ["job.submitted"], "report sent for your review"], ["Completed", ["job.reviewed"], "after the quality review"],
   ];
   return steps.map(([label, actions, sub], k) => {
-    const when_ = at(actions);
-    return { label: t(label), at: when_, atText: when_ ? showTime(when_, display) : null, sub: t(sub), state: stepState(k, reached, status) };
+    const whenAt = at(actions);
+    return { label: t(label), at: whenAt, atText: whenAt ? showTime(whenAt, display) : null, sub: t(sub), state: stepState(k, reached, status) };
   });
 }
 
@@ -203,10 +203,10 @@ export function detailBanner(j: ApiDetail, techName: string | null, now: number,
 }
 
 /** The delegation countdown (“7 d 14 h to schedule the work” while nobody is assigned), its end in the display zone. */
-export const delegationLeft = (until_: string, now: number, toSchedule = false, i: I18n = EN) => {
+export const delegationLeft = (untilIso: string, now: number, toSchedule = false, i: I18n = EN) => {
   const { t, display } = i;
-  if (Date.parse(until_) <= now) return t("The delegation period has ended.");
-  const p = { time: showTime(until_, display), left: until(until_, now, t) };
+  if (Date.parse(untilIso) <= now) return t("The delegation period has ended.");
+  const p = { time: showTime(untilIso, display), left: until(untilIso, now, t) };
   return t(toSchedule ? "Delegation ends {time} — {left} to schedule the work." : "Delegation ends {time} — {left} left.", p);
 };
 
