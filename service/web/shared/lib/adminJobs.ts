@@ -303,7 +303,7 @@ export const HQ_REFUSAL_KEYS = [...Object.values(HQ_REFUSAL_TEXT), ...Object.val
 /** Readable refusals of the HQ job actions, in the display language; a field is named in words (IR493). */
 export function hqRefusal(f: { code: string; messageKey: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null }, t: T = en): string {
   const word = (k: string | undefined) => (k ? t(k) : undefined);
-  const fields = Object.entries(f.fieldErrors).map(([k, v]) => `${fieldName(k)}: ${word(HQ_FIELD_TEXT[`${k}:${v}`]) ?? word(HQ_REFUSAL_TEXT[v]) ?? v}`);
+  const fields = Object.entries(f.fieldErrors).map(([k, v]) => `${fieldName(k)}: ${word(lookup(HQ_FIELD_TEXT, `${k}:${v}`)) ?? word(lookup(HQ_REFUSAL_TEXT, v)) ?? v}`);
   if (fields.length > 0) return fields.join(" · ");
   const known = textOf(HQ_REFUSAL_TEXT, f.messageKey, t);
   if (known) return f.code === "CONFLICT" ? t("Not saved: {reason}.", { reason: known }) : `${known}.`;

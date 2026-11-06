@@ -21,6 +21,7 @@ import {
   attentionCard, bucketPoints, emissionsCard, energyCard, nextRunText, overviewRows, overviewScope, periodLabel, periodNote, periodOf, previousRange, type OverviewUnit,
 } from "@ac/web/lib/customerOverview";
 import { orNull, recover } from "@ac/web/lib/promises";
+import { entryOf } from "@ac/web/lib/lookup";
 
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
@@ -90,11 +91,11 @@ export async function loadOverview(sp: Record<string, string | string[] | undefi
   const roomOf = (u: OverviewUnit) => (u.spaceId ? spaces.find((s) => s.id === u.spaceId)?.name : null) ?? properties.find((p) => p.id === u.propertyId)?.name ?? t("Room");
   return {
     due: dueLines,
-    now: now.toISOString(), period: kind, periodLabel: t(periodLabel[kind]), note: periodNote(kind, period, i), asOf: summary.asOf, properties: properties.filter((p) => !p.archived).map((p) => ({ id: p.id, name: p.name })), propertyId: sel.propertyId, propertyName: sel.propertyName,
+    now: now.toISOString(), period: kind, periodLabel: t(entryOf(periodLabel, kind)), note: periodNote(kind, period, i), asOf: summary.asOf, properties: properties.filter((p) => !p.archived).map((p) => ({ id: p.id, name: p.name })), propertyId: sel.propertyId, propertyName: sel.propertyName,
     units: sel.inProperty.map((u) => ({ id: u.id, name: u.displayName })), unitId: sel.unitId,
     counts: summary.counts,
     rows: overviewRows(sel.scope, (u) => place.get(u.id)?.place ?? "", i),
-    energy: sums ? energyCard(kind, sums[0], sums[1], week.map((d, k) => ({ label: d.label.split(" ", 1)[0] ?? d.label, kWh: sums[2][k]?.totals.kWh ?? null })), sums[3].map((s) => s.totals.kWh), scopeText, i) : null,
+    energy: sums ? energyCard(kind, sums[0], sums[1], week.map((d, k) => ({ label: d.label.split(" ", 1)[0] ?? d.label, kWh: sums[2].at(k)?.totals.kWh ?? null })), sums[3].map((s) => s.totals.kWh), scopeText, i) : null,
     emissions: sums ? { ...emissionsCard(sums[0], baseline ? baseline.method : null, i), scope: scopeText } : null,
     air: air ? {
       id: air.id, room: roomOf(air), unit: air.displayName, co2: metricCard("co2", air.latestMeasurements.find((m) => m.metric === "co2"), true, i),
@@ -105,10 +106,11 @@ export async function loadOverview(sp: Record<string, string | string[] | undefi
       on: inScope.filter((a) => a.enabled).length, off: inScope.filter((a) => !a.enabled).length,
       items: shown.map((a, k) => {
         const u = units.find((x) => x.id === a.unitIds[0]);
-        const card = ruleCard(a, u ? { name: u.displayName, path: place.get(u.id)?.place ?? "", property: properties.find((p) => p.id === u.propertyId)?.name ?? "" } : null, nexts[k] ?? null, !!consent?.granted, i);
+        const next = nexts.at(k);
+        const card = ruleCard(a, u ? { name: u.displayName, path: place.get(u.id)?.place ?? "", property: properties.find((p) => p.id === u.propertyId)?.name ?? "" } : null, next ?? null, !!consent?.granted, i);
         const consentWord = t(consent?.granted ? "granted" : "not granted");
         const idle = triggerOf(a) === "location" ? t("{when} · location consent: {state}", { when: card.when, state: consentWord }) : card.when;
-        const line = nexts[k] ? t("Next run: {when} · {unit}", { when: nextRunText(nexts[k], nowMs, i), unit: u?.displayName ?? "AC" }) : idle;
+        const line = next ? t("Next run: {when} · {unit}", { when: nextRunText(next, nowMs, i), unit: u?.displayName ?? "AC" }) : idle;
         return { id: a.id, name: a.name, status: card.status, line };
       }),
     }, display,

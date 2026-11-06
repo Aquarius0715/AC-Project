@@ -40,7 +40,7 @@ describe("the sealed session cookie (AES-256-GCM, IR333)", () => {
     expect(unseal(t)).toEqual({ a: 1, b: "x" });
     const [ivPart, bodyPart] = t.split(".", 2);
     const iv = must(ivPart), body = must(bodyPart);
-    const flip = (v: string, i: number) => { const b = Buffer.from(v, "base64url"); b[i] = (b[i] ?? 0) ^ 1; return b.toString("base64url"); };
+    const flip = (v: string, i: number) => { const b = Buffer.from(v, "base64url"); b.writeUInt8(b.readUInt8(i) ^ 1, i); return b.toString("base64url"); };
     expect([unseal(`${flip(iv, 0)}.${body}`), unseal(`${iv}.${flip(body, 0)}`), unseal(`${iv}.${flip(body, Buffer.from(body, "base64url").length - 1)}`),
       unseal(`${iv}.`), unseal(`.${body}`), unseal(iv), unseal(`${t}.x`), unseal(`${iv.slice(2)}.${body}`), unseal(undefined), unseal("")])
       .toEqual([null, null, null, null, null, null, null, null, null, null]);

@@ -6,6 +6,7 @@ import {
 import { componentGroups, componentLabel } from "@ac/web/lib/techJob";
 import { i18nOf } from "@ac/web/lib/i18n";
 import { must } from "./must";
+import { lookup } from "@ac/web/lib/lookup";
 
 const TECH_EXTERNAL_A = "tech-external-a";
 const TEXT_2026_09_14T01_05_00Z = "2026-09-14T01:05:00Z";
@@ -39,7 +40,7 @@ describe("inspection rows", () => {
     // the reviewer reads the words the technician chose from: “refrigerant pipe” is an item, its pressure a reading
     for (const { group, keys } of componentGroups) for (const key of keys) {
       const label = must(inspectionRows([item({ componentGroup: group, componentKey: key })])[0]?.label.split(" — ", 2)[1]);
-      const word = must(componentLabel[key]).toLowerCase();
+      const word = must(lookup(componentLabel, key)).toLowerCase();
       expect(label.startsWith(word), `${key}: ${label}`).toBe(true);
     }
     expect(Object.values(resultText).map((x) => x.label)).toEqual(["Normal", "Attention", "Not inspected", "Not applicable"]);

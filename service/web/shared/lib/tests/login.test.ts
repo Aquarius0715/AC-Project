@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { continueHref, loginError, otherServices, safeReturnTo } from "@ac/web/lib/login";
 import { ROLES } from "@ac/web/lib/nav";
+import { entryOf } from "@ac/web/lib/lookup";
 
 describe("Sign-in page (FR-X01, SCR-X-login, IR251)", () => {
   it("keeps returnTo only inside the role's area", () => {
@@ -14,7 +15,7 @@ describe("Sign-in page (FR-X01, SCR-X-login, IR251)", () => {
   });
 
   it("names the other services in Figma's order and says why a sign-in came back", () => {
-    expect((["client", "admin", "contractor", "technician"] as const).map((r) => otherServices(r).map((o) => ROLES[o].loginTitle).join(", ")))
+    expect((["client", "admin", "contractor", "technician"] as const).map((r) => otherServices(r).map((o) => entryOf(ROLES, o).loginTitle).join(", ")))
       .toEqual(["Admin, Partner, Technician", "Client, Partner, Technician", "Client, Admin, Technician", "Client, Admin, Partner"]);
     expect([loginError(undefined), loginError("role"), loginError("expired"), loginError("other")]).toEqual([null,
       "This account belongs to another AC Project service — use that service's own sign-in.", "Your session ended — sign in again.", "The sign-in did not complete — try again."]);

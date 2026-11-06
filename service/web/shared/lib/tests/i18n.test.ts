@@ -7,6 +7,7 @@ import { ROLES } from "@ac/web/lib/nav";
 import { consentNote } from "@ac/web/lib/preferences";
 import { byText } from "@ac/web/lib/order";
 import { must } from "./must";
+import { lookup } from "@ac/web/lib/lookup";
 
 const TEXT_2026_09_16 = "2026-09-16";
 const ASIA_KUALA_LUMPUR = "Asia/Kuala_Lumpur";
@@ -114,7 +115,7 @@ describe("Display language (FR-X01, AT-X01-N, IR258)", () => {
       for (const item of translated) expect(ms[item.label], item.label).toBeTruthy();
       expect(ms[config.sub], config.sub).toBeTruthy();
       const word = must(config.chip.split(" — ", 1)[0]); // the role chip of the header
-      expect(ms[word], word).toBeTruthy();
+      expect(lookup(ms, word), word).toBeTruthy();
     }
   });
 

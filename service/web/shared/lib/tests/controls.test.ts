@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
+import { lookup } from "@ac/web/lib/lookup";
 
 // Phase 5 of the shadcn/ui adoption (DEC-75, IR404): the screens build their controls from the shadcn/ui components
 // (through the product names in components/ui.tsx), not from raw <button>, <input>, <select> and <textarea> elements. A
@@ -22,7 +23,7 @@ export function rawElements(file: string): Record<string, number> {
   const visit = (n: ts.Node) => {
     if (ts.isJsxOpeningElement(n) || ts.isJsxSelfClosingElement(n)) {
       const tag = n.tagName.getText(sf);
-      if (RAW.has(tag)) counts[tag] = (counts[tag] ?? 0) + 1;
+      if (RAW.has(tag)) Object.assign(counts, { [tag]: (lookup(counts, tag) ?? 0) + 1 });
     }
     ts.forEachChild(n, visit);
   };

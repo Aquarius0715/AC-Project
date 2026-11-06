@@ -7,6 +7,7 @@ import { klTime } from "@ac/web/lib/devices";
 import { EN, intlTag, relativeTime, showTime, translator, type I18n, type Locale, type T, textOf } from "@ac/web/lib/i18n";
 import { wrapped } from "@ac/web/lib/text";
 import { isAfter } from "@ac/web/lib/order";
+import { entryOf } from "@ac/web/lib/lookup";
 
 const UNASSIGNED = "unassigned";
 const IN_PROGRESS = "in_progress";
@@ -180,7 +181,7 @@ export function progress(jobs: PartnerJob[], now: number) {
   const counts: Record<Exclude<Bucket, "other">, number> = { offered: 0, unassigned: 0, active: 0, overdue: 0, review: 0, completed: 0 };
   for (const j of jobs) {
     const b = bucket(j, now);
-    if (b !== "other") counts[b]++;
+    if (b !== "other") Object.assign(counts, { [b]: entryOf(counts, b) + 1 });
   }
   const total = BUCKETS.reduce((s, b) => s + counts[b.id], 0);
   return { counts, total, completedPct: total ? Math.round((counts.completed / total) * 100) : 0 };
