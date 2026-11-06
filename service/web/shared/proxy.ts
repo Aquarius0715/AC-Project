@@ -5,6 +5,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { clearedCookieOptions, cookieOptions, dropSession, loadSession, needsRefresh, oidcConfig, refresh, renewSessionCookie, roleHome, SESSION_COOKIE, type Session } from "@ac/web/lib/session";
 import { contentSecurityPolicy, HSTS, makeNonce as makeNonce, originOf } from "@ac/web/lib/securityHeaders";
+import { entryOf } from "@ac/web/lib/lookup";
 
 const sharedAreas = ["/notifications", "/settings"]; // shared pages that need a session but no particular role
 
@@ -49,7 +50,7 @@ export async function authProxy(req: NextRequest, appRole: Session["role"]) {
     return secure(res);
   };
   const path = req.nextUrl.pathname;
-  const home = roleHome[appRole];
+  const home = entryOf(roleHome, appRole);
   const isArea = path === home || path.startsWith(home + "/");
   const isShared = sharedAreas.some((p) => path === p || path.startsWith(p + "/"));
   if (!isArea && !isShared) return pass();

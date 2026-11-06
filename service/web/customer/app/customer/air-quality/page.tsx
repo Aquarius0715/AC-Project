@@ -19,6 +19,7 @@ import { AirQualityDemo } from "./_components/air-quality-demo";
 import { AirQualityView, type AirLive } from "./_components/air-quality-view";
 import type { OpInput } from "@ac/web/lib/opTypes";
 import { queryReader } from "@ac/web/lib/searchParams";
+import { entryOf } from "@ac/web/lib/lookup";
 
 /** telemetry.series of one unit over the window, whole: the chart's slots — 5-minute averages for an hour or a day, hourly
 for 7 days — of the valid readings, with how many readings the window holds (IR605, IR607). */
@@ -55,7 +56,7 @@ export default async function CustomerAirQualityPage({ searchParams }: Readonly<
   const roomName = sel.room.spaceId ? spaces.find((s) => s.id === sel.room.spaceId)?.name ?? i.t("this room") : sel.room.path; // outside rooms: the property
   const slots = series.slots; // the whole window: never cut off, so no slot is "not loaded" (IR592 → IR607)
   const points = slots.map((s) => s.avg);
-  const info = metricInfo[metric];
+  const info = entryOf(metricInfo, metric);
   const range = axisRange(points, info.guide);
   const names = new Map(units.map((u) => [u.id, u.displayName]));
   const live: AirLive = {
