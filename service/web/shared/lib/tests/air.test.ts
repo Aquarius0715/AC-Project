@@ -25,6 +25,12 @@ const m = (metric: string, value: number | null, over: Partial<ApiMeasurement> =
 // as the air-quality page passes it: whether the unit page has a temperature row
 const advice = (cap: ApiUnitDetail["capabilities"]) => metricCard(TEMPERATURE, m(TEMPERATURE, 27.2), true, undefined, setsTemperature(cap)).advice;
 
+const model = (over: Partial<ApiUnitDetail["capabilities"]>): ApiUnitDetail["capabilities"] => {
+  return {
+    manufacturer: "Daikin", model: "IR via node_1", control: true, modeControl: false, fanControl: false, temperature: { min: 16, max: 30, step: 1 },
+    modes: [], fanLevels: [], ventilation: false, ventilationLevels: [], sensors: [], ...over,
+  };
+};
 describe("air-quality metric cards (FR-C07, IR44, IR99, IR213, IR260)", () => {
   it("rounds per IR44 and states a live reading, its guide and advice", () => {
     expect([airNumber(TEMPERATURE, 28.05), airNumber("co2", 999.5), airNumber("pm25", 34.4), airNumber("power", 0.68)]).toEqual(["28.1", "1000", "34", "0.68"]);
@@ -36,12 +42,6 @@ describe("air-quality metric cards (FR-C07, IR44, IR99, IR213, IR260)", () => {
   });
 
   it("points the temperature to Unit Control only when the model sets it there (IR544)", () => {
-    const model = (over: Partial<ApiUnitDetail["capabilities"]>): ApiUnitDetail["capabilities"] => {
-      return {
-        manufacturer: "Daikin", model: "IR via node_1", control: true, modeControl: false, fanControl: false, temperature: { min: 16, max: 30, step: 1 },
-        modes: [], fanLevels: [], ventilation: false, ventilationLevels: [], sensors: [], ...over,
-      };
-    };
     expect(advice(model({}))).toBe("Setpoint is on Unit Control");
     expect(advice(model({ temperature: null }))).toBe(SET_ON_THE_AC_ITSELF); // the power alone (the live Daikin, DEC-89)
     expect(advice(model({ control: false }))).toBe(SET_ON_THE_AC_ITSELF); // monitoring only

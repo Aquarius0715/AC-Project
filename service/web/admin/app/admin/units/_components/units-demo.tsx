@@ -23,6 +23,12 @@ const unitRows = [
 ];
 
 /** The Phase 1A demo of /admin/units (fixtures; DATA_SOURCE≠API). */
+const setTop = (t: "customers" | "warranty") => { setSearchParameter("tab", t === "warranty" ? "warranty" : "overview"); };
+const setTab = (t: "units" | "users" | "policies") => { setSearchParameter("tab", t === "units" ? "overview" : t); };
+const setCust = (c: Cust | null) => {
+  setSearchParameter("customerId", c ? c.id : null);
+  setSearchParameter("tab", "overview");
+};
 export function UnitsDemo() {
   const toast = useToast();
   const [q, setQ] = useState("");
@@ -32,12 +38,6 @@ export function UnitsDemo() {
   const cust = customers.find((x) => x.id === urlCustomer) ?? null;
   const top: "customers" | "warranty" = !cust && urlTab === "warranty" ? "warranty" : "customers";
   const tab: "units" | "users" | "policies" = urlTab === "users" || urlTab === "policies" ? urlTab : "units";
-  const setTop = (t: "customers" | "warranty") => { setSearchParameter("tab", t === "warranty" ? "warranty" : "overview"); };
-  const setTab = (t: "units" | "users" | "policies") => { setSearchParameter("tab", t === "units" ? "overview" : t); };
-  const setCust = (c: Cust | null) => {
-    setSearchParameter("customerId", c ? c.id : null);
-    setSearchParameter("tab", "overview");
-  };
   const [imp, setImp] = useState(false);
   const [status, setStatus] = useState<"active" | "all">("active");
   const [loc, setLoc] = useState("home-a");

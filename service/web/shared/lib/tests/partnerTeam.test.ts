@@ -50,6 +50,8 @@ const week = dates.map((d, k) => {
 });
 const job: TeamJob = { jobId: "job-p12-full", short: "job-p12", technicianId: "m-b", slot: slot(TEXT_2026_09_15T05_00_00Z, "2026-09-15T09:00:00Z"), text: "15 Sept, 1:00 pm – 5:00 pm MYT" };
 
+const signer = (id: string) => ({ id, displayName: "E2E Signer" });
+const u = (id: string, membershipId: string | null, from: string, to: string, type = ANNUAL_LEAVE, note: string | null = null): ApiUnavailability => ({ version: 1, id, membershipId, from, to, type, note });
 describe("partner team & capacity", () => {
   it("reads the URL's conditions with today in Kuala Lumpur", () => {
     expect(teamQuery({}, "2026-09-14T17:00:00Z")).toEqual({ date: TEXT_2026_09_15, today: TEXT_2026_09_15, qualification: null, activeOnly: true }); // 01:00 on the 15th in KL
@@ -124,10 +126,8 @@ describe("partner team & capacity", () => {
   });
 
   it("lists the upcoming unavailable days and says what a removal does (IR612)", () => {
-    const signer = (id: string) => ({ id, displayName: "E2E Signer" });
     const names = technicianNames([a, signer("m-s1"), signer("m-s2"), signer("m-s3")], new Map([["m-s1", "s1@example.com"], ["m-s2", "s2@example.com"], ["m-a", "a@example.com"]]));
     expect(names.values().toArray()).toEqual([TECH_EXTERNAL_A, "E2E Signer · s1@example.com", "E2E Signer · s2@example.com", "E2E Signer"]); // no e-mail known: the name only
-    const u = (id: string, membershipId: string | null, from: string, to: string, type = ANNUAL_LEAVE, note: string | null = null): ApiUnavailability => ({ version: 1, id, membershipId, from, to, type, note });
     const rows = unavailabilityRows([u("u2", "m-s1", TEXT_2026_09_17, TEXT_2026_09_18, "training", "Refresher"), u("u1", "m-a", "2026-09-10", TEXT_2026_09_16), u("u3", null, TEXT_2026_09_21, TEXT_2026_09_21, "public_holiday"), u("u4", "m-gone", TEXT_2026_09_30, TEXT_2026_09_30)], names, TEXT_2026_09_15);
     expect(rows.map((r) => [r.who, r.type, r.note, r.days, r.first, r.started])).toEqual([
       [TECH_EXTERNAL_A, "Annual leave", null, "Thu 10 – Wed 16 Sept", TEXT_2026_09_15, true],

@@ -68,6 +68,15 @@ describe("a session the Core API refuses", () => {
   });
 });
 
+const signIn = (pending: { reauth?: boolean; returnTo?: string | null }, coreAnswer: Response) => {
+  vi.stubGlobal("fetch", vi.fn((url: string) => Promise.resolve(url.includes("/protocol/openid-connect/token") ? json(200, { access_token: token, refresh_token: "r-1", expires_in: 300 }) : coreAnswer)));
+  const cookie = seal({ state: "s-1", verifier: "v-1", returnTo: CUSTOMER_ALERTS, ...pending });
+  return callback(new NextRequest("http://localhost:3000/bff/auth/callback?code=c-1&state=s-1", { headers: { cookie: `${OIDC_COOKIE}=${cookie}` } }));
+};
+const kept = async (url: string) => {
+  const res = await login(new NextRequest(url));
+  return must(unsealAs(res.cookies.get(OIDC_COOKIE)?.value, signInState));
+};
 describe("signing in again after a revocation", () => {
   it("asks the identity provider for the password when reauth=1 (prompt=login), and only then", async () => {
     const again = await login(new NextRequest("http://localhost:3000/bff/auth/login?reauth=1&returnTo=/customer"));
@@ -78,11 +87,6 @@ describe("signing in again after a revocation", () => {
     expect(locationOf(plain).searchParams.get("prompt")).toBeNull();
   });
 
-  const signIn = (pending: { reauth?: boolean; returnTo?: string | null }, coreAnswer: Response) => {
-    vi.stubGlobal("fetch", vi.fn((url: string) => Promise.resolve(url.includes("/protocol/openid-connect/token") ? json(200, { access_token: token, refresh_token: "r-1", expires_in: 300 }) : coreAnswer)));
-    const cookie = seal({ state: "s-1", verifier: "v-1", returnTo: CUSTOMER_ALERTS, ...pending });
-    return callback(new NextRequest("http://localhost:3000/bff/auth/callback?code=c-1&state=s-1", { headers: { cookie: `${OIDC_COOKIE}=${cookie}` } }));
-  };
 
   it("turns a single sign-on answer with the old sign-in into one password prompt", async () => {
     const res = await signIn({}, json(401, revoked));
@@ -105,10 +109,6 @@ describe("signing in again after a revocation", () => {
   it("never leaves the app's origin, whatever returnTo says", async () => {
     const crafted = ["https://evil.example/x", "//evil.example", "/\\evil.example", "/.//evil.example", "/customer/..//evil.example", "/%2F%2Fevil.example", "/\t/evil.example", "javascript:alert(1)", "/@evil.example", " //evil.example"];
     const origin = "http://localhost:3000";
-    const kept = async (url: string) => {
-      const res = await login(new NextRequest(url));
-      return must(unsealAs(res.cookies.get(OIDC_COOKIE)?.value, signInState));
-    };
     for (const returnTo of crafted) {
       const first = await kept(`${origin}/bff/auth/login?returnTo=${encodeURIComponent(returnTo)}`);
       const refused = await signIn({ returnTo: first.returnTo }, json(401, revoked));

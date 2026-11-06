@@ -194,8 +194,8 @@ const LEAVE = new Set(["annual_leave", "sick"]);
 /** The team's week (Mon–Sun, Kuala Lumpur days and hours): per technician and day the booked blocks with their job,
 leave or other unavailability, no hours or free; the selected technician's cell of the proposed slot is “This
 proposal”. */
+const dayOf = (iso: string) => new Date(Date.parse(iso) + KL).toISOString().slice(0, 10);
 export function weekGrid(dates: string[], members: ApiMember[], capacity: ApiCapacity[][], jobsOf: Map<string, { short: string; slot: Slot }[]>, proposal: { technicianId: string; slot: Slot; short: string } | null, t: T = en): WeekRow[] {
-  const dayOf = (iso: string) => new Date(Date.parse(iso) + KL).toISOString().slice(0, 10);
   return members.filter((m) => m.role === TECHNICIAN).map((m) => {
     let avail = 0;
     const cells = dates.map((date, k): WeekCell => {

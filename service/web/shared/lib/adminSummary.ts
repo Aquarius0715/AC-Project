@@ -109,8 +109,8 @@ export function forecastView(f: ApiForecast | null | undefined, t: T = en): Fore
 
 export interface AxisRow { label: string; count: number; pct: number; tone: "primary" | "muted" | "warn" | "ok" | "crit"; href: string; key: string }
 /** The power-state and connection cards (SR27): one row per class with its share of the bar and its list link. */
+const pct = (n: number, of: number) => (of ? (n / of) * 100 : 0);
 export function axisRows(s: AdminSummary, links: ReturnType<typeof overviewLinks>, t: T = en) {
-  const pct = (n: number, of: number) => (of ? (n / of) * 100 : 0);
   const conn = s.online + s.offline + s.unknown;
   return {
     power: [

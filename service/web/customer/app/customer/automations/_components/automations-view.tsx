@@ -167,6 +167,7 @@ function useDebounced<T>(value: T, ms: number): T {
   return v;
 }
 
+const step = (n: number, title: string, sub?: string) => <div className="flex items-start gap-2"><span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-ink text-[11px] font-bold text-white">{n}</span><div><div className="text-[15px] font-bold">{title}</div>{sub && <div className="text-xs text-muted-foreground">{sub}</div>}</div></div>;
 function Editor({ live, onDone, onCancel }: Readonly<{ live: AutomationsLive; onDone: (n: Notice) => void; onCancel: () => void }>) {
   const i18n = useI18n();
   const { t } = i18n;
@@ -253,7 +254,6 @@ function Editor({ live, onDone, onCancel }: Readonly<{ live: AutomationsLive; on
       </Field>
     );
   };
-  const step = (n: number, title: string, sub?: string) => <div className="flex items-start gap-2"><span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-ink text-[11px] font-bold text-white">{n}</span><div><div className="text-[15px] font-bold">{title}</div>{sub && <div className="text-xs text-muted-foreground">{sub}</div>}</div></div>;
   return (
     <Page>
       <div className="text-[13px] text-muted-foreground"><Plain type="button" className="font-semibold text-primary" onClick={onCancel}><Icon name="arrowLeft" /> {t("Automations")}</Plain> › <b className="text-ink">{t(rule ? "Edit automation" : CREATE_AUTOMATION)}</b></div>

@@ -33,6 +33,7 @@ const row = (over: Partial<ApiImportRow>): ApiImportRow => ({ rowNumber: 2, prop
 const defaults = policy({ id: "def", kind: "default_alert", name: "Default policy", rules: [{ ruleKey: "co2", name: "CO₂ high", metric: "co2", operator: "gte", threshold: 1200, durationSeconds: 900, category: "ventilation" }],
   ruleSettings: [{ ruleKey: "co2", customerId: "c1", enabled: false, version: 2, reason: "office closed", updatedAt: "2026-09-10T02:00:00Z" }] });
 
+const cov = (over: Partial<ApiCoverage>): ApiCoverage => ({ unitId: "u1", customerId: "c1", modelId: "m1", warrantyEndsAt: "2026-10-09T16:00:00Z", contractIds: [], status: "expiring", claimableJobIds: [], ...over });
 describe("HQ customers & units", () => {
   it("marks each customer's standing and counts the register", () => {
     expect([standingMarks("inactive", null), standingMarks("active", standing({ overdue: 1, restriction: { id: "r", state: "applied", contractId: "k" } })), standingMarks("active", standing({})), standingMarks("active", standing({ contracts: 0 }))].map((m) => m.map((x) => x.label)))
@@ -73,7 +74,6 @@ describe("HQ customers & units", () => {
   });
 
   it("shows coverage with Kuala Lumpur warranty days and the import messages", () => {
-    const cov = (over: Partial<ApiCoverage>): ApiCoverage => ({ unitId: "u1", customerId: "c1", modelId: "m1", warrantyEndsAt: "2026-10-09T16:00:00Z", contractIds: [], status: "expiring", claimableJobIds: [], ...over });
     const x = { unit: () => ({ name: BEDROOM_AC, place: "Home A" }), customer: () => "Demo Customer A", model: () => "Daikin X", contract: (id: string) => `RTO until ${id}` };
     const rows = coverageRows([cov({}), cov({ unitId: "u2", status: "no_coverage", warrantyEndsAt: null })], x, NOW);
     expect(rows.map((r) => [r.ends, r.endsDate, r.statusText])).toEqual([["10 Oct 2026", "2026-10-10", "Ends in 26 d · no contract"], ["—", "", "No warranty · no contract"]]);

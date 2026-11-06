@@ -21,6 +21,7 @@ const optional = orWhenForbidden;
 const SEVERITIES: Severity[] = ["critical", "warning", "normal"];
 const STATES: AlertState[] = ["open", "acknowledged", "resolved"];
 
+const isMissing = (r: unknown): r is { missing: string } => typeof r === "object" && r !== null && "missing" in r;
 export default async function AdminAlertsPage({ searchParams }: Readonly<PageProps<"/admin/alerts">>) {
   interface Page<T> { items: T[] }
   await connection();
@@ -58,7 +59,6 @@ export default async function AdminAlertsPage({ searchParams }: Readonly<PagePro
     optional(coreAllPage<ApiMemberName>("members.list"), { items: [], total: 0 }),
     need(coreOp<Page<ApiPolicy>>("policies.list", { limit: 1, filters: { kind: "default_alert" } }), "alert.policy.read"),
   ]);
-  const isMissing = (r: unknown): r is { missing: string } => typeof r === "object" && r !== null && "missing" in r;
   const missing = [alertsRead, unitsRead, customersRead, propertiesRead, policiesRead, defaultsRead].find(isMissing);
   if (missing) return <NeedsAccess what="Alert policies" permission={missing.missing} />;
   const read = <T,>(r: T | { missing: string }): T => {

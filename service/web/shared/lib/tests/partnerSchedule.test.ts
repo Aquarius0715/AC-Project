@@ -63,6 +63,7 @@ const rows = [
   scheduleRowOf({ projection: "offer", status: "accepted", jobId: "job-2-bbbb", jobVersion: 2, offerId: "o", type: "reactive", siteAddress: "2 Demo Avenue", requestedSlot: visit, dueAt: "x", offerExpiresAt: "x", visitSlot: visit, accessValidFrom: "2026-09-22T00:00:00Z", accessValidUntil: "2026-09-26T00:00:00Z" }, NOW, units, names),
 ];
 
+const asg = (s: { startAt: string; endAt: string }, ack = "pending", why: string | null = null) => ({ technicianMembershipId: "m-a", scheduledStart: s.startAt, scheduledEnd: s.endAt, status: "active", acknowledgement: ack, cantMakeReason: why });
 describe("partner schedule", () => {
   it("lists the jobs with their state and delegation window", () => {
     expect(rows.map((r) => [r.title, r.line, r.tone ?? ""])).toEqual([
@@ -80,7 +81,6 @@ describe("partner schedule", () => {
   });
 
   it("decides what the form of a job allows", () => {
-    const asg = (s: { startAt: string; endAt: string }, ack = "pending", why: string | null = null) => ({ technicianMembershipId: "m-a", scheduledStart: s.startAt, scheduledEnd: s.endAt, status: "active", acknowledgement: ack, cantMakeReason: why });
     const a = formMode(detail({}), "job-1 · Lobby AC", NOW, names);
     expect(a.kind === "assign" && [a.title, a.slot, a.endEditable, a.reasonRequired, a.button]).toEqual(["Assign — job-1 · Lobby AC", visit, false, false, "Confirm assignment"]);
     const r = formMode(detail({ status: "assigned", scheduledSlot: visit, assignment: asg(visit, "cant_make", "sick") }), "job-1", NOW, names);

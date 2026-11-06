@@ -214,8 +214,8 @@ export function technicianNames(members: { id: string; displayName: string }[], 
 }
 
 /** Kuala Lumpur days as text in the user's language: “Wed 16 Sept” or “Wed 16 – Fri 18 Sept”. */
+const noon = (d: string) => new Date(`${d}T04:00:00Z`); // 12:00 in Kuala Lumpur
 export function dayRange(from: string, to: string, locale: Locale): string {
-  const noon = (d: string) => new Date(`${d}T04:00:00Z`); // 12:00 in Kuala Lumpur
   const f = new Intl.DateTimeFormat(intlTag(locale), { weekday: "short", day: "numeric", month: "short", timeZone: KL });
   return (from === to ? f.format(noon(from)) : f.formatRange(noon(from), noon(to))).replaceAll(/[\u{A0}\u{2009}\u{202F}]/gu, " ");
 }

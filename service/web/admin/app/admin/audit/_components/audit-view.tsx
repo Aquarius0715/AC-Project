@@ -200,9 +200,9 @@ function NoEntries({ live, periodErr, corr, result }: Readonly<{ live?: AuditLiv
 
 /** The restriction, command, job and unit of the entry and of its correlation (DD-A16 step 1). Each link opens the
 record's own screen, which checks its own permission; the command is read (commands.get) only when asked (SCR-A16). */
+const line = (r: RelatedRef) => <span><span className="font-mono text-xs">{r.id.slice(0, 8)}</span> · {r.note}</span>;
 function RelatedRecords({ related, demo }: Readonly<{ related: Related; demo: boolean }>) {
   const { t } = useI18n();
-  const line = (r: RelatedRef) => <span><span className="font-mono text-xs">{r.id.slice(0, 8)}</span> · {r.note}</span>;
   const row = (label: string, r: RelatedRef | null, none: string, link?: (r: RelatedRef) => ReactNode): [string, ReactNode] =>
     [label, r ? <span key={label} className="flex flex-wrap items-center justify-between gap-2">{line(r)}{link?.(r)}</span> : <span key={label} className="text-muted-foreground">{none}</span>];
   return (

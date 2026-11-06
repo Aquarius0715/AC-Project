@@ -149,8 +149,9 @@ export function questionRows(s: ApiPayoutStatement, rows: LineRow[], t: T = en) 
 const STATEMENT_STATUS = new Map([["paid", "Paid"], ["approved", "Approved"]]);
 /** A one-page PDF (Courier, PDF 1.4) of the statement: header, lines and totals in the user's language. ASCII only —
 other characters print as “-” — the result is a byte string the browser wraps in a Blob. */
+const col = (x: string, w: number) => (x.length > w ? x.slice(0, w - 1) + "…" : x).padEnd(w);
+const esc = (x: string) => x.replaceAll(/[^\u{20}-\u{7E}]/gu, "-").replaceAll(/[\\()]/g, (c) => "\\" + c);
 export function payoutPdf(s: ApiPayoutStatement, rows: LineRow[], company: string, t: T = en, locale: Locale = "en"): string {
-  const col = (x: string, w: number) => (x.length > w ? x.slice(0, w - 1) + "…" : x).padEnd(w);
   const text = [
     `${t("PAYOUT STATEMENT")} ${s.id.slice(0, 8)}  ${periodLabel(s.period, locale)}`, `${company}  -  ${t(STATEMENT_STATUS.get(s.status) ?? "Draft").toUpperCase()}  -  ${t("pay date {date}", { date: s.payDate.slice(0, 10) })}`, "",
     `${col(t("Job"), 10)} ${col(t("Work"), 36)} ${col(t("Accepted"), 9)} ${t("Amount").padStart(12)}`, "-".repeat(70),
@@ -159,7 +160,6 @@ export function payoutPdf(s: ApiPayoutStatement, rows: LineRow[], company: strin
     `${t("Net payable").padEnd(57)} ${money(s.netMinor, s.currency).padStart(12)}`, "",
     t("Rates come from the contractor's rate card with HQ. Only review-accepted jobs are paid."), t("Demo document - not a tax invoice."),
   ];
-  const esc = (x: string) => x.replaceAll(/[^\u{20}-\u{7E}]/gu, "-").replaceAll(/[\\()]/g, (c) => "\\" + c);
   const stream = `BT /F1 9 Tf 40 800 Td 12 TL ${text.map((l) => `(${esc(l)}) Tj T*`).join(" ")} ET`;
   const objects = [
     "<< /Type /Catalog /Pages 2 0 R >>", "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
