@@ -181,7 +181,7 @@ export function ventStrip(g: Guidance[], co2: ApiMeasurement | undefined, room: 
 /** The PM2.5 cleaning banner (IR99): the latest valid reading against the 35 µg/m³ guide, or null. */
 export function cleanNote(g: Guidance[], pm25: ApiMeasurement | undefined, room: string, t: T = en): string | null {
   const v = validValue(pm25);
-  return g.includes("clean") && v !== null
+  return v !== null && g.includes("clean")
     ? t("{guidance} — PM2.5 {value} µg/m³ in {room} (≥ 35 µg/m³ guide). Request a filter clean from Maintenance.", { guidance: t(guidanceText.clean), value: airNumber("pm25", v), room }) : null;
 }
 

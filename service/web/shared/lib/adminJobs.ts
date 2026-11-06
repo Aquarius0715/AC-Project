@@ -82,7 +82,7 @@ export function filtersOf(q: Query, hqOrgId: string | null, withStage = true): R
   if (q.unitId) f.unitId = q.unitId;
   if (q.origin === "client_request" || q.origin === "periodic_plan") f.origin = q.origin;
   if (q.type && TYPE_IDS.has(q.type)) f.type = q.type;
-  if (q.delivery === "internal" && hqOrgId) f.organizationId = hqOrgId;
+  if (hqOrgId && q.delivery === "internal") f.organizationId = hqOrgId;
   else if (q.delivery && q.delivery !== "internal") f.organizationId = q.delivery;
   if (q.assignee) f.membershipId = q.assignee;
   if (q.overdue === "1") f.overdueOnly = true;

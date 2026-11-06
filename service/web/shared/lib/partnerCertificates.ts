@@ -85,7 +85,7 @@ export function certRows(members: ApiTeamMember[], certs: ApiCert[], jobs: CertJ
     for (const [k, list] of groups) {
       const of = list[0]?.renewalOf;
       const target = of ? groups.get(`other:${of}`) : undefined;
-      if (!(k.startsWith("other:") && target)) {
+      if (!(target && k.startsWith("other:"))) {
         continue;
       }
 

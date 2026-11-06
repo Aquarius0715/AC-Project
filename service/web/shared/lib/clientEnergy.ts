@@ -71,14 +71,14 @@ function savingTone(saved: number | null): "ok" | "warn" | "muted" {
 }
 export function compareRow(unitId: string, name: string, s: ApiEnergySummary, tr: T = translator("en")): CompareRow {
   const t = s.totals;
-  const b = s.baselineSnapshot;
+  const baselineKWh = s.baselineSnapshot?.baselineKWh ?? null;
   const difference = baselineDifference(s, tr);
   return {
     unitId,
     name,
     difference,
     actual: t.kWh === null ? "—" : one(t.kWh),
-    baseline: b?.baselineKWh === null || !b ? "—" : one(b.baselineKWh),
+    baseline: baselineKWh === null ? "—" : one(baselineKWh),
     tone: savingTone(t.savedKWh),
     coverage: s.coverage === null ? "—" : `${coveragePct(s.coverage)}%`,
   };

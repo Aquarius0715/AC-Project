@@ -509,7 +509,7 @@ export function consentCard(c: ApiConsent | null, locationRules: number, disable
   if (c.granted) {
     return { granted: true, title: t("Granted"), tone: "ok", text: t(locationRules === 1 ? "Granted {when} · used only by {n} location automation · demo location events (no real GPS history)." : "Granted {when} · used only by {n} location automations · demo location events (no real GPS history).", { when: showTime(c.grantedAt, i.display), n: locationRules }) };
   }
-  if (c.revokedAt && disabledByConsent === 0) { // a choice, not a fault: nothing was turned off (IR619)
+  if (disabledByConsent === 0 && c.revokedAt) { // a choice, not a fault: nothing was turned off (IR619)
     return { granted: false, title: t("Revoked"), tone: "muted", text: t("Withdrawn {when} · location automations cannot run until you grant it again. Manual control and schedules are unaffected.", { when: showTime(c.revokedAt, i.display) }) };
   }
   if (c.revokedAt) {

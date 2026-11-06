@@ -296,7 +296,7 @@ function DemoAssistant({ onClose, context }: Readonly<{ onClose: () => void; con
     add({ kind: "user", text: q, via });
     const setpoint = (/(\d{2})/.exec(q))?.[1];
     const named = demoUnits.find((u) => q.toLowerCase().includes(u.toLowerCase().replace(" #2", "")));
-    if (/set|change/i.test(q) && setpoint) {
+    if (setpoint && /set|change/i.test(q)) {
       if (named) add({ kind: "confirm", target: named, temp: +setpoint }); else add({ kind: "ask", options: ["Bedroom AC", "Bedroom AC #2"], temp: +setpoint }); return;
     }
     if (/temperature/i.test(q)) { add({ kind: "bot", text: "Bedroom AC is 28.0 °C (observed 09:12). Bedroom AC #2 is 27.0 °C." }); return; }

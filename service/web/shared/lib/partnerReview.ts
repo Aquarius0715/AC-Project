@@ -173,7 +173,7 @@ export function versionRows(job: ApiReviewJob, r: ApiWorkReport, author: string,
     if (rv?.decision === "accept") return { title: t("v{version} · accepted {time}", { version: ref.reportVersion, time: showTime(rv.occurredAt, display) }), sub: t("by {name} · visible to the customer", { name: by }), badge: { label: t("Accepted"), tone: "ok" } };
     if (rv?.decision === "return") return { title: t("v{version} · returned {time}", { version: ref.reportVersion, time: showTime(rv.occurredAt, display) }), sub: rv.reason ? t("by {name} — {reason}", { name: by, reason: rv.reason }) : t("by {name}", { name: by }), badge: { label: t("Returned"), tone: "warn" } };
     return {
-      title: t("v{version} · submitted {time}", { version: ref.reportVersion, time: r.submittedAt && isCurrent ? showTime(r.submittedAt, display) : "—" }),
+      title: t("v{version} · submitted {time}", { version: ref.reportVersion, time: isCurrent && r.submittedAt ? showTime(r.submittedAt, display) : "—" }),
       sub: t(isCurrent && job.status === "submitted" ? "by {name} · reviewing now" : "by {name}", { name: author }), badge: isCurrent ? { label: t("Current"), tone: "primary" } : null,
     };
   });
