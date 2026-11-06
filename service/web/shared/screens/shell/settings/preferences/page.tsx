@@ -10,6 +10,16 @@ import { otpauthUri, qrPath } from "@ac/web/lib/twoFactor";
 import { PreferencesDemo } from "./_components/preferences-demo";
 import { PreferencesView, type PreferencesLive } from "./_components/preferences-view";
 
+/** The consent, or null when none was given yet (NOT_FOUND). */
+async function consentOrNull() {
+  try {
+    return await coreOp<NonNullable<PreferencesLive["consent"]>>("consents.get", { purpose: "location_automation" });
+  } catch (error) {
+    if (error instanceof CoreError && error.error.code === "NOT_FOUND") return null;
+    throw error;
+  }
+}
+
 export default async function PreferencesPage() {
   await connection();
   if (!apiMode()) return <PreferencesDemo />;
@@ -18,10 +28,7 @@ export default async function PreferencesPage() {
   const [prefs, twoFactor, consent, now, identity] = await Promise.all([
     coreOp<PreferencesLive["prefs"]>("preferences.get", {}),
     coreOp<PreferencesLive["twoFactor"]>("twoFactor.get", {}),
-    isClient ? coreOp<NonNullable<PreferencesLive["consent"]>>("consents.get", { purpose: "location_automation" }).catch((error: unknown) => {
-      if (error instanceof CoreError && error.error.code === "NOT_FOUND") return null;
-      throw error;
-    }) : Promise.resolve(null),
+    isClient ? consentOrNull() : Promise.resolve(null),
     coreNow(),
     coreIdentity(),
   ]);

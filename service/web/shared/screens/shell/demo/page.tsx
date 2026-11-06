@@ -10,13 +10,19 @@ import { DemoMock } from "./_components/demo-mock";
 import { DemoView } from "./_components/demo-view";
 import { orNull } from "@ac/web/lib/promises";
 
+/** The units a device can be named after: none when the units cannot be read. */
+async function unitNames() {
+  const units = await orNull(coreAll<{ id: string; displayName: string }>("units.list"));
+  return units ?? [];
+}
+
 export default async function DemoPage() {
   await connection();
   if (!apiMode()) return <DemoMock />;
   const [now, devices, units] = await Promise.all([
     coreNow(),
     orNull(coreAll<ApiDevice>("devices.list")), // a role without device reads gets no device tile
-    coreAll<{ id: string; displayName: string }>("units.list").catch(() => []),
+    unitNames(),
   ]);
   const listed = (devices ?? []).slice(0, 20);
   const histories = await Promise.all(listed.map((d) => orNull(coreItems<ApiDeviceEvent>("devices.events", { id: d.id, query: { limit: 100 } }))));
