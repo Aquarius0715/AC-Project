@@ -57,7 +57,7 @@ describe("inbox rows and alert rows", () => {
   });
 
   it("words the status, the reason and the message in the display language (IR481)", () => {
-    expect(NOTIFICATION_KEYS.filter((key) => !(key in ms))).toEqual([]);
+    expect(NOTIFICATION_KEYS.filter((key) => !Object.hasOwn(ms, key))).toEqual([]);
     const malay = { locale: "ms" as const, timeZone: "UTC" };
     // an access-release notice (IR439): the job is back to accepted and the reason is a code
     const released = note({ params: { ...note({}).params, status: "accepted", reason: "technician_access_ended" } });

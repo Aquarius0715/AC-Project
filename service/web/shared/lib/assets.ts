@@ -66,7 +66,7 @@ export function standing(customerId: string, contracts: ApiContractLite[], overd
   const ids = new Set(mine.map((k) => k.id));
   const current = mine.filter((k) => Date.parse(k.startAt) <= t && t < Date.parse(k.endAt));
   const due = overdue.filter((i) => ids.has(i.contractId));
-  const r = (restrictions ?? []).filter((x): x is ApiRestrictionLite & { contractId: string } => !!x.contractId && ids.has(x.contractId) && x.state in restrictionRank).toSorted((a, b) => (lookup(restrictionRank, a.state) ?? 9) - (lookup(restrictionRank, b.state) ?? 9))[0];
+  const r = (restrictions ?? []).filter((x): x is ApiRestrictionLite & { contractId: string } => !!x.contractId && ids.has(x.contractId) && Object.hasOwn(restrictionRank, x.state)).toSorted((a, b) => (lookup(restrictionRank, a.state) ?? 9) - (lookup(restrictionRank, b.state) ?? 9))[0];
   return {
     plans: [...new Set(current.map((k) => k.planType))], contracts: current.length, contractUnits: new Set(current.flatMap((k) => k.unitIds)).size, overdue: due.length,
     overdueAmount: due.length > 0 ? amount(due.reduce((n, i) => n + i.amountMinor, 0), due[0]?.currency ?? "MYR") : null,

@@ -29,6 +29,6 @@ describe("page names and document titles (IR490)", () => {
 
   it("has a Malay name for every menu item and shared page", () => {
     const labels = [...Object.values(ROLES).flatMap((r) => [...r.nav.map((i) => i.label), r.sub]), ...SHARED_PAGES.map((s) => s.label), "Users", "Demo controls"];
-    expect(labels.filter((l) => !(l in ms))).toEqual([]);
+    expect(labels.filter((l) => !Object.hasOwn(ms, l))).toEqual([]);
   });
 });

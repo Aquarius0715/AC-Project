@@ -248,7 +248,7 @@ const ACTIVE: Record<string, number> = { in_progress: 0, assigned: 1, rework_req
 /** The job diagnostic control works for (DD-T10, IR94): the URL's job when it is one of the technician's active jobs on
 the unit, else the one in progress, then assigned or returned for rework; null without one. */
 export function controlJob(jobs: ApiTechJobRow[], jobId?: string): string | null {
-  const active = jobs.filter((j): j is Extract<ApiTechJobRow, { projection: "summary" }> => j.projection === "summary" && j.status in ACTIVE).toSorted((a, b) => (lookup(ACTIVE, a.status) ?? 9) - (lookup(ACTIVE, b.status) ?? 9));
+  const active = jobs.filter((j): j is Extract<ApiTechJobRow, { projection: "summary" }> => j.projection === "summary" && Object.hasOwn(ACTIVE, j.status)).toSorted((a, b) => (lookup(ACTIVE, a.status) ?? 9) - (lookup(ACTIVE, b.status) ?? 9));
   return (active.find((j) => j.id === jobId) ?? active[0])?.id ?? null;
 }
 

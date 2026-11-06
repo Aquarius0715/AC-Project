@@ -24,7 +24,7 @@ export function translate(locale: Locale, text: string, params?: Params): string
   let base = english;
   if (locale === "ms") {
     base = lookup(ms, text) ?? english;
-    if (!(text in ms) && process.env.NODE_ENV === "development" && !warned.has(text)) {
+    if (!Object.hasOwn(ms, text) && process.env.NODE_ENV === "development" && !warned.has(text)) {
       warned.add(text);
       console.warn(`[i18n] no Malay text for "${text}"`);
     }

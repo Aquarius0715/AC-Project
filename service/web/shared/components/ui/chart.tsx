@@ -331,7 +331,7 @@ function getPayloadConfigFromPayload(
     (payloadPayload ? stringAt(payloadPayload, key) : undefined) ??
     key
 
-  return (configLabelKey in config ? lookup(config, configLabelKey) : lookup(config, key)) ?? null
+  return (Object.hasOwn(config, configLabelKey) ? lookup(config, configLabelKey) : lookup(config, key)) ?? null
 }
 
 export {

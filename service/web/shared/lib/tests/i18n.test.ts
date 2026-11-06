@@ -64,7 +64,7 @@ describe("Display language (FR-X01, AT-X01-N, IR258)", () => {
       ...code.matchAll(/<Route(?:Loading|Error) what="((?:[^"\\]|\\.)*)"/g), // the route states translate what loads (IR269)
     ].map((m) => String(JSON.parse(`"${m[1] ?? ""}"`)));
     expect(literals.length).toBeGreaterThan(100);
-    expect([...new Set(literals.filter((text) => !(text in ms)))]).toEqual([]);
+    expect([...new Set(literals.filter((text) => !Object.hasOwn(ms, text)))]).toEqual([]);
   });
 
   it("lists each English text once in the Malay dictionary (a renamed key can collide with an existing one)", () => {
@@ -83,7 +83,7 @@ describe("Display language (FR-X01, AT-X01-N, IR258)", () => {
     const files = ["customer/app", "partner/app", "technician/app", "admin/app", "shared/lib", "shared/components", "shared/screens"].flatMap((d) => sources(join(root, d)));
     // each string literal as written in the source, read as the text it stands for
     const strings = files.flatMap((f) => readFileSync(f, "utf8").matchAll(/"((?:[^"\\\n]|\\.)*)"/g).map((m) => literalText(`"${m[1] ?? ""}"`)).filter((x) => x !== null).toArray());
-    const texts = [...new Set(strings.filter((text) => text in ms))]; // every literal the dictionary translates, maps of texts included
+    const texts = [...new Set(strings.filter((text) => Object.hasOwn(ms, text)))]; // every literal the dictionary translates, maps of texts included
     expect(texts.length).toBeGreaterThan(100);
     // screen IDs as well ("Access & roles (A03)")
     const coded = /\b(?:IR\d+|(?:FR|DD|BR|NFR|DEC|AT|SCR|DDC|REV)-[A-Z]*\d+|SR\d+|D\d{2,})\b|^(?:CONFLICT|NOT_FOUND|FORBIDDEN|UNAVAILABLE|VALIDATION|TIMEOUT|OFFLINE)\b|\((?:CONFLICT|NOT_FOUND|FORBIDDEN|UNAVAILABLE|VALIDATION|TIMEOUT|OFFLINE)\)|\([ACPTX]\d{2}[a-z]?\)/;

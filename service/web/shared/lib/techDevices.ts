@@ -38,7 +38,7 @@ export interface TechJob { id: string; unitId: string; status: string }
 const rank: Record<string, number> = { in_progress: 0, assigned: 1, rework_requested: 2 };
 /** The job a device write on the unit runs under (IR94): in progress first, else assigned or rework; null without one. */
 export function jobFor(unitId: string | null, jobs: TechJob[]): string | null {
-  return unitId ? jobs.filter((j) => j.unitId === unitId && j.status in rank).toSorted((a, b) => (lookup(rank, a.status) ?? 9) - (lookup(rank, b.status) ?? 9))[0]?.id ?? null : null;
+  return unitId ? jobs.filter((j) => j.unitId === unitId && Object.hasOwn(rank, j.status)).toSorted((a, b) => (lookup(rank, a.status) ?? 9) - (lookup(rank, b.status) ?? 9))[0]?.id ?? null : null;
 }
 
 const ago = (iso: string | null, now: number, t: T) => {
