@@ -3,6 +3,7 @@
 // is in the display language (`t`, IR269); a field name and a domain message key are humanized English, because the
 // API sends keys, not texts.
 import { translator, type T, textOf } from "@ac/web/lib/i18n";
+import { lookup } from "@ac/web/lib/lookup";
 
 export interface ActionFailure { code: string; messageKey: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null }
 
@@ -75,7 +76,8 @@ export function actionMessage(r: ActionFailure, t: T = translator("en")): string
   const [field, key] = Object.entries(r.fieldErrors)[0] ?? [];
   if (field && key) {
     const name = fieldName(field);
-    return fieldText[key] ? t(fieldText[key], { field: name }) : t("{field} — {problem}", { field: name, problem: humanize(key).toLowerCase() });
+    const text = lookup(fieldText, key);
+    return text ? t(text, { field: name }) : t("{field} — {problem}", { field: name, problem: humanize(key).toLowerCase() });
   }
   if (r.messageKey === "error.versionConflict") return t("Someone changed this in the meantime — the screen now shows the latest version");
   // the write limit per member (IR375): how long to wait, as the implementation contracts ask for RATE_LIMITED

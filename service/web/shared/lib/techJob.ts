@@ -22,9 +22,9 @@ export interface Known { clock: Record<string, string>; stamp: Record<string, st
 export const fmtOf = (i: I18n, known?: Known): Fmt => {
   return {
     t: i.t,
-    clock: (iso) => known?.clock[iso] ?? showClock(iso, i.display),
-    stamp: (iso) => known?.stamp[iso] ?? showTime(iso, i.display),
-    span: (from, to) => known?.span[`${from}|${to}`] ?? showSpan(from, to, i.display),
+    clock: (iso) => lookup(known?.clock ?? {}, iso) ?? showClock(iso, i.display),
+    stamp: (iso) => lookup(known?.stamp ?? {}, iso) ?? showTime(iso, i.display),
+    span: (from, to) => lookup(known?.span ?? {}, `${from}|${to}`) ?? showSpan(from, to, i.display),
   };
 };
 /** The server's formatting of the instants a page shows: every time of day, stamp and span it will ask for. */
