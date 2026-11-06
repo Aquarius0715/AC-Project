@@ -20,7 +20,7 @@ describe("following a command until the device answers (D04, Unit Control and th
   it("reports every state every 2 s and stops at the first final one", async () => {
     callOp.mockResolvedValueOnce(deviceCommand("sent")).mockResolvedValueOnce(deviceCommand(ACKNOWLEDGED));
     const seen: string[] = [];
-    const done = waitForCommand(deviceCommand("requested"), (c) => seen.push(c.status));
+    const done = waitForCommand(deviceCommand("requested"), (c) => { seen.push(c.status); });
     expect(seen).toEqual(["requested"]); // the first state at once
     await vi.advanceTimersByTimeAsync(1999);
     expect(callOp).not.toHaveBeenCalled();
@@ -34,7 +34,7 @@ describe("following a command until the device answers (D04, Unit Control and th
   it("does not poll a command that is already final", async () => {
     for (const s of [ACKNOWLEDGED, "failed", "expired", "cancelled"] as const) {
       const seen: string[] = [];
-      const final = await waitForCommand(deviceCommand(s), (c) => seen.push(c.status));
+      const final = await waitForCommand(deviceCommand(s), (c) => { seen.push(c.status); });
       expect(final.status).toBe(s);
       expect(seen).toEqual([s]);
     }

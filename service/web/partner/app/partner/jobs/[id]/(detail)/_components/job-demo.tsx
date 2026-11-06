@@ -31,7 +31,7 @@ function LiveOffer({ j }: Readonly<{ j: Job }>) {
       {j.partnerProposal?.status === "approved" && j.status === "offered" && <Banner tone="ok">The client approved your time ({fmt(j.scheduled)}). Accept the offer to continue.</Banner>}
       {j.partnerProposal?.status === "rejected" && j.status === "offered" && <Banner tone="warn">Your time change was not approved — the agreed time stays {fmt(j.scheduled)}. Accept or decline.</Banner>}
       <div className="split">
-        <Card title={`${j.id} · Offer from HQ`} action={<Badge tone={pending ? "warn" : "warn"}>{pending ? "Time change proposed · waiting for client" : "Expires 2026-09-25 12:00"}</Badge>}>
+        <Card title={`${j.id} · Offer from HQ`} action={<Badge tone="warn">{pending ? "Time change proposed · waiting for client" : "Expires 2026-09-25 12:00"}</Badge>}>
           <Banner>{pending ? "The offer stays reserved for you until the client answers." : "The visit time was agreed with the client. Accept only if your team can come then; otherwise “Propose another time” — HQ asks the client first."}</Banner>
           <div className="mt-3"><SummaryList items={[
             ["Origin", <OriginBadge key="o" origin={j.origin} />],

@@ -8,6 +8,7 @@ import { statusWord, typeLabel } from "@ac/web/lib/partnerJobDetail";
 import type { Slot } from "@ac/web/lib/partnerOverview";
 import type { TechJobRead } from "@ac/web/lib/techJob";
 import { wrapped } from "@ac/web/lib/text";
+import { isAfter } from "@ac/web/lib/order";
 
 const en = translator("en");
 
@@ -34,7 +35,7 @@ export function qrMatch(r: ApiQrResolution, unit: ApiQrUnit | null, job: ApiQrJo
   if (r.jobId) {
     const j = job?.projection === "detail" ? job : null;
     const s = j?.scheduledSlot ?? null;
-    const isToday = !!s && klDate(Date.parse(s.startAt)) <= klDate(now) && klDate(now) <= klDate(Date.parse(s.endAt));
+    const isToday = !!s && !isAfter(klDate(Date.parse(s.startAt)), klDate(now)) && !isAfter(klDate(now), klDate(Date.parse(s.endAt)));
     const alerts = j?.alertIds.length ? byCount(j.alertIds.length, { one: t("1 linked alert"), many: t("{n} linked alerts", { n: j.alertIds.length }) }) : "";
     card = {
       label: t(isToday ? "Your job today: {id}" : "Your next job: {id}", { id: r.jobId.slice(0, 8) }),

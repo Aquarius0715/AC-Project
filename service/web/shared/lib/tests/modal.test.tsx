@@ -33,7 +33,7 @@ function Removal({ start = ["a"] }: Readonly<{ start?: string[] }>) {
   );
 }
 const open = () => { const b = screen.getByRole("button", { name: "Open" }); b.focus(); fireEvent.click(b); return b; };
-const escape = () => fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+const pressEscape = () => fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
 
 // IR361 on the shadcn/ui Dialog (DEC-75, IR401): where focus goes on open and on close, and which dialog answers
 // Escape. Tab cycling inside the dialog is a browser behaviour (Base UI's focus guards hand focus back on the next frame);
@@ -44,7 +44,7 @@ describe("the modal dialog's keyboard behaviour", () => {
     const trigger = open();
     await waitFor(() => { expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Name" })); });
     expect(screen.getByRole("dialog", { name: "Edit" })).toBeTruthy();
-    escape();
+    pressEscape();
     await waitFor(() => { expect(screen.queryByRole("dialog")).toBeNull(); });
     await waitFor(() => { expect(document.activeElement).toBe(trigger); });
   });
@@ -84,7 +84,7 @@ describe("the modal dialog's keyboard behaviour", () => {
     expect(screen.getByRole("dialog").getAttribute("aria-labelledby")).toBeTruthy();
     expect(screen.getByRole("dialog", { name: "Inner" })).toBeTruthy();
     await waitFor(() => { expect(document.activeElement).toBe(screen.getByRole("button", { name: "OK" })); });
-    escape();
+    pressEscape();
     await waitFor(() => { expect(screen.getAllByRole("dialog", { hidden: true })).toHaveLength(1); }); // the outer one stays
     expect(screen.getByRole("dialog", { name: "Edit" })).toBeTruthy();
     await waitFor(() => { expect(document.activeElement).toBe(screen.getByRole("button", { name: "Save" })); }); // back to its trigger

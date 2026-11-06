@@ -89,7 +89,7 @@ export function coreRequest(operation: string, input: unknown): CoreRequest | nu
     // a path parameter is one whole segment: "." and ".." would turn the URL into another path once fetch resolves the
     // dot segments (encodeURIComponent keeps dots, and %2E is resolved as a dot too), so they name no route (IR372)
     if (value === "." || value === "..") return null;
-    path = path.replace(`{${name}}`, encodeURIComponent(value));
+    path = path.replace(`{${name}}`, () => encodeURIComponent(value));
   }
   const [fixedKey, fixedValue] = route.fixed ?? [];
   if (fixedKey !== undefined && text(Reflect.get(rest, fixedKey)) === fixedValue) Reflect.deleteProperty(rest, fixedKey);

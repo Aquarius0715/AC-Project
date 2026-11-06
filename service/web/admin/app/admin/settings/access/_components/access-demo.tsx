@@ -40,7 +40,7 @@ export function AccessDemo() {
   const [message, setMessage] = useState<{ t: "crit" | "ok" | "warn"; m: string } | null>(null);
   const [revoke, setRevoke] = useState(false);
   const list = users.filter((u) => !q || (u.id + u.role + u.email).toLowerCase().includes(q.toLowerCase()));
-  const pick = (u: U | "new") => { setSel(u); setMessage(null); const r = u === "new" ? CONTRACTOR : u.role2; setRole(r); setChecked(preset[r]); setReason(""); setEnd(u !== "new" && u.id.startsWith("tech-external") ? "" : ""); };
+  const pick = (u: U | "new") => { setSel(u); setMessage(null); const r = u === "new" ? CONTRACTOR : u.role2; setRole(r); setChecked(preset[r]); setReason(""); setEnd(""); };
   const choose = (r: U["role2"]) => { setRole(r); setChecked(preset[r]); };
   const total = all.length;
   const has = (p?: string) => !!p && checked.includes(p);

@@ -152,7 +152,8 @@ function LiveAssistant({ onClose, context }: Readonly<{ onClose: () => void; con
       setState("failure");
       return;
     }
-    const id = ++seq.current;
+    seq.current += 1;
+    const id = seq.current;
     const measured = m.unit?.latestMeasurements.find((x) => x.metric === "temperature" && x.quality === "valid")?.value ?? null;
     const show = (c: typeof r.value) => {
       const p = progressOf(c, card.unit, m.intent.celsius, m.intent.before.celsius, measured, t, display);

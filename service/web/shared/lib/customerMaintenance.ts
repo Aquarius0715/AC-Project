@@ -16,6 +16,7 @@ const PERIODIC_PLAN = "periodic_plan";
 export const problemReason = z.enum(["same_problem", "new_damage", "not_completed", "other"]);
 import { codePoints, wrapped } from "@ac/web/lib/text";
 import { lookup } from "@ac/web/lib/lookup";
+import { isAfter } from "@ac/web/lib/order";
 
 export interface ApiClientRow {
   projection: "summary"; id: string; version: number; unitId: string; type: string; status: string; displayStatus: string; origin: string; dueAt: string;
@@ -179,7 +180,7 @@ export function preferredError(slots: Slot[], now: number, count = 3, t: T = en)
   for (const s of slots) {
     const h = (Date.parse(s.endAt) - Date.parse(s.startAt)) / 3_600_000;
     if (!(h >= 1 && h <= 4)) return t("Each time is 1–4 hours long.");
-    if (new Date(Date.parse(s.startAt) + 8 * 3_600_000).toISOString().slice(0, 10) <= today) return t("Times start on a later day than today (Kuala Lumpur).");
+    if (!isAfter(new Date(Date.parse(s.startAt) + 8 * 3_600_000).toISOString().slice(0, 10), today)) return t("Times start on a later day than today (Kuala Lumpur).");
     const k = `${String(Date.parse(s.startAt))}-${String(Date.parse(s.endAt))}`;
     if (keys.has(k)) return t(count === 3 ? "The 3 times must be different." : "The times must be different.");
     keys.add(k);

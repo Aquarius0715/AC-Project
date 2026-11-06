@@ -43,7 +43,7 @@ export async function loadControl(unitId: string, jobId: string | null) {
   }
   const unit = {
     id: d.id, name: d.displayName, version: d.version, connection: d.connection, tiles: stateTiles(d, t), observed: observedText(d.observedState.observedAt, i), pending: d.pendingCommands.length,
-    options: actionOptions(d.capabilities, t), capabilityText: `${capabilityText(d, t)} ${connectionText(d.connection, t)}`, restriction: restrictionText(d, t), blocked: blockedText(d, t), current: stateTiles(d, t).filter((x, k) => k < 4).map((x) => x.value).join(" · "),
+    options: actionOptions(d.capabilities, t), capabilityText: `${capabilityText(d, t)} ${connectionText(d.connection, t)}`, restriction: restrictionText(d, t), blocked: blockedText(d, t), current: stateTiles(d, t).slice(0, 4).map((x) => x.value).join(" · "),
   };
   const base = { kind: "live" as const, canDiagnose: perms.has("control.diagnose"), unitHref, unit };
   if (!jobId) return { ...base, job: null, run: null, banner: null, active: false, history: [] };
