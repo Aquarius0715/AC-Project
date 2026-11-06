@@ -47,7 +47,10 @@ const CLIENT_TITLE: Record<string, string> = {
   "job.rated": "You rated the job", "job.problem_reported": "You reported a problem", "proposal.sent": "New time proposed", "partner_proposal.sent_to_client": "New time proposed", "job.follow_up_classified": "HQ reviewed your problem report", "proposal.accepted": "You accepted the proposed time",
   "proposal.declined": "You declined the proposed time", "job.reschedule_requested": "You asked for another time",
 };
-export const clientEventTitle = (action: string, shared: Record<string, string>, t: T = en) => (textOf(CLIENT_TITLE, action, t) ?? (shared[action] ? t(shared[action]) : action.replaceAll(/[._]/g, " ")));
+export const clientEventTitle = (action: string, shared: Record<string, string>, t: T = en) => {
+  const sharedTitle = lookup(shared, action);
+  return textOf(CLIENT_TITLE, action, t) ?? (sharedTitle ? t(sharedTitle) : action.replaceAll(/[._]/g, " "));
+};
 export const sameSlot = (a: Slot | null, b: Slot | null) => !!a && !!b && Date.parse(a.startAt) === Date.parse(b.startAt) && Date.parse(a.endAt) === Date.parse(b.endAt);
 
 export type StatusTab = "all" | "reply" | "requested" | "scheduled" | "progress" | "completed" | "cancelled";
@@ -116,7 +119,10 @@ export const followUpText = (c: ApiClientJob["followUpClass"], t: T = en) => t(F
 const RANK = ["1st", "2nd", "3rd"];
 /** The preferred times with the booked one marked (request origin, open jobs). */
 export function preferredLines(j: ApiClientJob, i: I18n = EN): { text: string; note: string | null }[] {
-  return j.origin === PERIODIC_PLAN || ["completed", "cancelled"].includes(j.status) ? [] : j.preferredSlots.map((s, k) => ({ text: `${RANK[k] ? i.t(RANK[k]) : String(k + 1)} · ${slotLong(s, i)}`, note: sameSlot(s, j.scheduledSlot) ? i.t("booked") : null }));
+  return j.origin === PERIODIC_PLAN || ["completed", "cancelled"].includes(j.status) ? [] : j.preferredSlots.map((s, k) => {
+    const rank = RANK.at(k);
+    return { text: `${rank ? i.t(rank) : String(k + 1)} · ${slotLong(s, i)}`, note: sameSlot(s, j.scheduledSlot) ? i.t("booked") : null };
+  });
 }
 
 /** The proposal to answer (Figma 07k): who proposes, the time, who comes, the message and the reply deadline. */

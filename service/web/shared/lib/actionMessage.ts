@@ -68,7 +68,10 @@ export const fieldName = (field: string) => humanize(field.split(".").pop() ?? f
 each worded as the toast words it: the text under the field to fix (IR586). */
 export function fieldErrorTexts<K extends string>(r: ActionFailure, fields: Record<string, K>, t: T = translator("en")): Partial<Record<K, string>> {
   const out: Partial<Record<K, string>> = {};
-  for (const [field, key] of Object.entries(r.fieldErrors)) if (fields[field]) out[fields[field]] = actionMessage({ ...r, fieldErrors: { [field]: key } }, t);
+  for (const [field, key] of Object.entries(r.fieldErrors)) {
+    const form = lookup(fields, field);
+    if (form) Object.assign(out, { [form]: actionMessage({ ...r, fieldErrors: { [field]: key } }, t) });
+  }
   return out;
 }
 

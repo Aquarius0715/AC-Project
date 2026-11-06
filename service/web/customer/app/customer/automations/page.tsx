@@ -42,10 +42,10 @@ export default async function CustomerAutomationsPage({ searchParams }: Readonly
   const isGranted = consent?.granted ?? false;
   const location = rules.filter((r) => triggerOf(r) === "location");
   // the editor's ACs with their capabilities (action options), read only while editing
-  const caps: Record<string, Caps | null> = {};
+  let caps: Record<string, Caps | null> = {};
   if (editing) {
     const details = await Promise.all(acs.map((u) => orNull(coreOp<ApiUnitDetail>("units.get", { id: u.id }))));
-    for (const [i, d] of details.entries()) { const ac = acs[i]; if (ac) caps[ac.id] = d?.capabilities ?? null; }
+    caps = Object.fromEntries(acs.map((ac, i) => [ac.id, details.at(i)?.capabilities ?? null]));
   }
   const live: AutomationsLive = {
     rules,

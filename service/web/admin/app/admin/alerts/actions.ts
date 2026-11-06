@@ -8,6 +8,7 @@ import { alertPolicyInput, defaultRulesInput, metricUnit, type AdminPolicy, type
 import { formValue } from "@ac/web/lib/formValue";
 import { metricSchema } from "@ac/web/lib/devices";
 import type { OpInput } from "@ac/web/lib/opTypes";
+import { lookup } from "@ac/web/lib/lookup";
 
 export type ActionResult = { ok: true } | { ok: false; messageKey: string; code: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null };
 
@@ -67,7 +68,7 @@ export async function testPolicy(policyId: string, unitId: string, metric: strin
     const at = now.toISOString();
     const input: OpInput<"automations.simulate"> = {
       eventId: crypto.randomUUID(), occurredAt: at, phase: "condition", unitIds: [unitId],
-      facts: [{ unitId, value, metric: formValue(metricSchema, metric, "metric"), unit: metricUnit[metric] ?? "", observedAt: at, quality: "valid" }],
+      facts: [{ unitId, value, metric: formValue(metricSchema, metric, "metric"), unit: lookup(metricUnit, metric) ?? "", observedAt: at, quality: "valid" }],
     };
     const r = await coreOp<{ notifications: NotificationDecision[] }>("automations.simulate", input);
     return { ok: true, decision: r.notifications.find((n) => n.policyId === policyId && n.unitId === unitId) ?? null };

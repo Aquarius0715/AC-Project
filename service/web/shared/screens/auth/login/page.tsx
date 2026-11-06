@@ -4,6 +4,7 @@ import { roleConfig, type Role } from "@ac/web/lib/nav";
 import { continueHref, loginError, otherServices, safeReturnTo } from "@ac/web/lib/login";
 import { ContinueLink } from "./continue-link";
 import { Icon } from "@ac/web/components/Icon";
+import { lookup } from "@ac/web/lib/lookup";
 
 export type AppLinks = Partial<Record<Role, string>>;
 type Params = Record<string, string | string[] | undefined>;
@@ -33,7 +34,7 @@ export function LoginScreen({ appRole: role, others = {}, params = {}, api }: Re
         <ContinueLink appRole={role} href={href}>Continue as {config.loginUser} <Icon name="arrowRight" /></ContinueLink>
         <p className="mt-4 text-[11px] text-muted-foreground">Looking for a different AC Project service?{" "}
           {names.map((r, i) => (
-              <span key={r}>{i > 0 && (i === names.length - 1 ? ", and " : ", ")}{others[r] ? <a className="font-semibold text-primary hover:underline" href={`${others[r]}/login`}>{roleConfig(r).loginTitle}</a> : roleConfig(r).loginTitle}</span>
+              <span key={r}>{i > 0 && (i === names.length - 1 ? ", and " : ", ")}{lookup(others, r) ? <a className="font-semibold text-primary hover:underline" href={`${lookup(others, r) ?? ""}/login`}>{roleConfig(r).loginTitle}</a> : roleConfig(r).loginTitle}</span>
             ))}{" "}each have their own sign-in.
         </p>
         <Link href="/forgot-password" className="mt-3 inline-block text-xs font-semibold text-primary hover:underline">Forgot password?</Link>
