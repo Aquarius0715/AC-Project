@@ -141,7 +141,8 @@ export function memberErrors(d: MemberDraft, ctx: { selfUserId: string; current?
     if (email.length > 254 || !isEmail(email)) e["newUser.email"] = t("A valid email address (up to 254 characters)");
     const n = codePoints(d.inviteName.trim());
     if (n < 1 || n > 120) e["newUser.displayName"] = t("A name of 1–120 characters");
-  } else if (!d.userId) e.userId = t("Choose a user");
+  }
+  if (!d.creatingUser && !d.userId) e.userId = t("Choose a user");
   if (!d.organizationId) e.organizationId = t("Choose the organization");
   const bad = d.permissions.filter((p) => !allowedFor[d.role].includes(p));
   if (bad.length > 0) e.permissions = t("Not allowed for this role: {list}", { list: bad.join(", ") });

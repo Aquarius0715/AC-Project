@@ -158,17 +158,21 @@ export const UNAVAILABILITY_TYPES = [
 ] as const;
 export interface UnavailabilityForm { membershipId: string; from: string; to: string; type: (typeof UNAVAILABILITY_TYPES)[number]["id"]; note: string }
 
+/** What is wrong with the last day of an unavailability, or undefined. */
+function lastDayError(f: UnavailabilityForm, t: T): string | undefined {
+  if (!isDate(f.to)) return t("Choose the last day");
+  if (!isDate(f.from)) return undefined;
+  const days = (Date.parse(`${f.to}T00:00:00Z`) - Date.parse(`${f.from}T00:00:00Z`)) / DAY;
+  if (days < 0) return t("The last day must be on or after the first day");
+  return days > 30 ? t("At most 31 days at a time") : undefined;
+}
 /** The form's own checks before members.setUnavailability (DD-P06 Figma 04-8, IR111): dates, at most 31 days, a note
 of at most 500 characters. */
 export function unavailabilityErrors(f: UnavailabilityForm, t: T = en): Partial<Record<"from" | "to" | "note", string>> {
   const e: Partial<Record<"from" | "to" | "note", string>> = {};
   if (!isDate(f.from)) e.from = t("Choose the first day");
-  if (!isDate(f.to)) e.to = t("Choose the last day");
-  else if (isDate(f.from)) {
-    const days = (Date.parse(`${f.to}T00:00:00Z`) - Date.parse(`${f.from}T00:00:00Z`)) / DAY;
-    if (days < 0) e.to = t("The last day must be on or after the first day");
-    else if (days > 30) e.to = t("At most 31 days at a time");
-  }
+  const last = lastDayError(f, t);
+  if (last) e.to = last;
   if (codePoints(f.note.trim()) > 500) e.note = t("At most 500 characters");
   return e;
 }
