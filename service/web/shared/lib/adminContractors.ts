@@ -136,11 +136,16 @@ export const areasOf = (v: string) => v.split(",").map((a) => a.trim()).filter(B
 export function rateCardErrors(f: { effectiveFrom: string | null; lines: { workType: string; amount: string; note: string }[] }, now: number, t: T = en): Record<string, string> {
   const e: Record<string, string> = {};
   if (!f.effectiveFrom || Date.parse(f.effectiveFrom) <= now) e.effectiveFrom = t("Effective from a future date.");
-  if (f.lines.length === 0 || f.lines.length > 4) e.lines = t("1–4 lines.");
-  else if (new Set(f.lines.map((l) => l.workType)).size !== f.lines.length) e.lines = t("Each work type once.");
-  else if (f.lines.some((l) => !/^\d+(\.\d{1,2})?$/.test(l.amount.trim()))) e.lines = t("Amounts are non-negative with at most two decimals.");
-  else if (f.lines.some((l) => codePoints(l.note.trim()) > 200)) e.lines = t("Notes up to 200 characters.");
+  const lines = rateLinesError(f.lines, t);
+  if (lines) e.lines = lines;
   return e;
+}
+/** What is wrong with the lines of a rate card, or undefined. */
+function rateLinesError(lines: { workType: string; amount: string; note: string }[], t: T): string | undefined {
+  if (lines.length === 0 || lines.length > 4) return t("1–4 lines.");
+  if (new Set(lines.map((l) => l.workType)).size !== lines.length) return t("Each work type once.");
+  if (lines.some((l) => !/^\d+(\.\d{1,2})?$/.test(l.amount.trim()))) return t("Amounts are non-negative with at most two decimals.");
+  return lines.some((l) => codePoints(l.note.trim()) > 200) ? t("Notes up to 200 characters.") : undefined;
 }
 /** The first day of next month in Kuala Lumpur (00:00), the default start of a new rate card. */
 export function nextMonthStart(now: number): string {
