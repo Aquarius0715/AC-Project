@@ -134,6 +134,8 @@ export function webConfig(tsconfigRootDir) {
         // 4-2: the order of a guard (`!reason.trim() || !isOrder || !tech`) follows how the form reads, and moving an operand
         // changes what short-circuits; the rule only saves a call that has no side effect
         "unicorn/prefer-simple-condition-first": "off",
+        // t(a ? x : y) hides x and y from the test that checks every t("...") literal has a Malay text; two calls keep them visible
+        "unicorn/prefer-minimal-ternary": "off",
         // 4-2: the module-level `let` cases here are single-owner caches on purpose: the session store client (one per
         // process), the BFF session cache, the demo stores and the focus handed to a remounted view. A holder object
         // would hide the same mutation behind a property
