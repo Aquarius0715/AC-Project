@@ -5,6 +5,7 @@ import { translator, type T } from "@ac/web/lib/i18n";
 import type { OpInput } from "@ac/web/lib/opTypes";
 import type { Fact } from "@ac/web/lib/contracts.gen";
 import { codePoints } from "@ac/web/lib/text";
+import { lookup } from "@ac/web/lib/lookup";
 
 const en = translator("en");
 
@@ -194,7 +195,7 @@ export function reasonWord(reason: string, t: T = en): string {
     invalid_capability: t("not supported by the unit"), no_control_action: t("no control action"), reconciliation_required: t("reconciliation required"),
     superseded: t("superseded by a schedule starting in the same minute"),
   };
-  return words[reason] ?? reason;
+  return lookup(words, reason) ?? reason;
 }
 /** A per-unit decision, worded. */
 export const decisionWord = (d: string, t: T = en) => {

@@ -12,6 +12,7 @@ import { csvCell } from "@ac/web/lib/csv";
 import type { IconName } from "@ac/web/components/Icon";
 import { byText, isAfter, isBefore } from "@ac/web/lib/order";
 import { codePoints, isEmail, wrapped } from "@ac/web/lib/text";
+import { lookup } from "@ac/web/lib/lookup";
 
 export const profiles = ["rto", "general", "energy", "environment"] as const;
 export type Profile = (typeof profiles)[number];
@@ -62,7 +63,7 @@ export function standing(customerId: string, contracts: ApiContractLite[], overd
   const ids = new Set(mine.map((k) => k.id));
   const current = mine.filter((k) => Date.parse(k.startAt) <= t && t < Date.parse(k.endAt));
   const due = overdue.filter((i) => ids.has(i.contractId));
-  const r = (restrictions ?? []).filter((x): x is ApiRestrictionLite & { contractId: string } => !!x.contractId && ids.has(x.contractId) && x.state in restrictionRank).toSorted((a, b) => (restrictionRank[a.state] ?? 9) - (restrictionRank[b.state] ?? 9))[0];
+  const r = (restrictions ?? []).filter((x): x is ApiRestrictionLite & { contractId: string } => !!x.contractId && ids.has(x.contractId) && x.state in restrictionRank).toSorted((a, b) => (lookup(restrictionRank, a.state) ?? 9) - (lookup(restrictionRank, b.state) ?? 9))[0];
   return {
     plans: [...new Set(current.map((k) => k.planType))], contracts: current.length, contractUnits: new Set(current.flatMap((k) => k.unitIds)).size, overdue: due.length,
     overdueAmount: due.length > 0 ? amount(due.reduce((n, i) => n + i.amountMinor, 0), due[0]?.currency ?? "MYR") : null,
@@ -341,7 +342,7 @@ export function conditionText(p: { metric?: string; operator?: Operator; thresho
   const m = p.metric ?? "";
   const w = p.activeWindow ? `, ${days(p.activeWindow.weekdays, i)}${p.activeWindow.startLocal}–${p.activeWindow.endLocal}` : "";
   const cond = m === "heartbeat_gap" ? `${t("No heartbeat for {n} min", { n: p.threshold ?? 0 })}${w}` // the gap itself is the duration (minutes)
-    : `${textOf(metricLabel, m, t) ?? m} ${opSymbol[p.operator ?? "gte"]} ${String(p.threshold ?? 0)} ${metricUnit[m] ?? ""} ${t("for {duration}", { duration: duration(p.durationSeconds ?? 0, t) })}${w}`;
+    : `${textOf(metricLabel, m, t) ?? m} ${opSymbol[p.operator ?? "gte"]} ${String(p.threshold ?? 0)} ${lookup(metricUnit, m) ?? ""} ${t("for {duration}", { duration: duration(p.durationSeconds ?? 0, t) })}${w}`;
   return p.severity ? `${cond} → ${t(sevLabel[p.severity])}` : cond;
 }
 export interface PolicyLine { id: string; version: number; kind: "alert" | "default_alert"; name: string; type: string; condition: string; madeBy: string; units: number; enabled: boolean }

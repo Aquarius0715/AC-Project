@@ -4,6 +4,7 @@
 // Next.js internationalization guide, the dictionary is a plain object and the locale comes from the server (the
 // user's Preferences). lib/tests/i18n.test.ts keeps the code's texts and the dictionary's keys the same (NFR-07).
 import { ms } from "@ac/web/lib/i18n-ms";
+import { lookup } from "@ac/web/lib/lookup";
 
 export type Locale = "en" | "ms";
 export const isLocale = (v: unknown): v is Locale => v === "en" || v === "ms";
@@ -22,7 +23,7 @@ export function translate(locale: Locale, text: string, params?: Params): string
   const english = text.includes("::") ? text.slice(text.indexOf("::") + 2) : text;
   let base = english;
   if (locale === "ms") {
-    base = ms[text] ?? english;
+    base = lookup(ms, text) ?? english;
     if (!(text in ms) && process.env.NODE_ENV === "development" && !warned.has(text)) {
       warned.add(text);
       console.warn(`[i18n] no Malay text for "${text}"`);

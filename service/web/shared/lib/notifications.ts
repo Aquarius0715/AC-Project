@@ -5,6 +5,7 @@ import { evidenceText } from "@ac/web/lib/evidence";
 import { money } from "@ac/web/lib/money";
 import { channelText } from "@ac/web/lib/partnerHistory";
 import { DEFAULT_DISPLAY, showDate, showTime, translate, translator, type Display } from "@ac/web/lib/i18n";
+import { lookup } from "@ac/web/lib/lookup";
 
 type TargetKind = "unit" | "job" | "invoice" | "restriction" | "device" | "inquiry" | "client_user" | "partner_user" | "certificate";
 
@@ -103,7 +104,7 @@ function messageText(message: string, display: Display): string {
 are worded in that language when a source above wrote them (IR481); a status the API filled in from the type (the
 notification had none) is left out, and any other text stays as recorded. */
 export function inboxRow(n: ApiNotification, role: Role, display: Display = DEFAULT_DISPLAY): InboxRow {
-  const title = typeTitles[n.type] ?? titles[n.templateKey] ?? "Notification — {name}";
+  const title = lookup(typeTitles, n.type) ?? lookup(titles, n.templateKey) ?? "Notification — {name}";
   const word = (words: Record<string, string>, code: string | null) => (code && words[code] ? translate(display.locale, words[code]) : code);
   const status = n.params.status === n.type ? null : word(statusWords, n.params.status);
   const message = n.params.message ? messageText(n.params.message, display) : word(reasonWords, n.params.reason);

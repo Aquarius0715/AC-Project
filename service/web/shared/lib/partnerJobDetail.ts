@@ -9,6 +9,7 @@ import { EN, intlTag, showSpan, showTime, translator, type I18n, type T, textOf 
 import { actionMessage } from "@ac/web/lib/actionMessage";
 import { jobEventTitle, klDay, until, type ApiCapacity, type ApiJobEvent, type ApiMember, type Slot } from "@ac/web/lib/partnerOverview";
 import type { ReportHistorySummary } from "@ac/web/lib/contracts.gen";
+import { lookup } from "@ac/web/lib/lookup";
 
 const en = translator("en");
 
@@ -122,7 +123,7 @@ export function fits(members: ApiMember[], required: string[], visit: Slot, days
       badge: fitBadge(isOk, isFree, "Fits", "Not qualified", t),
     };
   });
-  return rows.toSorted((a, b) => (rank[a.id] ?? 9) - (rank[b.id] ?? 9) || a.name.localeCompare(b.name));
+  return rows.toSorted((a, b) => (lookup(rank, a.id) ?? 9) - (lookup(rank, b.id) ?? 9) || a.name.localeCompare(b.name));
 }
 
 export interface Step { label: string; at: string | null; atText: string | null; sub: string; state: "done" | "current" | "todo" }

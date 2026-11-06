@@ -5,6 +5,7 @@ import { byCount, EN, showClock, translator, type I18n, type T } from "@ac/web/l
 import { statusWord } from "@ac/web/lib/partnerJobDetail";
 import { coveragePct, warningShort } from "@ac/web/lib/energy";
 import { money as formatMoney } from "@ac/web/lib/money";
+import { lookup } from "@ac/web/lib/lookup";
 
 const en = translator("en");
 export interface ApiForecast {
@@ -131,7 +132,7 @@ export function axisRows(s: AdminSummary, links: ReturnType<typeof overviewLinks
 /** All ten job statuses in pipeline order, zeros included (DD-A01); each links to the Jobs tab stage when it has one. */
 export const JOB_STATUSES = ["requested", "offered", "accepted", "assigned", "in_progress", "submitted", "completed", "rework_requested", "on_hold", "cancelled"] as const;
 export function jobRows(counts: Record<string, number>, links: ReturnType<typeof overviewLinks>, t: T = en) {
-  return JOB_STATUSES.map((st) => ({ status: st, label: statusWord(st, t), count: counts[st] ?? 0, href: links.jobs(st === "cancelled" ? undefined : st) }));
+  return JOB_STATUSES.map((st) => ({ status: st, label: statusWord(st, t), count: lookup(counts, st) ?? 0, href: links.jobs(st === "cancelled" ? undefined : st) }));
 }
 
 /** The billing card: overdue invoices and one row per currency, never summed across currencies; forbidden without billing.read. */

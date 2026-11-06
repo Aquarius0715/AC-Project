@@ -17,6 +17,7 @@ import type { ApiDeviceEventFull } from "@ac/web/lib/techDevices";
 import { oneOf } from "@ac/web/lib/oneOf";
 import type { Metric } from "@ac/web/lib/contracts.gen";
 import { wrapped } from "@ac/web/lib/text";
+import { lookup } from "@ac/web/lib/lookup";
 
 /** units.get as the technician reads it (ACUnit.type is part of the unit). */
 export type ApiTechUnit = ApiUnitDetail & { type?: string | null };
@@ -76,7 +77,7 @@ export function componentCards(d: ApiTechUnit, i: I18n = EN): ComponentCard[] {
   const { t } = i;
   return componentGroups.map(({ group, keys }) => ({ group, keys: keys.filter((k) => d.components.includes(k)) })).filter((g) => g.keys.length).map(({ group, keys }) => {
     return {
-      group, title: t("{group} · {n} components", { group: t(groupLabel[group]), n: keys.length }), names: keys.map((k) => t(componentLabel[k] ?? k)).join(", "),
+      group, title: t("{group} · {n} components", { group: t(groupLabel[group]), n: keys.length }), names: keys.map((k) => t(lookup(componentLabel, k) ?? k)).join(", "),
     };
   });
 }
@@ -104,14 +105,14 @@ export function liveTiles(d: ApiTechUnit, nowMs: number, i: I18n = EN): Record<"
     if (!m) return { label: label(metric, t), value: "—", sub: t("no reading") };
     if (m.value === null) return { label: label(metric, t), value: "—", sub: seen(m.observedAt) };
     const isBad = m.quality !== "valid";
-    return { label: label(metric, t), value: `${airNumber(metric, m.value)} ${m.unit}${isBad ? ` (${t(QUALITY[m.quality] ?? m.quality)})` : ""}`, sub: seen(m.observedAt), tone: isBad ? "warn" : undefined };
+    return { label: label(metric, t), value: `${airNumber(metric, m.value)} ${m.unit}${isBad ? ` (${t(lookup(QUALITY, m.quality) ?? m.quality)})` : ""}`, sub: seen(m.observedAt), tone: isBad ? "warn" : undefined };
   };
   const s = d.observedState;
   return {
     temperature: reading("temperature"), power: reading("power"),
     operation: { label: t("Operation"), value: operationText(s, t), sub: seen(s.observedAt) },
     connection: {
-      label: t("Connection"), value: t(CONNECTION[d.connection] ?? d.connection), tone: isDown ? "crit" : undefined,
+      label: t("Connection"), value: t(lookup(CONNECTION, d.connection) ?? d.connection), tone: isDown ? "crit" : undefined,
       sub: d.lastSeenAt ? t("last seen {time}", { time: relativeTime(d.lastSeenAt, nowMs, i) }) : t("never seen"),
     },
   };
@@ -176,7 +177,7 @@ export function otherMetrics(d: ApiTechUnit, shown: string, series: Record<strin
       metric: m.metric, label: label(m.metric, t), tone: m.quality === "valid" ? undefined : "warn" as const,
       value: m.value === null ? "—" : `${airNumber(m.metric, m.value)} ${m.unit}${qualityNote(m.quality, t)}`,
       sub: t(d.connection === "online" ? "observed {time}" : "last known · observed {time}", { time: relativeTime(m.observedAt, nowMs, i) }),
-      points: bucket(series[m.metric] ?? [], new Date(from), new Date(to)), cut: (totals[m.metric] ?? 0) > (series[m.metric]?.length ?? 0),
+      points: bucket(lookup(series, m.metric) ?? [], new Date(from), new Date(to)), cut: (lookup(totals, m.metric) ?? 0) > (series[m.metric]?.length ?? 0),
     };
   });
 }
@@ -202,7 +203,7 @@ export function windowEvents(alerts: ApiAlert[], events: ApiDeviceEventFull[], p
   const inside = (iso?: string | null): iso is string => !!iso && Date.parse(iso) >= from && Date.parse(iso) <= to;
   const out: Omit<WindowEvent, "time">[] = [];
   for (const a of alerts) {
-    const title = alertTitle(a, t), sev = SEVERITY[a.severity] ?? INFO;
+    const title = alertTitle(a, t), sev = lookup(SEVERITY, a.severity) ?? INFO;
     if (inside(a.detectedAt)) out.push({ id: `${a.id}:raised`, at: a.detectedAt, title: t("Alert raised — {title}", { title }), sub: evidenceText(a.evidenceText, t), badge: { text: t(sev.text), tone: sev.tone } });
     if (inside(a.acknowledgedAt)) out.push({ id: `${a.id}:acknowledged`, at: a.acknowledgedAt, title: t("Alert acknowledged — {title}", { title }), sub: "", badge: { text: t("Acknowledged"), tone: "primary" } });
     if (inside(a.resolvedAt)) out.push({ id: `${a.id}:resolved`, at: a.resolvedAt, title: t("Alert resolved — {title}", { title }), sub: a.resolutionReason ? resolutionText(a.resolutionReason, t) : "", badge: { text: t("Resolved"), tone: "ok" } });
@@ -227,7 +228,7 @@ export function jobRows(jobs: ApiTechJobRow[], i: I18n = EN): HistoryRow[] {
     .map((j): HistoryRow => {
       return {
         id: j.id, title: `${j.id.slice(0, 8)} · ${typeLabel(j.type, t)}`, sub: j.scheduledSlot ? showSpan(j.scheduledSlot.startAt, j.scheduledSlot.endAt, display) : t("not scheduled yet"),
-        badge: { text: statusWord(j.status, t), tone: CURRENT_TONE[j.status] ?? "muted" },
+        badge: { text: statusWord(j.status, t), tone: lookup(CURRENT_TONE, j.status) ?? "muted" },
       };
     });
   const ended = jobs.filter((j): j is Extract<ApiTechJobRow, { projection: "history" }> => j.projection === "history")
@@ -245,7 +246,7 @@ const ACTIVE: Record<string, number> = { in_progress: 0, assigned: 1, rework_req
 /** The job diagnostic control works for (DD-T10, IR94): the URL's job when it is one of the technician's active jobs on
 the unit, else the one in progress, then assigned or returned for rework; null without one. */
 export function controlJob(jobs: ApiTechJobRow[], jobId?: string): string | null {
-  const active = jobs.filter((j): j is Extract<ApiTechJobRow, { projection: "summary" }> => j.projection === "summary" && j.status in ACTIVE).toSorted((a, b) => (ACTIVE[a.status] ?? 9) - (ACTIVE[b.status] ?? 9));
+  const active = jobs.filter((j): j is Extract<ApiTechJobRow, { projection: "summary" }> => j.projection === "summary" && j.status in ACTIVE).toSorted((a, b) => (lookup(ACTIVE, a.status) ?? 9) - (lookup(ACTIVE, b.status) ?? 9));
   return (active.find((j) => j.id === jobId) ?? active[0])?.id ?? null;
 }
 
@@ -254,7 +255,7 @@ const RANK: Record<string, number> = { critical: 0, warning: 1, normal: 2 };
 /** The unit's unresolved alerts, worst and newest first, each with its evidence and who acknowledged it — finishing the job never resolves one. */
 export function openAlerts(alerts: ApiAlert[], nowMs: number, i: I18n = EN): OpenAlert[] {
   const { t } = i;
-  return alerts.filter((a) => a.status !== "resolved").toSorted((a, b) => (RANK[a.severity] ?? 9) - (RANK[b.severity] ?? 9) || b.detectedAt.localeCompare(a.detectedAt)).map((a) => {
+  return alerts.filter((a) => a.status !== "resolved").toSorted((a, b) => (lookup(RANK, a.severity) ?? 9) - (lookup(RANK, b.severity) ?? 9) || b.detectedAt.localeCompare(a.detectedAt)).map((a) => {
     return {
       id: a.id, title: alertTitle(a, t), severity: a.severity, sub: `${evidenceText(a.evidenceText, t)} · ${relativeTime(a.detectedAt, nowMs, i)}`,
       ack: `${a.acknowledgedAt ? t("Acknowledged {time}.", { time: relativeTime(a.acknowledgedAt, nowMs, i) }) : t("Acknowledged by nobody yet.")} ${t("Completing the job does not resolve it.")}`,

@@ -11,6 +11,7 @@ import { oneOfOrThrow } from "@ac/web/lib/oneOf";
 import { byNumber, byText } from "@ac/web/lib/order";
 import { filled } from "@ac/web/lib/filled";
 import { wrapped } from "@ac/web/lib/text";
+import { lookup } from "@ac/web/lib/lookup";
 
 const en = translator("en");
 
@@ -144,7 +145,7 @@ export function policyRows(policies: ApiPolicy[], customers: ApiCustomerName[], 
       const rules = p.rules?.length ?? 0;
       const sub = p.kind === "default_alert"
         ? byCount(rules, { one: t("1 rule · ventilation (CO₂, PM2.5) + fault causes"), many: t("{n} rules · ventilation (CO₂, PM2.5) + fault causes", { n: rules }) })
-        : `${textOf(metricLabel, metric, t) ?? metric} ${opSymbol[op]} ${String(p.threshold ?? "—")} ${metricUnit[metric] ?? ""} ${t("for {n} s", { n: p.durationSeconds ?? 0 })}`;
+        : `${textOf(metricLabel, metric, t) ?? metric} ${opSymbol[op]} ${String(p.threshold ?? "—")} ${lookup(metricUnit, metric) ?? ""} ${t("for {n} s", { n: p.durationSeconds ?? 0 })}`;
       const recipients = (p.recipientMembershipIds ?? []).map((id) => {
         const m = member.get(id);
         return { id, label: filled(m?.displayName) ?? id, role: m ? recipientRole(m.role, t) : "" };
@@ -328,7 +329,7 @@ function holds(op: Operator, v: number, threshold: number): boolean {
 /** What “Test with demo data” found for a synthetic reading (DD-A05 item 7, IR348), in words and a tone; null means the
 policy did not run on the unit (no longer attached). */
 export function testOutcome(d: NotificationDecision | null, p: Pick<AdminPolicy, "metric" | "operator" | "threshold">, value: number, unitName: string, t: T = en): { tone: "ok" | "warn" | "crit" | "muted"; text: string } {
-  const unit = metricUnit[p.metric] ?? "";
+  const unit = lookup(metricUnit, p.metric) ?? "";
   const v = { value, unit, op: opSymbol[p.operator], threshold: p.threshold, name: unitName };
   if (!d) return { tone: "warn", text: t("The policy did not run on {name} — it is no longer attached to it.", v) };
   if (d.decision === "selected") return { tone: "ok", text: t("{value} {unit} on {name} raises an alert and notifies the recipients — simulated, nothing is stored.", v) };

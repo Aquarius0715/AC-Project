@@ -5,6 +5,7 @@
 import { klInstant, periodError } from "@ac/web/lib/energy";
 import { EN, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
 import { codePoints, wrapped } from "@ac/web/lib/text";
+import { lookup } from "@ac/web/lib/lookup";
 
 const en = translator("en");
 
@@ -34,14 +35,14 @@ export interface RecordRow {
 /** A record state as the screens word it (the customer offsets page uses the same words). */
 export function stateWord(s: ApiOffsetRecord["state"] | null, t: T = en): string {
   const words: Partial<Record<ApiOffsetRecord["state"], string>> = { demo_requested: t("Demo requested"), demo_purchased: t("Demo purchased"), demo_retired: t("Demo retired"), failed: t("Failed") };
-  return s ? words[s] ?? s : "—";
+  return s ? lookup(words, s) ?? s : "—";
 }
 
 /** An attempt: its stage, status and start in the display time zone. */
 export function attemptText(a: Attempt, i: I18n = EN): string {
   const { t } = i;
   const status: Partial<Record<Attempt["status"], string>> = { pending: t("pending"), succeeded: t("succeeded"), failed: t("failed") };
-  return t("{stage} · {status} · started {time}", { stage: t(a.stage === "purchase" ? "purchase" : "retirement"), status: status[a.status] ?? a.status, time: showTime(a.startedAt, i.display) });
+  return t("{stage} · {status} · started {time}", { stage: t(a.stage === "purchase" ? "purchase" : "retirement"), status: lookup(status, a.status) ?? a.status, time: showTime(a.startedAt, i.display) });
 }
 
 /** An event of the record's audit history: what was done, its audit result and when, in the display time zone. */
@@ -51,7 +52,7 @@ export function eventItem(e: ApiOffsetRecord["eventHistory"][number], i: I18n = 
     "offsets.request": t("Demo request"), "offsets.purchase_confirm": t("Demo purchase confirmed"), "offsets.retire": t("Demo retirement"), "offsets.fail": t("Simulated failure"), "offsets.retry": t("Retry started"),
   };
   const result: Record<string, string> = { success: t("done"), denied: t("denied"), failed: t("failed"), pending: t("pending") };
-  return { time: showTime(e.occurredAt, i.display), title: `${action[e.action] ?? e.action} · ${result[e.result] ?? e.result}`, detail: `${e.actorName ?? e.actorId.slice(0, 8)}${wrapped(e.reason, " · ")}` }; // who acted (IR305)
+  return { time: showTime(e.occurredAt, i.display), title: `${lookup(action, e.action) ?? e.action} · ${lookup(result, e.result) ?? e.result}`, detail: `${e.actorName ?? e.actorId.slice(0, 8)}${wrapped(e.reason, " · ")}` }; // who acted (IR305)
 }
 
 export function recordRows(rs: ApiOffsetRecord[], customers: { id: string; name: string }[], i: I18n = EN): RecordRow[] {
@@ -75,7 +76,7 @@ export function recordRows(rs: ApiOffsetRecord[], customers: { id: string; name:
       stateText: stateWord(r.state, t),
       currentText: current ? attemptText(current, i) : null,
       events: r.eventHistory.map((e) => eventItem(e, i)),
-      stage: r.state === "failed" ? -1 : stageOf[r.state] ?? 0,
+      stage: r.state === "failed" ? -1 : lookup(stageOf, r.state) ?? 0,
       next: nextText(),
       current,
       r,
@@ -86,7 +87,7 @@ export function recordRows(rs: ApiOffsetRecord[], customers: { id: string; name:
 /** The market concept of a quote: known codes worded, others as they are. */
 export function conceptText(m: ApiQuote["marketConcept"], t: T = en): string {
   const word: Record<string, string> = { future_concept: t("future concept"), unverified: t("unverified"), not_connected: t("not connected") };
-  return t("{stage} · verification {verification} · ledger {ledger}", { stage: word[m.stage] ?? m.stage, verification: word[m.verificationStatus] ?? m.verificationStatus, ledger: word[m.ledgerStatus] ?? m.ledgerStatus });
+  return t("{stage} · verification {verification} · ledger {ledger}", { stage: lookup(word, m.stage) ?? m.stage, verification: lookup(word, m.verificationStatus) ?? m.verificationStatus, ledger: lookup(word, m.ledgerStatus) ?? m.ledgerStatus });
 }
 
 /** The demo quote form (DD-A15 fields). */

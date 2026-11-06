@@ -1,6 +1,7 @@
 // Sign-in page helpers (FR-X01, DDC-07, SCR-X-login, IR251; Figma Login frames): where Continue goes, the other services,
 // and why a sign-in came back (the BFF callback's ?error=, or an expired session).
 import { ROLES, type Role } from "@ac/web/lib/nav";
+import { lookup } from "@ac/web/lib/lookup";
 
 /** returnTo kept only inside this role's area (the BFF validates it again); otherwise the role home. */
 export function safeReturnTo(role: Role, asked: string | undefined): string {
@@ -33,4 +34,4 @@ export const signedOutReason = (messageKey?: string): "revoked" | "expired" => (
 export const signInAgainHref = (reason: "revoked" | "expired", path: string): string => `/login?error=${reason}&returnTo=${encodeURIComponent(path)}`;
 
 /** Why the browser is back on sign-in, or null for a plain visit. */
-export const loginError = (code: string | undefined): string | null => (code ? ERRORS[code] ?? "The sign-in did not complete — try again." : null);
+export const loginError = (code: string | undefined): string | null => (code ? lookup(ERRORS, code) ?? "The sign-in did not complete — try again." : null);

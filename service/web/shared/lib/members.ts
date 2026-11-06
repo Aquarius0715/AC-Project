@@ -7,6 +7,7 @@ import type { OpInput } from "@ac/web/lib/opTypes";
 import type { Permission } from "@ac/web/lib/contracts.gen";
 import { codePoints, isEmail } from "@ac/web/lib/text";
 import { isAfter } from "@ac/web/lib/order";
+import { lookup } from "@ac/web/lib/lookup";
 
 const en = translator("en");
 
@@ -54,7 +55,7 @@ export function resourceWord(res: string, t: T = en): string {
     Alerts: t("Alerts"), "Alert policies": t("Alert policies"), "Maintenance jobs": t("Maintenance jobs"), Contracts: t("Contracts"), Billing: t("Billing"), Restrictions: t("Restrictions"),
     "Automation policies": t("Automation policies"), Energy: t("Energy"), MRV: t("MRV"), Offsets: t("Offsets"), Audit: t("Audit"), Partners: t("Partners"),
   };
-  return words[res] ?? res;
+  return lookup(words, res) ?? res;
 }
 /** A role (and a technician's employment) as the screen words it. */
 export const roleWord = (role: Role, employment: ApiMember["employment"], t: T = en) => {

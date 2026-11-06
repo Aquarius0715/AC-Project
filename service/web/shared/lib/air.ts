@@ -9,6 +9,7 @@ import { roundAway } from "@ac/web/lib/energy";
 import { spacePath, type ApiPropertyRow, type ApiSpaceRow, type ApiUnitRow } from "@ac/web/lib/assets";
 import { DEFAULT_DISPLAY, EN, relativeTime, showClock, showDate, showDay, showSpan, translator, type Display, type I18n, type T } from "@ac/web/lib/i18n";
 import type { IconName } from "@ac/web/components/Icon";
+import { lookup } from "@ac/web/lib/lookup";
 
 const en = translator("en");
 
@@ -143,7 +144,7 @@ export function metricCard(metric: AirMetric, m: ApiMeasurement | undefined, has
     advice,
     value: airNumber(metric, m.value),
     feed: { text: t("Live"), tone: "ok", icon: "live" },
-    sub: `${t("Observed {time}", { time: at })}${m.origin === "measured" ? "" : ` · ${t(originText[m.origin] ?? m.origin)}`}`,
+    sub: `${t("Observed {time}", { time: at })}${m.origin === "measured" ? "" : ` · ${t(lookup(originText, m.origin) ?? m.origin)}`}`,
     warn: isHigh,
   };
 }

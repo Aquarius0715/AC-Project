@@ -12,6 +12,7 @@ import { until, type Slot } from "@ac/web/lib/partnerOverview";
 import { statusWord, typeLabel, type ApiHistory } from "@ac/web/lib/partnerJobDetail";
 import { bucket, type ApiUnitDetail } from "@ac/web/lib/units";
 import type { Metric } from "@ac/web/lib/contracts.gen";
+import { lookup } from "@ac/web/lib/lookup";
 
 /** jobs.list rows on the unit (the company's own: summaries inside the access window, history after it). */
 export type ApiUnitJob =
@@ -85,7 +86,7 @@ export function evidenceRows(alerts: ApiAlert[], i: I18n = EN) {
   return [...alerts].toSorted((a, b) => b.detectedAt.localeCompare(a.detectedAt)).map((a) => {
     return {
       id: a.id, title: alertTitle(a, t), severity: a.severity, resolved: a.status === "resolved",
-      sub: `${t(EVIDENCE[a.evidenceKind] ?? "Evidence")} — ${evidenceText(a.evidenceText, t)} · ${showTime(a.detectedAt, display)}`,
+      sub: `${t(lookup(EVIDENCE, a.evidenceKind) ?? "Evidence")} — ${evidenceText(a.evidenceText, t)} · ${showTime(a.detectedAt, display)}`,
     };
   });
 }
@@ -96,7 +97,7 @@ interface ReadingRow { label: string; value: string; tone?: "warn" | "crit" }
 export function readingRows(d: ApiUnitDetail, i: I18n = EN): { rows: ReadingRow[]; observed: string } {
   const { t, display } = i;
   const rows = d.latestMeasurements.map((m): ReadingRow => {
-    const q = QUALITY[m.quality] ?? { text: m.quality };
+    const q = lookup(QUALITY, m.quality) ?? { text: m.quality };
     return { label: label(m.metric, t), value: m.value === null ? `— · ${t(q.text)}` : `${airNumber(m.metric, m.value)} ${m.unit} · ${t(q.text)}`, tone: q.tone };
   });
   const s = d.observedState;

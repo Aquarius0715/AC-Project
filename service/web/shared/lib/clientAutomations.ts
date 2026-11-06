@@ -9,6 +9,7 @@ import { codePoints, wrapped } from "@ac/web/lib/text";
 import { acModes, fanLevels } from "@ac/web/lib/automation";
 import { oneOf } from "@ac/web/lib/oneOf";
 import { isAfter } from "@ac/web/lib/order";
+import { lookup } from "@ac/web/lib/lookup";
 
 const en = translator("en");
 
@@ -361,7 +362,7 @@ const keyText: Record<string, string> = {
 /** API field errors of automations.save / nextRuns draft mapped to the editor fields. */
 export function apiErrors(fe: Record<string, string>, t: T = en): Record<string, string> {
   const out: Record<string, string> = {};
-  for (const [k, v] of Object.entries(fe)) out[fieldName[k] ?? k] = textOf(keyText, v, t) ?? v.replace(/^errors?\./, "").replaceAll('_', " ");
+  for (const [k, v] of Object.entries(fe)) out[lookup(fieldName, k) ?? k] = textOf(keyText, v, t) ?? v.replace(/^errors?\./, "").replaceAll('_', " ");
   return out;
 }
 
@@ -382,9 +383,9 @@ export function actionOptions(c: Caps | null, t: T = en): ActionGroup[] {
   const out: ActionGroup[] = [];
   if (c.control) out.push({ id: "power", group: t("Power"), options: [{ key: "power:on", label: t("Power ON"), short: t("ON") }, { key: "power:off", label: t("Power OFF"), short: t("OFF") }] });
   if (temps.length > 0) out.push({ id: "temp", group: t("Temperature"), options: temps });
-  if (c.control && c.modeControl && c.modes.length > 0) out.push({ id: "mode", group: t("Mode"), options: c.modes.map((m) => ({ key: `mode:${m}`, label: actionLabel({ kind: "set_mode", mode: m }, t), short: t(modeWord[m] ?? m) })) });
-  if (c.control && c.fanControl && c.fanLevels.length > 0) out.push({ id: "fan", group: t("Fan"), options: c.fanLevels.map((f) => ({ key: `fan:${f}`, label: actionLabel({ kind: "set_fan", fanLevel: f }, t), short: t(fanWord[f] ?? f) })) });
-  if (c.ventilation && c.ventilationLevels?.length) out.push({ id: "vent", group: t("Ventilation"), options: c.ventilationLevels.map((l) => ({ key: `vent:${l}`, label: actionLabel({ kind: "ventilate", level: l }, t), short: t(fanWord[l] ?? l) })) });
+  if (c.control && c.modeControl && c.modes.length > 0) out.push({ id: "mode", group: t("Mode"), options: c.modes.map((m) => ({ key: `mode:${m}`, label: actionLabel({ kind: "set_mode", mode: m }, t), short: t(lookup(modeWord, m) ?? m) })) });
+  if (c.control && c.fanControl && c.fanLevels.length > 0) out.push({ id: "fan", group: t("Fan"), options: c.fanLevels.map((f) => ({ key: `fan:${f}`, label: actionLabel({ kind: "set_fan", fanLevel: f }, t), short: t(lookup(fanWord, f) ?? f) })) });
+  if (c.ventilation && c.ventilationLevels?.length) out.push({ id: "vent", group: t("Ventilation"), options: c.ventilationLevels.map((l) => ({ key: `vent:${l}`, label: actionLabel({ kind: "ventilate", level: l }, t), short: t(lookup(fanWord, l) ?? l) })) });
   return out;
 }
 

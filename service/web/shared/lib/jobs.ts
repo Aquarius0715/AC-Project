@@ -14,6 +14,7 @@ import { oneOf } from "@ac/web/lib/oneOf";
 import { useOp } from "@ac/web/lib/useOp";
 import { wrapped } from "@ac/web/lib/text";
 import { isBefore } from "@ac/web/lib/order";
+import { lookup } from "@ac/web/lib/lookup";
 
 export interface Slot { date: string; win: string }
 export type Origin = "request" | "plan";
@@ -175,7 +176,7 @@ function jobFromApi(j: ApiJob): Job {
     loc: "",
     customer: "",
     origin: j.origin === "periodic_plan" ? "plan" : "request",
-    type: typeLabel[j.type] ?? "Reactive",
+    type: lookup(typeLabel, j.type) ?? "Reactive",
     symptom: "",
     preferred: (j.preferredSlots ?? []).map((x) => slotOf(x)).filter((s): s is Slot => s !== null),
     round: 1,

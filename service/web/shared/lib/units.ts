@@ -5,6 +5,7 @@ import { airNumber } from "@ac/web/lib/air";
 import type { Metric, RestrictionAction, UnitAction as AnyUnitAction, UnitSymbol } from "@ac/web/lib/contracts.gen";
 import { policyText } from "@ac/web/lib/restrictions";
 import { DEFAULT_DISPLAY, showClock, showRecent, showTime, translator, type Display, type T, textOf } from "@ac/web/lib/i18n";
+import { lookup } from "@ac/web/lib/lookup";
 
 type Mode = "cool" | "dry" | "fan";
 type Fan = "low" | "mid" | "high";
@@ -123,7 +124,7 @@ export function latest(d: ApiUnitDetail, metric: string, t: T = en, display: Dis
   const m = d.latestMeasurements.find((x) => x.metric === metric);
   // with the scenario's now, a reading of another day keeps its date (IR613)
   const at = (iso: string) => (nowMs === undefined ? showClock(iso, display) : showRecent(iso, nowMs, display));
-  return m && m.value !== null ? { text: `${airNumber(metric, m.value)} ${m.unit}${m.quality === "valid" ? "" : ` (${t(qualityText[m.quality] ?? m.quality)})`}`, at: at(m.observedAt) } : null;
+  return m && m.value !== null ? { text: `${airNumber(metric, m.value)} ${m.unit}${m.quality === "valid" ? "" : ` (${t(lookup(qualityText, m.quality) ?? m.quality)})`}`, at: at(m.observedAt) } : null;
 }
 
 // Technician unit monitoring (FR-T02): the rolling series window for telemetry.series. The component groups of the 18

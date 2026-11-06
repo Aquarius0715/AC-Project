@@ -4,6 +4,7 @@
 // language and instants in the display time zone (`t` / `i`, IR301); the customer's notice uses the same words (IR267).
 import { EN, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
 import { wrapped } from "@ac/web/lib/text";
+import { lookup } from "@ac/web/lib/lookup";
 
 const en = translator("en");
 
@@ -48,7 +49,7 @@ export const policyText = (p: Policy, t: T = en) => (p.kind === "power_off" ? t(
 /** Where a release intent came from, worded. */
 export const sourceWord = (s: NonNullable<ReleaseIntent>["source"], t: T = en) => {
   const words: Partial<Record<NonNullable<ReleaseIntent>["source"], string>> = { payment: t("payment"), exception: t("exception"), override: t("override"), manual: t("manual"), cancel: t("cancellation") };
-  return words[s] ?? s; // a value the API adds before this table does
+  return lookup(words, s) ?? s; // a value the API adds before this table does
 };
 /** The release intent with its time in the display time zone, or "none". */
 export const intentText = (r: Pick<ApiRestriction, "releaseIntent">, i: I18n = EN) => (r.releaseIntent ? `${sourceWord(r.releaseIntent.source, i.t)} · ${showTime(r.releaseIntent.at, i.display)}` : i.t("none"));
@@ -97,9 +98,9 @@ export function unitRows(r: ApiRestriction, names: Map<string, string>, commands
     const last = (ids: string[]) => { const id = ids.at(-1); return id ? commands.get(id) : undefined; };
     const a = last(u.applyCommandIds);
     const releaseId = last(u.releaseCommandIds);
-    const status = (c: ApiCommand) => `${command[c.status] ?? c.status}${wrapped(c.failureCode, " (", ")")}`;
+    const status = (c: ApiCommand) => `${lookup(command, c.status) ?? c.status}${wrapped(c.failureCode, " (", ")")}`;
     return {
-      unitId: u.unitId, name: names.get(u.unitId) ?? u.unitId.slice(0, 8), apply: apply[u.applyState] ?? u.applyState, release: release[u.releaseState] ?? u.releaseState, pending: pending(u.pendingReason),
+      unitId: u.unitId, name: names.get(u.unitId) ?? u.unitId.slice(0, 8), apply: lookup(apply, u.applyState) ?? u.applyState, release: lookup(release, u.releaseState) ?? u.releaseState, pending: pending(u.pendingReason),
       observed: observedText(u, r.id, i),
       retryApply: r.state === "requested" && (u.applyState === "not_sent" || u.applyState === "not_applied"),
       retryRelease: r.state === "release_requested" && (u.releaseState === "failed" || (u.releaseState === "none" && u.applyState === "applied")),

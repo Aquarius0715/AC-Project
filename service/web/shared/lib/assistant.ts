@@ -4,6 +4,7 @@
 import { one } from "@ac/web/lib/energy";
 import { showClock, type Display, type Locale, type T } from "@ac/web/lib/i18n";
 import { actionText, controlLayout, type ApiCommand, type ApiUnitDetail } from "@ac/web/lib/units";
+import { lookup } from "@ac/web/lib/lookup";
 
 /** ResolvedIntent of service-contracts.ts. */
 export interface Measurement { value: number | null; unit: string; observedAt: string; quality: "valid" | "missing" | "stale" | "suspect" }
@@ -66,7 +67,7 @@ export function temperatureText(m: Measurement | null, unit: string, t: T, displ
 }
 const qualityWord = (q: Measurement["quality"], t: T) => {
   const words: Partial<Record<Measurement["quality"], string>> = { valid: t("valid"), missing: t("missing"), stale: t("stale"), suspect: t("suspect") };
-  return words[q] ?? q; // a value the API adds before this table does
+  return lookup(words, q) ?? q; // a value the API adds before this table does
 };
 
 /** The confirmation card of a change (Figma 09c): target, current setting, requested setting and the allowed range. */

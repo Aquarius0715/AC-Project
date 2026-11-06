@@ -63,6 +63,7 @@ export { money } from "@ac/web/lib/money";
 import { money } from "@ac/web/lib/money";
 import { isAfter } from "@ac/web/lib/order";
 import { withoutYear } from "@ac/web/lib/text";
+import { lookup } from "@ac/web/lib/lookup";
 /** An amount with its sign: + for an addition, a minus sign for a deduction. */
 const signedMoney = (minor: number, currency: string) => `${minor > 0 ? "+" : "−"}${money(Math.abs(minor), currency)}`;
 const methodName = (m: string | null, t: T) => {
@@ -169,7 +170,7 @@ export interface StatementRow {
 /** A statement's status, a line's kind, a question's topic and state as the screen words them. */
 export const statementWord = (s: StatementRow["status"], t: T = en) => {
   const words: Partial<Record<StatementRow["status"], string>> = { Draft: t("Draft"), Approved: t("Approved"), Paid: t("Paid") };
-  return words[s] ?? s; // a value the API adds before this table does
+  return lookup(words, s) ?? s; // a value the API adds before this table does
 };
 export type StatementDetail = StatementRow & {
   gross: string; deductions: string; payDate: string; payable: boolean; approvedBy: string | null; paidAt: string | null;
@@ -215,10 +216,10 @@ export function statementDetail(s: ApiStatement, orgs: ApiOrganization[], now: D
   return {
     ...row, gross: money(s.grossMinor, s.currency), deductions: money(s.deductionsMinor, s.currency), payDate: businessDay(s.payDate, i.display.locale), payable: Date.parse(s.payDate) <= now.getTime(),
     approvedBy: s.approvedByMembershipId ? names.get(s.approvedByMembershipId) ?? s.approvedByMembershipId.slice(0, 8) : null, paidAt: s.paidAt ? businessDay(s.paidAt, i.display.locale) : null,
-    lines: s.lines.map((l) => ({ id: l.id, job: l.jobId, work: work[l.workType] ?? l.workType, kind: kind[l.kind] ?? l.kind, amount: l.kind === "deduction" ? `−${money(l.amountMinor, s.currency)}` : money(l.amountMinor, s.currency), note: l.note ?? "" })), // a minus sign, as on the adjustments
+    lines: s.lines.map((l) => ({ id: l.id, job: l.jobId, work: lookup(work, l.workType) ?? l.workType, kind: lookup(kind, l.kind) ?? l.kind, amount: l.kind === "deduction" ? `−${money(l.amountMinor, s.currency)}` : money(l.amountMinor, s.currency), note: l.note ?? "" })), // a minus sign, as on the adjustments
     queries: s.queries.map((q) => {
       return {
-        id: q.id, line: line.get(q.lineId)?.jobId ?? q.lineId, topic: topic[q.topic] ?? q.topic, message: q.message, state: state[q.state] ?? q.state, open: q.state === "open", reply: q.reply,
+        id: q.id, line: line.get(q.lineId)?.jobId ?? q.lineId, topic: lookup(topic, q.topic) ?? q.topic, message: q.message, state: lookup(state, q.state) ?? q.state, open: q.state === "open", reply: q.reply,
         adjustment: q.adjustmentMinor === null ? null : signedMoney(q.adjustmentMinor, s.currency),
       };
     }),

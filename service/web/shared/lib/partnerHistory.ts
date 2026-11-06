@@ -7,6 +7,7 @@ import { EN, relativeTime, showTime, translator, type I18n, type T, textOf } fro
 import { jobEventTitle, type ApiEventSummary, type ApiJobEvent, type ApiMember, type ApiPartnerJob } from "@ac/web/lib/partnerOverview";
 import { oneOf } from "@ac/web/lib/oneOf";
 import { statusWord, typeLabel } from "@ac/web/lib/partnerJobDetail";
+import { lookup } from "@ac/web/lib/lookup";
 
 const en = translator("en");
 
@@ -75,7 +76,7 @@ export function historyRow(j: ApiPartnerJob, now: number, units: Map<string, str
       // when the delegation ended: the period counts a history without completion by it (IR614)
       sub: t(s.count === 1 ? "1 own decision event · delegation ended {time} (read-only snapshot)" : "{n} own decision events · delegation ended {time} (read-only snapshot)", { n: s.count, time: showTime(j.asOf, display) }),
       delegation: t("ended — history only"), tech: { name: "—", sub: t("not shown after the delegation") }, lastAt: last ? Date.parse(last.at) : 0,
-      badge: { text: statusLabel(j.status, t), tone: STATUS_TONE[j.status] ?? "muted" }, overdue: false, last,
+      badge: { text: statusLabel(j.status, t), tone: lookup(STATUS_TONE, j.status) ?? "muted" }, overdue: false, last,
     };
   }
   const tech = j.technicianMembershipId ? names.get(j.technicianMembershipId) ?? t("technician") : null;
@@ -97,7 +98,7 @@ export function historyRow(j: ApiPartnerJob, now: number, units: Map<string, str
     tech: tech ? { name: tech, sub: t(ack ?? "assigned") } : { name: t("Unassigned"), sub: j.status === "accepted" ? t("assign in Schedule") : "—", tone: j.status === "accepted" ? "crit" : undefined },
     lastAt: last ? Date.parse(last.at) : 0,
     overdue: isOverdue,
-    badge: isOverdue ? { text: t("Overdue"), tone: "crit" } : { text: statusLabel(j.status, t), tone: STATUS_TONE[j.status] ?? "muted" },
+    badge: isOverdue ? { text: t("Overdue"), tone: "crit" } : { text: statusLabel(j.status, t), tone: lookup(STATUS_TONE, j.status) ?? "muted" },
     tab,
     delegation,
     last,

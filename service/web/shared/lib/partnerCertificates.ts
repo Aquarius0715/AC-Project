@@ -17,6 +17,7 @@ import { z } from "zod";
 export const certificateCode = z.enum(["demo_indoor", "demo_outdoor", "demo_electrical", "other"]);
 import { codePoints } from "@ac/web/lib/text";
 import { isAfter } from "@ac/web/lib/order";
+import { lookup } from "@ac/web/lib/lookup";
 
 const en = translator("en");
 const DAY = 86_400_000;
@@ -228,7 +229,7 @@ export function certificateRefusal(f: { code: string; fieldErrors: Record<string
   if (f.code === "NOT_FOUND") return { fields: {}, text: t("That technician or certificate is no longer in your company — reload the page.") };
   if (f.code === "CONFLICT") return { fields: {}, text: t("The certificate changed in the meantime — the page shows the latest state.") };
   if (f.code !== "VALIDATION") return { fields: {}, text: null };
-  const fields = Object.fromEntries(Object.entries(f.fieldErrors).map(([k, v]) => [FIELDS[k] ?? k, textOf(TEXT, v, t) ?? v]));
+  const fields = Object.fromEntries(Object.entries(f.fieldErrors).map(([k, v]) => [lookup(FIELDS, k) ?? k, textOf(TEXT, v, t) ?? v]));
   return { fields, text: Object.keys(fields).length > 0 ? null : t("Check the input.") };
 }
 /** “412 KB”, “2.4 MB”: a file's size as the form shows it. */

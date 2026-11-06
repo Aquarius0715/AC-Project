@@ -11,6 +11,7 @@ import { metrics } from "@ac/web/lib/devices";
 import { oneOfOrThrow } from "@ac/web/lib/oneOf";
 import { byNumber } from "@ac/web/lib/order";
 import { wrapped } from "@ac/web/lib/text";
+import { lookup } from "@ac/web/lib/lookup";
 
 const en = translator("en");
 
@@ -51,7 +52,7 @@ function unitSuffix(unit: string): string {
 /** “Room temperature ≥ 30 °C for 60 s”, “No heartbeat for 15 min”. */
 export function conditionText(c: { metric: string; operator: Operator; threshold: number; durationSeconds: number }, t: T = en): string {
   if (c.metric === "heartbeat_gap") return t("No heartbeat for {n} min", { n: c.threshold });
-  const unit = metricUnit[c.metric] ?? "";
+  const unit = lookup(metricUnit, c.metric) ?? "";
   const value = `${String(c.threshold)}${unitSuffix(unit)}`;
   return t("{metric} {op} {value} for {duration}", { metric: textOf(label, c.metric, t) ?? c.metric, op: opSymbol[c.operator], duration: durationText(c.durationSeconds), value });
 }
@@ -69,7 +70,7 @@ export function windowText(w: PolicyWindow, t: T = en): string {
   const d = daysText(w.weekdays, t);
   return `${t("only {from}–{to}", { from: w.startLocal, to: w.endLocal })}${wrapped(d, " ")}`;
 }
-const recoverText = (op: Operator, v: number, metric: string, t: T) => t(op === "gt" || op === "gte" ? "recover below {value} {unit}" : "recover above {value} {unit}", { value: v, unit: metricUnit[metric] ?? "" }).trim();
+const recoverText = (op: Operator, v: number, metric: string, t: T) => t(op === "gt" || op === "gte" ? "recover below {value} {unit}" : "recover above {value} {unit}", { value: v, unit: lookup(metricUnit, metric) ?? "" }).trim();
 const CHANNEL_TEXT = new Map<Channel, string>([["inApp", "in-app"], ["email", "email"], ["whatsapp", "WhatsApp"]]);
 const channelText = (cs: Channel[], t: T) => cs.map((c) => t(CHANNEL_TEXT.get(c) ?? c)).join(" + ");
 
@@ -164,12 +165,12 @@ const VERB: Record<string, string> = { critical: "Alert me (critical)", warning:
 /** The live summary sentence (Figma 06f): “Warn me when CO₂ stays ≥ 1200 ppm for 15 min on weekdays 08:00–19:00. Clears below 1000 ppm.” */
 export function summaryText(f: PolicyForm, t: T = en): string {
   const verb = textOf(VERB, f.severity, t) ?? t("Tell me");
-  const unit = metricUnit[f.metric] ?? "";
+  const unit = lookup(metricUnit, f.metric) ?? "";
   const s = seconds(f);
   const d = f.windowOn && f.weekdays.length > 0 ? daysText(f.weekdays, t) : "";
   const daysPart = d ? `${d} ` : "";
   const win = f.windowOn && f.weekdays.length > 0 ? ` ${daysPart}${f.start}–${f.end}` : "";
-  const what = f.metric === "co2" || f.metric === "pm25" ? label[f.metric] ?? f.metric : (textOf(label, f.metric, t) ?? f.metric).toLowerCase();
+  const what = f.metric === "co2" || f.metric === "pm25" ? lookup(label, f.metric) ?? f.metric : (textOf(label, f.metric, t) ?? f.metric).toLowerCase();
   const isUp = f.operator === "gt" || f.operator === "gte";
   return t(isUp ? "{verb} when {what} stays {op} {value} {unit} for {duration}{window}. Clears below {recovery} {unit}." : "{verb} when {what} stays {op} {value} {unit} for {duration}{window}. Clears above {recovery} {unit}.",
     { verb, what, unit, op: opSymbol[f.operator], value: f.threshold || "…", duration: s === null ? "…" : durationText(s), window: win, recovery: f.recovery || "…" }).replaceAll(/ +/g, " ");

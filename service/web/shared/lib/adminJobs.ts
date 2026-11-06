@@ -157,7 +157,7 @@ export function stepper(status: string, internal: boolean, t: T = en): Step[] {
     if (status === "completed" || k < at) return "done";
     return k === at ? "current" : "todo";
   };
-  return all.map((s, k) => ({ label: t(labels[s] ?? s), state: stateOf(k) }));
+  return all.map((s, k) => ({ label: t(lookup(labels, s) ?? s), state: stateOf(k) }));
 }
 
 /** The four facts of the detail: requested window, due, scheduled slot, symptom with the contact window. */
@@ -310,6 +310,7 @@ import { money } from "@ac/web/lib/money";
 import { codePoints, wrapped } from "@ac/web/lib/text";
 import { oneOf } from "@ac/web/lib/oneOf";
 import { isAfter } from "@ac/web/lib/order";
+import { lookup } from "@ac/web/lib/lookup";
 /** Estimate and actual totals per currency, never converted (“80.00 MYR + 6.20 USD”). */
 export function costTotals(lines: CostLine[]): { estimate: string; actual: string } {
   const total = (kind: CostLine["kind"]) => {

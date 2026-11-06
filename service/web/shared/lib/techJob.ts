@@ -10,6 +10,7 @@ import { statusWord, typeLabel } from "@ac/web/lib/partnerJobDetail";
 import type { OpInput } from "@ac/web/lib/opTypes";
 import type { ComponentKey } from "@ac/web/lib/contracts.gen";
 import { codePoints } from "@ac/web/lib/text";
+import { lookup } from "@ac/web/lib/lookup";
 
 const en = translator("en");
 
@@ -143,7 +144,7 @@ export interface Issue { key: string | null; group: Group | null; text: string }
 const PHOTO_STATE: Record<string, string> = { processing: "processing", failed: "failed", ready: "ready" };
 export function submitIssues(d: Draft, attachments: { id: string; name: string; status: string }[], now: number, t: T = en): Issue[] {
   const out: Issue[] = [];
-  const label = (key: string) => t(componentLabel[key] ?? key);
+  const label = (key: string) => t(lookup(componentLabel, key) ?? key);
   for (const it of d.items) {
     const where = `${t(groupLabel[it.componentGroup])} › ${label(it.componentKey)}`;
     if (it.result === null) out.push({ key: it.componentKey, group: it.componentGroup, text: t("{where} has no result", { where }) });

@@ -8,6 +8,7 @@ import { actionMessage } from "@ac/web/lib/actionMessage";
 import type { UnitAction } from "@ac/web/lib/contracts.gen";
 import { FAN_LABEL, MODE_LABEL, type ApiUnitDetail, type CommandAction } from "@ac/web/lib/units";
 import { airNumber } from "@ac/web/lib/air";
+import { lookup } from "@ac/web/lib/lookup";
 
 const en = translator("en");
 
@@ -124,7 +125,7 @@ export function stateTiles(d: { observedState: { power: boolean | null; celsius:
   const o = d.observedState;
   const room = d.latestMeasurements.find((m) => m.metric === "temperature");
   const powerText = o.power ? "On" : "Off";
-  const roomQuality = !room || room.quality === "valid" ? "" : ` (${t(QUALITY[room.quality] ?? room.quality)})`;
+  const roomQuality = !room || room.quality === "valid" ? "" : ` (${t(lookup(QUALITY, room.quality) ?? room.quality)})`;
   return [
     { label: t("Power"), value: t(o.power === null ? "Unknown" : powerText) },
     { label: t("Mode"), value: o.mode ? word(o.mode, MODE_LABEL, t) : "—" },

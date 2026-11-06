@@ -12,6 +12,7 @@ import { metricLabel, metricUnit } from "@ac/web/lib/adminAlerts";
 import { airNumber } from "@ac/web/lib/air";
 import { statusWord, typeLabel } from "@ac/web/lib/partnerJobDetail";
 import type { ApiUnitDetail } from "@ac/web/lib/units";
+import { lookup } from "@ac/web/lib/lookup";
 
 /** AlertRule of service-contracts.ts: the condition of the alert's policy or default rule. */
 export interface ApiAlertRule { name: string; metric: string; operator: "gt" | "gte" | "lt" | "lte"; threshold: number; recoveryThreshold: number; durationSeconds: number }
@@ -30,7 +31,7 @@ export function durationText(s: number, t: T): string {
   if (s >= 120 && s % 60 === 0) return t("{n} min", { n: s / 60 });
   return t("{n} s", { n: s });
 }
-const value = (metric: string, v: number) => `${airNumber(metric, v)} ${metricUnit[metric] ?? ""}`.trim();
+const value = (metric: string, v: number) => `${airNumber(metric, v)} ${lookup(metricUnit, metric) ?? ""}`.trim();
 const label = (metric: string, t: T) => (textOf(metricLabel, metric, t) ?? metric.replaceAll('_', " "));
 /** The words of a rule (Figma: “Policy: temperature ≥ 30 °C, recovery < 28 °C, duration 60 s”); recovery is below the
 recovery threshold for a high limit and above it for a low one (D08). */
@@ -38,8 +39,8 @@ export function ruleWords(r: ApiAlertRule, t: T) {
   const isUp = r.operator === "gt" || r.operator === "gte";
   const recovery = `${isUp ? "<" : ">"} ${value(r.metric, r.recoveryThreshold)}`, duration = durationText(r.durationSeconds, t);
   return {
-    policy: t("Policy: {metric} {op} {threshold}, recovery {recovery}, duration {duration}", { metric: label(r.metric, t), op: OP[r.operator] ?? r.operator, threshold: value(r.metric, r.threshold), recovery, duration }),
-    recovery: t("{recovery} for {duration}", { recovery, duration }), raise: `${label(r.metric, t)} ${OP[r.operator] ?? r.operator} ${value(r.metric, r.threshold)}`,
+    policy: t("Policy: {metric} {op} {threshold}, recovery {recovery}, duration {duration}", { metric: label(r.metric, t), op: lookup(OP, r.operator) ?? r.operator, threshold: value(r.metric, r.threshold), recovery, duration }),
+    recovery: t("{recovery} for {duration}", { recovery, duration }), raise: `${label(r.metric, t)} ${lookup(OP, r.operator) ?? r.operator} ${value(r.metric, r.threshold)}`,
   };
 }
 
@@ -83,19 +84,19 @@ export function alertView(a: ApiTechAlert, ctx: { alerts: ApiTechAlert[]; unit: 
   const when = (iso: string) => relativeTime(iso, nowMs, i);
   const rule = a.rule ?? null, words = rule ? ruleWords(rule, t) : null;
   const title = rule?.name ?? alertTitle(a, t);
-  const [state, tone] = STATE[a.status] ?? OPEN;
-  const cards: EvidenceCard[] = [{ kind: t(KIND[a.evidenceKind] ?? "Evidence"), title: t("Evidence at detection"), value: evidenceText(a.evidenceText, t), sub: t("observed {time}", { time: when(a.observedAt) }) }];
+  const [state, tone] = lookup(STATE, a.status) ?? OPEN;
+  const cards: EvidenceCard[] = [{ kind: t(lookup(KIND, a.evidenceKind) ?? "Evidence"), title: t("Evidence at detection"), value: evidenceText(a.evidenceText, t), sub: t("observed {time}", { time: when(a.observedAt) }) }];
   const m = rule ? ctx.unit?.latestMeasurements.find((x) => x.metric === rule.metric) : undefined;
   if (m) {
     cards.push({
-      kind: t(ORIGIN[m.origin] ?? m.origin), title: t("Latest reading"), value: m.value === null ? "—" : value(m.metric, m.value),
-      sub: [t("observed {time}", { time: when(m.observedAt) }), t(QUALITY[m.quality] ?? m.quality), m.origin === "estimated" ? t("confidence unknown — no numeric probability shown") : ""].filter(Boolean).join(" · "),
+      kind: t(lookup(ORIGIN, m.origin) ?? m.origin), title: t("Latest reading"), value: m.value === null ? "—" : value(m.metric, m.value),
+      sub: [t("observed {time}", { time: when(m.observedAt) }), t(lookup(QUALITY, m.quality) ?? m.quality), m.origin === "estimated" ? t("confidence unknown — no numeric probability shown") : ""].filter(Boolean).join(" · "),
     });
   }
   const history: AlertView["history"] = [];
   if (a.resolvedAt) history.push({ id: "resolved", time: when(a.resolvedAt), title: t("Resolved"), sub: a.resolutionReason ? resolutionText(a.resolutionReason, t) : "", badge: { text: t("Resolved"), tone: "ok" } });
   if (a.acknowledgedAt) history.push({ id: "acknowledged", time: when(a.acknowledgedAt), title: t("Acknowledged"), sub: "", badge: { text: t("Acknowledged"), tone: "primary" } });
-  history.push({ id: "raised", time: when(a.detectedAt), title: t("Raised"), sub: [evidenceText(a.evidenceText, t), rule && words && t("{condition} for {duration}", { condition: words.raise, duration: durationText(rule.durationSeconds, t) })].filter(Boolean).join(" · "), badge: { text: t(KIND[a.evidenceKind] ?? "Evidence"), tone: "primary" } });
+  history.push({ id: "raised", time: when(a.detectedAt), title: t("Raised"), sub: [evidenceText(a.evidenceText, t), rule && words && t("{condition} for {duration}", { condition: words.raise, duration: durationText(rule.durationSeconds, t) })].filter(Boolean).join(" · "), badge: { text: t(lookup(KIND, a.evidenceKind) ?? "Evidence"), tone: "primary" } });
   const prev = a.previousAlertId ? ctx.alerts.find((x) => x.id === a.previousAlertId) : undefined;
   const unit = ctx.unit ? unitPath(ctx.unit) : a.unitId.slice(0, 8);
   const resolver = a.status === "resolved" ? t("done {time}", { time: when(a.resolvedAt ?? a.detectedAt) }) : t(resolveWay(ctx.canResolve, !!rule));
@@ -105,7 +106,7 @@ export function alertView(a: ApiTechAlert, ctx: { alerts: ApiTechAlert[]; unit: 
     banner: {
       title: `${a.id.slice(0, 8)} · ${title}`,
       state: a.status === "open" ? null : `${t(state)} · ${when(stateTime(a))}`,
-      sub: words ? words.policy : t("{kind} · no policy — it resolves only with a reason", { kind: t(KIND[a.evidenceKind] ?? "Evidence") }),
+      sub: words ? words.policy : t("{kind} · no policy — it resolves only with a reason", { kind: t(lookup(KIND, a.evidenceKind) ?? "Evidence") }),
       tone,
     },
     resolution: {
@@ -127,7 +128,7 @@ export function alertView(a: ApiTechAlert, ctx: { alerts: ApiTechAlert[]; unit: 
 const RANK: Record<string, number> = { critical: 0, warning: 1, normal: 2 };
 /** The alert the page opens: the URL's, else the worst unresolved one, else the newest. */
 export function selectAlert(alerts: ApiTechAlert[], alertId?: string): ApiTechAlert | null {
-  const open = alerts.filter((a) => a.status !== "resolved").toSorted((a, b) => (RANK[a.severity] ?? 9) - (RANK[b.severity] ?? 9) || b.detectedAt.localeCompare(a.detectedAt));
+  const open = alerts.filter((a) => a.status !== "resolved").toSorted((a, b) => (lookup(RANK, a.severity) ?? 9) - (lookup(RANK, b.severity) ?? 9) || b.detectedAt.localeCompare(a.detectedAt));
   return alerts.find((a) => a.id === alertId) ?? open[0] ?? [...alerts].toSorted((a, b) => b.detectedAt.localeCompare(a.detectedAt))[0] ?? null;
 }
 /** The unit's alerts to choose from: title, state and when each was detected, unresolved first. */
@@ -135,7 +136,7 @@ export function alertChoices(alerts: ApiTechAlert[], nowMs: number, i: I18n = EN
   const { t } = i;
   return [...alerts].toSorted((a, b) => Number(a.status === "resolved") - Number(b.status === "resolved") || b.detectedAt.localeCompare(a.detectedAt)).map((a) => {
     return {
-      id: a.id, title: a.rule?.name ?? alertTitle(a, t), sub: `${t((STATE[a.status] ?? OPEN)[0])} · ${relativeTime(a.detectedAt, nowMs, i)}`, severity: a.severity,
+      id: a.id, title: a.rule?.name ?? alertTitle(a, t), sub: `${t((lookup(STATE, a.status) ?? OPEN)[0])} · ${relativeTime(a.detectedAt, nowMs, i)}`, severity: a.severity,
     };
   });
 }

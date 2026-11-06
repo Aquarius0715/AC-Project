@@ -4,6 +4,7 @@
 import { EN, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
 import { evidenceText, resolutionText } from "@ac/web/lib/evidence";
 import type { IconName } from "@ac/web/components/Icon";
+import { lookup } from "@ac/web/lib/lookup";
 export interface Alert { id: string; title: string; sev: "warning" | "normal"; kind: string; kindIcon: IconName; icon: IconName; where: string; ev: string; group: "attn" | "info"; read: boolean }
 
 /** Alert of service-contracts.ts (fields shown on this screen). */
@@ -31,7 +32,7 @@ const kindIcon: Record<AlertKind, IconName> = { inspection: "edit", load: "home"
 
 /** The display title of an alert: its suspected cause, else its type — in the display language (IR260). */
 export function alertTitle(a: Pick<ApiAlert, "causeCode" | "type">, t: T = translator("en")): string {
-  return t(causeTitle[a.causeCode] ?? typeTitle[a.type] ?? "Alert");
+  return t(lookup(causeTitle, a.causeCode) ?? lookup(typeTitle, a.type) ?? "Alert");
 }
 
 // ---- the customer alert inbox (DD-C08, IR242) ----
@@ -76,7 +77,7 @@ export function inboxAlerts(alerts: ApiAlert[], notes: AlertNote[], unit: (id: s
       kind: t(kindLabel[kindOf(a)]),
       kindIcon: kindIcon[kindOf(a)],
       where: t("{where} · detected {when}", { where: u ? [u.name, u.place].filter(Boolean).join(" · ") : "AC", when: stamp(a.detectedAt) }),
-      evidence: `${t(evidenceLabel[a.evidenceKind] ?? "Evidence")}: ${evidenceText(a.evidenceText, t)}`,
+      evidence: `${t(lookup(evidenceLabel, a.evidenceKind) ?? "Evidence")}: ${evidenceText(a.evidenceText, t)}`,
       group: attn(a) ? "attn" : "info",
       unread: mine.filter((n) => n.readAt === null).map((n) => ({ id: n.id, version: n.version })),
       notes: mine.length,

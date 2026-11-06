@@ -6,6 +6,7 @@
 import { EN, relativeTime, showClock, showTime, translator, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import type { ApiCalibration, ApiDevice, ApiDeviceDetail, ApiDeviceOperation, Connection } from "@ac/web/lib/devices";
 import { metricLabel } from "@ac/web/lib/adminAlerts";
+import { lookup } from "@ac/web/lib/lookup";
 
 // the device screens' colours (technician and HQ): the connection filter's dot (unknown warns), the firmware card and an
 // operation's tone (anything else is still under way)
@@ -37,7 +38,7 @@ export interface TechJob { id: string; unitId: string; status: string }
 const rank: Record<string, number> = { in_progress: 0, assigned: 1, rework_requested: 2 };
 /** The job a device write on the unit runs under (IR94): in progress first, else assigned or rework; null without one. */
 export function jobFor(unitId: string | null, jobs: TechJob[]): string | null {
-  return unitId ? jobs.filter((j) => j.unitId === unitId && j.status in rank).toSorted((a, b) => (rank[a.status] ?? 9) - (rank[b.status] ?? 9))[0]?.id ?? null : null;
+  return unitId ? jobs.filter((j) => j.unitId === unitId && j.status in rank).toSorted((a, b) => (lookup(rank, a.status) ?? 9) - (lookup(rank, b.status) ?? 9))[0]?.id ?? null : null;
 }
 
 const ago = (iso: string | null, now: number, t: T) => {
@@ -117,7 +118,7 @@ export function deviceTiles(d: ApiDeviceDetail, newer: string | null, now: numbe
   const power = POWER.get(d.powerSignal) ?? UNKNOWN_POWER;
   const opened = faults.tamper ? t("cover opened {time}", { time: clock(faults.tamper) }) : t("cover opened — see device events");
   return [
-    { label: t("Connection"), value: t(CONNECTION[conn] ?? conn), dot: connDot[conn] ?? "muted",
+    { label: t("Connection"), value: t(lookup(CONNECTION, conn) ?? conn), dot: lookup(connDot, conn) ?? "muted",
       sub: conn === "connecting" ? t("check running — waiting for the device") : lost },
     { label: t("Power signal"), value: t(power.text), dot: power.dot,
       sub: d.powerSignal === "off" && faults.power ? `power_signal ${clock(faults.power)}` : t("from the device's dedicated power signal") },
@@ -158,7 +159,7 @@ export const failureText = (code: string | null | undefined, t: T = en) => textO
 const KIND: Partial<Record<ApiDeviceOperation["kind"], string>> = { check: "Connection check", calibrate: "Calibration", firmware: "Firmware update" };
 const STATUS: Partial<Record<ApiDeviceOperation["status"], string>> = { queued: "Queued", running: "Running", succeeded: "Succeeded", failed: "Failed" };
 /** An operation in words, as “Connection check · Queued”. */
-export const operationLabel = (o: Pick<ApiDeviceOperation, "kind" | "status">, t: T = en) => `${t(KIND[o.kind] ?? o.kind)} · ${t(STATUS[o.status] ?? o.status)}`;
+export const operationLabel = (o: Pick<ApiDeviceOperation, "kind" | "status">, t: T = en) => `${t(lookup(KIND, o.kind) ?? o.kind)} · ${t(lookup(STATUS, o.status) ?? o.status)}`;
 /** One operation of the T11 history (Figma 03: started, “v1 → v2”, “heartbeat confirmed”). */
 export interface OperationRow { id: string; kind: string; status: ApiDeviceOperation["status"]; statusText: string; time: string; detail: string }
 /** What an operation did: its failure, the firmware it installs or installed, or the connection check's heartbeat. */
@@ -173,7 +174,7 @@ export function operationRows(ops: (ApiDeviceOperation & { startedAt?: string | 
   return ops.map((o) => {
     const isOpen = o.status === "queued" || o.status === "running";
     const detail = operationDetail(o, isOpen, current, t);
-    return { id: o.id, kind: t(KIND[o.kind] ?? o.kind), status: o.status, statusText: t(STATUS[o.status] ?? o.status), time: showTime(o.startedAt ?? o.createdAt, display), detail };
+    return { id: o.id, kind: t(lookup(KIND, o.kind) ?? o.kind), status: o.status, statusText: t(lookup(STATUS, o.status) ?? o.status), time: showTime(o.startedAt ?? o.createdAt, display), detail };
   });
 }
 const signed = (n: number) => (n < 0 ? `−${Math.abs(n).toFixed(1)}` : n.toFixed(1));
@@ -227,7 +228,7 @@ export function eventRows(es: ApiDeviceEventFull[], alerts: Map<string, ApiAlert
       version: e.version,
       time: when(e.occurredAt),
       type: e.eventType,
-      tone: EVENT_TONE[e.eventType] ?? "crit",
+      tone: lookup(EVENT_TONE, e.eventType) ?? "crit",
       detail: `${eventCause(e, t)} · ${e.evidenceSource}${alertCount(e.alertIds.length, t)}`,
       notes: e.responseNotes.map((n) => `${when(n.at)} — ${n.message}`),
       alerts: as,
