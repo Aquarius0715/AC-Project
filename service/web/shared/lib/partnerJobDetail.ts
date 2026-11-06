@@ -233,8 +233,10 @@ export function decisionRefusal(f: { code: string; messageKey: string; fieldErro
   }
   if (f.code === "NOT_FOUND") return t("This offer is no longer available to your company.");
   const text = (v: string) => (textOf(FIELD_TEXT, v, t) ?? v);
-  if (f.code === "VALIDATION") return Object.entries(f.fieldErrors).map(([k, v]) => k === "_" ? text(v) : `${k}: ${text(v)}`).join(" · ") || t("Check the input.");
-  return actionMessage({ ...f, fieldErrors: {} }, t); // the write limit's wait and other codes (IR380)
+  // the write limit's wait and other codes say it in words (IR380)
+  return f.code === "VALIDATION"
+    ? Object.entries(f.fieldErrors).map(([k, v]) => (k === "_" ? text(v) : `${k}: ${text(v)}`)).join(" · ") || t("Check the input.")
+    : actionMessage({ ...f, fieldErrors: {} }, t);
 }
 
 /** The job event rows of a history snapshot or the detail's history card, the times in the display time zone. */
