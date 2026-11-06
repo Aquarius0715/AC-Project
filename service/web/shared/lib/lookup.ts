@@ -5,3 +5,9 @@ export function lookup<V>(table: Readonly<Partial<Record<string, V>>>, key: stri
   for (const [name, value] of Object.entries(table)) if (name === key) return value;
   return undefined;
 }
+
+/** entryOf is the value of a table that has an entry for every key of its type (a key of that type is always found). */
+export function entryOf<K extends string, V>(table: Readonly<Record<K, V>>, key: K): V {
+  for (const [name, value] of Object.entries<V>(table)) if (name === key) return value;
+  throw new Error(`no entry for ${key}`);
+}

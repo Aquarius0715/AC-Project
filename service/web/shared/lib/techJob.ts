@@ -10,7 +10,7 @@ import { statusWord, typeLabel } from "@ac/web/lib/partnerJobDetail";
 import type { OpInput } from "@ac/web/lib/opTypes";
 import type { ComponentKey } from "@ac/web/lib/contracts.gen";
 import { codePoints } from "@ac/web/lib/text";
-import { lookup } from "@ac/web/lib/lookup";
+import { entryOf, lookup } from "@ac/web/lib/lookup";
 
 const en = translator("en");
 
@@ -146,7 +146,7 @@ export function submitIssues(d: Draft, attachments: { id: string; name: string; 
   const out: Issue[] = [];
   const label = (key: string) => t(lookup(componentLabel, key) ?? key);
   for (const it of d.items) {
-    const where = `${t(groupLabel[it.componentGroup])} › ${label(it.componentKey)}`;
+    const where = `${t(entryOf(groupLabel, it.componentGroup))} › ${label(it.componentKey)}`;
     if (it.result === null) out.push({ key: it.componentKey, group: it.componentGroup, text: t("{where} has no result", { where }) });
     else if (it.result !== "normal" && !it.reason.trim()) out.push({ key: it.componentKey, group: it.componentGroup, text: t("{where} needs a reason", { where }) });
   }
@@ -165,7 +165,7 @@ export function submitIssues(d: Draft, attachments: { id: string; name: string; 
 export function progress(d: Draft, issues: Issue[], t: T = en) {
   return componentGroups.map(({ group }) => {
     const items = d.items.filter((i) => i.componentGroup === group);
-    return { group, label: t(groupLabel[group]), done: items.filter((i) => i.result !== null).length, total: items.length, issues: issues.filter((x) => x.group === group).length };
+    return { group, label: t(entryOf(groupLabel, group)), done: items.filter((i) => i.result !== null).length, total: items.length, issues: issues.filter((x) => x.group === group).length };
   }).filter((g) => g.total > 0);
 }
 

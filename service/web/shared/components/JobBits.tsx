@@ -7,6 +7,7 @@ import { jobStatuses, statusLabel } from "@ac/web/lib/jobs";
 import { oneOf } from "@ac/web/lib/oneOf";
 import { useT } from "./I18n";
 import { isAfter } from "@ac/web/lib/order";
+import { entryOf } from "@ac/web/lib/lookup";
 
 /** Where a job came from — shown on every role (IR113), in the display language. */
 export function OriginBadge({ origin }: { origin: Origin }) {
@@ -30,7 +31,7 @@ export function JobStatusBadge({ s, client }: Readonly<{ s: string; client?: boo
   const t = useT();
   const known = oneOf(jobStatuses, s, undefined);
   if (known === undefined) return <Badge tone="muted">{s}</Badge>;
-  return client && SCHEDULED.has(known) ? <Badge tone="primary" icon="assigned">{t("Scheduled")}</Badge> : <Badge tone={statusTone[known]} icon={statusIcon[known]}>{t(statusLabel[known])}</Badge>;
+  return client && SCHEDULED.has(known) ? <Badge tone="primary" icon="assigned">{t("Scheduled")}</Badge> : <Badge tone={entryOf(statusTone, known)} icon={entryOf(statusIcon, known)}>{t(entryOf(statusLabel, known))}</Badge>;
 }
 
 export const RANKS = ["1st", "2nd", "3rd"];

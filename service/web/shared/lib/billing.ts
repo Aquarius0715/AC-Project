@@ -63,7 +63,7 @@ export { money } from "@ac/web/lib/money";
 import { money } from "@ac/web/lib/money";
 import { isAfter } from "@ac/web/lib/order";
 import { withoutYear } from "@ac/web/lib/text";
-import { lookup } from "@ac/web/lib/lookup";
+import { entryOf, lookup } from "@ac/web/lib/lookup";
 /** An amount with its sign: + for an addition, a minus sign for a deduction. */
 const signedMoney = (minor: number, currency: string) => `${minor > 0 ? "+" : "−"}${money(Math.abs(minor), currency)}`;
 const methodName = (m: string | null, t: T) => {
@@ -189,7 +189,7 @@ export function statementRows(statements: ApiStatement[], orgs: ApiOrganization[
   };
   return [...statements].toSorted((a, b) => b.period.localeCompare(a.period) || a.contractorOrgId.localeCompare(b.contractorOrgId)).map((s) => {
     return {
-      id: s.id, version: s.version, contractor: org.get(s.contractorOrgId) ?? i.t("contractor"), period: periodName(s.period, i.display.locale), status: statusLabel[s.status],
+      id: s.id, version: s.version, contractor: org.get(s.contractorOrgId) ?? i.t("contractor"), period: periodName(s.period, i.display.locale), status: entryOf(statusLabel, s.status),
       jobs: new Set(s.lines.map((l) => l.jobId)).size, net: money(s.netMinor, s.currency),
       statusText: statusText(s),
       queryCount: s.queries.length, openQueries: s.queries.filter((q) => q.state === "open").length,

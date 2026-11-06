@@ -12,7 +12,7 @@ import { csvCell } from "@ac/web/lib/csv";
 import type { IconName } from "@ac/web/components/Icon";
 import { byText, isAfter, isBefore } from "@ac/web/lib/order";
 import { codePoints, isEmail, wrapped } from "@ac/web/lib/text";
-import { lookup } from "@ac/web/lib/lookup";
+import { entryOf, lookup } from "@ac/web/lib/lookup";
 
 export const profiles = ["rto", "general", "energy", "environment"] as const;
 export type Profile = (typeof profiles)[number];
@@ -406,7 +406,7 @@ export function clientUserRows(us: ApiClientUser[], who: (membershipId: string) 
       id: u.id, version: u.version, email: u.email, name: u.displayName, role: u.clientRole, status: u.status,
       sub: u.displayName ? u.email : t("invited {date} by {who}", { date: i ? showDate(u.invitedAt, i.display) : klDate(u.invitedAt), who: who(u.invitedByMembershipId) }),
       lastSignIn: signInText(u.lastSignInAt, i),
-      channels: u.status === "active" && u.allowedChannels.length > 0 ? u.allowedChannels.map((c) => t(channelLabel[c])).join(" · ") : "—",
+      channels: u.status === "active" && u.allowedChannels.length > 0 ? u.allowedChannels.map((c) => t(entryOf(channelLabel, c))).join(" · ") : "—",
       lastOwner: u.clientRole === "owner" && u.status === "active" && owners === 1, you: !!self && u.membershipId === self, membershipId: u.membershipId, revoked: !!u.revokedAt,
     };
   });

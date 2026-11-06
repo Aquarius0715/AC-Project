@@ -310,7 +310,7 @@ import { money } from "@ac/web/lib/money";
 import { codePoints, wrapped } from "@ac/web/lib/text";
 import { oneOf } from "@ac/web/lib/oneOf";
 import { isAfter } from "@ac/web/lib/order";
-import { lookup } from "@ac/web/lib/lookup";
+import { entryOf, lookup } from "@ac/web/lib/lookup";
 /** Estimate and actual totals per currency, never converted (“80.00 MYR + 6.20 USD”). */
 export function costTotals(lines: CostLine[]): { estimate: string; actual: string } {
   const total = (kind: CostLine["kind"]) => {
@@ -401,7 +401,7 @@ export function reportCard(j: ApiHqJob, r: ApiWorkReport, byUser: Map<string, st
   const isDecide = j.status === "submitted" && av.allowed;
   const note = t(reviewNote(j.status, av, mode));
   const rows = inspectionRows(r.items, t, r.attachmentRefs).map((it) => {
-    const x = it.result ? resultText[it.result] : { label: "No result", tone: "crit" as const };
+    const x = it.result ? entryOf(resultText, it.result) : { label: "No result", tone: "crit" as const };
     return { id: it.id, label: it.label, result: t(x.label), tone: x.tone, reason: it.reason, photos: it.photos };
   });
   const readings = readingRows(r.measurements, t);

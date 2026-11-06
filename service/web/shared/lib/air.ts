@@ -9,7 +9,7 @@ import { roundAway } from "@ac/web/lib/energy";
 import { spacePath, type ApiPropertyRow, type ApiSpaceRow, type ApiUnitRow } from "@ac/web/lib/assets";
 import { DEFAULT_DISPLAY, EN, relativeTime, showClock, showDate, showDay, showSpan, translator, type Display, type I18n, type T } from "@ac/web/lib/i18n";
 import type { IconName } from "@ac/web/components/Icon";
-import { lookup } from "@ac/web/lib/lookup";
+import { entryOf, lookup } from "@ac/web/lib/lookup";
 
 const en = translator("en");
 
@@ -114,8 +114,8 @@ function adviceText(metric: AirMetric, isHigh: boolean, setpoint: string): strin
 /** The card in the display language; reading times are the IR44 time of day in the user's display time zone (IR260). */
 export function metricCard(metric: AirMetric, m: ApiMeasurement | undefined, hasSensor: boolean, i: I18n = EN, setsTemperature = true): MetricCard {
   const { t, display } = i;
-  const { unit, guide } = metricInfo[metric];
-  const label = t(metricInfo[metric].label);
+  const { unit, guide } = entryOf(metricInfo, metric);
+  const label = t(entryOf(metricInfo, metric).label);
   // the temperature points to the unit's remote control when that sets it (controlLayout's temperature); a model
   // without control, or with the power alone, is set on the AC itself (IR527, IR544)
   const setpoint = setsTemperature ? "Setpoint is on Unit Control" : "Set on the AC itself";
@@ -297,7 +297,7 @@ export function airRows(slots: AirSlot[], metric: AirMetric, slotMs: number, i: 
       continue;
     }
     flush();
-    out.push({ key: s.start, time: showSpan(s.start, end(s), display), value: `${airNumber(metric, s.avg)} ${metricInfo[metric].unit}`, note: t(s.n === 1 ? "{n} reading" : "{n} readings", { n: s.n }), gap: false });
+    out.push({ key: s.start, time: showSpan(s.start, end(s), display), value: `${airNumber(metric, s.avg)} ${entryOf(metricInfo, metric).unit}`, note: t(s.n === 1 ? "{n} reading" : "{n} readings", { n: s.n }), gap: false });
   }
   flush();
   return out;

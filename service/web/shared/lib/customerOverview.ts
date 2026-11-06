@@ -12,6 +12,7 @@ import type { ApiEnergySummary } from "@ac/web/lib/energy";
 import type { IconName } from "@ac/web/components/Icon";
 import { byText } from "@ac/web/lib/order";
 import { runState } from "@ac/web/lib/units";
+import { entryOf } from "@ac/web/lib/lookup";
 
 export type OverviewPeriod = "today" | "7d" | "30d";
 export const OVERVIEW_PERIODS: { id: OverviewPeriod; label: string }[] = [{ id: "today", label: "Today" }, { id: "7d", label: "7d" }, { id: "30d", label: "30d" }];
@@ -42,7 +43,7 @@ export const periodLabel: Record<OverviewPeriod, string> = { today: "Today", "7d
 /** “Today = 00:00–09:12 · Asia/Kuala_Lumpur” (the period the energy figures cover; the periods are Kuala Lumpur days). */
 export function periodNote(kind: OverviewPeriod, p: { from: string; to: string }, i: I18n = EN): string {
   return kind === "today" ? i.t("Today = {from}–{to} · {zone}", { from: hm(p.from), to: hm(p.to), zone: KL })
-    : i.t("{period} = {from} – {to} · {zone}", { period: i.t(periodLabel[kind]), from: `${md(p.from, i)} ${hm(p.from)}`, to: `${md(p.to, i)} ${hm(p.to)}`, zone: KL });
+    : i.t("{period} = {from} – {to} · {zone}", { period: i.t(entryOf(periodLabel, kind)), from: `${md(p.from, i)} ${hm(p.from)}`, to: `${md(p.to, i)} ${hm(p.to)}`, zone: KL });
 }
 /** The period of the same length that ends where this one starts. */
 export function previousRange(p: { from: string; to: string }): { from: string; to: string } {
@@ -91,8 +92,8 @@ export function energyCard(kind: OverviewPeriod, selected: ApiEnergySummary | nu
   const was = prev?.totals.kWh ?? null;
   const delta = total !== null && was !== null && was > 0 ? Math.round(((total - was) / was) * 100) : null;
   return {
-    sub: `${i.t(periodLabel[kind])} · ${scope}`, total: total === null ? null : one(total),
-    delta: delta === null || was === null ? null : { text: i.t("{pct}% vs {previous} ({kWh} kWh)", { pct: Math.abs(delta), previous: i.t(previousName[kind]), kWh: one(was) }), icon: trendIcon(delta), tone: delta <= 0 ? "ok" : "warn" },
+    sub: `${i.t(entryOf(periodLabel, kind))} · ${scope}`, total: total === null ? null : one(total),
+    delta: delta === null || was === null ? null : { text: i.t("{pct}% vs {previous} ({kWh} kWh)", { pct: Math.abs(delta), previous: i.t(entryOf(previousName, kind)), kWh: one(was) }), icon: trendIcon(delta), tone: delta <= 0 ? "ok" : "warn" },
     labels: week.map((d) => d.label), series: [before.map((v) => v ?? 0), week.map((d) => d.kWh ?? 0)], gaps: week.some((d) => d.kWh === null) || before.includes(null),
   };
 }

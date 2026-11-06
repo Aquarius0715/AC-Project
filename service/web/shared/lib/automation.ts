@@ -5,7 +5,7 @@ import { translator, type T } from "@ac/web/lib/i18n";
 import type { OpInput } from "@ac/web/lib/opTypes";
 import type { Fact } from "@ac/web/lib/contracts.gen";
 import { codePoints } from "@ac/web/lib/text";
-import { lookup } from "@ac/web/lib/lookup";
+import { entryOf, lookup } from "@ac/web/lib/lookup";
 
 const en = translator("en");
 
@@ -37,9 +37,9 @@ export function conditionText(c: AutoCondition, t: T = en): string {
     }
     case "peak": { return t(c.active ? "When a peak period is active" : "When no peak period is active");
     }
-    case "tariff": { return `${subjectText("tariff", t)} ${cmp[c.operator]} ${String(c.value)} MYR/kWh`;
+    case "tariff": { return `${subjectText("tariff", t)} ${entryOf(cmp, c.operator)} ${String(c.value)} MYR/kWh`;
     }
-    default: { return `${subjectText(c.type, t)} ${cmp[c.operator]} ${String(c.value)} kW`;
+    default: { return `${subjectText(c.type, t)} ${entryOf(cmp, c.operator)} ${String(c.value)} kW`;
     }
   }
 }

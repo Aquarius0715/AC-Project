@@ -5,6 +5,7 @@
 import { EN, showSpan, showTime, translator, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import { evidenceText } from "@ac/web/lib/evidence";
 import { wrapped } from "@ac/web/lib/text";
+import { entryOf } from "@ac/web/lib/lookup";
 
 const en = translator("en");
 
@@ -50,7 +51,7 @@ export interface ReworkItem { label: string; checked: boolean }
 “Items that need rework”; IR232, IR609): the inspection items that need attention, were not inspected or have no
 result — ticked — then each reading to re-measure, and more photos, ticked when the report has none. */
 export function reworkItems(items: Pick<InspectionRow, "label" | "result" | "reason">[], readings: [string, string][], photos: number, t: T = en): ReworkItem[] {
-  const word = (r: ApiInspectionItem["result"]) => t(r ? resultText[r].label : "No result").toLowerCase();
+  const word = (r: ApiInspectionItem["result"]) => t(r ? entryOf(resultText, r).label : "No result").toLowerCase();
   return [
     ...items.filter((x) => x.result === null || x.result === "attention" || x.result === "not_inspected")
       .map((x) => ({ label: `${x.label} — ${word(x.result)}${wrapped(x.reason, " (", ")")}`, checked: true })),
@@ -74,7 +75,7 @@ export function inspectionRows(items: ApiInspectionItem[], t: T = en, attachment
   const names = new Map(attachments.map((a) => [a.id, a.name]));
   return [...items].toSorted((a, b) => order[a.componentGroup] - order[b.componentGroup]).map((it) => {
     return {
-      id: it.id, label: `${t(groupLabel[it.componentGroup])} — ${textOf(componentLabel, it.componentKey, t) ?? it.componentKey.replaceAll('_', " ")}`, result: it.result, reason: it.reason,
+      id: it.id, label: `${t(entryOf(groupLabel, it.componentGroup))} — ${textOf(componentLabel, it.componentKey, t) ?? it.componentKey.replaceAll('_', " ")}`, result: it.result, reason: it.reason,
       photos: it.evidenceIds.map((id) => names.get(id) ?? id.slice(0, 8)),
     };
   });

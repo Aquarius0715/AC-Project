@@ -11,7 +11,7 @@ import { metrics } from "@ac/web/lib/devices";
 import { oneOfOrThrow } from "@ac/web/lib/oneOf";
 import { byNumber } from "@ac/web/lib/order";
 import { wrapped } from "@ac/web/lib/text";
-import { lookup } from "@ac/web/lib/lookup";
+import { entryOf, lookup } from "@ac/web/lib/lookup";
 
 const en = translator("en");
 
@@ -127,7 +127,7 @@ export const metricGroups: { id: MetricGroup; label: string; sub: string }[] = [
 const groupMetric: Record<MetricGroup, string> = { temperature: "temperature", humidity: "humidity", air: "co2", power: "power" };
 const METRIC_GROUP = new Map<string, MetricGroup>([["co2", "air"], ["pm25", "air"], ["humidity", "humidity"], ["power", "power"]]);
 export const groupOfMetric = (m: string): MetricGroup => METRIC_GROUP.get(m) ?? "temperature";
-export const metricOfGroup = (g: MetricGroup) => groupMetric[g];
+export const metricOfGroup = (g: MetricGroup) => entryOf(groupMetric, g);
 /** The editor's values: an existing policy's, or a new one (room temperature ≥ 30 °C for 1 min, recovering below 28). */
 export function policyForm(p?: ApiAlertPolicy | null): PolicyForm {
   if (!p) return { name: "", group: "temperature", metric: "temperature", operator: "gte", threshold: "30", recovery: "28", duration: "1", unit: "min", windowOn: false, weekdays: [1, 2, 3, 4, 5], start: "08:00", end: "19:00", severity: "warning", email: false };

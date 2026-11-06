@@ -9,7 +9,7 @@ import { codePoints, wrapped } from "@ac/web/lib/text";
 import { acModes, fanLevels } from "@ac/web/lib/automation";
 import { oneOf } from "@ac/web/lib/oneOf";
 import { isAfter } from "@ac/web/lib/order";
-import { lookup } from "@ac/web/lib/lookup";
+import { entryOf, lookup } from "@ac/web/lib/lookup";
 
 const en = translator("en");
 
@@ -78,14 +78,14 @@ export function actionLabel(a: UnitAction, t: T = en): string {
 }
 const cmp: Record<Compare, string> = { gt: ">", gte: "≥", lt: "<", lte: "≤" };
 export const compares: Compare[] = ["gte", "gt", "lte", "lt"];
-export const compareText = (c: Compare) => cmp[c];
+export const compareText = (c: Compare) => entryOf(cmp, c);
 /** The trigger of a condition rule in words: arrival or departure at the place, occupancy, the usual time or the weather. */
 function conditionText(c: ClientCondition, place: string, t: T): string {
   switch (c.type) {
     case "location": { return t(c.event === "arrival" ? "Arrival at {place}" : "Everyone leaves {place} (departure event)", { place }); }
     case "occupancy": { return t(c.occupied ? "Someone is in the room (demo occupancy)" : "No one detected (demo occupancy)"); }
     case "pattern": { return t("Your usual time {time} (demo routine)", { time: c.localTime }); }
-    default: { return t("Outdoor temperature {op} {value}°C (demo weather)", { op: cmp[c.operator], value: c.value }); }
+    default: { return t("Outdoor temperature {op} {value}°C (demo weather)", { op: entryOf(cmp, c.operator), value: c.value }); }
   }
 }
 /** The “When …” sentence of a rule; a location event happens where the target AC is (its property). */
@@ -104,7 +104,7 @@ export function extraText(x: ExtraCondition, t: T = en): string {
     return s === "1,2,3,4,5" || s === "6,7" || x.weekdays.length === 7 ? days.toLowerCase() : days;
   }
   if (x.type === "occupancy") return t(x.occupied ? "someone is home" : "no one is home");
-  return t("outdoor {op} {value}°C", { op: cmp[x.operator], value: x.value });
+  return t("outdoor {op} {value}°C", { op: entryOf(cmp, x.operator), value: x.value });
 }
 export const onlyIfText = (xs: ExtraCondition[], t: T = en) => (xs.length > 0 ? t(" · Only if: {conditions}", { conditions: xs.map((x) => extraText(x, t)).join(t(" and ")) }) : "");
 export function thenText(a: ApiAutomation, t: T = en): string {
@@ -433,7 +433,7 @@ function draftWhen(d: Draft, place: string, t: T): string {
   if (d.trigger === "location") return t(d.event === "arrival" ? "you arrive at {place}" : "everyone leaves {place}", { place });
   if (d.trigger === "presence") return t(d.occupied ? "someone is in the room" : "no one is detected");
   if (d.trigger === "routine") return t("it is your usual time {time}", { time: d.localTime });
-  return t("the outdoor temperature is {op} {value}°C", { op: cmp[d.operator], value: d.value });
+  return t("the outdoor temperature is {op} {value}°C", { op: entryOf(cmp, d.operator), value: d.value });
 }
 function onlyIfSummary(d: Draft, t: T): string {
   const xs = fitExtras(d).filter((x) => x.type !== "weather" || x.value.trim() !== "").map((x) => extraText(extraOf(x), t));

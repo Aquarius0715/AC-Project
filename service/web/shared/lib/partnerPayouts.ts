@@ -6,6 +6,7 @@ import { EN, intlTag, showDate, showDayMonth, translator, type I18n, type Locale
 import { businessDay } from "@ac/web/lib/clientBilling";
 import { typeLabel } from "@ac/web/lib/partnerJobDetail";
 import { wrapped } from "@ac/web/lib/text";
+import { entryOf } from "@ac/web/lib/lookup";
 
 const en = translator("en");
 
@@ -106,7 +107,7 @@ export function lineRows(s: ApiPayoutStatement, jobs: Map<string, JobLabel>, rev
       work: lineWork(status, l, j, t),
       sub: lineSub(status, l, j, t),
       accepted: l.acceptedAt ? showDayMonth(l.acceptedAt, display) : "—",
-      statusText: t(STATUS_TEXT[status]),
+      statusText: t(entryOf(STATUS_TEXT, status)),
       tone: LINE_TONE.get(status) ?? "ok",
       amount: amount(status === "deduction" ? -Math.abs(l.amountMinor) : l.amountMinor),
       question: byLine.get(l.id) ?? null,

@@ -17,7 +17,7 @@ import type { ApiDeviceEventFull } from "@ac/web/lib/techDevices";
 import { oneOf } from "@ac/web/lib/oneOf";
 import type { Metric } from "@ac/web/lib/contracts.gen";
 import { wrapped } from "@ac/web/lib/text";
-import { lookup } from "@ac/web/lib/lookup";
+import { entryOf, lookup } from "@ac/web/lib/lookup";
 
 /** units.get as the technician reads it (ACUnit.type is part of the unit). */
 export type ApiTechUnit = ApiUnitDetail & { type?: string | null };
@@ -77,7 +77,7 @@ export function componentCards(d: ApiTechUnit, i: I18n = EN): ComponentCard[] {
   const { t } = i;
   return componentGroups.map(({ group, keys }) => ({ group, keys: keys.filter((k) => d.components.includes(k)) })).filter((g) => g.keys.length).map(({ group, keys }) => {
     return {
-      group, title: t("{group} · {n} components", { group: t(groupLabel[group]), n: keys.length }), names: keys.map((k) => t(lookup(componentLabel, k) ?? k)).join(", "),
+      group, title: t("{group} · {n} components", { group: t(entryOf(groupLabel, group)), n: keys.length }), names: keys.map((k) => t(lookup(componentLabel, k) ?? k)).join(", "),
     };
   });
 }
