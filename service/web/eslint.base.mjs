@@ -128,9 +128,9 @@ export function webConfig(tsconfigRootDir) {
         // 4-2: a conditional suffix inside a template (`${a}${b ? \` · \${c}\` : ""}`) is the plainest way to write it; the
         // alternatives (a temporary for each suffix, or concatenation) read worse
         "sonarjs/no-nested-template-literals": "off",
-        // 4-2: a try block with a fetch or a parse, one branch and its result is small enough to read with its catch; the default
-        // (1) allows a single call. A block above 4 is split by hand
-        "unicorn/try-complexity": ["error", { max: 4 }],
+        // 4-2: a try that wraps a request, its parse and its result is one unit, and its catch answers for all of it (return
+        // null, show the error); the default (1) allows a single call. The widest such block here has complexity 9
+        "unicorn/try-complexity": ["error", { max: 9 }],
         // 4-2: the order of a guard (`!reason.trim() || !isOrder || !tech`) follows how the form reads, and moving an operand
         // changes what short-circuits; the rule only saves a call that has no side effect
         "unicorn/prefer-simple-condition-first": "off",
