@@ -11,6 +11,7 @@ import { capabilityHistory, saveCapability, type HistoryEntry } from "../actions
 import type { DevicesLive } from "./devices-view";
 import { oneOf } from "@ac/web/lib/oneOf";
 import { Icon } from "@ac/web/components/Icon";
+import { entryOf } from "@ac/web/lib/lookup";
 
 const modeLabel: Record<Mode, string> = { cool: "Cool", dry: "Dry", fan: "Fan" };
 const levelLabel: Record<Fan, string> = { low: "Low", mid: "Mid", high: "High" };
@@ -80,14 +81,14 @@ export function ModelsTab({ live }: Readonly<{ live: DevicesLive }>) {
           {d.temperatureOn && <section><h3 className="mb-1 text-[13px] font-bold">{t("Temperature")}</h3><div className="grid-fluid" style={{ ["--min" as string]: "110px" }}><Field label={t("Min °C")} error={fieldError("temperature")}><Input type="number" value={d.min} onChange={(e) => { set({ min: e.target.value }); }} /></Field><Field label={t("Max °C")}><Input type="number" value={d.max} onChange={(e) => { set({ max: e.target.value }); }} /></Field><Field label={t("Step °C")}><Input type="number" step="0.5" value={d.step} onChange={(e) => { set({ step: e.target.value }); }} /></Field></div></section>}
           <section>
             <h3 className="mb-1 text-[13px] font-bold">{t("Modes & fan")}</h3>
-            <div className="flex flex-wrap gap-x-6 gap-y-2 text-[13px]">{modes.map((m: Mode) => <Check key={m} label={t(modeLabel[m])} checked={d.modes.includes(m)} disabled={!d.modeControl} onChange={(v) => { set({ modes: toggle(d.modes, m, v) }); }} />)}{fans.map((f: Fan) => <Check key={f} label={t("Fan {level}", { level: t(levelLabel[f]) })} checked={d.fanLevels.includes(f)} disabled={!d.fanControl} onChange={(v) => { set({ fanLevels: toggle(d.fanLevels, f, v) }); }} />)}</div>
+            <div className="flex flex-wrap gap-x-6 gap-y-2 text-[13px]">{modes.map((m: Mode) => <Check key={m} label={t(modeLabel[m])} checked={d.modes.includes(m)} disabled={!d.modeControl} onChange={(v) => { set({ modes: toggle(d.modes, m, v) }); }} />)}{fans.map((f: Fan) => <Check key={f} label={t("Fan {level}", { level: t(entryOf(levelLabel, f)) })} checked={d.fanLevels.includes(f)} disabled={!d.fanControl} onChange={(v) => { set({ fanLevels: toggle(d.fanLevels, f, v) }); }} />)}</div>
             {(fieldError("modes") ?? fieldError("fanLevels")) !== undefined && <p className="mt-1 text-xs text-crit">{fieldError("modes") ?? fieldError("fanLevels")}</p>}
           </section>
           <section>
             <h3 className="mb-1 text-[13px] font-bold">{t("Ventilation")}</h3>
             <Check label={t("Ventilation supported")} checked={d.ventilation} onChange={(v) => { set({ ventilation: v, ventilationLevels: v ? d.ventilationLevels : [] }); }} />
             <p className="mb-1 mt-2 text-xs text-muted-foreground">{t("When enabled, levels must be non-empty and include Low.")}</p>
-            <div className="flex flex-wrap gap-x-6 gap-y-2">{fans.map((k) => <Check key={k} label={t(levelLabel[k])} checked={d.ventilationLevels.includes(k)} disabled={!d.ventilation} onChange={(v) => { set({ ventilationLevels: toggle(d.ventilationLevels, k, v) }); }} />)}</div>
+            <div className="flex flex-wrap gap-x-6 gap-y-2">{fans.map((k) => <Check key={k} label={t(entryOf(levelLabel, k))} checked={d.ventilationLevels.includes(k)} disabled={!d.ventilation} onChange={(v) => { set({ ventilationLevels: toggle(d.ventilationLevels, k, v) }); }} />)}</div>
             {fieldError("ventilationLevels") && <p className="mt-1 flex items-center gap-1 text-xs text-crit"><Icon name="error" />{fieldError("ventilationLevels")}</p>}
           </section>
           <section>

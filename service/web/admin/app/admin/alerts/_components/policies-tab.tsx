@@ -16,6 +16,7 @@ import { DefaultPolicyEditor } from "./default-policy";
 import { ConditionFields, WindowEditor } from "./policy-parts";
 import { DemoTest, NotificationPreview } from "./policy-checks";
 import { Icon } from "@ac/web/components/Icon";
+import { entryOf } from "@ac/web/lib/lookup";
 
 const CUSTOMER_A = "customer-a";
 const HQ_OPERATOR = "hq-operator";
@@ -325,7 +326,7 @@ function RecipientPicker({ unitId, customer, chosen, demo, onClose, onAdd }: Rea
             {options.map((r) => (
               <div key={r.id} className="rounded-xl border border-line px-3 py-2">
                 <Check checked={pick.includes(r.id)} onChange={(on) => { setPick((v) => (on ? [...v, r.id] : v.filter((x) => x !== r.id))); }}
-                  label={<span><b>{r.displayLabel}</b><span className="block text-xs text-muted-foreground">{recipientRole(r.role, t)} · {r.allowedChannels.map((c) => t(CHANNEL[c])).join(" · ")}</span></span>} />
+                  label={<span><b>{r.displayLabel}</b><span className="block text-xs text-muted-foreground">{recipientRole(r.role, t)} · {r.allowedChannels.map((c) => t(entryOf(CHANNEL, c))).join(" · ")}</span></span>} />
               </div>
             ))}
           </div>

@@ -22,6 +22,7 @@ import { typeLabel } from "@ac/web/lib/partnerJobDetail";
 import { archiveLocation, archiveUnit, createCustomer, deleteUnit, importCommit, importPreview, importUndo, inviteClientUser, previewPasswordReset, recordWarrantyClaim, removeClientUser, resendInvite, saveProperty, saveSpace, saveUnit, setDefaultRule, setUnitPolicies, updateClientUser, updateCustomer, signOutEverywhere } from "../actions";
 import { Icon, type IconName } from "@ac/web/components/Icon";
 import { NeedsAccess } from "@ac/web/components/NeedsAccess";
+import { entryOf } from "@ac/web/lib/lookup";
 
 export interface UnitLive {
   u: ApiUnitDetail; path: string; model: string; device: { id: string; serial: string; connection: Connection } | null; deviceKnown: boolean;
@@ -418,7 +419,7 @@ function UnitEdit({ live, c, x, nav, run, pending }: Readonly<{ live: UnitsLive;
             <div className="flex min-h-9 items-center gap-2 text-[13px]">{x.device ? <><b>{x.device.serial}</b><ConnBadge s={x.device.connection} /><TextLink href={`/admin/devices?tab=devices&deviceId=${x.device.id}`}>{t("Devices")} <Icon name="chevronRight" /></TextLink></> : null}{!x.device && x.deviceKnown && <span className="text-muted-foreground">{t("No device bound")}</span>}{!x.device && !x.deviceKnown && <span className="text-muted-foreground">{t("Needs device.read")}</span>}</div>
           </Field>
           <Field label={t("Service scope")} hint={t("Target inspection groups")} error={fieldError("serviceScope")}>
-            <div className="flex flex-wrap gap-3">{scopes.map((sc) => <Check key={sc} label={t(scopeLabel[sc])} disabled={isRo} checked={d.serviceScope.includes(sc)} onChange={(on) => { set({ serviceScope: on ? [...d.serviceScope, sc] : d.serviceScope.filter((v) => v !== sc) }); }} />)}</div>
+            <div className="flex flex-wrap gap-3">{scopes.map((sc) => <Check key={sc} label={t(entryOf(scopeLabel, sc))} disabled={isRo} checked={d.serviceScope.includes(sc)} onChange={(on) => { set({ serviceScope: on ? [...d.serviceScope, sc] : d.serviceScope.filter((v) => v !== sc) }); }} />)}</div>
           </Field>
         </div>
         {!isRo && (
@@ -600,7 +601,7 @@ function NewUnitModal({ live, c, init, pending, onClose, onSave }: Readonly<{ li
         <Field label={t("Installed at · optional")} hint={t("A Kuala Lumpur day · leave empty for “Not registered”")} error={fieldError("installedAt")}><Input type="date" max={live.todayKL} value={d.installedAt} onChange={(x) => { set({ installedAt: x.target.value }); }} /></Field>
         <Field label={t("Warranty end · optional")} error={fieldError("warrantyEnd")}><Input type="date" min={d.installedAt || undefined} value={d.warrantyEnd} onChange={(x) => { set({ warrantyEnd: x.target.value }); }} /></Field>
         <Field label={t("Service scope · required · type: split (fixed)")} error={fieldError("serviceScope")} className="sm:col-span-2">
-          <div className="flex flex-wrap gap-3">{scopes.map((sc) => <Check key={sc} label={t(scopeLabel[sc])} checked={d.serviceScope.includes(sc)} onChange={(on) => { set({ serviceScope: on ? [...d.serviceScope, sc] : d.serviceScope.filter((v) => v !== sc) }); }} />)}</div>
+          <div className="flex flex-wrap gap-3">{scopes.map((sc) => <Check key={sc} label={t(entryOf(scopeLabel, sc))} checked={d.serviceScope.includes(sc)} onChange={(on) => { set({ serviceScope: on ? [...d.serviceScope, sc] : d.serviceScope.filter((v) => v !== sc) }); }} />)}</div>
         </Field>
       </div>
     </Modal>

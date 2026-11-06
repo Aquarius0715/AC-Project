@@ -16,6 +16,7 @@ import { acknowledgeAlert, resolveAlert, type ActionResult } from "../actions";
 import { demoCustomers, NewPolicyModal, PoliciesTab, seedPolicies, type PoliciesLive, type PolicySel } from "./policies-tab";
 import { ScopeBar } from "../../jobs/_components/jobs-header";
 import { Icon } from "@ac/web/components/Icon";
+import { entryOf } from "@ac/web/lib/lookup";
 
 const ST: Record<AlertState, string> = { open: "Open", acknowledged: "Acknowledged", resolved: "Resolved" };
 const LIST: Record<AlertState, string> = { open: "Open alerts", acknowledged: "Acknowledged alerts", resolved: "Resolved alerts" };
@@ -140,7 +141,7 @@ export function AdminAlertsView({ live }: Readonly<{ live?: Live }>) {
       }
     });
   };
-  const demoState = (id: string, state: AlertState) => { setDemoList((l) => l.map((x) => (x.id === id ? { ...x, state, st: t(ST[state]), timeline: demoTimeline(x.time, state) } : x))); };
+  const demoState = (id: string, state: AlertState) => { setDemoList((l) => l.map((x) => (x.id === id ? { ...x, state, st: t(entryOf(ST, state)), timeline: demoTimeline(x.time, state) } : x))); };
   const acknowledge = () => {
     if (!a) return;
     if (live) { act(() => acknowledgeAlert(a.id, a.version), t("Acknowledged")); return; }
@@ -176,7 +177,7 @@ export function AdminAlertsView({ live }: Readonly<{ live?: Live }>) {
           <div className="flex flex-wrap items-stretch gap-3">
             {counts.map(([s, n]) => (
               <Plain key={s} type="button" aria-pressed={status === s} onClick={() => { pickStatus(s); }} className={cx("min-w-[140px] flex-1 rounded-2xl border bg-surface p-4 text-left", status === s ? "border-primary ring-1 ring-primary" : "border-line hover:bg-surface2")}>
-                <div className="text-xs text-muted-foreground">{t(ST[s])}</div><div className="text-2xl font-bold">{n}</div>
+                <div className="text-xs text-muted-foreground">{t(entryOf(ST, s))}</div><div className="text-2xl font-bold">{n}</div>
               </Plain>
             ))}
             {live && (
