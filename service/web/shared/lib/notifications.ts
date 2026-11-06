@@ -5,7 +5,7 @@ import { evidenceText } from "@ac/web/lib/evidence";
 import { money } from "@ac/web/lib/money";
 import { channelText } from "@ac/web/lib/partnerHistory";
 import { DEFAULT_DISPLAY, showDate, showTime, translate, translator, type Display } from "@ac/web/lib/i18n";
-import { lookup } from "@ac/web/lib/lookup";
+import { entryOf, lookup } from "@ac/web/lib/lookup";
 
 const FIRMWARE_NOTICE = "Firmware update from {date}, {from}–{to} local time. The AC may restart for about 2 minutes.";
 
@@ -117,9 +117,9 @@ export function inboxRow(n: ApiNotification, role: Role, display: Display = DEFA
   // a notice whose target page no longer opens — an offer withdrawn before the company accepted it — stays readable
   // without a link, so it never leads to "This page isn't available" (IR602)
   const targetHref = () => {
-    const alerts = alertsPage[role];
-    return alerts && n.sourceAlertId ? alerts : (routes[role][n.target.kind]?.(n.target.id) ?? "");
+    const alerts = entryOf(alertsPage, role);
+    return alerts && n.sourceAlertId ? alerts : (lookup(entryOf(routes, role), n.target.kind)?.(n.target.id) ?? "");
   };
-  const href = n.targetOpen === false ? "" : typeRoutes[role]?.[n.type] ?? targetHref();
+  const href = n.targetOpen === false ? "" : lookup(lookup(typeRoutes, role) ?? {}, n.type) ?? targetHref();
   return { id: n.id, version: n.version, t: translate(display.locale, title, { name: n.params.targetName }), d: detail, w: showTime(n.occurredAt, display), read: n.readAt !== null, href };
 }
