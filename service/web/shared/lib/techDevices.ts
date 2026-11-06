@@ -98,7 +98,7 @@ export function openFaults(es: ApiDeviceEventFull[]): OpenFaults {
     const k = faultAxis[e.eventType];
     if (!k || seen.has(k)) continue;
     seen.add(k);
-    if (!e.restoredAt) out[k] = e.occurredAt;
+    if (!e.restoredAt) Object.assign(out, { [k]: e.occurredAt });
   }
   return out;
 }

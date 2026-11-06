@@ -124,7 +124,7 @@ export function targetErrors(f: { responseHours: string; arrival: string; ftf: s
   if (!/^\d+$/.test(f.responseHours.trim()) || h < 1 || h > 168) e.responseHours = t("1–168 whole hours.");
   for (const [k, v] of [["arrival", f.arrival], ["ftf", f.ftf]] as const) {
     const n = Number(v);
-    if (!/^\d+(\.\d)?$/.test(v.trim()) || n < 0 || n > 100) e[k] = t("0–100 %.");
+    if (!/^\d+(\.\d)?$/.test(v.trim()) || n < 0 || n > 100) Object.assign(e, { [k]: t("0–100 %.") });
   }
   if (!f.effectiveFrom || Date.parse(f.effectiveFrom) < now - 60_000) e.effectiveFrom = t("Now or later.");
   return e;
