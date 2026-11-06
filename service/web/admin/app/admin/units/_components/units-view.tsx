@@ -27,7 +27,7 @@ import { typeLabel } from "@ac/web/lib/partnerJobDetail";
 import { archiveLocation, archiveUnit, createCustomer, deleteUnit, importCommit, importPreview, importUndo, inviteClientUser, previewPasswordReset, recordWarrantyClaim, removeClientUser, resendInvite, saveProperty, saveSpace, saveUnit, setDefaultRule, setUnitPolicies, updateClientUser, updateCustomer, signOutEverywhere } from "../actions";
 import { Icon, type IconName } from "@ac/web/components/Icon";
 import { NeedsAccess } from "@ac/web/components/NeedsAccess";
-import { entryOf } from "@ac/web/lib/lookup";
+import { entryOf, lookup } from "@ac/web/lib/lookup";
 
 export interface UnitLive {
   u: ApiUnitDetail; path: string; model: string; device: { id: string; serial: string; connection: Connection } | null; deviceKnown: boolean;
@@ -902,7 +902,7 @@ function ImportWizard({ live, onClose }: Readonly<{ live: UnitsLive; onClose: ()
   const [tried, setTried] = useState(false);
   const shape = file ? csvShape(file.text) : null;
   const isTooBig = !!file && file.size > 900_000;
-  const missing = importFields.filter((x) => x.required && !mapping[x.key]);
+  const missing = importFields.filter((x) => x.required && !lookup(mapping, x.key));
   const customer = live.activeCustomers.find((x) => x.id === customerId)?.name ?? "";
   if (result) {
     const isUndoable = result.state === "imported" && Date.parse(result.undoUntil) > Date.parse(live.now); // the business clock of the last render

@@ -13,6 +13,7 @@ import { inviteUser, removeUser, resendInvite, updateUser } from "../actions";
 import { Icon } from "@ac/web/components/Icon";
 import { oneOf } from "@ac/web/lib/oneOf";
 import { without } from "@ac/web/lib/omit";
+import { lookup } from "@ac/web/lib/lookup";
 
 type Dialog = { kind: "invite" } | { kind: "role" | "disable" | "enable" | "remove"; row: ClientUserRow };
 /** The dialog's fields, top to bottom, and the Core API fields that land on them. */
@@ -70,7 +71,7 @@ export function UsersView({ live }: Readonly<{ live: { customerId: string; custo
   const nameProblem = isAdding ? nameError(username, t) : undefined;
   const reasonProblem = dialog && !isAdding ? reasonError(reason, t) : undefined;
   const name = (r: ClientUserRow) => r.name ?? r.email;
-  const edit = (k: FieldKey) => { setServer((s) => (s[k] ? without(s, k) : s)); };
+  const edit = (k: FieldKey) => { setServer((s) => (lookup(s, k) ? without(s, k) : s)); };
   const submit = () => {
     setTried(true);
     if (!dialog) return;

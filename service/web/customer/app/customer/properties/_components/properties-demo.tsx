@@ -7,6 +7,7 @@ import { Btn, Card, Field, Input, Modal, Page, PowerBadge, SummaryList, Badge, c
 import { GroupControl, GUnit } from "@ac/web/components/Features";
 import { Icon, type IconName } from "@ac/web/components/Icon";
 import type { NonEmpty } from "@ac/web/lib/lists";
+import { lookup } from "@ac/web/lib/lookup";
 
 interface Node { id: string; name: string; type: string; units?: number; children?: Node[]; unassigned?: boolean }
 const tree: NonEmpty<Node> = [
@@ -108,7 +109,7 @@ export function PropertiesDemo() {
                 ))}
             </div>
           )}
-          {sel !== "home-a" && !us && !groupUnits[sel] && sel !== UNASSIGNED && <p className="text-[13px] text-muted-foreground">{sel === "study" ? "Study AC is offline (unknown)." : "Select a room with air conditioners to see them here."}</p>}
+          {sel !== "home-a" && !us && !lookup(groupUnits, sel) && sel !== UNASSIGNED && <p className="text-[13px] text-muted-foreground">{sel === "study" ? "Study AC is offline (unknown)." : "Select a room with air conditioners to see them here."}</p>}
           {(sel === "home-a" || sel === UNASSIGNED) && (
             <div className="mt-2">
               <div className="mb-2 text-[13px] font-bold">? Unassigned units (1) <span className="text-xs font-normal text-muted-foreground">Not in any room</span></div>

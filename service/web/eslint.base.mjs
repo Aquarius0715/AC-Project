@@ -142,6 +142,9 @@ export function webConfig(tsconfigRootDir) {
         "unicorn/prefer-query-selector": "off",
         // an if / else if chain that ends at the last case needs no empty else (each branch sets one thing)
         "sonarjs/elseif-without-else": "off",
+        // a read that is mapped by one step, in a list of parallel reads (Promise.all([read().then((r) => r.total), ...])), is
+        // clearer than a wrapping async function; failures are handled with recover()
+        "unicorn/prefer-await": "off",
         // safe-regex flags every optional group that holds a quantifier (^\d+(\.\d+)?$), which is linear; these patterns run
         // on short trimmed form values. The ones that are not linear are caught by sonarjs/slow-regex and super-linear-regex
         "security/detect-unsafe-regex": "off",

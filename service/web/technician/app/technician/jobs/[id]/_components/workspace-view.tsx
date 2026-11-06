@@ -22,6 +22,7 @@ import { acknowledge, checkIn, pauseWork, resumeRework, saveDraft, signOff, subm
 import { Icon } from "@ac/web/components/Icon";
 import type { ComponentKey } from "@ac/web/lib/contracts.gen";
 import { without } from "@ac/web/lib/omit";
+import { lookup } from "@ac/web/lib/lookup";
 
 export interface WorkspaceLive {
   now: string; known: Known; zone: string;
@@ -436,7 +437,7 @@ function CheckInModal({ open, unitId, pending, errors, setErrors, onClose, onChe
   const [distance, setDistance] = useState("40");
   const [qr, setQr] = useState(`ac-unit:${unitId}`);
   const [reason, setReason] = useState("");
-  const clear = (k: CheckInField) => { if (errors[k]) setErrors(without(errors, k)); };
+  const clear = (k: CheckInField) => { if (lookup(errors, k)) setErrors(without(errors, k)); };
   const go = () => {
     const e = checkInErrors(method, distance, qr, reason, t);
     setErrors(e);

@@ -12,6 +12,7 @@ import { focusField } from "@ac/web/lib/focusField";
 import { ACCESS_MAX_DAYS, accessEnd, accessError, addDays, nameError, PARTNER_ROLES, PARTNER_STATUSES, partnerInviteError, reasonError, roleLabel, statusFilter, statusLabel, type PartnerRole, type PartnerStatus, type PartnerUserRow } from "@ac/web/lib/partnerUsers";
 import { oneOf } from "@ac/web/lib/oneOf";
 import { without } from "@ac/web/lib/omit";
+import { lookup } from "@ac/web/lib/lookup";
 
 type Result = { ok: true; value: null } | ({ ok: false } & ActionFailure);
 export interface UsersOps {
@@ -90,7 +91,7 @@ export function UsersView({ data, ops, onStatus, sends = false }: Readonly<{ dat
   const nameProblem = isAdding ? nameError(name, t) : undefined;
   const untilError = (isAdding && role === TECHNICIAN) || dialog?.kind === "access" ? accessError(until, data.today, t) : undefined;
   const reasonProblem = dialog && !isAdding ? reasonError(reason, t) : undefined;
-  const edit = (k: FieldKey) => { setServer((s) => (s[k] ? without(s, k) : s)); };
+  const edit = (k: FieldKey) => { setServer((s) => (lookup(s, k) ? without(s, k) : s)); };
   const submit = () => {
     setTried(true);
     if (!dialog) return;
