@@ -72,8 +72,8 @@ const methodName = (m: string | null, t: T) => {
 };
 /** A payment's status as the screen words it; another code stays as it is. */
 export const paymentWord = (s: string, t: T = en) => {
-  const words: Partial<Record<string, string>> = { initiated: t("initiated"), processing: t("processing"), confirmed: t("confirmed"), failed: t("failed") };
-  return words[s] ?? s; // a value the API adds before this table does
+  const words = new Map(Object.entries({ initiated: t("initiated"), processing: t("processing"), confirmed: t("confirmed"), failed: t("failed") }));
+  return words.get(s) ?? s; // a value the API adds before this table does
 };
 
 /** Invoice state for HQ: unpaid past its due date is overdue (IR04). */

@@ -46,12 +46,12 @@ export function conditionText(c: AutoCondition, t: T = en): string {
 type Mode = "cool" | "dry" | "fan";
 type Level = "low" | "mid" | "high";
 export const modeWord = (m: Mode, t: T = en) => {
-  const words: Partial<Record<Mode, string>> = { cool: t("cool"), dry: t("dry"), fan: t("fan") };
-  return words[m] ?? m; // a value the API adds before this table does
+  const words = new Map(Object.entries({ cool: t("cool"), dry: t("dry"), fan: t("fan") }));
+  return words.get(m) ?? m; // a value the API adds before this table does
 };
 export const levelWord = (l: Level, t: T = en) => {
-  const words: Partial<Record<Level, string>> = { low: t("low"), mid: t("mid"), high: t("high") };
-  return words[l] ?? l; // a value the API adds before this table does
+  const words = new Map(Object.entries({ low: t("low"), mid: t("mid"), high: t("high") }));
+  return words.get(l) ?? l; // a value the API adds before this table does
 };
 export function actionText(a: UnitAction, t: T = en): string {
   switch (a.kind) {
@@ -90,8 +90,8 @@ export function policyGroups(ps: ApiAutoPolicy[], customerOfUnit: Map<string, st
 
 /** Why a policy was turned off automatically, worded; another code stays as it is. */
 export const disabledReasonWord = (r: string, t: T = en) => {
-  const words: Partial<Record<string, string>> = { consent_revoked: t("consent revoked"), capability_changed: t("capability changed"), unit_archived: t("unit archived") };
-  return words[r] ?? r; // a value the API adds before this table does
+  const words = new Map(Object.entries({ consent_revoked: t("consent revoked"), capability_changed: t("capability changed"), unit_archived: t("unit archived") }));
+  return words.get(r) ?? r; // a value the API adds before this table does
 };
 
 /** The editor form (DD-A11 fields, IR07 shared inputs). */
@@ -198,6 +198,6 @@ export function reasonWord(reason: string, t: T = en): string {
 }
 /** A per-unit decision, worded. */
 export const decisionWord = (d: string, t: T = en) => {
-  const words: Partial<Record<string, string>> = { selected: t("selected"), suppressed: t("suppressed"), requested: t("requested"), failed: t("failed") };
-  return words[d] ?? d; // a value the API adds before this table does
+  const words = new Map(Object.entries({ selected: t("selected"), suppressed: t("suppressed"), requested: t("requested"), failed: t("failed") }));
+  return words.get(d) ?? d; // a value the API adds before this table does
 };

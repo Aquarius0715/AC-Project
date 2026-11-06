@@ -30,8 +30,8 @@ export const lifecycleStates: RestrictionState[] = ["scheduled", "requested", "a
 export const stateLabel: Record<RestrictionState, string> = { scheduled: "Scheduled", requested: "Requested", applied: "Applied", release_requested: "Release requested", released: "Released", cancelled: "Cancelled" };
 /** A state as the screens word it. */
 export const stateWord = (s: RestrictionState, t: T = en) => {
-  const words: Partial<Record<RestrictionState, string>> = { scheduled: t("Scheduled"), requested: t("Requested"), applied: t("Applied"), release_requested: t("Release requested"), released: t("Released"), cancelled: t("Cancelled") };
-  return words[s] ?? s; // a value the API adds before this table does
+  const words = new Map(Object.entries({ scheduled: t("Scheduled"), requested: t("Requested"), applied: t("Applied"), release_requested: t("Release requested"), released: t("Released"), cancelled: t("Cancelled") }));
+  return words.get(s) ?? s; // a value the API adds before this table does
 };
 /** The colour of a restriction state's badge. */
 export type StateTone = "warn" | "ok" | "muted" | "unknown" | "primary";
