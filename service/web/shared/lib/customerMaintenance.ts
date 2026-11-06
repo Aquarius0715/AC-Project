@@ -207,7 +207,8 @@ export function clientJobRefusal(f: { code: string; messageKey: string; fieldErr
   };
   const fields = Object.entries(f.fieldErrors).map(([k, v]) => `${k}: ${textOf(keys, v, t) ?? v}`);
   if (fields.length > 0) return fields.join(" · ");
-  if (keys[f.messageKey]) return f.code === "CONFLICT" ? t("Not saved: {reason}.", { reason: textOf(keys, f.messageKey, t) ?? f.messageKey }) : `${textOf(keys, f.messageKey, t) ?? f.messageKey}.`;
+  const known = textOf(keys, f.messageKey, t);
+  if (known) return f.code === "CONFLICT" ? t("Not saved: {reason}.", { reason: known }) : `${known}.`;
   if (f.code === "NOT_FOUND") return t("The request no longer exists.");
   return actionMessage({ ...f, fieldErrors: {} }, t); // the write limit's wait and other codes (IR380)
 }

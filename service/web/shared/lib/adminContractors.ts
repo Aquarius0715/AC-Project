@@ -160,7 +160,8 @@ export function contractorRefusal(f: { code: string; messageKey: string; fieldEr
   const word = (k: string) => (textOf(keys, k, t) ?? k);
   const fields = Object.entries(f.fieldErrors).map(([k, v]) => `${k}: ${word(v)}`);
   if (fields.length > 0) return fields.join(" · ");
-  if (keys[f.messageKey]) return f.code === "CONFLICT" ? t("Not saved: {reason}.", { reason: word(f.messageKey) }) : `${word(f.messageKey)}.`;
+  const known = textOf(keys, f.messageKey, t);
+  if (known) return f.code === "CONFLICT" ? t("Not saved: {reason}.", { reason: known }) : `${known}.`;
   if (f.code === "NOT_FOUND") return t("The contractor or the certificate no longer exists.");
   return actionMessage({ ...f, fieldErrors: {} }, t); // the write limit's wait and other codes (IR380)
 }
