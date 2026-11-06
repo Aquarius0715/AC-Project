@@ -21,6 +21,7 @@ import { type NonEmpty } from "@ac/web/lib/lists";
 import { oneOf } from "@ac/web/lib/oneOf";
 import { filled } from "@ac/web/lib/filled";
 import { entryOf } from "@ac/web/lib/lookup";
+import { isAfter, isBefore } from "@ac/web/lib/order";
 
 /** A recipient's role in words (IR499). */
 const ROLE_WORD: Record<string, string> = { client: "Client", admin: "Admin", contractor: "Contractor", technician: "Technician" };
@@ -167,7 +168,7 @@ export function BillingView({ live }: Readonly<{ live?: BillingLive }>) {
   };
   const create = () => {
     setTried(true);
-    if (!contract || !nw.from || !nw.to || !nw.dueAt || nw.from >= nw.to) return;
+    if (!contract || !nw.from || !nw.to || !nw.dueAt || !isBefore(nw.from, nw.to)) return;
     if (!live) {
       toast(t("Invoice created"));
       close(); return;
@@ -293,7 +294,7 @@ export function BillingView({ live }: Readonly<{ live?: BillingLive }>) {
       </Modal>
       <Modal open={modal === "create"} onClose={close} title={t("Create invoice")} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={create}>{t("Create")}</Btn></>}>
         <Field label={t("Contract")}><Select value={contract?.id ?? ""} onChange={(e) => { setNw({ ...nw, contractId: e.target.value }); }}>{contracts.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}</Select></Field>
-        <div className="grid-fluid" style={{ ["--min" as string]: "150px" }}><Field label={t("Billing period start")} error={tried && !nw.from ? t("Required") : undefined}><Input type="date" value={nw.from} onChange={(e) => { setNw({ ...nw, from: e.target.value }); }} /></Field><Field label={t("Billing period end")} error={tried && (!nw.to || nw.from >= nw.to) ? t("After the start") : undefined}><Input type="date" value={nw.to} onChange={(e) => { setNw({ ...nw, to: e.target.value }); }} /></Field><Field label={t("Due date")} error={tried && !nw.dueAt ? t("Required") : undefined}><Input type="date" value={nw.dueAt} onChange={(e) => { setNw({ ...nw, dueAt: e.target.value }); }} /></Field></div>
+        <div className="grid-fluid" style={{ ["--min" as string]: "150px" }}><Field label={t("Billing period start")} error={tried && !nw.from ? t("Required") : undefined}><Input type="date" value={nw.from} onChange={(e) => { setNw({ ...nw, from: e.target.value }); }} /></Field><Field label={t("Billing period end")} error={tried && (!nw.to || !isBefore(nw.from, nw.to)) ? t("After the start") : undefined}><Input type="date" value={nw.to} onChange={(e) => { setNw({ ...nw, to: e.target.value }); }} /></Field><Field label={t("Due date")} error={tried && !nw.dueAt ? t("Required") : undefined}><Input type="date" value={nw.dueAt} onChange={(e) => { setNw({ ...nw, dueAt: e.target.value }); }} /></Field></div>
         <p className="text-xs text-muted-foreground">{t("Dates are Kuala Lumpur days ({zone}).", { zone: KL })}</p>
         {contract && <p className="text-xs text-muted-foreground">{t("Amount from the contract version: {amount}", { amount: money(contract.priceMinor, contract.currency) })}</p>}
       </Modal>
@@ -338,10 +339,10 @@ function BillingMonths({ from, to, onChange }: Readonly<{ from?: string; to?: st
     setSource(`${from ?? ""}:${to ?? ""}`);
     setF({ from: from ?? "", to: to ?? "" });
   }
-  const isReversed = !!f.from && !!f.to && f.from > f.to;
+  const isReversed = !!f.from && !!f.to && isAfter(f.from, f.to);
   const change = (next: { from: string; to: string }) => {
     setF(next);
-    if (!(next.from && next.to && next.from > next.to)) onChange(next.from || null, next.to || null);
+    if (!(next.from && next.to && isAfter(next.from, next.to))) onChange(next.from || null, next.to || null);
   };
   return (
     <>
@@ -368,7 +369,7 @@ function PayoutsTab({ live, nav, act, pending }: Readonly<{ live: BillingLive; n
   const answer = (id: string) => answers[id] ?? { reply: "", adjustment: "" };
   const setAnswer = (id: string, patch: Partial<{ reply: string; adjustment: string }>) => { setAnswers((a) => ({ ...a, [id]: { ...answer(id), ...patch } })); };
   const isFiltered = [p.period, p.contractorOrgId, p.status].some((v) => filled(v) !== undefined);
-  const isEnded = /^\d{4}-\d{2}$/.test(month) && month <= p.lastClosed;
+  const isEnded = /^\d{4}-\d{2}$/.test(month) && !isAfter(month, p.lastClosed);
   const generate = () => { act(() => generatePayouts(month), (n) => t(n === 1 ? "1 draft statement generated for {period}" : "{n} draft statements generated for {period}", { n, period: month }), () => { setGenerating(false); nav({ period: month, status: null, statementId: null }); }); };
   const tone = (s: StatementRow["status"]) => STATEMENT_TONE.get(s) ?? "primary";
   return (
@@ -380,7 +381,7 @@ function PayoutsTab({ live, nav, act, pending }: Readonly<{ live: BillingLive; n
         {isFiltered && <Btn size="sm" onClick={() => { nav({ period: null, contractorOrgId: null, status: null, statementId: null }); }}>{t("Clear the filters")}</Btn>}
       </div>
       <div className="split-rev">
-        <Card title={p.period ? t("Statements · {period}", { period: monthsText(p.period, p.period, i) ?? p.period }) : t("Statements")} className="self-start" action={<Btn size="sm" onClick={() => { setMonth(p.period && p.period <= p.lastClosed ? p.period : p.lastClosed); setGenerating(true); }}>{t("Generate drafts")}</Btn>}>
+        <Card title={p.period ? t("Statements · {period}", { period: monthsText(p.period, p.period, i) ?? p.period }) : t("Statements")} className="self-start" action={<Btn size="sm" onClick={() => { setMonth(p.period && !isAfter(p.period, p.lastClosed) ? p.period : p.lastClosed); setGenerating(true); }}>{t("Generate drafts")}</Btn>}>
           {rows.length === 0 ? <EmptyState title={t("No statements")}>{t(isFiltered ? "No statement matches these filters." : "Generate the drafts of a month that has ended.")}</EmptyState> : (
             <DataTable rows={rows} rowKey={(r) => r.id} selectedKey={st?.id} onRowClick={(r) => { nav({ statementId: r.id }); }} cols={[
               { key: "c", label: t("Contractor / statement"), render: (r) => <span><b className="text-[13px]">{r.contractor}</b><span className="block text-[11px] text-muted-foreground">{r.period} · {t(r.jobs === 1 ? "1 job" : "{n} jobs", { n: r.jobs })}</span></span> },

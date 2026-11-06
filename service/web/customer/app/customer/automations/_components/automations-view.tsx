@@ -18,6 +18,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Button } from "@ac/web/components/ui/button";
 import { oneOf } from "@ac/web/lib/oneOf";
 import { Checkbox } from "@ac/web/components/ui/checkbox";
+import { isAfter } from "@ac/web/lib/order";
 
 interface Ac { id: string; name: string; property: string; path: string }
 export interface AutomationsLive {
@@ -186,7 +187,7 @@ function Editor({ live, onDone, onCancel }: Readonly<{ live: AutomationsLive; on
   const supported = (k: string) => options.some((g) => g.options.some((o) => o.key === k));
   const unsupported = (k: string) => (draft.unitId && !supported(k) ? t("Not supported by this AC — choose another action") : undefined);
   const isDirty = !rule || JSON.stringify(saveInput(draft)) !== JSON.stringify(saveInput(draftOf(rule)));
-  const runsShown = preview.data.filter((o) => o.phase === "schedule_start").slice(0, 2).map((s) => ({ start: s, end: preview.data.find((o) => o.phase === "schedule_end" && o.at > s.at) }));
+  const runsShown = preview.data.filter((o) => o.phase === "schedule_start").slice(0, 2).map((s) => ({ start: s, end: preview.data.find((o) => o.phase === "schedule_end" && isAfter(o.at, s.at)) }));
   const previewError = preview.error ? apiErrors(preview.error.error.fieldErrors, t) : {};
   const isValid = Object.keys(local).length === 0 && [draft.startAction, draft.endAction, draft.action].every((k, i) => !((isSched ? i < 2 : i === 2) && unsupported(k)));
   const save = () => {

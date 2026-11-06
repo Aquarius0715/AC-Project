@@ -13,6 +13,7 @@ import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import { acceptOffer, declineOffer, proposeSlot, withdrawProposal } from "../actions";
 import type { JobDetailLive } from "../_lib/load";
 import { Icon } from "@ac/web/components/Icon";
+import { isBefore } from "@ac/web/lib/order";
 
 // a step's dot and label by its state; a step to do keeps the plain dot and a done step the plain label
 const STEP_DOT = new Map<string, string>([["done", "bg-primary text-white"], ["current", "border-2 border-primary text-primary"]]);
@@ -148,7 +149,7 @@ function ProposeModal({ j, x, technicians, onClose, onSend, pending }: Readonly<
   const [reason, setReason] = useState("");
   const [tried, setTried] = useState(false);
   const startAt = zonedInstant(date, from, x.propose.zone), endAt = zonedInstant(date, to, x.propose.zone);
-  const isOrder = !!startAt && !!endAt && startAt < endAt;
+  const isOrder = !!startAt && !!endAt && isBefore(startAt, endAt);
   return (
     <Modal open onClose={onClose} title={t("Propose another time")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (!reason.trim() || !isOrder || !tech) return; onSend({ startAt, endAt }, tech, reason.trim()); }}>{t("Send to HQ")}</Btn></>}>
       <p className="text-xs text-muted-foreground">{t("{id} · agreed with the client: {slot} · times in {zone}", { id: j.jobId.slice(0, 8), slot: x.visit, zone: x.propose.zone })}</p>

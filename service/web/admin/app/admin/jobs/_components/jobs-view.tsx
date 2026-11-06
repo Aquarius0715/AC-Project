@@ -17,6 +17,7 @@ import type { JobsLive } from "../_lib/load";
 import { JobsTabs, ScopeBar } from "./jobs-header";
 import { Icon } from "@ac/web/components/Icon";
 import { Checkbox } from "@ac/web/components/ui/checkbox";
+import { isBefore } from "@ac/web/lib/order";
 
 type Detail = NonNullable<JobsLive["detail"]>;
 const TYPES = [{ id: "", label: "All" }, { id: "reactive", label: "Repair" }, { id: "periodic", label: "Periodic" }, { id: "preventive", label: "Preventive" }];
@@ -322,7 +323,7 @@ function ProposeModal({ d, live, onClose, onFail }: Readonly<ModalProps>) {
   const isPreferred = j.preferredSlots.some((s) => s.startAt === slot.startAt && s.endAt === slot.endAt);
   const send = () => {
     setTried(true);
-    if (!notice.trim() || isPreferred || from >= to || !who) return;
+    if (!notice.trim() || isPreferred || !isBefore(from, to) || !who) return;
     const hold = who.startsWith("i:") ? { kind: "internal" as const, membershipId: who.slice(2) } : { kind: "contractor" as const, contractorOrgId: who.slice(2), technicianMembershipId: null };
     const replyBy = new Date(Math.min(now + Number(reply) * 3_600_000, Date.parse(slot.startAt))).toISOString();
     run(() => proposeSlot(j.id, j.version, slot, hold, notice, replyBy), t("Proposal sent — waiting for the client"), () => { onClose(t("Proposed {slot} to the client (reply by {time}).", { slot: slotText(slot, i), time: showTime(replyBy, i.display) })); }, onFail);
@@ -333,7 +334,7 @@ function ProposeModal({ d, live, onClose, onFail }: Readonly<ModalProps>) {
       <div className="grid-fluid" style={{ ["--min" as string]: "140px" }}>
         <Field label={t("Date")}><Input type="date" value={date} onChange={(e) => { setDate(e.target.value); }} /></Field>
         <Field label={t("From")}><Input type="time" value={from} onChange={(e) => { setFrom(e.target.value); }} /></Field>
-        <Field label={t("To")} error={tried && from >= to ? t("The end must be after the start") : undefined}><Input type="time" value={to} onChange={(e) => { setTo(e.target.value); }} /></Field>
+        <Field label={t("To")} error={tried && !isBefore(from, to) ? t("The end must be after the start") : undefined}><Input type="time" value={to} onChange={(e) => { setTo(e.target.value); }} /></Field>
       </div>
       {isPreferred && <p className="flex items-center gap-1 text-xs text-crit"><Icon name="error" />{t("This is one of the client’s own times — book it directly instead.")}</p>}
       <Field label={t("Capacity held for the time")}><Select value={who} onChange={(e) => { setWho(e.target.value); }}>{options.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}</Select></Field>

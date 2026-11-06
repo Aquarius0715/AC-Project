@@ -6,6 +6,7 @@ import { useI18n } from "@ac/web/components/I18n";
 import { useOp } from "@ac/web/lib/useOp";
 import { evidenceRows, MAX_EVIDENCE, type ApiEvidenceAttachment } from "@ac/web/lib/mrv";
 import { Icon } from "@ac/web/components/Icon";
+import { isBefore } from "@ac/web/lib/order";
 
 type Units = { id: string; label: string }[];
 interface Period { unitIds: string[]; from: string; to: string }
@@ -22,7 +23,7 @@ export function EvidencePicker({ ids, onChange, period, units }: Readonly<{ ids:
   const i = useI18n();
   const { t } = i;
   const [open, setOpen] = useState(false);
-  const isReady = period.unitIds.length > 0 && !!period.from && !!period.to && period.from < period.to;
+  const isReady = period.unitIds.length > 0 && !!period.from && !!period.to && isBefore(period.from, period.to);
   const cands = useCandidates(period, isReady && (open || ids.length > 0));
   const rows = evidenceRows(cands.data, units, i);
   const byId = new Map(rows.map((r) => [r.id, r]));
