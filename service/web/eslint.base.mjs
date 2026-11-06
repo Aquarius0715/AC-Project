@@ -124,6 +124,9 @@ export function webConfig(tsconfigRootDir) {
         // 5 operators per expression and 4 nested calls (the defaults are 3 and 3); longer ones are split by hand
         "sonarjs/expression-complexity": ["error", { max: 5 }],
         "unicorn/max-nested-calls": ["error", { max: 4 }],
+        // 4-2: a conditional suffix inside a template (`${a}${b ? \` · \${c}\` : ""}`) is the plainest way to write it; the
+        // alternatives (a temporary for each suffix, or concatenation) read worse
+        "sonarjs/no-nested-template-literals": "off",
         // 2: names say what a value is, and are not lengthened only for a rule: DOM and React attributes (checked,
         // disabled), the contract's fields (enabled, online) and predicates (overlaps, fits) are not renamed is…/has…
         "unicorn/consistent-boolean-name": "off",
