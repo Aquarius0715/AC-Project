@@ -133,6 +133,10 @@ export function webConfig(tsconfigRootDir) {
         // 4-2: the order of a guard (`!reason.trim() || !isOrder || !tech`) follows how the form reads, and moving an operand
         // changes what short-circuits; the rule only saves a call that has no side effect
         "unicorn/prefer-simple-condition-first": "off",
+        // 4-2: the module-level `let` cases here are single-owner caches on purpose: the session store client (one per
+        // process), the BFF session cache, the demo stores and the focus handed to a remounted view. A holder object
+        // would hide the same mutation behind a property
+        "unicorn/no-top-level-assignment-in-function": "off",
         // safe-regex flags every optional group that holds a quantifier (^\d+(\.\d+)?$), which is linear; these patterns run
         // on short trimmed form values. The ones that are not linear are caught by sonarjs/slow-regex and super-linear-regex
         "security/detect-unsafe-regex": "off",
