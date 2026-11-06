@@ -102,11 +102,9 @@ function Sections({ s, links, waiting }: Readonly<{ s: AdminSummary; links: Retu
       <div className="grid-fluid" style={{ ["--min" as string]: "420px" }}>
         <Card title={t("Maintenance jobs by status — this period")} action={<TextLink href={links.jobs()}>{t("Open jobs")} <Icon name="arrowRight" /></TextLink>}>
           <div className="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
-            {[jobs.slice(0, half), jobs.slice(half)].map((col, i) => {
-              return (
+            {[jobs.slice(0, half), jobs.slice(half)].map((col, i) => (
                 <div key={i} className="rounded-xl border border-line">{col.map((j) => <Link key={j.status} href={j.href} className="flex justify-between border-t border-line px-3 py-1.5 text-[13px] first:border-0 hover:bg-surface2"><span className="text-muted-foreground">{j.label}</span><b>{j.count}</b></Link>)}</div>
-              );
-            })}
+              ))}
           </div>
           <p className="mt-2 text-[11px] text-muted-foreground">{t("Jobs whose requested time starts in the period. The status rows open the Jobs tab with that stage, the scope and the period.")}</p>
         </Card>

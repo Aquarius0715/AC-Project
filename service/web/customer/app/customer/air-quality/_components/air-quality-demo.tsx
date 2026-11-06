@@ -35,11 +35,9 @@ export function AirQualityDemo() {
           { l: "PM2.5", v: "12", u: "µg/m³", b: <Badge tone="ok" icon="check">Within guide</Badge>, s: "Observed 09:12", n: "No current advice" },
           { l: "Temperature", v: "28.0", u: "°C", b: <Badge tone="muted" icon="live">Measured</Badge>, s: "Observed 09:12:30", n: "Setpoint is on Unit Control" },
           { l: "Humidity", v: "60", u: "%", b: <Badge tone="muted" icon="live">Measured</Badge>, s: "Observed 09:12:30", n: "No current advice" },
-        ].map((m) => {
-          return (
+        ].map((m) => (
             <div key={m.l} className="rounded-2xl border border-line bg-surface p-4"><div className="flex justify-between text-xs text-muted-foreground"><span>{m.l}</span>{m.b}</div><div className="text-[28px] font-bold">{m.v} <span className="text-sm font-medium text-muted-foreground">{m.u}</span></div><div className="text-[11px] text-muted-foreground">{m.s}</div><div className="mt-1 text-xs font-semibold">{m.n}</div></div>
-          );
-        })}
+          ))}
       </div>
       <Card><div className="flex flex-wrap items-center justify-between gap-2 text-[13px]"><span><b>Allergen (dust mite)</b> <Badge tone="warn" icon="warning">Detected</Badge></span><span className="text-xs text-muted-foreground">Source: demo_observation · 09:00 · cleaning recommended</span></div></Card>
       {!missing && <Banner tone="warn" action={<Btn size="sm" variant="primary" onClick={() => { setLog(true); }}>Log ventilation</Btn>}><b>Ventilation recommended</b><div className="text-xs text-muted-foreground">CO2 1000 ppm in Bedroom (≥ 1000 ppm guide). Open a window or run your ventilation fan, then log it — the record is kept in this room’s ventilation history.</div></Banner>}

@@ -36,11 +36,9 @@ export function TechUnitView({ live }: Readonly<{ live: UnitLive }>) {
               {live.register.missing && <p className="mt-2 text-[11px] text-muted-foreground">{t("Missing values are never filled from similar models or today’s date.")}</p>}
             </Card>
             <Card title={t("Components ({n})", { n: live.componentCount })}>
-              {live.components.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No components in this unit’s service scope.")}</p> : live.components.map((c) => {
-                return (
+              {live.components.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No components in this unit’s service scope.")}</p> : live.components.map((c) => (
                   <div key={c.group} className="border-t border-line py-2 first:border-0"><b className="text-[13px]">{c.title}</b><div className="text-xs text-muted-foreground">{c.names}</div></div>
-                );
-              })}
+                ))}
               <p className="mt-1 text-[11px] text-muted-foreground">{t("Each component gets its result in the job workspace — normal is never preselected.")}</p>
             </Card>
           </div>

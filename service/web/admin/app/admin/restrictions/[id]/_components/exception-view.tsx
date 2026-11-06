@@ -81,11 +81,9 @@ export function ExceptionView({ live }: Readonly<{ live: Live }>) {
           </Card>
           <Card title={t("What happens")}><ul className="list-disc pl-5 text-[13px]"><li>{outcome.result}</li><li>{t("A release still needs per-unit evidence (released or not required)")}</li><li>{t("Cause invoices stay unpaid — no action here settles billing")}</li><li>{t("Before/after, expiry, reason and your name are recorded in the audit log")}</li></ul></Card>
           {isFollowUp && live.units.some((u) => u.reconcile || u.retryRelease) && (
-            <Card title={t("Units needing follow-up")}>{live.units.filter((u) => u.reconcile || u.retryRelease).map((u) => {
-              return (
+            <Card title={t("Units needing follow-up")}>{live.units.filter((u) => u.reconcile || u.retryRelease).map((u) => (
                 <div key={u.unitId} className="flex items-center justify-between gap-2 border-t border-line py-1.5 text-[13px] first:border-0"><span>{u.name} <span className="text-xs text-muted-foreground">{t("apply {apply} · release {release}", { apply: u.apply, release: u.release })}{u.pending ? ` · ${u.pending}` : ""}</span></span><span className="flex gap-1">{u.reconcile && <Btn size="sm" disabled={pending} onClick={() => { run(() => reconcileUnits(r.id, r.version, [u.unitId]), t("Reconciled")); }}>{t("Reconcile")}</Btn>}{u.retryRelease && <Btn size="sm" disabled={pending} onClick={() => { run(() => retryUnits(r.id, r.version, [u.unitId], "release", r.rulesVersion, "Retry release from the exception screen"), t("Release retried")); }}>{t("Retry release")}</Btn>}</span></div>
-              );
-            })}</Card>
+              ))}</Card>
           )}
         </div>
         <div className="flex min-w-0 flex-col gap-4">

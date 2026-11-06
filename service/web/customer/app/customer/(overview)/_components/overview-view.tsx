@@ -48,11 +48,9 @@ export function OverviewView({ live }: Readonly<{ live: OverviewLive }>) {
 
       {live.due && ( // something is overdue or restricted: said where the customer first looks (DEC-90, IR610)
         <Banner tone="warn">
-          <div className="flex flex-col gap-1">{live.due.map((l) => {
-            return (
+          <div className="flex flex-col gap-1">{live.due.map((l) => (
               <div key={l.href} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1"><span>{l.text}</span><TextLink href={l.href}>{l.link} <Icon name="arrowRight" /></TextLink></div>
-            );
-          })}</div>
+            ))}</div>
         </Banner>
       )}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))]">
@@ -104,11 +102,9 @@ export function OverviewView({ live }: Readonly<{ live: OverviewLive }>) {
               <Link key={u.id} href={`/customer/units/${u.id}`} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-2 py-3 hover:bg-surface2/50 lg:grid-cols-[minmax(0,1fr)_72px_72px_72px_120px_14px]">
                 <div className="flex min-w-0 items-center gap-2.5"><span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-primary-soft text-primary"><Icon name="units" /></span><div className="min-w-0"><div className="truncate font-bold">{u.name}</div><div className="truncate text-[11px] text-muted-foreground">{u.place ? `${u.place} · ` : ""}{u.observed}</div></div></div>
                 <div className="col-span-2 row-start-2 flex gap-4 text-xs lg:contents">
-                  {([[u.temp, "°C"], [u.hum, "%"], [u.power, "W"]] as const).map(([v, unit], i) => {
-                    return (
+                  {([[u.temp, "°C"], [u.hum, "%"], [u.power, "W"]] as const).map(([v, unit], i) => (
                       <div key={i}><span className="text-[13px] font-bold">{v ?? "—"}</span> <span className="text-[11px] text-muted-foreground">{v === null ? t("no data") : unit}</span></div>
-                    );
-                  })}
+                    ))}
                 </div>
                 <div className="col-start-2 row-start-1 flex flex-col items-end gap-1 lg:col-auto lg:row-auto lg:items-start"><PowerBadge s={u.state} /><ConnBadge s={u.conn} /></div>
                 <span className="hidden text-muted-foreground lg:block"><Icon name="chevronRight" /></span>
@@ -121,11 +117,9 @@ export function OverviewView({ live }: Readonly<{ live: OverviewLive }>) {
           <Card title={t("Needs attention")} action={<span className={c.alertCount ? "font-bold text-warn" : "font-bold text-muted-foreground"}>{c.alertCount}</span>}>
             {a.items.length > 0 ? (
               <ul className="flex flex-col divide-y divide-line">
-                {a.items.map((x) => {
-                  return (
+                {a.items.map((x) => (
                     <li key={x.id}><Link href="/customer/alerts" className="flex items-center justify-between gap-2 py-2.5"><div><div className="font-bold">{x.title}</div><div className="my-1"><SeverityBadge s={x.severity} /></div><div className="text-[11px] text-muted-foreground">{x.where}</div></div><span className="text-muted-foreground"><Icon name="chevronRight" /></span></Link></li>
-                  );
-                })}
+                  ))}
               </ul>
             ) : <p className="text-xs text-muted-foreground">{t("Nothing needs your attention.")}</p>}
             {a.more > 0 && <p className="text-[11px] text-muted-foreground">{t("+{n} more", { n: a.more })}</p>}
@@ -133,11 +127,9 @@ export function OverviewView({ live }: Readonly<{ live: OverviewLive }>) {
             <TextLink href="/customer/alerts" className="mt-1 inline-block">{t("link::Open alerts")} <Icon name="arrowRight" /></TextLink>
           </Card>
           <Card title={t("Automations")} action={<span className="text-xs text-muted-foreground">{t("{on} on · {off} off", { on: live.automations.on, off: live.automations.off })}</span>}>
-            {live.automations.items.map((x) => {
-              return (
+            {live.automations.items.map((x) => (
                 <div key={x.id} className="flex items-center justify-between gap-2 py-2"><div className="min-w-0"><div className="font-bold">{x.name}</div><div className="text-[11px] text-muted-foreground">{x.line}</div></div><Badge tone={x.status.tone} icon={x.status.tone === "ok" ? "live" : undefined}>{x.status.text}</Badge></div>
-              );
-            })}
+              ))}
             {live.automations.items.length === 0 && <p className="text-xs text-muted-foreground">{t("No automations for these units.")}</p>}
             <TextLink href="/customer/automations" className="mt-1 inline-block">{t("Manage automations")} <Icon name="arrowRight" /></TextLink>
           </Card>

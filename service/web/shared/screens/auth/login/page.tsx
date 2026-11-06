@@ -32,11 +32,9 @@ export function LoginScreen({ appRole: role, others = {}, params = {}, api }: Re
         </div>
         <ContinueLink appRole={role} href={href}>Continue as {config.loginUser} <Icon name="arrowRight" /></ContinueLink>
         <p className="mt-4 text-[11px] text-muted-foreground">Looking for a different AC Project service?{" "}
-          {names.map((r, i) => {
-            return (
+          {names.map((r, i) => (
               <span key={r}>{i > 0 && (i === names.length - 1 ? ", and " : ", ")}{others[r] ? <a className="font-semibold text-primary hover:underline" href={`${others[r]}/login`}>{roleConfig(r).loginTitle}</a> : roleConfig(r).loginTitle}</span>
-            );
-          })}{" "}each have their own sign-in.
+            ))}{" "}each have their own sign-in.
         </p>
         <Link href="/forgot-password" className="mt-3 inline-block text-xs font-semibold text-primary hover:underline">Forgot password?</Link>
         <p className="mt-3 text-[11px] text-muted-foreground">Demo authentication only — no real accounts, emails, or passwords are used.</p>

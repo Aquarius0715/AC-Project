@@ -339,11 +339,9 @@ export function Field({ label, hint, error, children, className, labelHidden }: 
 // The form controls are the shadcn/ui Input, Textarea and NativeSelect. A width in className (w-auto, w-40) replaces the
 // default one (cn merges), and a select stays a native select, so the platform's own picker works everywhere.
 export const Input = ({ className, ...p }: React.ComponentProps<"input">) => <UIInput {...p} className={className} />; // React 19: ref is a prop
-export const Select = ({ className, children, ...p }: Omit<React.SelectHTMLAttributes<HTMLSelectElement>, "size">) => {
-  return (
+export const Select = ({ className, children, ...p }: Omit<React.SelectHTMLAttributes<HTMLSelectElement>, "size">) => (
     <NativeSelect {...p} className={cn("w-full", className)}>{children}</NativeSelect>
   );
-};
 /** A row's actions behind the "more" icon: the shadcn/ui DropdownMenu. The actions are written as <option value>
 children (shown only when they apply); `onChoose` gets the chosen value. */
 export function ActionMenu({ label, disabled, onChoose, children }: Readonly<{ label: string; disabled?: boolean; onChoose: (value: string) => void; children: React.ReactNode }>) {
@@ -377,11 +375,9 @@ export function CodeInput({ value, onChange, label, length = 6 }: Readonly<{ val
   const next = Math.min(value.length, length - 1);
   return (
     <div className="relative inline-flex gap-2">
-      {Array.from({ length }, (_, i) => {
-        return (
+      {Array.from({ length }, (_, i) => (
           <span key={i} aria-hidden className={cx("grid h-10 w-10 place-items-center rounded-lg border bg-surface text-lg font-semibold", focused && i === next ? "border-primary ring-2 ring-primary/20" : "border-line")}>{value.at(i) ?? ""}</span>
-        );
-      })}
+        ))}
       <input aria-label={label} inputMode="numeric" autoComplete="one-time-code" maxLength={length} value={value}
         onChange={(e) => { onChange(e.target.value.replaceAll(/\D/g, "").slice(0, length)); }} onFocus={() => { setFocused(true); }} onBlur={() => { setFocused(false); }}
         className="absolute inset-0 h-full w-full cursor-text opacity-0" />

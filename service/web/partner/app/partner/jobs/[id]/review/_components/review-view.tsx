@@ -105,19 +105,15 @@ export function ReviewView({ live }: Readonly<{ live: ReviewLive }>) {
             <p className="mt-2 text-[11px] text-muted-foreground">{t("Completion does not automatically resolve the linked alert.")}</p>
           </Card>
           <Card title={t("Evidence check")}>
-            <ul className="flex flex-col gap-1.5 text-[13px]">{r.evidence.map((e) => {
-              return (
+            <ul className="flex flex-col gap-1.5 text-[13px]">{r.evidence.map((e) => (
                 <li key={e.label} className="flex items-center justify-between gap-2"><span className="flex items-center gap-2 text-muted-foreground"><span className={cx("h-2 w-2 rounded-full", dot[e.tone])} />{e.label}</span><b>{e.value}</b></li>
-              );
-            })}</ul>
+              ))}</ul>
             <p className={cx("mt-2 rounded-xl px-3 py-1.5 text-xs font-semibold", r.acceptable ? "bg-ok-soft text-ok" : "bg-warn-soft text-warn")}>{r.acceptable ? t("All required evidence present — acceptable.") : t("Not acceptable yet: {missing}.", { missing: r.missing.join("; ") })}</p>
           </Card>
           <Card title={t("Versions & linked alert")}>
-            <ul className="divide-y divide-line">{r.versions.map((v, i) => {
-              return (
+            <ul className="divide-y divide-line">{r.versions.map((v, i) => (
                 <li key={i} className="flex items-start justify-between gap-2 py-2 text-[13px]"><div><b className="text-[13px]">{v.title}</b><div className="text-[11px] text-muted-foreground">{v.sub}</div></div>{v.badge && <Badge tone={v.badge.tone}>{v.badge.label}</Badge>}</li>
-              );
-            })}</ul>
+              ))}</ul>
           </Card>
         </div>
       </div>

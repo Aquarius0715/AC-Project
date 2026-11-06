@@ -285,11 +285,9 @@ function SpaceNode({ s, depth, selId, nav, canWrite, setM }: Readonly<{ s: TreeS
     </>
   );
 }
-const AddLink = ({ depth, onClick, children }: { depth: number; onClick: () => void; children: React.ReactNode }) => {
-  return (
+const AddLink = ({ depth, onClick, children }: { depth: number; onClick: () => void; children: React.ReactNode }) => (
     <Plain touch type="button" onClick={onClick} className="block py-1 text-left text-[12px] font-semibold text-primary pointer-coarse:justify-start" style={{ paddingLeft: depth * 14 + 8 }}>{children}</Plain>
   );
-};
 function LocationMenu({ onRename, onDelete }: Readonly<{ onRename: () => void; onDelete: () => void }>) {
   const t = useT();
   return (

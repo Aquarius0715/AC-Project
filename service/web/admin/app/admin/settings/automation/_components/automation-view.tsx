@@ -91,11 +91,9 @@ export function AutomationView({ live }: Readonly<{ live: Live }>) {
       </div>
       <div className="split-rev">
         <Card title={t("HQ automation policies")} sub={t("highest priority first")} action={live.canWrite && <Btn size="sm" variant="primary" onClick={() => { nav({ policyId: "new" }); }}><Icon name="add" /> {t("New policy")}</Btn>} className="self-start">
-          {live.groups.length === 0 ? <EmptyState title={t("No automation policies")}>{t("No HQ automation policy targets this scope.")}</EmptyState> : live.groups.map((g) => ({ ...g, rows: g.rows.filter((p) => showOff || p.enabled || p.id === sel?.id) })).filter((g) => g.rows.length > 0).map((g) => {
-            return (
+          {live.groups.length === 0 ? <EmptyState title={t("No automation policies")}>{t("No HQ automation policy targets this scope.")}</EmptyState> : live.groups.map((g) => ({ ...g, rows: g.rows.filter((p) => showOff || p.enabled || p.id === sel?.id) })).filter((g) => g.rows.length > 0).map((g) => (
               <div key={g.label} className="mb-3"><div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{g.label}</div><div className="flex flex-col gap-2">{g.rows.map((p) => <ListRow key={p.id} selected={sel?.id === p.id} onClick={() => { nav({ policyId: p.id }); }}><div className="min-w-0 flex-1"><b className="text-[13px]">{p.name}</b><div className="text-[11px] text-muted-foreground">{p.sentence}</div><div className="text-[11px] text-muted-foreground">{t("Priority {n}", { n: p.priority })}{!p.enabled && ` · ${t("Off")}`}{p.disabledReason && ` · ${p.disabledReason}`}</div></div></ListRow>)}</div></div>
-            );
-          })}
+            ))}
         </Card>
         <div className="flex min-w-0 flex-col gap-4">
           <Card title={sel ? sel.name : t("New automation policy")} sub={sel ? t("HQ tier · version {v}", { v: sel.version }) : t("Saving creates version 1 (disabled by default)")} action={sel && <Badge tone={sel.enabled ? "ok" : "muted"}>{t(sel.enabled ? "Enabled" : "Disabled")}</Badge>}>

@@ -103,11 +103,9 @@ export function PropertiesDemo() {
           {sel === "ws" && mode === "single" && <div className="flex flex-col gap-2">{(groupUnits.ws ?? []).map((u) => <Link key={u.id} href="/customer/units/unit-online-rto" className="flex items-center justify-between rounded-xl border border-line p-3 hover:bg-surface2/60"><b className="flex items-center gap-1.5"><Icon name="units" className="text-primary" />{u.name}</b><span className="flex items-center gap-3 text-xs"><PowerBadge s={u.state} />{u.temp ?? "—"} °C <Icon name="chevronRight" /></span></Link>)}</div>}
           {us && mode === "single" && (
             <div className="flex flex-col gap-2">
-              {us.map((u) => {
-                return (
+              {us.map((u) => (
                   <Link key={u.id} href={`/customer/units/${u.id}`} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line p-3 hover:bg-surface2/60"><span className="flex items-center gap-2 font-bold"><Icon name="units" className="text-primary" />{u.name}</span><span className="flex items-center gap-3 text-xs"><PowerBadge s={u.state} /><span>{u.temp} °C</span><span>{u.w} W</span><span className="text-muted-foreground"><Icon name="chevronRight" /></span></span></Link>
-                );
-              })}
+                ))}
             </div>
           )}
           {sel !== "home-a" && !us && !groupUnits[sel] && sel !== UNASSIGNED && <p className="text-[13px] text-muted-foreground">{sel === "study" ? "Study AC is offline (unknown)." : "Select a room with air conditioners to see them here."}</p>}

@@ -62,11 +62,9 @@ export function OverviewView({ live }: Readonly<{ live: OverviewLive }>) {
             )}
           </Card>
           <Card title={t("Team capacity — {period}", { period })} action={<TextLink href="/partner/team">{t("Team & capacity")} <Icon name="arrowRight" /></TextLink>}>
-            {live.capacity.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No technicians in your company yet.")}</p> : live.capacity.slice(0, OVERVIEW_ROWS).map((c) => {
-              return (
+            {live.capacity.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No technicians in your company yet.")}</p> : live.capacity.slice(0, OVERVIEW_ROWS).map((c) => (
                 <div key={c.id} className="mb-3"><div className="mb-1 flex justify-between text-xs"><b>{c.name}</b><span className="text-muted-foreground">{c.text}</span></div><UtilizationBar pct={c.pct} tone={c.pct !== null && c.pct >= 90 ? "warn" : "primary"} label={`${c.name}: ${c.text}`} /></div>
-              );
-            })}
+              ))}
             {live.capacity.length > OVERVIEW_ROWS && <p className="mb-2"><TextLink href="/partner/team">{t("{n} more technicians", { n: live.capacity.length - OVERVIEW_ROWS })} <Icon name="arrowRight" /></TextLink></p>}
             <p className="text-[11px] text-muted-foreground">{t("Utilization = assigned hours ÷ available hours. Undefined hours show “—”.")}</p>
           </Card>

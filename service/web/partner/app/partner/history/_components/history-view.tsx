@@ -95,11 +95,9 @@ function Detail({ live, detail }: Readonly<{ live: HistoryLive; detail: Detail }
             {([["unit", t("Unit"), r.unit ?? r.title], ["tech", t("Technician"), r.tech.name], ["status", t("Status"), r.badge.text], ["delegation", t("Delegation"), r.delegation]] as const).map(([k, label, v]) => <div key={k}><div className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{label}</div><b className={cx(k === "status" && r.badge.tone === "ok" && "text-ok", k === "status" && r.badge.tone === "crit" && "text-crit")}>{v}</b></div>)}
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
-            {([["all", t("All events"), detail.items.length], ["customer", t("Customer-visible"), count("customer")], ["internal", t("Internal"), count("internal")]] as const).map(([id, label, n]) => {
-              return (
+            {([["all", t("All events"), detail.items.length], ["customer", t("Customer-visible"), count("customer")], ["internal", t("Internal"), count("internal")]] as const).map(([id, label, n]) => (
                 <Plain key={id} type="button" aria-pressed={view === id} onClick={() => { setView(id); }} className={cx("rounded-full border px-3 py-1 text-xs font-semibold", view === id ? "border-primary bg-primary-soft text-primary" : "border-line bg-surface")}>{label} ({n})</Plain>
-              );
-            })}
+              ))}
           </div>
           <ol className="mt-3 flex flex-col">
             {items.length === 0 && <li className="py-3 text-[13px] text-muted-foreground">{t("No events in this view.")}</li>}

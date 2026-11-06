@@ -187,11 +187,9 @@ function WeekCard({ live }: Readonly<{ live: Live }>) {
         </table>
       </ScrollX>
       <dl className="mt-3 flex flex-wrap gap-6 text-xs">
-        {([[t("Assigned"), w.stats.assigned], [t("Available"), w.stats.available], [t("Team utilization"), w.stats.utilization], [w.freeLabel, w.stats.free]] as const).map(([k, v]) => {
-          return (
+        {([[t("Assigned"), w.stats.assigned], [t("Available"), w.stats.available], [t("Team utilization"), w.stats.utilization], [w.freeLabel, w.stats.free]] as const).map(([k, v]) => (
             <div key={k}><dt className="text-[11px] text-muted-foreground">{k}</dt><dd className="text-[15px] font-bold">{v}</dd></div>
-          );
-        })}
+          ))}
       </dl>
       <p className="mt-2 text-[11px] text-muted-foreground">
         {t("Sat/Sun have no configured available hours, so utilization shows “—”.")}

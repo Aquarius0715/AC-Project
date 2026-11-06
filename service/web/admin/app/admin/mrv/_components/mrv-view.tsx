@@ -49,11 +49,9 @@ function FiguresGrid({ v }: Readonly<{ v: Figures }>) {
   ];
   return (
     <div className="grid-fluid" style={{ ["--min" as string]: "170px" }}>
-      {tiles.map(([a, b, c]) => {
-        return (
+      {tiles.map(([a, b, c]) => (
           <div key={a} className="rounded-xl bg-surface2 p-3"><div className="text-[11px] text-muted-foreground">{a}</div><b>{b}</b><div className="text-[10px] text-muted-foreground">{c}</div></div>
-        );
-      })}
+        ))}
     </div>
   );
 }

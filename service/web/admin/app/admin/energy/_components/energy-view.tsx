@@ -26,11 +26,9 @@ function differenceTone(comparable: boolean, increase: boolean): "ok" | "crit" |
   if (!comparable) return "muted";
   return increase ? "crit" : "ok";
 }
-const kpi = (label: string, value: string, sub: string, tone?: "ok" | "crit" | "muted") => {
-  return (
+const kpi = (label: string, value: string, sub: string, tone?: "ok" | "crit" | "muted") => (
     <div className="rounded-2xl border border-line bg-surface p-4"><div className="text-xs text-muted-foreground">{label}</div><div className={`text-xl font-bold ${TEXT_TONE.get(tone ?? "") ?? ""}`}>{value}</div><div className="text-[11px] text-muted-foreground">{sub}</div></div>
   );
-};
 
 /** Energy-saving analysis (FR-A13) in API mode: the scope, period and baseline live in the URL and the server reads
 energy.summary; baselines are listed for their scope and saved as new versions with a Server Action. Texts in the

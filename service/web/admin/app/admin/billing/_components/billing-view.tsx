@@ -260,11 +260,9 @@ export function BillingView({ live }: Readonly<{ live?: BillingLive }>) {
                 </Card>}
                 <RelatedRestrictions ids={live ? detail?.restrictionIds ?? [] : ["restriction-limited-a"]} />
                 <Card title={t(CUSTOMER_INQUIRIES)}>
-                  {linked.length === 0 ? <p className="text-xs text-muted-foreground">{t("No inquiry about this invoice.")}</p> : <div className="flex flex-col gap-2">{linked.map((q) => {
-                    return (
+                  {linked.length === 0 ? <p className="text-xs text-muted-foreground">{t("No inquiry about this invoice.")}</p> : <div className="flex flex-col gap-2">{linked.map((q) => (
                       <div key={q.id} className={`rounded-xl p-2 ${live?.selectedInquiryId === q.id ? "bg-primary-soft" : ""}`}><p className="text-[13px]">{q.text}</p><p className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">{t("{kind} · received {time} · {customer}", { kind: q.kind, time: q.at, customer: q.cust })} {q.state === "answered" && <Badge tone="ok">{t("Answered")}</Badge>}<Plain className="font-semibold text-primary" onClick={() => { openInquiry(q.id); }}>{t("Open in Inquiries")} <Icon name="arrowRight" /></Plain></p></div>
-                    );
-                  })}</div>}
+                    ))}</div>}
                 </Card>
               </div>
             </div>
@@ -320,11 +318,9 @@ function RelatedRestrictions({ ids }: Readonly<{ ids: string[] }>) {
   return (
     <Card title={t(ids.length > 1 ? "Related restrictions" : "Related restriction")}>
       {ids.length === 0 ? <p className="text-xs text-muted-foreground">{t("No restriction cites this invoice.")}</p> : (
-        <div className="flex flex-col gap-1.5">{ids.map((id) => {
-          return (
+        <div className="flex flex-col gap-1.5">{ids.map((id) => (
             <p key={id} className="flex flex-wrap items-center justify-between gap-2 text-[13px]"><span className="font-mono font-semibold">{shortId(id)}</span><Link className="text-xs font-semibold text-primary" href={`/admin/restrictions?restrictionId=${id}`}>{t("Open restriction")} <Icon name="arrowRight" /></Link></p>
-          );
-        })}
+          ))}
           <p className="text-xs text-muted-foreground">{t(ids.length > 1 ? "This invoice is a cause of these restrictions. Once all cause invoices of a restriction are paid, it moves to “release requested”. Their states and units are on the Restrictions screen (restriction.read)."
             : "This invoice is a cause of this restriction. Once all of its cause invoices are paid, it moves to “release requested”. Its state and units are on the Restrictions screen (restriction.read).")}</p>
         </div>

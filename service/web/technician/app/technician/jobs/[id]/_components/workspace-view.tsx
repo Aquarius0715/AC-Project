@@ -279,11 +279,9 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
             </Card>
             <div className="flex min-w-0 flex-col gap-4">
               <Card title={t("Checklist progress")}>
-                {groups.map((g) => {
-                  return (
+                {groups.map((g) => (
                     <div key={g.group} className="mb-2"><div className="mb-1 flex justify-between text-xs"><b>{g.label}</b><span className="text-muted-foreground">{g.done} / {g.total}</span></div><UtilizationBar pct={g.total ? (g.done / g.total) * 100 : 0} tone={g.issues ? "warn" : "primary"}  label={`${g.label} ${String(g.done)} / ${String(g.total)}`} /></div>
-                  );
-                })}
+                  ))}
                 {isEditable && <p className="text-[11px] text-muted-foreground">{issues?.length ? byCount(issues.length, { one: t("1 issue blocks submit — it is listed above Submit report."), many: t("{n} issues block submit — they are listed above Submit report.", { n: issues.length }) }) : t("{n} items still empty — each needs a result, or not inspected / not applicable with a reason, before submit.", { n: draft.items.filter((x) => x.result === null).length })}</p>}
               </Card>
               <Card title={t("Job & unit")} action={<Link className="text-xs font-semibold text-primary" href={`/technician/units/${job.unitId}?jobId=${job.id}`}>{t("Unit")} <Icon name="arrowRight" /></Link>}>

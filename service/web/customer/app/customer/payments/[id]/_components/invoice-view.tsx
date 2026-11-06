@@ -111,11 +111,9 @@ function PaymentTab({ live }: Readonly<{ live: InvoiceLive }>) {
             <>
               <h3 className="mb-2 mt-4 text-[13px] font-bold">{t("Payment method")}</h3>
               <div className="flex flex-col gap-2">
-                {methods.map(([k, label, d]) => {
-                  return (
+                {methods.map(([k, label, d]) => (
                     <Plain key={k} type="button" onClick={() => { setMethod(k); }} aria-pressed={method === k} className={`rounded-xl border p-3 text-left ${method === k ? "border-primary bg-primary-soft/60" : "border-line hover:bg-surface2"}`}><b className="text-[13px]">{t(label)}</b><div className="text-xs text-muted-foreground">{t(d)}</div></Plain>
-                  );
-                })}
+                  ))}
               </div>
               <div className="mt-3 flex justify-end"><Btn variant="primary" disabled={pending} onClick={pay}>{payLabel()}</Btn></div>
             </>
@@ -130,11 +128,9 @@ function PaymentTab({ live }: Readonly<{ live: InvoiceLive }>) {
             )}
           </Card>
           <Card title={t("Payment reminders")} sub={t("Notifications only — not payment methods")}>
-            {live.reminders.length === 0 ? <p className="text-xs text-muted-foreground">{t("No reminder has been sent for this invoice.")}</p> : live.reminders.map((r) => {
-              return (
+            {live.reminders.length === 0 ? <p className="text-xs text-muted-foreground">{t("No reminder has been sent for this invoice.")}</p> : live.reminders.map((r) => (
                 <div key={r.id} className="border-t border-line py-2 text-[13px] first:border-0">{t("{channel} · sent {date} (demo record)", { channel: textOf(channelName, r.channel, t) ?? r.channel, date: r.at })}</div>
-              );
-            })}
+              ))}
             <div className="mt-2 flex gap-2"><Btn size="sm" variant="ghost" disabled={pending} onClick={() => { show("email"); }}>{t("Preview email")}</Btn><Btn size="sm" variant="ghost" disabled={pending || !live.whatsapp} onClick={() => { show("whatsapp"); }}>{t("Preview WhatsApp")}</Btn></div>
             {!live.whatsapp && <p className="mt-1 text-[11px] text-muted-foreground">{t("WhatsApp reminders need a phone number on your account. Yours has none, so reminders reach you by email and in the app.")}</p>}
           </Card>
