@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
-import { isRole, ROLES, ROLE_KEY, Role, roleFromPath, type ShellLive, SHARED_PAGES, documentTitle, pageLabel } from "@ac/web/lib/nav";
+import { isRole, roleConfig, ROLE_KEY, Role, roleFromPath, type ShellLive, SHARED_PAGES, documentTitle, pageLabel } from "@ac/web/lib/nav";
 import { Badge, Banner, Btn, Modal, SummaryList, ToastProvider, cx } from "./ui";
 import { Icon, type IconName } from "./Icon";
 import { useJobStore } from "@ac/web/lib/jobs";
@@ -68,7 +68,7 @@ zone (IR258, IR259); the demo keeps the fixed ones, the language chosen in this 
 export function AppShell({ appRole: forced, live, children }: Readonly<{ appRole?: Role; live?: ShellLive; children: React.ReactNode }>) {
   const detected = useStoredRole();
   const role = forced ?? detected;
-  const config = ROLES[role];
+  const config = roleConfig(role);
   const stored = useStoredValue(LOCALE_KEY);
   const display: Display = live ? live.display : { ...DEFAULT_DISPLAY, locale: isLocale(stored) ? stored : "en" };
   const t = (text: string) => translate(display.locale, text);

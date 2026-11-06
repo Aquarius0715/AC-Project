@@ -113,6 +113,16 @@ export const ROLES: Record<Role, RoleConfig> = {
   },
 };
 
+/** roleConfig is the configuration of a role. */
+export function roleConfig(role: Role): RoleConfig {
+  switch (role) {
+    case "client": { return ROLES.client; }
+    case "contractor": { return ROLES.contractor; }
+    case "technician": { return ROLES.technician; }
+    case "admin": { return ROLES.admin; }
+  }
+}
+
 export const ROLE_KEY = "ac-role";
 // each role's path prefix, in the order they are tried
 const ROLE_PREFIX: [string, Role][] = [["/customer", "client"], ["/partner", "contractor"], ["/technician", "technician"], ["/admin", "admin"]];
@@ -134,7 +144,7 @@ export function pageLabel(role: Role, pathname: string): string | null {
   if (shared) return shared.label;
   if (pathname === "/customer/users" || pathname === "/partner/users") return "Users";
   if (pathname === "/demo") return "Demo controls";
-  const { base, nav } = ROLES[role];
+  const { base, nav } = roleConfig(role);
   const score = (href: string, match?: string[]) => {
     const hits = [href, ...(match ?? [])].filter((h) => (h === base ? pathname === h : pathname === h || pathname.startsWith(h + "/")));
     return hits.length > 0 ? Math.max(...hits.map((h) => h.length)) : 0;
@@ -145,7 +155,7 @@ export function pageLabel(role: Role, pathname: string): string | null {
 
 /** The document title in the display language: "<page> — AC Project", or the app's name off the menu. */
 export function documentTitle(role: Role, pathname: string, locale: Locale): string {
-  const { app, sub } = ROLES[role];
+  const { app, sub } = roleConfig(role);
   const label = pageLabel(role, pathname);
   return label ? `${translate(locale, label)} — ${app}` : `${app} — ${translate(locale, sub)}`;
 }

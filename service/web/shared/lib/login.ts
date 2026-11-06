@@ -1,17 +1,17 @@
 // Sign-in page helpers (FR-X01, DDC-07, SCR-X-login, IR251; Figma Login frames): where Continue goes, the other services,
 // and why a sign-in came back (the BFF callback's ?error=, or an expired session).
-import { ROLES, type Role } from "@ac/web/lib/nav";
+import { roleConfig, type Role } from "@ac/web/lib/nav";
 import { lookup } from "@ac/web/lib/lookup";
 
 /** returnTo kept only inside this role's area (the BFF validates it again); otherwise the role home. */
 export function safeReturnTo(role: Role, asked: string | undefined): string {
-  const base = ROLES[role].base;
+  const base = roleConfig(role).base;
   return asked && (asked === base || asked.startsWith(base + "/")) && !asked.startsWith("//") ? asked : base;
 }
 
 /** API mode: the BFF OIDC sign-in with the demo identity as login hint; the browser demo opens the role home. */
 export function continueHref(api: boolean, role: Role, returnTo: string): string {
-  const config = ROLES[role];
+  const config = roleConfig(role);
   return api ? `/bff/auth/login?login_hint=${encodeURIComponent(config.loginUser)}&returnTo=${encodeURIComponent(returnTo)}` : config.base;
 }
 

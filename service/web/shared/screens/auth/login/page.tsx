@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Badge, Banner } from "@ac/web/components/ui";
-import { ROLES, type Role } from "@ac/web/lib/nav";
+import { roleConfig, type Role } from "@ac/web/lib/nav";
 import { continueHref, loginError, otherServices, safeReturnTo } from "@ac/web/lib/login";
 import { ContinueLink } from "./continue-link";
 import { Icon } from "@ac/web/components/Icon";
@@ -13,7 +13,7 @@ const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 source and the kept returnTo decide where Continue goes, and a sign-in that came back says why. `others` are the
 base URLs of the other apps (plain links: separate apps). */
 export function LoginScreen({ appRole: role, others = {}, params = {}, api }: Readonly<{ appRole: Role; others?: AppLinks; params?: Params; api: boolean }>) {
-  const config = ROLES[role];
+  const config = roleConfig(role);
   const href = continueHref(api, role, safeReturnTo(role, one(params.returnTo)));
   const error = loginError(one(params.error));
   const names = otherServices(role);
@@ -34,7 +34,7 @@ export function LoginScreen({ appRole: role, others = {}, params = {}, api }: Re
         <p className="mt-4 text-[11px] text-muted-foreground">Looking for a different AC Project service?{" "}
           {names.map((r, i) => {
             return (
-              <span key={r}>{i > 0 && (i === names.length - 1 ? ", and " : ", ")}{others[r] ? <a className="font-semibold text-primary hover:underline" href={`${others[r]}/login`}>{ROLES[r].loginTitle}</a> : ROLES[r].loginTitle}</span>
+              <span key={r}>{i > 0 && (i === names.length - 1 ? ", and " : ", ")}{others[r] ? <a className="font-semibold text-primary hover:underline" href={`${others[r]}/login`}>{roleConfig(r).loginTitle}</a> : roleConfig(r).loginTitle}</span>
             );
           })}{" "}each have their own sign-in.
         </p>
