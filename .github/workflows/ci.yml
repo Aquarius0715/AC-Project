@@ -1,6 +1,6 @@
 # Lint and tests of the whole repository on every push and pull request. Each check is its own job: Go lint (format, vet,
 # golangci-lint, generated files and the API description), the Go suite (unit + integration on one server), the integration suite
-# against the split services, web lint (no warnings allowed; the strict set too), web typecheck, web unit tests, and the design document validators. The
+# against the split services, web lint (no warnings allowed) and the strict web lint per workspace, web typecheck, web unit tests, and the design document validators. The
 # end-to-end suite needs the whole compose stack and runs in e2e.yml.
 #
 # The jobs run on the lab server's self-hosted runner (label ac-test, DEC-94), each in a container of its own: the dependencies'
@@ -10,7 +10,9 @@
 #
 # The three runners take the jobs in three lanes, longest first, so that the run lasts about as long as its longest lane
 # (the runner picks queued jobs in no fixed order, and a long job started last made a run up to 11 minutes):
-# go-test-cluster -> web-test -> go-lint | docs -> web-lint | go-test -> web-typecheck. The Go suites run the integration
+# go-test-cluster -> web-test -> go-lint | docs -> web-lint | go-test -> web-typecheck. The six strict web lint jobs (one per
+# workspace and one for the e2e specs, about two minutes each) have no needs: they take whichever runner is free, so the lanes do not
+# grow by the twelve minutes they would take one after the other. The Go suites run the integration
 # tests in three shards (service/api/scripts/test-shards.sh) and the document regressions run in parallel, so each lane
 # takes about three minutes. A job in a lane waits for the one before it with needs, and runs even when that one failed
 # (!cancelled()), so every check still reports.
@@ -166,7 +168,34 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: npm ci
       - run: npm run lint
-      - run: npm run lint:strict # the strict rule set of every workspace and of the e2e specs (CLAUDE.md 5): 0 findings
+      - name: the workspace back to the runner's user
+        if: always()
+        working-directory: .
+        run: chown -R "$(stat -c '%u:%g' .)" .
+
+  # The strict rule set (type-aware, CLAUDE.md 5) of each workspace and of the e2e specs, one job each: together they take about
+  # twelve minutes on the server, so they run side by side on the free runners instead of one after the other in web-lint.
+  # They need nothing from the other jobs, so they start as soon as a runner is free. Each runs `next typegen` first (the apps'
+  # lint:strict does), because the route types it writes are what the lint reads PageProps from.
+  web-lint-strict:
+    name: Web strict lint (${{ matrix.workspace }})
+    runs-on: [self-hosted, ac-test]
+    container: { image: "node:26-bookworm", volumes: ["ac-ci-npm:/root/.npm"] }
+    defaults: { run: { working-directory: service/web } }
+    strategy:
+      fail-fast: false   # every workspace reports, whichever fails
+      matrix:
+        workspace: [shared, customer, partner, technician, admin, e2e]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: npm ci
+      - name: strict lint
+        run: |
+          if [ "${{ matrix.workspace }}" = e2e ]; then
+            npx eslint --max-warnings=0 -c e2e/eslint.config.mjs e2e
+          else
+            npm run lint:strict --workspace=${{ matrix.workspace }}
+          fi
       - name: the workspace back to the runner's user
         if: always()
         working-directory: .
