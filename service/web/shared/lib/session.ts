@@ -37,7 +37,7 @@ export const SESSION_COOKIE = `${httpsApp() ? "__Host-" : ""}ac_session_${APP_RO
 export const OIDC_COOKIE = `${httpsApp() ? "__Secure-" : ""}ac_oidc_${APP_ROLE}`;
 
 /** Shortest SESSION_SECRET a deployment on HTTPS accepts. */
-export const MIN_SECRET_LENGTH = 32;
+const MIN_SECRET_LENGTH = 32;
 
 /** The local default secret of plain-http runs (compose.yaml uses the same value). */
 const LOCAL_SECRET = "local-dev-session-secret-change-me";

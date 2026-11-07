@@ -22,7 +22,7 @@ export interface ApiPartnerUser {
 }
 /** What a row may do: nothing on the caller's own account; the last active contractor, and a technician who holds an
 assigned job (IR421, IR432), cannot be disabled or removed. `access` changes a technician's access end (IR461). */
-export interface RowActions { resend: boolean; access: boolean; disable: boolean; enable: boolean; remove: boolean }
+interface RowActions { resend: boolean; access: boolean; disable: boolean; enable: boolean; remove: boolean }
 export interface PartnerUserRow {
   id: string; version: number; email: string; name: string | null; role: PartnerRole; status: PartnerStatus; sub: string; access: string; lastSignIn: string;
   you: boolean; lastContractor: boolean; booked: boolean; ended: boolean; actions: RowActions;

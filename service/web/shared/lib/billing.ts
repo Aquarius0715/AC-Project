@@ -12,7 +12,7 @@ import { entryOf, lookup } from "@ac/web/lib/lookup";
 const PROCESSING = "processing";
 
 const en = translator("en");
-export interface Range { from: string; to: string }
+interface Range { from: string; to: string }
 export interface ApiInvoice { id: string; version: number; number: string; amountMinor: number; currency: Currency; contractId: string; contractVersion: number; period: Range; dueAt: string; status: "unpaid" | "processing" | "paid"; paymentMethod: string | null; paymentStatus: string | null; paidAt: string | null }
 export interface ApiPayment { id: string; version: number; amountMinor: number; currency: Currency; invoiceId: string; method: string | null; status: "initiated" | "processing" | "confirmed" | "failed"; paymentReference: string | null; confirmedAt: string | null; confirmationReason: string | null }
 export type ApiInvoiceDetail = ApiInvoice & { paymentRefs: ApiPayment[]; restrictionIds: string[] };

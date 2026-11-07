@@ -45,7 +45,7 @@ export function isToday(slot: Slot | null, now: number): boolean {
   return Date.parse(slot.startAt) < end && start < Date.parse(slot.endAt);
 }
 /** “14:00–16:00” today, “09-22 10:00–12:00” on another day, “09-14 08:00 → 09-20 08:00” across days — Kuala Lumpur clock times, for the 08:00–18:00 timeline and the screens not on the display time zone yet. */
-export function windowText(s: Slot, now: number): string {
+function windowText(s: Slot, now: number): string {
   const d1 = klDate(Date.parse(s.startAt)), d2 = klDate(Date.parse(s.endAt));
   if (d1 !== d2) return `${klTime(s.startAt).slice(5)} → ${klTime(s.endAt).slice(5)}`;
   return d1 === klDate(now) ? `${hhmm(s.startAt)}–${hhmm(s.endAt)}` : `${klTime(s.startAt).slice(5, 10)} ${hhmm(s.startAt)}–${hhmm(s.endAt)}`;

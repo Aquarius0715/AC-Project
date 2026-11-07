@@ -72,8 +72,8 @@ export interface ApiTechReport {
 }
 export const checkResults = ["normal", "attention", "not_inspected", "not_applicable"] as const;
 export type Result = (typeof checkResults)[number] | null;
-export interface DraftItem { componentGroup: Group; componentKey: ComponentKey; result: Result; reason: string; evidenceIds: string[] }
-export interface DraftReading { id?: string; componentKey: ComponentKey; metric: Metric; value: string; observedAt: string }
+interface DraftItem { componentGroup: Group; componentKey: ComponentKey; result: Result; reason: string; evidenceIds: string[] }
+interface DraftReading { id?: string; componentKey: ComponentKey; metric: Metric; value: string; observedAt: string }
 export interface DraftPart {
   name: string; quantity: number; catalogCode: string | null; source: "van_stock" | "hq_warehouse" | "bought_locally"; lotSerial: string | null;
   replacesComponentKey: ComponentKey | null; oldPartDisposal: "disposed_on_site" | "returned" | null; receiptAttachmentId: string | null;

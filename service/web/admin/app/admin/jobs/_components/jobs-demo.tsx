@@ -80,7 +80,7 @@ export function JobsDemo({ jobId, tab: initial }: Readonly<{ jobId?: string; tab
 }
 
 /** The demo's Plans tab (fixture plans). */
-export function PlansDemo() {
+function PlansDemo() {
   const toast = useToast();
   const [plan, setPlan] = useState(plans[0]);
   return (
@@ -322,7 +322,7 @@ const contractors = nonEmpty([
   { id: "contractor-b", area: "Penang · 3 technicians", st: "Active" },
   { id: "contractor-c", area: "Johor · offers suspended 09-20", st: "Suspended" },
 ]);
-export function Contractors() {
+function Contractors() {
   const toast = useToast();
   const [sel, setSel] = useState(contractors[0]);
   const [list, setList] = useState<(typeof contractors)[number][]>(contractors);
@@ -353,7 +353,7 @@ export function Contractors() {
   );
 }
 
-export function Sla() {
+function Sla() {
   return (
     <div className="flex flex-col gap-4">
       <div className="grid-fluid" style={{ ["--min" as string]: "170px" }}>

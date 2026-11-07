@@ -1,0 +1,21 @@
+// Dead code and unused dependencies of the web workspaces (CI job web-knip). Each exception has its reason.
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "workspaces": {
+    ".": {
+      // the E2E project has no package.json of its own: its config, set-up and specs are the entries; the lint configs are read
+      // by ESLint, not imported
+      "entry": ["e2e/setup/*.ts", "e2e/specs/**/*.e2e.ts", "eslint.base.mjs"],
+      "project": ["e2e/**/*.ts"],
+      // used through the root node_modules by what knip does not read: tailwindcss and shadcn by the apps' CSS and components.json,
+      // globals by the ESLint configs
+      "ignoreDependencies": ["tailwindcss", "shadcn", "globals"]
+    },
+    "shared": {
+      // shadcn/ui components are added whole, with every part they export, and are kept as the generator wrote them
+      "ignore": ["components/ui/**"],
+      // imported by the CSS (@import "tw-animate-css"), which knip does not read
+      "ignoreDependencies": ["tw-animate-css"]
+    }
+  }
+}

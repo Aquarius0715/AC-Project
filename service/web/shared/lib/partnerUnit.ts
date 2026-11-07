@@ -26,7 +26,7 @@ const SCOPE: Record<string, string> = { indoor: "Indoor unit", outdoor: "Outdoor
 const QUALITY: Record<string, { text: string; tone?: "warn" | "crit" }> = { valid: { text: "good" }, stale: { text: "stale", tone: "warn" }, suspect: { text: "suspect", tone: "crit" }, missing: { text: "missing", tone: "warn" } };
 const EVIDENCE: Record<string, string> = { inferred: "Suspected", inspection: "Inspection record", demo_observation: "Observed (demo)" };
 /** The diagnosis metrics a chart shows first, in order (Figma: vibration and refrigerant pressure). */
-export const CHART_METRICS: Metric[] = ["vibration", "refrigerant_pressure", "temperature", "humidity", "power"];
+const CHART_METRICS: Metric[] = ["vibration", "refrigerant_pressure", "temperature", "humidity", "power"];
 const label = (metric: string, t: T) => (textOf(metricLabel, metric, t) ?? metric.replaceAll('_', " "));
 
 /** The unit register (Figma: location, model, maintenance scope; the connection — a badge — and the last seen time). */

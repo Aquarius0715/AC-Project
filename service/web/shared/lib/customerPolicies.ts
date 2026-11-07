@@ -20,11 +20,11 @@ const en = translator("en");
 
 export interface PolicyWindow { weekdays: number[]; startLocal: string; endLocal: string }
 /** DefaultAlertRule / DefaultRuleSetting / Policy (alert and default_alert kinds) of service-contracts.ts. */
-export interface ApiRule {
+interface ApiRule {
   ruleKey: string; name: string; category: "air_quality" | "fault" | "maintenance" | "connection"; metric: string; operator: Operator; threshold: number;
   recoveryThreshold: number; durationSeconds: number; activeWindow: PolicyWindow | null; severity: Severity;
 }
-export interface ApiRuleSetting { id: string; version: number; ruleKey: string; customerId: string; enabled: boolean; changedByMembershipId: string; reason: string | null; updatedAt: string }
+interface ApiRuleSetting { id: string; version: number; ruleKey: string; customerId: string; enabled: boolean; changedByMembershipId: string; reason: string | null; updatedAt: string }
 export interface ApiDefaultPolicy { id: string; version: number; kind: "default_alert"; name: string; rules: ApiRule[]; ruleSettings: ApiRuleSetting[] }
 export interface ApiAlertPolicy {
   id: string; version: number; kind: "alert"; name: string; unitIds: string[]; timezone: string; enabled: boolean; priority: number; disabledReason: string | null;
@@ -36,7 +36,7 @@ const label: Record<string, string> = {
   temperature: "Room temperature", humidity: "Humidity", co2: "CO₂", pm25: "PM2.5", power: "Power", refrigerant_pressure: "Refrigerant pressure",
   compressor_cycles: "Compressor cycles", airflow_drop: "Airflow drop", heartbeat_gap: "Heartbeat gap", vibration: "Vibration",
 };
-export const severityText: Record<Severity, string> = { normal: "Info", warning: "Warning", critical: "Critical" };
+const severityText: Record<Severity, string> = { normal: "Info", warning: "Warning", critical: "Critical" };
 const categoryText: Record<ApiRule["category"], string> = { air_quality: AIR_QUALITY, fault: "Fault cause", maintenance: "Maintenance", connection: "Connection" };
 const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -129,7 +129,7 @@ export const metricGroups: { id: MetricGroup; label: string; sub: string }[] = [
 ];
 const groupMetric: Record<MetricGroup, string> = { temperature: TEMPERATURE, humidity: "humidity", air: "co2", power: "power" };
 const METRIC_GROUP = new Map<string, MetricGroup>([["co2", "air"], ["pm25", "air"], ["humidity", "humidity"], ["power", "power"]]);
-export const groupOfMetric = (m: string): MetricGroup => METRIC_GROUP.get(m) ?? TEMPERATURE;
+const groupOfMetric = (m: string): MetricGroup => METRIC_GROUP.get(m) ?? TEMPERATURE;
 export const metricOfGroup = (g: MetricGroup) => entryOf(groupMetric, g);
 /** The editor's values: an existing policy's, or a new one (room temperature ≥ 30 °C for 1 min, recovering below 28). */
 export function policyForm(p?: ApiAlertPolicy | null): PolicyForm {

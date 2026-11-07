@@ -17,7 +17,7 @@ function subscribe(onChange: () => void) {
 }
 
 /** The current query string ("" on the server). */
-export function useSearch(): string {
+function useSearch(): string {
   return useSyncExternalStore(subscribe, () => location.search, () => "");
 }
 

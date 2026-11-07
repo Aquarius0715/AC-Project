@@ -37,9 +37,9 @@ export interface Slot { date: string; win: string }
 export type Origin = "request" | "plan";
 export const jobStatuses = ["requested", TIME_PROPOSED, "offered", "accepted", "assigned", "in_progress", "submitted", "rework_requested", "completed", "cancelled", "on_hold"] as const;
 export type JobStatus = (typeof jobStatuses)[number];
-export interface Proposal { by: "hq" | "contractor"; slot: Slot; who: string; message: string; replyBy: string; status: "pending" | "accepted" | "declined" | "withdrawn" }
-export interface PartnerProposal { slot: Slot; tech: string; reason: string; sentAt: string; status: "pending" | "sent_to_client" | "rejected" | "approved" | "withdrawn" }
-export interface TechAck { status: "pending" | "accepted" | "cant_make"; reason?: string; alt?: string; at?: string }
+interface Proposal { by: "hq" | "contractor"; slot: Slot; who: string; message: string; replyBy: string; status: "pending" | "accepted" | "declined" | "withdrawn" }
+interface PartnerProposal { slot: Slot; tech: string; reason: string; sentAt: string; status: "pending" | "sent_to_client" | "rejected" | "approved" | "withdrawn" }
+interface TechAck { status: "pending" | "accepted" | "cant_make"; reason?: string; alt?: string; at?: string }
 export interface Job {
   id: string;
   unitId: string;
@@ -94,7 +94,7 @@ const note = z.object({
   id: z.string(), role: z.enum(["client", "admin", CONTRACTOR, TECHNICIAN]), title: z.string(), detail: z.string(), href: z.string(), at: z.string(), read: z.boolean(),
 }) satisfies z.ZodType<Note>;
 
-export const NOW = "09-22 11:05";
+const NOW = "09-22 11:05";
 
 const req = (id: string, p: Partial<Job> & Pick<Job, "unitId" | "unit" | "loc" | "type" | "symptom" | "status">): Job => {
   return {

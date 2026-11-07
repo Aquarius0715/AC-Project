@@ -15,7 +15,7 @@ const IN_PROGRESS = "in_progress";
 
 const en = translator("en");
 
-export interface ApiProposal { id: string; offerId: string; slot: Slot; technicianMembershipId: string; reason: string; sentAt: string; status: "pending" | "sent_to_client" | "kept" | "approved" | "declined" | "withdrawn" }
+interface ApiProposal { id: string; offerId: string; slot: Slot; technicianMembershipId: string; reason: string; sentAt: string; status: "pending" | "sent_to_client" | "kept" | "approved" | "declined" | "withdrawn" }
 export interface ApiOffer {
   projection: "offer"; status: "offered" | "accepted"; jobId: string; jobVersion: number; offerId: string; type: string; siteAddress: string | null;
   requiredQualifications: string[]; requestedSlot: Slot; dueAt: string; offerExpiresAt: string; termsVersion: string; origin: string; visitSlot: Slot;

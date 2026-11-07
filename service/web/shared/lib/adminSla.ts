@@ -17,7 +17,7 @@ const FIRST_TIME_FIX = "First-time fix";
 const en = translator("en");
 
 type PlanType = "rto" | "general" | "energy" | "environment";
-export interface ApiSlaMetrics { responseWithinTarget: number | null; arrivalInWindow: number | null; firstTimeFix: number | null; averageRating: number | null; ratingCount: number; openOverdue: number }
+interface ApiSlaMetrics { responseWithinTarget: number | null; arrivalInWindow: number | null; firstTimeFix: number | null; averageRating: number | null; ratingCount: number; openOverdue: number }
 export interface ApiTargetView { planType: PlanType; responseHours: number; arrivalInWindowPercent: number; firstTimeFixPercent: number; version: number; effectiveFrom: string | null; state: "in_effect" | "default" | "scheduled" }
 export interface ApiBreach { jobId: string; customerId: string; kind: "response" | "arrival" | "first_time_fix" | "overdue"; detail: string; tookMinutes?: number | null; limitMinutes?: number | null }
 export interface ApiScorecard {

@@ -221,7 +221,7 @@ export function dayRange(from: string, to: string, locale: Locale): string {
 }
 
 /** The day before a date (YYYY-MM-DD). */
-export const dayBefore = (date: string) => new Date(Date.parse(`${date}T00:00:00Z`) - DAY).toISOString().slice(0, 10);
+const dayBefore = (date: string) => new Date(Date.parse(`${date}T00:00:00Z`) - DAY).toISOString().slice(0, 10);
 
 export interface UnavailabilityRow {
   id: string; version: number; who: string; type: string; note: string | null; days: string;

@@ -23,7 +23,7 @@ const en = translator("en");
 const DAY = 86_400_000;
 export const WINDOWS = [30, 60, 90] as const;
 export const CERT_STATUSES = ["valid", "expiring", "expired", "pending", "rejected", "not_held"] as const;
-export type CertStatus = (typeof CERT_STATUSES)[number];
+type CertStatus = (typeof CERT_STATUSES)[number];
 /** A certificate as certificates.list returns it (Certificate of service-contracts.ts). */
 export type ApiCert = ApiCertificate;
 /** A booked job of a technician with the qualifications its unit's maintenance scope needs (IR123 item 3). */

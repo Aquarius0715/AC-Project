@@ -34,7 +34,7 @@ function otpSecretOf(user: string): string {
 }
 
 /** RFC 6238 code (HMAC-SHA1, 30 s, 6 digits) over the identity provider's raw secret. */
-export function totp(secret: string, at = Date.now()): string {
+function totp(secret: string, at = Date.now()): string {
   const counter = Buffer.alloc(8);
   counter.writeBigUInt64BE(BigInt(Math.floor(at / 30_000)));
   const h = createHmac("sha1", Buffer.from(secret, "utf8")).update(counter).digest();

@@ -164,5 +164,3 @@ export function ContractorPayouts() {
     </div>
   );
 }
-
-export {Toggle} from "./ui";

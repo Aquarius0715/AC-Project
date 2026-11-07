@@ -35,7 +35,7 @@ export function JobStatusBadge({ s, client }: Readonly<{ s: string; client?: boo
   return client && SCHEDULED.has(known) ? <Badge tone="primary" icon="assigned">{t("Scheduled")}</Badge> : <Badge tone={entryOf(statusTone, known)} icon={entryOf(statusIcon, known)}>{t(entryOf(statusLabel, known))}</Badge>;
 }
 
-export const RANKS = ["1st", "2nd", "3rd"];
+const RANKS = ["1st", "2nd", "3rd"];
 export function Rank({ i }: Readonly<{ i: number }>) {
   const t = useT();
   return <span className="inline-grid w-10 shrink-0 place-items-center rounded-lg bg-primary-soft py-0.5 text-xs font-semibold text-primary">{t(RANKS.at(i) ?? String(i + 1))}</span>;

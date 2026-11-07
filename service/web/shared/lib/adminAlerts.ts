@@ -19,8 +19,7 @@ const DEFAULT_ALERT = "default_alert";
 const en = translator("en");
 
 export type Severity = "critical" | "warning" | "normal";
-export const operators = ["gt", "gte", "lt", "lte"] as const;
-export type Operator = (typeof operators)[number];
+export type Operator = "gt" | "gte" | "lt" | "lte";
 export type Channel = "inApp" | "email" | "whatsapp";
 export type AlertState = "open" | "acknowledged" | "resolved";
 

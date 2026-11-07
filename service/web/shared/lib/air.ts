@@ -154,7 +154,7 @@ export function metricCard(metric: AirMetric, m: ApiMeasurement | undefined, has
 
 /** IR99 guidance from the latest valid CO2 and PM2.5 (all that apply); no guidance from temperature or humidity. */
 export type Guidance = "ventilate" | "ventilate_manual" | "clean" | "none" | "unavailable";
-export const guidanceText: Record<Guidance, string> = {
+const guidanceText: Record<Guidance, string> = {
   ventilate: "Ventilation recommended", ventilate_manual: "Ventilate manually, for example by opening a window", clean: "Filter cleaning and inspection recommended",
   none: "No current guidance", unavailable: "Not enough data to provide guidance",
 };

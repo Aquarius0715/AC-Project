@@ -73,7 +73,7 @@ export function AlertsView({ rows = seed }: Readonly<{ rows?: Alert[] }>) {
 }
 
 /** The alert policies of the Phase 1A demo (FR-C15): the default policy's rules and the customer's own policies. */
-export function PoliciesPanel() {
+function PoliciesPanel() {
   const toast = useToast();
   const [rules, setRules] = useState(defaultRules.map((r) => r[3]));
   const [policies, setPolicies] = useState(seedPolicies);

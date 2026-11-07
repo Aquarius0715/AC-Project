@@ -2,7 +2,7 @@
 // setup key in the key URI format of authenticator apps, the key in groups of four, and the 6-digit code as typed.
 import { encode } from "uqr";
 
-export const ISSUER = "AC Project";
+const ISSUER = "AC Project";
 
 /** otpauth://totp/AC%20Project:<account>?secret=<key>&issuer=AC%20Project&algorithm=SHA1&digits=6&period=30 */
 export function otpauthUri(setupKey: string, account: string): string {

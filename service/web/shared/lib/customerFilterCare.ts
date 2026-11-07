@@ -26,7 +26,7 @@ export interface FilterUnit { id: string; name: string; place: string; spaceId: 
 /** The model default threshold (DD-C18). */
 export const DEFAULT_FILTER_HOURS = 250;
 /** A space with this many ACs or more shows one summary row with “View n” (DD-C18 step 1, IR238). */
-export const AREA_GROUP_AT = 4;
+const AREA_GROUP_AT = 4;
 
 type Tone = "ok" | "warn" | "crit" | "unknown" | "primary" | "muted";
 export const filterStatus: Record<FilterState, { label: string; badge: Tone; bar: Tone }> = {
@@ -37,7 +37,7 @@ export const filterStatus: Record<FilterState, { label: string; badge: Tone; bar
 };
 
 /** “8 Sept” in the user's language and display time zone. */
-export function monthDay(iso: string, d: Display = EN.display): string {
+function monthDay(iso: string, d: Display = EN.display): string {
   for (const timeZone of [d.timeZone, EN.display.timeZone]) {
     try {
       return new Date(iso).toLocaleDateString(intlTag(d.locale), { timeZone, month: "short", day: "numeric" });
@@ -112,7 +112,7 @@ function groupBadge(due: number, isOverdue: boolean, isUnknown: boolean, t: T): 
   return isUnknown ? { label: t("Unknown"), tone: "unknown" } : { label: t("OK"), tone: "ok" };
 }
 /** The summary of an area's ACs: “2 due soon · 1 offline”, the average progress and “2 due”. */
-export function filterGroup(key: string, rows: FilterRow[], t: T = en): FilterGroup {
+function filterGroup(key: string, rows: FilterRow[], t: T = en): FilterGroup {
   const n = (st: FilterState) => rows.filter((r) => r.state === st).length;
   const offline = rows.filter((r) => r.offline).length;
   const parts = [n("overdue") && t("{n} overdue", { n: n("overdue") }), n("due_soon") && t("{n} due soon", { n: n("due_soon") }), offline && t("{n} offline", { n: offline })].filter((part): part is string => typeof part === "string" && part !== "");

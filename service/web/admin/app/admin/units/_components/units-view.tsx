@@ -40,7 +40,7 @@ export interface CustomerLive {
   total: number; units: UnitRow[]; lastEdit: string | null; policies: PolicyLine[] | null; rules: { policyId: string; items: RuleLine[] } | null;
   canRules: boolean; canAttach: boolean; unit?: UnitLive; unitMissing?: boolean;
 }
-export interface WarrantyLive { rows: CoverageRow[]; kpis: ReturnType<typeof coverageKpis>; customers: { id: string; name: string }[]; claims: ClaimCandidate[] | null; canClaim: boolean }
+interface WarrantyLive { rows: CoverageRow[]; kpis: ReturnType<typeof coverageKpis>; customers: { id: string; name: string }[]; claims: ClaimCandidate[] | null; canClaim: boolean }
 export interface UnitsLive {
   now: string; todayKL: string; canWrite: boolean; standingKnown: boolean; rows: CustomerRow[]; kpis: ReturnType<typeof registerKpis>; search: string; missing: boolean;
   top: "customers" | "warranty"; activeCustomers: { id: string; name: string }[]; coverageAttention: number | null; warranty?: WarrantyLive | null; customer?: CustomerLive;

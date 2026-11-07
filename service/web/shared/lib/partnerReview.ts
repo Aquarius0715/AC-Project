@@ -18,7 +18,7 @@ export interface ApiReportMeasurement { id: string; componentKey?: string | null
 export interface ApiPart { name: string; quantity: number; source: string; replacesComponentKey: string | null }
 export interface ApiRefrigerant { refrigerant: string; cylinderId: string; recoveredKg: number; chargedKg: number; leakCheck: string }
 export interface ApiAttachment { id: string; name: string; mime: string; size: number; status: "processing" | "ready" | "failed" }
-export interface ApiReview { reviewerUserId: string; reportVersion: number; decision: "accept" | "return"; reason: string | null; occurredAt: string }
+interface ApiReview { reviewerUserId: string; reportVersion: number; decision: "accept" | "return"; reason: string | null; occurredAt: string }
 export type ReviewAvailability = { allowed: true; reason: null } | { allowed: false; reason: "permission_denied" | "self_authored" | "not_current" | "not_submitted" };
 export interface ApiWorkReport {
   id: string; version: number; jobId: string; authorId: string; reviewAvailability: ReviewAvailability; items: ApiInspectionItem[]; measurements: ApiReportMeasurement[];

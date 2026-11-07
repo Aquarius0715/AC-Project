@@ -1,6 +1,6 @@
 # Lint and tests of the whole repository on every push and pull request. Each check is its own job: Go lint (format, vet,
 # golangci-lint, generated files and the API description), the Go suite (unit + integration on one server), the integration suite
-# against the split services, web lint (no warnings allowed) and the strict web lint per workspace, web typecheck, web unit tests, and the design document validators. The
+# against the split services, web lint (no warnings allowed, then knip for dead code) and the strict web lint per workspace, web typecheck, web unit tests, and the design document validators. The
 # end-to-end suite needs the whole compose stack and runs in e2e.yml.
 #
 # The jobs run on the lab server's self-hosted runner (label ac-test, DEC-94), each in a container of its own: the dependencies'
@@ -168,6 +168,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: npm ci
       - run: npm run lint
+      - name: dead code and unused dependencies (knip.jsonc)
+        run: npm run knip
       - name: the workspace back to the runner's user
         if: always()
         working-directory: .
