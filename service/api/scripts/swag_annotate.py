@@ -13,7 +13,11 @@ service/api:
     go run ./cmd/gen/restdoc | python3 scripts/swag_annotate.py --routes -            # rewrite the annotations
     go run ./cmd/gen/restdoc | python3 scripts/swag_annotate.py --routes - --check    # exit 1 when they are stale
 """
-import csv, json, os, re, subprocess, sys
+import csv
+import json
+import re
+import subprocess
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -373,7 +377,7 @@ def main():
             start = hi
             while start > 0 and lines[start - 1].startswith("//"):
                 start -= 1
-            doc = [l for l in lines[start:hi] if not re.match(r"^//\s*@", l) and l.strip() != "//"]
+            doc = [line for line in lines[start:hi] if not re.match(r"^//\s*@", line) and line.strip() != "//"]
             if not doc:  # a sentence first: an annotation block that opens the doc comment loses its tab layout to
                 # gofmt, and golangci-lint's swaggo check then misreports the file as unformatted
                 doc = [f"// {re.match(r'^func (?:\([^)]*\) )?(\w+)', lines[hi]).group(1)} serves {op}."]

@@ -3,6 +3,7 @@
 # gofmt, vet and golangci-lint; generated files current; the design document validators. Each is judged by its exit code; the first failure
 # stops the script. The Go DB suites run with `make test-all` in service/api.
 #   sh scripts/check.sh
+# shellcheck disable=SC2086 # gen_paths is a list of paths, split on purpose
 set -eu
 cd "$(dirname "$0")/.."
 step() { printf '\n== %s\n' "$1"; }
