@@ -104,44 +104,20 @@ function JobsTab({ live, patch, fresh, onFresh }: Readonly<{ live: JobsLive; pat
   );
 }
 
-function JobDetail({ d, live, fresh, onFresh }: Readonly<{ d: Detail; live: JobsLive; fresh: Fresh | null; onFresh: () => void }>) {
-  type ModalState = null | { kind: "book"; row: PreferredRow; fresh?: boolean } | { kind: "propose" } | { kind: "reason"; what: "hold" | "resume" | "cancel" | "reassign" } | { kind: "classify" }
-    | { kind: "review"; decision: "accept" | "return" } | { kind: "cost" } | { kind: "extend" } | { kind: "report" };
-  const t = useT();
-  const j = d.job;
-  const now = Date.parse(live.now);
-  // Right after New job: “Next: choose delivery” opens step 2 on the 1st preferred time still ahead; “Save as requested” says so.
-  const [modal, setModal] = useState<ModalState>(() => {
-    const row = fresh?.book ? d.preferred.find((r) => Date.parse(r.slot.startAt) > now) : undefined;
-    return row ? { kind: "book", fresh: true, row } : null;
-  });
-  const [pending, run] = useAction();
-  const [result, setResult] = useState<{ tone: "ok" | "crit" | "warn"; text: string } | null>(() => (fresh && !fresh.book ? { tone: "ok", text: t("Job created as requested — book one of the preferred times or propose another.") } : null));
-  useEffect(() => {
-    if (fresh) onFresh();
-  }, [fresh, onFresh]);
-  const failed = (f: ActionFailure) => { setResult({ tone: f.code === "CONFLICT" ? "warn" : "crit", text: hqRefusal(f, t) }); };
-  const close = (text?: string) => { setModal(null); if (text) setResult({ tone: "ok", text }); };
-  const sp = j.slotProposal, pp = j.partnerSlotProposal;
-  const firstPreferred = d.preferred[0];
-  const c = d.controls;
-  return (
-    <div className="flex min-w-0 flex-col gap-4">
-      {result && <Banner tone={result.tone}>{result.text}</Banner>}
-      <Card title={<span className="flex flex-wrap items-center gap-2">{j.id.slice(0, 8)} · {d.title} <JobStatusBadge s={sp?.status === "pending" ? "time_proposed" : j.status} /><OriginBadge origin={j.origin === PERIODIC_PLAN ? "plan" : "request"} /></span>}
-        sub={`${typeLabel(j.type, t)} · ${d.customer}${d.location ? ` · ${d.location}` : ""}${j.planId ? ` · ${t("plan occurrence {date}", { date: d.texts.occurrence ?? "" })}` : ""}`}
-        action={<div className="flex gap-2">
-          {c.hold && <Btn size="sm" disabled={pending} onClick={() => { setModal({ kind: "reason", what: "hold" }); }}>{t("Hold…")}</Btn>}
-          {c.resume && <Btn size="sm" disabled={pending} onClick={() => { setModal({ kind: "reason", what: "resume" }); }}>{t("Resume…")}</Btn>}
-          <Btn size="sm" variant="danger" disabled={pending || !c.cancel} title={c.cancelWhy ?? undefined} onClick={() => { setModal({ kind: "reason", what: "cancel" }); }}>{t("Cancel…")}</Btn>
-        </div>}>
-        <ol className="flex flex-wrap gap-4">{d.steps.map((s, i) => <li key={s.label} className="flex items-center gap-1.5 text-xs"><span className={cx("grid h-5 w-5 place-items-center rounded-full text-[10px] font-bold", STEP_DOT.get(s.state) ?? "border border-line text-muted-foreground")}>{s.state === "done" ? <Icon name="check" /> : i + 1}</span><span className={STEP_LABEL.get(s.state) ?? ""}>{s.label}</span></li>)}</ol>
-        {!c.cancel && c.cancelWhy && <p className="mt-2 text-[11px] text-muted-foreground">{j.contractorOrgId ? "" : `${t("Internal delivery skips Offered / Accepted.")} `}{t("Cancel: {why}", { why: c.cancelWhy })}</p>}
-        <div className="mt-3 grid-fluid" style={{ ["--min" as string]: "180px" }}>
-          {d.facts.map((f) => <div key={f.label} className="rounded-xl border border-line p-3"><div className="text-[11px] text-muted-foreground">{f.label}</div><div className="text-[13px] font-semibold">{f.value}</div><div className="text-[11px] text-muted-foreground">{f.sub}</div></div>)}
-        </div>
-      </Card>
+type ModalState = null | { kind: "book"; row: PreferredRow; fresh?: boolean } | { kind: "propose" } | { kind: "reason"; what: "hold" | "resume" | "cancel" | "reassign" } | { kind: "classify" }
+  | { kind: "review"; decision: "accept" | "return" } | { kind: "cost" } | { kind: "extend" } | { kind: "report" };
 
+/** What the cards of a job share: the job, the list data, the running action and the modal switch. */
+interface DetailCtx { d: Detail; live: JobsLive; pending: boolean; run: ReturnType<typeof useAction>[1]; setModal: (m: ModalState) => void; close: (text?: string) => void; failed: (f: ActionFailure) => void; now: number }
+
+/** The cards about the time and who does the job: a follow-up request, the proposals, the delivery. */
+function ProposalCards({ ctx }: Readonly<{ ctx: DetailCtx }>) {
+  const t = useT();
+  const { d, live, pending, run, setModal, close, failed, now } = ctx;
+  const j = d.job, sp = j.slotProposal, pp = j.partnerSlotProposal;
+  const firstPreferred = d.preferred[0];
+  return (
+    <>
       {j.followUpOfJobId && (
         <Card tone="warn" title={<span className="inline-flex items-center gap-1.5"><Icon name="undo" />{j.followUpClass === "pending" ? t("Follow-up request — classify within 1 business day") : t("Follow-up of {id}", { id: j.followUpOfJobId.slice(0, 8) })}</span>} action={j.followUpClass === "pending" ? <Badge tone="warn">{t("Classify by {time}", { time: d.texts.classifyBy })}</Badge> : <Badge tone={j.followUpClass === "rework" ? "ok" : "primary"}>{t(j.followUpClass === "rework" ? "Rework (free)" : "New request")}</Badge>}>
           <SummaryList items={[[t("Client’s report"), j.symptom || "—"], [t("Original job"), <Link key="o" className="text-primary" href={`/admin/jobs?jobId=${j.followUpOfJobId}`}>{j.followUpOfJobId.slice(0, 8)} <Icon name="arrowRight" /></Link>]]} />
@@ -195,6 +171,17 @@ function JobDetail({ d, live, fresh, onFresh }: Readonly<{ d: Detail; live: Jobs
         </Card>
       )}
 
+    </>
+  );
+}
+
+/** The work report of a job and the buttons that review it. */
+function ReportCard({ ctx }: Readonly<{ ctx: DetailCtx }>) {
+  const t = useT();
+  const { d, pending, run, setModal, close, failed } = ctx;
+  const j = d.job;
+  return (
+    <>
       {d.report ? (
         <Card title={d.report.title} sub={d.report.sub} tone={okOrWarn(d.report.tone)}
           action={<Plain type="button" className="text-xs font-semibold text-primary hover:underline" onClick={() => { setModal({ kind: "report" }); }}>{t("Open report")} <Icon name="arrowRight" /></Plain>}>
@@ -216,7 +203,17 @@ function JobDetail({ d, live, fresh, onFresh }: Readonly<{ d: Detail; live: Jobs
           </div>
         </Card>
       ) : null}{!d.report && d.draft && <Card title={t("Work report")}><p className="text-[13px] text-muted-foreground">{t("The technician is drafting the report — nothing submitted yet.")}</p></Card>}{!d.report && !d.draft && null}
+    </>
+  );
+}
 
+/** The cost lines of a job with their totals, and its history. */
+function CostsCard({ ctx }: Readonly<{ ctx: DetailCtx }>) {
+  const t = useT();
+  const { d, pending, run, setModal, close, failed } = ctx;
+  const j = d.job;
+  return (
+    <>
       <Card title={t("Costs")} action={<Btn size="sm" disabled={pending || j.status === "cancelled"} title={j.status === "cancelled" ? t("A cancelled job’s costs cannot change.") : undefined} onClick={() => { setModal({ kind: "cost" }); }}><Icon name="add" /> {t("Add cost line")}</Btn>}>
         {d.costs.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No cost lines yet — add estimates before the work and actuals after it.")}</p> : (
           <ScrollX><table className="w-full min-w-[560px] text-[13px]">
@@ -231,10 +228,55 @@ function JobDetail({ d, live, fresh, onFresh }: Readonly<{ d: Detail; live: Jobs
         </div>
         <p className="mt-2 text-[11px] text-muted-foreground">{t("Totals are shown per currency — never converted. Customer lines are visible to the client; internal lines are not.")}</p>
       </Card>
-
+  
       <Card title={t("History")}>
         {d.history.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No events.")}</p> : <ol className="flex flex-col gap-1 text-xs">{d.history.map((h) => <li key={h.id}><span className="text-muted-foreground">{h.at}</span> · {h.text}</li>)}</ol>}
       </Card>
+    </>
+  );
+}
+
+function JobDetail({ d, live, fresh, onFresh }: Readonly<{ d: Detail; live: JobsLive; fresh: Fresh | null; onFresh: () => void }>) {
+  const t = useT();
+  const j = d.job;
+  const now = Date.parse(live.now);
+  // Right after New job: “Next: choose delivery” opens step 2 on the 1st preferred time still ahead; “Save as requested” says so.
+  const [modal, setModal] = useState<ModalState>(() => {
+    const row = fresh?.book ? d.preferred.find((r) => Date.parse(r.slot.startAt) > now) : undefined;
+    return row ? { kind: "book", fresh: true, row } : null;
+  });
+  const [pending, run] = useAction();
+  const [result, setResult] = useState<{ tone: "ok" | "crit" | "warn"; text: string } | null>(() => (fresh && !fresh.book ? { tone: "ok", text: t("Job created as requested — book one of the preferred times or propose another.") } : null));
+  useEffect(() => {
+    if (fresh) onFresh();
+  }, [fresh, onFresh]);
+  const failed = (f: ActionFailure) => { setResult({ tone: f.code === "CONFLICT" ? "warn" : "crit", text: hqRefusal(f, t) }); };
+  const close = (text?: string) => { setModal(null); if (text) setResult({ tone: "ok", text }); };
+  const sp = j.slotProposal;
+  const c = d.controls;
+  const ctx: DetailCtx = { d, live, pending, run, setModal, close, failed, now };
+  return (
+    <div className="flex min-w-0 flex-col gap-4">
+      {result && <Banner tone={result.tone}>{result.text}</Banner>}
+      <Card title={<span className="flex flex-wrap items-center gap-2">{j.id.slice(0, 8)} · {d.title} <JobStatusBadge s={sp?.status === "pending" ? "time_proposed" : j.status} /><OriginBadge origin={j.origin === PERIODIC_PLAN ? "plan" : "request"} /></span>}
+        sub={`${typeLabel(j.type, t)} · ${d.customer}${d.location ? ` · ${d.location}` : ""}${j.planId ? ` · ${t("plan occurrence {date}", { date: d.texts.occurrence ?? "" })}` : ""}`}
+        action={<div className="flex gap-2">
+          {c.hold && <Btn size="sm" disabled={pending} onClick={() => { setModal({ kind: "reason", what: "hold" }); }}>{t("Hold…")}</Btn>}
+          {c.resume && <Btn size="sm" disabled={pending} onClick={() => { setModal({ kind: "reason", what: "resume" }); }}>{t("Resume…")}</Btn>}
+          <Btn size="sm" variant="danger" disabled={pending || !c.cancel} title={c.cancelWhy ?? undefined} onClick={() => { setModal({ kind: "reason", what: "cancel" }); }}>{t("Cancel…")}</Btn>
+        </div>}>
+        <ol className="flex flex-wrap gap-4">{d.steps.map((s, i) => <li key={s.label} className="flex items-center gap-1.5 text-xs"><span className={cx("grid h-5 w-5 place-items-center rounded-full text-[10px] font-bold", STEP_DOT.get(s.state) ?? "border border-line text-muted-foreground")}>{s.state === "done" ? <Icon name="check" /> : i + 1}</span><span className={STEP_LABEL.get(s.state) ?? ""}>{s.label}</span></li>)}</ol>
+        {!c.cancel && c.cancelWhy && <p className="mt-2 text-[11px] text-muted-foreground">{j.contractorOrgId ? "" : `${t("Internal delivery skips Offered / Accepted.")} `}{t("Cancel: {why}", { why: c.cancelWhy })}</p>}
+        <div className="mt-3 grid-fluid" style={{ ["--min" as string]: "180px" }}>
+          {d.facts.map((f) => <div key={f.label} className="rounded-xl border border-line p-3"><div className="text-[11px] text-muted-foreground">{f.label}</div><div className="text-[13px] font-semibold">{f.value}</div><div className="text-[11px] text-muted-foreground">{f.sub}</div></div>)}
+        </div>
+      </Card>
+
+      <ProposalCards ctx={ctx} />
+
+      <ReportCard ctx={ctx} />
+
+      <CostsCard ctx={ctx} />
 
       {modal?.kind === "book" && <BookModal d={d} live={live} row={modal.row} fresh={modal.fresh} onClose={close} onFail={(f) => { setModal(null); failed(f); }} />}
       {modal?.kind === "review" && d.report && <ReviewModal d={d} report={d.report} decision={modal.decision} onClose={close} onFail={(f) => { setModal(null); failed(f); }} />}
