@@ -13,9 +13,8 @@ test("the status tabs keep the URL and open the jobs they list", async ({ page }
   for (let i = names.length - 1; i >= 0; i--) {
     await tabs.nth(i).click();
     await expect(tabs.nth(i)).toHaveAttribute("aria-selected", "true");
-    if (i > 0) await page.waitForURL(/[?&]tab=/);
-    else await page.waitForURL((u) => !u.searchParams.has("tab"));
-    const count = Number((/(\d+)\s*$/.exec(must(names[i])))?.[1] ?? NaN);
+    await (i > 0 ? page.waitForURL(/[?&]tab=/) : page.waitForURL((u) => !u.searchParams.has("tab")));
+    const count = Number((/(\d+)\s*$/.exec(must(names.at(i))))?.[1] ?? NaN);
     const jobs = page.locator("main a[href^='/partner/jobs/'], main a[href^='/partner/history?jobId=']");
     if (count === 0) await expect(jobs).toHaveCount(0);
     else if (count > 0) await expect(jobs.first()).toBeVisible();

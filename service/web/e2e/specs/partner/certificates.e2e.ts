@@ -14,9 +14,9 @@ test("an empty certificate takes focus to the first field to fix and the file pi
   await dialog.getByLabel(/^Certificate number/).focus();
   await page.keyboard.press("Tab");
   const picker = await page.evaluate(() => {
-    const a = document.activeElement as HTMLInputElement | null;
+    const a = document.activeElement;
     const label = a?.closest("label"); // this runs in the page: no test helpers here
-    return { type: a?.type, outline: label ? getComputedStyle(label).outlineStyle : "no label" };
+    return { type: a instanceof HTMLInputElement ? a.type : undefined, outline: label ? getComputedStyle(label).outlineStyle : "no label" };
   });
   expect(picker).toEqual({ type: "file", outline: "solid" });
   await dialog.getByRole("button", { name: "Cancel" }).click();

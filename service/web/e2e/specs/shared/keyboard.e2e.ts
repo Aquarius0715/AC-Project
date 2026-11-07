@@ -17,7 +17,11 @@ const DIALOGS: Record<string, [path: string, trigger: string | RegExp]> = {
 test("a dialog opened by keyboard keeps focus inside and returns it to its trigger", async ({ page, app }) => {
   const [path, name] = must(DIALOGS[app.id]);
   // the dialog's parts (the shadcn/ui Dialog on Base UI, DEC-75) add nothing the CSP refuses
-  await page.addInitScript(() => { document.addEventListener("securitypolicyviolation", (e) => (globalThis.refused ??= []).push(e.violatedDirective)); });
+  await page.addInitScript(() => {
+    const refused: string[] = [];
+    Object.defineProperty(globalThis, "refused", { value: refused });
+    document.addEventListener("securitypolicyviolation", (e) => { refused.push(e.violatedDirective); });
+  });
   await page.goto(path);
   const trigger = page.getByRole("button", { name }).first();
   await trigger.focus();

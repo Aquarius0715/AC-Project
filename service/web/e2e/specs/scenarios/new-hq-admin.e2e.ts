@@ -5,14 +5,14 @@
 // membership, revoked at the end. Skipped on a stack without Mailpit.
 import type { Browser, Page } from "@playwright/test";
 import { test, expect, FAILED_PAGE } from "../../fixtures/test";
-import { APPS, type App } from "../../fixtures/apps";
+import { APPS } from "../../fixtures/apps";
 import { totpBase32 } from "../../fixtures/auth";
 import { mailpitUp, setupLink } from "../../fixtures/mailpit";
 import { must } from "../../fixtures/must";
 
-const app = (id: App["id"]) => must(APPS.find((a) => a.id === id));
-const open = async (browser: Browser, a: App, signedIn = true): Promise<Page> => {
-  const context = await browser.newContext({ baseURL: a.url, viewport: { width: 1920, height: 1080 }, ...(signedIn ? { storageState: a.state } : { storageState: { cookies: [], origins: [] } }) });
+const adminApp = must(APPS.find((a) => a.id === "admin"));
+const open = async (browser: Browser, signedIn = true): Promise<Page> => {
+  const context = await browser.newContext({ baseURL: adminApp.url, viewport: { width: 1920, height: 1080 }, ...(signedIn ? { storageState: adminApp.state } : { storageState: { cookies: [], origins: [] } }) });
   return context.newPage();
 };
 
@@ -20,7 +20,7 @@ test("a new HQ administrator sets a password and a one-time-code device, then si
   test.setTimeout(240_000);
   test.skip(!(await mailpitUp()), "needs the local Mailpit inbox");
   const email = `e2e-admin-${String(Date.now())}@example.com`;
-  const admin = await open(browser, app("admin"));
+  const admin = await open(browser);
   const main = admin.getByRole("main");
 
   await test.step("HQ adds the person as Admin", async () => {
@@ -41,7 +41,7 @@ test("a new HQ administrator sets a password and a one-time-code device, then si
 
   const password = `E2e-${crypto.randomUUID()}`;
   let key = "";
-  const me = await open(browser, app("admin"), false);
+  const me = await open(browser, false);
 
   await test.step("the set-up e-mail sets the password and a one-time-code device", async () => {
     await me.goto(await setupLink(email));
@@ -77,7 +77,7 @@ test("a new HQ administrator sets a password and a one-time-code device, then si
   });
 
   await test.step("the admin app asks for the password and a code", async () => {
-    const hq = app("admin");
+    const hq = adminApp;
     await me.goto(`${hq.url}/login`);
     await me.getByRole("link", { name: /^Continue as / }).click();
     await me.locator("#username").fill(email);

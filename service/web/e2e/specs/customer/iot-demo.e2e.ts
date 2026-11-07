@@ -7,7 +7,7 @@ import { signIn } from "../../fixtures/auth";
 
 /** The API ID of a fixture-style name (seed.ID: UUIDv5 in the seed namespace). */
 function fixtureId(name: string): string {
-  const ns = Buffer.from("6f1c3a526d0b5c1e9a570d1b7a4c2e10", "hex");
+  const ns = Uint8Array.fromHex("6f1c3a526d0b5c1e9a570d1b7a4c2e10");
   const h = createHash("sha1").update(Buffer.concat([ns, Buffer.from(name)])).digest();
   h[6] = ((h[6] ?? 0) & 0x0F) | 0x50;
   h[8] = ((h[8] ?? 0) & 0x3F) | 0x80;

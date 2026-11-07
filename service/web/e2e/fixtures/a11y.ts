@@ -6,6 +6,7 @@ import { expect, type Page } from "@playwright/test";
 
 const AXE = readFileSync(require.resolve("axe-core/axe.min.js"), "utf8");
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
+interface AxeApi { run: (context: unknown, options: object) => Promise<{ violations: Violation[] }> }
 interface Violation { id: string; impact: string | null; help: string; nodes: { target: string[] }[] }
 
 /** The critical and serious violations of the page, or of the elements `scope` selects, as readable lines. */
@@ -15,7 +16,11 @@ export async function axeViolations(page: Page, scope?: string): Promise<string[
   await page.waitForFunction(() => document.getAnimations().every((a) => a.effect?.getComputedTiming().endTime === Infinity || a.playState !== "running"));
   await page.evaluate(AXE);
   const found = await page.evaluate(async ([s, tags]) => {
-    const axe = (globalThis as unknown as { axe: { run: (c: unknown, o: object) => Promise<{ violations: Violation[] }> } }).axe;
+    // axe-core put itself on the page by the evaluate above; the check says so instead of asserting it
+    const loaded: unknown = Reflect.get(globalThis, "axe");
+    const isAxe = (v: unknown): v is AxeApi => typeof v === "object" && v !== null && "run" in v && typeof v.run === "function";
+    if (!isAxe(loaded)) throw new Error("axe-core did not load on the page");
+    const axe = loaded;
     const { violations } = await axe.run(s ? { include: [s] } : document, { runOnly: { type: "tag", values: tags } });
     return violations;
   }, [scope ?? null, TAGS] as const);

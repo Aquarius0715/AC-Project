@@ -226,16 +226,16 @@ test("the default policy's rules, a customer's switch and a rule copied as a cus
   await expect(main).toContainText(`Policy v${String(before.version + 2)}`);
 
   // one customer's switch, with a reason, then back on
-  const row = (name: string) => main.locator("div").filter({ has: page.getByRole("switch", { name: `Refrigerant low pressure for ${name}` }) }).last();
-  await row("Demo Customer B").getByRole("switch").click();
+  const customerBRow = main.locator("div").filter({ has: page.getByRole("switch", { name: "Refrigerant low pressure for Demo Customer B" }) }).last();
+  await customerBRow.getByRole("switch").click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByRole("heading", { name: "Switch “Refrigerant low pressure” off for Demo Customer B" })).toBeVisible();
   await dialog.getByLabel(/^Reason · optional/).fill("E2E rooftop unit replaced");
   await dialog.getByRole("button", { name: "Switch off" }).click();
-  await expect(row("Demo Customer B")).toContainText(/Off · by hq-operator, .* \(E2E rooftop unit replaced\)/);
-  await row("Demo Customer B").getByRole("switch").click();
+  await expect(customerBRow).toContainText(/Off · by hq-operator, .* \(E2E rooftop unit replaced\)/);
+  await customerBRow.getByRole("switch").click();
   await page.getByRole("dialog").getByRole("button", { name: "Switch on" }).click();
-  await expect(row("Demo Customer B")).toContainText(/^.*On · by hq-operator/);
+  await expect(customerBRow).toContainText(/^.*On · by hq-operator/);
 
   // copy: Ventilation (CO₂) becomes a draft for the owner chosen; a metric no policy may watch cannot be copied
   await rules.getByRole("button", { name: /Clogged filter/ }).click();

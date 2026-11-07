@@ -18,7 +18,7 @@ test("HQ revokes a contractor's technician, who then stays out: the contractor c
   const name = `E2E Revoked ${String(stamp)}`;
   const email = `e2e-revoked-${String(stamp)}@example.com`;
   const partner = await open(browser, app("partner"));
-  const row = (text: string) => partner.getByRole("row").filter({ hasText: text });
+  const userRow = partner.getByRole("row").filter({ hasText: email });
   const dialog = partner.getByRole("dialog");
 
   await test.step("contractor-a adds a technician", async () => {
@@ -28,7 +28,7 @@ test("HQ revokes a contractor's technician, who then stays out: the contractor c
     await dialog.getByLabel("Email").fill(email);
     await dialog.getByRole("combobox", { name: "Role" }).selectOption("technician");
     await dialog.getByRole("button", { name: "Add user" }).click();
-    await expect(row(email)).toContainText("Not signed in yet");
+    await expect(userRow).toContainText("Not signed in yet");
   });
 
   await test.step("HQ revokes the access in Access & roles", async () => {
@@ -47,22 +47,22 @@ test("HQ revokes a contractor's technician, who then stays out: the contractor c
 
   await test.step("the contractor sees the access ended by HQ, with only Remove", async () => {
     await partner.reload();
-    await expect(row(email)).toContainText("Access ended by HQ");
-    await expect(row(email)).toContainText("Only HQ can give the access back");
-    for (const button of ["Access", "Enable", "Disable", "Resend set-up e-mail"]) await expect(row(email).getByRole("button", { name: button })).toHaveCount(0);
+    await expect(userRow).toContainText("Access ended by HQ");
+    await expect(userRow).toContainText("Only HQ can give the access back");
+    for (const button of ["Access", "Enable", "Disable", "Resend set-up e-mail"]) await expect(userRow.getByRole("button", { name: button })).toHaveCount(0);
   });
 
   await test.step("removed, the person cannot come back as a new account", async () => {
-    await row(email).getByRole("button", { name: "Remove" }).click();
+    await userRow.getByRole("button", { name: "Remove" }).click();
     await dialog.getByLabel("Reason").fill("E2E: left the company");
     await dialog.getByRole("button", { name: "Remove" }).click();
-    await expect(row(email)).toHaveCount(0);
+    await expect(userRow).toHaveCount(0);
     await partner.getByRole("button", { name: "Add user" }).click();
     await dialog.getByLabel("Name").fill(name);
     await dialog.getByLabel("Email").fill(email);
     await dialog.getByRole("combobox", { name: "Role" }).selectOption("technician");
     await dialog.getByRole("button", { name: "Add user" }).click();
     await expect(partner.getByText("HQ ended this person's access — only HQ can give it back").first()).toBeVisible();
-    await expect(row(email)).toHaveCount(0);
+    await expect(userRow).toHaveCount(0);
   });
 });

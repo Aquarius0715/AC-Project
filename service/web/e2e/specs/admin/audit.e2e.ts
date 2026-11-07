@@ -59,7 +59,7 @@ test("the audit log keeps its filters and the open entry in the URL", async ({ p
   const related = card(page, /./).filter({ has: page.getByRole("heading", { name: "Related records", exact: true }) });
   await expect(related.first()).toBeVisible();
   if (kind === "job") await expect(related.first().getByRole("link", { name: "Open job", exact: true })).toHaveAttribute("href", /^\/admin\/jobs\?jobId=[0-9a-f-]{36}$/);
-  if (kind === "unit") await expect(related.first().getByRole("link", { name: "Open unit", exact: true })).toHaveAttribute("href", /^\/admin\/units\?unitId=[0-9a-f-]{36}$/);
+  else if (kind === "unit") await expect(related.first().getByRole("link", { name: "Open unit", exact: true })).toHaveAttribute("href", /^\/admin\/units\?unitId=[0-9a-f-]{36}$/);
   await expect(related.first()).toContainText("Links open the existing detail screens");
 
   // Filter by actor and Filter by ID (the correlation) keep the open entry; the list then names the correlation

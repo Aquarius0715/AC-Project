@@ -21,6 +21,23 @@ const config = [
   },
   // the fixtures read Node's CommonJS require and __dirname (the web packages are CommonJS, as in the Next.js configs)
   { files: ["**/fixtures/**/*.ts"], rules: { "unicorn/prefer-module": "off" } },
+  // Each of these is a deliberate case, with its file:
+  // - waits that follow the clock (the one-time code's 30 s step, the 3 s the autosave spec lets pass) are fixed by nature
+  // - the smoke crawl waits for the network to go idle once per page, to count what a page asks for
+  // - the fixture ID of the seed is a UUIDv5, which is defined over SHA-1
+  // - alert-policies restores state in a second afterEach that only the tests after it need; merging or moving it would
+  //   run it for the tests before it too
+  // - axe-core's guard has to live inside the function Playwright sends to the page
+  // - closing a context in finally becomes `await using` only once the suite shows that Playwright's TypeScript transform
+  //   accepts it (not tried here: no stack to run the specs); turn prefer-dispose back on for these files then
+  {
+    files: ["**/fixtures/auth.ts", "**/specs/technician/report-autosave.e2e.ts"],
+    rules: { "playwright/no-wait-for-timeout": "off", "sonarjs/no-fixed-wait-in-tests": "off" },
+  },
+  { files: ["**/specs/shared/smoke.e2e.ts"], rules: { "playwright/no-networkidle": "off", "sonarjs/no-networkidle-wait": "off" } },
+  { files: ["**/specs/customer/iot-demo.e2e.ts"], rules: { "sonarjs/hashing": "off" } },
+  { files: ["**/specs/admin/alert-policies.e2e.ts"], rules: { "playwright/no-duplicate-hooks": "off", "playwright/prefer-hooks-on-top": "off" } },
+  { files: ["**/fixtures/a11y.ts"], rules: { "unicorn/consistent-function-scoping": "off" } },
   // the specs, fixtures and set-up run on Node, which has the newer built-ins the browser code may not use
   {
     rules: {
@@ -30,6 +47,11 @@ const config = [
       "unicorn/prefer-uint8array-base64": "error",
       "unicorn/prefer-uint8array-hex": "error",
     },
+  },
+  // placed last: the Node built-ins block above turns prefer-dispose on for all files
+  {
+    files: ["**/specs/admin/overview.e2e.ts", "**/specs/shared/demo.e2e.ts", "**/specs/shared/session.e2e.ts"],
+    rules: { "unicorn/prefer-dispose": "off" },
   },
 ];
 

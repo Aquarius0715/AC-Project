@@ -65,10 +65,17 @@ async function crawl(page: Page, app: App, lang = "en", wideFont = false, touch 
   return out;
 }
 
+let zoneBefore: string | null = null;
+
+test.afterEach(async ({ page }) => {
+  if (zoneBefore) await setDisplay(page, ENGLISH, zoneBefore);
+  zoneBefore = null;
+});
+
 test("every linked page of the app renders", async ({ page, app }) => {
   test.setTimeout(240_000);
   const errors: string[] = [];
-  page.on("pageerror", (e) => errors.push(`${page.url()}: ${e.message}`));
+  page.on("pageerror", (e) => { errors.push(`${page.url()}: ${e.message}`); });
   const refused: string[] = []; // Chromium logs each CSP violation as a console error
   page.on("console", (m) => { if (m.type() === "error" && /Content Security Policy/i.test(m.text())) refused.push(`${page.url()}: ${m.text().slice(0, 200)}`); });
   const r = await crawl(page, app);
@@ -86,13 +93,6 @@ test("every linked page of the app renders", async ({ page, app }) => {
   const name = label.trim(); // the label without its badge
   await link.click();
   await expect(page).toHaveTitle(`${name} — AC Project`);
-});
-
-let zoneBefore: string | null = null;
-
-test.afterEach(async ({ page }) => {
-  if (zoneBefore) await setDisplay(page, ENGLISH, zoneBefore);
-  zoneBefore = null;
 });
 
 test.describe("phone width", () => {

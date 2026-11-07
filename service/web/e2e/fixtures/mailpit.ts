@@ -1,6 +1,7 @@
 // The local Mailpit inbox (DEC-78): the stack's e-mails, the sign-in service's account set-up e-mails among them
 // (IR461). Specs that read it skip on a stack without it.
 import { expect } from "@playwright/test";
+import { z } from "zod";
 
 export const MAILPIT = "http://localhost:8025/api/v1";
 
@@ -16,7 +17,7 @@ export async function answers(url: string): Promise<boolean> {
 /** How many e-mails a Mailpit search URL finds. */
 export async function messageCount(search: string): Promise<number> {
   const res = await fetch(search);
-  const body = (await res.json()) as { messages_count: number };
+  const body = z.object({ messages_count: z.number() }).parse(await res.json());
   return body.messages_count;
 }
 
@@ -26,12 +27,12 @@ export async function setupLink(email: string): Promise<string> {
   let id = "";
   await expect.poll(async () => {
     const res = await fetch(search);
-    const body = (await res.json()) as { messages: { ID: string }[] };
+    const body = z.object({ messages: z.array(z.object({ ID: z.string() })) }).parse(await res.json());
     id = body.messages[0]?.ID ?? "";
     return id;
   }, { timeout: 30_000 }).not.toBe("");
   const res = await fetch(`${MAILPIT}/message/${id}`);
-  const { Text: text } = (await res.json()) as { Text: string };
+  const { Text: text } = z.object({ Text: z.string() }).parse(await res.json());
   const link = (/https?:\/\/\S+\/login-actions\/action-token\?\S+/.exec(text))?.[0];
   if (!link) throw new Error("the set-up e-mail has no link");
   return link;

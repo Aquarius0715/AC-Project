@@ -6,6 +6,7 @@
 // ambiguous room is asked, never guessed: the room, then the AC (Figma 09d, AT-X02-B). No command is sent.
 import { test, expect } from "../../fixtures/test";
 import { expectAccessible } from "../../fixtures/a11y";
+import { z } from "zod";
 
 test("the assistant answers with the fixed grammar and confirms a change before sending", async ({ page }) => {
   await page.goto("/customer");
@@ -81,12 +82,13 @@ test("voice input follows the device's microphone consent and falls back to text
 test("an ambiguous room is asked, never guessed: the room, then the AC", async ({ page }) => {
   let real = "";
   await page.route("**/bff/ops/voice.resolveIntent", async (route) => {
-    if ((route.request().postDataJSON() as { selectedUnitId?: string }).selectedUnitId) {
+    if (z.object({ selectedUnitId: z.string().optional() }).parse(route.request().postDataJSON()).selectedUnitId) {
       await route.continue();
       return;
     }
     const response = await route.fetch();
-    const json = (await response.json()) as { data: { unitId: string } };
+    // loose objects keep the other fields of the reply, which the fulfilled answer below spreads back
+    const json = z.looseObject({ data: z.looseObject({ unitId: z.string() }) }).parse(await response.json());
     real = json.data.unitId;
     await route.fulfill({ response, json: { ...json, data: { kind: "candidates", candidates: [
       { unitId: real, pathLabel: "Home A > 1F > Bedroom > Bedroom AC" },

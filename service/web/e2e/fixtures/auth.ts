@@ -8,12 +8,15 @@ import { createHmac } from "node:crypto";
 import type { Page } from "@playwright/test";
 import type { App } from "./apps";
 import { must } from "./must";
+import { z } from "zod";
 
-interface Credential { type: string; value?: string; secretData?: string }
+const credentialSchema = z.object({ type: z.string(), value: z.string().optional(), secretData: z.string().optional() });
+const realmSchema = z.object({ users: z.array(z.object({ username: z.string(), credentials: z.array(credentialSchema).optional() })).optional() });
+type Credential = z.infer<typeof credentialSchema>;
 const REALM = path.resolve(__dirname, "../../../../docker/keycloak/realm-ac.json");
 
 function credential(user: string, type: string): Credential | undefined {
-  const realm = JSON.parse(readFileSync(REALM, "utf8")) as { users?: { username: string; credentials?: Credential[] }[] };
+  const realm = realmSchema.parse(JSON.parse(readFileSync(REALM, "utf8")));
   return realm.users?.find((u) => u.username === user)?.credentials?.find((c) => c.type === type);
 }
 
@@ -25,7 +28,7 @@ function passwordOf(user: string): string {
 
 function otpSecretOf(user: string): string {
   const raw = credential(user, "otp")?.secretData;
-  const value = process.env.E2E_TOTP_SECRET ?? (raw ? (JSON.parse(raw) as { value?: string }).value : undefined);
+  const value = process.env.E2E_TOTP_SECRET ?? (raw ? z.object({ value: z.string().optional() }).parse(JSON.parse(raw)).value : undefined);
   if (!value) throw new Error(`No one-time-code secret for ${user}: set E2E_TOTP_SECRET`);
   return value;
 }
