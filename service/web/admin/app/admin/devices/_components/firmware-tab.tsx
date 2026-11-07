@@ -10,6 +10,7 @@ import { campaignErrors, campaignFacts, campaignStart, resultReason, waveStates,
 import { controlCampaign, scheduleCampaign } from "../actions";
 import type { DevicesLive } from "./devices-view";
 import { Icon } from "@ac/web/components/Icon";
+import { DateTimeSelect, TimeSelect } from "@ac/web/components/TimeSelect";
 
 // a campaign's tone by its state, and a device result's by its status; anything else is muted
 const CAMPAIGN_TONE = new Map<CampaignRow["state"], Tone>([["completed", "ok"], ["running", "primary"], ["paused", "warn"], ["aborted", "crit"]]);
@@ -78,11 +79,11 @@ export function FirmwareTab({ live }: Readonly<{ live: DevicesLive }>) {
         <div><p className="mb-1 text-[13px] font-semibold">{t("Devices of this model")}</p>{modelDevices.length === 0 ? <p className="text-xs text-muted-foreground">{t("No device is bound to a unit of this model.")}</p> : <div className="flex flex-col gap-1">{modelDevices.map((x) => <Check key={x.id} label={<span>{x.serial} <span className="text-xs text-muted-foreground">{x.unit} · {x.fw}{x.tamper ? ` · ${t("tamper (skipped)")}` : ""}</span></span>} checked={d.deviceIds.includes(x.id)} onChange={(on) => { setD({ ...d, deviceIds: on ? [...d.deviceIds, x.id] : d.deviceIds.filter((y) => y !== x.id) }); }} />)}</div>}{tried && errors.deviceIds && <p className="mt-1 text-xs text-crit">{errors.deviceIds}</p>}</div>
         <Field label={t("Waves (ascending %, ends at 100)")} error={tried ? errors.waves : undefined}><Input value={d.waves} onChange={(e) => { setD({ ...d, waves: e.target.value }); }} /></Field>
         <div className="grid-fluid" style={{ ["--min" as string]: "140px" }}>
-          <Field label={t("Window start")} hint={t("Device local time")} error={tried ? errors.window : undefined}><Input type="time" value={d.startLocal} onChange={(e) => { setD({ ...d, startLocal: e.target.value }); }} /></Field>
-          <Field label={t("Window end")}><Input type="time" value={d.endLocal} onChange={(e) => { setD({ ...d, endLocal: e.target.value }); }} /></Field>
+          <Field label={t("Window start")} hint={t("Device local time")} error={tried ? errors.window : undefined}><TimeSelect value={d.startLocal} onChange={(v) => { setD({ ...d, startLocal: v }); }} /></Field>
+          <Field label={t("Window end")}><TimeSelect value={d.endLocal} onChange={(v) => { setD({ ...d, endLocal: v }); }} /></Field>
           <Field label={t("Auto-pause above (%)")} error={tried ? errors.autoPause : undefined}><Input type="number" min="1" max="50" value={d.autoPause} onChange={(e) => { setD({ ...d, autoPause: e.target.value }); }} /></Field>
         </div>
-        <Field label={t("Start")} error={tried ? errors.startAt : undefined} hint={t("Now {time} — at least 24 h ahead · times in {zone}", { time: showTime(live.now, i.display), zone })}><Input type="datetime-local" value={d.startAt} onChange={(e) => { setD({ ...d, startAt: e.target.value }); }} /></Field>
+        <Field label={t("Start")} error={tried ? errors.startAt : undefined} hint={t("Now {time} — at least 24 h ahead · times in {zone}", { time: showTime(live.now, i.display), zone })}><DateTimeSelect value={d.startAt} onChange={(v) => { setD({ ...d, startAt: v }); }} /></Field>
         <Banner>{t("Devices with an active diagnostic run, firmware operation or open tamper are skipped with a reason.")}</Banner>
       </Modal>
       <Modal open={modal === "abort"} onClose={close} title={t("Abort campaign")} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant="danger" disabled={pending || !reason.trim()} onClick={() => { control("abort"); }}>{t("Abort")}</Btn></>}>

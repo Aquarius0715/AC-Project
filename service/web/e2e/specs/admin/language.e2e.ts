@@ -18,6 +18,8 @@
 import { test, expect } from "../../fixtures/test";
 import { displayZone, ENGLISH, MALAY, setDisplay } from "../../fixtures/display";
 import { expectAccessible } from "../../fixtures/a11y";
+import { pickDateTime } from "../../fixtures/time";
+const MALAY_PICKER = { date: "Tarikh", hour: "Jam", minute: "Minit" };
 
 let zoneBefore: string | null = null;
 
@@ -155,8 +157,8 @@ test("the HQ overview in Malay keeps the period in Kuala Lumpur days", async ({ 
   for (const text of ["Pilih organisasi pelanggan", "Pilih versi garis dasar", "Pilih versi faktor pelepasan"]) await expect(report).toContainText(text);
   await report.getByLabel("Organisasi pelanggan").selectOption({ label: "Demo Customer A" });
   await report.getByRole("checkbox").first().check();
-  await report.getByLabel("Mula (Kuala Lumpur)").fill("2026-09-01T00:00");
-  await report.getByLabel("Tamat", { exact: true }).fill("2026-09-08T00:00");
+  await pickDateTime(report.getByRole("group", { name: "Mula (Kuala Lumpur)" }), "2026-09-01T00:00", MALAY_PICKER);
+  await pickDateTime(report.getByRole("group", { name: "Tamat", exact: true }), "2026-09-08T00:00", MALAY_PICKER);
   await report.getByLabel("Versi garis dasar").selectOption({ index: 1 });
   await report.getByLabel("Versi faktor pelepasan").selectOption({ index: 1 });
   await report.getByLabel("Penerangan sempadan").fill("AC input electricity (E2E preview)");

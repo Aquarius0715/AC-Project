@@ -18,6 +18,7 @@ import { Icon } from "@ac/web/components/Icon";
 import { oneOf } from "@ac/web/lib/oneOf";
 import type { RestrictionRecoveryCase } from "@ac/web/lib/contracts.gen";
 import { commonRange } from "@ac/web/lib/temperatureRange";
+import { DateTimeSelect } from "@ac/web/components/TimeSelect";
 
 interface ScheduleContract {
   id: string; version: number; label: string; rulesVersion: string; recipients: number; invoices: { id: string; number: string }[];
@@ -184,7 +185,7 @@ function ScheduleModal({ open, onClose, contracts, now, onDone }: Readonly<{ ope
       <div className="grid-fluid" style={{ ["--min" as string]: "190px" }}>
         <Field label={t("Policy")}><Select value={kind} onChange={(e) => { setKind(oneOf([TEMPERATURE_LIMIT, "power_off"] as const, e.target.value, kind)); }}><option value="temperature_limit">{t("Temperature limit")}</option><option value="power_off">{t("Power off")}</option></Select></Field>
         {kind === TEMPERATURE_LIMIT && <Field label={t("Minimum cooling setpoint (°C)")} error={tried ? errors.setpoint : undefined}><Input type="number" value={setpoint} onChange={(e) => { setSetpoint(e.target.value); }} /></Field>}
-        <Field label={t("Execute after")} error={tried ? errors.executeAfter : undefined} hint={t("The notice is sent now; at least 24 h ahead · times in {zone}", { zone })}><Input type="datetime-local" value={executeAfter} onChange={(e) => { setExecuteAfter(e.target.value); }} /></Field>
+        <Field label={t("Execute after")} error={tried ? errors.executeAfter : undefined} hint={t("The notice is sent now; at least 24 h ahead · times in {zone}", { zone })}><DateTimeSelect value={executeAfter} onChange={(v) => { setExecuteAfter(v); }} /></Field>
       </div>
       <Field label={t("Reason shown to the customer")} error={tried ? errors.reason : undefined}><Textarea value={reason} maxLength={1000} onChange={(e) => { setReason(e.target.value); }} placeholder={t("Demo: invoice overdue since 2026-09-10")} /></Field>
     </Modal>

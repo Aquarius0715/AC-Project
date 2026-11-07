@@ -14,6 +14,7 @@ import { acceptOffer, declineOffer, proposeSlot, withdrawProposal } from "../act
 import type { JobDetailLive } from "../_lib/load";
 import { Icon } from "@ac/web/components/Icon";
 import { isBefore } from "@ac/web/lib/order";
+import { TimeSelect } from "@ac/web/components/TimeSelect";
 
 // a step's dot and label by its state; a step to do keeps the plain dot and a done step the plain label
 const STEP_DOT = new Map<string, string>([["done", "bg-primary text-white"], ["current", "border-2 border-primary text-primary"]]);
@@ -155,8 +156,8 @@ function ProposeModal({ j, x, technicians, onClose, onSend, pending }: Readonly<
       <p className="text-xs text-muted-foreground">{t("{id} · agreed with the client: {slot} · times in {zone}", { id: j.jobId.slice(0, 8), slot: x.visit, zone: x.propose.zone })}</p>
       <div className="grid-fluid" style={{ ["--min" as string]: "140px" }}>
         <Field label={t("Date")}><Input type="date" value={date} onChange={(e) => { setDate(e.target.value); }} /></Field>
-        <Field label={t("From")}><Input type="time" value={from} onChange={(e) => { setFrom(e.target.value); }} /></Field>
-        <Field label={t("To")} error={tried && !isOrder ? t("The end must be after the start") : undefined}><Input type="time" value={to} onChange={(e) => { setTo(e.target.value); }} /></Field>
+        <Field label={t("From")}><TimeSelect value={from} onChange={(v) => { setFrom(v); }} /></Field>
+        <Field label={t("To")} error={tried && !isOrder ? t("The end must be after the start") : undefined}><TimeSelect value={to} onChange={(v) => { setTo(v); }} /></Field>
       </div>
       <Field label={t("Technician (own company, qualified)")}><Select value={tech} onChange={(e) => { setTech(e.target.value); }}>{technicians.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</Select></Field>
       <Field label={t("Reason (sent to HQ and the client) · required, 1–1000 characters")} error={tried && !reason.trim() ? t("A reason is required") : undefined}><Textarea value={reason} maxLength={1000} onChange={(e) => { setReason(e.target.value); }} placeholder={t("Our qualified technician is on a certificate course that morning.")} /></Field>

@@ -15,6 +15,7 @@ import type { PlansLive } from "../_lib/load";
 import { JobsTabs, ScopeBar } from "./jobs-header";
 import { setParams } from "@ac/web/lib/searchParams";
 import { Icon } from "@ac/web/components/Icon";
+import { DateTimeSelect } from "@ac/web/components/TimeSelect";
 
 type Detail = NonNullable<PlansLive["detail"]>;
 /** What the last write on a plan left to show: saved, generated (the box names the job), a refused Generate job (the
@@ -100,7 +101,7 @@ function PlanDetail({ d, now, notice, setNotice }: Readonly<{ d: Detail; now: nu
         <div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>
           <Field label={t("Repeat")} hint={t("Only monthly recurrence is supported")}><Input value={t("Monthly")} disabled /></Field>
           <Field label={t("Every")} hint="1–12" error={errors.every}><Select value={String(every)} onChange={(e) => { setEvery(Number(e.target.value)); }}>{MONTHS.map((m) => <option key={m} value={m}>{t(m === 1 ? "1 month" : "{n} months", { n: m })}</option>)}</Select></Field>
-          <Field label={t("Next due")} hint={then ? t("Anchor day {n} · Recurrence uses UTC · then {date} · times in {zone}", { n: anchor, date: then, zone }) : t("Anchor day {n} · Recurrence uses UTC · times in {zone}", { n: anchor, zone })} error={errors.nextDueAt}><Input type="datetime-local" value={next} onChange={(e) => { setNext(e.target.value); }} /></Field>
+          <Field label={t("Next due")} hint={then ? t("Anchor day {n} · Recurrence uses UTC · then {date} · times in {zone}", { n: anchor, date: then, zone }) : t("Anchor day {n} · Recurrence uses UTC · times in {zone}", { n: anchor, zone })} error={errors.nextDueAt}><DateTimeSelect value={next} onChange={(v) => { setNext(v); }} /></Field>
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-3 rounded-2xl border border-[#b9cdf5] bg-primary-soft p-4">
           <div className="min-w-0 flex-1"><b className="text-[13px]">{box.title}</b><p className="text-xs text-muted-foreground">{box.text}</p></div>
@@ -160,7 +161,7 @@ function NewPlanModal({ live, onClose, onCreated, href }: Readonly<{ live: Plans
       </Field>
       <div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>
         <Field label={t("Every")} hint={t("Monthly recurrence, 1–12 months")} error={tried ? errors.every : undefined}><Select value={String(every)} onChange={(e) => { setEvery(Number(e.target.value)); }}>{MONTHS.map((m) => <option key={m} value={m}>{t(m === 1 ? "1 month" : "{n} months", { n: m })}</option>)}</Select></Field>
-        <Field label={t("First visit · next due")} hint={nextIso && anchor ? t("Anchor day {n} · Recurrence uses UTC · then {date} · times in {zone}", { n: anchor, date: planDate(nextOccurrence(nextIso, every, anchor), i.display), zone }) : undefined} error={tried ? errors.nextDueAt : undefined}><Input type="datetime-local" value={next} onChange={(e) => { setNext(e.target.value); }} /></Field>
+        <Field label={t("First visit · next due")} hint={nextIso && anchor ? t("Anchor day {n} · Recurrence uses UTC · then {date} · times in {zone}", { n: anchor, date: planDate(nextOccurrence(nextIso, every, anchor), i.display), zone }) : undefined} error={tried ? errors.nextDueAt : undefined}><DateTimeSelect value={next} onChange={(v) => { setNext(v); }} /></Field>
       </div>
       <Banner>{t("Each occurrence becomes a periodic job (requested) at this time of day when HQ presses Generate job; HQ then books it like any agreed time.")}</Banner>
     </Modal>

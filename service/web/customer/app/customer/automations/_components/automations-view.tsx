@@ -22,6 +22,7 @@ import { oneOf } from "@ac/web/lib/oneOf";
 import { Checkbox } from "@ac/web/components/ui/checkbox";
 import { isAfter } from "@ac/web/lib/order";
 import { entryOf, lookup } from "@ac/web/lib/lookup";
+import { TimeSelect } from "@ac/web/components/TimeSelect";
 
 interface Ac { id: string; name: string; property: string; path: string }
 export interface AutomationsLive {
@@ -284,8 +285,8 @@ function Editor({ live, onDone, onCancel }: Readonly<{ live: AutomationsLive; on
                 </Field>
                 {/* start and end side by side; the time zone on its own row until all three fit unclipped */}
                 <div className="@container"><div className="grid grid-cols-2 gap-3 @xl:grid-cols-3">
-                  <Field label={t("Start")} hint={t("24-hour HH:mm")} error={errors.startLocal}><Input inputMode="numeric" maxLength={5} placeholder="HH:mm" value={draft.startLocal} onChange={(e) => { set({ startLocal: e.target.value }); }} /></Field>
-                  <Field label={t("End")} hint={t("24-hour HH:mm")} error={errors.endLocal}><Input inputMode="numeric" maxLength={5} placeholder="HH:mm" value={draft.endLocal} onChange={(e) => { set({ endLocal: e.target.value }); }} /></Field>
+                  <Field label={t("Start")} error={errors.startLocal}><TimeSelect value={draft.startLocal} onChange={(v) => { set({ startLocal: v }); }} /></Field>
+                  <Field label={t("End")} error={errors.endLocal}><TimeSelect value={draft.endLocal} onChange={(v) => { set({ endLocal: v }); }} /></Field>
                   <Field className="col-span-2 @xl:col-span-1" label={t("Time zone")} hint={t("From your preferences")}><Input value={draft.timezone} readOnly className="bg-surface2" /></Field>
                 </div></div>
                 <label className="flex items-center gap-2 text-xs text-muted-foreground"><Checkbox checked={draft.endsNextDay} onCheckedChange={(v) => { set({ endsNextDay: v }); }} />{t("Ends next day (overnight) — off: end must be later than start; equal start/end is invalid")}</label>
@@ -306,7 +307,7 @@ function Editor({ live, onDone, onCancel }: Readonly<{ live: AutomationsLive; on
               </>
             )}
             {draft.trigger === "routine" && (
-              <Field label={t("Your usual time")} hint={t("Demo routine — no real behaviour history is collected")} error={errors.localTime}><Input inputMode="numeric" maxLength={5} placeholder="HH:mm" value={draft.localTime} onChange={(e) => { set({ localTime: e.target.value }); }} className="w-40" /></Field>
+              <Field label={t("Your usual time")} hint={t("Demo routine — no real behaviour history is collected")} error={errors.localTime}><TimeSelect value={draft.localTime} onChange={(v) => { set({ localTime: v }); }} className="w-48" /></Field>
             )}
             {draft.trigger === "weather" && (
               <div className="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-3">

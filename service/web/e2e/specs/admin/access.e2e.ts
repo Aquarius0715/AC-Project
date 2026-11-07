@@ -5,6 +5,7 @@
 // revokes the membership again (IR461).
 import { test, expect } from "../../fixtures/test";
 import { answers, messageCount } from "../../fixtures/mailpit";
+import { pickDateTime } from "../../fixtures/time";
 
 test("the organization filter narrows the memberships; an unknown membership is not opened", async ({ page }) => {
   await page.goto("/admin/settings/access");
@@ -82,7 +83,7 @@ test("HQ adds a new person with a membership, and revoking it ends the membershi
   await main.getByRole("textbox", { name: /^Email/ }).fill(email);
   await main.getByRole("button", { name: "Admin", exact: true }).last().click(); // the role, after the role filter
   await main.getByRole("combobox", { name: /^Organization/ }).selectOption({ label: "Demo HQ" });
-  await main.getByLabel("Valid from").fill("2026-09-01T09:00"); // before the seed's demo clock
+  await pickDateTime(main.getByRole("group", { name: "Valid from" }), "2026-09-01T09:00"); // before the seed's demo clock
   await main.getByRole("textbox", { name: /^Change reason/ }).fill("E2E: a new colleague");
   await main.getByRole("button", { name: "Create membership" }).click();
   await expect(page.getByText("Membership created").first()).toBeVisible();

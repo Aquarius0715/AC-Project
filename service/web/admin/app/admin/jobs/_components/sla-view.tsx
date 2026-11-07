@@ -14,6 +14,7 @@ import type { SlaLive } from "../_lib/load";
 import { JobsTabs } from "./jobs-header";
 import { NewJobModal } from "./jobs-view";
 import { Icon } from "@ac/web/components/Icon";
+import { DateTimeSelect } from "@ac/web/components/TimeSelect";
 
 /** HQ SLA by customer (FR-A22, DD-A22, Figma Admin 06-10) from the Core API. Texts in the display language; a target's
 start is typed and shown in the display time zone (IR291). */
@@ -97,7 +98,7 @@ function TargetsModal({ live, first, onClose, onFail }: Readonly<{ live: SlaLive
       <ul className="flex flex-col gap-1 text-xs">{live.targets.map((x) => <li key={x.plan}><b>{x.label}</b> — {x.line}{x.scheduled.map((s) => <span key={s} className="block pl-3 text-muted-foreground">{t("next: {target}", { target: s })}</span>)}</li>)}</ul>
       <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}>
         <Field label={t("Plan type")}><Select value={plan} onChange={(e) => { pick(e.target.value); }}>{live.targets.map((x) => <option key={x.plan} value={x.plan}>{x.label}</option>)}</Select></Field>
-        <Field label={t("Effective from")} hint={t("Jobs created from then on · times in {zone}", { zone })} error={tried ? errors.effectiveFrom : undefined}><Input type="datetime-local" value={f.from} onChange={(e) => { setF({ ...f, from: e.target.value }); }} /></Field>
+        <Field label={t("Effective from")} hint={t("Jobs created from then on · times in {zone}", { zone })} error={tried ? errors.effectiveFrom : undefined}><DateTimeSelect value={f.from} onChange={(v) => { setF({ ...f, from: v }); }} /></Field>
       </div>
       <div className="grid-fluid" style={{ ["--min" as string]: "160px" }}>
         <Field label={t("Response within (hours)")} hint={t("1–168; every job should be answered within it")} error={tried ? errors.responseHours : undefined}><Input inputMode="numeric" value={f.responseHours} onChange={(e) => { setF({ ...f, responseHours: e.target.value }); }} /></Field>

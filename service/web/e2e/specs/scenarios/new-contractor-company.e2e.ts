@@ -8,6 +8,7 @@ import { test, expect, FAILED_PAGE } from "../../fixtures/test";
 import { APPS, type App } from "../../fixtures/apps";
 import { mailpitUp, setupLink } from "../../fixtures/mailpit";
 import { must } from "../../fixtures/must";
+import { pickDateTime } from "../../fixtures/time";
 
 const app = (id: App["id"]) => must(APPS.find((a) => a.id === id));
 const open = async (browser: Browser, a: App, signedIn = true): Promise<Page> => {
@@ -46,7 +47,7 @@ test("HQ adds a contractor company and its first contractor, who signs in to the
     await main.getByRole("textbox", { name: /^Email/ }).fill(email);
     await main.getByRole("button", { name: "Contractor", exact: true }).last().click(); // the role, after the role filter
     await main.getByRole("combobox", { name: /^Organization/ }).selectOption({ label: company });
-    await main.getByLabel("Valid from").fill("2026-09-01T09:00"); // before the seed's demo clock
+    await pickDateTime(main.getByRole("group", { name: "Valid from" }), "2026-09-01T09:00"); // before the seed's demo clock
     await main.getByRole("textbox", { name: /^Change reason/ }).fill("E2E: the new company's first contractor");
     await main.getByRole("button", { name: "Create membership" }).click();
     await expect(admin.getByText("Membership created").first()).toBeVisible();

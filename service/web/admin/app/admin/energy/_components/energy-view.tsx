@@ -11,6 +11,7 @@ import { focusField } from "@ac/web/lib/focusField";
 import { saveBaseline } from "../actions";
 import { keysOf } from "@ac/web/lib/keysOf";
 import { Icon } from "@ac/web/components/Icon";
+import { DateTimeSelect } from "@ac/web/components/TimeSelect";
 
 interface UnitOption { id: string; label: string; customerId: string; propertyId: string }
 export interface EnergyLive {
@@ -64,8 +65,8 @@ function Analysis({ live, a }: Readonly<{ live: EnergyLive; a: NonNullable<Energ
         <div className="flex flex-wrap items-end gap-3">
           <Field label={t("Customer")}><Select value={live.scope.customerId ?? ""} onChange={(e) => { nav({ customerId: e.target.value || null, unitIds: null, baselineId: null }); }}><option value="">{t("All customers")}</option>{live.customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field>
           <Field label={t("Baseline")}><Select value={a.baselineId ?? ""} onChange={(e) => { nav({ baselineId: e.target.value || null, unitIds: null, from: null, to: null }); }}><option value="">{t("No baseline")}</option>{live.baselines.map((b) => <option key={b.id} value={b.id}>{b.id.slice(0, 8)} · {b.dates} · {b.value} · {b.units}</option>)}</Select></Field>
-          <Field label={t("From (Kuala Lumpur)")}><Input type="datetime-local" value={from} onChange={(e) => { setFrom(e.target.value); }} /></Field>
-          <Field label={t("To")}><Input type="datetime-local" value={to} onChange={(e) => { setTo(e.target.value); }} /></Field>
+          <Field label={t("From (Kuala Lumpur)")}><DateTimeSelect value={from} onChange={(v) => { setFrom(v); }} /></Field>
+          <Field label={t("To")}><DateTimeSelect value={to} onChange={(v) => { setTo(v); }} /></Field>
           <Btn size="sm" disabled={!from || !to || (from === a.from && to === a.to)} onClick={() => { nav({ from, to }); }}>{t("Apply period")}</Btn>
         </div>
         <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-[13px]">{units.map((u) => <Check key={u.id} label={u.label} checked={a.unitIds.includes(u.id)} onChange={(on) => { setUnits(on ? [...a.unitIds, u.id] : a.unitIds.filter((x) => x !== u.id)); }} />)}</div>
@@ -134,8 +135,8 @@ function Baselines({ live, l }: Readonly<{ live: EnergyLive; l: NonNullable<Ener
         <Field label={t("Customer")}><Select value={live.scope.customerId ?? ""} onChange={(e) => { nav({ customerId: e.target.value || null, propertyId: null, unitId: null, baselineId: null }); }}><option value="">{t("All customers")}</option>{live.customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field>
         <Field label={t("Property")}><Select value={live.scope.propertyId ?? ""} onChange={(e) => { nav({ propertyId: e.target.value || null, unitId: null, baselineId: null }); }}><option value="">{t("All properties")}</option>{props.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></Field>
         <Field label={t("Unit")}><Select value={live.scope.unitId ?? ""} onChange={(e) => { nav({ unitId: e.target.value || null, baselineId: null }); }}><option value="">{t("All units")}</option>{scopeUnits.map((u) => <option key={u.id} value={u.id}>{u.label}</option>)}</Select></Field>
-        <Field label={t("Period starts from (Kuala Lumpur)")}><Input type="datetime-local" value={from} onChange={(e) => { setFrom(e.target.value); }} /></Field>
-        <Field label={t("Period starts before")}><Input type="datetime-local" value={to} onChange={(e) => { setTo(e.target.value); }} /></Field>
+        <Field label={t("Period starts from (Kuala Lumpur)")}><DateTimeSelect value={from} onChange={(v) => { setFrom(v); }} /></Field>
+        <Field label={t("Period starts before")}><DateTimeSelect value={to} onChange={(v) => { setTo(v); }} /></Field>
         <Btn size="sm" disabled={from === l.from && to === l.to} onClick={() => { nav({ from: from || null, to: to || null, baselineId: null }); }}>{t("Apply")}</Btn>
         <span className="ml-auto pb-2 text-xs text-muted-foreground">{t(l.rows.length === 1 ? "1 baseline in scope" : "{n} baselines in scope", { n: l.rows.length })}</span>
       </div>
@@ -149,8 +150,8 @@ function Baselines({ live, l }: Readonly<{ live: EnergyLive; l: NonNullable<Ener
             <div className="flex flex-col gap-4">
               <section><h3 className="mb-1 text-[13px] font-bold">{t("Units · the same set is required for comparison")}</h3><div id={ids.unitIds} className="flex flex-wrap gap-x-5 gap-y-1.5 text-[13px]">{live.units.map((u) => <Check key={u.id} label={u.label} checked={d.unitIds.includes(u.id)} onChange={(on) => { set({ unitIds: on ? [...d.unitIds, u.id] : d.unitIds.filter((x) => x !== u.id) }); }} />)}</div>{fieldError("unitIds") && <p className="mt-1 text-xs text-crit">{fieldError("unitIds")}</p>}</section>
               <section className="grid-fluid" style={{ ["--min" as string]: "190px" }}>
-                <Field label={t("Period from (Kuala Lumpur)")} error={fieldError("period")}><Input id={ids.period} type="datetime-local" value={d.from} onChange={(e) => { set({ from: e.target.value }); }} /></Field>
-                <Field label={t("Period to")} hint={t("Up to 366 days")}><Input type="datetime-local" value={d.to} onChange={(e) => { set({ to: e.target.value }); }} /></Field>
+                <Field label={t("Period from (Kuala Lumpur)")} error={fieldError("period")}><DateTimeSelect id={ids.period} value={d.from} onChange={(v) => { set({ from: v }); }} /></Field>
+                <Field label={t("Period to")} hint={t("Up to 366 days")}><DateTimeSelect value={d.to} onChange={(v) => { set({ to: v }); }} /></Field>
               </section>
               <Field label={t("Method")}><Choice value={d.method} onChange={(v) => { set({ method: v }); }} options={[{ id: "demo_fixed" as const, label: `demo_fixed · ${t("entered value")}` }, { id: "demo_period_comparison" as const, label: `demo_period_comparison · ${t("measured")}` }]} /></Field>
               {d.method === DEMO_FIXED ? <div className="max-w-xs"><Field label={t("Baseline energy (kWh)")} error={fieldError("baselineKWh")} hint={t("Fictional demo value · ≥ 0 · not used for the demo period comparison")}><Input id={ids.baselineKWh} type="number" min="0" step="0.1" value={d.baselineKWh} onChange={(e) => { set({ baselineKWh: e.target.value }); }} /></Field></div> : <p className="text-xs text-muted-foreground">{t("Measured from the period’s readings when saved; no value is entered.")}</p>}
