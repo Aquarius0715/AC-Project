@@ -60,7 +60,7 @@ export function TechDevicesView({ live }: Readonly<{ live: TechDevicesLive }>) {
     setErrors(Object.fromEntries(Object.entries(f.fieldErrors).map(([k, v]) => [k, deviceFieldText(v, t)])));
     setRefused(deviceRefusal(f, t));
   };
-  const ok = (after?: () => void) => () => { setRefused(null); close(); after?.(); };
+  const ok = () => () => { setRefused(null); close(); };
   const isBusy = !!dv?.detail.activeOperation;
   useEffect(() => { // an operation starts on the scheduler and finishes with the device's answer or at its deadline (IR67)
     const t = isBusy ? setInterval(() => { router.refresh(); }, 4000) : null;

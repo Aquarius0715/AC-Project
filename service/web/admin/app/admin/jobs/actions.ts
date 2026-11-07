@@ -107,9 +107,9 @@ export async function createJob(input: { unitId: string; type: OpInput<"jobs.cre
 }
 
 type Failure = { ok: false } & ActionFailure;
-const failure = (e: unknown, conflictRefresh = true): Failure => {
+const failure = (e: unknown): Failure => {
   if (e instanceof CoreError) {
-    if (conflictRefresh && e.error.code === "CONFLICT") refresh();
+    if (e.error.code === "CONFLICT") refresh();
     return { ok: false, code: e.error.code, messageKey: e.error.messageKey, fieldErrors: e.error.fieldErrors, retryAfterSeconds: e.error.retryAfterSeconds };
   }
   throw e;

@@ -11,12 +11,12 @@ import { Button } from "@ac/web/components/ui/button";
 interface Step { label: string; time: string | null; action: string }
 interface Auto { id: string; name: string; kind: string; icon: IconName; when: string; steps: Step[]; unit: string; note?: string; on: boolean }
 const start = (time: string, action: string): Step => ({ label: "Start", time, action });
-const end = (time: string, action: string): Step => ({ label: "End", time, action });
+const end = (time: string): Step => ({ label: "End", time, action: "Power OFF" });
 const then = (action: string): Step[] => [{ label: "Then", time: null, action }];
 const seed: Auto[] = [
-  { id: "a1", name: "Weekday pre-cool", kind: "Schedule", icon: "schedule", when: "Mon, Wed at 18:00 (Asia/Kuala_Lumpur)", steps: [start("18:00", "Set temperature 25°C"), end("22:00", "Power OFF")], unit: "Bedroom AC · Home A › 1F › Bedroom · next run Mon Sep 28 18:00", on: true },
+  { id: "a1", name: "Weekday pre-cool", kind: "Schedule", icon: "schedule", when: "Mon, Wed at 18:00 (Asia/Kuala_Lumpur)", steps: [start("18:00", "Set temperature 25°C"), end("22:00")], unit: "Bedroom AC · Home A › 1F › Bedroom · next run Mon Sep 28 18:00", on: true },
   { id: "a2", name: "Away power-save", kind: "Location", icon: "location", when: "Everyone leaves Home A (departure event)", steps: then("Set temperature 28°C"), unit: "Living room AC · Home A › 1F", on: true },
-  { id: "a3", name: "Night comfort", kind: "Schedule", icon: "schedule", when: "Every day 23:00 → 06:00 next day (overnight)", steps: [start("23:00", "Set temperature 26°C, fan Low"), end("06:00 next day", "Power OFF")], unit: "Bedroom AC #2 · next run tonight 23:00", on: true },
+  { id: "a3", name: "Night comfort", kind: "Schedule", icon: "schedule", when: "Every day 23:00 → 06:00 next day (overnight)", steps: [start("23:00", "Set temperature 26°C, fan Low"), end("06:00 next day")], unit: "Bedroom AC #2 · next run tonight 23:00", on: true },
   { id: "a4", name: "Room empty stop", kind: "Presence", icon: "presence", when: "No one detected for 30 min (demo occupancy)", steps: then("Power OFF"), unit: "Study AC · Home A › 2F", note: "Last evaluation skipped 08:30 — occupancy data missing (never counted as a match)", on: true },
   { id: "a5", name: "Hot afternoon pre-cool", kind: "Weather", icon: "weather", when: "Outdoor temperature ≥ 33°C (demo weather) · Only if: weekday", steps: then("Set temperature 24°C"), unit: "Living room AC", on: false },
   { id: "a6", name: "Vacation mode", kind: "Location", icon: "location", when: "Arrival at Home A", steps: then("Set temperature 25°C"), unit: BEDROOM_AC, on: false },
@@ -42,7 +42,7 @@ export function AutomationsDemo() {
     setError(e); if (Object.keys(e).length === 0) setStep("review");
   };
   const save = () => {
-    if (edit === "new") setList((l) => [...l, { id: `n${String(Date.now())}`, name: f.name, kind: f.kind, icon: f.kind === "Location" ? "location" : "schedule", when: f.kind === "Schedule" ? "Every day at " + f.time : "Arrival at Home A", steps: f.kind === "Schedule" ? [start(f.time, `Set temperature ${f.temp}°C`), end("22:00", "Power OFF")] : then(`Set temperature ${f.temp}°C`), unit: f.unit, on: true }]);
+    if (edit === "new") setList((l) => [...l, { id: `n${String(Date.now())}`, name: f.name, kind: f.kind, icon: f.kind === "Location" ? "location" : "schedule", when: f.kind === "Schedule" ? "Every day at " + f.time : "Arrival at Home A", steps: f.kind === "Schedule" ? [start(f.time, `Set temperature ${f.temp}°C`), end("22:00")] : then(`Set temperature ${f.temp}°C`), unit: f.unit, on: true }]);
     else if (edit) setList((l) => l.map((x) => (x.id === edit.id ? { ...x, name: f.name, steps: x.steps.map((st, i) => (i === 0 ? { ...st, action: `Set temperature ${f.temp}°C` } : st)), unit: f.unit } : x)));
     toast("Automation saved"); setEdit(null);
   };

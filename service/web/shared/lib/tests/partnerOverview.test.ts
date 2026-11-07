@@ -21,7 +21,7 @@ const TEXT_2026_09_21T01_00_00Z = "2026-09-21T01:00:00Z";
 const NOW = "2026-09-21T01:30:00Z"; // Mon 09:30 in Kuala Lumpur
 const now = Date.parse(NOW);
 const slot = (s: string, e: string) => ({ startAt: s, endAt: e });
-const offer = (id: string, status: "offered" | "accepted", exp = TEXT_2026_09_21T17_00_00Z): ApiPartnerJob => ({ projection: "offer", jobId: id, jobVersion: 2, offerId: `o-${id}`, type: "reactive", siteAddress: "Jalan 1, KL", requestedSlot: slot("2026-09-22T01:00:00Z", "2026-09-22T03:00:00Z"), dueAt: "2026-09-24T10:00:00Z", offerExpiresAt: exp, visitSlot: slot("2026-09-22T01:00:00Z", "2026-09-22T03:00:00Z"), status });
+const offer = (id: string, status: "offered" | "accepted"): ApiPartnerJob => ({ projection: "offer", jobId: id, jobVersion: 2, offerId: `o-${id}`, type: "reactive", siteAddress: "Jalan 1, KL", requestedSlot: slot("2026-09-22T01:00:00Z", "2026-09-22T03:00:00Z"), dueAt: "2026-09-24T10:00:00Z", offerExpiresAt: TEXT_2026_09_21T17_00_00Z, visitSlot: slot("2026-09-22T01:00:00Z", "2026-09-22T03:00:00Z"), status });
 const summary = (id: string, status: string, over: Partial<Extract<ApiPartnerJob, { projection: "summary" }>> = {}): ApiPartnerJob => ({ projection: "summary", id, eventSummary: { count: 0, customerVisible: 0, notes: 0, latest: null }, version: 3, unitId: `u-${id}`, type: "periodic", status, dueAt: "2026-09-25T00:00:00Z", requestedSlot: slot(TEXT_2026_09_21T02_00_00Z, TEXT_2026_09_21T04_00_00Z), scheduledSlot: null, assignmentId: null, displayStatus: status, technicianMembershipId: null, ...over });
 const members: ApiMember[] = [
   { id: "m-a", userId: "user-a", displayName: TECH_EXTERNAL_A, role: TECHNICIAN, qualifications: [{ code: "demo_refrigerant", revokedAt: null }] },

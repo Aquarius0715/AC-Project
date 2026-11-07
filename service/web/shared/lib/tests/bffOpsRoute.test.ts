@@ -51,8 +51,8 @@ const note = (bytes: number) => {
 
 describe("the relay's input limit", () => {
   const same = { origin: "http://localhost:3000", host: LOCALHOST_3000, "sec-fetch-site": "same-origin" };
-  const post = (body: BodyInit, headers: Record<string, string> = same) => {
-    const init = { method: "POST", duplex: "half" as const, headers, body };
+  const post = (body: BodyInit) => {
+    const init = { method: "POST", duplex: "half" as const, headers: same, body };
     return POST(new NextRequest("http://localhost:3000/bff/ops/jobs.addNote", init), { params: Promise.resolve({ operation: "jobs.addNote" }) });
   };
 
