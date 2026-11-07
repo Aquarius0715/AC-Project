@@ -423,7 +423,7 @@ func (v equipmentView) restrictionTarget(
 	return targetOut{caps, found}, err
 }
 
-func (v equipmentView) observation(
+func (equipmentView) observation(
 	ctx context.Context,
 	c *ops.Call,
 	in *unitIn,
@@ -521,7 +521,7 @@ func (v maintenanceView) RateAt(
 
 // AddJobNote is a write into maintenance: billing publishes JobNoteRequested and maintenance's consumer adds the note
 // and its note.added event (IR193).
-func (v maintenanceView) AddJobNote(
+func (maintenanceView) AddJobNote(
 	ctx context.Context,
 	call *ops.Call,
 	job uuid.UUID,

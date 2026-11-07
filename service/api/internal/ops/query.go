@@ -144,7 +144,9 @@ func Ask[O any]( //nolint:ireturn // O is the query's own result type, chosen by
 			return out, apperr.Wrap(err, "json.Marshal")
 		}
 
-		return out, apperr.Wrap(json.Unmarshal(encoded, &out), "json.Unmarshal")
+		err = apperr.Wrap(json.Unmarshal(encoded, &out), "json.Unmarshal")
+
+		return out, err
 	}
 
 	if reg.Remote == nil {
@@ -156,7 +158,9 @@ func Ask[O any]( //nolint:ireturn // O is the query's own result type, chosen by
 		return out, apperr.Wrap(err, "ops.QueryTransport.Query")
 	}
 
-	return out, apperr.Wrap(json.Unmarshal(body, &out), "json.Unmarshal")
+	err = apperr.Wrap(json.Unmarshal(body, &out), "json.Unmarshal")
+
+	return out, err
 }
 
 // findQuery returns the registered query name of reg and its input as JSON.

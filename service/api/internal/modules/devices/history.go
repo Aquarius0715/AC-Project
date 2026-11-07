@@ -382,7 +382,7 @@ const evFrom = ` FROM devices.device_events e LEFT JOIN devices.device_bindings 
 	b.bound_at <= e.occurred_at
 	AND (b.unbound_at IS NULL OR b.unbound_at > e.occurred_at)`
 
-func (m *Module) scanEvent(_ context.Context, _ *ops.Call) func(pgx.Row) (DeviceEvent, error) {
+func (*Module) scanEvent(_ context.Context, _ *ops.Call) func(pgx.Row) (DeviceEvent, error) {
 	return func(r pgx.Row) (DeviceEvent, error) {
 		var deviceEvent DeviceEvent
 
@@ -419,7 +419,7 @@ type jsonRaw []byte
 func (j jsonRaw) MarshalJSON() ([]byte, error) { return j, nil }
 
 // withNotes reads the response notes of a page of events in one query, not one per event (IR497).
-func (m *Module) withNotes(ctx context.Context, call *ops.Call, evs []DeviceEvent) error {
+func (*Module) withNotes(ctx context.Context, call *ops.Call, evs []DeviceEvent) error {
 	if len(evs) == 0 {
 		return nil
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
@@ -66,7 +67,7 @@ func (r Replica) handle(ctx context.Context, txn pgx.Tx, e Event) error {
 		return apperr.Wrap(err, "delete (handle)")
 	}
 
-	all := append(append([]string{}, r.Keys...), r.Cols...)
+	all := slices.Concat(r.Keys, r.Cols)
 
 	set := make([]string, len(r.Cols))
 	for i, c := range r.Cols {

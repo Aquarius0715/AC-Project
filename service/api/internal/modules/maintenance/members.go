@@ -27,7 +27,7 @@ type Workforce struct {
 
 // technicians lists the active technician memberships the caller may plan (HQ: all, internal only when internalOnly;
 // contractor: own).
-func (m Workforce) technicians(
+func (Workforce) technicians(
 	ctx context.Context,
 	call *ops.Call,
 	internalOnly bool,
@@ -175,10 +175,10 @@ func pageOf[T any](all []T, q paging.Query, hashOf any, scopeVersion int) (pagin
 
 func klDates(from, to time.Time) (string, string) {
 	return from.In(kualaLumpur).
-			Format("2006-01-02"),
+			Format(time.DateOnly),
 		to.Add(-time.Nanosecond).
 			In(kualaLumpur).
-			Format("2006-01-02")
+			Format(time.DateOnly)
 }
 
 // unavailable reports whether a membership (or its whole organization) is unavailable on any date in [d1, d2].
@@ -362,7 +362,7 @@ type CapacityInput struct {
 
 // Validate implements ops.Validator.
 func (in *CapacityInput) Validate() map[string]string {
-	_, err := time.ParseInLocation("2006-01-02", in.Date, kualaLumpur)
+	_, err := time.ParseInLocation(time.DateOnly, in.Date, kualaLumpur)
 	if err != nil {
 		return map[string]string{"date": apperr.KeyInvalid}
 	}
@@ -424,7 +424,7 @@ func (m Workforce) capacity(
 	call *ops.Call,
 	input *CapacityInput,
 ) (paging.Page[Capacity], error) {
-	day, _ := time.ParseInLocation("2006-01-02", input.Date, kualaLumpur)
+	day, _ := time.ParseInLocation(time.DateOnly, input.Date, kualaLumpur)
 	work := Slot{day.Add(workdayStart).UTC(), day.Add(workdayEnd).UTC()}
 	weekend := day.Weekday() == time.Saturday || day.Weekday() == time.Sunday
 
@@ -642,9 +642,9 @@ func validUnavailabilityType(value string) bool {
 // Validate implements ops.Validator.
 func (in *UnavailabilityInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
-	f, err1 := time.Parse("2006-01-02", in.From)
+	f, err1 := time.Parse(time.DateOnly, in.From)
 
-	t, err2 := time.Parse("2006-01-02", in.To)
+	t, err2 := time.Parse(time.DateOnly, in.To)
 	if err1 != nil || err2 != nil || t.Before(f) || t.Sub(f) > 30*24*time.Hour {
 		fieldErrs["to"] = apperr.KeyRange
 	}
@@ -802,8 +802,8 @@ func conflictingAssignments(
 	input *UnavailabilityInput,
 	org uuid.UUID,
 ) ([]uuid.UUID, error) {
-	f, _ := time.ParseInLocation("2006-01-02", input.From, kualaLumpur)
-	t, _ := time.ParseInLocation("2006-01-02", input.To, kualaLumpur)
+	f, _ := time.ParseInLocation(time.DateOnly, input.From, kualaLumpur)
+	t, _ := time.ParseInLocation(time.DateOnly, input.To, kualaLumpur)
 	stmt := `SELECT a.id FROM maintenance.assignments a JOIN maintenance.ref_memberships mb ON mb.id =
 		a.technician_membership_id
 		WHERE a.status = 'active' AND a.scheduled && tstzrange($1, $2) AND `
@@ -873,7 +873,7 @@ func scanUnavailability(row pgx.Row) (Unavailability, error) {
 		&unavailability.Note,
 		&unavailability.ConflictingAssignmentIDs,
 	)
-	unavailability.From, unavailability.To = first.Format("2006-01-02"), last.Format("2006-01-02")
+	unavailability.From, unavailability.To = first.Format(time.DateOnly), last.Format(time.DateOnly)
 
 	return unavailability, apperr.Wrap(err, "scan (scanUnavailability)")
 }
@@ -909,7 +909,7 @@ func scanUnavailability(row pgx.Row) (Unavailability, error) {
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/members/unavailability [get]
-func (m Workforce) unavailabilityList(
+func (Workforce) unavailabilityList(
 	ctx context.Context,
 	call *ops.Call,
 	query *paging.Query,
@@ -930,7 +930,7 @@ func (m Workforce) unavailabilityList(
 		}
 	}
 
-	args := []any{call.Now.In(kualaLumpur).Format("2006-01-02")}
+	args := []any{call.Now.In(kualaLumpur).Format(time.DateOnly)}
 	add := func(v any) string {
 		args = append(args, v)
 
@@ -1015,7 +1015,7 @@ func (in *ClearUnavailabilityInput) Validate() map[string]string {
 		fieldErrs["id"] = apperr.KeyRequired
 	}
 
-	_, err := time.Parse("2006-01-02", in.From)
+	_, err := time.Parse(time.DateOnly, in.From)
 	if err != nil {
 		fieldErrs[fieldFrom] = apperr.KeyInvalid
 	}
@@ -1061,7 +1061,7 @@ type UnavailabilityCleared struct {
 //	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/members/unavailability/{id}/clear [post]
-func (m Workforce) clearUnavailability(
+func (Workforce) clearUnavailability(
 	ctx context.Context,
 	call *ops.Call,
 	input *ClearUnavailabilityInput,
@@ -1086,7 +1086,7 @@ func (m Workforce) clearUnavailability(
 		return UnavailabilityCleared{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
-	if input.From < call.Now.In(kualaLumpur).Format("2006-01-02") ||
+	if input.From < call.Now.In(kualaLumpur).Format(time.DateOnly) ||
 		input.From > unavailability.To {
 		return UnavailabilityCleared{}, apperr.Fields(map[string]string{fieldFrom: apperr.KeyRange})
 	}
@@ -1122,10 +1122,10 @@ func (m Workforce) clearUnavailability(
 		return UnavailabilityCleared{ID: unavailability.ID, Remaining: nil}, nil
 	}
 
-	from, _ := time.Parse("2006-01-02", input.From)
+	from, _ := time.Parse(time.DateOnly, input.From)
 
 	unavailability.To, unavailability.Version, unavailability.UpdatedAt = from.AddDate(0, 0, -1).
-		Format("2006-01-02"),
+		Format(time.DateOnly),
 		unavailability.Version+1, call.Now
 
 	_, execErr := call.Tx.Exec(

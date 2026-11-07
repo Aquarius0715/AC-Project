@@ -20,7 +20,7 @@ import (
 // released at once, as completion releases assignments (DEC-73): the job goes back to the contractor (accepted) or,
 // for HQ's own delivery, to requested, keeping its agreed visit, and the people who assign get a job_update notice so
 // they choose another technician. A job already started keeps its assignment for HQ to handle.
-func (m Jobs) ReleaseEndedAccess(ctx context.Context, call *ops.Call) (int, error) {
+func (Jobs) ReleaseEndedAccess(ctx context.Context, call *ops.Call) (int, error) {
 	rows, err := call.Tx.Query(
 		ctx,
 		`SELECT a.id, a.job_id, j.contractor_org_id FROM maintenance.assignments a

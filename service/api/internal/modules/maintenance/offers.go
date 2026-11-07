@@ -105,7 +105,7 @@ func (r jobRow) current(c *ops.Call) error {
 // load locks a job for update like lock, without the version. A handler whose scope check needs the row checks the
 // scope first and the version after it (current), so a caller outside the scope gets NOT_FOUND / FORBIDDEN for any
 // version and learns nothing of the job (IR366).
-func (m Delivery) load(ctx context.Context, call *ops.Call, jobID uuid.UUID) (jobRow, error) {
+func (Delivery) load(ctx context.Context, call *ops.Call, jobID uuid.UUID) (jobRow, error) {
 	var (
 		job                  jobRow
 		pref                 []byte
@@ -142,7 +142,7 @@ func (m Delivery) load(ctx context.Context, call *ops.Call, jobID uuid.UUID) (jo
 func sameSlot(a, b Slot) bool { return a.StartAt.Equal(b.StartAt) && a.EndAt.Equal(b.EndAt) }
 
 // agreed reports whether a slot is an agreed slot of the job (IR113 item 3).
-func (m Delivery) agreed(
+func (Delivery) agreed(
 	ctx context.Context,
 	call *ops.Call,
 	jobID uuid.UUID,

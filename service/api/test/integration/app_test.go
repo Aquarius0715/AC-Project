@@ -364,7 +364,7 @@ func TestUnitsListScopes(t *testing.T) {
 			seed.ID("unit-offline-rto").String(): powerUnknown,
 			seed.ID("unit-limited").String():     "on",
 		}
-		if w, ok := want[unit["id"].(string)]; ok && unit["effectivePowerState"] != w {
+		if w, ok := want[asStr(t, unit["id"])]; ok && unit["effectivePowerState"] != w {
 			t.Fatalf("%v: power %v want %s", unit["displayName"], unit["effectivePowerState"], w)
 		}
 	}

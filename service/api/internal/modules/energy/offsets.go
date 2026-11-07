@@ -402,7 +402,9 @@ func loadRecord(ctx context.Context, call *ops.Call, id uuid.UUID, lock bool) (R
 		return record, err
 	}
 
-	return record, decorateRecord(ctx, call, &record)
+	err = decorateRecord(ctx, call, &record)
+
+	return record, err
 }
 
 // recordFilter is the filters of offsetRecords.list.

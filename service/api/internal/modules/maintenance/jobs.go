@@ -612,7 +612,7 @@ func insertRequest(
 	return jobID, apperr.Wrap(err, "insert maintenance.jobs")
 }
 
-func (m Jobs) event(
+func (Jobs) event(
 	ctx context.Context,
 	call *ops.Call,
 	job uuid.UUID,
@@ -717,7 +717,9 @@ func (m Jobs) load(
 		return job, err
 	}
 
-	return job, m.project(ctx, call, &job)
+	err = m.project(ctx, call, &job)
+
+	return job, err
 }
 
 // detailExtras reads what JobDetail adds to the job's row: the slot proposal, the assignment, the contractor's time
@@ -867,7 +869,7 @@ type OfferView struct {
 }
 
 // project applies the IR42 role projections (and IR127 item 7: the current Offer) to a JobDetail.
-func (m Jobs) project(ctx context.Context, call *ops.Call, job *Job) error {
+func (Jobs) project(ctx context.Context, call *ops.Call, job *Job) error {
 	role := call.Principal.Role
 	if role == roleAdmin || role == roleContractor {
 		err := currentOffer(ctx, call, job)
@@ -1015,7 +1017,7 @@ func technicianName(ctx context.Context, call *ops.Call, assignment *Assignment)
 
 // pendingOrLastProposal is the job's pending slot proposal, or else its latest one; found is false for a job without
 // one.
-func (m Jobs) pendingOrLastProposal(
+func (Jobs) pendingOrLastProposal(
 	ctx context.Context,
 	c *ops.Call,
 	job uuid.UUID,
@@ -1061,7 +1063,7 @@ func (m Jobs) shownAssignment(
 }
 
 // assignmentWhere is the job's Assignment that meets cond; found is false when none does.
-func (m Jobs) assignmentWhere(
+func (Jobs) assignmentWhere(
 	ctx context.Context,
 	call *ops.Call,
 	job uuid.UUID,
@@ -2224,7 +2226,7 @@ func eventsWhere(
 }
 
 // eventRows loads JobEvents (with their notes) matching where.
-func (m Jobs) eventRows(
+func (Jobs) eventRows(
 	ctx context.Context,
 	call *ops.Call,
 	where string,
@@ -2322,7 +2324,7 @@ func scanEvent(rows pgx.Rows) (Event, error) {
 // ---- state changes ----
 
 // lockJob loads a job in scope for update and checks the expected version.
-func (m Jobs) lockJob(ctx context.Context, call *ops.Call, id uuid.UUID) (string, error) {
+func (Jobs) lockJob(ctx context.Context, call *ops.Call, id uuid.UUID) (string, error) {
 	args := []any{id}
 
 	var (

@@ -270,7 +270,7 @@ func ensureLogins(ctx context.Context, conn *pgx.Conn, password string) error {
 		return apperr.Wrap(err, "migrate.EnsureLogin")
 	}
 
-	log.Printf("migrate: login role ac_app_login ready")
+	log.Print("migrate: login role ac_app_login ready")
 
 	for _, domain := range []string{"identity", "equipment", "maintenance", "billing", "energy"} {
 		err := migrate.EnsureLogin(
@@ -285,7 +285,7 @@ func ensureLogins(ctx context.Context, conn *pgx.Conn, password string) error {
 		}
 	}
 
-	log.Printf("migrate: domain service logins ready")
+	log.Print("migrate: domain service logins ready")
 
 	return nil
 }
@@ -309,7 +309,7 @@ func seedFixture(
 	}
 
 	if done {
-		log.Printf("migrate: fixture already loaded")
+		log.Print("migrate: fixture already loaded")
 
 		return fixture, nil
 	}

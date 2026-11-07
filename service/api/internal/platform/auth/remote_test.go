@@ -64,6 +64,8 @@ func (f *fakeIdentity) ServeHTTP(writer http.ResponseWriter, req *http.Request) 
 	})
 	if err != nil {
 		http.Error(writer, err.Error(), http.StatusInternalServerError)
+
+		return
 	}
 }
 

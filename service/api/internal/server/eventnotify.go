@@ -72,7 +72,7 @@ func members(ctx context.Context, c *ops.Call, f identity.MembersInput) ([]uuid.
 	return ops.Query[[]uuid.UUID](ctx, c, identity.QueryMembers, f)
 }
 
-func (r notifyingRecorder) clients(
+func (notifyingRecorder) clients(
 	ctx context.Context,
 	c *ops.Call,
 	org uuid.UUID,
@@ -90,7 +90,7 @@ func (r notifyingRecorder) clients(
 	)
 }
 
-func (r notifyingRecorder) hq(ctx context.Context, c *ops.Call, perm string) ([]uuid.UUID, error) {
+func (notifyingRecorder) hq(ctx context.Context, c *ops.Call, perm string) ([]uuid.UUID, error) {
 	return members(
 		ctx,
 		c,
@@ -104,7 +104,7 @@ func (r notifyingRecorder) hq(ctx context.Context, c *ops.Call, perm string) ([]
 	)
 }
 
-func (r notifyingRecorder) partners(
+func (notifyingRecorder) partners(
 	ctx context.Context,
 	call *ops.Call,
 	org *uuid.UUID,
@@ -127,7 +127,7 @@ func (r notifyingRecorder) partners(
 	)
 }
 
-func (r notifyingRecorder) technician(
+func (notifyingRecorder) technician(
 	ctx context.Context,
 	call *ops.Call,
 	job uuid.UUID,

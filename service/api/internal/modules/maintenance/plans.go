@@ -81,7 +81,7 @@ func scanPlan(row pgx.Row) (Plan, error) {
 }
 
 // occurrences reads the jobs generated for the plans in one query, not one per plan (IR497).
-func (m Plans) occurrences(ctx context.Context, call *ops.Call, plans []Plan) error {
+func (Plans) occurrences(ctx context.Context, call *ops.Call, plans []Plan) error {
 	if len(plans) == 0 {
 		return nil
 	}

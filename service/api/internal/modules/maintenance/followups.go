@@ -63,7 +63,7 @@ type jobState struct {
 	claims      []byte
 }
 
-func (m FollowUps) lock(ctx context.Context, call *ops.Call, jobID uuid.UUID) (jobState, error) {
+func (FollowUps) lock(ctx context.Context, call *ops.Call, jobID uuid.UUID) (jobState, error) {
 	var (
 		state   jobState
 		version int
@@ -89,7 +89,7 @@ func (m FollowUps) lock(ctx context.Context, call *ops.Call, jobID uuid.UUID) (j
 	return state, nil
 }
 
-func (m FollowUps) bump(
+func (FollowUps) bump(
 	ctx context.Context,
 	call *ops.Call,
 	jobID uuid.UUID,

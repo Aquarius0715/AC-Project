@@ -174,7 +174,7 @@ func (r *RemoteSource) fetch(
 		ctx,
 		http.MethodGet,
 		r.BaseURL+PrincipalPath+"?"+params.Encode(),
-		nil,
+		http.NoBody,
 	)
 	if err != nil {
 		return nil, apperr.Wrap(err, "http.NewRequestWithContext")

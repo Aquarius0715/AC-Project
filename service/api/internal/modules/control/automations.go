@@ -162,7 +162,7 @@ func scanAutomation(row pgx.Row) (Automation, error) {
 	return automation, nil
 }
 
-func (m Automations) load(
+func (Automations) load(
 	ctx context.Context,
 	call *ops.Call,
 	automationID uuid.UUID,
@@ -267,7 +267,7 @@ func (filter automationFilter) where(call *ops.Call) (string, []any) {
 //	@Failure		504		{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/automations [get]
-func (m Automations) list(
+func (Automations) list(
 	ctx context.Context,
 	call *ops.Call,
 	query *paging.Query,
@@ -498,7 +498,7 @@ func validWeather(metric, operator string, value float64) bool {
 		value <= maxWeatherCelsius
 }
 
-var hhmm = regexp.MustCompile(`^([01][0-9]|2[0-3]):[0-5][0-9]$`)
+var hhmm = regexp.MustCompile(`^([01]\d|2[0-3]):[0-5]\d$`)
 
 // condition is the customer automation Condition subset (DD-C05): occupancy, location, pattern, weather.
 type condition struct {

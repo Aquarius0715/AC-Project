@@ -155,7 +155,7 @@ func deviceScope(call *ops.Call, args *[]any, mode unitscope.Mode) string {
 	) + "))"
 }
 
-func (m *Module) load(
+func (*Module) load(
 	ctx context.Context,
 	call *ops.Call,
 	where string,

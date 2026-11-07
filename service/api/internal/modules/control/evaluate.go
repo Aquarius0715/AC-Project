@@ -474,7 +474,7 @@ func (m Automations) Notify(
 	return out, nil
 }
 
-func (m Automations) candidates(
+func (Automations) candidates(
 	ctx context.Context,
 	call *ops.Call,
 	unit uuid.UUID,

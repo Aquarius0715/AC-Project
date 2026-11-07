@@ -195,7 +195,7 @@ func validProfile(profile string) bool {
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/customers [get]
-func (m *Module) customersList(
+func (*Module) customersList(
 	ctx context.Context,
 	call *ops.Call,
 	query *paging.Query,
@@ -375,7 +375,7 @@ func (m *Module) customersSave(
 }
 
 // addCustomer creates the customer of an organization; one the organization has already is a conflict (23505).
-func (m *Module) addCustomer(
+func (*Module) addCustomer(
 	ctx context.Context,
 	call *ops.Call,
 	input *CustomerSave,
@@ -482,7 +482,7 @@ func (m *Module) canDeactivate(ctx context.Context, call *ops.Call, org uuid.UUI
 //	@Failure		504			{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/properties [get]
-func (m *Module) propertiesList(
+func (*Module) propertiesList(
 	ctx context.Context,
 	call *ops.Call,
 	query *paging.Query,
@@ -566,7 +566,7 @@ func (m *Module) propertiesList(
 //	@Failure		504			{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/spaces [get]
-func (m *Module) spacesList(
+func (*Module) spacesList(
 	ctx context.Context,
 	call *ops.Call,
 	query *paging.Query,

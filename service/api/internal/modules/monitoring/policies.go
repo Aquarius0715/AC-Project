@@ -1063,7 +1063,7 @@ func intersect(ids, others []uuid.UUID) []uuid.UUID {
 	return out
 }
 
-func (m Policies) automationPolicies(
+func (Policies) automationPolicies(
 	ctx context.Context,
 	call *ops.Call,
 	enabled *bool,

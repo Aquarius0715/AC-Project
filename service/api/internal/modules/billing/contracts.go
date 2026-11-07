@@ -254,7 +254,9 @@ func (m Billing) loadContract(
 		return contract, err
 	}
 
-	return contract, m.decorate(ctx, call, &contract)
+	err = m.decorate(ctx, call, &contract)
+
+	return contract, err
 }
 
 // listContracts serves contracts.list.
@@ -993,7 +995,7 @@ func nextInvoiceSeq(ctx context.Context, call *ops.Call) (int, error) {
 	return seq, nil
 }
 
-func (m Billing) loadInvoice(
+func (Billing) loadInvoice(
 	ctx context.Context,
 	call *ops.Call,
 	invoiceID uuid.UUID,

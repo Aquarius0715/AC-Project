@@ -404,7 +404,9 @@ func load(
 		return restriction, err
 	}
 
-	return restriction, decorate(ctx, call, &restriction)
+	err = decorate(ctx, call, &restriction)
+
+	return restriction, err
 }
 
 // GetInput is restrictions.get input.
@@ -445,7 +447,7 @@ func (in *GetInput) Validate() map[string]string {
 //	@Failure		504	{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/restrictions/{id} [get]
-func (m Restrictions) get(ctx context.Context, call *ops.Call, in *GetInput) (any, error) {
+func (Restrictions) get(ctx context.Context, call *ops.Call, in *GetInput) (any, error) {
 	x, err := load(ctx, call, in.ID, false)
 	if err != nil {
 		return nil, err
@@ -503,7 +505,7 @@ func listWhere(filter listFilter) (string, []any) {
 	return strings.Join(conds, " AND "), args
 }
 
-func (m Restrictions) query(
+func (Restrictions) query(
 	ctx context.Context,
 	call *ops.Call,
 	query paging.Query,

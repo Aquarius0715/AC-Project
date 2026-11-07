@@ -334,7 +334,7 @@ func (in *RunIDInput) Validate() map[string]string {
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/diagnostic-runs/{diagnosticRunId} [get]
-func (m Diagnostics) get(ctx context.Context, call *ops.Call, in *RunIDInput) (Run, error) {
+func (Diagnostics) get(ctx context.Context, call *ops.Call, in *RunIDInput) (Run, error) {
 	run, err := scanRun(
 		call.Tx.QueryRow(
 			ctx,
@@ -406,7 +406,7 @@ func (in *RunListInput) Validate() map[string]string {
 //	@Failure		504		{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/diagnostic-runs [get]
-func (m Diagnostics) list(
+func (Diagnostics) list(
 	ctx context.Context,
 	call *ops.Call,
 	input *RunListInput,

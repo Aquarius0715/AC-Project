@@ -300,7 +300,7 @@ func scanReport(row pgx.Row) (Report, error) {
 }
 
 // decorate adds attachments, review history and the caller's review availability.
-func (m Reports) decorate(ctx context.Context, call *ops.Call, report *Report) error {
+func (Reports) decorate(ctx context.Context, call *ops.Call, report *Report) error {
 	err := attachmentRefs(ctx, call, report)
 	if err != nil {
 		return err
@@ -640,7 +640,7 @@ func validateNextAction(nextAction *NextAction, fieldErrs map[string]string) {
 }
 
 // currentDraft reads the job's current draft and whether it has one.
-func (m Reports) currentDraft(
+func (Reports) currentDraft(
 	ctx context.Context,
 	call *ops.Call,
 	job uuid.UUID,
@@ -1141,7 +1141,9 @@ func (m Reports) load(
 		return report, err
 	}
 
-	return report, m.decorate(ctx, call, &report)
+	err = m.decorate(ctx, call, &report)
+
+	return report, err
 }
 
 // ---- jobs.submit ----
@@ -1513,7 +1515,7 @@ func submitErrors(report *Report, components []string, now time.Time) map[string
 	return fieldErrs
 }
 
-func (m Reports) reportEvent(
+func (Reports) reportEvent(
 	ctx context.Context,
 	call *ops.Call,
 	job uuid.UUID,

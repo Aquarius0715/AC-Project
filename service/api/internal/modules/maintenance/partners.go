@@ -134,7 +134,7 @@ func averageRating(stars, ratings int) float64 {
 }
 
 // kpis computes ContractorKpis for the 90 days ending now (IR131 item 6).
-func (m Partners) kpis(ctx context.Context, call *ops.Call, org uuid.UUID) (KPIs, error) {
+func (Partners) kpis(ctx context.Context, call *ops.Call, org uuid.UUID) (KPIs, error) {
 	kpIs := KPIs{
 		Period:            Range{call.Now.Add(-90 * 24 * time.Hour), call.Now},
 		OfferAcceptance:   nil,
@@ -984,7 +984,7 @@ const rateCols = `id, tenant_id, version, created_at, contractor_org_id, effecti
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/rate-cards [post]
-func (m Partners) saveRateCard(
+func (Partners) saveRateCard(
 	ctx context.Context,
 	call *ops.Call,
 	input *RateCardInput,
@@ -1070,7 +1070,7 @@ func (m Partners) saveRateCard(
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/rate-cards [get]
-func (m Partners) listRateCards(
+func (Partners) listRateCards(
 	ctx context.Context,
 	call *ops.Call,
 	query *paging.Query,
@@ -1271,7 +1271,7 @@ func (in *TargetsInput) Validate() map[string]string {
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/sla/targets/{planType} [put]
-func (m Partners) saveTargets(
+func (Partners) saveTargets(
 	ctx context.Context,
 	call *ops.Call,
 	input *TargetsInput,

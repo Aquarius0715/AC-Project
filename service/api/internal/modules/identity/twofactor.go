@@ -31,7 +31,7 @@ type TwoFactorEnabled struct {
 	RecoveryCodes []string `json:"recoveryCodes"`
 }
 
-var sixDigits = regexp.MustCompile(`^[0-9]{6}$`)
+var sixDigits = regexp.MustCompile(`^\d{6}$`)
 
 // recoveryCodeCount is how many recovery codes enabling shows once (IR112), and recoveryCodeBytes the random bytes of
 // each: ten hex digits, shown as two groups of five.

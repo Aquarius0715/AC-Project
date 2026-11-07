@@ -186,7 +186,7 @@ func scanStatement(r pgx.Row) (Statement, error) {
 	return statement, apperr.Wrap(err, "scan (scanStatement)")
 }
 
-func (m Payouts) fill(ctx context.Context, call *ops.Call, statement *Statement) error {
+func (Payouts) fill(ctx context.Context, call *ops.Call, statement *Statement) error {
 	lines, err := payoutLines(ctx, call, statement.ID)
 	if err != nil {
 		return err
@@ -304,7 +304,9 @@ func (m Payouts) load(
 		return statement, err
 	}
 
-	return statement, m.fill(ctx, call, &statement)
+	err = m.fill(ctx, call, &statement)
+
+	return statement, err
 }
 
 // ---- payouts.generate ----
@@ -845,8 +847,9 @@ func (m Payouts) transition(
 			call.Now,
 		)
 	default:
-		today := call.Now.In(kualaLumpur()).Format("2006-01-02")
-		if statement.Status != statementApproved || today < statement.PayDate.Format("2006-01-02") {
+		today := call.Now.In(kualaLumpur()).Format(time.DateOnly)
+		if statement.Status != statementApproved ||
+			today < statement.PayDate.Format(time.DateOnly) {
 			return statement, apperr.E(apperr.Conflict, "errors.not_payable_yet")
 		}
 

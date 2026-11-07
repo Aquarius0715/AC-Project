@@ -4,8 +4,10 @@
 package main
 
 import (
+	"os"
+
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/server"
 )
 
-func main() { server.Main("identity-api", ops.DomainIdentity) }
+func main() { os.Exit(server.Main("identity-api", ops.DomainIdentity)) }

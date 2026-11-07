@@ -38,6 +38,66 @@ linters:
         - w http.ResponseWriter
         - r *http.Request
         - tx pgx.Tx
+    # Round 3 (2026-11-07): the linters above ran at their default checks. These turn on every check of the ones that hold
+    # several, and switch off, with its reason, each check that repeats another linter or only states a preference.
+    govet:
+      enable-all: true
+      # the order of a struct's fields follows the domain (an ID first, the timestamps last); reordering them to save a few
+      # bytes of padding would scatter the fields that belong together
+      disable: [fieldalignment]
+    gocritic:
+      enable-all: true
+      # hugeParam and rangeValCopy are performance hints for copies of large values; the API passes input structs by value so
+      # a callee cannot change the caller's copy, and no profile has shown the copy to matter
+      # unnamedResult is revive's confusing-results (below)
+      disabled-checks: [hugeParam, rangeValCopy, unnamedResult]
+    errcheck:
+      # `x.(T)` without ok panics on a value of another type, so every assertion names its ok
+      check-type-assertions: true
+      # check-blank would list the 273 places where the code ignores an error on purpose: a deferred Close, the json of a column
+      # this module wrote itself, the ok of a claim that may be absent. Each says so with `_`; what errcheck finds without
+      # it is the error nobody looked at, and that is zero
+    revive:
+      enable-all-rules: true
+      rules:
+        # the size and complexity checks of revive are the ones of lll, cyclop, gocognit, funlen and goconst/mnd, which have
+        # their limits set above
+        - {name: line-length-limit, disabled: true}
+        - {name: add-constant, disabled: true}
+        - {name: cyclomatic, disabled: true}
+        - {name: cognitive-complexity, disabled: true}
+        - {name: function-length, disabled: true}
+        # errcheck reports an unchecked error, with the same options as above
+        - {name: unhandled-error, disabled: true}
+        # golines wraps a long if-init over lines (`if err := f(a,\n b); err != nil`); the check would ask to undo the wrapping
+        - {name: multiline-if-init, disabled: true}
+        # the domain files hold the contract types of one area together (inputs, rows, results) and the DTOs nest one level of
+        # anonymous struct where a name would only be used once
+        - {name: max-public-structs, disabled: true}
+        - {name: nested-structs, disabled: true}
+        # an exported function and the unexported helper it wraps share a name (History / history), and a request struct holds the
+        # JSON field and a derived one (condition / Condition); the case is what tells them apart in Go
+        - {name: confusing-naming, disabled: true}
+        # it asks for named results, which nonamedreturns (on) forbids
+        - {name: confusing-results, disabled: true}
+        # exhaustive checks that a switch on an enum names every value; a switch that has no default says nothing about the
+        # others on purpose, and one with a default keeps it last
+        - {name: enforce-switch-style, arguments: [allowNoDefault]}
+        # BoundDevice, the one function over four, answers with the device, its connection, its power signal and whether one is
+        # bound, plus the error; the Devices interface of two consumers shares it
+        - {name: function-result-limit, arguments: [5]}
+        # sort.Slice and sort.Strings are not deprecated (since Go 1.22 sort.Strings calls slices.Sort), and modernize, which
+        # proposes the Go team's rewrites, leaves them; turning a multi-key `less` into a three-way comparison is where a sort
+        # order breaks
+        - {name: use-slices-sort, disabled: true}
+        # the query builders of the lists take their filter fields one by one; ten is the most any takes
+        - {name: argument-limit, arguments: [10]}
+        # `v, _ := m[k].(string)` reads a field that may be absent (a claim, a JSON object of a column) and takes the zero value;
+        # the `_` says so, and an assertion that can panic is what check-type-assertions of errcheck reports
+        - {name: unchecked-type-assertion, arguments: [{acceptIgnoredAssertionResult: true}]}
+        # a bool parameter that selects a mode (`full bool`, `accountsOnly bool`) is clearer at the call site than two
+        # near-identical functions
+        - {name: flag-parameter, disabled: true}
     depguard:
       rules:
         main:
@@ -65,6 +125,20 @@ linters:
     godot:
       exclude:
         - "^ *@" # swag annotations (@Router, @Param …) are read by swag: a period would change the route
+    usestdlibvars:
+      time-month: true
+      time-layout: true
+      crypto-hash: true
+      default-rpc-path: true
+      sql-isolation-level: true
+      tls-signature-scheme: true
+      constant-kind: true
+    iface:
+      # the `unused` check (an interface no code of its own package uses) is left out: a package that provides the interface
+      # for its callers (blob.Store, taken by the modules) is the intended case
+      enable: [identical, opaque, unexported]
+    unparam:
+      check-exported: true
     nolintlint:
       require-explanation: true
       require-specific: true
@@ -76,6 +150,29 @@ linters:
       - linters:
           - lll
         source: '^\s*//\s*@Param\s'
+      # the code generators stop at the first error with its message (log.Fatal in the helpers that read a file or parse a
+      # catalog); no caller of a helper could do anything but print it and exit
+      - linters:
+          - revive
+        text: 'deep-exit'
+        path: ^cmd/gen/
+      # the tests compare decoded JSON (map[string]any) with true and false, which `!x` cannot express for an any
+      - linters:
+          - revive
+        text: 'bool-literal-in-expr'
+        path: (_test\.go|^test/)
+      # `if err := f(); err != nil` in a nested block is how Go code reports an error at every level, so `err` is shadowed by
+      # design (47 of the 50 shadows in the code). What shadowing an err can break, an assignment to the outer one that is never
+      # read, ineffassign and staticcheck's SA4006 report; the check stays on for every other name
+      - linters:
+          - govet
+        text: 'shadow: declaration of "err" shadows'
+      # a test case repeats `code, body := call(...)` in its own block, so each shadows the one of the block around it
+      # (272 of the 337 shadows); the shadow check stays on for the code itself
+      - linters:
+          - govet
+        text: 'shadow: declaration of'
+        path: (_test\.go|^test/)
       # a test reads as one scenario from its set-up to its assertions; cutting it up only to meet a size or complexity
       # limit hides its steps (CLAUDE.md, lint rules 4-2)
       - linters:

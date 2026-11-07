@@ -313,7 +313,7 @@ func reminderStage(expires, now time.Time) int {
 // goes for a certificate that waits for HQ, was rejected or has expired, that a valid renewal or a later valid
 // certificate of the same qualification replaced, or whose technician is no longer an active member. A pending renewal
 // does not stop the reminders: the current expiry applies until HQ verifies it.
-func (m Certificates) Remind(ctx context.Context, call *ops.Call) (int, error) {
+func (Certificates) Remind(ctx context.Context, call *ops.Call) (int, error) {
 	rows, err := call.Tx.Query(
 		ctx,
 		`SELECT c.id, c.organization_id, c.expires_at FROM maintenance.certificates c
@@ -452,7 +452,7 @@ func remindCertificate(
 	return true, nil
 }
 
-func (m Certificates) lock(
+func (Certificates) lock(
 	ctx context.Context,
 	call *ops.Call,
 	certificateID uuid.UUID,
@@ -489,7 +489,7 @@ func (m Certificates) lock(
 	return certificate, stored, nil
 }
 
-func (m Certificates) reload(ctx context.Context, c *ops.Call, id uuid.UUID) (Certificate, error) {
+func (Certificates) reload(ctx context.Context, c *ops.Call, id uuid.UUID) (Certificate, error) {
 	return scanCert(
 		c.Tx.QueryRow(ctx, "SELECT "+certCols+" FROM maintenance.certificates WHERE id = $1", id),
 		c.Now,
@@ -928,7 +928,7 @@ func (m Certificates) content(
 //	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/certificates [get]
-func (m Certificates) list(
+func (Certificates) list(
 	ctx context.Context,
 	call *ops.Call,
 	query *paging.Query,
@@ -1069,7 +1069,7 @@ func (filters certFilters) where(call *ops.Call, args *[]any) string {
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/parts [get]
-func (m Certificates) parts(
+func (Certificates) parts(
 	ctx context.Context,
 	call *ops.Call,
 	query *paging.Query,
