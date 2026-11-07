@@ -28,8 +28,6 @@ const config = [
   // - alert-policies restores state in a second afterEach that only the tests after it need; merging or moving it would
   //   run it for the tests before it too
   // - axe-core's guard has to live inside the function Playwright sends to the page
-  // - closing a context in finally becomes `await using` only once the suite shows that Playwright's TypeScript transform
-  //   accepts it (not tried here: no stack to run the specs); turn prefer-dispose back on for these files then
   {
     files: ["**/fixtures/auth.ts", "**/specs/technician/report-autosave.e2e.ts"],
     rules: { "playwright/no-wait-for-timeout": "off", "sonarjs/no-fixed-wait-in-tests": "off" },
@@ -47,11 +45,6 @@ const config = [
       "unicorn/prefer-uint8array-base64": "error",
       "unicorn/prefer-uint8array-hex": "error",
     },
-  },
-  // placed last: the Node built-ins block above turns prefer-dispose on for all files
-  {
-    files: ["**/specs/admin/overview.e2e.ts", "**/specs/shared/demo.e2e.ts", "**/specs/shared/session.e2e.ts"],
-    rules: { "unicorn/prefer-dispose": "off" },
   },
 ];
 

@@ -288,7 +288,9 @@ test("the notification preview and the demo test of a policy attached to a unit"
 
   // attach it on Bedroom AC's unit page, then back by the unit's Edit link (scoped to the customer and the unit)
   await page.goto("/admin/alerts");
-  await main.getByRole("button", { name: /Possible open window/ }).click();
+  // the alert of Demo Customer A's Bedroom AC, not the first one: once the live IoT unit of Demo Customer B has an alert of
+  // its own, the first one belongs to a customer this policy is not for
+  await main.getByRole("button", { name: /Possible open window.*Demo Customer A · Bedroom AC/ }).click();
   await main.getByRole("link", { name: "Open unit", exact: true }).click();
   await page.waitForURL(/unitId=/);
   await main.getByRole("button", { name: "Attach policy" }).click();
