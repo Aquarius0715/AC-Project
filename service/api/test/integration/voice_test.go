@@ -12,6 +12,7 @@ const (
 	formatCSV         = "csv"
 	intentHelp        = "help"
 	intentUnsupported = "unsupported"
+	intentChange      = "change"
 	monthAugust       = "2026-08"
 )
 
@@ -38,7 +39,7 @@ func TestVoiceAndExport(t *testing.T) {
 	}
 
 	code, res = say(customerA(), "set living room to 24 degrees", "en", "")
-	if code != 200 || data(res)["kind"] != "change" || asNum(t, data(res)["celsius"]) != 24 ||
+	if code != 200 || data(res)["kind"] != intentChange || asNum(t, data(res)["celsius"]) != 24 ||
 		data(res)["expectedVersion"] == nil ||
 		data(res)["unitId"] != seed.ID("unit-non-rto").String() {
 		t.Fatalf("change: %d %v", code, res)
@@ -49,8 +50,36 @@ func TestVoiceAndExport(t *testing.T) {
 		"tetapkan living room kepada 25 darjah",
 		"ms",
 		"",
-	); data(resp)["kind"] != "change" {
+	); data(resp)["kind"] != intentChange {
 		t.Errorf("ms change: %v", resp)
+	}
+
+	// the Japanese grammar (IR639): a room name keeps its own letters, the phrase around it is Japanese
+	if _, resp := say(
+		customerA(),
+		"living roomを25度に設定",
+		"ja",
+		"",
+	); data(resp)["kind"] != intentChange || asNum(t, data(resp)["celsius"]) != 25 {
+		t.Errorf("ja change: %v", resp)
+	}
+
+	if _, resp := say(
+		customerA(),
+		"温度 bedroom",
+		"ja",
+		"",
+	); data(resp)["kind"] != metricTemperature || data(resp)["unitId"] != bedroomA {
+		t.Errorf("ja temperature: %v", resp)
+	}
+
+	if _, resp := say(customerA(), "ヘルプ", "ja", ""); data(resp)["kind"] != intentHelp ||
+		data(resp)["messageKey"] != "voice.help" {
+		t.Errorf("ja help: %v", resp)
+	}
+
+	if _, m := say(customerA(), "help", "ja", ""); data(m)["kind"] != intentUnsupported {
+		t.Error("English help in Japanese grammar")
 	}
 
 	for text, kind := range map[string]string{

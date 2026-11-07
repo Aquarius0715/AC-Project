@@ -9,7 +9,7 @@ import { RadioGroup, RadioGroupItem } from "@ac/web/components/ui/radio-group";
 import { useI18n } from "./I18n";
 import { actionMessage } from "@ac/web/lib/actionMessage";
 import { candidateGroups, changeCard, examples, groupSummary, helpText, MICROPHONE, progressOf, roomOf, stateText, temperatureText, type CandidateGroup, type PanelState, type Progress, type ResolvedIntent } from "@ac/web/lib/assistant";
-import { translator, type Locale, type T } from "@ac/web/lib/i18n";
+import { LANGUAGE_NAMES, LOCALES, translator, type Locale, type T } from "@ac/web/lib/i18n";
 import { callOp, OpError } from "@ac/web/lib/ops";
 import { waitForCommand } from "@ac/web/lib/unitCommands";
 import { useStoredValue } from "@ac/web/lib/urlState";
@@ -58,7 +58,7 @@ function Frame({ title, state, children, footer, lang, setLang, onClose, context
         <div className="flex items-center justify-between border-b border-line px-4 py-3">
           <h2 className="flex items-center gap-2 font-bold"><Icon name="mic" /> {title} <span className="rounded-full bg-surface2 px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">{state}</span></h2>
           <div className="flex items-center gap-2">
-            <Select aria-label={t("Language")} value={lang} onChange={(e) => setLang?.(oneOf(["en", "ms"] as const, e.target.value, lang))} className="w-auto text-xs"><option value="en">English</option><option value="ms">Bahasa Melayu</option></Select>
+            <Select aria-label={t("Language")} value={lang} onChange={(e) => setLang?.(oneOf(LOCALES, e.target.value, lang))} className="w-auto text-xs">{LOCALES.map((l) => <option key={l} value={l}>{LANGUAGE_NAMES[l]}</option>)}</Select>
             <Button variant="ghost" size="icon-sm" aria-label={t("Close")} onClick={onClose} className="text-muted-foreground"><Icon name="close" /></Button>
           </div>
         </div>
