@@ -216,6 +216,8 @@ export function webConfig(tsconfigRootDir) {
         "unicorn/max-nested-calls": "off",
         // a mock consumes its queue with shift(), and a case passes undefined on purpose to show the default
         "unicorn/no-array-front-mutation": "off",
+        // the tests scan the repository's own sources with regular expressions
+        "sonarjs/super-linear-regex": "off",
         "sonarjs/no-undefined-argument": "off",
         // tests read the repository's own files (the catalog, the sources they check) by a computed path
         "security/detect-non-literal-fs-filename": "off",
@@ -304,6 +306,27 @@ export function webConfig(tsconfigRootDir) {
       // input and its buttons are the keyboard path
       files: ["**/components/ui/input-group.tsx"],
       rules: { "jsx-a11y/click-events-have-key-events": "off", "jsx-a11y/no-noninteractive-element-interactions": "off" },
+    },
+    {
+      // shadcn/ui's chart and field components are written against recharts' and react-hook-form's loose (any) types and
+      // return mixed React nodes; they are the library's code, kept as the generator wrote it
+      files: ["**/components/ui/chart.tsx", "**/components/ui/field.tsx"],
+      rules: {
+        "@typescript-eslint/no-unsafe-member-access": "off",
+        "@typescript-eslint/no-unsafe-argument": "off",
+        "sonarjs/function-return-type": "off",
+      },
+    },
+    {
+      // coreCall<T> is the one place a Core API reply gets its type: T is the reply's shape, named by each caller
+      files: ["**/lib/dal.ts"],
+      rules: { "@typescript-eslint/no-unnecessary-type-parameters": "off" },
+    },
+    {
+      // these four files keep a handler that closes over a useState setter or a local table (setChange, setMsgs, commands);
+      // it cannot move out of its component without passing them in. Everywhere else the rule stays on
+      files: ["**/units/_components/units-view.tsx", "**/components/Assistant.tsx", "**/components/ui.tsx", "**/lib/restrictions.ts"],
+      rules: { "unicorn/consistent-function-scoping": "off" },
     },
     { linterOptions: { reportUnusedDisableDirectives: "error" } },
     // generated files are fixed by their generators (make swagger / go run ./cmd/gen/ops), never by hand or by a fix
