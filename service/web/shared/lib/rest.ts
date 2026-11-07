@@ -47,14 +47,11 @@ const text = (v: unknown): string => {
 function pick(routes: readonly CoreRoute[], input: Json): CoreRoute {
   let best = routes[0];
   let score = -1;
-  for (const r of routes) {
-    if (r.fixed && text(input[r.fixed[0]]) !== r.fixed[1]) continue;
+  const fitting = routes.filter((r) => !r.fixed || text(input[r.fixed[0]]) === r.fixed[1]);
+  for (const r of fitting) {
     const names = pathParams(r.path);
     const isHeld = names.every((n) => { const v = lookup(input, n.split(".")); return !EMPTY_VALUES.has(v); });
-    if (!(isHeld && names.length > score)) {
-      continue;
-    }
-
+    if (!isHeld || names.length <= score) continue;
     best = r;
     score = names.length;
   }

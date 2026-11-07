@@ -81,8 +81,8 @@ function groupedCerts(mine: ApiCert[]): Map<string, ApiCert[]> {
 function grantAndMissingRows(m: ApiTeamMember, groups: Map<string, ApiCert[]>, viaGrant: Map<string, "pending" | "rejected">, isActive: boolean, tools: RowTools): CertRow[] {
   const { t, locale, blocks, state, badgeOf } = tools;
   const rows: CertRow[] = [];
-  for (const code of QUALIFICATION_CODES) {
-    if (groups.has(code) && !viaGrant.has(code)) continue;
+  const withoutCertificate = QUALIFICATION_CODES.filter((c) => !groups.has(c) || viaGrant.has(c));
+  for (const code of withoutCertificate) {
     const upload = viaGrant.get(code);
     const until = (m.qualifications ?? []).map((q) => (q.code === code && !q.revokedAt ? q.validUntil : null)).filter((v): v is string => !!v).toSorted((a, b) => Date.parse(b) - Date.parse(a)).at(0);
     if (until) {
@@ -105,28 +105,28 @@ function grantAndMissingRows(m: ApiTeamMember, groups: Map<string, ApiCert[]>, v
         actions: isActive && upload !== "pending" ? ["add"] : [],
         code,
       });
-      continue;
-    }
-    const needed = blocks(m.id, code, -Infinity);
-    if (needed.length > 0) {
-      rows.push({
-        key: `${m.id}:${code}`,
-        technicianId: m.id,
-        technician: m.displayName,
-        name: qualificationLabel(code, t),
-        detail: t("not held"),
-        expires: "—",
-        expiresAt: null,
-        status: "not_held",
-        badge: badgeOf("not_held", null),
-        days: null,
-        blocks: needed,
-        cert: null,
-        renewalPending: false,
-        training: null,
-        actions: isActive ? ["add"] : [],
-        code,
-      });
+    } else {
+      const needed = blocks(m.id, code, -Infinity);
+      if (needed.length > 0) {
+        rows.push({
+          key: `${m.id}:${code}`,
+          technicianId: m.id,
+          technician: m.displayName,
+          name: qualificationLabel(code, t),
+          detail: t("not held"),
+          expires: "—",
+          expiresAt: null,
+          status: "not_held",
+          badge: badgeOf("not_held", null),
+          days: null,
+          blocks: needed,
+          cert: null,
+          renewalPending: false,
+          training: null,
+          actions: isActive ? ["add"] : [],
+          code,
+        });
+      }
     }
   }
   return rows;

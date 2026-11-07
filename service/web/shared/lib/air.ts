@@ -123,8 +123,8 @@ export function metricCard(metric: AirMetric, m: ApiMeasurement | undefined, has
   // without control, or with the power alone, is set on the AC itself (IR527, IR544)
   const setpoint = setsTemperature ? "Setpoint is on Unit Control" : "Set on the AC itself";
   const noAdvice = t(noAdviceText(metric, setpoint), { metric: label });
-  const unavailable = (sub: string, feed = { text: t("Unavailable"), tone: "unknown" as Tone, icon: "offline" as IconName }): MetricCard =>
-    ({ metric, label, unit, feed, sub, value: null, status: { text: t("Not measured"), tone: "muted", icon: "dot" }, advice: noAdvice, warn: false });
+  const unavailable = (sub: string, feed?: MetricCard["feed"]): MetricCard =>
+    ({ metric, label, unit, sub, feed: feed ?? { text: t("Unavailable"), tone: "unknown", icon: "offline" }, value: null, status: { text: t("Not measured"), tone: "muted", icon: "dot" }, advice: noAdvice, warn: false });
   if (!hasSensor) return unavailable(t("No {metric} sensor on this model", { metric: label }), { text: t("Unsupported"), tone: "muted", icon: UNSUPPORTED });
   if (!m) return unavailable(t("No reading yet"));
   const at = showClock(m.observedAt, display);

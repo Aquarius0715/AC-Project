@@ -89,7 +89,7 @@ export function AdminAlertsView({ live }: Readonly<{ live?: Live }>) {
   const tab = live ? live.tab : urlTab;
   // the customer → property → unit scope is shared by both tabs, so switching keeps it (DD-A05 items 5 and 8)
   const scoped = (extra: Record<string, string>) => {
-    const sp = new URLSearchParams({ ...Object.fromEntries((["customerId", "propertyId", "unitId"] as const).flatMap((k) => (live?.q[k] ? [[k, live.q[k]]] : []))), ...extra });
+    const sp = new URLSearchParams({ ...Object.fromEntries((["customerId", "propertyId", "unitId"] as const).flatMap((k) => { const v = live?.q[k]; return v ? [[k, v]] : []; })), ...extra });
     return sp.size > 0 ? `${pathname}?${sp}` : pathname;
   };
   const setTab = (v: "alerts" | "policies") => { if (live) router.replace(scoped(v === "policies" ? { tab: "policies" } : {}), { scroll: false }); else setUrlTab(v); };

@@ -69,7 +69,7 @@ function texts(file: string): { line: number; text: string; button?: boolean }[]
     if (ts.isStringLiteral(n) || ts.isNoSubstitutionTemplateLiteral(n) || ts.isTemplateHead(n) || ts.isTemplateMiddle(n) || ts.isTemplateTail(n) || ts.isJsxText(n)) {
       // a JSX text that is a button's only content
       const parent = ts.isJsxText(n) && ts.isJsxElement(n.parent) ? n.parent : null;
-      const isButton = !!parent && BUTTONS.has(parent.openingElement.tagName.getText(sf)) && parent.children.every((c) => c === n || (ts.isJsxText(c) && !c.text.trim()));
+      const isButton = !!parent && BUTTONS.has(parent.openingElement.tagName.getText(sf)) && parent.children.every((c) => (ts.isJsxText(c) ? !c.text.trim() : c.pos === n.pos));
       out.push({ line: sf.getLineAndCharacterOfPosition(n.getStart()).line + 1, text: n.text, button: isButton });
     }
     ts.forEachChild(n, visit);

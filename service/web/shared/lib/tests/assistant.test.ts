@@ -5,6 +5,7 @@ import type { ApiCommand, ApiUnitDetail } from "@ac/web/lib/units";
 import { must } from "./must";
 import { unitDetail } from "./unitFixture";
 import { without } from "@ac/web/lib/omit";
+import { entryOf } from "@ac/web/lib/lookup";
 
 const BEDROOM_AC = "Bedroom AC";
 const TEXT_2026_09_15T01_12_00Z = "2026-09-15T01:12:00Z";
@@ -32,7 +33,7 @@ describe("the customer assistant (FR-X02, D09, Figma Client 09a–09g)", () => {
   it("suggests only sentences the fixed grammar accepts, in each language", () => {
     for (const locale of ["en", "ms"] as const) {
       const ex = examples(locale);
-      expect([ex.temperature, ex.change, ex.help].map((s, i) => grammar[locale][i]?.test(s))).toEqual([true, true, true]);
+      expect([ex.temperature, ex.change, ex.help].map((s, i) => entryOf(grammar, locale).at(i)?.test(s))).toEqual([true, true, true]);
     }
     expect(examples("ms").change).toBe("tetapkan Bedroom kepada 24 darjah");
     expect([helpText(en).startsWith("Ask “temperature <room>”"), helpText(ms).startsWith("Tanya “suhu <bilik>”")]).toEqual([true, true]); // the help speaks its language's grammar
