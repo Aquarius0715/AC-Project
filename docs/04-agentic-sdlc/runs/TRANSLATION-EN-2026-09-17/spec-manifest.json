@@ -1,6 +1,6 @@
 {
   "version": "0.210.0",
-  "spec_baseline_id": "1b3781419c29079e9d1f804688f42008333dc16d39e720d974cf54a1a0b5046a",
+  "spec_baseline_id": "f2a0b56107ee05054238df7c74f3b7e443fd1057a9b9f99438b324acc26d11cc",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
@@ -135,6 +135,14 @@
     {
       "path": "02-design/deterministic-contracts.md",
       "sha256": "e7b5b3ab6bbc16d82ed46427ad09ad95811355837ebee4e7963bdaba008a35a5"
+    },
+    {
+      "path": "02-design/device-firmware.ja.md",
+      "sha256": "135ca2c6e72cfddec780cff74d699103fc1d0e250932e5d235343647c351196a"
+    },
+    {
+      "path": "02-design/device-firmware.md",
+      "sha256": "4a9dce9d7138dce70b9e9bee53469864ba01c191a0b99eb79e8b5c045d843825"
     },
     {
       "path": "02-design/implementation-contracts.md",
