@@ -217,64 +217,9 @@ export function PoliciesTab({ pols, live, sel, select, showOff = true, copyFor, 
           <DefaultPolicyEditor p={p} customers={customers} units={units} canWrite={canWrite} copyFor={copyFor} onCopy={onCopy} demo={!live} />
         )}
         {draft && !(draft.kind === DEFAULT_ALERT && p) && (
-          <Card
-            title={<span className="inline-flex flex-wrap items-center gap-2">{draft.name.trim() || t(NEW_ALERT_POLICY)}<Badge tone={isNew ? "warn" : "muted"}>{isNew ? t("Not saved") : t("Policy v{n}", { n: draft.version })}</Badge></span>}
-            sub={[isNew ? t("new") : draft.id, draft.customerName, draft.madeBy && t("made by {name}", { name: draft.madeBy })].filter(Boolean).join(" · ")}
-            action={<div className="flex items-center gap-2 text-xs font-semibold"><span aria-hidden>{t("Enabled")}</span><Toggle on={draft.on} onChange={(v) => { set("on", v); }} label={t("Enabled")} disabled={!canWrite} /></div>}>
-            {!canWrite && <div className="mb-3"><Banner>{t("You can read this policy. Changing it needs alert.policy.write.")}</Banner></div>}
-            <fieldset disabled={!canWrite} className="flex min-w-0 flex-col gap-5">
-              <section><h3 className="mb-2 text-[13px] font-bold">{t("Basics")}</h3>
-                <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}>
-                  <Field label={t("Name")} hint={t("1–120 characters")} error={tried ? errors.name : undefined}><Input value={draft.name} placeholder={t("e.g. Bedroom too hot")} onChange={(e) => { set("name", e.target.value); }} /></Field>
-                  <Field label={t("Priority")} hint="0–100" error={tried ? errors.priority : undefined}><Input type="number" value={draft.priority} onChange={(e) => { set("priority", +e.target.value); }} /></Field>
-                  <Field label={t("Timezone")} hint={t("The zone the policy’s active window is evaluated in")}><Select value={draft.timezone} onChange={(e) => { set("timezone", e.target.value); }}>{[...new Set([draft.timezone, ...ZONES])].map((z) => <option key={z}>{z}</option>)}</Select></Field>
-                </div>
-              </section>
-              <section><h3 className="mb-1 text-[13px] font-bold">{t("Owner & units")}</h3>
-                <p className="mb-2 text-xs text-muted-foreground">{t("A policy belongs to one customer. Units pick it up on their own page (Customers & units › unit › Alert policies) — units are never assigned from here.")}</p>
-                <div className="text-xs font-semibold">{t("Owner (customer) · fixed after creation")}</div>
-                <div className="mt-1"><Badge tone="primary">{draft.customerName}</Badge></div>
-                <div className="mt-2 rounded-xl bg-surface2 px-3 py-2 text-[13px]">
-                  <div>{draft.unitIds.length > 0 ? t("Attached to {units} of {customer}: {names}", { units: draft.units, customer: draft.customerName, names: draft.unitNames.join(", ") }) : t("Not attached to any unit yet")}</div>
-                  {draft.customerId && <TextLink href={`/admin/units?customerId=${draft.customerId}&tab=policies`}>{t("Read-only here · attach / detach on each unit")} <Icon name="chevronRight" /></TextLink>}
-                </div>
-              </section>
-              <section><h3 className="mb-2 text-[13px] font-bold">{t("Condition")}</h3><p className="mb-2 text-xs text-muted-foreground">{t("Missing or stale readings never count toward the condition — they raise a data-quality notice instead.")}</p>
-                <ConditionFields c={draft} onChange={(c) => { setDraft((d) => (d ? { ...d, ...c } : d)); }} errors={errors} tried={tried} />
-              </section>
-              <section><h3 className="mb-1 text-[13px] font-bold">{t("Only if … (optional) · active hours")}</h3>
-                <p className="mb-2 text-xs text-muted-foreground">{t("Evaluated in the policy timezone. Outside these hours the condition is not checked — the same field as “Only if” in the client app.")}</p>
-                <WindowEditor value={draft.activeWindow} onChange={(w) => { set("activeWindow", w); }} timezone={draft.timezone} error={errors.activeWindow} />
-              </section>
-              <section><h3 className="mb-1 text-[13px] font-bold">{t("Severity")}</h3><Choice value={draft.severity} onChange={(v) => { set("severity", v); }} options={[{ id: "normal", label: t("Info") }, { id: "warning", label: t("Warning") }, { id: "critical", label: t("Critical") }]} /><p className="mt-1 text-[11px] text-muted-foreground">{t("A severity change on an open alert counts as a new notification reason.")}</p></section>
-              <section>
-                <div className="mb-1 flex flex-wrap items-center justify-between gap-2"><h3 className="text-[13px] font-bold">{t("Notify")}</h3>{canWrite && <Btn size="sm" variant="ghost" onClick={() => { setPicking(true); }}><Icon name="add" /> {t("Add recipient")}</Btn>}</div>
-                <p className="mb-2 text-xs text-muted-foreground">{t("Recipients come from notifications.recipients — only people allowed to see these units.")}</p>
-                {draft.recipients.map((r) => (
-                  <div key={r.id} className="flex flex-wrap items-center justify-between gap-2 border-t border-line py-2 text-[13px]">
-                    <span><b>{r.label}</b><span className="block text-xs text-muted-foreground">{r.role}</span></span>
-                    {canWrite && <Btn size="sm" variant="ghost" aria-label={t("Remove {name}", { name: r.label })} onClick={() => { set("recipients", draft.recipients.filter((x) => x.id !== r.id)); }}><Icon name="close" /></Btn>}
-                  </div>
-                ))}
-                {(draft.recipients.length === 0 || (tried && errors.recipients)) && <p className={cx("py-1 text-xs", tried && errors.recipients ? "text-crit" : "text-muted-foreground")}>{tried && errors.recipients ? <span className="inline-flex items-center gap-1"><Icon name="error" />{errors.recipients}</span> : t("No recipients yet — add at least one.")}</p>}
-                <div className="flex flex-wrap gap-3 border-t border-line pt-2"><span className="text-xs text-muted-foreground">{t("Channels for every recipient:")}</span><Check label={t("In-app")} checked disabled /><Check label={t("Email")} checked={draft.channels.includes("email")} onChange={(v) => { toggleChannel("email", v); }} /><Check label="WhatsApp" checked={draft.channels.includes("whatsapp")} onChange={(v) => { toggleChannel("whatsapp", v); }} /></div>
-                <p className="text-[11px] text-muted-foreground">{t("In-app is always on. WhatsApp reaches only recipients who allowed that channel.")}</p>
-              </section>
-              <section className="grid-fluid" style={{ ["--min" as string]: "180px" }}><Field label={t("Cooldown (min)")} hint={t("Same severity is not re-sent within this window (1–1440)")} error={tried ? errors.cooldown : undefined}><Input type="number" value={draft.cooldown} onChange={(e) => { set("cooldown", +e.target.value); }} /></Field><Field label={t("Escalate after (min)")} hint={t("Escalate if still unacknowledged (1–1440)")} error={tried ? errors.escalate : undefined}><Input type="number" value={draft.escalate} onChange={(e) => { set("escalate", +e.target.value); }} /></Field></section>
-            </fieldset>
-            <div className="mt-5 flex flex-col gap-5">
-              <NotificationPreview recipients={draft.recipients} severity={draft.severity} customerName={draft.customerName} unit={previewUnit} demo={!live} />
-              {p && <DemoTest saved={p} dirty={isNew || changes.length > 0} unit={testUnit} demo={!live} />}
-            </div>
-            {canWrite && (
-              <div className="mt-5 flex flex-wrap items-center justify-end gap-2 border-t border-line pt-3">
-                {!isNew && <Btn variant="danger" disabled={pending} onClick={() => { setDeleting(true); }}>{t(DELETE_POLICY)}</Btn>}
-                <span className={cx("mr-auto text-[12px]", tried && problems ? "text-crit" : "text-muted-foreground")}>{status}</span>
-                <Btn disabled={pending || (!isNew && changes.length === 0)} onClick={discard}>{t("Discard")}</Btn>
-                <Btn variant="primary" disabled={pending || (!isNew && changes.length === 0)} onClick={save}>{t("Save policy")}</Btn>
-              </div>
-            )}
-          </Card>
+          <PolicyEditorCard draft={draft} p={p} isNew={isNew} errors={errors} tried={tried} canWrite={canWrite} demo={!live} set={set} patch={(c) => { setDraft((d) => (d ? { ...d, ...c } : d)); }}
+            changes={changes} status={status} problems={problems} pending={pending} previewUnit={previewUnit} testUnit={testUnit}
+            onPick={() => { setPicking(true); }} onDelete={() => { setDeleting(true); }} onDiscard={discard} onSave={save} onChannel={toggleChannel} />
         )}
         {!draft && (
           <Card title={t("Alert policy")}>
@@ -291,6 +236,79 @@ export function PoliciesTab({ pols, live, sel, select, showOff = true, copyFor, 
         </Modal>
       )}
     </>
+  );
+}
+
+interface PolicyEditorProps {
+  draft: AdminPolicy; p: AdminPolicy | null; isNew: boolean; errors: Record<string, string>; tried: boolean; canWrite: boolean; demo: boolean;
+  set: <K extends keyof AdminPolicy>(k: K, v: AdminPolicy[K]) => void; patch: (c: Partial<AdminPolicy>) => void;
+  changes: string[]; status: string; problems: number; pending: boolean;
+  previewUnit: { id: string; name: string } | null; testUnit: { id: string; name: string } | null;
+  onPick: () => void; onDelete: () => void; onDiscard: () => void; onSave: () => void; onChannel: (channel: Channel, on: boolean) => void;
+}
+
+/** The editor of one alert policy: basics, owner, condition, hours, severity, recipients and the buttons. */
+function PolicyEditorCard({ draft, p, isNew, errors, tried, canWrite, demo, set, patch, changes, status, problems, pending, previewUnit, testUnit, onPick, onDelete, onDiscard, onSave, onChannel }: Readonly<PolicyEditorProps>) {
+  const t = useT();
+  return (
+        <Card
+          title={<span className="inline-flex flex-wrap items-center gap-2">{draft.name.trim() || t(NEW_ALERT_POLICY)}<Badge tone={isNew ? "warn" : "muted"}>{isNew ? t("Not saved") : t("Policy v{n}", { n: draft.version })}</Badge></span>}
+          sub={[isNew ? t("new") : draft.id, draft.customerName, draft.madeBy && t("made by {name}", { name: draft.madeBy })].filter(Boolean).join(" · ")}
+          action={<div className="flex items-center gap-2 text-xs font-semibold"><span aria-hidden>{t("Enabled")}</span><Toggle on={draft.on} onChange={(v) => { set("on", v); }} label={t("Enabled")} disabled={!canWrite} /></div>}>
+          {!canWrite && <div className="mb-3"><Banner>{t("You can read this policy. Changing it needs alert.policy.write.")}</Banner></div>}
+          <fieldset disabled={!canWrite} className="flex min-w-0 flex-col gap-5">
+            <section><h3 className="mb-2 text-[13px] font-bold">{t("Basics")}</h3>
+              <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}>
+                <Field label={t("Name")} hint={t("1–120 characters")} error={tried ? errors.name : undefined}><Input value={draft.name} placeholder={t("e.g. Bedroom too hot")} onChange={(e) => { set("name", e.target.value); }} /></Field>
+                <Field label={t("Priority")} hint="0–100" error={tried ? errors.priority : undefined}><Input type="number" value={draft.priority} onChange={(e) => { set("priority", +e.target.value); }} /></Field>
+                <Field label={t("Timezone")} hint={t("The zone the policy’s active window is evaluated in")}><Select value={draft.timezone} onChange={(e) => { set("timezone", e.target.value); }}>{[...new Set([draft.timezone, ...ZONES])].map((z) => <option key={z}>{z}</option>)}</Select></Field>
+              </div>
+            </section>
+            <section><h3 className="mb-1 text-[13px] font-bold">{t("Owner & units")}</h3>
+              <p className="mb-2 text-xs text-muted-foreground">{t("A policy belongs to one customer. Units pick it up on their own page (Customers & units › unit › Alert policies) — units are never assigned from here.")}</p>
+              <div className="text-xs font-semibold">{t("Owner (customer) · fixed after creation")}</div>
+              <div className="mt-1"><Badge tone="primary">{draft.customerName}</Badge></div>
+              <div className="mt-2 rounded-xl bg-surface2 px-3 py-2 text-[13px]">
+                <div>{draft.unitIds.length > 0 ? t("Attached to {units} of {customer}: {names}", { units: draft.units, customer: draft.customerName, names: draft.unitNames.join(", ") }) : t("Not attached to any unit yet")}</div>
+                {draft.customerId && <TextLink href={`/admin/units?customerId=${draft.customerId}&tab=policies`}>{t("Read-only here · attach / detach on each unit")} <Icon name="chevronRight" /></TextLink>}
+              </div>
+            </section>
+            <section><h3 className="mb-2 text-[13px] font-bold">{t("Condition")}</h3><p className="mb-2 text-xs text-muted-foreground">{t("Missing or stale readings never count toward the condition — they raise a data-quality notice instead.")}</p>
+              <ConditionFields c={draft} onChange={(c) => { patch(c); }} errors={errors} tried={tried} />
+            </section>
+            <section><h3 className="mb-1 text-[13px] font-bold">{t("Only if … (optional) · active hours")}</h3>
+              <p className="mb-2 text-xs text-muted-foreground">{t("Evaluated in the policy timezone. Outside these hours the condition is not checked — the same field as “Only if” in the client app.")}</p>
+              <WindowEditor value={draft.activeWindow} onChange={(w) => { set("activeWindow", w); }} timezone={draft.timezone} error={errors.activeWindow} />
+            </section>
+            <section><h3 className="mb-1 text-[13px] font-bold">{t("Severity")}</h3><Choice value={draft.severity} onChange={(v) => { set("severity", v); }} options={[{ id: "normal", label: t("Info") }, { id: "warning", label: t("Warning") }, { id: "critical", label: t("Critical") }]} /><p className="mt-1 text-[11px] text-muted-foreground">{t("A severity change on an open alert counts as a new notification reason.")}</p></section>
+            <section>
+              <div className="mb-1 flex flex-wrap items-center justify-between gap-2"><h3 className="text-[13px] font-bold">{t("Notify")}</h3>{canWrite && <Btn size="sm" variant="ghost" onClick={onPick}><Icon name="add" /> {t("Add recipient")}</Btn>}</div>
+              <p className="mb-2 text-xs text-muted-foreground">{t("Recipients come from notifications.recipients — only people allowed to see these units.")}</p>
+              {draft.recipients.map((r) => (
+                <div key={r.id} className="flex flex-wrap items-center justify-between gap-2 border-t border-line py-2 text-[13px]">
+                  <span><b>{r.label}</b><span className="block text-xs text-muted-foreground">{r.role}</span></span>
+                  {canWrite && <Btn size="sm" variant="ghost" aria-label={t("Remove {name}", { name: r.label })} onClick={() => { set("recipients", draft.recipients.filter((x) => x.id !== r.id)); }}><Icon name="close" /></Btn>}
+                </div>
+              ))}
+              {(draft.recipients.length === 0 || (tried && errors.recipients)) && <p className={cx("py-1 text-xs", tried && errors.recipients ? "text-crit" : "text-muted-foreground")}>{tried && errors.recipients ? <span className="inline-flex items-center gap-1"><Icon name="error" />{errors.recipients}</span> : t("No recipients yet — add at least one.")}</p>}
+              <div className="flex flex-wrap gap-3 border-t border-line pt-2"><span className="text-xs text-muted-foreground">{t("Channels for every recipient:")}</span><Check label={t("In-app")} checked disabled /><Check label={t("Email")} checked={draft.channels.includes("email")} onChange={(v) => { onChannel("email", v); }} /><Check label="WhatsApp" checked={draft.channels.includes("whatsapp")} onChange={(v) => { onChannel("whatsapp", v); }} /></div>
+              <p className="text-[11px] text-muted-foreground">{t("In-app is always on. WhatsApp reaches only recipients who allowed that channel.")}</p>
+            </section>
+            <section className="grid-fluid" style={{ ["--min" as string]: "180px" }}><Field label={t("Cooldown (min)")} hint={t("Same severity is not re-sent within this window (1–1440)")} error={tried ? errors.cooldown : undefined}><Input type="number" value={draft.cooldown} onChange={(e) => { set("cooldown", +e.target.value); }} /></Field><Field label={t("Escalate after (min)")} hint={t("Escalate if still unacknowledged (1–1440)")} error={tried ? errors.escalate : undefined}><Input type="number" value={draft.escalate} onChange={(e) => { set("escalate", +e.target.value); }} /></Field></section>
+          </fieldset>
+          <div className="mt-5 flex flex-col gap-5">
+            <NotificationPreview recipients={draft.recipients} severity={draft.severity} customerName={draft.customerName} unit={previewUnit} demo={demo} />
+            {p && <DemoTest saved={p} dirty={isNew || changes.length > 0} unit={testUnit} demo={demo} />}
+          </div>
+          {canWrite && (
+            <div className="mt-5 flex flex-wrap items-center justify-end gap-2 border-t border-line pt-3">
+              {!isNew && <Btn variant="danger" disabled={pending} onClick={onDelete}>{t(DELETE_POLICY)}</Btn>}
+              <span className={cx("mr-auto text-[12px]", tried && problems ? "text-crit" : "text-muted-foreground")}>{status}</span>
+              <Btn disabled={pending || (!isNew && changes.length === 0)} onClick={onDiscard}>{t("Discard")}</Btn>
+              <Btn variant="primary" disabled={pending || (!isNew && changes.length === 0)} onClick={onSave}>{t("Save policy")}</Btn>
+            </div>
+          )}
+        </Card>
   );
 }
 
