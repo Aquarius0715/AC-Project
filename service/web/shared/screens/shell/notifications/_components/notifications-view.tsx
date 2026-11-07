@@ -5,19 +5,12 @@ import { useState, useTransition } from "react";
 import { Badge, Btn, Card, Page, Tabs, useToast, cx } from "@ac/web/components/ui";
 import { useStoredRole } from "@ac/web/components/AppShell";
 import { useT } from "@ac/web/components/I18n";
-import { jobActions, useNotes } from "@ac/web/lib/jobs";
+import { jobActions, useDemoInbox } from "@ac/web/lib/jobs";
 import type { InboxRow } from "@ac/web/lib/notifications";
 import { actionMessage, type ActionFailure } from "@ac/web/lib/actionMessage";
 import { byCount, type T } from "@ac/web/lib/i18n";
 import { markAllRead, markRead } from "../actions";
 import { Button } from "@ac/web/components/ui/button";
-
-const initial = [
-  { id: "s1", t: "Alert opened on Bedroom AC", d: "alert-window-a · unresolved · linked evidence available", w: "09:12 today", read: false, href: "" },
-  { id: "s2", t: "Work report accepted — job-c02", d: "Quality-reviewed report now visible", w: "Yesterday, 17:20", read: false, href: "" },
-  { id: "s3", t: "Invoice inv-0231 is now unpaid", d: "Read · restriction notice pending", w: "2 days ago", read: false, href: "" },
-  { id: "s4", t: "Session extended by 30 minutes", d: "System · read", w: "3 days ago", read: true, href: "" },
-];
 
 // why a notification was not marked read, in the display language (the write limit says how long to wait, IR380)
 const readFailure = (f: ActionFailure, t: T) => {
@@ -29,30 +22,29 @@ const readFailure = (f: ActionFailure, t: T) => {
 export function NotificationsView({ rows }: Readonly<{ rows?: InboxRow[] }>) {
   const t = useT();
   const role = useStoredRole();
-  const live = useNotes(role);
+  const demo = useDemoInbox(role);
   const [tab, setTab] = useState<"all" | "unread">("all");
-  const [items, setItems] = useState(initial);
   const [pending, start] = useTransition();
   const [failed, setFailed] = useState<string | null>(null);
   const toast = useToast();
   const isApi = rows !== undefined;
   const all = isApi
     ? rows.map((n) => ({ ...n, live: true }))
-    : [...live.map((n) => ({ id: n.id, version: 0, t: n.title, d: n.detail, w: n.at, read: n.read, href: n.href, live: true })), ...items.map((i) => ({ ...i, version: 0, live: false }))];
+    : [...demo.own.map((n) => ({ id: n.id, version: 0, t: n.title, d: n.detail, w: n.at, read: n.read, href: n.href, live: true })), ...demo.fixed.map((i) => ({ ...i, version: 0, live: false }))];
   const shown = all.filter((i) => tab === "all" || !i.read);
   const open = (n: { id: string; version: number; read: boolean; live: boolean }) => {
     if (isApi) {
       if (n.read) return;
       start(async () => { const f = await markRead(n.id, n.version); setFailed(f && readFailure(f, t)); }); return; // Server Action; the page re-renders with fresh rows
     }
-    if (n.live) jobActions.markRead(n.id); else setItems((s) => s.map((x) => (x.id === n.id ? { ...x, read: true } : x)));
+    if (n.live) jobActions.markRead(n.id); else jobActions.markFixedRead([n.id]);
   };
   const unread = all.filter((i) => !i.read);
   // “Mark all as read” (Figma Client 10c): every unread notification of the list in one write (IR379)
   const readAll = () => {
     if (!isApi) {
       for (const n of unread) if (n.live) jobActions.markRead(n.id);
-      setItems((s) => s.map((x) => ({ ...x, read: true })));
+      jobActions.markFixedRead(unread.filter((n) => !n.live).map((n) => n.id));
       toast(t(unread.length === 1 ? "1 notification marked as read" : "{n} notifications marked as read", { n: unread.length })); return;
     }
     start(async () => {
