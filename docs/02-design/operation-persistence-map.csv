@@ -58,6 +58,7 @@ devices.get,read,Devices,devices.devices;devices.sensors;devices.device_bindings
 devices.list,read,Devices,devices.devices;devices.sensors;devices.device_bindings,,,,
 devices.operations,read,Devices,devices.device_operations,,,,
 devices.register,write,Devices,devices.devices;devices.sensors;devices.device_bindings,devices.devices;devices.sensors;devices.device_bindings;devices.device_operations,,audit.audit_log;platform.idempotency_keys;platform.outbox,
+devices.setMqttNode,write,Devices,devices.devices,devices.devices,,audit.audit_log;platform.idempotency_keys;platform.outbox,
 devices.updateFirmware,write,Devices,devices.devices;devices.sensors;devices.device_bindings,devices.device_operations,,audit.audit_log;platform.idempotency_keys;platform.outbox,
 diagnosticRuns.create,write,Control,control.diagnostic_runs,control.diagnostic_runs,,audit.audit_log;platform.idempotency_keys;platform.outbox,
 diagnosticRuns.get,read,Control,control.diagnostic_runs,,,,

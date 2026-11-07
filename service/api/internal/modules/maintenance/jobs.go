@@ -857,7 +857,7 @@ type OfferView struct {
 	JobID            uuid.UUID  `json:"jobId"`
 	ContractorOrgID  uuid.UUID  `json:"contractorOrgId"`
 	TermsVersion     string     `json:"termsVersion"`
-	VisitSlot        Slot       `json:"visitSlot"`
+	CandidateSlots   []Slot     `json:"candidateSlots"` // the client's agreed times; the contractor picks one (IR636)
 	OfferedAt        time.Time  `json:"offeredAt"`
 	OfferExpiresAt   time.Time  `json:"offerExpiresAt"`
 	AccessValidFrom  time.Time  `json:"accessValidFrom"`
@@ -897,7 +897,7 @@ func (Jobs) project(ctx context.Context, call *ops.Call, job *Job) error {
 func currentOffer(ctx context.Context, call *ops.Call, job *Job) error {
 	role := call.Principal.Role
 	stmt := `SELECT id, tenant_id, version, created_at, updated_at, job_id, contractor_org_id, terms_version,
-			lower(visit_slot), upper(visit_slot), offered_at,
+			candidate_slots, offered_at,
 			offer_expires_at, access_valid_from, access_valid_until, decision, decided_by, decided_at, decline_reason
 			FROM maintenance.offers WHERE job_id = $1 AND ((decision IS NULL AND expired_at IS NULL) OR decision = 'accept')`
 	args := []any{job.ID}
@@ -913,7 +913,7 @@ func currentOffer(ctx context.Context, call *ops.Call, job *Job) error {
 	err := call.Tx.QueryRow(ctx, stmt+" ORDER BY offered_at DESC LIMIT 1", args...).
 		Scan(&offerView.ID, &offerView.TenantID, &offerView.Version, &offerView.CreatedAt, &offerView.UpdatedAt,
 			&offerView.JobID,
-			&offerView.ContractorOrgID, &offerView.TermsVersion, &offerView.VisitSlot.StartAt, &offerView.VisitSlot.EndAt,
+			&offerView.ContractorOrgID, &offerView.TermsVersion, &offerView.CandidateSlots,
 			&offerView.OfferedAt, &offerView.OfferExpiresAt,
 			&offerView.AccessValidFrom, &offerView.AccessValidUntil,
 			&offerView.Decision, &offerView.DecidedBy, &offerView.DecidedAt, &offerView.DeclineReason)

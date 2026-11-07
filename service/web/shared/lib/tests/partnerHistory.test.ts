@@ -53,7 +53,7 @@ describe("partner job history", () => {
     expect(unassigned.tech).toEqual({ name: "Unassigned", sub: "assign in Schedule", tone: "crit" });
     const h = historyRowOf(history("job-9-hhhh", [must(events[0])]), NOW, units, names);
     expect([h.tab, h.ended, h.sub, h.badge.text, h.version]).toEqual(["ended", true, "1 own decision event · delegation ended 21 Sept 2026, 12:00 am MYT (read-only snapshot)", "Completed", null]);
-    expect(historyRow({ projection: "offer", status: "offered", jobId: "j", jobVersion: 1, offerId: "o", type: "reactive", siteAddress: null, requestedSlot: slot("a", "b"), dueAt: "x", offerExpiresAt: "x", visitSlot: null }, NOW, units, names)).toBeNull();
+    expect(historyRow({ projection: "offer", status: "offered", jobId: "j", jobVersion: 1, offerId: "o", type: "reactive", siteAddress: null, requestedSlot: slot("a", "b"), dueAt: "x", offerExpiresAt: "x", candidateSlots: [] }, NOW, units, names)).toBeNull();
   });
 
   it("filters, counts and orders the rows", () => {

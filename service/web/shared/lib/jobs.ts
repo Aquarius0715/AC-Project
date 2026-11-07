@@ -5,6 +5,7 @@ const PREVENTIVE = "Preventive";
 const TECHNICIAN = "technician";
 const KEY = "ac-jobs-v2";
 const NKEY = "ac-job-notes-v2";
+const SKEY = "ac-job-notes-seed-read-v1";
 const BEDROOM_LOC = "Home A › 1F › Bedroom";
 const WIN_AFTERNOON = "14:00–16:00";
 const WIN_LATE_MORNING = "10:00–12:00";
@@ -140,23 +141,24 @@ export function fitFor(s: Slot): Fit {
 }
 
 /* ---------- store ---------- */
-interface State { jobs: Job[]; notes: Note[] }
+interface State { jobs: Job[]; notes: Note[]; seedRead: string[] }
 let state: State | null = null;
 const listeners = new Set<() => void>();
 const load = (): State => {
   if (state) return state;
-  state = { jobs: readDemoAs(KEY, z.array(job)) ?? SEED, notes: readDemoAs(NKEY, z.array(note)) ?? [] };
+  state = { jobs: readDemoAs(KEY, z.array(job)) ?? SEED, notes: readDemoAs(NKEY, z.array(note)) ?? [], seedRead: readDemoAs(SKEY, z.array(z.string())) ?? [] };
   return state;
 };
 const save = () => {
   const s = load();
   writeDemo(KEY, s.jobs);
   writeDemo(NKEY, s.notes);
+  writeDemo(SKEY, s.seedRead);
   listeners.forEach((l) => { l(); });
 };
-const SERVER: State = { jobs: SEED, notes: [] };
+const SERVER: State = { jobs: SEED, notes: [], seedRead: [] };
 const subscribe = (l: () => void) => { listeners.add(l); return () => listeners.delete(l); };
-export function useJobStore() {
+function useJobStore() {
   return useSyncExternalStore(subscribe, load, () => SERVER);
 }
 /** JobSummary / Offer / History projections of jobs.list (IR23, IR124), the fields the job screens read. */
@@ -202,7 +204,22 @@ export const useJobs = () => {
 };
 /** Non-React read (tests, scripts). */
 export const getJobState = () => load();
-export const useNotes = (role: Note["role"]) => useJobStore().notes.filter((n) => n.role === role);
+interface DemoInboxRow { id: string; t: string; d: string; w: string; read: boolean; href: string }
+/** The fixed rows of the demo inbox (every role sees them, Phase 1A); their read state lives in the store, so the
+sidebar badge and the inbox count the same unread notifications. */
+const DEMO_INBOX: readonly DemoInboxRow[] = [
+  { id: "s1", t: "Alert opened on Bedroom AC", d: "alert-window-a · unresolved · linked evidence available", w: "09:12 today", read: false, href: "" },
+  { id: "s2", t: "Work report accepted — job-c02", d: "Quality-reviewed report now visible", w: "Yesterday, 17:20", read: false, href: "" },
+  { id: "s3", t: "Invoice inv-0231 is now unpaid", d: "Read · restriction notice pending", w: "2 days ago", read: false, href: "" },
+  { id: "s4", t: "Session extended by 30 minutes", d: "System · read", w: "3 days ago", read: true, href: "" },
+];
+/** The demo inbox of a role: its own notices, then the fixed rows with the ones read here marked read. */
+export function useDemoInbox(role: Note["role"]) {
+  const { notes, seedRead } = useJobStore();
+  const fixed = DEMO_INBOX.map((r) => ({ ...r, read: r.read || seedRead.includes(r.id) }));
+  const own = notes.filter((n) => n.role === role);
+  return { own, fixed, unread: own.filter((n) => !n.read).length + fixed.filter((r) => !r.read).length };
+}
 
 function update(id: string, fn: (j: Job) => Partial<Job>, log?: string) {
   const s = load();
@@ -221,8 +238,10 @@ export const longDate = (s: Slot) => {
 };
 
 export const jobActions = {
-  reset() { state = { jobs: SEED, notes: [] }; save(); },
+  reset() { state = { jobs: SEED, notes: [], seedRead: [] }; save(); },
   markRead(id: string) { const s = load(); state = { ...s, notes: s.notes.map((n) => (n.id === id ? { ...n, read: true } : n)) }; save(); },
+  /** Marks fixed demo inbox rows read (their IDs, see useDemoInbox). */
+  markFixedRead(ids: string[]) { const s = load(); state = { ...s, seedRead: [...new Set([...s.seedRead, ...ids])] }; save(); },
   /** Client: new request with 3 preferred times (FR-C09 / IR113). */
   create(p: { unitId: string; unit: string; loc: string; type: "Reactive" | "Preventive"; symptom: string; preferred: Slot[] }) {
     const s = load();

@@ -7,7 +7,7 @@ import { Suspense, useEffect, useState } from "react";
 import { isRole, roleConfig, ROLE_KEY, type Role, roleFromPath, type ShellLive, SHARED_PAGES, documentTitle, pageLabel } from "@ac/web/lib/nav";
 import { Badge, Banner, Btn, Modal, SummaryList, ToastProvider, cx } from "./ui";
 import { Icon, type IconName } from "./Icon";
-import { useJobStore } from "@ac/web/lib/jobs";
+import { useDemoInbox } from "@ac/web/lib/jobs";
 import { AssistantPanel } from "./Assistant";
 import { QrScan } from "./QrScan";
 import { CURRENT_CLIENT } from "@ac/web/lib/clientUsers";
@@ -93,8 +93,9 @@ export function AppShell({ appRole: forced, live, children }: Readonly<{ appRole
   }
   const [assistant, setAssistant] = useState(false);
   const [qr, setQr] = useState(false);
-  const unread = useJobStore().notes.filter((n) => n.role === role && !n.read).length;
-  const unreadBadge = (href: string) => (live ? count(href) : String(3 + unread)); // the demo counts its own unread
+  const demoUnread = useDemoInbox(role).unread;
+  const demoBadge = demoUnread > 0 ? String(demoUnread) : undefined; // no badge for 0, like the Core API's counts
+  const unreadBadge = (href: string) => (live ? count(href) : demoBadge); // the demo counts its own unread
 
   const items = (live ? config.nav.map((i) => ({ ...i, badge: count(i.href) })) : config.nav).map((i) => ({ ...i, label: t(i.label) }));
   // the page's name: the menu item with the longest matching path (/customer/units/x is "Units & locations")

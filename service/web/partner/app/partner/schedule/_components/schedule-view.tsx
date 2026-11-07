@@ -3,7 +3,7 @@ const TEXT_MUTED_FOREGROUND = "text-muted-foreground";
 const TEXT_PRIMARY = "text-primary";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Badge, Banner, Btn, Card, EmptyState, Field, ListRow, Page, Select, Textarea, cx, Plain, ScrollX } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
@@ -111,6 +111,7 @@ function AssignCard({ sel, choice, zone, otherZone }: Readonly<{ sel: Selected; 
   const [reason, setReason] = useState("");
   const [tried, setTried] = useState(false);
   const [result, setResult] = useState<{ tone: "ok" | "crit" | "warn"; text: string } | null>(null);
+  const patch = useUrlPatch();
   const chosen = sel.candidates.find((c) => c.id === tech);
   const currentName = sel.candidates.find((c) => c.id === sel.currentId)?.name;
   const window = sel.text.window ? t("Delegation period: {span} — work must fit within this window.", { span: sel.text.window }) : null;
@@ -128,8 +129,9 @@ function AssignCard({ sel, choice, zone, otherZone }: Readonly<{ sel: Selected; 
   const slot = proposedSlot(m, end, zone);
   const endOk = !m.endEditable || (!!end && Date.parse(slot.endAt) >= Date.parse(m.slot.endAt));
   const isReasonMissing = m.reasonRequired && !reason.trim();
-  const isSame = tech === sel.currentId && (!m.endEditable || slot.endAt === m.slot.endAt);
-  const sameError = tried && isSame ? t("Choose another technician or a later end") : undefined;
+  const isSame = tech === sel.currentId && !sel.moved && (!m.endEditable || slot.endAt === m.slot.endAt);
+  const sameWhy = m.kind === "reassign" ? "Choose another technician or another time" : "Choose another technician or a later end";
+  const sameError = tried && isSame ? t(sameWhy) : undefined;
   const save = () => {
     setTried(true);
     if (!tech || isReasonMissing || !endOk || isSame) return;
@@ -138,6 +140,28 @@ function AssignCard({ sel, choice, zone, otherZone }: Readonly<{ sel: Selected; 
       (v) => { setResult({ tone: "ok", text: t(m.kind === "assign" ? "Assigned {name} for {slot}. The technician must accept the assignment; HQ and the technician are notified." : "Changed to {name} for {slot}. The technician must accept the assignment; HQ and the technician are notified.", { name, slot: v.slot }) }); },
       (f: ActionFailure) => { setResult({ tone: f.code === "CONFLICT" ? "warn" : "crit", text: assignRefusal(f, name, t) }); });
   };
+  let visitField: ReactNode;
+  if (m.endEditable) visitField = (
+          <div className="grid-fluid" style={{ ["--min" as string]: "220px" }}>
+            <Field label={t("Work start (kept)")}><div className="rounded-control border border-line bg-surface2 px-3 py-2 text-[13px] font-semibold"><Icon name="locked" /> {sel.text.start}</div></Field>
+            <Field label={t("Work end (same or later)")} hint={t("Times in {zone}.", { zone })} error={tried && !endOk ? t("The end must be at or after the current end") : undefined}><DateTimeSelect value={end} min={sel.text.end} onChange={(v) => { setEnd(v); }} /></Field>
+          </div>
+  );
+  else if (sel.times.length > 1) visitField = (
+          <Field label={t("Visit time · pick one of the times the client agreed")} hint={t("Only these times are agreed; a different time needs the client’s approval via HQ.")}>
+            <div role="radiogroup" aria-label={t("Visit time")} className="flex flex-col gap-1.5">
+              {sel.times.map((x, k) => (
+                <Plain key={x.text} type="button" role="radio" aria-checked={x.on} onClick={() => { patch({ slot: String(k) }); }}
+                  className={cx("rounded-xl border px-3 py-2 text-left text-[13px] font-semibold", x.on ? "border-primary bg-primary-soft/60 text-primary" : "border-line bg-surface")}>{x.text}</Plain>
+              ))}
+            </div>
+          </Field>
+  );
+  else visitField = (
+          <Field label={t("Visit time (agreed with the client)")} hint={t("Fixed. A different time needs the client’s approval via HQ.")}>
+            <div className="rounded-control border border-line bg-surface2 px-3 py-2 text-[13px] font-semibold"><Icon name="locked" /> {sel.text.slot}</div>
+          </Field>
+  );
   return (
     <Card title={m.title}>
       <div className="flex flex-col gap-3">
@@ -160,16 +184,7 @@ function AssignCard({ sel, choice, zone, otherZone }: Readonly<{ sel: Selected; 
             {otherZone && ` ${t("Free hours are in Kuala Lumpur time (Asia/Kuala_Lumpur).")}`}
           </p>
         </Field>
-        {m.endEditable ? (
-          <div className="grid-fluid" style={{ ["--min" as string]: "220px" }}>
-            <Field label={t("Work start (kept)")}><div className="rounded-control border border-line bg-surface2 px-3 py-2 text-[13px] font-semibold"><Icon name="locked" /> {sel.text.start}</div></Field>
-            <Field label={t("Work end (same or later)")} hint={t("Times in {zone}.", { zone })} error={tried && !endOk ? t("The end must be at or after the current end") : undefined}><DateTimeSelect value={end} min={sel.text.end} onChange={(v) => { setEnd(v); }} /></Field>
-          </div>
-        ) : (
-          <Field label={t("Visit time (agreed with the client)")} hint={t("Fixed. A different time needs the client’s approval via HQ.")}>
-            <div className="rounded-control border border-line bg-surface2 px-3 py-2 text-[13px] font-semibold"><Icon name="locked" /> {sel.text.slot}</div>
-          </Field>
-        )}
+        {visitField}
         {m.kind !== "assign" && (
           <Field label={t(m.reasonRequired ? "Reason for reassignment (required, 1–1000)" : "Reason (optional, kept with the change)")} error={tried && isReasonMissing ? t("A reason is required while the work is under way") : undefined}>
             <Textarea value={reason} maxLength={1000} onChange={(e) => { setReason(e.target.value); }} placeholder={m.reasonRequired ? t("tech-external-a is on sick leave from today.") : ""} />

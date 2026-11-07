@@ -34,10 +34,10 @@ describe("partner job list", () => {
   });
 
   it("shows an offer with its answer deadline and an accepted offer before the window", () => {
-    const offered: ApiPartnerJob = { projection: "offer", status: "offered", jobId: TEXT_22222222_BBBB, jobVersion: 2, offerId: "o", type: "reactive", siteAddress: "2 Demo Avenue", requestedSlot: slot(TEXT_2026_09_22T01_00_00Z, TEXT_2026_09_22T03_00_00Z), dueAt: "2026-09-24T10:00:00Z", offerExpiresAt: "2026-09-21T16:30:00Z", visitSlot: slot(TEXT_2026_09_22T01_00_00Z, TEXT_2026_09_22T03_00_00Z) };
+    const offered: ApiPartnerJob = { projection: "offer", status: "offered", jobId: TEXT_22222222_BBBB, jobVersion: 2, offerId: "o", type: "reactive", siteAddress: "2 Demo Avenue", requestedSlot: slot(TEXT_2026_09_22T01_00_00Z, TEXT_2026_09_22T03_00_00Z), dueAt: "2026-09-24T10:00:00Z", offerExpiresAt: "2026-09-21T16:30:00Z", candidateSlots: [slot(TEXT_2026_09_22T01_00_00Z, TEXT_2026_09_22T03_00_00Z)] };
     expect(jobRow(offered, NOW, units, names)).toEqual({
       id: TEXT_22222222_BBBB, title: "22222222 · 2 Demo Avenue", origin: null, href: "/partner/jobs/22222222-bbbb",
-      line: "Offered by HQ · visit 22 Sept, 9:00 – 11:00 am MYT (fixed)", tech: { name: "—", sub: "not assignable before acceptance" },
+      line: "Offered by HQ · 22 Sept, 9:00 – 11:00 am MYT", tech: { name: "—", sub: "not assignable before acceptance" },
       slot: { main: "Answer by 22 Sept 2026, 12:30 am MYT", sub: "15 h left" }, badge: { text: "Offered", tone: "primary" },
     });
     const proposed = jobRow({ ...offered, partnerSlotProposal: { status: "sent_to_client" } }, NOW, units, names);
@@ -71,9 +71,9 @@ describe("partner job list", () => {
   });
 
   it("words the rows in Malay with the slots and deadlines in the display time zone (IR271)", () => {
-    const offered: ApiPartnerJob = { projection: "offer", status: "offered", jobId: TEXT_22222222_BBBB, jobVersion: 2, offerId: "o", type: "reactive", siteAddress: "2 Demo Avenue", requestedSlot: slot(TEXT_2026_09_22T01_00_00Z, TEXT_2026_09_22T03_00_00Z), dueAt: "2026-09-24T10:00:00Z", offerExpiresAt: "2026-09-21T16:30:00Z", visitSlot: slot(TEXT_2026_09_22T01_00_00Z, TEXT_2026_09_22T03_00_00Z) };
+    const offered: ApiPartnerJob = { projection: "offer", status: "offered", jobId: TEXT_22222222_BBBB, jobVersion: 2, offerId: "o", type: "reactive", siteAddress: "2 Demo Avenue", requestedSlot: slot(TEXT_2026_09_22T01_00_00Z, TEXT_2026_09_22T03_00_00Z), dueAt: "2026-09-24T10:00:00Z", offerExpiresAt: "2026-09-21T16:30:00Z", candidateSlots: [slot(TEXT_2026_09_22T01_00_00Z, TEXT_2026_09_22T03_00_00Z)] };
     expect(jobRow(offered, NOW, units, names, MS_TOKYO)).toMatchObject({
-      line: "Ditawarkan oleh HQ · lawatan 22 Sep, 10:00 PG – 12:00 PTG GMT+9 (tetap)", tech: { sub: "tidak boleh ditugaskan sebelum diterima" },
+      line: "Ditawarkan oleh HQ · 22 Sep, 10:00 PG – 12:00 PTG GMT+9", tech: { sub: "tidak boleh ditugaskan sebelum diterima" },
       slot: { main: "Jawab sebelum 22 Sep 2026, 1:30 PG GMT+9", sub: "15 j lagi" }, badge: { text: "Ditawarkan" },
     });
     const cantMake = { assignmentId: "as", technicianMembershipId: "m-a", assignmentAcknowledgement: "cant_make" as const, scheduledSlot: slot(TEXT_2026_09_21T02_00_00Z, TEXT_2026_09_21T04_00_00Z) };

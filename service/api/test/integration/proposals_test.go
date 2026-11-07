@@ -300,7 +300,7 @@ func TestSlotProposals(t *testing.T) {
 		hq(),
 		"jobs.get",
 		`{"jobId":"`+job2+`"}`,
-	); asObj(t, asObj(t, data(res)["offer"])["visitSlot"])["startAt"] != stamp(
+	); firstCandidate(t, data(res)["offer"]) != stamp(
 		98,
 	) ||
 		asObj(t, data(res)["offer"])["offerExpiresAt"] != stamp(24) {
@@ -420,11 +420,7 @@ func TestPartnerProposalsAndReschedule(t *testing.T) {
 		"jobs.offer",
 		`{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").
 			String()+
-			`","visitSlot":`+slotJSON(
-			49,
-			2,
-		)+
-			`,"offerExpiresAt":"`+stamp(
+			`","offerExpiresAt":"`+stamp(
 			12,
 		)+`","accessValidFrom":"`+stamp(
 			0,
@@ -610,7 +606,7 @@ func TestPartnerProposalsAndReschedule(t *testing.T) {
 		hq(),
 		"jobs.get",
 		`{"jobId":"`+job+`"}`,
-	); asObj(t, asObj(t, data(m)["offer"])["visitSlot"])["startAt"] != stamp(
+	); firstCandidate(t, data(m)["offer"]) != stamp(
 		101,
 	) {
 		t.Fatal("offer visit slot moved")
@@ -635,11 +631,7 @@ func TestPartnerProposalsAndReschedule(t *testing.T) {
 		"jobs.offer",
 		`{"jobId":"`+job2+`","contractorOrgId":"`+seed.ID("org-contractor-a").
 			String()+
-			`","visitSlot":`+slotJSON(
-			49,
-			2,
-		)+
-			`,"offerExpiresAt":"`+stamp(
+			`","offerExpiresAt":"`+stamp(
 			12,
 		)+`","accessValidFrom":"`+stamp(
 			0,
@@ -905,11 +897,7 @@ func TestRescheduleAfterContractorAssignment(t *testing.T) {
 		"jobs.offer",
 		`{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").
 			String()+
-			`","visitSlot":`+slotJSON(
-			49,
-			2,
-		)+
-			`,"offerExpiresAt":"`+stamp(
+			`","offerExpiresAt":"`+stamp(
 			12,
 		)+`","accessValidFrom":"`+stamp(
 			0,
@@ -1030,7 +1018,7 @@ func TestRescheduleAfterContractorAssignment(t *testing.T) {
 		hq(),
 		"jobs.get",
 		`{"jobId":"`+job+`"}`,
-	); asObj(t, asObj(t, data(res)["offer"])["visitSlot"])["startAt"] != stamp(
+	); firstCandidate(t, data(res)["offer"]) != stamp(
 		97,
 	) {
 		t.Errorf("the accepted offer's visit: %v", data(res)["offer"])
@@ -1074,11 +1062,7 @@ func TestPartnerProposalRefusals(t *testing.T) {
 		"jobs.offer",
 		`{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").
 			String()+
-			`","visitSlot":`+slotJSON(
-			49,
-			2,
-		)+
-			`,"offerExpiresAt":"`+stamp(
+			`","offerExpiresAt":"`+stamp(
 			12,
 		)+`","accessValidFrom":"`+stamp(
 			0,
@@ -1222,9 +1206,12 @@ func TestRescheduleOfferedPeriodicVisit(t *testing.T) {
 	)
 	owner(
 		t,
-		`INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, visit_slot, offered_at,
+		`INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, candidate_slots, offered_at,
 			offer_expires_at, access_valid_from, access_valid_until)
-		VALUES ($1,$2,$3,'t',tstzrange($4,$5),$6,$7,$6,$8)`,
+		VALUES ($1,$2,$3,'t',`+oneSlotSQL(
+			"$4",
+			"$5",
+		)+`,$6,$7,$6,$8)`,
 		seed.ID("tenant-a"),
 		job,
 		seed.ID("org-contractor-a"),
@@ -1254,7 +1241,10 @@ func TestRescheduleOfferedPeriodicVisit(t *testing.T) {
 
 	owner(
 		t,
-		`UPDATE maintenance.offers SET visit_slot = tstzrange($2, $3) WHERE job_id = $1`,
+		`UPDATE maintenance.offers SET candidate_slots = `+oneSlotSQL(
+			"$2",
+			"$3",
+		)+` WHERE job_id = $1`,
 		job,
 		clock().Add(100*time.Hour),
 		clock().Add(102*time.Hour),
@@ -1297,11 +1287,7 @@ func TestPartnerProposalEndsWithClientProposal(t *testing.T) {
 			"jobs.offer",
 			`{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").
 				String()+
-				`","visitSlot":`+slotJSON(
-				49,
-				2,
-			)+
-				`,"offerExpiresAt":"`+stamp(
+				`","offerExpiresAt":"`+stamp(
 				12,
 			)+`","accessValidFrom":"`+stamp(
 				0,
@@ -1455,11 +1441,7 @@ func TestPartnerProposalEndsWithOffer(t *testing.T) {
 			"jobs.offer",
 			`{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").
 				String()+
-				`","visitSlot":`+slotJSON(
-				49,
-				2,
-			)+
-				`,"offerExpiresAt":"`+stamp(
+				`","offerExpiresAt":"`+stamp(
 				12,
 			)+`","accessValidFrom":"`+stamp(
 				0,
@@ -1615,11 +1597,7 @@ func TestDeclineWithdrawsClientProposal(t *testing.T) {
 		"jobs.offer",
 		`{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").
 			String()+
-			`","visitSlot":`+slotJSON(
-			49,
-			2,
-		)+
-			`,"offerExpiresAt":"`+stamp(
+			`","offerExpiresAt":"`+stamp(
 			12,
 		)+`","accessValidFrom":"`+stamp(
 			0,
@@ -1838,16 +1816,12 @@ func TestAcceptedProposalExtendsAccess(t *testing.T) {
 		"jobs.offer",
 		`{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").
 			String()+
-			`","visitSlot":`+slotJSON(
-			49,
-			2,
-		)+
-			`,"offerExpiresAt":"`+stamp(
+			`","offerExpiresAt":"`+stamp(
 			12,
 		)+`","accessValidFrom":"`+stamp(
 			0,
 		)+`","accessValidUntil":"`+stamp(
-			60,
+			100,
 		)+`","termsVersion":"t"}`,
 		1,
 	); code != 200 {
@@ -2016,4 +1990,16 @@ func TestProposalReplyByBeforeSlot(t *testing.T) {
 	if offers != 0 {
 		t.Errorf("offers after the refused acceptance: %d", offers)
 	}
+}
+
+// firstCandidate is the start of the first candidate time of an Offer (IR636).
+func firstCandidate(t *testing.T, offer any) any {
+	t.Helper()
+
+	slots, ok := asObj(t, offer)["candidateSlots"].([]any)
+	if !ok || len(slots) == 0 {
+		t.Fatalf("offer without candidateSlots: %v", offer)
+	}
+
+	return asObj(t, slots[0])["startAt"]
 }

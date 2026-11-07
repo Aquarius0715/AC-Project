@@ -42,7 +42,7 @@ test("a customer request reaches the partner's technician", async ({ browser }) 
       expect(jobId).toMatch(/^[0-9a-f-]{36}$/);
     });
 
-    await test.step("HQ offers the first preferred time to contractor-a", async () => {
+    await test.step("HQ offers all the preferred times to contractor-a", async () => {
       await admin.goto(`/admin/jobs?jobId=${jobId}`);
       await admin.getByRole("button", { name: "Use this time" }).first().click();
       const dialog = admin.getByRole("dialog");
@@ -50,7 +50,7 @@ test("a customer request reaches the partner's technician", async ({ browser }) 
       const org = dialog.getByLabel("Contractor organization");
       await org.selectOption((await org.locator("option", { hasText: /Contractor A/ }).first().getAttribute("value")));
       await dialog.getByRole("button", { name: "Send offer" }).click();
-      await expect(admin.getByText(/They accept, decline or propose/)).toBeVisible();
+      await expect(admin.getByText(/pick one of these times when they assign a technician/)).toBeVisible();
     });
 
     const partner = await open(browser, app("partner"));
@@ -62,8 +62,14 @@ test("a customer request reaches the partner's technician", async ({ browser }) 
       await expect(partner.getByText("Acceptance does not assign a technician")).toBeVisible();
     });
 
-    await test.step("and gives it to tech-external-a", async () => {
+    await test.step("and picks the second time and gives it to tech-external-a", async () => {
       await partner.goto(`/partner/schedule?jobId=${jobId}`);
+      // the offer carries the three times the customer agreed (IR636); the partner settles one
+      const times = partner.getByRole("radiogroup", { name: "Visit time" }).getByRole("radio");
+      await expect(times).toHaveCount(3);
+      await times.nth(1).click();
+      await partner.waitForURL(/slot=1/);
+      await expect(times.nth(1)).toHaveAttribute("aria-checked", "true");
       await partner.getByRole("radiogroup", { name: "Technician" }).getByRole("radio", { name: /tech-external-a/ }).click();
       await partner.getByRole("button", { name: "Confirm assignment" }).click();
       await expect(partner.getByText("Technician assigned — waiting for acceptance")).toBeVisible();

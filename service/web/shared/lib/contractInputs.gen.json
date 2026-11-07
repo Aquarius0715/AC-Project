@@ -357,9 +357,14 @@
  ],
  "devices.register": [
   "jobId",
+  "mqttNode",
   "sensorTypes",
   "serial",
   "unitId"
+ ],
+ "devices.setMqttNode": [
+  "deviceId",
+  "mqttNode"
  ],
  "devices.updateFirmware": [
   "deviceId",
@@ -576,8 +581,7 @@
   "contractorOrgId",
   "jobId",
   "offerExpiresAt",
-  "termsVersion",
-  "visitSlot"
+  "termsVersion"
  ],
  "jobs.pauseWork": [
   "jobId",

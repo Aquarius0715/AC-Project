@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { assignRefusal, candidates, formMode, freeText, scheduleRow, scheduleTeam, sortOf, weekGrid } from "@ac/web/lib/partnerSchedule";
 import type { ApiDetail, ApiOffer } from "@ac/web/lib/partnerJobDetail";
 import type { ApiCapacity, ApiMember, ApiPartnerJob } from "@ac/web/lib/partnerOverview";
-import { i18nOf, translator } from "@ac/web/lib/i18n";
+import { EN, i18nOf, translator } from "@ac/web/lib/i18n";
 import { must } from "./must";
 
 const TECH_EXTERNAL_A = "tech-external-a";
@@ -36,11 +36,12 @@ type SummaryJob = Extract<ApiPartnerJob, { projection: "summary" }>;
 const detail = (over: Partial<ApiDetail> = {}): ApiDetail => ({
   projection: "detail", id: "job-1", version: 4, unitId: "u1", type: "reactive", status: "accepted", symptom: "x", origin: "client_request", alertIds: [], requestedSlot: visit, scheduledSlot: null,
   dueAt: TEXT_2026_09_25T00_00_00Z, startedAt: null, completedAt: null, assignmentId: null, partnerSlotProposal: null, reportRefs: [], assignment: null,
-  offer: { id: "o", termsVersion: "t", visitSlot: visit, offeredAt: "x", accessValidFrom: "x", accessValidUntil: "x", decision: "accept", decidedAt: "x" }, ...over,
+  offer: { id: "o", termsVersion: "t", candidateSlots: [visit], offeredAt: "x", accessValidFrom: "x", accessValidUntil: "x", decision: "accept", decidedAt: "x" }, ...over,
 });
+const offered = (slots: { startAt: string; endAt: string }[]) => ({ id: "o", termsVersion: "t", candidateSlots: slots, offeredAt: "x", accessValidFrom: "x", accessValidUntil: "x", decision: "accept", decidedAt: "x" });
 const acceptedOffer = (): ApiOffer => ({
   projection: "offer", status: "accepted", jobId: "job-2", jobVersion: 1, offerId: "o-2", type: "reactive", siteAddress: null, requiredQualifications: [], requestedSlot: visit, dueAt: TEXT_2026_09_25T00_00_00Z,
-  offerExpiresAt: "2026-09-30T00:00:00Z", termsVersion: "t", origin: "client_request", visitSlot: visit, offeredAt: "x", accessValidFrom: "2026-09-22T00:00:00Z", accessValidUntil: TEXT_2026_09_25T00_00_00Z, partnerSlotProposal: null,
+  offerExpiresAt: "2026-09-30T00:00:00Z", termsVersion: "t", origin: "client_request", candidateSlots: [visit], offeredAt: "x", accessValidFrom: "2026-09-22T00:00:00Z", accessValidUntil: TEXT_2026_09_25T00_00_00Z, partnerSlotProposal: null,
 });
 const summary = (over: Partial<SummaryJob>): SummaryJob => {
   return ({
@@ -60,7 +61,7 @@ const rows = [
   scheduleRowOf(summary({ status: "assigned", scheduledSlot: visit, technicianMembershipId: "m-a", assignmentAcknowledgement: "cant_make" }), NOW, units, names),
   scheduleRowOf(summary({ status: IN_PROGRESS, scheduledSlot: slot("2026-09-20T02:00:00Z", "2026-09-20T04:00:00Z"), technicianMembershipId: "m-a" }), NOW, units, names),
   scheduleRowOf(summary({ status: "on_hold", accessValidUntil: "2026-09-21T01:00:00Z" }), NOW, units, names),
-  scheduleRowOf({ projection: "offer", status: "accepted", jobId: "job-2-bbbb", jobVersion: 2, offerId: "o", type: "reactive", siteAddress: "2 Demo Avenue", requestedSlot: visit, dueAt: "x", offerExpiresAt: "x", visitSlot: visit, accessValidFrom: "2026-09-22T00:00:00Z", accessValidUntil: "2026-09-26T00:00:00Z" }, NOW, units, names),
+  scheduleRowOf({ projection: "offer", status: "accepted", jobId: "job-2-bbbb", jobVersion: 2, offerId: "o", type: "reactive", siteAddress: "2 Demo Avenue", requestedSlot: visit, dueAt: "x", offerExpiresAt: "x", candidateSlots: [visit], accessValidFrom: "2026-09-22T00:00:00Z", accessValidUntil: "2026-09-26T00:00:00Z" }, NOW, units, names),
 ];
 
 const asg = (s: { startAt: string; endAt: string }, ack = "pending", why: string | null = null) => ({ technicianMembershipId: "m-a", scheduledStart: s.startAt, scheduledEnd: s.endAt, status: "active", acknowledgement: ack, cantMakeReason: why });
@@ -86,14 +87,26 @@ describe("partner schedule", () => {
     const r = formMode(detail({ status: "assigned", scheduledSlot: visit, assignment: asg(visit, "cant_make", "sick") }), "job-1", NOW, names);
     expect(r.kind === "reassign" && [r.currentTech, r.banner?.text.startsWith("tech-external-a can’t make this time: “sick”")]).toStrictEqual([TECH_EXTERNAL_A, true]);
     const past = slot("2026-09-20T02:00:00Z", "2026-09-20T04:00:00Z");
-    const gone = formMode(detail({ status: "assigned", scheduledSlot: past, assignment: asg(past) }), "job-1", NOW, names);
+    const gone = formMode(detail({ status: "assigned", scheduledSlot: past, assignment: asg(past), offer: offered([past]) }), "job-1", NOW, names);
     expect([gone.kind, gone.banner?.tone]).toStrictEqual(["blocked", "crit"]);
+    // IR636: the booked time is over but the client agreed another one — the contractor reassigns to it
+    const moved = formMode(detail({ status: "assigned", scheduledSlot: past, assignment: asg(past), offer: offered([past, visit]) }), "job-1", NOW, names);
+    expect(moved.kind === "reassign" && [moved.slot, moved.choices]).toStrictEqual([visit, [visit]]);
+    // IR636: an offer with several times: earliest first, `pick` chooses one, a time that is over is not offered
+    const later = slot("2026-09-23T02:00:00Z", "2026-09-23T04:00:00Z");
+    const several = detail({ offer: offered([later, past, visit]) });
+    const first = formMode(several, "job-1", NOW, names);
+    expect(first.kind === "assign" && [first.slot, first.choices]).toStrictEqual([visit, [visit, later]]);
+    const second = formMode(several, "job-1", NOW, names, EN, 1);
+    expect(second.kind === "assign" && second.slot).toStrictEqual(later);
+    const none = formMode(detail({ offer: offered([past]) }), "job-1", NOW, names);
+    expect([none.kind, none.banner?.tone]).toStrictEqual(["blocked", "crit"]);
     const extension = formMode(detail({ status: IN_PROGRESS, scheduledSlot: past, assignment: asg(past) }), "job-1", NOW, names);
     expect(extension.kind === "extend" && [extension.title, extension.endEditable, extension.reasonRequired, extension.banner?.tone]).toStrictEqual(["Reschedule — job-1", true, true, "crit"]);
     const running = formMode(detail({ status: IN_PROGRESS, scheduledSlot: visit, assignment: asg(visit, "accepted") }), "job-1", NOW, names);
     expect(running.kind === "extend" && [running.title, running.banner]).toStrictEqual(["Reassign — job-1 (in progress)", undefined]);
     const offer = acceptedOffer();
-    expect(formMode(offer, "job-2", NOW, names)).toMatchObject({ kind: "blocked", banner: { text: "Accepted — the delegation period starts 22 Sept 2026, 8:00 am MYT; the technician can be assigned from then, for exactly 22 Sept, 10:00 am – 12:00 pm MYT." } });
+    expect(formMode(offer, "job-2", NOW, names)).toMatchObject({ kind: "blocked", banner: { text: "Accepted — the delegation period starts 22 Sept 2026, 8:00 am MYT; the technician can be assigned from then, for one of the times the client agreed: 22 Sept, 10:00 am – 12:00 pm MYT." } });
     expect(formMode(detail({ status: "completed" }), "job-1", NOW, names).kind).toBe("blocked");
   });
 
@@ -148,7 +161,7 @@ describe("partner schedule", () => {
     const row = scheduleRowOf(summary({ status: "assigned", scheduledSlot: visit, technicianMembershipId: "m-a", assignmentAcknowledgement: null }), NOW, units, names, MS_TOKYO);
     expect([row.line, row.windowText, row.left]).toStrictEqual(["Ditugaskan · tech-external-a · menunggu penerimaan", "20 Sep, 10:30 PG – 22 Sep, 10:30 PG GMT+9", "1 hari lagi"]);
     const offer = acceptedOffer();
-    expect(formMode(offer, "job-2", NOW, names, MS_TOKYO)).toMatchObject({ title: "Tugaskan — job-2", banner: { text: "Diterima — tempoh delegasi bermula 22 Sep 2026, 9:00 PG GMT+9; juruteknik boleh ditugaskan mulai ketika itu, tepat untuk 22 Sep, 11:00 PG – 1:00 PTG GMT+9." } });
+    expect(formMode(offer, "job-2", NOW, names, MS_TOKYO)).toMatchObject({ title: "Tugaskan — job-2", banner: { text: "Diterima — tempoh delegasi bermula 22 Sep 2026, 9:00 PG GMT+9; juruteknik boleh ditugaskan mulai ketika itu, untuk salah satu masa yang dipersetujui pelanggan: 22 Sep, 11:00 PG – 1:00 PTG GMT+9." } });
     const held = formMode(detail({ status: "on_hold", scheduledSlot: visit, offer: null }), "job-1", NOW, names, MS_TOKYO);
     expect(held.kind === "extend" && [held.title, held.button]).toStrictEqual(["Tugaskan semula — job-1 (ditangguhkan)", "Sahkan penugasan semula"]);
     expect(formMode(detail({ status: "submitted", scheduledSlot: visit, offer: null }), "job-1", NOW, names, MS_TOKYO).banner?.text).toBe("Kerja ini dihantar — tiada apa-apa untuk dijadualkan.");

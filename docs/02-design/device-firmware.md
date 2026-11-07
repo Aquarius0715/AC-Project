@@ -27,6 +27,8 @@ Two nodes exist today. The firmware is the same binary; only the settings differ
 | 1 | `node_1` | IR LED (`ir`), BME680 (`bme680`). No power meter. |
 | 2 | `node_2` | BME680, PZEM power meter (`pzem`). No IR. |
 
+The platform learns which AC a node belongs to from its `node_id`: HQ registers each device in the platform's admin app with the **MQTT node ID** the node uses (exactly as set in the firmware, letters of either case, digits, `-` and `_`, one device per ID). A node whose ID nobody has registered is heard but not recorded, so a new node needs no platform release, only that registration.
+
 Out of scope: TLS, per-node credentials, OTA update. The topics `…/sensors` and `…/command` and the plain-text commands already work in the current sketch and must keep working.
 
 ## 2. MQTT topics

@@ -48,9 +48,12 @@ func TestUnitScopeExternalTechnicianAndContractor(t *testing.T) {
 
 	owner(
 		t,
-		`INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, visit_slot, offered_at,
+		`INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, candidate_slots, offered_at,
 			offer_expires_at, access_valid_from, access_valid_until, decision, decided_at)
-		VALUES ($1,$2,$3,'v1',tstzrange($4,$5),$6,$5,$6,$5,'accept',$6)`,
+		VALUES ($1,$2,$3,'v1',`+oneSlotSQL(
+			"$4",
+			"$5",
+		)+`,$6,$5,$6,$5,'accept',$6)`,
 		seed.ID(
 			"tenant-a",
 		),
@@ -234,9 +237,12 @@ func TestUnitAccessProjection(t *testing.T) {
 	)
 	owner(
 		t,
-		`INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, visit_slot, offered_at,
+		`INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, candidate_slots, offered_at,
 			offer_expires_at, access_valid_from, access_valid_until)
-		VALUES ($1,$2,$3,'v1',tstzrange($4,$5),$6,$5,$6,$5)`,
+		VALUES ($1,$2,$3,'v1',`+oneSlotSQL(
+			"$4",
+			"$5",
+		)+`,$6,$5,$6,$5)`,
 		seed.ID(
 			"tenant-a",
 		),

@@ -503,6 +503,7 @@ CREATE TABLE devices.devices (
   tenant_id                 uuid NOT NULL,
   serial                    text NOT NULL,
   iot_thing_name            text UNIQUE,         -- AWS IoT Core thing
+  mqtt_node                 text CHECK (mqtt_node ~ '^[A-Za-z0-9_-]{1,64}$'),   -- node_id of the ESP32 node: the <node> of smarthome/ac/<node>/... (IR635)
   certificate_arn           text,
   binding_id                uuid,
   unit_id                   uuid,                -- current binding (denormalised)
@@ -519,6 +520,7 @@ CREATE TABLE devices.devices (
   UNIQUE (tenant_id, id)
 );
 CREATE UNIQUE INDEX devices_serial ON devices.devices (tenant_id, upper(btrim(serial)));   -- duplicate serial CONFLICT (AT-T11-E)
+CREATE UNIQUE INDEX devices_mqtt_node ON devices.devices (tenant_id, mqtt_node) WHERE mqtt_node IS NOT NULL;   -- one device per node
 CREATE INDEX devices_unit ON devices.devices (tenant_id, unit_id);
 
 CREATE TABLE devices.sensors (
@@ -1064,7 +1066,7 @@ CREATE TABLE maintenance.offers (
   job_id             uuid NOT NULL,
   contractor_org_id  uuid NOT NULL,
   terms_version      text NOT NULL,
-  visit_slot         tstzrange NOT NULL,
+  candidate_slots    jsonb NOT NULL CHECK (jsonb_typeof(candidate_slots) = 'array' AND jsonb_array_length(candidate_slots) >= 1), -- Slot[]: the client's agreed times; the contractor picks one when it assigns a technician (IR636)
   offered_at         timestamptz NOT NULL,
   offer_expires_at   timestamptz NOT NULL,
   access_valid_from  timestamptz NOT NULL,

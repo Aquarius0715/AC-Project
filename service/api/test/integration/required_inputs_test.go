@@ -56,7 +56,7 @@ func TestRequiredInputs(t *testing.T) {
 		{"jobs.resolvePartnerSlot", `{"decision":"maybe"}`, map[string]string{fieldProposalID: req, fieldDecision: inv}},
 		{
 			"jobs.offer", `{}`,
-			map[string]string{fieldJobID: req, fieldContractorOrgID: req, fieldVisitSlot: rng, fieldAccessValidUntil: rng},
+			map[string]string{fieldJobID: req, fieldContractorOrgID: req, fieldAccessValidUntil: rng},
 		},
 		{opJobsAccept, `{"termsVersion":` + long(65) + `}`, map[string]string{fieldTermsVersion: length}},
 		{opJobsAssign, `{}`, map[string]string{fieldJobID: req, "technicianMembershipId": req}},

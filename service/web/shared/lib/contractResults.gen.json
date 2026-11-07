@@ -984,6 +984,7 @@
    "firmwareVersion",
    "id",
    "lastSeenAt",
+   "mqttNode",
    "powerSignal",
    "sensors",
    "serial",
@@ -1104,6 +1105,7 @@
    "firmwareVersion",
    "id",
    "lastSeenAt",
+   "mqttNode",
    "powerSignal",
    "sensors",
    "serial",
@@ -1131,6 +1133,7 @@
    "firmwareVersion",
    "id",
    "lastSeenAt",
+   "mqttNode",
    "powerSignal",
    "sensors",
    "serial",
@@ -1177,6 +1180,29 @@
    "firmwareVersion",
    "id",
    "lastSeenAt",
+   "mqttNode",
+   "powerSignal",
+   "sensors",
+   "serial",
+   "tamper",
+   "targetUnitId",
+   "tenantId",
+   "unitId",
+   "updatedAt",
+   "version"
+  ],
+  "items": null
+ },
+ "devices.setMqttNode": {
+  "fields": [
+   "bindingId",
+   "connection",
+   "createdAt",
+   "createdByMembershipId",
+   "firmwareVersion",
+   "id",
+   "lastSeenAt",
+   "mqttNode",
    "powerSignal",
    "sensors",
    "serial",
@@ -1961,6 +1987,7 @@
    "asOf",
    "assignment",
    "assignmentId",
+   "candidateSlots",
    "completedAt",
    "contactWindow",
    "contractorOrgId",
@@ -2007,7 +2034,6 @@
    "unitId",
    "updatedAt",
    "version",
-   "visitSlot",
    "warrantyClaims"
   ],
   "items": null
@@ -2073,6 +2099,7 @@
    "asOf",
    "assignmentAcknowledgement",
    "assignmentId",
+   "candidateSlots",
    "completedAt",
    "contractorOrgId",
    "createdAt",
@@ -2104,8 +2131,7 @@
    "termsVersion",
    "type",
    "unitId",
-   "version",
-   "visitSlot"
+   "version"
   ]
  },
  "jobs.offer": {

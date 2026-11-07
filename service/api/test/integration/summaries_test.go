@@ -171,9 +171,13 @@ func TestSummariesTechnicianPartner(t *testing.T) {
 	)
 	owner(
 		t,
-		`INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, visit_slot, offered_at,
+		`INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, candidate_slots, offered_at,
 			offer_expires_at, decision, decided_at, access_valid_from, access_valid_until)
-		SELECT tenant_id, id, $2, 'terms-1', requested_slot, $3, $4, 'accept', $3, $3, $4 FROM maintenance.jobs WHERE id =
+		SELECT tenant_id, id, $2, 'terms-1', `+oneSlotSQL(
+			"lower(requested_slot)",
+			"upper(requested_slot)",
+		)+`,
+			$3, $4, 'accept', $3, $3, $4 FROM maintenance.jobs WHERE id =
 		$1`,
 		job,
 		seedID("org-contractor-b"),

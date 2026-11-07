@@ -130,7 +130,6 @@ const (
 	fieldUserID                  = "userId"
 	fieldValidFrom               = "validFrom"
 	fieldValidUntil              = "validUntil"
-	fieldVisitSlot               = "visitSlot"
 	fieldWeekdays                = "weekdays"
 )
 
@@ -353,3 +352,8 @@ const (
 	projectionOffer   = "offer"
 	projectionSummary = "summary"
 )
+
+// oneSlotSQL is the SQL of an offer's candidate_slots holding one time, from two timestamp expressions (IR636).
+func oneSlotSQL(start, end string) string {
+	return "jsonb_build_array(jsonb_build_object('startAt'," + start + "::timestamptz,'endAt'," + end + "::timestamptz))"
+}

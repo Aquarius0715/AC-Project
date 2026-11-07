@@ -20,7 +20,7 @@ const optional = orWhenRefused;
 const plusDays = (date: string, n: number) => new Date(Date.parse(`${date}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 const klDate = (iso: string) => new Date(Date.parse(iso) + 8 * 3_600_000).toISOString().slice(0, 10);
 
-export async function loadSchedule(sp: { jobId?: string; sort?: string }) {
+export async function loadSchedule(sp: { jobId?: string; sort?: string; slot?: string }) {
   interface Page<T> { items: T[]; total: number }
   const [now, display] = await Promise.all([coreNow(), coreDisplay()]);
   const nowMs = now.getTime();
@@ -46,7 +46,8 @@ export async function loadSchedule(sp: { jobId?: string; sort?: string }) {
   });
   if (!job || job.projection === "history") return { ...base, selected: null, week: null };
   const label = `${picked.short} · ${picked.title}`;
-  const mode = formMode(job, label, nowMs, names, i);
+  const pick = sp.slot !== undefined && /^\d+$/.test(sp.slot) ? Number(sp.slot) : null; // which of the offer's open times (IR636)
+  const mode = formMode(job, label, nowMs, names, i, pick);
   const slot: Slot | null = mode.slot;
   const unit = job.projection === "detail" ? await optional(coreOp<ApiUnitDetail>("units.get", { id: job.unitId }), null) : null;
   const required = job.projection === "offer" ? job.requiredQualifications : requiredFor(unit?.serviceScope ?? []);
@@ -70,6 +71,10 @@ export async function loadSchedule(sp: { jobId?: string; sort?: string }) {
       short: picked.short,
       version: job.projection === "detail" ? job.version : job.jobVersion,
       ack: job.projection === "detail" && job.assignment ? { status: job.assignment.acknowledgement, reason: job.assignment.cantMakeReason, alternative } : null,
+      // the chosen candidate time differs from the booked one: a reassignment may keep the technician (IR636)
+      moved: job.projection === "detail" && !!job.assignment && !!slot && (Date.parse(job.assignment.scheduledStart) !== Date.parse(slot.startAt) || Date.parse(job.assignment.scheduledEnd) !== Date.parse(slot.endAt)),
+      // the open candidate times to pick from, as text, and which one is shown
+      times: mode.kind === "blocked" ? [] : mode.choices.map((c) => ({ text: showSpan(c.startAt, c.endAt, display), on: !!slot && Date.parse(c.startAt) === Date.parse(slot.startAt) && Date.parse(c.endAt) === Date.parse(slot.endAt) })),
       window: picked.window,
       candidates: slot ? candidates(technicians, new Set(eligible), required, slot, day, currentId, t) : [],
       text: {
