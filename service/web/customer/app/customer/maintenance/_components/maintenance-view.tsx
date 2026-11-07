@@ -109,6 +109,23 @@ export function MaintenanceView({ live }: Readonly<{ live: MaintenanceLive }>) {
 
 type Done = (text?: string, tone?: "ok" | "warn") => void;
 
+/** The submitted report of a completed job: what needs attention, the checks that are fine, parts, readings, work text, photos. */
+function CompletedReport({ report }: Readonly<{ report: NonNullable<Detail["report"]> }>) {
+  const t = useT();
+  return (
+    <>
+        <ul className="divide-y divide-line">{report.items.filter((i) => i.tone !== "ok").map((i) => <li key={i.id} className="flex items-center justify-between gap-2 py-1 text-[13px]"><span>{i.label}{i.reason && <span className="text-xs text-muted-foreground"> · {i.reason}</span>}</span><Badge tone={i.tone}>{i.result}</Badge></li>)}</ul>
+        <p className="mt-1 text-xs text-muted-foreground">{t("{n} checks OK", { n: report.items.filter((i) => i.tone === "ok").length })}{report.parts.length > 0 ? t(" · parts: {parts}", { parts: report.parts.join(", ") }) : t(" · no parts replaced")}</p>
+        {report.readings.length > 0 && <div className="mt-2"><SummaryList items={report.readings} /></div>}
+        {report.workText && <p className="mt-2 text-xs">{report.workText}</p>}
+        {report.photos.length > 0 && <div className="mt-2 flex flex-wrap gap-2">{report.photos.map((p) => (
+          // eslint-disable-next-line @next/next/no-img-element -- data URL read through the DAL (attachments.getContent)
+          <img key={p.id} src={p.url} alt={p.name} className="h-20 w-28 rounded-lg bg-surface2 object-cover" />
+        ))}</div>}
+    </>
+  );
+}
+
 function JobDetail({ d, open, onDone, onFail }: Readonly<{ d: Detail; open: (m: ModalKind) => void; onDone: Done; onFail: (f: ActionFailure) => void }>) {
   const { proposal } = d;
   const t = useT();
@@ -149,18 +166,7 @@ function JobDetail({ d, open, onDone, onFail }: Readonly<{ d: Detail; open: (m: 
       {j.status === "completed" && (
         <>
           <p className="mt-3 text-[13px] font-bold">{t("Completed report")} {d.report ? <span className="text-xs font-normal text-muted-foreground">v{d.report.version}{d.report.accepted ? t(" · accepted {when}", { when: d.report.accepted }) : ""}</span> : <span className="text-xs font-normal text-muted-foreground">{t("visible once HQ accepts it")}</span>}</p>
-          {d.report && (
-            <>
-              <ul className="divide-y divide-line">{d.report.items.filter((i) => i.tone !== "ok").map((i) => <li key={i.id} className="flex items-center justify-between gap-2 py-1 text-[13px]"><span>{i.label}{i.reason && <span className="text-xs text-muted-foreground"> · {i.reason}</span>}</span><Badge tone={i.tone}>{i.result}</Badge></li>)}</ul>
-              <p className="mt-1 text-xs text-muted-foreground">{t("{n} checks OK", { n: d.report.items.filter((i) => i.tone === "ok").length })}{d.report.parts.length > 0 ? t(" · parts: {parts}", { parts: d.report.parts.join(", ") }) : t(" · no parts replaced")}</p>
-              {d.report.readings.length > 0 && <div className="mt-2"><SummaryList items={d.report.readings} /></div>}
-              {d.report.workText && <p className="mt-2 text-xs">{d.report.workText}</p>}
-              {d.report.photos.length > 0 && <div className="mt-2 flex flex-wrap gap-2">{d.report.photos.map((p) => (
-                // eslint-disable-next-line @next/next/no-img-element -- data URL read through the DAL (attachments.getContent)
-                <img key={p.id} src={p.url} alt={p.name} className="h-20 w-28 rounded-lg bg-surface2 object-cover" />
-              ))}</div>}
-            </>
-          )}
+          {d.report && <CompletedReport report={d.report} />}
           {d.feedback.kind === "rate" && <div className="mt-3 flex flex-wrap items-center justify-end gap-2"><span className="mr-auto text-[11px] text-muted-foreground">{d.feedback.text}</span><Btn onClick={() => { open("problem"); }}>{t("Report a problem")}</Btn><Btn variant="primary" onClick={() => { open("rate"); }}>{t("Confirm & rate")}</Btn></div>}
           {(d.feedback.kind === "edit" || d.feedback.kind === "rated") && <div className="mt-3 flex flex-wrap items-center justify-end gap-2"><span className="mr-auto text-[13px]">{t("Rated")} <span role="img" aria-label={t("{n} of 5 stars", { n: d.feedback.stars ?? 0 })} className="inline-flex align-[-0.125em] text-warn">{Array.from({ length: d.feedback.stars ?? 0 }, (_, k) => <Icon key={k} name="star" filled />)}</span>{d.feedback.text}</span>{d.feedback.kind === "edit" && <Btn size="sm" onClick={() => { open("rate"); }}>{t("Edit rating")}</Btn>}{d.feedback.report && <Btn size="sm" onClick={() => { open("problem"); }}>{t("Report a problem")}</Btn>}</div>}
         </>

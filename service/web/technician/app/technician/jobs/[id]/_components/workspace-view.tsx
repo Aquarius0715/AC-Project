@@ -300,6 +300,7 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
     return () => { if (t) clearTimeout(t); };
   }, [draft, dirty, isEditable, pending]);
   const withSaved = (fn: (r: Rep) => void) => { if (dirty || !rep) save(fn); else fn(rep); };
+  const photoAdded = (next: Rep) => { setRep(next); edit((d) => ({ ...d, attachmentIds: next.attachmentRefs.map((a) => a.id) })); setDirty(false); };
   const addPhotos = (files: FileList | null) => {
     const file = files?.[0];
     if (!file) return;
@@ -311,7 +312,7 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
     withSaved((r) => {
       const form = new FormData();
       form.set("jobId", job.id); form.set("reportId", r.id); form.set("reportVersion", String(r.version)); form.set("file", file);
-      run(() => uploadPhoto(form), t("Photo {name} added — sign-off cleared", { name: file.name }), (next) => { setRep(next); edit((d) => ({ ...d, attachmentIds: next.attachmentRefs.map((a) => a.id) })); setDirty(false); }, failed);
+      run(() => uploadPhoto(form), t("Photo {name} added — sign-off cleared", { name: file.name }), photoAdded, failed);
     });
   };
   const trySubmit = () => {

@@ -294,6 +294,8 @@ function DemoAssistant({ onClose, context }: Readonly<{ onClose: () => void; con
   const end = useRef<HTMLDivElement>(null);
   useEffect(() => { end.current?.scrollIntoView({ block: "end" }); }, [msgs, listening]);
 
+  // choosing one of the offered ACs replaces the open question with the confirmation
+  const choose = (target: string, celsius: number) => { setMsgs((s) => [...s.filter((x) => x.kind !== "ask"), { target, kind: "confirm", temp: celsius }]); };
   const interpret = (q: string, via: "text" | "voice") => {
     const add = (...m: DemoChatMessage[]) => { setMsgs((s) => [...s, ...m]); };
     add({ kind: "user", text: q, via });
@@ -349,7 +351,7 @@ function DemoAssistant({ onClose, context }: Readonly<{ onClose: () => void; con
           if (m.kind === "ask") return (
             <div key={n} className="rounded-2xl bg-surface2 p-3 text-[13px]">
               Which AC did you mean? I never guess the target.
-              <div className="mt-2 flex flex-wrap gap-2">{m.options.map((o) => <Btn key={o} size="sm" onClick={() => { setMsgs((s) => [...s.filter((x) => x.kind !== "ask"), { kind: "confirm", target: o, temp: m.temp }]); }}>{o}</Btn>)}</div>
+              <div className="mt-2 flex flex-wrap gap-2">{m.options.map((o) => <Btn key={o} size="sm" onClick={() => { choose(o, m.temp); }}>{o}</Btn>)}</div>
             </div>);
           return <div key={n} className={cx("rounded-xl px-3 py-2 text-[13px] font-semibold", lookOf(m.tone).soft, lookOf(m.tone).text)}><Icon name={lookOf(m.tone).icon} /> {m.text}</div>;
         })}
