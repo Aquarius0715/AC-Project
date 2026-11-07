@@ -124,20 +124,20 @@ func DefaultFactorID() uuid.UUID {
 	)
 }
 
-// DefaultFactor is the current default factor and whether there is one; without it the summaries report
+// DefaultFactor is the current default factor, or nil when there is none; without it the summaries report
 // factor_missing and leave the emissions null.
-func DefaultFactor(ctx context.Context, c *ops.Call) (*Factor, bool, error) {
+func DefaultFactor(ctx context.Context, c *ops.Call) (*Factor, error) {
 	factor, err := LoadFactor(ctx, c, DefaultFactorID(), nil)
 	if err != nil {
 		var de *apperr.DomainError
 		if errors.As(err, &de) && de.Code == apperr.NotFound {
-			return nil, false, nil
+			return nil, nil //nolint:nilnil // nil means there is no default factor; the summaries read it as factor_missing
 		}
 
-		return nil, false, err
+		return nil, err
 	}
 
-	return &factor, true, nil
+	return &factor, nil
 }
 
 func sameSet(a, b []uuid.UUID) bool {
@@ -392,7 +392,7 @@ func summary(ctx context.Context, call *ops.Call, input *SummaryInput) (Summary,
 		return Summary{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
-	factor, _, err := DefaultFactor(ctx, call)
+	factor, err := DefaultFactor(ctx, call)
 	if err != nil {
 		return Summary{}, err
 	}

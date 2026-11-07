@@ -41,7 +41,7 @@ export function EnergyDemo() {
       {tab === "analysis" ? (
         <>
           <Card title="Scope">
-            <div className="flex flex-wrap items-end gap-4"><div className="flex flex-wrap items-center gap-3 text-[13px]">{allUnits.map((u) => <Check key={u} label={u} checked={units.includes(u)} onChange={(v) => { toggleUnit(u, v); }} />)}</div><div className="min-w-[200px]"><Field label="Baseline"><Select value={bid} onChange={(e) => { setBid(e.target.value); }}>{baselines.map((x) => <option key={x.id}>{x.id}</option>)}</Select></Field></div><div className="w-32"><Field label="Actual (kWh, demo)"><Input type="number" value={actual} onChange={(e) => { setActual(+e.target.value); }} /></Field></div></div>
+            <div className="flex flex-wrap items-end gap-4"><div className="flex flex-wrap items-center gap-3 text-[13px]">{allUnits.map((u) => <Check key={u} label={u} checked={units.includes(u)} onChange={(v) => { toggleUnit(u, v); }} />)}</div><div className="min-w-[200px]"><Field label="Baseline"><Select value={bid} onChange={(e) => { setBid(e.target.value); }}>{baselines.map((x) => <option key={x.id}>{x.id}</option>)}</Select></Field></div><div className="w-32"><Field label="Actual (kWh, demo)"><Input type="number" value={actual} onChange={(e) => { setActual(Number(e.target.value)); }} /></Field></div></div>
             <p className="mt-2 text-xs">{isMismatch ? <span className="inline-flex items-center gap-1 text-crit"><Icon name="error" />Unit set mismatch → no difference can be calculated.</span> : <span className="inline-flex items-center gap-1 text-ok"><Icon name="check" />comparable</span>}</p>
           </Card>
           <div className="grid-fluid" style={{ ["--min"as string]: "190px" }}>

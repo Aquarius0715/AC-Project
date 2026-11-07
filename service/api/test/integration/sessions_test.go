@@ -131,7 +131,7 @@ func TestRevokeSessions(t *testing.T) {
 	}
 
 	body := func(id any, reason string) string {
-		return fmt.Sprintf(`{"membershipId":"%s","reason":%q}`, id, reason)
+		return fmt.Sprintf(`{"membershipId":%q,"reason":%q}`, id, reason)
 	}
 
 	// the input and who may
@@ -372,7 +372,7 @@ func (f *fakeIDP) take() []string {
 //
 //nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestRevokeSessionsEndsIdentityProviderSessions(t *testing.T) {
-	idp := &fakeIDP{
+	provider := &fakeIDP{
 		mu:         sync.Mutex{},
 		subjects:   nil,
 		err:        nil,
@@ -386,7 +386,7 @@ func TestRevokeSessionsEndsIdentityProviderSessions(t *testing.T) {
 	}
 	srv := serverCfg(
 		t,
-		func(c *apiserver.Config) { c.IdentityProvider = idp; c.Domains = ops.Domains },
+		func(c *apiserver.Config) { c.IdentityProvider = provider; c.Domains = ops.Domains },
 	)
 	user, member := seed.ID("user-test-revoke-idp"), seed.ID("test-revoke-idp-tech")
 	owner(
@@ -415,7 +415,7 @@ func TestRevokeSessionsEndsIdentityProviderSessions(t *testing.T) {
 			srv,
 			hq(),
 			"members.revokeSessions",
-			fmt.Sprintf(`{"membershipId":"%s","reason":"Laptop stolen"}`, member),
+			fmt.Sprintf(`{"membershipId":%q,"reason":"Laptop stolen"}`, member),
 			0,
 		); code != 200 {
 			t.Fatalf("revoke: %d %v", code, res)
@@ -429,12 +429,12 @@ func TestRevokeSessionsEndsIdentityProviderSessions(t *testing.T) {
 
 	revoke()
 
-	if got := idp.take(); !slices.Contains(got, user.String()) {
+	if got := provider.take(); !slices.Contains(got, user.String()) {
 		t.Errorf("ended at the identity provider: %v, want %s", got, user)
 	}
 
 	err := srv.DrainEvents(context.Background())
-	if err != nil || len(idp.take()) != 0 {
+	if err != nil || len(provider.take()) != 0 {
 		t.Errorf("the event was applied again: %v", err)
 	}
 
@@ -445,18 +445,18 @@ func TestRevokeSessionsEndsIdentityProviderSessions(t *testing.T) {
 		func() { owner(t, `UPDATE identity.users SET cognito_sub = NULL WHERE id = $1`, user) },
 	)
 
-	idp.err = errIdentityProviderDown
+	provider.err = errIdentityProviderDown
 
 	revoke()
 
-	if got := idp.take(); !slices.Contains(got, sub) || slices.Contains(got, user.String()) {
+	if got := provider.take(); !slices.Contains(got, sub) || slices.Contains(got, user.String()) {
 		t.Errorf("ended with the Cognito sub: %v", got)
 	}
 
-	idp.err = nil
+	provider.err = nil
 
 	err = srv.DrainEvents(context.Background())
-	if err != nil || len(idp.take()) != 0 {
+	if err != nil || len(provider.take()) != 0 {
 		t.Errorf("a failed provider call is retried and holds up the consumer: %v", err)
 	}
 
@@ -471,7 +471,7 @@ func TestRevokeSessionsEndsIdentityProviderSessions(t *testing.T) {
 	)
 
 	err = srv.DrainEvents(context.Background())
-	if err != nil || len(idp.take()) != 0 {
+	if err != nil || len(provider.take()) != 0 {
 		t.Errorf("a user who is gone: %v", err)
 	}
 }

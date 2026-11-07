@@ -36,7 +36,7 @@ export function money(minor: number, currency: string): string {
   return `${minor < 0 ? "− " : ""}${currency} ${abs}`;
 }
 const amount = (minor: number) => `${minor < 0 ? "− " : ""}${(Math.abs(minor) / 100).toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-export const workLabel: Record<ApiPayoutLine["workType"], string> = { periodic_inspection: "Periodic inspection", repair_base: "Repair", emergency: "Emergency call-out", rework_deduction: "Rework deduction" };
+const workLabel: Record<ApiPayoutLine["workType"], string> = { periodic_inspection: "Periodic inspection", repair_base: "Repair", emergency: "Emergency call-out", rework_deduction: "Rework deduction" };
 
 export interface StatementRow { id: string; period: string; label: string; sub: string; badge: { label: string; tone: "primary" | "ok" } }
 /** The statements list (newest period first): “Sept 2026 · stmt · MYR 1,990.00 · Approved / Paid 15 Sept”. */
@@ -69,7 +69,7 @@ export function kpis(s: ApiPayoutStatement, rateCard: string | null, i: I18n = E
   ];
 }
 
-export type LineStatus = "accepted" | "deduction" | "adjustment" | "not_included";
+type LineStatus = "accepted" | "deduction" | "adjustment" | "not_included";
 export interface LineRow {
   key: string; lineId: string | null; jobId: string; job: string; work: string; sub: string | null; accepted: string; status: LineStatus; statusText: string;
   tone: "ok" | "warn" | "primary" | "muted"; amount: string; question: ApiPayoutQuestion | null; askable: boolean;

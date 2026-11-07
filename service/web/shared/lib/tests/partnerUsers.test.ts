@@ -20,48 +20,48 @@ const revoked = (status: "active" | "disabled") => partnerUserRows([user({ id: "
 describe("partnerUserRows (FR-P11)", () => {
   it("sorts by name, marks the caller's own account and gives it no actions", () => {
     const rows = partnerUserRows(PARTNER_USERS_SEED, CONTRACTOR_A);
-    expect(rows.map((r) => r.name ?? r.email)).toEqual([CONTRACTOR_A, "New Tech", "tech-external-a"]);
+    expect(rows.map((r) => r.name ?? r.email)).toStrictEqual([CONTRACTOR_A, "New Tech", "tech-external-a"]);
     const self = must(rows.find((r) => r.you));
-    expect(self.actions).toEqual({ resend: false, access: false, disable: false, enable: false, remove: false });
+    expect(self.actions).toStrictEqual({ resend: false, access: false, disable: false, enable: false, remove: false });
   });
   it("offers resend, access and remove on a technician not signed in yet; access, disable and remove on an active one (IR461)", () => {
     const rows = partnerUserRows(PARTNER_USERS_SEED, CONTRACTOR_A);
     const added = must(rows.find((r) => r.status === "invited"));
-    expect(added.actions).toEqual({ resend: true, access: true, disable: false, enable: false, remove: true });
+    expect(added.actions).toStrictEqual({ resend: true, access: true, disable: false, enable: false, remove: true });
     expect(added.accessDate).toBe("2026-12-31");
     const tech = must(rows.find((r) => r.name === "tech-external-a"));
-    expect(tech.actions).toEqual({ resend: false, access: true, disable: true, enable: false, remove: true });
+    expect(tech.actions).toStrictEqual({ resend: false, access: true, disable: true, enable: false, remove: true });
     expect(tech.access).toMatch(/2026/);
   });
   it("keeps the company's last active contractor: no disable, no remove", () => {
     const rows = partnerUserRows([user({ id: "boss", membershipId: "m1", partnerRole: "contractor", status: "active", displayName: "Boss" })], "someone-else");
     expect(rows[0]?.lastContractor).toBe(true);
-    expect([rows[0]?.actions.disable, rows[0]?.actions.remove]).toEqual([false, false]);
+    expect([rows[0]?.actions.disable, rows[0]?.actions.remove]).toStrictEqual([false, false]);
   });
   it("reads an active account whose access end has passed as ended: no disable, only remove", () => {
     const [r] = partnerUserRows([user({ id: "e", displayName: "Old", status: "active", membershipId: "m", accessUntil: TEXT_2026_10_01T00_00_00Z })], null, undefined, new Date(TEXT_2026_10_02T00_00_00Z));
     expect(r?.ended).toBe(true);
-    expect(r?.actions).toEqual({ resend: false, access: true, disable: false, enable: false, remove: true });
+    expect(r?.actions).toStrictEqual({ resend: false, access: true, disable: false, enable: false, remove: true });
     expect(partnerUserRows([user({ id: "e", displayName: "Old", status: "active", membershipId: "m", accessUntil: TEXT_2026_10_01T00_00_00Z })], null, undefined, new Date("2026-09-15T00:00:00Z"))[0]?.ended).toBe(false);
   });
   it("leaves only removing to an account whose access HQ ended (IR508)", () => {
-    expect([revoked("active")?.revoked, revoked("active")?.actions, revoked("disabled")?.actions]).toEqual([
+    expect([revoked("active")?.revoked, revoked("active")?.actions, revoked("disabled")?.actions]).toStrictEqual([
       true, { resend: false, access: false, disable: false, enable: false, remove: true }, { resend: false, access: false, disable: false, enable: false, remove: true }]);
   });
   it("reads a technician not signed in yet whose access end has passed as ended: no resend until the end moves (IR461)", () => {
     const [r] = partnerUserRows([user({ id: "n", displayName: "Late", membershipId: "m", accessUntil: TEXT_2026_10_01T00_00_00Z })], null, undefined, new Date(TEXT_2026_10_02T00_00_00Z));
     expect(r?.ended).toBe(true);
-    expect(r?.actions).toEqual({ resend: false, access: true, disable: false, enable: false, remove: true });
+    expect(r?.actions).toStrictEqual({ resend: false, access: true, disable: false, enable: false, remove: true });
   });
   it("keeps a technician who holds an assigned job: no disable, no remove until it is reassigned (IR432)", () => {
     const [r] = partnerUserRows([user({ id: "b", displayName: "Busy", status: "active", membershipId: "m", booked: true })], null);
     expect(r?.booked).toBe(true);
-    expect(r?.actions).toEqual({ resend: false, access: true, disable: false, enable: false, remove: false }); // a later end is still set
+    expect(r?.actions).toStrictEqual({ resend: false, access: true, disable: false, enable: false, remove: false }); // a later end is still set
   });
   it("enables a disabled account; an invite from before IR461 (no account) has no access end and no resend", () => {
     const [d, i] = partnerUserRows([user({ id: "d", displayName: "A", status: "disabled", membershipId: "m" }), user({ id: "i", displayName: "B" })], null);
     expect(d?.actions.enable).toBe(true);
-    expect([i?.access, i?.actions.resend, i?.actions.access]).toEqual(["—", false, false]);
+    expect([i?.access, i?.actions.resend, i?.actions.access]).toStrictEqual(["—", false, false]);
   });
 });
 
@@ -85,7 +85,7 @@ describe("partner invite checks", () => {
   });
   it("takes an access end from the business day to a year ahead, closing at the end of that Kuala Lumpur day (IR461)", () => {
     expect([accessError("2026-09-14", TEXT_2026_09_15), accessError(TEXT_2026_09_15, TEXT_2026_09_15), accessError(addDays(TEXT_2026_09_15, 365), TEXT_2026_09_15), accessError(addDays(TEXT_2026_09_15, 366), TEXT_2026_09_15), accessError("15/09/2026", TEXT_2026_09_15)])
-      .toEqual(["Today or later", undefined, undefined, "At most a year ahead", "A date"]);
+      .toStrictEqual(["Today or later", undefined, undefined, "At most a year ahead", "A date"]);
     expect(accessEnd("2026-12-31")).toBe("2026-12-31T15:59:59.000Z");
   });
   it("reads only known statuses from the URL", () => {

@@ -125,7 +125,7 @@ function ReadingsTable({ draft, edit, isEditable, components, f }: Readonly<{ dr
   return (
 draft.readings.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No readings yet. Record each measurement with its unit and the component it belongs to — an unmeasured value is left empty, never 0.")}</p> : (
         <ScrollX><table className="w-full min-w-[560px] text-[13px]">
-          <thead className="text-left text-[11px] uppercase text-muted-foreground"><tr><th className="py-1">{t("Metric")}</th><th>{t("Value")}</th><th>{t("Unit")}</th><th>{t("Linked item")}</th><th>{t("Observed")}</th><th /></tr></thead>
+          <thead className="text-left text-[11px] uppercase text-muted-foreground"><tr><th className="py-1">{t("Metric")}</th><th>{t("Value")}</th><th>{t("Unit")}</th><th>{t("Linked item")}</th><th>{t("Observed")}</th><td /></tr></thead>
           <tbody>{draft.readings.map((m, i) => (
             <tr key={i} className="border-t border-line align-middle">
               <td className="py-1.5 pr-2">{isEditable ? <Select aria-label={t("Metric")} value={m.metric} onChange={(e) => { edit((d) => ({ ...d, readings: d.readings.map((x, k) => (k === i ? { ...x, metric: oneOf(metricIds, e.target.value, x.metric) } : x)) })); }}>{readingMetrics.map((x) => <option key={x.metric} value={x.metric}>{t(x.label)}</option>)}</Select> : t(readingMetrics.find((x) => x.metric === m.metric)?.label ?? m.metric)}</td>
@@ -235,8 +235,8 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
   const [now, setNow] = useState(() => Date.parse(live.now));
   useEffect(() => {
     const offset = Date.parse(live.now) - Date.now();
-    const t = setInterval(() => { setNow(Date.now() + offset); }, 30_000);
-    return () => { clearInterval(t); };
+    const timer = setInterval(() => { setNow(Date.now() + offset); }, 30_000);
+    return () => { clearInterval(timer); };
   }, [live.now]);
   const editableReport = job.draftReportRef && live.report?.version === job.draftReportRef.reportVersion ? live.report : null;
   const [draft, setDraft] = useState<Draft>(() => draftFrom(editableReport ?? (job.status === IN_PROGRESS ? null : live.report), live.components));
@@ -247,10 +247,10 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
   const [checked, setChecked] = useState(false);
   const [refused, setRefused] = useState<string | null>(null);
   // the open checklist group and view outlive the remount a new job version causes (IR625)
-  const [tab, setTabState] = useState<Group>(openTab.get(live.job.id) ?? live.components[0]?.group ?? "indoor");
-  const [view, setViewState] = useState<View>(openView.get(live.job.id) ?? "readings");
-  const setTab = (g: Group) => { openTab.set(live.job.id, g); setTabState(g); };
-  const setView = (v: View) => { openView.set(live.job.id, v); setViewState(v); };
+  const [tab, setTab] = useState<Group>(openTab.get(live.job.id) ?? live.components[0]?.group ?? "indoor");
+  const [view, setView] = useState<View>(openView.get(live.job.id) ?? "readings");
+  const selectTab = (g: Group) => { openTab.set(live.job.id, g); setTab(g); };
+  const selectView = (v: View) => { openView.set(live.job.id, v); setView(v); };
   const [modal, setModal] = useState<null | "checkin" | "cant" | "part" | "refrigerant" | "sign" | "submit">(null);
   const [checkInError, setCheckInError] = useState<CheckInErrors>({});
   // an action that moves the job on mounts the view again for the new version: the focus goes where it said (IR621, IR625)
@@ -296,8 +296,8 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
   // the timer restarts with each edit, not with every render; the save it runs reads the latest draft (useEffectEvent)
   const autosave = useEffectEvent(() => { save(); });
   useEffect(() => {
-    const t = dirty && isEditable && !pending ? setTimeout(() => { autosave(); }, 20_000) : null;
-    return () => { if (t) clearTimeout(t); };
+    const timer = dirty && isEditable && !pending ? setTimeout(() => { autosave(); }, 20_000) : null;
+    return () => { if (timer) clearTimeout(timer); };
   }, [draft, dirty, isEditable, pending]);
   const withSaved = (fn: (r: Rep) => void) => { if (dirty || !rep) save(fn); else fn(rep); };
   const photoAdded = (next: Rep) => { setRep(next); edit((d) => ({ ...d, attachmentIds: next.attachmentRefs.map((a) => a.id) })); setDirty(false); };
@@ -320,7 +320,7 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
     setChecked(true);
     if (found.length > 0) {
       const first = found.find((i) => i.group);
-      if (first?.group) setTab(first.group);
+      if (first?.group) selectTab(first.group);
       // focus the first item to fix once its tab shows it, so a phone does not have to scroll up to it (IR594)
       if (first?.key) focusField(`result-${first.key}`);
       return;
@@ -385,7 +385,7 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
         )}
         {isActions && (
           <div className="flex flex-wrap gap-2">
-            <Btn size="sm" onClick={() => { addReading(it.componentKey); setView("readings"); }}><Icon name="add" /> {t("Add reading")}</Btn>
+            <Btn size="sm" onClick={() => { addReading(it.componentKey); selectView("readings"); }}><Icon name="add" /> {t("Add reading")}</Btn>
             <Btn size="sm" disabled={ph.free.length === 0} aria-expanded={linking === it.componentKey} onClick={() => { setLinking((k) => (k === it.componentKey ? null : it.componentKey)); }}><Icon name="add" /> {t("Link photo")}</Btn>
           </div>
         )}
@@ -417,7 +417,7 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <div className="flex min-w-0 flex-col gap-4 xl:col-span-2">
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <Card title={<Tabs value={tab} onChange={setTab} tabs={groups.map((g) => ({ id: g.group, label: `${g.label} (${String(g.total)})${g.issues ? ` · ${byCount(g.issues, { one: t("1 issue"), many: t("{n} issues", { n: g.issues }) })}` : ""}` }))} />}>
+            <Card title={<Tabs value={tab} onChange={selectTab} tabs={groups.map((g) => ({ id: g.group, label: `${g.label} (${String(g.total)})${g.issues ? ` · ${byCount(g.issues, { one: t("1 issue"), many: t("{n} issues", { n: g.issues }) })}` : ""}` }))} />}>
               {items.length === 0 ? <EmptyState title={t("No components")}>{t("This unit’s service scope has no components in {group}.", { group: t(groupLabel[tab]) })}</EmptyState> : (
                 <ul className="divide-y divide-line">{items.map((it) => (
                   <li key={it.componentKey} className="py-2.5">
@@ -443,7 +443,7 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
               <JobUnitCard live={live} win={win} isUnitOpen={isUnitOpen} />
             </div>
           </div>
-          <Card title={<Tabs value={view} onChange={setView} tabs={[{ id: "readings", label: t("Readings"), count: draft.readings.length }, { id: "parts", label: t("Parts & refrigerant"), count: draft.parts.length + draft.refrigerant.length }, { id: "time", label: t("Time on site") }]} />}
+          <Card title={<Tabs value={view} onChange={selectView} tabs={[{ id: "readings", label: t("Readings"), count: draft.readings.length }, { id: "parts", label: t("Parts & refrigerant"), count: draft.parts.length + draft.refrigerant.length }, { id: "time", label: t("Time on site") }]} />}
             action={viewAction()}>
             {view === "readings" && <ReadingsTable draft={draft} edit={edit} isEditable={isEditable} components={live.components} f={f} />}
             {view === "parts" && <PartsView draft={draft} edit={edit} isEditable={isEditable} />}
@@ -457,16 +457,16 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
           </Card>
         </div>
         <div className="flex min-w-0 flex-col gap-4">
-          <WorkReportCard versionText={versionText()} issues={issues} isEditable={isEditable} notice={win.notice} isInWork={isInWork} hasReport={!!live.report} hasDraftReport={!!rep} draft={draft} edit={edit} photos={photos} photoUrl={photoUrl} photoError={photoError} addPhotos={addPhotos} pending={pending} dirty={dirty} signature={signature} f={f} onViewParts={() => { setView("parts"); }} onSign={() => { setModal("sign"); }} onSave={() => { save(); }} onSubmit={trySubmit} />
+          <WorkReportCard versionText={versionText()} issues={issues} isEditable={isEditable} notice={win.notice} isInWork={isInWork} hasReport={!!live.report} hasDraftReport={!!rep} draft={draft} edit={edit} photos={photos} photoUrl={photoUrl} photoError={photoError} addPhotos={addPhotos} pending={pending} dirty={dirty} signature={signature} f={f} onViewParts={() => { selectView("parts"); }} onSign={() => { setModal("sign"); }} onSave={() => { save(); }} onSubmit={trySubmit} />
           <VersionsCard versions={versions} win={win} />
         </div>
       </div>
       <CheckInModal open={modal === "checkin"} unitId={job.unitId} pending={pending} errors={checkInError} setErrors={setCheckInError} onClose={() => { setModal(null); }}
-        onCheckIn={(method, distance, qr, reason) => { run(() => checkIn(job.id, job.version, method, distance, qr, reason), t("Checked in — the job has started"), () => { remountFocus = { jobId: job.id, id: "job-title" }; setModal(null); }, (f) => {
+        onCheckIn={(method, distance, qr, reason) => { run(() => checkIn(job.id, job.version, method, distance, qr, reason), t("Checked in — the job has started"), () => { remountFocus = { jobId: job.id, id: "job-title" }; setModal(null); }, (failure) => {
           // a refusal of a field (too far, another unit's label) shows under that field, which takes the focus (IR621)
-          const fields = fieldErrorTexts(f, CHECK_IN_API_FIELDS, t);
+          const fields = fieldErrorTexts(failure, CHECK_IN_API_FIELDS, t);
           const first = CHECK_IN_FIELDS.find((k) => fields[k]);
-          if (!first) { failed(f); return; }
+          if (!first) { failed(failure); return; }
           setCheckInError(fields);
           focusField(CHECK_IN_IDS[first]);
         }); }} />

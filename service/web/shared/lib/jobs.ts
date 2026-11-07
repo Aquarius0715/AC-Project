@@ -37,9 +37,9 @@ export interface Slot { date: string; win: string }
 export type Origin = "request" | "plan";
 export const jobStatuses = ["requested", TIME_PROPOSED, "offered", "accepted", "assigned", "in_progress", "submitted", "rework_requested", "completed", "cancelled", "on_hold"] as const;
 export type JobStatus = (typeof jobStatuses)[number];
-export interface Proposal { by: "hq" | "contractor"; slot: Slot; who: string; message: string; replyBy: string; status: "pending" | "accepted" | "declined" | "withdrawn" }
-export interface PartnerProposal { slot: Slot; tech: string; reason: string; sentAt: string; status: "pending" | "sent_to_client" | "rejected" | "approved" | "withdrawn" }
-export interface TechAck { status: "pending" | "accepted" | "cant_make"; reason?: string; alt?: string; at?: string }
+interface Proposal { by: "hq" | "contractor"; slot: Slot; who: string; message: string; replyBy: string; status: "pending" | "accepted" | "declined" | "withdrawn" }
+interface PartnerProposal { slot: Slot; tech: string; reason: string; sentAt: string; status: "pending" | "sent_to_client" | "rejected" | "approved" | "withdrawn" }
+interface TechAck { status: "pending" | "accepted" | "cant_make"; reason?: string; alt?: string; at?: string }
 export interface Job {
   id: string;
   unitId: string;
@@ -94,7 +94,7 @@ const note = z.object({
   id: z.string(), role: z.enum(["client", "admin", CONTRACTOR, TECHNICIAN]), title: z.string(), detail: z.string(), href: z.string(), at: z.string(), read: z.boolean(),
 }) satisfies z.ZodType<Note>;
 
-export const NOW = "09-22 11:05";
+const NOW = "09-22 11:05";
 
 const req = (id: string, p: Partial<Job> & Pick<Job, "unitId" | "unit" | "loc" | "type" | "symptom" | "status">): Job => {
   return {
@@ -226,7 +226,7 @@ export const jobActions = {
   /** Client: new request with 3 preferred times (FR-C09 / IR113). */
   create(p: { unitId: string; unit: string; loc: string; type: "Reactive" | "Preventive"; symptom: string; preferred: Slot[] }) {
     const s = load();
-    const n = Math.max(0, ...s.jobs.filter((j) => /^job-c\d+$/.test(j.id)).map((j) => +j.id.slice(5))) + 1;
+    const n = Math.max(0, ...s.jobs.filter((j) => /^job-c\d+$/.test(j.id)).map((j) => Number(j.id.slice(5)))) + 1;
     const id = `job-c${String(n).padStart(2, "0")}`;
     state = { ...s, jobs: [req(id, { ...p, status: "requested", history: [{ at: NOW, text: "customer-a submitted the request with 3 preferred times" }] }), ...s.jobs] };
     save();
@@ -235,20 +235,20 @@ export const jobActions = {
   },
   cancel(id: string, reason: string) { update(id, () => ({ status: "cancelled", proposal: null }), `Cancelled by client · ${reason}`); notify("admin", `${id} cancelled by the client`, reason, `/admin/jobs?jobId=${id}`); },
   /** HQ: book one of the client's own times — no client approval needed. */
-  book(id: string, slot: Slot, delivery: "internal" | "contractor", who: string) {
+  book(id: string, visit: Slot, delivery: "internal" | "contractor", who: string) {
     if (delivery === "internal") {
-      update(id, () => ({ status: "assigned", scheduled: slot, technician: who, contractor: null, techAck: { status: "pending" }, proposal: null, delivery }), `HQ booked ${fmt(slot)} · assigned ${who}`);
-      notify(TECHNICIAN, `New assignment ${id}`, `${fmt(slot)} — accept or tell HQ you can’t make it`, `/technician/jobs/${id}`);
+      update(id, () => ({ status: "assigned", scheduled: visit, technician: who, contractor: null, techAck: { status: "pending" }, proposal: null, delivery }), `HQ booked ${fmt(visit)} · assigned ${who}`);
+      notify(TECHNICIAN, `New assignment ${id}`, `${fmt(visit)} — accept or tell HQ you can’t make it`, `/technician/jobs/${id}`);
     } else {
-      update(id, () => ({ status: "offered", scheduled: slot, contractor: who, technician: null, techAck: null, proposal: null, partnerProposal: null, delivery }), `HQ offered ${id} to ${who} at ${fmt(slot)}`);
-      notify(CONTRACTOR, `New offer ${id}`, `Visit time fixed: ${fmt(slot)} — accept, decline or propose another time`, `/partner/jobs/${id}`);
+      update(id, () => ({ status: "offered", scheduled: visit, contractor: who, technician: null, techAck: null, proposal: null, partnerProposal: null, delivery }), `HQ offered ${id} to ${who} at ${fmt(visit)}`);
+      notify(CONTRACTOR, `New offer ${id}`, `Visit time fixed: ${fmt(visit)} — accept, decline or propose another time`, `/partner/jobs/${id}`);
     }
-    notify("client", `Booked: ${id}`, `${fmt(slot)} — one of your preferred times`, `/customer/maintenance?jobId=${id}`);
+    notify("client", `Booked: ${id}`, `${fmt(visit)} — one of your preferred times`, `/customer/maintenance?jobId=${id}`);
   },
   /** HQ: none of the preferred times fits → propose another time (client must accept). */
-  propose(id: string, slot: Slot, who: string, message: string, replyBy: string) {
-    update(id, () => ({ status: TIME_PROPOSED, proposal: { by: "hq", status: "pending", slot, who, message, replyBy } }), `HQ proposed ${fmt(slot)} (${who} held) · reply by ${replyBy}`);
-    notify("client", `HQ proposed a new time for ${id}`, `${longDate(slot)} — accept or decline by ${replyBy}`, `/customer/maintenance?jobId=${id}`);
+  propose(id: string, visit: Slot, who: string, message: string, replyBy: string) {
+    update(id, () => ({ status: TIME_PROPOSED, proposal: { by: "hq", status: "pending", slot: visit, who, message, replyBy } }), `HQ proposed ${fmt(visit)} (${who} held) · reply by ${replyBy}`);
+    notify("client", `HQ proposed a new time for ${id}`, `${longDate(visit)} — accept or decline by ${replyBy}`, `/customer/maintenance?jobId=${id}`);
   },
   withdraw(id: string) { update(id, (j) => ({ status: "requested", proposal: j.proposal ? { ...j.proposal, status: "withdrawn" } : null }), "HQ withdrew the proposal"); notify("client", `Proposal withdrawn — ${id}`, "HQ will contact you again", `/customer/maintenance?jobId=${id}`); },
   /** Client accepts a proposed time → booked automatically with the held partner. */
@@ -302,11 +302,11 @@ export const jobActions = {
     const s = load();
     const source = s.jobs.find((x) => x.id === fromId);
     if (source?.status !== "completed") return { error: "CONFLICT — only completed jobs can be reported" };
-    const n = Math.max(0, ...s.jobs.filter((j) => /^job-c\d+$/.test(j.id)).map((j) => +j.id.slice(5))) + 1;
+    const n = Math.max(0, ...s.jobs.filter((j) => /^job-c\d+$/.test(j.id)).map((j) => Number(j.id.slice(5)))) + 1;
     const id = `job-c${String(n).padStart(2, "0")}`;
-    const job = req(id, { unitId: source.unitId, unit: source.unit, loc: source.loc, type: "Reactive", symptom: `${reason} — ${details}`, status: "requested", followUpOf: fromId, followUpClass: "pending",
+    const followUp = req(id, { unitId: source.unitId, unit: source.unit, loc: source.loc, type: "Reactive", symptom: `${reason} — ${details}`, status: "requested", followUpOf: fromId, followUpClass: "pending",
       preferred: visit ? [{ date: visit, win: "09:00–12:00" }] : [], history: [{ at: NOW, text: `customer-a reported a problem on ${fromId} — follow-up created, under HQ review` }] });
-    state = { ...s, jobs: [job, ...s.jobs] };
+    state = { ...s, jobs: [followUp, ...s.jobs] };
     save();
     notify("admin", `Follow-up ${id} of ${fromId}`, "Report a problem — classify as rework or new request within 1 business day", `/admin/jobs?jobId=${id}`);
     return { id };
@@ -323,9 +323,9 @@ export const jobActions = {
   /* ---- contractor ---- */
   partnerAccept(id: string) { update(id, () => ({ status: "accepted", partnerProposal: null }), "contractor-a accepted the offer"); notify("admin", `contractor-a accepted ${id}`, "assign a technician next", `/admin/jobs?jobId=${id}`); },
   partnerDecline(id: string, reason: string) { update(id, () => ({ status: "requested", contractor: null, delivery: null, scheduled: null }), `contractor-a declined · ${reason}`); notify("admin", `contractor-a declined ${id}`, reason, `/admin/jobs?jobId=${id}`); },
-  partnerPropose(id: string, slot: Slot, tech: string, reason: string) {
-    update(id, () => ({ partnerProposal: { slot, tech, reason, sentAt: NOW, status: "pending" } }), `contractor-a proposed ${fmt(slot)} instead`);
-    notify("admin", `contractor-a proposes another time — ${id}`, `${fmt(slot)} · ${reason}`, `/admin/jobs?jobId=${id}`);
+  partnerPropose(id: string, visit: Slot, tech: string, reason: string) {
+    update(id, () => ({ partnerProposal: { tech, reason, slot: visit, sentAt: NOW, status: "pending" } }), `contractor-a proposed ${fmt(visit)} instead`);
+    notify("admin", `contractor-a proposes another time — ${id}`, `${fmt(visit)} · ${reason}`, `/admin/jobs?jobId=${id}`);
   },
   partnerWithdraw(id: string) { update(id, () => ({ partnerProposal: null }), "contractor-a withdrew its time proposal"); },
   partnerAssign(id: string, tech: string) {

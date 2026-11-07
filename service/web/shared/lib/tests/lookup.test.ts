@@ -5,11 +5,11 @@ describe("lookup", () => {
   const table = { a: "A", b: "B" };
 
   it("reads an entry of the table", () => {
-    expect([lookup(table, "a"), lookup(table, "b")]).toEqual(["A", "B"]);
+    expect([lookup(table, "a"), lookup(table, "b")]).toStrictEqual(["A", "B"]);
   });
 
   it("finds nothing for a name the table does not have, including names an object inherits", () => {
-    expect([lookup(table, "c"), lookup(table, "constructor"), lookup(table, "__proto__"), lookup(table, "toString")]).toEqual([undefined, undefined, undefined, undefined]);
+    expect([lookup(table, "c"), lookup(table, "constructor"), lookup(table, "__proto__"), lookup(table, "toString")]).toStrictEqual([undefined, undefined, undefined, undefined]);
   });
 });
 
@@ -17,7 +17,7 @@ describe("entryOf", () => {
   const table: Record<"a" | "b", string> = { a: "A", b: "B" };
 
   it("reads the entry of a key of the table's type", () => {
-    expect([entryOf(table, "a"), entryOf(table, "b")]).toEqual(["A", "B"]);
+    expect([entryOf(table, "a"), entryOf(table, "b")]).toStrictEqual(["A", "B"]);
   });
 
   it("refuses a key the table does not have", () => {

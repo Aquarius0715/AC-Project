@@ -553,31 +553,33 @@ func autoPauseCampaign(
 	autoPausePercent int,
 ) (bool, error) {
 	for wave := range counts {
-		if failedNow[wave] &&
-			counts[wave][resultFailed]*100 > autoPausePercent*counts[wave].total() {
-			reason := fmt.Sprintf(
-				"Auto-paused: %d of %d devices failed in wave %d (more than %d %%).",
-				counts[wave][resultFailed],
-				counts[wave].total(),
-				wave+1,
-				autoPausePercent,
-			)
+		if !failedNow[wave] ||
+			counts[wave][resultFailed]*100 <= autoPausePercent*counts[wave].total() {
+			continue
+		}
 
-			var version int
+		reason := fmt.Sprintf(
+			"Auto-paused: %d of %d devices failed in wave %d (more than %d %%).",
+			counts[wave][resultFailed],
+			counts[wave].total(),
+			wave+1,
+			autoPausePercent,
+		)
 
-			err := call.Tx.QueryRow(ctx, `UPDATE devices.firmware_campaigns SET state = 'paused', reason = $2, version = version
+		var version int
+
+		err := call.Tx.QueryRow(ctx, `UPDATE devices.firmware_campaigns SET state = 'paused', reason = $2, version = version
 				+
 				1, updated_at = $3 WHERE id = $1 RETURNING version`,
-				campaignID, reason, call.Now).
-				Scan(&version)
-			if err != nil {
-				return false, apperr.Wrap(err, "update devices.firmware_campaigns")
-			}
-
-			campaignChanged(call, campaignID, "autoPause", statePaused, version, reason)
-
-			return true, nil
+			campaignID, reason, call.Now).
+			Scan(&version)
+		if err != nil {
+			return false, apperr.Wrap(err, "update devices.firmware_campaigns")
 		}
+
+		campaignChanged(call, campaignID, "autoPause", statePaused, version, reason)
+
+		return true, nil
 	}
 
 	return false, nil

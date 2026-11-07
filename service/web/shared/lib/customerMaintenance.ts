@@ -22,8 +22,8 @@ export interface ApiClientRow {
   projection: "summary"; id: string; version: number; unitId: string; type: string; status: string; displayStatus: string; origin: string; dueAt: string;
   requestedSlot: Slot; scheduledSlot: Slot | null; preferredSlots: Slot[]; assignmentAcknowledgement: "pending" | "accepted" | "cant_make" | null;
 }
-export interface ApiClientProposal { id: string; source: "hq" | "contractor"; slot: Slot; hold: { kind: "internal" | "contractor" }; message: string; replyBy: string; status: string; decidedAt: string | null; declineReason: string | null; declineComment: string | null }
-export interface ApiRating { stars: number; tags: string[]; comment: string | null; ratedAt: string; editableUntil: string }
+interface ApiClientProposal { id: string; source: "hq" | "contractor"; slot: Slot; hold: { kind: "internal" | "contractor" }; message: string; replyBy: string; status: string; decidedAt: string | null; declineReason: string | null; declineComment: string | null }
+interface ApiRating { stars: number; tags: string[]; comment: string | null; ratedAt: string; editableUntil: string }
 export interface ApiClientJob {
   projection: "detail"; id: string; version: number; unitId: string; type: string; status: string; symptom: string; contactWindow: string | null; origin: string;
   planId: string | null; occurrenceAt: string | null; requestedSlot: Slot; preferredSlots: Slot[]; preferenceRound: number; slotProposal: ApiClientProposal | null;
@@ -52,7 +52,7 @@ export const clientEventTitle = (action: string, shared: Record<string, string>,
   const sharedTitle = lookup(shared, action);
   return textOf(CLIENT_TITLE, action, t) ?? (sharedTitle ? t(sharedTitle) : action.replaceAll(/[._]/g, " "));
 };
-export const sameSlot = (a: Slot | null, b: Slot | null) => !!a && !!b && Date.parse(a.startAt) === Date.parse(b.startAt) && Date.parse(a.endAt) === Date.parse(b.endAt);
+const sameSlot = (a: Slot | null, b: Slot | null) => !!a && !!b && Date.parse(a.startAt) === Date.parse(b.startAt) && Date.parse(a.endAt) === Date.parse(b.endAt);
 
 export type StatusTab = "all" | "reply" | "requested" | "scheduled" | "progress" | "completed" | "cancelled";
 export const STATUS_TABS: [StatusTab, string][] = [["all", "All"], ["reply", "Needs your reply"], ["requested", "Requested"], ["scheduled", "Scheduled"], ["progress", "In progress"], ["completed", "Completed"], ["cancelled", "Cancelled"]];
@@ -79,7 +79,9 @@ export function clientRows(rows: ApiClientRow[], unit: (id: string) => { name: s
   return [...rows].toSorted((a, b) => ORDER.indexOf(a.displayStatus) - ORDER.indexOf(b.displayStatus) || Date.parse(a.dueAt) - Date.parse(b.dueAt)).map((j) => {
     const u = unit(j.unitId);
     const isPlan = j.origin === PERIODIC_PLAN;
-    let line = "", isWarn = false, icon: IconName = "time";
+    let line: string; // every case below sets it
+    let isWarn = false;
+    let icon: IconName = "time";
     switch (j.displayStatus) {
       case TIME_PROPOSED: { [line, isWarn, icon] = [t("A new visit time needs your reply — nothing is booked until you accept"), true, "swap"]; break;
       }

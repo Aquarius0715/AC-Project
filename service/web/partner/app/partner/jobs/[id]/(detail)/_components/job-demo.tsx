@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Badge, Banner, Btn, Card, Field, Input, Modal, Page, Select, SummaryList, Textarea, LinkButton, useToast, Plain } from "@ac/web/components/ui";
 import { JobStatusBadge, OriginBadge, WINDOWS } from "@ac/web/components/JobBits";
-import { Job, fmt, jobActions, longDate, useJobs } from "@ac/web/lib/jobs";
+import { type Job, fmt, jobActions, longDate, useJobs } from "@ac/web/lib/jobs";
 import { Icon } from "@ac/web/components/Icon";
 
 const cap = [[TECH_EXTERNAL_A, "Refrigerant handling · valid to 2027-03-31", ["4 h", "4 h", "8 h", "—", "—"]], ["tech-external-a2", "No refrigerant qualification", ["—", "—", "—", "—", "—"]]] as const;

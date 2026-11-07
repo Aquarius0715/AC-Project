@@ -16,7 +16,7 @@ afterEach(() => {
 const show = async (session: () => Promise<Response>) => {
   vi.stubGlobal("fetch", vi.fn(session));
   await act(() => { render(<RouteError what="unit" error={new Error("refused")} retry={vi.fn()} />); return Promise.resolve(); });
-  await act(async () => { await new Promise((r) => setTimeout(r, 0)); }); // the session check settles
+  await act(async () => { await new Promise((r) => { setTimeout(r, 0); }); }); // the session check settles
 };
 const json = (body: unknown) => () => Promise.resolve(Response.json(body));
 
@@ -25,7 +25,7 @@ const json = (body: unknown) => () => Promise.resolve(Response.json(body));
 describe("RouteError", () => {
   it("goes to sign-in when the session is gone in API mode", async () => {
     await show(json({ dataSource: "api", signedIn: false }));
-    expect(assign.mock.calls).toEqual([["/login?error=expired&returnTo=%2Fcustomer%2Funits%2Fu-1%3Ftab%3Dreadings"]]);
+    expect(assign.mock.calls).toStrictEqual([["/login?error=expired&returnTo=%2Fcustomer%2Funits%2Fu-1%3Ftab%3Dreadings"]]);
   });
 
   it("stays with Try again while signed in, in the demo, or when the check fails", async () => {

@@ -47,16 +47,16 @@ describe("techDeviceRows / filterOf", () => {
   const names = new Map([["unit-1", "Bedroom AC"]]);
   const rows = techDeviceRows([device({ id: "b", serial: "AC-B", unitId: null, connection: "offline", lastSeenAt: "2026-09-14T01:04:30Z", tamper: "detected" }), device({ id: "a", serial: "AC-A" }), device({ id: "c", serial: "AC-C", connection: "unknown", lastSeenAt: null })], names, NOW);
   it("sorts by serial and names the unit (Unbound without one)", () => {
-    expect(rows.map((r) => r.serial)).toEqual(["AC-A", "AC-B", "AC-C"]);
+    expect(rows.map((r) => r.serial)).toStrictEqual(["AC-A", "AC-B", "AC-C"]);
     // HQ's No sensors chip (Figma Admin 246:2, IR319): a device without sensors
     const bare = techDeviceRows([device({ id: "n", serial: "AC-N", sensors: [] }), device({ id: "s", serial: "AC-S", sensors: [{ id: "s1", metric: TEMPERATURE, unit: "°C", staleAfterSeconds: 120, calibratedAt: null }] })], new Map(), NOW);
-    expect([bare.map((r) => r.sensors > 0), bare.filter(filterOf("nosensors")).map((r) => r.id), HQ_FILTERS.map((f) => f.id)]).toEqual([[false, true], ["n"], ["all", "online", "offline", "tamper", "nosensors"]]);
+    expect([bare.map((r) => r.sensors > 0), bare.filter(filterOf("nosensors")).map((r) => r.id), HQ_FILTERS.map((f) => f.id)]).toStrictEqual([[false, true], ["n"], ["all", "online", "offline", "tamper", "nosensors"]]);
     expect(rows[0]?.unit).toBe("Bedroom AC");
     expect(rows[1]?.unit).toBe("Unbound");
   });
   it("says a registered device is not bound yet, with its planned unit (D05, IR467)", () => {
     const [planned] = techDeviceRows([device({ id: "p", serial: "AC-P", unitId: null, targetUnitId: "unit-1" })], names, NOW);
-    expect([planned?.unit, planned?.unitId, planned?.targetUnitId]).toEqual(["Not bound yet — planned for Bedroom AC", null, "unit-1"]);
+    expect([planned?.unit, planned?.unitId, planned?.targetUnitId]).toStrictEqual(["Not bound yet — planned for Bedroom AC", null, "unit-1"]);
   });
   it("shows the age of the last heartbeat only while the device is not online", () => {
     expect(rows[0]?.connText).toBeNull();
@@ -65,9 +65,9 @@ describe("techDeviceRows / filterOf", () => {
   });
   it("filters all / online / offline (any non-online) / tamper", () => {
     expect(rows.filter(filterOf("all"))).toHaveLength(3);
-    expect(rows.filter(filterOf("online")).map((r) => r.id)).toEqual(["a"]);
-    expect(rows.filter(filterOf("offline")).map((r) => r.id)).toEqual(["b", "c"]);
-    expect(rows.filter(filterOf("tamper")).map((r) => r.id)).toEqual(["b"]);
+    expect(rows.filter(filterOf("online")).map((r) => r.id)).toStrictEqual(["a"]);
+    expect(rows.filter(filterOf("offline")).map((r) => r.id)).toStrictEqual(["b", "c"]);
+    expect(rows.filter(filterOf("tamper")).map((r) => r.id)).toStrictEqual(["b"]);
   });
 });
 
@@ -88,7 +88,7 @@ describe("deviceTiles", () => {
     expect(conn).toMatchObject({ value: "Online", dot: "ok", sub: "last seen 30 s ago" });
     // a long silence reads in hours up to two days, then in days (IR613)
     const seen = (lastSeenAt: string) => deviceTiles(detail({ connection: "offline", lastSeenAt }), "v2", NOW)[0]?.sub;
-    expect([seen("2026-09-13T00:05:00Z"), seen("2026-09-04T19:05:00Z")]).toEqual(["last seen 25 h ago", "last seen 9 d ago"]);
+    expect([seen("2026-09-13T00:05:00Z"), seen("2026-09-04T19:05:00Z")]).toStrictEqual(["last seen 25 h ago", "last seen 9 d ago"]);
     expect(power).toMatchObject({ value: "ON", dot: "primary" });
     expect(tamper).toMatchObject({ value: "Clear", dot: "ok", sub: "no removal detected" });
     expect(fw).toMatchObject({ value: "v1", sub: "v2 available" });
@@ -111,8 +111,8 @@ describe("deviceTiles", () => {
 
 describe("firmware candidates", () => {
   it("offers only versions above the installed one, in numeric order", () => {
-    expect(newerVersions("v2", ["v10", "v1", "v2", "v3", "v3"])).toEqual(["v3", "v10"]);
-    expect(newerVersions("v10", ["v1", "v2"])).toEqual([]);
+    expect(newerVersions("v2", ["v10", "v1", "v2", "v3", "v3"])).toStrictEqual(["v3", "v10"]);
+    expect(newerVersions("v10", ["v1", "v2"])).toStrictEqual([]);
     expect(newerFirmware("v1", ["v2", "v10"])).toBe("v10");
     expect(newerFirmware("v10", ["v2", "v10"])).toBeNull();
   });
@@ -122,13 +122,13 @@ describe("firmwareCard", () => {
   it("is absent without a firmware operation", () => { expect(firmwareCard(detail(), [op()])).toBeNull(); });
   it("shows the active update with the D05 lock and its deadline", () => {
     const active = op({ id: "fw", kind: "firmware", status: "running", targetVersion: "v2", startedAt: "2026-09-14T01:00:01Z", expiresAt: "2026-09-14T01:01:00Z", finishedAt: null });
-    expect(firmwareCard(detail({ activeOperation: active }), [])).toEqual({ tone: "primary", title: "Firmware update v1 → v2", status: "Running", text: "Started 9:00 am MYT · control commands locked · fails if the device does not confirm by 9:01 am MYT" });
+    expect(firmwareCard(detail({ activeOperation: active }), [])).toStrictEqual({ tone: "primary", title: "Firmware update v1 → v2", status: "Running", text: "Started 9:00 am MYT · control commands locked · fails if the device does not confirm by 9:01 am MYT" });
     const queued = { ...active, status: "queued" as const, startedAt: null };
     expect(firmwareCard(detail({ activeOperation: queued }), [])?.status).toBe("Queued");
   });
   it("keeps the old version after a failure and reports a finished install", () => {
-    expect(firmwareCard(detail(), [op({ kind: "firmware", status: "failed", targetVersion: "v2", failureCode: "TIMEOUT" })])).toEqual({ tone: "crit", title: "Firmware update to v2 failed", status: "Failed", text: "no confirmation within 60 s · the old version v1 is kept" });
-    expect(firmwareCard(detail({ firmwareVersion: "v2" }), [op({ kind: "firmware", status: "succeeded", targetVersion: "v2", finishedAt: "2026-09-14T01:00:05Z" })])).toEqual({ tone: "ok", title: "Firmware v2 installed", status: "Succeeded", text: "finished 14 Sept 2026, 9:00 am MYT · history appended" });
+    expect(firmwareCard(detail(), [op({ kind: "firmware", status: "failed", targetVersion: "v2", failureCode: "TIMEOUT" })])).toStrictEqual({ tone: "crit", title: "Firmware update to v2 failed", status: "Failed", text: "no confirmation within 60 s · the old version v1 is kept" });
+    expect(firmwareCard(detail({ firmwareVersion: "v2" }), [op({ kind: "firmware", status: "succeeded", targetVersion: "v2", finishedAt: "2026-09-14T01:00:05Z" })])).toStrictEqual({ tone: "ok", title: "Firmware v2 installed", status: "Succeeded", text: "finished 14 Sept 2026, 9:00 am MYT · history appended" });
   });
 });
 
@@ -147,7 +147,7 @@ describe("operation history", () => {
       op({ id: "4", kind: "firmware", status: "running", targetVersion: "v2", finishedAt: null }), op({ id: "5", kind: "firmware", status: "succeeded", targetVersion: "v2" }),
       op({ id: "6", status: "failed", failureCode: "TIMEOUT" }),
     ], "v1");
-    expect(rows.map((r) => r.detail)).toEqual(["heartbeat confirmed", "waiting for the heartbeat", "starts within a second", "v1 → v2", "v2 installed", "no confirmation within 60 s"]);
+    expect(rows.map((r) => r.detail)).toStrictEqual(["heartbeat confirmed", "waiting for the heartbeat", "starts within a second", "v1 → v2", "v2 installed", "no confirmation within 60 s"]);
     expect(rows[1]?.time).toBe("14 Sept 2026, 9:00 am MYT"); // startedAt, else createdAt
     expect(rows[0]).toMatchObject({ id: "1", kind: "Connection check", status: "succeeded", statusText: "Succeeded" });
   });
@@ -171,8 +171,8 @@ describe("device events (T12)", () => {
       event({ id: "tamper", eventType: "tamper", evidenceSource: TAMPER_SIGNAL, occurredAt: "2026-09-14T00:40:00Z", restoredAt: "2026-09-14T00:50:00Z" }),
       event({ id: "back", eventType: "restored", occurredAt: "2026-09-14T00:50:00Z", recovery: { axis: "tamper", sourceEventId: "tamper", value: "clear" } }),
     ];
-    expect(openFaults(es)).toEqual({ connection: TEXT_2026_09_14T01_00_00Z, power: "2026-09-14T00:30:00Z" });
-    expect(openFaults([])).toEqual({});
+    expect(openFaults(es)).toStrictEqual({ connection: TEXT_2026_09_14T01_00_00Z, power: "2026-09-14T00:30:00Z" });
+    expect(openFaults([])).toStrictEqual({});
   });
   it("renders detection, evidence, alerts, recovery and notes per row", () => {
     const alerts = new Map([["al-1", alert()], ["al-2", alert({ id: "al-2", status: "acknowledged" })], ["al-3", alert({ id: "al-3", status: "resolved" })]]);
@@ -185,7 +185,7 @@ describe("device events (T12)", () => {
     const rows = eventRows(es, alerts, NOW);
     expect(rows[0]).toMatchObject({ tone: "ok", detail: "Connection restored · heartbeat", recovery: "recovers communication_lost today 9:00 am MYT", time: "today 9:10 am MYT" });
     expect(rows[1]).toMatchObject({ tone: "warn", detail: "Cover opened while powered · tamper_signal · 2 alerts", recovery: "open · unacknowledged", notes: ["today 9:02 am MYT — Cover refitted"] });
-    expect(rows[1]?.alerts.map((a) => a.id)).toEqual(["al-1"]);
+    expect(rows[1]?.alerts.map((a) => a.id)).toStrictEqual(["al-1"]);
     expect(rows[2]?.recovery).toBe("open · acknowledged");
     expect(rows[3]?.recovery).toBe("open · resolved");
     expect(rows[4]).toMatchObject({ tone: "crit", detail: "Missed heartbeats (not proof of power loss) · heartbeat", recovery: "restored today 9:10 am MYT" });
@@ -196,24 +196,24 @@ describe("device events (T12)", () => {
   it("lists each open alert once for the acknowledge links", () => {
     const rows = eventRows([event({ id: "a", alertIds: ["al-1"] }), event({ id: "b", eventType: "restored", alertIds: ["al-1"], recovery: { axis: "connection", sourceEventId: "a", value: "online" } }), event({ id: "c", alertIds: ["al-2"] })],
       new Map([["al-1", alert()], ["al-2", alert({ id: "al-2", status: "acknowledged" })]]), NOW);
-    expect(openAlerts(rows).map((a) => a.id)).toEqual(["al-1"]);
+    expect(openAlerts(rows).map((a) => a.id)).toStrictEqual(["al-1"]);
   });
 });
 
 describe("the device screens in Malay with the display time zone (IR287)", () => {
   it("words the tiles, the history and the events", () => {
     const [conn, power, tamper, fw] = deviceTiles(detail(), null, NOW, {}, MS);
-    expect([conn?.label, conn?.value, conn?.sub, power?.label, power?.value, tamper?.value, fw?.sub]).toEqual(["Sambungan", "Dalam talian", "kali terakhir dilihat 30 s lalu", "Isyarat kuasa", "HIDUP", "Tiada gangguan", "terkini"]);
+    expect([conn?.label, conn?.value, conn?.sub, power?.label, power?.value, tamper?.value, fw?.sub]).toStrictEqual(["Sambungan", "Dalam talian", "kali terakhir dilihat 30 s lalu", "Isyarat kuasa", "HIDUP", "Tiada gangguan", "terkini"]);
     expect(deviceTiles(detail(), null, NOW)[2]?.value).toBe("Clear"); // English shows the text after the context
     expect(operationRows([op()], "v1", MS)[0]).toMatchObject({ kind: "Semakan sambungan", statusText: "Berjaya", detail: "denyutan disahkan" });
     expect(eventRows([event()], new Map(), NOW, MS)[0]).toMatchObject({ time: "hari ini 10:00 PG GMT+9", detail: "Denyutan terlepas (bukan bukti kehilangan kuasa) · heartbeat", recovery: "terbuka" });
     expect(failureText("TIMEOUT", MS.t)).toBe("tiada pengesahan dalam 60 s");
-    expect(sensorRows(device({ sensors: [{ id: "s1", metric: TEMPERATURE, unit: "°C", staleAfterSeconds: 120, calibratedAt: null }] }), MS)).toEqual([{ id: "s1", metric: "Suhu", unit: "°C", stale: "120 s", calibrated: "Tidak pernah" }]); // the metric in words (IR499)
+    expect(sensorRows(device({ sensors: [{ id: "s1", metric: TEMPERATURE, unit: "°C", staleAfterSeconds: 120, calibratedAt: null }] }), MS)).toStrictEqual([{ id: "s1", metric: "Suhu", unit: "°C", stale: "120 s", calibrated: "Tidak pernah" }]); // the metric in words (IR499)
   });
   it("words a refused write and its fields", () => {
     expect(deviceRefusal({ code: "CONFLICT", messageKey: "errors.duplicate_serial", fieldErrors: {} })).toBe("This serial is already registered.");
     expect(deviceRefusal({ code: "OFFLINE", messageKey: "error.offline", fieldErrors: {} })).toMatch(/^The device is not reachable, so nothing was started/);
     expect(deviceRefusal({ code: "VALIDATION", messageKey: "error.validation", fieldErrors: { reason: "error.required" } })).toBeNull();
-    expect([deviceFieldText("error.duplicate"), deviceFieldText("error.duplicate", MS.t), deviceFieldText("errors.serial_format")]).toEqual(["Already registered", "Sudah didaftarkan", "serial format"]);
+    expect([deviceFieldText("error.duplicate"), deviceFieldText("error.duplicate", MS.t), deviceFieldText("errors.serial_format")]).toStrictEqual(["Already registered", "Sudah didaftarkan", "serial format"]);
   });
 });

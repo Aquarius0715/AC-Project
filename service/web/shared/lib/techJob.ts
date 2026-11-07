@@ -3,6 +3,7 @@
 // site and the version rows. Pure code shared by the Server Component and the client view. Texts in the display
 // language (`t`, IR282); instants through a formatter (`Fmt`) that reads the loader's server-formatted strings, so the
 // first render matches the server's, and formats in the browser only what appears after the page loaded.
+import { isNone } from "@ac/web/lib/isNone";
 import { metricUnit, type Metric } from "@ac/web/lib/devices";
 import { EN, showClock, showDate, showSpan, showTime, translator, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import { businessDay } from "@ac/web/lib/clientBilling";
@@ -71,8 +72,8 @@ export interface ApiTechReport {
 }
 export const checkResults = ["normal", "attention", "not_inspected", "not_applicable"] as const;
 export type Result = (typeof checkResults)[number] | null;
-export interface DraftItem { componentGroup: Group; componentKey: ComponentKey; result: Result; reason: string; evidenceIds: string[] }
-export interface DraftReading { id?: string; componentKey: ComponentKey; metric: Metric; value: string; observedAt: string }
+interface DraftItem { componentGroup: Group; componentKey: ComponentKey; result: Result; reason: string; evidenceIds: string[] }
+interface DraftReading { id?: string; componentKey: ComponentKey; metric: Metric; value: string; observedAt: string }
 export interface DraftPart {
   name: string; quantity: number; catalogCode: string | null; source: "van_stock" | "hq_warehouse" | "bought_locally"; lotSerial: string | null;
   replacesComponentKey: ComponentKey | null; oldPartDisposal: "disposed_on_site" | "returned" | null; receiptAttachmentId: string | null;
@@ -244,7 +245,7 @@ export const timeInstants = (ts: TimeOnSite | null | undefined) => [ts?.arrivedA
 /** How the technician checked in: manually with the reason, or by QR at a distance from the site. */
 function checkInPlace(ts: TimeOnSite, t: T): string {
   if (ts.checkInMethod === "manual") return t("manual — {reason}", { reason: ts.checkInReason ?? t("no reason") });
-  return ts.distanceMeters == null ? "—" : t("{m} m from site · QR matched", { m: Math.round(ts.distanceMeters) });
+  return isNone(ts.distanceMeters) ? "—" : t("{m} m from site · QR matched", { m: Math.round(ts.distanceMeters) });
 }
 /** The ended pauses: how many and how long in all. */
 function pausesText(count: number, pausedMs: number, t: T): string {

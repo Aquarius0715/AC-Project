@@ -17,7 +17,7 @@ export function uploadType(bytes: Uint8Array, browserType: string): string {
 // File names (IR368). The Core API refuses a name with control characters, path separators or bidirectional
 // formatting characters. The browser's File.name can hold them, so the Server Actions clean it first; the name is only a
 // label, and the bytes and their type are what count.
-const UNSAFE_NAME = /[\u{0}-\u{1F}\u{7F}-\u{9F}\u{61C}\u{200E}\u{200F}\u{202A}-\u{202E}\u{2066}-\u{2069}]/gu;
+const UNSAFE_NAME = /[\p{Cc}\u{61C}\u{200E}\u{200F}\u{202A}-\u{202E}\u{2066}-\u{2069}]/gu;
 
 /** An upload's name as the API accepts it: unsafe characters dropped, "/" and "\" made "_", at most 200 characters
 (the extension kept), "upload" when nothing is left. */

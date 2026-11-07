@@ -42,7 +42,7 @@ export function MaintenanceView({ live }: Readonly<{ live: MaintenanceLive }>) {
   const [modal, setModal] = useState<ModalKind>(live.requestUnitId ? "new" : null);
   const [result, setResult] = useState<{ tone: "ok" | "warn" | "crit"; text: string } | null>(null);
   const d = live.detail;
-  const count = (t: StatusTab) => live.rows.filter((r) => t === "all" || r.tab === t).length;
+  const count = (statusTab: StatusTab) => live.rows.filter((r) => statusTab === "all" || r.tab === statusTab).length;
   const shown = live.rows.filter((r) => (tab === "all" || r.tab === tab) && (origin === "all" || r.origin === origin));
   const replies = count("reply");
   const close = (text?: string, tone: "ok" | "warn" = "ok") => { setModal(null); if (text) setResult({ tone, text }); };

@@ -1,6 +1,7 @@
 package iotbridge_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"slices"
 	"testing"
@@ -357,7 +358,7 @@ func TestLiveEventIDIsOnePerMinute(t *testing.T) {
 		t.Fatal(marshalErr)
 	}
 
-	if string(roomBeat) != string(powerBeat) {
+	if !bytes.Equal(roomBeat, powerBeat) {
 		t.Errorf("the nodes' heartbeats of one minute differ:\n%s\n%s", roomBeat, powerBeat)
 	}
 }

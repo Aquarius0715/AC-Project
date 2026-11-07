@@ -21,14 +21,14 @@ describe("following a command until the device answers (D04, Unit Control and th
     callOp.mockResolvedValueOnce(deviceCommand("sent")).mockResolvedValueOnce(deviceCommand(ACKNOWLEDGED));
     const seen: string[] = [];
     const done = waitForCommand(deviceCommand("requested"), (c) => { seen.push(c.status); });
-    expect(seen).toEqual(["requested"]); // the first state at once
+    expect(seen).toStrictEqual(["requested"]); // the first state at once
     await vi.advanceTimersByTimeAsync(1999);
     expect(callOp).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(2001);
     const acknowledged = await done;
     expect(acknowledged.status).toBe(ACKNOWLEDGED);
-    expect(seen).toEqual(["requested", "sent", ACKNOWLEDGED]);
-    expect(callOp.mock.calls).toEqual([["commands.get", { id: "c1" }], ["commands.get", { id: "c1" }]]);
+    expect(seen).toStrictEqual(["requested", "sent", ACKNOWLEDGED]);
+    expect(callOp.mock.calls).toStrictEqual([["commands.get", { id: "c1" }], ["commands.get", { id: "c1" }]]);
   });
 
   it("does not poll a command that is already final", async () => {
@@ -36,7 +36,7 @@ describe("following a command until the device answers (D04, Unit Control and th
       const seen: string[] = [];
       const final = await waitForCommand(deviceCommand(s), (c) => { seen.push(c.status); });
       expect(final.status).toBe(s);
-      expect(seen).toEqual([s]);
+      expect(seen).toStrictEqual([s]);
     }
     expect(callOp).not.toHaveBeenCalled();
   });

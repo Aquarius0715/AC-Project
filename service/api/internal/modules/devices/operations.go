@@ -965,7 +965,7 @@ func scanCal(row pgx.Row) (CalibrationRecord, error) {
 const calFrom = ` FROM devices.calibration_records r LEFT JOIN devices.device_bindings b ON b.device_id = r.device_id
 	AND b.bound_at <= r.created_at AND (b.unbound_at IS NULL OR b.unbound_at > r.created_at)`
 
-func (m *Module) calibration(
+func (*Module) calibration(
 	ctx context.Context,
 	c *ops.Call,
 	id uuid.UUID,

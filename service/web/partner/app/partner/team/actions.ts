@@ -6,6 +6,7 @@
 // the row's version, which removes the days from a chosen day on (IR612); certificates.submit for a
 // renewal or a new certificate, its file read from the form data and sent base64 (IR129, IR277); and
 // certificates.requestTraining with the certificate version as the expected version (write-version catalog).
+import { isNone } from "@ac/web/lib/isNone";
 import { refresh } from "next/cache";
 import { coreOp, CoreError } from "@ac/web/lib/dal";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
@@ -38,7 +39,7 @@ export async function clearUnavailability(id: string, version: number, from: str
   try {
     const r = await coreOp<{ remaining: unknown }>("members.clearUnavailability", { id, from }, { write: true, expectedVersion: version });
     refresh();
-    return { ok: true, value: { kept: r.remaining != null } };
+    return { ok: true, value: { kept: !isNone(r.remaining) } };
   } catch (error) {
     if (error instanceof CoreError && (error.error.code === "CONFLICT" || error.error.code === "NOT_FOUND")) refresh();
     return failure(error);

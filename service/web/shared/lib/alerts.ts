@@ -19,7 +19,7 @@ const evidenceLabel: Record<string, string> = { inferred: "Evidence (inferred)",
 /** The kind of an alert (Figma Client 06a, DD-C08): an inspection record; a load cause — an open window or poor
 insulation — that is only suspected, never a fault (BIZ-17, IR315); a maintenance reminder; an air-quality alert;
 else a fault. */
-export type AlertKind = "inspection" | "load" | "maintenance" | "quality" | "fault";
+type AlertKind = "inspection" | "load" | "maintenance" | "quality" | "fault";
 const kindOf = (a: Pick<ApiAlert, "type" | "causeCode" | "evidenceKind">): AlertKind => {
   if (a.evidenceKind === "inspection") return "inspection";
   if (a.causeCode === "window_open" || a.causeCode === "insulation_loss") return "load";

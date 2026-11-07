@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { setSearchParameter, useSearchParameter } from "@ac/web/lib/urlState";
 import { ImportCsvModal, WarrantyTab } from "@ac/web/components/Features";
-import { ClientRole, ClientUser, clientUserActions, emailError, useClientUsers } from "@ac/web/lib/clientUsers";
+import { type ClientRole, type ClientUser, clientUserActions, emailError, useClientUsers } from "@ac/web/lib/clientUsers";
 import { nameError } from "@ac/web/lib/partnerUsers";
 import { Badge, Banner, Btn, Card, DataTable, Field, Input, Kpi, ListRow, Modal, Page, PowerBadge, ConnBadge, Search, Select, SummaryList, Tabs, useToast, ActionMenu, Plain } from "@ac/web/components/ui";
 import { oneOf } from "@ac/web/lib/oneOf";

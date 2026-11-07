@@ -63,8 +63,8 @@ export function TechDevicesView({ live }: Readonly<{ live: TechDevicesLive }>) {
   const closeRefused = () => { setRefused(null); close(); };
   const isBusy = !!dv?.detail.activeOperation;
   useEffect(() => { // an operation starts on the scheduler and finishes with the device's answer or at its deadline (IR67)
-    const t = isBusy ? setInterval(() => { router.refresh(); }, 4000) : null;
-    return () => { if (t) clearInterval(t); };
+    const timer = isBusy ? setInterval(() => { router.refresh(); }, 4000) : null;
+    return () => { if (timer) clearInterval(timer); };
   }, [isBusy, router]);
   const canWrite = live.canMaintain && !!dv?.jobId;
   const regUnit = live.register.find((u) => u.unitId === reg.unitId);
@@ -91,12 +91,12 @@ export function TechDevicesView({ live }: Readonly<{ live: TechDevicesLive }>) {
     const s = dv?.detail.sensors.find((x) => x.id === cal.sensorId);
     const e: Record<string, string> = {};
     if (!s) e.sensorId = t("Choose a sensor");
-    if (cal.reference.trim() === "" || !Number.isFinite(+cal.reference)) e.referenceValue = t("Enter a number");
-    if (cal.measured.trim() === "" || !Number.isFinite(+cal.measured)) e.measuredValue = t("Enter a number");
+    if (cal.reference.trim() === "" || !Number.isFinite(Number(cal.reference))) e.referenceValue = t("Enter a number");
+    if (cal.measured.trim() === "" || !Number.isFinite(Number(cal.measured))) e.measuredValue = t("Enter a number");
     setErrors(e);
     const jobId = dv?.jobId;
     if (Object.keys(e).length > 0 || !dv || !s || !jobId) return;
-    run(() => calibrateSensor(dv.detail.id, dv.detail.version, s.id, s.metric, s.unit, +cal.reference, +cal.measured, jobId), t("Calibration recorded — earlier readings unchanged"), closeRefused, failed);
+    run(() => calibrateSensor(dv.detail.id, dv.detail.version, s.id, s.metric, s.unit, Number(cal.reference), Number(cal.measured), jobId), t("Calibration recorded — earlier readings unchanged"), closeRefused, failed);
   };
   const firmware = () => {
     const jobId = dv?.jobId;
@@ -145,11 +145,11 @@ export function TechDevicesView({ live }: Readonly<{ live: TechDevicesLive }>) {
                   : <Link href={`/technician/devices/${dv.detail.id}`} className="rounded-control border border-line px-3 py-1.5 text-xs font-semibold">{t("Device events")} <Icon name="arrowRight" /></Link>}
               </div>
               <div className="grid-fluid" style={{ ["--min" as string]: "150px" }}>
-                {dv.tiles.map((t) => (
-                  <div key={t.label} className={cx("rounded-xl border p-3", t.warn ? "border-[#fdba74] bg-warn-soft/50" : "border-line")}>
-                    <div className="text-[11px] text-muted-foreground">{t.label}</div>
-                    <div className="flex items-center gap-1.5 text-[15px] font-bold">{t.dot && <span className={cx("h-2 w-2 rounded-full", dot[t.dot])} />}<span className={t.warn ? "text-warn" : ""}>{t.value}</span></div>
-                    <div className="text-[10px] text-muted-foreground">{t.sub}</div>
+                {dv.tiles.map((tile) => (
+                  <div key={tile.label} className={cx("rounded-xl border p-3", tile.warn ? "border-[#fdba74] bg-warn-soft/50" : "border-line")}>
+                    <div className="text-[11px] text-muted-foreground">{tile.label}</div>
+                    <div className="flex items-center gap-1.5 text-[15px] font-bold">{tile.dot && <span className={cx("h-2 w-2 rounded-full", dot[tile.dot])} />}<span className={tile.warn ? "text-warn" : ""}>{tile.value}</span></div>
+                    <div className="text-[10px] text-muted-foreground">{tile.sub}</div>
                   </div>
                 ))}
               </div>
@@ -215,7 +215,7 @@ export function TechDevicesView({ live }: Readonly<{ live: TechDevicesLive }>) {
                     <b className="text-[15px]">{t("Sensors ({n}) · from the unit’s capability", { n: dv.sensors.length })}</b>
                     {dv.sensors.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("This device has no sensors.")}</p> : (
                       <ScrollX className="mt-2 rounded-xl border border-line"><table className="w-full min-w-[420px] text-[13px] [&_td]:pr-3 [&_th]:pr-3">
-                        <thead className="bg-surface2 text-left text-[11px] uppercase text-muted-foreground"><tr><th className="px-3 py-2">{t("Metric")}</th><th>{t("Unit")}</th><th>{t("Stale after")}</th><th>{t("Last calibrated")}</th><th /></tr></thead>
+                        <thead className="bg-surface2 text-left text-[11px] uppercase text-muted-foreground"><tr><th className="px-3 py-2">{t("Metric")}</th><th>{t("Unit")}</th><th>{t("Stale after")}</th><th>{t("Last calibrated")}</th><td /></tr></thead>
                         <tbody>{dv.sensors.map((s) => (
                           <tr key={s.id} className="border-t border-line"><td className="px-3 py-2 font-semibold">{s.metric}</td><td>{s.unit}</td><td>{s.stale}</td><td className="text-xs">{s.calibrated}</td>
                             <td className="pr-3 text-right">{live.canMaintain && <Btn size="sm" disabled={pending || isBusy || !canWrite} onClick={() => { setCal({ sensorId: s.id, reference: "", measured: "" }); setErrors({}); setModal("calibrate"); }}>{t("Calibrate…")}</Btn>}</td></tr>

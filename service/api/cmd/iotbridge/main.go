@@ -58,6 +58,9 @@ const (
 	liveCommandWait = 5 * time.Second
 )
 
+// defaultEquipmentURL is the equipment-api service inside the compose network, which has no TLS.
+const defaultEquipmentURL = "http://equipment-api:8080" //nolint:revive // unsecure-url-scheme: private network
+
 func main() {
 	broker := flag.String("broker", envOr("MQTT_URL", "tcp://localhost:1883"), "MQTT broker URL")
 	api := flag.String(
@@ -67,7 +70,7 @@ func main() {
 	)
 	equipment := flag.String(
 		"equipment",
-		envOr("EQUIPMENT_API_URL", "http://equipment-api:8080"),
+		envOr("EQUIPMENT_API_URL", defaultEquipmentURL),
 		"equipment API base URL: the internal queries of the control domain are served there",
 	)
 	tenant := flag.String(

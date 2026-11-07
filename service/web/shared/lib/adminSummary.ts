@@ -1,6 +1,7 @@
 // Admin dashboard KPIs (FR-A01, IR115): admin.summary projected into the KPI tiles. Pure code shared by the
 // Server Component that reads it and the client view. Texts in the display language (`t` / `i`, IR289); the as-of time
 // in the user's display time zone (IR44), the period in Kuala Lumpur days (named so).
+import { isNone } from "@ac/web/lib/isNone";
 import { byCount, EN, showClock, translator, type I18n, type T } from "@ac/web/lib/i18n";
 import { statusWord } from "@ac/web/lib/partnerJobDetail";
 import { coveragePct, warningShort } from "@ac/web/lib/energy";
@@ -30,8 +31,8 @@ export function kpisFrom(a: AdminSummary, t: T = en): Kpis {
   return {
     customers: a.customerCount, units: a.total, on: a.powerOn, off: a.powerOff, unknown: a.powerUnknown,
     rate: a.operatingRate === null ? "—" : `${a.operatingRate.toFixed(1)}%`, alerts: a.alertCount,
-    kwh: e?.totals.kWh == null ? "—" : `${e.totals.kWh.toFixed(1)} kWh`,
-    kwhSub: t("measured · coverage {coverage} · cost {cost}", { coverage: e?.coverage == null ? "—" : `${coveragePct(e.coverage, 0)}%`, cost: e?.totals.amountMinor == null ? "—" : formatMoney(e.totals.amountMinor, "MYR") }),
+    kwh: isNone(e?.totals.kWh) ? "—" : `${e.totals.kWh.toFixed(1)} kWh`,
+    kwhSub: t("measured · coverage {coverage} · cost {cost}", { coverage: isNone(e?.coverage) ? "—" : `${coveragePct(e.coverage, 0)}%`, cost: isNone(e?.totals.amountMinor) ? "—" : formatMoney(e.totals.amountMinor, "MYR") }),
     billing: a.billingVisibility === "forbidden" ? t("Not permitted") : (a.amountsByCurrency ?? []).map((item) => money(item)).join(" · ") || "0.00 MYR",
     billingSub: a.billingVisibility === "forbidden" ? t("billing.read required") : byCount(overdue, { one: t("1 overdue invoice · unpaid, per currency"), many: t("{n} overdue invoices · unpaid, per currency", { n: overdue }) }),
     jobs: Object.values(a.jobCounts).reduce((x, y) => x + y, 0), online: a.online, offline: a.offline, connUnknown: a.unknown,
@@ -130,7 +131,7 @@ export function axisRows(s: AdminSummary, links: ReturnType<typeof overviewLinks
 }
 
 /** All ten job statuses in pipeline order, zeros included (DD-A01); each links to the Jobs tab stage when it has one. */
-export const JOB_STATUSES = ["requested", "offered", "accepted", "assigned", "in_progress", "submitted", "completed", "rework_requested", "on_hold", "cancelled"] as const;
+const JOB_STATUSES = ["requested", "offered", "accepted", "assigned", "in_progress", "submitted", "completed", "rework_requested", "on_hold", "cancelled"] as const;
 export function jobRows(counts: Record<string, number>, links: ReturnType<typeof overviewLinks>, t: T = en) {
   return JOB_STATUSES.map((st) => ({ status: st, label: statusWord(st, t), count: lookup(counts, st) ?? 0, href: links.jobs(st === "cancelled" ? undefined : st) }));
 }

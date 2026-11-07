@@ -111,7 +111,7 @@ func TestDevicesRegisterListGet(t *testing.T) {
 
 	// the write answers Device; calibrations and the running operation are devices.get's (IR392)
 	_, detail := doc["activeOperation"]
-	if doc["serial"] != strings.ToUpper(serial) || len(asArr(t, doc["sensors"])) != 2 ||
+	if !strings.EqualFold(asStr(t, doc["serial"]), serial) || len(asArr(t, doc["sensors"])) != 2 ||
 		doc["unitId"] != nil ||
 		doc["targetUnitId"] != unit ||
 		detail {

@@ -18,13 +18,13 @@ const KL = "Asia/Kuala_Lumpur";
 const en = translator("en");
 
 export type Compare = "gt" | "gte" | "lt" | "lte";
-export type ClientCondition =
+type ClientCondition =
   | { type: "occupancy"; occupied: boolean } | { type: "location"; event: "arrival" | "departure" }
   | { type: "pattern"; localTime: string } | { type: "weather"; metric: "temperature"; operator: Compare; value: number };
 /** ExtraCondition of service-contracts.ts (IR215, Figma 03b “Only if …”). */
-export type ExtraCondition = { type: "weekday"; weekdays: number[] } | { type: "occupancy"; occupied: boolean } | { type: "weather"; metric: "temperature"; operator: Compare; value: number };
+type ExtraCondition = { type: "weekday"; weekdays: number[] } | { type: "occupancy"; occupied: boolean } | { type: "weather"; metric: "temperature"; operator: Compare; value: number };
 /** AutomationRun of service-contracts.ts: the latest Command or skip of the rule (IR215). */
-export interface ApiRun { at: string; outcome: "command_created" | "skipped"; reason: string | null; commandId: string | null }
+interface ApiRun { at: string; outcome: "command_created" | "skipped"; reason: string | null; commandId: string | null }
 interface RuleBase {
   id: string; version: number; createdAt: string; updatedAt: string; name: string; unitIds: string[]; ownerMembershipId: string; timezone: string;
   enabled: boolean; priority: number; disabledReason: "capability_changed" | "unit_archived" | "consent_revoked" | null; onlyIf: ExtraCondition[] | null; lastRun: ApiRun | null;
@@ -101,7 +101,7 @@ export function whenText(a: ApiAutomation, place: string, t: T = en): string {
   return conditionText(a.condition, place, t) + onlyIfText(a.onlyIf ?? [], t);
 }
 /** “someone is home”, “outdoor ≥ 30°C”, “weekdays” — the “Only if” clause of a sentence. */
-export function extraText(x: ExtraCondition, t: T = en): string {
+function extraText(x: ExtraCondition, t: T = en): string {
   if (x.type === "weekday") {
     const s = [...x.weekdays].toSorted((a, b) => a - b).join(',');
     const days = weekdaysText(x.weekdays, false, t);
@@ -110,8 +110,8 @@ export function extraText(x: ExtraCondition, t: T = en): string {
   if (x.type === "occupancy") return t(x.occupied ? "someone is home" : "no one is home");
   return t("outdoor {op} {value}°C", { op: entryOf(cmp, x.operator), value: x.value });
 }
-export const onlyIfText = (xs: ExtraCondition[], t: T = en) => (xs.length > 0 ? t(" · Only if: {conditions}", { conditions: xs.map((x) => extraText(x, t)).join(t(" and ")) }) : "");
-export function thenText(a: ApiAutomation, t: T = en): string {
+const onlyIfText = (xs: ExtraCondition[], t: T = en) => (xs.length > 0 ? t(" · Only if: {conditions}", { conditions: xs.map((x) => extraText(x, t)).join(t(" and ")) }) : "");
+function thenText(a: ApiAutomation, t: T = en): string {
   return a.kind === "schedule" ? t("{start} · at {end} → {endAction} (end action)", { start: actionLabel(a.startAction, t), end: a.endLocal, endAction: actionLabel(a.endAction, t) }) : actionLabel(a.action, t);
 }
 
@@ -141,9 +141,9 @@ export function runClock(iso: string, tz = KL, i: I18n = EN): string {
 const reasonText: Record<string, string> = { consent_revoked: "consent revoked", capability_changed: "capability changed", unit_archived: "unit archived" };
 
 /** One “Then” row of a card: a schedule has its start and its end, each at its own time; an event rule has one action. */
-export interface RuleStep { key: "start" | "end" | "action"; label: string; time: string | null; action: string }
+interface RuleStep { key: "start" | "end" | "action"; label: string; time: string | null; action: string }
 /** The “Then” rows of a rule, in the display language. */
-export function ruleSteps(a: ApiAutomation, t: T = en): RuleStep[] {
+function ruleSteps(a: ApiAutomation, t: T = en): RuleStep[] {
   if (a.kind !== "schedule") return [{ key: "action", label: t("Then"), time: null, action: actionLabel(a.action, t) }];
   return [
     { key: "start", label: t("Start"), time: a.startLocal, action: actionLabel(a.startAction, t) },
@@ -241,7 +241,7 @@ export function fitExtras(d: Draft): ExtraDraft[] {
 const extraOf = (x: ExtraDraft): ExtraCondition => (x.type === "weather" ? { type: "weather", metric: "temperature", operator: x.operator, value: Number(x.value) } : x);
 const extraDraftOf = (x: ExtraCondition): ExtraDraft => (x.type === "weather" ? { type: "weather", operator: x.operator, value: String(x.value) } : x);
 /** The option key of an action; every UnitAction of the contract has one, so a saved rule edits back unchanged (IR314). */
-export const actionKey = (a: UnitAction): string => {
+const actionKey = (a: UnitAction): string => {
   switch (a.kind) {
     case "set_power": { return `power:${a.power ? "on" : "off"}`; }
     case SET_TEMPERATURE: { return `temp:${String(a.celsius)}`; }
@@ -297,7 +297,7 @@ export function draftOf(a: ApiAutomation): Draft {
     localTime: c.type === "pattern" ? c.localTime : d.localTime, operator: c.type === "weather" ? c.operator : d.operator, value: c.type === "weather" ? String(c.value) : d.value,
   };
 }
-export function conditionOf(d: Draft): ClientCondition {
+function conditionOf(d: Draft): ClientCondition {
   switch (d.trigger) {
     case "presence": { return { type: "occupancy", occupied: d.occupied };
     }

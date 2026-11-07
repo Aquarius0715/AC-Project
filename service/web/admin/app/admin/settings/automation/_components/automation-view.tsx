@@ -145,7 +145,7 @@ export function AutomationView({ live }: Readonly<{ live: Live }>) {
           </Card>
           {sel && (
             <Card title={t("Simulate")} sub={t("Evaluates all enabled HQ policies and customer rules for these units with synthetic facts at the current minute.")}>
-              <ScrollX><table className="w-full min-w-[560px] text-[13px]"><thead className="text-left text-[11px] uppercase text-muted-foreground"><tr><th>{t("Unit")}</th><th>{t("Fact")}</th><th>{t("Value")}</th><th>{t("Quality")}</th><th /></tr></thead><tbody>{facts.map((f, i) => {
+              <ScrollX><table className="w-full min-w-[560px] text-[13px]"><thead className="text-left text-[11px] uppercase text-muted-foreground"><tr><th>{t("Unit")}</th><th>{t("Fact")}</th><th>{t("Value")}</th><th>{t("Quality")}</th><td /></tr></thead><tbody>{facts.map((f, i) => {
                 const fact = factOf[f.kind ?? d.type];
                 return (
                   <tr key={i} className="border-t border-line">

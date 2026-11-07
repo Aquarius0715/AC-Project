@@ -17,7 +17,7 @@ const KL = "Asia/Kuala_Lumpur";
 
 const en = translator("en");
 export type AuditResult = "Success" | "Denied" | "Failed" | "Pending";
-export interface AuditChange { field: string; before: string; after: string; changed: boolean }
+interface AuditChange { field: string; before: string; after: string; changed: boolean }
 export interface AuditRow {
   id: string; op: string; target: string; targetKind: string; targetId: string; versions: string | null; actor: string; actorId: string; role: string; at: string; occurred: string;
   corr: string; res: AuditResult; reason: string | null; changes: AuditChange[];

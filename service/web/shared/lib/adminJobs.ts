@@ -12,6 +12,11 @@ import { actionMessage, fieldName } from "@ac/web/lib/actionMessage";
 import { statusWord, typeLabel } from "@ac/web/lib/partnerJobDetail";
 import type { Slot } from "@ac/web/lib/partnerOverview";
 import { inspectionRows, readingRows, resultText, reworkItems, type ApiWorkReport } from "@ac/web/lib/partnerReview";
+import { money } from "@ac/web/lib/money";
+import { codePoints, wrapped } from "@ac/web/lib/text";
+import { oneOf } from "@ac/web/lib/oneOf";
+import { isAfter } from "@ac/web/lib/order";
+import { entryOf, lookup } from "@ac/web/lib/lookup";
 
 const TIME_PROPOSED = "time_proposed";
 const IN_PROGRESS = "in_progress";
@@ -27,8 +32,8 @@ export interface ApiHqRow {
   technicianMembershipId: string | null; accessValidFrom: string | null; accessValidUntil: string | null;
   createdAt: string; followUpOfJobId: string | null; followUpClass: "pending" | "rework" | "new_request" | null;
 }
-export interface ApiSlotProposal { id: string; source: "hq" | "contractor"; slot: Slot; hold: { kind: "internal"; membershipId: string } | { kind: "contractor"; contractorOrgId: string; technicianMembershipId: string | null }; message: string; replyBy: string; status: string; decidedAt: string | null; declineReason: string | null; declineComment: string | null }
-export interface ApiPartnerProposal { id: string; offerId: string; slot: Slot; technicianMembershipId: string; reason: string; sentAt: string; status: string }
+interface ApiSlotProposal { id: string; source: "hq" | "contractor"; slot: Slot; hold: { kind: "internal"; membershipId: string } | { kind: "contractor"; contractorOrgId: string; technicianMembershipId: string | null }; message: string; replyBy: string; status: string; decidedAt: string | null; declineReason: string | null; declineComment: string | null }
+interface ApiPartnerProposal { id: string; offerId: string; slot: Slot; technicianMembershipId: string; reason: string; sentAt: string; status: string }
 export interface ApiHqJob {
   projection: "detail"; id: string; version: number; unitId: string; type: string; status: string; symptom: string; contactWindow: string | null; origin: string; planId: string | null; occurrenceAt: string | null;
   requestedSlot: Slot; preferredSlots: Slot[]; preferenceRound: number; slotProposal: ApiSlotProposal | null; partnerSlotProposal: ApiPartnerProposal | null; scheduledSlot: Slot | null;
@@ -314,11 +319,6 @@ export function hqRefusal(f: { code: string; messageKey: string; fieldErrors: Re
 export interface CostLine { kind: "estimate" | "actual"; description: string; visibility: "internal" | "customer"; amountMinor: number; currency: "MYR" | "USD" }
 /** “80.00 MYR” from minor units. */
 export { money } from "@ac/web/lib/money";
-import { money } from "@ac/web/lib/money";
-import { codePoints, wrapped } from "@ac/web/lib/text";
-import { oneOf } from "@ac/web/lib/oneOf";
-import { isAfter } from "@ac/web/lib/order";
-import { entryOf, lookup } from "@ac/web/lib/lookup";
 
 /** Estimate and actual totals per currency, never converted (“80.00 MYR + 6.20 USD”). */
 export function costTotals(lines: CostLine[]): { estimate: string; actual: string } {

@@ -82,7 +82,7 @@ func TestWindow(t *testing.T) {
 func TestWindowLastInstant(t *testing.T) {
 	t.Parallel()
 
-	now := time.Date(2026, 10, 11, 9, 2, 59, 999_000_000, time.UTC)
+	now := time.Date(2026, 10, 11, 9, 2, 59, 999000000, time.UTC)
 	_, window := testWindow(t, &now)
 
 	ctx := context.Background()

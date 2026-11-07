@@ -31,15 +31,15 @@ export function AutomationsDemo() {
   const [del, setDel] = useState<Auto | null>(null);
   const [step, setStep] = useState<"form" | "review">("form");
   const [f, setF] = useState({ name: "", kind: "Schedule", time: "18:00", temp: "25", unit: BEDROOM_AC });
-  const [errorText, setError] = useState<Record<string, string>>({});
+  const [errorText, setErrorText] = useState<Record<string, string>>({});
 
-  const open = (a: Auto | "new") => { setEdit(a); setStep("form"); setError({}); setF(a === "new" ? { name: "", kind: "Schedule", time: "18:00", temp: "25", unit: BEDROOM_AC } : { name: a.name, kind: a.kind, time: "18:00", temp: "25", unit: a.unit.split(" · ", 1)[0] ?? a.unit }); };
+  const open = (a: Auto | "new") => { setEdit(a); setStep("form"); setErrorText({}); setF(a === "new" ? { name: "", kind: "Schedule", time: "18:00", temp: "25", unit: BEDROOM_AC } : { name: a.name, kind: a.kind, time: "18:00", temp: "25", unit: a.unit.split(" · ", 1)[0] ?? a.unit }); };
   const review = () => {
     const e: Record<string, string> = {};
     if (!f.name.trim()) e.name = "Name is required";
-    const t = +f.temp; if (!(t >= 16 && t <= 30)) e.temp = "16–30°C only (device capability)";
+    const t = Number(f.temp); if (!(t >= 16 && t <= 30)) e.temp = "16–30°C only (device capability)";
     if (f.kind === "Location" && !consent) e.kind = "Location consent is withdrawn — grant it to use location triggers";
-    setError(e); if (Object.keys(e).length === 0) setStep("review");
+    setErrorText(e); if (Object.keys(e).length === 0) setStep("review");
   };
   const save = () => {
     if (edit === "new") setList((l) => [...l, { id: `n${String(Date.now())}`, name: f.name, kind: f.kind, icon: f.kind === "Location" ? "location" : "schedule", when: f.kind === "Schedule" ? "Every day at " + f.time : "Arrival at Home A", steps: f.kind === "Schedule" ? [start(f.time, `Set temperature ${f.temp}°C`), end("22:00")] : then(`Set temperature ${f.temp}°C`), unit: f.unit, on: true }]);
@@ -96,7 +96,7 @@ export function AutomationsDemo() {
       )}
       <p className="text-xs text-muted-foreground">Priority when rules overlap: device capabilities & active restrictions → HQ policy → your automations. List order is not run priority. Missing condition data never counts as a match.</p>
 
-      <Modal open={!!edit} onClose={() => { setEdit(null); }} wide title={step === "review" ? "Review / Test result" : formTitle} footer={step === "form" ? <><Btn onClick={() => { setEdit(null); }}>Cancel</Btn><Btn variant="primary" onClick={review}>Review</Btn></> : <><Btn onClick={() => { setStep("form"); }}><Icon name="arrowLeft" /> Back</Btn><Btn variant="primary" onClick={save}>Save automation</Btn></>}>
+      <Modal open={edit !== null} onClose={() => { setEdit(null); }} wide title={step === "review" ? "Review / Test result" : formTitle} footer={step === "form" ? <><Btn onClick={() => { setEdit(null); }}>Cancel</Btn><Btn variant="primary" onClick={review}>Review</Btn></> : <><Btn onClick={() => { setStep("form"); }}><Icon name="arrowLeft" /> Back</Btn><Btn variant="primary" onClick={save}>Save automation</Btn></>}>
         {step === "form" ? (
           <>
             <Field label="Name" error={errorText.name}><Input value={f.name} onChange={(e) => { setF({ ...f, name: e.target.value }); }} placeholder="e.g. Weekday pre-cool" /></Field>

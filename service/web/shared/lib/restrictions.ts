@@ -49,7 +49,7 @@ function observedText(u: ApiRestriction["perUnit"][number], restrictionId: strin
 }
 export const policyText = (p: Policy, t: T = en) => (p.kind === "power_off" ? t("Power off") : t("Temperature limit — cooling setpoint ≥ {value} °C", { value: p.minimumCoolingSetpoint }));
 /** Where a release intent came from, worded. */
-export const sourceWord = (s: NonNullable<ReleaseIntent>["source"], t: T = en) => {
+const sourceWord = (s: NonNullable<ReleaseIntent>["source"], t: T = en) => {
   const words: Partial<Record<NonNullable<ReleaseIntent>["source"], string>> = { payment: t("payment"), exception: t("exception"), override: t("override"), manual: t("manual"), cancel: t("cancellation") };
   return lookup(words, s) ?? s; // a value the API adds before this table does
 };

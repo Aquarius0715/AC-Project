@@ -11,24 +11,24 @@ describe("page names and document titles (IR490)", () => {
     expect([
       pageLabel("client", "/customer"), pageLabel("client", "/customer/units/u1"), pageLabel("client", "/customer/payments/i1"),
       pageLabel("admin", "/admin/billing/contracts"), pageLabel("admin", "/admin/billing"), pageLabel(TECHNICIAN, "/technician"),
-    ]).toEqual(["Overview", "Units & locations", "Contracts & payments", "Contracts", "Billing", "Overview"]);
+    ]).toStrictEqual(["Overview", "Units & locations", "Contracts & payments", "Contracts", "Billing", "Overview"]);
     // the pages a job leads to belong to the jobs item: the partner's unit view, the technician's job and unit pages
     expect([pageLabel("contractor", "/partner/units/u1"), pageLabel(TECHNICIAN, "/technician/jobs/j1"), pageLabel(TECHNICIAN, "/technician/units/u1/control")])
-      .toEqual(["Jobs", "Assigned jobs", "Assigned jobs"]);
+      .toStrictEqual(["Jobs", "Assigned jobs", "Assigned jobs"]);
   });
 
   it("names the shared pages, Users and Demo controls, and nothing off the menu", () => {
     expect([pageLabel("client", "/notifications"), pageLabel("admin", "/settings/preferences"), pageLabel("client", "/customer/users"), pageLabel("contractor", "/partner/users"), pageLabel(TECHNICIAN, "/demo"), pageLabel("client", "/login")])
-      .toEqual(["Notifications", "Preferences", "Users", "Users", "Demo controls", null]);
+      .toStrictEqual(["Notifications", "Preferences", "Users", "Users", "Demo controls", null]);
   });
 
   it("titles the document in the display language", () => {
     expect([documentTitle("client", "/customer/alerts", "en"), documentTitle("client", "/customer/alerts", "ms"), documentTitle("client", "/login", "en")])
-      .toEqual(["Alerts — AC Project", "Amaran — AC Project", "AC Project — Customer app"]);
+      .toStrictEqual(["Alerts — AC Project", "Amaran — AC Project", "AC Project — Customer app"]);
   });
 
   it("has a Malay name for every menu item and shared page", () => {
     const labels = [...Object.values(ROLES).flatMap((r) => [...r.nav.map((i) => i.label), r.sub]), ...SHARED_PAGES.map((s) => s.label), "Users", "Demo controls"];
-    expect(labels.filter((l) => !Object.hasOwn(ms, l))).toEqual([]);
+    expect(labels.filter((l) => !Object.hasOwn(ms, l))).toStrictEqual([]);
   });
 });

@@ -18,7 +18,7 @@ describe("Two-step verification setup (FR-X08, IR247)", () => {
   it("builds the authenticator key URI and groups the key", () => {
     expect(otpauthUri("6wug qkfw hdvs xim5", "customer-a")).toBe("otpauth://totp/AC%20Project:customer-a?secret=6WUGQKFWHDVSXIM5&issuer=AC%20Project&algorithm=SHA1&digits=6&period=30");
     expect(otpauthUri("JBSWY3DPEHPK3PXP", "Demo User:1")).toMatch(/^otpauth:\/\/totp\/AC%20Project:Demo%20User%3A1\?secret=JBSWY3DPEHPK3PXP&/);
-    expect([groupKey("JBSWY3DPEHPK3PXP"), groupKey("ABCDEF"), groupKey("")]).toEqual(["JBSW Y3DP EHPK 3PXP", "ABCD EF", ""]);
+    expect([groupKey("JBSWY3DPEHPK3PXP"), groupKey("ABCDEF"), groupKey("")]).toStrictEqual(["JBSW Y3DP EHPK 3PXP", "ABCD EF", ""]);
   });
 
   it("draws a QR code that decodes back to the URI", () => {
@@ -30,6 +30,6 @@ describe("Two-step verification setup (FR-X08, IR247)", () => {
   });
 
   it("keeps the code to six digits", () => {
-    expect([codeComplete("123456"), codeComplete("12345"), codeComplete("12345a")]).toEqual([true, false, false]);
+    expect([codeComplete("123456"), codeComplete("12345"), codeComplete("12345a")]).toStrictEqual([true, false, false]);
   });
 });

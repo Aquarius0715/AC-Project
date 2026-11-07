@@ -28,7 +28,7 @@ describe("POST /bff/ops/<operation>", () => {
     const fetch = vi.fn(() => Promise.resolve(Response.json({ data: { id: "u-1" } }, { status: 200 })));
     vi.stubGlobal("fetch", fetch);
     const res = await relay("units.get", { id: TEXT_00000000_0000_4000_8000_000000000001 });
-    expect([res.status, await res.json()]).toEqual([200, { data: { id: "u-1" } }]);
+    expect([res.status, await res.json()]).toStrictEqual([200, { data: { id: "u-1" } }]);
     expect(sentCall(fetch.mock.calls)[0]).toBe("https://core:8080/v1/units/00000000-0000-4000-8000-000000000001");
   });
   it("refuses another site's read or write without calling the Core API", async () => {
@@ -64,11 +64,11 @@ describe("the relay's input limit", () => {
     expect(note(1 << 20)).toHaveLength(1 << 20);
     const accepted = await post(note(1 << 20));
     expect(accepted.status).toBe(200);
-    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledOnce();
     const res = await post(note((1 << 20) + 1));
     const body: unknown = await res.json();
     expect([res.status, body]).toMatchObject([422, { messageKey: "error.bodyTooLarge" }]);
-    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledOnce();
   });
 
   it("stops reading a body without a length as soon as it passes the limit", async () => {

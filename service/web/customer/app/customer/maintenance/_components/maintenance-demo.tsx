@@ -7,7 +7,7 @@ const CONTRACTOR = "contractor";
 import { useState } from "react";
 import { Badge, Banner, Btn, Card, Choice, DataTable, Field, Input, ListRow, Modal, Page, PageHead, Select, SummaryList, Tabs, Textarea, Timeline, UtilizationBar, cx, useToast, Plain } from "@ac/web/components/ui";
 import { JobStatusBadge, OriginBadge, PreferredSlotsInput, SlotLine, preferredError } from "@ac/web/components/JobBits";
-import { Job, JobStatus, Slot, fitFor, fmt, jobActions, longDate, useJobs } from "@ac/web/lib/jobs";
+import { type Job, type JobStatus, type Slot, fitFor, fmt, jobActions, longDate, useJobs } from "@ac/web/lib/jobs";
 import { units } from "@ac/web/lib/client";
 import { Icon, type IconName } from "@ac/web/components/Icon";
 import { Checkbox } from "@ac/web/components/ui/checkbox";
@@ -244,9 +244,9 @@ function ProblemModal({ open, j, onClose, onDone }: Readonly<{ open: boolean; j:
   const [d, setD] = useState("");
   const [visit, setVisit] = useState("2026-09-25");
   const [tried, setTried] = useState(false);
-  const [errorText, setError] = useState<string | undefined>();
+  const [errorText, setErrorText] = useState<string | undefined>();
   return (
-    <Modal open={open} onClose={onClose} title={`Report a problem — ${j.id}`} footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (d.trim().length < 10 || d.length > 2000) { return; } const r = jobActions.reportProblem(j.id, entryOf(PROBLEM, reason), d.trim(), visit); if ("error" in r) { setError(r.error); return; } setD(""); setTried(false); onDone(r.id); }}>Send report</Btn></>}>
+    <Modal open={open} onClose={onClose} title={`Report a problem — ${j.id}`} footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (d.trim().length < 10 || d.length > 2000) { return; } const r = jobActions.reportProblem(j.id, entryOf(PROBLEM, reason), d.trim(), visit); if ("error" in r) { setErrorText(r.error); return; } setD(""); setTried(false); onDone(r.id); }}>Send report</Btn></>}>
       <Field label="What happened?"><Choice value={reason} onChange={setReason} options={[{ id: "same", label: "Same problem again" }, { id: "new", label: "New damage" }, { id: "incomplete", label: "Work not completed" }, { id: "other", label: "Other" }]} /></Field>
       <Field label="Details (10–2000 characters)" error={tried && (d.trim().length < 10 || d.length > 2000) ? "Describe the problem (10–2000 characters)" : undefined}><Textarea value={d} onChange={(e) => { setD(e.target.value); }} /></Field>
       <Field label="Preferred visit (optional)"><Input type="date" value={visit} onChange={(e) => { setVisit(e.target.value); }} /></Field>
@@ -265,10 +265,10 @@ function FollowUpBadge({ j }: Readonly<{ j: Job }>) {
 function NoteModal({ open, j, onClose, onDone }: Readonly<{ open: boolean; j: Job; onClose: () => void; onDone: () => void }>) {
   const [t, setT] = useState("");
   const [tried, setTried] = useState(false);
-  const [errorText, setError] = useState<string | undefined>();
+  const [errorText, setErrorText] = useState<string | undefined>();
   const isBad = !t.trim() || t.length > 2000;
   return (
-    <Modal open={open} onClose={onClose} title={`Add a note for ${j.id}`} footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (isBad) { return; } const e = jobActions.addNote(j.id, t); if (e) { setError(e); return; } setT(""); setTried(false); onDone(); }}>Send note</Btn></>}>
+    <Modal open={open} onClose={onClose} title={`Add a note for ${j.id}`} footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (isBad) { return; } const e = jobActions.addNote(j.id, t); if (e) { setErrorText(e); return; } setT(""); setTried(false); onDone(); }}>Send note</Btn></>}>
       <Field label="Note to the HQ coordinator (1–2000 characters)" error={tried && isBad ? "Write 1–2000 characters" : undefined} hint={`${String(t.length)} / 2000 · Visible to: HQ coordinator${j.delivery === CONTRACTOR ? ` · ${orDash(j.contractor)}` : ""}${j.technician ? ` · assigned technician (${j.technician})` : ""}`}>
         <Textarea value={t} onChange={(e) => { setT(e.target.value); }} placeholder="Please call 30 minutes before arriving — the gate code changed to 4821." />
       </Field>

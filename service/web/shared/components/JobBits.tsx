@@ -1,5 +1,6 @@
 "use client";
 
+import { hasContent } from "@ac/web/lib/hasContent";
 import { Badge, Input, Select, cx } from "./ui";
 import { Icon, type IconName } from "@ac/web/components/Icon";
 import type { JobStatus, Origin, Slot } from "@ac/web/lib/jobs";
@@ -34,7 +35,7 @@ export function JobStatusBadge({ s, client }: Readonly<{ s: string; client?: boo
   return client && SCHEDULED.has(known) ? <Badge tone="primary" icon="assigned">{t("Scheduled")}</Badge> : <Badge tone={entryOf(statusTone, known)} icon={entryOf(statusIcon, known)}>{t(entryOf(statusLabel, known))}</Badge>;
 }
 
-export const RANKS = ["1st", "2nd", "3rd"];
+const RANKS = ["1st", "2nd", "3rd"];
 export function Rank({ i }: Readonly<{ i: number }>) {
   const t = useT();
   return <span className="inline-grid w-10 shrink-0 place-items-center rounded-lg bg-primary-soft py-0.5 text-xs font-semibold text-primary">{t(RANKS.at(i) ?? String(i + 1))}</span>;
@@ -73,7 +74,7 @@ export function SlotLine({ i, slot, struck, note }: Readonly<{ i: number; slot: 
     <div className="flex flex-wrap items-center gap-2 text-[13px]">
       <Rank i={i} />
       <span className={cx("font-semibold", struck && "text-muted-foreground line-through")}>{slot.date.slice(5)} · {slot.win}</span>
-      {note && <span className="text-xs text-muted-foreground">{note}</span>}
+      {hasContent(note) && <span className="text-xs text-muted-foreground">{note}</span>}
     </div>
   );
 }

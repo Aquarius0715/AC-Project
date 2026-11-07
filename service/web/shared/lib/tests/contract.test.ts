@@ -131,7 +131,7 @@ describe("the web's calls against the Core API contract (IR312)", () => {
       };
       visit(sf);
     }
-    expect(problems).toEqual([]);
+    expect(problems).toStrictEqual([]);
     expect(calls).toBeGreaterThan(300); // the scan sees the calls
   });
 });
@@ -155,7 +155,7 @@ describe("the browser's calls through the BFF relay", () => {
       };
       visit(sf);
     }
-    expect(problems, "writes sent through the relay").toEqual([]);
+    expect(problems, "writes sent through the relay").toStrictEqual([]);
     expect(calls).toBeGreaterThan(10); // the scan sees the relay's calls (17 in R350)
   });
 });

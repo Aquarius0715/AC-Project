@@ -37,7 +37,7 @@ export const SESSION_COOKIE = `${httpsApp() ? "__Host-" : ""}ac_session_${APP_RO
 export const OIDC_COOKIE = `${httpsApp() ? "__Secure-" : ""}ac_oidc_${APP_ROLE}`;
 
 /** Shortest SESSION_SECRET a deployment on HTTPS accepts. */
-export const MIN_SECRET_LENGTH = 32;
+const MIN_SECRET_LENGTH = 32;
 
 /** The local default secret of plain-http runs (compose.yaml uses the same value). */
 const LOCAL_SECRET = "local-dev-session-secret-change-me";
@@ -241,8 +241,8 @@ export async function loadSession(cookie: string | undefined): Promise<Session |
   const id = idOf(cookie);
   if (!id) return null;
   try {
-    const client = await timed(c);
-    const rec = unsealAs((await timed(client.getEx(keyOf(id), { type: "EX", value: SESSION_MAX_AGE }))) ?? undefined, stored);
+    const opened = await timed(c);
+    const rec = unsealAs((await timed(opened.getEx(keyOf(id), { type: "EX", value: SESSION_MAX_AGE }))) ?? undefined, stored);
     if (!rec) return null;
     if (Date.now() / 1000 - rec.startedAt >= ABSOLUTE_SECONDS) {
       await dropSession(cookie);
@@ -261,8 +261,8 @@ export async function createSessionCookie(s: Session, previous?: string): Promis
   if (!c) return seal(s);
   const id = randomBytes(32).toString("base64url");
   const rec: Stored = { session: s, startedAt: Math.floor(Date.now() / 1000) };
-  const client = await timed(c);
-  await timed(client.set(keyOf(id), seal(rec), { expiration: { type: "EX", value: SESSION_MAX_AGE } }));
+  const opened = await timed(c);
+  await timed(opened.set(keyOf(id), seal(rec), { expiration: { type: "EX", value: SESSION_MAX_AGE } }));
   await dropSession(previous);
   return seal({ sid: id });
 }
@@ -292,8 +292,8 @@ export async function dropSession(cookie: string | undefined): Promise<void> {
   const id = c ? idOf(cookie) : null;
   if (!c || !id) return;
   try {
-    const client = await timed(c);
-    await timed(client.del(keyOf(id)));
+    const opened = await timed(c);
+    await timed(opened.del(keyOf(id)));
   } catch (error) {
     console.warn(`session store: ${Error.isError(error) ? error.message : String(error)}`);
   }
@@ -319,7 +319,7 @@ export async function readSession(): Promise<Session | null> {
 
 /** A same-origin path to return to after sign-in; rejects absolute, protocol-relative ("//host") and backslash forms. */
 export function safeReturnTo(v: string | null | undefined): string | null {
-  return !v || !v.startsWith("/") || v.startsWith("//") || v.includes("\\") || /[\u{0}-\u{1F}]/u.test(v) ? null : v;
+  return !v || !v.startsWith("/") || v.startsWith("//") || v.includes("\\") || /\p{Cc}/u.test(v) ? null : v;
 }
 
 export const roleHome: Record<Session["role"], string> = { client: "/customer", contractor: "/partner", technician: "/technician", admin: "/admin" };

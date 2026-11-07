@@ -1,6 +1,6 @@
 # Lint and tests of the whole repository on every push and pull request. Each check is its own job: Go lint (format, vet,
 # golangci-lint, generated files and the API description), the Go suite (unit + integration on one server), the integration suite
-# against the split services, web lint (no warnings allowed) and the strict web lint per workspace, web typecheck, web unit tests, and the design document validators. The
+# against the split services, the web lint (type-aware, no warnings allowed) per workspace, web dead code (knip), Python, shell, workflows and Dockerfiles, web typecheck, web unit tests, and the design document validators. The
 # end-to-end suite needs the whole compose stack and runs in e2e.yml.
 #
 # The jobs run on the lab server's self-hosted runner (label ac-test, DEC-94), each in a container of its own: the dependencies'
@@ -10,7 +10,7 @@
 #
 # The three runners take the jobs in three lanes, longest first, so that the run lasts about as long as its longest lane
 # (the runner picks queued jobs in no fixed order, and a long job started last made a run up to 11 minutes):
-# go-test-cluster -> web-test -> go-lint | docs -> web-lint | go-test -> web-typecheck. The six strict web lint jobs (one per
+# go-test-cluster -> web-test -> go-lint | docs -> web-knip | go-test -> web-typecheck. The six web lint jobs (one per
 # workspace and one for the e2e specs, about two minutes each) have no needs: they take whichever runner is free, so the lanes do not
 # grow by the twelve minutes they would take one after the other. The Go suites run the integration
 # tests in three shards (service/api/scripts/test-shards.sh) and the document regressions run in parallel, so each lane
@@ -105,6 +105,7 @@ jobs:
         # lines also become annotations, readable on the run without the logs (like the E2E's reporter)
         run: |
           rp=0 ri=0
+          # shellcheck disable=SC2046 # the package list splits into words, one per package
           go test -count=1 -timeout 30m $(go list ./... | grep -v /test/) > packages.log 2>&1 & p=$!
           SHARDS=3 RESET=0 sh scripts/test-shards.sh > integration.log 2>&1 || ri=$?
           wait $p || rp=$?
@@ -157,8 +158,8 @@ jobs:
         if: always()
         run: chown -R "$(stat -c '%u:%g' .)" .
 
-  web-lint:
-    name: Web lint (ESLint)
+  web-knip:
+    name: Web dead code (knip)
     needs: docs
     if: ${{ !cancelled() }}
     runs-on: [self-hosted, ac-test]
@@ -167,18 +168,19 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: npm ci
-      - run: npm run lint
+      - name: dead code and unused dependencies (knip.jsonc)
+        run: npm run knip
       - name: the workspace back to the runner's user
         if: always()
         working-directory: .
         run: chown -R "$(stat -c '%u:%g' .)" .
 
-  # The strict rule set (type-aware, CLAUDE.md 5) of each workspace and of the e2e specs, one job each: together they take about
-  # twelve minutes on the server, so they run side by side on the free runners instead of one after the other in web-lint.
-  # They need nothing from the other jobs, so they start as soon as a runner is free. Each runs `next typegen` first (the apps'
-  # lint:strict does), because the route types it writes are what the lint reads PageProps from.
-  web-lint-strict:
-    name: Web strict lint (${{ matrix.workspace }})
+  # The web lint (type-aware, CLAUDE.md 5) of each workspace and of the e2e specs, one job each: together they take about twelve
+  # minutes on the server, so they run side by side on the free runners instead of one after the other. They need nothing from
+  # the other jobs, so they start as soon as a runner is free. Each app's lint runs `next typegen` first, because the route
+  # types it writes are what the lint reads PageProps from.
+  web-lint:
+    name: Web lint (${{ matrix.workspace }})
     runs-on: [self-hosted, ac-test]
     container: { image: "node:26-bookworm", volumes: ["ac-ci-npm:/root/.npm"] }
     defaults: { run: { working-directory: service/web } }
@@ -189,16 +191,33 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: npm ci
-      - name: strict lint
+      - name: lint
         run: |
           if [ "${{ matrix.workspace }}" = e2e ]; then
             npx eslint --max-warnings=0 -c e2e/eslint.config.mjs e2e
           else
-            npm run lint:strict --workspace=${{ matrix.workspace }}
+            npm run lint --workspace=${{ matrix.workspace }}
           fi
       - name: the workspace back to the runner's user
         if: always()
         working-directory: .
+        run: chown -R "$(stat -c '%u:%g' .)" .
+
+  # Python (ruff, ruff.toml), shell scripts (shellcheck), the workflows (actionlint, with the shell they run) and the Dockerfiles
+  # (hadolint), through the PyPI packages that carry each tool's binary; the versions are pinned. Nothing here needs the other jobs.
+  other-lint:
+    name: Python, shell, workflows and Dockerfiles
+    runs-on: [self-hosted, ac-test]
+    container: { image: "python:3.13-bookworm", volumes: ["ac-ci-pip:/root/.cache/pip"] }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: pip install ruff==0.17.3 shellcheck-py==0.11.0.1 actionlint-py==1.7.12.25 hadolint-py==2.15.1.3
+      - run: ruff check .
+      - run: find . -name '*.sh' -not -path './.git/*' -not -path '*/node_modules/*' -print0 | xargs -0 shellcheck
+      - run: actionlint -config-file .github/actionlint.yaml
+      - run: find . -name '*Dockerfile' -not -path './.git/*' -not -path '*/node_modules/*' -print0 | xargs -0 -n1 hadolint
+      - name: the workspace back to the runner's user
+        if: always()
         run: chown -R "$(stat -c '%u:%g' .)" .
 
   web-typecheck:

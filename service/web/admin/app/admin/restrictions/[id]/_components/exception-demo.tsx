@@ -1,5 +1,6 @@
 "use client";
 
+import { useOpenedAt } from "@ac/web/lib/useOpenedAt";
 import Link from "next/link";
 import { useState } from "react";
 import { Banner, Btn, Card, Check, Field, Input, Page, SummaryList, Textarea, Timeline, useToast, Plain } from "@ac/web/components/ui";
@@ -24,7 +25,7 @@ export function ExceptionDemo({ id }: Readonly<{ id: string }>) {
   const [done, setDone] = useState(false);
   const [tried, setTried] = useState(false);
   const isNeedsDate = act === "defer" || act === "exempt";
-  const [openedAt] = useState(() => Date.now()); // reference time for the date check (render stays pure)
+  const openedAt = useOpenedAt(); // reference time for the date check (render stays pure)
   const dateError = tried && isNeedsDate && (!until || new Date(until).getTime() < openedAt - 86_400e3) ? "Date must be in the future" : undefined;
   const run = () => { setTried(true); if (!reason.trim() || dateError) { return; } if (act === "override" && !hasOverride) { toast("FORBIDDEN — restriction.override required", "crit"); return; } setDone(true); toast("Action recorded"); };
   return (

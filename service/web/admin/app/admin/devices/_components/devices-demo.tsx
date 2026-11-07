@@ -36,7 +36,7 @@ export function DevicesDemo() {
   const [tried, setTried] = useState(false);
   const [modal, setModal] = useState<null | "register" | "calibrate" | "rebind" | "history" | "newModel">(null);
   const [mf, setMf] = useState({ manu: "", model: "", serial: "" });
-  const rangeError = +min > +max ? "min must be ≤ max" : undefined;
+  const rangeError = Number(min) > Number(max) ? "min must be ≤ max" : undefined;
   const saveModel = () => { setTried(true); if (!reason.trim() || rangeError) { return; } toast("Saved — new capability version created (v4)"); setReason(""); setTried(false); };
   const shown = devs.filter((x) => !q || (x.serial + x.id + x.unit).toLowerCase().includes(q.toLowerCase()));
   return (

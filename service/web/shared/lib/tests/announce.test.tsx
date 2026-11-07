@@ -9,8 +9,8 @@ import { Banner, ToastProvider, useToast } from "@ac/web/components/ui";
 afterEach(() => { cleanup(); toast.dismiss(); });
 
 function Pusher() {
-  const toast = useToast();
-  return <><button onClick={() => { toast("Saved"); }}>ok</button><button onClick={() => { toast("Not saved: CONFLICT", "crit"); }}>crit</button></>;
+  const notify = useToast();
+  return <><button type="button" onClick={() => { notify("Saved"); }}>ok</button><button type="button" onClick={() => { notify("Not saved: CONFLICT", "crit"); }}>crit</button></>;
 }
 
 // IR362: critical errors are announced at once (UX-06), other results politely
@@ -18,9 +18,9 @@ describe("announcements", () => {
   it("makes an error banner an alert and other banners a status", () => {
     render(<><Banner tone="crit">Not submitted</Banner><Banner tone="warn">Window ends soon</Banner><Banner>Saved</Banner></>);
     expect(screen.getByRole("alert").textContent).toContain("Not submitted");
-    expect(screen.getAllByRole("status").map((x) => x.textContent)).toEqual(["Window ends soon", "Saved"]);
+    expect(screen.getAllByRole("status").map((x) => x.textContent)).toStrictEqual(["Window ends soon", "Saved"]);
     // each banner's icon is a Lucide drawing, hidden from assistive technology (DEC-74)
-    expect([...screen.getByRole("alert").querySelectorAll("svg"), ...screen.getAllByRole("status").flatMap((x) => [...x.querySelectorAll("svg")])].map((x) => [x.getAttribute("aria-hidden"), x.classList.contains("lucide")])).toEqual([["true", true], ["true", true], ["true", true]]);
+    expect([...screen.getByRole("alert").querySelectorAll("svg"), ...screen.getAllByRole("status").flatMap((x) => [...x.querySelectorAll("svg")])].map((x) => [x.getAttribute("aria-hidden"), x.classList.contains("lucide")])).toStrictEqual([["true", true], ["true", true], ["true", true]]);
   });
   it("puts an error toast in the alert region and other toasts in the status region", async () => {
     render(<ToastProvider><Pusher /></ToastProvider>);

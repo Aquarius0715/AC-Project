@@ -8,6 +8,7 @@
 // - vitest's recommended rules for the unit tests (playwright's come with the E2E config).
 // The scripts run ESLint with --max-warnings=0, so every finding fails the lint.
 import comments from "@eslint-community/eslint-plugin-eslint-comments/configs";
+import js from "@eslint/js";
 import vitest from "@vitest/eslint-plugin";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
@@ -15,6 +16,7 @@ import security from "eslint-plugin-security";
 import sonarjs from "eslint-plugin-sonarjs";
 import unicorn from "eslint-plugin-unicorn";
 import { defineConfig, globalIgnores } from "eslint/config";
+import path from "node:path";
 import tseslint from "typescript-eslint";
 
 // eslint-config-next registers react, react-hooks, import and jsx-a11y; their rule sets come from those same plugin
@@ -32,6 +34,7 @@ const everyRule = (prefix, plugin) =>
 /** @param {string} tsconfigRootDir the directory of the tsconfig.json the files belong to */
 export function webConfig(tsconfigRootDir) {
   return defineConfig([
+    js.configs.recommended,
     ...nextVitals,
     ...nextTs,
     tseslint.configs.strictTypeChecked,
@@ -67,7 +70,18 @@ export function webConfig(tsconfigRootDir) {
     comments.recommended,
     { files: ["**/tests/**", "**/*.test.{ts,tsx}"], ...vitest.configs.recommended },
     // Vitest's expect takes a message as its second argument (expect(value, "what failed"))
-    { files: ["**/tests/**", "**/*.test.{ts,tsx}"], rules: { "vitest/valid-expect": ["error", { maxArgs: 2 }] } },
+    {
+      files: ["**/tests/**", "**/*.test.{ts,tsx}"],
+      rules: {
+        "vitest/valid-expect": ["error", { maxArgs: 2 }],
+        // Round 3: the assertions that tell more. toStrictEqual compares undefined properties and classes; a throw is matched
+        // by its message; hooks run in their order; a spy is checked for its one call
+        "vitest/prefer-strict-equal": "error",
+        "vitest/require-to-throw-message": "error",
+        "vitest/prefer-hooks-in-order": "error",
+        "vitest/prefer-called-once": "error",
+      },
+    },
     // Where a rule needs a fact of this project, or contradicts a contract or platform it has to follow:
     {
       rules: {
@@ -109,6 +123,11 @@ export function webConfig(tsconfigRootDir) {
           {
             selector: "TSAsExpression > TSAsExpression[typeAnnotation.type=/^TS(?:Unknown|Any)Keyword$/]",
             message: "Narrow the value with a runtime check or a Zod schema instead of asserting through unknown or any.",
+          },
+          {
+            // a length of 0 is a number React renders ("0"); the number that stands alone in `&&` is this one
+            selector: 'JSXExpressionContainer > LogicalExpression[operator="&&"] > MemberExpression.left[property.name="length"]',
+            message: "`{list.length && <X />}` renders 0 for an empty list: compare it, `{list.length > 0 && <X />}`.",
           },
         ],
         // 3: no raw HTML
@@ -191,6 +210,79 @@ export function webConfig(tsconfigRootDir) {
         ],
       },
     },
+    { settings: { "import/internal-regex": "^@ac/web(?:/|$)" } },
+    // Round 3 (2026-11-07): rules outside the recommended sets, added as each reaches zero findings
+    {
+      rules: {
+        // typescript-eslint and tsc check names and undeclared variables; the core rules would report them twice
+        "no-undef": "off",
+        // syntactic, so it flags every `cond && <X />` whose left side is a boolean, string or object (581 of 582 here), and
+        // React renders none of them; only a number (0) leaks, and @typescript-eslint/strict-boolean-expressions finds that
+        // one by its type
+        "react/jsx-no-leaked-render": "off",
+        "eqeqeq": "error",
+        "no-promise-executor-return": "error",
+        // `!!x` narrows the type of x in `!!x && x.y`; `Boolean(x)` does not (it returns a plain boolean), so the boolean form
+        // stays. Numbers (`+x`) and strings (`"" + x`) are coerced with Number() and String()
+        "no-implicit-coercion": ["error", { boolean: false }],
+        "react/jsx-no-constructed-context-values": "error",
+        "react/jsx-no-useless-fragment": "error",
+        "import/no-relative-packages": "error",
+        // console.warn and console.error are the logs of the Next.js server process (a failing session store, a missing
+        // translation); console.log, info and debug stay forbidden, as leftovers of debugging
+        "no-console": ["error", { allow: ["warn", "error"] }],
+        "react/button-has-type": "error",
+        "react/no-object-type-as-default-prop": "error",
+        // jsx-a11y reads a <td> as a gridcell, a widget role, and asks for a label; an empty cell (the corner of a schedule grid,
+        // a column of badges) is a plain data cell. Buttons, links and inputs are still checked
+        "jsx-a11y/control-has-associated-label": ["error", { ignoreElements: ["td"] }],
+        // a render prop (recharts' tick, dot and labelFormatter, a table column's render) is a function the library calls, not
+        // a component that React mounts; a component declared inside another is still reported
+        "react/no-unstable-nested-components": ["error", { allowAsProps: true }],
+        // the ARIA roles here are chosen on purpose and checked by axe in the E2E suite: role="status" and "alert" are live regions
+        // (<output> is for a calculation's result), role="img" labels a drawing (an <img> cannot hold the bar's segments),
+        // role="radio" on a button is a radio group of buttons (a native <input type="radio"> cannot be styled as the chips),
+        // role="group" and "region" name a block (<fieldset> brings a legend and form semantics, <section> no change at all)
+        "jsx-a11y/prefer-tag-over-role": "off",
+        // the lists keyed by index here have no identity of their own to key by: an append-only log (the assistant's messages),
+        // the cells of a schedule row, the series of a chart, the rows of a static demo table, a text split at its separators.
+        // The lists whose items can move or go (units, jobs, members, alerts) carry an id and use it
+        "react/no-array-index-key": "off",
+        // a state and its setter are named as a pair ([tab, setTab]); a wrapper that does more than set it has its own name (selectTab)
+        "react/hook-use-state": "error",
+        "import/no-mutable-exports": "error",
+        "require-atomic-updates": "error",
+        "no-await-in-loop": "error",
+        // an import names a package of the workspace root or of the workspace itself (shared, an app, e2e); `@ac/web/*` is the
+        // shared package's own path alias (tsconfig paths), an internal module and no dependency of itself (see settings above)
+        "import/no-extraneous-dependencies": ["error", { packageDir: [tsconfigRootDir, path.resolve(tsconfigRootDir, "..")] }],
+      },
+    },
+    {
+      files: ["**/*.{ts,tsx,mts,cts}"],
+      rules: {
+        "@typescript-eslint/consistent-type-imports": ["error", { fixStyle: "inline-type-imports" }],
+        // `import { type A }` leaves an empty import at runtime under verbatimModuleSyntax; a file that imports only types
+        // writes `import type { A }`
+        "@typescript-eslint/no-import-type-side-effects": "error",
+        // a `default` that stands for the other members of a union (a case per kind, then "the other kinds") is the author's
+        // statement that the rest behave alike, so it counts as exhaustive. Without a default, every member must have a case.
+        // (@typescript-eslint/consistent-return is not enabled: tsc's noImplicitReturns checks the same with the exhaustiveness
+        // analysis, and the rule reports a switch that covers a whole union as falling off the end.)
+        "@typescript-eslint/switch-exhaustiveness-check": ["error", { considerDefaultExhaustiveForUnions: true }],
+        "@typescript-eslint/strict-void-return": "error",
+        // A condition names what it tests. A string, a number or an optional value may stand alone (an empty string, 0 and a
+        // missing value all mean "not set" here, and React renders "" as nothing); an object that may be null may too. A value of
+        // a mixed type (a ReactNode, a string-or-boolean) says what it tests: hasContent(node), !!value or a comparison. The
+        // number that leaks into the page, `{n && <X />}`, is the selector in no-restricted-syntax
+        "@typescript-eslint/strict-boolean-expressions": ["error", { allowNullableString: true, allowNullableBoolean: true, allowNullableNumber: true }],
+        // a file reads top-down: the exported function first, its helpers below. A helper (a function, or a const holding one)
+        // that a function calls is defined by the time the call runs; only a use in the same scope before the declaration (the
+        // temporal dead zone) is a mistake, and that is what `variables: false` leaves
+        "@typescript-eslint/no-use-before-define": ["error", { functions: false, variables: false }],
+        "@typescript-eslint/no-shadow": "error",
+      },
+    },
     {
       // 1: no assertion that narrows a type. The rule reads types, so it applies to the TypeScript files only: the config
       // files (*.mjs) are linted without type information
@@ -214,6 +306,11 @@ export function webConfig(tsconfigRootDir) {
         "sonarjs/regex-complexity": "off",
         "sonarjs/expression-complexity": "off",
         "unicorn/max-nested-calls": "off",
+        // vi.fn() and the spies return any, so passing one as a callback reads as a value-returning function; a test steps through
+        // pages, retries and polls in order, one await after the other, and assigns a variable after an await in a helper
+        "@typescript-eslint/strict-void-return": "off",
+        "no-await-in-loop": "off",
+        "require-atomic-updates": "off",
         // a mock consumes its queue with shift(), and a case passes undefined on purpose to show the default
         "unicorn/no-array-front-mutation": "off",
         // the tests scan the repository's own sources with regular expressions
@@ -273,6 +370,49 @@ export function webConfig(tsconfigRootDir) {
       // components.json expects ("utils": "@ac/web/lib/utils")
       files: ["**/lib/utils.ts"],
       rules: { "unicorn/no-barrel-files": "off" },
+    },
+    {
+      // the four apps' and the shared package's ESLint configs share the rules of the workspace root by a relative path; the
+      // root is not a package that resolves by name (it is no dependency of any workspace)
+      files: ["**/eslint.*config.mjs"],
+      rules: { "import/no-relative-packages": "off" },
+    },
+    {
+      // These loops run one await after the other because each step depends on the one before or may end the loop: a cursor
+      // (pagination of the Core API and of the telemetry series, the response stream), a poll that waits between reads (a
+      // command's result, the demo clock), writes paced by the API's rate limit (a bulk send, one unit's commands), and a search
+      // that stops at the first match (the restriction behind a contract's first invoices). Running them at once would send
+      // requests the first answer makes needless. Everywhere else the rule stays on.
+      files: [
+        "**/lib/dal.ts",
+        "**/bff/ops/*/route.ts",
+        "**/lib/unitCommands.ts",
+        "**/lib/writeLimit.ts",
+        "**/screens/shell/demo/actions.ts",
+        "**/customer/payments/page.tsx",
+        "**/customer/properties/_components/properties-view.tsx",
+        "**/customer/units/*/_components/unit-view.tsx",
+        "**/customer/units/*/page.tsx",
+        "**/technician/units/*/_lib/load.ts",
+      ],
+      rules: { "no-await-in-loop": "off" },
+    },
+    {
+      // These rows carry `tone: undefined` (or `error: undefined`) for "no tone"; the expected rows list the tones they have.
+      // toStrictEqual tells an undefined property from a missing one, which is not what these tests are about
+      files: [
+        "**/tests/energy.test.ts",
+        "**/tests/partnerHistory.test.ts",
+        "**/tests/partnerJobs.test.ts",
+        "**/tests/partnerUnit.test.ts",
+        "**/tests/techUnit.test.ts",
+      ],
+      rules: { "vitest/prefer-strict-equal": "off" },
+    },
+    {
+      // useOpenedAt keeps the first value of a state that is never set again; a setter it did not use would only be dropped
+      files: ["**/lib/useOpenedAt.ts"],
+      rules: { "react/hook-use-state": "off" },
     },
     {
       // Next.js runs next.config.ts as CommonJS here (the packages have no "type": "module"), where __dirname is the

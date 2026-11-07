@@ -50,7 +50,7 @@ function List({ live }: Readonly<{ live: HistoryLive }>) {
         {live.rows.length === 0 ? emptyState() : (
           <ScrollX>
             <table className="w-full min-w-[880px] text-[13px]">
-              <thead><tr className="text-left text-[11px] uppercase tracking-wide text-muted-foreground"><th className="py-2 font-semibold">{t("Job")}</th><th className="py-2 font-semibold">{t("Technician")}</th><th className="py-2 font-semibold">{t("Last event")}</th><th className="py-2 font-semibold">{t("Status")}</th><th /></tr></thead>
+              <thead><tr className="text-left text-[11px] uppercase tracking-wide text-muted-foreground"><th className="py-2 font-semibold">{t("Job")}</th><th className="py-2 font-semibold">{t("Technician")}</th><th className="py-2 font-semibold">{t("Last event")}</th><th className="py-2 font-semibold">{t("Status")}</th><td /></tr></thead>
               <tbody>
                 {live.rows.map((r) => (
                   <tr key={r.id} className="border-t border-line align-top hover:bg-surface2/60">
@@ -71,10 +71,10 @@ function List({ live }: Readonly<{ live: HistoryLive }>) {
   );
 }
 
-type Detail = NonNullable<HistoryLive["detail"]>;
+type DetailRows = NonNullable<HistoryLive["detail"]>;
 interface SessionPreview { id: string; title: string; sub: string }
 
-function Detail({ live, detail }: Readonly<{ live: HistoryLive; detail: Detail }>) {
+function Detail({ live, detail }: Readonly<{ live: HistoryLive; detail: DetailRows }>) {
   const t = useT();
   const patch = useUrlPatch();
   const [view, setView] = useState<"all" | "customer" | "internal">("all");
@@ -129,7 +129,7 @@ function Crumb({ live, text }: Readonly<{ live: HistoryLive; text: string }>) {
   return <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground"><Link href={hrefOf(live)} className="font-semibold text-primary"><Icon name="arrowLeft" /> {t("Job history")}</Link> › <b className="text-ink">{text}</b></div>;
 }
 
-function Compose({ detail, onPreview }: Readonly<{ detail: Extract<Detail, { missing: false }>; onPreview: (p: SessionPreview) => void }>) {
+function Compose({ detail, onPreview }: Readonly<{ detail: Extract<DetailRows, { missing: false }>; onPreview: (p: SessionPreview) => void }>) {
   const t = useT();
   const r = detail.row, mode = detail.mode;
   const [pending, run] = useAction();

@@ -20,7 +20,7 @@ func Check(addr string) int {
 		ctx,
 		http.MethodGet,
 		"http://127.0.0.1"+addr+"/healthz",
-		nil,
+		http.NoBody,
 	)
 	if err != nil {
 		return 1

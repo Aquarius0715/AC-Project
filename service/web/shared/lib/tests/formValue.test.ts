@@ -26,6 +26,6 @@ describe("a form value that must have the contract's shape", () => {
       return null;
     })();
     expect(refused).toBeInstanceOf(CoreError);
-    expect(refused instanceof CoreError && [refused.status, refused.error.code, refused.error.fieldErrors]).toEqual([422, "VALIDATION", { photos: "error.invalid" }]);
+    expect(refused instanceof CoreError && [refused.status, refused.error.code, refused.error.fieldErrors]).toStrictEqual([422, "VALIDATION", { photos: "error.invalid" }]);
   });
 });

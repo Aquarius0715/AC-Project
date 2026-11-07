@@ -411,7 +411,7 @@ type ArchivedResource struct {
 
 // MoveToCapabilityVersion points every unit of the model at its new capability version (called by Devices on
 // capabilities.save, DD-A04 step 3); returns the number of units changed.
-func (m *Module) MoveToCapabilityVersion(
+func (*Module) MoveToCapabilityVersion(
 	ctx context.Context,
 	call *ops.Call,
 	modelID uuid.UUID,
@@ -455,7 +455,7 @@ func (m *Module) MoveToCapabilityVersion(
 }
 
 // UnitInfo answers unit lookups for Devices (scope is applied by the calling operation's own rules).
-func (m *Module) UnitInfo(
+func (*Module) UnitInfo(
 	ctx context.Context,
 	c *ops.Call,
 	unit uuid.UUID,
@@ -473,7 +473,7 @@ func (m *Module) UnitInfo(
 }
 
 // UnitsOfProperty lists the units of a property (Monitoring propertyId filters).
-func (m *Module) UnitsOfProperty(
+func (*Module) UnitsOfProperty(
 	ctx context.Context,
 	c *ops.Call,
 	property uuid.UUID,
@@ -501,7 +501,7 @@ func (m *Module) UnitsOfProperty(
 }
 
 // OrgOfCustomer maps a customer ID to its organization.
-func (m *Module) OrgOfCustomer(
+func (*Module) OrgOfCustomer(
 	ctx context.Context,
 	c *ops.Call,
 	customer uuid.UUID,
@@ -518,7 +518,7 @@ func (m *Module) OrgOfCustomer(
 }
 
 // AttachedUnits returns the units carrying each alert policy (IR108: units are the attachment source).
-func (m *Module) AttachedUnits(
+func (*Module) AttachedUnits(
 	ctx context.Context,
 	c *ops.Call,
 	policies []uuid.UUID,
@@ -550,7 +550,7 @@ func (m *Module) AttachedUnits(
 }
 
 // PoliciesOfUnits returns the alert policies attached to any of the units.
-func (m *Module) PoliciesOfUnits(
+func (*Module) PoliciesOfUnits(
 	ctx context.Context,
 	c *ops.Call,
 	units []uuid.UUID,
@@ -583,7 +583,7 @@ func (m *Module) PoliciesOfUnits(
 
 // DetachPolicy removes an alert policy from every unit and bumps the version of each changed unit (policies.delete,
 // IR108).
-func (m *Module) DetachPolicy(ctx context.Context, call *ops.Call, policy uuid.UUID) error {
+func (*Module) DetachPolicy(ctx context.Context, call *ops.Call, policy uuid.UUID) error {
 	rows, err := call.Tx.Query(
 		ctx,
 		`DELETE FROM assets.unit_alert_policies WHERE policy_id = $1 RETURNING unit_id`,
@@ -643,7 +643,7 @@ func (m *Module) DetachPolicy(ctx context.Context, call *ops.Call, policy uuid.U
 }
 
 // OrgsOfUnits maps units to their customer organization.
-func (m *Module) OrgsOfUnits(
+func (*Module) OrgsOfUnits(
 	ctx context.Context,
 	c *ops.Call,
 	units []uuid.UUID,
@@ -675,7 +675,7 @@ func (m *Module) OrgsOfUnits(
 }
 
 // CustomerOfOrg maps an organization to its customer.
-func (m *Module) CustomerOfOrg(
+func (*Module) CustomerOfOrg(
 	ctx context.Context,
 	c *ops.Call,
 	org uuid.UUID,
@@ -692,7 +692,7 @@ func (m *Module) CustomerOfOrg(
 }
 
 // CustomerState returns the organization of a customer and whether it is active.
-func (m *Module) CustomerState(
+func (*Module) CustomerState(
 	ctx context.Context,
 	call *ops.Call,
 	customer uuid.UUID,
@@ -758,7 +758,7 @@ func (m *Module) SpaceInfo(
 }
 
 // SpacesOfUnits returns the spaces of the given units (units without a space are skipped).
-func (m *Module) SpacesOfUnits(
+func (*Module) SpacesOfUnits(
 	ctx context.Context,
 	c *ops.Call,
 	units []uuid.UUID,
@@ -798,7 +798,7 @@ func (m *Module) ScopedUnits(ctx context.Context, c *ops.Call) ([]uuid.UUID, err
 }
 
 // SpacesOfOrg returns every space in the properties of a customer organization.
-func (m *Module) SpacesOfOrg(ctx context.Context, c *ops.Call, org uuid.UUID) ([]uuid.UUID, error) {
+func (*Module) SpacesOfOrg(ctx context.Context, c *ops.Call, org uuid.UUID) ([]uuid.UUID, error) {
 	rows, err := c.Tx.Query(
 		ctx,
 		`SELECT s.id FROM assets.spaces s JOIN assets.properties p ON p.id = s.property_id WHERE p.customer_org_id = $1`,
@@ -826,7 +826,7 @@ func (m *Module) SpacesOfOrg(ctx context.Context, c *ops.Call, org uuid.UUID) ([
 }
 
 // UnitState returns the customer organization of a unit and whether it is archived (Maintenance job intake).
-func (m *Module) UnitState(
+func (*Module) UnitState(
 	ctx context.Context,
 	call *ops.Call,
 	unit uuid.UUID,
@@ -846,7 +846,7 @@ func (m *Module) UnitState(
 }
 
 // UnitService returns the organization, property and service scope of a unit (Maintenance qualification checks).
-func (m *Module) UnitService(
+func (*Module) UnitService(
 	ctx context.Context,
 	call *ops.Call,
 	unit uuid.UUID,
@@ -864,7 +864,7 @@ func (m *Module) UnitService(
 }
 
 // SiteAddress returns the IR25 installation address of a unit (null for blank) and the unit's service scope.
-func (m *Module) SiteAddress(
+func (*Module) SiteAddress(
 	ctx context.Context,
 	call *ops.Call,
 	unit uuid.UUID,
@@ -882,7 +882,7 @@ func (m *Module) SiteAddress(
 }
 
 // WarrantyEnd returns a unit's warrantyEndsAt (Maintenance warranty claims).
-func (m *Module) WarrantyEnd(ctx context.Context, c *ops.Call, unit uuid.UUID) (*time.Time, error) {
+func (*Module) WarrantyEnd(ctx context.Context, c *ops.Call, unit uuid.UUID) (*time.Time, error) {
 	var t *time.Time
 
 	err := c.Tx.QueryRow(ctx, `SELECT warranty_ends_at FROM assets.units WHERE id = $1`, unit).
@@ -897,7 +897,7 @@ func (m *Module) UnitsOfOrg(ctx context.Context, c *ops.Call, org uuid.UUID) ([]
 }
 
 // CustomerProfiles maps customer organizations to {customerId, serviceProfile} (Maintenance SLA, IR131).
-func (m *Module) CustomerProfiles(
+func (*Module) CustomerProfiles(
 	ctx context.Context,
 	c *ops.Call,
 	orgs []uuid.UUID,
@@ -933,7 +933,7 @@ func (m *Module) CustomerProfiles(
 
 // BriefUnits lists the caller-readable, not archived units matching the optional customer / property / space / unit
 // filters.
-func (m *Module) BriefUnits(
+func (*Module) BriefUnits(
 	ctx context.Context,
 	call *ops.Call,
 	customer, property, space, unit *uuid.UUID,
@@ -990,7 +990,7 @@ func (m *Module) BriefUnits(
 }
 
 // UnitVersion returns a unit's current version (Control expectedUnitVersion).
-func (m *Module) UnitVersion(ctx context.Context, c *ops.Call, unit uuid.UUID) (int, error) {
+func (*Module) UnitVersion(ctx context.Context, c *ops.Call, unit uuid.UUID) (int, error) {
 	var v int
 
 	err := c.Tx.QueryRow(ctx, `SELECT version FROM assets.units WHERE id = $1`, unit).Scan(&v)
@@ -998,7 +998,7 @@ func (m *Module) UnitVersion(ctx context.Context, c *ops.Call, unit uuid.UUID) (
 	return v, apperr.Wrap(err, "select assets.units")
 }
 
-func (m *Module) customerActive(ctx context.Context, c *ops.Call, org uuid.UUID) error {
+func (*Module) customerActive(ctx context.Context, c *ops.Call, org uuid.UUID) error {
 	var status string
 
 	err := c.Tx.QueryRow(ctx, `SELECT status FROM assets.customers WHERE organization_id = $1`, org).
@@ -1165,7 +1165,7 @@ func locationSaved(
 
 // activeProperty requires an active property, read with a share lock: an archive of it waits, or is waited for and seen
 // (IR478).
-func (m *Module) activeProperty(ctx context.Context, c *ops.Call, id uuid.UUID) error {
+func (*Module) activeProperty(ctx context.Context, c *ops.Call, id uuid.UUID) error {
 	err := c.Tx.QueryRow(ctx, `SELECT 1 FROM assets.properties WHERE id = $1 AND NOT archived FOR SHARE`, id).
 		Scan(new(int))
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -1177,7 +1177,7 @@ func (m *Module) activeProperty(ctx context.Context, c *ops.Call, id uuid.UUID) 
 
 // checkParent requires the parent to be an active space of the same property and, for an existing space, not one
 // of its own descendants (no hierarchy cycles).
-func (m *Module) checkParent(
+func (*Module) checkParent(
 	ctx context.Context,
 	call *ops.Call,
 	self *uuid.UUID,
@@ -1711,7 +1711,7 @@ func (m *Module) spacesArchive(
 	)
 }
 
-func (m *Module) archive(
+func (*Module) archive(
 	kind, table, busySQL string,
 ) func(context.Context, *ops.Call, *ArchiveInput) (ArchivedResource, error) {
 	return func(ctx context.Context, call *ops.Call, input *ArchiveInput) (ArchivedResource, error) {
@@ -1816,7 +1816,7 @@ func (m *Module) unitsArchive(
 	return m.archive(kindUnit, "assets.units", "")(ctx, call, input)
 }
 
-func (m *Module) unitIDs(
+func (*Module) unitIDs(
 	ctx context.Context,
 	c *ops.Call,
 	where string,

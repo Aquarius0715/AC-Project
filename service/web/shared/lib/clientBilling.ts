@@ -16,7 +16,7 @@ const en = translator("en");
 const plain = (s: string) => s.replaceAll(/[\u{A0}\u{2009}\u{202F}]/gu, " ");
 const businessDayShort = (iso: string, locale: Locale) => plain(new Date(iso).toLocaleDateString(intlTag(locale), { timeZone: KL, month: "short", day: "numeric" }));
 
-export const planName: Record<string, string> = { rto: "RTO Plan", general: "General maintenance", energy: "Energy service", environment: "Environment service" };
+const planName: Record<string, string> = { rto: "RTO Plan", general: "General maintenance", energy: "Energy service", environment: "Environment service" };
 const planLong: Record<string, string> = { rto: "Rent-to-own (RTO)", general: "General maintenance", energy: "Energy service", environment: "Environment service" };
 
 export interface UnitPlace { name: string; place: string }

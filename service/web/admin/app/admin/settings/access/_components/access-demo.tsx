@@ -7,7 +7,7 @@ const CONTRACTOR_A = "contractor-a";
 import { useState } from "react";
 import { Badge, Banner, Btn, Card, Check, Choice, Field, Input, ListRow, Modal, Page, Search, Select, Textarea, useToast } from "@ac/web/components/ui";
 import { Icon } from "@ac/web/components/Icon";
-import { type NonEmpty } from "@ac/web/lib/lists";
+import type { NonEmpty } from "@ac/web/lib/lists";
 import { allPermissions, type PermissionRow, permissionRows as rows } from "@ac/web/lib/members";
 
 interface U { id: string; role: string; org: string; email: string; role2: "admin" | "contractor" | "technician" }

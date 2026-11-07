@@ -1,5 +1,6 @@
 "use client"
 
+import { hasContent } from "@ac/web/lib/hasContent";
 import { createContext, useContext, useId, useMemo, type CSSProperties, type ComponentProps, type ComponentType, type ReactNode } from "react"
 import { cn } from "cn"
 import { cssVariables } from "@ac/web/lib/cssVariables"
@@ -60,8 +61,10 @@ function ChartContainer({
   const uniqueId = useId()
   const chartId = `chart-${id ?? uniqueId.replaceAll(':', "")}`
 
+  const context = useMemo(() => ({ config }), [config])
+
   return (
-    <ChartContext.Provider value={{ config }}>
+    <ChartContext.Provider value={context}>
       <div
         data-slot="chart"
         data-chart={chartId}
@@ -146,7 +149,7 @@ function ChartTooltipContent({
       )
     }
 
-    if (!value) {
+    if (!hasContent(value)) {
       return null
     }
 
@@ -192,7 +195,7 @@ function ChartTooltipContent({
                   indicator === "dot" && "items-center"
                 )}
               >
-                {formatter && item.value !== undefined && item.name ? (
+                {formatter && item.value !== undefined && hasContent(item.name) ? (
                   formatter(item.value, item.name, item, index, item.payload)
                 ) : (
                   <>
@@ -230,7 +233,7 @@ function ChartTooltipContent({
                           {itemConfig?.label ?? item.name}
                         </span>
                       </div>
-                      {item.value != null && (
+                      {item.value !== undefined && (
                         <span className="font-mono font-medium text-foreground tabular-nums">
                           {typeof item.value === "number"
                             ? item.value.toLocaleString()

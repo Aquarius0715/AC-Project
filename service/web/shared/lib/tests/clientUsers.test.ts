@@ -14,13 +14,13 @@ beforeEach(() => {
 describe("the client users of the demo", () => {
   it("checks an invitation's e-mail: present, well formed and not already a user (any case)", () => {
     expect([emailError(" ", CLIENT_USERS_SEED), emailError("tan.wei@", CLIENT_USERS_SEED), emailError(" MEI.TAN@example.com ", CLIENT_USERS_SEED), emailError("new@example.com", CLIENT_USERS_SEED)])
-      .toEqual(["Enter an e-mail address", "Enter a valid e-mail address", "This person is already a user of customer-a (Mei Tan · Member). E-mails are matched without case.", null]);
+      .toStrictEqual(["Enter an e-mail address", "Enter a valid e-mail address", "This person is already a user of customer-a (Mei Tan · Member). E-mails are matched without case.", null]);
   });
 
   it("invites a user who stays invited until they sign in, and re-sends only to the invited", () => {
     expect(clientUserActions.invite(" new@example.com ", "member", "customer-a")).toBeNull();
     expect(clientUserActions.invite("NEW@example.com", "member", "customer-a")).toMatch(/already a user/);
-    expect([clientUserActions.resend(guest), clientUserActions.resend(member)]).toEqual([null, "Only invited users can be re-invited"]);
+    expect([clientUserActions.resend(guest), clientUserActions.resend(member)]).toStrictEqual([null, "Only invited users can be re-invited"]);
   });
 
   it("keeps one active owner: the last one cannot be demoted, disabled or removed", () => {

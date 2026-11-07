@@ -52,7 +52,7 @@ const QUALITY: Record<string, string> = { valid: "good", stale: "stale", suspect
 const OPEN: [string, Tone] = ["Open", "crit"]; // an alert of an unknown status reads as open
 const STATE: Record<string, [string, Tone]> = { open: ["Open", "crit"], acknowledged: [ACKNOWLEDGED, "warn"], resolved: ["Resolved", "ok"] };
 
-export interface EvidenceCard { kind: string; title: string; value: string; sub: string }
+interface EvidenceCard { kind: string; title: string; value: string; sub: string }
 export interface AlertView {
   id: string; version: number; status: ApiTechAlert["status"]; severity: ApiTechAlert["severity"]; policyless: boolean;
   banner: { title: string; sub: string; tone: Tone; state: string | null };

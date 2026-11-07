@@ -11,27 +11,27 @@ const deviceCommand = (over: Partial<ApiCommand>): ApiCommand => ({ id: "cmd-123
 
 describe("unit commands and readings in the display language and time zone (FR-X01, IR44, IR259)", () => {
   it("words every command in English and Malay, the stored values unchanged", () => {
-    expect([actionText({ kind: "set_power", power: true }), actionText({ kind: "set_mode", mode: "cool" }), actionText({ kind: "set_fan", fanLevel: "mid" })]).toEqual(["Set power ON", "Set mode COOL", "Set fan MID"]);
-    expect([actionText({ kind: "set_power", power: false }, ms), actionText({ kind: "set_temperature", celsius: 24 }, ms), actionText({ kind: "set_mode", mode: "dry" }, ms)]).toEqual(["Tetapkan kuasa MATI", "Tetapkan suhu 24°C", "Tetapkan mod KERING"]);
+    expect([actionText({ kind: "set_power", power: true }), actionText({ kind: "set_mode", mode: "cool" }), actionText({ kind: "set_fan", fanLevel: "mid" })]).toStrictEqual(["Set power ON", "Set mode COOL", "Set fan MID"]);
+    expect([actionText({ kind: "set_power", power: false }, ms), actionText({ kind: "set_temperature", celsius: 24 }, ms), actionText({ kind: "set_mode", mode: "dry" }, ms)]).toStrictEqual(["Tetapkan kuasa MATI", "Tetapkan suhu 24°C", "Tetapkan mod KERING"]);
 
     // every kind of the contract has words: ventilation (an automation) and a restriction's apply / remove (IR314)
     const limit = { kind: "apply_restriction", restrictionId: "r1", rulesVersion: "v1", policy: { kind: "temperature_limit", minimumCoolingSetpoint: 26 } } as const;
     const remove = { kind: "remove_restriction", restrictionId: "r1", rulesVersion: "v1" } as const;
     expect([actionText({ kind: "ventilate", level: "high" }), actionText(limit), actionText({ ...limit, policy: { kind: "power_off" } }), actionText(remove)])
-      .toEqual(["Set ventilation HIGH", "Apply restriction: Temperature limit — cooling setpoint ≥ 26 °C", "Apply restriction: Power off", "Remove restriction"]);
+      .toStrictEqual(["Set ventilation HIGH", "Apply restriction: Temperature limit — cooling setpoint ≥ 26 °C", "Apply restriction: Power off", "Remove restriction"]);
     expect([actionText({ kind: "ventilate", level: "low" }, ms), actionText(limit, ms), actionText(remove, ms)])
-      .toEqual(["Tetapkan pengudaraan RENDAH", "Kenakan sekatan: Had suhu — suhu tetapan penyejukan ≥ 26 °C", "Tarik balik sekatan"]);
+      .toStrictEqual(["Tetapkan pengudaraan RENDAH", "Kenakan sekatan: Had suhu — suhu tetapan penyejukan ≥ 26 °C", "Tarik balik sekatan"]);
     expect(historyRow(deviceCommand({ action: limit, source: "restriction" })).text).toBe("Apply restriction: Temperature limit — cooling setpoint ≥ 26 °C — acknowledged by device · by a restriction");
   });
 
   it("states a command's outcome and source, with the IR44 time of the request", () => {
-    expect(historyRow(deviceCommand({}))).toEqual({ id: "cmd-1234", text: "Set temperature 24°C — acknowledged by device", when: "14 Sept 2026, 9:00 am MYT", bad: false });
+    expect(historyRow(deviceCommand({}))).toStrictEqual({ id: "cmd-1234", text: "Set temperature 24°C — acknowledged by device", when: "14 Sept 2026, 9:00 am MYT", bad: false });
     expect(historyRow(deviceCommand({ status: "failed", failureCode: "device_rejected", source: "automation" }), ms, { locale: "ms", timeZone: "Asia/Tokyo" }))
-      .toEqual({ id: "cmd-1234", text: "Tetapkan suhu 24°C — gagal (device_rejected) · oleh automasi", when: "14 Sep 2026, 10:00 PG GMT+9", bad: true });
+      .toStrictEqual({ id: "cmd-1234", text: "Tetapkan suhu 24°C — gagal (device_rejected) · oleh automasi", when: "14 Sep 2026, 10:00 PG GMT+9", bad: true });
     expect(historyRow(deviceCommand({ status: "expired" }), undefined, tokyo)).toMatchObject({ text: "Set temperature 24°C — no device response (expired)", when: "14 Sept 2026, 10:00 am GMT+9", bad: true });
     // the assistant's confirmed change (IR306); a command from Unit Control (UI) carries no label
     expect([historyRow(deviceCommand({ source: "voice" })).text, historyRow(deviceCommand({ source: "voice" }), ms).text, historyRow(deviceCommand({ source: "ui" })).text])
-      .toEqual(["Set temperature 24°C — acknowledged by device · by voice", "Tetapkan suhu 24°C — disahkan oleh peranti · melalui suara", "Set temperature 24°C — acknowledged by device"]);
+      .toStrictEqual(["Set temperature 24°C — acknowledged by device · by voice", "Tetapkan suhu 24°C — disahkan oleh peranti · melalui suara", "Set temperature 24°C — acknowledged by device"]);
   });
 
   it("keeps a stale reading's quality beside it and times it in the display time zone", () => {
@@ -39,9 +39,9 @@ describe("unit commands and readings in the display language and time zone (FR-X
       { id: "m1", unitId: "u1", sensorId: "s1", metric: TEMPERATURE, value: 28.04, unit: "°C", observedAt: "2026-09-14T01:12:00Z", origin: "measured", quality: "stale", qualityReason: null },
       { id: "m2", unitId: "u1", sensorId: "s2", metric: "humidity", value: null, unit: "%", observedAt: "2026-09-14T01:12:00Z", origin: "measured", quality: "missing", qualityReason: null },
     ] });
-    expect(latest(d, TEMPERATURE)).toEqual({ text: "28.0 °C (stale)", at: "9:12 am MYT" });
-    expect(latest(d, TEMPERATURE, ms, tokyo)).toEqual({ text: "28.0 °C (lapuk)", at: "10:12 am GMT+9" });
-    expect([latest(d, "humidity"), latest(d, "power")]).toEqual([null, null]);
+    expect(latest(d, TEMPERATURE)).toStrictEqual({ text: "28.0 °C (stale)", at: "9:12 am MYT" });
+    expect(latest(d, TEMPERATURE, ms, tokyo)).toStrictEqual({ text: "28.0 °C (lapuk)", at: "10:12 am GMT+9" });
+    expect([latest(d, "humidity"), latest(d, "power")]).toStrictEqual([null, null]);
     // with the scenario's now (IR613): the same day keeps the time alone, another day adds the date
     expect(latest(d, TEMPERATURE, undefined, undefined, Date.parse("2026-09-14T09:00:00Z"))?.at).toBe("9:12 am MYT");
     expect(latest(d, TEMPERATURE, undefined, undefined, Date.parse("2026-09-23T06:00:00Z"))?.at).toBe("14 Sept 2026, 9:12 am MYT");
@@ -59,7 +59,7 @@ const model = (over: Partial<ApiUnitDetail["capabilities"]>): ApiUnitDetail["cap
 describe("the remote control a model offers (deterministic contracts, AT-X06; IR524, IR530)", () => {
 
   it("offers every setting of a full model, and the demo screen's without a model", () => {
-    expect(controlLayout(model({}))).toEqual({ control: true, temperature: { min: 16, max: 30, step: 1 }, modes: ["cool", "dry", "fan"], fans: ["low", "mid", "high"], review: true });
+    expect(controlLayout(model({}))).toStrictEqual({ control: true, temperature: { min: 16, max: 30, step: 1 }, modes: ["cool", "dry", "fan"], fans: ["low", "mid", "high"], review: true });
     expect(controlLayout(null).review).toBe(true);
   });
 
@@ -69,9 +69,9 @@ describe("the remote control a model offers (deterministic contracts, AT-X06; IR
   });
 
   it("offers the power alone without a review bar, and nothing on a model without control", () => {
-    expect(controlLayout(model({ modeControl: false, fanControl: false, temperature: null, modes: [], fanLevels: [] }))).toEqual({ control: true, temperature: null, modes: [], fans: [], review: false });
-    expect(controlLayout(model({ control: false }))).toEqual({ control: false, temperature: null, modes: [], fans: [], review: false });
+    expect(controlLayout(model({ modeControl: false, fanControl: false, temperature: null, modes: [], fanLevels: [] }))).toStrictEqual({ control: true, temperature: null, modes: [], fans: [], review: false });
+    expect(controlLayout(model({ control: false }))).toStrictEqual({ control: false, temperature: null, modes: [], fans: [], review: false });
     // other screens point a temperature to Unit Control only when its temperature row is there (IR544)
-    expect([setsTemperature(model({})), setsTemperature(model({ temperature: null })), setsTemperature(model({ control: false })), setsTemperature(null)]).toEqual([true, false, false, true]);
+    expect([setsTemperature(model({})), setsTemperature(model({ temperature: null })), setsTemperature(model({ control: false })), setsTemperature(null)]).toStrictEqual([true, false, false, true]);
   });
 });

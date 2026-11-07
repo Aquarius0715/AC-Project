@@ -99,7 +99,7 @@ function CertificateModal({ live, kind, row, onClose }: Readonly<{ live: Live; k
   const t = useT();
   const [pending, run] = useAction();
   const c = live.certificates;
-  const renew = kind === "renew" && row?.cert;
+  const renew = kind === "renew" ? row?.cert : undefined;
   const [form, setForm] = useState<CertForm>({
     membershipId: row?.technicianId ?? c.people.find((p) => p.active)?.id ?? "", code: row?.code ?? "demo_indoor", name: row?.name ?? c.codes[0]?.text ?? "",
     number: "", issued: "", expires: "", file: null,
@@ -128,12 +128,12 @@ function CertificateModal({ live, kind, row, onClose }: Readonly<{ live: Live; k
       (f) => { const r = certificateRefusal(f, t); setServer(r.fields); setRefused(r.text); });
   };
   return (
-    <Modal open onClose={onClose} title={renew ? t("Upload renewal — {name}", { name: row.name }) : t(ADD_CERTIFICATE)} footer={<>
+    <Modal open onClose={onClose} title={renew ? t("Upload renewal — {name}", { name: row?.name ?? "" }) : t(ADD_CERTIFICATE)} footer={<>
       <Btn onClick={onClose}>{t("Cancel")}</Btn>
       <Btn variant="primary" disabled={pending} onClick={save}>{t("Submit for verification")}</Btn>
     </>}>
       {renew ? (
-        <SummaryList items={[[t(TECHNICIAN), row.technician], [t("Current"), t("{number} · expires {date}", { number: renew.number, date: row.expires })]]} />
+        <SummaryList items={[[t(TECHNICIAN), row?.technician ?? ""], [t("Current"), t("{number} · expires {date}", { number: renew.number, date: row?.expires ?? "" })]]} />
       ) : (
         <>
           <Field label={t(TECHNICIAN)} error={fieldError("membershipId")}>

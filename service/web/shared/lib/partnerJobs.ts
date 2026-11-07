@@ -117,6 +117,9 @@ export function jobRow(raw: ApiPartnerJob, now: number, units: Map<string, strin
     case "completed": {
       return { id: j.id, href: detail, line: t("Quality review accepted · report visible to the customer"), tech: tech ? { name: tech, sub: t("report author") } : none, slot: { main: t("Completed"), sub: due }, badge: { text: t("Completed"), tone: "ok" }, title, origin };
     }
+    default: {
+      break; // the other kinds are worded below, by the job's status
+    }
   }
   const slot = j.slot ? { main: span(j.slot), sub: due } : { main: due || "—", sub: "" };
   if (j.status === "in_progress") return { id: j.id, href: detail, line: tech ? t("In progress · {name} on site", { name: tech }) : t("In progress"), tech: technician ?? none, badge: { text: t("In progress"), tone: "primary" }, title, origin, slot };

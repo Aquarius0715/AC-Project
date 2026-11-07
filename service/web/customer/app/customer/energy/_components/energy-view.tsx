@@ -50,11 +50,11 @@ export function EnergyView({ live }: Readonly<{ live: EnergyLive }>) {
   const days = t(live.period.days === 1 ? "{n} day" : "{n} days", { n: live.period.days });
   if (live.units.length === 0) return <Page><Banner>{t("No air conditioner is registered yet — energy appears here once HQ adds your units.")}</Banner></Page>;
   // the card's body: no readings, the chart (per unit, or actual against the baseline) or the table
-  const chartBody = (s: NonNullable<typeof live.summary>, r: NonNullable<typeof live.raw>) => {
-    if (view === "chart" && live.daily.every((d) => !d.actual)) return <p className="rounded-xl bg-surface2 p-4 text-center text-[13px] text-muted-foreground">{t("No valid power readings in this period — the chart appears once the units report minute readings (coverage {coverage}).", { coverage: s.coverage })}</p>;
+  const chartBody = (summary: NonNullable<typeof live.summary>, raw: NonNullable<typeof live.raw>) => {
+    if (view === "chart" && live.daily.every((d) => !d.actual)) return <p className="rounded-xl bg-surface2 p-4 text-center text-[13px] text-muted-foreground">{t("No valid power readings in this period — the chart appears once the units report minute readings (coverage {coverage}).", { coverage: summary.coverage })}</p>;
     if (view === "chart") {
       if (isMulti) return live.compare?.series ? <BarChart labels={live.daily.map((d) => d.label)} series={live.compare.series} names={live.unitIds.map((u) => names.get(u) ?? u)} unit="kWh" height={200} colors={colors} /> : <p className="text-[13px] text-muted-foreground">{t("The per-unit daily chart covers up to 7 days — see the table for this period.")}</p>;
-      return r.baseline === null ? <BarChart labels={live.daily.map((d) => d.label)} series={[live.daily.map((d) => d.actual ?? 0)]} names={[t("Actual (measured)")]} colors={["#005bea"]} unit="kWh" height={200} /> : <BarChart labels={live.daily.map((d) => d.label)} series={[live.daily.map((d) => d.baseline ?? 0), live.daily.map((d) => d.actual ?? 0)]} names={[t("Baseline (normal operation)"), t("Actual (measured)")]} unit="kWh" height={200} />;
+      return raw.baseline === null ? <BarChart labels={live.daily.map((d) => d.label)} series={[live.daily.map((d) => d.actual ?? 0)]} names={[t("Actual (measured)")]} colors={["#005bea"]} unit="kWh" height={200} /> : <BarChart labels={live.daily.map((d) => d.label)} series={[live.daily.map((d) => d.baseline ?? 0), live.daily.map((d) => d.actual ?? 0)]} names={[t("Baseline (normal operation)"), t("Actual (measured)")]} unit="kWh" height={200} />;
     }
     return isMulti && live.compare ? (
               <DataTable rows={live.compare.rows} rowKey={(x) => x.unitId} cols={[

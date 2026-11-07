@@ -10,10 +10,12 @@ import { domainError, type DomainError } from "@ac/web/lib/domainError";
 export type { DomainError } from "@ac/web/lib/domainError";
 
 export class OpError extends Error {
+  readonly error: DomainError;
   readonly status: number;
-  constructor(public readonly error: DomainError, options: ErrorOptions & { status: number }) {
+  constructor(error: DomainError, options: ErrorOptions & { status: number }) {
     super(`${error.code}: ${error.messageKey}`, options);
     this.name = "OpError";
+    this.error = error;
     this.status = options.status;
   }
 }

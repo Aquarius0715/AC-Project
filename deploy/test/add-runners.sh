@@ -20,6 +20,7 @@ echo
 }
 
 # the runner package: the one the first runner came from, else the latest release
+# shellcheck disable=SC2012 # the names are the runner releases, and sort -V orders their versions
 tarball=$(ls "$HOME"/actions-runner/actions-runner-linux-x64-*.tar.gz 2>/dev/null | sort -V | tail -n 1 || true)
 if [ -z "$tarball" ]; then
   version=$(curl -fsSL https://api.github.com/repos/actions/runner/releases/latest |

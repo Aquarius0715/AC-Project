@@ -23,7 +23,7 @@ func TestEndedPeriod(t *testing.T) {
 		"mid month":                {time.Date(2026, 9, 14, 1, 0, 0, 0, time.UTC), "2026-08"},
 		"the 1st in Kuala Lumpur":  {time.Date(2026, 9, 30, 16, 0, 0, 0, time.UTC), "2026-09"},
 		"the last day there":       {time.Date(2026, 9, 30, 15, 59, 0, 0, time.UTC), "2026-08"},
-		"January":                  {time.Date(2027, 1, 5, 0, 0, 0, 0, time.UTC), "2026-12"},
+		time.January.String():      {time.Date(2027, 1, 5, 0, 0, 0, 0, time.UTC), "2026-12"},
 		"New Year in Kuala Lumpur": {time.Date(2026, 12, 31, 16, 30, 0, 0, time.UTC), "2026-12"},
 	} {
 		if got := endedPeriod(testCase.now); got != testCase.want {
@@ -70,7 +70,9 @@ func TestTransitionInput(t *testing.T) {
 	}
 
 	in := TransitionInput{StatementID: uuid.New(), Action: actionApprove, Reason: &blank}
-	if in.Validate(); *in.Reason != "ok" {
+	in.Validate()
+
+	if *in.Reason != "ok" {
 		t.Errorf("the reason is trimmed: %q", *in.Reason)
 	}
 }

@@ -35,6 +35,6 @@ RUN apt-get update && apt-get upgrade -y && apt-get clean && rm -rf /var/lib/apt
 COPY --from=build --chown=node:node /src/${APP}/.next/standalone ./
 COPY --from=build --chown=node:node /src/${APP}/.next/static ./${APP}/.next/static
 WORKDIR /app/${APP}
-USER node
+USER 1000:1000
 EXPOSE 3000
 CMD ["node", "server.js"]

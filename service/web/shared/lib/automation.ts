@@ -48,11 +48,11 @@ export function conditionText(c: AutoCondition, t: T = en): string {
 /** A mode or a fan / ventilation level, worded. */
 type Mode = "cool" | "dry" | "fan";
 type Level = "low" | "mid" | "high";
-export const modeWord = (m: Mode, t: T = en) => {
+const modeWord = (m: Mode, t: T = en) => {
   const words = new Map(Object.entries({ cool: t("cool"), dry: t("dry"), fan: t("fan") }));
   return words.get(m) ?? m; // a value the API adds before this table does
 };
-export const levelWord = (l: Level, t: T = en) => {
+const levelWord = (l: Level, t: T = en) => {
   const words = new Map(Object.entries({ low: t("low"), mid: t("mid"), high: t("high") }));
   return words.get(l) ?? l; // a value the API adds before this table does
 };

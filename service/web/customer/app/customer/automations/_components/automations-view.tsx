@@ -158,7 +158,7 @@ function eventHint(isSchedule: boolean, isRoutine: boolean, isDirty: boolean, t:
   return isDirty ? t("Save first — the test runs your saved automations for this AC") : null;
 }
 /** Debounces a value (the schedule preview reads after typing pauses). */
-function useDebounced<T>(value: T, ms: number): T {
+function useDebounced<Value>(value: Value, ms: number): Value {
   const [v, setV] = useState(value);
   useEffect(() => {
     const t = setTimeout(() => { setV(value); }, ms);

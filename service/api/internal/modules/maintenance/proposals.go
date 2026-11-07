@@ -49,7 +49,7 @@ func replyByOK(now, replyBy, slotStart time.Time) bool {
 		!replyBy.After(slotStart)
 }
 
-func (m Proposals) pending(ctx context.Context, c *ops.Call, job uuid.UUID) (bool, error) {
+func (Proposals) pending(ctx context.Context, c *ops.Call, job uuid.UUID) (bool, error) {
 	var found bool
 
 	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.slot_proposals WHERE job_id = $1 AND status =
@@ -306,7 +306,7 @@ func (m Proposals) proposeSlotJob(
 	return m.finish(ctx, call, input.JobID, "proposal.sent", "jobs.proposeSlot", "SlotProposed", "")
 }
 
-func (m Proposals) insertProposal(
+func (Proposals) insertProposal(
 	ctx context.Context,
 	call *ops.Call,
 	job uuid.UUID,
@@ -1210,7 +1210,7 @@ func (m Proposals) proposePartnerJob(
 	)
 }
 
-func (m Proposals) partnerProposal(
+func (Proposals) partnerProposal(
 	ctx context.Context,
 	call *ops.Call,
 	input *ProposalRef,

@@ -35,12 +35,12 @@ const names = (text: string) => text.matchAll(/\{(\w+)\}/g).map((m) => must(m[1]
 
 describe("Display language (FR-X01, AT-X01-N, IR258)", () => {
   it("keeps English as the key and falls back to it when Malay has no entry", () => {
-    expect([translate("en", "Sign out"), translate("ms", "Sign out")]).toEqual(["Sign out", "Log keluar"]);
+    expect([translate("en", "Sign out"), translate("ms", "Sign out")]).toStrictEqual(["Sign out", "Log keluar"]);
     expect(translate("ms", "A text nobody translated yet")).toBe("A text nobody translated yet");
   });
 
   it("tells one English text apart by its context (IR287)", () => {
-    expect([translate("en", "tamper::Clear"), translate("ms", "tamper::Clear"), translate("ms", "Clear")]).toEqual(["Clear", "Tiada gangguan", "Kosongkan"]);
+    expect([translate("en", "tamper::Clear"), translate("ms", "tamper::Clear"), translate("ms", "Clear")]).toStrictEqual(["Clear", "Tiada gangguan", "Kosongkan"]);
     expect(translate("ms", "nobody::Untranslated")).toBe("Untranslated"); // English after the context when Malay has none
   });
 
@@ -52,7 +52,7 @@ describe("Display language (FR-X01, AT-X01-N, IR258)", () => {
   });
 
   it("keeps every placeholder of an English key in its Malay text", () => {
-    for (const [en, text] of Object.entries(ms)) expect(names(text), en).toEqual(names(en));
+    for (const [en, text] of Object.entries(ms)) expect(names(text), en).toStrictEqual(names(en));
   });
 
   // NFR-07 / IR44 key check: the English texts the code translates and the dictionary's keys are the same set
@@ -65,19 +65,19 @@ describe("Display language (FR-X01, AT-X01-N, IR258)", () => {
       ...code.matchAll(/<Route(?:Loading|Error) what="((?:[^"\\]|\\.)*)"/g), // the route states translate what loads (IR269)
     ].map((m) => String(JSON.parse(`"${m[1] ?? ""}"`)));
     expect(literals.length).toBeGreaterThan(100);
-    expect([...new Set(literals.filter((text) => !Object.hasOwn(ms, text)))]).toEqual([]);
+    expect([...new Set(literals.filter((text) => !Object.hasOwn(ms, text)))]).toStrictEqual([]);
   });
 
   it("lists each English text once in the Malay dictionary (a renamed key can collide with an existing one)", () => {
     const keys = readFileSync(path.join(root, "shared/lib/i18n-ms.ts"), "utf8").matchAll(/^\s*("(?:[^"\\]|\\.)*"):/gm).map((m) => m[1]).toArray();
     expect(keys.length).toBeGreaterThan(1000);
-    expect(keys.filter((k, n) => keys.indexOf(k) !== n)).toEqual([]);
+    expect(keys.filter((k, n) => keys.indexOf(k) !== n)).toStrictEqual([]);
   });
 
   // it searches the whole code once per key: seconds of work, beyond the default 5 s while the other files run beside it
   it("has no Malay entry the code no longer shows", () => {
     const dynamic = new Set(Object.values(ROLES).flatMap((config) => [config.sub, config.chip.split(" — ", 1)[0], ...config.nav.map((i) => i.label)]));
-    expect(Object.keys(ms).filter((key) => !dynamic.has(key) && !code.includes(JSON.stringify(key)))).toEqual([]);
+    expect(Object.keys(ms).filter((key) => !dynamic.has(key) && !code.includes(JSON.stringify(key)))).toStrictEqual([]);
   }, 30_000);
 
   it("speaks to customers, contractors, technicians and HQ without error codes or spec IDs (IR584, IR585, IR587, IR590, IR591, IR595, IR622, IR626)", () => {
@@ -88,25 +88,25 @@ describe("Display language (FR-X01, AT-X01-N, IR258)", () => {
     expect(texts.length).toBeGreaterThan(100);
     // screen IDs as well ("Access & roles (A03)")
     const coded = /\b(?:IR\d+|(?:FR|DD|BR|NFR|DEC|AT|SCR|DDC|REV)-[A-Z]*\d+|SR\d+|D\d{2,})\b|^(?:CONFLICT|NOT_FOUND|FORBIDDEN|UNAVAILABLE|VALIDATION|TIMEOUT|OFFLINE)\b|\((?:CONFLICT|NOT_FOUND|FORBIDDEN|UNAVAILABLE|VALIDATION|TIMEOUT|OFFLINE)\)|\([ACPTX]\d{2}[a-z]?\)/;
-    expect(texts.filter((text) => coded.test(text))).toEqual([]);
+    expect(texts.filter((text) => coded.test(text))).toStrictEqual([]);
   });
 
   // IR626: a status or event code ("release_requested", "end_failed") is said in words; dotted permissions such as
   // restriction.read and {placeholders} are not codes of this kind
   it("shows no snake_case status or event code in a text the apps translate", () => {
-    expect(Object.keys(ms).filter((text) => /(?<![\w./{-])[a-z]+_[a-z_]+(?![\w}])/.test(text))).toEqual([]);
+    expect(Object.keys(ms).filter((text) => /(?<![\w./{-])[a-z]+_[a-z_]+(?![\w}])/.test(text))).toStrictEqual([]);
   });
 
   // IR626: no field or operation name of the code ("previousAlertId", "jobs.saveCost") and no IR number either; units
   // such as kWh and kgCO₂e and the {placeholders} are not names of this kind
   it("shows no field name, operation name or IR number in a text the apps translate", () => {
     const named = /\b(?!kWh\b|kgCO)[a-z]+[A-Z][a-z][A-Za-z]*\b|\b[a-z]+\.[a-z]+[A-Z][A-Za-z]*\b|\bIR\d+\b/;
-    expect(Object.keys(ms).filter((text) => named.test(text.replaceAll(/\{\w+\}/g, "")))).toEqual([]);
+    expect(Object.keys(ms).filter((text) => named.test(text.replaceAll(/\{\w+\}/g, "")))).toStrictEqual([]);
   });
 
   // IR624: the apps speak English and Malay; a Japanese term of the specification ("受領") once reached the partner's schedule
   it("shows no Japanese term in a text the apps translate", () => {
-    expect(Object.keys(ms).filter((text) => /[\u{3040}-\u{30FF}\u{4E00}-\u{9FFF}]/u.test(text))).toEqual([]);
+    expect(Object.keys(ms).filter((text) => /[\u{3040}-\u{30FF}\u{4E00}-\u{9FFF}]/u.test(text))).toStrictEqual([]);
   });
 
   it("names every sidebar item and the role words of the four apps in Malay", () => {
@@ -121,20 +121,20 @@ describe("Display language (FR-X01, AT-X01-N, IR258)", () => {
 
   it("puts the consent line in the display language", () => {
     const c = { id: "c1", version: 2, granted: true, grantedAt: "2026-09-14T01:00:00Z", revokedAt: null };
-    expect([consentNote(c, translator("ms")), consentNote(null, translator("ms"))]).toEqual(["Diberikan 2026-09-14", "Belum diberikan"]);
+    expect([consentNote(c, translator("ms")), consentNote(null, translator("ms"))]).toStrictEqual(["Diberikan 2026-09-14", "Belum diberikan"]);
   });
 
   it("accepts only the two locales and formats both for Malaysia", () => {
-    expect([isLocale("en"), isLocale("ms"), isLocale("ja"), isLocale(null)]).toEqual([true, true, false, false]);
-    expect([intlTag("en"), intlTag("ms")]).toEqual(["en-MY", "ms-MY"]);
+    expect([isLocale("en"), isLocale("ms"), isLocale("ja"), isLocale(null)]).toStrictEqual([true, true, false, false]);
+    expect([intlTag("en"), intlTag("ms")]).toStrictEqual(["en-MY", "ms-MY"]);
   });
 
   it("reads a typed date and time in the display time zone and prefills it back (NFR-08)", () => {
     expect([zonedInstant(TEXT_2026_09_16, "10:00", ASIA_KUALA_LUMPUR), zonedInstant(TEXT_2026_09_16, "10:00", ASIA_TOKYO), zonedInstant(TEXT_2026_09_16, "10:00", "UTC")])
-      .toEqual(["2026-09-16T02:00:00.000Z", "2026-09-16T01:00:00.000Z", "2026-09-16T10:00:00.000Z"]);
-    expect([zonedInstant(TEXT_2026_09_16, "", ASIA_TOKYO), zonedInstant("", "10:00", ASIA_TOKYO), zonedInstant("2026-02-31", "10:00", "UTC")]).toEqual(["", "", "2026-03-03T10:00:00.000Z"]);
+      .toStrictEqual(["2026-09-16T02:00:00.000Z", "2026-09-16T01:00:00.000Z", "2026-09-16T10:00:00.000Z"]);
+    expect([zonedInstant(TEXT_2026_09_16, "", ASIA_TOKYO), zonedInstant("", "10:00", ASIA_TOKYO), zonedInstant("2026-02-31", "10:00", "UTC")]).toStrictEqual(["", "", "2026-03-03T10:00:00.000Z"]);
     expect(zonedInstant(TEXT_2026_09_16, "10:00", "Not/AZone")).toBe("2026-09-16T02:00:00.000Z"); // an unknown zone falls back to Kuala Lumpur
-    expect([zonedParts("2026-09-16T01:00:00Z", ASIA_TOKYO), zonedParts("2026-09-15T23:30:00Z", ASIA_KUALA_LUMPUR)]).toEqual([{ date: TEXT_2026_09_16, time: "10:00" }, { date: TEXT_2026_09_16, time: "07:30" }]);
+    expect([zonedParts("2026-09-16T01:00:00Z", ASIA_TOKYO), zonedParts("2026-09-15T23:30:00Z", ASIA_KUALA_LUMPUR)]).toStrictEqual([{ date: TEXT_2026_09_16, time: "10:00" }, { date: TEXT_2026_09_16, time: "07:30" }]);
   });
 
   it("shows a span in one line, with plain spaces whatever the ICU (no hydration difference)", () => {
@@ -147,12 +147,12 @@ describe("Display language (FR-X01, AT-X01-N, IR258)", () => {
   it("shows a time in the user's language and time zone with the zone's abbreviation (IR44)", () => {
     const at = "2026-09-14T01:00:00Z";
     expect([showTime(at), showTime(at, { locale: "ms", timeZone: ASIA_KUALA_LUMPUR }), showTime(at, { locale: "en", timeZone: ASIA_TOKYO }), showTime(at, { locale: "en", timeZone: "UTC" })])
-      .toEqual(["14 Sept 2026, 9:00 am MYT", "14 Sep 2026, 9:00 PG MYT", "14 Sept 2026, 10:00 am GMT+9", "14 Sept 2026, 1:00 am UTC"]);
+      .toStrictEqual(["14 Sept 2026, 9:00 am MYT", "14 Sep 2026, 9:00 PG MYT", "14 Sept 2026, 10:00 am GMT+9", "14 Sept 2026, 1:00 am UTC"]);
   });
   it("shows a recent time alone on today and with its date on another day (IR613)", () => {
     const at = "2026-09-14T00:30:00Z"; // 8:30 am in Kuala Lumpur
     expect([showRecent(at, Date.parse("2026-09-14T10:00:00Z")), showRecent(at, Date.parse("2026-09-23T06:00:00Z")), showRecent(at, Date.parse("2026-09-13T17:00:00Z")), showRecent(null, 0)])
-      .toEqual(["8:30 am MYT", "14 Sept 2026, 8:30 am MYT", "8:30 am MYT", "—"]); // 13 Sept 17:00 UTC is already the 14th in Kuala Lumpur
+      .toStrictEqual(["8:30 am MYT", "14 Sept 2026, 8:30 am MYT", "8:30 am MYT", "—"]); // 13 Sept 17:00 UTC is already the 14th in Kuala Lumpur
     expect(showRecent(at, Date.parse("2026-09-14T15:30:00Z"), { locale: "en", timeZone: ASIA_TOKYO })).toBe("14 Sept 2026, 9:30 am GMT+9"); // the 15th in Tokyo
   });
 });

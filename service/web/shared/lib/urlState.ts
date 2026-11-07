@@ -17,7 +17,7 @@ function subscribe(onChange: () => void) {
 }
 
 /** The current query string ("" on the server). */
-export function useSearch(): string {
+function useSearch(): string {
   return useSyncExternalStore(subscribe, () => location.search, () => "");
 }
 
@@ -62,5 +62,7 @@ export function setStoredValue(key: string, value: string) {
     if (localStorage.getItem(key) === value) return;
     localStorage.setItem(key, value);
     dispatchEvent(new Event(STORAGE));
-  } catch {}
+  } catch {
+    // storage is blocked (private window, site data off): the value stays unsaved
+  }
 }

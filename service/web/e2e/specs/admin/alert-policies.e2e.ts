@@ -5,6 +5,7 @@
 // operation relay (policies.delete with its version). The unit page's “+ New policy for …” opens the same draft. The
 // relay's idempotency keys are made here, not in the page: crypto.randomUUID is missing from a page served over plain
 // HTTP, as the shared test environment's are (DEC-93).
+import type { Page } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 import { test, expect } from "../../fixtures/test";
 import { expectAccessible } from "../../fixtures/a11y";
@@ -171,14 +172,14 @@ function firstDefault(body: unknown): DefaultPolicy {
   if (!isPolicy(p)) throw new Error("policies.list returned no default policy");
   return p;
 }
-const relay = async (page: import("@playwright/test").Page, op: string, input: unknown, version?: number) => {
+const relay = async (page: Page, operation: string, payload: unknown, expectedVersion?: number) => {
   return page.evaluate(async ({ op, input, version, key }) => {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (version !== undefined) Object.assign(headers, { "Idempotency-Key": key, "X-Expected-Version": String(version) });
     const r = await fetch(`/bff/ops/${op}`, { method: "POST", body: JSON.stringify(input), headers });
     const body: unknown = await r.json();
     return { status: r.status, body };
-  }, { op, input, version, key: randomUUID() });
+  }, { op: operation, input: payload, version: expectedVersion, key: randomUUID() });
 };
 let before: DefaultPolicy | null = null;
 

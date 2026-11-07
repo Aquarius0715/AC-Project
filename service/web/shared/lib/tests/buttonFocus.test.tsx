@@ -29,7 +29,7 @@ describe("a button disabled while it has the focus", () => {
     act(() => { save.focus(); });
     fireEvent.click(save);
     expect(document.activeElement).toBe(save);
-    expect([save.getAttribute("aria-disabled"), save.hasAttribute("disabled")]).toEqual(["true", false]);
+    expect([save.getAttribute("aria-disabled"), save.hasAttribute("disabled")]).toStrictEqual(["true", false]);
     fireEvent.click(save);
     fireEvent.keyDown(save, { key: "Enter" });
     expect(screen.getByText("Clicks 1")).toBeTruthy();

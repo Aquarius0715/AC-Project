@@ -214,7 +214,7 @@ export async function loadContractors(sp: SP) {
   ]);
   // without a profile there is no rateCardId: the card in effect is the latest that has started
   const inEffect = profile?.rateCardId ?? [...cards].filter((c) => Date.parse(c.effectiveFrom) <= nowMs).toSorted((a, b) => Date.parse(b.effectiveFrom) - Date.parse(a.effectiveFrom))[0]?.id ?? null;
-  const mine = technicians.filter((t) => t.organizationId === pick);
+  const mine = technicians.filter((technician) => technician.organizationId === pick);
   return {
     ...base,
     detail: {

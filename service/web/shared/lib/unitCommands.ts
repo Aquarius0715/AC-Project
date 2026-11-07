@@ -13,7 +13,7 @@ export async function waitForCommand(first: ApiCommand, onUpdate: (c: ApiCommand
   let c = first;
   onUpdate(c);
   for (let i = 0; i < 25 && !terminal.has(c.status); i++) {
-    await new Promise((r) => setTimeout(r, 2000));
+    await new Promise((r) => { setTimeout(r, 2000); });
     c = await callOp<ApiCommand>("commands.get", { id: c.id });
     onUpdate(c);
   }

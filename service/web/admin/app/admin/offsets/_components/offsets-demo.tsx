@@ -7,7 +7,7 @@ import { useState } from "react";
 import { Banner, Btn, Card, Check, DemoBadge, Field, Input, ListRow, Modal, Page, Steps, SummaryList, Tabs, Timeline, useToast } from "@ac/web/components/ui";
 import { useUrlTab } from "@ac/web/lib/useUrlTab";
 import { Icon } from "@ac/web/components/Icon";
-import { type NonEmpty } from "@ac/web/lib/lists";
+import type { NonEmpty } from "@ac/web/lib/lists";
 
 interface O { id: string; cust: string; kind: string; amt: string; st: string; stage: number; tone: "primary" | "ok" | "warn" | "crit" }
 const seed: NonEmpty<O> = [
@@ -49,7 +49,7 @@ export function OffsetsDemo() {
       ) : (
         <Card title="Market concept" sub="Not available · no prices, balances or trading"><p className="text-[13px]">A future carbon market is a concept only. Nothing here is tradable, priced or balance-carrying.</p></Card>
       )}
-      <Modal open={quote} onClose={() => { setQuote(false); }} title="New demo quote" footer={<><Btn onClick={() => { setQuote(false); }}>Cancel</Btn><Btn variant="primary" disabled={+q.amt <= 0} onClick={() => { setList((l) => [{ id: "offset-0240", cust: q.cust, kind: "Demo offset", amt: (+q.amt).toFixed(3), st: "Quoted", stage: 0, tone: "primary" }, ...l]); toast("Demo quote created"); setQuote(false); }}>Create quote</Btn></>}><Field label="Customer"><Input value={q.cust} onChange={(e) => { setQ({ ...q, cust: e.target.value }); }} /></Field><Field label="Amount (kgCO₂e, > 0)" error={+q.amt > 0 ? undefined : "Positive numbers only"}><Input type="number" value={q.amt} onChange={(e) => { setQ({ ...q, amt: e.target.value }); }} /></Field></Modal>
+      <Modal open={quote} onClose={() => { setQuote(false); }} title="New demo quote" footer={<><Btn onClick={() => { setQuote(false); }}>Cancel</Btn><Btn variant="primary" disabled={Number(q.amt) <= 0} onClick={() => { setList((l) => [{ id: "offset-0240", cust: q.cust, kind: "Demo offset", amt: (Number(q.amt)).toFixed(3), st: "Quoted", stage: 0, tone: "primary" }, ...l]); toast("Demo quote created"); setQuote(false); }}>Create quote</Btn></>}><Field label="Customer"><Input value={q.cust} onChange={(e) => { setQ({ ...q, cust: e.target.value }); }} /></Field><Field label="Amount (kgCO₂e, > 0)" error={Number(q.amt) > 0 ? undefined : "Positive numbers only"}><Input type="number" value={q.amt} onChange={(e) => { setQ({ ...q, amt: e.target.value }); }} /></Field></Modal>
     </Page>
   );
 }

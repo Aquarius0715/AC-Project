@@ -128,7 +128,7 @@ export function grantRows(members: ApiTeamMember[], nowMs: number, i: I18n = EN)
   };
   const rows: GrantRow[] = [];
   for (const m of members) {
-    if ((m.qualifications) != null) {
+    if (m.qualifications !== undefined) {
       for (const q of m.qualifications) {
         const until = q.validUntil ? businessDay(q.validUntil, locale) : "—";
         const [sub, badge] = standing(m.displayName, q, until);
@@ -221,7 +221,7 @@ export function dayRange(from: string, to: string, locale: Locale): string {
 }
 
 /** The day before a date (YYYY-MM-DD). */
-export const dayBefore = (date: string) => new Date(Date.parse(`${date}T00:00:00Z`) - DAY).toISOString().slice(0, 10);
+const dayBefore = (date: string) => new Date(Date.parse(`${date}T00:00:00Z`) - DAY).toISOString().slice(0, 10);
 
 export interface UnavailabilityRow {
   id: string; version: number; who: string; type: string; note: string | null; days: string;

@@ -23,7 +23,6 @@
   "scripts": {
     "lint": "eslint --max-warnings=0",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit",
-    "lint:strict": "eslint --max-warnings=0 -c eslint.strict.config.mjs"
+    "typecheck": "tsc --noEmit"
   }
 }

@@ -23,7 +23,7 @@ type ExportInput struct {
 	Format      string      `json:"format"`
 }
 
-var monthRe = regexp.MustCompile(`^[0-9]{4}-(0[1-9]|1[0-2])$`)
+var monthRe = regexp.MustCompile(`^\d{4}-(0[1-9]|1[012])$`)
 
 // reportSections are the sections an energy report can have.
 func reportSections() []string {
@@ -126,7 +126,7 @@ func exportReport(ctx context.Context, call *ops.Call, input *ExportInput) (Repo
 		return ReportFile{}, err
 	}
 
-	factor, _, err := DefaultFactor(ctx, call)
+	factor, err := DefaultFactor(ctx, call)
 	if err != nil {
 		return ReportFile{}, err
 	}

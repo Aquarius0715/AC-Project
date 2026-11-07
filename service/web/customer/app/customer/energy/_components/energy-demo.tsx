@@ -28,12 +28,12 @@ export function EnergyDemo() {
       return s.length >= 4 ? s : [...s, u];
     });
   };
-  const actual = days.map((_, i) => +sel.reduce((a, u) => a + (lookup(perUnit, u)?.actual.at(i) ?? 0), 0).toFixed(1));
+  const actual = days.map((_, i) => Number(sel.reduce((a, u) => a + (lookup(perUnit, u)?.actual.at(i) ?? 0), 0).toFixed(1)));
   const base = days.map((_, i) => sel.reduce((a, u) => a + (lookup(perUnit, u)?.base.at(i) ?? 0), 0));
   const scopeLabel = sel.length === 1 ? sel[0] ?? "" : `${String(sel.length)} units`;
-  const sumA = +actual.reduce((a, b) => a + b, 0).toFixed(1);
+  const sumA = Number(actual.reduce((a, b) => a + b, 0).toFixed(1));
   const sumB = base.reduce((a, b) => a + b, 0);
-  const saved = +(sumB - sumA).toFixed(1);
+  const saved = Number((sumB - sumA).toFixed(1));
   return (
     <Page>
       <Card>
@@ -52,9 +52,7 @@ export function EnergyDemo() {
       </div>
       <Card title="Daily energy — Actual vs Baseline" sub={`kWh per day · ${sel.join(", ")} · Sep 14–20 · baseline = demo_fixed normal operation`} action={<Tabs value={view} onChange={setView} tabs={[{ id: "chart", label: "Chart" }, { id: "table", label: "Table" }]} />}>
         {view === "chart" ? (
-          <>
-            <BarChart labels={week} series={[base, actual]} names={["Baseline (normal operation)", "Actual (measured)"]} unit="kWh" height={200} />
-          </>
+          <BarChart labels={week} series={[base, actual]} names={["Baseline (normal operation)", "Actual (measured)"]} unit="kWh" height={200} />
         ) : <DataTable rows={days.map((d, i) => ({ d, a: actual.at(i) ?? 0, b: base.at(i) ?? 0 }))} rowKey={(r) => r.d} cols={[{ key: "d", label: "Day", render: (r) => r.d }, { key: "a", label: "Actual (kWh)", render: (r) => r.a }, { key: "b", label: "Baseline (kWh)", render: (r) => r.b }, { key: "s", label: "Difference", render: (r) => (r.b - r.a).toFixed(1) }]} />}
         <p className="mt-3 text-xs text-muted-foreground"><Icon name="time" /> <b>Peak window 17:00–21:00</b> — 34% of energy used in peak · highest draw 1.2 kW (Thu 18:40) · pre-cooling before 17:00 lowers peak cost</p>
       </Card>

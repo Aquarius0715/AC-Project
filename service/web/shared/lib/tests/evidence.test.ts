@@ -10,7 +10,7 @@ describe("evidence texts and resolution reasons in the display language (IR480, 
   const en = translator("en"), malay = translator("ms");
 
   it("has a Malay text for every evidence text the sources write", () => {
-    expect(EVIDENCE_KEYS.filter((key) => !Object.hasOwn(ms, key))).toEqual([]);
+    expect(EVIDENCE_KEYS.filter((key) => !Object.hasOwn(ms, key))).toStrictEqual([]);
   });
 
   it("keeps a stored English text in English and translates it into Malay", () => {

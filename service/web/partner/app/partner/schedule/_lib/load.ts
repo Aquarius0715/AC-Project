@@ -57,7 +57,7 @@ export async function loadSchedule(sp: { jobId?: string; sort?: string }) {
   const [capacity, eligible, booked] = await Promise.all([
     Promise.all(dates.map((date) => optional(coreItems<ApiCapacity>("members.capacity", { date, query: { limit: 100 } }), []))),
     slot && mode.kind !== "blocked" ? optional(coreOp<Page<ApiMember>>("members.eligible", { jobId: picked.id, startAt: slot.startAt, endAt: slot.endAt, query: { limit: 100 } }).then((r) => r.items.map((m) => m.id)), []) : Promise.resolve([] as string[]),
-    Promise.all(technicians.map(async (t) => { const r = await optional(coreOp<Page<ApiPartnerJob>>("jobs.list", { filters: { membershipId: t.id }, limit: 100 }), { items: [], total: 0 }); return [t.id, r.items.flatMap((j) => (j.projection === "summary" && j.scheduledSlot && j.status !== "completed" && j.status !== "cancelled" ? { short: j.id.slice(0, 8), slot: j.scheduledSlot } : [])) /* completion released them (IR234) */] as const; })),
+    Promise.all(technicians.map(async (technician) => { const r = await optional(coreOp<Page<ApiPartnerJob>>("jobs.list", { filters: { membershipId: technician.id }, limit: 100 }), { items: [], total: 0 }); return [technician.id, r.items.flatMap((j) => (j.projection === "summary" && j.scheduledSlot && j.status !== "completed" && j.status !== "cancelled" ? { short: j.id.slice(0, 8), slot: j.scheduledSlot } : [])) /* completion released them (IR234) */] as const; })),
   ]);
   const day = slot ? capacity[dates.indexOf(klDate(slot.startAt))] ?? [] : [];
   const alternative = job.projection === "detail" ? job.assignment?.alternativeSlot ?? null : null;

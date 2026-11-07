@@ -37,22 +37,22 @@ afterEach(() => {
 describe("the sealed session cookie (AES-256-GCM, IR333)", () => {
   it("opens what it sealed and refuses anything altered", () => {
     const t = seal({ a: 1, b: "x" });
-    expect(unseal(t)).toEqual({ a: 1, b: "x" });
+    expect(unseal(t)).toStrictEqual({ a: 1, b: "x" });
     const [ivPart, bodyPart] = t.split(".", 2);
     const iv = must(ivPart), body = must(bodyPart);
     const flip = (v: string, i: number) => { const b = Uint8Array.fromBase64(v, { alphabet: "base64url" }); b.set([(b.at(i) ?? 0) ^ 1], i); return b.toBase64({ alphabet: "base64url" }); };
     expect([unseal(`${flip(iv, 0)}.${body}`), unseal(`${iv}.${flip(body, 0)}`), unseal(`${iv}.${flip(body, Uint8Array.fromBase64(body, { alphabet: "base64url" }).length - 1)}`),
       unseal(`${iv}.`), unseal(`.${body}`), unseal(iv), unseal(`${t}.x`), unseal(`${iv.slice(2)}.${body}`), unseal(undefined), unseal()])
-      .toEqual([null, null, null, null, null, null, null, null, null, null]);
+      .toStrictEqual([null, null, null, null, null, null, null, null, null, null]);
   });
 
   it("keeps the tokens unreadable to the browser and never repeats a value", () => {
     const s = session();
     const t = seal(s);
     const plain = new TextDecoder("latin1").decode(Uint8Array.fromBase64(must(t.split(".", 2)[1]), { alphabet: "base64url" }));
-    expect([plain.includes("accessToken"), plain.includes("r-1"), t.includes(b64(s).slice(0, 16))]).toEqual([false, false, false]);
+    expect([plain.includes("accessToken"), plain.includes("r-1"), t.includes(b64(s).slice(0, 16))]).toStrictEqual([false, false, false]);
     expect(seal(s)).not.toBe(t); // a fresh IV each time
-    expect(unseal(t)).toEqual(s);
+    expect(unseal(t)).toStrictEqual(s);
   });
 
   it("depends on the server's secret", () => {
@@ -61,7 +61,7 @@ describe("the sealed session cookie (AES-256-GCM, IR333)", () => {
     vi.stubEnv(SESSION_SECRET_2, "two");
     expect(unseal(t)).toBeNull();
     vi.stubEnv(SESSION_SECRET_2, "one");
-    expect(unseal(t)).toEqual({ a: 1 });
+    expect(unseal(t)).toStrictEqual({ a: 1 });
   });
 
   it("on https needs a real secret: none, an empty, a short one or the local value seals nothing (IR367, IR430)", () => {
@@ -72,7 +72,7 @@ describe("the sealed session cookie (AES-256-GCM, IR333)", () => {
       expect(() => seal({ a: 1 })).toThrow(/SESSION_SECRET/);
     }
     vi.stubEnv(SESSION_SECRET_2, "test-".padEnd(32, "s"));
-    expect(unseal(seal({ a: 1 }))).toEqual({ a: 1 });
+    expect(unseal(seal({ a: 1 }))).toStrictEqual({ a: 1 });
     // a cookie sealed before the secret went missing cannot be opened either: the visitor is signed out
     const t = seal({ a: 1 });
     vi.stubEnv(SESSION_SECRET_2, "");
@@ -88,7 +88,7 @@ describe("the sealed session cookie (AES-256-GCM, IR333)", () => {
   });
 
   it("is httpOnly, lax, 30 minutes, and secure only on https", () => {
-    expect(cookieOptions()).toEqual({ httpOnly: true, sameSite: "lax", secure: false, path: "/", maxAge: 1800 });
+    expect(cookieOptions()).toStrictEqual({ httpOnly: true, sameSite: "lax", secure: false, path: "/", maxAge: 1800 });
     vi.stubEnv("APP_URL", HTTPS_AC_EXAMPLE_COM);
     expect(cookieOptions().secure).toBe(true);
   });
@@ -97,21 +97,21 @@ describe("the sealed session cookie (AES-256-GCM, IR333)", () => {
 describe("a session from the identity provider's tokens", () => {
   it("keeps the tenant, membership and role claims, and times the access token from now", () => {
     expect(sessionFromTokens({ access_token: token(claims), refresh_token: "r-2", expires_in: 300 }))
-      .toEqual({ accessToken: token(claims), refreshToken: "r-2", tenantId: "t-1", membershipId: "m-1", role: "client", expiresAt: NOW / 1000 + 300 });
+      .toStrictEqual({ accessToken: token(claims), refreshToken: "r-2", tenantId: "t-1", membershipId: "m-1", role: "client", expiresAt: NOW / 1000 + 300 });
     expect(sessionFromTokens({ access_token: token(claims), expires_in: 60 }, "r-old")?.refreshToken).toBe("r-old"); // a refresh without a new token keeps the old one
   });
 
   it("refuses a token without the claims or with an unknown role", () => {
     const bad = [without(claims, "tenant_id"), { ...claims, membership_id: "" }, without(claims, "role"), { ...claims, role: "superuser" },
       { ...claims, role: "constructor" }, { ...claims, role: "toString" }, { ...claims, role: "__proto__" }, { ...claims, role: 1 }];
-    expect(bad.map((c) => sessionFromTokens({ access_token: token(c), expires_in: 300 }))).toEqual(bad.map(() => null));
+    expect(bad.map((c) => sessionFromTokens({ access_token: token(c), expires_in: 300 }))).toStrictEqual(bad.map(() => null));
     expect(sessionFromTokens({ access_token: "not-a-jwt", expires_in: 300 })).toBeNull();
-    expect(Object.keys(roleHome)).toEqual(["client", "contractor", "technician", "admin"]);
+    expect(Object.keys(roleHome)).toStrictEqual(["client", "contractor", "technician", "admin"]);
   });
 
   it("decodes a payload without trusting it, and nothing from a broken token", () => {
-    expect(jwtClaims(token({ sub: "u-1" }))).toEqual({ sub: "u-1" });
-    expect([jwtClaims("a"), jwtClaims("a.%%%.c"), jwtClaims("")]).toEqual([{}, {}, {}]);
+    expect(jwtClaims(token({ sub: "u-1" }))).toStrictEqual({ sub: "u-1" });
+    expect([jwtClaims("a"), jwtClaims("a.%%%.c"), jwtClaims("")]).toStrictEqual([{}, {}, {}]);
   });
 });
 
@@ -120,7 +120,7 @@ const answer = (status: number, body: unknown) => vi.fn(() => Promise.resolve(Re
 describe("refreshing the access token", () => {
 
   it("is due 30 seconds before the access token expires", () => {
-    expect([needsRefresh(session({ expiresAt: NOW / 1000 + 31 })), needsRefresh(session({ expiresAt: NOW / 1000 + 30 })), needsRefresh(session({ expiresAt: NOW / 1000 - 1 }))]).toEqual([false, true, true]);
+    expect([needsRefresh(session({ expiresAt: NOW / 1000 + 31 })), needsRefresh(session({ expiresAt: NOW / 1000 + 30 })), needsRefresh(session({ expiresAt: NOW / 1000 - 1 }))]).toStrictEqual([false, true, true]);
   });
 
   it("posts the refresh grant to the internal token endpoint and keeps the same tenant and membership", async () => {
@@ -131,7 +131,7 @@ describe("refreshing the access token", () => {
     expect(await refresh(session())).toMatchObject({ refreshToken: "r-2", tenantId: "t-1", membershipId: "m-1", expiresAt: NOW / 1000 + 300 });
     const [url, init] = sentCall(fetch.mock.calls);
     expect(url).toBe("https://keycloak:8080/realms/ac/protocol/openid-connect/token");
-    expect(Object.fromEntries(new URLSearchParams(bodyText(init)))).toEqual({ grant_type: "refresh_token", refresh_token: "r-1", client_id: "ac-web", client_secret: TEST_CLIENT_SECRET });
+    expect(Object.fromEntries(new URLSearchParams(bodyText(init)))).toStrictEqual({ grant_type: "refresh_token", refresh_token: "r-1", client_id: "ac-web", client_secret: TEST_CLIENT_SECRET });
   });
 
   it("gives nothing for another membership, a refused grant, a network failure or no refresh token", async () => {
@@ -161,8 +161,8 @@ describe("ending the identity provider's session", () => {
     vi.stubGlobal("fetch", fetch);
     expect(await endIdpSession("r-1")).toBe(true);
     const [url, init] = sentCall(fetch.mock.calls);
-    expect([url, init.method]).toEqual(["https://keycloak:8080/realms/ac/protocol/openid-connect/logout", "POST"]);
-    expect(Object.fromEntries(new URLSearchParams(bodyText(init)))).toEqual({ refresh_token: "r-1", client_id: "ac-web", client_secret: TEST_CLIENT_SECRET });
+    expect([url, init.method]).toStrictEqual(["https://keycloak:8080/realms/ac/protocol/openid-connect/logout", "POST"]);
+    expect(Object.fromEntries(new URLSearchParams(bodyText(init)))).toStrictEqual({ refresh_token: "r-1", client_id: "ac-web", client_secret: TEST_CLIENT_SECRET });
     expect(init.signal).toBeInstanceOf(AbortSignal); // never waits long for the provider
   });
   it("answers false when the provider refuses or cannot be reached", async () => {
@@ -177,8 +177,8 @@ describe("reading the session in a route handler", () => {
   it("returns a valid session as it is", async () => {
     const s = session();
     jar.get.mockImplementation((name: string) => (name === SESSION_COOKIE ? { value: seal(s) } : undefined));
-    expect(await readSession()).toEqual(s);
-    expect([jar.set.mock.calls.length, jar.delete.mock.calls.length]).toEqual([0, 0]);
+    expect(await readSession()).toStrictEqual(s);
+    expect([jar.set.mock.calls.length, jar.delete.mock.calls.length]).toStrictEqual([0, 0]);
     expect(SESSION_COOKIE).toBe("ac_session_client"); // one cookie per app: local apps share the host
   });
 
@@ -187,7 +187,7 @@ describe("reading the session in a route handler", () => {
     vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(Response.json({ access_token: token(claims), refresh_token: "r-2", expires_in: 300 }))));
     expect(await readSession()).toMatchObject({ refreshToken: "r-2", expiresAt: NOW / 1000 + 300 });
     const [name, value, options] = must(jar.set.mock.calls[0]);
-    expect([name, unsealAs(value, tokenHolder)?.refreshToken, options.maxAge]).toEqual([SESSION_COOKIE, "r-2", 1800]);
+    expect([name, unsealAs(value, tokenHolder)?.refreshToken, options.maxAge]).toStrictEqual([SESSION_COOKIE, "r-2", 1800]);
   });
 
   it("clears the cookie when the refresh fails, and ignores a missing or forged cookie", async () => {
@@ -208,7 +208,7 @@ describe("the cookie names (IR374)", () => {
     vi.stubEnv(SESSION_SECRET_2, "test-".padEnd(32, "s"));
     vi.resetModules();
     const https = await import("@ac/web/lib/session");
-    expect([https.SESSION_COOKIE, https.OIDC_COOKIE]).toEqual(["__Host-ac_session_client", "__Secure-ac_oidc_client"]);
+    expect([https.SESSION_COOKIE, https.OIDC_COOKIE]).toStrictEqual(["__Host-ac_session_client", "__Secure-ac_oidc_client"]);
     // a __Host- cookie must be Secure, on Path=/ and without a Domain; a deletion needs the same
     expect(https.cookieOptions()).toMatchObject({ secure: true, path: "/" });
     expect(https.cookieOptions()).not.toHaveProperty("domain");
@@ -217,15 +217,15 @@ describe("the cookie names (IR374)", () => {
     vi.unstubAllEnvs();
     vi.resetModules();
     const local = await import("@ac/web/lib/session");
-    expect([local.SESSION_COOKIE, local.OIDC_COOKIE, local.clearedCookieOptions().secure]).toEqual(["ac_session_client", "ac_oidc_client", false]);
+    expect([local.SESSION_COOKIE, local.OIDC_COOKIE, local.clearedCookieOptions().secure]).toStrictEqual(["ac_session_client", "ac_oidc_client", false]);
   });
 });
 
 describe("where sign-in returns to", () => {
   it("keeps a same-origin path and refuses absolute, protocol-relative, backslash and control-character forms", () => {
-    expect([safeReturnTo("/customer/units/u1?tab=history"), safeReturnTo("/")]).toEqual(["/customer/units/u1?tab=history", "/"]);
+    expect([safeReturnTo("/customer/units/u1?tab=history"), safeReturnTo("/")]).toStrictEqual(["/customer/units/u1?tab=history", "/"]);
     const bad = ["https://evil.example", "//evil.example", "/\\evil.example", "\\\\evil.example", "customer", "/\tevil", "/\nSet-Cookie:x", "/\0", "", null, undefined];
-    expect(bad.map((v) => safeReturnTo(v))).toEqual(bad.map(() => null));
+    expect(bad.map((v) => safeReturnTo(v))).toStrictEqual(bad.map(() => null));
   });
 });
 

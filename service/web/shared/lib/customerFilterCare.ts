@@ -3,6 +3,7 @@
 // summary row, the reminder settings in the client's words (filterCare.getSettings) and the reminder dialog's checks.
 // Pure code shared by the Server Component and the client view; texts in the display language and days in the user's
 // display time zone (`i`, IR262).
+import { isNone } from "@ac/web/lib/isNone";
 import { EN, intlTag, translator, type Display, type I18n, type T } from "@ac/web/lib/i18n";
 import { actionMessage } from "@ac/web/lib/actionMessage";
 import { filled } from "@ac/web/lib/filled";
@@ -25,7 +26,7 @@ export interface FilterUnit { id: string; name: string; place: string; spaceId: 
 /** The model default threshold (DD-C18). */
 export const DEFAULT_FILTER_HOURS = 250;
 /** A space with this many ACs or more shows one summary row with “View n” (DD-C18 step 1, IR238). */
-export const AREA_GROUP_AT = 4;
+const AREA_GROUP_AT = 4;
 
 type Tone = "ok" | "warn" | "crit" | "unknown" | "primary" | "muted";
 export const filterStatus: Record<FilterState, { label: string; badge: Tone; bar: Tone }> = {
@@ -36,7 +37,7 @@ export const filterStatus: Record<FilterState, { label: string; badge: Tone; bar
 };
 
 /** “8 Sept” in the user's language and display time zone. */
-export function monthDay(iso: string, d: Display = EN.display): string {
+function monthDay(iso: string, d: Display = EN.display): string {
   for (const timeZone of [d.timeZone, EN.display.timeZone]) {
     try {
       return new Date(iso).toLocaleDateString(intlTag(d.locale), { timeZone, month: "short", day: "numeric" });
@@ -66,11 +67,11 @@ export type FilterLine = { kind: "unit"; row: FilterRow } | { kind: "group"; gro
 
 /** How far a filter is to its next cleaning: % of the run-time threshold, else % of the fallback days, else unknown. */
 function filterProgress(h: number | null | undefined, days: number | null, s: ApiFilterStatus, t: T): { pct: number | null; text: string } {
-  if (h != null) {
+  if (!isNone(h)) {
     const pct = Math.min(100, Math.round((h / s.thresholdHours) * 100));
     return { pct, text: t("{pct} % of {n} h", { pct, n: s.thresholdHours }) };
   }
-  if (days == null) return { pct: null, text: t("run time unknown") };
+  if (days === null) return { pct: null, text: t("run time unknown") };
   const pct = Math.min(100, Math.round((days / s.fallbackDays) * 100));
   return { pct, text: t("{pct} % of {n} days", { pct, n: s.fallbackDays }) };
 }
@@ -92,8 +93,8 @@ export function filterRow(s: ApiFilterStatus, u: FilterUnit | undefined, nowMs: 
     spaceId: u?.spaceId ?? null,
     offline: isOffline,
     jobId: s.lastCleanedBy === "technician" ? s.lastCleaningJobId : null,
-    run: h == null ? "—" : t(runText, { n: Math.round(h) }),
-    runNote: h == null ? noReadings : null,
+    run: h === null ? "—" : t(runText, { n: Math.round(h) }),
+    runNote: h === null ? noReadings : null,
     state: s.status,
     threshold: s.thresholdHours,
     hours: h,
@@ -111,11 +112,11 @@ function groupBadge(due: number, isOverdue: boolean, isUnknown: boolean, t: T): 
   return isUnknown ? { label: t("Unknown"), tone: "unknown" } : { label: t("OK"), tone: "ok" };
 }
 /** The summary of an area's ACs: “2 due soon · 1 offline”, the average progress and “2 due”. */
-export function filterGroup(key: string, rows: FilterRow[], t: T = en): FilterGroup {
+function filterGroup(key: string, rows: FilterRow[], t: T = en): FilterGroup {
   const n = (st: FilterState) => rows.filter((r) => r.state === st).length;
   const offline = rows.filter((r) => r.offline).length;
   const parts = [n("overdue") && t("{n} overdue", { n: n("overdue") }), n("due_soon") && t("{n} due soon", { n: n("due_soon") }), offline && t("{n} offline", { n: offline })].filter((part): part is string => typeof part === "string" && part !== "");
-  const known = rows.filter((r) => r.hours != null && r.pct != null);
+  const known = rows.filter((r) => r.hours !== null && r.pct !== null);
   const pct = known.length > 0 ? Math.round(known.reduce((a, r) => a + (r.pct ?? 0), 0) / known.length) : null;
   const due = n("overdue") + n("due_soon");
   const name = filled(rows[0]?.place.split(" › ").pop()) ?? t("Area");
@@ -123,7 +124,7 @@ export function filterGroup(key: string, rows: FilterRow[], t: T = en): FilterGr
     title: t("{name} · {n} ACs", { name, n: rows.length }),
     place: rows[0]?.place ?? "",
     run: parts.length > 0 ? parts.join(" · ") : t("all OK"),
-    progress: pct == null ? t("run time unknown") : t("{pct} % of {n} h (average)", { pct, n: rows[0]?.threshold ?? 0 }),
+    progress: pct === null ? t("run time unknown") : t("{pct} % of {n} h (average)", { pct, n: rows[0]?.threshold ?? 0 }),
     badge: groupBadge(due, n("overdue") > 0, n("unknown") === rows.length, t),
     key,
     pct,
@@ -153,14 +154,14 @@ export function filterLines(items: ApiFilterStatus[], units: FilterUnit[], nowMs
 /** The symptom line of a cleaning request opened from the tab (New request prefilled, type preventive), in the
 display language — the client still edits it before sending. */
 export const cleaningSymptom = (r: FilterRow, t: T = en) => {
-  if (r.hours != null) return t("Filter cleaning: {n} h of running since the last cleaning (reminder at {threshold} h).", { n: Math.round(r.hours), threshold: r.threshold });
-  return r.days == null ? t("Filter cleaning: the filter is due for cleaning.") : t("Filter cleaning: {n} days since the last cleaning (reminder every {days} days).", { n: r.days, days: r.fallbackDays });
+  if (r.hours !== null) return t("Filter cleaning: {n} h of running since the last cleaning (reminder at {threshold} h).", { n: Math.round(r.hours), threshold: r.threshold });
+  return r.days === null ? t("Filter cleaning: the filter is due for cleaning.") : t("Filter cleaning: {n} days since the last cleaning (reminder every {days} days).", { n: r.days, days: r.fallbackDays });
 };
 
 /** The Reminders card (Figma 07j). */
 export function reminderLines(s: ApiFilterSettings, t: T = en): [string, string][] {
   return [
-    [t("Remind at"), s.thresholdHours == null ? t("{n} h (model default)", { n: DEFAULT_FILTER_HOURS }) : t("{n} h of running", { n: s.thresholdHours })],
+    [t("Remind at"), s.thresholdHours === null ? t("{n} h (model default)", { n: DEFAULT_FILTER_HOURS }) : t("{n} h of running", { n: s.thresholdHours })],
     [t("Also remind"), t("every {n} days if run time unknown", { n: s.fallbackDays })],
     [t("Send by"), t(s.channels.includes("email") ? "App + email" : "App only")],
     [t("Who"), t(s.recipients === "owners" ? "Owners of the location" : "All users of the location")],
@@ -171,10 +172,10 @@ export function reminderLines(s: ApiFilterSettings, t: T = en): [string, string]
 export interface ReminderForm { useDefault: boolean; hours: string; days: string; recipients: ApiFilterSettings["recipients"]; email: boolean }
 export const reminderForm = (s: ApiFilterSettings): ReminderForm => {
   return {
-    useDefault: s.thresholdHours == null, hours: String(s.thresholdHours ?? DEFAULT_FILTER_HOURS), days: String(s.fallbackDays), recipients: s.recipients, email: s.channels.includes("email"),
+    useDefault: s.thresholdHours === null, hours: String(s.thresholdHours ?? DEFAULT_FILTER_HOURS), days: String(s.fallbackDays), recipients: s.recipients, email: s.channels.includes("email"),
   };
 };
-const whole = (v: string, lo: number, hi: number) => /^\d+$/.test(v.trim()) && +v >= lo && +v <= hi;
+const whole = (v: string, lo: number, hi: number) => /^\d+$/.test(v.trim()) && Number(v) >= lo && Number(v) <= hi;
 export function reminderErrors(f: ReminderForm, t: T = en): { hours?: string; days?: string } {
   return {
     ...(!f.useDefault && !whole(f.hours, 50, 2000) && { hours: t("Whole hours from 50 to 2000.") }),

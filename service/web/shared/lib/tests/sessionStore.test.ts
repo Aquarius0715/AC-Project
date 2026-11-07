@@ -57,19 +57,19 @@ describe("the server-side session store", () => {
     const cookie = await createSessionCookie(session());
     const id = unsealAs(cookie, sealedSid)?.sid ?? "";
     const fields = unsealAs(cookie, anyFields) ?? {};
-    expect([Object.keys(fields), id.length]).toEqual([["sid"], 43]);
+    expect([Object.keys(fields), id.length]).toStrictEqual([["sid"], 43]);
     const [key, rec] = must([...kv.data][0]);
     expect(key).toBe(`ac:session:${createHash("sha256").update(id).digest("hex")}`); // the key reveals no cookie
     // the markers hold ":" and "." around words, which base64url ciphertext cannot reproduce by chance
-    expect([rec.value.includes("header.claims.sig"), rec.value.includes("refresh:r-1"), kv.data.size]).toEqual([false, false, 1]);
-    expect(await loadSession(cookie)).toEqual(session());
+    expect([rec.value.includes("header.claims.sig"), rec.value.includes("refresh:r-1"), kv.data.size]).toStrictEqual([false, false, 1]);
+    expect(await loadSession(cookie)).toStrictEqual(session());
   });
 
   it("revokes the session at sign-out: a copy of the cookie stops working at once", async () => {
     const cookie = await createSessionCookie(session());
     const copy = cookie;
     await dropSession(cookie);
-    expect([await loadSession(copy), kv.data.size]).toEqual([null, 0]);
+    expect([await loadSession(copy), kv.data.size]).toStrictEqual([null, 0]);
   });
 
   it("slides the idle lifetime with use and ends 30 minutes after the last one", async () => {
@@ -89,16 +89,16 @@ describe("the server-side session store", () => {
       expect(await loadSession(cookie), `${String(m)} min`).not.toBeNull();
     }
     later(20);
-    expect([await loadSession(cookie), kv.data.size]).toEqual([null, 0]);
+    expect([await loadSession(cookie), kv.data.size]).toStrictEqual([null, 0]);
   });
 
   it("stores a refreshed session under the same cookie, but never brings a signed-out one back", async () => {
     const cookie = await createSessionCookie(session());
     const next = session({ accessToken: "new.token.sig", expiresAt: NOW / 1000 + 600 });
     expect(await renewSessionCookie(cookie, next)).toBe(cookie);
-    expect(await loadSession(cookie)).toEqual(next);
+    expect(await loadSession(cookie)).toStrictEqual(next);
     await dropSession(cookie); // sign-out in another tab
-    expect([await renewSessionCookie(cookie, next), kv.data.size]).toEqual([null, 0]);
+    expect([await renewSessionCookie(cookie, next), kv.data.size]).toStrictEqual([null, 0]);
   });
 
   it("starts each sign-in with a new ID and deletes the browser's previous session", async () => {
@@ -107,7 +107,7 @@ describe("the server-side session store", () => {
     expect(second).not.toBe(first);
     const dropped = await loadSession(first);
     const kept = await loadSession(second);
-    expect([dropped, kept?.membershipId, kv.data.size]).toEqual([null, "m-2", 1]);
+    expect([dropped, kept?.membershipId, kv.data.size]).toStrictEqual([null, "m-2", 1]);
   });
 
   it("refuses a cookie that carries the session itself, an altered cookie and a short ID", async () => {
@@ -116,15 +116,15 @@ describe("the server-side session store", () => {
     // an altered cookie: its last two characters replaced by others (a cookie that already ends in "xx" gets "yy")
     const altered = `${iv}.${body.slice(0, -2)}${body.endsWith("xx") ? "yy" : "xx"}`;
     expect([await loadSession(seal(session())), await loadSession(altered), await loadSession(seal({ sid: "short" })), await loadSession(undefined)])
-      .toEqual([null, null, null, null]);
+      .toStrictEqual([null, null, null, null]);
   });
 
   it("counts the session as absent when the store does not answer, and cannot start one", async () => {
     const cookie = await createSessionCookie(session());
     kv.api.down = true;
-    expect([await loadSession(cookie), await renewSessionCookie(cookie, session())]).toEqual([null, null]);
-    await expect(createSessionCookie(session())).rejects.toThrow();
+    expect([await loadSession(cookie), await renewSessionCookie(cookie, session())]).toStrictEqual([null, null]);
+    await expect(createSessionCookie(session())).rejects.toThrow("connection lost");
     kv.api.down = false;
-    expect(await loadSession(cookie)).toEqual(session()); // back once the store answers again
+    expect(await loadSession(cookie)).toStrictEqual(session()); // back once the store answers again
   });
 });

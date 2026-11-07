@@ -332,7 +332,9 @@ func LoadReport(
 		return report, err
 	}
 
-	return report, reviews(ctx, call, &report)
+	err = reviews(ctx, call, &report)
+
+	return report, err
 }
 
 // GetInput is mrv.get input.

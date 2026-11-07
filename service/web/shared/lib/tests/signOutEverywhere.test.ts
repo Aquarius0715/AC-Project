@@ -59,11 +59,11 @@ describe("a session the Core API refuses", () => {
     jar.value = await createSessionCookie(session);
     vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(json(401, revoked))));
     await expect(coreOp("units.list", { limit: 5 })).rejects.toBeInstanceOf(CoreError);
-    expect([await loadSession(jar.value), kv.size]).toEqual([null, 0]);
+    expect([await loadSession(jar.value), kv.size]).toStrictEqual([null, 0]);
   });
 
   it("sends the browser to sign-in with why, and back to the page it was on", () => {
-    expect([signedOutReason("errors.session_revoked"), signedOutReason("error.membershipInvalid"), signedOutReason()]).toEqual(["revoked", "expired", "expired"]);
+    expect([signedOutReason("errors.session_revoked"), signedOutReason("error.membershipInvalid"), signedOutReason()]).toStrictEqual(["revoked", "expired", "expired"]);
     expect(signInAgainHref("revoked", "/admin/units?customerId=c-1")).toBe("/login?error=revoked&returnTo=%2Fadmin%2Funits%3FcustomerId%3Dc-1");
   });
 });
@@ -82,7 +82,7 @@ describe("signing in again after a revocation", () => {
     const again = await login(new NextRequest("http://localhost:3000/bff/auth/login?reauth=1&returnTo=/customer"));
     const url = locationOf(again);
     const state = unsealAs(again.cookies.get(OIDC_COOKIE)?.value, signInState);
-    expect([url.searchParams.get("prompt"), state?.reauth, state?.returnTo]).toEqual(["login", true, "/customer"]);
+    expect([url.searchParams.get("prompt"), state?.reauth, state?.returnTo]).toStrictEqual(["login", true, "/customer"]);
     const plain = await login(new NextRequest("http://localhost:3000/bff/auth/login?returnTo=/customer"));
     expect(locationOf(plain).searchParams.get("prompt")).toBeNull();
   });
@@ -91,17 +91,17 @@ describe("signing in again after a revocation", () => {
   it("turns a single sign-on answer with the old sign-in into one password prompt", async () => {
     const res = await signIn({}, json(401, revoked));
     const to = locationOf(res);
-    expect([to.pathname, to.searchParams.get("reauth"), to.searchParams.get("returnTo"), kv.size]).toEqual(["/bff/auth/login", "1", CUSTOMER_ALERTS, 0]);
+    expect([to.pathname, to.searchParams.get("reauth"), to.searchParams.get("returnTo"), kv.size]).toStrictEqual(["/bff/auth/login", "1", CUSTOMER_ALERTS, 0]);
   });
 
   it("gives up after the password prompt rather than looping", async () => {
     const res = await signIn({ reauth: true }, json(401, revoked));
-    expect([locationOf(res).pathname + locationOf(res).search, kv.size]).toEqual(["/login?error=revoked", 0]);
+    expect([locationOf(res).pathname + locationOf(res).search, kv.size]).toStrictEqual(["/login?error=revoked", 0]);
   });
 
   it("starts the session when the Core API takes the sign-in", async () => {
     const res = await signIn({ reauth: true }, json(200, { data: {} }));
-    expect([locationOf(res).pathname, kv.size]).toEqual([CUSTOMER_ALERTS, 1]);
+    expect([locationOf(res).pathname, kv.size]).toStrictEqual([CUSTOMER_ALERTS, 1]);
   });
 
   // open redirects (security check R380): a crafted returnTo goes through the sign-in, the password prompt after a
@@ -116,7 +116,7 @@ describe("signing in again after a revocation", () => {
       const second = await kept(hop.href);
       const signedIn = await signIn({ returnTo: second.returnTo, reauth: second.reauth }, json(200, { data: {} }));
       const home = locationOf(signedIn);
-      expect([returnTo, hop.origin, hop.pathname, home.origin]).toEqual([returnTo, origin, "/bff/auth/login", origin]);
+      expect([returnTo, hop.origin, hop.pathname, home.origin]).toStrictEqual([returnTo, origin, "/bff/auth/login", origin]);
     }
   });
 });

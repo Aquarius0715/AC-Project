@@ -36,7 +36,7 @@ describe("a request in the maintenance demo", () => {
   it("is booked at a preferred time for an internal technician, or offered to a contractor", () => {
     jobActions.book("job-c07", slot, "internal", TECH_INTERNAL_A);
     expect(job("job-c07")).toMatchObject({ status: "assigned", scheduled: slot, delivery: "internal", technician: TECH_INTERNAL_A, techAck: { status: "pending" } });
-    expect([notes("technician")[0]?.title, notes("client")[0]?.title]).toEqual(["New assignment job-c07", "Booked: job-c07"]);
+    expect([notes("technician")[0]?.title, notes("client")[0]?.title]).toStrictEqual(["New assignment job-c07", "Booked: job-c07"]);
     jobActions.book(JOB_INTERNAL_A, slot, CONTRACTOR, CONTRACTOR_A);
     expect(job(JOB_INTERNAL_A)).toMatchObject({ status: "offered", delivery: CONTRACTOR, contractor: CONTRACTOR_A, technician: null });
     expect(notes(CONTRACTOR)[0]?.title).toBe("New offer job-internal-a");
@@ -92,7 +92,7 @@ describe("notes, follow-ups and answers in the maintenance demo", () => {
   });
 
   it("opens a follow-up from a completed job only, and classifies it once", () => {
-    expect(jobActions.reportProblem("job-c07", "same_problem", "still dripping", "")).toEqual({ error: "CONFLICT — only completed jobs can be reported" });
+    expect(jobActions.reportProblem("job-c07", "same_problem", "still dripping", "")).toStrictEqual({ error: "CONFLICT — only completed jobs can be reported" });
     const reported = jobActions.reportProblem(completed.id, "same_problem", "still dripping", TEXT_2026_10_06);
     expect(reported).toHaveProperty("id");
     const id = "id" in reported ? reported.id ?? "" : "";
@@ -130,15 +130,15 @@ describe("notes, follow-ups and answers in the maintenance demo", () => {
     jobActions.markRead(n.id);
     expect(notes("admin")[0]?.read).toBe(true);
     jobActions.reset();
-    expect([job("job-c07").status, getJobState().notes]).toEqual(["requested", []]);
+    expect([job("job-c07").status, getJobState().notes]).toStrictEqual(["requested", []]);
   });
 });
 
 describe("demo availability and slot texts", () => {
   it("names who fits a time and formats slots", () => {
     expect([fitFor({ date: "2026-09-28", win: TEXT_14_00_16_00 }).fits, fitFor({ date: "2026-10-02", win: TEXT_14_00_16_00 }).fits, fitFor(slot).fits, fitFor({ date: "2026-10-05", win: TEXT_10_00_12_00 }).fits])
-      .toEqual(["none", "none", "both", CONTRACTOR]);
-    expect([fmt(slot), fmt(null), longDate(slot)]).toEqual(["10-05 · 14:00–16:00", "—", "Mon 10-05 · 14:00–16:00"]);
+      .toStrictEqual(["none", "none", "both", CONTRACTOR]);
+    expect([fmt(slot), fmt(null), longDate(slot)]).toStrictEqual(["10-05 · 14:00–16:00", "—", "Mon 10-05 · 14:00–16:00"]);
     expect(Object.keys(statusLabel)).toHaveLength(11);
   });
 });

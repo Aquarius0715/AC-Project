@@ -41,7 +41,7 @@ export interface ApiContractLite { id: string; customerId: string; unitIds: stri
 export interface ApiInvoiceLite { id: string; contractId: string; amountMinor: number; currency: Currency }
 export interface ApiRestrictionLite { id: string; contractId?: string; state: string; unitIds: string[] }
 
-const byName = <T extends { name: string }>(a: T, b: T) => a.name.localeCompare(b.name);
+const byName = <Item extends { name: string }>(a: Item, b: Item) => a.name.localeCompare(b.name);
 const en = translator("en");
 /** “Apr 2026”: the month an account was created, in the user's language (a Kuala Lumpur month). */
 const monthYear = (iso: string, locale: Locale) => new Date(iso).toLocaleDateString(intlTag(locale), { month: "short", year: "numeric", timeZone: "Asia/Kuala_Lumpur" }).replaceAll(/[\u{A0}\u{2009}\u{202F}]/gu, " ");
@@ -91,7 +91,7 @@ export interface CustomerRow {
   properties: number; propertyNames: string[]; units: number; operation: string; running: number; known: number; alerts: number; standing: Standing | null; marks: Mark[];
 }
 /** Operation rate = on ÷ (on + off) of the known power states; unknown stays out of the denominator (DD-A01). */
-export const operation = (us: ApiUnitRow[]) => {
+const operation = (us: ApiUnitRow[]) => {
   const on = us.filter((u) => u.effectivePowerState === "on").length;
   const known = us.filter((u) => u.effectivePowerState !== "unknown").length;
   return known ? `${one((on * 100) / known)}%` : "—";
@@ -381,7 +381,7 @@ export function defaultRules(p: ApiCustomerPolicy, i: I18n = EN): RuleLine[] {
 
 // ---- client users of the customer (FR-A17, IR144) ----
 
-export type Channel = "inApp" | "email" | "whatsapp";
+type Channel = "inApp" | "email" | "whatsapp";
 /** ClientUser of service-contracts.ts. */
 export interface ApiClientUser {
   id: string; version: number; customerId: string; membershipId: string | null; email: string; displayName: string | null; clientRole: "owner" | "member";
@@ -428,7 +428,7 @@ export function inviteError(email: string, us: { email: string }[], t: T = trans
 // ---- warranty & coverage (FR-A19) ----
 
 export const coverageStatuses = ["under_warranty", "contract", "expiring", "no_coverage"] as const;
-export type CoverageStatus = (typeof coverageStatuses)[number];
+type CoverageStatus = (typeof coverageStatuses)[number];
 /** UnitCoverage of service-contracts.ts. */
 export interface ApiCoverage { unitId: string; customerId: string; modelId: string; warrantyEndsAt: string | null; contractIds: string[]; status: CoverageStatus; claimableJobIds: string[] }
 export interface CoverageRow {
@@ -437,11 +437,11 @@ export interface CoverageRow {
 }
 const dayMs = 86_400_000;
 /** A unit's cover in words: contract, warranty, ending soon, or none. */
-function coverageText(c: ApiCoverage, days: number | null, t: T): string {
+function coverageText(c: ApiCoverage, warrantyDays: number | null, t: T): string {
   switch (c.status) {
     case "contract": { return t("Covered by contract"); }
     case "under_warranty": { return t("Under warranty"); }
-    case "expiring": { return t("Ends in {n} d · no contract", { n: days ?? 0 }); }
+    case "expiring": { return t("Ends in {n} d · no contract", { n: warrantyDays ?? 0 }); }
     default: { return t(c.warrantyEndsAt ? "Warranty ended · no contract" : "No warranty · no contract"); }
   }
 }
@@ -457,8 +457,8 @@ export function coverageRows(cs: ApiCoverage[], x: { unit: (id: string) => { nam
   const { t } = i;
   return cs.map((c) => {
     const u = x.unit(c.unitId);
-    const days = c.warrantyEndsAt ? Math.ceil((Date.parse(c.warrantyEndsAt) - now.getTime()) / dayMs) : null;
-    const statusText = coverageText(c, days, t);
+    const warrantyDays = c.warrantyEndsAt ? Math.ceil((Date.parse(c.warrantyEndsAt) - now.getTime()) / dayMs) : null;
+    const statusText = coverageText(c, warrantyDays, t);
     return {
       unitId: c.unitId,
       unit: u?.name ?? c.unitId.slice(0, 8),
@@ -472,7 +472,7 @@ export function coverageRows(cs: ApiCoverage[], x: { unit: (id: string) => { nam
       contractIds: c.contractIds,
       contracts: c.contractIds.map((id) => x.contract(id)).join(", ") || "—",
       status: c.status,
-      days,
+      days: warrantyDays,
       statusText,
     };
   }).toSorted(byWarrantyEnd);
@@ -496,7 +496,7 @@ export const coverageMatch = (r: CoverageRow, f: CoverageFilter) => {
     !f.within || (r.days !== null && r.days > 0 && r.days <= Number(f.within)),
   ].every(Boolean);
 };
-export const toCsv = (header: string[], rows: string[][]) => [header, ...rows].map((r) => r.map((item) => csvCell(item)).join(",")).join("\n") + "\n";
+const toCsv = (header: string[], rows: string[][]) => [header, ...rows].map((r) => r.map((item) => csvCell(item)).join(",")).join("\n") + "\n";
 export const coverageCsv = (rows: CoverageRow[]) => {
   return toCsv(["unit", "unit_id", "customer", "model", "warranty_end", "maintenance_contract", "status"],
     rows.map((r) => [r.unit, r.unitId, r.customer, r.model, r.endsDate, r.contracts === "—" ? "" : r.contracts, r.statusText]));

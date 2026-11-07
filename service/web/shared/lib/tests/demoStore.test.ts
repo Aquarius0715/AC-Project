@@ -13,7 +13,7 @@ describe("Phase 1A demo stores (FR-X05, IR257)", () => {
   it("keeps the demo data in the tab across navigations", () => {
     navigation("navigate");
     writeDemo("k", [{ id: "j1" }]);
-    expect(readDemoAs("k", idRows)).toEqual([{ id: "j1" }]);
+    expect(readDemoAs("k", idRows)).toStrictEqual([{ id: "j1" }]);
     expect(localStorage.getItem("k")).toBeNull(); // per tab, not per browser
   });
 
@@ -36,7 +36,7 @@ describe("Phase 1A demo stores (FR-X05, IR257)", () => {
     navigation("navigate");
     const rows = z.array(z.object({ id: z.string(), n: z.number() }));
     writeDemo("k", [{ id: "j1", n: 1 }]);
-    expect(readDemoAs("k", rows)).toEqual([{ id: "j1", n: 1 }]);
+    expect(readDemoAs("k", rows)).toStrictEqual([{ id: "j1", n: 1 }]);
     writeDemo("k", [{ id: "j1", n: "1" }]); // an older release stored the number as text
     expect(readDemoAs("k", rows)).toBeNull();
     expect(readDemoAs("none", rows)).toBeNull();

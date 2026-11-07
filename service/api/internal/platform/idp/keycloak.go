@@ -72,7 +72,7 @@ func (k *Keycloak) EndSessions(ctx context.Context, subject string) error {
 		ctx,
 		http.MethodPost,
 		k.AdminURL+"/users/"+url.PathEscape(subject)+"/logout",
-		nil,
+		http.NoBody,
 	)
 	if err != nil {
 		return apperr.Wrap(err, "http.NewRequestWithContext")

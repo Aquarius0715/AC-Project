@@ -26,12 +26,12 @@ RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache
 # tools: the IoT commands on the distroless runtime, as the services run (non-root, no shell or toolchain; IR539)
 FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab AS tools
 COPY --from=dev /app/devicesim /app/iotbridge /app/mockhistory /app/
-USER nonroot
+USER 65532:65532
 
 FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab AS runtime
 COPY --from=build /out/server /app/server
 # the local blob store (BLOB_DIR) of development: owned by nonroot so a named volume mounted here is writable
 COPY --from=build --chown=65532:65532 /out/blobs /var/lib/ac/blobs
-USER nonroot
+USER 65532:65532
 EXPOSE 8080
 CMD ["/app/server"]

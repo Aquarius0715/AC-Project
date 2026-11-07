@@ -11,8 +11,6 @@ export type OpArgs<O> = { [K in OpName]: [operation: K, input: OpInput<K>, opts?
 /** [operation, input] for every operation. */
 export type OpCall = { [K in OpName]: [operation: K, input: OpInput<K>] }[OpName];
 /** The query part of a list operation's input: its filters and sort (coreAll adds the paging). */
-export type ListQuery<K extends OpName> = Partial<Pick<OpInput<K>, Extract<keyof OpInput<K>, "filters" | "sort">>>;
+type ListQuery<K extends OpName> = Partial<Pick<OpInput<K>, Extract<keyof OpInput<K>, "filters" | "sort">>>;
 /** [operation, query, max] for every operation. */
 export type ListArgs = { [K in OpName]: [operation: K, query?: ListQuery<K>, max?: number] }[OpName];
-
-export {type OperationContracts} from "@ac/web/lib/contracts.gen";

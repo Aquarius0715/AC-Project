@@ -8,5 +8,5 @@ import { ROLE_KEY, type Role } from "@ac/web/lib/nav";
 demo opens the role home and remembers the chosen role for the shared screens' frame. */
 export function ContinueLink({ appRole: role, href, children }: Readonly<{ appRole: Role; href: string; children: React.ReactNode }>) {
   if (href.startsWith("/bff/")) return <a href={href} className={cls}>{children}</a>;
-  return <Link onClick={() => { try { localStorage.setItem(ROLE_KEY, role); } catch {} }} href={href} className={cls}>{children}</Link>;
+  return <Link onClick={() => { try { localStorage.setItem(ROLE_KEY, role); } catch { /* storage is blocked: the role is not remembered */ } }} href={href} className={cls}>{children}</Link>;
 }

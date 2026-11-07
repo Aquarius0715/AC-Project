@@ -11,24 +11,25 @@ function Harness({ fields = true, inner = false }: Readonly<{ fields?: boolean; 
   const [second, setSecond] = useState(false);
   return (
     <>
-      <button onClick={() => { setOpen(true); }}>Open</button>
-      <Modal open={open} title="Edit" onClose={() => { setOpen(false); }} footer={<><button>Cancel</button><button onClick={() => { setSecond(true); }}>Save</button></>}>
+      <button type="button" onClick={() => { setOpen(true); }}>Open</button>
+      <Modal open={open} title="Edit" onClose={() => { setOpen(false); }} footer={<><button type="button">Cancel</button><button type="button" onClick={() => { setSecond(true); }}>Save</button></>}>
         {fields ? <input aria-label="Name" /> : <p>Delete this?</p>}
       </Modal>
-      {inner && <Modal open={second} title="Inner" onClose={() => { setSecond(false); }} footer={<button>OK</button>}><p>Sure?</p></Modal>}
+      {inner && <Modal open={second} title="Inner" onClose={() => { setSecond(false); }} footer={<button type="button">OK</button>}><p>Sure?</p></Modal>}
     </>
   );
 }
+const initialRows = ["a"];
 // a list whose row the dialog removes: the row's button opened it, so focus goes to the list (IR612)
-function Removal({ start = ["a"] }: Readonly<{ start?: string[] }>) {
+function Removal({ start = initialRows }: Readonly<{ start?: string[] }>) {
   const [rows, setRows] = useState(start);
   const [open, setOpen] = useState(false);
   const gone = useRef(false);
   return (
     <>
-      <div id="rows" tabIndex={-1} role="region" aria-label="Rows">{rows.map((r) => <button key={r} onClick={() => { setOpen(true); }}>Remove {r}</button>)}</div>
+      <div id="rows" tabIndex={-1} role="region" aria-label="Rows">{rows.map((r) => <button type="button" key={r} onClick={() => { setOpen(true); }}>Remove {r}</button>)}</div>
       <Modal open={open} title="Remove" onClose={() => { setOpen(false); }} finalFocus={() => (gone.current ? document.querySelector("#rows") : true)}
-        footer={<button onClick={() => { gone.current = true; setRows((rs) => rs.slice(1)); setOpen(false); }}>Remove</button>}><p>Sure?</p></Modal>
+        footer={<button type="button" onClick={() => { gone.current = true; setRows((rs) => rs.slice(1)); setOpen(false); }}>Remove</button>}><p>Sure?</p></Modal>
     </>
   );
 }

@@ -44,7 +44,7 @@ export function ModelsTab({ live }: Readonly<{ live: DevicesLive }>) {
   const changes = sel ? capabilityChanges(d, capabilityDraft(sel.cap), t) : [];
   const isDirty = changes.length > 0;
   const onModel = new Set(units.map((u) => u.id));
-  const runningOn = (v: string) => live.devices.filter((x) => x.unitId && onModel.has(x.unitId) && x.fw === v).length;
+  const runningOn = (v: string) => live.devices.filter((x) => !!x.unitId && onModel.has(x.unitId) && x.fw === v).length;
   const problemOnAdd = adding === null ? null : firmwareProblem(adding, d.firmware, t);
   const addVersion = () => {
     if (adding === null || problemOnAdd) return;
@@ -93,7 +93,7 @@ export function ModelsTab({ live }: Readonly<{ live: DevicesLive }>) {
           </section>
           <section>
             <h3 className="mb-2 text-[13px] font-bold">{t("Sensors")}</h3>
-            <ScrollX><table className="w-full min-w-[420px] text-[13px]"><thead className="text-left text-[11px] uppercase text-muted-foreground"><tr><th>{t("Metric")}</th><th>{t("Unit")}</th><th>{t("Stale after (s)")}</th><th>{t("Boundary")}</th><th /></tr></thead><tbody>{d.sensors.map((s, n) => <tr key={s.metric} className="border-t border-line"><td className="py-1.5">{metricText(s.metric, t)}</td><td>{metricUnit[s.metric]}</td><td><Input type="number" className="w-28" aria-label={t("Stale after (s)")} value={s.staleAfterSeconds} onChange={(e) => { set({ sensors: d.sensors.map((x, j) => (j === n ? { ...x, staleAfterSeconds: e.target.value } : x)) }); }} /></td><td className="text-xs text-muted-foreground">{s.metric === "power" ? "ac_input_electricity" : "—"}</td><td><Plain touch type="button" className="text-xs text-crit" onClick={() => { set({ sensors: d.sensors.filter((_, j) => j !== n) }); }}>{t("Remove")}</Plain></td></tr>)}</tbody></table></ScrollX>
+            <ScrollX><table className="w-full min-w-[420px] text-[13px]"><thead className="text-left text-[11px] uppercase text-muted-foreground"><tr><th>{t("Metric")}</th><th>{t("Unit")}</th><th>{t("Stale after (s)")}</th><th>{t("Boundary")}</th><td /></tr></thead><tbody>{d.sensors.map((s, n) => <tr key={s.metric} className="border-t border-line"><td className="py-1.5">{metricText(s.metric, t)}</td><td>{metricUnit[s.metric]}</td><td><Input type="number" className="w-28" aria-label={t("Stale after (s)")} value={s.staleAfterSeconds} onChange={(e) => { set({ sensors: d.sensors.map((x, j) => (j === n ? { ...x, staleAfterSeconds: e.target.value } : x)) }); }} /></td><td className="text-xs text-muted-foreground">{s.metric === "power" ? "ac_input_electricity" : "—"}</td><td><Plain touch type="button" className="text-xs text-crit" onClick={() => { set({ sensors: d.sensors.filter((_, j) => j !== n) }); }}>{t("Remove")}</Plain></td></tr>)}</tbody></table></ScrollX>
             {pick && <div className="mt-2 flex items-end gap-2"><Field label={t("Add sensor")}><Select value={pick} onChange={(e) => { setAddedSensor(oneOf(available, e.target.value, pick)); }}>{available.map((m) => <option key={m} value={m}>{metricText(m, t)} ({metricUnit[m]})</option>)}</Select></Field><Btn size="sm" onClick={() => { set({ sensors: [...d.sensors, { metric: pick, staleAfterSeconds: "120" }] }); }}>{t("Add")}</Btn></div>}
             {fieldError("sensors") && <p className="mt-1 text-xs text-crit">{fieldError("sensors")}</p>}
           </section>

@@ -1190,7 +1190,7 @@ func TestNotificationMail(t *testing.T) {
 	ownerScan(t, `SELECT count(*) FROM notify.notifications WHERE id = $1`, []any{ended}, &left)
 
 	if left != 1 {
-		t.Errorf("a recent notification was swept")
+		t.Error("a recent notification was swept")
 	}
 }
 

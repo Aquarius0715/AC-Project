@@ -45,7 +45,7 @@ export default async function CustomerAutomationsPage({ searchParams }: Readonly
   let caps: Record<string, Caps | null> = {};
   if (editing) {
     const details = await Promise.all(acs.map((u) => orNull(coreOp<ApiUnitDetail>("units.get", { id: u.id }))));
-    caps = Object.fromEntries(acs.map((ac, i) => [ac.id, details.at(i)?.capabilities ?? null]));
+    caps = Object.fromEntries(acs.map((item, index) => [item.id, details.at(index)?.capabilities ?? null]));
   }
   const live: AutomationsLive = {
     rules,

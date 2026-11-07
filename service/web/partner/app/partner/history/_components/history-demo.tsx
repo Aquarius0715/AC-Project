@@ -47,7 +47,7 @@ export function HistoryDemo() {
   const toast = useToast();
   const [job, setJob] = useState("job-p03");
   const [f, setF] = useState<F>("all");
-  const [notice, setMessage] = useState("Schedule moved to 2026-09-22 09:00–11:00 due to technician availability.");
+  const [notice, setNotice] = useState("Schedule moved to 2026-09-22 09:00–11:00 due to technician availability.");
   const [tried, setTried] = useState(false);
   const [role, setRole] = useState("hq");
   const [vis, setVis] = useState<"internal" | "customer">("internal");
@@ -76,7 +76,7 @@ export function HistoryDemo() {
                   <Field label="Template"><Select><option>schedule_change</option><option>quality_rework</option></Select></Field>
                   <Field label="Visibility"><Choice value={vis} onChange={setVis} options={[{ id: "internal", label: "Internal (default)" }, { id: "customer", label: "Customer-visible" }]} /></Field>
                   <Field label="Recipient role"><Select value={role} onChange={(e) => { setRole(e.target.value); }}><option value="hq">hq</option><option value="technician">technician</option><option value="customer">customer</option></Select></Field>
-                  <Field label="Message (1–2000 chars)" error={tried && !notice.trim() ? "Message is required" : undefined}><Textarea value={notice} onChange={(e) => { setMessage(e.target.value); }} /></Field>
+                  <Field label="Message (1–2000 chars)" error={tried && !notice.trim() ? "Message is required" : undefined}><Textarea value={notice} onChange={(e) => { setNotice(e.target.value); }} /></Field>
                   <Btn variant="primary" disabled={isApi && sel?.projection === "history"} onClick={() => { setTried(true); if (!notice.trim()) { return; } setPreviews((p) => [{ k: `schedule_change → ${role}`, d: `in-app · preview · ${vis} · just now` }, ...p]); toast("Note saved + preview created"); }}>Save note & create preview</Btn>
                   <p className="text-[11px] text-muted-foreground">No real sending. Free-form external recipients and other-job recipients are rejected. Internal notes stay hidden from customers.</p>
                 </div>

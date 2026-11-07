@@ -1,6 +1,7 @@
 package integration_test
 
 import (
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -28,7 +29,7 @@ func TestReplicas(t *testing.T) {
 		for _, replica := range append(
 			append(append(append([]events.Replica{}, notify.Replicas()...), energy.Replicas()...), maintenance.Replicas()...),
 			billing.Replicas()...) {
-			cols := strings.Join(append(append([]string{}, replica.Keys...), replica.Cols...), ", ")
+			cols := strings.Join(slices.Concat(replica.Keys, replica.Cols), ", ")
 
 			source := replica.Source
 			if source == "monitoring.measurements" { // only minute-slot power samples are captured

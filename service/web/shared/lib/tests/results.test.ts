@@ -59,14 +59,14 @@ function check(): { checked: number; problems: string[] } {
       for (const [k, v] of literals(own)) if (a.has(k) && !overlap(must(a.get(k)), v)) return false;
       return true;
     };
-    const compare = (source: ts.Type, target: ts.Type, path: string, depth: number, out: string[], top: boolean): void => {
+    const compare = (source: ts.Type, target: ts.Type, trail: string, depth: number, out: string[], top: boolean): void => {
       if (c.isTypeAssignableTo(source, target)) return;
-      const at = path || "(result)";
+      const at = trail || "(result)";
       if (depth > 6) { out.push(`${at}: contract ${singleText(source)}, web ${singleText(target)}`); return; }
       if (c.isTypeAssignableTo(c.getNullType(), source) && !c.isTypeAssignableTo(c.getNullType(), target)) out.push(`${at}: may be null in the contract`);
       const s = c.getNonNullableType(source), d = c.getNonNullableType(target);
       if (c.isTypeAssignableTo(s, d)) return;
-      if (c.isArrayType(s) && c.isArrayType(d)) { compare(must(typeArguments(c, s)[0]), must(typeArguments(c, d)[0]), `${path}[]`, depth + 1, out, top); return; }
+      if (c.isArrayType(s) && c.isArrayType(d)) { compare(must(typeArguments(c, s)[0]), must(typeArguments(c, d)[0]), `${trail}[]`, depth + 1, out, top); return; }
       if (s.isUnion() && !(s.flags & ts.TypeFlags.Boolean) && variants(s).some((item) => isObject(item))) {
         const sv = variants(s), dv = variants(d);
         const keys = sv.every((item) => isObject(item))
@@ -74,7 +74,7 @@ function check(): { checked: number; problems: string[] } {
           : [];
         if (top && keys.length === 0) { // the input picks the variant
           if (sv.some((m) => c.isTypeAssignableTo(m, d))) return;
-          const tries = sv.map((m) => { const o: string[] = []; compare(m, d, path, depth + 1, o, false); return o; });
+          const tries = sv.map((m) => { const o: string[] = []; compare(m, d, trail, depth + 1, o, false); return o; });
           out.push(...must(tries.toSorted((a, b) => a.length - b.length).at(0)));
           return;
         }
@@ -87,19 +87,19 @@ function check(): { checked: number; problems: string[] } {
         for (const m of candidates) {
           if (dv.some((x) => c.isTypeAssignableTo(m, x))) continue;
           const own = dv.find((x) => isObject(m) && isObject(x) && literals(m).size > 0 && literals(x).size > 0 && fits(m, x) && fits(x, m));
-          if (own || dv.length === 1) compare(m, own ?? d, path, depth + 1, out, false);
+          if (own || dv.length === 1) compare(m, own ?? d, trail, depth + 1, out, false);
           else out.push(`${at}: the web does not cover ${singleText(m)}`);
         }
         return;
       }
       if (d.isUnion() && isObject(s)) {
         const own = variants(d).find((x) => isObject(x) && fits(s, x));
-        if (own) { compare(s, own, path, depth + 1, out, false); return; }
+        if (own) { compare(s, own, trail, depth + 1, out, false); return; }
       }
       if (isObject(s) && isObject(d) && !c.isArrayType(d)) {
         const isPage = top && !!s.getProperty("nextCursor");
         for (const f of c.getPropertiesOfType(d)) {
-          const name = f.getName(), sf = s.getProperty(name), field = `${path}${path ? "." : ""}${name}`;
+          const name = f.getName(), sf = s.getProperty(name), field = `${trail}${trail ? "." : ""}${name}`;
           if (!sf) { out.push(`${field}: not in the contract`); continue; }
           compare(c.getTypeOfSymbol(sf), c.getTypeOfSymbol(f), field, depth + 1, out, isPage && name === "items");
         }
@@ -147,7 +147,7 @@ function check(): { checked: number; problems: string[] } {
 describe("the web's result types against the Core API contract (IR314)", () => {
   it("accept what the contract answers: every field, null and variant the screen reads", () => {
     const { checked, problems } = check();
-    expect(problems).toEqual([]);
+    expect(problems).toStrictEqual([]);
     expect(checked).toBeGreaterThan(350); // the scan sees the typed calls
   }, 120_000);
 });

@@ -24,7 +24,7 @@ function Page() {
   return (
     <>
       <p>Opened {n}</p>
-      <DataTable rows={units} rowKey={(u) => u.id} cols={[{ key: "a", label: "Actions", render: (u) => <button onClick={() => { setN(n + 1); }}>Edit {u.name}</button> }]} />
+      <DataTable rows={units} rowKey={(u) => u.id} cols={[{ key: "a", label: "Actions", render: (u) => <button type="button" onClick={() => { setN(n + 1); }}>Edit {u.name}</button> }]} />
     </>
   );
 }
@@ -33,13 +33,13 @@ describe("DataTable", () => {
   it("renders a header row and one row per record, keyed and in order", () => {
     render(<DataTable cols={cols} rows={units} rowKey={(u) => u.id} />);
     const [head, ...body] = screen.getAllByRole("row");
-    expect(within(must(head)).getAllByRole("columnheader").map((c) => c.textContent)).toEqual(["Unit", "Status"]);
-    expect(body.map((item) => cells(item))).toEqual([[BEDROOM_AC, "Online"], ["Office AC", "Offline"]]);
+    expect(within(must(head)).getAllByRole("columnheader").map((c) => c.textContent)).toStrictEqual(["Unit", "Status"]);
+    expect(body.map((item) => cells(item))).toStrictEqual([[BEDROOM_AC, "Online"], ["Office AC", "Offline"]]);
     // a column's classes reach its header and its cells; hideBelow hides it on a narrow screen
     const status = [within(must(head)).getAllByRole("columnheader")[1], within(must(body[0])).getAllByRole("cell")[1]];
-    expect(status.map((c) => [c?.classList.contains("max-sm:hidden"), c?.classList.contains("text-right")])).toEqual([[true, true], [true, true]]);
+    expect(status.map((c) => [c?.classList.contains("max-sm:hidden"), c?.classList.contains("text-right")])).toStrictEqual([[true, true], [true, true]]);
     // a table that opens nothing has no focusable rows
-    expect(body.map((r) => r.getAttribute("tabindex"))).toEqual([null, null]);
+    expect(body.map((r) => r.getAttribute("tabindex"))).toStrictEqual([null, null]);
   });
 
   it("shows one No data row across every column when there are no records", () => {
@@ -47,21 +47,21 @@ describe("DataTable", () => {
     const rows = screen.getAllByRole("row");
     expect(rows).toHaveLength(2);
     const cell = within(must(rows[1])).getByRole("cell");
-    expect([cell.textContent, cell.getAttribute("colspan")]).toEqual(["No data", "2"]);
+    expect([cell.textContent, cell.getAttribute("colspan")]).toStrictEqual(["No data", "2"]);
   });
 
   it("opens a record by a click, Enter or Space, and marks the open one", () => {
     const open = vi.fn<(unit: (typeof units)[number]) => void>();
     render(<DataTable cols={cols} rows={units} rowKey={(u) => u.id} onRowClick={open} selectedKey="u-2" />);
     const [, bedroom, office] = screen.getAllByRole("row");
-    expect([bedroom?.getAttribute("tabindex"), office?.getAttribute("tabindex")]).toEqual(["0", "0"]);
-    expect([bedroom?.getAttribute("aria-current"), office?.getAttribute("aria-current"), office?.dataset.state]).toEqual([null, "true", "selected"]);
+    expect([bedroom?.getAttribute("tabindex"), office?.getAttribute("tabindex")]).toStrictEqual(["0", "0"]);
+    expect([bedroom?.getAttribute("aria-current"), office?.getAttribute("aria-current"), office?.dataset.state]).toStrictEqual([null, "true", "selected"]);
     fireEvent.click(within(must(bedroom)).getByText(BEDROOM_AC));
     fireEvent.keyDown(must(office), { key: "Enter" });
     fireEvent.keyDown(must(bedroom), { key: " " });
     // a key pressed on a control inside the row belongs to that control
     fireEvent.keyDown(within(must(office)).getByText("Office AC"), { key: "Enter" });
-    expect(open.mock.calls.map(([u]) => u.id)).toEqual(["u-1", "u-2", "u-1"]);
+    expect(open.mock.calls.map(([u]) => u.id)).toStrictEqual(["u-1", "u-2", "u-1"]);
   });
 
   // IR620: pages write their columns inline, so every render brings new render functions; the cells keep their

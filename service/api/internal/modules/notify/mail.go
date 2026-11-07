@@ -36,7 +36,10 @@ type SMTP struct {
 }
 
 // Send implements Sender.
-func (s SMTP) Send(_ context.Context, recipient, subject, body string) (string, error) {
+func (s SMTP) Send(
+	_ context.Context,
+	recipient, subject, body string,
+) (string, error) { //nolint:unparam // Send implements Sender, whose caller reads the message ID
 	if strings.ContainsAny(recipient, "\r\n") ||
 		strings.ContainsAny(subject, "\r\n") { // no header injection
 		return "", errHeaderLineBreak

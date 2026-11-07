@@ -23,8 +23,8 @@ export function OverviewView({ live }: Readonly<{ live: OverviewLive }>) {
   // the values were read when the page rendered: two minutes later they read as stale until a refresh (DD-C01)
   const [staleFor, setStaleFor] = useState<string | null>(null);
   useEffect(() => {
-    const t = setTimeout(() => { setStaleFor(live.asOf); }, 120_000);
-    return () => { clearTimeout(t); };
+    const timer = setTimeout(() => { setStaleFor(live.asOf); }, 120_000);
+    return () => { clearTimeout(timer); };
   }, [live.asOf]);
   const isStale = staleFor === live.asOf;
   return (

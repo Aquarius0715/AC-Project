@@ -3,7 +3,7 @@
 import { expect } from "@playwright/test";
 import { z } from "zod";
 
-export const MAILPIT = "http://localhost:8025/api/v1";
+const MAILPIT = "http://localhost:8025/api/v1";
 
 /** Whether the inbox answers. */
 export const mailpitUp = async (): Promise<boolean> => answers(`${MAILPIT}/messages?limit=1`);

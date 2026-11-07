@@ -52,8 +52,8 @@ export function DeviceTab({ live }: Readonly<{ live: DevicesLive }>) {
   const calibrate = () => {
     setTried(true);
     const s = dv?.detail.sensors.find((x) => x.id === cal.sensorId);
-    if (!dv || !s || cal.reference.trim() === "" || cal.measured.trim() === "" || !Number.isFinite(+cal.reference) || !Number.isFinite(+cal.measured)) return;
-    run(() => calibrateSensor(dv.detail.id, dv.detail.version, s.id, s.metric, s.unit, +cal.reference, +cal.measured), t("Calibration recorded (demo)"), close);
+    if (!dv || !s || cal.reference.trim() === "" || cal.measured.trim() === "" || !Number.isFinite(Number(cal.reference)) || !Number.isFinite(Number(cal.measured))) return;
+    run(() => calibrateSensor(dv.detail.id, dv.detail.version, s.id, s.metric, s.unit, Number(cal.reference), Number(cal.measured)), t("Calibration recorded (demo)"), close);
   };
   const firmware = () => {
     setTried(true);
@@ -133,7 +133,7 @@ export function DeviceTab({ live }: Readonly<{ live: DevicesLive }>) {
                 <h3 className="text-[15px] font-bold">{t("Sensors ({n}) · from the unit’s capability", { n: dv.sensors.length })}</h3>
                 {dv.sensors.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("This device has no sensors.")}</p> : (
                   <ScrollX className="mt-2 rounded-xl border border-line"><table className="w-full min-w-[420px] text-[13px]">
-                    <thead className="bg-surface2 text-left text-[11px] uppercase text-muted-foreground"><tr><th className="px-3 py-2">{t("Metric")}</th><th>{t("Unit")}</th><th>{t("Stale after")}</th><th>{t("Last calibrated")}</th><th /></tr></thead>
+                    <thead className="bg-surface2 text-left text-[11px] uppercase text-muted-foreground"><tr><th className="px-3 py-2">{t("Metric")}</th><th>{t("Unit")}</th><th>{t("Stale after")}</th><th>{t("Last calibrated")}</th><td /></tr></thead>
                     <tbody>{dv.sensors.map((x) => (
                       <tr key={x.id} className="border-t border-line"><td className="px-3 py-2 font-semibold">{x.metric}</td><td>{x.unit}</td><td>{x.stale}</td><td className="text-xs">{x.calibrated}</td>
                         <td className="pr-3 text-right">{live.canWrite && <Btn size="sm" disabled={pending || isBusy} onClick={() => { calibrateOf(x.id); }}>{t("Calibrate…")}</Btn>}</td></tr>
@@ -188,7 +188,7 @@ export function DeviceTab({ live }: Readonly<{ live: DevicesLive }>) {
       </Modal>
       <Modal open={modal === "calibrate"} onClose={close} title={t("Calibrate sensor")} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={calibrate}>{t("Record")}</Btn></>}>
         <Field label={t("Sensor")}><Select value={cal.sensorId} onChange={(e) => { setCal({ ...cal, sensorId: e.target.value }); }}>{dv?.detail.sensors.map((s) => <option key={s.id} value={s.id}>{metricText(s.metric, t)} ({s.unit})</option>)}</Select></Field>
-        <div className="grid-fluid" style={{ ["--min" as string]: "140px" }}><Field label={t("Reference")} error={tried && (cal.reference.trim() === "" || !Number.isFinite(+cal.reference)) ? t("Enter a number") : undefined}><Input type="number" value={cal.reference} onChange={(e) => { setCal({ ...cal, reference: e.target.value }); }} /></Field><Field label={t("Measured")} error={tried && (cal.measured.trim() === "" || !Number.isFinite(+cal.measured)) ? t("Enter a number") : undefined}><Input type="number" value={cal.measured} onChange={(e) => { setCal({ ...cal, measured: e.target.value }); }} /></Field></div>
+        <div className="grid-fluid" style={{ ["--min" as string]: "140px" }}><Field label={t("Reference")} error={tried && (cal.reference.trim() === "" || !Number.isFinite(Number(cal.reference))) ? t("Enter a number") : undefined}><Input type="number" value={cal.reference} onChange={(e) => { setCal({ ...cal, reference: e.target.value }); }} /></Field><Field label={t("Measured")} error={tried && (cal.measured.trim() === "" || !Number.isFinite(Number(cal.measured))) ? t("Enter a number") : undefined}><Input type="number" value={cal.measured} onChange={(e) => { setCal({ ...cal, measured: e.target.value }); }} /></Field></div>
         <p className="text-[11px] text-muted-foreground">{t("Recorded at the current time as a demo calibration.")}</p>
       </Modal>
       <Modal open={modal === "firmware"} onClose={close} title={t("Update firmware")} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending || !fw} onClick={firmware}>{t("Queue update")}</Btn></>}>

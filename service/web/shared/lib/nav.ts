@@ -8,7 +8,7 @@ const TECHNICIAN_2 = "/technician";
 
 export type Role = "client" | "admin" | "contractor" | "technician";
 
-export interface NavItem { href: string; label: string; icon: IconName; badge?: string; match?: string[] }
+interface NavItem { href: string; label: string; icon: IconName; badge?: string; match?: string[] }
 /** The shell in API mode (lib/shell.ts, IR241): the signed-in user, the membership's organization, the sidebar badge
 counts by href and the user's display language and time zone (IR258, IR259). The demo keeps the fixed scope, chip
 and badges below. */

@@ -54,7 +54,7 @@ const signer = (id: string) => ({ id, displayName: "E2E Signer" });
 const u = (id: string, membershipId: string | null, from: string, to: string, type = ANNUAL_LEAVE, note: string | null = null): ApiUnavailability => ({ version: 1, id, membershipId, from, to, type, note });
 describe("partner team & capacity", () => {
   it("reads the URL's conditions with today in Kuala Lumpur", () => {
-    expect(teamQuery({}, "2026-09-14T17:00:00Z")).toEqual({ date: TEXT_2026_09_15, today: TEXT_2026_09_15, qualification: null, activeOnly: true }); // 01:00 on the 15th in KL
+    expect(teamQuery({}, "2026-09-14T17:00:00Z")).toStrictEqual({ date: TEXT_2026_09_15, today: TEXT_2026_09_15, qualification: null, activeOnly: true }); // 01:00 on the 15th in KL
     expect(teamQuery({ date: TEXT_2026_09_19, qualification: DEMO_INDOOR, activeOnly: "false" }, TEXT_2026_09_15T01_30_00Z)).toMatchObject({ date: TEXT_2026_09_19, qualification: DEMO_INDOOR, activeOnly: false });
     expect(teamQuery({ date: "19/09/2026", qualification: "gas_leak" }, TEXT_2026_09_15T01_30_00Z)).toMatchObject({ date: TEXT_2026_09_15, qualification: null });
     expect(weekday(TEXT_2026_09_15, "en")).toBe("Tue");
@@ -63,73 +63,73 @@ describe("partner team & capacity", () => {
 
   it("lists the technicians of the conditions and counts the hidden expired ones", () => {
     const q = { date: TEXT_2026_09_15, qualification: null, activeOnly: true };
-    expect(listed([a, a2, old], q, NOW)).toEqual({ rows: [a, a2], hidden: 1, expired: [] });
-    expect(listed([a, a2, old], { ...q, activeOnly: false }, NOW)).toEqual({ rows: [a, a2, old], hidden: 0, expired: ["tech-external-old"] });
-    expect(listed([a, a2, old], { ...q, qualification: DEMO_INDOOR }, NOW).rows).toEqual([a2]);
-    expect(listed([a, a2], { ...q, date: "2026-10-05", qualification: "demo_electrical" }, NOW).rows).toEqual([]); // the grant ends on 1 Oct
+    expect(listed([a, a2, old], q, NOW)).toStrictEqual({ rows: [a, a2], hidden: 1, expired: [] });
+    expect(listed([a, a2, old], { ...q, activeOnly: false }, NOW)).toStrictEqual({ rows: [a, a2, old], hidden: 0, expired: ["tech-external-old"] });
+    expect(listed([a, a2, old], { ...q, qualification: DEMO_INDOOR }, NOW).rows).toStrictEqual([a2]);
+    expect(listed([a, a2], { ...q, date: "2026-10-05", qualification: "demo_electrical" }, NOW).rows).toStrictEqual([]); // the grant ends on 1 Oct
   });
 
   it("shows each technician's week and the chosen day", () => {
     const rows = memberRows([a, a2, old], week, 1, [job], NOW);
-    expect(rows[0]).toEqual({
+    expect(rows[0]).toStrictEqual({
       id: "m-a", name: TECH_EXTERNAL_A, sub: "Outdoor unit work · Electrical work · active since Apr 2025", active: true,
       week: { text: "4 h / 40 h", pct: 10 }, day: { main: "09:00–13:00 assigned", sub: "13:00–17:00 free" }, util: "50%",
     });
-    expect(rows[1]?.day).toEqual({ main: "13:00–17:00 assigned (job-p12)", sub: "09:00–13:00 free" });
+    expect(rows[1]?.day).toStrictEqual({ main: "13:00–17:00 assigned (job-p12)", sub: "09:00–13:00 free" });
     expect(rows[2]).toMatchObject({ sub: "Outdoor unit work · expired 1 Aug 2026", active: false, day: { main: "Expired — cannot be assigned", tone: "crit" }, util: "—" });
     expect(memberRows([a], week, 5, [], NOW)[0]).toMatchObject({ day: { main: "No available hours set", sub: "—" }, util: "—" }); // Saturday
     expect(memberRows([a2], week, 3, [], NOW)[0]).toMatchObject({ day: { main: "Unavailable · annual leave", tone: "warn" }, util: "—" });
-    expect(memberRows([a], week, 0, [], NOW)[0]?.day).toEqual({ main: "No assignments", sub: "09:00–17:00 free" });
+    expect(memberRows([a], week, 0, [], NOW)[0]?.day).toStrictEqual({ main: "No assignments", sub: "09:00–17:00 free" });
   });
 
   it("builds the team's week and its totals", () => {
     const rows = weekRows([a, a2], week);
-    expect(rows[0]?.cells.map((c) => c.text)).toEqual(["0 / 8 h", "4 / 8 h", "0 / 8 h", "0 / 8 h", "0 / 8 h", "—", "—"]);
-    expect(rows[1]?.cells.slice(1, 4)).toEqual([{ text: "4 / 8 h", kind: "busy" }, { text: "0 / 8 h", kind: "free" }, { text: "annual leave", kind: "off" }]);
-    expect(teamStats([a, a2], week, 1)).toEqual({ assigned: "8 h", available: "80 h", utilization: "10%", free: "8 h" });
-    expect(teamStats([], week, 1)).toEqual({ assigned: "0 h", available: "0 h", utilization: "—", free: "0 h" });
+    expect(rows[0]?.cells.map((c) => c.text)).toStrictEqual(["0 / 8 h", "4 / 8 h", "0 / 8 h", "0 / 8 h", "0 / 8 h", "—", "—"]);
+    expect(rows[1]?.cells.slice(1, 4)).toStrictEqual([{ text: "4 / 8 h", kind: "busy" }, { text: "0 / 8 h", kind: "free" }, { text: "annual leave", kind: "off" }]);
+    expect(teamStats([a, a2], week, 1)).toStrictEqual({ assigned: "8 h", available: "80 h", utilization: "10%", free: "8 h" });
+    expect(teamStats([], week, 1)).toStrictEqual({ assigned: "0 h", available: "0 h", utilization: "—", free: "0 h" });
   });
 
   it("states the qualification grants and the register qualifications nobody holds", () => {
     const revoked = member("m-d", "tech-external-a3", [grant(DEMO_OUTDOOR, "2027-03-31T00:00:00Z", "2026-09-01T00:00:00Z")]);
-    expect(grantRows([a, a2, old, revoked], NOW).map((g) => [g.name, g.sub, g.badge.text])).toEqual([
+    expect(grantRows([a, a2, old, revoked], NOW).map((g) => [g.name, g.sub, g.badge.text])).toStrictEqual([
       ["Electrical work", "tech-external-a · expires 1 Oct 2026", "Expiring · 16 d"],
       ["Indoor unit work", "tech-external-a2 · valid to 31 Jan 2027", "Valid"],
       [OUTDOOR_UNIT_WORK, "tech-external-a · valid to 31 Mar 2027", "Valid"],
       [OUTDOOR_UNIT_WORK, "tech-external-a3 · revoked 1 Sept 2026", "Revoked"],
       [OUTDOOR_UNIT_WORK, "tech-external-old · expired 1 Aug 2026", "Expired"],
     ]);
-    expect(grantRows([a2], NOW).filter((g) => g.sub === "not held").map((g) => g.name)).toEqual(["Electrical work", OUTDOOR_UNIT_WORK]);
+    expect(grantRows([a2], NOW).filter((g) => g.sub === "not held").map((g) => g.name)).toStrictEqual(["Electrical work", OUTDOOR_UNIT_WORK]);
   });
 
   it("checks the unavailable days and finds the assignments they overlap", () => {
     const f: UnavailabilityForm = { membershipId: "m-b", from: TEXT_2026_09_15, to: TEXT_2026_09_15, type: ANNUAL_LEAVE, note: "" };
-    expect(unavailabilityErrors(f)).toEqual({});
-    expect(unavailabilityErrors({ ...f, from: "", to: TEXT_2026_09_14 })).toEqual({ from: "Choose the first day" });
-    expect(unavailabilityErrors({ ...f, to: TEXT_2026_09_14 })).toEqual({ to: "The last day must be on or after the first day" });
-    expect(unavailabilityErrors({ ...f, to: "2026-10-16", note: "x".repeat(501) })).toEqual({ to: "At most 31 days at a time", note: "At most 500 characters" });
-    expect(unavailabilityErrors({ ...f, to: "2026-10-15" })).toEqual({}); // 31 days
-    expect(unavailabilityConflicts([job], f)).toEqual([job]);
-    expect(unavailabilityConflicts([job], { ...f, membershipId: "m-a" })).toEqual([]);
-    expect(unavailabilityConflicts([job], { ...f, membershipId: "" })).toEqual([job]); // the whole team
-    expect(unavailabilityConflicts([job], { ...f, from: TEXT_2026_09_16, to: TEXT_2026_09_16 })).toEqual([]);
+    expect(unavailabilityErrors(f)).toStrictEqual({});
+    expect(unavailabilityErrors({ ...f, from: "", to: TEXT_2026_09_14 })).toStrictEqual({ from: "Choose the first day" });
+    expect(unavailabilityErrors({ ...f, to: TEXT_2026_09_14 })).toStrictEqual({ to: "The last day must be on or after the first day" });
+    expect(unavailabilityErrors({ ...f, to: "2026-10-16", note: "x".repeat(501) })).toStrictEqual({ to: "At most 31 days at a time", note: "At most 500 characters" });
+    expect(unavailabilityErrors({ ...f, to: "2026-10-15" })).toStrictEqual({}); // 31 days
+    expect(unavailabilityConflicts([job], f)).toStrictEqual([job]);
+    expect(unavailabilityConflicts([job], { ...f, membershipId: "m-a" })).toStrictEqual([]);
+    expect(unavailabilityConflicts([job], { ...f, membershipId: "" })).toStrictEqual([job]); // the whole team
+    expect(unavailabilityConflicts([job], { ...f, from: TEXT_2026_09_16, to: TEXT_2026_09_16 })).toStrictEqual([]);
     const late = { ...job, slot: slot("2026-09-15T15:30:00Z", "2026-09-15T16:30:00Z") }; // 23:30–00:30 in Kuala Lumpur
-    expect(unavailabilityConflicts([late], { ...f, from: TEXT_2026_09_16, to: TEXT_2026_09_16 })).toEqual([late]);
+    expect(unavailabilityConflicts([late], { ...f, from: TEXT_2026_09_16, to: TEXT_2026_09_16 })).toStrictEqual([late]);
   });
 
   it("reads the refusals of members.setUnavailability", () => {
-    expect(unavailabilityRefusal({ code: "VALIDATION", fieldErrors: { to: "error.range", type: "error.invalid" } })).toEqual({
+    expect(unavailabilityRefusal({ code: "VALIDATION", fieldErrors: { to: "error.range", type: "error.invalid" } })).toStrictEqual({
       fields: { to: "The last day must be on or after the first day, at most 31 days", type: "Choose a type" }, text: null,
     });
     expect(unavailabilityRefusal({ code: "NOT_FOUND", fieldErrors: {} }).text).toBe("That technician is no longer in your company — reload the page.");
-    expect(unavailabilityRefusal({ code: "UNAVAILABLE", fieldErrors: {} })).toEqual({ fields: {}, text: null });
+    expect(unavailabilityRefusal({ code: "UNAVAILABLE", fieldErrors: {} })).toStrictEqual({ fields: {}, text: null });
   });
 
   it("lists the upcoming unavailable days and says what a removal does (IR612)", () => {
     const names = technicianNames([a, signer("m-s1"), signer("m-s2"), signer("m-s3")], new Map([["m-s1", "s1@example.com"], ["m-s2", "s2@example.com"], ["m-a", "a@example.com"]]));
-    expect(names.values().toArray()).toEqual([TECH_EXTERNAL_A, "E2E Signer · s1@example.com", "E2E Signer · s2@example.com", "E2E Signer"]); // no e-mail known: the name only
+    expect(names.values().toArray()).toStrictEqual([TECH_EXTERNAL_A, "E2E Signer · s1@example.com", "E2E Signer · s2@example.com", "E2E Signer"]); // no e-mail known: the name only
     const rows = unavailabilityRows([u("u2", "m-s1", TEXT_2026_09_17, TEXT_2026_09_18, "training", "Refresher"), u("u1", "m-a", "2026-09-10", TEXT_2026_09_16), u("u3", null, TEXT_2026_09_21, TEXT_2026_09_21, "public_holiday"), u("u4", "m-gone", TEXT_2026_09_30, TEXT_2026_09_30)], names, TEXT_2026_09_15);
-    expect(rows.map((r) => [r.who, r.type, r.note, r.days, r.first, r.started])).toEqual([
+    expect(rows.map((r) => [r.who, r.type, r.note, r.days, r.first, r.started])).toStrictEqual([
       [TECH_EXTERNAL_A, "Annual leave", null, "Thu 10 – Wed 16 Sept", TEXT_2026_09_15, true],
       ["E2E Signer · s1@example.com", "Training", "Refresher", "Thu 17 – Fri 18 Sept", TEXT_2026_09_17, false],
       ["All technicians", "Public holiday", null, "Mon, 21 Sept", TEXT_2026_09_21, false],
@@ -149,16 +149,16 @@ describe("partner team & capacity", () => {
 
   it("words the team in Malay with Kuala Lumpur days (IR276)", () => {
     const rows = memberRows([a, a2, old], week, 1, [job], NOW, MS);
-    expect([rows[0]?.sub, rows[0]?.week.text]).toEqual(["Kerja unit luaran · Kerja elektrik · aktif sejak Apr 2025", "4 j / 40 j"]);
-    expect(rows[0]?.day).toEqual({ main: "09:00–13:00 ditugaskan", sub: "13:00–17:00 lapang" });
+    expect([rows[0]?.sub, rows[0]?.week.text]).toStrictEqual(["Kerja unit luaran · Kerja elektrik · aktif sejak Apr 2025", "4 j / 40 j"]);
+    expect(rows[0]?.day).toStrictEqual({ main: "09:00–13:00 ditugaskan", sub: "13:00–17:00 lapang" });
     expect(rows[2]?.day.main).toBe("Tamat tempoh — tidak boleh ditugaskan");
     expect(memberRows([a], week, 5, [], NOW, MS)[0]?.day.main).toBe("Tiada jam tersedia ditetapkan");
-    expect(weekRows([a2], week, ms)[0]?.cells[3]).toEqual({ text: "cuti tahunan", kind: "off" });
+    expect(weekRows([a2], week, ms)[0]?.cells[3]).toStrictEqual({ text: "cuti tahunan", kind: "off" });
     expect(teamStats([a, a2], week, 1, ms).assigned).toBe("8 j");
-    expect(grantRows([a], NOW, MS).map((g) => [g.name, g.sub, g.badge.text])).toEqual([
+    expect(grantRows([a], NOW, MS).map((g) => [g.name, g.sub, g.badge.text])).toStrictEqual([
       ["Kerja elektrik", "tech-external-a · akan tamat 1 Okt 2026", "Hampir tamat · 16 hari"], ["Kerja unit dalaman", "tidak dipegang", "—"],
       ["Kerja unit luaran", "tech-external-a · sah hingga 31 Mac 2027", "Sah"],
     ]);
-    expect(unavailabilityErrors({ membershipId: "", from: TEXT_2026_09_15, to: TEXT_2026_09_14, type: "other", note: "" }, ms)).toEqual({ to: "Hari terakhir mesti pada atau selepas hari pertama" });
+    expect(unavailabilityErrors({ membershipId: "", from: TEXT_2026_09_15, to: TEXT_2026_09_14, type: "other", note: "" }, ms)).toStrictEqual({ to: "Hari terakhir mesti pada atau selepas hari pertama" });
   });
 });

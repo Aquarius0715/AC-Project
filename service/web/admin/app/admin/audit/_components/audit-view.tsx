@@ -208,23 +208,23 @@ record's own screen, which checks its own permission; the command is read (comma
 const line = (r: RelatedRef) => <span><span className="font-mono text-xs">{r.id.slice(0, 8)}</span> · {r.note}</span>;
 function RelatedRecords({ related, demo }: Readonly<{ related: Related; demo: boolean }>) {
   const { t } = useI18n();
-  const row = (label: string, r: RelatedRef | null, none: string, link?: (r: RelatedRef) => ReactNode): [string, ReactNode] =>
-    [label, r ? <span key={label} className="flex flex-wrap items-center justify-between gap-2">{line(r)}{link?.(r)}</span> : <span key={label} className="text-muted-foreground">{none}</span>];
+  const row = (label: string, r: RelatedRef | null, none: string, to?: { href: (id: string) => string; text: string }): [string, ReactNode] =>
+    [label, r ? <span key={label} className="flex flex-wrap items-center justify-between gap-2">{line(r)}{to && <TextLink href={to.href(r.id)}>{to.text} <Icon name="arrowRight" /></TextLink>}</span> : <span key={label} className="text-muted-foreground">{none}</span>];
   return (
     <>
       <h3 className="mt-4 mb-2 text-[13px] font-bold">{t("Related records")}</h3>
       <SummaryList items={[
-        row(t("Restriction"), related.restriction, t("No related restriction"), (r) => <TextLink href={`/admin/restrictions?restrictionId=${r.id}`}>{t("Open restriction")} <Icon name="arrowRight" /></TextLink>),
+        row(t("Restriction"), related.restriction, t("No related restriction"), { href: (id) => `/admin/restrictions?restrictionId=${id}`, text: t("Open restriction") }),
         [t("Command"), related.command ? <CommandLine key="cmd" r={related.command} demo={demo} line={line(related.command)} /> : <span key="cmd" className="text-muted-foreground">{t("No related command")}</span>],
-        row(t("Job"), related.job, t("No related job"), (r) => <TextLink href={`/admin/jobs?jobId=${r.id}`}>{t("Open job")} <Icon name="arrowRight" /></TextLink>),
-        ...(related.unit ? [row(t("Unit"), related.unit, "", (r) => <TextLink href={`/admin/units?unitId=${r.id}`}>{t("Open unit")} <Icon name="arrowRight" /></TextLink>)] : []),
+        row(t("Job"), related.job, t("No related job"), { href: (id) => `/admin/jobs?jobId=${id}`, text: t("Open job") }),
+        ...(related.unit ? [row(t("Unit"), related.unit, "", { href: (id) => `/admin/units?unitId=${id}`, text: t("Open unit") })] : []),
       ]} />
       <p className="mt-2 rounded-lg bg-primary-soft/50 px-3 py-2 text-[11px] text-muted-foreground">{t("Links open the existing detail screens, and each checks your permission there. “Load command” reads the command only when you click it. Audit entries cannot be edited, deleted or exported.")}</p>
     </>
   );
 }
 
-function CommandLine({ r, demo, line }: Readonly<{ r: RelatedRef; demo: boolean; line: ReactNode }>) {
+function CommandLine({ r, demo, line: lineText }: Readonly<{ r: RelatedRef; demo: boolean; line: ReactNode }>) {
   type Loaded = { state: "idle" | "loading" } | { state: "done"; text: string; when: string; unitId: string | null } | { state: "error"; text: string };
   const { t, display } = useI18n();
   const [c, setC] = useState<Loaded>({ state: "idle" });
@@ -242,7 +242,7 @@ function CommandLine({ r, demo, line }: Readonly<{ r: RelatedRef; demo: boolean;
   };
   return (
     <span className="flex flex-col gap-1">
-      <span className="flex flex-wrap items-center justify-between gap-2">{line}{c.state !== "done" && <Btn size="sm" disabled={c.state === "loading"} onClick={() => { void load(); }}>{t("Load command")}</Btn>}</span>
+      <span className="flex flex-wrap items-center justify-between gap-2">{lineText}{c.state !== "done" && <Btn size="sm" disabled={c.state === "loading"} onClick={() => { void load(); }}>{t("Load command")}</Btn>}</span>
       {c.state === "done" && <span className="flex flex-wrap items-center justify-between gap-2 text-xs"><span>{c.text} · {c.when}</span>{c.unitId && <TextLink href={`/admin/units?unitId=${c.unitId}`}>{t("Open unit")} <Icon name="arrowRight" /></TextLink>}</span>}
       {c.state === "error" && <span className="text-xs text-crit">{c.text}</span>}
     </span>

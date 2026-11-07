@@ -1,6 +1,7 @@
 package integration_test
 
 import (
+	"bytes"
 	"net/http"
 	"strings"
 	"testing"
@@ -45,7 +46,7 @@ func TestReadModelsAcrossServices(t *testing.T) {
 		wantJSON := jsonBytes(t, want["data"])
 
 		gotJSON := jsonBytes(t, got["data"])
-		if code1 != 200 || code2 != 200 || string(wantJSON) != string(gotJSON) {
+		if code1 != 200 || code2 != 200 || !bytes.Equal(wantJSON, gotJSON) {
 			t.Fatalf(
 				"%s %s: single %d %s\nsplit %d %s",
 				testCase.op,

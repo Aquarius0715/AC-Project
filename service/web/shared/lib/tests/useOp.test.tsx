@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const UNITS_LIST = "units.list";
 
 const callOp = vi.fn();
-vi.mock("@ac/web/lib/ops", async (original) => ({ ...(await original<typeof import("@ac/web/lib/ops")>()), callRelay: (...a: unknown[]): unknown => callOp(...a) }));
+vi.mock("@ac/web/lib/ops", async (original) => ({ ...(await original<Record<string, unknown>>()), callRelay: (...a: unknown[]): unknown => callOp(...a) }));
 
 function session(dataSource: "mock" | "api") {
   vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(Response.json({ dataSource, signedIn: true, role: "client", membershipId: "m-1", clientRole: "owner", serverNow: "2026-09-20T01:00:00Z" }))));

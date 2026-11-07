@@ -47,40 +47,40 @@ const draft = (over: Partial<MRVDraft>): MRVDraft => {
 describe("HQ digital MRV (FR-A14, DD-A14)", () => {
   it("lists reports with their Kuala Lumpur period and result, or says the calculation is incomplete", () => {
     const rows = reportRows([report, { ...report, id: "r2", conditions: { ...report.conditions, organizationId: "org-x", unitIds: ["u1"] }, incomplete: true }], orgs);
-    expect(rows.map((r) => [r.org, r.units, r.period, r.result])).toEqual([
+    expect(rows.map((r) => [r.org, r.units, r.period, r.result])).toStrictEqual([
       [DEMO_CUSTOMER_A, "2 units", "2026-09-01 00:00 → 2026-09-08 00:00", "71.0 kgCO₂e"], ["customer", "1 unit", "2026-09-01 00:00 → 2026-09-08 00:00", "Calculation incomplete"],
     ]);
   });
 
   it("keeps energy and emissions vs the baseline apart with the IR68 wording, and shows the stored conditions", () => {
     const v = mrvView(report, orgs, units);
-    expect([v.incomplete, v.electricity, v.emissions, v.energyVsBaseline, v.energyPercent, v.emissionsVsBaseline]).toEqual([false, "120.3 kWh", "71.0 kgCO₂e", "Increase 14.8 kWh", "Increase 10.9%", "Increase 8.7 kgCO₂e"]);
-    expect(v.conditions).toEqual([
+    expect([v.incomplete, v.electricity, v.emissions, v.energyVsBaseline, v.energyPercent, v.emissionsVsBaseline]).toStrictEqual([false, "120.3 kWh", "71.0 kgCO₂e", "Increase 14.8 kWh", "Increase 10.9%", "Increase 8.7 kgCO₂e"]);
+    expect(v.conditions).toStrictEqual([
       ["Organization", DEMO_CUSTOMER_A], ["Units", "Lobby AC, Bedroom AC"], ["Period", "2026-09-01 00:00 → 2026-09-08 00:00 (Asia/Kuala_Lumpur)"], ["Boundary", "ac_input_electricity — AC input"],
       ["Baseline", "v2 · demo_fixed · 105.5 kWh"], ["Emission factor", "v1 · Demo region · 2026 · 0.59 kgCO₂e/kWh"], ["Factor source", DEMO_FICTIONAL], ["Coverage", "100.0%"],
     ]);
     const missing = mrvView({ ...report, summary: { ...summary, factorSnapshot: null, totals: { ...summary.totals, emissionsKg: null } } }, orgs, units);
-    expect([missing.incomplete, missing.emissions, missing.conditions[5]]).toEqual([true, "Calculation incomplete", ["Emission factor", "Calculation incomplete — factor missing"]]);
-    expect(reviewItems(report)).toEqual([{ time: "14 Sept 2026, 9:30 am MYT", title: "“Looks consistent”", detail: "version 1 · user-hq-" }]);
+    expect([missing.incomplete, missing.emissions, missing.conditions[5]]).toStrictEqual([true, "Calculation incomplete", ["Emission factor", "Calculation incomplete — factor missing"]]);
+    expect(reviewItems(report)).toStrictEqual([{ time: "14 Sept 2026, 9:30 am MYT", title: "“Looks consistent”", detail: "version 1 · user-hq-" }]);
   });
 
   it("checks a new report and turns its Kuala Lumpur period into instants", () => {
-    expect(mrvDraftErrors(draft({}))).toEqual({});
-    expect(mrvDraftErrors(draft({ organizationId: "", unitIds: [], to: "2026-09-01T00:00", baseline: "", factor: "", boundary: " " }))).toEqual({
+    expect(mrvDraftErrors(draft({}))).toStrictEqual({});
+    expect(mrvDraftErrors(draft({ organizationId: "", unitIds: [], to: "2026-09-01T00:00", baseline: "", factor: "", boundary: " " }))).toStrictEqual({
       organizationId: "Choose a customer organization", unitIds: "Choose 1–100 units", period: "The end must be after the start",
       baseline: "Choose a baseline version", factor: "Choose an emission factor version", boundary: "1–500 characters",
     });
     const c = mrvConditions(draft({}));
-    expect([c.from, c.to, c.baselineId, c.baselineVersion, c.factorId, c.factorVersion, c.boundary]).toEqual(["2026-08-31T16:00:00.000Z", "2026-09-07T16:00:00.000Z", "b1", 2, "f1", 1, "AC input"]);
-    expect(mrvDraftOf(report.conditions)).toEqual(draft({ boundary: "AC input", unitIds: ["u1", "u2"] }));
+    expect([c.from, c.to, c.baselineId, c.baselineVersion, c.factorId, c.factorVersion, c.boundary]).toStrictEqual(["2026-08-31T16:00:00.000Z", "2026-09-07T16:00:00.000Z", "b1", 2, "f1", 1, "AC input"]);
+    expect(mrvDraftOf(report.conditions)).toStrictEqual(draft({ boundary: "AC input", unitIds: ["u1", "u2"] }));
     expect(mrvDraftOf().organizationId).toBe("");
   });
 
   it("checks a demo emission factor (IR102: the unit is fixed)", () => {
     const f: FactorDraft = { region: " Demo region ", year: "2026", kgCO2ePerKWh: "0.59", source: " Demo (fictional) " };
-    expect(factorErrors(f)).toEqual({});
-    expect(factorInput(f, "f1")).toEqual({ id: "f1", region: "Demo region", year: 2026, kgCO2ePerKWh: 0.59, source: DEMO_FICTIONAL, isDemo: true });
-    expect(factorErrors({ region: "", year: "1999", kgCO2ePerKWh: "0", source: "" })).toEqual({
+    expect(factorErrors(f)).toStrictEqual({});
+    expect(factorInput(f, "f1")).toStrictEqual({ id: "f1", region: "Demo region", year: 2026, kgCO2ePerKWh: 0.59, source: DEMO_FICTIONAL, isDemo: true });
+    expect(factorErrors({ region: "", year: "1999", kgCO2ePerKWh: "0", source: "" })).toStrictEqual({
       region: "1–120 characters", year: "A year 2000–2100", kgCO2ePerKWh: "Above 0 and at most 10 kgCO₂e/kWh", source: "1–500 characters, stating the demo source",
     });
   });
@@ -89,23 +89,23 @@ describe("HQ digital MRV (FR-A14, DD-A14)", () => {
 describe("HQ digital MRV in Malay with the display time zone (IR297)", () => {
   it("words the rows, figures, conditions, statuses and checks; review times are in the display zone", () => {
     const t = translator("ms");
-    expect(reportRows([{ ...report, incomplete: true }], [], t).map((r) => [r.org, r.units, r.result])).toEqual([["pelanggan", "2 unit", "Pengiraan tidak lengkap"]]);
+    expect(reportRows([{ ...report, incomplete: true }], [], t).map((r) => [r.org, r.units, r.result])).toStrictEqual([["pelanggan", "2 unit", "Pengiraan tidak lengkap"]]);
     const v = mrvView(report, orgs, units, MS);
-    expect([v.energyVsBaseline, v.emissionsVsBaseline, v.conditions.map(([k]) => k)]).toEqual([
+    expect([v.energyVsBaseline, v.emissionsVsBaseline, v.conditions.map(([k]) => k)]).toStrictEqual([
       "Peningkatan 14.8 kWh", "Peningkatan 8.7 kgCO₂e", ["Organisasi", "Unit", "Tempoh", "Sempadan", "Garis dasar", "Faktor pelepasan", "Sumber faktor", "Liputan"],
     ]);
     expect(v.conditions[2]?.[1]).toBe("2026-09-01 00:00 → 2026-09-08 00:00 (Asia/Kuala_Lumpur)"); // the period stays Kuala Lumpur time, named so
-    expect([statusWord("draft", t), statusWord("demo_reviewed", t), statusWord("other", t)]).toEqual(["draf", "disemak (demo)", "other"]);
-    expect(reviewItems(report, MS)).toEqual([{ time: "14 Sep 2026, 10:30 PG GMT+9", title: "“Looks consistent”", detail: "versi 1 · user-hq-" }]);
-    expect(mrvDraftErrors(draft({ factor: "" }), t)).toEqual({ factor: "Pilih versi faktor pelepasan" });
-    expect(factorErrors({ region: "x", year: "2026", kgCO2ePerKWh: "11", source: "demo" }, t)).toEqual({ kgCO2ePerKWh: "Melebihi 0 dan paling banyak 10 kgCO₂e/kWh" });
+    expect([statusWord("draft", t), statusWord("demo_reviewed", t), statusWord("other", t)]).toStrictEqual(["draf", "disemak (demo)", "other"]);
+    expect(reviewItems(report, MS)).toStrictEqual([{ time: "14 Sep 2026, 10:30 PG GMT+9", title: "“Looks consistent”", detail: "versi 1 · user-hq-" }]);
+    expect(mrvDraftErrors(draft({ factor: "" }), t)).toStrictEqual({ factor: "Pilih versi faktor pelepasan" });
+    expect(factorErrors({ region: "x", year: "2026", kgCO2ePerKWh: "11", source: "demo" }, t)).toStrictEqual({ kgCO2ePerKWh: "Melebihi 0 dan paling banyak 10 kgCO₂e/kWh" });
   });
 });
 
 describe("MRV evidence candidates (DD-A14 item 6, IR349)", () => {
   it("names each attachment with its unit and upload time in the display zone", () => {
     const a = { id: "att-1", jobId: "j1", reportId: "r1", name: "meter.png", mime: "image/png", size: 10, status: "ready", createdAt: "2026-09-13T02:30:00Z", unitId: "u1", acceptedAt: "2026-09-13T04:00:00Z" };
-    expect(evidenceRows([a, { ...a, id: "att-2", unitId: "u9" }], [{ id: "u1", label: "Bedroom AC" }])).toEqual([
+    expect(evidenceRows([a, { ...a, id: "att-2", unitId: "u9" }], [{ id: "u1", label: "Bedroom AC" }])).toStrictEqual([
       { id: "att-1", name: "meter.png", sub: "Bedroom AC · uploaded 13 Sept 2026, 10:30 am MYT" }, { id: "att-2", name: "meter.png", sub: "u9 · uploaded 13 Sept 2026, 10:30 am MYT" },
     ]);
     expect(evidenceRows([a], [], i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" }))[0]?.sub).toBe("u1 · dimuat naik 13 Sep 2026, 11:30 PG GMT+9");

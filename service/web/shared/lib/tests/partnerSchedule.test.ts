@@ -66,15 +66,15 @@ const rows = [
 const asg = (s: { startAt: string; endAt: string }, ack = "pending", why: string | null = null) => ({ technicianMembershipId: "m-a", scheduledStart: s.startAt, scheduledEnd: s.endAt, status: "active", acknowledgement: ack, cantMakeReason: why });
 describe("partner schedule", () => {
   it("lists the jobs with their state and delegation window", () => {
-    expect(rows.map((r) => [r.title, r.line, r.tone ?? ""])).toEqual([
+    expect(rows.map((r) => [r.title, r.line, r.tone ?? ""])).toStrictEqual([
       ["Lobby AC", "Accepted · awaiting assignment", ""],
       ["Lobby AC", "Assigned · tech-external-a · can’t make it", "warn"],
       ["Lobby AC", "Work window ended · reassignment required", "crit"],
       ["Lobby AC", "On hold by HQ", "warn"],
       ["2 Demo Avenue", "Accepted · delegation starts 22 Sept 2026, 8:00 am MYT", "muted"],
     ]);
-    expect([rows[0]?.windowText, rows[0]?.left, rows[0]?.leftTone, rows[0]?.elapsedPct, rows[0]?.ended]).toEqual(["20 Sept, 9:30 am – 22 Sept, 9:30 am MYT", "1 d left", "primary", 50, false]);
-    expect([rows[3]?.left, rows[3]?.leftTone, rows[3]?.ended]).toEqual(["Ended", "crit", true]);
+    expect([rows[0]?.windowText, rows[0]?.left, rows[0]?.leftTone, rows[0]?.elapsedPct, rows[0]?.ended]).toStrictEqual(["20 Sept, 9:30 am – 22 Sept, 9:30 am MYT", "1 d left", "primary", 50, false]);
+    expect([rows[3]?.left, rows[3]?.leftTone, rows[3]?.ended]).toStrictEqual(["Ended", "crit", true]);
     expect(scheduleRow({ projection: "history", jobId: "h", type: "reactive", status: "completed", completedAt: null, asOf: "2026-09-20T16:00:00Z", ownDecisionEvents: [] }, NOW, units, names)).toBeNull();
     expect(sortOf("dueAt")).toBe("dueAt");
     expect(sortOf("nope")).toBe("status");
@@ -82,16 +82,16 @@ describe("partner schedule", () => {
 
   it("decides what the form of a job allows", () => {
     const a = formMode(detail({}), "job-1 · Lobby AC", NOW, names);
-    expect(a.kind === "assign" && [a.title, a.slot, a.endEditable, a.reasonRequired, a.button]).toEqual(["Assign — job-1 · Lobby AC", visit, false, false, "Confirm assignment"]);
+    expect(a.kind === "assign" && [a.title, a.slot, a.endEditable, a.reasonRequired, a.button]).toStrictEqual(["Assign — job-1 · Lobby AC", visit, false, false, "Confirm assignment"]);
     const r = formMode(detail({ status: "assigned", scheduledSlot: visit, assignment: asg(visit, "cant_make", "sick") }), "job-1", NOW, names);
-    expect(r.kind === "reassign" && [r.currentTech, r.banner?.text.startsWith("tech-external-a can’t make this time: “sick”")]).toEqual([TECH_EXTERNAL_A, true]);
+    expect(r.kind === "reassign" && [r.currentTech, r.banner?.text.startsWith("tech-external-a can’t make this time: “sick”")]).toStrictEqual([TECH_EXTERNAL_A, true]);
     const past = slot("2026-09-20T02:00:00Z", "2026-09-20T04:00:00Z");
     const gone = formMode(detail({ status: "assigned", scheduledSlot: past, assignment: asg(past) }), "job-1", NOW, names);
-    expect([gone.kind, gone.banner?.tone]).toEqual(["blocked", "crit"]);
+    expect([gone.kind, gone.banner?.tone]).toStrictEqual(["blocked", "crit"]);
     const extension = formMode(detail({ status: IN_PROGRESS, scheduledSlot: past, assignment: asg(past) }), "job-1", NOW, names);
-    expect(extension.kind === "extend" && [extension.title, extension.endEditable, extension.reasonRequired, extension.banner?.tone]).toEqual(["Reschedule — job-1", true, true, "crit"]);
+    expect(extension.kind === "extend" && [extension.title, extension.endEditable, extension.reasonRequired, extension.banner?.tone]).toStrictEqual(["Reschedule — job-1", true, true, "crit"]);
     const running = formMode(detail({ status: IN_PROGRESS, scheduledSlot: visit, assignment: asg(visit, "accepted") }), "job-1", NOW, names);
-    expect(running.kind === "extend" && [running.title, running.banner]).toEqual(["Reassign — job-1 (in progress)", undefined]);
+    expect(running.kind === "extend" && [running.title, running.banner]).toStrictEqual(["Reassign — job-1 (in progress)", undefined]);
     const offer = acceptedOffer();
     expect(formMode(offer, "job-2", NOW, names)).toMatchObject({ kind: "blocked", banner: { text: "Accepted — the delegation period starts 22 Sept 2026, 8:00 am MYT; the technician can be assigned from then, for exactly 22 Sept, 10:00 am – 12:00 pm MYT." } });
     expect(formMode(detail({ status: "completed" }), "job-1", NOW, names).kind).toBe("blocked");
@@ -106,11 +106,11 @@ describe("partner schedule", () => {
     expect(freeText(day[0])).toBe("free 09:00–13:00, 15:00–17:00");
     expect(freeText(day[2])).toBe("no hours");
     expect(freeText(cap("m-a", "d", [workday(TEXT_2026_09_22)], [workday(TEXT_2026_09_22)], 480))).toBe("fully booked");
-    const rows = candidates(members, new Set(["m-a"]), [DEMO_INDOOR, DEMO_ELECTRICAL], visit, day, null);
-    expect(rows.map((c) => [c.name, c.badge.text, c.eligible])).toEqual([
+    const candidateRows = candidates(members, new Set(["m-a"]), [DEMO_INDOOR, DEMO_ELECTRICAL], visit, day, null);
+    expect(candidateRows.map((c) => [c.name, c.badge.text, c.eligible])).toStrictEqual([
       [TECH_EXTERNAL_A, "Qualified", true], ["tech-external-a2", "Missing: Electrical work", false], ["tech-external-a3", "Unavailable (annual leave)", false],
     ]);
-    expect(rows[0]?.sub).toBe("Indoor unit work · Outdoor unit work · Electrical work · free 09:00–13:00, 15:00–17:00");
+    expect(candidateRows[0]?.sub).toBe("Indoor unit work · Outdoor unit work · Electrical work · free 09:00–13:00, 15:00–17:00");
     const busy = candidates(members, new Set(), [DEMO_INDOOR], visit, [cap("m-a", TEXT_2026_09_22, [workday(TEXT_2026_09_22)], [["2026-09-22T01:00:00Z", "2026-09-22T09:00:00Z"]], 480)], null);
     expect(busy[0]?.badge.text).toBe("Busy at this time");
     expect(candidates(members, new Set(["m-a"]), [DEMO_INDOOR], visit, [], "m-a")[0]?.badge.text).toBe("Current");
@@ -124,12 +124,12 @@ describe("partner schedule", () => {
       [cap("m-a", must(dates[2]), [], [], 0), cap("m-b", must(dates[2]), [workday(must(dates[2]))], [], 480)],
     ];
     const jobsOf = new Map([["m-a", [{ short: "job-9", slot: slot("2026-09-21T02:00:00Z", "2026-09-21T04:00:00Z") }]]]);
-    const rows = weekGrid(dates, members.slice(0, 2), week, jobsOf, { technicianId: "m-a", slot: visit, short: "job-1" });
-    expect(rows[0]?.cells).toEqual([{ kind: "booked", text: "10:00–12:00", sub: "job-9" }, { kind: "proposal", text: "10:00–12:00", sub: "job-1" }, { kind: "none", text: "no hours" }]);
-    expect(rows[1]?.cells).toEqual([{ kind: "free", text: "free" }, { kind: "leave", text: "Leave", sub: "annual leave" }, { kind: "free", text: "free" }]);
+    const gridRows = weekGrid(dates, members.slice(0, 2), week, jobsOf, { technicianId: "m-a", slot: visit, short: "job-1" });
+    expect(gridRows[0]?.cells).toStrictEqual([{ kind: "booked", text: "10:00–12:00", sub: "job-9" }, { kind: "proposal", text: "10:00–12:00", sub: "job-1" }, { kind: "none", text: "no hours" }]);
+    expect(gridRows[1]?.cells).toStrictEqual([{ kind: "free", text: "free" }, { kind: "leave", text: "Leave", sub: "annual leave" }, { kind: "free", text: "free" }]);
     const training = weekGrid(dates.slice(0, 1), members.slice(1, 2), [[cap("m-b", must(dates[0]), [], [], 0, "training")]], new Map(), null);
-    expect(training[0]?.cells).toEqual([{ kind: "leave", text: "Unavailable", sub: "training" }]);
-    expect([rows[0]?.sub, rows[1]?.sub]).toEqual(["Indoor, Outdoor, Electrical · 16 h avail.", "Indoor · 16 h avail."]);
+    expect(training[0]?.cells).toStrictEqual([{ kind: "leave", text: "Unavailable", sub: "training" }]);
+    expect([gridRows[0]?.sub, gridRows[1]?.sub]).toStrictEqual(["Indoor, Outdoor, Electrical · 16 h avail.", "Indoor · 16 h avail."]);
   });
 
   it("states the refusals of the assignment", () => {
@@ -146,21 +146,21 @@ describe("partner schedule", () => {
 
   it("words the schedule in Malay with the job's times in the display time zone (IR275)", () => {
     const row = scheduleRowOf(summary({ status: "assigned", scheduledSlot: visit, technicianMembershipId: "m-a", assignmentAcknowledgement: null }), NOW, units, names, MS_TOKYO);
-    expect([row.line, row.windowText, row.left]).toEqual(["Ditugaskan · tech-external-a · menunggu penerimaan", "20 Sep, 10:30 PG – 22 Sep, 10:30 PG GMT+9", "1 hari lagi"]);
+    expect([row.line, row.windowText, row.left]).toStrictEqual(["Ditugaskan · tech-external-a · menunggu penerimaan", "20 Sep, 10:30 PG – 22 Sep, 10:30 PG GMT+9", "1 hari lagi"]);
     const offer = acceptedOffer();
     expect(formMode(offer, "job-2", NOW, names, MS_TOKYO)).toMatchObject({ title: "Tugaskan — job-2", banner: { text: "Diterima — tempoh delegasi bermula 22 Sep 2026, 9:00 PG GMT+9; juruteknik boleh ditugaskan mulai ketika itu, tepat untuk 22 Sep, 11:00 PG – 1:00 PTG GMT+9." } });
     const held = formMode(detail({ status: "on_hold", scheduledSlot: visit, offer: null }), "job-1", NOW, names, MS_TOKYO);
-    expect(held.kind === "extend" && [held.title, held.button]).toEqual(["Tugaskan semula — job-1 (ditangguhkan)", "Sahkan penugasan semula"]);
+    expect(held.kind === "extend" && [held.title, held.button]).toStrictEqual(["Tugaskan semula — job-1 (ditangguhkan)", "Sahkan penugasan semula"]);
     expect(formMode(detail({ status: "submitted", scheduledSlot: visit, offer: null }), "job-1", NOW, names, MS_TOKYO).banner?.text).toBe("Kerja ini dihantar — tiada apa-apa untuk dijadualkan.");
     const day = [cap("m-a", TEXT_2026_09_22, [workday(TEXT_2026_09_22)], [], 480), cap("m-c", TEXT_2026_09_22, [], [], 0, "sick")];
-    expect(candidates(members, new Set(["m-a"]), [DEMO_INDOOR, DEMO_ELECTRICAL], visit, day, null, ms).map((c) => [c.sub, c.badge.text])).toEqual([
+    expect(candidates(members, new Set(["m-a"]), [DEMO_INDOOR, DEMO_ELECTRICAL], visit, day, null, ms).map((c) => [c.sub, c.badge.text])).toStrictEqual([
       ["Kerja unit dalaman · Kerja unit luaran · Kerja elektrik · lapang 09:00–17:00", "Layak"],
       ["Kerja unit dalaman · tiada jam", "Tiada: Kerja elektrik"],
       ["Kerja unit dalaman · Kerja unit luaran · Kerja elektrik · tiada jam", "Tidak tersedia (cuti sakit)"],
     ]);
     const week = weekGrid([TEXT_2026_09_22], members.slice(0, 1), [[cap("m-a", TEXT_2026_09_22, [], [], 0, "sick")]], new Map(), null, ms);
     expect(week[0]?.sub).toBe("Dalaman, Luaran, Elektrik · 0 j tersedia");
-    expect(week[0]?.cells).toEqual([{ kind: "leave", text: "Cuti", sub: "cuti sakit" }]);
+    expect(week[0]?.cells).toStrictEqual([{ kind: "leave", text: "Cuti", sub: "cuti sakit" }]);
     expect(assignRefusal({ code: VALIDATION_2, messageKey: ERROR_VALIDATION, fieldErrors: { reason: "error.required" } }, TECH_EXTERNAL_A, ms)).toBe("Sebab: diperlukan (1–1000 aksara)");
     expect(assignRefusal({ code: "CONFLICT", messageKey: "errors.assignment_overlap", fieldErrors: {} }, TECH_EXTERNAL_A, ms)).toBe("Bertindih dengan jadual yang disahkan untuk tech-external-a — pilih juruteknik lain.");
   });
@@ -173,7 +173,7 @@ describe("the schedule's team", () => {
     const ended: ApiMember = { id: "m-e", userId: "u-e", displayName: "former", role: TECHNICIAN, validUntil: "2026-09-20T00:00:00Z", qualifications: [] };
     const revoked: ApiMember = { id: "m-r", userId: "u-r", displayName: "revoked", role: TECHNICIAN, revokedAt: "2026-09-19T00:00:00Z", qualifications: [] };
     const all = [...members, ended, revoked];
-    expect(scheduleTeam(all, NOW, null).map((m) => m.id)).toEqual(["m-a", "m-b", "m-c"]);
-    expect(scheduleTeam(all, NOW, "m-e").map((m) => m.id)).toEqual(["m-a", "m-b", "m-c", "m-e"]);
+    expect(scheduleTeam(all, NOW, null).map((m) => m.id)).toStrictEqual(["m-a", "m-b", "m-c"]);
+    expect(scheduleTeam(all, NOW, "m-e").map((m) => m.id)).toStrictEqual(["m-a", "m-b", "m-c", "m-e"]);
   });
 });

@@ -4,7 +4,7 @@ const signOut = "flex w-full items-center gap-2.5 rounded-control px-3 py-2 text
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
-import { isRole, roleConfig, ROLE_KEY, Role, roleFromPath, type ShellLive, SHARED_PAGES, documentTitle, pageLabel } from "@ac/web/lib/nav";
+import { isRole, roleConfig, ROLE_KEY, type Role, roleFromPath, type ShellLive, SHARED_PAGES, documentTitle, pageLabel } from "@ac/web/lib/nav";
 import { Badge, Banner, Btn, Modal, SummaryList, ToastProvider, cx } from "./ui";
 import { Icon, type IconName } from "./Icon";
 import { useJobStore } from "@ac/web/lib/jobs";
