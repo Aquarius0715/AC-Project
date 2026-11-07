@@ -46,8 +46,13 @@ export async function capabilityHistory(capabilityId: string) {
   }, false);
 }
 
-export async function registerDevice(serial: string, sensorTypes: Metric[], unitId: string) {
-  return run(async () => { const d = await coreOp<{ id: string }>("devices.register", { serial, sensorTypes, unitId }, { write: true }); return d.id; });
+export async function registerDevice(serial: string, sensorTypes: Metric[], unitId: string, mqttNode: string | null) {
+  return run(async () => { const d = await coreOp<{ id: string }>("devices.register", { serial, sensorTypes, unitId, ...(mqttNode && { mqttNode }) }, { write: true }); return d.id; });
+}
+
+/** devices.setMqttNode: the node ID the device's ESP32 sends (null clears it); the IoT bridge reads it within 30 seconds (IR635). */
+export async function setMqttNode(deviceId: string, version: number, mqttNode: string | null) {
+  return run(async () => { await coreOp("devices.setMqttNode", { deviceId, mqttNode }, { write: true, expectedVersion: version }); return null; });
 }
 
 export async function bindDevice(deviceId: string, version: number, unitId: string, reason: string) {

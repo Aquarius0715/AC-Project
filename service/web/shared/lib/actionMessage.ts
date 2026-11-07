@@ -15,6 +15,7 @@ const fieldText: Record<string, string> = {
   "error.past": "{field} must not be in the past",
   "error.future": "{field} must not be in the future",
   "error.duplicate": "{field} is already used",
+  "error.mqttNodeFormat": "The MQTT node ID needs 1–64 letters, digits, hyphens or underscores",
   "error.count": "{field} has the wrong number of entries",
   "error.invalidFile": "{field} is not an accepted file — check its type and size", // the bytes, the type or the size (IR308)
   // the person does not get this notice on that channel, e.g. WhatsApp without a phone number on the account (IR578)
@@ -28,6 +29,8 @@ const fieldText: Record<string, string> = {
 };
 // the refusals of the user management and assignment (IR416, IR417, IR420, IR421, IR433) say what to do
 const keyText: Record<string, string> = {
+  // a node ID belongs to one device (IR635)
+  "error.duplicateMqttNode": "Another device already has this MQTT node ID",
   "errors.own_account": "You can’t change or remove your own account",
   "errors.last_owner": "The last active owner can’t be demoted, disabled or removed",
   "errors.last_contractor": "Your company keeps one active contractor — this one can’t be disabled or removed",

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   campaignErrors, campaignFacts, campaignRows, campaignStart, capabilityChanges, capabilityDraft, capabilityErrors, capabilityInput, deviceRows, firmwareProblem, modelRows, parseWaves,
-  resultReason, shortChecksum, waveStates,
+  mqttNodeValue, resultReason, shortChecksum, waveStates,
   type ApiCampaign, type ApiCapability, type ApiDevice, type CampaignDraft,
 } from "@ac/web/lib/devices";
 import { i18nOf } from "@ac/web/lib/i18n";
@@ -90,5 +90,17 @@ describe("the model editor's changes and firmware candidates (Figma Admin 106:3,
       .toStrictEqual(["Enter a version", "v1 is already a candidate", "Firmware versions are at most 32 characters", null]);
     expect(capabilityInput({ ...capabilityDraft(cap), firmware: ["v1", " v2", "v1"] }).firmwareCandidates).toStrictEqual(["v1", "v2"]);
     expect(capabilityDraft(cap).firmware).toStrictEqual(["v1", "v2"]);
+  });
+});
+
+const value = (raw: string) => mqttNodeValue(raw);
+
+describe("a device's MQTT node ID (IR635)", () => {
+  it("is the trimmed text as the firmware sends it; empty clears it; anything else is refused", () => {
+    expect(["node_1", "  Node-2 ", "A", "n".repeat(64)].map((raw) => value(raw))).toStrictEqual(["node_1", "Node-2", "A", "n".repeat(64)]);
+    expect(["", " ".repeat(3)].map((raw) => value(raw))).toStrictEqual([null, null]);
+    const refused = ["node 1", "node/1", "ノード", "n".repeat(65), "a+b", "node_1\n2"].map((raw) => value(raw));
+    expect(refused.filter((node) => node !== undefined)).toStrictEqual([]);
+    expect(refused).toHaveLength(6);
   });
 });

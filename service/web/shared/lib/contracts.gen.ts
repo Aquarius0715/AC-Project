@@ -114,7 +114,7 @@ export type RestrictionDetail = Restriction;
 export type RestrictionReleaseView = Pick<Restriction,'id'|'version'|'createdAt'|'updatedAt'|'unitIds'|'rulesVersion'|'policy'|'state'|'perUnit'|'recoveryCases'|'noticeAt'|'executeAfter'> & {projection:'release';releaseIntent:Pick<ReleaseIntent,'source'|'at'>|null};
 export type RestrictionRead = RestrictionDetail|RestrictionReleaseView;
 export type Inquiry = Entity & {customerId:ID;invoiceId:ID|null;restrictionId:ID|null;subjectType:'payment'|'restriction';message:string;state:'received'|'answered';reply:string|null};
-export type Device = Entity & {bindingId:ID|null;unitId:ID|null;targetUnitId:ID;createdByMembershipId:ID;serial:string;connection:Connection;lastSeenAt:Instant|null;firmwareVersion:string;powerSignal:'unknown'|'on'|'off';tamper:'clear'|'detected';sensors:Sensor[]};
+export type Device = Entity & {bindingId:ID|null;unitId:ID|null;targetUnitId:ID;createdByMembershipId:ID;serial:string;mqttNode:string|null;connection:Connection;lastSeenAt:Instant|null;firmwareVersion:string;powerSignal:'unknown'|'on'|'off';tamper:'clear'|'detected';sensors:Sensor[]};
 export type DeviceOperation = Entity & DeviceHistoryScope & {deviceId:ID;kind:'check'|'calibrate'|'firmware';status:'queued'|'running'|'succeeded'|'failed';targetVersion:string|null;failureCode:ErrorCode|null;startedAt:Instant|null;finishedAt:Instant|null;expiresAt:Instant};
 export type DeviceDetail = Device & {calibrationRefs:ID[];activeOperation:DeviceOperation|null};
 export type DeviceEvent = Entity & DeviceHistoryScope & {alertIds:ID[];deviceId:ID;eventType:'communication_lost'|'power_lost'|'tamper'|'restored'|'operation_failed';recovery:DeviceRecovery|null;evidenceSource:'heartbeat'|'power_signal'|'tamper_signal';sequence:number;occurredAt:Instant;restoredAt:Instant|null;responseNotes:{actorId:ID;message:string;at:Instant}[]};
@@ -303,7 +303,8 @@ export type OperationContracts = {
   'devices.events': {input:{id:ID;query:Query};result:Page<DeviceEvent>;mode:'read'};
   'devices.get': {input:{id:ID};result:DeviceDetail;mode:'read'};
   'devices.list': {input:Query;result:Page<Device>;mode:'read'};
-  'devices.register': {input:{serial:string;sensorTypes:Metric[];unitId:ID;jobId?:ID};result:Device;mode:'write'};
+  'devices.register': {input:{serial:string;sensorTypes:Metric[];unitId:ID;mqttNode?:string;jobId?:ID};result:Device;mode:'write'};
+  'devices.setMqttNode': {input:{deviceId:ID;mqttNode:string|null};result:Device;mode:'write'};
   'devices.updateFirmware': {input:{deviceId:ID;firmwareVersion:string;jobId?:ID};result:DeviceOperation;mode:'write'};
   'diagnosticRuns.create': {input:{jobId:ID;unitId:ID;startAction:UnitAction;endAction:UnitAction;durationMinutes:number;reason:string;expectedUnitVersion:number;expectedJobVersion:number};result:DiagnosticRun;mode:'write'};
   'diagnosticRuns.get': {input:{diagnosticRunId:ID};result:DiagnosticRun;mode:'read'};

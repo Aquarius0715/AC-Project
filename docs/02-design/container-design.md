@@ -128,7 +128,7 @@ Configuration is twelve-factor: every service reads environment variables only. 
 | `MQTT_URL` | iot-bridge, device-sim (the iot worker has no jobs yet) | `tcp://mosquitto:1883` | not set; the iot worker publishes through the AWS IoT data plane endpoint (`IOT_DATA_ENDPOINT`) |
 | `MQTT_USER` / `MQTT_PASSWORD` | iot-bridge, device-sim (development only) | each tool's own broker user, `iot-bridge` / `device-sim`, and its key from `.env.local` (`MQTT_IOT_BRIDGE_KEY` / `MQTT_DEVICE_SIM_KEY`; `docker/mosquitto/passwd.sh` writes the broker's password file) | not set: devices connect to AWS IoT Core with their certificates |
 | `REAL_MQTT_URL` / `REAL_MQTT_USER` / `REAL_MQTT_PASSWORD` / `REAL_MQTT_TOPIC` | iot-bridge (development only, DEC-86) | the real nodes' broker and its login from `.env.local`, never committed; the topic defaults to `smarthome/ac/#`; empty URL: no live site | not set |
-| `REAL_MQTT_COMMANDS` / `REAL_MQTT_COMMAND_NODE` | iot-bridge (development only, DEC-89) | `1` from `.env.local` lets the bridge send the live unit's power commands, else they fail / `node_1` | not set |
+| `REAL_MQTT_COMMANDS` | iot-bridge (development only, DEC-89) | `1` from `.env.local` lets the bridge send a live unit's power commands to its device's node (IR635), else they fail | not set |
 | `MOCK_HISTORY_DAYS` | mock-history (development only) | `30` (1–35 days of past readings) | not set |
 | `IOT_DATA_ENDPOINT` | backend (iot worker) | not set | AWS IoT Core data endpoint / custom domain |
 | `STRIPE_API_BASE` | backend | `http://stripe-mock:12111` | not set (api.stripe.com); keys come from Secrets Manager |

@@ -21,6 +21,16 @@ export type Metric = (typeof metrics)[number];
 export const metricSchema = z.enum(metrics);
 export type Connection = "online" | "offline" | "unknown" | "connecting" | "error";
 
+/** A node ID as the firmware sends it in its topics, smarthome/ac/<node>/…: 1–64 letters, digits, hyphens or underscores,
+matched exactly (IR635). */
+const mqttNodeSchema = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/);
+/** What a form sends for a node ID: the trimmed text, or null for none (empty clears it); undefined when it is malformed. */
+export function mqttNodeValue(raw: string): string | null | undefined {
+  const node = raw.trim();
+  if (node === "") return null;
+  return mqttNodeSchema.safeParse(node).success ? node : undefined;
+}
+
 /** The fixed unit of each metric (DD-A04 boundary cases). */
 export const metricUnit: Record<Metric, UnitSymbol> = {
   temperature: "°C", humidity: "%", co2: "ppm", pm25: "µg/m³", power: "kW", vibration: "mm/s", refrigerant_pressure: "kPa", compressor_cycles: "cycles/h",
@@ -41,6 +51,7 @@ export interface ApiUnitLite { id: string; displayName: string; modelId: string;
 export interface ApiDevice {
   id: string; version: number; unitId: string | null; serial: string; connection: Connection; lastSeenAt: string | null; firmwareVersion: string;
   targetUnitId?: string | null; // the unit chosen at registration: devices.bind connects it (D05)
+  mqttNode?: string | null; // the node ID the device's ESP32 sends in its MQTT topics: the IoT bridge feeds the device by it (IR635)
   powerSignal: "unknown" | "on" | "off"; tamper: "clear" | "detected"; sensors: { id: string; metric: Metric; unit: UnitSymbol; staleAfterSeconds: number; calibratedAt: string | null }[];
 }
 export interface ApiDeviceOperation { id: string; kind: "check" | "calibrate" | "firmware"; status: "queued" | "running" | "succeeded" | "failed"; targetVersion: string | null; failureCode: string | null; createdAt: string; finishedAt: string | null }

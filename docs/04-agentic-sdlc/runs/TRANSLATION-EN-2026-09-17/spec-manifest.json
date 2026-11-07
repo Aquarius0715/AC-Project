@@ -1,12 +1,12 @@
 {
   "version": "0.210.0",
-  "spec_baseline_id": "f2a0b56107ee05054238df7c74f3b7e443fd1057a9b9f99438b324acc26d11cc",
+  "spec_baseline_id": "378bce5b085eb18b8f64cc9ffc8338c4705cda9d0cb06973fe2b069038010230",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
     {
       "path": "00-prepare/PrepareDocument.md",
-      "sha256": "60ff555c113a3db704fa0b8c63fe6bc90050d56bcfeb7001a7cd8a80491f47a5"
+      "sha256": "606267decc29ac018e3a07db91dcfbf26e363b551c336209f2240acce7764b54"
     },
     {
       "path": "00-prepare/company-requirement-map.csv",
@@ -98,15 +98,15 @@
     },
     {
       "path": "02-design/admin.md",
-      "sha256": "c644a23f466deb070090119a1396e218aaad170a396e558fc6f630de60463fff"
+      "sha256": "2cbe8c9ccd1c559bb61e8991ab1cd5e742984858e2573b92b499335d7136b4db"
     },
     {
       "path": "02-design/api/swagger.json",
-      "sha256": "6975abe4142fe0135dc1732d736905850f293fbacf3581ac7c4eb61e9d0ec60b"
+      "sha256": "499d985bb1f997a38f81021559805be08b22c04d970b33395d22bb9c5fd17ded"
     },
     {
       "path": "02-design/backend-architecture.md",
-      "sha256": "43d33d52cd77caaf370bdba06d710bfab414c542c5d53598142aa198bd64a06c"
+      "sha256": "57af930b14a0e866d594493d16b6d90849954a069ec182903de45449762929be"
     },
     {
       "path": "02-design/backend-go-design.md",
@@ -118,11 +118,11 @@
     },
     {
       "path": "02-design/common.md",
-      "sha256": "58310b665c9f5caa3eef58ae1eb2d731e961ba4fc433922a53a40edf99df6bd1"
+      "sha256": "9d9763f0f4899c308e61361914dbbfe99e4760e5fcb537d7a82c627591cf26ce"
     },
     {
       "path": "02-design/container-design.md",
-      "sha256": "44c45efb470144e4d1289d4661b9bb201cd11a5bd61f49a06a08827edf47c0cd"
+      "sha256": "1c4990af5b99ea541a5eea6222d1b635b9c51b519afddcb83cd4e06daec2cdb1"
     },
     {
       "path": "02-design/contractor.md",
@@ -138,11 +138,11 @@
     },
     {
       "path": "02-design/device-firmware.ja.md",
-      "sha256": "135ca2c6e72cfddec780cff74d699103fc1d0e250932e5d235343647c351196a"
+      "sha256": "f3340cab1979fa2a5d474eb85fe956a40410ce29580cdb30482745e6b31e6052"
     },
     {
       "path": "02-design/device-firmware.md",
-      "sha256": "4a9dce9d7138dce70b9e9bee53469864ba01c191a0b99eb79e8b5c045d843825"
+      "sha256": "4d0c54ece426f3756bc772cf69075132cf98cba040fc2880105d7910161de92f"
     },
     {
       "path": "02-design/implementation-contracts.md",
@@ -154,11 +154,11 @@
     },
     {
       "path": "02-design/operation-catalog.csv",
-      "sha256": "23a516e02b31941946f6c513ea0cc2eb5d22e538a438e2fe3cc6a31f47d73995"
+      "sha256": "3e10398084e0f6d3d75cf7324e84dc3132b036049388842252ef9506d7cfefd8"
     },
     {
       "path": "02-design/operation-persistence-map.csv",
-      "sha256": "6c2ed0c92d18aef539b99c98893178458f913b4035ed2e804370c8f8aea64008"
+      "sha256": "8668e1c5bf23303153d8d549a133417f8c3e408582eff44a38fffa0420edc3e0"
     },
     {
       "path": "02-design/query-catalog.csv",
@@ -166,11 +166,11 @@
     },
     {
       "path": "02-design/review-resolution-contracts.md",
-      "sha256": "fe761b742f23f4b4f47b62ccb53805e61fba4a05dcc236d64f70110462710305"
+      "sha256": "eab51fb838beb17ca02a427759cadfc3b6d79bf9220b49af86ea5bc144c031f1"
     },
     {
       "path": "02-design/service-contracts.ts",
-      "sha256": "c26d3c1bfb77f8883581533a67dfe798d7b63ef289778495101889cab05df087"
+      "sha256": "43fd63ca19b597047120e773b73c44b51d9e00076f266e6fd7e6063d5a36cb5a"
     },
     {
       "path": "02-design/strict-review-contracts.md",
@@ -182,7 +182,7 @@
     },
     {
       "path": "02-design/write-version-catalog.csv",
-      "sha256": "abe5f6931966c777781d7b58109f63c4c1cfbc0311ead4ae459df24f965f8500"
+      "sha256": "c5d7165591a6bac8291fe0be2320905195c52fd6a09671637ec8504caa43ecc4"
     },
     {
       "path": "03-uiux/UIUXSpecification.md",
@@ -190,11 +190,11 @@
     },
     {
       "path": "03-uiux/component-contracts.csv",
-      "sha256": "98960893edb7c4cea1428b57dad8b838493b54951304469e41cde39fa49ba1cc"
+      "sha256": "0282cd52ea13baa3c3a5dc670f072d897a43c02dda56eb4a3aa423f0c4fe3df7"
     },
     {
       "path": "03-uiux/screen-catalog.csv",
-      "sha256": "6a8f51ca3d2ec01b84b3f553c83dd6b85c81ea4149da640ca5146365e93d9794"
+      "sha256": "69e9360b99359604378e8c92b0573df4babd7a5425254619823e6078eb490692"
     },
     {
       "path": "04-agentic-sdlc/README.md",
@@ -294,11 +294,11 @@
     },
     {
       "path": "README.md",
-      "sha256": "c41b066c316131ca2c09a3e262e045ab7bde7b924b39e206196610ef215ba91c"
+      "sha256": "d2295f5b535f90ea787fc9135c4b8e86a9aafe835923128c6081270b1da5f9c5"
     },
     {
       "path": "tools/check_review_regressions.py",
-      "sha256": "46a5ea10a0cc17fd9e7cffe618fa0e9870f6a31be3fe25fcb290b0080a5dd1e8"
+      "sha256": "e87e9fefaeb9e600c8e34adede585e895714f74b14d9cac5913b5dc05c0c0b97"
     },
     {
       "path": "tools/gen_operation_persistence_map.py",
@@ -306,7 +306,7 @@
     },
     {
       "path": "tools/validate_documents.py",
-      "sha256": "7db6a25ee385676a16af61535f321cadd5e486c20429edbf0f07680503056c1e"
+      "sha256": "6d3c75100b371ccd50914b4d5f77225c4f4caa57b4ea2f0bee6a2c7e5ca48915"
     }
   ]
 }

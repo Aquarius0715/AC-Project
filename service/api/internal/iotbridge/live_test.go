@@ -1,8 +1,8 @@
 package iotbridge_test
 
 import (
-	"bytes"
 	"encoding/json"
+	"regexp"
 	"slices"
 	"testing"
 	"time"
@@ -29,6 +29,34 @@ const (
 // liveAt is when the test messages arrive, on the scenario clock.
 func liveAt() time.Time { return time.Date(2026, 9, 20, 3, 15, 42, 0, time.UTC) }
 
+// liveDevice is what devices.mqttNodes answers for a module of the seed's live site: its device, unit and sensors under
+// the module's node_id (IR635).
+func liveDevice(module seed.LiveModule) iotbridge.NodeDevice {
+	sensors := make([]iotbridge.NodeSensor, 0, len(module.Sensors))
+	for _, sensor := range module.Sensors {
+		sensors = append(
+			sensors,
+			iotbridge.NodeSensor{
+				ID:     seed.ID(sensor.Name),
+				Metric: sensor.Metric,
+				Unit:   sensor.Unit,
+			},
+		)
+	}
+
+	return iotbridge.NodeDevice{
+		Node:     module.Node,
+		DeviceID: seed.ID(module.Device),
+		UnitID:   seed.ID(module.Unit),
+		Control:  module.Control,
+		Sensors:  sensors,
+	}
+}
+
+// airConditioner is the live site's air conditioner (node_1), roomSensors its node_2 sensor unit.
+func airConditioner() iotbridge.NodeDevice { return liveDevice(seed.LiveSite().Modules()[0]) }
+func roomSensors() iotbridge.NodeDevice    { return liveDevice(seed.LiveSite().Modules()[1]) }
+
 // TestLiveNode: the node is the level before sensors; other topics under the subscription carry no node.
 func TestLiveNode(t *testing.T) {
 	t.Parallel()
@@ -43,12 +71,12 @@ func TestLiveNode(t *testing.T) {
 	}
 }
 
-// TestLiveTriggersRoomNode: node_1 gives the room temperature and humidity on the live unit's sensors, stamped at the
-// start of the scenario minute, measured and valid, and the module's heartbeat with no settings.
+// TestLiveTriggersRoomNode: node_1 gives the room temperature and humidity on the air conditioner's sensors, stamped at
+// the start of the scenario minute, measured and valid, and the device's heartbeat with no settings.
 func TestLiveTriggersRoomNode(t *testing.T) {
 	t.Parallel()
 
-	out, err := iotbridge.LiveTriggers(node1, []byte(node1Message), liveAt())
+	out, err := iotbridge.LiveTriggers(airConditioner(), []byte(node1Message), liveAt())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -159,12 +187,14 @@ func TestLiveTriggersRoomNode(t *testing.T) {
 	}
 }
 
-// TestLiveTriggersPowerNode: node_2's power in W is recorded in kW on the same unit, with the module's heartbeat; a
+// TestLiveTriggersPowerNode: node_2's power in W is recorded in kW on its sensor unit, with its device's heartbeat; a
 // zero power is a reading while the meter sees a voltage, and with no voltage the meter measured nothing.
 func TestLiveTriggersPowerNode(t *testing.T) {
 	t.Parallel()
 
-	out, err := iotbridge.LiveTriggers(node2, []byte(node2Message), liveAt())
+	dev := roomSensors()
+
+	out, err := iotbridge.LiveTriggers(dev, []byte(node2Message), liveAt())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -180,24 +210,24 @@ func TestLiveTriggersPowerNode(t *testing.T) {
 		t.Errorf("power fact %+v", f)
 	}
 
-	if m := out[0].Measurement; m.UnitID != seed.ID("unit-live-ac") ||
-		m.SensorID != seed.ID("sensor-live-power") ||
+	if m := out[0].Measurement; m.UnitID != seed.ID("unit-live-node-2-sensors") ||
+		m.SensorID != seed.ID("sensor-live-node-2-power") ||
 		m.Unit != "kW" ||
 		*m.Value != 0.742 {
 		t.Errorf("power reading %+v (value %v)", m, *m.Value)
 	}
 
-	if hb := out[2]; hb.DeviceID == nil || *hb.DeviceID != seed.ID("device-live-ac") {
-		t.Errorf("node_2's heartbeat names module %v", hb.DeviceID)
+	if hb := out[2]; hb.DeviceID == nil || *hb.DeviceID != seed.ID("device-live-node-2-sensors") {
+		t.Errorf("node_2's heartbeat names device %v", hb.DeviceID)
 	}
 
-	off, err := iotbridge.LiveTriggers(node2, []byte(`{"voltage":230.1,"power":0.0}`), liveAt())
+	off, err := iotbridge.LiveTriggers(dev, []byte(`{"voltage":230.1,"power":0.0}`), liveAt())
 	if err != nil || len(off) != 3 || *off[0].Measurement.Value != 0 {
 		t.Errorf("an air conditioner drawing nothing: %+v, %v", off, err)
 	}
 
 	none, err := iotbridge.LiveTriggers(
-		node2,
+		dev,
 		[]byte(`{"voltage":0.0,"current":0.0,"power":0.0}`),
 		liveAt(),
 	)
@@ -206,36 +236,38 @@ func TestLiveTriggersPowerNode(t *testing.T) {
 	}
 }
 
-// TestLiveTriggersNode2Room: node_2's room temperature and humidity are recorded on its own sensor unit (DEC-91), its
-// power still on the air conditioner; one evaluation takes the facts of both units, and each module gets a heartbeat.
+// TestLiveTriggersNode2Room: node_2's room temperature, humidity and power are all recorded on its one device's sensors
+// (IR635); one evaluation takes the facts of the unit, and the device gets one heartbeat.
 func TestLiveTriggersNode2Room(t *testing.T) {
 	t.Parallel()
 
-	out, err := iotbridge.LiveTriggers(node2, []byte(node2RoomMessage), liveAt())
+	dev := roomSensors()
+
+	out, err := iotbridge.LiveTriggers(dev, []byte(node2RoomMessage), liveAt())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if len(out) != 6 {
+	if len(out) != 5 {
 		t.Fatalf(
-			"%d triggers, want power, temperature, humidity, their alert evaluation and two heartbeats",
+			"%d triggers, want temperature, humidity, power, their alert evaluation and the heartbeat",
 			len(out),
 		)
 	}
 
-	acUnit, sensorUnit := seed.ID("unit-live-ac"), seed.ID("unit-live-node-2-sensors")
+	sensorUnit := seed.ID("unit-live-node-2-sensors")
+
 	for idx, want := range []struct {
 		metric, sensor string
-		unit           uuid.UUID
 		value          float64
 	}{
-		{sensorPower, "sensor-live-power", acUnit, 0.742},
-		{sensorTemperature, "sensor-live-node-2-temperature", sensorUnit, 28.3},
-		{sensorHumidity, "sensor-live-node-2-humidity", sensorUnit, 58.4},
+		{sensorTemperature, "sensor-live-node-2-temperature", 28.3},
+		{sensorHumidity, "sensor-live-node-2-humidity", 58.4},
+		{sensorPower, "sensor-live-node-2-power", 0.742},
 	} {
 		m := out[idx].Measurement
 		if m == nil || m.Metric != want.metric || m.SensorID != seed.ID(want.sensor) ||
-			m.UnitID != want.unit ||
+			m.UnitID != sensorUnit ||
 			*m.Value != want.value {
 			t.Errorf("reading %d %+v, want %s on %s", idx, m, want.metric, want.sensor)
 		}
@@ -243,7 +275,7 @@ func TestLiveTriggersNode2Room(t *testing.T) {
 
 	evaluation := out[3].Event
 	if out[3].EventType != eventAutomation || evaluation == nil ||
-		!slices.Equal(evaluation.UnitIDs, []uuid.UUID{acUnit, sensorUnit}) ||
+		!slices.Equal(evaluation.UnitIDs, []uuid.UUID{sensorUnit}) ||
 		len(evaluation.Facts) != 3 {
 		t.Fatalf("alert evaluation %+v", out[3])
 	}
@@ -255,22 +287,37 @@ func TestLiveTriggersNode2Room(t *testing.T) {
 		}
 	}
 
-	for idx, device := range []string{"device-live-ac", "device-live-node-2-sensors"} {
-		if hb := out[4+idx]; hb.EventType != eventState || hb.DeviceID == nil ||
-			*hb.DeviceID != seed.ID(device) {
-			t.Errorf("heartbeat %d names %v, want %s", idx, hb.DeviceID, device)
-		}
+	if hb := out[4]; hb.EventType != eventState || hb.DeviceID == nil ||
+		*hb.DeviceID != seed.ID("device-live-node-2-sensors") {
+		t.Errorf("heartbeat names %v", hb.DeviceID)
 	}
 
 	roomOnly, err := iotbridge.LiveTriggers(
-		node2,
+		dev,
 		[]byte(`{"temp":28.1,"humidity":58.0,"voltage":0.0,"power":0.0}`),
 		liveAt(),
 	)
 	if err != nil || len(roomOnly) != 4 || roomOnly[0].Measurement.UnitID != sensorUnit ||
-		!slices.Equal(roomOnly[2].Event.UnitIDs, []uuid.UUID{sensorUnit}) ||
-		*roomOnly[3].DeviceID != seed.ID("device-live-node-2-sensors") {
+		len(roomOnly[2].Event.Facts) != 2 {
 		t.Errorf("room readings without the meter's: %+v, %v", roomOnly, err)
+	}
+}
+
+// TestLiveTriggersOnlyWhatTheDeviceHas: a device registered with fewer sensors records only those, whatever else the
+// node measures; a metric the bridge has no field for is left out.
+func TestLiveTriggersOnlyWhatTheDeviceHas(t *testing.T) {
+	t.Parallel()
+
+	dev := roomSensors()
+	dev.Sensors = []iotbridge.NodeSensor{
+		dev.Sensors[0],
+		{ID: seed.ID("sensor-x-co2"), Metric: "co2", Unit: "ppm"},
+	}
+
+	out, err := iotbridge.LiveTriggers(dev, []byte(node2RoomMessage), liveAt())
+	if err != nil || len(out) != 3 || out[0].Measurement.Metric != sensorTemperature ||
+		len(out[1].Event.Facts) != 1 {
+		t.Errorf("temperature only: %+v, %v", out, err)
 	}
 }
 
@@ -279,14 +326,16 @@ func TestLiveTriggersNode2Room(t *testing.T) {
 func TestLiveTriggersSkipWhatIsNotMeasured(t *testing.T) {
 	t.Parallel()
 
-	out, err := iotbridge.LiveTriggers(node1, []byte(`{"temp":26.4,"humidity":0.0}`), liveAt())
+	dev := airConditioner()
+
+	out, err := iotbridge.LiveTriggers(dev, []byte(`{"temp":26.4,"humidity":0.0}`), liveAt())
 	if err != nil || len(out) != 3 || out[0].Measurement.Metric != sensorTemperature ||
 		len(out[1].Event.Facts) != 1 {
 		t.Errorf("temperature only: %+v, %v", out, err)
 	}
 
 	out, err = iotbridge.LiveTriggers(
-		node1,
+		dev,
 		[]byte(`{"temp":0.0,"humidity":0.0,"pressure":0.0}`),
 		liveAt(),
 	)
@@ -294,41 +343,84 @@ func TestLiveTriggersSkipWhatIsNotMeasured(t *testing.T) {
 		t.Errorf("a failed read gave %+v, %v", out, err)
 	}
 
-	out, err = iotbridge.LiveTriggers(node1, []byte(`{"temp":"27.2","humidity":null}`), liveAt())
+	out, err = iotbridge.LiveTriggers(dev, []byte(`{"temp":"27.2","humidity":null}`), liveAt())
 	if err != nil || out != nil {
 		t.Errorf("fields that are no numbers gave %+v, %v", out, err)
 	}
 }
 
-// TestLiveTriggersRefuse: a node the site does not know and a message that is no JSON are errors.
+// TestLiveTriggersRefuse: a message that is no JSON is an error.
 func TestLiveTriggersRefuse(t *testing.T) {
 	t.Parallel()
 
-	_, err := iotbridge.LiveTriggers("node_3", []byte(node1Message), liveAt())
-	if err == nil {
-		t.Error("an unknown node was converted")
-	}
-
-	_, err = iotbridge.LiveTriggers(node1, []byte(`temp=27.2`), liveAt())
+	_, err := iotbridge.LiveTriggers(airConditioner(), []byte(`temp=27.2`), liveAt())
 	if err == nil {
 		t.Error("a message that is no JSON was converted")
 	}
 }
 
+// TestNodeRegistry: nothing is known before the first read; a node_id is matched exactly; a read replaces the whole
+// table; the devices come in the order of their node_id.
+func TestNodeRegistry(t *testing.T) {
+	t.Parallel()
+
+	registry := iotbridge.NewNodeRegistry()
+	if registry.Loaded() || len(registry.Devices()) != 0 {
+		t.Fatal("a new registry knows nodes")
+	}
+
+	air, sensors := airConditioner(), roomSensors()
+	registry.Set([]iotbridge.NodeDevice{sensors, air})
+
+	if !registry.Loaded() {
+		t.Error("a registry that was set is not loaded")
+	}
+
+	if dev, ok := registry.Node(node1); !ok || dev.DeviceID != air.DeviceID {
+		t.Errorf("node_1 is %+v", dev)
+	}
+
+	for _, unknown := range []string{"NODE_1", "node_3", "node_1 ", ""} {
+		if _, ok := registry.Node(unknown); ok {
+			t.Errorf("%q matched a node", unknown)
+		}
+	}
+
+	if dev, ok := registry.Device(sensors.DeviceID); !ok || dev.Node != node2 {
+		t.Errorf("device %s is %+v", sensors.DeviceID, dev)
+	}
+
+	if got := registry.Devices(); len(got) != 2 || got[0].Node != node1 || got[1].Node != node2 {
+		t.Errorf("devices %+v", got)
+	}
+
+	registry.Set(
+		[]iotbridge.NodeDevice{sensors},
+	) // the node_id of the air conditioner was cleared in Admin
+
+	if _, ok := registry.Node(node1); ok {
+		t.Error("a node that was cleared is still registered")
+	}
+
+	if _, ok := registry.Device(air.DeviceID); ok {
+		t.Error("a device that was cleared is still registered")
+	}
+}
+
 // TestLiveEventIDIsOnePerMinute: messages of one minute share their event IDs (the API keeps one reading a minute), the
-// next minute has others, and both nodes send the module's heartbeat of a minute with the same body, so the API takes
-// it once.
+// next minute has others, and the heartbeat of a device and minute is one event whichever message it follows.
 func TestLiveEventIDIsOnePerMinute(t *testing.T) {
 	t.Parallel()
 
-	first, _ := iotbridge.LiveTriggers(node1, []byte(node1Message), liveAt())
+	dev := airConditioner()
+	first, _ := iotbridge.LiveTriggers(dev, []byte(node1Message), liveAt())
 	sameMinute, _ := iotbridge.LiveTriggers(
-		node1,
+		dev,
 		[]byte(`{"temp":27.4,"humidity":51.0}`),
 		liveAt().Add(15*time.Second),
 	)
 	nextMinute, _ := iotbridge.LiveTriggers(
-		node1,
+		dev,
 		[]byte(node1Message),
 		liveAt().Add(time.Minute),
 	)
@@ -346,28 +438,24 @@ func TestLiveEventIDIsOnePerMinute(t *testing.T) {
 		t.Error("the alert evaluations of one minute differ, or two minutes share one")
 	}
 
-	power, _ := iotbridge.LiveTriggers(node2, []byte(node2Message), liveAt().Add(10*time.Second))
-
-	roomBeat, marshalErr := json.Marshal(first[len(first)-1])
-	if marshalErr != nil {
-		t.Fatal(marshalErr)
+	last := len(first) - 1
+	if first[last].EventID != sameMinute[last].EventID ||
+		first[last].EventID == nextMinute[last].EventID {
+		t.Error("the heartbeats of one minute differ, or two minutes share one")
 	}
 
-	powerBeat, marshalErr := json.Marshal(power[len(power)-1])
-	if marshalErr != nil {
-		t.Fatal(marshalErr)
-	}
-
-	if !bytes.Equal(roomBeat, powerBeat) {
-		t.Errorf("the nodes' heartbeats of one minute differ:\n%s\n%s", roomBeat, powerBeat)
+	power, _ := iotbridge.LiveTriggers(roomSensors(), []byte(node2Message), liveAt())
+	if power[len(power)-1].EventID == first[last].EventID {
+		t.Error("two devices share a heartbeat event")
 	}
 }
 
-// TestLiveNodesMatchTheSite: every recorded field names a sensor of a live module, whose metric and unit are the
-// platform's (the units the simulator reports, which the API checks); a sensor name is the site's once and a metric a
-// module's once (devices.sensors is unique per device and metric); no sensor is left unfed; each module hears from its
-// nodes; and the commands go to a node the bridge listens to.
-func TestLiveNodesMatchTheSite(t *testing.T) {
+// TestNodeFieldsMatchTheSite: every sensor of a live module is one the bridge reads (a metric of NodeFields, with a
+// scale and a gate), whose unit is the platform's (the units the simulator reports, which the API checks); a sensor
+// name is the site's once and a metric a module's once (devices.sensors is unique per device and metric); each module
+// has its own node_id and a serial that Admin's register accepts (DD-T11); and the commands go to the node of the one
+// module whose model takes them.
+func TestNodeFieldsMatchTheSite(t *testing.T) {
 	t.Parallel()
 
 	platform := map[string]string{}
@@ -375,13 +463,28 @@ func TestLiveNodesMatchTheSite(t *testing.T) {
 		platform[s.Metric] = s.Unit
 	}
 
-	site := map[string]seed.LiveSensor{}
+	serial := regexp.MustCompile(`^[A-Z0-9-]{3,64}$`)
+	node := regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
+	names, nodes, fields := map[string]bool{}, map[string]bool{}, iotbridge.NodeFields()
+
+	var commanded []string
 
 	for _, module := range seed.LiveSite().Modules() {
+		if !serial.MatchString(module.Serial) || !node.MatchString(module.Node) ||
+			nodes[module.Node] {
+			t.Errorf("%s: serial %q or node %q", module.UnitName, module.Serial, module.Node)
+		}
+
+		nodes[module.Node] = true
+
+		if module.Control {
+			commanded = append(commanded, module.Node)
+		}
+
 		metrics := map[string]bool{}
 
 		for _, liveSensor := range module.Sensors {
-			if _, dup := site[liveSensor.Name]; dup || metrics[liveSensor.Metric] {
+			if names[liveSensor.Name] || metrics[liveSensor.Metric] {
 				t.Errorf(
 					"%s: sensor %s or metric %s twice",
 					module.UnitName,
@@ -390,7 +493,18 @@ func TestLiveNodesMatchTheSite(t *testing.T) {
 				)
 			}
 
-			site[liveSensor.Name], metrics[liveSensor.Metric] = liveSensor, true
+			names[liveSensor.Name], metrics[liveSensor.Metric] = true, true
+
+			field, ok := fields[liveSensor.Metric]
+			if !ok || field.Scale == 0 || field.Gate == "" {
+				t.Errorf(
+					"%s: the bridge does not read %s (%+v)",
+					module.UnitName,
+					liveSensor.Metric,
+					field,
+				)
+			}
+
 			if platform[liveSensor.Metric] != liveSensor.Unit {
 				t.Errorf(
 					"site sensor %s is %s in %q, the platform uses %q",
@@ -403,47 +517,9 @@ func TestLiveNodesMatchTheSite(t *testing.T) {
 		}
 	}
 
-	fed := map[string]bool{}
-
-	for node, fields := range iotbridge.LiveNodes() {
-		for _, liveField := range fields {
-			if _, ok := site[liveField.Sensor]; !ok || liveField.Scale == 0 ||
-				liveField.Gate == "" {
-				t.Errorf(
-					"%s.%s: sensor %s, scale %v, gate %q",
-					node,
-					liveField.Field,
-					liveField.Sensor,
-					liveField.Scale,
-					liveField.Gate,
-				)
-			}
-
-			fed[liveField.Sensor] = true
-		}
-	}
-
-	if len(fed) != len(site) {
-		t.Errorf("%d of the site's %d sensors are fed", len(fed), len(site))
-	}
-
-	nodes := map[string][]string{
-		"unit-live-ac":             {node1, node2},
-		"unit-live-node-2-sensors": {node2},
-	}
-	for _, module := range seed.LiveSite().Modules() {
-		if got := iotbridge.ModuleNodes(module); !slices.Equal(got, nodes[module.Unit]) {
-			t.Errorf("%s hears from %v, want %v", module.UnitName, got, nodes[module.Unit])
-		}
-	}
-
-	if _, ok := iotbridge.LiveNodes()[iotbridge.LiveCommandNode]; !ok ||
-		iotbridge.LiveCommandTopic(iotbridge.LiveCommandNode) != "smarthome/ac/node_1/command" {
-		t.Errorf(
-			"commands go to %s (%s)",
-			iotbridge.LiveCommandNode,
-			iotbridge.LiveCommandTopic(iotbridge.LiveCommandNode),
-		)
+	if !slices.Equal(commanded, []string{node1}) ||
+		iotbridge.LiveCommandTopic(node1) != "smarthome/ac/node_1/command" {
+		t.Errorf("commands go to %v (%s)", commanded, iotbridge.LiveCommandTopic(node1))
 	}
 }
 
@@ -501,6 +577,7 @@ func TestLiveSentTriggers(t *testing.T) {
 
 	powerOn := iotbridge.LiveSentTriggers(
 		waiting,
+		waiting.DeviceID,
 		liveAt(),
 		liveAt().Add(-2*time.Second),
 		command.State,
@@ -518,16 +595,25 @@ func TestLiveSentTriggers(t *testing.T) {
 		t.Errorf("ack %+v, state %+v", powerOn[1], powerOn[2])
 	}
 
-	if off := iotbridge.LiveSentTriggers(waiting, liveAt(), liveAt(), nil); len(off) != 2 {
+	if off := iotbridge.LiveSentTriggers(
+		waiting,
+		waiting.DeviceID,
+		liveAt(),
+		liveAt(),
+		nil,
+	); len(
+		off,
+	) != 2 {
 		t.Errorf("power off reports %d triggers, want sent and acknowledged", len(off))
 	}
 
-	if f := iotbridge.LiveRefusedTrigger(
+	if refused := iotbridge.LiveRefusedTrigger(
 		waiting,
+		waiting.DeviceID,
 		liveAt(),
-	); f.EventType != "command_fail" || *f.CommandID != waiting.ID ||
-		!f.OccurredAt.Equal(liveAt()) {
-		t.Errorf("refusal %+v", f)
+	); refused.EventType != "command_fail" || *refused.CommandID != waiting.ID ||
+		!refused.OccurredAt.Equal(liveAt()) {
+		t.Errorf("refusal %+v", refused)
 	}
 }
 
