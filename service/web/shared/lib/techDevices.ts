@@ -51,7 +51,7 @@ const ago = (iso: string | null, now: number, t: T) => {
 };
 /** One device of the list (Figma Technician 03, Admin 246:2): serial, connection, unit, firmware and its sensor count. */
 /** `unit` names the bound unit; a device not bound yet says so with its planned unit (D05, IR467). */
-export interface TechDeviceRow { id: string; serial: string; unitId: string | null; targetUnitId: string | null; unit: string; conn: Connection; connText: string | null; fw: string; tamper: boolean; sensors: number }
+export interface TechDeviceRow { id: string; serial: string; mqttNode: string | null; unitId: string | null; targetUnitId: string | null; unit: string; conn: Connection; connText: string | null; fw: string; tamper: boolean; sensors: number }
 /** The unit a device serves: the bound unit, the planned one when it is not bound yet, or none. */
 function deviceUnit(d: ApiDevice, unitName: Map<string, string>, t: T): string {
   if (d.unitId) return unitName.get(d.unitId) ?? t("unit");
@@ -60,7 +60,7 @@ function deviceUnit(d: ApiDevice, unitName: Map<string, string>, t: T): string {
 export function techDeviceRows(ds: ApiDevice[], unitName: Map<string, string>, now: number, t: T = en): TechDeviceRow[] {
   return [...ds].toSorted((a, b) => a.serial.localeCompare(b.serial)).map((d) => {
     return {
-      id: d.id, serial: d.serial, unitId: d.unitId, targetUnitId: d.targetUnitId ?? null, conn: d.connection,
+      id: d.id, serial: d.serial, mqttNode: d.mqttNode ?? null, unitId: d.unitId, targetUnitId: d.targetUnitId ?? null, conn: d.connection,
       unit: deviceUnit(d, unitName, t),
       connText: d.connection !== "online" && d.lastSeenAt ? ago(d.lastSeenAt, now, t) : null, fw: d.firmwareVersion, tamper: d.tamper === "detected", sensors: d.sensors.length,
     };

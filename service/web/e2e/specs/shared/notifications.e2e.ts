@@ -10,13 +10,21 @@ test("Mark all as read empties the Unread tab", async ({ page }) => {
   const unreadTab = main.getByRole("tab", { name: /^Unread/ });
   const button = main.getByRole("button", { name: "Mark all as read" });
   const unread = Number((/\d+/.exec((await unreadTab.innerText())))?.[0] ?? "0");
+  // The sidebar's Notifications badge counts every unread notification of the member (no badge for 0), while the page
+  // lists the newest 100 only: the two agree when the whole inbox is listed.
+  const listed = Number((/\d+/.exec(await main.getByRole("tab", { name: /^All/ }).innerText()))?.[0] ?? "0");
+  const sidebarLink = page.getByRole("link", { name: /^Notifications/ });
+  const badgeIs = async (n: number) => { await expect(sidebarLink).toHaveText(n === 0 ? /^Notifications$/ : new RegExp(String.raw`^Notifications\s*${String(n)}$`)); };
   if (unread === 0) {
     await expect(button).toHaveCount(0);
+    if (listed < 100) await badgeIs(0);
     return;
   }
+  if (listed < 100) await badgeIs(unread);
   await button.click();
   await expect(page.getByText(/^\d+ notifications? marked as read$|^1 notification marked as read$/)).toBeVisible();
   await expect(unreadTab).toHaveText(/Unread\s*0/);
+  if (listed < 100) await badgeIs(0); // the layout was rendered again by the action's refresh()
   await expect(button).toHaveCount(0);
   await unreadTab.click();
   await expect(main).toContainText("No unread notifications");

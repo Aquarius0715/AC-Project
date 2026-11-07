@@ -180,11 +180,17 @@ func TestLiveSiteSeeds(t *testing.T) {
 		}
 
 		if c := count(
-			`SELECT count(*) FROM devices.devices WHERE id = $1 AND serial = $2`,
+			`SELECT count(*) FROM devices.devices WHERE id = $1 AND serial = $2 AND mqtt_node = $3`,
 			seed.ID(module.Device),
 			module.Serial,
+			module.Node,
 		); c != 1 {
-			t.Errorf("the module of %s is not serial %s", module.UnitName, module.Serial)
+			t.Errorf(
+				"the module of %s is not serial %s with MQTT node %s",
+				module.UnitName,
+				module.Serial,
+				module.Node,
+			)
 		}
 
 		for _, liveSensor := range module.Sensors {
@@ -211,9 +217,9 @@ func TestLiveSiteSeeds(t *testing.T) {
 	if c := count(
 		`SELECT count(*) FROM devices.sensors WHERE device_id = $1 AND metric = 'power' AND boundary_id =
 			'ac_input_electricity'`,
-		seed.ID(site.Device),
+		seed.ID(site.SensorUnits[0].Device),
 	); c != 1 {
-		t.Error("the power sensor does not count the air conditioner's electricity")
+		t.Error("the power sensor of node_2 does not count the air conditioner's electricity")
 	}
 
 	// the air conditioner's module went offline since, and the sensor unit is one the site gained since (as an

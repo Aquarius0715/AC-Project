@@ -54,6 +54,10 @@ describe("techDeviceRows / filterOf", () => {
     expect(rows[0]?.unit).toBe("Bedroom AC");
     expect(rows[1]?.unit).toBe("Unbound");
   });
+  it("carries the node ID the device is fed by, or null (IR635)", () => {
+    const [fed, bare] = techDeviceRows([device({ id: "f", serial: "AC-F", mqttNode: "node_1" }), device({ id: "g", serial: "AC-G" })], names, NOW);
+    expect([fed?.mqttNode, bare?.mqttNode]).toStrictEqual(["node_1", null]);
+  });
   it("says a registered device is not bound yet, with its planned unit (D05, IR467)", () => {
     const [planned] = techDeviceRows([device({ id: "p", serial: "AC-P", unitId: null, targetUnitId: "unit-1" })], names, NOW);
     expect([planned?.unit, planned?.unitId, planned?.targetUnitId]).toStrictEqual(["Not bound yet — planned for Bedroom AC", null, "unit-1"]);

@@ -357,9 +357,14 @@
  ],
  "devices.register": [
   "jobId",
+  "mqttNode",
   "sensorTypes",
   "serial",
   "unitId"
+ ],
+ "devices.setMqttNode": [
+  "deviceId",
+  "mqttNode"
  ],
  "devices.updateFirmware": [
   "deviceId",

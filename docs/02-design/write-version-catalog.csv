@@ -38,6 +38,7 @@ devices.bind,all,device,devices.get,required,none,D01; version mismatch CONFLICT
 devices.calibrate,all,device,devices.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 devices.check,all,device,devices.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 devices.register,all,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+devices.setMqttNode,all,device,devices.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 devices.updateFirmware,all,device,devices.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 diagnosticRuns.create,all,none,units.get;jobs.get,omit,expectedUnitVersion=UnitDetail.version;expectedJobVersion=JobDetail.version,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 factors.save,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects

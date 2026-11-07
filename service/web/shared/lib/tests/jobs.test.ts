@@ -134,6 +134,17 @@ describe("notes, follow-ups and answers in the maintenance demo", () => {
   });
 });
 
+describe("the fixed rows of the demo inbox", () => {
+  it("are marked read once, kept across a reload of the store, and come back unread on reset", () => {
+    jobActions.markFixedRead(["s1", "s2"]);
+    jobActions.markFixedRead(["s2", "s3"]);
+    expect(getJobState().seedRead).toStrictEqual(["s1", "s2", "s3"]);
+    expect(JSON.parse(sessionStorage.getItem("ac-job-notes-seed-read-v1") ?? "null")).toStrictEqual(["s1", "s2", "s3"]);
+    jobActions.reset();
+    expect(getJobState().seedRead).toStrictEqual([]);
+  });
+});
+
 describe("demo availability and slot texts", () => {
   it("names who fits a time and formats slots", () => {
     expect([fitFor({ date: "2026-09-28", win: TEXT_14_00_16_00 }).fits, fitFor({ date: "2026-10-02", win: TEXT_14_00_16_00 }).fits, fitFor(slot).fits, fitFor({ date: "2026-10-05", win: TEXT_10_00_12_00 }).fits])
