@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Badge, Banner, Btn, Card, DataTable, Field, Input, LinkButton, Modal, Page, PageHead, Select, useToast, type Tone } from "@ac/web/components/ui";
-import { CURRENT_CLIENT, ClientUser, clientUserActions, emailError, useClientUsers } from "@ac/web/lib/clientUsers";
+import { CURRENT_CLIENT, type ClientUser, clientUserActions, emailError, useClientUsers } from "@ac/web/lib/clientUsers";
 import { Icon } from "@ac/web/components/Icon";
 import { oneOf } from "@ac/web/lib/oneOf";
 import { codePoints } from "@ac/web/lib/text";

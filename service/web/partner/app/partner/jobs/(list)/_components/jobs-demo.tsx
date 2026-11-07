@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Badge, EmptyState, ErrorState, Page, PageHead, Select, Tabs, Plain } from "@ac/web/components/ui";
 import { OriginBadge } from "@ac/web/components/JobBits";
-import { PJob, pjobs } from "@ac/web/lib/partner";
+import { type PJob, pjobs } from "@ac/web/lib/partner";
 import { fmt, useJobs } from "@ac/web/lib/jobs";
 import { oneOf } from "@ac/web/lib/oneOf";
 import { orDash } from "@ac/web/lib/text";

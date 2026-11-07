@@ -9,7 +9,7 @@ import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Badge, Banner, Btn, Card, Choice, DataTable, Field, Input, Modal, Page, Select, SummaryList, Tabs, Textarea, UtilizationBar, cx, useToast, Plain, type Tone } from "@ac/web/components/ui";
 import { OriginBadge } from "@ac/web/components/JobBits";
-import { Job, fmt, jobActions, longDate, useJobs } from "@ac/web/lib/jobs";
+import { type Job, fmt, jobActions, longDate, useJobs } from "@ac/web/lib/jobs";
 import { Icon } from "@ac/web/components/Icon";
 import { lookup } from "@ac/web/lib/lookup";
 

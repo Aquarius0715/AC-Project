@@ -4,7 +4,7 @@ const UNASSIGNED = "unassigned";
 import Link from "next/link";
 import { useState } from "react";
 import { Btn, Card, Field, Input, Modal, Page, PowerBadge, SummaryList, Badge, cx, useToast, Plain } from "@ac/web/components/ui";
-import { GroupControl, GUnit } from "@ac/web/components/Features";
+import { GroupControl, type GUnit } from "@ac/web/components/Features";
 import { Icon, type IconName } from "@ac/web/components/Icon";
 import type { NonEmpty } from "@ac/web/lib/lists";
 import { lookup } from "@ac/web/lib/lookup";

@@ -7,7 +7,7 @@ const CONTRACTOR = "contractor";
 import { useState } from "react";
 import { Badge, Banner, Btn, Card, Choice, DataTable, Field, Input, ListRow, Modal, Page, PageHead, Select, SummaryList, Tabs, Textarea, Timeline, UtilizationBar, cx, useToast, Plain } from "@ac/web/components/ui";
 import { JobStatusBadge, OriginBadge, PreferredSlotsInput, SlotLine, preferredError } from "@ac/web/components/JobBits";
-import { Job, JobStatus, Slot, fitFor, fmt, jobActions, longDate, useJobs } from "@ac/web/lib/jobs";
+import { type Job, type JobStatus, type Slot, fitFor, fmt, jobActions, longDate, useJobs } from "@ac/web/lib/jobs";
 import { units } from "@ac/web/lib/client";
 import { Icon, type IconName } from "@ac/web/components/Icon";
 import { Checkbox } from "@ac/web/components/ui/checkbox";

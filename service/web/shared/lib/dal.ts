@@ -30,10 +30,12 @@ export const verifySession = cache(async (): Promise<Session> => {
 });
 
 export class CoreError extends Error {
+  readonly error: DomainError;
   readonly status: number;
-  constructor(public readonly error: DomainError, options: ErrorOptions & { status: number }) {
+  constructor(error: DomainError, options: ErrorOptions & { status: number }) {
     super(`${error.code}: ${error.messageKey}`, options);
     this.name = "CoreError";
+    this.error = error;
     this.status = options.status;
   }
 }

@@ -5,7 +5,8 @@ import { describe, expect, it, vi } from "vitest";
 
 const dal = vi.hoisted(() => {
   class CoreError extends Error {
-    constructor(public error: DomainError, options?: ErrorOptions) { super(error.code, options); this.name = "CoreError"; }
+    error: DomainError;
+    constructor(error: DomainError, options?: ErrorOptions) { super(error.code, options); this.name = "CoreError"; this.error = error; }
   }
   return { coreOp: vi.fn(), CoreError };
 });

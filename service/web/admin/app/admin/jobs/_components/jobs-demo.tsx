@@ -8,7 +8,7 @@ const TEXT_10_00_12_00 = "10:00–12:00";
 import { useState } from "react";
 import { Badge, Banner, Btn, Card, Choice, DataTable, Field, Input, Kpi, ListRow, Modal, Page, Select, SummaryList, Tabs, Textarea, Timeline, cx, useToast, Plain } from "@ac/web/components/ui";
 import { JobStatusBadge, OriginBadge, PreferredSlotsInput, Rank, preferredError } from "@ac/web/components/JobBits";
-import { Job, JobStatus, Slot, fitFor, fmt, jobActions, longDate, statusLabel, useJobs } from "@ac/web/lib/jobs";
+import { type Job, type JobStatus, type Slot, fitFor, fmt, jobActions, longDate, statusLabel, useJobs } from "@ac/web/lib/jobs";
 import { Icon } from "@ac/web/components/Icon";
 import { oneOf } from "@ac/web/lib/oneOf";
 import { nonEmpty } from "@ac/web/lib/lists";
