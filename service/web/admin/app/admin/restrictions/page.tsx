@@ -112,7 +112,7 @@ export default async function AdminRestrictionsPage({ searchParams }: Readonly<P
     for (const [u, why] of [...restricted, ...recovering]) busy.set(u, why);
     const cap = new Map(caps.items.map((k) => [k.id, k]));
     const term = (k: ApiContract) => Date.parse(k.startAt) <= now.getTime() && now.getTime() < Date.parse(k.endAt);
-    live.schedule = contracts.items.filter((k) => k.planType === "rto" && k.restrictionEligible && k.rulesVersion && term(k)).map((k) => {
+    live.schedule = contracts.items.filter((k) => k.planType === "rto" && k.restrictionEligible && !!k.rulesVersion && term(k)).map((k) => {
       return {
         id: k.id, version: k.version, label: contractLabel(k.id), rulesVersion: k.rulesVersion ?? "", recipients: clients.items.filter((c) => c.customerId === k.customerId).length,
         invoices: overdue.items.filter((inv) => inv.contractId === k.id && inv.status === "unpaid").map((inv) => ({ id: inv.id, number: inv.number })),

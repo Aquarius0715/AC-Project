@@ -246,7 +246,7 @@ const REFUSED: Record<string, string> = {
 };
 /** A refused device write in words (null for a VALIDATION that only marks fields). */
 export function deviceRefusal(f: { code: string; messageKey: string; fieldErrors: Record<string, string> }, t: T = en): string | null {
-  const duplicate = f.messageKey === "errors.duplicate_serial" || (f.code === "CONFLICT" && f.fieldErrors.serial);
+  const duplicate = f.messageKey === "errors.duplicate_serial" || (f.code === "CONFLICT" && !!f.fieldErrors.serial);
   return duplicate ? t("This serial is already registered.") : textOf(REFUSED, f.code, t) ?? null;
 }
 const FIELD: Record<string, string> = { "error.required": "Required", "error.length": "1–1000 characters", "error.invalid": "Not valid", "error.duplicate": "Already registered" };

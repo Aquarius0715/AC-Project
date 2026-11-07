@@ -29,7 +29,8 @@ export function RestrictionsDemo() {
   const currentRow = flow.indexOf(sel.st);
   const openedAt = useOpenedAt(); // reference time for the 24 h rule (render stays pure)
   const tooSoon = new Date(f.exec).getTime() - openedAt < 24 * 3600e3 ? "Execute-after must be at least 24 h after the notice" : undefined;
-  const execError = tried && (f.exec ? tooSoon : "Execute-after is required");
+  const execProblem = f.exec ? tooSoon : "Execute-after is required";
+  const execError = tried ? execProblem : undefined;
   return (
     <Page>
       <div className="flex flex-wrap items-center justify-between gap-3"><div className="flex flex-wrap gap-2">{flow.map((s) => <span key={s} className="rounded-full bg-surface2 px-2.5 py-1 text-xs"><span className="text-muted-foreground">{s}</span> <b>{list.filter((x) => x.st === s).length}</b></span>)}</div><Btn size="sm" variant="primary" onClick={() => { setModal(true); }}><Icon name="add" /> Schedule restriction</Btn></div>

@@ -125,7 +125,7 @@ function AssignCard({ sel, choice, zone, otherZone }: Readonly<{ sel: Selected; 
     );
   }
   const slot = proposedSlot(m, end, zone);
-  const endOk = !m.endEditable || (end && Date.parse(slot.endAt) >= Date.parse(m.slot.endAt));
+  const endOk = !m.endEditable || (!!end && Date.parse(slot.endAt) >= Date.parse(m.slot.endAt));
   const isReasonMissing = m.reasonRequired && !reason.trim();
   const isSame = tech === sel.currentId && (!m.endEditable || slot.endAt === m.slot.endAt);
   const sameError = tried && isSame ? t("Choose another technician or a later end") : undefined;

@@ -64,7 +64,7 @@ export function modelRows(caps: ApiCapability[], units: ApiUnitLite[], devices: 
   return caps.map((k) => {
     const mine = units.filter((u) => u.modelId === k.id && !u.archived);
     const ids = new Set(mine.map((u) => u.id));
-    const devs = devices.filter((d) => d.unitId && ids.has(d.unitId)).length;
+    const devs = devices.filter((d) => !!d.unitId && ids.has(d.unitId)).length;
     return {
       id: k.id, version: k.version, name: `${k.manufacturer} ${k.model}`, ventilation: k.ventilation, updated: showTime(k.updatedAt, i.display), cap: k,
       used: `${t(mine.length === 1 ? "1 unit" : "{n} units", { n: mine.length })} · ${t(devs === 1 ? "1 device" : "{n} devices", { n: devs })}`,

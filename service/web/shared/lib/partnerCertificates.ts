@@ -164,7 +164,7 @@ export function certRows(members: ApiTeamMember[], certs: ApiCert[], jobs: CertJ
       const onFile = list.filter((c) => c.status === "valid" || c.status === "expiring" || c.status === "expired").toSorted((a, b) => Date.parse(b.expiresAt) - Date.parse(a.expiresAt))[0];
       const pending = list.filter((c) => c.status === "pending_verification").toSorted((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
       const rejected = list.filter((c) => c.status === "rejected").toSorted((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
-      const isViaGrant = !onFile && (m.qualifications ?? []).some((q) => q.code === k && !q.revokedAt && q.validUntil);
+      const isViaGrant = !onFile && (m.qualifications ?? []).some((q) => q.code === k && !q.revokedAt && !!q.validUntil);
       if (isViaGrant) viaGrant.set(k, pending ? "pending" : "rejected");
       const shown = onFile ?? pending ?? rejected; // a group holds at least one certificate on file, pending or rejected
       if (isViaGrant || !shown) continue;

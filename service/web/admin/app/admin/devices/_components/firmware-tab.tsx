@@ -35,7 +35,7 @@ export function FirmwareTab({ live }: Readonly<{ live: DevicesLive }>) {
   const [d, setD] = useState<CampaignDraft>(blank);
   const model = live.models.find((m) => m.id === d.modelId);
   const modelUnits = new Set(live.units.filter((u) => u.modelId === d.modelId).map((u) => u.id));
-  const modelDevices = live.devices.filter((x) => x.unitId && modelUnits.has(x.unitId));
+  const modelDevices = live.devices.filter((x) => !!x.unitId && modelUnits.has(x.unitId));
   const errors = campaignErrors(d, now, zone, t);
   const sel = live.campaign;
   const close = () => { setModal(null); setTried(false); };

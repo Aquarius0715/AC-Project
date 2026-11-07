@@ -99,7 +99,7 @@ export function technicianRows(technicians: ApiTechnician[], certs: ApiCertifica
   const { t } = i;
   return technicians.map((x) => {
     const until = x.validUntil;
-    const ended = until && Date.parse(until) <= now;
+    const ended = !!until && Date.parse(until) <= now;
     const quals = x.qualifications.filter((q) => !q.revokedAt);
     const sub = ended ? t("membership ended {date}", { date: dayMonth(until, i) }) : quals.map((q) => qualificationLabel(q.code, t).replace(/ (unit )?work$/, "")).join(" · ") || t("no qualifications");
     const mine = certs.filter((c) => c.membershipId === x.id);

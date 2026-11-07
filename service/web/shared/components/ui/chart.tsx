@@ -1,5 +1,6 @@
 "use client"
 
+import { hasContent } from "@ac/web/lib/hasContent";
 import { createContext, useContext, useId, useMemo, type CSSProperties, type ComponentProps, type ComponentType, type ReactNode } from "react"
 import { cn } from "cn"
 import { cssVariables } from "@ac/web/lib/cssVariables"
@@ -148,7 +149,7 @@ function ChartTooltipContent({
       )
     }
 
-    if (!value) {
+    if (!hasContent(value)) {
       return null
     }
 
@@ -194,7 +195,7 @@ function ChartTooltipContent({
                   indicator === "dot" && "items-center"
                 )}
               >
-                {formatter && item.value !== undefined && item.name ? (
+                {formatter && item.value !== undefined && hasContent(item.name) ? (
                   formatter(item.value, item.name, item, index, item.payload)
                 ) : (
                   <>

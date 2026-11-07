@@ -1,5 +1,6 @@
 "use client";
 
+import { hasContent } from "@ac/web/lib/hasContent";
 import Link from "next/link";
 import { Children, cloneElement, createContext, isValidElement, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useT } from "@ac/web/components/I18n";
@@ -133,10 +134,10 @@ export function Card({ title, sub, action, children, className, pad = true, tone
         // squeezing it into a column; a small one stays beside it
         <CardHeader className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
           <div className="flex min-w-0 flex-[1_1_12rem] flex-col gap-1.5">
-            {title && <CardTitle><h2>{title}</h2></CardTitle>}
-            {sub && <CardDescription className="text-xs">{sub}</CardDescription>}
+            {hasContent(title) && <CardTitle><h2>{title}</h2></CardTitle>}
+            {hasContent(sub) && <CardDescription className="text-xs">{sub}</CardDescription>}
           </div>
-          {action && <CardAction className="self-start">{action}</CardAction>}
+          {hasContent(action) && <CardAction className="self-start">{action}</CardAction>}
         </CardHeader>
       )}
       <CardContent className={cn("min-w-0", !pad && "px-0")}>{children}</CardContent>
@@ -149,7 +150,7 @@ export function PageHead({ title, sub, action }: Readonly<{ title: React.ReactNo
     <div className="flex flex-wrap items-end justify-between gap-3">
       <div className="min-w-0">
         <h1 className="text-lg font-bold text-ink">{title}</h1>
-        {sub && <p className="text-xs text-muted-foreground">{sub}</p>}
+        {hasContent(sub) && <p className="text-xs text-muted-foreground">{sub}</p>}
       </div>
       {action}
     </div>
@@ -190,7 +191,7 @@ export function Kpi({ label, value, icon, unit, badge, sub, href, link, tone }: 
         {unit && <span className="ml-1 text-sm font-medium text-muted-foreground">{unit}</span>}
       </div>
       {/* a long word without spaces (unknown/connecting/error) breaks instead of running out of a narrow card */}
-      {sub && <p className="break-words text-xs text-muted-foreground">{sub}</p>}
+      {hasContent(sub) && <p className="break-words text-xs text-muted-foreground">{sub}</p>}
       {href && link && <TextLink href={href} className="mt-auto pt-1">{link} <Icon name="arrowRight" /></TextLink>}
     </UICard>
   );
@@ -201,7 +202,7 @@ export function Stat({ label, value, sub }: Readonly<{ label: string; value: Rea
     <div className="min-w-0 rounded-xl bg-surface2 p-3">
       <div className="text-[11px] text-muted-foreground">{label}</div>
       <div className="text-base font-bold text-ink">{value}</div>
-      {sub && <div className="text-[11px] text-muted-foreground">{sub}</div>}
+      {hasContent(sub) && <div className="text-[11px] text-muted-foreground">{sub}</div>}
     </div>
   );
 }
@@ -229,9 +230,9 @@ export function EmptyState({ title, children, action }: Readonly<{ title: string
       <EmptyHeader>
         <EmptyMedia variant="icon"><Icon name="info" /></EmptyMedia>
         <EmptyTitle><h3>{title}</h3></EmptyTitle>
-        {children && <EmptyDescription>{children}</EmptyDescription>}
+        {hasContent(children) && <EmptyDescription>{children}</EmptyDescription>}
       </EmptyHeader>
-      {action && <EmptyContent>{action}</EmptyContent>}
+      {hasContent(action) && <EmptyContent>{action}</EmptyContent>}
     </Empty>
   );
 }
@@ -241,7 +242,7 @@ export function ErrorState({ title, children, onRetry }: Readonly<{ title: strin
       <EmptyHeader>
         <EmptyMedia variant="icon" className="bg-crit-soft text-crit"><Icon name="error" /></EmptyMedia>
         <EmptyTitle className="text-crit"><h3>{title}</h3></EmptyTitle>
-        {children && <EmptyDescription>{children}</EmptyDescription>}
+        {hasContent(children) && <EmptyDescription>{children}</EmptyDescription>}
       </EmptyHeader>
       <EmptyContent><Btn size="sm" onClick={onRetry}><Icon name="refresh" /> Retry</Btn></EmptyContent>
     </Empty>
@@ -290,7 +291,7 @@ export function Timeline({ items }: Readonly<{ items: { time: string; title: Rea
           <span className={cx("mt-1.5 h-2.5 w-2.5 rounded-full", (it.tone && DOT_CLS.get(it.tone)) ?? "bg-primary")} />
           <div className="min-w-0">
             <div className="font-semibold">{it.title}</div>
-            {it.detail && <div className="text-xs text-muted-foreground">{it.detail}</div>}
+            {hasContent(it.detail) && <div className="text-xs text-muted-foreground">{it.detail}</div>}
           </div>
         </li>
       ))}
@@ -326,13 +327,13 @@ export function Field({ label, hint, error, children, className, labelHidden }: 
   const Tag = isGroup ? "div" : "label";
   // an error marks its control invalid, so assistive technology tells which field to fix; the error text is part of
   // the label, and so of the control's name (IR573)
-  const field = element && isControl && error ? cloneElement(element, { "aria-invalid": true }) : children;
+  const field = element && isControl && hasContent(error) ? cloneElement(element, { "aria-invalid": true }) : children;
   return (
     <Tag role={isGroup ? "group" : undefined} aria-label={isGroup ? label : undefined} className={cx("flex min-w-0 flex-col gap-1 text-xs text-ink", className)}>
       <span aria-hidden={isGroup || undefined} className={cx("font-semibold", labelHidden && "sr-only")}>{label}</span>
       {field}
-      {error ? <span className="flex items-center gap-1 font-medium text-crit"><Icon name="error" />{error}</span> : null}
-      {!error && hint ? <span className="font-normal text-muted-foreground">{hint}</span> : null}
+      {hasContent(error) ? <span className="flex items-center gap-1 font-medium text-crit"><Icon name="error" />{error}</span> : null}
+      {!hasContent(error) && hasContent(hint) ? <span className="font-normal text-muted-foreground">{hint}</span> : null}
     </Tag>
   );
 }
@@ -484,7 +485,7 @@ export function Modal({ open, title, onClose, children, footer, wide, finalFocus
           <DialogClose render={<Button variant="ghost" size="icon-sm" aria-label={t("Close")} />}><Icon name="close" /></DialogClose>
         </div>
         <div data-part="body" className="flex flex-col gap-3 overflow-y-auto px-5 py-4">{children}</div>
-        {footer && <div data-part="footer" className="flex flex-wrap justify-end gap-2 rounded-b-xl border-t bg-muted/50 px-5 py-3">{footer}</div>}
+        {hasContent(footer) && <div data-part="footer" className="flex flex-wrap justify-end gap-2 rounded-b-xl border-t bg-muted/50 px-5 py-3">{footer}</div>}
       </DialogContent>
     </Dialog>
   );

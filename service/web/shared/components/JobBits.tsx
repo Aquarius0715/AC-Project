@@ -1,5 +1,6 @@
 "use client";
 
+import { hasContent } from "@ac/web/lib/hasContent";
 import { Badge, Input, Select, cx } from "./ui";
 import { Icon, type IconName } from "@ac/web/components/Icon";
 import type { JobStatus, Origin, Slot } from "@ac/web/lib/jobs";
@@ -73,7 +74,7 @@ export function SlotLine({ i, slot, struck, note }: Readonly<{ i: number; slot: 
     <div className="flex flex-wrap items-center gap-2 text-[13px]">
       <Rank i={i} />
       <span className={cx("font-semibold", struck && "text-muted-foreground line-through")}>{slot.date.slice(5)} · {slot.win}</span>
-      {note && <span className="text-xs text-muted-foreground">{note}</span>}
+      {hasContent(note) && <span className="text-xs text-muted-foreground">{note}</span>}
     </div>
   );
 }

@@ -31,7 +31,7 @@ export async function loadDevices(options: { selected?: string; unitId?: string;
   const names = new Map(units.map((u) => [u.id, u.displayName]));
   const rows = techDeviceRows(devices, names, now.getTime(), t);
   const bound = new Set(devices.map((d) => d.unitId).filter(Boolean));
-  const free = units.filter((u) => !u.archived && !bound.has(u.id) && jobFor(u.id, myJobs));
+  const free = units.filter((u) => !u.archived && !bound.has(u.id) && Boolean(jobFor(u.id, myJobs)));
   const freeDetails = await Promise.all(free.map((u) => quiet(coreOp<Unit>("units.get", { id: u.id }))));
   const live: TechDevicesLive = {
     rows, canMaintain: perms.has("device.maintain"), canAcknowledge: perms.has("alert.read"), events: options.events, device: null, // acknowledging needs alert.read (IR284)
@@ -42,7 +42,7 @@ export async function loadDevices(options: { selected?: string; unitId?: string;
     }),
     rebind: units.filter((u) => !u.archived).map((u) => ({ unitId: u.id, label: u.displayName, jobId: jobFor(u.id, myJobs) })).filter((r): r is typeof r & { jobId: string } => !!r.jobId),
   };
-  const row = rows.find((r) => r.id === options.selected) ?? rows.find((r) => options.unitId && r.unitId === options.unitId) ?? rows.at(0);
+  const row = rows.find((r) => r.id === options.selected) ?? rows.find((r) => !!options.unitId && r.unitId === options.unitId) ?? rows.at(0);
   if (!row) return live;
   const { id } = row;
   const d = await coreOp<ApiDeviceDetail & { activeOperation: (ApiDeviceOperation & { startedAt?: string | null; expiresAt?: string }) | null }>("devices.get", { id });

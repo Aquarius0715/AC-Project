@@ -113,6 +113,11 @@ export function webConfig(tsconfigRootDir) {
             selector: "TSAsExpression > TSAsExpression[typeAnnotation.type=/^TS(?:Unknown|Any)Keyword$/]",
             message: "Narrow the value with a runtime check or a Zod schema instead of asserting through unknown or any.",
           },
+          {
+            // a length of 0 is a number React renders ("0"); the number that stands alone in `&&` is this one
+            selector: 'JSXExpressionContainer > LogicalExpression[operator="&&"] > MemberExpression.left[property.name="length"]',
+            message: "`{list.length && <X />}` renders 0 for an empty list: compare it, `{list.length > 0 && <X />}`.",
+          },
         ],
         // 3: no raw HTML
         "react/no-danger": "error",
@@ -255,6 +260,11 @@ export function webConfig(tsconfigRootDir) {
         // analysis, and the rule reports a switch that covers a whole union as falling off the end.)
         "@typescript-eslint/switch-exhaustiveness-check": ["error", { considerDefaultExhaustiveForUnions: true }],
         "@typescript-eslint/strict-void-return": "error",
+        // A condition names what it tests. A string, a number or an optional value may stand alone (an empty string, 0 and a
+        // missing value all mean "not set" here, and React renders "" as nothing); an object that may be null may too. A value of
+        // a mixed type (a ReactNode, a string-or-boolean) says what it tests: hasContent(node), !!value or a comparison. The
+        // number that leaks into the page, `{n && <X />}`, is the selector in no-restricted-syntax
+        "@typescript-eslint/strict-boolean-expressions": ["error", { allowNullableString: true, allowNullableBoolean: true, allowNullableNumber: true }],
         // a file reads top-down: the exported function first, its helpers below. A helper (a function, or a const holding one)
         // that a function calls is defined by the time the call runs; only a use in the same scope before the declaration (the
         // temporal dead zone) is a mistake, and that is what `variables: false` leaves

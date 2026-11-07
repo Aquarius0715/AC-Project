@@ -44,7 +44,7 @@ export function ModelsTab({ live }: Readonly<{ live: DevicesLive }>) {
   const changes = sel ? capabilityChanges(d, capabilityDraft(sel.cap), t) : [];
   const isDirty = changes.length > 0;
   const onModel = new Set(units.map((u) => u.id));
-  const runningOn = (v: string) => live.devices.filter((x) => x.unitId && onModel.has(x.unitId) && x.fw === v).length;
+  const runningOn = (v: string) => live.devices.filter((x) => !!x.unitId && onModel.has(x.unitId) && x.fw === v).length;
   const problemOnAdd = adding === null ? null : firmwareProblem(adding, d.firmware, t);
   const addVersion = () => {
     if (adding === null || problemOnAdd) return;

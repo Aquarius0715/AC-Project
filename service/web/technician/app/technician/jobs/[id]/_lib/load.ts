@@ -19,7 +19,7 @@ const quiet = <T,>(p: Promise<T>): Promise<T | Refused> => {
     throw error;
   });
 };
-const isRefused = (x: unknown): x is Refused => !!x && typeof x === "object" && "refused" in x;
+const isRefused = (x: unknown): x is Refused => x !== null && typeof x === "object" && "refused" in x;
 
 export async function loadWorkspace(jobId: string): Promise<WorkspaceLive | "not_found" | { kind: "history"; card: ReturnType<typeof historyCard> }> {
   /** jobs.get for the technician: the detail while the job is theirs, the snapshot after the window (IR124); an offer
