@@ -113,10 +113,11 @@ export function webConfig(tsconfigRootDir) {
         ],
         // 3: no raw HTML
         "react/no-danger": "error",
-        // 4-2: the cyclomatic count adds every case of a flat switch or lookup, so it takes Go's limit (30);
-        // sonarjs/cognitive-complexity is the measure Go's gocognit takes, with its limit (30)
-        "sonarjs/cyclomatic-complexity": ["error", { threshold: 30 }],
-        "sonarjs/cognitive-complexity": ["error", 30],
+        // 4-2: the cyclomatic count adds every case of a flat switch or lookup and every conditional render of a view, so a
+        // screen component gets 60 (Go's limit is 30, which suits code without markup); the same 60 for the cognitive
+        // measure. The few above it are split
+        "sonarjs/cyclomatic-complexity": ["error", { threshold: 60 }],
+        "sonarjs/cognitive-complexity": ["error", 60],
         // 4-2: a status, tone or kind is a union of its named values ("idle" | "running" | "failed" | "ok"); the default
         // (2 members) would flag every such union. The limit is 9 members: the Core API state machines (a command, a
         // proposal, a release) have up to 6 named states, and a page's modal state (new, decline, rate, ...) has up to 9.
