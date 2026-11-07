@@ -50,7 +50,7 @@ describe("useAction", () => {
   it("sends a session HQ signed out everywhere to sign-in, back to this page", async () => {
     const { after, failed } = await press({ ok: false, code: "UNAUTHENTICATED", messageKey: "errors.session_revoked", fieldErrors: {} });
     expect(assign.mock.calls).toEqual([["/login?error=revoked&returnTo=%2Fadmin%2Funits%3FcustomerId%3Dc-1%26tab%3Dusers"]]);
-    await act(() => new Promise((r) => setTimeout(r, 20))); // past the tick on which Sonner would add a toast
+    await act(() => new Promise((r) => { setTimeout(r, 20); })); // past the tick on which Sonner would add a toast
     expect([after.mock.calls.length, failed.mock.calls.length, screen.queryByRole("alert")?.textContent ?? ""]).toEqual([0, 0, ""]);
   });
 

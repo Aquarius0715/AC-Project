@@ -10,6 +10,7 @@ const CONTRACT_RTO_A = "contract-rto-a";
 const INVOICE_OVERDUE_A = "invoice-overdue-a";
 const NO_METHOD = "Method not selected";
 
+import { isNone } from "@ac/web/lib/isNone";
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { usePathname, useRouter } from "next/navigation";
@@ -236,9 +237,9 @@ export function BillingView({ live }: Readonly<{ live?: BillingLive }>) {
   const sel = list.find((x) => x.id === (live ? live.selectedInvoice?.id : demoSel)) ?? list.at(0) ?? null;
   const detail = live?.selectedInvoice;
   const shown = list.filter((x) => f === "All" || x.st === f);
-  const hasPayment = live ? (detail?.payments.length ?? 0) > 0 : sel?.paymentState != null;
+  const hasPayment = live ? (detail?.payments.length ?? 0) > 0 : !isNone(sel?.paymentState);
   // a failed or expired card payment leaves the invoice open to a manual one (IR447)
-  const isManualBlocked = live ? !(detail?.manualAllowed ?? true) : sel?.paymentState != null && sel.paymentState !== "failed";
+  const isManualBlocked = live ? !(detail?.manualAllowed ?? true) : !isNone(sel?.paymentState) && sel.paymentState !== "failed";
   const [modal, setModal] = useState<null | "create" | "manual" | "confirm">(null);
   const [m, setM] = useState({ amount: "", ref: "", reason: "", paidAt: "2026-09-14" });
   const [tried, setTried] = useState(false);
@@ -280,7 +281,7 @@ export function BillingView({ live }: Readonly<{ live?: BillingLive }>) {
     setTried(true);
     const id = detail?.processingPaymentId;
     const version = detail?.processingPaymentVersion;
-    if (!sel || !m.ref.trim() || !m.reason.trim() || !id || version == null) return;
+    if (!sel || !m.ref.trim() || !m.reason.trim() || !id || isNone(version)) return;
     act(() => confirmCardPayment(id, version, m.ref.trim(), sel.amountMinor, sel.currency, m.reason.trim()), t("Card payment confirmed"), close);
   };
   const create = () => {
@@ -378,7 +379,7 @@ const shortId = (id: string) => (/^[0-9a-f-]{36}$/.test(id) ? id.slice(0, 8) : i
 /** The inquiry's restriction: a link to it (live), its ID (demo), or none. */
 function restrictionCell(id: string | null | undefined, isLive: boolean): React.ReactNode {
   if (!id) return <>—</>;
-  return isLive ? <Link key="r" className="font-mono font-semibold text-primary" href={`/admin/restrictions?restrictionId=${id}`}>{shortId(id)}</Link> : <>{id}</>;
+  return isLive ? <Link key="r" className="font-mono font-semibold text-primary" href={`/admin/restrictions?restrictionId=${id}`}>{shortId(id)}</Link> : <span>{id}</span>;
 }
 /** The restrictions this invoice is a cause of (DD-A08 step 6): their IDs with a link each to the restriction on the
 Restrictions screen, which checks restriction.read itself; their state and units are not read here (IR321). */

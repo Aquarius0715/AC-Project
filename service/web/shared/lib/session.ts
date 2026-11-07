@@ -319,7 +319,7 @@ export async function readSession(): Promise<Session | null> {
 
 /** A same-origin path to return to after sign-in; rejects absolute, protocol-relative ("//host") and backslash forms. */
 export function safeReturnTo(v: string | null | undefined): string | null {
-  return !v || !v.startsWith("/") || v.startsWith("//") || v.includes("\\") || /[\u{0}-\u{1F}]/u.test(v) ? null : v;
+  return !v || !v.startsWith("/") || v.startsWith("//") || v.includes("\\") || /\p{Cc}/u.test(v) ? null : v;
 }
 
 export const roleHome: Record<Session["role"], string> = { client: "/customer", contractor: "/partner", technician: "/technician", admin: "/admin" };

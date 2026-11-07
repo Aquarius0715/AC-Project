@@ -1,6 +1,7 @@
 // Digital MRV demo (FR-A14, DATA_SOURCE=API): Scope 2 reports, their versions and emission factors projected for
 // /admin/mrv. Pure code shared by the Server Component and the client view; texts in the display language (`t` / `i`).
 // Report periods are Kuala Lumpur business time and say so; review times are in the display time zone (IR297).
+import { isNone } from "@ac/web/lib/isNone";
 import { klInstant, klLocal, periodError, klStamp, one, saving, summaryView, type ApiBaseline, type ApiEnergySummary, type BoundaryId, type SummaryView } from "@ac/web/lib/energy";
 import { EN, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
 import { codePoints } from "@ac/web/lib/text";
@@ -57,7 +58,7 @@ export function mrvView(p: ApiMRVPreview, orgs: { id: string; name: string }[], 
   const s = summaryView(p.summary, i);
   const unit = new Map(units.map((u) => [u.id, u.label]));
   const b = p.summary.baselineSnapshot;
-  const baselineTotal = b?.baselineKWh == null ? tr("no value") : `${one(b.baselineKWh)} kWh`;
+  const baselineTotal = isNone(b?.baselineKWh) ? tr("no value") : `${one(b.baselineKWh)} kWh`;
   const f = p.summary.factorSnapshot;
   const isIncomplete = p.incomplete || t.kWh === null || t.emissionsKg === null;
   return {

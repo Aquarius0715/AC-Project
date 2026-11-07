@@ -8,6 +8,7 @@
 // - vitest's recommended rules for the unit tests (playwright's come with the E2E config).
 // The scripts run ESLint with --max-warnings=0, so every finding fails the lint.
 import comments from "@eslint-community/eslint-plugin-eslint-comments/configs";
+import js from "@eslint/js";
 import vitest from "@vitest/eslint-plugin";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
@@ -15,6 +16,7 @@ import security from "eslint-plugin-security";
 import sonarjs from "eslint-plugin-sonarjs";
 import unicorn from "eslint-plugin-unicorn";
 import { defineConfig, globalIgnores } from "eslint/config";
+import path from "node:path";
 import tseslint from "typescript-eslint";
 
 // eslint-config-next registers react, react-hooks, import and jsx-a11y; their rule sets come from those same plugin
@@ -32,6 +34,7 @@ const everyRule = (prefix, plugin) =>
 /** @param {string} tsconfigRootDir the directory of the tsconfig.json the files belong to */
 export function webConfig(tsconfigRootDir) {
   return defineConfig([
+    js.configs.recommended,
     ...nextVitals,
     ...nextTs,
     tseslint.configs.strictTypeChecked,
@@ -191,6 +194,29 @@ export function webConfig(tsconfigRootDir) {
         ],
       },
     },
+    { settings: { "import/internal-regex": "^@ac/web(?:/|$)" } },
+    // Round 3 (2026-11-07): rules outside the recommended sets, added as each reaches zero findings
+    {
+      rules: {
+        // typescript-eslint and tsc check names and undeclared variables; the core rules would report them twice
+        "no-undef": "off",
+        // syntactic, so it flags every `cond && <X />` whose left side is a boolean, string or object (581 of 582 here), and
+        // React renders none of them; only a number (0) leaks, and @typescript-eslint/strict-boolean-expressions finds that
+        // one by its type
+        "react/jsx-no-leaked-render": "off",
+        "eqeqeq": "error",
+        "no-promise-executor-return": "error",
+        "react/jsx-no-constructed-context-values": "error",
+        "react/jsx-no-useless-fragment": "error",
+        "import/no-relative-packages": "error",
+        // console.warn and console.error are the logs of the Next.js server process (a failing session store, a missing
+        // translation); console.log, info and debug stay forbidden, as leftovers of debugging
+        "no-console": ["error", { allow: ["warn", "error"] }],
+        // an import names a package of the workspace root or of the workspace itself (shared, an app, e2e); `@ac/web/*` is the
+        // shared package's own path alias (tsconfig paths), an internal module and no dependency of itself (see settings above)
+        "import/no-extraneous-dependencies": ["error", { packageDir: [tsconfigRootDir, path.resolve(tsconfigRootDir, "..")] }],
+      },
+    },
     {
       // 1: no assertion that narrows a type. The rule reads types, so it applies to the TypeScript files only: the config
       // files (*.mjs) are linted without type information
@@ -273,6 +299,12 @@ export function webConfig(tsconfigRootDir) {
       // components.json expects ("utils": "@ac/web/lib/utils")
       files: ["**/lib/utils.ts"],
       rules: { "unicorn/no-barrel-files": "off" },
+    },
+    {
+      // the four apps' and the shared package's ESLint configs share the rules of the workspace root by a relative path; the
+      // root is not a package that resolves by name (it is no dependency of any workspace)
+      files: ["**/eslint.*config.mjs"],
+      rules: { "import/no-relative-packages": "off" },
     },
     {
       // Next.js runs next.config.ts as CommonJS here (the packages have no "type": "module"), where __dirname is the

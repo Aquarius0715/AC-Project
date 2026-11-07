@@ -8,7 +8,7 @@ export interface Paced { ok: boolean; code?: string; retryAfterSeconds?: number 
 /** Sends `send()`; while it is refused as RATE_LIMITED, calls `onWait(seconds)`, waits and sends again, up to `tries`
 more times. The wait is the advised one, kept within 1–60 s (5 s when none is given). */
 export async function sendPaced<R extends Paced>(send: () => Promise<R>, onWait: (seconds: number) => void, tries = 5,
-  pause: (ms: number) => Promise<void> = (ms) => new Promise((done) => setTimeout(done, ms))): Promise<R> {
+  pause: (ms: number) => Promise<void> = (ms) => new Promise((done) => { setTimeout(done, ms); })): Promise<R> {
   let r = await send();
   for (let n = 0; !r.ok && r.code === "RATE_LIMITED" && n < tries; n++) {
     const seconds = Math.min(Math.max(r.retryAfterSeconds ?? 5, 1), 60);

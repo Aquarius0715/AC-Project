@@ -4,6 +4,7 @@
 // the server loader and the client view; Vitest covers it. Texts in the display language (`i` / `t`, IR291): a breach
 // is phrased from its kind and its response minutes, and the targets' start times are instants in the display time
 // zone, as typed (NFR-08).
+import { isNone } from "@ac/web/lib/isNone";
 import { EN, showDate, showTime, translator, zonedParts, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import { actionMessage } from "@ac/web/lib/actionMessage";
 import { planLabel } from "@ac/web/lib/contracts";
@@ -87,8 +88,8 @@ export function slaRows(sc: ApiScorecard, customers: { id: string; name: string;
 const duration = (min: number, t: T) => (min % 60 === 0 ? t("{n} h", { n: Math.floor(min / 60) }) : t("{h} h {m} min", { h: Math.floor(min / 60), m: min % 60 }));
 /** A breach in words from its kind and response minutes (IR291); the API's English detail when it has neither. */
 export function breachText(b: ApiBreach, t: T = en): string {
-  if (b.kind === "response" && b.limitMinutes != null) {
-    return b.tookMinutes == null ? t("no response within {limit}", { limit: duration(b.limitMinutes, t) }) : t("response {took} vs {limit}", { took: duration(b.tookMinutes, t), limit: duration(b.limitMinutes, t) });
+  if (b.kind === "response" && !isNone(b.limitMinutes)) {
+    return isNone(b.tookMinutes) ? t("no response within {limit}", { limit: duration(b.limitMinutes, t) }) : t("response {took} vs {limit}", { took: duration(b.tookMinutes, t), limit: duration(b.limitMinutes, t) });
   }
   const fixed: Record<string, string> = { arrival: "arrival outside the scheduled window", first_time_fix: "not fixed the first time", overdue: "open past its due time" };
   return textOf(fixed, b.kind, t) ?? b.detail;

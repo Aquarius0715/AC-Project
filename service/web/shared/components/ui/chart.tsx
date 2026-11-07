@@ -60,8 +60,10 @@ function ChartContainer({
   const uniqueId = useId()
   const chartId = `chart-${id ?? uniqueId.replaceAll(':', "")}`
 
+  const context = useMemo(() => ({ config }), [config])
+
   return (
-    <ChartContext.Provider value={{ config }}>
+    <ChartContext.Provider value={context}>
       <div
         data-slot="chart"
         data-chart={chartId}
@@ -230,7 +232,7 @@ function ChartTooltipContent({
                           {itemConfig?.label ?? item.name}
                         </span>
                       </div>
-                      {item.value != null && (
+                      {item.value !== undefined && (
                         <span className="font-mono font-medium text-foreground tabular-nums">
                           {typeof item.value === "number"
                             ? item.value.toLocaleString()

@@ -86,7 +86,7 @@ describe("payoutPdf", () => {
     expect(pdf).toContain("/BaseFont /Courier");
     expect(pdf).toContain("Contractor \\(A\\) - demo"); // parentheses escaped, non-ASCII replaced
     expect(pdf).toContain("(Net payable");
-    expect(pdf).not.toMatch(/[^\u{0}-\u{7F}]/u);
+    expect(pdf).not.toMatch(/\P{ASCII}/u);
     expect(pdf.match(/\) Tj/g) ?? []).toHaveLength(16); // 2 header + blank + column head + rule + 4 statement lines (Not included rows are left out) + rule + 3 totals + blank + 2 notes
     const xref = Number(must(/startxref\n(\d+)/.exec(pdf))[1]);
     expect(pdf.slice(xref, xref + 4)).toBe("xref");
@@ -113,6 +113,6 @@ describe("payouts in Malay (IR279)", () => {
     const pdf = payoutPdf(statement(), rows, "Demo Contractor A", ms, "ms");
     expect(pdf).toContain("(PENYATA BAYARAN stmt-202  Ogo 2026)");
     expect(pdf).toContain("(Bersih perlu dibayar");
-    expect(pdf).not.toMatch(/[^\u{0}-\u{7F}]/u);
+    expect(pdf).not.toMatch(/\P{ASCII}/u);
   });
 });

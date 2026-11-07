@@ -62,5 +62,7 @@ export function setStoredValue(key: string, value: string) {
     if (localStorage.getItem(key) === value) return;
     localStorage.setItem(key, value);
     dispatchEvent(new Event(STORAGE));
-  } catch {}
+  } catch {
+    // storage is blocked (private window, site data off): the value stays unsaved
+  }
 }

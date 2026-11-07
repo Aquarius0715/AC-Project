@@ -16,7 +16,7 @@ afterEach(() => {
 const show = async (session: () => Promise<Response>) => {
   vi.stubGlobal("fetch", vi.fn(session));
   await act(() => { render(<RouteError what="unit" error={new Error("refused")} retry={vi.fn()} />); return Promise.resolve(); });
-  await act(async () => { await new Promise((r) => setTimeout(r, 0)); }); // the session check settles
+  await act(async () => { await new Promise((r) => { setTimeout(r, 0); }); }); // the session check settles
 };
 const json = (body: unknown) => () => Promise.resolve(Response.json(body));
 

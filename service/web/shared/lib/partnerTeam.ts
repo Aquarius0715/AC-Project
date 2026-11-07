@@ -128,7 +128,7 @@ export function grantRows(members: ApiTeamMember[], nowMs: number, i: I18n = EN)
   };
   const rows: GrantRow[] = [];
   for (const m of members) {
-    if ((m.qualifications) != null) {
+    if (m.qualifications !== undefined) {
       for (const q of m.qualifications) {
         const until = q.validUntil ? businessDay(q.validUntil, locale) : "—";
         const [sub, badge] = standing(m.displayName, q, until);

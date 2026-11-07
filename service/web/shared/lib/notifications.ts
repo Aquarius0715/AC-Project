@@ -1,5 +1,6 @@
 // Notification rows (DATA_SOURCE=API): notifications.list items projected into the inbox row shape. Pure code,
 // shared by the Server Component that reads the list and the client view that renders it (FR-X07).
+import { isNone } from "@ac/web/lib/isNone";
 import type { Role } from "@ac/web/lib/nav";
 import { evidenceText } from "@ac/web/lib/evidence";
 import { money } from "@ac/web/lib/money";
@@ -52,7 +53,7 @@ reminder the invoice's amount (IR488). */
 const details: Record<string, (n: ApiNotification, display: Display) => string> = {
   certificate_expiry: (n, display) => translate(display.locale, "Expires {date}", { date: showDate(n.params.at, display) }),
   warranty_expiring: (n, display) => translate(display.locale, "Warranty ends {date} · no maintenance contract", { date: showDate(n.params.at, display) }),
-  payment_reminder: (n, display) => (n.params.amountMinor != null && n.params.currency ? translate(display.locale, "Amount due {amount}", { amount: money(n.params.amountMinor, n.params.currency) }) : ""),
+  payment_reminder: (n, display) => (!isNone(n.params.amountMinor) && n.params.currency ? translate(display.locale, "Amount due {amount}", { amount: money(n.params.amountMinor, n.params.currency) }) : ""),
 };
 
 /** Types whose title and link come from the type rather than the template: a filter cleaning reminder (alert template,

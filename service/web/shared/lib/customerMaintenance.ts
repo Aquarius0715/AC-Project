@@ -79,7 +79,9 @@ export function clientRows(rows: ApiClientRow[], unit: (id: string) => { name: s
   return [...rows].toSorted((a, b) => ORDER.indexOf(a.displayStatus) - ORDER.indexOf(b.displayStatus) || Date.parse(a.dueAt) - Date.parse(b.dueAt)).map((j) => {
     const u = unit(j.unitId);
     const isPlan = j.origin === PERIODIC_PLAN;
-    let line = "", isWarn = false, icon: IconName = "time";
+    let line: string; // every case below sets it
+    let isWarn = false;
+    let icon: IconName = "time";
     switch (j.displayStatus) {
       case TIME_PROPOSED: { [line, isWarn, icon] = [t("A new visit time needs your reply — nothing is booked until you accept"), true, "swap"]; break;
       }

@@ -37,7 +37,7 @@ export async function advanceClock(minutes: number) {
     for (let i = 0; i < 12; i++) {
       const clock = await coreClockFresh();
       if (clock.getTime() >= target) break;
-      await new Promise((r) => setTimeout(r, 250));
+      await new Promise((r) => { setTimeout(r, 250); });
     }
     return null;
   });

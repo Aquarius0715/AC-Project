@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext } from "react"
+import { createContext, useContext, useMemo } from "react"
 import { Toggle as TogglePrimitive } from "@base-ui/react/toggle"
 import { ToggleGroup as ToggleGroupPrimitive } from "@base-ui/react/toggle-group"
 import { type VariantProps } from "class-variance-authority"
@@ -34,6 +34,8 @@ function ToggleGroup({
     spacing?: number
     orientation?: "horizontal" | "vertical"
   }) {
+  const context = useMemo(() => ({ variant, size, spacing, orientation }), [variant, size, spacing, orientation])
+
   return (
     <ToggleGroupPrimitive
       data-slot="toggle-group"
@@ -48,9 +50,7 @@ function ToggleGroup({
       )}
       {...props}
     >
-      <ToggleGroupContext.Provider
-        value={{ variant, size, spacing, orientation }}
-      >
+      <ToggleGroupContext.Provider value={context}>
         {children}
       </ToggleGroupContext.Provider>
     </ToggleGroupPrimitive>
