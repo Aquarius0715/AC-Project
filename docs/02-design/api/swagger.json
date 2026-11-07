@@ -17515,7 +17515,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: authenticated:recipient-only\nValidation: D01; input constraints in the corresponding DD; IR379 1–100 distinct IDs; the caller's unread notifications with a readable target are marked read, every other ID is skipped (never told apart); one write for the whole list\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DDC-07, DD-C08",
+                "description": "Authorization: authenticated:recipient-only\nValidation: D01; input constraints in the corresponding DD; IR379 1–100 distinct IDs, or IR637 all:true (not both); the caller's unread notifications with a readable target are marked read, every other listed ID is skipped (never told apart); one write for the whole list\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DDC-07, DD-C08",
                 "consumes": [
                     "application/json"
                 ],
@@ -35311,6 +35311,9 @@
         "notify.MarkAllReadInput": {
             "type": "object",
             "properties": {
+                "all": {
+                    "type": "boolean"
+                },
                 "ids": {
                     "type": "array",
                     "items": {

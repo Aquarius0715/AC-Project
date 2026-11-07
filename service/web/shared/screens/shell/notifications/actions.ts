@@ -27,12 +27,12 @@ export async function markRead(id: string, version: number): Promise<ActionFailu
   }
 }
 
-/** “Mark all as read” (Figma Client 10c): the listed unread notifications in one notifications.markAllRead write, so the
-click spends one write of the member's limit (IR375, IR379); returns how many were marked and how many were skipped
-(read meanwhile or no longer available), or why nothing was marked. */
-export async function markAllRead(ids: string[]): Promise<{ marked: number; skipped: number; failure: ActionFailure | null }> {
+/** “Mark all as read” (Figma Client 10c): every unread notification of the member in one notifications.markAllRead write,
+also the ones older than the newest 100 the page lists (IR637), so the click spends one write of the member's limit
+(IR375, IR379); returns how many were marked and how many were skipped (none with all), or why nothing was marked. */
+export async function markAllRead(): Promise<{ marked: number; skipped: number; failure: ActionFailure | null }> {
   try {
-    const r = await coreOp<NotificationsMarked>("notifications.markAllRead", { ids }, { write: true });
+    const r = await coreOp<NotificationsMarked>("notifications.markAllRead", { all: true }, { write: true });
     return { marked: r.markedIds.length, skipped: r.skippedIds.length, failure: null };
   } catch (error) {
     return { marked: 0, skipped: 0, failure: failure(error) }; // everything stays unread

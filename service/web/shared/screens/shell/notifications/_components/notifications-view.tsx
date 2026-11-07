@@ -18,8 +18,12 @@ const readFailure = (f: ActionFailure, t: T) => {
   return f.messageKey === "error.notFound" ? t("This notification is no longer available.") : t("Not marked as read: {reason}", { reason: actionMessage(f, t) });
 };
 
-/** The inbox. `rows` come from the Server Component in API mode; without them the Phase 1A demo rows are shown. */
-export function NotificationsView({ rows }: Readonly<{ rows?: InboxRow[] }>) {
+/** The inbox as the Server Component read it in API mode: the newest notifications and the newest unread ones, each
+with its total (the page lists at most 100 of each, IR637). */
+export interface ApiInbox { rows: InboxRow[]; total: number; unreadRows: InboxRow[]; unreadTotal: number }
+
+/** The inbox. `inbox` comes from the Server Component in API mode; without it the Phase 1A demo rows are shown. */
+export function NotificationsView({ inbox }: Readonly<{ inbox?: ApiInbox }>) {
   const t = useT();
   const role = useStoredRole();
   const demo = useDemoInbox(role);
@@ -27,11 +31,16 @@ export function NotificationsView({ rows }: Readonly<{ rows?: InboxRow[] }>) {
   const [pending, start] = useTransition();
   const [failed, setFailed] = useState<string | null>(null);
   const toast = useToast();
-  const isApi = rows !== undefined;
-  const all = isApi
-    ? rows.map((n) => ({ ...n, live: true }))
+  const isApi = inbox !== undefined;
+  const all = inbox
+    ? inbox.rows.map((n) => ({ ...n, live: true }))
     : [...demo.own.map((n) => ({ id: n.id, version: 0, t: n.title, d: n.detail, w: n.at, read: n.read, href: n.href, live: true })), ...demo.fixed.map((i) => ({ ...i, version: 0, live: false }))];
-  const shown = all.filter((i) => tab === "all" || !i.read);
+  const unread = inbox ? inbox.unreadRows.map((n) => ({ ...n, live: true })) : all.filter((i) => !i.read);
+  const shown = tab === "all" ? all : unread;
+  // the counts are the totals, as the sidebar badge is; the lists hold the newest 100 of each
+  const allTotal = inbox ? inbox.total : all.length;
+  const unreadTotal = inbox ? inbox.unreadTotal : unread.length;
+  const hidden = (tab === "all" ? allTotal : unreadTotal) - shown.length;
   const open = (n: { id: string; version: number; read: boolean; live: boolean }) => {
     if (isApi) {
       if (n.read) return;
@@ -39,8 +48,7 @@ export function NotificationsView({ rows }: Readonly<{ rows?: InboxRow[] }>) {
     }
     if (n.live) jobActions.markRead(n.id); else jobActions.markFixedRead([n.id]);
   };
-  const unread = all.filter((i) => !i.read);
-  // “Mark all as read” (Figma Client 10c): every unread notification of the list in one write (IR379)
+  // “Mark all as read” (Figma Client 10c): every unread notification of the member in one write (IR379, IR637)
   const readAll = () => {
     if (!isApi) {
       for (const n of unread) if (n.live) jobActions.markRead(n.id);
@@ -48,7 +56,7 @@ export function NotificationsView({ rows }: Readonly<{ rows?: InboxRow[] }>) {
       toast(t(unread.length === 1 ? "1 notification marked as read" : "{n} notifications marked as read", { n: unread.length })); return;
     }
     start(async () => {
-      const r = await markAllRead(unread.map((n) => n.id));
+      const r = await markAllRead();
       setFailed(null);
       if (r.failure) { toast(readFailure(r.failure, t), "crit"); return; }
       toast(r.skipped ? t("{n} marked as read · {skipped} skipped — read meanwhile or no longer available", { n: r.marked, skipped: r.skipped }) : byCount(r.marked, { one: t("1 notification marked as read"), many: t("{n} notifications marked as read", { n: r.marked }) }));
@@ -57,8 +65,8 @@ export function NotificationsView({ rows }: Readonly<{ rows?: InboxRow[] }>) {
   return (
     <Page className="max-w-3xl">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Tabs value={tab} onChange={setTab} tabs={[{ id: "all", label: t("All"), count: all.length }, { id: "unread", label: t("Unread"), count: unread.length }]} />
-        {unread.length > 0 && <Btn size="sm" disabled={pending} onClick={readAll}>{t("Mark all as read")}</Btn>}
+        <Tabs value={tab} onChange={setTab} tabs={[{ id: "all", label: t("All"), count: allTotal }, { id: "unread", label: t("Unread"), count: unreadTotal }]} />
+        {unreadTotal > 0 && <Btn size="sm" disabled={pending} onClick={readAll}>{t("Mark all as read")}</Btn>}
       </div>
       {failed && <p role="alert" className="text-xs text-crit">{failed}</p>}
       <Card pad={false} className={pending ? "opacity-70" : undefined}>
@@ -70,6 +78,7 @@ export function NotificationsView({ rows }: Readonly<{ rows?: InboxRow[] }>) {
           })}
           {shown.length === 0 && <li className="p-6 text-center text-muted-foreground">{t(tab === "unread" ? "No unread notifications" : "No notifications")}</li>}
         </ul>
+        {hidden > 0 && <p className="border-t border-line px-4 py-2 text-xs text-muted-foreground">{t("Showing the newest {n} notifications.", { n: shown.length })}</p>}
       </Card>
       <p className="text-xs text-muted-foreground">{t("Reading a notification is separate from resolving the linked alert. Maintenance scheduling events (new request, time proposed, accepted/declined, new offer, new assignment) appear here for the role that has to act.")} {!isApi && <Badge tone="muted">{t("preview only")}</Badge>}</p>
     </Page>

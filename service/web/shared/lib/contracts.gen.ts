@@ -355,7 +355,7 @@ export type OperationContracts = {
   'mrv.recordReview': {input:{reportId:ID;reportVersion:number;reviewComment:string};result:MRVReport;mode:'write'};
   'mrv.saveDraft': {input:{id?:ID;conditions:MRVConditions;evidenceIds:ID[]};result:MRVReport;mode:'write'};
   'notifications.list': {input:Query;result:Page<Notification>;mode:'read'};
-  'notifications.markAllRead': {input:{ids:ID[]};result:NotificationsMarked;mode:'write'};
+  'notifications.markAllRead': {input:{ids?:ID[];all?:boolean};result:NotificationsMarked;mode:'write'};
   'notifications.markRead': {input:{id:ID};result:Notification;mode:'write'};
   'notifications.recipients': {input:{target:Target;templateKey:Notification['templateKey'];channel:Channel;role?:Role;query:Query};result:Page<NotificationRecipient>;mode:'read'};
   'notifications.preview': {input:{target:Target;templateKey:Notification['templateKey'];channel:Channel;recipientMembershipId:ID;sourceAlertId?:ID;message?:string;reason?:string;severity?:Severity};result:NotificationPreview;mode:'read'};

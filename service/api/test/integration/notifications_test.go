@@ -304,6 +304,90 @@ func TestMarkAllRead(t *testing.T) {
 	}
 }
 
+// TestMarkAllReadEveryUnread: with all, "Mark all as read" marks every unread notification of the caller, also the
+// ones past the 100 an inbox page lists (IR637). The same rules hold: another member's notifications and the ones
+// whose target the caller cannot read stay unread, and it is exactly one of ids and all.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
+func TestMarkAllReadEveryUnread(t *testing.T) {
+	srv := server(t)
+	batch := uuid.NewString()
+	insert := func(member, unit string, n int) {
+		owner(
+			t,
+			`INSERT INTO notify.notifications (tenant_id, recipient_membership_id, scope_version_at_creation, type,
+				template_key, target, params, severity, occurred_at)
+			SELECT $1,$2,1,'fault','alert',$3::jsonb,$4::jsonb,'warning',$5::timestamptz - (g || ' seconds')::interval
+			FROM generate_series(1,$6::int) g`,
+			seed.ID("tenant-a"),
+			seed.ID(member),
+			`{"kind":"unit","id":"`+seed.ID(unit).String()+`"}`,
+			`{"batch":"`+batch+`"}`,
+			clock(),
+			n,
+		)
+	}
+	insert("customer-b", "unit-other-customer", 130)
+	insert(
+		"customer-b",
+		"unit-online-rto",
+		1,
+	) // customer A's unit: customer-b cannot read the target (IR58)
+	insert("customer-a", "unit-online-rto", 1)
+
+	unreadOf := func(member string) int {
+		var unread int
+		ownerScan(
+			t,
+			`SELECT count(*) FROM notify.notifications
+			WHERE params->>'batch' = $1 AND recipient_membership_id = $2 AND read_at IS NULL`,
+			[]any{batch, seed.ID(member)},
+			&unread,
+		)
+
+		return unread
+	}
+
+	code, res := write(
+		srv,
+		customerB(),
+		"notifications.markAllRead",
+		`{"all":true,"ids":["`+uuid.NewString()+`"]}`,
+		0,
+	)
+	refusal(t, "all and ids", code, res, "ids=error.invalid")
+
+	code, res = write(srv, customerB(), "notifications.markAllRead", `{"all":false}`, 0)
+	refusal(t, "neither", code, res, "ids=error.required")
+
+	if unreadOf("customer-b") != 131 {
+		t.Fatalf("customer-b unread before: %d", unreadOf("customer-b"))
+	}
+
+	code, res = write(srv, customerB(), "notifications.markAllRead", `{"all":true}`, 0)
+	if code != 200 {
+		t.Fatalf("markAllRead all: %d %v", code, res)
+	}
+
+	if marked := len(asArr(t, data(res)["markedIds"])); marked < 130 {
+		t.Errorf("marked %d, want at least the 130 readable ones", marked)
+	}
+
+	if skipped := len(asArr(t, data(res)["skippedIds"])); skipped != 0 {
+		t.Errorf("skipped %d, want none", skipped)
+	}
+
+	// the one with an unreadable target and the other member's stay unread
+	if got := [2]int{unreadOf("customer-b"), unreadOf("customer-a")}; got != [2]int{1, 1} {
+		t.Errorf("unread after (customer-b, customer-a) = %v, want [1 1]", got)
+	}
+
+	code, res = write(srv, customerB(), "notifications.markAllRead", `{"all":true}`, 0)
+	if code != 200 || len(asArr(t, data(res)["markedIds"])) != 0 {
+		t.Errorf("again: %d %v", code, res)
+	}
+}
+
 //nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestNotificationRecipientsPreview(t *testing.T) {
 	srv := server(t)

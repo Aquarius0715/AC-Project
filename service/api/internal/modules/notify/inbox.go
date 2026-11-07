@@ -614,16 +614,27 @@ func (Inbox) markRead(
 	return notification, nil
 }
 
-// MarkAllReadInput is notifications.markAllRead input: the listed unread notifications (IR379).
+// MarkAllReadInput is notifications.markAllRead input: the listed unread notifications (IR379), or every unread
+// notification of the caller (All, IR637) — the inbox page lists the newest 100 only, so "Mark all as read" cannot
+// name the older ones. Exactly one of the two.
 type MarkAllReadInput struct {
-	IDs []uuid.UUID `json:"ids"`
+	IDs []uuid.UUID `json:"ids,omitempty"`
+	All bool        `json:"all,omitempty"`
 }
 
 // inboxPage is the size of one inbox page, the most IDs one notifications.markAllRead takes.
 const inboxPage = 100
 
-// Validate implements ops.Validator: 1–100 distinct IDs, the size of one inbox page.
+// Validate implements ops.Validator: either all, or 1–100 distinct IDs (the size of one inbox page), not both.
 func (in *MarkAllReadInput) Validate() map[string]string {
+	if in.All {
+		if len(in.IDs) > 0 {
+			return map[string]string{keyIDs: apperr.KeyInvalid}
+		}
+
+		return nil
+	}
+
 	if len(in.IDs) == 0 {
 		return map[string]string{keyIDs: apperr.KeyRequired}
 	}
@@ -653,14 +664,16 @@ type Marked struct {
 // markAllRead marks the listed notifications read in one write, so "Mark all as read" spends one write of the
 // membership's limit (IR375) instead of one per notification (IR379). Only the caller's unread notifications with a
 // readable target (IR58) change; any other ID (already read, another member's, out of scope, unknown) is skipped
-// alike, so the answer never tells which of them exist. Marking read only moves forward, so no version is expected.
+// alike, so the answer never tells which of them exist. With all, every such notification of the caller changes, not
+// only the ones a page listed (IR637); nothing is skipped then. Marking read only moves forward, so no version is
+// expected.
 //
 //	@Summary		notifications.markAllRead (write)
 //	@ID				notifications.markAllRead
 //	@Description	Authorization: authenticated:recipient-only
-//	@Description	Validation: D01; input constraints in the corresponding DD; IR379 1–100 distinct IDs; the caller's \
-//	@Description	unread notifications with a readable target are marked read, every other ID is skipped (never told \
-//	@Description	apart); one write for the whole list
+//	@Description	Validation: D01; input constraints in the corresponding DD; IR379 1–100 distinct IDs, or IR637 \
+//	@Description	all:true (not both); the caller's unread notifications with a readable target are marked read, every \
+//	@Description	other listed ID is skipped (never told apart); one write for the whole list
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DDC-07, DD-C08
 //	@Tags			notifications
@@ -684,10 +697,17 @@ func (Inbox) markAllRead(
 	call *ops.Call,
 	markAllReadInput *MarkAllReadInput,
 ) (Marked, error) {
-	args := []any{markAllReadInput.IDs, call.Principal.MembershipID, call.Now}
-	stmt := "UPDATE notify.notifications x SET read_at = $3, version = x.version + 1 FROM (SELECT n.id FROM " +
+	args := []any{call.Principal.MembershipID, call.Now}
+	listed := ""
+
+	if !markAllReadInput.All {
+		args = append(args, markAllReadInput.IDs)
+		listed = fmt.Sprintf("n.id = ANY($%d) AND ", len(args))
+	}
+
+	stmt := "UPDATE notify.notifications x SET read_at = $2, version = x.version + 1 FROM (SELECT n.id FROM " +
 		inboxFrom() +
-		" WHERE n.id = ANY($1) AND n.recipient_membership_id = $2 AND n.read_at IS NULL AND " +
+		" WHERE " + listed + "n.recipient_membership_id = $1 AND n.read_at IS NULL AND " +
 		readableSQL(
 			call.Principal,
 			call.Now,
@@ -707,6 +727,12 @@ func (Inbox) markAllRead(
 	}
 
 	out := Marked{MarkedIDs: []uuid.UUID{}, SkippedIDs: []uuid.UUID{}}
+
+	if markAllReadInput.All {
+		out.MarkedIDs = append(out.MarkedIDs, ids...)
+
+		return out, nil
+	}
 
 	for _, id := range markAllReadInput.IDs {
 		if slices.Contains(ids, id) {

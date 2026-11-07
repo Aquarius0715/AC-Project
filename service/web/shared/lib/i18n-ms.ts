@@ -4073,6 +4073,7 @@ export const ms: Record<string, string> = {
   // Mark all as read; the diagnostic end retry (IR351)
   "{n} marked as read · {skipped} skipped — read meanwhile or no longer available": "{n} ditanda sebagai dibaca · {skipped} dilangkau — sudah dibaca sementara itu atau tidak lagi tersedia",
   "Mark all as read": "Tanda semua sebagai dibaca",
+  "Showing the newest {n} notifications.": "Menunjukkan {n} pemberitahuan terbaharu.", // the inbox lists at most 100 (IR637)
   "1 notification marked as read": "1 pemberitahuan ditanda sebagai dibaca",
   "{n} notifications marked as read": "{n} pemberitahuan ditanda sebagai dibaca",
   "End of test run sent again: {reason}": "Penamat larian ujian dihantar semula: {reason}",

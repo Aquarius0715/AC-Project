@@ -9017,3 +9017,24 @@ The user found the CI before a deployment slow, asked to order the jobs for the 
 5. **The lanes after the change.** go-test-cluster → web-test → go-lint | docs → web-lint | go-test → web-typecheck: each about three minutes.
 6. **The E2E's images.** E2E built its 12 images one at a time, 207 s: the four Next.js apps about 160 s, the eight Go images about 50 s. The Go images now build together in one call; the Next.js apps stay one at a time, because four of those builds at once need several GB beside the server's other projects.
 7. **Left as they are.** The cost does not change: the runners are self-hosted, and GitHub does not bill their minutes; the lab server does the same work in less time. The E2E's Playwright specs keep one worker: they share the demo users and restore what they change, so two at once would see each other's changes. The deployment keeps building its images one at a time, for the same reason and because it serves the shared environment.
+
+## IR637 "Mark all as read" marks every unread notification, and the inbox counts them all — 2026-11-08
+
+The user saw, on the shared test environment, that "Mark all as read" turned the rows read but left the sidebar's Notifications count. It was reproduced on the dev stack with 130 unread notifications for one member.
+
+1. **Cause.** The inbox page lists the newest 100 notifications and "Mark all as read" sent the IDs of the unread ones it listed (IR379). The sidebar count is the total of `notifications.list` with `unreadOnly` (IR102), so unread notifications older than the newest 100 were never listed, never marked, and kept the count. The Unread tab counted only the listed rows, so it read 0 while the sidebar did not, and with the tab at 0 the button was gone: there was no way left to read them. Reading single rows was correct.
+2. **Contract.** `notifications.markAllRead` takes `{ids?, all?}`, exactly one of the two. This is not a new operation: the counts stay at 212 operations.
+   - `all: true` marks every unread notification of the caller whose target the caller can read now (IR58), in the same one write. Nothing is skipped then, so `skippedIds` is empty and `markedIds` holds every notification marked.
+   - `ids` keeps its rules (1–100 distinct IDs). `all: true` together with `ids` is refused with `ids=error.invalid`; neither is refused with `ids=error.required`.
+   - Another member's notifications and the ones with an unreadable target stay unread, as before. The write version catalog still says `omit`.
+3. **Web.**
+   - The inbox's "Mark all as read" sends `{all: true}`. Opening a customer alert still sends the IDs of that alert's notifications (DD-C08).
+   - The page reads the newest 100 notifications and the newest 100 unread ones, each with its total. The tabs show the totals, so the Unread tab and the sidebar count the same notifications. The Unread tab lists the unread ones even when they are older than the newest 100, and the button is offered while any is unread.
+   - When a tab holds more than it lists, a line says "Showing the newest n notifications." (Malay text added).
+   - The Phase 1A demo is unchanged by this round; its own badge fix (PR 62) keeps the fixed rows' read state in the job store.
+4. **Docs.** DD-C08 and the shared notifications row of the implementation contracts state the rule; the operation catalog, `service-contracts.ts` and the Swagger description carry the new input.
+5. **Tests.**
+   - Integration `TestMarkAllReadEveryUnread`: 131 unread notifications of one member (one on a unit the member cannot read) and one of another member. `{all, ids}` and `{all: false}` are refused; `{all}` marks the 130, leaves the unreadable one and the other member's, skips nothing, and a second call marks nothing.
+   - Web: `markAllRead.test.ts` requires the action to send `{all: true}`; `notificationsView.test.tsx` checks that the tabs show the totals, that the button is offered when only older notifications are unread, and the "newest n" line.
+   - The shared E2E spec compares the sidebar count with the Unread tab before the click and requires it gone after.
+6. **Checks.** `make test-all` passes with the dev stack's API containers stopped. With them running, the dev Postgres (100 connections) is short of slots for the two suites. The web checks, `check.sh` and the E2E suite pass.

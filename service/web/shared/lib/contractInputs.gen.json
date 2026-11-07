@@ -778,6 +778,7 @@
   "sort"
  ],
  "notifications.markAllRead": [
+  "all",
   "ids"
  ],
  "notifications.markRead": [

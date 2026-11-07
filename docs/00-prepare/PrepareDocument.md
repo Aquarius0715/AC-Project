@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.502.0
+version: 0.503.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -293,6 +293,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.503.0: "Mark all as read" marks every unread notification of the member, also those past the newest 100 the inbox lists, and the tabs count the totals as the sidebar does (IR637). Phase 1A unchanged.
 0.502.0: The shared test environment holds the fixture's accounts and the real devices at customer-a only, on the real clock (DEC-96, IR633). Phase 1A unchanged.
 0.501.0: CI and E2E run on the lab server's runner too, in containers and beside its services (DEC-95, IR632). Phase 1A unchanged.
 0.500.0: The test deployment runs on the lab server as the private repository's self-hosted runner, with its logs on the Actions tab (DEC-94, IR631). Phase 1A unchanged.

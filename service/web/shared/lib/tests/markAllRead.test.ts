@@ -18,20 +18,21 @@ import { domainError, type DomainError } from "@ac/web/lib/domainError";
 
 beforeEach(() => dal.coreOp.mockReset());
 
-// IR379: "Mark all as read" is one write for the whole list, so it spends one of the member's writes a minute (IR375)
+// IR379: "Mark all as read" is one write, so it spends one of the member's writes a minute (IR375); IR637: it names
+// no IDs, so the notifications older than the newest 100 the page lists are marked too
 describe("Mark all as read", () => {
-  it("sends the listed notifications in one write", async () => {
-    dal.coreOp.mockResolvedValueOnce({ markedIds: ["n1", "n3"], skippedIds: ["n2"] });
-    expect(await markAllRead(["n1", "n2", "n3"])).toStrictEqual({ marked: 2, skipped: 1, failure: null });
-    expect(dal.coreOp).toHaveBeenCalledExactlyOnceWith("notifications.markAllRead", { ids: ["n1", "n2", "n3"] }, { write: true });
+  it("asks for every unread notification in one write", async () => {
+    dal.coreOp.mockResolvedValueOnce({ markedIds: ["n1", "n2", "n3"], skippedIds: [] });
+    expect(await markAllRead()).toStrictEqual({ marked: 3, skipped: 0, failure: null });
+    expect(dal.coreOp).toHaveBeenCalledExactlyOnceWith("notifications.markAllRead", { all: true }, { write: true });
   });
   it("passes a refusal on, with the wait of the write limit", async () => {
     dal.coreOp.mockRejectedValueOnce(new dal.CoreError(domainError({ code: "RATE_LIMITED", messageKey: "error.rateLimited", fieldErrors: {}, retryAfterSeconds: 12 })));
-    expect(await markAllRead(["n1"])).toStrictEqual({ marked: 0, skipped: 0, failure: { code: "RATE_LIMITED", messageKey: "error.rateLimited", fieldErrors: {}, retryAfterSeconds: 12 } });
+    expect(await markAllRead()).toStrictEqual({ marked: 0, skipped: 0, failure: { code: "RATE_LIMITED", messageKey: "error.rateLimited", fieldErrors: {}, retryAfterSeconds: 12 } });
   });
   it("marks nothing when the Core API is unreachable", async () => {
     dal.coreOp.mockRejectedValueOnce(new TypeError("fetch failed"));
-    const result = await markAllRead(["n1"]);
+    const result = await markAllRead();
     expect(result.failure?.code).toBe("UNAVAILABLE");
   });
 });

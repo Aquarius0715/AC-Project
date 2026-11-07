@@ -324,6 +324,7 @@ Scope: FR-C08 / Main display pattern: **UI-LIST**. Service boundary: `alerts.lis
 
 1. Filter by severity or unread status. Open notification text, then unit evidence or maintenance requests. Finally, mark only the notification as read.
    - As built (IR379): opening an alert marks the membership's unread notifications about it read in one `notifications.markAllRead` write. One already read meanwhile is skipped.
+   - The shared inbox's “Mark all as read” sends `all` instead of IDs (IR637): the inbox lists the newest 100, and the unread ones past them would keep the sidebar count.
 2. Apply the following business rules to both reads and actions.
    - critical and warning indicate response priority.
    - normal is a health notice, not an unresolved problem.
