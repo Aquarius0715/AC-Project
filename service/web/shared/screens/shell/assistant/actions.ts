@@ -16,6 +16,6 @@ export async function sendVoiceChange(unitId: string, celsius: number, expectedV
     const command = await coreOp<ApiCommand>("commands.create", { unitId, action: { kind: "set_temperature", celsius }, expectedUnitVersion: expectedVersion, source: "voice" }, { write: true });
     return { ok: true, value: command };
   } catch (error) {
-    return error instanceof CoreError ? { ok: false, messageKey: error.error.messageKey, code: error.error.code, fieldErrors: error.error.fieldErrors ?? {}, retryAfterSeconds: error.error.retryAfterSeconds } : { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
+    return error instanceof CoreError ? { ok: false, messageKey: error.error.messageKey, code: error.error.code, fieldErrors: error.error.fieldErrors, retryAfterSeconds: error.error.retryAfterSeconds } : { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
   }
 }

@@ -3,11 +3,17 @@
 // shared by the Server Component and the client view. Texts in the display language and instants in the display time
 // zone; the period's days are the display time zone's days too (`i` / `zone`, IR304). Actions, target kinds and IDs,
 // correlation IDs, field names, event types and evidence sources stay codes (IR304, IR320).
-import { EN, relativeTime, showTime, translator, zonedInstant, zonedParts, type I18n, type T } from "@ac/web/lib/i18n";
+import { EN, relativeTime, showTime, translator, zonedInstant, zonedParts, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import type { OpInput } from "@ac/web/lib/opTypes";
-import type { AuditView } from "@ac/web/lib/contracts.gen";
-import { stateWord, states, type RestrictionState } from "@ac/web/lib/restrictions";
+import { stateWord, states } from "@ac/web/lib/restrictions";
+import { oneOf } from "@ac/web/lib/oneOf";
 import { eventCause, eventRows, type ApiAlertLite, type ApiDeviceEventFull } from "@ac/web/lib/techDevices";
+import { byText } from "@ac/web/lib/order";
+import { wrapped } from "@ac/web/lib/text";
+import { lookup } from "@ac/web/lib/lookup";
+
+const RESTRICTION = "restriction";
+const KL = "Asia/Kuala_Lumpur";
 
 const en = translator("en");
 export type AuditResult = "Success" | "Denied" | "Failed" | "Pending";
@@ -20,26 +26,29 @@ export interface AuditRow {
 /** AuditView of service-contracts.ts. */
 export interface ApiAudit {
   id: string; actorId: string; actorName: string | null; actorRoleAtTime: string; action: string; targetRef: { kind: string; id: string }; previousVersion: number | null; nextVersion: number | null;
-  occurredAt: string; correlationId: string; result: "success" | "denied" | "failed" | "pending"; maskedBefore: Record<string, string | null>; maskedAfter: Record<string, string | null>; reason: string | null;
+  occurredAt: string; correlationId: string; result: "success" | "denied" | "failed" | "pending"; /** null when the row has no change to show: the Go view marshals a nil map as null */
+  maskedBefore: Record<string, string | null> | null; maskedAfter: Record<string, string | null> | null; reason: string | null;
 }
 
 /** The URL filters of the log (SCR-A16): the period, actor, target kind and ID, correlation ID, result and page size. */
 export interface AuditFilters { from: string; to: string; actorId: string; targetKind: string; targetId: string; correlationId: string; result: AuditResult | "All"; limit: number }
 
-const KL = "Asia/Kuala_Lumpur";
-const results: AuditResult[] = ["Success", "Denied", "Failed", "Pending"];
+/** The API's result and the word the screen files it under. */
+const RESULT_WORDS: [ApiAudit["result"], AuditResult][] = [["success", "Success"], ["denied", "Denied"], ["failed", "Failed"], ["pending", "Pending"]];
+const results = RESULT_WORDS.map(([, word]) => word);
 /** A result as the screen words it. */
-export const resultWord = (r: AuditResult | string, t: T = en) => ({ Success: t("Success"), Denied: t("Denied"), Failed: t("Failed"), Pending: t("Pending") })[r] ?? r;
+export const resultWord = (r: string, t: T = en) => lookup({ Success: t("Success"), Denied: t("Denied"), Failed: t("Failed"), Pending: t("Pending") }, r) ?? r;
 /** The badge tone of a result. */
-export const resultTone = (r: AuditResult) => (r === "Success" ? "ok" : r === "Denied" ? "warn" : r === "Failed" ? "crit" : "primary");
+const RESULT_TONE = new Map<AuditResult, "ok" | "warn" | "crit">([["Success", "ok"], ["Denied", "warn"], ["Failed", "crit"]]);
+export const resultTone = (r: AuditResult) => RESULT_TONE.get(r) ?? "primary";
 /** The role an entry recorded, worded (it is never rewritten). */
 export const roleAtTimeWord = (r: string, t: T = en) =>
-  ({ admin: t("Admin"), contractor: t("Contractor"), technician: t("Technician"), client: t("Client"), system: t("System") })[r] ?? r;
-const resultOf = (r: ApiAudit["result"]) => (r.charAt(0).toUpperCase() + r.slice(1)) as AuditResult;
+  lookup({ admin: t("Admin"), contractor: t("Contractor"), technician: t("Technician"), client: t("Client"), system: t("System") }, r) ?? r;
+const resultOf = (r: ApiAudit["result"]): AuditResult => RESULT_WORDS.find(([wire]) => wire === r)?.[1] ?? "Pending";
 
 /** The screen's filters from the URL; the default period is the 30 days up to the Core API business clock, as days of the display time zone. */
 export function auditFilters(sp: Record<string, string | string[] | undefined>, now: Date, zone = KL): AuditFilters {
-  const one = (k: string) => (typeof sp[k] === "string" ? (sp[k] as string) : "");
+  const one = (k: string) => { const v = lookup(sp, k); return typeof v === "string" ? v : ""; };
   const res = one("result");
   const limit = Math.min(100, Math.max(25, Number(one("limit")) || 25));
   const day = (ms: number) => zonedParts(new Date(ms).toISOString(), zone).date;
@@ -47,7 +56,7 @@ export function auditFilters(sp: Record<string, string | string[] | undefined>, 
     from: one("from") || day(now.getTime() - 30 * 86_400_000),
     to: one("to") || day(now.getTime() + 86_400_000),
     actorId: one("actorId"), targetKind: one("targetKind"), targetId: one("targetId"), correlationId: one("correlationId"),
-    result: (results as string[]).includes(res) ? (res as AuditResult) : "All",
+    result: oneOf(results, res, "All"),
     limit,
   };
 }
@@ -55,7 +64,8 @@ export function auditFilters(sp: Record<string, string | string[] | undefined>, 
 /** A valid period: start < end, at most 366 days (IR143). */
 export function periodError(f: Pick<AuditFilters, "from" | "to">, t: T = en): string | undefined {
   const a = Date.parse(f.from), b = Date.parse(f.to);
-  return !(a < b) || b - a > 366 * 86_400_000 ? t("Period must be start < end, at most 366 days") : undefined;
+  const isOrdered = !Number.isNaN(a) && !Number.isNaN(b) && a < b; // an unreadable date is not ordered
+  return !isOrdered || b - a > 366 * 86_400_000 ? t("Period must be start < end, at most 366 days") : undefined;
 }
 
 /** The period of the filters as instants: its days start at midnight in the display time zone (NFR-08). */
@@ -63,6 +73,7 @@ export const periodInstants = (f: Pick<AuditFilters, "from" | "to">, zone = KL) 
 
 /** audit.list input for the filters. */
 export function auditQuery(f: AuditFilters, zone = KL): OpInput<"audit.list"> {
+  const wire = RESULT_WORDS.find(([, word]) => word === f.result)?.[0];
   return {
     limit: f.limit,
     filters: {
@@ -71,7 +82,7 @@ export function auditQuery(f: AuditFilters, zone = KL): OpInput<"audit.list"> {
       ...(f.targetKind && { targetKind: f.targetKind }),
       ...(f.targetId && { targetId: f.targetId }),
       ...(f.correlationId && { correlationId: f.correlationId }),
-      ...((f.result !== "All") && { result: f.result.toLowerCase() as AuditView["result"] }),
+      ...(wire && { result: wire }),
     },
   };
 }
@@ -83,16 +94,21 @@ export function correlationQuery(a: Pick<ApiAudit, "correlationId" | "occurredAt
   return { limit: 100, sort: { field: "occurredAt", direction: "asc" }, filters: { from: new Date(at - 86_400_000).toISOString(), to: new Date(at + 86_400_000).toISOString(), correlationId: a.correlationId } };
 }
 
+/** The versions a write moved between: “version 3”, “version 2 → 3”, or none. */
+function versionsText(previous: number | null, next: number | null, t: T): string | null {
+  if (next === null) return null;
+  return previous === null ? t("version {v}", { v: next }) : t("version {from} → {to}", { from: previous, to: next });
+}
 /** One entry of the log: who acted (the user's name, else the actor ID — a system actor has no name, IR305), the list
 time relative to now, the full time, the role in the display language and the versions it moved the target between. */
 export function auditRow(a: ApiAudit, i: I18n = EN, nowMs?: number): AuditRow {
-  const fields = [...new Set([...Object.keys(a.maskedBefore ?? {}), ...Object.keys(a.maskedAfter ?? {})])].sort();
+  const fields = [...new Set([...Object.keys(a.maskedBefore ?? {}), ...Object.keys(a.maskedAfter ?? {})])].toSorted(byText);
   const { t } = i;
   return {
     id: a.id,
     op: a.action,
     target: `${a.targetRef.kind} · ${a.targetRef.id}`, targetKind: a.targetRef.kind, targetId: a.targetRef.id,
-    versions: a.nextVersion === null ? null : (a.previousVersion === null ? t("version {v}", { v: a.nextVersion }) : t("version {from} → {to}", { from: a.previousVersion, to: a.nextVersion })),
+    versions: versionsText(a.previousVersion, a.nextVersion, t),
     actor: a.actorName ?? a.actorId,
     actorId: a.actorId,
     role: roleAtTimeWord(a.actorRoleAtTime, t),
@@ -102,7 +118,7 @@ export function auditRow(a: ApiAudit, i: I18n = EN, nowMs?: number): AuditRow {
     res: resultOf(a.result),
     reason: reasonText(a, t),
     changes: fields.map((f) => {
-      const before = a.maskedBefore?.[f] ?? "null", after = a.maskedAfter?.[f] ?? "null";
+      const before = lookup(a.maskedBefore ?? {}, f) ?? "null", after = lookup(a.maskedAfter ?? {}, f) ?? "null";
       return { field: f, changed: before !== after, before, after };
     }),
   };
@@ -114,26 +130,26 @@ const DENIAL: Record<string, string> = {
   "error.forbidden": "Refused — the role may not do this",
   "error.notFound": "Refused — not found in the actor's scope",
 };
-export const reasonText = (a: Pick<ApiAudit, "result" | "reason">, t: T = en): string | null => (a.result === "denied" && a.reason && DENIAL[a.reason] ? t(DENIAL[a.reason]) : a.reason);
+export const reasonText = (a: Pick<ApiAudit, "result" | "reason">, t: T = en): string | null => ((a.result === "denied" && a.reason ? textOf(DENIAL, a.reason, t) : undefined) ?? a.reason);
 
 /** An entry as a timeline item (the restriction exception screen's audit card, IR301; the correlation trace, IR320). */
 export const auditItem = (a: ApiAudit, i: I18n = EN) => {
   const reason = reasonText(a, i.t);
   return {
     time: showTime(a.occurredAt, i.display), title: `${a.action} · ${resultWord(resultOf(a.result), i.t)}`,
-    detail: `${a.actorName ?? a.actorId} (${roleAtTimeWord(a.actorRoleAtTime, i.t)})${reason ? ` · ${reason}` : ""}`,
+    detail: `${a.actorName ?? a.actorId} (${roleAtTimeWord(a.actorRoleAtTime, i.t)})${wrapped(reason, " · ")}`,
   };
 };
 
 /** The entries of one correlation ID in the order they were appended (Figma Admin 338:2): a pending entry stays as it
 was; the final result is a later entry of its own. Empty when the entry stands alone. */
 export const correlationTrace = (group: ApiAudit[], i: I18n = EN) =>
-  group.length < 2 ? [] : [...group].sort((a, b) => Date.parse(a.occurredAt) - Date.parse(b.occurredAt) || a.id.localeCompare(b.id)).map((a) => ({ id: a.id, ...auditItem(a, i) }));
+  group.length < 2 ? [] : [...group].toSorted((a, b) => Date.parse(a.occurredAt) - Date.parse(b.occurredAt) || a.id.localeCompare(b.id)).map((a) => ({ id: a.id, ...auditItem(a, i) }));
 
 /** The target kinds the Target filter always offers, the records HQ looks up most; the kinds of the shown entries and
 the URL's kind join them (targetKind is a string like AuditView.targetRef.kind and the log records more kinds). */
-const KINDS = ["alert", "automation", "command", "contract", "device", "device_event", "invoice", "job", "membership", "payment", "policy", "restriction", "unit", "user"];
-export const targetKinds = (rows: Pick<AuditRow, "targetKind">[], current: string) => [...new Set([...KINDS, ...rows.map((r) => r.targetKind), ...(current ? [current] : [])])].sort();
+const KINDS = ["alert", "automation", "command", "contract", "device", "device_event", "invoice", "job", "membership", "payment", "policy", RESTRICTION, "unit", "user"];
+export const targetKinds = (rows: Pick<AuditRow, "targetKind">[], current: string) => [...new Set([...KINDS, ...rows.map((r) => r.targetKind), ...(current ? [current] : [])])].toSorted(byText);
 
 /** The Actor filter's people by name: the users of the memberships the session may read (members.list), the actors of
 the shown entries and the URL's actor (a system actor by its ID). A name that several people share carries the start
@@ -145,7 +161,7 @@ export function actorOptions(members: { userId: string; displayName: string }[],
   if (current && !m.has(current)) m.set(current, current);
   const shared = new Map<string, number>();
   for (const name of m.values()) shared.set(name, (shared.get(name) ?? 0) + 1);
-  return [...m].map(([id, name]) => ({ id, name: (shared.get(name) ?? 0) > 1 ? `${name} · ${id.slice(0, 8)}` : name })).sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+  return [...m].map(([id, name]) => ({ id, name: (shared.get(name) ?? 0) > 1 ? `${name} · ${id.slice(0, 8)}` : name })).toSorted((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
 }
 
 /** A record related to an entry: its own target, or the target of an entry with the same correlation ID. */
@@ -165,10 +181,11 @@ export function relatedRecords(sel: ApiAudit, group: ApiAudit[], i: I18n = EN): 
     const via = a.id === sel.id ? "target" : "correlation";
     return { id: a.targetRef.id, note: t(via === "target" ? "this entry’s target" : "same correlation ID"), via };
   };
-  const restriction = ref("restriction");
-  if (restriction && sel.targetRef.kind === "restriction" && sel.targetRef.id === restriction.id) {
+  const restriction = ref(RESTRICTION);
+  if (restriction && sel.targetRef.kind === RESTRICTION && sel.targetRef.id === restriction.id) {
     const after = sel.maskedAfter ?? {};
-    const state = after.state && (states as string[]).includes(after.state) ? stateWord(after.state as RestrictionState, t) : after.state;
+    const known = after.state ? oneOf(states, after.state, undefined) : undefined;
+    const state = known ? stateWord(known, t) : after.state;
     const until = after["exception.until"] && !Number.isNaN(Date.parse(after["exception.until"])) ? t("exception until {time}", { time: showTime(after["exception.until"], i.display) }) : null;
     const recorded = [state, until].filter(Boolean).join(" · ");
     if (recorded) restriction.note = t("{state} — as this entry recorded it", { state: recorded });
@@ -188,20 +205,29 @@ export interface AuditDeviceEvent {
   id: string; title: string; type: ApiDeviceEventFull["eventType"]; tone: "warn" | "crit" | "ok" | "muted"; meta: string; state: string;
   badge: { text: string; tone: "crit" | "ok" } | null; facts: [string, string][]; alerts: { id: string; text: string; href: string }[]; notes: { text: string; by: string }[];
 }
+/** An event's sequence number against the one before it: no gap, or how many are missing. */
+function sequenceText(n: number, prev: number | undefined, t: T): string {
+  if (prev === undefined) return String(n);
+  return prev === n - 1 ? t("{n} (previous {p} — no gap)", { n, p: prev }) : t("{n} (previous {p} — {missing} missing)", { n, p: prev, missing: n - prev - 1 });
+}
+/** A fault's badge (whether it was restored); a restore event has none. */
+function faultBadge(e: ApiAuditDeviceEvent, t: T): { text: string; tone: "ok" | "crit" } | null {
+  if (e.eventType === "restored") return null;
+  return e.restoredAt ? { text: t("Restored"), tone: "ok" } : { text: t("Not restored"), tone: "crit" };
+}
 export function auditDeviceEvents(es: ApiAuditDeviceEvent[], alerts: Map<string, ApiAlertLite>, names: Map<string, string>, units: Map<string, string>, nowMs: number, i: I18n = EN): AuditDeviceEvent[] {
   const { t, display } = i;
   const rows = new Map(eventRows(es, alerts, nowMs, i).map((r) => [r.id, r]));
-  const seqs = es.map((e) => e.sequence).sort((a, b) => a - b);
-  return es.map((e) => {
-    const r = rows.get(e.id)!;
-    const prev = [...seqs].reverse().find((s) => s < e.sequence);
-    const sequence = prev === undefined ? String(e.sequence)
-      : (prev === e.sequence - 1 ? t("{n} (previous {p} — no gap)", { n: e.sequence, p: prev }) : t("{n} (previous {p} — {missing} missing)", { n: e.sequence, p: prev, missing: e.sequence - prev - 1 }));
+  const seqs = es.map((e) => e.sequence).toSorted((a, b) => a - b);
+  const withRows = es.map((e) => ({ e, r: rows.get(e.id) })).filter((x): x is { e: ApiAuditDeviceEvent; r: NonNullable<typeof x.r> } => x.r !== undefined);
+  return withRows.map(({ e, r }) => {
+    const prev = seqs.findLast((s) => s < e.sequence);
+    const sequence = sequenceText(e.sequence, prev, t);
     const isFault = e.eventType !== "restored";
     return {
       id: e.id, title: t(EVENT_TITLE[e.eventType]), type: e.eventType, tone: r.tone,
       meta: t("{source} · seq {n} · {time}", { source: e.evidenceSource, n: e.sequence, time: r.time }), state: r.recovery,
-      badge: isFault ? (e.restoredAt ? { text: t("Restored"), tone: "ok" } : { text: t("Not restored"), tone: "crit" }) : null,
+      badge: faultBadge(e, t),
       facts: [
         [t("Event type"), e.eventType], [t("Evidence"), `${e.evidenceSource} — ${eventCause(e, t)}`], [t("Sequence"), sequence],
         [t("Unit at the time"), units.get(e.unitIdAtOccurrence) ?? e.unitIdAtOccurrence.slice(0, 8)], [t("Occurred"), showTime(e.occurredAt, display)],
@@ -209,7 +235,7 @@ export function auditDeviceEvents(es: ApiAuditDeviceEvent[], alerts: Map<string,
       ],
       alerts: e.alertIds.map((id) => {
         const a = alerts.get(id);
-        return { id, text: a ? `${a.type} · ${t(a.status === "open" ? "open" : (a.status === "acknowledged" ? "acknowledged" : "resolved"))}` : t("alert {id}", { id: id.slice(0, 8) }), href: `/admin/alerts?alertId=${id}${a && a.status !== "open" ? `&status=${a.status}` : ""}` };
+        return { id, text: a ? `${a.type} · ${t(a.status)}` : t("alert {id}", { id: id.slice(0, 8) }), href: `/admin/alerts?alertId=${id}${a && a.status !== "open" ? `&status=${a.status}` : ""}` };
       }),
       notes: e.responseNotes.map((n) => ({ text: n.message, by: `${names.get(n.actorId) ?? n.actorId.slice(0, 8)} · ${showTime(n.at, display)}` })),
     };

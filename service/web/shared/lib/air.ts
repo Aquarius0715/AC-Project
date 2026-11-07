@@ -9,11 +9,16 @@ import { roundAway } from "@ac/web/lib/energy";
 import { spacePath, type ApiPropertyRow, type ApiSpaceRow, type ApiUnitRow } from "@ac/web/lib/assets";
 import { DEFAULT_DISPLAY, EN, relativeTime, showClock, showDate, showDay, showSpan, translator, type Display, type I18n, type T } from "@ac/web/lib/i18n";
 import type { IconName } from "@ac/web/components/Icon";
+import { entryOf, lookup } from "@ac/web/lib/lookup";
+
+const TEMPERATURE = "temperature";
+const UNSUPPORTED = "unsupported";
+const KL = "Asia/Kuala_Lumpur";
 
 const en = translator("en");
 
 export type AirMetric = "co2" | "pm25" | "temperature" | "humidity";
-export const airMetrics: AirMetric[] = ["co2", "pm25", "temperature", "humidity"];
+export const airMetrics: AirMetric[] = ["co2", "pm25", TEMPERATURE, "humidity"];
 export type AirPeriod = "1h" | "24h" | "7d";
 export const airPeriods: AirPeriod[] = ["1h", "24h", "7d"];
 type Tone = "ok" | "warn" | "crit" | "unknown" | "primary" | "muted";
@@ -47,11 +52,11 @@ export const metricInfo: Record<AirMetric, { label: string; tab: string; unit: s
   humidity: { label: "Humidity", tab: "Humidity", unit: "%", guide: null },
 };
 
-const KL = "Asia/Kuala_Lumpur";
 const nf =(digits: number) => new Intl.NumberFormat("en-MY", { minimumFractionDigits: digits, maximumFractionDigits: digits, useGrouping: false });
+const DIGITS = new Map([[TEMPERATURE, 1], ["humidity", 1], ["co2", 0], ["pm25", 0]]);
 /** IR44: temperature and humidity with one decimal, ppm and µg/m³ as integers, rounded half away from zero; other metrics as received. */
 export function airNumber(metric: string, v: number): string {
-  const digits = metric === "temperature" || metric === "humidity" ? 1 : (metric === "co2" || metric === "pm25" ? 0 : null);
+  const digits = DIGITS.get(metric) ?? null;
   return digits === null ? String(v) : nf(digits).format(roundAway(v, digits));
 }
 
@@ -61,25 +66,27 @@ export interface AirRoom { key: string; spaceId: string | null; label: string; p
 export function airRooms(ps: ApiPropertyRow[], ss: ApiSpaceRow[], us: ApiUnitRow[], t: T = en): AirRoom[] {
   const props = new Map(ps.filter((p) => !p.archived).map((p) => [p.id, p.name]));
   const live = us.filter((u) => !u.archived && props.has(u.propertyId));
-  const units = (keep: (u: ApiUnitRow) => boolean) => live.filter(keep).map((u) => ({ id: u.id, name: u.displayName })).sort((a, b) => a.name.localeCompare(b.name));
+  const units = (keep: (u: ApiUnitRow) => boolean) => live.filter((item) => keep(item)).map((u) => ({ id: u.id, name: u.displayName })).toSorted((a, b) => a.name.localeCompare(b.name));
   const out: (AirRoom & { sort: string })[] = [];
-  for (const s of ss.filter((x) => !x.archived && props.has(x.propertyId))) {
+  for (const s of ss) {
+    const property = s.archived ? undefined : props.get(s.propertyId);
+    if (property === undefined) continue; // an archived room, or a room of an archived property
     const here = units((u) => u.spaceId === s.id);
-    const property = props.get(s.propertyId)!;
     if (here.length > 0) out.push({ key: s.id, spaceId: s.id, label: `${s.name} · ${[property, spacePath(s.parentSpaceId, ss)].filter(Boolean).join(" › ")}`, path: `${property} › ${spacePath(s.id, ss)}`, units: here, sort: `${property}\0${spacePath(s.id, ss)}` });
   }
   for (const [id, property] of props) {
     const loose = units((u) => u.propertyId === id && u.spaceId === null);
     if (loose.length > 0) out.push({ key: `unassigned:${id}`, spaceId: null, label: t("Not in a room · {property}", { property }), path: property, units: loose, sort: `${property}\0￿` });
   }
-  return out.sort((a, b) => a.sort.localeCompare(b.sort)).map((r) => ({ key: r.key, spaceId: r.spaceId, label: r.label, path: r.path, units: r.units }));
+  return out.toSorted((a, b) => a.sort.localeCompare(b.sort)).map((r) => ({ key: r.key, spaceId: r.spaceId, label: r.label, path: r.path, units: r.units }));
 }
 /** The room and unit shown: the URL unit when it is listed, else the URL room's (or the first room's) first unit. */
 export function airSelection(rooms: AirRoom[], unitId?: string, spaceId?: string): { room: AirRoom; unitId: string } | null {
   const byUnit = unitId ? rooms.find((r) => r.units.some((u) => u.id === unitId)) : undefined;
-  if (byUnit) return { room: byUnit, unitId: unitId! };
+  if (byUnit && unitId) return { room: byUnit, unitId };
   const room = rooms.find((r) => r.spaceId !== null && r.spaceId === spaceId) ?? rooms[0];
-  return room ? { room, unitId: room.units[0].id } : null;
+  const first = room?.units[0];
+  return room && first ? { room, unitId: first.id } : null;
 }
 
 /** One metric card (Figma Client 05a/05b): the feed badge, value, status, observation line and advice. A stale, null or
@@ -90,18 +97,35 @@ export interface MetricCard {
 }
 const reasonText: Record<string, string> = { unit_mismatch: "unit mismatch", non_finite: "not a number", out_of_range: "out of range", invalid_time: "invalid time" };
 const originText: Record<string, string> = { estimated: "estimated", inspection: "inspection" };
+/** The advice line when there is no reading to advise on. */
+function noAdviceText(metric: AirMetric, setpoint: string): string {
+  if (metric === TEMPERATURE) return setpoint;
+  return metric === "humidity" ? "Not enough data for advice" : "Not enough data for {metric} advice";
+}
+/** A reading against its guide: measured (no guide), high, or within the guide. */
+function guideStatus(guide: number | null, isHigh: boolean, t: T): MetricCard["status"] {
+  if (guide === null) return { text: t("Measured"), tone: "muted", icon: "live" };
+  return isHigh ? { text: t("High"), tone: "warn", icon: "warning" } : { text: t("Within guide"), tone: "ok", icon: "check" };
+}
+/** What to do about a reading: ventilate (CO₂), clean the filter (PM2.5), the setpoint (temperature), or nothing. */
+function adviceText(metric: AirMetric, isHigh: boolean, setpoint: string): string {
+  if (metric === TEMPERATURE) return setpoint;
+  if (isHigh && metric === "co2") return "Ventilation recommended (≥ 1000 ppm)";
+  if (isHigh && metric === "pm25") return "Filter cleaning recommended (≥ 35 µg/m³)";
+  return "No current advice";
+}
 /** The card in the display language; reading times are the IR44 time of day in the user's display time zone (IR260). */
 export function metricCard(metric: AirMetric, m: ApiMeasurement | undefined, hasSensor: boolean, i: I18n = EN, setsTemperature = true): MetricCard {
   const { t, display } = i;
-  const { unit, guide } = metricInfo[metric];
-  const label = t(metricInfo[metric].label);
+  const { unit, guide } = entryOf(metricInfo, metric);
+  const label = t(entryOf(metricInfo, metric).label);
   // the temperature points to the unit's remote control when that sets it (controlLayout's temperature); a model
   // without control, or with the power alone, is set on the AC itself (IR527, IR544)
   const setpoint = setsTemperature ? "Setpoint is on Unit Control" : "Set on the AC itself";
-  const noAdvice = t(metric === "temperature" ? setpoint : (metric === "humidity" ? "Not enough data for advice" : "Not enough data for {metric} advice"), { metric: label });
-  const unavailable = (sub: string, feed = { text: t("Unavailable"), tone: "unknown" as Tone, icon: "offline" as IconName }): MetricCard =>
-    ({ metric, label, unit, feed, sub, value: null, status: { text: t("Not measured"), tone: "muted", icon: "dot" }, advice: noAdvice, warn: false });
-  if (!hasSensor) return unavailable(t("No {metric} sensor on this model", { metric: label }), { text: t("Unsupported"), tone: "muted", icon: "unsupported" });
+  const noAdvice = t(noAdviceText(metric, setpoint), { metric: label });
+  const unavailable = (sub: string, feed?: MetricCard["feed"]): MetricCard =>
+    ({ metric, label, unit, sub, feed: feed ?? { text: t("Unavailable"), tone: "unknown", icon: "offline" }, value: null, status: { text: t("Not measured"), tone: "muted", icon: "dot" }, advice: noAdvice, warn: false });
+  if (!hasSensor) return unavailable(t("No {metric} sensor on this model", { metric: label }), { text: t("Unsupported"), tone: "muted", icon: UNSUPPORTED });
   if (!m) return unavailable(t("No reading yet"));
   const at = showClock(m.observedAt, display);
   if (m.quality === "stale") return unavailable(m.value === null ? t("No reading since {time}", { time: at }) : t("No reading since {time} (last {value} {unit})", { time: at, value: airNumber(metric, m.value), unit }));
@@ -113,10 +137,8 @@ export function metricCard(metric: AirMetric, m: ApiMeasurement | undefined, has
   }
   if (m.value === null) return unavailable(t(metric === "humidity" ? "No reading (null) — not 0% · {time}" : "No reading (null) · {time}", { time: at }), { text: t("Unknown"), tone: "unknown", icon: "unknown" });
   const isHigh = guide !== null && m.value >= guide;
-  const status = guide === null ? { text: t("Measured"), tone: "muted" as Tone, icon: "live" as IconName } : (isHigh ? { text: t("High"), tone: "warn" as Tone, icon: "warning" as IconName } : { text: t("Within guide"), tone: "ok" as Tone, icon: "check" as IconName });
-  const advice = t(metric === "co2" ? (isHigh ? "Ventilation recommended (≥ 1000 ppm)" : "No current advice")
-    : metric === "pm25" ? (isHigh ? "Filter cleaning recommended (≥ 35 µg/m³)" : "No current advice")
-    : metric === "temperature" ? setpoint : "No current advice");
+  const status = guideStatus(guide, isHigh, t);
+  const advice = t(adviceText(metric, isHigh, setpoint));
   return {
     metric,
     label,
@@ -125,7 +147,7 @@ export function metricCard(metric: AirMetric, m: ApiMeasurement | undefined, has
     advice,
     value: airNumber(metric, m.value),
     feed: { text: t("Live"), tone: "ok", icon: "live" },
-    sub: `${t("Observed {time}", { time: at })}${m.origin === "measured" ? "" : ` · ${t(originText[m.origin] ?? m.origin)}`}`,
+    sub: `${t("Observed {time}", { time: at })}${m.origin === "measured" ? "" : ` · ${t(lookup(originText, m.origin) ?? m.origin)}`}`,
     warn: isHigh,
   };
 }
@@ -136,7 +158,7 @@ export const guidanceText: Record<Guidance, string> = {
   ventilate: "Ventilation recommended", ventilate_manual: "Ventilate manually, for example by opening a window", clean: "Filter cleaning and inspection recommended",
   none: "No current guidance", unavailable: "Not enough data to provide guidance",
 };
-const validValue = (m?: ApiMeasurement) => (m && m.quality === "valid" && m.value !== null ? m.value : null);
+const validValue = (m?: ApiMeasurement) => (m?.quality === "valid" && m.value !== null ? m.value : null);
 export function airGuidance(co2: ApiMeasurement | undefined, pm25: ApiMeasurement | undefined, freshAir: boolean): Guidance[] {
   const c = validValue(co2);
   const p = validValue(pm25);
@@ -163,7 +185,7 @@ export function ventStrip(g: Guidance[], co2: ApiMeasurement | undefined, room: 
 /** The PM2.5 cleaning banner (IR99): the latest valid reading against the 35 µg/m³ guide, or null. */
 export function cleanNote(g: Guidance[], pm25: ApiMeasurement | undefined, room: string, t: T = en): string | null {
   const v = validValue(pm25);
-  return g.includes("clean") && v !== null
+  return v !== null && g.includes("clean")
     ? t("{guidance} — PM2.5 {value} µg/m³ in {room} (≥ 35 µg/m³ guide). Request a filter clean from Maintenance.", { guidance: t(guidanceText.clean), value: airNumber("pm25", v), room }) : null;
 }
 
@@ -173,7 +195,7 @@ export function allergenView(a: ApiAllergen | null, i: I18n = EN): { title: stri
   const { t, display } = i;
   const title = t("Allergen");
   if (!a) return { title, badge: { text: t("Unknown"), tone: "unknown", icon: "unknown" }, text: t("No observation for this selection — this does not mean “no allergens”.") };
-  if (a.availability === "unsupported") return { title, badge: { text: t("Unsupported"), tone: "muted", icon: "unsupported" }, text: t("This unit cannot observe allergens — this does not mean “no allergens”.") };
+  if (a.availability === UNSUPPORTED) return { title, badge: { text: t("Unsupported"), tone: "muted", icon: UNSUPPORTED }, text: t("This unit cannot observe allergens — this does not mean “no allergens”.") };
   if (a.availability === "not_measured") return { title, badge: { text: t("Not measured"), tone: "muted", icon: "dot" }, text: t("No observation — this does not mean “no allergens”.") };
   if (!a.substance || !a.sourceLabel || !a.observedAt || !a.evidenceText) return { title, badge: { text: t("Unknown"), tone: "unknown", icon: "unknown" }, text: t("Incomplete observation — shown as unknown, this does not mean “no allergens”.") };
   const value = a.value === null ? [] : [a.unit ? `${String(a.value)} ${a.unit}` : t("Value unknown (no unit)")];
@@ -194,7 +216,8 @@ export function airWindow(period: AirPeriod, now: Date): AirWindow {
   const to = Math.floor(now.getTime() / 60_000) * 60_000;
   return { period, from: new Date(to - (period === "1h" ? 60 : 1440) * 60_000).toISOString(), to: new Date(to).toISOString(), slotMs: 300_000 };
 }
-export const windowTitle = (p: AirPeriod, t: T = en) => t(p === "1h" ? "last hour" : (p === "24h" ? "last 24 hours" : "last 7 days"));
+const WINDOW_TITLE = new Map([["1h", "last hour"], ["24h", "last 24 hours"]]);
+export const windowTitle = (p: AirPeriod, t: T = en) => t(WINDOW_TITLE.get(p) ?? "last 7 days");
 /** The chart's sub line: unit, room and the window — its end in the display time zone with the zone's abbreviation, and for 7 days the Kuala Lumpur calendar day it starts on. */
 export function windowSub(w: AirWindow, unit: string, room: string, i: I18n = EN): string {
   const { t, display } = i;
@@ -211,16 +234,15 @@ export function airSlots(items: ApiMeasurement[], w: AirWindow): AirSlot[] {
   const from = Date.parse(w.from);
   const to = Date.parse(w.to);
   const n = Math.max(1, Math.ceil((to - from) / w.slotMs));
-  const sum = new Array<number>(n).fill(0);
-  const cnt = new Array<number>(n).fill(0);
+  const slots = Array.from({ length: n }, () => ({ sum: 0, n: 0 })); // each slot's total and count of valid readings
   for (const m of items) {
     const t = Date.parse(m.observedAt);
-    if (m.quality !== "valid" || m.value === null || t < from || t >= to) continue;
-    const i = Math.floor((t - from) / w.slotMs);
-    sum[i] += m.value;
-    cnt[i] += 1;
+    const slot = t >= from && t < to ? slots.at(Math.floor((t - from) / w.slotMs)) : undefined; // only readings inside the window
+    if (!slot || m.value === null || m.quality !== "valid") continue;
+    slot.sum += m.value;
+    slot.n += 1;
   }
-  return sum.map((s, i) => ({ start: new Date(from + i * w.slotMs).toISOString(), avg: cnt[i] ? s / cnt[i] : null, n: cnt[i] }));
+  return slots.map((s, i) => ({ start: new Date(from + i * w.slotMs).toISOString(), avg: s.n ? s.sum / s.n : null, n: s.n }));
 }
 /** Five x-axis labels from the window start to now (Figma 05a “09:12 yesterday … 09:12 now”) in the display time zone,
 which the sub line names. */
@@ -270,7 +292,7 @@ export function airRows(slots: AirSlot[], metric: AirMetric, slotMs: number, i: 
       note: t(gap.unloaded ? "Earlier readings are not loaded" : "Gap — not joined"), gap: true });
     gap = null;
   };
-  for (const s of [...slots].reverse()) {
+  for (const s of slots.toReversed()) {
     if (s.avg === null) {
       const isU = unloaded(s);
       if (gap && gap.unloaded !== isU) flush();
@@ -278,7 +300,7 @@ export function airRows(slots: AirSlot[], metric: AirMetric, slotMs: number, i: 
       continue;
     }
     flush();
-    out.push({ key: s.start, time: showSpan(s.start, end(s), display), value: `${airNumber(metric, s.avg)} ${metricInfo[metric].unit}`, note: t(s.n === 1 ? "{n} reading" : "{n} readings", { n: s.n }), gap: false });
+    out.push({ key: s.start, time: showSpan(s.start, end(s), display), value: `${airNumber(metric, s.avg)} ${entryOf(metricInfo, metric).unit}`, note: t(s.n === 1 ? "{n} reading" : "{n} readings", { n: s.n }), gap: false });
   }
   flush();
   return out;
@@ -290,7 +312,10 @@ export const ventMethods: { id: VentMethod; label: string }[] = [
 /** Durations offered by the Log ventilation modal (Figma 05c); ventilation.log accepts 1–240 minutes (IR110). */
 export const ventDurations = [5, 10, 15, 20, 30, 45, 60, 90, 120, 180, 240];
 /** The latest valid CO2 as the modal's “Current CO2” (what co2AtLog will record), or null. */
-export const co2Now = (co2?: ApiMeasurement, d: Display = DEFAULT_DISPLAY) => (validValue(co2) === null ? null : `${airNumber("co2", co2!.value!)} ppm · ${showClock(co2!.observedAt, d)}`);
+export const co2Now = (co2?: ApiMeasurement, d: Display = DEFAULT_DISPLAY) => {
+  const value = validValue(co2);
+  return value === null || !co2 ? null : `${airNumber("co2", value)} ppm · ${showClock(co2.observedAt, d)}`;
+};
 /** One ventilation history row: method and duration, the CO2 recorded at logging time, who and when (“today …” on the
 days next to now). */
 export function ventRow(v: ApiVentilationLog, me: string, names: Map<string, string>, nowMs: number, i: I18n = EN) {

@@ -6,11 +6,11 @@ import { apiMode } from "@ac/web/lib/dal";
 import { HistoryDemo } from "./_components/history-demo";
 import { HistoryView } from "./_components/history-view";
 import { loadHistory } from "./_lib/load";
+import { firstOf as one } from "@ac/web/lib/searchParams";
 
 export default async function PartnerHistoryPage({ searchParams }: Readonly<PageProps<"/partner/history">>) {
   await connection();
   const sp = await searchParams;
-  const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
   if (!apiMode()) return <HistoryDemo />;
   const live = await loadHistory({ jobId: one(sp.jobId), tab: one(sp.tab), sort: one(sp.sort), period: one(sp.period) });
   return <HistoryView live={live} />;

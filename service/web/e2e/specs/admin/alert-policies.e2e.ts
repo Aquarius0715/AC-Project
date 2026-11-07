@@ -9,6 +9,7 @@ import { randomUUID } from "node:crypto";
 import { test, expect } from "../../fixtures/test";
 import { expectAccessible } from "../../fixtures/a11y";
 import { selectForURL } from "../../fixtures/select";
+import { must } from "../../fixtures/must";
 
 let created: string | null = null;
 
@@ -17,10 +18,13 @@ test.afterEach(async ({ page }) => {
   const status = await page.evaluate(async ({ id, key }) => {
     const got = await fetch("/bff/ops/policies.get", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ policyId: id }) });
     if (got.status === 404) return 200; // the test deleted it
-    const { data } = await got.json();
-    return (await fetch("/bff/ops/policies.delete", {
-      method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": key, "X-Expected-Version": String(data.version) }, body: JSON.stringify({ policyId: id }),
-    })).status;
+    const body: unknown = await got.json();
+    const data: unknown = typeof body === "object" && body !== null ? Reflect.get(body, "data") : null;
+    const version: unknown = typeof data === "object" && data !== null ? Reflect.get(data, "version") : null;
+    const deleted = await fetch("/bff/ops/policies.delete", {
+      method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": key, "X-Expected-Version": typeof version === "number" ? String(version) : "" }, body: JSON.stringify({ policyId: id }),
+    });
+    return deleted.status;
   }, { id: created, key: randomUUID() });
   expect(status).toBe(200);
   created = null;
@@ -153,29 +157,52 @@ test("the Policies tab's scope, Show disabled and a scoped new policy with activ
 // asked, the draft carries the rule's name and condition, nothing is saved); a rule whose metric no policy may watch
 // cannot be copied. afterEach puts the limits and the switch back through the operation relay if a run stopped halfway.
 interface DefaultPolicy { id: string; version: number; rules: { ruleKey: string; threshold: number }[]; ruleSettings: { ruleKey: string; customerId: string; enabled: boolean; version: number }[] }
+const isObject = (v: unknown): v is object => typeof v === "object" && v !== null;
+/** The default policy in a policies.list answer: its id, version and the two lists the test restores, checked. */
+function firstDefault(body: unknown): DefaultPolicy {
+  const data: unknown = isObject(body) ? Reflect.get(body, "data") : null;
+  const items: unknown = isObject(data) ? Reflect.get(data, "items") : null;
+  const p: unknown = Array.isArray(items) ? items.at(0) : null;
+  const isPolicy = (x: unknown): x is DefaultPolicy => {
+    if (!isObject(x)) return false;
+    const hasIdentity = typeof Reflect.get(x, "id") === "string" && typeof Reflect.get(x, "version") === "number";
+    return hasIdentity && Array.isArray(Reflect.get(x, "rules")) && Array.isArray(Reflect.get(x, "ruleSettings"));
+  };
+  if (!isPolicy(p)) throw new Error("policies.list returned no default policy");
+  return p;
+}
 const relay = async (page: import("@playwright/test").Page, op: string, input: unknown, version?: number) => {
   return page.evaluate(async ({ op, input, version, key }) => {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (version !== undefined) Object.assign(headers, { "Idempotency-Key": key, "X-Expected-Version": String(version) });
     const r = await fetch(`/bff/ops/${op}`, { method: "POST", body: JSON.stringify(input), headers });
-    return { status: r.status, body: await r.json() };
+    const body: unknown = await r.json();
+    return { status: r.status, body };
   }, { op, input, version, key: randomUUID() });
 };
 let before: DefaultPolicy | null = null;
 
 test.afterEach(async ({ page }) => {
   if (!before) return;
-  const now = (await relay(page, "policies.list", { limit: 1, filters: { kind: "default_alert" } })).body.data.items[0] as DefaultPolicy;
-  if (JSON.stringify(now.rules) !== JSON.stringify(before.rules)) expect((await relay(page, "policies.save", { id: now.id, kind: "default_alert", rules: before.rules }, now.version)).status).toBe(200);
-  for (const s of now.ruleSettings.filter((x) => !x.enabled && before!.ruleSettings.every((b) => !(b.ruleKey === x.ruleKey && b.customerId === x.customerId) || b.enabled))) {
-    expect((await relay(page, "policies.setDefaultRule", { policyId: now.id, ruleKey: s.ruleKey, customerId: s.customerId, enabled: true }, s.version)).status).toBe(200);
+  const listed = await relay(page, "policies.list", { limit: 1, filters: { kind: "default_alert" } });
+  const now = firstDefault(listed.body);
+  if (JSON.stringify(now.rules) !== JSON.stringify(before.rules)) {
+    const saved = await relay(page, "policies.save", { id: now.id, kind: "default_alert", rules: before.rules }, now.version);
+    expect(saved.status).toBe(200);
+  }
+  for (const s of now.ruleSettings) {
+    const turnedOffHere = !s.enabled && must(before).ruleSettings.every((b) => !(b.ruleKey === s.ruleKey && b.customerId === s.customerId) || b.enabled);
+    if (!turnedOffHere) continue; // a switch the test turned off, not one that was off before it
+    const switched = await relay(page, "policies.setDefaultRule", { policyId: now.id, ruleKey: s.ruleKey, customerId: s.customerId, enabled: true }, s.version);
+    expect(switched.status).toBe(200);
   }
   before = null;
 });
 
 test("the default policy's rules, a customer's switch and a rule copied as a customer policy", async ({ page }) => {
   await page.goto("/admin/alerts?tab=policies");
-  before = (await relay(page, "policies.list", { limit: 1, filters: { kind: "default_alert" } })).body.data.items[0] as DefaultPolicy;
+  const listed = await relay(page, "policies.list", { limit: 1, filters: { kind: "default_alert" } });
+  before = firstDefault(listed.body);
   const main = page.getByRole("main");
   const list = main.locator('section, [data-slot="card"]').filter({ has: page.getByRole("heading", { name: "Alert policies", exact: true }) });
   await list.getByRole("button", { name: /Default policy/ }).click();
@@ -199,16 +226,16 @@ test("the default policy's rules, a customer's switch and a rule copied as a cus
   await expect(main).toContainText(`Policy v${String(before.version + 2)}`);
 
   // one customer's switch, with a reason, then back on
-  const row = (name: string) => main.locator("div").filter({ has: page.getByRole("switch", { name: `Refrigerant low pressure for ${name}` }) }).last();
-  await row("Demo Customer B").getByRole("switch").click();
+  const customerBRow = main.locator("div").filter({ has: page.getByRole("switch", { name: "Refrigerant low pressure for Demo Customer B" }) }).last();
+  await customerBRow.getByRole("switch").click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByRole("heading", { name: "Switch “Refrigerant low pressure” off for Demo Customer B" })).toBeVisible();
   await dialog.getByLabel(/^Reason · optional/).fill("E2E rooftop unit replaced");
   await dialog.getByRole("button", { name: "Switch off" }).click();
-  await expect(row("Demo Customer B")).toContainText(/Off · by hq-operator, .* \(E2E rooftop unit replaced\)/);
-  await row("Demo Customer B").getByRole("switch").click();
+  await expect(customerBRow).toContainText(/Off · by hq-operator, .* \(E2E rooftop unit replaced\)/);
+  await customerBRow.getByRole("switch").click();
   await page.getByRole("dialog").getByRole("button", { name: "Switch on" }).click();
-  await expect(row("Demo Customer B")).toContainText(/^.*On · by hq-operator/);
+  await expect(customerBRow).toContainText(/^.*On · by hq-operator/);
 
   // copy: Ventilation (CO₂) becomes a draft for the owner chosen; a metric no policy may watch cannot be copied
   await rules.getByRole("button", { name: /Clogged filter/ }).click();
@@ -261,13 +288,15 @@ test("the notification preview and the demo test of a policy attached to a unit"
 
   // attach it on Bedroom AC's unit page, then back by the unit's Edit link (scoped to the customer and the unit)
   await page.goto("/admin/alerts");
-  await main.getByRole("button", { name: /Possible open window/ }).click();
+  // the alert of Demo Customer A's Bedroom AC, not the first one: once the live IoT unit of Demo Customer B has an alert of
+  // its own, the first one belongs to a customer this policy is not for
+  await main.getByRole("button", { name: /Possible open window.*Demo Customer A · Bedroom AC/ }).click();
   await main.getByRole("link", { name: "Open unit", exact: true }).click();
   await page.waitForURL(/unitId=/);
   await main.getByRole("button", { name: "Attach policy" }).click();
   await page.getByRole("dialog").getByRole("checkbox", { name: new RegExp(name) }).check();
   await page.getByRole("dialog").getByRole("button", { name: "Attach 1 policy" }).click();
-  await main.locator(`a[href*="policyId=${created}"]`).click();
+  await main.locator(`a[href*="policyId=${created ?? ""}"]`).click();
   await page.waitForURL((u) => u.searchParams.get("policyId") === created && u.searchParams.has("unitId"));
   await expect(main).toContainText("Attached to 1 unit of Demo Customer A: Bedroom AC");
 

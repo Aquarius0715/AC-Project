@@ -1,7 +1,8 @@
 "use client";
 
 import { useId, useRef, useState } from "react";
-import { Badge, Banner, Btn, Card, DataTable, Field, Input, LinkBtn, Modal, Page, PageHead, Select, Textarea } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, DataTable, Field, Input, LinkButton, Modal, Page, PageHead, Select, Textarea, type Tone } from "@ac/web/components/ui";
+import type { T } from "@ac/web/lib/i18n";
 import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { fieldErrorTexts, type ActionFailure } from "@ac/web/lib/actionMessage";
@@ -10,11 +11,27 @@ import { inviteError, type ClientUserRow } from "@ac/web/lib/assets";
 import { nameError, reasonError } from "@ac/web/lib/partnerUsers";
 import { inviteUser, removeUser, resendInvite, updateUser } from "../actions";
 import { Icon } from "@ac/web/components/Icon";
+import { oneOf } from "@ac/web/lib/oneOf";
+import { without } from "@ac/web/lib/omit";
+import { lookup } from "@ac/web/lib/lookup";
 
 type Dialog = { kind: "invite" } | { kind: "role" | "disable" | "enable" | "remove"; row: ClientUserRow };
 /** The dialog's fields, top to bottom, and the Core API fields that land on them. */
 type FieldKey = "name" | "email" | "reason";
 const FIELDS: FieldKey[] = ["name", "email", "reason"];
+
+/** The role a dialog starts with: the other role when changing it, the user's own otherwise, member for a new user. */
+function initialRole(d: Dialog): ClientUserRow["role"] {
+  if (!("row" in d)) return "member";
+  if (d.kind !== "role") return d.row.role;
+  return d.row.role === "owner" ? "member" : "owner";
+}
+/** An account's own status badge: active, not signed in yet, or disabled. */
+function accountStatus(u: ClientUserRow, t: T): { tone: Tone; text: string } {
+  if (u.status === "active") return { tone: "ok", text: t("Active") };
+  if (u.status === "invited") return { tone: "warn", text: t("Not signed in yet") };
+  return { tone: "muted", text: t("Disabled") };
+}
 const API_FIELDS: Record<string, FieldKey> = { displayName: "name", email: "email", reason: "reason" };
 
 /** Users (FR-C19, IR417, IR461) in API mode: the owner manages the customer's users — adds members and owners (the
@@ -27,7 +44,7 @@ export function UsersView({ live }: Readonly<{ live: { customerId: string; custo
   const [pending, run] = useAction();
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const [email, setEmail] = useState("");
-  const [userName, setUserName] = useState("");
+  const [username, setUsername] = useState("");
   const [role, setRole] = useState<Role>("member");
   const [reason, setReason] = useState("");
   const [tried, setTried] = useState(false);
@@ -39,27 +56,27 @@ export function UsersView({ live }: Readonly<{ live: { customerId: string; custo
       <Page>
         <Card title={t("Page unavailable")}>
           <p className="text-[13px] text-muted-foreground">{t("This page doesn’t exist or you don’t have access to it.")}</p>
-          <div className="mt-3"><LinkBtn href="/customer" variant="primary">{t("Go to your home (or sign in)")}</LinkBtn></div>
+          <div className="mt-3"><LinkButton href="/customer" variant="primary">{t("Go to your home (or sign in)")}</LinkButton></div>
         </Card>
       </Page>
     );
   }
   const open = (d: Dialog) => {
     setDialog(d); setTried(false); setReason(""); setServer({}); gone.current = false;
-    setEmail(""); setUserName(""); setRole("row" in d ? (d.kind === "role" ? (d.row.role === "owner" ? "member" : "owner") : d.row.role) : "member");
+    setEmail(""); setUsername(""); setRole(initialRole(d));
   };
   const close = () => { setDialog(null); };
   const isAdding = dialog?.kind === "invite";
-  const emailErr = isAdding ? inviteError(email, live.all, t) : undefined;
-  const nameErr = isAdding ? nameError(userName, t) : undefined;
-  const reasonErr = dialog && !isAdding ? reasonError(reason, t) : undefined;
+  const emailError = isAdding ? inviteError(email, live.all, t) : undefined;
+  const nameProblem = isAdding ? nameError(username, t) : undefined;
+  const reasonProblem = dialog && !isAdding ? reasonError(reason, t) : undefined;
   const name = (r: ClientUserRow) => r.name ?? r.email;
-  const edit = (k: FieldKey) => { setServer((s) => (s[k] ? { ...s, [k]: undefined } : s)); };
+  const edit = (k: FieldKey) => { setServer((s) => (lookup(s, k) ? without(s, k) : s)); };
   const submit = () => {
     setTried(true);
     if (!dialog) return;
     // a refused submit takes focus to the first field to fix, top to bottom (IR586, IR593)
-    const local: Partial<Record<FieldKey, string>> = { name: nameErr, email: emailErr, reason: reasonErr };
+    const local: Partial<Record<FieldKey, string>> = { name: nameProblem, email: emailError, reason: reasonProblem };
     const bad = FIELDS.find((k) => local[k]);
     if (bad) { focusField(ids[bad]); return; }
     // what the Core API refuses on a field (an address someone else still holds, IR462) shows under it as well
@@ -69,18 +86,26 @@ export function UsersView({ live }: Readonly<{ live: { customerId: string; custo
       const first = FIELDS.find((k) => fields[k]);
       if (first) focusField(ids[first]);
     };
-    if (dialog.kind === "invite") { run(() => inviteUser(live.customerId, email, role, userName), t("{name} added — a set-up e-mail is on its way to {email}", { name: userName.trim(), email: email.trim() }), close, refused); return; }
+    if (dialog.kind === "invite") { run(() => inviteUser(live.customerId, email, role, username), t("{name} added — a set-up e-mail is on its way to {email}", { name: username.trim(), email: email.trim() }), close, refused); return; }
     const r = dialog.row;
     if (dialog.kind === "remove") { run(() => removeUser(r.id, r.version, reason), t("{name} removed", { name: name(r) }), () => { gone.current = true; close(); }, refused); return; }
     if (dialog.kind === "role") { run(() => updateUser(r.id, r.version, live.customerId, r.email, role, null, reason), t(role === "owner" ? "{name} is now an owner" : "{name} is now a member", { name: name(r) }), close, refused); return; }
     const status = dialog.kind === "disable" ? "disabled" : "active";
     run(() => updateUser(r.id, r.version, live.customerId, r.email, r.role, status, reason), t(status === "disabled" ? "{name} disabled — they can no longer sign in" : "{name} enabled again", { name: name(r) }), close, refused);
   };
-  const title = dialog ? dialog.kind === "invite" ? (live.customer ? t("Add a user to {company}", { company: live.customer }) : t("Add a user"))
-    : t({ role: "Change role of {name}", disable: "Disable {name}", enable: "Enable {name}", remove: "Remove {name}" }[dialog.kind], { name: name(dialog.row) }) : "";
+  const dialogTitle = (): string => {
+    if (!dialog) return "";
+    if (dialog.kind === "invite") return live.customer ? t("Add a user to {company}", { company: live.customer }) : t("Add a user");
+    return t({ role: "Change role of {name}", disable: "Disable {name}", enable: "Enable {name}", remove: "Remove {name}" }[dialog.kind], { name: name(dialog.row) });
+  };
+  const title = dialogTitle();
   const action = dialog ? t({ invite: "Add user", role: "Change role", disable: "Disable", enable: "Enable", remove: "Remove" }[dialog.kind]) : "";
   const roleBadge = (u: ClientUserRow) => <Badge tone={u.role === "owner" ? "primary" : "muted"}>{t(u.role === "owner" ? "Owner" : "Member")}</Badge>;
-  const statusBadge = (u: ClientUserRow) => u.revoked ? <Badge tone="crit">{t("Access ended by HQ")}</Badge> : <Badge tone={u.status === "active" ? "ok" : (u.status === "invited" ? "warn" : "muted")}>{t(u.status === "active" ? "Active" : (u.status === "invited" ? "Not signed in yet" : "Disabled"))}</Badge>;
+  const statusBadge = (u: ClientUserRow) => {
+    if (u.revoked) return <Badge tone="crit">{t("Access ended by HQ")}</Badge>;
+    const s = accountStatus(u, t);
+    return <Badge tone={s.tone}>{s.text}</Badge>;
+  };
   return (
     <Page>
       <PageHead title={live.customer ? t("Users of {customer}", { customer: live.customer }) : t("Users")} sub={t("People who can sign in to this customer app. As an owner you add users, change their role and access, and remove them.")} action={<Btn variant="primary" onClick={() => { open({ kind: "invite" }); }}><Icon name="add" /> {t("Add user")}</Btn>} />
@@ -118,11 +143,11 @@ export function UsersView({ live }: Readonly<{ live: { customerId: string; custo
       <Banner>{t("Your customer always keeps one active owner, and you can’t change your own account. A user keeps their e-mail — to change it, remove them and add them again. For a password reset, contact HQ. Only owners see this page.")}</Banner>
       <p className="text-[11px] text-muted-foreground">{t("The set-up e-mail comes from the sign-in service; in development it arrives in the local Mailpit inbox.")}</p>
       <Modal open={!!dialog} onClose={close} title={title} finalFocus={() => (gone.current ? document.querySelector("#users-list") : true)} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant={dialog?.kind === "remove" || dialog?.kind === "disable" ? "danger" : "primary"} disabled={pending} onClick={submit}>{action}</Btn></>}>
-        {isAdding && <Field label={t("Name")} error={(tried ? nameErr : undefined) ?? server.name}><Input id={ids.name} value={userName} maxLength={120} onChange={(e) => { setUserName(e.target.value); edit("name"); }} placeholder="Lim Ka Wai" /></Field>}
-        {isAdding && <Field label={t("Email")} error={(tried ? emailErr : undefined) ?? server.email}><Input id={ids.email} type="email" value={email} onChange={(e) => { setEmail(e.target.value); edit("email"); }} placeholder="lim.ka@example.com" /></Field>}
+        {isAdding && <Field label={t("Name")} error={(tried ? nameProblem : undefined) ?? server.name}><Input id={ids.name} value={username} maxLength={120} onChange={(e) => { setUsername(e.target.value); edit("name"); }} placeholder="Lim Ka Wai" /></Field>}
+        {isAdding && <Field label={t("Email")} error={(tried ? emailError : undefined) ?? server.email}><Input id={ids.email} type="email" value={email} onChange={(e) => { setEmail(e.target.value); edit("email"); }} placeholder="lim.ka@example.com" /></Field>}
         {(isAdding || dialog?.kind === "role") && (
           <Field label={t("Role")} hint={t("Owners manage users and everything members can do; members use the app.")}>
-            <Select aria-label={t("Role")} value={role} onChange={(e) => { setRole(e.target.value as Role); }}>
+            <Select aria-label={t("Role")} value={role} onChange={(e) => { setRole(oneOf(["member", "owner"] as const, e.target.value, role)); }}>
               <option value="member">{t("Member")}</option>
               <option value="owner">{t("Owner")}</option>
             </Select>
@@ -131,7 +156,7 @@ export function UsersView({ live }: Readonly<{ live: { customerId: string; custo
         {isAdding && <Banner>{t("Their account is created now and they get an e-mail to set their password. They see only your properties and units; until they sign in they are listed as “Not signed in yet”.")}</Banner>}
         {dialog?.kind === "disable" && <Banner tone="warn">{t("Their access ends now. You can enable them again later.")}</Banner>}
         {dialog?.kind === "remove" && <Banner tone="warn">{t(dialog.row.status === "invited" ? "Their account is removed before they signed in." : "Their access ends now and they leave your user list.")}</Banner>}
-        {dialog && dialog.kind !== "invite" && <Field label={t("Reason")} error={(tried ? reasonErr : undefined) ?? server.reason}><Textarea id={ids.reason} value={reason} onChange={(e) => { setReason(e.target.value); edit("reason"); }} placeholder={t("e.g. moved to another team")} /></Field>}
+        {dialog && dialog.kind !== "invite" && <Field label={t("Reason")} error={(tried ? reasonProblem : undefined) ?? server.reason}><Textarea id={ids.reason} value={reason} onChange={(e) => { setReason(e.target.value); edit("reason"); }} placeholder={t("e.g. moved to another team")} /></Field>}
       </Modal>
     </Page>
   );

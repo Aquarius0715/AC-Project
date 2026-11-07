@@ -18,6 +18,8 @@ import {
 import { AirQualityDemo } from "./_components/air-quality-demo";
 import { AirQualityView, type AirLive } from "./_components/air-quality-view";
 import type { OpInput } from "@ac/web/lib/opTypes";
+import { queryReader } from "@ac/web/lib/searchParams";
+import { entryOf } from "@ac/web/lib/lookup";
 
 /** telemetry.series of one unit over the window, whole: the chart's slots — 5-minute averages for an hour or a day, hourly
 for 7 days — of the valid readings, with how many readings the window holds (IR605, IR607). */
@@ -31,7 +33,7 @@ export default async function CustomerAirQualityPage({ searchParams }: Readonly<
   await connection();
   if (!apiMode()) return <AirQualityDemo />;
   const sp = await searchParams;
-  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k] as string) : undefined);
+  const one = queryReader(sp);
   const [me, now, properties, spaces, units, display] = await Promise.all([
     corePrincipal(), coreNow(), coreAll<ApiPropertyRow>("properties.list"), coreAll<ApiSpaceRow>("spaces.list"), coreAll<ApiUnitRow>("units.list"), coreDisplay(),
   ]);
@@ -54,7 +56,7 @@ export default async function CustomerAirQualityPage({ searchParams }: Readonly<
   const roomName = sel.room.spaceId ? spaces.find((s) => s.id === sel.room.spaceId)?.name ?? i.t("this room") : sel.room.path; // outside rooms: the property
   const slots = series.slots; // the whole window: never cut off, so no slot is "not loaded" (IR592 → IR607)
   const points = slots.map((s) => s.avg);
-  const info = metricInfo[metric];
+  const info = entryOf(metricInfo, metric);
   const range = axisRange(points, info.guide);
   const names = new Map(units.map((u) => [u.id, u.displayName]));
   const live: AirLive = {
@@ -75,7 +77,7 @@ export default async function CustomerAirQualityPage({ searchParams }: Readonly<
       title: `${i.t(info.label)} — ${windowTitle(period, i.t)}`, sub: windowSub(w, info.unit, roomName, i), points, labels: axisLabels(w, i), guide: info.guide, ...range, ticks: axisTicks(range.min, range.max),
       hasSensor: sensors.has(metric), readings: series.total, total: series.total, valid: slots.some((s) => s.avg !== null), gaps: slots.some((s) => s.avg === null),
     },
-    rows: airRows(slots, metric, w.slotMs, i, null),
+    rows: airRows(slots, metric, w.slotMs, i),
     co2Now: co2Now(latest("co2"), display),
     history: logs ? { rows: logs.items.map((v) => ventRow(v, me.membershipId, names, now.getTime(), i)), total: logs.total } : null,
     metric,

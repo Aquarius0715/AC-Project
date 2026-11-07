@@ -11,6 +11,10 @@ import { coreOp, CoreError } from "@ac/web/lib/dal";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import { uploadName, uploadType } from "@ac/web/lib/files";
 import type { OpInput } from "@ac/web/lib/opTypes";
+import { formText } from "@ac/web/lib/formData";
+import { formValue } from "@ac/web/lib/formValue";
+import { imageMime } from "@ac/web/lib/uploads";
+import { problemReason } from "@ac/web/lib/customerMaintenance";
 
 interface Slot { startAt: string; endAt: string }
 type Result<T> = { ok: true; value: T } | ({ ok: false } & ActionFailure);
@@ -33,6 +37,7 @@ const write = (version: number) => ({ write: true, expectedVersion: version });
 export async function createRequest(input: { unitId: string; type: "reactive" | "preventive"; symptom: string; slots: Slot[]; contactWindow: string }) {
   return run(async () => {
     const [first, ...alternativeSlots] = input.slots;
+    if (!first) throw new Error("a request needs its 1st preferred time");
     const j = await coreOp<{ id: string }>("jobs.create", {
       unitId: input.unitId, type: input.type, symptom: input.symptom.trim(), requestedStart: first.startAt, requestedEnd: first.endAt, alternativeSlots,
       ...(input.contactWindow.trim() && { contactWindow: input.contactWindow.trim() }),
@@ -74,14 +79,14 @@ export async function rateJob(jobId: string, version: number, stars: OpInput<"jo
 export async function reportProblem(form: FormData) {
   return run(async () => {
     const photos = await Promise.all(form.getAll("photos").filter((f): f is File => f instanceof File && f.size > 0).map(async (f) => {
-      const buf = Buffer.from(await f.arrayBuffer());
-      return { name: uploadName(f.name), mime: uploadType(buf, f.type) as OpInput<"jobs.reportProblem">["photos"][number]["mime"], size: f.size, bytes: buf.toString("base64") }; // the API refuses any other type
+      const buffer = Buffer.from(await f.arrayBuffer());
+      return { name: uploadName(f.name), mime: formValue(imageMime, uploadType(buffer, f.type), "photos"), size: f.size, bytes: buffer.toString("base64") }; // the API refuses any other type
     }));
-    const start = String(form.get("visitStart") ?? ""), end = String(form.get("visitEnd") ?? "");
+    const start = formText(form, "visitStart"), end = formText(form, "visitEnd");
     const j = await coreOp<{ id: string }>("jobs.reportProblem", {
-      jobId: String(form.get("jobId")),
-      reasonCode: String(form.get("reasonCode")) as OpInput<"jobs.reportProblem">["reasonCode"],
-      details: String(form.get("details") ?? "").trim(),
+      jobId: formText(form, "jobId"),
+      reasonCode: formValue(problemReason, formText(form, "reasonCode"), "reasonCode"),
+      details: formText(form, "details").trim(),
       preferredSlot: start && end ? { startAt: start, endAt: end } : null,
       photos,
     }, write(Number(form.get("version"))));

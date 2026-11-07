@@ -21,9 +21,9 @@ export function qrPath(text: string): QrPath {
   let path = "";
   for (const [y, row] of data.entries()) {
     for (let x = 0; x < size; x++) {
-      if (!row[x]) continue;
+      if (!row.at(x)) continue;
       let w = 1;
-      while (x + w < size && row[x + w]) w++;
+      while (x + w < size && row.at(x + w)) w++;
       path += `M${String(x)} ${String(y)}h${String(w)}v1h-${String(w)}z`;
       x += w - 1;
     }

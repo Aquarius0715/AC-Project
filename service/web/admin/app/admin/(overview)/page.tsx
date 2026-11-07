@@ -4,29 +4,30 @@
 // user's display language; the as-of time and the period are formatted here (IR289). The Phase 1A demo keeps the
 // fixture KPIs.
 import { connection } from "next/server";
-import { apiMode, coreAll, coreDisplay, coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
+import { apiMode, coreAll, coreDisplay, coreNow, coreOp, CoreError, orAbsent } from "@ac/web/lib/dal";
 import { i18nOf } from "@ac/web/lib/i18n";
-import { periodKinds, periodRange, type PeriodKind } from "@ac/web/lib/clientEnergy";
+import { periodKinds, periodRange } from "@ac/web/lib/clientEnergy";
 import { asOfText, type AdminSummary } from "@ac/web/lib/adminSummary";
 import { NeedsAccess } from "@ac/web/components/NeedsAccess";
 import { AdminOverviewDemo } from "./_components/overview-demo";
 import { AdminOverviewView } from "./_components/overview-view";
+import { queryReader } from "@ac/web/lib/searchParams";
 
-const quiet = <T,>(p: Promise<T>) => p.catch((error) => { if (error instanceof CoreError && (error.error.code === "FORBIDDEN" || error.error.code === "NOT_FOUND")) return null; throw error; });
+const quiet = orAbsent;
 
 export default async function AdminOverviewPage({ searchParams }: Readonly<PageProps<"/admin">>) {
   await connection();
   if (!apiMode()) return <AdminOverviewDemo />;
   const sp = await searchParams;
-  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k] as string) : undefined);
-  const kind = (periodKinds.find((k) => k === one("period")) ?? "today") as PeriodKind;
+  const one = queryReader(sp);
+  const kind = (periodKinds.find((k) => k === one("period")) ?? "today");
   const [now, display] = await Promise.all([coreNow(), coreDisplay()]);
   const i = i18nOf(display);
   const period = periodRange(kind, now, { from: one("from"), to: one("to") }, i);
   const customers = await quiet(coreAll<{ id: string; name: string }>("customers.list"));
-  const customerId = customers?.some((c) => c.id === one("customerId")) ? one("customerId")! : null;
+  const customerId = customers?.find((c) => c.id === one("customerId"))?.id ?? null;
   const properties = customerId ? await quiet(coreAll<{ id: string; name: string }>("properties.list", { filters: { customerId } })) : null;
-  const propertyId = properties?.some((p) => p.id === one("propertyId")) ? one("propertyId")! : null;
+  const propertyId = properties?.find((p) => p.id === one("propertyId"))?.id ?? null;
   // what waits for HQ whatever its requested time — requests to book, offers declined or expired, follow-ups to classify
   // (DEC-90, IR611); a role without job.read sees no such tile
   const scope = { ...(customerId && { customerId }), ...(propertyId && { propertyId }) };
@@ -41,7 +42,8 @@ export default async function AdminOverviewPage({ searchParams }: Readonly<PageP
       throw error;
     }
   }
-  const waiting = (await waitingPage)?.total ?? null;
+  const waitingTotal = await waitingPage;
+  const waiting = waitingTotal?.total ?? null;
   return (
     <AdminOverviewView live={{
       period: { kind, from: period.from, to: period.to, error: period.error ?? null, label: period.label },

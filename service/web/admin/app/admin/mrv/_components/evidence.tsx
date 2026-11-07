@@ -6,6 +6,7 @@ import { useI18n } from "@ac/web/components/I18n";
 import { useOp } from "@ac/web/lib/useOp";
 import { evidenceRows, MAX_EVIDENCE, type ApiEvidenceAttachment } from "@ac/web/lib/mrv";
 import { Icon } from "@ac/web/components/Icon";
+import { isBefore } from "@ac/web/lib/order";
 
 type Units = { id: string; label: string }[];
 interface Period { unitIds: string[]; from: string; to: string }
@@ -22,7 +23,7 @@ export function EvidencePicker({ ids, onChange, period, units }: Readonly<{ ids:
   const i = useI18n();
   const { t } = i;
   const [open, setOpen] = useState(false);
-  const isReady = period.unitIds.length > 0 && !!period.from && !!period.to && period.from < period.to;
+  const isReady = period.unitIds.length > 0 && !!period.from && !!period.to && isBefore(period.from, period.to);
   const cands = useCandidates(period, isReady && (open || ids.length > 0));
   const rows = evidenceRows(cands.data, units, i);
   const byId = new Map(rows.map((r) => [r.id, r]));
@@ -44,10 +45,10 @@ export function EvidencePicker({ ids, onChange, period, units }: Readonly<{ ids:
       {!isReady && <p className="mt-1 text-[11px] text-muted-foreground">{t("Choose the units and the period first: the candidates are their work-report photos.")}</p>}
       {open && isReady && (
         <div className="mt-2 flex flex-col gap-1.5 rounded-xl border border-line p-3">
-          {cands.loading ? <p className="text-xs text-muted-foreground">{t("Loading the attachments…")}</p>
-            : cands.error ? <p className="text-xs text-crit">{t("The attachments could not be loaded — try again.")}</p>
-            : rows.length === 0 ? <p className="text-xs text-muted-foreground">{t("No photos of accepted work reports on these units in this period.")}</p>
-            : rows.map((r) => {
+          {cands.loading ? <p className="text-xs text-muted-foreground">{t("Loading the attachments…")}</p> : null}
+          {!cands.loading && cands.error ? <p className="text-xs text-crit">{t("The attachments could not be loaded — try again.")}</p> : null}
+          {!cands.loading && !cands.error && rows.length === 0 ? <p className="text-xs text-muted-foreground">{t("No photos of accepted work reports on these units in this period.")}</p> : null}
+          {!cands.loading && !cands.error && rows.map((r) => {
               return (
                 <Check key={r.id} checked={ids.includes(r.id)} disabled={!ids.includes(r.id) && ids.length >= MAX_EVIDENCE} onChange={(on) => { onChange(on ? [...ids, r.id] : ids.filter((x) => x !== r.id)); }}
                   label={<span><b>{r.name}</b><span className="block text-xs text-muted-foreground">{r.sub}</span></span>} />
@@ -65,8 +66,8 @@ export function EvidenceList({ ids, period, units }: Readonly<{ ids: string[]; p
   const i = useI18n();
   const { t } = i;
   const cands = useCandidates(period, ids.length > 0);
-  const byId = new Map(evidenceRows(cands.data, units, i).map((r) => [r.id, r]));
   if (ids.length === 0) return <p className="text-xs text-muted-foreground">{t("No evidence attached.")}</p>;
+  const byId = new Map(evidenceRows(cands.data, units, i).map((r) => [r.id, r]));
   return (
     <ul className="flex flex-col gap-1 text-[13px]">
       {ids.map((id) => {

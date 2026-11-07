@@ -39,7 +39,8 @@ export function OffsetsView({ live }: Readonly<{ live: Live }>) {
   const purposeError = purpose.trim().length === 0 || purpose.trim().length > 1000 ? t("1–1000 characters") : undefined;
   const ask = () => { run(() => getQuote({ purpose: purpose.trim(), amountKg: n, period: { from: live.period.from, to: live.period.to }, unitIds: live.unitIds }), t("Demo quote ready — no record was created"), (q) => { setQuote(q); setStep(1); }); };
   const confirm = () => {
-    return quote && run(() => requestOffset(quote.id, quote.version), t("Demo request recorded"), (r) => { setDone(r); setStep(3); },
+    if (!quote) return;
+    run(() => requestOffset(quote.id, quote.version), t("Demo request recorded"), (r) => { setDone(r); setStep(3); },
       (f) => { if (f.code !== "CONFLICT") {
         return;
       }
@@ -63,7 +64,8 @@ export function OffsetsView({ live }: Readonly<{ live: Live }>) {
           <Banner tone="ok">{t("{id} created · status {state} · proof {proof} · no external purchase was made.", { id: done.id.slice(0, 8), state: t(stateLabel[done.state]), proof: done.demoCertificateRef ?? t("Not issued") })}</Banner>
           <div className="mt-3"><Btn onClick={restart}>{t("Start another")}</Btn></div>
         </Card>
-      ) : step === 0 ? (
+      ) : null}
+      {!done && step === 0 ? (
         <Card title={t("How much would you like to offset?")}>
           <div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>
             <Field label={t("Amount (kgCO₂e, > 0)")} hint={t("Up to 3 decimals")} error={amountError}><Input inputMode="decimal" value={amountKg} onChange={(e) => { setAmountKg(e.target.value); }} /></Field>
@@ -71,7 +73,8 @@ export function OffsetsView({ live }: Readonly<{ live: Live }>) {
           </div>
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2"><span className="text-xs text-muted-foreground">{t("Getting a quote creates no record.")}</span><Btn variant="primary" disabled={pending || !!amountError || !!purposeError} onClick={ask}>{t("Get demo quote")}</Btn></div>
         </Card>
-      ) : step === 1 && quote ? (
+      ) : null}
+      {!done && quote && step === 1 ? (
         <Card title={<span className="flex items-center gap-2">{t("Demo quote")} <Badge tone="primary" icon="time">{t("Quoted")}</Badge></span>}>
           <SummaryList items={[
             [t("Amount"), `${kg3(quote.amountKg)} kgCO₂e`], [t("Period / units"), `${span(quote)} · ${live.subject}`],
@@ -80,7 +83,8 @@ export function OffsetsView({ live }: Readonly<{ live: Live }>) {
           ]} />
           <div className="mt-3 flex gap-2"><Btn onClick={() => { setStep(0); }}><Icon name="arrowLeft" /> {t("Back")}</Btn><Btn variant="primary" onClick={() => { setStep(2); }}>{t("Continue")}</Btn></div>
         </Card>
-      ) : quote ? (
+      ) : null}
+      {!done && quote && step > 1 ? (
         <Card title={t("Confirm demo request")}>
           <SummaryList items={[[t("Amount"), `${kg3(quote.amountKg)} kgCO₂e`], [t("Quote"), t("{id} · expires {when}", { id: quote.id.slice(0, 8), when: showTime(quote.expiresAt, display) })], [t("Result"), t("A demo record “Demo requested” is created. Proof stays “Not issued”.")]]} />
           <div className="mt-3"><Check checked={ack} onChange={setAck} label={t("I understand this is a simulated request — not a real purchase.")} /></div>

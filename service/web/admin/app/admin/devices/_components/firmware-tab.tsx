@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, Check, EmptyState, Field, Input, ListRow, Modal, Select, SummaryList, Textarea, UtilBar } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Check, EmptyState, Field, Input, ListRow, Modal, Select, SummaryList, Textarea, UtilizationBar, type Tone } from "@ac/web/components/ui";
 import { useI18n } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
@@ -11,7 +11,10 @@ import { controlCampaign, scheduleCampaign } from "../actions";
 import type { DevicesLive } from "./devices-view";
 import { Icon } from "@ac/web/components/Icon";
 
-const tone = (s: CampaignRow["state"]) => (s === "completed" ? "ok" : s === "running" ? "primary" : s === "paused" ? "warn" : s === "aborted" ? "crit" : "muted");
+// a campaign's tone by its state, and a device result's by its status; anything else is muted
+const CAMPAIGN_TONE = new Map<CampaignRow["state"], Tone>([["completed", "ok"], ["running", "primary"], ["paused", "warn"], ["aborted", "crit"]]);
+const RESULT_TONE = new Map<string, Tone>([["succeeded", "ok"], ["failed", "crit"], ["skipped", "warn"]]);
+const tone = (s: CampaignRow["state"]): Tone => CAMPAIGN_TONE.get(s) ?? "muted";
 const stateWord: Record<CampaignRow["state"], string> = { scheduled: "scheduled", running: "running", paused: "paused", aborted: "aborted", completed: "completed" };
 const resultWord: Record<string, string> = { pending: "pending", installing: "installing", succeeded: "succeeded", failed: "failed", skipped: "skipped" };
 const waveWord: Record<WaveState, [string, "ok" | "primary" | "warn" | "crit" | "muted"]> = { done: ["Done", "ok"], running: ["Running", "primary"], paused: ["Paused", "warn"], aborted: ["Aborted", "crit"], waiting: ["Waiting", "muted"] };
@@ -42,28 +45,29 @@ export function FirmwareTab({ live }: Readonly<{ live: DevicesLive }>) {
     run(() => scheduleCampaign(d, campaignStart(d, zone)), t("Campaign scheduled"), (id) => { close(); setD(blank()); nav({ campaignId: id }); });
   };
   const done = { pause: "Campaign paused", resume: "Campaign resumed", abort: "Campaign aborted", retry_device: "Device queued again" } as const;
-  const control = (action: "pause" | "resume" | "abort" | "retry_device", deviceId?: string) =>
-    sel && run(() => controlCampaign(sel.id, sel.version, action, deviceId, action === "abort" ? reason.trim() : undefined), t(done[action]), close);
+  const control = (action: "pause" | "resume" | "abort" | "retry_device", deviceId?: string) => {
+    if (sel) run(() => controlCampaign(sel.id, sel.version, action, deviceId, action === "abort" ? reason.trim() : undefined), t(done[action]), close);
+  };
   const serial = new Map(live.devices.map((x) => [x.id, x.unitId ? `${x.serial} · ${x.unit}` : x.serial])); // Figma 04-9: the device and its unit
 
   return (
     <div className="split-rev">
       <Card title={t("Campaigns")} action={live.canWrite && <Btn size="sm" variant="primary" onClick={() => { setD(blank()); setModal("new"); }}><Icon name="add" /> {t("New campaign")}</Btn>} className="self-start">
-        {(live.campaigns ?? []).length === 0 ? <EmptyState title={t("No campaigns")}>{t("Schedule a firmware campaign for a model.")}</EmptyState> : <div className="flex flex-col gap-2">{live.campaigns!.map((c) => <ListRow key={c.id} selected={sel?.id === c.id} onClick={() => { nav({ campaignId: c.id }); }}><div className="min-w-0 flex-1"><b className="text-[13px]">{c.model}</b><div className="text-[11px] text-muted-foreground">{c.versions} · {t(c.devices === 1 ? "1 device" : "{n} devices", { n: c.devices })} · {t("starts {time}", { time: c.start })}</div></div><Badge tone={tone(c.state)}>{t(stateWord[c.state])}</Badge></ListRow>)}</div>}
+        {(live.campaigns ?? []).length === 0 ? <EmptyState title={t("No campaigns")}>{t("Schedule a firmware campaign for a model.")}</EmptyState> : <div className="flex flex-col gap-2">{(live.campaigns ?? []).map((c) => <ListRow key={c.id} selected={sel?.id === c.id} onClick={() => { nav({ campaignId: c.id }); }}><div className="min-w-0 flex-1"><b className="text-[13px]">{c.model}</b><div className="text-[11px] text-muted-foreground">{c.versions} · {t(c.devices === 1 ? "1 device" : "{n} devices", { n: c.devices })} · {t("starts {time}", { time: c.start })}</div></div><Badge tone={tone(c.state)}>{t(stateWord[c.state])}</Badge></ListRow>)}</div>}
       </Card>
       {sel ? (
-        <Card title={`${sel.model} · ${sel.versions}`} action={live.canWrite && <span className="flex gap-2">{(sel.state === "running" || sel.state === "scheduled") && <Btn size="sm" disabled={pending} onClick={() => control("pause")}>{t("Pause")}</Btn>}{sel.state === "paused" && <Btn size="sm" disabled={pending} onClick={() => control("resume")}>{t("Resume")}</Btn>}{["scheduled", "running", "paused"].includes(sel.state) && <Btn size="sm" variant="danger" disabled={pending} onClick={() => { setReason(""); setModal("abort"); }}>{t("Abort")}</Btn>}</span>}>
+        <Card title={`${sel.model} · ${sel.versions}`} action={live.canWrite && <span className="flex gap-2">{(sel.state === "running" || sel.state === "scheduled") && <Btn size="sm" disabled={pending} onClick={() => { control("pause"); }}>{t("Pause")}</Btn>}{sel.state === "paused" && <Btn size="sm" disabled={pending} onClick={() => { control("resume"); }}>{t("Resume")}</Btn>}{["scheduled", "running", "paused"].includes(sel.state) && <Btn size="sm" variant="danger" disabled={pending} onClick={() => { setReason(""); setModal("abort"); }}>{t("Abort")}</Btn>}</span>}>
           <div className="mb-3"><SummaryList cols={2} items={campaignFacts(sel, i)} /></div>
           <div className="flex flex-col gap-3">{sel.c.waves.map((w, n) => {
             const inWave = sel.c.results.filter((r) => r.waveIndex === n);
-            const [word, chip] = waveWord[waveStates(sel.c)[n]];
+            const [word, chip] = waveWord[waveStates(sel.c)[n] ?? "waiting"];
             const ok = inWave.filter((r) => r.status === "succeeded").length;
             const pct = inWave.length > 0 ? Math.round((ok * 100) / inWave.length) : 0;
-            return <div key={w.label}><div className="mb-1 flex items-center justify-between gap-2 text-xs"><b>{t("Wave {n} · {percent} %", { n: n + 1, percent: w.percent })}</b><span className="flex items-center gap-2 text-muted-foreground">{t("{done} / {total} succeeded", { done: ok, total: inWave.length })}<Badge tone={chip}>{t(word)}</Badge></span></div><UtilBar pct={pct} tone={pct >= 95 ? "ok" : "primary"} label={t("Wave {n} · {percent} %", { n: n + 1, percent: w.percent })} /></div>;
+            return <div key={w.label}><div className="mb-1 flex items-center justify-between gap-2 text-xs"><b>{t("Wave {n} · {percent} %", { n: n + 1, percent: w.percent })}</b><span className="flex items-center gap-2 text-muted-foreground">{t("{done} / {total} succeeded", { done: ok, total: inWave.length })}<Badge tone={chip}>{t(word)}</Badge></span></div><UtilizationBar pct={pct} tone={pct >= 95 ? "ok" : "primary"} label={t("Wave {n} · {percent} %", { n: n + 1, percent: w.percent })} /></div>;
           })}</div>
           <div className="mt-3"><SummaryList items={[[t("Succeeded / installing / pending"), `${String(sel.c.progress.succeeded)} / ${String(sel.c.progress.installing)} / ${String(sel.c.progress.pending)}`], [t("Failed"), t("{n} · failed devices keep their old version", { n: sel.c.progress.failed })], [t("Skipped"), t("{n} · busy, offline or tampered", { n: sel.c.progress.skipped })], ...(sel.c.reason ? [[t("Reason"), sel.c.reason] as [string, string]] : [])]} /></div>
           <h3 className="mb-1 mt-4 text-[13px] font-bold">{t("Devices")}</h3>
-          <div className="flex flex-col gap-1">{sel.c.results.map((r) => <div key={r.deviceId} className="flex items-center justify-between gap-2 border-t border-line py-1.5 text-[13px]"><span className="min-w-0">{serial.get(r.deviceId) ?? r.deviceId.slice(0, 8)} <span className="text-xs text-muted-foreground">{t("wave {n}", { n: r.waveIndex + 1 })}{r.reasonKey ? ` · ${resultReason(r.reasonKey, t)}` : ""}</span></span><span className="flex shrink-0 items-center gap-2">{r.at && <span className="text-xs text-muted-foreground">{showTime(r.at, i.display)}</span>}<Badge tone={r.status === "succeeded" ? "ok" : r.status === "failed" ? "crit" : r.status === "skipped" ? "warn" : "muted"}>{t(resultWord[r.status] ?? r.status)}</Badge>{live.canWrite && (r.status === "failed" || r.status === "skipped") && ["running", "paused"].includes(sel.state) && <Btn size="sm" disabled={pending} onClick={() => control("retry_device", r.deviceId)}>{t("Retry")}</Btn>}</span></div>)}</div>
+          <div className="flex flex-col gap-1">{sel.c.results.map((r) => <div key={r.deviceId} className="flex items-center justify-between gap-2 border-t border-line py-1.5 text-[13px]"><span className="min-w-0">{serial.get(r.deviceId) ?? r.deviceId.slice(0, 8)} <span className="text-xs text-muted-foreground">{t("wave {n}", { n: r.waveIndex + 1 })}{r.reasonKey ? ` · ${resultReason(r.reasonKey, t)}` : ""}</span></span><span className="flex shrink-0 items-center gap-2">{r.at && <span className="text-xs text-muted-foreground">{showTime(r.at, i.display)}</span>}<Badge tone={RESULT_TONE.get(r.status) ?? "muted"}>{t(resultWord[r.status] ?? r.status)}</Badge>{live.canWrite && (r.status === "failed" || r.status === "skipped") && ["running", "paused"].includes(sel.state) && <Btn size="sm" disabled={pending} onClick={() => { control("retry_device", r.deviceId); }}>{t("Retry")}</Btn>}</span></div>)}</div>
         </Card>
       ) : <Card title={t("Campaign")}><EmptyState title={t("Nothing selected")}>{t("Choose or schedule a campaign.")}</EmptyState></Card>}
       <Modal open={modal === "new"} onClose={close} title={t("New firmware campaign")} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={schedule}>{t("campaign::Schedule")}</Btn></>}>
@@ -81,7 +85,7 @@ export function FirmwareTab({ live }: Readonly<{ live: DevicesLive }>) {
         <Field label={t("Start")} error={tried ? errors.startAt : undefined} hint={t("Now {time} — at least 24 h ahead · times in {zone}", { time: showTime(live.now, i.display), zone })}><Input type="datetime-local" value={d.startAt} onChange={(e) => { setD({ ...d, startAt: e.target.value }); }} /></Field>
         <Banner>{t("Devices with an active diagnostic run, firmware operation or open tamper are skipped with a reason.")}</Banner>
       </Modal>
-      <Modal open={modal === "abort"} onClose={close} title={t("Abort campaign")} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant="danger" disabled={pending || !reason.trim()} onClick={() => control("abort")}>{t("Abort")}</Btn></>}>
+      <Modal open={modal === "abort"} onClose={close} title={t("Abort campaign")} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant="danger" disabled={pending || !reason.trim()} onClick={() => { control("abort"); }}>{t("Abort")}</Btn></>}>
         <Field label={t("Reason")}><Textarea value={reason} maxLength={1000} onChange={(e) => { setReason(e.target.value); }} /></Field>
         <p className="text-[11px] text-muted-foreground">{t("Installed devices keep the new version; pending devices are not updated.")}</p>
       </Modal>

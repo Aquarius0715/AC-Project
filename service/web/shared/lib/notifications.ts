@@ -5,6 +5,8 @@ import { evidenceText } from "@ac/web/lib/evidence";
 import { money } from "@ac/web/lib/money";
 import { channelText } from "@ac/web/lib/partnerHistory";
 import { DEFAULT_DISPLAY, showDate, showTime, translate, translator, type Display } from "@ac/web/lib/i18n";
+import { entryOf, lookup } from "@ac/web/lib/lookup";
+
 
 type TargetKind = "unit" | "job" | "invoice" | "restriction" | "device" | "inquiry" | "client_user" | "partner_user" | "certificate";
 
@@ -86,31 +88,38 @@ const reasonWords: Record<string, string> = {
 /** The firmware campaign's advance notice (IR339): its day is dated again in the display language. */
 const FIRMWARE_NOTICE = "Firmware update from {date}, {from}–{to} local time. The AC may restart for about 2 minutes.";
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const firmwareNotice = /^Firmware update from (\d{1,2}) ([A-Z][a-z]{2}) (\d{4}), (\S+)–(\S+) local time\. The AC may restart for about 2 minutes\.$/;
+const firmwareNotice = /^Firmware update from (\d{1,2}) ([A-Z][a-z]{2}) (\d{4}), ([^\s–]+)–([^\s–]+) local time\. The AC may restart for about 2 minutes\.$/;
 
 /** The dictionary keys of the detail line (the key check of the tests). */
 export const NOTIFICATION_KEYS = [...Object.values(statusWords), ...Object.values(reasonWords), FIRMWARE_NOTICE];
 
 function messageText(message: string, display: Display): string {
   const m = firmwareNotice.exec(message);
-  const month = m ? MONTHS.indexOf(m[2]) : -1;
+  const month = m ? MONTHS.indexOf(m[2] ?? "") : -1;
   if (!m || month < 0) return evidenceText(message, translator(display.locale)); // a filter reminder's message is its evidence (IR480)
-  const day = `${m[3]}-${String(month + 1).padStart(2, "0")}-${m[1].padStart(2, "0")}T00:00:00Z`;
-  return translate(display.locale, FIRMWARE_NOTICE, { date: showDate(day, { locale: display.locale, timeZone: "UTC" }), from: m[4], to: m[5] });
+  const day = `${m[3] ?? ""}-${String(month + 1).padStart(2, "0")}-${(m[1] ?? "").padStart(2, "0")}T00:00:00Z`;
+  return translate(display.locale, FIRMWARE_NOTICE, { date: showDate(day, { locale: display.locale, timeZone: "UTC" }), from: m[4] ?? "", to: m[5] ?? "" });
 }
 
 /** One inbox row in the user's display language and time zone (FR-X01, IR258). The message, the reason and the status
 are worded in that language when a source above wrote them (IR481); a status the API filled in from the type (the
 notification had none) is left out, and any other text stays as recorded. */
 export function inboxRow(n: ApiNotification, role: Role, display: Display = DEFAULT_DISPLAY): InboxRow {
-  const title = typeTitles[n.type] ?? titles[n.templateKey] ?? "Notification — {name}";
-  const word = (words: Record<string, string>, code: string | null) => (code && words[code] ? translate(display.locale, words[code]) : code);
+  const title = lookup(typeTitles, n.type) ?? lookup(titles, n.templateKey) ?? "Notification — {name}";
+  const word = (words: Record<string, string>, code: string | null) => {
+    const text = code === null ? undefined : lookup(words, code);
+    return text ? translate(display.locale, text) : code;
+  };
   const status = n.params.status === n.type ? null : word(statusWords, n.params.status);
   const message = n.params.message ? messageText(n.params.message, display) : word(reasonWords, n.params.reason);
   const text = details[n.templateKey]?.(n, display) ?? [message, status].filter(Boolean).join(" · ");
   const detail = [text, n.channel === "inApp" ? null : channelText(n.channel, translator(display.locale))].filter(Boolean).join(" · "); // "e-mail" in words (IR488)
   // a notice whose target page no longer opens — an offer withdrawn before the company accepted it — stays readable
   // without a link, so it never leads to "This page isn't available" (IR602)
-  const href = n.targetOpen === false ? "" : typeRoutes[role]?.[n.type] ?? (n.sourceAlertId && alertsPage[role] ? alertsPage[role] : (routes[role][n.target.kind]?.(n.target.id) ?? ""));
+  const targetHref = () => {
+    const alerts = entryOf(alertsPage, role);
+    return alerts && n.sourceAlertId ? alerts : (lookup(entryOf(routes, role), n.target.kind)?.(n.target.id) ?? "");
+  };
+  const href = n.targetOpen === false ? "" : lookup(lookup(typeRoutes, role) ?? {}, n.type) ?? targetHref();
   return { id: n.id, version: n.version, t: translate(display.locale, title, { name: n.params.targetName }), d: detail, w: showTime(n.occurredAt, display), read: n.readAt !== null, href };
 }

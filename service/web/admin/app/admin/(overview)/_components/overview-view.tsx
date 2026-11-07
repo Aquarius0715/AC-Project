@@ -1,4 +1,5 @@
 "use client";
+const OPEN_UNITS = "Open units";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -72,13 +73,13 @@ function Sections({ s, links, waiting }: Readonly<{ s: AdminSummary; links: Retu
         {/* what waits for HQ whatever the period: requests to book, offers declined or expired, follow-ups to classify (IR611) */}
         {waiting !== null && <Kpi label={t("Waiting for HQ")} value={waiting} tone={waiting ? "warn" : undefined} sub={t("requests to book or reassign · any requested time")} href={links.waiting} link={t("Open requests")} />}
         <Kpi label={t("Active customers")} value={k.customers} sub={t("with Active status")} />
-        <Kpi label={t("Target units")} value={k.units} sub={t("Running {on} · Stopped {off} · unknown {unknown} · archived excluded", { on: k.on, off: k.off, unknown: k.unknown })} href={links.units} link={t("Open units")} />
+        <Kpi label={t("Target units")} value={k.units} sub={t("Running {on} · Stopped {off} · unknown {unknown} · archived excluded", { on: k.on, off: k.off, unknown: k.unknown })} href={links.units} link={t(OPEN_UNITS)} />
         <Kpi label={t("Operation rate")} value={k.rate} sub={t("Running {on} / known {known} · unknown {unknown} not in denominator", { on: k.on, known: k.on + k.off, unknown: k.unknown })} href={links.power("on")} link={t("Units running")} />
         <Kpi label={t("Unresolved alerts")} value={k.alerts} tone={k.alerts ? "warn" : undefined} sub={t("open or acknowledged · critical and warning")} href={links.alerts} link={t("View alerts")} />
         <Kpi label={t("Energy used (actual)")} value={k.kwh} sub={k.kwhSub} href={links.energy} link={t("Energy analysis")} />
-        <Kpi label={t("Overdue billing")} value={k.billing} tone={bill.forbidden ? undefined : (bill.overdue ? "crit" : undefined)} sub={k.billingSub} href={bill.forbidden ? undefined : links.billing} link={bill.forbidden ? undefined : t("Open overdue")} />
+        <Kpi label={t("Overdue billing")} value={k.billing} tone={!bill.forbidden && bill.overdue ? "crit" : undefined} sub={k.billingSub} href={bill.forbidden ? undefined : links.billing} link={bill.forbidden ? undefined : t("Open overdue")} />
         <Kpi label={t("Maintenance jobs (period)")} value={k.jobs} sub={jobs.filter((j) => j.count).map((j) => `${j.label} ${String(j.count)}`).join(" · ") || t("no jobs in the period")} href={links.jobs()} link={t("Open jobs")} />
-        <Kpi label={t("Connection")} value={t("{n} online", { n: k.online })} sub={t("offline {offline} · unknown/connecting/error {unknown}", { offline: k.offline, unknown: k.connUnknown })} href={links.connection("online")} link={t("Open units")} />
+        <Kpi label={t("Connection")} value={t("{n} online", { n: k.online })} sub={t("offline {offline} · unknown/connecting/error {unknown}", { offline: k.offline, unknown: k.connUnknown })} href={links.connection("online")} link={t(OPEN_UNITS)} />
       </div>
       <Card title={<span className="flex flex-wrap items-center gap-2">{t("Energy-saving forecast")} <Badge tone="warn">{t("Forecast (prorated assumed baseline, demo)")}</Badge></span>} action={<TextLink href={links.energy}>{t("Energy analysis")} <Icon name="arrowRight" /></TextLink>}>
         {f.state === "ok" ? (
@@ -95,17 +96,15 @@ function Sections({ s, links, waiting }: Readonly<{ s: AdminSummary; links: Retu
         <p className="mt-2 text-[11px] text-muted-foreground">{t("A forecast, not a measured saving. Actual results for the period are in the “Energy used” KPI; baseline comparison lives in Energy analysis.")}</p>
       </Card>
       <div className="grid-fluid" style={{ ["--min" as string]: "420px" }}>
-        <Card title={t("Operation (power state)")} action={<TextLink href={links.units}>{t("Open units")} <Icon name="arrowRight" /></TextLink>}><Axis rows={axes.power} /><p className="mt-2 text-[11px] text-muted-foreground">{axes.rateNote}</p></Card>
-        <Card title={t("Connection")} action={<TextLink href={links.units}>{t("Open units")} <Icon name="arrowRight" /></TextLink>}><Axis rows={axes.connection} /><p className="mt-2 text-[11px] text-muted-foreground">{t("Connection is a separate axis from power state: an online unit can still have unknown power (no power sensor).")}</p></Card>
+        <Card title={t("Operation (power state)")} action={<TextLink href={links.units}>{t(OPEN_UNITS)} <Icon name="arrowRight" /></TextLink>}><Axis rows={axes.power} /><p className="mt-2 text-[11px] text-muted-foreground">{axes.rateNote}</p></Card>
+        <Card title={t("Connection")} action={<TextLink href={links.units}>{t(OPEN_UNITS)} <Icon name="arrowRight" /></TextLink>}><Axis rows={axes.connection} /><p className="mt-2 text-[11px] text-muted-foreground">{t("Connection is a separate axis from power state: an online unit can still have unknown power (no power sensor).")}</p></Card>
       </div>
       <div className="grid-fluid" style={{ ["--min" as string]: "420px" }}>
         <Card title={t("Maintenance jobs by status — this period")} action={<TextLink href={links.jobs()}>{t("Open jobs")} <Icon name="arrowRight" /></TextLink>}>
           <div className="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
-            {[jobs.slice(0, half), jobs.slice(half)].map((col, i) => {
-              return (
+            {[jobs.slice(0, half), jobs.slice(half)].map((col, i) => (
                 <div key={i} className="rounded-xl border border-line">{col.map((j) => <Link key={j.status} href={j.href} className="flex justify-between border-t border-line px-3 py-1.5 text-[13px] first:border-0 hover:bg-surface2"><span className="text-muted-foreground">{j.label}</span><b>{j.count}</b></Link>)}</div>
-              );
-            })}
+              ))}
           </div>
           <p className="mt-2 text-[11px] text-muted-foreground">{t("Jobs whose requested time starts in the period. The status rows open the Jobs tab with that stage, the scope and the period.")}</p>
         </Card>

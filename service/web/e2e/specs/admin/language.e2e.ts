@@ -209,12 +209,12 @@ test("the HQ overview in Malay keeps the period in Kuala Lumpur days", async ({ 
     await expect(pay).toBeHidden();
   }
   await main.getByRole("button", { name: "Cipta invois" }).click();
-  const newInvoice = page.getByRole("dialog", { name: "Cipta invois" });
-  await expect(newInvoice).toContainText("Tarikh ialah hari Kuala Lumpur (Asia/Kuala_Lumpur).");
-  await newInvoice.getByRole("button", { name: "Cipta", exact: true }).click();
-  await expect(newInvoice).toContainText("Diperlukan");
-  await newInvoice.getByRole("button", { name: "Batal", exact: true }).click();
-  await expect(newInvoice).toBeHidden();
+  const invoiceDialog = page.getByRole("dialog", { name: "Cipta invois" });
+  await expect(invoiceDialog).toContainText("Tarikh ialah hari Kuala Lumpur (Asia/Kuala_Lumpur).");
+  await invoiceDialog.getByRole("button", { name: "Cipta", exact: true }).click();
+  await expect(invoiceDialog).toContainText("Diperlukan");
+  await invoiceDialog.getByRole("button", { name: "Batal", exact: true }).click();
+  await expect(invoiceDialog).toBeHidden();
   await main.getByRole("tab", { name: /^Pertanyaan/ }).click();
   await page.waitForURL(/tab=inquiries/);
   await expect(main.getByRole("heading", { name: "Pertanyaan pelanggan", exact: true })).toBeVisible();

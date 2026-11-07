@@ -78,22 +78,22 @@ test("unavailable days are listed, shortened and removed", async ({ page }) => {
 
   await row.getByRole("button", { name: /^Remove unavailable days of tech-external-a, / }).click();
   const dialog = page.getByRole("dialog", { name: "Remove unavailable days" });
-  const removeFrom = dialog.getByLabel(/^Remove from/);
-  await expect(removeFrom).toHaveValue(from);
+  const endDateInput = dialog.getByLabel(/^Remove from/);
+  await expect(endDateInput).toHaveValue(from);
   await expect(dialog).toContainText("All of these days are removed.");
   await expectAccessible(page, '[role="dialog"]');
-  await removeFrom.fill(day(5));
+  await endDateInput.fill(day(5));
   await dialog.getByRole("button", { name: "Remove" }).click();
   await expect(dialog).toContainText(/^.*Choose a day from .+ to .+/);
   await expect(dialog).not.toContainText("Still unavailable");
-  await removeFrom.fill(day(1));
+  await endDateInput.fill(day(1));
   await expect(dialog).toContainText(/Still unavailable: .+; the days from .+ on are removed\./);
   await dialog.getByRole("button", { name: "Remove" }).click();
   await expect(page.getByText(/^Unavailable days shortened — tech-external-a can take visits again from /).first()).toBeVisible();
   await expect(dialog).toBeHidden();
 
   await row.getByRole("button", { name: /^Remove unavailable days of tech-external-a, / }).click();
-  await expect(removeFrom).toHaveValue(from);
+  await expect(endDateInput).toHaveValue(from);
   await dialog.getByRole("button", { name: "Remove" }).click();
   await expect(page.getByText("Unavailable days removed — tech-external-a can take visits on those days again.").first()).toBeVisible();
   await expect(row).toHaveCount(0);

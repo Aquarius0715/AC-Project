@@ -16,12 +16,12 @@ import { useI18n } from "./I18n";
 import { qrMatch, qrRefusal, scanCode, type ApiQrJob, type ApiQrResolution, type ApiQrUnit, type QrMatch } from "@ac/web/lib/techQr";
 import { Icon } from "@ac/web/components/Icon";
 import { Button } from "@ac/web/components/ui/button";
-
-const OPEN = ["assigned", "in_progress", "on_hold", "rework_requested"]; // the jobs units.resolveQr opens (IR230)
-
-type State = { kind: "idle" } | { kind: "busy" } | { kind: "matched"; code: string; at: string; match: QrMatch } | { kind: "refused"; title: string; text: string; absent: boolean };
+import { orNull, recover } from "@ac/web/lib/promises";
 
 export function QrScan({ open, onClose }: Readonly<{ open: boolean; onClose: () => void }>) {
+  const OPEN = ["assigned", "in_progress", "on_hold", "rework_requested"]; // the jobs units.resolveQr opens (IR230)
+
+  type State = { kind: "idle" } | { kind: "busy" } | { kind: "matched"; code: string; at: string; match: QrMatch } | { kind: "refused"; title: string; text: string; absent: boolean };
   const i18n = useI18n();
   const { t } = i18n;
   const [code, setCode] = useState("");
@@ -31,19 +31,19 @@ export function QrScan({ open, onClose }: Readonly<{ open: boolean; onClose: () 
   const units = useOp<{ items: { id: string; displayName: string }[] }, { id: string; displayName: string }[]>("units.list", { limit: 100 }, [], (p) => p.items, open);
   // the open jobs' summary rows name their units; a snapshot of a past job (history) names none
   const jobUnits = useOp<{ items: ({ projection: "summary"; unitId: string } | { projection: "offer" | "history" })[] }, string[]>("jobs.list", { filters: { statuses: OPEN }, limit: 100 }, [],
-    (p) => p.items.flatMap((j) => (j.projection === "summary" ? [j.unitId] : [])), open);
+    (p) => p.items.flatMap((j) => (j.projection === "summary" ? j.unitId : [])), open);
   const assigned = units.data.filter((u) => jobUnits.data.includes(u.id));
   const close = () => { setState({ kind: "idle" }); setCode(""); onClose(); };
   const scan = async (raw: string) => {
     const c = scanCode(raw);
-    if (!c) { setState({ kind: "refused", ...qrRefusal({ code: "VALIDATION", messageKey: "error.validation" }, t) }); return; }
+    if (!c) { setState({ kind: "refused", ...qrRefusal({ code: "VALIDATION" }, t) }); return; }
     setState({ kind: "busy" });
     try {
       const r = await callOp<ApiQrResolution>("units.resolveQr", { code: c });
       let isLocked = false;
       const [unit, job] = await Promise.all([
-        callOp<ApiQrUnit>("units.get", { id: r.unitId }).catch((error: unknown) => { isLocked = error instanceof OpError && error.error.code === "FORBIDDEN"; return null; }), // before the work window (IR94)
-        r.jobId ? callOp<ApiQrJob>("jobs.get", { jobId: r.jobId }).catch(() => null) : Promise.resolve(null),
+        recover(callOp<ApiQrUnit>("units.get", { id: r.unitId }), (error: unknown) => { isLocked = error instanceof OpError && error.error.code === "FORBIDDEN"; return null; }), // before the work window (IR94)
+        r.jobId ? orNull(callOp<ApiQrJob>("jobs.get", { jobId: r.jobId })) : Promise.resolve(null),
       ]);
       const at = (now ?? new Date()).toISOString();
       const name = units.data.find((u) => u.id === r.unitId)?.displayName;

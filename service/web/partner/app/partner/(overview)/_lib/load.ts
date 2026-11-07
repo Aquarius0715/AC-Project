@@ -5,18 +5,16 @@
 // jobs (activity). The counts and the list are the authority; the optional reads degrade to empty sections. Texts in the
 // user's display language; the period and today's timeline stay Kuala Lumpur days and hours (IR270).
 import "server-only";
-import { coreAll, coreDisplay, coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
+import { coreAll, coreDisplay, coreNow, coreOp, orWhenRefused, coreItems } from "@ac/web/lib/dal";
 import { i18nOf, showClock } from "@ac/web/lib/i18n";
 import { actions, activity, capacity, hhmm, klDay, kpis, onTeam, partnerJob, period, periodChoice, progress, timeline, timelinePct, type ApiCapacity, type ApiCounts, type ApiJobEvent, type ApiMember, type ApiPartnerJob } from "@ac/web/lib/partnerOverview";
 
 const KL = "Asia/Kuala_Lumpur";
-const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => p.catch((error) => {
-  if (error instanceof CoreError && error.error.code !== "UNAVAILABLE" && error.error.code !== "TIMEOUT") return fallback; // not readable now: empty section
-  throw error;
-});
+
+// not readable now: empty section
+const optional = orWhenRefused;
 
 export async function loadOverview(sp: { from?: string; to?: string }) {
-  interface Page<T> { items: T[] }
   const [now, display] = await Promise.all([coreNow(), coreDisplay()]);
   const i = i18nOf(display);
   const { t } = i;
@@ -32,14 +30,15 @@ export async function loadOverview(sp: { from?: string; to?: string }) {
   ]);
   const jobs = rows.map((r) => partnerJob(r, new Map(units.map((u) => [u.id, u.displayName]))));
   const today = new Date(now.getTime() + 8 * 3_600_000).toISOString().slice(0, 10);
-  const capacityOf = (date: string) => optional(coreOp<Page<ApiCapacity>>("members.capacity", { date, query: { limit: 100 } }).then((r) => r.items), []);
+  const capacityOf = (date: string) => optional(coreItems<ApiCapacity>("members.capacity", { date, query: { limit: 100 } }), []);
   const [days, todayCapacity] = await Promise.all([
-    Promise.all(p.days.map(capacityOf)),
+    Promise.all(p.days.map((item) => capacityOf(item))),
     p.days.includes(today) ? Promise.resolve(null) : capacityOf(today),
   ]);
   // activity: the events of the jobs that moved last (open ones first), newest first
-  const recent = [...jobs].sort((a, b) => Number(a.status === "completed") - Number(b.status === "completed") || Date.parse(b.dueAt ?? "") - Date.parse(a.dueAt ?? "")).slice(0, 8);
-  const events = (await Promise.all(recent.map((j) => optional(coreOp<Page<ApiJobEvent>>("jobs.events", { jobId: j.id, query: { limit: 100 } }).then((r) => r.items), [])))).flat();
+  const recent = [...jobs].toSorted((a, b) => Number(a.status === "completed") - Number(b.status === "completed") || Date.parse(b.dueAt ?? "") - Date.parse(a.dueAt ?? "")).slice(0, 8);
+  const eventLists = await Promise.all(recent.map((j) => optional(coreItems<ApiJobEvent>("jobs.events", { jobId: j.id, query: { limit: 100 } }), [])));
+  const events = eventLists.flat();
   const names = new Map(members.map((m) => [m.id, m.displayName]));
   const ms = now.getTime();
   return {

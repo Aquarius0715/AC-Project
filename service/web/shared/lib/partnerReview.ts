@@ -2,8 +2,10 @@
 // the evidence check of DD-P05 step 2, the version / alert rows and the IR31 review availability. Pure code shared by
 // the Server Component and the client view. Texts in the display language (`t` / `i`) and times in the user's display
 // time zone, formatted by the loader on the server (IR274).
-import { EN, showSpan, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
+import { EN, showSpan, showTime, translator, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import { evidenceText } from "@ac/web/lib/evidence";
+import { wrapped } from "@ac/web/lib/text";
+import { entryOf } from "@ac/web/lib/lookup";
 
 const en = translator("en");
 
@@ -49,10 +51,10 @@ export interface ReworkItem { label: string; checked: boolean }
 “Items that need rework”; IR232, IR609): the inspection items that need attention, were not inspected or have no
 result — ticked — then each reading to re-measure, and more photos, ticked when the report has none. */
 export function reworkItems(items: Pick<InspectionRow, "label" | "result" | "reason">[], readings: [string, string][], photos: number, t: T = en): ReworkItem[] {
-  const word = (r: ApiInspectionItem["result"]) => t(r ? resultText[r].label : "No result").toLowerCase();
+  const word = (r: ApiInspectionItem["result"]) => t(r ? entryOf(resultText, r).label : "No result").toLowerCase();
   return [
     ...items.filter((x) => x.result === null || x.result === "attention" || x.result === "not_inspected")
-      .map((x) => ({ label: `${x.label} — ${word(x.result)}${x.reason ? ` (${x.reason})` : ""}`, checked: true })),
+      .map((x) => ({ label: `${x.label} — ${word(x.result)}${wrapped(x.reason, " (", ")")}`, checked: true })),
     ...readings.map(([label]) => ({ label: t("{reading} — re-measure", { reading: label }), checked: false })),
     { label: t("Photos — add more evidence"), checked: photos === 0 },
   ];
@@ -60,7 +62,9 @@ export function reworkItems(items: Pick<InspectionRow, "label" | "result" | "rea
 /** The return reason sent to jobs.review: the ticked items, then the reviewer's words (1–1000 together). */
 export function returnReason(items: string[], text: string, t: T = en): string {
   const words = text.trim();
-  return items.length > 0 ? `${t("Rework: {items}.", { items: items.join("; ") })}${words ? ` ${words}` : ""}` : words;
+  if (items.length === 0) return words;
+  const rework = t("Rework: {items}.", { items: items.join("; ") });
+  return words ? `${rework} ${words}` : rework;
 }
 /** One inspection row (Figma 03 “Indoor unit — filter condition · Normal”, reason under not-applicable items) with the
 names of the report photos linked to its finding (InspectionItem.evidenceIds, IR352); a photo the report no longer
@@ -69,9 +73,9 @@ export interface InspectionRow { id: string; label: string; result: ApiInspectio
 export function inspectionRows(items: ApiInspectionItem[], t: T = en, attachments: Pick<ApiAttachment, "id" | "name">[] = []): InspectionRow[] {
   const order = { indoor: 0, outdoor: 1, electrical: 2 };
   const names = new Map(attachments.map((a) => [a.id, a.name]));
-  return [...items].sort((a, b) => order[a.componentGroup] - order[b.componentGroup]).map((it) => {
+  return [...items].toSorted((a, b) => order[a.componentGroup] - order[b.componentGroup]).map((it) => {
     return {
-      id: it.id, label: `${t(groupLabel[it.componentGroup])} — ${componentLabel[it.componentKey] ? t(componentLabel[it.componentKey]) : it.componentKey.replaceAll('_', " ")}`, result: it.result, reason: it.reason,
+      id: it.id, label: `${t(entryOf(groupLabel, it.componentGroup))} — ${textOf(componentLabel, it.componentKey, t) ?? it.componentKey.replaceAll('_', " ")}`, result: it.result, reason: it.reason,
       photos: it.evidenceIds.map((id) => names.get(id) ?? id.slice(0, 8)),
     };
   });
@@ -83,17 +87,18 @@ const qualityNote: Record<string, string> = { valid: "recorded", suspect: "suspe
 const componentShort: Record<string, string> = { filter: "filter", refrigerant_pipe: "refrigerant", wiring: "wiring" };
 /** Readings recorded (Figma 03): “Refrigerant pressure · 4.6 bar · within spec” from the inspection measurements. */
 export function readingRows(ms: ApiReportMeasurement[], t: T = en): [string, string][] {
-  const part = (key: string) => (componentShort[key] ?? componentLabel[key] ? t(componentShort[key] ?? componentLabel[key]) : key);
+  const part = (key: string) => (textOf(componentShort, key, t) ?? textOf(componentLabel, key, t) ?? key);
   return ms.map((m) => {
-    return [`${metricLabel[m.metric] ? t(metricLabel[m.metric]) : m.metric}${m.componentKey ? ` (${part(m.componentKey)})` : ""}`,
-      m.value === null ? t("no value") : `${String(m.value)} ${m.unit} · ${qualityNote[m.quality] ? t(qualityNote[m.quality]) : m.quality}${m.qualityReason ? ` (${m.qualityReason.replaceAll('_', " ")})` : ""}`];
+    const reason = m.qualityReason ? ` (${m.qualityReason.replaceAll('_', " ")})` : "";
+    return [`${textOf(metricLabel, m.metric, t) ?? m.metric}${m.componentKey ? ` (${part(m.componentKey)})` : ""}`,
+      m.value === null ? t("no value") : `${String(m.value)} ${m.unit} · ${textOf(qualityNote, m.quality, t) ?? m.quality}${reason}`];
   });
 }
 /** “14 Sept, 9:05 – 11:40 am MYT (2 h 35 m)” from the job's time on site, in the display time zone (IR274). */
 export function timeOnSiteText(ts: ApiReviewJob["timeOnSite"], i: I18n = EN): string {
   const { t, display } = i;
   if (!ts?.arrivedAt) return t("not recorded");
-  const from = ts.arrivedAt ?? ts.startedAt!;
+  const from = ts.arrivedAt;
   const span = ts.finishedAt ? showSpan(from, ts.finishedAt, display) : t("{from} – now", { from: showTime(from, display) });
   const mins = ts.onSiteMinutes ?? null;
   return mins === null ? span : t("{span} ({h} h {m} m)", { span, h: Math.floor(mins / 60), m: mins % 60 });
@@ -103,9 +108,9 @@ const partSource: Record<string, string> = { van_stock: "from van stock", hq_war
 const leakCheckText: Record<string, string> = { pass: "passed", fail: "failed", not_done: "not done" };
 /** Parts & refrigerant lines (Figma 03): “Filter × 1 · from van stock · replaces filter”. */
 export function partLines(parts: ApiPart[], refrigerant: ApiRefrigerant[], t: T = en): [string, string][] {
-  const code = (x: string, map: Record<string, string>) => (map[x] ? t(map[x]) : x.replaceAll('_', " "));
+  const code = (x: string, map: Record<string, string>) => (textOf(map, x, t) ?? x.replaceAll('_', " "));
   return [
-    ...parts.map((p): [string, string] => [`${p.name} × ${String(p.quantity)}`, [code(p.source, partSource), ...(p.replacesComponentKey ? [t("replaces {part}", { part: componentLabel[p.replacesComponentKey] ? t(componentLabel[p.replacesComponentKey]) : p.replacesComponentKey.replaceAll('_', " ") })] : [])].join(" · ")]),
+    ...parts.map((p): [string, string] => [`${p.name} × ${String(p.quantity)}`, [code(p.source, partSource), ...(p.replacesComponentKey ? [t("replaces {part}", { part: textOf(componentLabel, p.replacesComponentKey, t) ?? p.replacesComponentKey.replaceAll('_', " ") })] : [])].join(" · ")]),
     ...refrigerant.map((x): [string, string] => [t("{refrigerant} · cylinder {id}", { refrigerant: x.refrigerant, id: x.cylinderId }), t("recovered {recovered} kg · charged {charged} kg · leak check {check}", { recovered: x.recoveredKg, charged: x.chargedKg, check: code(x.leakCheck, leakCheckText) })]),
   ];
 }
@@ -116,7 +121,7 @@ export interface EvidenceRow { label: string; value: string; tone: "ok" | "warn"
 export function evidenceCheck(r: ApiWorkReport, names: Map<string, string>, t: T = en): { rows: EvidenceRow[]; acceptable: boolean; missing: string[] } {
   const recorded = r.items.filter((x) => x.result !== null).length;
   const needReason = r.items.filter((x) => x.result !== null && x.result !== "normal");
-  const withReason = needReason.filter((x) => x.reason && x.reason.trim()).length;
+  const withReason = needReason.filter((x) => x.reason?.trim()).length;
   const photos = r.attachmentRefs.filter((a) => a.status === "ready").length;
   const contributors = [...new Set(r.items.map((x) => x.authorId))].map((id) => names.get(id) ?? id.slice(0, 8));
   const missing: string[] = [];
@@ -129,12 +134,18 @@ export function evidenceCheck(r: ApiWorkReport, names: Map<string, string>, t: T
       { label: t("Not-applicable reasons"), value: needReason.length > 0 ? t("{n} / {total} given", { n: withReason, total: needReason.length }) : t("none needed"), tone: withReason === needReason.length ? "ok" : "warn" },
       { label: t("Photos"), value: t("{n} attached", { n: photos }), tone: photos ? "ok" : "muted" },
       { label: t("Readings"), value: t("{n} recorded", { n: r.measurements.length }), tone: r.measurements.length > 0 ? "ok" : "muted" },
-      { label: t("Contributors to v{version}", { version: r.version }), value: contributors.length === 1 ? t("{name} only", { name: contributors[0] }) : contributors.join(", ") || "—", tone: "ok" },
+      { label: t("Contributors to v{version}", { version: r.version }), value: contributors.length === 1 ? t("{name} only", { name: contributors[0] ?? "" }) : contributors.join(", ") || "—", tone: "ok" },
     ],
     acceptable: missing.length === 0, missing,
   };
 }
 
+/** Why a report version that is not submitted cannot be reviewed, by the job's status. */
+function notSubmittedText(status: string, t: T): string {
+  if (status === "completed") return t("This report was accepted; the job is completed.");
+  if (status === "rework_requested") return t("This version was returned for rework; wait for the technician's next version.");
+  return t("The report has not been submitted yet.");
+}
 /** Why the signed-in reviewer may not decide (IR31 self-authorship, stale version, not submitted, permission). */
 export function availabilityText(av: ReviewAvailability, status: string, t: T = en): string | null {
   if (av.allowed) return null;
@@ -143,7 +154,7 @@ export function availabilityText(av: ReviewAvailability, status: string, t: T = 
     }
     case "not_current": { return t("This is not the current report version — a newer version exists; the page shows the latest refs.");
     }
-    case "not_submitted": { return t(status === "completed" ? "This report was accepted; the job is completed." : (status === "rework_requested" ? "This version was returned for rework; wait for the technician's next version." : "The report has not been submitted yet."));
+    case "not_submitted": { return notSubmittedText(status, t);
     }
     default: { return t("Reviewing needs the partner.review permission on this delegated job.");
     }
@@ -157,30 +168,36 @@ export function versionRows(job: ApiReviewJob, r: ApiWorkReport, author: string,
   const { t, display } = i;
   const refs = job.reportRefs ?? [];
   const rows: VersionRow[] = refs.map((ref) => {
-    const rv = r.reviewHistory.filter((h) => h.reportVersion === ref.reportVersion).sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt))[0];
+    const rv = r.reviewHistory.filter((h) => h.reportVersion === ref.reportVersion).toSorted((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt))[0];
     const isCurrent = ref.reportVersion === r.version;
     const by = rv ? names.get(rv.reviewerUserId) ?? t("reviewer") : "";
     if (rv?.decision === "accept") return { title: t("v{version} · accepted {time}", { version: ref.reportVersion, time: showTime(rv.occurredAt, display) }), sub: t("by {name} · visible to the customer", { name: by }), badge: { label: t("Accepted"), tone: "ok" } };
     if (rv?.decision === "return") return { title: t("v{version} · returned {time}", { version: ref.reportVersion, time: showTime(rv.occurredAt, display) }), sub: rv.reason ? t("by {name} — {reason}", { name: by, reason: rv.reason }) : t("by {name}", { name: by }), badge: { label: t("Returned"), tone: "warn" } };
     return {
-      title: t("v{version} · submitted {time}", { version: ref.reportVersion, time: r.submittedAt && isCurrent ? showTime(r.submittedAt, display) : "—" }),
+      title: t("v{version} · submitted {time}", { version: ref.reportVersion, time: isCurrent && r.submittedAt ? showTime(r.submittedAt, display) : "—" }),
       sub: t(isCurrent && job.status === "submitted" ? "by {name} · reviewing now" : "by {name}", { name: author }), badge: isCurrent ? { label: t("Current"), tone: "primary" } : null,
     };
   });
   if (job.draftReportRef) rows.push({ title: t("v{version} · draft", { version: job.draftReportRef.reportVersion }), sub: t("{name} is working on the rework", { name: author }), badge: { label: t("Draft"), tone: "muted" } });
   return rows;
 }
+/** An alert's badge: resolved, or acknowledged or open in its severity's tone. */
+function alertBadge(a: ApiAlertLite, t: T): NonNullable<VersionRow["badge"]> {
+  if (a.status === "resolved") return { label: t("Resolved"), tone: "ok" };
+  return { label: t(a.status === "acknowledged" ? "Acknowledged" : "Open"), tone: a.severity === "critical" ? "crit" : "warn" };
+}
 export function alertRows(alerts: ApiAlertLite[], i: I18n = EN): VersionRow[] {
   const { t, display } = i;
   return alerts.map((a) => {
     return {
       title: t("{text} (alert)", { text: a.evidenceText ? evidenceText(a.evidenceText, t) : a.type }), sub: `${showTime(a.detectedAt, display)} · ${t(a.status === "resolved" ? "resolved" : "stays open after completion")}`,
-      badge: { label: t(a.status === "resolved" ? "Resolved" : (a.status === "acknowledged" ? "Acknowledged" : "Open")), tone: a.status === "resolved" ? "ok" : (a.severity === "critical" ? "crit" : "warn") },
+      badge: alertBadge(a, t),
     };
   });
 }
 export function dueRow(job: ApiReviewJob, i: I18n = EN): VersionRow {
   const { t, display } = i;
   const a = job.assignment;
-  return { title: t("Job due"), sub: a ? t("work window {span}", { span: showSpan(a.scheduledStart, a.scheduledEnd, display) }) : (job.dueAt ? t("due {time}", { time: showTime(job.dueAt, display) }) : t("no window")), badge: null };
+  const due = job.dueAt ? t("due {time}", { time: showTime(job.dueAt, display) }) : t("no window");
+  return { title: t("Job due"), sub: a ? t("work window {span}", { span: showSpan(a.scheduledStart, a.scheduledEnd, display) }) : due, badge: null };
 }

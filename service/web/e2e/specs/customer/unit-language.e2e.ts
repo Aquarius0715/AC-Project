@@ -7,6 +7,7 @@
 import { test, expect } from "../../fixtures/test";
 import { displayZone, ENGLISH, MALAY, setDisplay } from "../../fixtures/display";
 import { expectAccessible } from "../../fixtures/a11y";
+import { must } from "../../fixtures/must";
 
 let zoneBefore: string | null = null;
 
@@ -84,7 +85,7 @@ test("the customer screens in Malay keep IDs and units and use the display time 
   await expect(dialog.getByRole("heading", { name: /^Tambah pengguna/ })).toBeVisible();
   await dialog.getByRole("button", { name: "Batal" }).click();
   await expect(dialog).toBeHidden();
-  await page.goto(href!);
+  await page.goto(must(href));
   for (const name of ["KAWALAN JAUH", "Sejarah arahan", "Telemetri langsung"]) await expect(main.getByRole("heading", { name })).toBeVisible();
   expect(new URL(page.url()).pathname).toBe(href); // the ID is the stored one
   await expect(main).toContainText("°C");
@@ -92,6 +93,6 @@ test("the customer screens in Malay keep IDs and units and use the display time 
   await expect(main).not.toContainText("MYT");
   await setDisplay(page, ENGLISH, zone);
   zoneBefore = null;
-  await page.goto(href!);
+  await page.goto(must(href));
   await expect(page.getByRole("main").getByRole("heading", { name: "REMOTE CONTROL" })).toBeVisible();
 });

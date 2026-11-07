@@ -1,4 +1,6 @@
 "use client";
+const TEXT_MUTED_FOREGROUND = "text-muted-foreground";
+const TEXT_PRIMARY = "text-primary";
 
 import Link from "next/link";
 import { useState } from "react";
@@ -13,7 +15,7 @@ import { assignTechnician } from "../actions";
 import type { ScheduleLive } from "../_lib/load";
 import { Icon } from "@ac/web/components/Icon";
 
-const toneText: Record<string, string> = { crit: "text-crit", warn: "text-warn", muted: "text-muted-foreground", primary: "text-primary", ok: "text-ok" };
+const toneText: Record<string, string> = { crit: "text-crit", warn: "text-warn", muted: TEXT_MUTED_FOREGROUND, primary: TEXT_PRIMARY, ok: "text-ok" };
 const barTone: Record<string, string> = { crit: "bg-crit", warn: "bg-warn", primary: "bg-primary", muted: "bg-muted-foreground", ok: "bg-ok" };
 const cellTone: Record<WeekCell["kind"], string> = {
   booked: "bg-primary text-white", free: "border border-dashed border-line text-muted-foreground", leave: "bg-warn-soft text-warn", none: "bg-surface2 text-muted-foreground", proposal: "border-2 border-dashed border-primary bg-primary-soft/60 text-primary",
@@ -24,7 +26,6 @@ display language; the job's times come formatted from the loader, the team's wee
 export function ScheduleView({ live }: Readonly<{ live: ScheduleLive }>) {
   const t = useT();
   const patch = useUrlPatch();
-  const sel = live.selected;
   if (live.rows.length === 0) {
     return (
       <Page>
@@ -34,6 +35,7 @@ export function ScheduleView({ live }: Readonly<{ live: ScheduleLive }>) {
       </Page>
     );
   }
+  const sel = live.selected;
   return (
     <Page>
       <div className="split-rev">
@@ -49,8 +51,8 @@ export function ScheduleView({ live }: Readonly<{ live: ScheduleLive }>) {
               {live.rows.map((r) => (
                 <ListRow key={r.id} selected={sel?.id === r.id} href={`/partner/schedule?jobId=${r.id}${live.sort === "status" ? "" : `&sort=${live.sort}`}`}>
                   <div className="min-w-0">
-                    <b className={cx("block truncate text-[13px]", sel?.id === r.id && "text-primary")}>{r.short} · {r.title}</b>
-                    <span className={cx("block text-xs", r.tone ? toneText[r.tone] : "text-muted-foreground")}>{r.line}</span>
+                    <b className={cx("block truncate text-[13px]", sel?.id === r.id && TEXT_PRIMARY)}>{r.short} · {r.title}</b>
+                    <span className={cx("block text-xs", r.tone ? toneText[r.tone] : TEXT_MUTED_FOREGROUND)}>{r.line}</span>
                   </div>
                 </ListRow>
               ))}
@@ -93,10 +95,12 @@ function Workspace({ sel, week, members, zone, otherZone }: Readonly<{ sel: Sele
 
 /** The slot the form proposes: the agreed or current one, or the same start with the chosen end — typed in the user's
 display time zone (NFR-08) — while extending. */
-function proposed(sel: Selected, end: string, zone: string) {
-  const endAt = sel.mode.kind === "extend" && end ? zonedInstant(end.slice(0, 10), end.slice(11, 16), zone) : "";
-  return sel.mode.kind === "extend" && endAt ? { startAt: sel.mode.slot.startAt, endAt } : sel.mode.slot;
+function proposedSlot(mode: Exclude<Selected["mode"], { kind: "blocked" }>, end: string, zone: string) {
+  const endAt = mode.kind === "extend" && end ? zonedInstant(end.slice(0, 10), end.slice(11, 16), zone) : "";
+  return mode.kind === "extend" && endAt ? { startAt: mode.slot.startAt, endAt } : mode.slot;
 }
+// a blocked selection has no slot to change
+const proposed = (sel: Selected, end: string, zone: string) => (sel.mode.kind === "blocked" ? sel.mode.slot : proposedSlot(sel.mode, end, zone));
 
 function AssignCard({ sel, choice, zone, otherZone }: Readonly<{ sel: Selected; choice: Choice; zone: string; otherZone: boolean }>) {
   const t = useT();
@@ -120,10 +124,11 @@ function AssignCard({ sel, choice, zone, otherZone }: Readonly<{ sel: Selected; 
       </Card>
     );
   }
-  const slot = proposed(sel, end, zone)!;
+  const slot = proposedSlot(m, end, zone);
   const endOk = !m.endEditable || (end && Date.parse(slot.endAt) >= Date.parse(m.slot.endAt));
   const isReasonMissing = m.reasonRequired && !reason.trim();
   const isSame = tech === sel.currentId && (!m.endEditable || slot.endAt === m.slot.endAt);
+  const sameError = tried && isSame ? t("Choose another technician or a later end") : undefined;
   const save = () => {
     setTried(true);
     if (!tech || isReasonMissing || !endOk || isSame) return;
@@ -137,14 +142,14 @@ function AssignCard({ sel, choice, zone, otherZone }: Readonly<{ sel: Selected; 
       <div className="flex flex-col gap-3">
         {m.banner && <Banner tone={m.banner.tone === "muted" ? undefined : m.banner.tone}>{m.banner.text}</Banner>}
         {window && <Banner>{window}</Banner>}
-        <Field label={sel.currentId ? t("New technician (current: {name})", { name: currentName ?? "—" }) : t("Technician (own company, active, qualified)")} error={tried && !tech ? t("Choose a technician") : (tried && isSame ? t("Choose another technician or a later end") : undefined)}>
+        <Field label={sel.currentId ? t("New technician (current: {name})", { name: currentName ?? "—" }) : t("Technician (own company, active, qualified)")} error={tried && !tech ? t("Choose a technician") : sameError}>
           <div role="radiogroup" aria-label={t("Technician")} className="flex flex-col gap-1.5">
             {sel.candidates.length === 0 && <p className="text-[13px] text-muted-foreground">{t("No technicians in your company yet — add them in Team & capacity.")}</p>}
             {sel.candidates.map((c) => (
               <Plain key={c.id} type="button" role="radio" aria-checked={tech === c.id} disabled={!c.eligible} onClick={() => { setTech(c.id); }}
                 className={cx("flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left", tech === c.id ? "border-primary bg-primary-soft/60" : "border-line bg-surface", !c.eligible && "cursor-not-allowed opacity-70")}>
                 {/* the name keeps at least 10rem; a long reason (the missing qualifications) goes below it and wraps */}
-                <span className="min-w-0 flex-[1_1_10rem]"><b className={cx("block text-[13px]", tech === c.id && "text-primary")}>{c.name}</b><span className="block text-[11px] text-muted-foreground">{c.sub}</span></span>
+                <span className="min-w-0 flex-[1_1_10rem]"><b className={cx("block text-[13px]", tech === c.id && TEXT_PRIMARY)}>{c.name}</b><span className="block text-[11px] text-muted-foreground">{c.sub}</span></span>
                 <Badge tone={c.badge.tone === "muted" ? "muted" : c.badge.tone} className="h-auto min-h-5 max-w-full whitespace-normal text-left">{c.badge.text}</Badge>
               </Plain>
             ))}
@@ -195,7 +200,7 @@ function WeekCard({ week, members, sel, choice, zone }: Readonly<{ week: NonNull
       {rows.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No technicians in your company yet.")}</p> : (
         <ScrollX>
           <table className="w-full min-w-[720px] text-[11px]">
-            <thead><tr><th className="p-1 text-left" />{week.dates.map((d, k) => <th key={d} className={cx("p-1 text-center font-semibold", d === week.today ? "text-primary" : "text-muted-foreground")}>{week.days[k]}</th>)}</tr></thead>
+            <thead><tr><th className="p-1 text-left" />{week.dates.map((d, k) => <th key={d} className={cx("p-1 text-center font-semibold", d === week.today ? TEXT_PRIMARY : TEXT_MUTED_FOREGROUND)}>{week.days[k]}</th>)}</tr></thead>
             <tbody>
               {rows.map((r) => (
                 <tr key={r.id} className="border-t border-line">

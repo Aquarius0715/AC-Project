@@ -8,6 +8,7 @@ import { coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
 import type { CampaignDraft, Metric } from "@ac/web/lib/devices";
 import { parseWaves } from "@ac/web/lib/devices";
 import type { OpInput } from "@ac/web/lib/opTypes";
+import { lookup } from "@ac/web/lib/lookup";
 
 export type ActionResult<T = null> = { ok: true; value: T } | { ok: false; messageKey: string; code: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null };
 
@@ -15,7 +16,7 @@ async function run<T>(fn: () => Promise<T>, rerender = true): Promise<ActionResu
   try {
     return { ok: true, value: await fn() };
   } catch (error) {
-    return error instanceof CoreError ? { ok: false, messageKey: error.error.messageKey, code: error.error.code, fieldErrors: error.error.fieldErrors ?? {}, retryAfterSeconds: error.error.retryAfterSeconds } : { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
+    return error instanceof CoreError ? { ok: false, messageKey: error.error.messageKey, code: error.error.code, fieldErrors: error.error.fieldErrors, retryAfterSeconds: error.error.retryAfterSeconds } : { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
   } finally {
     if (rerender) refresh();
   }
@@ -23,7 +24,7 @@ async function run<T>(fn: () => Promise<T>, rerender = true): Promise<ActionResu
 
 /** capabilities.save: a new model (no id) or the next capability version (id + the version it was read at). */
 export async function saveCapability(input: OpInput<"capabilities.save">, version?: number) {
-  return run(() => coreOp<{ id: string; version: number }>("capabilities.save", input, { write: true, expectedVersion: input.id ? version : undefined }).then((k) => ({ id: k.id, version: k.version })));
+  return run(async () => { const k = await coreOp<{ id: string; version: number }>("capabilities.save", input, { write: true, expectedVersion: input.id ? version : undefined }); return ({ id: k.id, version: k.version }); });
 }
 
 export interface HistoryEntry { at: string; actor: string; from: number | null; to: number | null; reason: string | null; changes: string[] }
@@ -39,46 +40,45 @@ export async function capabilityHistory(capabilityId: string) {
     return page.items.map((a): HistoryEntry => {
       return {
         at: a.occurredAt, actor: a.actorId, from: a.previousVersion, to: a.nextVersion, reason: a.reason,
-        changes: Object.keys({ ...a.maskedBefore, ...a.maskedAfter }).filter((k) => (a.maskedBefore ?? {})[k] !== (a.maskedAfter ?? {})[k]),
+        changes: Object.keys({ ...a.maskedBefore, ...a.maskedAfter }).filter((k) => lookup(a.maskedBefore ?? {}, k) !== lookup(a.maskedAfter ?? {}, k)),
       };
     });
   }, false);
 }
 
 export async function registerDevice(serial: string, sensorTypes: Metric[], unitId: string) {
-  return run(() => coreOp<{ id: string }>("devices.register", { serial, sensorTypes, unitId }, { write: true }).then((d) => d.id));
+  return run(async () => { const d = await coreOp<{ id: string }>("devices.register", { serial, sensorTypes, unitId }, { write: true }); return d.id; });
 }
 
 export async function bindDevice(deviceId: string, version: number, unitId: string, reason: string) {
-  return run(() => coreOp("devices.bind", { deviceId, unitId, reason }, { write: true, expectedVersion: version }).then(() => null));
+  return run(async () => { await coreOp("devices.bind", { deviceId, unitId, reason }, { write: true, expectedVersion: version }); return null; });
 }
 
 export async function checkDevice(deviceId: string, version: number) {
-  return run(() => coreOp("devices.check", { id: deviceId }, { write: true, expectedVersion: version }).then(() => null));
+  return run(async () => { await coreOp("devices.check", { id: deviceId }, { write: true, expectedVersion: version }); return null; });
 }
 
 export async function calibrateSensor(deviceId: string, version: number, sensorId: string, metric: Metric, unit: OpInput<"devices.calibrate">["unit"], referenceValue: number, measuredValue: number) {
   return run(async () => {
-    const calibratedAt = (await coreNow()).toISOString();
+    const now = await coreNow();
+    const calibratedAt = now.toISOString();
     await coreOp("devices.calibrate", { deviceId, sensorId, metric, unit, referenceValue, measuredValue, calibratedAt }, { write: true, expectedVersion: version });
     return null;
   });
 }
 
 export async function updateFirmware(deviceId: string, version: number, firmwareVersion: string) {
-  return run(() => coreOp("devices.updateFirmware", { deviceId, firmwareVersion }, { write: true, expectedVersion: version }).then(() => null));
+  return run(async () => { await coreOp("devices.updateFirmware", { deviceId, firmwareVersion }, { write: true, expectedVersion: version }); return null; });
 }
 
 /** firmwareCampaigns.schedule; `startAt` is the instant the form read in the user's display time zone (NFR-08). */
 export async function scheduleCampaign(d: CampaignDraft, startAt: string) {
-  return run(() => {
-    return coreOp<{ id: string }>("firmwareCampaigns.schedule", {
+  return run(async () => { const c = await coreOp<{ id: string }>("firmwareCampaigns.schedule", {
       modelId: d.modelId, targetVersion: d.targetVersion, deviceIds: d.deviceIds, waves: parseWaves(d.waves) ?? [], window: { startLocal: d.startLocal, endLocal: d.endLocal },
       autoPauseFailurePercent: Number(d.autoPause), startAt,
-    }, { write: true }).then((c) => c.id);
-  });
+    }, { write: true }); return c.id; });
 }
 
 export async function controlCampaign(campaignId: string, version: number, action: "pause" | "resume" | "abort" | "retry_device", deviceId?: string, reason?: string) {
-  return run(() => coreOp("firmwareCampaigns.control", { campaignId, action, ...(deviceId && { deviceId }), ...(reason && { reason }) }, { write: true, expectedVersion: version }).then(() => null));
+  return run(async () => { await coreOp("firmwareCampaigns.control", { campaignId, action, ...(deviceId && { deviceId }), ...(reason && { reason }) }, { write: true, expectedVersion: version }); return null; });
 }

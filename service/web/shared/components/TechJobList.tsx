@@ -8,16 +8,19 @@ import { fmt, useJobs } from "@ac/web/lib/jobs";
 
 export type TechRow = (typeof tjobs)[number];
 
+// the technician's own answer as a note and a status; an accepted assignment names who assigned it
+const ACK_NOTE = new Map([["pending", "new assignment — accept it"], ["cant_make", "you said you can’t make it"]]);
+const ACK_STATUS = new Map([["pending", "Not accepted"], ["cant_make", "Can’t make it"]]);
 /** Seeded technician jobs plus jobs assigned through the shared store (e.g. job-c07). */
 export function useTechJobs(today = false): TechRow[] {
   const live = useJobs().filter((j) => j.technician === "tech-external-a" && tjobs.every((t) => t.id !== j.id) && (j.status === "assigned" || j.status === "in_progress"));
   const rows: TechRow[] = live.map((j) => {
     return {
       id: j.id, unit: j.unit, cust: j.customer, type: j.type, origin: j.origin, win: fmt(j.scheduled), today: false,
-      note: j.techAck?.status === "pending" ? "new assignment — accept it" : (j.techAck?.status === "cant_make" ? "you said you can’t make it" : `assigned by ${j.contractor ?? "HQ"}`),
-      status: j.techAck?.status === "pending" ? "Not accepted" : (j.techAck?.status === "cant_make" ? "Can’t make it" : "Assigned"),
+      note: ACK_NOTE.get(j.techAck?.status ?? "") ?? `assigned by ${j.contractor ?? "HQ"}`,
+      status: ACK_STATUS.get(j.techAck?.status ?? "") ?? "Assigned",
       progress: j.techAck?.status === "accepted" ? "accepted · opens on the day (read-only until then)" : "visit time agreed with the client",
-      tone: (j.techAck?.status === "pending" ? "warn" : "primary") as TechRow["tone"],
+      tone: (j.techAck?.status === "pending" ? "warn" : "primary"),
     };
   });
   return [...rows, ...tjobs.filter((t) => !today || t.today)];

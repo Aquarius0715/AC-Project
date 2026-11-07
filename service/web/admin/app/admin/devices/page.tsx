@@ -4,7 +4,7 @@
 // deviceId, campaignId). Writes are Server Actions (actions.ts). The Phase 1A demo keeps the fixture register. Texts and
 // times of the first render are formatted here in the user's language and display time zone (IR295).
 import { connection } from "next/server";
-import { apiMode, coreAll, coreDisplay, coreNow, coreOp, corePermissions, CoreError } from "@ac/web/lib/dal";
+import { apiMode, coreAll, coreDisplay, coreNow, coreOp, corePermissions, orWhenForbidden, orAbsent, coreAllPage } from "@ac/web/lib/dal";
 import { i18nOf } from "@ac/web/lib/i18n";
 import {
   campaignRows, deviceRows, modelRows,
@@ -18,15 +18,12 @@ import type { ApiUnitDetail } from "@ac/web/lib/units";
 import { withAccess } from "@ac/web/lib/withAccess";
 import { DevicesDemo } from "./_components/devices-demo";
 import { DevicesView, type DevicesLive } from "./_components/devices-view";
+import { queryReader } from "@ac/web/lib/searchParams";
 
-const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => p.catch((error) => { // members the session may not read (no identity.read)
-  if (error instanceof CoreError && error.error.code === "FORBIDDEN") return fallback;
-  throw error;
-});
-const absent = <T,>(p: Promise<T>) => p.catch((error) => { // an alert or unit HQ cannot read (archived, another tenant) reads as absent
-  if (error instanceof CoreError && (error.error.code === "FORBIDDEN" || error.error.code === "NOT_FOUND")) return null;
-  throw error;
-});
+// members the session may not read (no identity.read)
+const optional = orWhenForbidden;
+// an alert or unit HQ cannot read (archived, another tenant) reads as absent
+const absent = orAbsent;
 
 // a role without the page's read permission sees which one it needs, not a failure (IR582)
 export default async function AdminDevicesPage(props: PageProps<"/admin/devices">) {
@@ -38,12 +35,13 @@ async function AdminDevicesPageContent({ searchParams }: Readonly<PageProps<"/ad
   await connection();
   if (!apiMode()) return <DevicesDemo />;
   const sp = await searchParams;
-  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k] as string) : undefined);
-  const tab = one("tab") === "devices" ? "devices" : (one("tab") === "firmware" ? "firmware" : "models");
+  const one = queryReader(sp);
+  const asked = one("tab");
+  const tab = asked === "devices" || asked === "firmware" ? asked : "models";
   const [now, perms, display, caps, units, devices] = await Promise.all([
     coreNow(), corePermissions(), coreDisplay(),
-    coreAll<ApiCapability>("capabilities.list").then((items) => ({ items, total: items.length })),
-    coreAll<ApiUnitLite>("units.list").then((items) => ({ items, total: items.length })),
+    coreAllPage<ApiCapability>("capabilities.list"),
+    coreAllPage<ApiUnitLite>("units.list"),
     coreOp<Page<ApiDevice>>("devices.list", { limit: 100 }),
   ]);
   const i = i18nOf(display);
@@ -59,8 +57,9 @@ async function AdminDevicesPageContent({ searchParams }: Readonly<PageProps<"/ad
     // history and the events (IR319)
     const names = new Map(units.items.map((u) => [u.id, u.displayName]));
     live.rows = techDeviceRows(devices.items, names, now.getTime(), i.t);
-    const id = live.rows.find((r) => r.id === one("deviceId"))?.id ?? live.rows[0]?.id;
-    if (id) {
+    const row = live.rows.find((r) => r.id === one("deviceId")) ?? live.rows.at(0);
+    if (row) {
+      const { id } = row;
       type Operation = ApiDeviceOperation & { startedAt?: string | null; expiresAt?: string };
       const q = { limit: 20 };
       const [d, ops, cals, events] = await Promise.all([
@@ -76,7 +75,7 @@ async function AdminDevicesPageContent({ searchParams }: Readonly<PageProps<"/ad
       const model = units.items.find((u) => u.id === d.unitId)?.modelId;
       const candidates = caps.items.find((k) => k.id === model)?.firmwareCandidates ?? [];
       live.device = {
-        detail: d, row: live.rows.find((r) => r.id === id)!,
+        row, detail: d,
         tiles: deviceTiles(d, newerFirmware(d.firmwareVersion, candidates), now.getTime(), openFaults(events.items), i), sensors: sensorRows(d, i),
         unit: unit ? { name: unit.displayName, place: unit.location.pathLabels.join(" › "), model: `${unit.capabilities.manufacturer} ${unit.capabilities.model} v${String(unit.capabilityVersion)}` } : null,
         firmware: newerVersions(d.firmwareVersion, candidates), firmwareCard: firmwareCard(d, ops.items, i),
@@ -84,8 +83,7 @@ async function AdminDevicesPageContent({ searchParams }: Readonly<PageProps<"/ad
         events: eventRows(events.items, new Map(alerts.filter((a): a is ApiAlertLite => !!a).map((a) => [a.id, a])), now.getTime(), i),
       };
     }
-  }
-  if (tab === "firmware") {
+  } else if (tab === "firmware") {
     const [campaigns, members] = await Promise.all([
       coreOp<Page<ApiCampaign>>("firmwareCampaigns.list", { limit: 100, sort: { field: "createdAt", direction: "desc" } }),
       optional(coreAll<{ id: string; displayName: string }>("members.list"), []), // who scheduled it, where the session may read members (IR344)

@@ -5,13 +5,16 @@
 // the review times are formatted here, in the display time zone (IR282, IR297). The Phase 1A demo keeps the fixture
 // reports.
 import { connection } from "next/server";
-import { coreAll, apiMode, coreDisplay, coreOp, corePermissions } from "@ac/web/lib/dal";
+import { apiMode, coreDisplay, coreOp, corePermissions, coreAllPage } from "@ac/web/lib/dal";
 import { baselineRows, klInstant, type ApiBaseline } from "@ac/web/lib/energy";
 import { i18nOf } from "@ac/web/lib/i18n";
 import { mrvView, reportRows, reviewItems, type ApiFactor, type ApiMRVReport } from "@ac/web/lib/mrv";
 import { withAccess } from "@ac/web/lib/withAccess";
 import { MRVDemo } from "./_components/mrv-demo";
 import { MRVView, type MRVLive } from "./_components/mrv-view";
+import { queryReader } from "@ac/web/lib/searchParams";
+
+const ORGANIZATIONID = "organizationId";
 
 interface Unit { id: string; displayName: string; customerOrgId: string; archived: boolean }
 
@@ -24,14 +27,15 @@ async function AdminMRVPageContent({ searchParams }: Readonly<PageProps<"/admin/
   await connection();
   if (!apiMode()) return <MRVDemo />;
   const sp = await searchParams;
-  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k] as string) : undefined);
+  const one = queryReader(sp);
+  const fromQ = one("from"), toQ = one("to"); // the period asked in the URL
   const tab = one("tab") === "factors" ? "factors" : "reports";
   const [perms, display, orgs, units, baselines, factors] = await Promise.all([
     corePermissions(), coreDisplay(),
-    coreAll<{ id: string; name: string; kind: string; status: string }>("organizations.list", { filters: { kind: "customer" } }).then((items) => ({ items, total: items.length })),
-    coreAll<Unit>("units.list").then((items) => ({ items, total: items.length })),
-    coreAll<ApiBaseline>("baselines.list").then((items) => ({ items, total: items.length })),
-    coreAll<ApiFactor>("factors.list").then((items) => ({ items, total: items.length })),
+    coreAllPage<{ id: string; name: string; kind: string; status: string }>("organizations.list", { filters: { kind: "customer" } }),
+    coreAllPage<Unit>("units.list"),
+    coreAllPage<ApiBaseline>("baselines.list"),
+    coreAllPage<ApiFactor>("factors.list"),
   ]);
   const i = i18nOf(display);
   const customers = orgs.items.map((o) => ({ id: o.id, name: o.name }));
@@ -44,20 +48,20 @@ async function AdminMRVPageContent({ searchParams }: Readonly<PageProps<"/admin/
     interface Page<T> { items: T[] }
     const status = one("status") === "draft" || one("status") === "demo_reviewed" ? one("status") : undefined;
     const filters = {
-      ...(one("organizationId") && { organizationId: one("organizationId") }), ...(one("unitId") && { unitId: one("unitId") }), ...(status && { status }),
-      ...(one("from") && { from: klInstant(one("from")!) }), ...(one("to") && { to: klInstant(one("to")!) }),
+      ...(one(ORGANIZATIONID) && { organizationId: one(ORGANIZATIONID) }), ...(one("unitId") && { unitId: one("unitId") }), ...(status && { status }),
+      ...(fromQ && { from: klInstant(fromQ) }), ...(toQ && { to: klInstant(toQ) }),
     };
     const list = await coreOp<Page<ApiMRVReport>>("mrv.list", { limit: 100, filters });
     const rows = reportRows(list.items, customers, i.t);
     const id = rows.find((r) => r.id === one("reportId"))?.id ?? rows[0]?.id;
-    live.reports = { rows, scope: { organizationId: one("organizationId"), unitId: one("unitId"), from: one("from") ?? "", to: one("to") ?? "", status } };
+    live.reports = { rows, scope: { organizationId: one(ORGANIZATIONID), unitId: one("unitId"), from: one("from") ?? "", to: one("to") ?? "", status } };
     if (id) {
       const wanted = Number(one("reportVersion"));
       const [versions, latest] = await Promise.all([
         coreOp<Page<ApiMRVReport>>("mrv.versions", { id, query: { limit: 100 } }),
         coreOp<ApiMRVReport>("mrv.get", { id }),
       ]);
-      const shown = Number.isInteger(wanted) && wanted > 0 && wanted !== latest.version ? await coreOp<ApiMRVReport>("mrv.get", { id, reportVersion: wanted }) : latest;
+      const shown = Number.isSafeInteger(wanted) && wanted > 0 && wanted !== latest.version ? await coreOp<ApiMRVReport>("mrv.get", { id, reportVersion: wanted }) : latest;
       live.reports.selected = {
         report: shown, latestVersion: latest.version, versions: versions.items.map((v) => ({ version: v.version, status: v.status })),
         view: mrvView(shown, customers, unitOptions, i), review: reviewItems(shown, i),

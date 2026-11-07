@@ -1,22 +1,31 @@
 "use client";
+const HQ_OPERATOR = "hq-operator";
+const DEVICE_ONLINE_RTO = "device-online-rto";
 
 import { useRef, useState, type ReactNode } from "react";
 import { Badge, Banner, Btn, Card, Choice, DataTable, EmptyState, Field, Input, ListRow, Page, Select, SummaryList, Tabs, TextLink, Timeline, Plain } from "@ac/web/components/ui";
 import { useI18n } from "@ac/web/components/I18n";
+import type { T } from "@ac/web/lib/i18n";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { useUrlTab } from "@ac/web/lib/useUrlTab";
 import { callOp, OpError } from "@ac/web/lib/ops";
 import { historyRow, type ApiCommand } from "@ac/web/lib/units";
 import { periodError, resultTone, resultWord, type AuditDeviceEvent, type AuditFilters, type AuditRow, type Related, type RelatedRef } from "@ac/web/lib/audit";
 import { Icon } from "@ac/web/components/Icon";
+import { byText } from "@ac/web/lib/order";
 
+/** Why a related command could not be read: not permitted, out of scope or gone, or anything else. */
+function commandFailure(code: string, t: T): string {
+  if (code === "FORBIDDEN") return t("You may not read this command — it needs control.execute, restriction.read, restriction.override or automation.policy.read.");
+  return t(code === "NOT_FOUND" ? "This command is outside your scope or no longer exists." : "The command could not be loaded — try again.");
+}
 const seed: AuditRow[] = [
-  { id: "1", op: "restriction.override", target: "restriction · restriction-a41", targetKind: "restriction", targetId: "restriction-a41", versions: "version 3 → 4", actor: "hq-operator", actorId: "hq-operator", role: "admin", at: "09-22 09:14", occurred: "2026-09-22 09:14 (Asia/Kuala_Lumpur)", corr: "corr-7f21a9", res: "Success", reason: "Customer requested a short exception while the invoice is under review.",
+  { id: "1", op: "restriction.override", target: "restriction · restriction-a41", targetKind: "restriction", targetId: "restriction-a41", versions: "version 3 → 4", actor: HQ_OPERATOR, actorId: HQ_OPERATOR, role: "admin", at: "09-22 09:14", occurred: "2026-09-22 09:14 (Asia/Kuala_Lumpur)", corr: "corr-7f21a9", res: "Success", reason: "Customer requested a short exception while the invoice is under review.",
     changes: [{ field: "exception.until", before: "null", after: "2026-09-29 00:00", changed: true }, { field: "exception.reason", before: "null", after: "Invoice under review", changed: true }, { field: "contactPhone", before: "***masked***", after: "***masked***", changed: false }, { field: "state", before: "applied", after: "applied", changed: false }] },
   { id: "2", op: "access.grant", target: "membership · membership-b09", targetKind: "membership", targetId: "membership-b09", versions: null, actor: "contractor-lead-b", actorId: "contractor-lead-b", role: "contractor", at: "09-22 08:51", occurred: "2026-09-22 08:51 (Asia/Kuala_Lumpur)", corr: "corr-2c88e0", res: "Denied", reason: null, changes: [] },
-  { id: "3", op: "devices.calibrate", target: "device · device-online-rto", targetKind: "device", targetId: "device-online-rto", versions: "version 4 → 5", actor: "tech-ali", actorId: "tech-ali", role: "technician", at: "09-21 16:30", occurred: "2026-09-21 16:30 (Asia/Kuala_Lumpur)", corr: "corr-51d0aa", res: "Failed", reason: null, changes: [] },
-  { id: "4", op: "commands.create", target: "command · cmd-3310", targetKind: "command", targetId: "cmd-3310", versions: "version 1", actor: "hq-operator", actorId: "hq-operator", role: "admin", at: "09-20 10:14", occurred: "2026-09-20 10:14 (Asia/Kuala_Lumpur)", corr: "corr-115e6b", res: "Pending", reason: null, changes: [] },
-  { id: "5", op: "offsets.simulate · retire", target: "offset · offset-0231", targetKind: "offset_record", targetId: "offset-0231", versions: null, actor: "hq-operator", actorId: "hq-operator", role: "admin", at: "09-12 14:20", occurred: "2026-09-12 14:20 (Asia/Kuala_Lumpur)", corr: "corr-9a10f4", res: "Success", reason: null, changes: [] },
+  { id: "3", op: "devices.calibrate", target: "device · device-online-rto", targetKind: "device", targetId: DEVICE_ONLINE_RTO, versions: "version 4 → 5", actor: "tech-ali", actorId: "tech-ali", role: "technician", at: "09-21 16:30", occurred: "2026-09-21 16:30 (Asia/Kuala_Lumpur)", corr: "corr-51d0aa", res: "Failed", reason: null, changes: [] },
+  { id: "4", op: "commands.create", target: "command · cmd-3310", targetKind: "command", targetId: "cmd-3310", versions: "version 1", actor: HQ_OPERATOR, actorId: HQ_OPERATOR, role: "admin", at: "09-20 10:14", occurred: "2026-09-20 10:14 (Asia/Kuala_Lumpur)", corr: "corr-115e6b", res: "Pending", reason: null, changes: [] },
+  { id: "5", op: "offsets.simulate · retire", target: "offset · offset-0231", targetKind: "offset_record", targetId: "offset-0231", versions: null, actor: HQ_OPERATOR, actorId: HQ_OPERATOR, role: "admin", at: "09-12 14:20", occurred: "2026-09-12 14:20 (Asia/Kuala_Lumpur)", corr: "corr-9a10f4", res: "Success", reason: null, changes: [] },
 ];
 const seedRelated: Related = {
   restriction: { id: "restriction-a41", via: "target", note: "applied · exception until 09-29 — as this entry recorded it" }, command: { id: "cmd-3302", via: "correlation", note: "same correlation ID" }, job: null, unit: null,
@@ -59,11 +68,16 @@ export function AuditView({ live }: Readonly<{ live?: AuditLive }>) {
   const [shown, setShown] = useState(5);
   const [selId, setSelId] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const periodErr = periodError(f, t);
+  const periodProblem = periodError(f, t);
   const all = live ? live.rows : seed;
   const rows = live ? all : all.filter((l) => {
-    return (f.result === "All" || l.res === f.result) && (!f.correlationId || l.corr.includes(f.correlationId)) && (!f.actorId || l.actorId === f.actorId)
-      && (!f.targetKind || l.targetKind === f.targetKind) && (!f.targetId || l.targetId === f.targetId);
+    return [
+      f.result === "All" || l.res === f.result,
+      !f.correlationId || l.corr.includes(f.correlationId),
+      !f.actorId || l.actorId === f.actorId,
+      !f.targetKind || l.targetKind === f.targetKind,
+      !f.targetId || l.targetId === f.targetId,
+    ].every(Boolean);
   }).slice(0, shown);
   const sel = live ? rows.find((r) => r.id === live.selected) ?? null : rows.find((r) => r.id === selId) ?? rows[0] ?? null;
   const total = live ? live.total : rows.length;
@@ -74,7 +88,7 @@ export function AuditView({ live }: Readonly<{ live?: AuditLive }>) {
     const merged = { ...f, ...next };
     setF(merged);
     if (!live) return;
-    patch({ ...Object.fromEntries(Object.entries(next).map(([k, v]) => [k, k === "result" && v === "All" ? null : String(v ?? "")])), limit: null, ...(!keepEntry && { entryId: null, eventId: null }) });
+    patch({ ...Object.fromEntries(Object.entries(next).map(([k, v]) => [k, k === "result" && v === "All" ? null : String(v)])), limit: null, ...(!keepEntry && { entryId: null, eventId: null }) });
   };
   const typeCorr = (v: string) => {
     setF((x) => ({ ...x, correlationId: v }));
@@ -96,11 +110,12 @@ export function AuditView({ live }: Readonly<{ live?: AuditLive }>) {
   };
   const open = (id: string) => { if (live) patch({ entryId: id }); else setSelId(id); };
   const actors = live ? live.actors : [...new Map(seed.map((r) => [r.actorId, r.actor]))].map(([id, name]) => ({ id, name }));
-  const kinds = live ? live.kinds : [...new Set(seed.map((r) => r.targetKind))].toSorted();
-  const related = live ? live.related : (sel?.id === "1" ? seedRelated : { restriction: null, command: null, job: null, unit: null });
+  const kinds = live ? live.kinds : [...new Set(seed.map((r) => r.targetKind))].toSorted(byText);
+  const demoRelated = sel?.id === "1" ? seedRelated : { restriction: null, command: null, job: null, unit: null }; // the demo links only its first entry
+  const related = live ? live.related : demoRelated;
   const trace = live ? live.trace : [];
   const corr = live ? live.filters.correlationId : f.correlationId; // the searched correlation ID (typing waits 300 ms)
-  const device = live ? live.device : { options: [{ id: "device-online-rto", label: "device-online-rto · unit-online-rto" }], deviceId: "device-online-rto", missing: false, label: "device-online-rto · unit-online-rto", total: seedEvents.length, events: seedEvents, selected: null };
+  const device = live ? live.device : { options: [{ id: DEVICE_ONLINE_RTO, label: "device-online-rto · unit-online-rto" }], deviceId: DEVICE_ONLINE_RTO, missing: false, label: "device-online-rto · unit-online-rto", total: seedEvents.length, events: seedEvents, selected: null };
 
   return (
     <Page>
@@ -114,7 +129,7 @@ export function AuditView({ live }: Readonly<{ live?: AuditLive }>) {
         <>
           <Card title={t("Filter")}>
             <div className="grid-fluid" style={{ ["--min" as string]: "170px" }}>
-              <Field label={t("From")} error={periodErr} hint={periodErr ? undefined : t("Days in {zone}", { zone })}><Input type="date" value={f.from} onChange={(e) => { changeDate("from", e.target.value); }} /></Field>
+              <Field label={t("From")} error={periodProblem} hint={periodProblem ? undefined : t("Days in {zone}", { zone })}><Input type="date" value={f.from} onChange={(e) => { changeDate("from", e.target.value); }} /></Field>
               <Field label={t("To")}><Input type="date" value={f.to} onChange={(e) => { changeDate("to", e.target.value); }} /></Field>
               <Field label={t("Actor")}><Select value={f.actorId} onChange={(e) => { search({ actorId: e.target.value }); }}><option value="">{t("Actor: All")}</option>{actors.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</Select></Field>
               <Field label={t("Target")}><Select value={f.targetKind} onChange={(e) => { search({ targetKind: e.target.value, targetId: "" }); }}><option value="">{t("Target: All")}</option>{kinds.map((k) => <option key={k} value={k}>{k}</option>)}</Select></Field>
@@ -131,7 +146,7 @@ export function AuditView({ live }: Readonly<{ live?: AuditLive }>) {
           </Card>
           <div className="split-rev">
             <Card title={corr ? t("Correlation {id}", { id: corr }) : t("Audit log · newest first")} className="self-start">
-              {rows.length === 0 ? <NoEntries live={live} periodErr={periodErr} corr={corr} result={f.result} /> : (
+              {rows.length === 0 ? <NoEntries live={live} periodErr={periodProblem} corr={corr} result={f.result} /> : (
                 <div className="flex flex-col gap-2">{rows.map((l) => (
                   <ListRow key={l.id} selected={sel?.id === l.id} onClick={() => { open(l.id); }}>
                     <div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="truncate text-[13px]">{l.op}</b><Badge tone={resultTone(l.res)}>{resultWord(l.res, t)}</Badge></div><div className="truncate text-[11px] text-muted-foreground">{l.target}</div><div className="truncate text-[11px] text-muted-foreground">{l.actor} ({l.role}) · {l.at} · {l.corr}</div></div>
@@ -167,7 +182,7 @@ export function AuditView({ live }: Readonly<{ live?: AuditLive }>) {
           </div>
         </>
       ) : device && (
-        <DeviceEvents device={device} f={f} periodErr={periodErr} zone={zone} live={!!live} onDate={changeDate} onDevice={(id) => { if (live) patch({ deviceId: id || null, eventId: null });; }} onEvent={(id) => live && patch({ eventId: id })} onReset={reset} />
+        <DeviceEvents device={device} f={f} periodErr={periodProblem} zone={zone} live={!!live} onDate={changeDate} onDevice={(id) => { if (live) patch({ deviceId: id || null, eventId: null }); }} onEvent={(id) => { if (live) patch({ eventId: id }); }} onReset={reset} />
       )}
     </Page>
   );
@@ -190,9 +205,9 @@ function NoEntries({ live, periodErr, corr, result }: Readonly<{ live?: AuditLiv
 
 /** The restriction, command, job and unit of the entry and of its correlation (DD-A16 step 1). Each link opens the
 record's own screen, which checks its own permission; the command is read (commands.get) only when asked (SCR-A16). */
+const line = (r: RelatedRef) => <span><span className="font-mono text-xs">{r.id.slice(0, 8)}</span> · {r.note}</span>;
 function RelatedRecords({ related, demo }: Readonly<{ related: Related; demo: boolean }>) {
   const { t } = useI18n();
-  const line = (r: RelatedRef) => <span><span className="font-mono text-xs">{r.id.slice(0, 8)}</span> · {r.note}</span>;
   const row = (label: string, r: RelatedRef | null, none: string, link?: (r: RelatedRef) => ReactNode): [string, ReactNode] =>
     [label, r ? <span key={label} className="flex flex-wrap items-center justify-between gap-2">{line(r)}{link?.(r)}</span> : <span key={label} className="text-muted-foreground">{none}</span>];
   return (
@@ -217,18 +232,17 @@ function CommandLine({ r, demo, line }: Readonly<{ r: RelatedRef; demo: boolean;
     if (demo) { setC({ state: "done", text: t("Set temperature {celsius}°C", { celsius: 24 }), when: "09-20 10:14", unitId: null }); return; }
     setC({ state: "loading" });
     try {
-      const cmd = await callOp<ApiCommand & { unitId: string }>("commands.get", { id: r.id });
-      const h = historyRow(cmd, t, display);
-      setC({ state: "done", text: h.text, when: h.when, unitId: cmd.unitId });
+      const deviceCommand = await callOp<ApiCommand & { unitId: string }>("commands.get", { id: r.id });
+      const h = historyRow(deviceCommand, t, display);
+      setC({ state: "done", text: h.text, when: h.when, unitId: deviceCommand.unitId });
     } catch (error) {
       const code = error instanceof OpError ? error.error.code : "";
-      setC({ state: "error", text: t(code === "FORBIDDEN" ? "You may not read this command — it needs control.execute, restriction.read, restriction.override or automation.policy.read."
-        : (code === "NOT_FOUND" ? "This command is outside your scope or no longer exists." : "The command could not be loaded — try again.")) });
+      setC({ state: "error", text: commandFailure(code, t) });
     }
   };
   return (
     <span className="flex flex-col gap-1">
-      <span className="flex flex-wrap items-center justify-between gap-2">{line}{c.state !== "done" && <Btn size="sm" disabled={c.state === "loading"} onClick={load}>{t("Load command")}</Btn>}</span>
+      <span className="flex flex-wrap items-center justify-between gap-2">{line}{c.state !== "done" && <Btn size="sm" disabled={c.state === "loading"} onClick={() => { void load(); }}>{t("Load command")}</Btn>}</span>
       {c.state === "done" && <span className="flex flex-wrap items-center justify-between gap-2 text-xs"><span>{c.text} · {c.when}</span>{c.unitId && <TextLink href={`/admin/units?unitId=${c.unitId}`}>{t("Open unit")} <Icon name="arrowRight" /></TextLink>}</span>}
       {c.state === "error" && <span className="text-xs text-crit">{c.text}</span>}
     </span>
@@ -243,7 +257,7 @@ function DeviceEvents({ device, f, periodErr, zone, live, onDate, onDevice, onEv
 }>) {
   const { t } = useI18n();
   const [pick, setPick] = useState<string | null>(null);
-  const ev = device.events.find((e) => e.id === (live ? device.selected : pick)) ?? device.events[0] ?? null;
+  const event = device.events.find((e) => e.id === (live ? device.selected : pick)) ?? device.events[0] ?? null;
   return (
     <>
       <Card title={t("Filter")}>
@@ -262,22 +276,22 @@ function DeviceEvents({ device, f, periodErr, zone, live, onDate, onDevice, onEv
           <Card title={t("Device events · newest first")} className="self-start">
             {device.events.length === 0 ? <EmptyState title={t("No device events in this period")}>{t(periodErr ? "The period must start before it ends and cover at most 366 days." : "This device recorded no events in the period.")}</EmptyState> : (
               <div className="flex flex-col gap-2">{device.events.map((e) => (
-                <ListRow key={e.id} selected={ev?.id === e.id} onClick={() => { if (live) onEvent(e.id); else setPick(e.id); }}>
+                <ListRow key={e.id} selected={event?.id === e.id} onClick={() => { if (live) onEvent(e.id); else setPick(e.id); }}>
                   <div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="truncate text-[13px]">{e.title}</b><Badge tone={e.tone}>{e.type}</Badge></div><div className="truncate text-[11px] text-muted-foreground">{e.meta}</div><div className="truncate text-[11px] text-muted-foreground">{e.state}</div></div>
                 </ListRow>
               ))}</div>
             )}
           </Card>
-          {ev && (
-            <Card title={<span className="flex flex-wrap items-center gap-2">{ev.title}{ev.badge && <Badge tone={ev.badge.tone}>{ev.badge.text}</Badge>}</span>} sub={device.label ?? undefined} className="self-start">
-              <SummaryList items={ev.facts} />
+          {event && (
+            <Card title={<span className="flex flex-wrap items-center gap-2">{event.title}{event.badge && <Badge tone={event.badge.tone}>{event.badge.text}</Badge>}</span>} sub={device.label ?? undefined} className="self-start">
+              <SummaryList items={event.facts} />
               <h3 className="mt-4 mb-2 text-[13px] font-bold">{t("Linked alerts and audit")}</h3>
               <SummaryList items={[
-                ...ev.alerts.map((a): [string, ReactNode] => [t("Alert"), <span key={a.id} className="flex flex-wrap items-center justify-between gap-2"><span>{a.text}</span><TextLink href={a.href}>{t("Open alert")} <Icon name="arrowRight" /></TextLink></span>]),
-                [t("Audit"), <span key="audit" className="flex flex-wrap items-center justify-between gap-2"><span className="font-mono text-xs">device_event · {ev.id.slice(0, 8)}</span><TextLink href={`/admin/audit?targetKind=device_event&targetId=${ev.id}`}>{t("Filter log")} <Icon name="arrowRight" /></TextLink></span>],
+                ...event.alerts.map((a): [string, ReactNode] => [t("Alert"), <span key={a.id} className="flex flex-wrap items-center justify-between gap-2"><span>{a.text}</span><TextLink href={a.href}>{t("Open alert")} <Icon name="arrowRight" /></TextLink></span>]),
+                [t("Audit"), <span key="audit" className="flex flex-wrap items-center justify-between gap-2"><span className="font-mono text-xs">device_event · {event.id.slice(0, 8)}</span><TextLink href={`/admin/audit?targetKind=device_event&targetId=${event.id}`}>{t("Filter log")} <Icon name="arrowRight" /></TextLink></span>],
               ]} />
               <h3 className="mt-4 mb-2 text-[13px] font-bold">{t("Response notes (read-only here)")}</h3>
-              {ev.notes.length === 0 ? <p className="text-xs text-muted-foreground">{t("No response notes.")}</p> : <ul className="flex flex-col gap-2">{ev.notes.map((n, k) => <li key={k} className="rounded-lg border border-line px-3 py-2 text-[13px]">“{n.text}”<div className="text-[11px] text-muted-foreground">{n.by}</div></li>)}</ul>}
+              {event.notes.length === 0 ? <p className="text-xs text-muted-foreground">{t("No response notes.")}</p> : <ul className="flex flex-col gap-2">{event.notes.map((n, k) => <li key={k} className="rounded-lg border border-line px-3 py-2 text-[13px]">“{n.text}”<div className="text-[11px] text-muted-foreground">{n.by}</div></li>)}</ul>}
               <p className="mt-2 rounded-lg bg-primary-soft/50 px-3 py-2 text-[11px] text-muted-foreground">{t("Notes are added from Devices & models (device.write), not here.")}</p>
             </Card>
           )}

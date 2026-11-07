@@ -8,6 +8,7 @@
 import type { Locator, Page } from "@playwright/test";
 import { test, expect } from "../../fixtures/test";
 import { displayZone, ENGLISH, setDisplay } from "../../fixtures/display";
+import { must } from "../../fixtures/must";
 
 const card = (page: Page, heading: string | RegExp) => page.getByRole("main").locator('section, [data-slot="card"]').filter({ has: page.getByRole("heading", { name: heading, exact: typeof heading === "string" }) });
 /** The value of a SummaryList row of the open entry. */
@@ -32,15 +33,18 @@ test("the audit log keeps its filters and the open entry in the URL", async ({ p
 
   // opening an entry puts it in the URL; its detail names the actor, the recorded role and the target
   const second = (await rows.count()) > 1 ? rows.nth(1) : rows.first();
-  const op = (await second.locator("b").innerText()).trim();
+  const opText = await second.locator("b").innerText();
+  const op = opText.trim();
   await second.click();
   await page.waitForURL(/entryId=[0-9a-f-]{36}/);
   const detail = card(page, new RegExp(`^${RegExp.escape(op)}`));
   await expect(detail.first()).toBeVisible();
   const entryId = new URL(page.url()).searchParams.get("entryId");
   await expect(fact(detail.first(), "Role at the time")).toContainText("kept as recorded, not rewritten by the current membership");
-  const target = (await fact(detail.first(), "Target").locator("span.font-mono").innerText()).trim(); // "kind · id"
-  const [kind, id] = target.split(" · ", 2);
+  const targetText = await fact(detail.first(), "Target").locator("span.font-mono").innerText();
+  const target = targetText.trim(); // "kind · id"
+  const [kindText, idText] = target.split(" · ", 2);
+  const kind = must(kindText, "the target kind"), id = must(idText, "the target id");
 
   // Filter by target keeps the entry open; every shown entry has that target; the chip clears it
   await detail.first().getByRole("button", { name: "Filter by target" }).click();
@@ -55,7 +59,7 @@ test("the audit log keeps its filters and the open entry in the URL", async ({ p
   const related = card(page, /./).filter({ has: page.getByRole("heading", { name: "Related records", exact: true }) });
   await expect(related.first()).toBeVisible();
   if (kind === "job") await expect(related.first().getByRole("link", { name: "Open job", exact: true })).toHaveAttribute("href", /^\/admin\/jobs\?jobId=[0-9a-f-]{36}$/);
-  if (kind === "unit") await expect(related.first().getByRole("link", { name: "Open unit", exact: true })).toHaveAttribute("href", /^\/admin\/units\?unitId=[0-9a-f-]{36}$/);
+  else if (kind === "unit") await expect(related.first().getByRole("link", { name: "Open unit", exact: true })).toHaveAttribute("href", /^\/admin\/units\?unitId=[0-9a-f-]{36}$/);
   await expect(related.first()).toContainText("Links open the existing detail screens");
 
   // Filter by actor and Filter by ID (the correlation) keep the open entry; the list then names the correlation
@@ -64,11 +68,11 @@ test("the audit log keeps its filters and the open entry in the URL", async ({ p
   const open = card(page, /./).filter({ has: page.getByText("Role at the time", { exact: true }) }).first();
   await open.getByRole("button", { name: "Filter by actor" }).click();
   await page.waitForURL(/actorId=/);
-  const actor = new URL(page.url()).searchParams.get("actorId")!;
+  const actor = must(new URL(page.url()).searchParams.get("actorId"));
   await expect(main.getByRole("combobox", { name: "Actor" })).toHaveValue(actor);
   await open.getByRole("button", { name: "Filter by ID" }).click();
   await page.waitForURL(/correlationId=/);
-  const corr = new URL(page.url()).searchParams.get("correlationId")!;
+  const corr = must(new URL(page.url()).searchParams.get("correlationId"));
   await expect(main.getByRole("heading", { name: `Correlation ${corr}`, exact: true })).toBeVisible();
   await expect(main).toContainText(/\d+ entr(y|ies) with this correlation ID/);
 
@@ -107,7 +111,7 @@ test("device events load only for a picked device and link the event's audit tra
   if (await rows.count()) {
     await rows.first().click();
     await page.waitForURL(/eventId=[0-9a-f-]{36}/);
-    const eventId = new URL(page.url()).searchParams.get("eventId")!;
+    const eventId = must(new URL(page.url()).searchParams.get("eventId"));
     const detail = card(page, /./).filter({ has: page.getByRole("heading", { name: "Linked alerts and audit", exact: true }) });
     for (const label of ["Event type", "Evidence", "Sequence", "Unit at the time", "Occurred", "Recovery"]) await expect(detail.locator("dt", { hasText: new RegExp(`^${label}$`) })).toBeVisible();
     await expect(detail.getByRole("link", { name: "Filter log" })).toHaveAttribute("href", `/admin/audit?targetKind=device_event&targetId=${eventId}`);

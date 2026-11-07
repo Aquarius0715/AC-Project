@@ -14,7 +14,7 @@ async function run<T>(fn: () => Promise<T>): Promise<ActionResult<T>> {
   try {
     return { ok: true, value: await fn() };
   } catch (error) {
-    return error instanceof CoreError ? { ok: false, messageKey: error.error.messageKey, code: error.error.code, fieldErrors: error.error.fieldErrors ?? {}, retryAfterSeconds: error.error.retryAfterSeconds } : { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
+    return error instanceof CoreError ? { ok: false, messageKey: error.error.messageKey, code: error.error.code, fieldErrors: error.error.fieldErrors, retryAfterSeconds: error.error.retryAfterSeconds } : { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
   } finally {
     refresh();
   }
@@ -22,31 +22,32 @@ async function run<T>(fn: () => Promise<T>): Promise<ActionResult<T>> {
 
 /** devices.register on an assigned unit (serial trimmed and upper-cased by the API before the uniqueness check). */
 export async function registerDevice(serial: string, sensorTypes: Metric[], unitId: string, jobId: string) {
-  return run(() => coreOp<{ id: string }>("devices.register", { serial, sensorTypes, unitId, jobId }, { write: true }).then((d) => d.id));
+  return run(async () => { const d = await coreOp<{ id: string }>("devices.register", { serial, sensorTypes, unitId, jobId }, { write: true }); return d.id; });
 }
 /** devices.bind to another assigned unit; a reason is required and the device gets new sensor IDs (SR24). */
 export async function bindDevice(deviceId: string, version: number, unitId: string, jobId: string, reason: string) {
-  return run(() => coreOp("devices.bind", { deviceId, unitId, jobId, reason: reason.trim() }, { write: true, expectedVersion: version }).then(() => null));
+  return run(async () => { await coreOp("devices.bind", { deviceId, unitId, jobId, reason: reason.trim() }, { write: true, expectedVersion: version }); return null; });
 }
 export async function checkDevice(deviceId: string, version: number, jobId: string) {
-  return run(() => coreOp("devices.check", { id: deviceId, jobId }, { write: true, expectedVersion: version }).then(() => null));
+  return run(async () => { await coreOp("devices.check", { id: deviceId, jobId }, { write: true, expectedVersion: version }); return null; });
 }
 /** devices.calibrate at the current business time (a demo record; earlier readings stay unchanged). */
 export async function calibrateSensor(deviceId: string, version: number, sensorId: string, metric: Metric, unit: OpInput<"devices.calibrate">["unit"], referenceValue: number, measuredValue: number, jobId: string) {
   return run(async () => {
-    const calibratedAt = (await coreNow()).toISOString();
+    const now = await coreNow();
+    const calibratedAt = now.toISOString();
     await coreOp("devices.calibrate", { deviceId, sensorId, metric, unit, referenceValue, measuredValue, calibratedAt, jobId }, { write: true, expectedVersion: version });
     return null;
   });
 }
 export async function updateFirmware(deviceId: string, version: number, firmwareVersion: string, jobId: string) {
-  return run(() => coreOp("devices.updateFirmware", { deviceId, firmwareVersion, jobId }, { write: true, expectedVersion: version }).then(() => null));
+  return run(async () => { await coreOp("devices.updateFirmware", { deviceId, firmwareVersion, jobId }, { write: true, expectedVersion: version }); return null; });
 }
 /** devices.addResponseNote on one device event (its version); the device's physical state does not change. */
 export async function addResponseNote(deviceId: string, eventId: string, eventVersion: number, responseNote: string) {
-  return run(() => coreOp("devices.addResponseNote", { deviceId, eventId, responseNote: responseNote.trim() }, { write: true, expectedVersion: eventVersion }).then(() => null));
+  return run(async () => { await coreOp("devices.addResponseNote", { deviceId, eventId, responseNote: responseNote.trim() }, { write: true, expectedVersion: eventVersion }); return null; });
 }
 /** alerts.acknowledge of an alert raised by a device event (its version). Reconnection never clears it (DD-T12). */
 export async function acknowledgeAlert(alertId: string, version: number) {
-  return run(() => coreOp("alerts.acknowledge", { alertId }, { write: true, expectedVersion: version }).then(() => null));
+  return run(async () => { await coreOp("alerts.acknowledge", { alertId }, { write: true, expectedVersion: version }); return null; });
 }

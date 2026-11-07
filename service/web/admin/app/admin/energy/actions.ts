@@ -14,7 +14,7 @@ export async function saveBaseline(input: OpInput<"baselines.save">, version?: n
     const b = await coreOp<{ id: string; version: number }>("baselines.save", input, { write: true, expectedVersion: input.id ? version : undefined });
     return { ok: true, value: { id: b.id, version: b.version } };
   } catch (error) {
-    return error instanceof CoreError ? { ok: false, messageKey: error.error.messageKey, code: error.error.code, fieldErrors: error.error.fieldErrors ?? {}, retryAfterSeconds: error.error.retryAfterSeconds } : { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
+    return error instanceof CoreError ? { ok: false, messageKey: error.error.messageKey, code: error.error.code, fieldErrors: error.error.fieldErrors, retryAfterSeconds: error.error.retryAfterSeconds } : { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
   } finally {
     refresh();
   }

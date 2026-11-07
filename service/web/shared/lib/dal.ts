@@ -5,16 +5,20 @@ import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { dropSession, loadSession, needsRefresh, SESSION_COOKIE, type Session } from "@ac/web/lib/session";
-import type { DomainError } from "@ac/web/lib/ops";
+import { domainError, type DomainError } from "@ac/web/lib/domainError";
 import { coreRequest } from "@ac/web/lib/rest";
 import { DEFAULT_DISPLAY, isLocale, type Display } from "@ac/web/lib/i18n";
 import type { ListArgs, OpArgs } from "@ac/web/lib/opTypes";
+import { orNull } from "@ac/web/lib/promises";
+import { answerOf } from "@ac/web/lib/answer";
+import { filled } from "@ac/web/lib/filled";
 
 /** The session of the cookie (sealed, or stored under the sealed ID it holds, IR382), or null. proxy.ts refreshes tokens
 before pages render (Server Components cannot write cookies), so an expired token here means the refresh failed.
 Memoized per render pass. */
 export const getSession = cache(async (): Promise<Session | null> => {
-  const s = await loadSession((await cookies()).get(SESSION_COOKIE)?.value);
+  const jar = await cookies();
+  const s = await loadSession(jar.get(SESSION_COOKIE)?.value);
   return s && !needsRefresh(s) ? s : null;
 });
 
@@ -26,8 +30,11 @@ export const verifySession = cache(async (): Promise<Session> => {
 });
 
 export class CoreError extends Error {
-  constructor(public readonly status: number, public readonly error: DomainError) {
-    super(`${error.code}: ${error.messageKey}`);
+  readonly status: number;
+  constructor(public readonly error: DomainError, options: ErrorOptions & { status: number }) {
+    super(`${error.code}: ${error.messageKey}`, options);
+    this.name = "CoreError";
+    this.status = options.status;
   }
 }
 
@@ -35,8 +42,9 @@ export interface CoreOptions { write?: boolean; expectedVersion?: number; idempo
 
 /** Calls one Core API operation as the signed-in membership at its REST route (IR222) and returns `data`
 (DomainError → CoreError). The input is typed by the contract (IR313). */
-export async function coreOp<T>(...[operation, input, opts = {}]: OpArgs<CoreOptions>): Promise<T> {
-  return (await coreCall<T>(operation, input, opts)).data;
+export async function coreOp<T>(...[operation, input, options = {}]: OpArgs<CoreOptions>): Promise<T> {
+  const { data } = await coreCall<T>(operation, input, options);
+  return data;
 }
 
 /** Every item of a list operation: follows nextCursor with the same filters and sort (SR14), up to `max` items. */
@@ -44,11 +52,58 @@ export async function coreAll<T>(...[operation, query = {}, max = 1000]: ListArg
   const out: T[] = [];
   let cursor: string | null = null;
   do {
-    const page: { items: T[]; nextCursor: string | null } = (await coreCall<{ items: T[]; nextCursor: string | null }>(operation, { ...query, limit: 100, ...(cursor && { cursor }) }, {})).data;
+    const response: { data: { items: T[]; nextCursor: string | null } } = await coreCall<{ items: T[]; nextCursor: string | null }>(operation, { ...query, limit: 100, ...(cursor && { cursor }) }, {});
+    const page = response.data;
     out.push(...page.items);
     cursor = page.nextCursor;
   } while (cursor && out.length < max);
   return out.slice(0, max);
+}
+
+/** Every item of a list and how many there are. */
+export interface AllItems<T> { items: T[]; total: number }
+
+/** coreAll as a page: every item and their count. */
+export async function coreAllPage<T>(...args: ListArgs): Promise<AllItems<T>> {
+  const items = await coreAll<T>(...args);
+  return { items, total: items.length };
+}
+
+/** The items of one page of a list operation. */
+export async function coreItems<T>(...args: OpArgs<CoreOptions>): Promise<T[]> {
+  const page = await coreOp<{ items: T[] }>(...args);
+  return page.items;
+}
+
+/** A read a page can do without: `fallback` when the Core API refuses it, except UNAVAILABLE and TIMEOUT, which
+still fail the page (it is not readable now, not refused). */
+export async function orWhenRefused<T, F>(read: Promise<T>, fallback: F): Promise<T | F> {
+  try {
+    return await read;
+  } catch (error) {
+    if (error instanceof CoreError && error.error.code !== "UNAVAILABLE" && error.error.code !== "TIMEOUT") return fallback;
+    throw error;
+  }
+}
+
+/** `fallback` when the session may not read it (FORBIDDEN); every other failure still fails. */
+export async function orWhenForbidden<T, F>(read: Promise<T>, fallback: F): Promise<T | F> {
+  try {
+    return await read;
+  } catch (error) {
+    if (error instanceof CoreError && error.error.code === "FORBIDDEN") return fallback;
+    throw error;
+  }
+}
+
+/** null for a record the session cannot see (FORBIDDEN, or NOT_FOUND: archived or another tenant's). */
+export async function orAbsent<T>(read: Promise<T>): Promise<T | null> {
+  try {
+    return await read;
+  } catch (error) {
+    if (error instanceof CoreError && (error.error.code === "FORBIDDEN" || error.error.code === "NOT_FOUND")) return null;
+    throw error;
+  }
 }
 
 /** session.get once per render pass: the principal and the response meta. */
@@ -85,34 +140,42 @@ shell and the screens that show times read the same answer. Unreadable preferenc
 export const coreDisplay = cache(async (): Promise<Display> => {
   try {
     const p = await coreOp<{ locale?: string; timezone?: string }>("preferences.get", {});
-    return { locale: isLocale(p.locale) ? p.locale : DEFAULT_DISPLAY.locale, timeZone: p.timezone || DEFAULT_DISPLAY.timeZone };
+    return { locale: isLocale(p.locale) ? p.locale : DEFAULT_DISPLAY.locale, timeZone: filled(p.timezone) ?? DEFAULT_DISPLAY.timeZone };
   } catch {
     return DEFAULT_DISPLAY;
   }
 });
 
 /** The signed-in membership's permissions (session.get), for permission-scoped sections; the API still authorizes. */
-export const corePermissions = cache(async (): Promise<Set<string>> => new Set((await coreSession()).data.permissions));
+export const corePermissions = cache(async (): Promise<Set<string>> => {
+  const { data } = await coreSession();
+  return new Set(data.permissions);
+});
 
-async function coreCall<T>(operation: string, input: unknown, opts: CoreOptions): Promise<{ data: T; meta?: { snapshotAt?: string } }> {
+async function coreCall<T>(operation: string, input: unknown, options: CoreOptions): Promise<{ data: T; meta?: { snapshotAt?: string } }> {
   const s = await verifySession();
   const req = coreRequest(operation, input);
-  if (!req) throw new CoreError(404, { code: "NOT_FOUND", messageKey: "error.unknownOperation", fieldErrors: {}, correlationId: "", retryAfterSeconds: null });
+  if (!req) throw new CoreError({ code: "NOT_FOUND", messageKey: "error.unknownOperation", fieldErrors: {}, correlationId: "", retryAfterSeconds: null }, { status: 404 });
   const headers: Record<string, string> = {
     Authorization: `Bearer ${s.accessToken}`,
     "X-Tenant-Id": s.tenantId,
     "X-Membership-Id": s.membershipId,
   };
   if (req.body !== undefined) headers["Content-Type"] = "application/json";
-  if (opts.write) headers["Idempotency-Key"] = opts.idempotencyKey ?? crypto.randomUUID();
-  if (opts.expectedVersion !== undefined) headers["X-Expected-Version"] = String(opts.expectedVersion);
+  if (options.write) headers["Idempotency-Key"] = options.idempotencyKey ?? crypto.randomUUID();
+  if (options.expectedVersion !== undefined) headers["X-Expected-Version"] = String(options.expectedVersion);
   const res = await fetch(`${process.env.CORE_API_URL ?? "http://localhost:8080"}${req.path}`, { method: req.method, body: req.body, cache: "no-store", headers });
-  const body = await res.json().catch(() => null);
+  const body: unknown = await orNull<unknown>(res.json());
   // the Core API no longer takes this sign-in (HQ signed the user out everywhere, IR384, or the membership ended): the
   // stored session goes too, so the next page asks to sign in; the caller still gets the refusal (IR385)
-  if (res.status === 401) await dropSession((await cookies()).get(SESSION_COOKIE)?.value);
-  if (!res.ok) throw new CoreError(res.status, body ?? { code: "UNAVAILABLE", messageKey: "error.unavailable", fieldErrors: {}, correlationId: "", retryAfterSeconds: null });
-  return body as { data: T; meta?: { snapshotAt?: string } };
+  if (res.status === 401) {
+    const jar = await cookies();
+    await dropSession(jar.get(SESSION_COOKIE)?.value);
+  }
+  if (!res.ok) throw new CoreError(domainError(body), { status: res.status });
+  const answer = answerOf<T>(body);
+  if (!answer) throw new CoreError(domainError(null), { status: res.status }); // a success without an envelope reads as unavailable
+  return answer;
 }
 
 export const apiMode = () => process.env.DATA_SOURCE === "api";

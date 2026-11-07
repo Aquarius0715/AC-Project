@@ -1,18 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { Banner, Card, Kpi, Page, TextLink, UtilBar } from "@ac/web/components/ui";
+import { Banner, Card, Kpi, Page, TextLink, UtilizationBar } from "@ac/web/components/ui";
 import { fmt, useJobs } from "@ac/web/lib/jobs";
 import { Icon } from "@ac/web/components/Icon";
 
 const hours = [8, 10, 12, 14, 16, 18];
+const jobCounts: { label: string; count: number }[] = [{ label: "Offered", count: 1 }, { label: "Accepted · unassigned", count: 2 }, { label: "Assigned / in progress", count: 1 }, { label: "Overdue", count: 1 }, { label: "Submitted · in review", count: 1 }, { label: "Completed", count: 4 }];
+const schedule: { id: string; skill: string; block: { s: number; w: number; t: string } | null }[] = [{ id: "tech-external-a", skill: "Refrigerant handling", block: { s: 2, w: 1, t: "10–12" } }, { id: "tech-external-a2", skill: "General maintenance", block: null }];
+const capacity: { id: string; pct: number; text: string }[] = [{ id: "tech-external-a", pct: 25, text: "10 h / 40 h · 25%" }, { id: "tech-external-a2", pct: 10, text: "4 h / 40 h · 10%" }];
 /** The Phase 1A demo dashboard (DATA_SOURCE=mock): the fixture jobs of the shared store and fixed rows. */
 export function OverviewDemo() {
   const live = useJobs().filter((j) => j.contractor === "contractor-a" && j.id !== "job-p09");
   const actions: [string, string, string][] = [
     ...live.filter((j) => j.status === "offered" && j.partnerProposal?.status !== "pending").map((j): [string, string, string] => [`${j.id} · ${j.unit} · ${j.customer}`, `New offer · visit ${fmt(j.scheduled)} (fixed) — accept, decline or propose another time`, `/partner/jobs/${j.id}`]),
     ...live.filter((j) => j.status === "accepted").map((j): [string, string, string] => [`${j.id} · ${j.unit}`, `Accepted · assign a technician for ${fmt(j.scheduled)}`, `/partner/schedule?jobId=${j.id}`]),
-    ...live.filter((j) => j.techAck?.status === "cant_make").map((j): [string, string, string] => [`${j.id} · ${j.unit}`, `${j.technician} can’t make ${fmt(j.scheduled)} — reassign`, `/partner/schedule?jobId=${j.id}`]),
+    ...live.filter((j) => j.techAck?.status === "cant_make").map((j): [string, string, string] => [`${j.id} · ${j.unit}`, `${j.technician ?? "—"} can’t make ${fmt(j.scheduled)} — reassign`, `/partner/schedule?jobId=${j.id}`]),
   ];
   return (
     <Page>
@@ -26,22 +29,20 @@ export function OverviewDemo() {
       </div>
       <Card title="Job progress — this week" action={<TextLink href="/partner/jobs">All jobs <Icon name="arrowRight" /></TextLink>}>
         <div className="grid-fluid" style={{ ["--min" as string]: "130px" }}>
-          {[["Offered", 1, "primary"], ["Accepted · unassigned", 2, "warn"], ["Assigned / in progress", 1, "primary"], ["Overdue", 1, "crit"], ["Submitted · in review", 1, "primary"], ["Completed", 4, "ok"]].map(([l, n]) => <div key={l as string} className="rounded-xl bg-surface2 p-3"><div className="text-[11px] text-muted-foreground">{l}</div><div className="text-xl font-bold">{n}</div></div>)}
+          {jobCounts.map(({ label: l, count: n }) => <div key={l} className="rounded-xl bg-surface2 p-3"><div className="text-[11px] text-muted-foreground">{l}</div><div className="text-xl font-bold">{n}</div></div>)}
         </div>
       </Card>
       <div className="split">
         <div className="flex min-w-0 flex-col gap-4">
           <Card title={`Needs your action (${String(actions.length + 5)})`}>
-            <ul className="divide-y divide-line">{[...actions, ["job-p09 · Lobby AC · customer-b", "Answer by 2026-09-22 01:00 (15 h left)", "/partner/jobs/job-p09"], ["job-p07 · Server room AC", "Work window ended 09-20 17:00", "/partner/schedule?jobId=job-p07"], ["job-p05 · Server room AC", "Report by tech-external-a · awaiting review", "/partner/jobs/job-p05/review"], ["job-p02 · Rooftop unit", "No technician · delegation ends 09-22 00:00", "/partner/schedule?jobId=job-p02"], ["job-p12 · Lobby AC", "No technician · delegation ends 09-24 18:00", "/partner/schedule?jobId=job-p12"]].map(([t, d, h]) => <li key={t}><Link href={h} className="flex items-center justify-between gap-2 py-2.5 hover:bg-surface2/50"><span><b className="text-[13px]">{t}</b><span className="block text-xs text-muted-foreground">{d}</span></span><span className="text-muted-foreground"><Icon name="chevronRight" /></span></Link></li>)}</ul>
+            <ul className="divide-y divide-line">{([...actions, ["job-p09 · Lobby AC · customer-b", "Answer by 2026-09-22 01:00 (15 h left)", "/partner/jobs/job-p09"], ["job-p07 · Server room AC", "Work window ended 09-20 17:00", "/partner/schedule?jobId=job-p07"], ["job-p05 · Server room AC", "Report by tech-external-a · awaiting review", "/partner/jobs/job-p05/review"], ["job-p02 · Rooftop unit", "No technician · delegation ends 09-22 00:00", "/partner/schedule?jobId=job-p02"], ["job-p12 · Lobby AC", "No technician · delegation ends 09-24 18:00", "/partner/schedule?jobId=job-p12"]] satisfies [string, string, string][]).map(([t, d, h]) => <li key={t}><Link href={h} className="flex items-center justify-between gap-2 py-2.5 hover:bg-surface2/50"><span><b className="text-[13px]">{t}</b><span className="block text-xs text-muted-foreground">{d}</span></span><span className="text-muted-foreground"><Icon name="chevronRight" /></span></Link></li>)}</ul>
           </Card>
           <Card title="Today · Mon 2026-09-21" action={<TextLink href="/partner/schedule">Schedule <Icon name="arrowRight" /></TextLink>}>
             <div className="scroll-x"><div className="min-w-[520px]">
               <div className="grid grid-cols-[120px_repeat(6,1fr)] text-[11px] text-muted-foreground"><span />{hours.map((h) => <span key={h}>{String(h).padStart(2, "0")}:00</span>)}</div>
-              {[["tech-external-a", "Refrigerant handling", { s: 2, w: 1, t: "10–12" }], ["tech-external-a2", "General maintenance", null]].map(([n, q, b]) => {
-                return (
-                  <div key={n as string} className="relative grid grid-cols-[120px_repeat(6,1fr)] items-center border-t border-line py-2 text-xs"><span><b>{n as string}</b><span className="block text-[11px] text-muted-foreground">{q as string}</span></span><div className="col-span-6 relative h-8 rounded-lg bg-surface2">{b ? <div className="absolute top-1 h-6 rounded bg-primary px-2 text-[11px] leading-6 text-white" style={{ left: "16.6%", width: "16.6%" }}>10–12</div> : <span className="absolute inset-0 grid place-items-center text-[11px] text-muted-foreground">Free all day</span>}<span className="absolute inset-y-0 w-px bg-crit" style={{ left: "29%" }} /></div></div>
-                );
-              })}
+              {schedule.map(({ id: n, skill: q, block: b }) => (
+                  <div key={n} className="relative grid grid-cols-[120px_repeat(6,1fr)] items-center border-t border-line py-2 text-xs"><span><b>{n}</b><span className="block text-[11px] text-muted-foreground">{q}</span></span><div className="col-span-6 relative h-8 rounded-lg bg-surface2">{b ? <div className="absolute top-1 h-6 rounded bg-primary px-2 text-[11px] leading-6 text-white" style={{ left: "16.6%", width: "16.6%" }}>10–12</div> : <span className="absolute inset-0 grid place-items-center text-[11px] text-muted-foreground">Free all day</span>}<span className="absolute inset-y-0 w-px bg-crit" style={{ left: "29%" }} /></div></div>
+                ))}
             </div></div>
             <p className="mt-2 text-[11px] text-muted-foreground">Red line = now (09:30). 10–12 = job-contractor-a · Bedroom AC (assigned, starts 10:00).</p>
             <div className="mt-2"><Banner tone="warn">2 accepted jobs still have no technician — assign them before their delegation period ends.</Banner></div>
@@ -49,7 +50,7 @@ export function OverviewDemo() {
         </div>
         <div className="flex min-w-0 flex-col gap-4">
           <Card title="Team capacity — this week" action={<TextLink href="/partner/team">Team <Icon name="arrowRight" /></TextLink>}>
-            {[["tech-external-a", 25, "10 h / 40 h · 25%"], ["tech-external-a2", 10, "4 h / 40 h · 10%"]].map(([n, p, l]) => <div key={n as string} className="mb-3"><div className="mb-1 flex justify-between text-xs"><b>{n}</b><span className="text-muted-foreground">{l}</span></div><UtilBar pct={p as number} /></div>)}
+            {capacity.map(({ id: n, pct: p, text: l }) => <div key={n} className="mb-3"><div className="mb-1 flex justify-between text-xs"><b>{n}</b><span className="text-muted-foreground">{l}</span></div><UtilizationBar pct={p} /></div>)}
             <p className="text-[11px] text-muted-foreground">Utilization = assigned hours ÷ available hours. Undefined hours show “—”.</p>
           </Card>
           <Card title="Recent activity" action={<TextLink href="/partner/history">History <Icon name="arrowRight" /></TextLink>}>

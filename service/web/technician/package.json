@@ -8,7 +8,7 @@
     "start": "next start -p 3002",
     "lint": "eslint --max-warnings=0",
     "typecheck": "next typegen && tsc --noEmit",
-    "lint:strict": "eslint --max-warnings=0 -c eslint.strict.config.mjs"
+    "lint:strict": "next typegen && eslint --max-warnings=0 -c eslint.strict.config.mjs"
   },
   "dependencies": {
     "@ac/web": "*",

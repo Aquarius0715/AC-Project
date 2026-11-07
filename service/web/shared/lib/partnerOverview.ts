@@ -4,7 +4,14 @@
 // Texts in the display language (`t` / `i`, IR270). The periods and today's timeline are Kuala Lumpur days and hours;
 // deadlines, starts and the activity are instants in the user's display time zone (IR44).
 import { klTime } from "@ac/web/lib/devices";
-import { EN, intlTag, relativeTime, showTime, translator, type I18n, type Locale, type T } from "@ac/web/lib/i18n";
+import { EN, intlTag, relativeTime, showTime, translator, type I18n, type Locale, type T, textOf } from "@ac/web/lib/i18n";
+import { wrapped } from "@ac/web/lib/text";
+import { isAfter } from "@ac/web/lib/order";
+import { entryOf } from "@ac/web/lib/lookup";
+
+const UNASSIGNED = "unassigned";
+const IN_PROGRESS = "in_progress";
+const TECHNICIAN = "technician";
 
 const en = translator("en");
 
@@ -12,7 +19,7 @@ export interface Slot { startAt: string; endAt: string }
 
 /** jobs.list rows of a contractor (IR23): the offer before the access window, the summary inside it, the history after. */
 export type ApiPartnerJob =
-  | { projection: "offer"; status: "offered" | "accepted"; jobId: string; jobVersion: number; offerId: string; type: string; siteAddress: string | null; requestedSlot: Slot; dueAt: string; offerExpiresAt: string; visitSlot: Slot | null; accessValidFrom?: string; accessValidUntil?: string }
+  | { projection: "offer"; status: "offered" | "accepted"; jobId: string; jobVersion: number; offerId: string; type: string; siteAddress: string | null; requestedSlot: Slot; dueAt: string; offerExpiresAt: string; visitSlot: Slot | null; accessValidFrom?: string; accessValidUntil?: string; origin?: string; partnerSlotProposal?: { status: string } | null }
   | { projection: "summary"; id: string; version: number; unitId: string; type: string; status: string; dueAt: string; requestedSlot: Slot; scheduledSlot: Slot | null; assignmentId: string | null; displayStatus: string; technicianMembershipId: string | null; assignmentAcknowledgement?: "pending" | "accepted" | "cant_make" | null; accessValidFrom?: string | null; accessValidUntil?: string | null; origin?: string; eventSummary: ApiEventSummary }
   | { projection: "history"; jobId: string; type: string; status: string; completedAt: string | null; asOf: string; ownDecisionEvents: ApiJobEvent[] };
 /** jobs.list's count of a summary's events (IR506): what the caller reads with jobs.events, and what the customer reads. */
@@ -42,14 +49,15 @@ export function weekOf(nowIso: string): { from: string; to: string } {
 
 /** The period of the URL (from/to KL dates, at most 366 days) or this week, and its half-open instant range. */
 export function period(nowIso: string, from?: string, to?: string): { from: string; to: string; fromAt: string; toAt: string; days: string[]; label: string } {
-  const ok = (d?: string) => !!d && /^\d{4}-\d{2}-\d{2}$/.test(d) && !Number.isNaN(Date.parse(`${d}T00:00:00Z`));
+  const ok = (d?: string): d is string => !!d && /^\d{4}-\d{2}-\d{2}$/.test(d) && !Number.isNaN(Date.parse(`${d}T00:00:00Z`));
   let p = weekOf(nowIso);
-  if (ok(from) && ok(to) && from! <= to! && Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`) <= 365 * day) p = { from: from!, to: to! };
+  if (ok(from) && ok(to) && !isAfter(from, to) && Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`) <= 365 * day) p = { from, to };
   const start = Date.parse(`${p.from}T00:00:00Z`) - KL_OFFSET, end = Date.parse(`${p.to}T00:00:00Z`) - KL_OFFSET + day;
   const days: string[] = [];
   for (let t = start; t < end && days.length < 31; t += day) days.push(ymd(t));
   const week = weekOf(nowIso);
-  const label = p.from === week.from && p.to === week.to ? "This week" : p.from === shift(week, -7).from && p.to === shift(week, -7).to ? "Last week" : p.from === shift(week, 7).from && p.to === shift(week, 7).to ? "Next week" : "Period";
+  const named: [{ from: string; to: string }, string][] = [[week, "This week"], [shift(week, -7), "Last week"], [shift(week, 7), "Next week"]];
+  const label = named.find(([w]) => p.from === w.from && p.to === w.to)?.[1] ?? "Period";
   return { ...p, fromAt: new Date(start).toISOString(), toAt: new Date(end).toISOString(), days, label };
 }
 
@@ -63,7 +71,7 @@ export function shift(p: { from: string; to: string }, n: number) {
 on the server: a browser's ICU can write a month differently, and the page would not hydrate. */
 export function klDay(d: string, locale: Locale, weekday = false): string {
   return new Date(`${d}T00:00:00Z`).toLocaleDateString(intlTag(locale), { timeZone: "UTC", day: "numeric", month: "short", ...(weekday && { weekday: "short" }) })
-    .replaceAll(/[\u00A0\u2009\u202F]/g, " ").replace(",", "");
+    .replaceAll(/[\u{A0}\u{2009}\u{202F}]/gu, " ").replace(",", "");
 }
 /** The period inside section titles ("Job progress — this week"). */
 const periodWord: Record<string, string> = { "This week": "this week", "Last week": "last week", "Next week": "next week" };
@@ -74,7 +82,7 @@ export function periodChoice(p: { from: string; to: string; label: string }, now
   const week = weekOf(nowIso);
   const range = (q: { from: string; to: string }) => `${klDay(q.from, locale)} – ${klDay(q.to, locale)}`;
   return {
-    period: { value: `${p.from}|${p.to}`, custom: p.label === "Period", text: periodWord[p.label] ? t(periodWord[p.label]) : range(p), label: range(p) },
+    period: { value: `${p.from}|${p.to}`, custom: p.label === "Period", text: textOf(periodWord, p.label, t) ?? range(p), label: range(p) },
     periods: [{ label: "Last week", ...shift(week, -7) }, { label: "This week", ...week }, { label: "Next week", ...shift(week, 7) }]
       .map((o) => ({ value: `${o.from}|${o.to}`, label: `${t(o.label)} (${range(o)})` })),
   };
@@ -102,10 +110,10 @@ export function bucket(j: PartnerJob, now: number): Bucket {
       return "offered";
     }
     case "accepted": {
-      return j.assignmentId ? "active" : "unassigned";
+      return j.assignmentId ? "active" : UNASSIGNED;
     }
     case "assigned":
-    case "in_progress": {
+    case IN_PROGRESS: {
       return j.slot && Date.parse(j.slot.endAt) <= now ? "overdue" : "active";
     }
     case "rework_requested":
@@ -123,7 +131,7 @@ export function bucket(j: PartnerJob, now: number): Bucket {
 }
 
 const typeText: Record<string, string> = { periodic: "Periodic inspection", reactive: "Repair", preventive: "Preventive maintenance" };
-const label = (j: PartnerJob, t: T = en) => [j.short, j.unit ?? j.address ?? (typeText[j.type] ? t(typeText[j.type]) : j.type)].filter(Boolean).join(" · ");
+const label = (j: PartnerJob, t: T = en) => [j.short, j.unit ?? j.address ?? (textOf(typeText, j.type, t) ?? j.type)].filter(Boolean).join(" · ");
 export const hhmm = (iso: string) => klTime(iso).slice(11);
 /** "15 h", "3 d 8 h" or "45 min" until an instant (negative → "ended"), in the display language. */
 export function until(iso: string, now: number, t: T = en): string {
@@ -140,37 +148,40 @@ export interface KpiTile { label: string; value: number; sub: string; href: stri
 from the list, and in progress / scheduled as the summary's active jobs without them. Each opens the job list. */
 export function kpis(counts: ApiCounts, jobs: PartnerJob[], now: number, names: Map<string, string>, period?: { from: string; to: string }, i: I18n = EN): KpiTile[] {
   const { t } = i;
+  type Offered = PartnerJob & { offerExpiresAt: string }; // an offer with its answer deadline
   const list = (tab: string) => `/partner/jobs?tab=${tab}${period ? `&from=${period.from}&to=${period.to}` : ""}`; // the list with the same period
-  const offers = jobs.filter((j) => j.status === "offered" && j.offerExpiresAt).sort((a, b) => Date.parse(a.offerExpiresAt!) - Date.parse(b.offerExpiresAt!));
-  const unassigned = jobs.filter((j) => bucket(j, now) === "unassigned");
-  const running = jobs.filter((j) => (j.status === "assigned" || j.status === "in_progress") && j.slot).sort((a, b) => Date.parse(a.slot!.startAt) - Date.parse(b.slot!.startAt));
-  const next = running.find((j) => j.status === "in_progress") ?? running.find((j) => Date.parse(j.slot!.endAt) > now);
+  const offers = jobs.filter((j): j is Offered => j.status === "offered" && j.offerExpiresAt !== null).toSorted((a, b) => Date.parse(a.offerExpiresAt) - Date.parse(b.offerExpiresAt));
+  const unassigned = jobs.filter((j) => bucket(j, now) === UNASSIGNED);
+  type Slotted = PartnerJob & { slot: Slot }; // a job with its visit window
+  const running = jobs.filter((j): j is Slotted => (j.status === "assigned" || j.status === IN_PROGRESS) && j.slot !== null).toSorted((a, b) => Date.parse(a.slot.startAt) - Date.parse(b.slot.startAt));
+  const next = running.find((j) => j.status === IN_PROGRESS) ?? running.find((j) => Date.parse(j.slot.endAt) > now);
   const review = jobs.filter((j) => j.status === "submitted");
   const active = Math.max(0, counts.activeCount - unassigned.length);
   const who = (id: string | null) => names.get(id ?? "") ?? t("Technician");
+  const nextVisit = (j: NonNullable<typeof next>) => t(j.status === IN_PROGRESS ? "{name} on site from {time}" : "{name} starts {time}", { name: who(j.technicianId), time: relativeTime(j.slot.startAt, now, i) });
   return [
-    { label: t("Offers to answer"), value: counts.offerCount, sub: offers[0] ? t("{job} · expires in {left}", { job: offers[0].short, left: until(offers[0].offerExpiresAt!, now, t) }) : t("No open offers"), href: list("offered"), link: t("link::Open offers") },
+    { label: t("Offers to answer"), value: counts.offerCount, sub: offers[0] ? t("{job} · expires in {left}", { job: offers[0].short, left: until(offers[0].offerExpiresAt, now, t) }) : t("No open offers"), href: list("offered"), link: t("link::Open offers") },
     { label: t("Awaiting assignment"), value: unassigned.length, sub: unassigned.length > 0 ? t("Accepted, no technician yet") : "—", href: "/partner/schedule", link: t("Assign"), tone: unassigned.length > 0 ? "warn" : undefined },
     {
       label: t("In progress / scheduled"), value: active, href: list("active"), link: t("View jobs"),
-      sub: next ? t(next.status === "in_progress" ? "{name} on site from {time}" : "{name} starts {time}", { name: who(next.technicianId), time: relativeTime(next.slot!.startAt, now, i) }) : "—",
+      sub: next ? nextVisit(next) : "—",
     },
-    { label: t("Reports to review"), value: counts.reviewCount, sub: review[0] ? t("{job} · awaiting review", { job: label(review[0], t) }) : "—", href: review.length === 1 ? `/partner/jobs/${review[0].id}/review` : list("review"), link: t("Review") },
+    { label: t("Reports to review"), value: counts.reviewCount, sub: review[0] ? t("{job} · awaiting review", { job: label(review[0], t) }) : "—", href: review.length === 1 ? `/partner/jobs/${review[0]?.id ?? ""}/review` : list("review"), link: t("Review") },
     { label: t("Overdue"), value: counts.overdueCount, sub: counts.overdueCount ? t("Past the due date or the work window") : "—", href: list("active"), link: t("View"), tone: counts.overdueCount ? "crit" : undefined },
   ];
 }
 
 export const BUCKETS: { id: Exclude<Bucket, "other">; label: string; tone: string }[] = [
-  { id: "offered", label: "Offered", tone: "bg-warn/25" }, { id: "unassigned", label: "Accepted · unassigned", tone: "bg-primary/20" },
+  { id: "offered", label: "Offered", tone: "bg-warn/25" }, { id: UNASSIGNED, label: "Accepted · unassigned", tone: "bg-primary/20" },
   { id: "active", label: "Assigned / in progress", tone: "bg-primary" }, { id: "overdue", label: "Overdue", tone: "bg-crit/70" },
   { id: "review", label: "Submitted · in review", tone: "bg-warn" }, { id: "completed", label: "Completed", tone: "bg-ok" },
 ];
 /** The progress bar: jobs per bucket with the same period as the list. */
 export function progress(jobs: PartnerJob[], now: number) {
-  const counts = Object.fromEntries(BUCKETS.map((b) => [b.id, 0])) as Record<Exclude<Bucket, "other">, number>;
+  const counts: Record<Exclude<Bucket, "other">, number> = { offered: 0, unassigned: 0, active: 0, overdue: 0, review: 0, completed: 0 };
   for (const j of jobs) {
     const b = bucket(j, now);
-    if (b !== "other") counts[b]++;
+    if (b !== "other") Object.assign(counts, { [b]: entryOf(counts, b) + 1 });
   }
   const total = BUCKETS.reduce((s, b) => s + counts[b.id], 0);
   return { counts, total, completedPct: total ? Math.round((counts.completed / total) * 100) : 0 };
@@ -181,21 +192,25 @@ export interface ActionRow { kind: "offer" | "overdue" | "review" | "unassigned"
 export function actions(jobs: PartnerJob[], now: number, names: Map<string, string>, i: I18n = EN): ActionRow[] {
   const { t, display } = i;
   const rows: ActionRow[] = [];
-  for (const j of jobs.filter((x) => x.status === "offered").sort((a, b) => Date.parse(a.offerExpiresAt ?? a.dueAt ?? "") - Date.parse(b.offerExpiresAt ?? b.dueAt ?? ""))) {
+  const offered = jobs.filter((x) => x.status === "offered").toSorted((a, b) => Date.parse(a.offerExpiresAt ?? a.dueAt ?? "") - Date.parse(b.offerExpiresAt ?? b.dueAt ?? ""));
+  for (const j of offered) {
     const detail = j.offerExpiresAt ? t("Answer by {time} ({left} left)", { time: showTime(j.offerExpiresAt, display), left: until(j.offerExpiresAt, now, t) }) : t("Answer the offer");
     rows.push({ kind: "offer", badge: t("Offer"), title: label(j, t), href: `/partner/jobs/${j.id}`, button: t("Respond"), detail });
   }
-  for (const j of jobs.filter((x) => bucket(x, now) === "overdue")) {
-    const ended = t("Work window ended {time}", { time: showTime(j.slot!.endAt, display) });
-    rows.push({ kind: "overdue", badge: t("Overdue"), title: label(j, t), detail: j.technicianId ? `${ended} · ${names.get(j.technicianId) ?? t("technician")}` : ended, href: `/partner/schedule?jobId=${j.id}`, button: t("Reassign") });
+  for (const j of jobs) {
+    if (j.slot === null || bucket(j, now) !== "overdue") continue;
+    const ended = t("Work window ended {time}", { time: showTime(j.slot.endAt, display) });
+    rows.push({ kind: "overdue", badge: t("Overdue"), title: label(j, t), detail: j.technicianId ? `${ended} · ${names.get(j.technicianId) ?? t(TECHNICIAN)}` : ended, href: `/partner/schedule?jobId=${j.id}`, button: t("Reassign") });
   }
-  for (const j of jobs.filter((x) => x.status === "submitted")) {
+  for (const j of jobs) {
+    if (j.status !== "submitted") continue;
     const by = j.technicianId ? t("Report by {name} · awaiting review", { name: names.get(j.technicianId) ?? t("your technician") }) : t("Report · awaiting review");
     rows.push({ kind: "review", badge: t("Submitted"), title: label(j, t), detail: by, href: `/partner/jobs/${j.id}/review`, button: t("Review") });
   }
-  for (const j of jobs.filter((x) => bucket(x, now) === "unassigned")) {
+  for (const j of jobs) {
+    if (bucket(j, now) !== UNASSIGNED) continue;
     const detail = j.dueAt ? t("No technician · due {time}", { time: showTime(j.dueAt, display) }) : t("No technician");
-    rows.push({ kind: "unassigned", badge: t("Accepted"), title: label(j, t), href: `/partner/schedule?jobId=${j.id}`, button: t("Assign"), detail });
+    rows.push({ kind: UNASSIGNED, badge: t("Accepted"), title: label(j, t), href: `/partner/schedule?jobId=${j.id}`, button: t("Assign"), detail });
   }
   return rows;
 }
@@ -209,14 +224,14 @@ export function timelinePct(iso: string, date: string): number {
 
 const SHORT_QUALIFICATIONS: Record<string, string> = { demo_indoor: "Indoor", demo_outdoor: "Outdoor", demo_electrical: "Electrical" };
 /** A qualification in a compact list (“Indoor, Electrical”); an unknown code reads as its words. */
-export const shortQualification = (code: string, t: T = en) => (SHORT_QUALIFICATIONS[code] ? t(SHORT_QUALIFICATIONS[code]) : code.replace(/^demo_/, "").replaceAll('_', " "));
+export const shortQualification = (code: string, t: T = en) => (textOf(SHORT_QUALIFICATIONS, code, t) ?? code.replace(/^demo_/, "").replaceAll('_', " "));
 const UNAVAILABILITY: Record<string, string> = { annual_leave: "annual leave", sick: "sick leave", training: "training", public_holiday: "public holiday", other: "other" };
 /** Why a technician is unavailable on a day (the members.setUnavailability types), in running text. */
-export const unavailabilityLabel = (type: string, t: T = en) => (UNAVAILABILITY[type] ? t(UNAVAILABILITY[type]) : type.replaceAll('_', " "));
+export const unavailabilityLabel = (type: string, t: T = en) => (textOf(UNAVAILABILITY, type, t) ?? type.replaceAll('_', " "));
 
 /** The technicians who can still work: access neither revoked by HQ nor past its end (IR575). The overview's timeline
 and capacity list them; a former technician stays in Team & capacity and in job history. */
-export const onTeam = (members: ApiMember[], now: number) => members.filter((m) => m.role === "technician" && !m.revokedAt && (!m.validUntil || Date.parse(m.validUntil) > now));
+export const onTeam = (members: ApiMember[], now: number) => members.filter((m) => m.role === TECHNICIAN && !m.revokedAt && (!m.validUntil || Date.parse(m.validUntil) > now));
 /** How many technicians each overview card shows; the rest are one link away (IR575). */
 export const OVERVIEW_ROWS = 8;
 
@@ -225,7 +240,7 @@ export interface TimelineRow { id: string; name: string; sub: string; blocks: { 
 Lumpur hours like its axis: those with work or away first, by their first slot, then the free ones by name (IR575). */
 export function timeline(today: ApiCapacity[], members: ApiMember[], date: string, t: T = en): TimelineRow[] {
   const cap = new Map(today.map((c) => [c.membershipId, c]));
-  return members.filter((m) => m.role === "technician").map((m) => {
+  return members.filter((m) => m.role === TECHNICIAN).map((m) => {
     const c = cap.get(m.id);
     const blocks = (c?.assignedSlots ?? []).map((s) => {
       const left = timelinePct(s.startAt, date), right = timelinePct(s.endAt, date);
@@ -233,7 +248,7 @@ export function timeline(today: ApiCapacity[], members: ApiMember[], date: strin
     }).filter((b) => b.width > 0);
     const quals = (m.qualifications ?? []).filter((q) => !q.revokedAt).map((q) => shortQualification(q.code, t));
     return { id: m.id, name: m.displayName, sub: quals.slice(0, 2).join(", ") || t("Technician"), off: c?.unavailability ? unavailabilityLabel(c.unavailability, t) : null, blocks };
-  }).sort((a, b) => Number(a.blocks.length === 0 && !a.off) - Number(b.blocks.length === 0 && !b.off) || (a.blocks[0]?.left ?? 100) - (b.blocks[0]?.left ?? 100) || a.name.localeCompare(b.name));
+  }).toSorted((a, b) => Number(a.blocks.length === 0 && !a.off) - Number(b.blocks.length === 0 && !b.off) || (a.blocks[0]?.left ?? 100) - (b.blocks[0]?.left ?? 100) || a.name.localeCompare(b.name));
 }
 
 export interface CapacityRow { id: string; name: string; text: string; pct: number | null }
@@ -251,7 +266,7 @@ export function capacity(days: ApiCapacity[][], members: ApiMember[], t: T = en)
   }
   const h = (min: number) => t("{n} h", { n: Math.round((min / 60) * 10) / 10 });
   const of = (m: ApiMember) => sum.get(m.id) ?? { assigned: 0, available: null };
-  return members.filter((m) => m.role === "technician").sort((a, b) => of(b).assigned - of(a).assigned || a.displayName.localeCompare(b.displayName)).map((m) => {
+  return members.filter((m) => m.role === TECHNICIAN).toSorted((a, b) => of(b).assigned - of(a).assigned || a.displayName.localeCompare(b.displayName)).map((m) => {
     const s = of(m);
     const pct = s.available ? Math.min(100, Math.round((s.assigned / s.available) * 100)) : null;
     return { id: m.id, name: m.displayName, text: `${h(s.assigned)} / ${s.available === null ? "—" : h(s.available)} · ${pct === null ? "—" : `${String(pct)}%`}`, pct };
@@ -277,10 +292,10 @@ export interface ActivityRow { id: string; time: string; text: string; href: str
 export function activity(events: ApiJobEvent[], jobs: Map<string, PartnerJob>, members: ApiMember[], now: number, max = 6, i: I18n = EN): ActivityRow[] {
   const { t } = i;
   const byUser = new Map(members.map((m) => [m.userId, m.displayName]));
-  return [...events].sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt) || b.id.localeCompare(a.id)).slice(0, max).map((e) => {
+  return [...events].toSorted((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt) || b.id.localeCompare(a.id)).slice(0, max).map((e) => {
     const j = jobs.get(e.jobId);
     const who = e.actorUserId ? byUser.get(e.actorUserId) : null;
-    const title = jobEventTitle[e.action] ? t(jobEventTitle[e.action]) : e.action.replaceAll(/[._]/g, " ");
-    return { id: e.id, time: relativeTime(e.occurredAt, now, i), text: `${title} — ${j ? label(j, t) : e.jobId.slice(0, 8)}${who ? ` (${who})` : ""}`, href: `/partner/history?jobId=${e.jobId}` };
+    const title = textOf(jobEventTitle, e.action, t) ?? e.action.replaceAll(/[._]/g, " ");
+    return { id: e.id, time: relativeTime(e.occurredAt, now, i), text: `${title} — ${j ? label(j, t) : e.jobId.slice(0, 8)}${wrapped(who, " (", ")")}`, href: `/partner/history?jobId=${e.jobId}` };
   });
 }

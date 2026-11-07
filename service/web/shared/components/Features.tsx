@@ -1,8 +1,10 @@
 "use client";
+const CUSTOMER_A = "customer-a";
+const CONTRACT_RTO_A = "contract-rto-a";
 
 /** Features confirmed from the Figma proposals on 2026-10-02 (FR-C14, C16, A18–A20, A23). */
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, Check, Choice, DataTable, Field, Input, Kpi, ListRow, Modal, PowerBadge, Select, Steps, SummaryList,  UtilBar, cx, useToast } from "./ui";
+import { Badge, Banner, Btn, Card, Check, Choice, DataTable, Field, Input, Kpi, ListRow, Modal, PowerBadge, Select, Steps, SummaryList,  UtilizationBar, cx, useToast, type Tone } from "./ui";
 import { Icon } from "./Icon";
 import { Button } from "@ac/web/components/ui/button";
 
@@ -32,11 +34,12 @@ export function GroupControl({ space, units }: Readonly<{ space: string; units: 
   const toast = useToast();
   const [sel, setSel] = useState<string[]>(units.filter((u) => u.online).slice(0, 4).map((u) => u.id));
   const [power, setPower] = useState<"on" | "off">("on");
-  const [temp, setTemp] = useState(24);
+  const [setpoint, setTemperature] = useState(24);
   const [mode, setMode] = useState<"cool" | "auto" | "fan">("cool");
   const [review, setReview] = useState(false);
   const toggle = (id: string) => { setSel((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id])); };
   const chosen = units.filter((u) => sel.includes(u.id));
+  const powerWord = power === "on" ? "On" : "Off";
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface2 px-3 py-2 text-[13px]"><b>{sel.length} selected</b><span className="flex gap-2"><Btn size="sm" onClick={() => { setSel(units.filter((u) => u.online).map((u) => u.id)); }}>Select all online ({units.filter((u) => u.online).length})</Btn><Btn size="sm" variant="ghost" onClick={() => { setSel([]); }}>Clear</Btn></span></div>
@@ -44,7 +47,7 @@ export function GroupControl({ space, units }: Readonly<{ space: string; units: 
         {units.map((u) => (
           <Button key={u.id} variant="outline" disabled={!u.online} onClick={() => { toggle(u.id); }} aria-pressed={sel.includes(u.id)} className={cx("h-auto justify-start rounded-xl p-3 text-left font-normal whitespace-normal disabled:opacity-60", sel.includes(u.id) ? "border-2 border-primary bg-primary-soft/50" : "border-line bg-surface")}>
             <div className="flex items-center justify-between"><b className="text-[13px]">{u.name}</b><Icon name={sel.includes(u.id) ? "checked" : "unchecked"} className="text-sm" /></div>
-            <div className="text-[11px] text-muted-foreground">{u.temp === null ? "—" : `${String(u.temp)} °C · ${u.w} W`}</div>
+            <div className="text-[11px] text-muted-foreground">{u.temp === null ? "—" : `${String(u.temp)} °C · ${String(u.w ?? "—")} W`}</div>
             <div className="mt-1 flex gap-1"><PowerBadge s={u.state} />{!u.online && <Badge tone="unknown">Offline</Badge>}{u.min && <Badge tone="warn">min {u.min} °C</Badge>}</div>
           </Button>
         ))}
@@ -52,14 +55,14 @@ export function GroupControl({ space, units }: Readonly<{ space: string; units: 
       <Card title={`Apply to ${String(sel.length)} selected ACs`}>
         <div className="flex flex-wrap items-center gap-4">
           <Choice value={power} onChange={setPower} options={[{ id: "on", label: "On" }, { id: "off", label: "Off" }]} />
-          <div className="flex items-center gap-2"><Btn size="sm" onClick={() => { setTemp((t) => Math.max(16, t - 1)); }} aria-label="Lower the temperature"><Icon name="remove" /></Btn><b className="w-14 text-center">{temp} °C</b><Btn size="sm" onClick={() => { setTemp((t) => Math.min(30, t + 1)); }} aria-label="Raise the temperature"><Icon name="add" /></Btn></div>
+          <div className="flex items-center gap-2"><Btn size="sm" onClick={() => { setTemperature((t) => Math.max(16, t - 1)); }} aria-label="Lower the temperature"><Icon name="remove" /></Btn><b className="w-14 text-center">{setpoint} °C</b><Btn size="sm" onClick={() => { setTemperature((t) => Math.min(30, t + 1)); }} aria-label="Raise the temperature"><Icon name="add" /></Btn></div>
           <Choice value={mode} onChange={setMode} options={[{ id: "cool", label: "Cool" }, { id: "auto", label: "Auto" }, { id: "fan", label: "Fan" }]} />
           <Btn variant="primary" disabled={sel.length === 0} onClick={() => { setReview(true); }}>Review & send</Btn>
         </div>
         <p className="mt-2 text-[11px] text-muted-foreground">Each AC gets its own command and confirmation (same as single control). One space only · owner role only.</p>
       </Card>
       <Modal open={review} onClose={() => { setReview(false); }} title={`Send to ${String(chosen.length)} ACs in ${space}?`} footer={<><Btn onClick={() => { setReview(false); }}>Back</Btn><Btn variant="primary" onClick={() => { setReview(false); toast(`${String(chosen.length)} commands sent — results arrive per AC`); }}>Send {chosen.length} commands</Btn></>}>
-        <DataTable rowKey={(r) => r.id} rows={chosen} cols={[{ key: "n", label: "AC", render: (r) => <b>{r.name}</b> }, { key: "c", label: "Change", render: (r) => (r.min && temp < r.min ? <span className="text-warn">Set to {r.min} °C (restriction)</span> : `${power === "on" ? "On" : "Off"} · ${String(temp)} °C · ${mode}`) }]} />
+        <DataTable rowKey={(r) => r.id} rows={chosen} cols={[{ key: "n", label: "AC", render: (r) => <b>{r.name}</b> }, { key: "c", label: "Change", render: (r) => (r.min && setpoint < r.min ? <span className="text-warn">Set to {r.min} °C (restriction)</span> : `${powerWord} · ${String(setpoint)} °C · ${mode}`) }]} />
         <Banner>Offline or restricted ACs are skipped or clamped and shown per AC. There is no rollback across ACs.</Banner>
       </Modal>
     </div>
@@ -80,7 +83,7 @@ export function ImportCsvModal({ open, onClose }: Readonly<{ open: boolean; onCl
         <DataTable rowKey={(r) => r.c} rows={[{ c: "property", f: "Property name", req: true }, { c: "floor", f: "Floor", req: false }, { c: "room", f: "Room / space", req: true }, { c: "unit_name", f: "Unit name", req: true }, { c: "model", f: "Model", req: true }, { c: "installed_on", f: "Install date (warranty)", req: false }]} cols={[{ key: "c", label: "CSV column", render: (r) => <code>{r.c}</code> }, { key: "f", label: "Field", render: (r) => <Select className="w-auto"><option>{r.f}</option></Select> }, { key: "r", label: "", render: (r) => <Badge tone={r.req ? "primary" : "muted"}>{r.req ? "Required" : "Optional"}</Badge> }]} />
       </> : <>
         <div className="grid-fluid" style={{ ["--min" as string]: "140px" }}><Kpi label="Rows" value={24} /><Kpi label="Will be created" value={22} tone="ok" /><Kpi label="Errors (skipped)" value={2} tone="crit" /></div>
-        <DataTable rowKey={(r) => r.r + ""} rows={[{ r: 7, m: "Unknown model “CS-9.9K”", st: "Error" }, { r: 15, m: "Duplicate unit name “WS-AC 03” in Workstations", st: "Error" }, { r: 2, m: "Office A › 3F › Meeting room › Meeting AC 2", st: "New" }]} cols={[{ key: "r", label: "Row", render: (r) => r.r }, { key: "m", label: "Result", render: (r) => r.m }, { key: "s", label: "", render: (r) => <Badge tone={r.st === "Error" ? "crit" : "ok"}>{r.st}</Badge> }]} />
+        <DataTable rowKey={(r) => String(r.r)} rows={[{ r: 7, m: "Unknown model “CS-9.9K”", st: "Error" }, { r: 15, m: "Duplicate unit name “WS-AC 03” in Workstations", st: "Error" }, { r: 2, m: "Office A › 3F › Meeting room › Meeting AC 2", st: "New" }]} cols={[{ key: "r", label: "Row", render: (r) => r.r }, { key: "m", label: "Result", render: (r) => r.m }, { key: "s", label: "", render: (r) => <Badge tone={r.st === "Error" ? "crit" : "ok"}>{r.st}</Badge> }]} />
         <Banner tone="warn">Rows with errors are skipped (VALIDATION). The preview expires after 30 minutes; importing an expired or changed preview is a CONFLICT.</Banner>
       </>}
     </Modal>
@@ -91,10 +94,10 @@ export function ImportCsvModal({ open, onClose }: Readonly<{ open: boolean; onCl
 export function WarrantyTab() {
   const toast = useToast();
   const rows = [
-    { u: "Living room AC", id: "unit-non-rto · Home A", c: "customer-a", m: "CS-3.5K", end: "2026-10-28", k: "—", st: "Ends in 27 d · no contract", tone: "warn" as const },
-    { u: "Bedroom AC", id: "unit-online-rto · Home A", c: "customer-a", m: "CS-2.5K", end: "2026-11-30", k: "contract-rto-a", st: "Covered by contract", tone: "ok" as const },
-    { u: "Lobby AC", id: "unit-limited · Office A", c: "customer-a", m: "CS-5.0K", end: "2027-03-31", k: "contract-rto-a", st: "Covered", tone: "ok" as const },
-    { u: "Meeting room AC", id: "Office A", c: "customer-a", m: "CS-2.5K", end: "2027-06-30", k: "contract-rto-a", st: "Covered", tone: "ok" as const },
+    { u: "Living room AC", id: "unit-non-rto · Home A", c: CUSTOMER_A, m: "CS-3.5K", end: "2026-10-28", k: "—", st: "Ends in 27 d · no contract", tone: "warn" as const },
+    { u: "Bedroom AC", id: "unit-online-rto · Home A", c: CUSTOMER_A, m: "CS-2.5K", end: "2026-11-30", k: CONTRACT_RTO_A, st: "Covered by contract", tone: "ok" as const },
+    { u: "Lobby AC", id: "unit-limited · Office A", c: CUSTOMER_A, m: "CS-5.0K", end: "2027-03-31", k: CONTRACT_RTO_A, st: "Covered", tone: "ok" as const },
+    { u: "Meeting room AC", id: "Office A", c: CUSTOMER_A, m: "CS-2.5K", end: "2027-06-30", k: CONTRACT_RTO_A, st: "Covered", tone: "ok" as const },
     { u: "Rooftop AC", id: "unit-p-rooftop", c: "customer-b", m: "VRF-12", end: "2026-08-31", k: "—", st: "No coverage", tone: "crit" as const },
   ];
   return (
@@ -129,7 +132,7 @@ export function FirmwareCampaigns() {
         <ListRow><div className="min-w-0 flex-1"><b className="text-[13px]">fw-2.0.0-pilot</b><div className="text-[11px] text-muted-foreground">CTRL-A1 · 5 devices</div></div><Badge tone="ok">Completed</Badge></ListRow>
       </Card>
       <Card title="fw-2.0.0-rollout" sub="Auto-pause if failures exceed 5 % within a wave" action={<Btn size="sm" onClick={() => { setPaused((p) => !p); toast(paused ? "Campaign resumed" : "Campaign paused", "warn"); }}>{paused ? "Resume" : "Pause"}</Btn>}>
-        <div className="flex flex-col gap-3">{waves.map(([l, p, d]) => <div key={l}><div className="mb-1 flex justify-between text-xs"><b>{l}</b><span className="text-muted-foreground">{d}</span></div><UtilBar pct={p} tone={p >= 95 ? "ok" : "primary"} /></div>)}</div>
+        <div className="flex flex-col gap-3">{waves.map(([l, p, d]) => <div key={l}><div className="mb-1 flex justify-between text-xs"><b>{l}</b><span className="text-muted-foreground">{d}</span></div><UtilizationBar pct={p} tone={p >= 95 ? "ok" : "primary"} /></div>)}</div>
         <div className="mt-3"><SummaryList items={[["Succeeded / installing / pending", "47 / 4 / 34"], ["Failed", "2 · old version kept (AC-DEMO-0003 checksum mismatch → rolled back to 1.9.2)"], ["Skipped", "3 · offline / busy (AC-DEMO-0002 test run job-t12)"]]} /></div>
       </Card>
       <Modal open={modal} onClose={() => { setModal(false); }} title="New firmware campaign" footer={<><Btn onClick={() => { setModal(false); }}>Cancel</Btn><Btn variant="primary" onClick={() => { setModal(false); toast("Campaign scheduled"); }}>Schedule</Btn></>}>
@@ -143,13 +146,14 @@ export function FirmwareCampaigns() {
 }
 
 /* ───── Admin · Contractor payouts (FR-A23) ───── */
+const STATEMENT_TONE = new Map<string, Tone>([["Paid", "ok"], ["Draft", "muted"]]);
 export function ContractorPayouts() {
   const toast = useToast();
   const [st, setSt] = useState<"Draft" | "Approved" | "Paid">("Approved");
   return (
     <div className="split-rev">
       <Card title="Statements · September 2026" action={<Btn size="sm" onClick={() => { toast("Draft statements regenerated for September"); }}>Generate</Btn>} className="self-start">
-        <ListRow selected><div className="min-w-0 flex-1"><b className="text-[13px]">contractor-a</b><div className="text-[11px] text-muted-foreground">stmt-2026-09-a · 5 jobs</div></div><Badge tone={st === "Paid" ? "ok" : (st === "Draft" ? "muted" : "primary")}>{st}</Badge></ListRow>
+        <ListRow selected><div className="min-w-0 flex-1"><b className="text-[13px]">contractor-a</b><div className="text-[11px] text-muted-foreground">stmt-2026-09-a · 5 jobs</div></div><Badge tone={STATEMENT_TONE.get(st) ?? "primary"}>{st}</Badge></ListRow>
         <ListRow><div className="min-w-0 flex-1"><b className="text-[13px]">contractor-b</b><div className="text-[11px] text-muted-foreground">stmt-2026-09-b · 3 jobs</div></div><Badge>Draft</Badge></ListRow>
       </Card>
       <Card title="contractor-a · stmt-2026-09-a" sub="Priced by the rate card effective at acceptance · pays 10-15" action={<span className="flex gap-2">{st === "Draft" && <Btn size="sm" variant="primary" onClick={() => { setSt("Approved"); }}>Approve</Btn>}{st === "Approved" && <Btn size="sm" variant="primary" onClick={() => { setSt("Paid"); toast("Marked paid"); }}>Mark paid</Btn>}</span>}>
@@ -160,7 +164,5 @@ export function ContractorPayouts() {
     </div>
   );
 }
-
-
 
 export {Toggle} from "./ui";

@@ -13,6 +13,7 @@ import {
 } from "@ac/web/lib/clientBilling";
 import { PaymentsDemo } from "./_components/payments-demo";
 import { PaymentsView } from "./_components/payments-view";
+import { queryReader } from "@ac/web/lib/searchParams";
 
 
 export default async function CustomerPaymentsPage({ searchParams }: Readonly<PageProps<"/customer/payments">>) {
@@ -20,7 +21,7 @@ export default async function CustomerPaymentsPage({ searchParams }: Readonly<Pa
   await connection();
   if (!apiMode()) return <PaymentsDemo />;
   const sp = await searchParams;
-  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k] as string) : undefined);
+  const one = queryReader(sp);
   const [now, contracts, units, properties, spaces, display] = await Promise.all([
     coreNow(), coreAll<ClientContract>("contracts.list"), coreAll<Unit>("units.list"), coreAll<{ id: string; name: string }>("properties.list"),
     coreAll<{ id: string; name: string; parentSpaceId: string | null }>("spaces.list"), coreDisplay(),
@@ -39,7 +40,8 @@ export default async function CustomerPaymentsPage({ searchParams }: Readonly<Pa
   // the active restriction of the contract, found through one of its invoices (the customer has no restriction list)
   let notice: (RestrictionNotice & { invoiceId: string }) | null = null;
   if (sel && sel.restrictionIds.length > 0) {
-    for (const i of [...all].sort((a, b) => (a.status === "paid" ? 1 : 0) - (b.status === "paid" ? 1 : 0)).slice(0, 3)) {
+    const unpaidFirst = [...all].toSorted((a, b) => (a.status === "paid" ? 1 : 0) - (b.status === "paid" ? 1 : 0)).slice(0, 3);
+    for (const i of unpaidFirst) {
       const page = await coreOp<{ items: ApiRestriction[] }>("restrictions.forInvoice", { invoiceId: i.id, query: { limit: 10 } });
       const r = page.items.find((x) => sel.restrictionIds.includes(x.id));
       if (r) {

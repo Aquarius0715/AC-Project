@@ -4,7 +4,7 @@
 // zone (`i`, IR263).
 import { one } from "@ac/web/lib/energy";
 import { EN, showClock, translator, type I18n, type T } from "@ac/web/lib/i18n";
-import type { ApiUnitDetail, UnitAction } from "@ac/web/lib/units";
+import { runState, type ApiUnitDetail, type UnitAction } from "@ac/web/lib/units";
 
 type Mode = "cool" | "dry" | "fan";
 type Fan = "low" | "mid" | "high";
@@ -18,17 +18,17 @@ export interface RoomUnit {
   conn: ApiUnitDetail["connection"]; seen: string | null; online: boolean;
 }
 /** The latest reading of a metric when it is current (valid, IR213); a stale, suspect or null reading shows “—”. */
-const metric = (d: ApiUnitDetail, m: string) => { const x = d.latestMeasurements.find((r) => r.metric === m); return x && x.quality === "valid" ? x.value : null; };
+const metric = (d: ApiUnitDetail, m: string) => { const x = d.latestMeasurements.find((r) => r.metric === m); return x?.quality === "valid" ? x.value : null; };
 export function roomUnits(ds: ApiUnitDetail[], i: I18n = EN): RoomUnit[] {
   const { t } = i;
-  return [...ds].sort((a, b) => a.displayName.localeCompare(b.displayName)).map((d) => {
+  return [...ds].toSorted((a, b) => a.displayName.localeCompare(b.displayName)).map((d) => {
     const o = d.observedState;
     const set = [o.celsius === null ? null : t("Set {celsius}°C", { celsius: o.celsius }), o.mode ? t(modeLabel[o.mode]) : null, o.fanLevel ? t("Fan {level}", { level: t(fanLabel[o.fanLevel]) }) : null].filter(Boolean).join(" · ");
-    const temp = metric(d, "temperature");
+    const temperatureText = metric(d, "temperature");
     const kw = metric(d, "power");
     return {
-      id: d.id, version: d.version, name: d.displayName, set: set || t("No setting reported yet"), temp: temp === null ? "—" : t("{temp} °C room", { temp: one(temp) }),
-      watts: kw === null ? "—" : `${String(Math.round(kw * 1000))} W`, power: d.effectivePowerState === "on" ? "running" : (d.effectivePowerState === "off" ? "stopped" : "unknown"),
+      id: d.id, version: d.version, name: d.displayName, set: set || t("No setting reported yet"), temp: temperatureText === null ? "—" : t("{temp} °C room", { temp: one(temperatureText) }),
+      watts: kw === null ? "—" : `${String(Math.round(kw * 1000))} W`, power: runState(d.effectivePowerState),
       conn: d.connection, seen: d.lastSeenAt ? showClock(d.lastSeenAt, i.display) : null, online: d.connection === "online",
     };
   });

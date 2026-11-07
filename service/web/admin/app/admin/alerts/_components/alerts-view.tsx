@@ -1,4 +1,7 @@
 "use client";
+const ACKNOWLEDGED = "Acknowledged";
+const ACKNOWLEDGED_2 = "acknowledged";
+const CUSTOMER_A_BEDROOM_AC = "customer-a · Bedroom AC";
 
 import Link from "next/link";
 import { useState, useTransition } from "react";
@@ -16,17 +19,19 @@ import { acknowledgeAlert, resolveAlert, type ActionResult } from "../actions";
 import { demoCustomers, NewPolicyModal, PoliciesTab, seedPolicies, type PoliciesLive, type PolicySel } from "./policies-tab";
 import { ScopeBar } from "../../jobs/_components/jobs-header";
 import { Icon } from "@ac/web/components/Icon";
+import { entryOf } from "@ac/web/lib/lookup";
 
-const ST: Record<AlertState, string> = { open: "Open", acknowledged: "Acknowledged", resolved: "Resolved" };
+const ST: Record<AlertState, string> = { open: "Open", acknowledged: ACKNOWLEDGED, resolved: "Resolved" };
 const LIST: Record<AlertState, string> = { open: "Open alerts", acknowledged: "Acknowledged alerts", resolved: "Resolved alerts" };
 const SEVERITY: [Severity, string][] = [["critical", "Severity: Critical"], ["warning", "Severity: Warning"], ["normal", "Severity: Info"]];
 // the Phase 1A demo's fixture rows (their data stays English, as the other demo screens)
+const STATE_TITLE = new Map([["resolved", "Resolved"], [ACKNOWLEDGED_2, "Acknowledged — waiting for resolution"]]);
 const demoTimeline = (time: string, st: AlertState): AdminAlert["timeline"] => {
   return [
     { time, title: "Alert detected", detail: "Load increase with stable outdoor temperature", tone: "warn" },
     { time: "08:50", title: "Notified customer-a · In-app", detail: "deliveryState: simulated" },
     { time: "08:52", title: "customer-a read the notification", detail: "Reading a notification does not acknowledge or resolve the alert" },
-    { time: "—", title: st === "resolved" ? "Resolved" : (st === "acknowledged" ? "Acknowledged — waiting for resolution" : "Waiting for acknowledgement"), detail: "", tone: st === "resolved" ? "ok" : undefined },
+    { time: "—", title: STATE_TITLE.get(st) ?? "Waiting for acknowledgement", detail: "", tone: st === "resolved" ? "ok" : undefined },
   ];
 };
 const demoAlert = (id: string, title: string, time: string, sev: Severity, meta: string): AdminAlert => {
@@ -55,10 +60,10 @@ const demoAlert = (id: string, title: string, time: string, sev: Severity, meta:
 };
 const seedAlerts: AdminAlert[] = [
   demoAlert("alert-c08-critical", "High temperature observed", "08:55", "critical", "customer-a · Bedroom AC · no policy"),
-  demoAlert("alert-insulation-a", "Poor insulation suspected", "08:45", "warning", "customer-a · Bedroom AC"),
-  demoAlert("alert-temp-a", "Temperature ≥ 30 °C for 60 s", "08:58", "warning", "customer-a · Bedroom AC"),
-  demoAlert("alert-unknown-a", "Cooling load increase", "08:48", "warning", "customer-a · Bedroom AC"),
-  demoAlert("alert-window-a", "Possible open window", "08:50", "warning", "customer-a · Bedroom AC"),
+  demoAlert("alert-insulation-a", "Poor insulation suspected", "08:45", "warning", CUSTOMER_A_BEDROOM_AC),
+  demoAlert("alert-temp-a", "Temperature ≥ 30 °C for 60 s", "08:58", "warning", CUSTOMER_A_BEDROOM_AC),
+  demoAlert("alert-unknown-a", "Cooling load increase", "08:48", "warning", CUSTOMER_A_BEDROOM_AC),
+  demoAlert("alert-window-a", "Possible open window", "08:50", "warning", CUSTOMER_A_BEDROOM_AC),
 ];
 // the demo's remeasurements of the Bedroom AC after its alerts (Figma Admin 259:2)
 const demoEvidence: ApiEvidenceCandidate[] = [
@@ -84,7 +89,7 @@ export function AdminAlertsView({ live }: Readonly<{ live?: Live }>) {
   const tab = live ? live.tab : urlTab;
   // the customer → property → unit scope is shared by both tabs, so switching keeps it (DD-A05 items 5 and 8)
   const scoped = (extra: Record<string, string>) => {
-    const sp = new URLSearchParams({ ...Object.fromEntries((["customerId", "propertyId", "unitId"] as const).flatMap((k) => (live?.q[k] ? [[k, live.q[k]!]] : []))), ...extra });
+    const sp = new URLSearchParams({ ...Object.fromEntries((["customerId", "propertyId", "unitId"] as const).flatMap((k) => { const v = live?.q[k]; return v ? [[k, v]] : []; })), ...extra });
     return sp.size > 0 ? `${pathname}?${sp}` : pathname;
   };
   const setTab = (v: "alerts" | "policies") => { if (live) router.replace(scoped(v === "policies" ? { tab: "policies" } : {}), { scroll: false }); else setUrlTab(v); };
@@ -101,9 +106,9 @@ export function AdminAlertsView({ live }: Readonly<{ live?: Live }>) {
   const pick = (id: string) => { if (live) patch({ alertId: id }); else setDemoAlertId(id); };
   const pickStatus = (s: AlertState) => { if (live) patch({ status: s === "open" ? null : s, alertId: null }); else { setDemoStatus(s); setDemoAlertId(null); } };
   // policies: the selected one and a new one's owner customer, in the URL in API mode (DD-A05 items 5 and 8, IR345)
-  const [demoSel, setDemoSel] = useState<PolicySel>({ policyId: null, newFor: null, from: null });
-  const polSel: PolicySel = live ? { policyId: live.pol.policyId, newFor: live.pol.newFor, from: live.pol.from } : demoSel;
-  const selectPolicy = (policyId: string | null, newFor: string | null = null) => { if (live) patch({ policyId, new: newFor, from: null }); else setDemoSel({ policyId, newFor, from: null }); };
+  const [demoSel, setDemoSel] = useState<PolicySel>({ policyId: null, creatingFor: null, from: null });
+  const polSel: PolicySel = live ? { policyId: live.pol.policyId, creatingFor: live.pol.creatingFor, from: live.pol.from } : demoSel;
+  const selectPolicy = (policyId: string | null, creatingFor: string | null = null) => { if (live) patch({ policyId, new: creatingFor, from: null }); else setDemoSel({ policyId, creatingFor, from: null }); };
   // “+ New policy” asks for the owner; a default rule's copy remembers the rule it starts from (`from`, DD-A05 item 9)
   const [asking, setAsking] = useState<{ from: string | null } | null>(null);
   const [showOff, setShowOff] = useState(true);
@@ -111,7 +116,7 @@ export function AdminAlertsView({ live }: Readonly<{ live?: Live }>) {
     setAsking(null);
     if (live) { router.replace(scoped({ tab: "policies", new: customerId, ...(from && { from }) }), { scroll: false }); return; }
     setUrlTab("policies");
-    setDemoSel({ policyId: null, newFor: customerId, from });
+    setDemoSel({ policyId: null, creatingFor: customerId, from });
   };
   // scoped to one active customer, “+ New policy for <customer>” opens its draft at once (Figma 268:2)
   const scopeOwner = live?.q.customerId ? live.pol.customers.find((c) => c.id === live.q.customerId) ?? null : null;
@@ -123,9 +128,9 @@ export function AdminAlertsView({ live }: Readonly<{ live?: Live }>) {
   const [tried, setTried] = useState(false);
   // the evidence candidates, read only while the Resolve dialog is open (IR327); the demo lists its fixture readings
   const evidence = useOp<{ items: ApiEvidenceCandidate[] }, ApiEvidenceCandidate[]>("alerts.evidence", { alertId: a?.id ?? "", query: { limit: 100 } }, live ? [] : demoEvidence, (d) => d.items, resolve && !!a);
-  const evRows = evidenceRows(evidence.data, (now ?? new Date()).getTime(), i18n);
-  const sendable = picked.filter((id) => evRows.some((r) => r.id === id)); // a refreshed list drops what is no longer a candidate
-  const evProblem = a ? evidenceProblem(a.policyless, sendable, t) : null;
+  const eventRows = evidenceRows(evidence.data, (now ?? new Date()).getTime(), i18n);
+  const sendable = picked.filter((id) => eventRows.some((r) => r.id === id)); // a refreshed list drops what is no longer a candidate
+  const eventProblem = a ? evidenceProblem(a.policyless, sendable, t) : null;
 
   const act = (fn: () => Promise<ActionResult>, ok: string, after?: () => void, failed?: () => void) => {
     startTransition(async () => {
@@ -139,31 +144,33 @@ export function AdminAlertsView({ live }: Readonly<{ live?: Live }>) {
       }
     });
   };
-  const demoState = (id: string, state: AlertState) => { setDemoList((l) => l.map((x) => (x.id === id ? { ...x, state, st: t(ST[state]), timeline: demoTimeline(x.time, state) } : x))); };
+  const demoState = (id: string, state: AlertState) => { setDemoList((l) => l.map((x) => (x.id === id ? { ...x, state, st: t(entryOf(ST, state)), timeline: demoTimeline(x.time, state) } : x))); };
   const acknowledge = () => {
     if (!a) return;
-    if (live) { act(() => acknowledgeAlert(a.id, a.version), t("Acknowledged")); return; }
-    demoState(a.id, "acknowledged");
-    toast(t("Acknowledged"));
+    if (live) { act(() => acknowledgeAlert(a.id, a.version), t(ACKNOWLEDGED)); return; }
+    demoState(a.id, ACKNOWLEDGED_2);
+    toast(t(ACKNOWLEDGED));
   };
   const doResolve = () => {
     setTried(true);
-    if (!a || !reason.trim() || reason.length > 1000 || evProblem) return;
+    if (!a || !reason.trim() || reason.length > 1000 || eventProblem) return;
     // a refused evidence ID re-reads the candidates (invalidate)
     if (live) { act(() => resolveAlert(a.id, a.version, reason.trim(), sendable), t("Alert resolved"), () => { setResolve(false); setReason(""); setPicked([]); setTried(false); }, invalidate); return; }
     demoState(a.id, "resolved");
     setResolve(false);
     toast(t("Alert resolved"));
   };
-  const counts: [AlertState, number][] = [["open", al.filter((x) => x.state === "open").length], ["acknowledged", al.filter((x) => x.state === "acknowledged").length], ["resolved", al.filter((x) => x.state === "resolved").length]];
+  const counts: [AlertState, number][] = [["open", al.filter((x) => x.state === "open").length], [ACKNOWLEDGED_2, al.filter((x) => x.state === ACKNOWLEDGED_2).length], ["resolved", al.filter((x) => x.state === "resolved").length]];
   const openish = al.filter((x) => x.state !== "resolved");
   const scopeName = live?.scopeName ?? t("all customers");
 
+  const evidenceError = tried ? eventProblem : null;
+  const reasonTooLong = tried && reason.length > 1000 ? t("At most 1000 characters") : undefined;
   return (
     <Page>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Tabs value={tab} onChange={setTab} tabs={[{ id: "alerts", label: t("Alerts"), count: openish.length }, { id: "policies", label: t("Policies"), count: pols.length }]} />
-        {(live ? live.pol.canWrite : true) && (scopeOwner
+        {(!live || live.pol.canWrite) && (scopeOwner
           ? <Btn size="sm" variant="primary" onClick={() => { startPolicy(scopeOwner.id); }}><Icon name="add" /> {t("New policy for {name}", { name: scopeOwner.name })}</Btn>
           : <Btn size="sm" variant="primary" onClick={() => { setAsking({ from: null }); }}><Icon name="add" /> {t("New policy")}</Btn>)}
       </div>
@@ -173,7 +180,7 @@ export function AdminAlertsView({ live }: Readonly<{ live?: Live }>) {
           <div className="flex flex-wrap items-stretch gap-3">
             {counts.map(([s, n]) => (
               <Plain key={s} type="button" aria-pressed={status === s} onClick={() => { pickStatus(s); }} className={cx("min-w-[140px] flex-1 rounded-2xl border bg-surface p-4 text-left", status === s ? "border-primary ring-1 ring-primary" : "border-line hover:bg-surface2")}>
-                <div className="text-xs text-muted-foreground">{t(ST[s])}</div><div className="text-2xl font-bold">{n}</div>
+                <div className="text-xs text-muted-foreground">{t(entryOf(ST, s))}</div><div className="text-2xl font-bold">{n}</div>
               </Plain>
             ))}
             {live && (
@@ -234,10 +241,10 @@ export function AdminAlertsView({ live }: Readonly<{ live?: Live }>) {
         {a && (
           <>
             <p className="text-xs text-muted-foreground">{a.id} · {a.title}</p>
-            <EvidencePicker rows={evRows} policyless={a.policyless} picked={sendable} onChange={setPicked} loading={evidence.loading} error={evidence.error ? t("The evidence could not be loaded — close the dialog and try again.") : (tried ? evProblem : null)} />
+            <EvidencePicker rows={eventRows} policyless={a.policyless} picked={sendable} onChange={setPicked} loading={evidence.loading} error={evidence.error ? t("The evidence could not be loaded — close the dialog and try again.") : evidenceError} />
           </>
         )}
-        <Field label={t("Resolution reason · required")} hint={`${String(reason.length)} / 1000`} error={tried && !reason.trim() ? t("A reason is required") : (tried && reason.length > 1000 ? t("At most 1000 characters") : undefined)}><Textarea value={reason} onChange={(e) => { setReason(e.target.value); }} /></Field>
+        <Field label={t("Resolution reason · required")} hint={`${String(reason.length)} / 1000`} error={tried && !reason.trim() ? t("A reason is required") : reasonTooLong}><Textarea value={reason} onChange={(e) => { setReason(e.target.value); }} /></Field>
         <p className="text-[11px] text-muted-foreground">{t("Resolved alerts stay in history. If the condition returns, a new alert is created.")}</p>
       </Modal>
     </Page>

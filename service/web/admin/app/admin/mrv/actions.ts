@@ -13,7 +13,7 @@ async function run<T>(fn: () => Promise<T>, rerender = true): Promise<ActionResu
   try {
     return { ok: true, value: await fn() };
   } catch (error) {
-    return error instanceof CoreError ? { ok: false, messageKey: error.error.messageKey, code: error.error.code, fieldErrors: error.error.fieldErrors ?? {}, retryAfterSeconds: error.error.retryAfterSeconds } : { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
+    return error instanceof CoreError ? { ok: false, messageKey: error.error.messageKey, code: error.error.code, fieldErrors: error.error.fieldErrors, retryAfterSeconds: error.error.retryAfterSeconds } : { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
   } finally {
     if (rerender) refresh();
   }
@@ -26,18 +26,15 @@ export async function previewReport(conditions: MRVConditions) {
 
 /** mrv.saveDraft: version 1 of a new report, or the next version of one (id + the version it was read at). */
 export async function saveReportDraft(conditions: MRVConditions, evidenceIds: string[], id?: string, version?: number) {
-  return run(() => {
-    return coreOp<{ id: string; version: number }>("mrv.saveDraft", { ...(id && { id }), conditions, evidenceIds }, { write: true, expectedVersion: id ? version : undefined })
-      .then((r) => ({ id: r.id, version: r.version }));
-  });
+  return run(async () => { const r = await coreOp<{ id: string; version: number }>("mrv.saveDraft", { ...(id && { id }), conditions, evidenceIds }, { write: true, expectedVersion: id ? version : undefined }); return ({ id: r.id, version: r.version }); });
 }
 
 /** mrv.recordReview of the latest version (a demo review, not external certification). */
 export async function recordReview(reportId: string, version: number, reviewComment: string) {
-  return run(() => coreOp<{ version: number }>("mrv.recordReview", { reportVersion: version, reportId, reviewComment }, { write: true, expectedVersion: version }).then((r) => r.version));
+  return run(async () => { const r = await coreOp<{ version: number }>("mrv.recordReview", { reportVersion: version, reportId, reviewComment }, { write: true, expectedVersion: version }); return r.version; });
 }
 
 /** factors.save: a new factor or the next version (id + the version it was read at). */
 export async function saveFactor(input: OpInput<"factors.save">, version?: number) {
-  return run(() => coreOp<{ id: string; version: number }>("factors.save", input, { write: true, expectedVersion: input.id ? version : undefined }).then((f) => ({ id: f.id, version: f.version })));
+  return run(async () => { const f = await coreOp<{ id: string; version: number }>("factors.save", input, { write: true, expectedVersion: input.id ? version : undefined }); return ({ id: f.id, version: f.version }); });
 }

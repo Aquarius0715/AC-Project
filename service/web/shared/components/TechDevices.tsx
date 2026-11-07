@@ -4,13 +4,14 @@ import Link from "next/link";
 import { useState } from "react";
 import { Badge, Banner, Btn, Card, ConnBadge, Field, Input, ListRow, Modal, Page, Search, Tabs, Textarea, Timeline, useToast, Plain } from "@ac/web/components/ui";
 import { Icon } from "@ac/web/components/Icon";
+import { nonEmpty } from "@ac/web/lib/lists";
 
-const devices = [
+const devices = nonEmpty([
   { id: "ac-001", serial: "AC-001", dev: "device-ac-001", unit: "unit-t11-new · ventilation-demo v3", fw: "fw v1 → v2", conn: "online" as const, tamper: false },
   { id: "device-online-rto", serial: "AC-DEMO-0001", dev: "device-online-rto", unit: "unit-online-rto · ventilation-demo v3", fw: "fw v1", conn: "online" as const, tamper: false },
   { id: "device-tamper", serial: "AC-DEMO-0002", dev: "device-tamper", unit: "unit-non-rto · cap-split-std v1", fw: "fw v1", conn: "offline" as const, tamper: true },
   { id: "device-offline-rto", serial: "AC-DEMO-0003", dev: "device-offline-rto", unit: "unit-offline-rto · cap-split-std v1", fw: "fw v1", conn: "offline" as const, tamper: false },
-];
+]);
 
 export function DevicesView({ initial }: Readonly<{ initial?: string }>) {
   type F = "all" | "online" | "offline" | "tamper";
@@ -36,9 +37,10 @@ export function DevicesView({ initial }: Readonly<{ initial?: string }>) {
     { t: "09-22 08:12", title: "Missed 3 heartbeats · heartbeat (not proof of power loss)", detail: "open", tone: "warn" },
     { t: "09-20 10:02", title: "check · DEVICE_TIMEOUT", detail: "retry succeeded 10:05" },
   ];
+  const duplicate = devices.some((d) => d.serial.toLowerCase() === f.serial.toLowerCase()) ? "Duplicate serial (CONFLICT)" : undefined;
   return (
     <Page>
-      <Tabs value={filter} onChange={setFilter} tabs={(["all", "online", "offline", "tamper"] as F[]).map((k) => ({ id: k, label: k[0].toUpperCase() + k.slice(1), count: count(k) }))} />
+      <Tabs value={filter} onChange={setFilter} tabs={(["all", "online", "offline", "tamper"] as F[]).map((k) => ({ id: k, label: k.charAt(0).toUpperCase() + k.slice(1), count: count(k) }))} />
       <div className="split-rev">
         <Card title="Devices — assigned units" sub="your jobs only" action={<Btn size="sm" onClick={() => { setReg(true); }}><Icon name="add" /> Register</Btn>} className="self-start">
           <div className="mb-2"><Search placeholder="Search serial, device or unit…" value={q} onChange={setQ} /></div>
@@ -59,7 +61,7 @@ export function DevicesView({ initial }: Readonly<{ initial?: string }>) {
             {fw === "ok" && <div className="mt-3"><Banner tone="ok">Firmware v2.0 succeeded — history appended.</Banner></div>}
           </Card>
           <Card title="Sensors (5)" sub="from the unit’s capability v3">
-            <div className="scroll-x"><table className="w-full min-w-[420px] text-[13px]"><thead className="text-left text-[11px] uppercase text-muted-foreground"><tr><th>Metric</th><th>Unit</th><th>Stale after</th><th>Last calibrated</th><th /></tr></thead><tbody>{[["temperature", "°C"], ["humidity", "%"], ["co2", "ppm"], ["pm25", "µg/m³"], ["power", "kW"]].map(([m, u], i) => <tr key={m} className="border-t border-line"><td className="py-2">{m}</td><td>{u}</td><td>120 s</td><td>{i === 0 && sel.id === "ac-001" ? "2026-09-21 09:40" : "Never"}</td><td><Plain className="text-xs font-semibold text-primary" onClick={() => { setCal(m); }}>Calibrate <Icon name="arrowRight" /></Plain></td></tr>)}</tbody></table></div>
+            <div className="scroll-x"><table className="w-full min-w-[420px] text-[13px]"><thead className="text-left text-[11px] uppercase text-muted-foreground"><tr><th>Metric</th><th>Unit</th><th>Stale after</th><th>Last calibrated</th><th /></tr></thead><tbody>{([["temperature", "°C"], ["humidity", "%"], ["co2", "ppm"], ["pm25", "µg/m³"], ["power", "kW"]] as const).map(([m, u], i) => <tr key={m} className="border-t border-line"><td className="py-2">{m}</td><td>{u}</td><td>120 s</td><td>{i === 0 && sel.id === "ac-001" ? "2026-09-21 09:40" : "Never"}</td><td><Plain className="text-xs font-semibold text-primary" onClick={() => { setCal(m); }}>Calibrate <Icon name="arrowRight" /></Plain></td></tr>)}</tbody></table></div>
           </Card>
           <div className="split-even">
             <Card title="Operation history"><div className="text-[13px]">{[["firmware", "2026-09-21 09:14", "v1 → v2"], ["check", "2026-09-21 09:12", "heartbeat confirmed"]].map(([k, t, d]) => <div key={t} className="flex flex-wrap justify-between gap-2 border-t border-line py-2 first:border-0"><span><b>{k}</b> · {d}</span><span className="text-xs text-muted-foreground">{t}</span></div>)}</div></Card>
@@ -68,14 +70,14 @@ export function DevicesView({ initial }: Readonly<{ initial?: string }>) {
           {sel.tamper && <Card title="Device events" sub="connection, power and tamper are separate events" tone="crit" action={!ack && <Btn size="sm" variant="primary" onClick={() => { setAck(true); toast("alert-tamper-a acknowledged"); }}>Acknowledge alert-tamper-a <Icon name="arrowRight" /></Btn>}><Timeline items={events.map((e) => ({ time: e.t, title: e.title, detail: e.detail, tone: e.tone }))} /></Card>}
         </div>
       </div>
-      <Modal open={reg} onClose={() => { setReg(false); }} title="Register device" footer={<><Btn onClick={() => { setReg(false); }}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!f.serial.trim() || devices.some((d) => d.serial.toLowerCase() === f.serial.toLowerCase())) return; toast("Device registered"); setReg(false); }}>Register</Btn></>}>
-        <Field label="Serial" error={tried && !f.serial.trim() ? "Serial is required" : (devices.some((d) => d.serial.toLowerCase() === f.serial.toLowerCase()) ? "Duplicate serial (CONFLICT)" : undefined)}><Input value={f.serial} onChange={(e) => { setF({ ...f, serial: e.target.value }); }} placeholder="AC-002" /></Field>
+      <Modal open={reg} onClose={() => { setReg(false); }} title="Register device" footer={<><Btn onClick={() => { setReg(false); }}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!f.serial.trim() || devices.some((d) => d.serial.toLowerCase() === f.serial.toLowerCase())) { return; } toast("Device registered"); setReg(false); }}>Register</Btn></>}>
+        <Field label="Serial" error={tried && !f.serial.trim() ? "Serial is required" : duplicate}><Input value={f.serial} onChange={(e) => { setF({ ...f, serial: e.target.value }); }} placeholder="AC-002" /></Field>
         <Field label="Unit to bind"><Input value={f.unit} onChange={(e) => { setF({ ...f, unit: e.target.value }); }} placeholder="unit-t11-new" /></Field>
       </Modal>
-      <Modal open={!!cal} onClose={() => { setCal(null); }} title={`Calibrate ${cal}`} footer={<><Btn onClick={() => { setCal(null); }}>Cancel</Btn><Btn variant="primary" onClick={() => { setHist((h) => [`${cal} · ref ${f.ref} / measured ${f.meas} · offset ${(+f.ref - +f.meas).toFixed(1)} · just now · you`, ...h]); setCal(null); toast("Calibration recorded"); }}>Record calibration</Btn></>}>
+      <Modal open={!!cal} onClose={() => { setCal(null); }} title={`Calibrate ${cal ?? ""}`} footer={<><Btn onClick={() => { setCal(null); }}>Cancel</Btn><Btn variant="primary" onClick={() => { setHist((h) => [`${cal ?? ""} · ref ${f.ref} / measured ${f.meas} · offset ${(+f.ref - +f.meas).toFixed(1)} · just now · you`, ...h]); setCal(null); toast("Calibration recorded"); }}>Record calibration</Btn></>}>
         <div className="grid-fluid" style={{ ["--min"as string]: "140px" }}><Field label="Reference value"><Input type="number" value={f.ref} onChange={(e) => { setF({ ...f, ref: e.target.value }); }} /></Field><Field label="Measured value"><Input type="number" value={f.meas} onChange={(e) => { setF({ ...f, meas: e.target.value }); }} /></Field></div>
       </Modal>
-      <Modal open={rebind} onClose={() => { setRebind(false); }} title="Rebind device" footer={<><Btn onClick={() => { setRebind(false); }}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!f.reason.trim()) return; setRebind(false); toast("Device rebound"); }}>Rebind</Btn></>}>
+      <Modal open={rebind} onClose={() => { setRebind(false); }} title="Rebind device" footer={<><Btn onClick={() => { setRebind(false); }}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!f.reason.trim()) { return; } setRebind(false); toast("Device rebound"); }}>Rebind</Btn></>}>
         <Field label="New unit"><Input placeholder="unit-…" /></Field>
         <Field label="Reason (required)" error={tried && !f.reason.trim() ? "A reason is required" : undefined}><Textarea value={f.reason} onChange={(e) => { setF({ ...f, reason: e.target.value }); }} /></Field>
       </Modal>

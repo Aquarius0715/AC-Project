@@ -1,7 +1,9 @@
 "use client";
+const ADD_CERTIFICATE = "Add certificate";
+const TECHNICIAN = "Technician";
 
 import { useId, useState } from "react";
-import { Badge, Banner, Btn, Card, cx, DataTable, Field, Input, LinkBtn, Modal, Select, SummaryList, Textarea } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, cx, DataTable, Field, Input, LinkButton, Modal, Select, SummaryList, Textarea } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { focusField } from "@ac/web/lib/focusField";
@@ -9,16 +11,17 @@ import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { certificateErrors, certificateRefusal, fileSize, FILE_TYPES, type CertForm, type CertRow } from "@ac/web/lib/partnerCertificates";
 import { requestTraining, submitCertificate } from "../actions";
 import type { TeamLive } from "../_lib/load";
+import { keysOf } from "@ac/web/lib/keysOf";
 import { Icon } from "@ac/web/components/Icon";
 
 type Live = Extract<TeamLive, { notFound: false }>;
-type Open = { kind: "renew" | "add"; row: CertRow | null } | { kind: "training" | "view"; row: CertRow } | null;
 
 /** The Certifications tab (FR-P09, Figma Contractor 04-6/04-7): filters by technician, status and the expiring window;
 the KPIs; one row per technician and qualification with the jobs an ending certificate blocks; the assignment
 impact; renewals, new certificates and training requests. Texts in the user's display language; the dates come
 formatted from the loader (IR277). */
 export function Certifications({ live }: Readonly<{ live: Live }>) {
+  type Open = { kind: "renew" | "add"; row: CertRow | null } | { kind: "training" | "view"; row: CertRow } | null;
   const t = useT();
   const patch = useUrlPatch();
   const c = live.certificates;
@@ -27,7 +30,7 @@ export function Certifications({ live }: Readonly<{ live: Live }>) {
   const action = (r: CertRow) => (
     <div className="flex flex-wrap items-center justify-end gap-1.5">
       {r.actions.includes("renew") && <Btn size="sm" variant={r.status === "expiring" ? "primary" : "secondary"} onClick={() => { setOpen({ kind: "renew", row: r }); }}>{t("Upload renewal")}</Btn>}
-      {r.actions.includes("add") && <Btn size="sm" onClick={() => { setOpen({ kind: "add", row: r }); }}>{t(r.status === "not_held" ? "Add certificate" : "Upload certificate")}</Btn>}
+      {r.actions.includes("add") && <Btn size="sm" onClick={() => { setOpen({ kind: "add", row: r }); }}>{t(r.status === "not_held" ? ADD_CERTIFICATE : "Upload certificate")}</Btn>}
       {r.actions.includes("training") && <Btn size="sm" onClick={() => { setOpen({ kind: "training", row: r }); }}>{t("Request training")}</Btn>}
       {r.actions.includes("view") && <Btn size="sm" variant="ghost" onClick={() => { setOpen({ kind: "view", row: r }); }}>{t("View")}</Btn>}
       {r.renewalPending && <span className="text-[11px] text-primary">{t("Renewal pending HQ verification")}</span>}
@@ -37,7 +40,7 @@ export function Certifications({ live }: Readonly<{ live: Live }>) {
   return (
     <>
       <div className="flex flex-wrap items-center gap-2">
-        <Select aria-label={t("Technician")} className="w-auto" value={q.membershipId ?? ""} onChange={(e) => { patch({ membershipId: e.target.value || null }); }}>
+        <Select aria-label={t(TECHNICIAN)} className="w-auto" value={q.membershipId ?? ""} onChange={(e) => { patch({ membershipId: e.target.value || null }); }}>
           <option value="">{t("Technician: All")}</option>
           {c.people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
         </Select>
@@ -59,10 +62,10 @@ export function Certifications({ live }: Readonly<{ live: Live }>) {
         ))}
       </div>
       <div className="split">
-        <Card title={t("Certificates — {company}", { company: live.company })} action={<Btn size="sm" onClick={() => { setOpen({ kind: "add", row: null }); }} disabled={c.people.every((p) => !p.active)}><Icon name="add" /> {t("Add certificate")}</Btn>}>
+        <Card title={t("Certificates — {company}", { company: live.company })} action={<Btn size="sm" onClick={() => { setOpen({ kind: "add", row: null }); }} disabled={c.people.every((p) => !p.active)}><Icon name="add" /> {t(ADD_CERTIFICATE)}</Btn>}>
           {c.rows.length === 0 ? <p className="py-4 text-[13px] text-muted-foreground">{t("No certificates match these filters.")}</p> : (
             <DataTable rowKey={(r) => r.key} rows={c.rows} cols={[
-              { key: "t", label: t("Technician"), render: (r) => <b className="whitespace-nowrap">{r.technician}</b> },
+              { key: "t", label: t(TECHNICIAN), render: (r) => <b className="whitespace-nowrap">{r.technician}</b> },
               { key: "c", label: t("Certificate"), render: (r) => <span><b className="block">{r.name}</b><span className="block text-[11px] text-muted-foreground">{r.detail}</span></span> },
               { key: "e", label: t("Expires"), render: (r) => <span className="whitespace-nowrap">{r.expires}</span> },
               { key: "s", label: t("Status"), render: (r) => <Badge tone={r.badge.tone}>{r.badge.text}</Badge> },
@@ -77,7 +80,7 @@ export function Certifications({ live }: Readonly<{ live: Live }>) {
             <div className="flex flex-col gap-3">
               <Banner tone="warn">{c.impact.text}</Banner>
               <SummaryList items={c.impact.rows} />
-              <div><LinkBtn href={`/partner/schedule?jobId=${c.impact.jobId}`} size="sm">{t("Open assignment")} <Icon name="arrowRight" /></LinkBtn></div>
+              <div><LinkButton href={`/partner/schedule?jobId=${c.impact.jobId}`} size="sm">{t("Open assignment")} <Icon name="arrowRight" /></LinkButton></div>
             </div>
           ) : <p className="text-[13px] text-muted-foreground">{t("No booked job depends on an expiring, expired or missing certificate.")}</p>}
           <p className="mt-3 text-[11px] text-muted-foreground">{t("Reminders are sent 60, 30 and 7 days before expiry to the contractor admin (Notifications).")}</p>
@@ -98,7 +101,7 @@ function CertificateModal({ live, kind, row, onClose }: Readonly<{ live: Live; k
   const c = live.certificates;
   const renew = kind === "renew" && row?.cert;
   const [form, setForm] = useState<CertForm>({
-    membershipId: row?.technicianId ?? c.people.find((p) => p.active)?.id ?? "", code: row?.code ?? "demo_indoor", name: row?.name ?? c.codes[0].text,
+    membershipId: row?.technicianId ?? c.people.find((p) => p.active)?.id ?? "", code: row?.code ?? "demo_indoor", name: row?.name ?? c.codes[0]?.text ?? "",
     number: "", issued: "", expires: "", file: null,
   });
   const [file, setFile] = useState<File | null>(null);
@@ -107,59 +110,60 @@ function CertificateModal({ live, kind, row, onClose }: Readonly<{ live: Live; k
   const [server, setServer] = useState<Record<string, string>>({});
   const [refused, setRefused] = useState<string | null>(null);
   const local = tried ? certificateErrors(form, t) : {};
-  const err = (k: string) => (local as Record<string, string | undefined>)[k] ?? server[k];
+  const fieldError = (k: string) => (local as Record<string, string | undefined>)[k] ?? server[k];
   const set = (p: Partial<CertForm>) => { setForm({ ...form, ...p }); setServer({}); setRefused(null); };
   const save = () => {
     setTried(true);
     const e = certificateErrors(form, t);
     // a refused submit takes focus to the first field to fix, top to bottom (IR593, as IR586)
-    const bad = (Object.keys(ids) as (keyof typeof ids)[]).find((k) => e[k] || (k === "file" && !file));
+    const bad = keysOf(ids).find((k) => e[k] !== undefined || (k === "file" && !file));
     if (bad) { focusField(ids[bad]); return; }
     if (!file) return;
     const data = new FormData();
-    for (const [k, v] of Object.entries({ membershipId: form.membershipId, code: form.code, name: form.name, number: form.number, issued: form.issued, expires: form.expires })) data.set(k, v);
-    if (renew) data.set("renewalOf", row!.cert!.id);
+    const fields = Object.entries({ membershipId: form.membershipId, code: form.code, name: form.name, number: form.number, issued: form.issued, expires: form.expires });
+    for (const [k, v] of fields) data.set(k, v);
+    if (renew) data.set("renewalOf", renew.id);
     data.set("file", file);
     run(() => submitCertificate(data), t("Submitted for HQ verification — it counts for eligibility once HQ approves it."), onClose,
       (f) => { const r = certificateRefusal(f, t); setServer(r.fields); setRefused(r.text); });
   };
   return (
-    <Modal open onClose={onClose} title={renew ? t("Upload renewal — {name}", { name: row!.name }) : t("Add certificate")} footer={<>
+    <Modal open onClose={onClose} title={renew ? t("Upload renewal — {name}", { name: row.name }) : t(ADD_CERTIFICATE)} footer={<>
       <Btn onClick={onClose}>{t("Cancel")}</Btn>
       <Btn variant="primary" disabled={pending} onClick={save}>{t("Submit for verification")}</Btn>
     </>}>
       {renew ? (
-        <SummaryList items={[[t("Technician"), row!.technician], [t("Current"), t("{number} · expires {date}", { number: row!.cert!.number, date: row!.expires })]]} />
+        <SummaryList items={[[t(TECHNICIAN), row.technician], [t("Current"), t("{number} · expires {date}", { number: renew.number, date: row.expires })]]} />
       ) : (
         <>
-          <Field label={t("Technician")} error={err("membershipId")}>
+          <Field label={t(TECHNICIAN)} error={fieldError("membershipId")}>
             <Select id={ids.membershipId} value={form.membershipId} onChange={(e) => { set({ membershipId: e.target.value }); }}>
               {c.people.filter((p) => p.active).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </Select>
           </Field>
           <div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>
-            <Field label={t("Qualification")} error={err("code")}>
+            <Field label={t("Qualification")} error={fieldError("code")}>
               <Select value={form.code} onChange={(e) => { set({ code: e.target.value, name: c.codes.find((x) => x.code === e.target.value)?.text ?? form.name }); }}>
                 {c.codes.map((x) => <option key={x.code} value={x.code}>{x.text}</option>)}
               </Select>
             </Field>
-            <Field label={t("Certificate name")} error={err("name")}><Input id={ids.name} value={form.name} maxLength={120} onChange={(e) => { set({ name: e.target.value }); }} /></Field>
+            <Field label={t("Certificate name")} error={fieldError("name")}><Input id={ids.name} value={form.name} maxLength={120} onChange={(e) => { set({ name: e.target.value }); }} /></Field>
           </div>
         </>
       )}
       <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}>
-        <Field label={t("Issued on")} error={err("issued")}><Input id={ids.issued} type="date" value={form.issued} onChange={(e) => { set({ issued: e.target.value }); }} /></Field>
-        <Field label={t("Expires on")} error={err("expires")}><Input id={ids.expires} type="date" value={form.expires} min={form.issued || undefined} onChange={(e) => { set({ expires: e.target.value }); }} /></Field>
+        <Field label={t("Issued on")} error={fieldError("issued")}><Input id={ids.issued} type="date" value={form.issued} onChange={(e) => { set({ issued: e.target.value }); }} /></Field>
+        <Field label={t("Expires on")} error={fieldError("expires")}><Input id={ids.expires} type="date" value={form.expires} min={form.issued || undefined} onChange={(e) => { set({ expires: e.target.value }); }} /></Field>
       </div>
-      <Field label={t("Certificate number")} error={err("number")}><Input id={ids.number} value={form.number} maxLength={64} onChange={(e) => { set({ number: e.target.value }); }} /></Field>
+      <Field label={t("Certificate number")} error={fieldError("number")}><Input id={ids.number} value={form.number} maxLength={64} onChange={(e) => { set({ number: e.target.value }); }} /></Field>
       <div className="flex flex-col gap-1 text-xs font-semibold text-ink">
         <span>{t("Certificate file")}</span>
-        <label className={cx("block cursor-pointer rounded-xl border border-dashed px-4 py-4 text-center hover:bg-surface2 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-primary", err("file") ? "border-crit" : "border-line")}>
+        <label className={cx("block cursor-pointer rounded-xl border border-dashed px-4 py-4 text-center hover:bg-surface2 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-primary", fieldError("file") ? "border-crit" : "border-line")}>
           <Input id={ids.file} type="file" accept={FILE_TYPES.join(",")} className="sr-only h-px w-px" onChange={(e) => { const f = e.target.files?.[0] ?? null; setFile(f); set({ file: f ? { name: f.name, type: f.type, size: f.size } : null }); }} />
           <b className="flex items-center gap-1 text-[13px]">{file ? <><Icon name="document" />{`${file.name} · ${fileSize(file.size)}`}</> : t("Choose a file")}</b>
           <span className="block text-[11px] font-normal text-muted-foreground">{t("PDF / JPG / PNG, up to 10 MB")}{file ? ` · ${t("Replace")}` : ""}</span>
         </label>
-        {err("file") && <span className="flex items-center gap-1 font-medium text-crit"><Icon name="error" />{err("file")}</span>}
+        {fieldError("file") && <span className="flex items-center gap-1 font-medium text-crit"><Icon name="error" />{fieldError("file")}</span>}
       </div>
       <Banner>{t(renew ? "The renewal is “Pending HQ verification” until HQ checks it. Until then the current expiry date is used for eligibility." : "The certificate is “Pending HQ verification” until HQ checks it; only then does it count for eligibility.")}</Banner>
       {refused && <Banner tone="crit">{refused}</Banner>}
@@ -177,15 +181,16 @@ function TrainingModal({ row, onClose }: Readonly<{ row: CertRow; onClose: () =>
   const isBad = note.trim().length === 0 || note.trim().length > 1000;
   const save = () => {
     setTried(true);
-    if (isBad) return;
-    run(() => requestTraining(row.cert!.id, row.cert!.version, note), t("Training requested."), onClose, (f) => { setRefused(certificateRefusal(f, t).text ?? t("Check the input.")); });
+    const { cert } = row;
+    if (isBad || !cert) return;
+    run(() => requestTraining(cert.id, cert.version, note), t("Training requested."), onClose, (f) => { setRefused(certificateRefusal(f, t).text ?? t("Check the input.")); });
   };
   return (
     <Modal open onClose={onClose} title={t("Request training — {name}", { name: row.name })} footer={<>
       <Btn onClick={onClose}>{t("Cancel")}</Btn>
       <Btn variant="primary" disabled={pending} onClick={save}>{t("Request training")}</Btn>
     </>}>
-      <SummaryList items={[[t("Technician"), row.technician], [t("Certificate"), `${row.name} · ${row.badge.text}`]]} />
+      <SummaryList items={[[t(TECHNICIAN), row.technician], [t("Certificate"), `${row.name} · ${row.badge.text}`]]} />
       <Field label={t("Note (required, 1–1000 characters)")} error={tried && isBad ? t("A note is required (1–1000 characters)") : undefined}>
         <Textarea value={note} maxLength={1000} onChange={(e) => { setNote(e.target.value); }} placeholder={t("Refresher course before the certificate expires.")} />
       </Field>
@@ -198,7 +203,7 @@ function ViewModal({ row, onClose }: Readonly<{ row: CertRow; onClose: () => voi
   const t = useT();
   return (
     <Modal open onClose={onClose} title={row.name} footer={<Btn onClick={onClose}>{t("Close")}</Btn>}>
-      <SummaryList items={[[t("Technician"), row.technician], [t("Certificate number"), row.cert?.number ?? "—"], [t("Details"), row.detail], [t("Expires"), row.expires], [t("Status"), row.badge.text]]} />
+      <SummaryList items={[[t(TECHNICIAN), row.technician], [t("Certificate number"), row.cert?.number ?? "—"], [t("Details"), row.detail], [t("Expires"), row.expires], [t("Status"), row.badge.text]]} />
       {row.cert?.fileName
         ? <p className="text-[13px]"><a href={`/partner/certificates/${row.cert.id}/document`} target="_blank" rel="noreferrer" className="font-semibold text-primary"><Icon name="external" /> {t("Open the document")}</a></p>
         : <p className="text-[11px] text-muted-foreground">{t("No document was uploaded with this certificate.")}</p>}

@@ -3,6 +3,10 @@
 // the action availability. Pure code shared by the Server Components and the client views. Texts in the display
 // language and instants in the display time zone (`t` / `i`, IR301); the customer's notice uses the same words (IR267).
 import { EN, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
+import { wrapped } from "@ac/web/lib/text";
+import { lookup } from "@ac/web/lib/lookup";
+
+const RELEASE_REQUESTED = "release_requested";
 
 const en = translator("en");
 
@@ -23,18 +27,32 @@ export interface ApiRestriction {
 }
 export interface ApiCommand { id: string; status: "requested" | "sent" | "acknowledged" | "failed" | "expired" | "cancelled"; delivery: string; requestedAt: string; failureCode: string | null }
 
-export const states: RestrictionState[] = ["scheduled", "requested", "applied", "release_requested", "released", "cancelled"];
+export const states: RestrictionState[] = ["scheduled", "requested", "applied", RELEASE_REQUESTED, "released", "cancelled"];
 /** The steps of the lifecycle (cancelled is off the path). */
-export const lifecycleStates: RestrictionState[] = ["scheduled", "requested", "applied", "release_requested", "released"];
+export const lifecycleStates: RestrictionState[] = ["scheduled", "requested", "applied", RELEASE_REQUESTED, "released"];
 export const stateLabel: Record<RestrictionState, string> = { scheduled: "Scheduled", requested: "Requested", applied: "Applied", release_requested: "Release requested", released: "Released", cancelled: "Cancelled" };
 /** A state as the screens word it. */
-export const stateWord = (s: RestrictionState, t: T = en) =>
-  ({ scheduled: t("Scheduled"), requested: t("Requested"), applied: t("Applied"), release_requested: t("Release requested"), released: t("Released"), cancelled: t("Cancelled") })[s] ?? s;
-export const stateTone = (s: RestrictionState) => (s === "applied" ? "warn" : s === "released" ? "ok" : s === "cancelled" ? "muted" : s === "release_requested" ? "unknown" : "primary") as "warn" | "ok" | "muted" | "unknown" | "primary";
+export const stateWord = (s: RestrictionState, t: T = en) => {
+  const words = new Map(Object.entries({ scheduled: t("Scheduled"), requested: t("Requested"), applied: t("Applied"), release_requested: t("Release requested"), released: t("Released"), cancelled: t("Cancelled") }));
+  return words.get(s) ?? s; // a value the API adds before this table does
+};
+/** The colour of a restriction state's badge. */
+export type StateTone = "warn" | "ok" | "muted" | "unknown" | "primary";
+const STATE_TONE = new Map<RestrictionState, StateTone>([["applied", "warn"], ["released", "ok"], ["cancelled", "muted"], [RELEASE_REQUESTED, "unknown"]]);
+export const stateTone = (s: RestrictionState): StateTone => STATE_TONE.get(s) ?? "primary";
+/** Which restriction the unit reports it is under, and when it said so. */
+function observedText(u: ApiRestriction["perUnit"][number], restrictionId: string, i: I18n): string {
+  const { t } = i;
+  if (!u.observedRestriction) return t("none observed");
+  const which = t(u.observedRestriction.restrictionId === restrictionId ? "this restriction" : "another restriction");
+  return u.observedAt ? `${which} · ${showTime(u.observedAt, i.display)}` : which;
+}
 export const policyText = (p: Policy, t: T = en) => (p.kind === "power_off" ? t("Power off") : t("Temperature limit — cooling setpoint ≥ {value} °C", { value: p.minimumCoolingSetpoint }));
 /** Where a release intent came from, worded. */
-export const sourceWord = (s: NonNullable<ReleaseIntent>["source"], t: T = en) =>
-  ({ payment: t("payment"), exception: t("exception"), override: t("override"), manual: t("manual"), cancel: t("cancellation") })[s] ?? s;
+export const sourceWord = (s: NonNullable<ReleaseIntent>["source"], t: T = en) => {
+  const words: Partial<Record<NonNullable<ReleaseIntent>["source"], string>> = { payment: t("payment"), exception: t("exception"), override: t("override"), manual: t("manual"), cancel: t("cancellation") };
+  return lookup(words, s) ?? s; // a value the API adds before this table does
+};
 /** The release intent with its time in the display time zone, or "none". */
 export const intentText = (r: Pick<ApiRestriction, "releaseIntent">, i: I18n = EN) => (r.releaseIntent ? `${sourceWord(r.releaseIntent.source, i.t)} · ${showTime(r.releaseIntent.at, i.display)}` : i.t("none"));
 
@@ -55,10 +73,11 @@ export function progressText(r: ApiRestriction, i: I18n = EN): string {
   const released = r.perUnit.filter((u) => u.releaseState === "released" || u.releaseState === "not_required").length;
   const offline = r.perUnit.filter((u) => u.pendingReason === "offline").length;
   const busy = r.perUnit.filter((u) => u.pendingReason === "device_operation_running").length; // waiting for a check or firmware update (D03)
-  const tail = [offline && t("{n} offline", { n: offline }), busy && t("{n} waiting for a device operation", { n: busy })].filter(Boolean).map((x) => ` · ${x}`).join("");
   if (r.state === "scheduled") return t("executes after {time}", { time: showTime(r.executeAfter, i.display) });
+  const notes = [...(offline > 0 ? [t("{n} offline", { n: offline })] : []), ...(busy > 0 ? [t("{n} waiting for a device operation", { n: busy })] : [])];
+  const tail = notes.map((x) => ` · ${x}`).join("");
   if (r.state === "requested" || r.state === "applied") return `${t("{done}/{n} applied", { done: applied, n })}${tail}`;
-  if (r.state === "release_requested") return `${t("{done}/{n} released", { done: released, n })}${tail}`;
+  if (r.state === RELEASE_REQUESTED) return `${t("{done}/{n} released", { done: released, n })}${tail}`;
   return r.state === "released" ? t("{n} released", { n }) : t("cancelled");
 }
 
@@ -70,25 +89,25 @@ export function restrictionRows(rs: ApiRestriction[], contractLabel: (id?: strin
 export interface UnitRow { unitId: string; name: string; apply: string; release: string; observed: string; pending: string | null; retryApply: boolean; retryRelease: boolean; reconcile: boolean; commands: string }
 export function unitRows(r: ApiRestriction, names: Map<string, string>, commands: Map<string, ApiCommand>, i: I18n = EN): UnitRow[] {
   const { t } = i;
-  const apply: Record<PerUnit["applyState"], string> = { not_sent: t("not sent"), sent_unknown: t("sent, result unknown"), applied: t("applied"), not_applied: t("not applied") };
-  const release: Record<PerUnit["releaseState"], string> = {
+  const apply: Partial<Record<PerUnit["applyState"], string>> = { not_sent: t("not sent"), sent_unknown: t("sent, result unknown"), applied: t("applied"), not_applied: t("not applied") };
+  const release: Partial<Record<PerUnit["releaseState"], string>> = {
     none: t("none"), waiting_reconcile: t("waiting for reconciliation"), requested: t("requested"), released: t("released"), not_required: t("not required"), failed: t("failed"),
   };
-  const command: Record<ApiCommand["status"], string> = { requested: t("requested"), sent: t("sent"), acknowledged: t("acknowledged"), failed: t("failed"), expired: t("expired"), cancelled: t("cancelled") };
-  const pending = (p: string | null) => (p === "offline" ? t("offline") : (p === "device_operation_running" ? t("a device operation is running") : p));
+  const command: Partial<Record<ApiCommand["status"], string>> = { requested: t("requested"), sent: t("sent"), acknowledged: t("acknowledged"), failed: t("failed"), expired: t("expired"), cancelled: t("cancelled") };
+  const pendingText = new Map([["offline", t("offline")], ["device_operation_running", t("a device operation is running")]]);
+  const pending = (p: string | null) => (p === null ? null : pendingText.get(p) ?? p);
   return r.perUnit.map((u) => {
-    const last = (ids: string[]) => (ids.length > 0 ? commands.get(ids[ids.length - 1]) : undefined);
+    const last = (ids: string[]) => { const id = ids.at(-1); return id ? commands.get(id) : undefined; };
     const a = last(u.applyCommandIds);
-    const rel = last(u.releaseCommandIds);
-    const status = (c: ApiCommand) => `${command[c.status] ?? c.status}${c.failureCode ? ` (${c.failureCode})` : ""}`;
+    const releaseId = last(u.releaseCommandIds);
+    const status = (c: ApiCommand) => `${lookup(command, c.status) ?? c.status}${wrapped(c.failureCode, " (", ")")}`;
     return {
-      unitId: u.unitId, name: names.get(u.unitId) ?? u.unitId.slice(0, 8), apply: apply[u.applyState] ?? u.applyState, release: release[u.releaseState] ?? u.releaseState, pending: pending(u.pendingReason),
-      observed: u.observedRestriction
-        ? `${t(u.observedRestriction.restrictionId === r.id ? "this restriction" : "another restriction")}${u.observedAt ? ` · ${showTime(u.observedAt, i.display)}` : ""}` : t("none observed"),
+      unitId: u.unitId, name: names.get(u.unitId) ?? u.unitId.slice(0, 8), apply: lookup(apply, u.applyState) ?? u.applyState, release: lookup(release, u.releaseState) ?? u.releaseState, pending: pending(u.pendingReason),
+      observed: observedText(u, r.id, i),
       retryApply: r.state === "requested" && (u.applyState === "not_sent" || u.applyState === "not_applied"),
-      retryRelease: r.state === "release_requested" && (u.releaseState === "failed" || (u.releaseState === "none" && u.applyState === "applied")),
-      reconcile: ["requested", "applied", "release_requested"].includes(r.state) && u.applyState === "sent_unknown",
-      commands: [a && t("apply {status}", { status: status(a) }), rel && t("remove {status}", { status: status(rel) })].filter(Boolean).join(" · ") || "—",
+      retryRelease: r.state === RELEASE_REQUESTED && (u.releaseState === "failed" || (u.releaseState === "none" && u.applyState === "applied")),
+      reconcile: ["requested", "applied", RELEASE_REQUESTED].includes(r.state) && u.applyState === "sent_unknown",
+      commands: [a && t("apply {status}", { status: status(a) }), releaseId && t("remove {status}", { status: status(releaseId) })].filter(Boolean).join(" · ") || "—",
     };
   });
 }
@@ -108,7 +127,7 @@ export function executeBlocker(r: ApiRestriction, now: Date, i: I18n = EN): stri
 /** An explicit release request needs requested/applied and all causes paid or an active grace/exception (IR35). */
 export function releaseBlocker(r: ApiRestriction, allPaid: boolean, now: Date, i: I18n = EN): string | null {
   const { t } = i;
-  if (r.state === "release_requested") return t("Release already requested");
+  if (r.state === RELEASE_REQUESTED) return t("Release already requested");
   if (r.state !== "requested" && r.state !== "applied") return t("Only a requested or applied restriction can be released");
   if (!allPaid && !activePeriod(r, now, i)) return t("Cause invoices are unpaid and no grace period or exception is active — use the exception screen or an override");
   return null;
@@ -124,15 +143,15 @@ export function actionOutcome(kind: ActionKind, s: RestrictionState, t: T = en):
     case "defer":
     case "exempt": {
       return s === "scheduled" ? { allowed: true, result: t("Stays scheduled; execution waits until the date passes") }
-        : (({ allowed: true, result: s === "release_requested" ? t("Records the period only (release already requested)") : t("{state} → Release requested (source: exception)", { state }) }));
+        : (({ allowed: true, result: s === RELEASE_REQUESTED ? t("Records the period only (release already requested)") : t("{state} → Release requested (source: exception)", { state }) }));
     }
     case "cancel": {
       return s === "scheduled" ? { allowed: true, result: t("Scheduled → Cancelled; no commands are sent") }
-        : (({ allowed: true, result: s === "release_requested" ? t("No change — release already requested (idempotent)") : t("{state} → Release requested (source: cancel); application may already have happened", { state }) }));
+        : (({ allowed: true, result: s === RELEASE_REQUESTED ? t("No change — release already requested (idempotent)") : t("{state} → Release requested (source: cancel); application may already have happened", { state }) }));
     }
     case "override": {
       return s === "scheduled" ? { allowed: false, result: t("Not possible for a scheduled restriction — cancel it instead") }
-        : (({ allowed: true, result: s === "release_requested" ? t("No change — release already requested (idempotent)") : t("{state} → Release requested (source: override); the invoices stay unpaid", { state }) }));
+        : (({ allowed: true, result: s === RELEASE_REQUESTED ? t("No change — release already requested (idempotent)") : t("{state} → Release requested (source: override); the invoices stay unpaid", { state }) }));
     }
   }
 }

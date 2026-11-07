@@ -1,16 +1,22 @@
 "use client";
+const ADD_PROPERTY = "Add property";
+const VERSION_V = "version {v}";
+const DEFAULT_ALERT = "default_alert";
+const REASON_REQUIRED = "Reason · required";
+const MAINTENANCE_CONTRACT = "Maintenance contract";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Badge, Banner, Btn, Card, Check, Choice, ConnBadge, cx, DataTable, EmptyState, Field, Input, Kpi, LinkBtn, Modal, Page, PowerBadge, Search, Select, SummaryList, Tabs, Textarea, TextLink, Toggle, ActionMenu, Plain } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Check, Choice, ConnBadge, cx, DataTable, EmptyState, Field, Input, Kpi, LinkButton, Modal, Page, PowerBadge, Search, Select, SummaryList, Tabs, Textarea, TextLink, Toggle, ActionMenu, Plain } from "@ac/web/components/ui";
 import { useI18n, useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
+import { oneOf } from "@ac/web/lib/oneOf";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
-import { showTime, type T } from "@ac/web/lib/i18n";
+import { showTime, type T, textOf } from "@ac/web/lib/i18n";
 import {
-  autoMapping, changedFields, connections, contractMatch, coverageCsv, coverageMatch, csvShape, customerDraft, customerErrors, customerMatch, errorReportCsv, flatten,
-  importFields, importMessage, importPlace, importTemplate, inviteError, nameError, powerStates, profileLabel, propertyDraft, propertyErrors, propertyInput, reasonError,
-  relocates, unitDraft, unitErrors, unitInput,
+  autoMapping, changedFields, connections, contractFilters, contractMatch, coverageCsv, coverageMatch, csvShape, customerDraft, customerErrors, customerMatch, errorReportCsv, flatten,
+  importFields, importMessage, importPlace, importTemplate, inviteError, nameError, powerStates, profileLabel, profiles, propertyDraft, propertyErrors, propertyInput, reasonError,
+  relocates, selectionId, unitDraft, unitErrors, unitInput, coverageStatuses, withinDays,
   type ApiImportPreview, type ApiUnitDetail, type ApiUnitImport, type ClaimCandidate, type ClientUserRow, type Connection, type ContractFilter, type CoverageFilter,
   type CoverageRow, type coverageKpis, type CustomerDraft, type CustomerRow, type PolicyLine, type PowerState, type Profile, type PropertyDraft, type RuleLine, type Scope,
   type Selection, type TreeProperty, type TreeSpace, type UnitDraft, type UnitRow, type registerKpis,
@@ -21,6 +27,7 @@ import { typeLabel } from "@ac/web/lib/partnerJobDetail";
 import { archiveLocation, archiveUnit, createCustomer, deleteUnit, importCommit, importPreview, importUndo, inviteClientUser, previewPasswordReset, recordWarrantyClaim, removeClientUser, resendInvite, saveProperty, saveSpace, saveUnit, setDefaultRule, setUnitPolicies, updateClientUser, updateCustomer, signOutEverywhere } from "../actions";
 import { Icon, type IconName } from "@ac/web/components/Icon";
 import { NeedsAccess } from "@ac/web/components/NeedsAccess";
+import { entryOf, lookup } from "@ac/web/lib/lookup";
 
 export interface UnitLive {
   u: ApiUnitDetail; path: string; model: string; device: { id: string; serial: string; connection: Connection } | null; deviceKnown: boolean;
@@ -43,13 +50,27 @@ type Run = ReturnType<typeof useAction>[1];
 
 const scopes: Scope[] = ["indoor", "outdoor", "electrical"];
 const kindLabel: Record<string, string> = { home: "Home", office: "Office", floor: "Floor", area: "Area", room: "Room", space: "Space" };
-const addKind: Record<TreeSpace["kind"], string> = { floor: "Add floor", area: "Add area", room: "Add room", space: "Add space" };
-const deleteKind: Record<TreeSpace["kind"], string> = { floor: "Delete floor", area: "Delete area", room: "Delete room", space: "Delete space" };
+const kindAddLabel: Record<TreeSpace["kind"], string> = { floor: "Add floor", area: "Add area", room: "Add room", space: "Add space" };
+const kindDeleteLabel: Record<TreeSpace["kind"], string> = { floor: "Delete floor", area: "Delete area", room: "Delete room", space: "Delete space" };
 const powerLabel: Record<PowerState, string> = { on: "Running", off: "Stopped", unknown: "Unknown" };
 const connLabel: Record<Connection, string> = { online: "Online", offline: "Offline", unknown: "Unknown", connecting: "Connecting", error: "Error" };
 const scopeLabel: Record<Scope, string> = { indoor: "indoor", outdoor: "outdoor", electrical: "electrical" };
 /** “1 unit” / “3 units” in the display language: the singular and the plural key of one count. */
 const count = (t: T, n: number, one: string, many: string) => t(n === 1 ? one : many, { n });
+/** A customer row's contract line: the restriction (its state), the overdue invoices, or none; and where it links. */
+function standingLine(s: CustomerRow["standing"], customerId: string, t: T): { sub: string; href?: string; link?: string } {
+  const r = s?.restriction;
+  if (r) {
+    return r.state === "active" ? { sub: t("Restriction active") }
+      : { sub: t("Restriction {state}", { state: t(r.state.replace("_", " ")) }), href: `/admin/restrictions?restrictionId=${r.id}`, link: t("View restriction") };
+  }
+  return s?.overdue ? { sub: count(t, s.overdue, "1 invoice overdue", "{n} invoices overdue"), href: `/admin/billing?customerId=${customerId}&overdueOnly=true`, link: t("View invoices") }
+    : { sub: t("no overdue invoice") };
+}
+const POWER_STATE = new Map<string, "running" | "stopped">([["on", "running"], ["off", "stopped"]]);
+const USER_TONE = new Map<string, "ok" | "warn">([["active", "ok"], ["invited", "warn"]]);
+const USER_STATUS = new Map([["active", "Active"], ["invited", "Not signed in yet"]]);
+const RESULT_TONE = new Map<string, "ok" | "warn">([["ready", "ok"], ["warning", "warn"]]);
 const units = (t: T, n: number) => count(t, n, "1 unit", "{n} units");
 const clearUnit = { unitId: null };
 
@@ -94,9 +115,9 @@ function CustomerList({ live }: Readonly<{ live: UnitsLive }>) {
       <Card title={t("Customers")} sub={t("Select a customer to manage its properties, spaces and units")} action={live.canWrite && <Btn size="sm" variant="primary" onClick={() => { setOpen(true); }}><Icon name="add" /> {t("New customer")}</Btn>}>
         <div className="mb-3 flex flex-wrap items-center gap-3">
           <div className="min-w-[220px] flex-1 sm:max-w-sm"><Search placeholder={t("Search customer name, ID or property…")} value={q} onChange={setQ} /></div>
-          <Select aria-label={t("Status")} className="w-auto" value={status} onChange={(e) => { setStatus(e.target.value as "active" | "all"); }}><option value="active">{t("Status: Active")}</option><option value="all">{t("Status: All")}</option></Select>
+          <Select aria-label={t("Status")} className="w-auto" value={status} onChange={(e) => { setStatus(oneOf(["active", "all"] as const, e.target.value, status)); }}><option value="active">{t("Status: Active")}</option><option value="all">{t("Status: All")}</option></Select>
           {live.standingKnown && (
-            <Select aria-label={t("Contract")} className="w-auto" value={contract} onChange={(e) => { setContract(e.target.value as ContractFilter); }}>
+            <Select aria-label={t("Contract")} className="w-auto" value={contract} onChange={(e) => { setContract(oneOf(contractFilters, e.target.value, contract)); }}>
               <option value="all">{t("Contract: All")}</option><option value="overdue">{t("Overdue")}</option><option value="restricted">{t("Restriction")}</option><option value="good">{t("Good standing")}</option><option value="none">{t("No contract")}</option>
             </Select>
           )}
@@ -127,16 +148,16 @@ function CustomerModal({ row, pending, onClose, onSave }: Readonly<{ row?: Custo
   const [d, setD] = useState<CustomerDraft>(customerDraft(row));
   const [tried, setTried] = useState(false);
   const e = customerErrors(d, t);
-  const err = (k: string) => (tried ? e[k] : undefined);
+  const fieldError = (k: string) => (tried ? e[k] : undefined);
   const save = () => { setTried(true); if (Object.keys(e).length === 0) onSave(d); };
   return (
     <Modal open onClose={onClose} title={row ? t("Edit {name}", { name: row.name }) : t("New customer")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={save}>{t(row ? "Save customer" : "Create customer")}</Btn></>}>
       <div className="flex flex-col gap-3">
-        <Field label={t("Billing name · required")} hint={t("1–120 characters. Two customers cannot share a billing name.")} error={err("billingName")}><Input value={d.billingName} onChange={(x) => { setD({ ...d, billingName: x.target.value }); }} /></Field>
-        <Field label={t("Customer display name · required")} hint={t("1–120 characters")} error={err("name")}><Input value={d.name} onChange={(x) => { setD({ ...d, name: x.target.value }); }} /></Field>
-        <Field label={t("Service profile · required")}><Choice value={d.profile} onChange={(v: Profile) => { setD({ ...d, profile: v }); }} options={(Object.keys(profileLabel) as Profile[]).map((p) => ({ id: p, label: t(profileLabel[p]) }))} /></Field>
+        <Field label={t("Billing name · required")} hint={t("1–120 characters. Two customers cannot share a billing name.")} error={fieldError("billingName")}><Input value={d.billingName} onChange={(x) => { setD({ ...d, billingName: x.target.value }); }} /></Field>
+        <Field label={t("Customer display name · required")} hint={t("1–120 characters")} error={fieldError("name")}><Input value={d.name} onChange={(x) => { setD({ ...d, name: x.target.value }); }} /></Field>
+        <Field label={t("Service profile · required")}><Choice value={d.profile} onChange={(v: Profile) => { setD({ ...d, profile: v }); }} options={profiles.map((p) => ({ id: p, label: t(profileLabel[p]) }))} /></Field>
         <Field label={t("Status")} hint={t(row ? "A customer that still has units, contracts or open jobs cannot be deactivated." : "Inactive customers cannot get new units.")}>
-          <Select value={d.status} onChange={(x) => { setD({ ...d, status: x.target.value as "active" | "inactive" }); }}><option value="active">{t("Active")}</option><option value="inactive">{t("Inactive")}</option></Select>
+          <Select value={d.status} onChange={(x) => { setD({ ...d, status: oneOf(["active", "inactive"] as const, x.target.value, d.status) }); }}><option value="active">{t("Active")}</option><option value="inactive">{t("Inactive")}</option></Select>
         </Field>
         {!row && <p className="text-[11px] text-muted-foreground">{t("Next step: add a property (home or office) for this customer.")}</p>}
       </div>
@@ -148,7 +169,8 @@ function CustomerModal({ row, pending, onClose, onSave }: Readonly<{ row?: Custo
 
 type ModalState =
   | null | { kind: "customer" } | { kind: "property"; p?: TreeProperty } | { kind: "space"; propertyId: string; parentSpaceId: string | null; spaceKind: TreeSpace["kind"] }
-  | { kind: "rename"; p?: TreeProperty; s?: TreeSpace } | { kind: "archive"; p?: TreeProperty; s?: TreeSpace } | { kind: "unit"; propertyId: string; spaceId: string };
+  // a location is a property or a space, never both
+  | { kind: "rename" | "archive"; p: TreeProperty; s?: undefined } | { kind: "rename" | "archive"; p?: undefined; s: TreeSpace } | { kind: "unit"; propertyId: string; spaceId: string };
 
 function CustomerScreen({ live, c }: Readonly<{ live: UnitsLive; c: CustomerLive }>) {
   const t = useT();
@@ -160,8 +182,8 @@ function CustomerScreen({ live, c }: Readonly<{ live: UnitsLive; c: CustomerLive
   const s = r.standing;
   const canWrite = live.canWrite;
   const sel = c.selection;
-  const selId = sel ? sel.kind === "property" ? sel.property.id : sel.kind === "space" ? sel.space.id : `unassigned:${sel.property.id}` : "";
-  const newUnitAt = () => { setM({ kind: "unit", propertyId: sel?.property.id ?? c.tree[0]?.id ?? "", spaceId: sel?.kind === "space" ? sel.space.id : "" }); };
+  const selId = selectionId(sel);
+  const addUnitHere = () => { setM({ kind: "unit", propertyId: sel?.property.id ?? c.tree[0]?.id ?? "", spaceId: sel?.kind === "space" ? sel.space.id : "" }); };
   const unitsTotal = c.tree.reduce((n, p) => n + p.units, 0);
   return (
     <Page>
@@ -171,7 +193,7 @@ function CustomerScreen({ live, c }: Readonly<{ live: UnitsLive; c: CustomerLive
         {r.marks.map((x) => <Badge key={x.label} tone={x.tone} icon={x.icon}>{x.label}</Badge>)}
         <div className="ml-auto flex gap-2">
           {canWrite && <Btn size="sm" onClick={() => { setM({ kind: "customer" }); }}>{t("Edit customer")}</Btn>}
-          {canWrite && r.status === "active" && c.tree.length > 0 && <Btn size="sm" variant="primary" onClick={newUnitAt}><Icon name="add" /> {t("New unit")}</Btn>}
+          {canWrite && r.status === "active" && c.tree.length > 0 && <Btn size="sm" variant="primary" onClick={addUnitHere}><Icon name="add" /> {t("New unit")}</Btn>}
         </div>
       </div>
       <Card>
@@ -189,23 +211,21 @@ function CustomerScreen({ live, c }: Readonly<{ live: UnitsLive; c: CustomerLive
         <Kpi label={t("Operation")} value={r.operation} sub={t("Running {on} / known {known}", { on: r.running, known: r.known })} />
         <Kpi label={t("Open alerts")} value={r.alerts} tone={r.alerts ? "warn" : undefined} sub={c.alertsSub ?? t("severity needs alert.read")} href="/admin/alerts" link={t("Alerts")} />
         {s ? <Kpi label={t("Overdue billing")} value={s.overdueAmount ?? t("None")} tone={s.overdue ? "crit" : undefined}
-          sub={s.restriction ? (s.restriction.state === "active" ? t("Restriction active") : t("Restriction {state}", { state: t(s.restriction.state.replace("_", " ")) })) : (s.overdue ? count(t, s.overdue, "1 invoice overdue", "{n} invoices overdue") : t("no overdue invoice"))}
-          href={s.restriction && s.restriction.state !== "active" ? `/admin/restrictions?restrictionId=${s.restriction.id}` : (s.overdue ? `/admin/billing?customerId=${r.id}&overdueOnly=true` : undefined)}
-          link={s.restriction && s.restriction.state !== "active" ? t("View restriction") : (s.overdue ? t("View invoices") : undefined)} />
+          {...standingLine(s, r.id, t)} />
           : <Kpi label={t("Overdue billing")} value="—" sub={t("needs billing.read")} />}
       </div>
       <Tabs value={c.tab} onChange={(v) => { nav({ tab: v === "overview" ? null : v, unitId: null }); }} tabs={[
         { id: "overview" as const, label: t("Units & locations"), count: unitsTotal }, { id: "users" as const, label: t("Users"), count: c.users.length },
         { id: "policies" as const, label: t("Alert policies"), count: c.policies?.length ?? "—" },
       ]} />
-      {c.tab === "policies" ? <PoliciesTab c={c} run={run} pending={pending} /> : (c.tab === "users" ? <UsersTab live={live} c={c} run={run} pending={pending} /> : (
+      {c.tab === "policies" && <PoliciesTab c={c} run={run} pending={pending} />}{c.tab === "users" && <UsersTab live={live} c={c} run={run} pending={pending} />}{c.tab !== "policies" && c.tab !== "users" && (
         <div className="split-rev">
-          <Card title={t("Locations")} action={canWrite && <Btn size="sm" onClick={() => { setM({ kind: "property" }); }}><Icon name="add" /> {t("Add property")}</Btn>} className="self-start">
+          <Card title={t("Locations")} action={canWrite && <Btn size="sm" onClick={() => { setM({ kind: "property" }); }}><Icon name="add" /> {t(ADD_PROPERTY)}</Btn>} className="self-start">
             {c.tree.length === 0 ? <EmptyState title={t("No properties yet")}>{t(canWrite ? "Add the customer’s home or office first." : "HQ has not registered a property yet.")}</EmptyState> : (
               <div className="flex flex-col gap-0.5">
                 {c.tree.map((p) => (
                   <div key={p.id}>
-                    <Node depth={0} selected={selId === p.id} onClick={() => { nav({ locationId: p.id, ...clearUnit }); }} icon="home" name={p.name} meta={`${t(kindLabel[p.kind])} · ${units(t, p.units)}`}
+                    <Node depth={0} selected={selId === p.id} onClick={() => { nav({ locationId: p.id, ...clearUnit }); }} icon="home" name={p.name} meta={`${(textOf(kindLabel, p.kind, t) ?? p.kind)} · ${units(t, p.units)}`}
                       menu={canWrite && <LocationMenu onRename={() => { setM({ kind: "rename", p }); }} onDelete={() => { setM({ kind: "archive", p }); }} />} />
                     {p.spaces.map((x) => <SpaceNode key={x.id} s={x} depth={1} selId={selId} nav={nav} canWrite={canWrite} setM={setM} />)}
                     {p.unassigned > 0 && <Node depth={1} selected={selId === `unassigned:${p.id}`} onClick={() => { nav({ locationId: `unassigned:${p.id}`, ...clearUnit }); }} icon="dot" name={t("Unassigned")} meta={units(t, p.unassigned)} />}
@@ -220,23 +240,23 @@ function CustomerScreen({ live, c }: Readonly<{ live: UnitsLive; c: CustomerLive
             {c.unitMissing && <Banner tone="warn" action={<Btn size="sm" onClick={() => { nav(clearUnit); }}>{t("Close")}</Btn>}>{t("This unit no longer exists or belongs to another customer.")}</Banner>}
             {c.unit ? <UnitEdit key={c.unit.u.id} live={live} c={c} x={c.unit} nav={nav} run={run} pending={pending} /> : sel && <>
               <LocationCard c={c} sel={sel} canWrite={canWrite} active={r.status === "active"} setM={setM} />
-              <UnitsCard key={selId} c={c} sel={sel} nav={nav} canWrite={canWrite && r.status === "active"} onNew={newUnitAt} />
+              <UnitsCard key={selId} c={c} sel={sel} nav={nav} canWrite={canWrite && r.status === "active"} onNew={addUnitHere} />
             </>}
           </div>
         </div>
-      ))}
+      )}
       {m?.kind === "customer" && <CustomerModal row={r} pending={pending} onClose={close} onSave={(d) => { run(() => updateCustomer(r.id, r.version, { id: r.orgId, version: r.orgVersion ?? 1, name: r.billingName, status: r.orgStatus }, { billingName: d.billingName, name: d.name, serviceProfile: d.profile, status: d.status }), t("Customer saved"), close); }} />}
       {m?.kind === "property" && <PropertyModal p={m.p} pending={pending} onClose={close} onSave={(d) => { run(() => saveProperty(propertyInput(d, r.orgId, m.p?.id), m.p?.version), t(m.p ? "Property saved" : "Property added"), (id) => { close(); nav({ locationId: id, ...clearUnit }); }); }} />}
-      {m?.kind === "space" && <SpaceModal c={c} init={m} pending={pending} onClose={close} onSave={(x) => { run(() => saveSpace(x), t("{kind} “{name}” added", { kind: t(kindLabel[x.kind]), name: x.name }), (id) => { close(); nav({ locationId: id, ...clearUnit }); }); }} />}
-      {m?.kind === "rename" && <RenameModal name={m.p?.name ?? m.s?.name ?? ""} where={m.p ? t("{kind} · property", { kind: t(kindLabel[m.p.kind]) }) : t(kindLabel[m.s!.kind])} pending={pending} onClose={close}
+      {m?.kind === "space" && <SpaceModal c={c} init={m} pending={pending} onClose={close} onSave={(x) => { run(() => saveSpace(x), t("{kind} “{name}” added", { kind: (textOf(kindLabel, x.kind, t) ?? x.kind), name: x.name }), (id) => { close(); nav({ locationId: id, ...clearUnit }); }); }} />}
+      {m?.kind === "rename" && <RenameModal name={m.p?.name ?? m.s?.name ?? ""} where={m.p ? t("{kind} · property", { kind: (textOf(kindLabel, m.p.kind, t) ?? m.p.kind) }) : (textOf(kindLabel, m.s.kind, t) ?? m.s.kind)} pending={pending} onClose={close}
         onSave={(name) => {
           run(() => {
             return (m.p ? saveProperty(propertyInput({ ...propertyDraft(m.p), name }, r.orgId, m.p.id), m.p.version)
-              : saveSpace({ id: m.s!.id, propertyId: m.s!.propertyId, parentSpaceId: m.s!.parentSpaceId, kind: m.s!.kind, name: name.trim() }, m.s!.version));
+              : saveSpace({ id: m.s.id, propertyId: m.s.propertyId, parentSpaceId: m.s.parentSpaceId, kind: m.s.kind, name: name.trim() }, m.s.version));
           }, t("Name saved"), close);
         }} />}
       {m?.kind === "archive" && <ArchiveLocationModal p={m.p} s={m.s} pending={pending} onClose={close}
-        onSave={(reason) => { run(() => archiveLocation(m.p ? "property" : "space", m.p?.id ?? m.s!.id, m.p?.version ?? m.s!.version, reason), t("Location deleted — its history stays in the audit log"), () => { close(); nav({ locationId: null, ...clearUnit }); }); }} />}
+        onSave={(reason) => { run(() => archiveLocation(m.p ? "property" : "space", m.p ? m.p.id : m.s.id, m.p ? m.p.version : m.s.version, reason), t("Location deleted — its history stays in the audit log"), () => { close(); nav({ locationId: null, ...clearUnit }); }); }} />}
       {m?.kind === "unit" && <NewUnitModal live={live} c={c} init={m} pending={pending} onClose={close}
         onSave={(d) => { run(() => saveUnit(unitInput(d, r.orgId)), t("Unit “{name}” registered", { name: d.displayName.trim() }), (id) => { close(); nav({ locationId: d.spaceId || d.propertyId, unitId: id }); }); }} />}
     </Page>
@@ -259,21 +279,19 @@ function SpaceNode({ s, depth, selId, nav, canWrite, setM }: Readonly<{ s: TreeS
   return (
     <>
       <Node depth={depth} selected={selId === s.id} onClick={() => { nav({ locationId: s.id, ...clearUnit }); }} icon={s.children.length > 0 ? "chevronDown" : "chevronRight"} name={s.name}
-        meta={`${t(kindLabel[s.kind])}${s.units ? ` · ${String(s.units)}` : ""}`} menu={canWrite && <LocationMenu onRename={() => { setM({ kind: "rename", s }); }} onDelete={() => { setM({ kind: "archive", s }); }} />} />
+        meta={`${(textOf(kindLabel, s.kind, t) ?? s.kind)}${s.units ? ` · ${String(s.units)}` : ""}`} menu={canWrite && <LocationMenu onRename={() => { setM({ kind: "rename", s }); }} onDelete={() => { setM({ kind: "archive", s }); }} />} />
       {s.children.map((x) => <SpaceNode key={x.id} s={x} depth={depth + 1} selId={selId} nav={nav} canWrite={canWrite} setM={setM} />)}
       {canWrite && isContainer && <AddLink depth={depth + 1} onClick={() => { setM({ kind: "space", propertyId: s.propertyId, parentSpaceId: s.id, spaceKind: "room" }); }}><Icon name="add" /> {t("Add room")}</AddLink>}
     </>
   );
 }
-const AddLink = ({ depth, onClick, children }: { depth: number; onClick: () => void; children: React.ReactNode }) => {
-  return (
+const AddLink = ({ depth, onClick, children }: { depth: number; onClick: () => void; children: React.ReactNode }) => (
     <Plain touch type="button" onClick={onClick} className="block py-1 text-left text-[12px] font-semibold text-primary pointer-coarse:justify-start" style={{ paddingLeft: depth * 14 + 8 }}>{children}</Plain>
   );
-};
 function LocationMenu({ onRename, onDelete }: Readonly<{ onRename: () => void; onDelete: () => void }>) {
   const t = useT();
   return (
-    <ActionMenu label={t("Location actions")} onChoose={(v) => (v === "rename" ? onRename() : v === "delete" && onDelete())}>
+    <ActionMenu label={t("Location actions")} onChoose={(v) => { new Map([["rename", onRename], ["delete", onDelete]]).get(v)?.(); }}>
       <option value="rename">{t("Rename")}</option><option value="delete">{t("Delete…")}</option>
     </ActionMenu>
   );
@@ -287,37 +305,42 @@ function LocationCard({ c, sel, canWrite, active, setM }: Readonly<{ c: Customer
   if (sel.kind === "property") {
     const p = sel.property;
     return (
-      <Card title={p.name} sub={[t("{kind} · property", { kind: t(kindLabel[p.kind]) }), p.address, count(t, p.floors, "1 floor", "{n} floors"), count(t, p.rooms, "1 room", "{n} rooms"), units(t, p.units)].filter(Boolean).join(" · ")}
+      <Card title={p.name} sub={[t("{kind} · property", { kind: (textOf(kindLabel, p.kind, t) ?? p.kind) }), p.address, count(t, p.floors, "1 floor", "{n} floors"), count(t, p.rooms, "1 room", "{n} rooms"), units(t, p.units)].filter(Boolean).join(" · ")}
         action={canWrite && <div className="flex flex-wrap gap-2"><Btn size="sm" onClick={() => { setM({ kind: "rename", p }); }}>{t("Rename")}</Btn><Btn size="sm" onClick={() => { setM({ kind: "property", p }); }}>{t("Edit details")}</Btn>
           <Btn size="sm" onClick={() => { setM({ kind: "space", propertyId: p.id, parentSpaceId: null, spaceKind: p.kind === "office" ? "area" : "floor" }); }}><Icon name="add" /> {t(p.kind === "office" ? "Add floor / area" : "Add floor")}</Btn><Btn size="sm" variant="danger" onClick={() => { setM({ kind: "archive", p }); }}>{t("Delete")}</Btn></div>}>
-        <SummaryList cols={2} items={[[t("Type"), t(kindLabel[p.kind])], [t("Address"), p.address ?? "—"], [t("Access instructions"), p.accessInstructions ?? "—"], [t("Time zone"), "Asia/Kuala_Lumpur"], [t("Last edited"), c.lastEdit ?? "—"]]} />
+        <SummaryList cols={2} items={[[t("Type"), (textOf(kindLabel, p.kind, t) ?? p.kind)], [t("Address"), p.address ?? "—"], [t("Access instructions"), p.accessInstructions ?? "—"], [t("Time zone"), "Asia/Kuala_Lumpur"], [t("Last edited"), c.lastEdit ?? "—"]]} />
       </Card>
     );
   }
   const s = sel.space;
   const isHolds = s.kind === "room" || s.kind === "space";
   return (
-    <Card title={s.name} sub={`${t(kindLabel[s.kind])} · ${sel.path} · ${units(t, s.units)}`}
+    <Card title={s.name} sub={`${(textOf(kindLabel, s.kind, t) ?? s.kind)} · ${sel.path} · ${units(t, s.units)}`}
       action={canWrite && <div className="flex flex-wrap gap-2"><Btn size="sm" onClick={() => { setM({ kind: "rename", s }); }}>{t("Rename")}</Btn>
         {!isHolds && <Btn size="sm" onClick={() => { setM({ kind: "space", propertyId: s.propertyId, parentSpaceId: s.id, spaceKind: "room" }); }}><Icon name="add" /> {t("Add room")}</Btn>}
         <Btn size="sm" variant="danger" onClick={() => { setM({ kind: "archive", s }); }}>{t("Delete")}</Btn>
         {isHolds && active && <Btn size="sm" variant="primary" onClick={() => { setM({ kind: "unit", propertyId: s.propertyId, spaceId: s.id }); }}><Icon name="add" /> {t("New unit in {name}", { name: s.name })}</Btn>}</div>}>
-      <SummaryList cols={2} items={[[t("Kind"), t(kindLabel[s.kind])], [t("Child locations"), s.children.length || t("none")], [t("Units here"), s.direct], [t("Last edited"), c.lastEdit ?? "—"]]} />
+      <SummaryList cols={2} items={[[t("Kind"), (textOf(kindLabel, s.kind, t) ?? s.kind)], [t("Child locations"), s.children.length || t("none")], [t("Units here"), s.direct], [t("Last edited"), c.lastEdit ?? "—"]]} />
     </Card>
   );
 }
 
+/** The units card's title for the selected place. */
+function unitsTitle(sel: Selection, t: T): string {
+  if (sel.kind === "property") return t("All units in {name}", { name: sel.property.name });
+  return sel.kind === "space" ? t("Units in {name}", { name: sel.space.name }) : t("Unassigned units in {name}", { name: sel.property.name });
+}
 function UnitsCard({ c, sel, nav, canWrite, onNew }: Readonly<{ c: CustomerLive; sel: Selection; nav: Nav; canWrite: boolean; onNew: () => void }>) {
   const t = useT();
   const [q, setQ] = useState(c.filter.search);
   const rows = c.units.filter((u) => !q.trim() || u.name.toLowerCase().includes(q.trim().toLowerCase()) || u.id.toLowerCase().includes(q.trim().toLowerCase()));
   const isFiltered = !!c.filter.powerState || c.filter.connections.length > 0;
-  const title = sel.kind === "property" ? t("All units in {name}", { name: sel.property.name }) : (sel.kind === "space" ? t("Units in {name}", { name: sel.space.name }) : t("Unassigned units in {name}", { name: sel.property.name }));
+  const title = unitsTitle(sel, t);
   const conn = (x: Connection) => t(connLabel[x]);
   return (
-    <Card title={`${title} · ${isFiltered || q.trim() ? t("{n} of {total}", { n: rows.length, total: c.total }) : c.total}`} action={canWrite && <Btn size="sm" variant="primary" onClick={onNew}><Icon name="add" /> {t("New unit")}</Btn>}>
+    <Card title={`${title} · ${String(isFiltered || q.trim() ? t("{n} of {total}", { n: rows.length, total: c.total }) : c.total)}`} action={canWrite && <Btn size="sm" variant="primary" onClick={onNew}><Icon name="add" /> {t("New unit")}</Btn>}>
       {isFiltered && <div className="mb-3"><Banner action={<Btn size="sm" onClick={() => { nav({ powerState: null, connections: null }); }}>{t("Clear filters")}</Btn>}>
-        {t("Filtered by {filters} — clear the filter to see all {units}.", { filters: [c.filter.powerState && t("Power: {state}", { state: t(powerLabel[c.filter.powerState]) }), c.filter.connections.length && t("Connection: {state}", { state: c.filter.connections.map(conn).join(", ") })].filter(Boolean).join(" · "), units: units(t, c.total) })}
+        {t("Filtered by {filters} — clear the filter to see all {units}.", { filters: [c.filter.powerState && t("Power: {state}", { state: t(powerLabel[c.filter.powerState]) }), c.filter.connections.length > 0 && t("Connection: {state}", { state: c.filter.connections.map((item) => conn(item)).join(", ") })].filter(Boolean).join(" · "), units: units(t, c.total) })}
       </Banner></div>}
       <div className="mb-3 flex flex-wrap items-center gap-3">
         <div className="min-w-[200px] flex-1 sm:max-w-xs"><Search placeholder={t("Search unit name or ID…")} value={q} onChange={setQ} /></div>
@@ -361,7 +384,7 @@ function UnitEdit({ live, c, x, nav, run, pending }: Readonly<{ live: UnitsLive;
   }
   const isRo = !live.canWrite || u.archived;
   const errors = unitErrors(d, live.todayKL, t);
-  const err = (k: string) => (tried ? errors[k] : undefined);
+  const fieldError = (k: string) => (tried ? errors[k] : undefined);
   const changes = changedFields(u, d, t);
   const set = (patch: Partial<UnitDraft>) => { setD((v) => ({ ...v, ...patch })); };
   const place = `${d.propertyId}|${d.spaceId}`;
@@ -375,31 +398,31 @@ function UnitEdit({ live, c, x, nav, run, pending }: Readonly<{ live: UnitsLive;
   const attachedIds = x.attached.filter((p) => p.kind === "alert").map((p) => p.id);
   return (
     <>
-      <Card title={<span className="flex flex-wrap items-center gap-2">{u.displayName}<PowerBadge s={u.effectivePowerState === "on" ? "running" : (u.effectivePowerState === "off" ? "stopped" : "unknown")} /><ConnBadge s={u.connection} />{x.seen && <span className="text-[11px] font-normal text-muted-foreground">{t("seen {time}", { time: x.seen })}</span>}{u.activeAlertCount > 0 && <Badge tone="warn" icon="warning">{count(t, u.activeAlertCount, "1 open alert", "{n} open alerts")}</Badge>}</span>}
-        sub={<>{u.id.slice(0, 8)} · {t("version {v}", { v: u.version })} · <Plain touch type="button" className="font-semibold text-primary" onClick={() => { nav({ unitId: null, locationId: u.archived ? null : u.spaceId ?? `unassigned:${u.propertyId}` }); }}><Icon name="chevronLeft" /> {t("back to {place}", { place: back })}</Plain></>}
+      <Card title={<span className="flex flex-wrap items-center gap-2">{u.displayName}<PowerBadge s={POWER_STATE.get(u.effectivePowerState) ?? "unknown"} /><ConnBadge s={u.connection} />{x.seen && <span className="text-[11px] font-normal text-muted-foreground">{t("seen {time}", { time: x.seen })}</span>}{u.activeAlertCount > 0 && <Badge tone="warn" icon="warning">{count(t, u.activeAlertCount, "1 open alert", "{n} open alerts")}</Badge>}</span>}
+        sub={<>{u.id.slice(0, 8)} · {t(VERSION_V, { v: u.version })} · <Plain touch type="button" className="font-semibold text-primary" onClick={() => { nav({ unitId: null, locationId: u.archived ? null : u.spaceId ?? `unassigned:${u.propertyId}` }); }}><Icon name="chevronLeft" /> {t("back to {place}", { place: back })}</Plain></>}
         action={live.canWrite && !u.archived && <Btn size="sm" variant="danger" onClick={() => { setModal("delete"); }}>{t("Delete unit…")}</Btn>}>
         {u.archived && <div className="mb-3"><Banner tone="warn">{t("Read only — {note}. Deleted (archived) units are left out of lists, summaries and totals.", { note: x.archivedNote ?? "" })}</Banner></div>}
         <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2">
-          <Field label={t("Name")} error={err("displayName")}><Input value={d.displayName} disabled={isRo} onChange={(e) => { set({ displayName: e.target.value }); }} /></Field>
-          <Field label={t("Location")} hint={t("Changing it relocates the unit — a reason is asked on save; the old location stays in the history.")} error={err("propertyId")}>
+          <Field label={t("Name")} error={fieldError("displayName")}><Input value={d.displayName} disabled={isRo} onChange={(e) => { set({ displayName: e.target.value }); }} /></Field>
+          <Field label={t("Location")} hint={t("Changing it relocates the unit — a reason is asked on save; the old location stays in the history.")} error={fieldError("propertyId")}>
             <Select value={place} disabled={isRo} onChange={(e) => { const [propertyId, spaceId] = e.target.value.split("|", 2); set({ propertyId, spaceId }); }}>
               {c.places.every((p) => `${p.propertyId}|${p.spaceId}` !== place) && <option value={place}>{t("{place} (current)", { place: x.path })}</option>}
               {c.places.map((p) => <option key={`${p.propertyId}|${p.spaceId}`} value={`${p.propertyId}|${p.spaceId}`}>{p.label}</option>)}
             </Select>
           </Field>
-          <Field label={t("Model")} hint={t(c.models.length > 0 ? "From capabilities.list · type split (fixed)" : "Models need device.read — the current model stays")} error={err("modelId")}>
+          <Field label={t("Model")} hint={t(c.models.length > 0 ? "From capabilities.list · type split (fixed)" : "Models need device.read — the current model stays")} error={fieldError("modelId")}>
             <Select value={d.modelId} disabled={isRo || c.models.length === 0} onChange={(e) => { set({ modelId: e.target.value }); }}>
               {c.models.every((k) => k.id !== d.modelId) && <option value={d.modelId}>{x.model}</option>}
               {c.models.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}
             </Select>
           </Field>
-          <Field label={t("Installed at")} hint={t("A Kuala Lumpur day · leave empty for “Not registered”")} error={err("installedAt")}><Input type="date" max={live.todayKL} value={d.installedAt} disabled={isRo} onChange={(e) => { set({ installedAt: e.target.value }); }} /></Field>
-          <Field label={t("Warranty end")} hint={t("Manufacturer warranty; coverage also counts active maintenance contracts")} error={err("warrantyEnd")}><Input type="date" min={d.installedAt || undefined} value={d.warrantyEnd} disabled={isRo} onChange={(e) => { set({ warrantyEnd: e.target.value }); }} /></Field>
+          <Field label={t("Installed at")} hint={t("A Kuala Lumpur day · leave empty for “Not registered”")} error={fieldError("installedAt")}><Input type="date" max={live.todayKL} value={d.installedAt} disabled={isRo} onChange={(e) => { set({ installedAt: e.target.value }); }} /></Field>
+          <Field label={t("Warranty end")} hint={t("Manufacturer warranty; coverage also counts active maintenance contracts")} error={fieldError("warrantyEnd")}><Input type="date" min={d.installedAt || undefined} value={d.warrantyEnd} disabled={isRo} onChange={(e) => { set({ warrantyEnd: e.target.value }); }} /></Field>
           <Field label={t("IoT device")} hint={x.device ? t("Rebinding is done in Devices and keeps the command history on the unit.") : undefined}>
-            <div className="flex min-h-9 items-center gap-2 text-[13px]">{x.device ? <><b>{x.device.serial}</b><ConnBadge s={x.device.connection} /><TextLink href={`/admin/devices?tab=devices&deviceId=${x.device.id}`}>{t("Devices")} <Icon name="chevronRight" /></TextLink></> : (x.deviceKnown ? <span className="text-muted-foreground">{t("No device bound")}</span> : <span className="text-muted-foreground">{t("Needs device.read")}</span>)}</div>
+            <div className="flex min-h-9 items-center gap-2 text-[13px]">{x.device ? <><b>{x.device.serial}</b><ConnBadge s={x.device.connection} /><TextLink href={`/admin/devices?tab=devices&deviceId=${x.device.id}`}>{t("Devices")} <Icon name="chevronRight" /></TextLink></> : null}{!x.device && x.deviceKnown && <span className="text-muted-foreground">{t("No device bound")}</span>}{!x.device && !x.deviceKnown && <span className="text-muted-foreground">{t("Needs device.read")}</span>}</div>
           </Field>
-          <Field label={t("Service scope")} hint={t("Target inspection groups")} error={err("serviceScope")}>
-            <div className="flex flex-wrap gap-3">{scopes.map((sc) => <Check key={sc} label={t(scopeLabel[sc])} disabled={isRo} checked={d.serviceScope.includes(sc)} onChange={(on) => { set({ serviceScope: on ? [...d.serviceScope, sc] : d.serviceScope.filter((v) => v !== sc) }); }} />)}</div>
+          <Field label={t("Service scope")} hint={t("Target inspection groups")} error={fieldError("serviceScope")}>
+            <div className="flex flex-wrap gap-3">{scopes.map((sc) => <Check key={sc} label={t(entryOf(scopeLabel, sc))} disabled={isRo} checked={d.serviceScope.includes(sc)} onChange={(on) => { set({ serviceScope: on ? [...d.serviceScope, sc] : d.serviceScope.filter((v) => v !== sc) }); }} />)}</div>
           </Field>
         </div>
         {!isRo && (
@@ -416,8 +439,8 @@ function UnitEdit({ live, c, x, nav, run, pending }: Readonly<{ live: UnitsLive;
           <div className="flex flex-col">
             {x.attached.map((p) => (
               <div key={p.id} className="flex flex-wrap items-center gap-2 border-t border-line py-2.5 text-[13px] first:border-0">
-                <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><b>{p.name}</b><Badge tone={p.kind === "default_alert" ? "primary" : "muted"}>{p.type}</Badge>{p.madeBy && <span className="text-[11px] text-muted-foreground">{p.madeBy}</span>}</div><div className="text-xs text-muted-foreground">{p.condition}{p.on ? ` · ${p.on}` : ""}</div></div>
-                <TextLink href={`/admin/alerts?tab=policies&customerId=${c.row.id}&unitId=${u.id}&policyId=${p.id}`}>{t(p.kind === "default_alert" ? "View" : "Edit")}</TextLink>
+                <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><b>{p.name}</b><Badge tone={p.kind === DEFAULT_ALERT ? "primary" : "muted"}>{p.type}</Badge>{p.madeBy && <span className="text-[11px] text-muted-foreground">{p.madeBy}</span>}</div><div className="text-xs text-muted-foreground">{p.condition}{p.on ? ` · ${p.on}` : ""}</div></div>
+                <TextLink href={`/admin/alerts?tab=policies&customerId=${c.row.id}&unitId=${u.id}&policyId=${p.id}`}>{t(p.kind === DEFAULT_ALERT ? "View" : "Edit")}</TextLink>
                 {p.kind === "alert" && c.canAttach && !u.archived && <Btn size="sm" variant="ghost" disabled={pending} onClick={() => { run(() => setUnitPolicies(u.id, u.version, attachedIds.filter((id) => id !== p.id)), t("“{name}” detached", { name: p.name })); }}>{t("Detach")}</Btn>}
               </div>
             ))}
@@ -448,13 +471,13 @@ function PoliciesTab({ c, run, pending }: Readonly<{ c: CustomerLive; run: Run; 
   return (
     <>
       <Card title={t("Alert policies of {name}", { name: c.row.name })} sub={t("Policies belong to the customer. Each unit picks which of them it carries (unit edit › Alert policies). Air-quality limits are alert policies too.")}
-        action={<LinkBtn size="sm" variant="primary" href={`/admin/alerts?tab=policies&customerId=${c.row.id}&new=${c.row.id}`}><Icon name="add" /> {t("New policy for {name}", { name: c.row.name })}</LinkBtn>}>
+        action={<LinkButton size="sm" variant="primary" href={`/admin/alerts?tab=policies&customerId=${c.row.id}&new=${c.row.id}`}><Icon name="add" /> {t("New policy for {name}", { name: c.row.name })}</LinkButton>}>
         <DataTable rows={c.policies} rowKey={(p) => p.id} onRowClick={(p) => { router.push(`/admin/alerts?tab=policies&customerId=${c.row.id}&policyId=${p.id}`); }} cols={[
           { key: "n", label: t("Policy"), render: (p) => <><b>{p.name}</b>{!p.enabled && <Badge className="ml-2">{t("Off")}</Badge>}</> },
-          { key: "t", label: t("Type"), render: (p) => <Badge tone={p.kind === "default_alert" ? "primary" : "muted"}>{p.type}</Badge> },
+          { key: "t", label: t("Type"), render: (p) => <Badge tone={p.kind === DEFAULT_ALERT ? "primary" : "muted"}>{p.type}</Badge> },
           { key: "c", label: t("Condition"), render: (p) => p.condition, hideBelow: "sm" },
           { key: "m", label: t("Made by"), render: (p) => p.madeBy, hideBelow: "md" },
-          { key: "u", label: t("Units"), render: (p) => (p.kind === "default_alert" ? t("All {n}", { n: p.units }) : units(t, p.units)) },
+          { key: "u", label: t("Units"), render: (p) => (p.kind === DEFAULT_ALERT ? t("All {n}", { n: p.units }) : units(t, p.units)) },
         ]} />
         <p className="mt-2 text-[11px] text-muted-foreground">{t("A row opens the policy editor (Alert policies › Policies). The default policy is on every unit; its rules can be switched per customer but it cannot be detached.")}</p>
       </Card>
@@ -465,7 +488,7 @@ function PoliciesTab({ c, run, pending }: Readonly<{ c: CustomerLive; run: Run; 
               <div key={r.ruleKey} className="flex flex-wrap items-center gap-3 border-t border-line py-2.5 text-[13px] first:border-0">
                 <div className="min-w-0 flex-1"><b>{r.name}</b><div className="text-xs text-muted-foreground">{r.condition}{r.note ? ` · ${r.note}` : ""}</div></div>
                 <Toggle on={r.enabled} label={t(r.enabled ? "On" : "Off")} disabled={!c.canRules || pending}
-                  onChange={(on) => { run(() => setDefaultRule(c.rules!.policyId, r.ruleKey, c.row.id, on, r.version), t(on ? "{rule} switched on for {name}" : "{rule} switched off for {name}", { rule: r.name, name: c.row.name })); }} />
+                  onChange={(on) => { const { rules } = c; if (!rules) { return; } run(() => setDefaultRule(rules.policyId, r.ruleKey, c.row.id, on, r.version), t(on ? "{rule} switched on for {name}" : "{rule} switched off for {name}", { rule: r.name, name: c.row.name })); }} />
               </div>
             ))}
           </div>
@@ -483,14 +506,14 @@ function PropertyModal({ p, pending, onClose, onSave }: Readonly<{ p?: TreePrope
   const [d, setD] = useState<PropertyDraft>(propertyDraft(p));
   const [tried, setTried] = useState(false);
   const e = propertyErrors(d, t);
-  const err = (k: string) => (tried ? e[k] : undefined);
+  const fieldError = (k: string) => (tried ? e[k] : undefined);
   return (
-    <Modal open onClose={onClose} title={p ? t("Edit {name}", { name: p.name }) : t("Add property")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (Object.keys(e).length === 0) onSave(d); }}>{t(p ? "Save property" : "Add property")}</Btn></>}>
+    <Modal open onClose={onClose} title={p ? t("Edit {name}", { name: p.name }) : t(ADD_PROPERTY)} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (Object.keys(e).length === 0) onSave(d); }}>{t(p ? "Save property" : ADD_PROPERTY)}</Btn></>}>
       <div className="flex flex-col gap-3">
         <Field label={t("Kind · required")}><Choice value={d.kind} onChange={(v: "home" | "office") => { setD({ ...d, kind: v }); }} options={[{ id: "home", label: t("Home") }, { id: "office", label: t("Office") }]} /></Field>
-        <Field label={t("Name · required")} hint={t("1–120 characters, unique among the customer’s properties")} error={err("name")}><Input value={d.name} onChange={(x) => { setD({ ...d, name: x.target.value }); }} /></Field>
-        <Field label={t("Address")} hint={t("0–500 characters · fictional values only; shown as the site address")} error={err("address")}><Input value={d.address} onChange={(x) => { setD({ ...d, address: x.target.value }); }} /></Field>
-        <Field label={t("Access instructions")} hint={t("0–1000 characters · visible to a contractor only after acceptance, within the valid period")} error={err("accessInstructions")}><Textarea rows={3} value={d.accessInstructions} onChange={(x) => { setD({ ...d, accessInstructions: x.target.value }); }} /></Field>
+        <Field label={t("Name · required")} hint={t("1–120 characters, unique among the customer’s properties")} error={fieldError("name")}><Input value={d.name} onChange={(x) => { setD({ ...d, name: x.target.value }); }} /></Field>
+        <Field label={t("Address")} hint={t("0–500 characters · fictional values only; shown as the site address")} error={fieldError("address")}><Input value={d.address} onChange={(x) => { setD({ ...d, address: x.target.value }); }} /></Field>
+        <Field label={t("Access instructions")} hint={t("0–1000 characters · visible to a contractor only after acceptance, within the valid period")} error={fieldError("accessInstructions")}><Textarea rows={3} value={d.accessInstructions} onChange={(x) => { setD({ ...d, accessInstructions: x.target.value }); }} /></Field>
       </div>
     </Modal>
   );
@@ -507,12 +530,12 @@ function SpaceModal({ c, init, pending, onClose, onSave }: Readonly<{ c: Custome
   const parents = p ? flatten(p.spaces) : [];
   const e = nameError(name, t);
   return (
-    <Modal open onClose={onClose} title={t("Add location")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (!e) onSave({ propertyId, kind, parentSpaceId: parent || null, name: name.trim() }); }}>{t(addKind[kind])}</Btn></>}>
+    <Modal open onClose={onClose} title={t("Add location")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (!e) onSave({ propertyId, kind, parentSpaceId: parent || null, name: name.trim() }); }}>{t(kindAddLabel[kind])}</Btn></>}>
       <div className="flex flex-col gap-3">
         <Field label={t("Property")}><Select value={propertyId} onChange={(x) => { setPropertyId(x.target.value); setParent(""); }}>{c.tree.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</Select></Field>
-        <Field label={t("Kind · required")} hint={t("floor · area · room · space (under the parent you pick)")}><Select value={kind} onChange={(x) => { setKind(x.target.value as TreeSpace["kind"]); }}>{(["floor", "area", "room", "space"] as const).map((k) => <option key={k} value={k}>{t(kindLabel[k])}</option>)}</Select></Field>
+        <Field label={t("Kind · required")} hint={t("floor · area · room · space (under the parent you pick)")}><Select value={kind} onChange={(x) => { setKind(oneOf(["floor", "area", "room", "space"] as const, x.target.value, kind)); }}>{(["floor", "area", "room", "space"] as const).map((k) => <option key={k} value={k}>{(textOf(kindLabel, k, t) ?? k)}</option>)}</Select></Field>
         <Field label={t("Parent")} hint={t("Same property only; floors and areas usually sit directly under the property")}>
-          <Select value={parent} onChange={(x) => { setParent(x.target.value); }}><option value="">{t("{name} (top level)", { name: p?.name ?? t("Property") })}</option>{parents.map((x) => <option key={x.id} value={x.id}>{x.name} ({t(kindLabel[x.kind])})</option>)}</Select>
+          <Select value={parent} onChange={(x) => { setParent(x.target.value); }}><option value="">{t("{name} (top level)", { name: p?.name ?? t("Property") })}</option>{parents.map((x) => <option key={x.id} value={x.id}>{x.name} ({(textOf(kindLabel, x.kind, t) ?? x.kind)})</option>)}</Select>
         </Field>
         <Field label={t("Name · required")} hint={t("1–120 characters, unique among its siblings")} error={tried ? e : undefined}><Input value={name} onChange={(x) => { setName(x.target.value); }} /></Field>
         <p className="text-[11px] text-muted-foreground">{t("A parent in another property, or a parent change that creates a cycle, is rejected with VALIDATION.")}</p>
@@ -547,11 +570,11 @@ function ArchiveLocationModal({ p, s, pending, onClose, onSave }: Readonly<{ p?:
   const isBlocked = children > 0 || held > 0;
   const e = reasonError(reason, t);
   return (
-    <Modal open onClose={onClose} title={t("Delete {name}?", { name })} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="danger" disabled={pending || isBlocked} onClick={() => { setTried(true); if (!e) onSave(reason.trim()); }}>{t(p ? "Delete property" : deleteKind[s!.kind])}</Btn></>}>
+    <Modal open onClose={onClose} title={t("Delete {name}?", { name })} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="danger" disabled={pending || isBlocked} onClick={() => { setTried(true); if (!e) onSave(reason.trim()); }}>{t(p ? "Delete property" : kindDeleteLabel[s?.kind ?? "room"])}</Btn></>}>
       <div className="flex flex-col gap-3">
         <p className="text-[13px] text-muted-foreground">{t("Deleting takes the location out of the customer’s tree (archived). Its history stays in the audit log.")}</p>
         {isBlocked && <Banner tone="crit">{t("{name} still contains {what}. Move or delete them first (unit › Location).", { name, what: [children && count(t, children, "1 location", "{n} locations"), held && units(t, held)].filter(Boolean).join(t(" and ")) })}</Banner>}
-        <Field label={t("Reason · required")} hint={t("1–1000 characters")} error={tried ? e : undefined}><Textarea rows={2} value={reason} disabled={isBlocked} onChange={(x) => { setReason(x.target.value); }} /></Field>
+        <Field label={t(REASON_REQUIRED)} hint={t("1–1000 characters")} error={tried ? e : undefined}><Textarea rows={2} value={reason} disabled={isBlocked} onChange={(x) => { setReason(x.target.value); }} /></Field>
       </div>
     </Modal>
   );
@@ -562,7 +585,7 @@ function NewUnitModal({ live, c, init, pending, onClose, onSave }: Readonly<{ li
   const [d, setD] = useState<UnitDraft>({ ...unitDraft(undefined, init.propertyId, init.spaceId), modelId: c.models[0]?.id ?? "" });
   const [tried, setTried] = useState(false);
   const e = unitErrors(d, live.todayKL, t);
-  const err = (k: string) => (tried ? e[k] : undefined);
+  const fieldError = (k: string) => (tried ? e[k] : undefined);
   const set = (patch: Partial<UnitDraft>) => { setD((v) => ({ ...v, ...patch })); };
   const p = c.tree.find((x) => x.id === d.propertyId);
   return (
@@ -570,18 +593,18 @@ function NewUnitModal({ live, c, init, pending, onClose, onSave }: Readonly<{ li
       <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2">
         <p className="text-[12px] text-muted-foreground sm:col-span-2">{t("The location and the model must belong to this customer.")}</p>
         <Field label={t("Customer · fixed")}><Input value={c.row.name} disabled /></Field>
-        <Field label={t("Location · required")} error={err("propertyId")}><Select value={d.propertyId} onChange={(x) => { set({ propertyId: x.target.value, spaceId: "" }); }}>{c.tree.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</Select></Field>
+        <Field label={t("Location · required")} error={fieldError("propertyId")}><Select value={d.propertyId} onChange={(x) => { set({ propertyId: x.target.value, spaceId: "" }); }}>{c.tree.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</Select></Field>
         <Field label={t("Room / space · optional")} hint={t("Same property only. Leave empty for no room or floor.")}>
-          <Select value={d.spaceId} onChange={(x) => { set({ spaceId: x.target.value }); }}><option value="">{t("— not assigned —")}</option>{(p ? flatten(p.spaces) : []).map((x) => <option key={x.id} value={x.id}>{x.name} ({t(kindLabel[x.kind])})</option>)}</Select>
+          <Select value={d.spaceId} onChange={(x) => { set({ spaceId: x.target.value }); }}><option value="">{t("— not assigned —")}</option>{(p ? flatten(p.spaces) : []).map((x) => <option key={x.id} value={x.id}>{x.name} ({(textOf(kindLabel, x.kind, t) ?? x.kind)})</option>)}</Select>
         </Field>
-        <Field label={t("Model · required")} hint={t(c.models.length > 0 ? "From capabilities.list" : "Models need device.read")} error={err("modelId")}>
+        <Field label={t("Model · required")} hint={t(c.models.length > 0 ? "From capabilities.list" : "Models need device.read")} error={fieldError("modelId")}>
           <Select value={d.modelId} onChange={(x) => { set({ modelId: x.target.value }); }}>{c.models.length === 0 && <option value="">{t("no model available")}</option>}{c.models.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}</Select>
         </Field>
-        <Field label={t("Display name · required")} hint={t("1–120 characters, unique in its room")} error={err("displayName")}><Input value={d.displayName} onChange={(x) => { set({ displayName: x.target.value }); }} /></Field>
-        <Field label={t("Installed at · optional")} hint={t("A Kuala Lumpur day · leave empty for “Not registered”")} error={err("installedAt")}><Input type="date" max={live.todayKL} value={d.installedAt} onChange={(x) => { set({ installedAt: x.target.value }); }} /></Field>
-        <Field label={t("Warranty end · optional")} error={err("warrantyEnd")}><Input type="date" min={d.installedAt || undefined} value={d.warrantyEnd} onChange={(x) => { set({ warrantyEnd: x.target.value }); }} /></Field>
-        <Field label={t("Service scope · required · type: split (fixed)")} error={err("serviceScope")} className="sm:col-span-2">
-          <div className="flex flex-wrap gap-3">{scopes.map((sc) => <Check key={sc} label={t(scopeLabel[sc])} checked={d.serviceScope.includes(sc)} onChange={(on) => { set({ serviceScope: on ? [...d.serviceScope, sc] : d.serviceScope.filter((v) => v !== sc) }); }} />)}</div>
+        <Field label={t("Display name · required")} hint={t("1–120 characters, unique in its room")} error={fieldError("displayName")}><Input value={d.displayName} onChange={(x) => { set({ displayName: x.target.value }); }} /></Field>
+        <Field label={t("Installed at · optional")} hint={t("A Kuala Lumpur day · leave empty for “Not registered”")} error={fieldError("installedAt")}><Input type="date" max={live.todayKL} value={d.installedAt} onChange={(x) => { set({ installedAt: x.target.value }); }} /></Field>
+        <Field label={t("Warranty end · optional")} error={fieldError("warrantyEnd")}><Input type="date" min={d.installedAt || undefined} value={d.warrantyEnd} onChange={(x) => { set({ warrantyEnd: x.target.value }); }} /></Field>
+        <Field label={t("Service scope · required · type: split (fixed)")} error={fieldError("serviceScope")} className="sm:col-span-2">
+          <div className="flex flex-wrap gap-3">{scopes.map((sc) => <Check key={sc} label={t(entryOf(scopeLabel, sc))} checked={d.serviceScope.includes(sc)} onChange={(on) => { set({ serviceScope: on ? [...d.serviceScope, sc] : d.serviceScope.filter((v) => v !== sc) }); }} />)}</div>
         </Field>
       </div>
     </Modal>
@@ -596,7 +619,7 @@ function RelocateModal({ u, from, to, pending, onClose, onSave }: Readonly<{ u: 
   return (
     <Modal open onClose={onClose} title={t("Change location")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (!e) onSave(reason.trim()); }}>{t("Save location")}</Btn></>}>
       <div className="flex flex-col gap-3">
-        <SummaryList items={[[t("Unit"), `${u.displayName} · ${t("version {v}", { v: u.version })}`], [t("Current"), from], [t("New"), to]]} />
+        <SummaryList items={[[t("Unit"), `${u.displayName} · ${t(VERSION_V, { v: u.version })}`], [t("Current"), from], [t("New"), to]]} />
         <Field label={t("Change reason · required")} hint={t("1–1000 characters. Saved with the before/after values in the audit log.")} error={tried ? e : undefined}><Textarea rows={2} value={reason} onChange={(x) => { setReason(x.target.value); }} /></Field>
         <p className="text-[11px] text-muted-foreground">{t("Keeps the unit ID; version {from} → {to}. Alert policies stay attached to the unit.", { from: u.version, to: u.version + 1 })}</p>
       </div>
@@ -615,15 +638,15 @@ function DeleteUnitModal({ x, pending, onClose, onArchive, onDelete }: Readonly<
     <Modal open onClose={onClose} title={t("Delete unit")} footer={<><Btn onClick={onClose}>{t("Close")}</Btn><Btn variant="danger" disabled={pending || isBlocked} onClick={() => { go(onArchive); }}>{t("Delete unit")}</Btn></>}>
       <div className="flex flex-col gap-3">
         <p className="text-[13px] text-muted-foreground">{t("Removes the unit from lists, totals and candidates. Its history is kept (archived), and its active automations are switched off.")}</p>
-        <SummaryList items={[[t("Unit"), `${x.u.displayName} · ${t("version {v}", { v: x.u.version })}`], [t("Location"), x.path]]} />
-        {isBlocked && (
+        <SummaryList items={[[t("Unit"), `${x.u.displayName} · ${t(VERSION_V, { v: x.u.version })}`], [t("Location"), x.path]]} />
+        {isBlocked && x.blockers && (
           <Banner tone="crit"><b>{t("This unit is still in use")}</b>
-            <ul className="mt-1 list-disc pl-4 [&>li]:leading-6">{x.blockers!.map((b) => <li key={b.label}>{b.href ? <TextLink href={b.href}>{b.label}</TextLink> : b.label}</li>)}</ul>
+            <ul className="mt-1 list-disc pl-4 [&>li]:leading-6">{x.blockers.map((b) => <li key={b.label}>{b.href ? <TextLink href={b.href}>{b.label}</TextLink> : b.label}</li>)}</ul>
             <div className="mt-1 text-[12px]">{t("End or move these first. Ended history alone does not block deletion.")}</div>
           </Banner>
         )}
         {x.blockers === null && <Banner>{t("Your permissions don’t show this unit’s contracts, jobs or device binding; they are checked when you delete.")}</Banner>}
-        <Field label={t("Reason · required")} hint={t("1–1000 characters")} error={tried ? e : undefined}><Textarea rows={2} value={reason} onChange={(v) => { setReason(v.target.value); }} /></Field>
+        <Field label={t(REASON_REQUIRED)} hint={t("1–1000 characters")} error={tried ? e : undefined}><Textarea rows={2} value={reason} onChange={(v) => { setReason(v.target.value); }} /></Field>
         <details className="text-[12px] text-muted-foreground">
           <summary className="cursor-pointer font-semibold">{t("Registered by mistake?")}</summary>
           <p className="mt-1">{t("A unit that never had a contract, a job or an IoT device can be removed completely; any other unit is refused and has to be deleted as above.")}</p>
@@ -666,9 +689,15 @@ function UsersTab({ live, c, run, pending }: Readonly<{ live: UnitsLive; c: Cust
   const [change, setChange] = useState<null | { u: ClientUserRow; kind: "role" | "status" | "remove" | "signout" }>(null);
   const canWrite = live.canWrite;
   const act = (u: ClientUserRow, a: string) => {
-    if (a === "role" || a === "status" || a === "remove" || a === "signout") setChange({ u, kind: a });
-    if (a === "resend") run(() => resendInvite(u.id), t("Set-up e-mail sent again to {email}", { email: u.email }));
-    if (a === "reset") run(() => previewPasswordReset(u.email), t("Password reset preview created — the same generic message for every address"));
+    switch (a) {
+      case "role":
+      case "status":
+      case "remove":
+      case "signout": { setChange({ u, kind: a }); break; }
+      case "resend": { run(() => resendInvite(u.id), t("Set-up e-mail sent again to {email}", { email: u.email })); break; }
+      case "reset": { run(() => previewPasswordReset(u.email), t("Password reset preview created — the same generic message for every address")); break; }
+      default: // a menu item that opens nothing here
+    }
   };
   return (
     <Card title={t("Client users of {name}", { name: c.row.name })} sub={t("People who sign in to the customer app. They only ever see {name}’s properties and units.", { name: c.row.name })}
@@ -677,7 +706,7 @@ function UsersTab({ live, c, run, pending }: Readonly<{ live: UnitsLive; c: Cust
         <DataTable rows={c.users} rowKey={(u) => u.id} cols={[
           { key: "u", label: t("User"), render: (u) => <><b>{u.name ?? u.email}</b><div className="text-xs text-muted-foreground">{u.sub}</div></> },
           { key: "r", label: t("Role"), render: (u) => <Badge tone={u.role === "owner" ? "primary" : "muted"}>{t(u.role === "owner" ? "Owner" : "Member")}</Badge> },
-          { key: "s", label: t("Status"), render: (u) => <Badge tone={u.status === "active" ? "ok" : (u.status === "invited" ? "warn" : "muted")}>{t(u.status === "active" ? "Active" : (u.status === "invited" ? "Not signed in yet" : "Disabled"))}</Badge> },
+          { key: "s", label: t("Status"), render: (u) => <Badge tone={USER_TONE.get(u.status) ?? "muted"}>{t(USER_STATUS.get(u.status) ?? "Disabled")}</Badge> },
           { key: "l", label: t("Last sign-in"), render: (u) => u.lastSignIn, hideBelow: "md" },
           { key: "c", label: t("Notification channels"), render: (u) => u.channels, hideBelow: "md" },
           { key: "a", label: "", render: (u) => canWrite && (
@@ -699,9 +728,12 @@ function UsersTab({ live, c, run, pending }: Readonly<{ live: UnitsLive; c: Cust
         const close = () => { setChange(null); };
         if (kind === "remove") { run(() => removeClientUser(u.id, u.version, reason), t("{email} removed from {name}", { email: u.email, name: c.row.name }), close); return; }
         if (kind === "signout") { run(() => signOutEverywhere(u.membershipId ?? "", reason), t("Signed out everywhere — every session of {email} has ended", { email: u.email }), close); return; }
-        const status = kind === "status" ? (u.status === "disabled" ? "active" : "disabled") : undefined;
+        const next = u.status === "disabled" ? "active" : "disabled";
+        const status = kind === "status" ? next : undefined;
+        const roleDone = role === "owner" ? "Role changed to Owner" : "Role changed to Member";
+        const signInDone = status === "active" ? "Sign-in enabled" : "Sign-in disabled";
         run(() => updateClientUser(u.id, u.version, { customerId: c.row.id, email: u.email, clientRole: role, ...(status && { status }), reason }),
-          t(kind === "role" ? (role === "owner" ? "Role changed to Owner" : "Role changed to Member") : (status === "active" ? "Sign-in enabled" : "Sign-in disabled")), close);
+          t(kind === "role" ? roleDone : signInDone), close);
       }} />}
     </Card>
   );
@@ -727,6 +759,16 @@ function InviteModal({ c, pending, onClose, onSave }: Readonly<{ c: CustomerLive
   );
 }
 
+/** The dialog title of a change to a client user (English; translated by the caller). */
+function userChangeTitle(kind: string, status: string): string {
+  switch (kind) {
+    case "role": { return "Change role of {email}"; }
+    case "remove": { return "Remove {email}?"; }
+    case "signout": { return "Sign out {email} everywhere?"; }
+    default: { return status === "disabled" ? "Enable sign-in for {email}" : "Disable sign-in for {email}"; }
+  }
+}
+const USER_CHANGE_SAVE = new Map([["remove", "Remove user"], ["signout", "Sign out everywhere"]]);
 function ClientUserModal({ change, pending, onClose, onSave }: Readonly<{ change: { u: ClientUserRow; kind: "role" | "status" | "remove" | "signout" }; pending: boolean; onClose: () => void; onSave: (role: "owner" | "member", reason: string) => void }>) {
   const t = useT();
   const { u, kind } = change;
@@ -734,15 +776,16 @@ function ClientUserModal({ change, pending, onClose, onSave }: Readonly<{ change
   const [reason, setReason] = useState("");
   const [tried, setTried] = useState(false);
   const e = reasonError(reason, t);
-  const title = t(kind === "role" ? "Change role of {email}" : kind === "remove" ? "Remove {email}?" : kind === "signout" ? "Sign out {email} everywhere?" : u.status === "disabled" ? "Enable sign-in for {email}" : "Disable sign-in for {email}", { email: u.email });
+  const title = t(userChangeTitle(kind, u.status), { email: u.email });
+  const saveText = USER_CHANGE_SAVE.get(kind) ?? "Save";
   return (
-    <Modal open onClose={onClose} title={title} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant={kind === "remove" || kind === "signout" ? "danger" : "primary"} disabled={pending} onClick={() => { setTried(true); if (!e) onSave(kind === "role" ? role : u.role, reason.trim()); }}>{t(kind === "remove" ? "Remove user" : (kind === "signout" ? "Sign out everywhere" : "Save"))}</Btn></>}>
+    <Modal open onClose={onClose} title={title} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant={kind === "remove" || kind === "signout" ? "danger" : "primary"} disabled={pending} onClick={() => { setTried(true); if (!e) onSave(kind === "role" ? role : u.role, reason.trim()); }}>{t(saveText)}</Btn></>}>
       <div className="flex flex-col gap-3">
         {kind === "role" && <Field label={t("New role")}><Choice value={role} onChange={(v: "owner" | "member") => { setRole(v); }} options={[{ id: "member", label: t("Member") }, { id: "owner", label: t("Owner") }]} /></Field>}
         {kind === "remove" && <p className="text-[13px] text-muted-foreground">{t("The user loses access to the customer app; their membership ends now. The history stays in the audit log.")}</p>}
         {kind === "signout" && <p className="text-[13px] text-muted-foreground">{t("Ends every session of this user now, in all four apps. Their access stays: the next sign-in asks for their password again. For a lost device or a suspected takeover.")}</p>}
         {kind === "status" && <p className="text-[13px] text-muted-foreground">{t(u.status === "disabled" ? "The user can sign in again." : "The user cannot sign in until sign-in is enabled again; the membership ends now.")}</p>}
-        <Field label={t("Reason · required")} hint={t("1–1000 characters, stored in the audit log")} error={tried ? e : undefined}><Textarea rows={2} value={reason} onChange={(x) => { setReason(x.target.value); }} /></Field>
+        <Field label={t(REASON_REQUIRED)} hint={t("1–1000 characters, stored in the audit log")} error={tried ? e : undefined}><Textarea rows={2} value={reason} onChange={(x) => { setReason(x.target.value); }} /></Field>
       </div>
     </Modal>
   );
@@ -776,18 +819,18 @@ function WarrantyTab({ live }: Readonly<{ live: UnitsLive }>) {
         <Select aria-label={t("Customer")} className="w-auto" value={f.customerId} onChange={(e) => { setF({ ...f, customerId: e.target.value }); }}>
           <option value="">{t("Customer: All")}</option>{w.customers.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
         </Select>
-        <Select aria-label={t("Coverage")} className="w-auto" value={f.coverage} onChange={(e) => { setF({ ...f, coverage: e.target.value as CoverageFilter["coverage"] }); }}>
-          <option value="">{t("Coverage: All")}</option><option value="contract">{t("Maintenance contract")}</option><option value="under_warranty">{t("Under warranty")}</option><option value="expiring">{t("Ending within 90 days")}</option><option value="no_coverage">{t("No coverage")}</option>
+        <Select aria-label={t("Coverage")} className="w-auto" value={f.coverage} onChange={(e) => { setF({ ...f, coverage: oneOf(["", ...coverageStatuses], e.target.value, f.coverage) }); }}>
+          <option value="">{t("Coverage: All")}</option><option value="contract">{t(MAINTENANCE_CONTRACT)}</option><option value="under_warranty">{t("Under warranty")}</option><option value="expiring">{t("Ending within 90 days")}</option><option value="no_coverage">{t("No coverage")}</option>
         </Select>
-        <Select aria-label={t("Ends within")} className="w-auto" value={f.within} onChange={(e) => { setF({ ...f, within: e.target.value as CoverageFilter["within"] }); }}>
-          <option value="">{t("Ends within: any")}</option>{["30", "90", "180", "365"].map((d) => <option key={d} value={d}>{t("Ends within: {n} days", { n: d })}</option>)}
+        <Select aria-label={t("Ends within")} className="w-auto" value={f.within} onChange={(e) => { setF({ ...f, within: oneOf(["", ...withinDays], e.target.value, f.within) }); }}>
+          <option value="">{t("Ends within: any")}</option>{withinDays.map((d) => <option key={d} value={d}>{t("Ends within: {n} days", { n: d })}</option>)}
         </Select>
       </div>
       <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}>
         <Kpi label={t("Under warranty")} value={k.underWarranty} sub={t("of {units}", { units: units(t, k.total) })} />
         <Kpi label={t("Warranty ends ≤ 90 days")} value={k.within90} tone={k.within90 ? "warn" : undefined} sub={t("{n} within 30 days", { n: k.within30 })} />
         <Kpi label={t("Out of warranty, no contract")} value={k.noCoverage} tone={k.noCoverage ? "crit" : undefined} sub={t("Offer maintenance")} />
-        <Kpi label={t("Maintenance contract")} value={k.contract} sub={k.contractNames} />
+        <Kpi label={t(MAINTENANCE_CONTRACT)} value={k.contract} sub={k.contractNames} />
       </div>
       <Card title={t("Units by coverage end")} sub={t("{n} of {total}", { n: rows.length, total: w.rows.length })} action={<Btn size="sm" disabled={rows.length === 0} onClick={() => { download("warranty-coverage.csv", coverageCsv(rows)); }}>{t("Export CSV")}</Btn>}>
         <DataTable rows={rows} rowKey={(r) => r.unitId} cols={[
@@ -795,18 +838,19 @@ function WarrantyTab({ live }: Readonly<{ live: UnitsLive }>) {
           { key: "c", label: t("Customer"), render: (r) => r.customer, hideBelow: "sm" },
           { key: "m", label: t("Model"), render: (r) => r.model, hideBelow: "md" },
           { key: "w", label: t("Warranty end"), render: (r) => r.ends },
-          { key: "k", label: t("Maintenance contract"), render: (r) => r.contracts, hideBelow: "md" },
+          { key: "k", label: t(MAINTENANCE_CONTRACT), render: (r) => r.contracts, hideBelow: "md" },
           { key: "s", label: t("Status"), render: (r) => <Badge tone={coverageTone[r.status]}>{r.statusText}</Badge> },
           { key: "a", label: t("Action"), render: (r) => {
-            return (r.contractIds.length > 0
-              ? <TextLink href={`/admin/billing/contracts?contractId=${r.contractIds[0]}`}>{t("Open contract")}</TextLink>
+            const contractId = r.contractIds[0];
+            return (contractId
+              ? <TextLink href={`/admin/billing/contracts?contractId=${contractId}`}>{t("Open contract")}</TextLink>
               : <TextLink href={`/admin/billing/contracts?customerId=${r.customerId}&unitId=${r.unitId}`}>{t("Renewal offer")}</TextLink>);
           } },
         ]} />
         <p className="mt-2 text-[11px] text-muted-foreground">{t("The warranty end is set on the unit (unit edit › Warranty end) or by the CSV import. Coverage = an active maintenance contract, otherwise the warranty; fewer than 90 days left counts as ending.")}</p>
       </Card>
       <Card title={t("Warranty on jobs")} sub={t("Jobs completed while the unit’s warranty ran whose accepted report lists replaced parts — the parts cost is claimable from the manufacturer until a claim is filed.")}>
-        {w.claims === null ? <p className="text-[13px] text-muted-foreground">{t("Claimable jobs need job.read.")}</p> : (w.claims.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No claimable job right now.")}</p> : (
+        {w.claims === null && <p className="text-[13px] text-muted-foreground">{t("Claimable jobs need job.read.")}</p>}{w.claims?.length === 0 && <p className="text-[13px] text-muted-foreground">{t("No claimable job right now.")}</p>}{w.claims && w.claims.length > 0 && (
           <div className="flex flex-col">
             {w.claims.map((x) => (
               <div key={x.jobId} className="flex flex-wrap items-center gap-3 border-t border-line py-2.5 text-[13px] first:border-0">
@@ -816,7 +860,7 @@ function WarrantyTab({ live }: Readonly<{ live: UnitsLive }>) {
               </div>
             ))}
           </div>
-        ))}
+        )}
       </Card>
       {claim && <ClaimModal x={claim} pending={pending} onClose={() => { setClaim(null); }}
         onSave={(label, minor, reason) => { run(() => recordWarrantyClaim(claim.jobId, claim.version, label, minor, claim.currency, reason), t("Warranty claim filed for {unit}", { unit: claim.unit }), () => { setClaim(null); }); }} />}
@@ -838,7 +882,7 @@ function ClaimModal({ x, pending, onClose, onSave }: Readonly<{ x: ClaimCandidat
         <SummaryList items={[[t("Job"), t("{type} · {id} · completed {date}", { type: typeLabel(x.type, t), id: x.jobId.slice(0, 8), date: x.completed })], [t("Parts in the report"), x.parts]]} />
         <Field label={t("Part · required")} hint={t("1–120 characters")} error={tried ? e.label : undefined}><Input value={label} onChange={(v) => { setLabel(v.target.value); }} /></Field>
         <Field label={t("Claim amount ({currency}) · required", { currency: x.currency })} error={tried ? e.value : undefined}><Input inputMode="decimal" value={value} onChange={(v) => { setValue(v.target.value); }} /></Field>
-        <Field label={t("Reason · required")} hint={t("1–1000 characters, e.g. the manufacturer’s claim reference")} error={tried ? e.reason : undefined}><Textarea rows={2} value={reason} onChange={(v) => { setReason(v.target.value); }} /></Field>
+        <Field label={t(REASON_REQUIRED)} hint={t("1–1000 characters, e.g. the manufacturer’s claim reference")} error={tried ? e.reason : undefined}><Textarea rows={2} value={reason} onChange={(v) => { setReason(v.target.value); }} /></Field>
       </div>
     </Modal>
   );
@@ -858,21 +902,8 @@ function ImportWizard({ live, onClose }: Readonly<{ live: UnitsLive; onClose: ()
   const [tried, setTried] = useState(false);
   const shape = file ? csvShape(file.text) : null;
   const isTooBig = !!file && file.size > 900_000;
-  const missing = importFields.filter((x) => x.required && !mapping[x.key]);
+  const missing = importFields.filter((x) => x.required && !lookup(mapping, x.key));
   const customer = live.activeCustomers.find((x) => x.id === customerId)?.name ?? "";
-  const pick = async (f: File | undefined) => {
-    if (!f) return;
-    const text = await f.text();
-    setFile({ name: f.name, size: f.size, text });
-    setMapping(autoMapping(csvShape(text).header));
-    setPreview(null);
-  };
-  const validate = () => {
-    setTried(true);
-    if (!file || !customerId || missing.length > 0 || isTooBig) return;
-    run(() => importPreview(customerId, file.name, file.text, Object.fromEntries(Object.entries(mapping).filter(([, v]) => v))),
-      (p) => t("{n} of {total} rows can be imported", { n: p.readyCount + p.warningCount, total: p.rows.length }), setPreview);
-  };
   if (result) {
     const isUndoable = result.state === "imported" && Date.parse(result.undoUntil) > Date.parse(live.now); // the business clock of the last render
     return (
@@ -904,13 +935,26 @@ function ImportWizard({ live, onClose }: Readonly<{ live: UnitsLive; onClose: ()
             { key: "n", label: t("Row"), render: (r) => r.rowNumber },
             { key: "l", label: t("Location / unit"), render: (r) => <><b>{importPlace(r)}</b><div className="text-xs text-muted-foreground">{r.unitName || "—"}</div></> },
             { key: "m", label: t("Model · serial"), render: (r) => `${r.modelCode || "—"} · ${r.serial ?? "—"}`, hideBelow: "sm" },
-            { key: "r", label: t("Result"), render: (r) => <span className="flex items-start gap-2"><Badge tone={r.result === "ready" ? "ok" : (r.result === "warning" ? "warn" : "crit")}>{t(resultLabel[r.result])}</Badge><span className="text-xs">{importMessage(r, t)}</span></span> },
+            { key: "r", label: t("Result"), render: (r) => <span className="flex items-start gap-2"><Badge tone={RESULT_TONE.get(r.result) ?? "crit"}>{t(resultLabel[r.result])}</Badge><span className="text-xs">{importMessage(r, t)}</span></span> },
           ]} />
           <p className="text-[11px] text-muted-foreground">{t("Nothing is written until you import. Error rows are skipped; the import runs as one change set, is recorded in the audit log and can be undone for 24 h while no unit has telemetry or jobs. The preview expires after 30 minutes.")}</p>
         </div>
       </Modal>
     );
   }
+  const pick = async (f: File | undefined) => {
+    if (!f) return;
+    const text = await f.text();
+    setFile({ name: f.name, size: f.size, text });
+    setMapping(autoMapping(csvShape(text).header));
+    setPreview(null);
+  };
+  const validate = () => {
+    setTried(true);
+    if (!file || !customerId || missing.length > 0 || isTooBig) return;
+    run(() => importPreview(customerId, file.name, file.text, Object.fromEntries(Object.entries(mapping).filter(([, v]) => v))),
+      (p) => t("{n} of {total} rows can be imported", { n: p.readyCount + p.warningCount, total: p.rows.length }), setPreview);
+  };
   return (
     <Modal open wide onClose={onClose} title={t("Import units from CSV · 1 / 2")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={validate}>{t("Validate")} <Icon name="arrowRight" /></Btn></>}>
       <div className="flex flex-col gap-3">
@@ -918,7 +962,7 @@ function ImportWizard({ live, onClose }: Readonly<{ live: UnitsLive; onClose: ()
           <Select value={customerId} onChange={(v) => { setCustomerId(v.target.value); setPreview(null); }}>{live.activeCustomers.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</Select>
         </Field>
         <div className="flex flex-wrap items-center gap-3">
-          <Input aria-label={t("CSV file")} type="file" accept=".csv,text/csv" className="text-[13px]" onChange={(v) => pick(v.target.files?.[0])} />
+          <Input aria-label={t("CSV file")} type="file" accept=".csv,text/csv" className="text-[13px]" onChange={(v) => { void pick(v.target.files?.[0]); }} />
           <Btn size="sm" variant="ghost" onClick={() => { download("units-template.csv", importTemplate); }}>{t("Download template")}</Btn>
         </div>
         {file && <p className="text-[12px] text-muted-foreground"><Icon name="document" /> {file.name} · {count(t, shape?.rows ?? 0, "1 row", "{n} rows")} · {count(t, shape?.header.length ?? 0, "1 column", "{n} columns")} · UTF-8 · {Math.max(1, Math.round(file.size / 1024))} KB{isTooBig ? ` — ${t("too large: split the file (at most about 900 KB, 1000 rows)")}` : ""}</p>}

@@ -3,10 +3,12 @@
 // and jobs.get describe them. Pure code shared by the scan dialog; Vitest covers it. Texts in the display language
 // (`i` / `t`, IR288); the job's window is a span in the user's display time zone (IR44), while "today" is the Kuala
 // Lumpur day the work happens on, as on the overview (IR281).
-import { EN, showSpan, translator, type I18n, type T } from "@ac/web/lib/i18n";
+import { byCount, EN, showSpan, translator, type I18n, type T } from "@ac/web/lib/i18n";
 import { statusWord, typeLabel } from "@ac/web/lib/partnerJobDetail";
 import type { Slot } from "@ac/web/lib/partnerOverview";
 import type { TechJobRead } from "@ac/web/lib/techJob";
+import { wrapped } from "@ac/web/lib/text";
+import { isAfter } from "@ac/web/lib/order";
 
 const en = translator("en");
 
@@ -24,28 +26,28 @@ export const scanCode = (raw: string) => raw.trim();
 export interface QrMatch { title: string; sub: string; job: { label: string; text: string; tone: "ok" | "primary" } | null; unitHref: string; jobHref: string | null }
 /** The matched card: the unit with its location and model, and the user's job on it (today's, or the next one). Before
 the work window units.get is FORBIDDEN (IR94): the card then names the unit from the user's unit list and says so. */
-export function qrMatch(r: ApiQrResolution, unit: ApiQrUnit | null, job: ApiQrJob | null, now: number, opts: { name?: string; locked?: boolean } = {}, i: I18n = EN): QrMatch {
+export function qrMatch(r: ApiQrResolution, unit: ApiQrUnit | null, job: ApiQrJob | null, now: number, options: { name?: string; locked?: boolean } = {}, i: I18n = EN): QrMatch {
   const { t, display } = i;
-  const title = unit?.displayName ?? opts.name ?? t("Assigned unit");
-  const sub = unit ? [unit.location.pathLabels.join(" › "), `${unit.capabilities.manufacturer} ${unit.capabilities.model}`].filter(Boolean).join(" · ")
-    : (opts.locked ? t("Unit details open when your work window starts.") : "");
+  const title = unit?.displayName ?? options.name ?? t("Assigned unit");
+  const locked = options.locked ? t("Unit details open when your work window starts.") : "";
+  const sub = unit ? [unit.location.pathLabels.join(" › "), `${unit.capabilities.manufacturer} ${unit.capabilities.model}`].filter(Boolean).join(" · ") : locked;
   let card: QrMatch["job"] = null;
   if (r.jobId) {
     const j = job?.projection === "detail" ? job : null;
     const s = j?.scheduledSlot ?? null;
-    const isToday = !!s && klDate(Date.parse(s.startAt)) <= klDate(now) && klDate(now) <= klDate(Date.parse(s.endAt));
-    const alerts = j?.alertIds.length ? t(j.alertIds.length === 1 ? "1 linked alert" : "{n} linked alerts", { n: j.alertIds.length }) : "";
+    const isToday = !!s && !isAfter(klDate(Date.parse(s.startAt)), klDate(now)) && !isAfter(klDate(now), klDate(Date.parse(s.endAt)));
+    const alerts = j?.alertIds.length ? byCount(j.alertIds.length, { one: t("1 linked alert"), many: t("{n} linked alerts", { n: j.alertIds.length }) }) : "";
     card = {
       label: t(isToday ? "Your job today: {id}" : "Your next job: {id}", { id: r.jobId.slice(0, 8) }),
       text: [s ? showSpan(s.startAt, s.endAt, display) : "", j ? typeLabel(j.type, t) : "", j ? statusWord(j.status, t) : "", alerts].filter(Boolean).join(" · "), tone: isToday ? "ok" : "primary",
     };
   }
-  return { title, sub, job: card, unitHref: `/technician/units/${r.unitId}${r.jobId ? `?jobId=${r.jobId}` : ""}`, jobHref: r.jobId ? `/technician/jobs/${r.jobId}` : null };
+  return { title, sub, job: card, unitHref: `/technician/units/${r.unitId}${wrapped(r.jobId, "?jobId=")}`, jobHref: r.jobId ? `/technician/jobs/${r.jobId}` : null };
 }
 
 /** Readable refusals of a scan: anything outside the user's assignments is absent without unit data (DD-T13). `absent`
 marks the NOT_FOUND answer, which the dialog shows as a warning rather than an error. */
-export function qrRefusal(f: { code: string; messageKey: string }, t: T = en): { title: string; text: string; absent: boolean } {
+export function qrRefusal(f: { code: string }, t: T = en): { title: string; text: string; absent: boolean } {
   if (f.code === "NOT_FOUND") return { title: t("Page unavailable"), text: t("This label is not on a unit in your assignments, or it is unknown. Check the label, or enter the unit ID manually."), absent: true };
   if (f.code === "VALIDATION") return { title: t("Not a label"), text: t("Enter the label code, a device serial or the unit ID."), absent: false };
   return { title: t("Scan failed"), text: t("The label could not be checked — try again."), absent: false };

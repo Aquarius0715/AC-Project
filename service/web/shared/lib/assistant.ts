@@ -4,6 +4,7 @@
 import { one } from "@ac/web/lib/energy";
 import { showClock, type Display, type Locale, type T } from "@ac/web/lib/i18n";
 import { actionText, controlLayout, type ApiCommand, type ApiUnitDetail } from "@ac/web/lib/units";
+import { entryOf, lookup } from "@ac/web/lib/lookup";
 
 /** ResolvedIntent of service-contracts.ts. */
 export interface Measurement { value: number | null; unit: string; observedAt: string; quality: "valid" | "missing" | "stale" | "suspect" }
@@ -40,7 +41,7 @@ export function candidateGroups(candidates: { unitId: string; pathLabel: string 
   const rooms = new Map<string, { unitId: string; name: string }[]>();
   for (const c of candidates) {
     const parts = c.pathLabel.split(" > ");
-    const name = parts.length > 1 ? parts.pop()! : c.pathLabel;
+    const name = parts.length > 1 ? parts.pop() ?? c.pathLabel : c.pathLabel;
     const path = parts.join(" › ");
     rooms.set(path, [...(rooms.get(path) ?? []), { unitId: c.unitId, name }]);
   }
@@ -52,18 +53,22 @@ export function candidateGroups(candidates: { unitId: string; pathLabel: string 
 }
 /** A room choice's ACs, “2 ACs: Bedroom AC, Bedroom AC #2”. */
 export const groupSummary = (g: CandidateGroup, t: T) =>
-  g.units.length === 1 ? t("1 AC: {name}", { name: g.units[0].label }) : t("{count} ACs: {names}", { count: g.units.length, names: g.units.map((u) => u.label).join(", ") });
+  g.units.length === 1 ? t("1 AC: {name}", { name: g.units[0]?.label ?? "" }) : t("{count} ACs: {names}", { count: g.units.length, names: g.units.map((u) => u.label).join(", ") });
 /** The room the request named, as the matched rooms are called (“Bedroom”). */
 export const roomOf = (groups: CandidateGroup[]) => groups[0]?.path.split(" › ").pop() ?? "";
 
 /** The answer to a temperature question: the latest reading, or why there is none (never a zero). */
 export function temperatureText(m: Measurement | null, unit: string, t: T, display: Display): string {
-  if (!m || m.value === null) return t("{unit} has no temperature reading yet.", { unit });
+  const value = m?.value ?? null;
+  if (m === null || value === null) return t("{unit} has no temperature reading yet.", { unit });
   const at = showClock(m.observedAt, display);
-  return m.quality === "valid" ? t("{unit} is {value} °C (measured {time}).", { unit, value: one(m.value), time: at })
-    : t("{unit} last read {value} °C at {time} — the reading is {quality}.", { unit, value: one(m.value), time: at, quality: qualityWord(m.quality, t) });
+  return m.quality === "valid" ? t("{unit} is {value} °C (measured {time}).", { unit, value: one(value), time: at })
+    : t("{unit} last read {value} °C at {time} — the reading is {quality}.", { unit, value: one(value), time: at, quality: qualityWord(m.quality, t) });
 }
-const qualityWord = (q: Measurement["quality"], t: T) => ({ valid: t("valid"), missing: t("missing"), stale: t("stale"), suspect: t("suspect") })[q] ?? q;
+const qualityWord = (q: Measurement["quality"], t: T) => {
+  const words: Partial<Record<Measurement["quality"], string>> = { valid: t("valid"), missing: t("missing"), stale: t("stale"), suspect: t("suspect") };
+  return lookup(words, q) ?? q; // a value the API adds before this table does
+};
 
 /** The confirmation card of a change (Figma 09c): target, current setting, requested setting and the allowed range. */
 export function changeCard(intent: Extract<ResolvedIntent, { kind: "change" }>, u: ApiUnitDetail | null, t: T) {
@@ -93,8 +98,11 @@ export function progressOf(c: ApiCommand, unit: string, celsius: number, before:
   if (c.status === "failed" || c.status === "expired" || c.status === "cancelled") {
     const kept = before === null ? t("Nothing changed.") : t("Nothing changed — the confirmed setting is still {value} °C.", { value: before });
     const ttl = c.expiresAt ? Math.round((Date.parse(c.expiresAt) - Date.parse(c.requestedAt)) / 1000) : null;
-    const why = c.status === "expired" ? (ttl ? t("The device did not answer within {seconds} s (expired).", { seconds: ttl }) : t("The device did not answer in time (expired)."))
-      : (c.status === "cancelled" ? t("The command was cancelled.") : t("The device refused it ({code}).", { code: c.failureCode ?? "—" }));
+    const failure = () => {
+      if (c.status === "expired") return ttl ? t("The device did not answer within {seconds} s (expired).", { seconds: ttl }) : t("The device did not answer in time (expired).");
+      return c.status === "cancelled" ? t("The command was cancelled.") : t("The device refused it ({code}).", { code: c.failureCode ?? "—" });
+    };
+    const why = failure();
     return { tone: "crit", title: t("Couldn’t change {unit}", { unit }), detail: `${why} ${kept}` };
   }
   return {
@@ -107,4 +115,4 @@ export function progressOf(c: ApiCommand, unit: string, celsius: number, before:
 /** The state chip of the header (Figma 09a–09g). */
 export type PanelState = "idle" | "listening" | "confirm" | "sending" | "success" | "failure";
 export const stateText = (s: PanelState, t: T) =>
-  ({ idle: t("Idle"), listening: t("Listening"), confirm: t("Needs confirmation"), sending: t("Sending"), success: t("Success"), failure: t("Failure") })[s];
+  entryOf({ idle: t("Idle"), listening: t("Listening"), confirm: t("Needs confirmation"), sending: t("Sending"), success: t("Success"), failure: t("Failure") }, s);

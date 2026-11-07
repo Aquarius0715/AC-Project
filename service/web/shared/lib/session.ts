@@ -7,19 +7,25 @@ import "server-only";
 import { createCipheriv, createDecipheriv, createHash, hkdfSync, randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
 import { createClient } from "@redis/client";
+import { z } from "zod";
+import { filled } from "@ac/web/lib/filled";
+
+
+const roleSchema = z.enum(["client", "contractor", "technician", "admin"]);
+type Role = z.infer<typeof roleSchema>;
 
 export interface Session {
   accessToken: string;
   refreshToken: string | null;
   tenantId: string;
   membershipId: string;
-  role: "client" | "contractor" | "technician" | "admin";
+  role: Role;
   expiresAt: number; // epoch seconds of the access token
 }
 
 // One web app per role (IR178). AC_APP_ROLE is set at build time by each app's next.config; the cookie names carry
 // it because local apps share the host "localhost" (cookies are not separated by port).
-export const APP_ROLE = (process.env.AC_APP_ROLE ?? "client") as Session["role"];
+export const APP_ROLE = roleSchema.parse(process.env.AC_APP_ROLE ?? "client"); // an unknown role fails at start, not as a cookie name
 
 /** True when the app is served over HTTPS (APP_URL): its cookies are Secure and carry the cookie prefixes. */
 const httpsApp = () => oidcConfig().appUrl.startsWith("https");
@@ -41,9 +47,9 @@ a missing, empty or short secret is refused rather than replaced by the local on
 (IR430: it is long enough, but it is in the repository), so a deployment without its own secret cannot seal or open
 a session and fails closed (IR367). Plain-http local runs keep the local default. */
 export function cookieKey(): Buffer {
-  const secret = process.env.SESSION_SECRET || undefined;
+  const secret = filled(process.env.SESSION_SECRET);
   if (oidcConfig().appUrl.startsWith("https") && (secret === undefined || secret.length < MIN_SECRET_LENGTH || secret.includes("change-me"))) {
-    throw new Error(`SESSION_SECRET of at least ${MIN_SECRET_LENGTH} characters, not the local value, is required on https`);
+    throw new Error(`SESSION_SECRET of at least ${String(MIN_SECRET_LENGTH)} characters, not the local value, is required on https`);
   }
   return Buffer.from(hkdfSync("sha256", secret ?? LOCAL_SECRET, "", "ac bff session cookie", 32));
 }
@@ -58,16 +64,22 @@ export function seal(value: object): string {
   return `${iv.toString("base64url")}.${body.toString("base64url")}`;
 }
 
+/** The sealed value when it also has the shape `schema` describes; null otherwise (a cookie of an older release too). */
+export function unsealAs<T>(token: string | undefined, schema: z.ZodType<T>): T | null {
+  const parsed = schema.safeParse(unseal(token));
+  return parsed.success ? parsed.data : null;
+}
+
 /** Opens a sealed cookie value; null when it is missing, altered, sealed with another key, or not JSON. */
-export function unseal<T>(token: string | undefined): T | null {
-  const [iv64, body64, extra] = (token ?? "").split(".", 3);
+export function unseal(token: string | undefined = ""): unknown {
+  const [iv64, body64, extra] = token.split(".", 3);
   if (!iv64 || !body64 || extra !== undefined) return null;
   const iv = Buffer.from(iv64, "base64url"), body = Buffer.from(body64, "base64url");
   if (iv.length !== IV_BYTES || body.length <= TAG_BYTES) return null;
   try {
     const d = createDecipheriv("aes-256-gcm", cookieKey(), iv);
     d.setAuthTag(body.subarray(body.length - TAG_BYTES));
-    return JSON.parse(Buffer.concat([d.update(body.subarray(0, body.length - TAG_BYTES)), d.final()]).toString("utf8")) as T;
+    return JSON.parse(Buffer.concat([d.update(body.subarray(0, body.length - TAG_BYTES)), d.final()]).toString("utf8"));
   } catch {
     return null;
   }
@@ -93,36 +105,46 @@ export function oidcCookieOptions(maxAge = 600) {
   return { httpOnly: true, sameSite: "lax" as const, secure: httpsApp(), path: "/bff/auth", maxAge };
 }
 
+/** The access token claims a session needs: the tenant, the membership and one of the four roles. */
+/** The identity provider's token endpoint answer (authorization code and refresh grants). */
+export const tokenResponse = z.object({ access_token: z.string(), refresh_token: z.string().optional(), expires_in: z.number() });
+export type TokenResponse = z.infer<typeof tokenResponse>;
+const sessionClaims = z.object({
+  tenant_id: z.string().min(1),
+  membership_id: z.string().min(1),
+  role: roleSchema,
+});
+
 /** Builds a session from a token response; null when the token lacks the tenant / membership / role claims. */
-export function sessionFromTokens(t: { access_token: string; refresh_token?: string; expires_in: number }, previousRefresh: string | null = null): Session | null {
-  const claims = jwtClaims(t.access_token);
-  const role = claims.role as Session["role"] | undefined;
-  // own keys only: `in` would also accept inherited names such as "constructor"
-  if (!claims.tenant_id || !claims.membership_id || typeof role !== "string" || !Object.hasOwn(roleHome, role)) return null;
+export function sessionFromTokens(t: TokenResponse, previousRefresh: string | null = null): Session | null {
+  const claims = sessionClaims.safeParse(jwtClaims(t.access_token));
+  if (!claims.success) return null;
   return {
     accessToken: t.access_token,
     refreshToken: t.refresh_token ?? previousRefresh,
-    tenantId: String(claims.tenant_id),
-    membershipId: String(claims.membership_id),
+    tenantId: claims.data.tenant_id,
+    membershipId: claims.data.membership_id,
     expiresAt: Math.floor(Date.now() / 1000) + t.expires_in,
-    role,
+    role: claims.data.role,
   };
 }
 
 /** Exchanges the refresh token for a new access token (same tenant and membership), or null. */
 export async function refresh(s: Session): Promise<Session | null> {
   if (!s.refreshToken) return null;
-  const cfg = oidcConfig();
+  const roleConfig = oidcConfig();
   try {
-    const r = await fetch(`${cfg.internalIssuer}/protocol/openid-connect/token`, {
+    const r = await fetch(`${roleConfig.internalIssuer}/protocol/openid-connect/token`, {
       method: "POST", cache: "no-store",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: s.refreshToken, client_id: cfg.clientId, client_secret: cfg.clientSecret }),
+      body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: s.refreshToken, client_id: roleConfig.clientId, client_secret: roleConfig.clientSecret }),
     });
     if (!r.ok) return null;
-    const next = sessionFromTokens(await r.json(), s.refreshToken);
+    const tokens = tokenResponse.safeParse(await r.json());
+    if (!tokens.success) return null;
+    const next = sessionFromTokens(tokens.data, s.refreshToken);
     // a refreshed token must keep the selected tenant and membership
-    return next && next.tenantId === s.tenantId && next.membershipId === s.membershipId ? next : null;
+    return next?.tenantId === s.tenantId && next.membershipId === s.membershipId ? next : null;
   } catch {
     return null;
   }
@@ -132,12 +154,12 @@ export async function refresh(s: Session): Promise<Session | null> {
 its refresh token, IR357): Keycloak's back-channel logout, the refresh token posted with the client's credentials
 to the internal logout endpoint. False when the provider refused or did not answer within 3 seconds. */
 export async function endIdpSession(refreshToken: string): Promise<boolean> {
-  const cfg = oidcConfig();
+  const roleConfig = oidcConfig();
   try {
-    const r = await fetch(`${cfg.internalIssuer}/protocol/openid-connect/logout`, {
+    const r = await fetch(`${roleConfig.internalIssuer}/protocol/openid-connect/logout`, {
       method: "POST", cache: "no-store",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ refresh_token: refreshToken, client_id: cfg.clientId, client_secret: cfg.clientSecret }),
+      body: new URLSearchParams({ refresh_token: refreshToken, client_id: roleConfig.clientId, client_secret: roleConfig.clientSecret }),
       signal: AbortSignal.timeout(3000),
     });
     return r.ok;
@@ -161,7 +183,12 @@ export function needsRefresh(s: Session): boolean {
 export const ABSOLUTE_SECONDS = 12 * 60 * 60;
 const STORE_TIMEOUT_MS = 2000;
 
-interface Stored { session: Session; startedAt: number } // epoch seconds of the sign-in
+const sessionSchema = z.object({
+  accessToken: z.string(), refreshToken: z.string().nullable(), tenantId: z.string(), membershipId: z.string(), role: roleSchema, expiresAt: z.number(),
+}) satisfies z.ZodType<Session>;
+const stored = z.object({ session: sessionSchema, startedAt: z.number() }); // startedAt: epoch seconds of the sign-in
+type Stored = z.infer<typeof stored>;
+const sealedId = z.object({ sid: z.string().min(43) });
 interface StoreClient {
   getEx(key: string, options: { type: "EX"; value: number }): Promise<string | null>;
   set(key: string, value: string, options: { expiration: { type: "EX"; value: number }; condition?: "XX" }): Promise<string | null>;
@@ -169,6 +196,17 @@ interface StoreClient {
 }
 
 let client: Promise<StoreClient> | null = null;
+
+/** The client once connected, as the three commands this module uses; a failed connection clears it. */
+async function connected(c: StoreClient & { connect: () => Promise<unknown> }): Promise<StoreClient> {
+  try {
+    await c.connect();
+  } catch (error: unknown) {
+    client = null;
+    throw error;
+  }
+  return c;
+}
 
 /** The store's client, connected once per process; null without SESSION_STORE_URL (the cookie carries the session). A
 failed connection is tried again by the next request; commands fail at once while it is down (no offline queue). */
@@ -178,10 +216,7 @@ function store(): Promise<StoreClient> | null {
   if (!client) {
     const c = createClient({ url, disableOfflineQueue: true, socket: { connectTimeout: STORE_TIMEOUT_MS, reconnectStrategy: (n: number) => Math.min(100 * 2 ** n, 2000) } });
     c.on("error", (e: Error) => { console.warn(`session store: ${e.message}`); });
-    client = c.connect().then(() => c as unknown as StoreClient, (error: unknown) => {
-      client = null;
-      throw error;
-    });
+    client = connected(c);
   }
   return client;
 }
@@ -193,10 +228,7 @@ const timed = <T,>(p: Promise<T>): Promise<T> => {
   return Promise.race([p, late]).finally(() => { clearTimeout(timer); });
 };
 const keyOf = (id: string) => `ac:session:${createHash("sha256").update(id).digest("hex")}`;
-const idOf = (cookie: string | undefined) => {
-  const id = unseal<{ sid?: unknown }>(cookie)?.sid;
-  return typeof id === "string" && id.length >= 43 ? id : null;
-};
+const idOf = (cookie: string | undefined) => unsealAs(cookie, sealedId)?.sid ?? null;
 
 /** The session a cookie value names: in store mode the live record of its sealed ID (the read extends the idle
 lifetime), else the sealed session itself. Null when the cookie is missing, altered or of the other mode, when the
@@ -204,13 +236,13 @@ record was deleted or has expired, or when the store does not answer. */
 export async function loadSession(cookie: string | undefined): Promise<Session | null> {
   const c = store();
   if (!c) {
-    const s = unseal<Session>(cookie);
-    return s && typeof s.accessToken === "string" ? s : null;
+    return unsealAs(cookie, sessionSchema);
   }
   const id = idOf(cookie);
   if (!id) return null;
   try {
-    const rec = unseal<Stored>((await timed((await timed(c)).getEx(keyOf(id), { type: "EX", value: SESSION_MAX_AGE }))) ?? undefined);
+    const client = await timed(c);
+    const rec = unsealAs((await timed(client.getEx(keyOf(id), { type: "EX", value: SESSION_MAX_AGE }))) ?? undefined, stored);
     if (!rec) return null;
     if (Date.now() / 1000 - rec.startedAt >= ABSOLUTE_SECONDS) {
       await dropSession(cookie);
@@ -218,7 +250,7 @@ export async function loadSession(cookie: string | undefined): Promise<Session |
     }
     return rec.session;
   } catch (error) {
-    console.warn(`session store: ${(error as Error).message}`);
+    console.warn(`session store: ${Error.isError(error) ? error.message : String(error)}`);
     return null;
   }
 }
@@ -229,7 +261,8 @@ export async function createSessionCookie(s: Session, previous?: string): Promis
   if (!c) return seal(s);
   const id = randomBytes(32).toString("base64url");
   const rec: Stored = { session: s, startedAt: Math.floor(Date.now() / 1000) };
-  await timed((await timed(c)).set(keyOf(id), seal(rec), { expiration: { type: "EX", value: SESSION_MAX_AGE } }));
+  const client = await timed(c);
+  await timed(client.set(keyOf(id), seal(rec), { expiration: { type: "EX", value: SESSION_MAX_AGE } }));
   await dropSession(previous);
   return seal({ sid: id });
 }
@@ -242,12 +275,12 @@ export async function renewSessionCookie(cookie: string | undefined, s: Session)
   if (!id || !cookie) return null;
   try {
     const sc = await timed(c);
-    const rec = unseal<Stored>((await timed(sc.getEx(keyOf(id), { type: "EX", value: SESSION_MAX_AGE }))) ?? undefined);
+    const rec = unsealAs((await timed(sc.getEx(keyOf(id), { type: "EX", value: SESSION_MAX_AGE }))) ?? undefined, stored);
     if (!rec) return null;
     const ok = await timed(sc.set(keyOf(id), seal({ session: s, startedAt: rec.startedAt } satisfies Stored), { expiration: { type: "EX", value: SESSION_MAX_AGE }, condition: "XX" }));
     return ok === null ? null : cookie;
   } catch (error) {
-    console.warn(`session store: ${(error as Error).message}`);
+    console.warn(`session store: ${Error.isError(error) ? error.message : String(error)}`);
     return null;
   }
 }
@@ -259,9 +292,10 @@ export async function dropSession(cookie: string | undefined): Promise<void> {
   const id = c ? idOf(cookie) : null;
   if (!c || !id) return;
   try {
-    await timed((await timed(c)).del(keyOf(id)));
+    const client = await timed(c);
+    await timed(client.del(keyOf(id)));
   } catch (error) {
-    console.warn(`session store: ${(error as Error).message}`);
+    console.warn(`session store: ${Error.isError(error) ? error.message : String(error)}`);
   }
 }
 
@@ -285,7 +319,7 @@ export async function readSession(): Promise<Session | null> {
 
 /** A same-origin path to return to after sign-in; rejects absolute, protocol-relative ("//host") and backslash forms. */
 export function safeReturnTo(v: string | null | undefined): string | null {
-  return !v || !v.startsWith("/") || v.startsWith("//") || v.includes("\\") || /[\u0000-\u001F]/.test(v) ? null : v;
+  return !v || !v.startsWith("/") || v.startsWith("//") || v.includes("\\") || /[\u{0}-\u{1F}]/u.test(v) ? null : v;
 }
 
 export const roleHome: Record<Session["role"], string> = { client: "/customer", contractor: "/partner", technician: "/technician", admin: "/admin" };
@@ -294,7 +328,7 @@ export const roleHome: Record<Session["role"], string> = { client: "/customer", 
 export function jwtClaims(token: string): Record<string, unknown> {
   const part = token.split(".", 2)[1] ?? "";
   try {
-    return JSON.parse(Buffer.from(part, "base64url").toString()) as Record<string, unknown>;
+    return z.record(z.string(), z.unknown()).catch({}).parse(JSON.parse(Buffer.from(part, "base64url").toString()));
   } catch {
     return {};
   }

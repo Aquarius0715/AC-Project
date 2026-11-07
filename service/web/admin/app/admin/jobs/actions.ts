@@ -31,6 +31,12 @@ const run = async (fn: () => Promise<unknown>): Promise<Result> => {
   }
 };
 const write = (version: number) => ({ write: true, expectedVersion: version });
+// an update writes over the version it read; a new record has none
+const writeOf = (input: { id: string | null; version: number | null }) => {
+  if (!input.id) return { write: true };
+  if (input.version === null) throw new Error("an update needs the version it changes");
+  return write(input.version);
+};
 
 /** jobs.assign: an internal technician for the agreed time (also a reassignment at the same slot with a reason). */
 export async function assignInternal(jobId: string, version: number, technicianMembershipId: string, slot: Slot, reason?: string) {
@@ -87,6 +93,7 @@ export async function extendAccess(jobId: string, version: number, accessValidUn
 more, due at or after the requested end, an optional contact window. Returns the new job's id. */
 export async function createJob(input: { unitId: string; type: OpInput<"jobs.create">["type"]; symptom: string; slots: Slot[]; dueAt: string | null; contactWindow: string }): Promise<{ ok: true; value: { id: string } } | ({ ok: false } & ActionFailure)> {
   const [first, ...alternatives] = input.slots;
+  if (!first) throw new Error("a job needs its 1st preferred time");
   try {
     const job = await coreOp<{ id: string }>("jobs.create", {
       unitId: input.unitId, type: input.type, symptom: input.symptom.trim(), requestedStart: first.startAt, requestedEnd: first.endAt, alternativeSlots: alternatives,
@@ -100,9 +107,9 @@ export async function createJob(input: { unitId: string; type: OpInput<"jobs.cre
 }
 
 type Failure = { ok: false } & ActionFailure;
-const failure = (e: unknown, conflictRefresh = true): Failure => {
+const failure = (e: unknown): Failure => {
   if (e instanceof CoreError) {
-    if (conflictRefresh && e.error.code === "CONFLICT") refresh();
+    if (e.error.code === "CONFLICT") refresh();
     return { ok: false, code: e.error.code, messageKey: e.error.messageKey, fieldErrors: e.error.fieldErrors, retryAfterSeconds: e.error.retryAfterSeconds };
   }
   throw e;
@@ -113,7 +120,7 @@ the future, stored in UTC with its UTC day as the anchor day). Returns the plan 
 export async function savePlan(input: { id: string | null; version: number | null; unitId: string; intervalMonths: number; nextDueAt: string }): Promise<Failure | { ok: true; value: { id: string } }> {
   try {
     const p = await coreOp<{ id: string }>("plans.save", { ...(input.id && { id: input.id }), unitId: input.unitId, recurrence: { kind: "monthly", intervalMonths: input.intervalMonths }, nextDueAt: input.nextDueAt },
-      input.id ? write(input.version!) : { write: true });
+      writeOf(input));
     refresh();
     return { ok: true, value: { id: p.id } };
   } catch (error) {
@@ -155,7 +162,7 @@ export async function createContractorOrganization(name: string) {
 export async function saveContractor(input: { id: string | null; version: number | null; organizationId: string; registrationNo: string; serviceAreas: string[]; contactEmail: string; insuranceValidUntil: string | null }) {
   return value(async () => {
     const p = await coreOp<{ id: string }>("contractors.save", { ...(input.id && { id: input.id }), organizationId: input.organizationId, registrationNo: input.registrationNo.trim(),
-      serviceAreas: input.serviceAreas, contactEmail: input.contactEmail.trim(), insuranceValidUntil: input.insuranceValidUntil }, input.id ? write(input.version!) : { write: true });
+      serviceAreas: input.serviceAreas, contactEmail: input.contactEmail.trim(), insuranceValidUntil: input.insuranceValidUntil }, writeOf(input));
     return { id: p.id };
   });
 }

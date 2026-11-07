@@ -103,7 +103,7 @@ function TurnOn({ setupKey, qr, onClose }: Readonly<{ setupKey: string | null; q
             <b>1&nbsp;&nbsp;{t("Scan with an authenticator app")}</b>
             <div className="text-xs text-muted-foreground">{t("or enter key")}&nbsp;&nbsp;<span className="font-mono">{setupKey ? groupKey(setupKey) : "—"}</span></div>
             <b>2&nbsp;&nbsp;{t("Enter the 6-digit code")}</b>
-            <CodeInput label={t("6-digit code")} value={code} onChange={setCode} autoFocus />
+            <CodeInput label={t("6-digit code")} value={code} onChange={setCode} />
             <b>3&nbsp;&nbsp;{t("Save your 8 recovery codes (shown after verifying)")}</b>
           </div>
         </div>
@@ -121,7 +121,7 @@ function TurnOff({ onClose }: Readonly<{ onClose: () => void }>) {
   const [error, setError] = useState<string | null>(null);
   return (
     <Modal open onClose={onClose} title={t("Turn off two-step verification")} footer={<><Btn onClick={onClose}>{t("Keep it on")}</Btn><Btn variant="danger" disabled={!codeComplete(code) || pending} onClick={() => { run(() => disableTwoFactor(code), t("Two-step verification turned off"), onClose, (f) => { setError(actionMessage(f, t)); }); }}>{t("Turn off")}</Btn></>}>
-      <Field label={t("Enter a 6-digit code from your authenticator app")}><CodeInput label={t("6-digit code")} value={code} onChange={setCode} autoFocus /></Field>
+      <Field label={t("Enter a 6-digit code from your authenticator app")}><CodeInput label={t("6-digit code")} value={code} onChange={setCode} /></Field>
       {error && <p className="mt-2 flex items-center gap-1 text-xs text-crit"><Icon name="error" />{error}</p>}
     </Modal>
   );

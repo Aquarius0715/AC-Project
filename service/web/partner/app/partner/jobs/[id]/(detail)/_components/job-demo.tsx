@@ -1,14 +1,14 @@
 "use client";
+const TECH_EXTERNAL_A = "tech-external-a";
 
 import Link from "next/link";
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, Field, Input, Modal, Page, Select, SummaryList, Textarea, LinkBtn, useToast, Plain } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Field, Input, Modal, Page, Select, SummaryList, Textarea, LinkButton, useToast, Plain } from "@ac/web/components/ui";
 import { JobStatusBadge, OriginBadge, WINDOWS } from "@ac/web/components/JobBits";
 import { Job, fmt, jobActions, longDate, useJobs } from "@ac/web/lib/jobs";
 import { Icon } from "@ac/web/components/Icon";
 
-const cap = [["tech-external-a", "Refrigerant handling · valid to 2027-03-31", ["4 h", "4 h", "8 h", "—", "—"]], ["tech-external-a2", "No refrigerant qualification", ["—", "—", "—", "—", "—"]]] as const;
-type S = "offer" | "accepted" | "declined" | "expired" | "proposed";
+const cap = [[TECH_EXTERNAL_A, "Refrigerant handling · valid to 2027-03-31", ["4 h", "4 h", "8 h", "—", "—"]], ["tech-external-a2", "No refrigerant qualification", ["—", "—", "—", "—", "—"]]] as const;
 
 /** The Phase 1A demo offer / job detail (DATA_SOURCE=mock): the shared job store and the seeded offer job-p09. */
 export function JobDemo({ id }: Readonly<{ id: string }>) {
@@ -25,13 +25,13 @@ function LiveOffer({ j }: Readonly<{ j: Job }>) {
   return (
     <Page>
       <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground"><Link href="/partner/jobs" className="font-semibold text-primary"><Icon name="arrowLeft" /> Jobs</Link> › {j.id} · {j.unit} · <JobStatusBadge s={j.status} /></div>
-      {j.status === "accepted" && <Banner tone="ok" action={<LinkBtn size="sm" variant="primary" href={`/partner/schedule?jobId=${j.id}`}>Assign technician <Icon name="arrowRight" /></LinkBtn>}>Accepted — assign your technician for exactly {fmt(j.scheduled)}.</Banner>}
-      {(j.status === "assigned" || j.status === "in_progress") && <Banner tone="ok">Assigned to {j.technician} · {j.techAck?.status === "accepted" ? "accepted by the technician" : (j.techAck?.status === "cant_make" ? "technician can’t make it — reassign in Schedule" : "waiting for the technician to accept")}.</Banner>}
+      {j.status === "accepted" && <Banner tone="ok" action={<LinkButton size="sm" variant="primary" href={`/partner/schedule?jobId=${j.id}`}>Assign technician <Icon name="arrowRight" /></LinkButton>}>Accepted — assign your technician for exactly {fmt(j.scheduled)}.</Banner>}
+      {(j.status === "assigned" || j.status === "in_progress") && <Banner tone="ok">Assigned to {j.technician} · {j.techAck?.status === "accepted" ? "accepted by the technician" : null}{j.techAck?.status !== "accepted" && j.techAck?.status === "cant_make" && "technician can’t make it — reassign in Schedule"}{j.techAck?.status !== "accepted" && j.techAck?.status !== "cant_make" && "waiting for the technician to accept"}.</Banner>}
       {j.status === "time_proposed" && <Banner tone="warn">HQ has asked the client about your proposed time. You will be notified of the answer.</Banner>}
       {j.partnerProposal?.status === "approved" && j.status === "offered" && <Banner tone="ok">The client approved your time ({fmt(j.scheduled)}). Accept the offer to continue.</Banner>}
       {j.partnerProposal?.status === "rejected" && j.status === "offered" && <Banner tone="warn">Your time change was not approved — the agreed time stays {fmt(j.scheduled)}. Accept or decline.</Banner>}
       <div className="split">
-        <Card title={`${j.id} · Offer from HQ`} action={<Badge tone={pending ? "warn" : "warn"}>{pending ? "Time change proposed · waiting for client" : "Expires 2026-09-25 12:00"}</Badge>}>
+        <Card title={`${j.id} · Offer from HQ`} action={<Badge tone="warn">{pending ? "Time change proposed · waiting for client" : "Expires 2026-09-25 12:00"}</Badge>}>
           <Banner>{pending ? "The offer stays reserved for you until the client answers." : "The visit time was agreed with the client. Accept only if your team can come then; otherwise “Propose another time” — HQ asks the client first."}</Banner>
           <div className="mt-3"><SummaryList items={[
             ["Origin", <OriginBadge key="o" origin={j.origin} />],
@@ -39,7 +39,7 @@ function LiveOffer({ j }: Readonly<{ j: Job }>) {
             ["Installation address", "Home A, Kuala Lumpur (registered)"],
             ["Required qualification", "Split-unit refrigerant handling"],
             ["Visit time (fixed)", pending ? <s key="s" className="text-muted-foreground">{fmt(j.scheduled)}</s> : <b key="b">{j.scheduled ? longDate(j.scheduled) : "—"} · {j.origin === "plan" ? "from the periodic plan" : "agreed with the client"}</b>],
-            ...(pending ? [["Your proposal", <b key="p" className="text-warn">{longDate(j.partnerProposal!.slot)} · sent {j.partnerProposal!.sentAt}</b>] as [string, React.ReactNode]] : []),
+            ...(pending && j.partnerProposal ? [["Your proposal", <b key="p" className="text-warn">{longDate(j.partnerProposal.slot)} · sent {j.partnerProposal.sentAt}</b>] as [string, React.ReactNode]] : []),
             ["Offer / delegation terms", `offer-${j.id.slice(4)}-1 · terms v3`],
           ]} /></div>
           {j.status === "offered" && (
@@ -51,7 +51,7 @@ function LiveOffer({ j }: Readonly<{ j: Job }>) {
         </Card>
         <div className="flex min-w-0 flex-col gap-4">
           <Card title={`Can your team take it? — ${fmt(j.scheduled)}`} action={<Link className="text-xs font-semibold text-primary" href="/partner/team">Team & capacity <Icon name="arrowRight" /></Link>}>
-            <SummaryList items={[["tech-external-a", <Badge key="a" tone="ok" icon="check">Fits · refrigerant qualified</Badge>], ["tech-external-a2", <Badge key="b" tone="muted">Not qualified</Badge>]]} />
+            <SummaryList items={[[TECH_EXTERNAL_A, <Badge key="a" tone="ok" icon="check">Fits · refrigerant qualified</Badge>], ["tech-external-a2", <Badge key="b" tone="muted">Not qualified</Badge>]]} />
             <p className="mt-2 text-[11px] text-muted-foreground">Own-company technicians only. No customer data before acceptance.</p>
           </Card>
           <Card title="Job history"><ul className="flex flex-col gap-1.5 text-xs">{j.history.slice(-5).map((h, i) => <li key={i}><span className="text-muted-foreground">{h.at}</span> · {h.text}</li>)}</ul></Card>
@@ -66,11 +66,11 @@ function LiveOffer({ j }: Readonly<{ j: Job }>) {
 function ProposeTimeModal({ j, onClose, onDone }: Readonly<{ j: Pick<Job, "id" | "scheduled">; onClose: () => void; onDone: (slot: { date: string; win: string }, tech: string, reason: string) => void }>) {
   const [date, setDate] = useState("2026-10-02");
   const [win, setWin] = useState("14:00–16:00");
-  const [tech, setTech] = useState("tech-external-a");
+  const [tech, setTech] = useState(TECH_EXTERNAL_A);
   const [reason, setReason] = useState("");
   const [tried, setTried] = useState(false);
   return (
-    <Modal open onClose={onClose} title="Propose another time" footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!reason.trim()) return; onDone({ date, win }, tech, reason.trim()); }}>Send to HQ</Btn></>}>
+    <Modal open onClose={onClose} title="Propose another time" footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!reason.trim()) { return; } onDone({ date, win }, tech, reason.trim()); }}>Send to HQ</Btn></>}>
       <p className="text-xs text-muted-foreground">{j.id} · agreed with the client: {fmt(j.scheduled)}</p>
       <div className="grid-fluid" style={{ ["--min" as string]: "160px" }}><Field label="Date"><Input type="date" value={date} onChange={(e) => { setDate(e.target.value); }} /></Field><Field label="Window"><Select value={win} onChange={(e) => { setWin(e.target.value); }}>{WINDOWS.map((w) => <option key={w}>{w}</option>)}</Select></Field></div>
       <Field label="Technician"><Select value={tech} onChange={(e) => { setTech(e.target.value); }}><option value="tech-external-a">tech-external-a · free 14:00–18:00 · refrigerant qualified</option><option value="tech-external-a2">tech-external-a2 · not qualified</option></Select></Field>
@@ -84,7 +84,7 @@ function DeclineModal({ id, onClose, onDone }: Readonly<{ id: string; onClose: (
   const [why, setWhy] = useState("");
   const [tried, setTried] = useState(false);
   return (
-    <Modal open onClose={onClose} title={`Decline offer ${id}`} footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="danger" onClick={() => { setTried(true); if (!why.trim()) return; onDone(why.trim()); }}>Confirm decline</Btn></>}>
+    <Modal open onClose={onClose} title={`Decline offer ${id}`} footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="danger" onClick={() => { setTried(true); if (!why.trim()) { return; } onDone(why.trim()); }}>Confirm decline</Btn></>}>
       <Field label="Decline reason (required, 1–1000 characters)" error={tried && !why.trim() ? "A reason is required (1–1000 characters)" : undefined}><Textarea value={why} onChange={(e) => { setWhy(e.target.value); }} placeholder="No qualified technician available at this time." /></Field>
     </Modal>
   );
@@ -92,6 +92,7 @@ function DeclineModal({ id, onClose, onDone }: Readonly<{ id: string; onClose: (
 
 /** Seeded offer job-p09 (periodic plan visit) kept as in the Figma states 02-7…02-10. */
 function StaticOffer({ id }: Readonly<{ id: string }>) {
+  type S = "offer" | "accepted" | "declined" | "expired" | "proposed";
   const toast = useToast();
   const [s, setS] = useState<S>("offer");
   const [modal, setModal] = useState<null | "decline" | "propose">(null);
@@ -106,7 +107,7 @@ function StaticOffer({ id }: Readonly<{ id: string }>) {
         <Card title={`${id} · Offer from HQ`} sub="Before acceptance: job type, registered installation address, and required qualifications only. No live telemetry, entry instructions, or billing.">
           <SummaryList items={[["Origin", <OriginBadge key="o" origin="plan" />], ["Job type", "Periodic inspection"], ["Installation address", "12 Jalan Ampang, Kuala Lumpur (registered)"], ["Required qualification", "Split-unit refrigerant handling"], ["Visit time (fixed)", "2026-09-16 10:00–12:00 · from the periodic plan"], ["Access period if accepted", "2026-09-14 01:00 – 2026-09-22 00:00"], ["Offer / delegation terms", "offer-p09-1 · terms v3"]]} />
           {s === "offer" && <div className="mt-4 flex flex-col gap-2"><Btn onClick={() => { setModal("propose"); }}>Propose another time…</Btn><div className="flex gap-2"><Btn variant="danger" className="flex-1" onClick={() => { setModal("decline"); }}>Decline…</Btn><Btn variant="primary" className="flex-1" onClick={() => { setS("accepted"); toast("Offer accepted"); }}>Accept job</Btn></div></div>}
-          {s === "accepted" && <div className="mt-4"><LinkBtn variant="primary" href="/partner/schedule?jobId=job-p02">Assign technician <Icon name="arrowRight" /></LinkBtn></div>}
+          {s === "accepted" && <div className="mt-4"><LinkButton variant="primary" href="/partner/schedule?jobId=job-p02">Assign technician <Icon name="arrowRight" /></LinkButton></div>}
         </Card>
         <div className="flex min-w-0 flex-col gap-4">
           <Card title="Can your team take it? — visit 09-16 10:00–12:00" action={<Link className="text-xs font-semibold text-primary" href="/partner/team">Team & capacity <Icon name="arrowRight" /></Link>}>

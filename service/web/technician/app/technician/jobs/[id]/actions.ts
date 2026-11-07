@@ -10,6 +10,9 @@ import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import type { ApiTechReport } from "@ac/web/lib/techJob";
 import { uploadName, uploadType } from "@ac/web/lib/files";
 import type { OpInput } from "@ac/web/lib/opTypes";
+import { formText } from "@ac/web/lib/formData";
+import { formValue } from "@ac/web/lib/formValue";
+import { imageMime } from "@ac/web/lib/uploads";
 
 type Result<T> = { ok: true; value: T } | ({ ok: false } & ActionFailure);
 const failed = (e: unknown): Result<never> => {
@@ -40,7 +43,8 @@ export async function checkIn(jobId: string, version: number, method: "location_
   let qrUnitId: string | null = null;
   if (method === "location_qr" && qrCode) {
     try {
-      qrUnitId = (await coreOp<{ unitId: string }>("units.resolveQr", { code: qrCode })).unitId;
+      const resolved = await coreOp<{ unitId: string }>("units.resolveQr", { code: qrCode });
+      qrUnitId = resolved.unitId;
     } catch (error) {
       return error instanceof CoreError && error.error.code === "NOT_FOUND" ? { ok: false, code: "VALIDATION", messageKey: "error.validation", fieldErrors: { qrUnitId: "errors.qr_unit_mismatch" } } : failed(error);
     }
@@ -60,12 +64,12 @@ export async function saveDraft(body: OpInput<"jobs.saveDraft">, reportVersion: 
 
 /** attachments.add: one JPEG/PNG photo (≤ 5 MiB) from a form field; the draft version moves on and the sign-off is cleared. */
 export async function uploadPhoto(form: FormData) {
-  const jobId = String(form.get("jobId")), reportId = String(form.get("reportId")), version = Number(form.get("reportVersion"));
+  const jobId = formText(form, "jobId"), reportId = formText(form, "reportId"), version = Number(form.get("reportVersion"));
   const file = form.get("file");
   if (!(file instanceof File)) return { ok: false as const, code: "VALIDATION", messageKey: "error.validation", fieldErrors: { file: "error.required" } };
-  const buf = Buffer.from(await file.arrayBuffer());
+  const buffer = Buffer.from(await file.arrayBuffer());
   return run(async () => {
-    await coreOp("attachments.add", { jobId, reportId, file: { name: uploadName(file.name), mime: uploadType(buf, file.type) as OpInput<"attachments.add">["file"]["mime"], size: file.size, bytes: buf.toString("base64") } }, { write: true, expectedVersion: version });
+    await coreOp("attachments.add", { jobId, reportId, file: { name: uploadName(file.name), mime: formValue(imageMime, uploadType(buffer, file.type), "file"), size: file.size, bytes: buffer.toString("base64") } }, { write: true, expectedVersion: version });
     return reportState(await coreOp<ApiTechReport>("reports.get", { jobId, reportId, reportVersion: version + 1 }));
   });
 }
@@ -73,15 +77,15 @@ export async function uploadPhoto(form: FormData) {
 /** reports.signOff (FR-T15): the customer's signature (PNG drawn on the device), or an absence reason with a site
 photo, bound to this draft version (a later save clears it). */
 export async function signOff(form: FormData) {
-  const jobId = String(form.get("jobId")), reportId = String(form.get("reportId")), reportVersion = Number(form.get("reportVersion"));
-  const signerName = String(form.get("signerName") ?? "").trim();
-  const png = form.get("signature"), photo = form.get("sitePhoto"), absent = String(form.get("absentReason") ?? "").trim();
+  const jobId = formText(form, "jobId"), reportId = formText(form, "reportId"), reportVersion = Number(form.get("reportVersion"));
+  const signerName = formText(form, "signerName").trim();
+  const png = form.get("signature"), photo = form.get("sitePhoto"), absent = formText(form, "absentReason").trim();
   const signature = typeof png === "string" && png ? { name: "signature.png", mime: "image/png" as const, size: Buffer.from(png, "base64").length, bytes: png } : null;
   const photoBytes = photo instanceof File && photo.size > 0 ? Buffer.from(await photo.arrayBuffer()) : null;
-  const sitePhoto = photo instanceof File && photoBytes ? { name: uploadName(photo.name), mime: uploadType(photoBytes, photo.type) as OpInput<"attachments.add">["file"]["mime"], size: photo.size, bytes: photoBytes.toString("base64") } : undefined;
+  const sitePhoto = () => (photo instanceof File && photoBytes ? { name: uploadName(photo.name), mime: formValue(imageMime, uploadType(photoBytes, photo.type), "sitePhoto"), size: photo.size, bytes: photoBytes.toString("base64") } : undefined);
   return run(async () => {
     return reportState(await coreOp<ApiTechReport>("reports.signOff", {
-      jobId, reportId, reportVersion, signerName, signature, ...(!signature && { absentReason: absent, sitePhoto }),
+      jobId, reportId, reportVersion, signerName, signature, ...(!signature && { absentReason: absent, sitePhoto: sitePhoto() }),
     }, { write: true, expectedVersion: reportVersion }));
   });
 }

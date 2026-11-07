@@ -15,7 +15,7 @@ export async function saveMember(input: OpInput<"members.save">, version?: numbe
     const m = await coreOp<{ id: string; version: number }>("members.save", input, { write: true, expectedVersion: input.id ? version : undefined });
     return { ok: true, value: { id: m.id, version: m.version } };
   } catch (error) {
-    return error instanceof CoreError ? { ok: false, messageKey: error.error.messageKey, code: error.error.code, fieldErrors: error.error.fieldErrors ?? {}, retryAfterSeconds: error.error.retryAfterSeconds } : { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
+    return error instanceof CoreError ? { ok: false, messageKey: error.error.messageKey, code: error.error.code, fieldErrors: error.error.fieldErrors, retryAfterSeconds: error.error.retryAfterSeconds } : { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
   } finally {
     refresh();
   }
@@ -24,7 +24,8 @@ export async function saveMember(input: OpInput<"members.save">, version?: numbe
 /** Revoke access: members.save with the access ending now — the Core API's clock when HQ confirms, not the time the
 page loaded, so the record says when the access really ended (IR492). */
 export async function revokeMember(input: OpInput<"members.save">, version: number): Promise<ActionResult<{ id: string; version: number }>> {
-  return saveMember({ ...input, validUntil: (await coreNow()).toISOString() }, version);
+  const now = await coreNow();
+  return saveMember({ ...input, validUntil: now.toISOString() }, version);
 }
 
 /** members.revokeSessions: ends every session of the membership's user in this tenant at once (Figma Admin 03-8). */
@@ -33,7 +34,7 @@ export async function signOutEverywhere(membershipId: string, reason: string): P
     await coreOp("members.revokeSessions", { membershipId, reason: reason.trim() }, { write: true });
     return { ok: true, value: null };
   } catch (error) {
-    return error instanceof CoreError ? { ok: false, messageKey: error.error.messageKey, code: error.error.code, fieldErrors: error.error.fieldErrors ?? {}, retryAfterSeconds: error.error.retryAfterSeconds } : { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
+    return error instanceof CoreError ? { ok: false, messageKey: error.error.messageKey, code: error.error.code, fieldErrors: error.error.fieldErrors, retryAfterSeconds: error.error.retryAfterSeconds } : { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
   } finally {
     refresh();
   }

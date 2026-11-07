@@ -13,6 +13,7 @@ import type { ApiUnitDetail } from "@ac/web/lib/units";
 import { consentCard, ruleCard, triggerOf, type ApiAutomation, type ApiConsent, type ApiOccurrence, type Caps } from "@ac/web/lib/clientAutomations";
 import { AutomationsDemo } from "./_components/automations-demo";
 import { AutomationsView, type AutomationsLive } from "./_components/automations-view";
+import { orNull, recover } from "@ac/web/lib/promises";
 
 export default async function CustomerAutomationsPage({ searchParams }: Readonly<PageProps<"/customer/automations">>) {
   await connection();
@@ -22,7 +23,7 @@ export default async function CustomerAutomationsPage({ searchParams }: Readonly
   const [prefs, rules, units, properties, spaces, consent, display] = await Promise.all([
     coreOp<{ timezone: string }>("preferences.get", {}), coreAll<ApiAutomation>("automations.list"), coreAll<ApiUnitRow>("units.list"),
     coreAll<ApiPropertyRow>("properties.list"), coreAll<ApiSpaceRow>("spaces.list"),
-    coreOp<ApiConsent>("consents.get", { purpose: "location_automation" }).catch((error) => {
+    recover(coreOp<ApiConsent>("consents.get", { purpose: "location_automation" }), (error: unknown) => {
       if (error instanceof CoreError && error.error.code === "NOT_FOUND") return null; // no consent record: location rules unavailable
       throw error;
     }), coreDisplay(),
@@ -32,17 +33,19 @@ export default async function CustomerAutomationsPage({ searchParams }: Readonly
   const acs = units.filter((u) => !u.archived).map((u) => {
     const property = propertyName.get(u.propertyId) ?? "";
     return { id: u.id, name: u.displayName, path: [property, spacePath(u.spaceId, spaces)].filter(Boolean).join(" › "), property };
-  }).sort((a, b) => a.path.localeCompare(b.path) || a.name.localeCompare(b.name));
+  }).toSorted((a, b) => a.path.localeCompare(b.path) || a.name.localeCompare(b.name));
   const ac = new Map(acs.map((u) => [u.id, u]));
-  const nextRuns = new Map(await Promise.all(rules.filter((r) => r.kind === "schedule" && r.enabled).map(async (r) =>
-    [r.id, (await coreOp<ApiOccurrence[]>("automations.nextRuns", { automationId: r.id, count: 8 })).find((o) => o.phase === "schedule_start")?.at ?? null] as const)));
+  const nextRuns = new Map(await Promise.all(rules.filter((r) => r.kind === "schedule" && r.enabled).map(async (r) => {
+    const runs = await coreOp<ApiOccurrence[]>("automations.nextRuns", { automationId: r.id, count: 8 });
+    return [r.id, runs.find((o) => o.phase === "schedule_start")?.at ?? null] as const;
+  })));
   const isGranted = consent?.granted ?? false;
   const location = rules.filter((r) => triggerOf(r) === "location");
   // the editor's ACs with their capabilities (action options), read only while editing
-  const caps: Record<string, Caps | null> = {};
+  let caps: Record<string, Caps | null> = {};
   if (editing) {
-    const details = await Promise.all(acs.map((u) => coreOp<ApiUnitDetail>("units.get", { id: u.id }).catch(() => null)));
-    for (const [i, d] of details.entries()) { caps[acs[i].id] = d?.capabilities ?? null; }
+    const details = await Promise.all(acs.map((u) => orNull(coreOp<ApiUnitDetail>("units.get", { id: u.id }))));
+    caps = Object.fromEntries(acs.map((ac, i) => [ac.id, details.at(i)?.capabilities ?? null]));
   }
   const live: AutomationsLive = {
     rules,
@@ -50,7 +53,7 @@ export default async function CustomerAutomationsPage({ searchParams }: Readonly
     caps,
     editing,
     timezone: prefs.timezone || "Asia/Kuala_Lumpur",
-    cards: rules.map((r) => ruleCard(r, ac.get(r.unitIds[0]) ?? null, nextRuns.get(r.id) ?? null, isGranted, i)),
+    cards: rules.map((r) => ruleCard(r, ac.get(r.unitIds[0] ?? "") ?? null, nextRuns.get(r.id) ?? null, isGranted, i)),
     consent: consent ? { version: consent.version, ...consentCard(consent, location.length, location.filter((r) => r.disabledReason === "consent_revoked").length, i) } : { version: null, ...consentCard(null, 0, 0, i) },
     nextRuns: Object.fromEntries(nextRuns),
   };

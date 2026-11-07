@@ -6,7 +6,7 @@ import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { metrics, metricUnit, type Metric } from "@ac/web/lib/devices";
-import { filterOf, followFilter, HQ_FILTERS, type Filter, metricText } from "@ac/web/lib/techDevices";
+import { connectionDot, filterOf, firmwareCardLook, firmwareSub, followFilter, HQ_FILTERS, operationTone, type Filter, metricText } from "@ac/web/lib/techDevices";
 import { bindDevice, calibrateSensor, checkDevice, registerDevice, updateFirmware } from "../actions";
 import type { DevicesLive } from "./devices-view";
 import { Icon } from "@ac/web/components/Icon";
@@ -68,7 +68,7 @@ export function DeviceTab({ live }: Readonly<{ live: DevicesLive }>) {
         <div className="flex flex-wrap gap-2">{counts.map(({ f, label, n }) => (
           <Plain key={f} type="button" aria-pressed={filter === f} onClick={() => { setFilter(f); const next = followFilter(rows, f, dv?.row.id ?? null); if (next) nav({ deviceId: next }); }}
             className={cx("flex items-center gap-1.5 rounded-full border px-3 py-1 text-[13px] font-semibold", filter === f ? "border-ink bg-ink text-white" : "border-line bg-surface")}>
-            {f !== "all" && f !== "nosensors" && <span className={cx("h-2 w-2 rounded-full", f === "online" ? "bg-ok" : (f === "offline" ? "bg-crit" : "bg-warn"))} />}{label} <span className="text-xs opacity-70">{n}</span>
+            {f !== "all" && f !== "nosensors" && <span className={cx("h-2 w-2 rounded-full", connectionDot(f))} />}{label} <span className="text-xs opacity-70">{n}</span>
           </Plain>
         ))}</div>
         <div className="flex flex-wrap items-center gap-2"><div className="w-64"><Search placeholder={t("Search serial, device or unit…")} value={q} onChange={setQ} /></div>
@@ -113,7 +113,7 @@ export function DeviceTab({ live }: Readonly<{ live: DevicesLive }>) {
                   {[
                     { label: t("Check connection"), sub: t("ping the device"), act: () => { run(() => checkDevice(dv.detail.id, dv.detail.version), t("Connection check queued")); }, off: false },
                     { label: t("Calibrate sensor"), sub: t("reference vs measured"), act: () => { calibrateOf(dv.detail.sensors[0]?.id ?? ""); }, off: dv.detail.sensors.length === 0 },
-                    { label: t("Update firmware"), sub: dv.detail.activeOperation?.kind === "firmware" ? t("running…") : (dv.firmware.length > 0 ? t("{version} available", { version: dv.firmware.join(", ") }) : t("no newer candidate")), act: () => { setFw(dv.firmware[dv.firmware.length - 1] ?? ""); setModal("firmware"); }, off: dv.firmware.length === 0 },
+                    { label: t("Update firmware"), sub: firmwareSub(dv.detail.activeOperation?.kind === "firmware", dv.firmware, t), act: () => { setFw(dv.firmware.at(-1) ?? ""); setModal("firmware"); }, off: dv.firmware.length === 0 },
                   ].map((a) => (
                     <Plain key={a.label} type="button" disabled={pending || isBusy || a.off} onClick={a.act} className="rounded-xl border border-line px-3 py-2 text-left hover:bg-surface2 disabled:cursor-not-allowed disabled:opacity-50">
                       <div className="text-[13px] font-semibold">{a.label}</div><div className="text-[11px] text-muted-foreground">{a.sub}</div>
@@ -123,7 +123,7 @@ export function DeviceTab({ live }: Readonly<{ live: DevicesLive }>) {
               )}
               {isBusy && <p className="-mt-2 text-xs text-muted-foreground">{t("One operation at a time: check, calibration and firmware update are disabled until the active one finishes.")}</p>}
               {dv.firmwareCard && (
-                <div className={cx("rounded-xl border p-3", dv.firmwareCard.tone === "crit" ? "border-crit bg-crit-soft/40" : (dv.firmwareCard.tone === "ok" ? "border-[#86efac] bg-ok-soft/40" : "border-primary bg-primary-soft/40"))}>
+                <div className={cx("rounded-xl border p-3", firmwareCardLook(dv.firmwareCard.tone))}>
                   <div className="flex items-center justify-between gap-2"><b className="text-[13px]">{dv.firmwareCard.title}</b><Badge tone={dv.firmwareCard.tone}>{dv.firmwareCard.status}</Badge></div>
                   {dv.firmwareCard.tone === "primary" && <div className="mt-2 h-1.5 rounded-full bg-primary" />}
                   <p className="mt-1 text-[11px] text-muted-foreground">{dv.firmwareCard.text}</p>
@@ -148,7 +148,7 @@ export function DeviceTab({ live }: Readonly<{ live: DevicesLive }>) {
                     <thead className="bg-surface2 text-left text-[11px] uppercase text-muted-foreground"><tr><th className="px-3 py-2">{t("Kind")}</th><th>{t("Started")}</th><th>{t("Detail")}</th><th>{t("Status")}</th></tr></thead>
                     <tbody>{dv.operations.map((o) => (
                       <tr key={o.id} className="border-t border-line"><td className="px-3 py-2 font-semibold">{o.kind}</td><td className="text-xs">{o.time}</td><td className="text-xs">{o.detail}</td>
-                        <td className="pr-3"><Badge tone={o.status === "succeeded" ? "ok" : (o.status === "failed" ? "crit" : "primary")}>{o.statusText}</Badge></td></tr>
+                        <td className="pr-3"><Badge tone={operationTone(o.status)}>{o.statusText}</Badge></td></tr>
                     ))}</tbody>
                   </table></ScrollX>
                 )}
@@ -192,7 +192,7 @@ export function DeviceTab({ live }: Readonly<{ live: DevicesLive }>) {
         <p className="text-[11px] text-muted-foreground">{t("Recorded at the current time as a demo calibration.")}</p>
       </Modal>
       <Modal open={modal === "firmware"} onClose={close} title={t("Update firmware")} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending || !fw} onClick={firmware}>{t("Queue update")}</Btn></>}>
-        {dv && dv.firmware.length === 0 ? <p className="text-xs text-muted-foreground">{t("The unit model lists no firmware candidates.")}</p> : <Field label={t("Target version")} error={tried && !fw ? t("Choose a version") : undefined}><Select value={fw} onChange={(e) => { setFw(e.target.value); }}><option value="">{t("Select…")}</option>{dv?.firmware.map((v) => <option key={v} value={v} disabled={v === dv.detail.firmwareVersion}>{v === dv.detail.firmwareVersion ? t("{version} (current)", { version: v }) : v}</option>)}</Select></Field>}
+        {dv?.firmware.length === 0 ? <p className="text-xs text-muted-foreground">{t("The unit model lists no firmware candidates.")}</p> : <Field label={t("Target version")} error={tried && !fw ? t("Choose a version") : undefined}><Select value={fw} onChange={(e) => { setFw(e.target.value); }}><option value="">{t("Select…")}</option>{dv?.firmware.map((v) => <option key={v} value={v} disabled={v === dv.detail.firmwareVersion}>{v === dv.detail.firmwareVersion ? t("{version} (current)", { version: v }) : v}</option>)}</Select></Field>}
         <p className="text-[11px] text-muted-foreground">{t("Only an online device accepts an update; a failure keeps the current version.")}</p>
       </Modal>
     </div>

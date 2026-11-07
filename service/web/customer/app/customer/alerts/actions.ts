@@ -39,7 +39,10 @@ export async function readAlert(ids: string[]): Promise<ActionFailure | null> {
 
 /** policies.save: a new policy, or an own policy at its version (the input of customerPolicies.policyInput). */
 export async function savePolicy(input: OpInput<"policies.save">, version: number | null) {
-  return run(async () => (await coreOp<{ id: string }>("policies.save", input, version === null ? { write: true } : { write: true, expectedVersion: version })).id);
+  return run(async () => {
+    const { id } = await coreOp<{ id: string }>("policies.save", input, version === null ? { write: true } : { write: true, expectedVersion: version });
+    return id;
+  });
 }
 
 /** policies.delete at the policy's version: detaches it from every AC and deletes it (IR108). */

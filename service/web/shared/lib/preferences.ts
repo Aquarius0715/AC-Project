@@ -16,7 +16,7 @@ export function zoneOffset(tz: string, at: Date): string {
     return "";
   }
   const minute = Math.floor(at.getTime() / 60_000) * 60_000;
-  const min = Math.round((Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute) - minute) / 60_000);
+  const min = Math.round((Date.UTC(Number(p.year ?? 0), Number(p.month ?? 1) - 1, Number(p.day ?? 1), Number(p.hour ?? 0), Number(p.minute ?? 0)) - minute) / 60_000);
   const abs = Math.abs(min);
   return `UTC${min < 0 ? "−" : "+"}${String(Math.floor(abs / 60))}${abs % 60 ? `:${String(abs % 60).padStart(2, "0")}` : ""}`;
 }

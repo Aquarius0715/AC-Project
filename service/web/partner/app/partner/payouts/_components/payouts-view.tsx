@@ -5,9 +5,10 @@ import { Badge, Banner, Btn, Card, DataTable, EmptyState, Field, Kpi, ListRow, M
 import { useLocale, useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
-import type { T } from "@ac/web/lib/i18n";
+import { textOf, type T } from "@ac/web/lib/i18n";
 import { payoutPdf, type ApiPayoutQuestion, type ApiPayoutStatement, type Kpi as KpiRow, type LineRow, type StatementRow } from "@ac/web/lib/partnerPayouts";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
+import { oneOf } from "@ac/web/lib/oneOf";
 import { askHq } from "../actions";
 
 export interface PayoutsLive {
@@ -18,9 +19,11 @@ export interface PayoutsLive {
   };
 }
 
+// a line question's state; any other state is answered
+const QUESTION_STATE: Record<string, string> = { open: "Question open", adjusted: "Adjusted" };
 const refusal = (f: ActionFailure, t: T): string | null => {
-  return f.code === "CONFLICT" ? t("The statement changed (or is no longer approved); the page shows the latest state.")
-    : (f.code === "NOT_FOUND" ? t("This statement or line is not available to your company.") : null);
+  if (f.code === "CONFLICT") return t("The statement changed (or is no longer approved); the page shows the latest state.");
+  return f.code === "NOT_FOUND" ? t("This statement or line is not available to your company.") : null;
 };
 
 /** Payout statements of the company (FR-P10): approved and paid statements only, lines priced by the rate card,
@@ -33,19 +36,19 @@ export function PayoutsView({ live }: Readonly<{ live: PayoutsLive }>) {
   const [pending, run] = useAction();
   const [ask, setAsk] = useState<null | { lineId: string }>(null);
   const [topic, setTopic] = useState<ApiPayoutQuestion["topic"]>("amount");
-  const [msg, setMsg] = useState("");
+  const [notice, setMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [refused, setRefused] = useState<string | null>(null);
   const sel = live.selected;
   const isFiltered = !!(live.period || live.status);
-  const askable = sel?.rows.filter((r) => r.askable && r.lineId && !r.question) ?? [];
+  const askable = sel?.rows.filter((r): r is typeof r & { lineId: string } => r.askable && !!r.lineId && !r.question) ?? [];
   const questionError = t("Enter your question (1–2000 characters)");
   const send = () => {
-    const m = msg.trim();
     if (!sel || !ask) return;
+    const m = notice.trim();
     if (m.length === 0 || m.length > 2000) { setError(questionError); return; }
     setError(null);
-    run(() => askHq(sel.statement.id, sel.statement.version, ask.lineId, topic, m), t("Question sent — HQ answers on the statement"), () => { setAsk(null); setMsg(""); setRefused(null); },
+    run(() => askHq(sel.statement.id, sel.statement.version, ask.lineId, topic, m), t("Question sent — HQ answers on the statement"), () => { setAsk(null); setMessage(""); setRefused(null); },
       (f) => { setRefused(refusal(f, t)); if (f.fieldErrors.message) setError(questionError); });
   };
   const download = () => {
@@ -67,11 +70,9 @@ export function PayoutsView({ live }: Readonly<{ live: PayoutsLive }>) {
       <div className="split-rev">
         <Card title={t("Statements")} className="self-start">
           {live.statements.length === 0 ? <EmptyState title={t(isFiltered ? "No statements" : "No statements yet")}>{t(isFiltered ? "No statement matches these filters." : "A statement appears here once HQ approves your first one.")}</EmptyState> : (
-            <div className="flex flex-col gap-2">{live.statements.map((s) => {
-              return (
+            <div className="flex flex-col gap-2">{live.statements.map((s) => (
                 <ListRow key={s.id} selected={sel?.statement.id === s.id} onClick={() => { nav({ statementId: s.id }); }}><div className="min-w-0 flex-1"><b className="text-[13px]">{s.label}</b><div className="text-[11px] text-muted-foreground">{s.sub}</div></div><Badge tone={s.badge.tone}>{s.badge.label}</Badge></ListRow>
-              );
-            })}</div>
+              ))}</div>
           )}
           <p className="mt-2 text-[11px] text-muted-foreground">{t("A statement is issued on the 1st for jobs whose report was accepted in the previous month. HQ approves it; payment follows on the 15th. Drafts stay with HQ.")}</p>
         </Card>
@@ -85,25 +86,24 @@ export function PayoutsView({ live }: Readonly<{ live: PayoutsLive }>) {
               { key: "status", label: t("Status"), render: (r) => <Badge tone={r.tone}>{r.statusText}</Badge> },
               { key: "amount", label: sel.statement.currency, render: (r) => <span className="font-semibold">{r.amount}</span>, className: "text-right" },
               { key: "action", label: "", render: (r) => {
-                return r.question ? <span className="text-[11px] text-muted-foreground">{t(r.question.state === "open" ? "Question open" : (r.question.state === "adjusted" ? "Adjusted" : "Answered"))}</span>
-                  : (r.askable ? <Plain type="button" disabled={pending} className="text-xs font-semibold text-primary disabled:opacity-50" onClick={() => { setAsk({ lineId: r.lineId! }); setTopic(r.status === "deduction" ? "deduction" : "amount"); setError(null); }}>{t("Ask HQ")}</Plain>
-                  : <span className="text-[11px] text-muted-foreground">{r.status === "not_included" ? t("next statement") : ""}</span>);
+                const { lineId } = r;
+                if (r.question) return <span className="text-[11px] text-muted-foreground">{textOf(QUESTION_STATE, r.question.state, t) ?? t("Answered")}</span>;
+                return lineId && r.askable ? <Plain type="button" disabled={pending} className="text-xs font-semibold text-primary disabled:opacity-50" onClick={() => { setAsk({ lineId }); setTopic(r.status === "deduction" ? "deduction" : "amount"); setError(null); }}>{t("Ask HQ")}</Plain>
+                  : <span className="text-[11px] text-muted-foreground">{r.status === "not_included" ? t("next statement") : ""}</span>;
               } },
             ]} />
             <div className="mt-3"><SummaryList items={[...sel.totals.map(([k, v]): [string, React.ReactNode] => [k, <b key={k}>{v}</b>]), [t("Bank account"), t("set by HQ")]]} /></div>
             <p className="mt-2 text-[11px] text-muted-foreground">{t("Rates come from your rate card with HQ. Only jobs whose report your review accepted are paid; jobs still in review move to the next statement. Amounts are shown in {currency}.", { currency: sel.statement.currency })}</p>
-            {sel.questions.length > 0 && <div className="mt-4"><b className="text-[13px]">{t("Questions to HQ")}</b><ul className="mt-1 divide-y divide-line">{sel.questions.map((q) => {
-              return (
+            {sel.questions.length > 0 && <div className="mt-4"><b className="text-[13px]">{t("Questions to HQ")}</b><ul className="mt-1 divide-y divide-line">{sel.questions.map((q) => (
                 <li key={q.id} className="py-2 text-[13px]"><div className="flex flex-wrap items-center justify-between gap-2"><span>{q.title}</span><Badge tone={q.tone}>{q.state}</Badge></div><div className="text-xs text-muted-foreground">“{q.message}”{q.reply ? ` — ${t("HQ: {reply}", { reply: q.reply })}` : ""}</div></li>
-              );
-            })}</ul></div>}
+              ))}</ul></div>}
           </Card>
         ) : <Card title={t("Statement")}><EmptyState title={t("No statement to show")}>{t("Only approved and paid statements are shown; jobs still in review move to the next statement.")}</EmptyState></Card>}
       </div>
       <Modal open={!!ask} onClose={() => { setAsk(null); }} title={t("Ask HQ about this line")} footer={<><Btn onClick={() => { setAsk(null); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={send}>{t("Send")}</Btn></>}>
-        <Field label={t("Line")}><Select value={ask?.lineId ?? ""} onChange={(e) => { setAsk({ lineId: e.target.value }); }}>{askable.map((r) => <option key={r.lineId!} value={r.lineId!}>{r.job} · {r.work} · {r.amount} {sel?.statement.currency}</option>)}</Select></Field>
-        <Field label={t("Topic")}><Select value={topic} onChange={(e) => { setTopic(e.target.value as ApiPayoutQuestion["topic"]); }}>{live.topics.map((x) => <option key={x.id} value={x.id}>{x.text}</option>)}</Select></Field>
-        <Field label={t("Question (required, 1–2000 characters)")} error={error ?? undefined}><Textarea value={msg} maxLength={2000} onChange={(e) => { setMsg(e.target.value); }} placeholder={t("The 2nd return was caused by a missing part from HQ stock.")} /></Field>
+        <Field label={t("Line")}><Select value={ask?.lineId ?? ""} onChange={(e) => { setAsk({ lineId: e.target.value }); }}>{askable.map((r) => <option key={r.lineId} value={r.lineId}>{r.job} · {r.work} · {r.amount} {sel?.statement.currency}</option>)}</Select></Field>
+        <Field label={t("Topic")}><Select value={topic} onChange={(e) => { setTopic(oneOf(live.topics.map((x) => x.id), e.target.value, topic)); }}>{live.topics.map((x) => <option key={x.id} value={x.id}>{x.text}</option>)}</Select></Field>
+        <Field label={t("Question (required, 1–2000 characters)")} error={error ?? undefined}><Textarea value={notice} maxLength={2000} onChange={(e) => { setMessage(e.target.value); }} placeholder={t("The 2nd return was caused by a missing part from HQ stock.")} /></Field>
         <Banner>{t("HQ answers on the statement and in the job’s history. If HQ agrees, an adjustment line is added to your next statement; this statement stays approved.")}</Banner>
       </Modal>
     </Page>

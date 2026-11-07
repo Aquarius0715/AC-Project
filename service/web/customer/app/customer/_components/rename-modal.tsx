@@ -17,18 +17,18 @@ export function RenameModal({ r, onClose, demo = false }: Readonly<{ r: Renaming
   const toast = useToast();
   const [pending, run] = useAction();
   const [name, setName] = useState(r.name);
-  const [err, setErr] = useState<string | undefined>();
+  const [errorText, setError] = useState<string | undefined>();
   const save = () => {
     const e = nameError(name, t);
-    if (e) { setErr(e); return; }
+    if (e) { setError(e); return; }
     if (demo) {
       toast(t("Renamed to “{name}”", { name: name.trim() }));
       onClose(); return;
     }
     run(() => renameLocation(r.kind, r.id, r.version, name), t("Renamed to “{name}”", { name: name.trim() }), onClose, (f) => {
-      if (f.messageKey === "error.duplicateSiblingName") setErr(t("“{name}” already exists there — choose another name. Your input is kept.", { name: name.trim() }));
-      else if (f.messageKey === "error.versionConflict") setErr(t(r.kind === "unit" ? "Someone changed this AC in the meantime — the page now shows its current name. Your input is kept." : "Someone renamed it in the meantime — the tree now shows the current name. Your input is kept."));
-      else setErr(undefined);
+      if (f.messageKey === "error.duplicateSiblingName") setError(t("“{name}” already exists there — choose another name. Your input is kept.", { name: name.trim() }));
+      else if (f.messageKey === "error.versionConflict") setError(t(r.kind === "unit" ? "Someone changed this AC in the meantime — the page now shows its current name. Your input is kept." : "Someone renamed it in the meantime — the tree now shows the current name. Your input is kept."));
+      else setError(undefined);
     });
   };
   return (
@@ -36,7 +36,7 @@ export function RenameModal({ r, onClose, demo = false }: Readonly<{ r: Renaming
       <div className="flex flex-col gap-3">
         <p className="text-[13px] text-muted-foreground">{t("Only the name changes. Floors, rooms and units stay as they are — HQ manages the structure.")}</p>
         <SummaryList items={[[t(r.kind === "unit" ? "AC" : "Location"), r.where]]} />
-        <Field label={t("New name")} hint={t("1–120 characters, unique among its siblings. HQ and technicians see the new name too.")} error={err}><Input value={name} onChange={(e) => { setName(e.target.value); setErr(undefined); }} autoFocus /></Field>
+        <Field label={t("New name")} hint={t("1–120 characters, unique among its siblings. HQ and technicians see the new name too.")} error={errorText}><Input value={name} onChange={(e) => { setName(e.target.value); setError(undefined); }} /></Field>
       </div>
     </Modal>
   );

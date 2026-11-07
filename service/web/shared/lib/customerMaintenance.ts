@@ -3,10 +3,20 @@
 // proposal to answer, the plan visit, the technician once accepted, the accepted report, the rating), the notes and
 // history from the job events, and the form checks. Pure code shared by the server loader and the client view; Vitest
 // covers it. Texts in the display language and times in the user's display time zone (`i`, IR262).
-import { EN, showDate, showSpan, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
+import { EN, showDate, showSpan, showTime, translator, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import { actionMessage } from "@ac/web/lib/actionMessage";
 import type { Slot } from "@ac/web/lib/partnerOverview";
 import type { IconName } from "@ac/web/components/Icon";
+import { z } from "@ac/web/lib/zod";
+
+const TIME_PROPOSED = "time_proposed";
+const PERIODIC_PLAN = "periodic_plan";
+
+/** The reasons a client gives when reporting a problem with a completed job (jobs.reportProblem). */
+export const problemReason = z.enum(["same_problem", "new_damage", "not_completed", "other"]);
+import { codePoints, wrapped } from "@ac/web/lib/text";
+import { lookup } from "@ac/web/lib/lookup";
+import { isAfter } from "@ac/web/lib/order";
 
 export interface ApiClientRow {
   projection: "summary"; id: string; version: number; unitId: string; type: string; status: string; displayStatus: string; origin: string; dueAt: string;
@@ -38,33 +48,42 @@ const CLIENT_TITLE: Record<string, string> = {
   "job.rated": "You rated the job", "job.problem_reported": "You reported a problem", "proposal.sent": "New time proposed", "partner_proposal.sent_to_client": "New time proposed", "job.follow_up_classified": "HQ reviewed your problem report", "proposal.accepted": "You accepted the proposed time",
   "proposal.declined": "You declined the proposed time", "job.reschedule_requested": "You asked for another time",
 };
-export const clientEventTitle = (action: string, shared: Record<string, string>, t: T = en) => (CLIENT_TITLE[action] ? t(CLIENT_TITLE[action]) : (shared[action] ? t(shared[action]) : action.replaceAll(/[._]/g, " ")));
+export const clientEventTitle = (action: string, shared: Record<string, string>, t: T = en) => {
+  const sharedTitle = lookup(shared, action);
+  return textOf(CLIENT_TITLE, action, t) ?? (sharedTitle ? t(sharedTitle) : action.replaceAll(/[._]/g, " "));
+};
 export const sameSlot = (a: Slot | null, b: Slot | null) => !!a && !!b && Date.parse(a.startAt) === Date.parse(b.startAt) && Date.parse(a.endAt) === Date.parse(b.endAt);
 
 export type StatusTab = "all" | "reply" | "requested" | "scheduled" | "progress" | "completed" | "cancelled";
 export const STATUS_TABS: [StatusTab, string][] = [["all", "All"], ["reply", "Needs your reply"], ["requested", "Requested"], ["scheduled", "Scheduled"], ["progress", "In progress"], ["completed", "Completed"], ["cancelled", "Cancelled"]];
 /** The tab of a request: Needs your reply = a pending proposal; Scheduled = a time is agreed (offered … assigned). */
-export const tabOf = (displayStatus: string): StatusTab => {
-  return displayStatus === "time_proposed" ? "reply" : displayStatus === "requested" ? "requested" : ["offered", "accepted", "assigned"].includes(displayStatus) ? "scheduled"
-    : displayStatus === "completed" ? "completed" : displayStatus === "cancelled" ? "cancelled" : "progress";
-};
-const ORDER = ["time_proposed", "requested", "in_progress", "rework_requested", "submitted", "offered", "accepted", "assigned", "on_hold", "completed", "cancelled"];
+const TAB_OF = new Map<string, StatusTab>([
+  [TIME_PROPOSED, "reply"], ["requested", "requested"], ["offered", "scheduled"], ["accepted", "scheduled"], ["assigned", "scheduled"], ["completed", "completed"], ["cancelled", "cancelled"],
+]);
+export const tabOf = (displayStatus: string): StatusTab => TAB_OF.get(displayStatus) ?? "progress";
+const ORDER = [TIME_PROPOSED, "requested", "in_progress", "rework_requested", "submitted", "offered", "accepted", "assigned", "on_hold", "completed", "cancelled"];
 
 export interface ClientRow { id: string; short: string; unit: string; place: string; origin: "plan" | "request"; type: string; status: string; tab: StatusTab; line: string; icon: IconName; warn: boolean }
 const TYPE: Record<string, string> = { reactive: "Repair", preventive: "Preventive maintenance", periodic: "Periodic inspection" };
+/** What a requested job waits for: the preferred times (not confirmed yet), HQ booking the plan visit, or HQ. */
+function requestedLine(j: ApiClientRow, isPlan: boolean, slot: (s: Slot) => string, t: T): string {
+  const first = j.preferredSlots.at(0);
+  if (!first) return isPlan ? t("Plan visit {slot} · HQ is booking it", { slot: slot(j.requestedSlot) }) : t("Waiting for HQ");
+  const more = j.preferredSlots.length - 1;
+  return more > 0 ? t("Preferred {slot} · +{n} more (not confirmed yet)", { slot: slot(first), n: more }) : t("Preferred {slot} (not confirmed yet)", { slot: slot(first) });
+}
 /** One request of the list (Figma 07a): unit and place, origin, type and what is next — business status order. */
 export function clientRows(rows: ApiClientRow[], unit: (id: string) => { name: string; place: string }, i: I18n = EN): ClientRow[] {
   const { t } = i;
   const slot = (s: Slot) => slotShort(s, i);
-  return [...rows].sort((a, b) => ORDER.indexOf(a.displayStatus) - ORDER.indexOf(b.displayStatus) || Date.parse(a.dueAt) - Date.parse(b.dueAt)).map((j) => {
+  return [...rows].toSorted((a, b) => ORDER.indexOf(a.displayStatus) - ORDER.indexOf(b.displayStatus) || Date.parse(a.dueAt) - Date.parse(b.dueAt)).map((j) => {
     const u = unit(j.unitId);
-    const isPlan = j.origin === "periodic_plan";
+    const isPlan = j.origin === PERIODIC_PLAN;
     let line = "", isWarn = false, icon: IconName = "time";
     switch (j.displayStatus) {
-      case "time_proposed": { [line, isWarn, icon] = [t("A new visit time needs your reply — nothing is booked until you accept"), true, "swap"]; break;
+      case TIME_PROPOSED: { [line, isWarn, icon] = [t("A new visit time needs your reply — nothing is booked until you accept"), true, "swap"]; break;
       }
-      case "requested": { line = j.preferredSlots.length > 1 ? t("Preferred {slot} · +{n} more (not confirmed yet)", { slot: slot(j.preferredSlots[0]), n: j.preferredSlots.length - 1 })
-        : j.preferredSlots.length > 0 ? t("Preferred {slot} (not confirmed yet)", { slot: slot(j.preferredSlots[0]) }) : isPlan ? t("Plan visit {slot} · HQ is booking it", { slot: slot(j.requestedSlot) }) : t("Waiting for HQ"); break;
+      case "requested": { line = requestedLine(j, isPlan, slot, t); break;
       }
       case "completed": { icon = "success"; line = j.scheduledSlot ? t("Completed · visit {slot} · report available", { slot: slot(j.scheduledSlot) }) : t("Completed · report available"); break;
       }
@@ -75,15 +94,15 @@ export function clientRows(rows: ApiClientRow[], unit: (id: string) => { name: s
       default: { line = `${t(isPlan ? "Scheduled {slot}" : "Confirmed {slot}", { slot: j.scheduledSlot ? slot(j.scheduledSlot) : "" })}${j.assignmentAcknowledgement === "accepted" ? t(" · technician confirmed") : ""}`;
       }
     }
-    return { id: j.id, short: j.id.slice(0, 8), unit: u.name, place: u.place, origin: isPlan ? "plan" : "request", type: t(isPlan ? "Periodic inspection" : TYPE[j.type] ?? j.type), status: j.displayStatus, tab: tabOf(j.displayStatus), line, icon, warn: isWarn };
+    return { id: j.id, short: j.id.slice(0, 8), unit: u.name, place: u.place, origin: isPlan ? "plan" : "request", type: t(isPlan ? "Periodic inspection" : lookup(TYPE, j.type) ?? j.type), status: j.displayStatus, tab: tabOf(j.displayStatus), warn: isWarn, line, icon };
   });
 }
 
 /** The detail facts (Figma 07b): unit, origin and type, follow-up, request, the agreed time, the technician once accepted. */
 export function detailFacts(j: ApiClientJob, unit: { name: string; place: string }, i: I18n = EN): [string, string][] {
   const { t } = i;
-  const isPlan = j.origin === "periodic_plan";
-  const out: [string, string][] = [[t("Unit"), `${unit.name}${unit.place ? ` · ${unit.place}` : ""}`], [t("Origin · type"), isPlan ? t("Periodic plan · visit {date}", { date: j.occurrenceAt ? showDate(j.occurrenceAt, i.display) : "" }) : t("Client request · {type}", { type: t(TYPE[j.type] ?? j.type) })]];
+  const isPlan = j.origin === PERIODIC_PLAN;
+  const out: [string, string][] = [[t("Unit"), `${unit.name}${wrapped(unit.place, " · ")}`], [t("Origin · type"), isPlan ? t("Periodic plan · visit {date}", { date: j.occurrenceAt ? showDate(j.occurrenceAt, i.display) : "" }) : t("Client request · {type}", { type: t(lookup(TYPE, j.type) ?? j.type) })]];
   if (j.followUpOfJobId) out.push([t("Follow-up of"), `${j.followUpOfJobId.slice(0, 8)} · ${followUpText(j.followUpClass, t)}`]);
   if (!isPlan && j.symptom) out.push([t("Request"), `“${j.symptom}”`]);
   const photos = (j.problemPhotos ?? []).filter((p) => p.status === "ready").length; // HQ and the technician see them too (IR437)
@@ -92,22 +111,26 @@ export function detailFacts(j: ApiClientJob, unit: { name: string; place: string
   if (j.scheduledSlot && j.slotProposal?.status !== "pending") out.push([t(isPlan ? "Scheduled" : "Confirmed time"), isPlan ? t("{slot} · set by HQ from your plan", { slot: slotLong(j.scheduledSlot, i) }) : slotLong(j.scheduledSlot, i)]);
   const a = j.assignment;
   if (a?.acknowledgement === "accepted") out.push([t("Technician"), `${a.technicianName ?? t("your technician")} · ${t(j.contractorOrgId ? "service partner" : "HQ")}`]);
-  else if (j.scheduledSlot && ["offered", "accepted", "assigned"].includes(j.status)) out.push([t("Technician"), t("being confirmed — the name shows once the technician accepts")]);
+  if (a?.acknowledgement !== "accepted" && j.scheduledSlot && ["offered", "accepted", "assigned"].includes(j.status)) out.push([t("Technician"), t("being confirmed — the name shows once the technician accepts")]);
   return out;
 }
-export const followUpText = (c: ApiClientJob["followUpClass"], t: T = en) => t(c === "rework" ? "Rework (free)" : (c === "new_request" ? "New request" : "Under HQ review"));
+const FOLLOW_UP = new Map([["rework", "Rework (free)"], ["new_request", "New request"]]);
+export const followUpText = (c: ApiClientJob["followUpClass"], t: T = en) => t(FOLLOW_UP.get(c ?? "") ?? "Under HQ review");
 
 const RANK = ["1st", "2nd", "3rd"];
 /** The preferred times with the booked one marked (request origin, open jobs). */
 export function preferredLines(j: ApiClientJob, i: I18n = EN): { text: string; note: string | null }[] {
-  return j.origin === "periodic_plan" || ["completed", "cancelled"].includes(j.status) ? [] : j.preferredSlots.map((s, k) => ({ text: `${RANK[k] ? i.t(RANK[k]) : String(k + 1)} · ${slotLong(s, i)}`, note: sameSlot(s, j.scheduledSlot) ? i.t("booked") : null }));
+  return j.origin === PERIODIC_PLAN || ["completed", "cancelled"].includes(j.status) ? [] : j.preferredSlots.map((s, k) => {
+    const rank = RANK.at(k);
+    return { text: `${rank ? i.t(rank) : String(k + 1)} · ${slotLong(s, i)}`, note: sameSlot(s, j.scheduledSlot) ? i.t("booked") : null };
+  });
 }
 
 /** The proposal to answer (Figma 07k): who proposes, the time, who comes, the message and the reply deadline. */
 export function proposalCard(j: ApiClientJob, now: number, i: I18n = EN) {
   const { t } = i;
   const p = j.slotProposal;
-  if (!p || p.status !== "pending") return null;
+  if (p?.status !== "pending") return null;
   return {
     id: p.id, title: t(p.source === "contractor" ? "Your service partner asks for another time (via HQ)" : "HQ proposes a new time"), when: slotLong(p.slot, i),
     who: t(p.hold.kind === "contractor" ? "A service partner technician (name shown once assigned)" : "An HQ technician (name shown once confirmed)"),
@@ -123,7 +146,7 @@ export const declinedNotice = (j: ApiClientJob, t: T = en) => {
 
 /** A plan visit the client may move (Figma 07n): an agreed plan visit at least 48 h ahead (IR113). */
 export function planVisit(j: ApiClientJob, now: number, t: T = en): { can: boolean; why: string | null } | null {
-  if (j.origin !== "periodic_plan" || !["offered", "accepted", "assigned"].includes(j.status)) return null;
+  if (j.origin !== PERIODIC_PLAN || !["offered", "accepted", "assigned"].includes(j.status)) return null;
   const start = j.scheduledSlot ? Date.parse(j.scheduledSlot.startAt) : null;
   return start !== null && start - now < 48 * 3_600_000 ? { can: false, why: t("Less than 48 h before the visit — contact HQ to change it.") } : { can: true, why: null };
 }
@@ -134,7 +157,7 @@ export function feedback(j: ApiClientJob, now: number, i: I18n = EN): { kind: "r
   const { t } = i;
   if (j.status !== "completed") return { kind: "none", text: "", report: false };
   // jobs.reportProblem: within 7 days of completion (IR127 item 2), rated or not
-  const isOpen = j.completedAt ? now < Date.parse(j.completedAt) + 7 * 86_400_000 : true;
+  const isOpen = !j.completedAt || now < Date.parse(j.completedAt) + 7 * 86_400_000;
   const r = j.rating;
   if (!r) {
     return isOpen ? { kind: "rate", text: t("Is everything working? Your confirmation closes the job."), report: true } : { kind: "none", text: t("Confirmed automatically after 7 days."), report: false };
@@ -157,7 +180,7 @@ export function preferredError(slots: Slot[], now: number, count = 3, t: T = en)
   for (const s of slots) {
     const h = (Date.parse(s.endAt) - Date.parse(s.startAt)) / 3_600_000;
     if (!(h >= 1 && h <= 4)) return t("Each time is 1–4 hours long.");
-    if (new Date(Date.parse(s.startAt) + 8 * 3_600_000).toISOString().slice(0, 10) <= today) return t("Times start on a later day than today (Kuala Lumpur).");
+    if (!isAfter(new Date(Date.parse(s.startAt) + 8 * 3_600_000).toISOString().slice(0, 10), today)) return t("Times start on a later day than today (Kuala Lumpur).");
     const k = `${String(Date.parse(s.startAt))}-${String(Date.parse(s.endAt))}`;
     if (keys.has(k)) return t(count === 3 ? "The 3 times must be different." : "The times must be different.");
     keys.add(k);
@@ -167,7 +190,7 @@ export function preferredError(slots: Slot[], now: number, count = 3, t: T = en)
 /** The contact window rule (IR64, IR90): up to 200 characters without an e-mail address or a phone number. */
 // the symptom length the API checks (jobs.create): the trimmed text, counted in code points (characters), as the API counts it
 export function symptomLength(v: string): number {
-  return [...v.trim()].length;
+  return codePoints(v.trim());
 }
 
 export function contactError(v: string, tr: T = en): string | null {
@@ -180,8 +203,8 @@ export function contactError(v: string, tr: T = en): string | null {
 /** The client's notes and the job history from jobs.events (internal notes never reach the client, IR42). */
 export interface ApiClientEvent { id: string; action: string; occurredAt: string; actorUserId: string | null; note: { visibility: string; message: string } | null }
 export function notesOf(events: ApiClientEvent[], me: string, i: I18n = EN): { id: string; who: string; at: string; text: string }[] {
-  return events.filter((e) => e.note && e.note.visibility === "customer").sort((a, b) => Date.parse(a.occurredAt) - Date.parse(b.occurredAt))
-    .map((e) => ({ id: e.id, who: i.t(e.actorUserId === me ? "You" : "Coordinator"), at: showTime(e.occurredAt, i.display), text: e.note!.message }));
+  return events.filter((e): e is typeof e & { note: NonNullable<typeof e.note> } => e.note?.visibility === "customer").toSorted((a, b) => Date.parse(a.occurredAt) - Date.parse(b.occurredAt))
+    .map((e) => ({ id: e.id, who: i.t(e.actorUserId === me ? "You" : "Coordinator"), at: showTime(e.occurredAt, i.display), text: e.note.message }));
 }
 
 /** Readable refusals of the client's maintenance actions. */
@@ -193,9 +216,10 @@ export function clientJobRefusal(f: { code: string; messageKey: string; fieldErr
     "errors.contact_details_forbidden": "no e-mail addresses or phone numbers in the contact window", "error.length": "wrong length", "error.count": "wrong number of entries",
     "error.invalidFile": "photos must be JPEG or PNG up to 5 MiB", "error.unitArchived": "the unit is archived", "error.required": "required", "error.invalid": "not a valid value",
   };
-  const fields = Object.entries(f.fieldErrors ?? {}).map(([k, v]) => `${k}: ${keys[v] ? t(keys[v]) : v}`);
+  const fields = Object.entries(f.fieldErrors).map(([k, v]) => `${k}: ${textOf(keys, v, t) ?? v}`);
   if (fields.length > 0) return fields.join(" · ");
-  if (keys[f.messageKey]) return f.code === "CONFLICT" ? t("Not saved: {reason}.", { reason: t(keys[f.messageKey]) }) : `${t(keys[f.messageKey])}.`;
+  const known = textOf(keys, f.messageKey, t);
+  if (known) return f.code === "CONFLICT" ? t("Not saved: {reason}.", { reason: known }) : `${known}.`;
   if (f.code === "NOT_FOUND") return t("The request no longer exists.");
   return actionMessage({ ...f, fieldErrors: {} }, t); // the write limit's wait and other codes (IR380)
 }

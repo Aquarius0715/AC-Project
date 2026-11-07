@@ -1,19 +1,25 @@
 "use client";
+const EVAPORATOR_COIL = "Evaporator coil";
+const NOT_APPLICABLE = "not_applicable";
+const IN_PROGRESS = "In progress";
+const NOT_INSPECTED = "not_inspected";
 
 import Link from "next/link";
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Badge, Banner, Btn, Card, Choice, DataTable, Field, Input, Modal, Page, Select, SummaryList, Tabs, Textarea, UtilBar, cx, useToast, Plain } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Choice, DataTable, Field, Input, Modal, Page, Select, SummaryList, Tabs, Textarea, UtilizationBar, cx, useToast, Plain, type Tone } from "@ac/web/components/ui";
 import { OriginBadge } from "@ac/web/components/JobBits";
 import { Job, fmt, jobActions, longDate, useJobs } from "@ac/web/lib/jobs";
 import { Icon } from "@ac/web/components/Icon";
+import { lookup } from "@ac/web/lib/lookup";
 
 const groups: Record<string, string[]> = {
-  indoor: ["Filter", "Evaporator coil", "Blower motor", "Blower fan", "Drain pipe", "Drain pan", "Outlet", "Louver"],
+  indoor: ["Filter", EVAPORATOR_COIL, "Blower motor", "Blower fan", "Drain pipe", "Drain pan", "Outlet", "Louver"],
   outdoor: ["Compressor", "Condenser coil", "Fan motor", "Refrigerant line", "Service valve"],
   electrical: ["Wiring insulation", "Capacitor", "Breaker", "Terminals", "Grounding"],
 };
-const labels = { indoor: "Indoor (8)", outdoor: "Outdoor (5)", electrical: "Electrical (5)" };
+type GroupTab = "indoor" | "outdoor" | "electrical";
+const groupTabs: { id: GroupTab; label: string }[] = [{ id: "indoor", label: "Indoor (8)" }, { id: "outdoor", label: "Outdoor (5)" }, { id: "electrical", label: "Electrical (5)" }];
 
 // The Phase 1A demo view (shared job store and fixture rows) of the job workspace; the page renders it outside DATA_SOURCE=API.
 export function WorkspaceDemo({ id }: { id: string }) {
@@ -48,7 +54,8 @@ function LiveAssignment({ j }: Readonly<{ j: Job }>) {
           {ack === "accepted" && <div className="mt-3"><Btn variant="primary" disabled className="w-full">Start job (opens check-in)</Btn></div>}
         </Card>
       </div>
-      <Modal open={cant} onClose={() => { setCant(false); }} title="Can’t make this time" footer={<><Btn onClick={() => { setCant(false); }}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!comment.trim()) return; jobActions.techCantMake(j.id, comment.trim(), alt); setCant(false); toast(`Sent to ${coord}`, "warn"); }}>Send to {coord}</Btn></>}>
+      <Modal open={cant} onClose={() => { setCant(false); }} title="Can’t make this time" footer={<><Btn onClick={() => { setCant(false); }}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!comment.trim()) { return; }
+    jobActions.techCantMake(j.id, comment.trim(), alt); setCant(false); toast(`Sent to ${coord ?? "—"}`, "warn"); }}>Send to {coord}</Btn></>}>
         <p className="text-xs text-muted-foreground">{j.id} · {fmt(j.scheduled)} · assigned by {coord}</p>
         <Field label="Reason"><Choice value={reason} onChange={setReason} options={[{ id: "training", label: "Training / course" }, { id: "overrun", label: "Another job runs over" }, { id: "sick", label: "Sick" }, { id: "other", label: "Other" }]} /></Field>
         <Field label="Comment (required)" error={tried && !comment.trim() ? "Tell your coordinator why" : undefined}><Input value={comment} onChange={(e) => { setComment(e.target.value); }} placeholder="Medical appointment on 10-01 morning." /></Field>
@@ -59,24 +66,30 @@ function LiveAssignment({ j }: Readonly<{ j: Job }>) {
   );
 }
 
+// the demo jobs' starting status (others are in progress) and the badge tone of a status (others warn)
+const DEMO_STATUS = new Map([["job-t07", "Assigned"], ["job-p09", "Submitted"]]);
+const STATUS_TONE = new Map<string, Tone>([["Submitted", "ok"], ["Assigned", "primary"]]);
+// a chosen result's colours: attention warns, normal is ok, the others are plain choices
+const CHOSEN = new Map<string, string>([["attention", "border-warn bg-warn-soft text-warn"], ["normal", "border-ok bg-ok-soft text-ok"]]);
 function Workspace({ id }: Readonly<{ id: string }>) {
   type R = "normal" | "attention" | "not_inspected" | "not_applicable" | null;
   const toast = useToast();
   // URL key `tab` selects the checklist group (SCR-T04: indoor default · outdoor · electrical, IR115).
   const sp = useSearchParams();
   const initialTab = sp.get("tab");
-  const [tab, setTabState] = useState<"indoor" | "outdoor" | "electrical">(initialTab === "outdoor" || initialTab === "electrical" ? initialTab : "indoor");
+  const [tab, setTabState] = useState<GroupTab>(initialTab === "outdoor" || initialTab === "electrical" ? initialTab : "indoor");
   const setTab = (t: "indoor" | "outdoor" | "electrical") => {
     setTabState(t);
     const u = new URL(location.href);
     u.searchParams.set("tab", t);
     history.replaceState(null, "", u);
   };
-  const [res, setRes] = useState<Record<string, R>>({ Filter: "attention", "Evaporator coil": "normal", "Blower motor": "normal", "Blower fan": "normal", "Drain pipe": "normal", "Drain pan": "normal", Outlet: "not_applicable" });
+  const [res, setRes] = useState<Record<string, R>>({ Filter: "attention", "Evaporator coil": "normal", "Blower motor": "normal", "Blower fan": "normal", "Drain pipe": "normal", "Drain pan": "normal", Outlet: NOT_APPLICABLE });
   const [why, setWhy] = useState<Record<string, string>>({ Filter: "heavy dust buildup, recommend replacement", Outlet: "no accessible outlet in this installation" });
-  const [readings, setReadings] = useState([["Supply air temperature", "14.2", "°C", "Evaporator coil"], ["Return air temperature", "25.8", "°C", "Evaporator coil"], ["Filter pressure drop", "118", "Pa", "Filter"], ["Blower motor current", "1.9", "A", "Blower motor"]]);
+  const [readings, setReadings] = useState([["Supply air temperature", "14.2", "°C", EVAPORATOR_COIL], ["Return air temperature", "25.8", "°C", EVAPORATOR_COIL], ["Filter pressure drop", "118", "Pa", "Filter"], ["Blower motor current", "1.9", "A", "Blower motor"]]);
+  const setCell = (row: number, col: number, value: string) => { setReadings((rs) => rs.map((x, a) => (a === row ? x.map((y, b) => (b === col ? value : y)) : x))); };
   const [work, setWork] = useState("Cleaned filter, inspected coil and blower — all normal except filter (dust buildup, recommend replacement). No parts used yet.");
-  const [status, setStatus] = useState(id === "job-t07" ? "Assigned" : (id === "job-p09" ? "Submitted" : "In progress"));
+  const [status, setStatus] = useState(DEMO_STATUS.get(id) ?? IN_PROGRESS);
   const [errs, setErrs] = useState<string[]>([]);
   const [confirm, setConfirm] = useState(false);
   const [view, setView] = useState<"readings" | "parts" | "time">("readings");
@@ -86,44 +99,50 @@ function Workspace({ id }: Readonly<{ id: string }>) {
   const [signed, setSigned] = useState<string | null>(null);
   const [checkIn, setCheckIn] = useState(false);
   if (id === "job-internal-a") return <Page className="max-w-xl"><Card title="This page isn’t available" sub="Not assigned to you (NOT_FOUND)." /></Page>;
-  const isReadOnly = status === "Submitted" || status === "Assigned" || status === "On hold";
+  const isReadOnly = ["Submitted", "Assigned", "On hold"].includes(status);
   const all = Object.values(groups).flat();
-  const done = all.filter((k) => res[k]).length;
-  const left = (g: string) => groups[g].filter((k) => !res[k]).length;
+  const done = all.filter((k) => lookup(res, k)).length;
+  const left = (g: string) => (lookup(groups, g) ?? []).filter((k) => !lookup(res, k)).length;
   const submit = () => {
     const e: string[] = [];
     const nul = all.length - done;
     if (nul) e.push(`${String(nul)} items still null — each needs a result, or not_inspected / not_applicable with a reason.`);
     if (work.trim().length < 10) e.push("Work performed must be 10–4000 characters.");
-    for (const [k, v] of Object.entries(res)) { if ((v === "not_inspected" || v === "not_applicable") && !why[k]?.trim()) e.push(`${k}: reason required.`); }
+    for (const [k, v] of Object.entries(res)) { if ((v === NOT_INSPECTED || v === NOT_APPLICABLE) && !lookup(why, k)?.trim()) e.push(`${k}: reason required.`); }
     setErrs(e);
     if (e.length === 0) setConfirm(true);
   };
+  // the add button of the readings and parts tabs
+  const viewAction = () => {
+    if (view === "readings") return <Btn size="sm" disabled={isReadOnly} onClick={() => { setReadings((r) => [...r, ["New reading", "", "", ""]]); }}><Icon name="add" /> Add reading</Btn>;
+    if (view === "parts") return <Btn size="sm" disabled={isReadOnly} onClick={() => { setPartModal(true); }}><Icon name="add" /> Add part</Btn>;
+    return null;
+  };
   return (
     <Page>
-      <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground"><Link href="/technician" className="font-semibold text-primary"><Icon name="arrowLeft" /> Overview</Link><b className="text-ink">{id} · Bedroom AC</b><Badge tone={status === "Submitted" ? "ok" : (status === "Assigned" ? "primary" : "warn")}>{status}</Badge></div>
+      <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground"><Link href="/technician" className="font-semibold text-primary"><Icon name="arrowLeft" /> Overview</Link><b className="text-ink">{id} · Bedroom AC</b><Badge tone={STATUS_TONE.get(status) ?? "warn"}>{status}</Badge></div>
       {status === "Assigned" && <Banner action={<span className="flex gap-2"><Btn size="sm" disabled>Start job</Btn><Btn size="sm" variant="ghost" onClick={() => { setCheckIn(true); }}>Preview check-in</Btn></span>}>Read-only until the window opens at 14:00 — Start is disabled before then. On site, Start job opens Check in (location + unit QR).</Banner>}
       {status === "Submitted" && <Banner tone="ok">Submitted v1 — read-only, awaiting quality review.</Banner>}
-      {status === "In progress" && <Banner tone="warn">Work window ends in 15 min — unsaved input will be discarded at 12:00.</Banner>}
-      {status === "On hold" && <Banner tone="warn" action={<Btn size="sm" variant="ghost" onClick={() => { setStatus("In progress"); }}>Demo: HQ resumes</Btn>}>On hold by HQ — saving and submitting are blocked. Your draft v2 is kept; continue when HQ resumes the job.</Banner>}
-      {status === "In progress" && <p className="text-right text-[11px] text-muted-foreground"><Plain className="underline" onClick={() => { setStatus("On hold"); }}>Demo: HQ puts the job on hold</Plain></p>}
+      {status === IN_PROGRESS && <Banner tone="warn">Work window ends in 15 min — unsaved input will be discarded at 12:00.</Banner>}
+      {status === "On hold" && <Banner tone="warn" action={<Btn size="sm" variant="ghost" onClick={() => { setStatus(IN_PROGRESS); }}>Demo: HQ resumes</Btn>}>On hold by HQ — saving and submitting are blocked. Your draft v2 is kept; continue when HQ resumes the job.</Banner>}
+      {status === IN_PROGRESS && <p className="text-right text-[11px] text-muted-foreground"><Plain className="underline" onClick={() => { setStatus("On hold"); }}>Demo: HQ puts the job on hold</Plain></p>}
       {errs.length > 0 && <Banner tone="crit"><b>Can’t submit:</b><ul className="list-disc pl-5 text-xs">{errs.slice(0, 5).map((e) => <li key={e}>{e}</li>)}</ul></Banner>}
       <div className="split">
         <div className="flex min-w-0 flex-col gap-4">
-          <Card title="Inspection checklist" action={<Tabs value={tab} onChange={setTab} tabs={(Object.keys(groups) as (keyof typeof groups)[]).map((g) => ({ id: g as "indoor", label: labels[g as "indoor"] }))} />}>
+          <Card title="Inspection checklist" action={<Tabs value={tab} onChange={setTab} tabs={groupTabs} />}>
             <ul className="divide-y divide-line">
-              {groups[tab].map((k) => (
+              {(lookup(groups, tab) ?? []).map((k) => (
                 <li key={k} className="py-2.5">
                   <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-[13px] font-semibold">{k}</span>
-                    <div className="flex flex-wrap gap-1">{([["normal", "Normal"], ["attention", "Attention"], ["not_inspected", "Not inspected"], ["not_applicable", "N/A"]] as const).map(([v, l]) => <Plain key={v} disabled={isReadOnly} onClick={() => { setRes((r) => ({ ...r, [k]: v })); }} aria-pressed={res[k] === v} className={cx("rounded-lg border px-2.5 py-1 text-xs font-semibold disabled:opacity-60", res[k] === v ? (v === "attention" ? "border-warn bg-warn-soft text-warn" : v === "normal" ? "border-ok bg-ok-soft text-ok" : "border-primary bg-primary-soft text-primary") : "border-line hover:bg-surface2")}>{l}</Plain>)}</div></div>
-                  {(res[k] === "attention" || res[k] === "not_inspected" || res[k] === "not_applicable") && <div className="mt-1.5"><Input disabled={isReadOnly} placeholder="Reason…" value={why[k] ?? ""} onChange={(e) => { setWhy((w) => ({ ...w, [k]: e.target.value })); }} /></div>}
+                    <div className="flex flex-wrap gap-1">{([["normal", "Normal"], ["attention", "Attention"], [NOT_INSPECTED, "Not inspected"], [NOT_APPLICABLE, "N/A"]] as const).map(([v, l]) => <Plain key={v} disabled={isReadOnly} onClick={() => { setRes((r) => ({ ...r, [k]: v })); }} aria-pressed={lookup(res, k) === v} className={cx("rounded-lg border px-2.5 py-1 text-xs font-semibold disabled:opacity-60", lookup(res, k) === v ? (CHOSEN.get(v) ?? "border-primary bg-primary-soft text-primary") : "border-line hover:bg-surface2")}>{l}</Plain>)}</div></div>
+                  {(lookup(res, k) === "attention" || lookup(res, k) === NOT_INSPECTED || lookup(res, k) === NOT_APPLICABLE) && <div className="mt-1.5"><Input disabled={isReadOnly} placeholder="Reason…" value={lookup(why, k) ?? ""} onChange={(e) => { setWhy((w) => ({ ...w, [k]: e.target.value })); }} /></div>}
                 </li>
               ))}
             </ul>
             <p className="mt-2 text-[11px] text-muted-foreground">Initial result is always null — normal is never preselected. Not inspected/not applicable require a reason.</p>
           </Card>
-          <Card title={<Tabs value={view} onChange={setView} tabs={[{ id: "readings", label: "Readings", count: readings.length }, { id: "parts", label: "Parts & refrigerant", count: parts.length }, { id: "time", label: "Time on site" }]} />} action={view === "readings" ? <Btn size="sm" disabled={isReadOnly} onClick={() => { setReadings((r) => [...r, ["New reading", "", "", ""]]); }}><Icon name="add" /> Add reading</Btn> : (view === "parts" ? <Btn size="sm" disabled={isReadOnly} onClick={() => { setPartModal(true); }}><Icon name="add" /> Add part</Btn> : null)}>
-            {view === "parts" ? <PartsView parts={parts} readOnly={isReadOnly} onRemove={(i) => { setParts((p) => p.filter((_, k) => k !== i)); }} /> : (view === "time" ? <TimeView /> : <div className="scroll-x"><table className="w-full min-w-[460px] text-[13px]"><thead className="text-left text-[11px] uppercase text-muted-foreground"><tr><th>Metric</th><th>Value</th><th>Unit</th><th>Linked item</th></tr></thead><tbody>{readings.map((r, i) => <tr key={i} className="border-t border-line">{r.map((c, j) => <td key={j} className="py-1.5 pr-2"><Input disabled={isReadOnly} value={c} onChange={(e) => { setReadings((rs) => rs.map((x, a) => (a === i ? x.map((y, b) => (b === j ? e.target.value : y)) : x))); }} /></td>)}</tr>)}</tbody></table></div>)}
+          <Card title={<Tabs value={view} onChange={setView} tabs={[{ id: "readings", label: "Readings", count: readings.length }, { id: "parts", label: "Parts & refrigerant", count: parts.length }, { id: "time", label: "Time on site" }]} />} action={viewAction()}>
+            {view === "parts" ? <PartsView parts={parts} readOnly={isReadOnly} onRemove={(i) => { setParts((p) => p.filter((_, k) => k !== i)); }} /> : null}{view !== "parts" && view === "time" && <TimeView />}{view !== "parts" && view !== "time" && <div className="scroll-x"><table className="w-full min-w-[460px] text-[13px]"><thead className="text-left text-[11px] uppercase text-muted-foreground"><tr><th>Metric</th><th>Value</th><th>Unit</th><th>Linked item</th></tr></thead><tbody>{readings.map((r, i) => <tr key={i} className="border-t border-line">{r.map((c, j) => <td key={j} className="py-1.5 pr-2"><Input disabled={isReadOnly} value={c} onChange={(e) => { setCell(i, j, e.target.value); }} /></td>)}</tr>)}</tbody></table></div>}
           </Card>
           <Card title="Work report — draft v2">
             <Field label="Work performed & next action (10–4000 characters)"><Textarea disabled={isReadOnly} value={work} onChange={(e) => { setWork(e.target.value); }} className="min-h-[110px]" /></Field>
@@ -136,7 +155,7 @@ function Workspace({ id }: Readonly<{ id: string }>) {
           </Card>
         </div>
         <div className="flex min-w-0 flex-col gap-4">
-          <Card title="Checklist progress"><div className="mb-2 flex justify-between text-xs"><b>{done} / {all.length}</b><span className="text-muted-foreground">{all.length - done} items still null</span></div><UtilBar pct={(done / all.length) * 100} />{Object.keys(groups).map((g) => <div key={g} className="mt-2 flex justify-between text-xs"><span className="capitalize">{g}</span><span>{groups[g].length - left(g)} / {groups[g].length}</span></div>)}</Card>
+          <Card title="Checklist progress"><div className="mb-2 flex justify-between text-xs"><b>{done} / {all.length}</b><span className="text-muted-foreground">{all.length - done} items still null</span></div><UtilizationBar pct={(done / all.length) * 100} />{Object.keys(groups).map((g) => <div key={g} className="mt-2 flex justify-between text-xs"><span className="capitalize">{g}</span><span>{(lookup(groups, g) ?? []).length - left(g)} / {(lookup(groups, g) ?? []).length}</span></div>)}</Card>
           <Card title="Job & unit" action={<Link className="text-xs font-semibold text-primary" href="/technician/units/unit-online-rto">Unit <Icon name="arrowRight" /></Link>}><SummaryList items={[["Window", "10:00–12:00 today"], ["Site", "customer-a · Home A › 1F › Bedroom"], ["Access", "Security desk · show job ID"], ["Unit", "unit-online-rto · Split 2.5 kW"], ["Linked alert", "Bedroom too hot · warning"]]} /><div className="mt-3 flex flex-wrap gap-2"><Link className="text-xs font-semibold text-primary" href="/technician/units/unit-online-rto/alerts?jobId=job-t07">Alert evidence <Icon name="arrowRight" /></Link><Link className="text-xs font-semibold text-primary" href="/technician/units/unit-online-rto/control?jobId=job-contractor-a">Diagnostics <Icon name="arrowRight" /></Link></div></Card>
           <Card title="Versions & autosave"><SummaryList items={[["Draft v2", "autosaved 11:44 · 7 results · 1 photo"], ["Draft v1", "saved 10:40 · 3 results · no photos"], ["Work window", "10:00–12:00 · warning at 11:45 · discard at 12:00"]]} /></Card>
         </div>

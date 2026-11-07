@@ -5,20 +5,23 @@
 // property → unit), severity, status and selected alert live in the URL (DD-A05 item 5, Figma Admin 256:2, IR318); so do
 // the Policies tab's selected policy (`policyId`) and the owner customer of a new one (`new`, DD-A05 item 8, IR345).
 import { connection } from "next/server";
-import { apiMode, coreAll, coreDisplay, coreNow, coreOp, corePermissions, CoreError } from "@ac/web/lib/dal";
+import { apiMode, coreAll, coreDisplay, coreNow, coreOp, corePermissions, CoreError, orWhenForbidden, coreAllPage } from "@ac/web/lib/dal";
 import { i18nOf } from "@ac/web/lib/i18n";
 import { adminAlertRows, policyRows, type AlertState, type ApiAdminAlert, type ApiCustomerName, type ApiMemberName, type ApiPolicy, type ApiUnitName, type Severity } from "@ac/web/lib/adminAlerts";
 import { NeedsAccess } from "@ac/web/components/NeedsAccess";
-import { AdminAlertsView } from "./_components/alerts-view";
 
-const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
-const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => p.catch((error) => { // names the session may not read (no identity.read or job.read)
-  if (error instanceof CoreError && error.error.code === "FORBIDDEN") return fallback;
-  throw error;
-});
+import { AdminAlertsView } from "./_components/alerts-view";
+import { recover } from "@ac/web/lib/promises";
+import { firstOf as one } from "@ac/web/lib/searchParams";
+
+const ASSET_READ = "asset.read";
+
+// names the session may not read (no identity.read or job.read)
+const optional = orWhenForbidden;
 const SEVERITIES: Severity[] = ["critical", "warning", "normal"];
 const STATES: AlertState[] = ["open", "acknowledged", "resolved"];
 
+const isMissing = (r: unknown): r is { missing: string } => typeof r === "object" && r !== null && "missing" in r;
 export default async function AdminAlertsPage({ searchParams }: Readonly<PageProps<"/admin/alerts">>) {
   interface Page<T> { items: T[] }
   await connection();
@@ -41,7 +44,7 @@ export default async function AdminAlertsPage({ searchParams }: Readonly<PagePro
   // a read the role may not make answers the permission it needs: the first one missing names the page's state, instead
   // of a failure with Try again (IR581)
   const need = <T,>(p: Promise<T>, permission: string): Promise<T | { missing: string }> => {
-    return p.catch((error) => {
+    return recover(p, (error: unknown) => {
       if (error instanceof CoreError && error.error.code === "FORBIDDEN") return { missing: permission };
       throw error;
     });
@@ -49,16 +52,19 @@ export default async function AdminAlertsPage({ searchParams }: Readonly<PagePro
   const [now, perms, display, alertsRead, unitsRead, customersRead, propertiesRead, policiesRead, members, defaultsRead] = await Promise.all([
     coreNow(), corePermissions(), coreDisplay(),
     need(coreOp<Page<ApiAdminAlert>>("alerts.list", { limit: 100, filters }), "alert.read"), // every status in the scope: the tiles count them
-    need(coreAll<ApiUnitName & { propertyId: string; archived?: boolean }>("units.list").then((items) => ({ items, total: items.length })), "asset.read"),
-    need(coreAll<ApiCustomerName & { status?: "active" | "inactive" }>("customers.list").then((items) => ({ items, total: items.length })), "asset.read"),
-    need(coreAll<{ id: string; name: string; customerOrgId: string }>("properties.list"), "asset.read"),
-    need(coreAll<ApiPolicy>("policies.list", { filters: scope }).then((items) => ({ items, total: items.length })), "alert.policy.read"),
-    optional(coreAll<ApiMemberName>("members.list").then((items) => ({ items, total: items.length })), { items: [], total: 0 }),
+    need(coreAllPage<ApiUnitName & { propertyId: string; archived?: boolean }>("units.list"), ASSET_READ),
+    need(coreAllPage<ApiCustomerName & { status?: "active" | "inactive" }>("customers.list"), ASSET_READ),
+    need(coreAll<{ id: string; name: string; customerOrgId: string }>("properties.list"), ASSET_READ),
+    need(coreAllPage<ApiPolicy>("policies.list", { filters: scope }), "alert.policy.read"),
+    optional(coreAllPage<ApiMemberName>("members.list"), { items: [], total: 0 }),
     need(coreOp<Page<ApiPolicy>>("policies.list", { limit: 1, filters: { kind: "default_alert" } }), "alert.policy.read"),
   ]);
-  const missing = [alertsRead, unitsRead, customersRead, propertiesRead, policiesRead, defaultsRead].find((r): r is { missing: string } => !!r && typeof r === "object" && "missing" in r);
+  const missing = [alertsRead, unitsRead, customersRead, propertiesRead, policiesRead, defaultsRead].find(isMissing);
   if (missing) return <NeedsAccess what="Alert policies" permission={missing.missing} />;
-  const read = <T,>(r: T | { missing: string }) => r as T; // none is missing past this point
+  const read = <T,>(r: T | { missing: string }): T => {
+    if (isMissing(r)) throw new Error(`a read that is missing "${r.missing}" was shown the page`); // none is missing past the check above
+    return r;
+  };
   const [alerts, units, customers, properties, policies, defaults] = [read(alertsRead), read(unitsRead), read(customersRead), read(propertiesRead), read(policiesRead), read(defaultsRead)];
   const scoped = [...defaults.items, ...policies.items.filter((p) => p.kind !== "default_alert")];
   const i = i18nOf(display);
@@ -77,7 +83,7 @@ export default async function AdminAlertsPage({ searchParams }: Readonly<PagePro
         alerts: adminAlertRows(alerts.items, units.items, customers.items, scoped, now.getTime(), i),
         policies: policyRows(scoped, customers.items, members.items, i.t, units.items),
         pol: {
-          policyId: one(sp.policyId) ?? null, newFor: one(sp.new) ?? null, from: one(sp.from) ?? null, canWrite: perms.has("alert.policy.write"), timezone: display.timeZone,
+          policyId: one(sp.policyId) ?? null, creatingFor: one(sp.new) ?? null, from: one(sp.from) ?? null, canWrite: perms.has("alert.policy.write"), timezone: display.timeZone,
           customers: customers.items.filter((c) => c.status !== "inactive").map((c) => ({ id: c.id, name: c.name })),
           units: units.items.filter((u) => !u.archived).map((u) => ({ id: u.id, name: u.displayName, customerId: custByOrg.get(u.customerOrgId) ?? null })),
         },

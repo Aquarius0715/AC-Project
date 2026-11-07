@@ -5,6 +5,7 @@
 // display time zone (`i`, IR262).
 import { EN, intlTag, translator, type Display, type I18n, type T } from "@ac/web/lib/i18n";
 import { actionMessage } from "@ac/web/lib/actionMessage";
+import { filled } from "@ac/web/lib/filled";
 
 const en = translator("en");
 
@@ -63,15 +64,27 @@ export interface FilterGroup {
 }
 export type FilterLine = { kind: "unit"; row: FilterRow } | { kind: "group"; group: FilterGroup };
 
+/** How far a filter is to its next cleaning: % of the run-time threshold, else % of the fallback days, else unknown. */
+function filterProgress(h: number | null | undefined, days: number | null, s: ApiFilterStatus, t: T): { pct: number | null; text: string } {
+  if (h != null) {
+    const pct = Math.min(100, Math.round((h / s.thresholdHours) * 100));
+    return { pct, text: t("{pct} % of {n} h", { pct, n: s.thresholdHours }) };
+  }
+  if (days == null) return { pct: null, text: t("run time unknown") };
+  const pct = Math.min(100, Math.round((days / s.fallbackDays) * 100));
+  return { pct, text: t("{pct} % of {n} days", { pct, n: s.fallbackDays }) };
+}
 /** One row per AC (IR134 items 1–3): run time and % of the threshold, or the fallback days since the last cleaning. */
 export function filterRow(s: ApiFilterStatus, u: FilterUnit | undefined, nowMs: number, i: I18n = EN): FilterRow {
   const { t } = i;
   const h = s.runHoursSinceCleaning;
   const days = s.lastCleanedAt ? Math.max(0, Math.floor((nowMs - Date.parse(s.lastCleanedAt)) / 86_400_000)) : null;
-  const pct = h == null ? (days == null ? null : Math.min(100, Math.round((days / s.fallbackDays) * 100))) : Math.min(100, Math.round((h / s.thresholdHours) * 100));
-  const progress = h == null ? (days == null ? t("run time unknown") : t("{pct} % of {n} days", { pct: pct!, n: s.fallbackDays })) : t("{pct} % of {n} h", { pct: pct!, n: s.thresholdHours });
+  const { pct, text: progress } = filterProgress(h, days, s, t);
   const isOffline = !!u && u.connection !== "online";
-  const last = s.lastCleanedAt ? t(s.lastCleanedBy === "technician" ? "cleaned by technician {date}" : "last cleaned {date}", { date: monthDay(s.lastCleanedAt, i.display) }) : t("no cleaning recorded yet");
+  const noReadings = t(isOffline ? "offline" : "no power readings");
+  const lastText = s.lastCleanedBy === "technician" ? "cleaned by technician {date}" : "last cleaned {date}";
+  const last = s.lastCleanedAt ? t(lastText, { date: monthDay(s.lastCleanedAt, i.display) }) : t("no cleaning recorded yet");
+  const runText = s.lastCleanedAt ? "{n} h since cleaning" : "{n} h so far";
   return {
     unitId: s.unitId,
     unit: u?.name ?? t("Unit"),
@@ -79,8 +92,8 @@ export function filterRow(s: ApiFilterStatus, u: FilterUnit | undefined, nowMs: 
     spaceId: u?.spaceId ?? null,
     offline: isOffline,
     jobId: s.lastCleanedBy === "technician" ? s.lastCleaningJobId : null,
-    run: h == null ? "—" : t(s.lastCleanedAt ? "{n} h since cleaning" : "{n} h so far", { n: Math.round(h) }),
-    runNote: h == null ? t(isOffline ? "offline" : "no power readings") : null,
+    run: h == null ? "—" : t(runText, { n: Math.round(h) }),
+    runNote: h == null ? noReadings : null,
     state: s.status,
     threshold: s.thresholdHours,
     hours: h,
@@ -92,21 +105,26 @@ export function filterRow(s: ApiFilterStatus, u: FilterUnit | undefined, nowMs: 
   };
 }
 
+/** A group's badge: how many are due (critical when one is overdue), unknown when no AC reports, or OK. */
+function groupBadge(due: number, isOverdue: boolean, isUnknown: boolean, t: T): FilterGroup["badge"] {
+  if (due) return { label: t("{n} due", { n: due }), tone: isOverdue ? "crit" : "warn" };
+  return isUnknown ? { label: t("Unknown"), tone: "unknown" } : { label: t("OK"), tone: "ok" };
+}
 /** The summary of an area's ACs: “2 due soon · 1 offline”, the average progress and “2 due”. */
 export function filterGroup(key: string, rows: FilterRow[], t: T = en): FilterGroup {
   const n = (st: FilterState) => rows.filter((r) => r.state === st).length;
   const offline = rows.filter((r) => r.offline).length;
-  const parts = [n("overdue") && t("{n} overdue", { n: n("overdue") }), n("due_soon") && t("{n} due soon", { n: n("due_soon") }), offline && t("{n} offline", { n: offline })].filter(Boolean) as string[];
+  const parts = [n("overdue") && t("{n} overdue", { n: n("overdue") }), n("due_soon") && t("{n} due soon", { n: n("due_soon") }), offline && t("{n} offline", { n: offline })].filter((part): part is string => typeof part === "string" && part !== "");
   const known = rows.filter((r) => r.hours != null && r.pct != null);
   const pct = known.length > 0 ? Math.round(known.reduce((a, r) => a + (r.pct ?? 0), 0) / known.length) : null;
   const due = n("overdue") + n("due_soon");
-  const name = rows[0].place.split(" › ").pop() || t("Area");
+  const name = filled(rows[0]?.place.split(" › ").pop()) ?? t("Area");
   return {
     title: t("{name} · {n} ACs", { name, n: rows.length }),
-    place: rows[0].place,
+    place: rows[0]?.place ?? "",
     run: parts.length > 0 ? parts.join(" · ") : t("all OK"),
-    progress: pct == null ? t("run time unknown") : t("{pct} % of {n} h (average)", { pct, n: rows[0].threshold }),
-    badge: due ? { label: t("{n} due", { n: due }), tone: n("overdue") ? "crit" : "warn" } : (n("unknown") === rows.length ? { label: t("Unknown"), tone: "unknown" } : { label: t("OK"), tone: "ok" }),
+    progress: pct == null ? t("run time unknown") : t("{pct} % of {n} h (average)", { pct, n: rows[0]?.threshold ?? 0 }),
+    badge: groupBadge(due, n("overdue") > 0, n("unknown") === rows.length, t),
     key,
     pct,
     rows,
@@ -123,11 +141,11 @@ export function filterLines(items: ApiFilterStatus[], units: FilterUnit[], nowMs
   const out: FilterLine[] = [];
   const placed = new Set<string>();
   for (const r of rows) {
-    if (!r.spaceId || (size.get(r.spaceId) ?? 0) < AREA_GROUP_AT) out.push({ kind: "unit", row: r });
-    else if (!placed.has(r.spaceId)) {
-      placed.add(r.spaceId);
-      out.push({ kind: "group", group: filterGroup(r.spaceId, rows.filter((x) => x.spaceId === r.spaceId), i.t) });
-    }
+    const isUnit = !r.spaceId || (size.get(r.spaceId) ?? 0) < AREA_GROUP_AT;
+    if (isUnit) out.push({ kind: "unit", row: r });
+    const groupId = isUnit ? undefined : r.spaceId;
+    if (groupId && !placed.has(groupId)) out.push({ kind: "group", group: filterGroup(groupId, rows.filter((x) => x.spaceId === groupId), i.t) });
+    if (groupId) placed.add(groupId);
   }
   return out;
 }
@@ -135,8 +153,8 @@ export function filterLines(items: ApiFilterStatus[], units: FilterUnit[], nowMs
 /** The symptom line of a cleaning request opened from the tab (New request prefilled, type preventive), in the
 display language — the client still edits it before sending. */
 export const cleaningSymptom = (r: FilterRow, t: T = en) => {
-  return r.hours == null ? (r.days == null ? t("Filter cleaning: the filter is due for cleaning.") : t("Filter cleaning: {n} days since the last cleaning (reminder every {days} days).", { n: r.days, days: r.fallbackDays }))
-    : t("Filter cleaning: {n} h of running since the last cleaning (reminder at {threshold} h).", { n: Math.round(r.hours), threshold: r.threshold });
+  if (r.hours != null) return t("Filter cleaning: {n} h of running since the last cleaning (reminder at {threshold} h).", { n: Math.round(r.hours), threshold: r.threshold });
+  return r.days == null ? t("Filter cleaning: the filter is due for cleaning.") : t("Filter cleaning: {n} days since the last cleaning (reminder every {days} days).", { n: r.days, days: r.fallbackDays });
 };
 
 /** The Reminders card (Figma 07j). */
@@ -174,7 +192,7 @@ export const reminderInput = (f: ReminderForm) => {
 export function filterRefusal(f: { code: string; messageKey: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null }, t: T = en): string {
   if (f.code === "FORBIDDEN") return t("Not saved: only the account owner can change the reminders.");
   if (f.code === "NOT_FOUND") return t("Not saved: that AC is no longer in your account.");
-  const fe = f.fieldErrors ?? {};
+  const fe = f.fieldErrors;
   if (fe.unitId === "error.unitArchived") return t("Not saved: that AC is archived.");
   if (fe.thresholdHours) return t("Not saved: remind at 50–2000 h of running, or use the model default.");
   if (fe.fallbackDays) return t("Not saved: the fallback is 7–180 days.");

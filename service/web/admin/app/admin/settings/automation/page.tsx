@@ -3,7 +3,7 @@
 // customers, properties and capabilities. Saving, simulating and firing are Server Actions (actions.ts). Texts in the
 // display language (IR303). The Phase 1A demo keeps the fixture policies.
 import { connection } from "next/server";
-import { coreAll, apiMode, coreDisplay, coreNow, coreOp, corePermissions } from "@ac/web/lib/dal";
+import { apiMode, coreDisplay, coreNow, coreOp, corePermissions, coreAllPage } from "@ac/web/lib/dal";
 import { translator } from "@ac/web/lib/i18n";
 import type { ApiCustomer, ApiProperty } from "@ac/web/lib/billing";
 import type { ApiCapability } from "@ac/web/lib/devices";
@@ -11,6 +11,7 @@ import { policyGroups, type ApiAutoPolicy } from "@ac/web/lib/automation";
 import { withAccess } from "@ac/web/lib/withAccess";
 import { AutomationDemo } from "./_components/automation-demo";
 import { AutomationView } from "./_components/automation-view";
+import { queryReader } from "@ac/web/lib/searchParams";
 
 interface Unit { id: string; displayName: string; customerOrgId: string; propertyId: string; modelId: string; archived: boolean }
 
@@ -23,16 +24,16 @@ async function AdminAutomationPageContent({ searchParams }: Readonly<PageProps<"
   await connection();
   if (!apiMode()) return <AutomationDemo />;
   const sp = await searchParams;
-  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k] as string) : undefined);
+  const one = queryReader(sp);
   const scope = { customerId: one("customerId"), propertyId: one("propertyId"), unitId: one("unitId") };
   const filters = { kind: "automation", ...(scope.customerId && { customerId: scope.customerId }), ...(scope.propertyId && { propertyId: scope.propertyId }), ...(scope.unitId && { unitId: scope.unitId }) };
   const [now, perms, display, policies, units, customers, properties, caps] = await Promise.all([
     coreNow(), corePermissions(), coreDisplay(),
-    coreAll<ApiAutoPolicy>("policies.list", { filters }).then((items) => ({ items, total: items.length })),
-    coreAll<Unit>("units.list").then((items) => ({ items, total: items.length })),
-    coreAll<ApiCustomer>("customers.list").then((items) => ({ items, total: items.length })),
-    coreAll<ApiProperty>("properties.list").then((items) => ({ items, total: items.length })),
-    coreAll<ApiCapability>("capabilities.list").then((items) => ({ items, total: items.length })),
+    coreAllPage<ApiAutoPolicy>("policies.list", { filters }),
+    coreAllPage<Unit>("units.list"),
+    coreAllPage<ApiCustomer>("customers.list"),
+    coreAllPage<ApiProperty>("properties.list"),
+    coreAllPage<ApiCapability>("capabilities.list"),
   ]);
   const customerOfOrg = new Map(customers.items.map((c) => [c.organizationId, c]));
   const t = translator(display.locale);

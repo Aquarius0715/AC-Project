@@ -2,7 +2,8 @@
 // the Core API turned into one toast line. Pure code shared by every client view that calls Server Actions. The line
 // is in the display language (`t`, IR269); a field name and a domain message key are humanized English, because the
 // API sends keys, not texts.
-import { translator, type T } from "@ac/web/lib/i18n";
+import { translator, type T, textOf } from "@ac/web/lib/i18n";
+import { lookup } from "@ac/web/lib/lookup";
 
 export interface ActionFailure { code: string; messageKey: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null }
 
@@ -67,7 +68,10 @@ export const fieldName = (field: string) => humanize(field.split(".").pop() ?? f
 each worded as the toast words it: the text under the field to fix (IR586). */
 export function fieldErrorTexts<K extends string>(r: ActionFailure, fields: Record<string, K>, t: T = translator("en")): Partial<Record<K, string>> {
   const out: Partial<Record<K, string>> = {};
-  for (const [field, key] of Object.entries(r.fieldErrors)) if (fields[field]) out[fields[field]] = actionMessage({ ...r, fieldErrors: { [field]: key } }, t);
+  for (const [field, key] of Object.entries(r.fieldErrors)) {
+    const form = lookup(fields, field);
+    if (form) Object.assign(out, { [form]: actionMessage({ ...r, fieldErrors: { [field]: key } }, t) });
+  }
   return out;
 }
 
@@ -75,7 +79,8 @@ export function actionMessage(r: ActionFailure, t: T = translator("en")): string
   const [field, key] = Object.entries(r.fieldErrors)[0] ?? [];
   if (field && key) {
     const name = fieldName(field);
-    return fieldText[key] ? t(fieldText[key], { field: name }) : t("{field} — {problem}", { field: name, problem: humanize(key).toLowerCase() });
+    const text = lookup(fieldText, key);
+    return text ? t(text, { field: name }) : t("{field} — {problem}", { field: name, problem: humanize(key).toLowerCase() });
   }
   if (r.messageKey === "error.versionConflict") return t("Someone changed this in the meantime — the screen now shows the latest version");
   // the write limit per member (IR375): how long to wait, as the implementation contracts ask for RATE_LIMITED
@@ -90,7 +95,8 @@ export function actionMessage(r: ActionFailure, t: T = translator("en")): string
     }
     return r.retryAfterSeconds ? t("Too many changes in a short time — try again in {s} s", { s: r.retryAfterSeconds }) : t("Too many changes in a short time — try again shortly");
   }
-  if (keyText[r.messageKey]) return t(keyText[r.messageKey]);
+  const known = keyText[r.messageKey];
+  if (known) return t(known);
   if (r.messageKey.startsWith("errors.")) return humanize(r.messageKey);
-  return codeText[r.code] ? t(codeText[r.code]) : `${r.code}: ${humanize(r.messageKey)}`;
+  return textOf(codeText, r.code, t) ?? `${r.code}: ${humanize(r.messageKey)}`;
 }

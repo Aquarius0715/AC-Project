@@ -3,5 +3,5 @@ import { AppShell } from "@ac/web/components/AppShell";
 import { loadShell } from "@ac/web/lib/shell";
 
 export default async function L({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <AppShell role="admin" live={await loadShell("admin")}>{children}</AppShell>;
+  return <AppShell appRole="admin" live={await loadShell("admin")}>{children}</AppShell>;
 }

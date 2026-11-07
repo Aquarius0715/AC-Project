@@ -4,9 +4,10 @@
 // to the alert. An alert without a policy resolves only with at least one; a policy alert may be resolved by hand
 // without. Pure code shared by the HQ Resolve dialog and the technician's resolution; Vitest covers it. Texts in the
 // display language; instants in the user's display time zone (IR44).
-import { EN, relativeTime, type I18n, type T } from "@ac/web/lib/i18n";
+import { EN, relativeTime, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import { metricLabel } from "@ac/web/lib/adminAlerts";
 import { airNumber } from "@ac/web/lib/air";
+import { withoutNote } from "@ac/web/lib/text";
 
 /** EvidenceCandidate of service-contracts.ts. */
 export interface ApiEvidenceCandidate {
@@ -19,7 +20,7 @@ export interface EvidenceRow { id: string; kind: ApiEvidenceCandidate["kind"]; t
 const ORIGIN: Record<string, string> = { measured: "measured", inspection: "recorded on site", estimated: "estimated" };
 const EVENT: Record<string, string> = { restored: "The device's signal is back" };
 /** The metric's name without the unit some labels carry (“CO₂ (ppm)” → “CO₂”): the value names its unit. */
-const metricName = (metric: string, t: T) => (metricLabel[metric] ? t(metricLabel[metric]).replace(/\s*\([^)]*\)$/, "") : metric.replaceAll('_', " "));
+const metricName = (metric: string, t: T) => withoutNote(textOf(metricLabel, metric, t) ?? metric.replaceAll('_', " "));
 
 /** The candidates as the picker lists them: the newest first, as alerts.evidence returns them. */
 export function evidenceRows(items: ApiEvidenceCandidate[], nowMs: number, i: I18n = EN): EvidenceRow[] {
@@ -31,17 +32,16 @@ export function evidenceRows(items: ApiEvidenceCandidate[], nowMs: number, i: I1
       const value = c.value === null ? "—" : `${airNumber(metric, c.value)} ${c.unit ?? ""}`.trim();
       return { id: c.id, kind: c.kind, title: t("Remeasurement · {metric} {value} · {time}", { metric: metricName(metric, t), value, time }), sub: t("{origin} · valid", { origin: t(ORIGIN[c.origin ?? ""] ?? c.origin ?? "") }) };
     }
-    if (c.kind === "device_event") return { id: c.id, kind: c.kind, title: t("Device event · {time}", { time }), sub: EVENT[c.eventType ?? ""] ? t(EVENT[c.eventType ?? ""]) : c.eventType ?? "" };
-    return { id: c.id, kind: c.kind, title: t("Evidence attached to this alert"), sub: `${c.id.slice(0, 8)} · ${t("observed {time}", { time })}` };
+    return c.kind === "device_event"
+      ? { id: c.id, kind: c.kind, title: t("Device event · {time}", { time }), sub: textOf(EVENT, c.eventType, t) ?? c.eventType ?? "" }
+      : { id: c.id, kind: c.kind, title: t("Evidence attached to this alert"), sub: `${c.id.slice(0, 8)} · ${t("observed {time}", { time })}` };
   });
 }
 
-/** The picker's heading: required for an alert without a policy (IR66), optional for a policy alert. */
-export function evidenceHeading(policyless: boolean, t: T): { title: string; sub: string } {
-  return policyless
-    ? { title: t("Resolution evidence · required"), sub: t("At least one · measurements after detection") }
-    : { title: t("Resolution evidence · optional"), sub: t("A policy alert may also be resolved by hand without evidence") };
-}
+/** The picker's heading for an alert without a policy: the evidence is required (IR66). */
+export const requiredEvidenceHeading = (t: T): { title: string; sub: string } => ({ title: t("Resolution evidence · required"), sub: t("At least one · measurements after detection") });
+/** The picker's heading for a policy alert: the evidence is optional. */
+export const optionalEvidenceHeading = (t: T): { title: string; sub: string } => ({ title: t("Resolution evidence · optional"), sub: t("A policy alert may also be resolved by hand without evidence") });
 
 /** At most this many evidence IDs go with one resolution (the Core API's bound). */
 export const MAX_EVIDENCE = 20;
@@ -59,9 +59,11 @@ const REFUSED: Record<string, string> = {
 /** The resolution's refusal of its evidence (fieldErrors.resolutionEvidenceIds) in words, or null for another refusal. */
 export function evidenceRefusal(fieldErrors: Record<string, string> | undefined, t: T): string | null {
   const key = fieldErrors?.resolutionEvidenceIds;
-  if (!key) return null;
-  return REFUSED[key] ? t(REFUSED[key]) : t("Pick each evidence record once, at most {n}", { n: MAX_EVIDENCE });
+  return key ? textOf(REFUSED, key, t) ?? t("Pick each evidence record once, at most {n}", { n: MAX_EVIDENCE }) : null;
 }
 
 /** The picked IDs after ticking one on or off, in the order they were picked. */
-export const togglePick = (picked: string[], id: string, on: boolean): string[] => (on ? (picked.includes(id) ? picked : [...picked, id]) : picked.filter((x) => x !== id));
+export const togglePick = (picked: string[], id: string, on: boolean): string[] => {
+  if (!on) return picked.filter((x) => x !== id);
+  return picked.includes(id) ? picked : [...picked, id];
+};

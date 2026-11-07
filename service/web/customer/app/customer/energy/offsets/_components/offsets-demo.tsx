@@ -26,7 +26,8 @@ export function OffsetsDemo() {
       </Card>
       {done ? (
         <Card title="Demo request recorded" tone="ok"><Banner tone="ok">A demo record “Demo requested” (offset-0232) was created. Proof stays “Not issued”.</Banner><div className="mt-3"><Btn onClick={() => { setDone(false); setStep(0); setAck(false); }}>Start another</Btn></div></Card>
-      ) : step === 0 ? (
+      ) : null}
+      {!done && step === 0 ? (
         <Card title="How much would you like to offset?">
           <div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>
             <Field label="Amount (kgCO2e, > 0)" error={isValid ? undefined : "Positive numbers only"} hint="Positive numbers only"><Input type="number" value={amount} onChange={(e) => { setAmount(e.target.value); }} /></Field>
@@ -34,18 +35,20 @@ export function OffsetsDemo() {
           </div>
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2"><span className="text-xs text-muted-foreground">Getting a quote creates no record.</span><Btn variant="primary" disabled={!isValid} onClick={() => { setStep(1); }}>Get demo quote</Btn></div>
         </Card>
-      ) : step === 1 ? (
+      ) : null}
+      {!done && step === 1 ? (
         <Card title="Demo quote">
           <SummaryList items={[["Amount", `${amount} kgCO2e`], ["Period / units", "Sep 14–20 · Bedroom AC"], ["Quote ID", "quote-0107 (demo)"], ["Expires", "09:55 (15 minutes from now)"], ["Records created", "None yet"]]} />
           <div className="mt-3 flex gap-2"><Btn onClick={() => { setStep(0); }}><Icon name="arrowLeft" /> Back</Btn><Btn variant="primary" onClick={() => { setStep(2); }}>Continue</Btn></div>
         </Card>
-      ) : (
+      ) : null}
+      {!done && step > 1 ? (
         <Card title="Confirm demo request">
           <SummaryList items={[["Amount", `${amount} kgCO2e`], ["Quote", "quote-0107 · expires 09:55"], ["Result", "A demo record “Demo requested” is created. Proof stays “Not issued”."]]} />
           <div className="mt-3"><Check checked={ack} onChange={setAck} label="I understand this is a simulated request — not a real purchase." /></div>
           <div className="mt-3 flex gap-2"><Btn onClick={() => { setStep(1); }}><Icon name="arrowLeft" /> Back</Btn><Btn variant="primary" disabled={!ack} onClick={() => { setDone(true); toast("Demo request recorded"); }}>Confirm demo request</Btn></div>
         </Card>
-      )}
+      ) : null}
       <Card title="Demo offset records" sub="Demo retirement ≠ certified credit">
         <ul className="flex flex-col divide-y divide-line text-[13px]">{[["offset-0231", "Proof: DEMO-CERT-0231"], ["offset-0198", "Proof: Not issued"]].map(([a, b]) => <li key={a} className="flex flex-wrap justify-between gap-2 py-2"><b>{a}</b><span className="text-muted-foreground">{b}</span></li>)}</ul>
       </Card>

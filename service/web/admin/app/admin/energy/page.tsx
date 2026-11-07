@@ -5,18 +5,30 @@
 // display language; the analysis and baseline periods are Kuala Lumpur business time and say so (IR296). The Phase 1A
 // demo keeps the fixture baselines.
 import { connection } from "next/server";
-import { coreAll, apiMode, coreDisplay, coreNow, coreOp, CoreError, corePermissions } from "@ac/web/lib/dal";
+import { coreAll, apiMode, coreDisplay, coreNow, coreOp, CoreError, corePermissions, coreAllPage } from "@ac/web/lib/dal";
 import { actionMessage } from "@ac/web/lib/actionMessage";
 import type { ApiCustomer, ApiProperty } from "@ac/web/lib/billing";
 import { baselineRows, klInstant, klLocal, summaryView, type ApiBaseline, type ApiEnergySummary } from "@ac/web/lib/energy";
-import { i18nOf } from "@ac/web/lib/i18n";
+import { i18nOf, type T } from "@ac/web/lib/i18n";
+import type { OpInput } from "@ac/web/lib/opTypes";
 import { withAccess } from "@ac/web/lib/withAccess";
 import { EnergyDemo } from "./_components/energy-demo";
 import { EnergyView, type EnergyLive } from "./_components/energy-view";
+import { queryReader } from "@ac/web/lib/searchParams";
 
 const minute = (d: Date) => new Date(Math.floor(d.getTime() / 60_000) * 60_000);
 
 // a role without the page's read permission sees which one it needs, not a failure (IR582)
+/** energy.summary for the analysis form; an unusable period or unit set comes back as the message shown next to the form. */
+async function summaryOf(input: OpInput<"energy.summary">, t: T): Promise<{ summary: ApiEnergySummary | null; error?: string }> {
+  try {
+    return { summary: await coreOp<ApiEnergySummary>("energy.summary", input) };
+  } catch (error) {
+    if (!(error instanceof CoreError) || error.error.code !== "VALIDATION") throw error;
+    return { summary: null, error: actionMessage(error.error, t) };
+  }
+}
+
 export default async function AdminEnergyPage(props: PageProps<"/admin/energy">) {
   return withAccess("Energy analysis", ["energy.read", "asset.read"], () => AdminEnergyPageContent(props));
 }
@@ -26,14 +38,15 @@ async function AdminEnergyPageContent({ searchParams }: Readonly<PageProps<"/adm
   await connection();
   if (!apiMode()) return <EnergyDemo />;
   const sp = await searchParams;
-  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k] as string) : undefined);
+  const one = queryReader(sp);
+  const fromQ = one("from"), toQ = one("to"); // the period asked in the URL
   const tab = one("tab") === "baselines" ? "baselines" : "analysis";
   const [now, perms, display, customers, properties, units, all] = await Promise.all([
     coreNow(), corePermissions(), coreDisplay(),
-    coreAll<ApiCustomer>("customers.list").then((items) => ({ items, total: items.length })),
-    coreAll<ApiProperty>("properties.list").then((items) => ({ items, total: items.length })),
-    coreAll<Unit>("units.list").then((items) => ({ items, total: items.length })),
-    coreAll<ApiBaseline>("baselines.list").then((items) => ({ items, total: items.length })),
+    coreAllPage<ApiCustomer>("customers.list"),
+    coreAllPage<ApiProperty>("properties.list"),
+    coreAllPage<Unit>("units.list"),
+    coreAllPage<ApiBaseline>("baselines.list"),
   ]);
   const i = i18nOf(display);
   const customerOfOrg = new Map(customers.items.map((c) => [c.organizationId, c.id]));
@@ -52,25 +65,16 @@ async function AdminEnergyPageContent({ searchParams }: Readonly<PageProps<"/adm
     const baseline = all.items.find((b) => b.id === one("baselineId"));
     const unitIds = one("unitIds")?.split(",").filter(Boolean) ?? baseline?.unitIds ?? unitOptions.filter((u) => !scope.customerId || u.customerId === scope.customerId).map((u) => u.id);
     const today = klLocal(now.toISOString()).slice(0, 10);
-    const from = one("from") ? klInstant(one("from")!) : baseline?.period.from ?? klInstant(`${today}T00:00`);
-    const to = one("to") ? klInstant(one("to")!) : baseline?.period.to ?? minute(now).toISOString();
-    let summary: ApiEnergySummary | null = null;
-    let error: string | undefined;
-    if (unitIds.length > 0) {
-      try {
-        summary = await coreOp<ApiEnergySummary>("energy.summary", { from, to, unitIds, ...(baseline && { baselineId: baseline.id }) });
-      } catch (error_) {
-        if (!(error_ instanceof CoreError) || error_.error.code !== "VALIDATION") throw error_; // an unusable period or unit set shows next to the form
-        error = actionMessage({ code: error_.error.code, messageKey: error_.error.messageKey, fieldErrors: error_.error.fieldErrors ?? {}, retryAfterSeconds: error_.error.retryAfterSeconds }, i.t);
-      }
-    }
+    const from = fromQ ? klInstant(fromQ) : baseline?.period.from ?? klInstant(`${today}T00:00`);
+    const to = toQ ? klInstant(toQ) : baseline?.period.to ?? minute(now).toISOString();
+    const { summary, error } = unitIds.length > 0 ? await summaryOf({ from, to, unitIds, ...(baseline && { baselineId: baseline.id }) }, i.t) : { summary: null };
     live.analysis = { from: klLocal(from), to: klLocal(to), baselineId: baseline?.id ?? null, summary: summary ? summaryView(summary, i) : null, unitIds, error };
   } else {
     const filters = {
       ...(scope.customerId && { customerId: scope.customerId }), ...(scope.propertyId && { propertyId: scope.propertyId }), ...(scope.unitId && { unitId: scope.unitId }),
-      ...(one("from") && { from: klInstant(one("from")!) }), ...(one("to") && { to: klInstant(one("to")!) }),
+      ...(fromQ && { from: klInstant(fromQ) }), ...(toQ && { to: klInstant(toQ) }),
     };
-    const scoped = Object.keys(filters).length > 0 ? (await coreAll<ApiBaseline>("baselines.list", { filters }).then((items) => ({ items, total: items.length }))).items : all.items;
+    const scoped = Object.keys(filters).length > 0 ? await coreAll<ApiBaseline>("baselines.list", { filters }) : all.items;
     const rows = baselineRows(scoped, i.t);
     live.list = { rows, from: one("from") ?? "", to: one("to") ?? "", selectedId: rows.find((r) => r.id === one("baselineId"))?.id ?? rows[0]?.id ?? null };
   }

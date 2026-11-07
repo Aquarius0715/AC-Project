@@ -1,4 +1,5 @@
 "use client";
+const DEMO_REVIEWED = "demo_reviewed";
 
 import { useState } from "react";
 import { Badge, Banner, Btn, Card, Check, DemoBadge, EmptyState, Field, Input, ListRow, Modal, Page, Select, SummaryList, Tabs, Textarea, Timeline } from "@ac/web/components/ui";
@@ -12,6 +13,7 @@ import {
 } from "@ac/web/lib/mrv";
 import { previewReport, recordReview, saveFactor, saveReportDraft } from "../actions";
 import { EvidenceList, EvidencePicker } from "./evidence";
+import { oneOf } from "@ac/web/lib/oneOf";
 import { Icon } from "@ac/web/components/Icon";
 
 interface UnitOption { id: string; label: string; organizationId: string }
@@ -47,11 +49,9 @@ function FiguresGrid({ v }: Readonly<{ v: Figures }>) {
   ];
   return (
     <div className="grid-fluid" style={{ ["--min" as string]: "170px" }}>
-      {tiles.map(([a, b, c]) => {
-        return (
+      {tiles.map(([a, b, c]) => (
           <div key={a} className="rounded-xl bg-surface2 p-3"><div className="text-[11px] text-muted-foreground">{a}</div><b>{b}</b><div className="text-[10px] text-muted-foreground">{c}</div></div>
-        );
-      })}
+        ))}
     </div>
   );
 }
@@ -67,7 +67,7 @@ function Reports({ live, r }: Readonly<{ live: MRVLive; r: NonNullable<MRVLive["
   const [tried, setTried] = useState(false);
   const [from, setFrom] = useState(r.scope.from);
   const [to, setTo] = useState(r.scope.to);
-  const isLatest = sel ? sel.report.version === sel.latestVersion : false;
+  const isLatest = !!sel && sel.report.version === sel.latestVersion;
   const scopeUnits = live.units.filter((u) => !r.scope.organizationId || u.organizationId === r.scope.organizationId);
   const openDraft = (fromReport?: ApiMRVReport) => {
     setPreview(null);
@@ -91,6 +91,7 @@ function Reports({ live, r }: Readonly<{ live: MRVLive; r: NonNullable<MRVLive["
     run(() => recordReview(sel.report.id, sel.report.version, comment.trim()), (v) => t("Demo review recorded — version {v}", { v }), () => { setComment(""); nav({ reportVersion: null }); });
   };
   const orgUnits = d ? live.units.filter((u) => u.organizationId === d.organizationId) : [];
+  const isReviewed = sel?.report.status === DEMO_REVIEWED;
   return (
     <>
       <div className="flex flex-wrap items-end gap-3">
@@ -103,7 +104,7 @@ function Reports({ live, r }: Readonly<{ live: MRVLive; r: NonNullable<MRVLive["
       </div>
       <div className="split-rev">
         <Card title={t("Scope 2 reports")} action={live.canWrite && <Btn size="sm" variant="primary" onClick={() => { openDraft(); }}><Icon name="add" /> {t("New report")}</Btn>} className="self-start">
-          {r.rows.length === 0 ? <EmptyState title={t("No reports")}>{t("No report matches these filters.")}</EmptyState> : <div className="flex flex-col gap-2">{r.rows.map((x) => <ListRow key={x.id} selected={sel?.report.id === x.id} onClick={() => { nav({ reportId: x.id, reportVersion: null }); }}><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="text-[13px]">{x.id.slice(0, 8)} · v{x.version}</b><Badge tone={x.status === "demo_reviewed" ? "ok" : "muted"}>{t(x.status === "demo_reviewed" ? "Demo reviewed" : "Draft")}</Badge></div><div className="text-[11px] text-muted-foreground">{x.org} · {x.units} · {x.period}</div><div className={`text-[11px] ${x.incomplete ? "text-warn" : "text-muted-foreground"}`}>{x.result}</div></div></ListRow>)}</div>}
+          {r.rows.length === 0 ? <EmptyState title={t("No reports")}>{t("No report matches these filters.")}</EmptyState> : <div className="flex flex-col gap-2">{r.rows.map((x) => <ListRow key={x.id} selected={sel?.report.id === x.id} onClick={() => { nav({ reportId: x.id, reportVersion: null }); }}><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="text-[13px]">{x.id.slice(0, 8)} · v{x.version}</b><Badge tone={x.status === DEMO_REVIEWED ? "ok" : "muted"}>{t(x.status === DEMO_REVIEWED ? "Demo reviewed" : "Draft")}</Badge></div><div className="text-[11px] text-muted-foreground">{x.org} · {x.units} · {x.period}</div><div className={`text-[11px] ${x.incomplete ? "text-warn" : "text-muted-foreground"}`}>{x.result}</div></div></ListRow>)}</div>}
           <p className="mt-3 text-[11px] text-muted-foreground">{t("Every report is a demo — “Demo — unverified”. A demo review is not external certification.")}</p>
         </Card>
         {sel ? (
@@ -116,10 +117,10 @@ function Reports({ live, r }: Readonly<{ live: MRVLive; r: NonNullable<MRVLive["
             <Card title={t("Evidence")}><EvidenceList ids={sel.report.evidenceIds} units={live.units} period={{ unitIds: sel.report.conditions.unitIds, from: sel.report.conditions.from, to: sel.report.conditions.to }} /></Card>
             <Card title={t("Demo review")}>
               {sel.review.length > 0 && <Timeline items={sel.review} />}
-              {sel.report.status === "demo_reviewed" ? <p className="text-xs text-muted-foreground">{t("This version is demo reviewed. Sending the same review again returns the existing result.")}</p>
-                : isLatest ? sel.view.incomplete ? <p className="text-xs text-muted-foreground">{t("An incomplete calculation cannot be reviewed.")}</p>
-                : live.canReview && <><Field label={t("Review comment")}><Textarea value={comment} maxLength={1000} onChange={(e) => { setComment(e.target.value); }} /></Field><div className="mt-2"><Btn variant="primary" disabled={pending || !comment.trim()} onClick={doReview}>{t("Submit demo review")}</Btn></div></>
-                : <p className="text-xs text-muted-foreground">{t("Only the latest version can be reviewed.")}</p>}
+              {isReviewed ? <p className="text-xs text-muted-foreground">{t("This version is demo reviewed. Sending the same review again returns the existing result.")}</p> : null}
+              {isLatest && !isReviewed && sel.view.incomplete ? <p className="text-xs text-muted-foreground">{t("An incomplete calculation cannot be reviewed.")}</p> : null}
+              {isLatest && !isReviewed && !sel.view.incomplete && live.canReview ? <><Field label={t("Review comment")}><Textarea value={comment} maxLength={1000} onChange={(e) => { setComment(e.target.value); }} /></Field><div className="mt-2"><Btn variant="primary" disabled={pending || !comment.trim()} onClick={doReview}>{t("Submit demo review")}</Btn></div></> : null}
+              {isLatest ? null : <p className="text-xs text-muted-foreground">{t("Only the latest version can be reviewed.")}</p>}
             </Card>
           </div>
         ) : <Card title={t("Report")}><EmptyState title={t("Nothing selected")}>{t("Choose a report or create one.")}</EmptyState></Card>}
@@ -132,11 +133,11 @@ function Reports({ live, r }: Readonly<{ live: MRVLive; r: NonNullable<MRVLive["
             <Field label={t("End")}><Input type="datetime-local" value={d.to} onChange={(e) => { setD({ to: e.target.value }); }} /></Field>
             <Field label={t("Baseline version")} error={tried ? errors.baseline : undefined}><Select value={d.baseline} onChange={(e) => { setD({ baseline: e.target.value }); }}><option value="">{t("Select…")}</option>{live.baselines.map((b) => <option key={b.id} value={versionKey(b.id, b.version)}>{b.id.slice(0, 8)} v{b.version} · {b.value} · {b.units}</option>)}</Select></Field>
             <Field label={t("Emission factor version")} error={tried ? errors.factor : undefined}><Select value={d.factor} onChange={(e) => { setD({ factor: e.target.value }); }}><option value="">{t("Select…")}</option>{live.factors.map((f) => <option key={f.id} value={versionKey(f.id, f.version)}>{f.region} {f.year} v{f.version} · {f.kgCO2ePerKWh}</option>)}</Select></Field>
-            <Field label={t("Boundary")}><Select value={d.boundaryId} onChange={(e) => { setD({ boundaryId: e.target.value as MRVDraft["boundaryId"] }); }}><option value="ac_input_electricity">ac_input_electricity</option><option value="whole_building_electricity">whole_building_electricity</option></Select></Field>
+            <Field label={t("Boundary")}><Select value={d.boundaryId} onChange={(e) => { setD({ boundaryId: oneOf(["ac_input_electricity", "whole_building_electricity"] as const, e.target.value, d.boundaryId) }); }}><option value="ac_input_electricity">ac_input_electricity</option><option value="whole_building_electricity">whole_building_electricity</option></Select></Field>
           </div>
           <Field label={t("Boundary description")} error={tried ? errors.boundary : undefined}><Input value={d.boundary} maxLength={500} onChange={(e) => { setD({ boundary: e.target.value }); }} placeholder={t("AC unit input electricity only")} /></Field>
           <div><p className="mb-1 text-[13px] font-semibold">{t("Units")}</p>{d.organizationId ? <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-[13px]">{orgUnits.map((u) => <Check key={u.id} label={u.label} checked={d.unitIds.includes(u.id)} onChange={(on) => { setD({ unitIds: on ? [...d.unitIds, u.id] : d.unitIds.filter((x) => x !== u.id) }); }} />)}</div> : <p className="text-xs text-muted-foreground">{t("Choose the organization first.")}</p>}{tried && errors.unitIds && <p className="mt-1 text-xs text-crit">{errors.unitIds}</p>}</div>
-          <EvidencePicker ids={draft!.evidenceIds} onChange={(ids) => { setDraft((x) => (x ? { ...x, evidenceIds: ids } : x)); }} units={live.units}
+          <EvidencePicker ids={draft.evidenceIds} onChange={(ids) => { setDraft((x) => (x ? { ...x, evidenceIds: ids } : x)); }} units={live.units}
             period={{ unitIds: d.unitIds, from: d.from ? klInstant(d.from) : "", to: d.to ? klInstant(d.to) : "" }} />
           {preview && <div className="flex flex-col gap-2 rounded-xl border border-line p-3"><div className="flex items-center gap-2"><b className="text-[13px]">{t("Preview · not saved")}</b><DemoBadge /><span className="text-[11px] text-muted-foreground">{t("Demo — unverified")}</span></div><FiguresGrid v={preview} /></div>}
           {!preview && <p className="text-[11px] text-muted-foreground">{t("Preview first: saving stores the conditions and the result computed at save time.")}</p>}
@@ -149,8 +150,9 @@ function Reports({ live, r }: Readonly<{ live: MRVLive; r: NonNullable<MRVLive["
 function Factors({ live }: Readonly<{ live: MRVLive }>) {
   const t = useT();
   const [pending, run] = useAction();
-  const [selId, setSelId] = useState<string | "new">(live.factors[0]?.id ?? "new");
+  const [selId, setSelId] = useState<string>(live.factors[0]?.id ?? "new");
   const sel = selId === "new" ? null : live.factors.find((f) => f.id === selId) ?? live.factors[0] ?? null;
+  const firstFactor = live.factors[0];
   const blank: FactorDraft = { region: "", year: "2026", kgCO2ePerKWh: "", source: t("Demo (fictional)") };
   const key = sel ? `${sel.id}:${String(sel.version)}` : "new";
   const [source, setSource] = useState(key);
@@ -170,7 +172,7 @@ function Factors({ live }: Readonly<{ live: MRVLive }>) {
     if (Object.keys(errors).length > 0) return;
     run(() => saveFactor(factorInput(d, sel?.id), sel?.version), (f) => (sel ? t("Saved as factor version {v}", { v: f.version }) : t("Factor created")), (f) => { setSelId(f.id); });
   };
-  const err = (k: string) => (tried ? errors[k] : undefined);
+  const fieldError = (k: string) => (tried ? errors[k] : undefined);
   return (
     <div className="split-rev">
       <Card title={t("Emission factors")} action={live.canFactors && <Btn size="sm" onClick={() => { setSelId("new"); }}><Icon name="add" /> {t("New factor")}</Btn>} className="self-start">
@@ -179,16 +181,16 @@ function Factors({ live }: Readonly<{ live: MRVLive }>) {
       </Card>
       <Card title={sel ? <span className="inline-flex flex-wrap items-center gap-2">{sel.region} · {sel.year}{isDirty && <Badge tone="warn">{t("Editing → v{v}", { v: sel.version + 1 })}</Badge>}</span> : t("New factor")} sub={sel ? t("Version {v} · saving creates version {next}", { v: sel.version, next: sel.version + 1 }) : t("Saving creates version 1")}>
         <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}>
-          <Field label={t("Region")} error={err("region")}><Input value={d.region} maxLength={120} onChange={(e) => { setD({ ...d, region: e.target.value }); }} /></Field>
-          <Field label={t("Year")} error={err("year")}><Input type="number" value={d.year} onChange={(e) => { setD({ ...d, year: e.target.value }); }} /></Field>
-          <Field label={t("kgCO₂e/kWh (fixed unit)")} error={err("kgCO2ePerKWh")}><Input type="number" step="0.001" value={d.kgCO2ePerKWh} onChange={(e) => { setD({ ...d, kgCO2ePerKWh: e.target.value }); }} /></Field>
+          <Field label={t("Region")} error={fieldError("region")}><Input value={d.region} maxLength={120} onChange={(e) => { setD({ ...d, region: e.target.value }); }} /></Field>
+          <Field label={t("Year")} error={fieldError("year")}><Input type="number" value={d.year} onChange={(e) => { setD({ ...d, year: e.target.value }); }} /></Field>
+          <Field label={t("kgCO₂e/kWh (fixed unit)")} error={fieldError("kgCO2ePerKWh")}><Input type="number" step="0.001" value={d.kgCO2ePerKWh} onChange={(e) => { setD({ ...d, kgCO2ePerKWh: e.target.value }); }} /></Field>
         </div>
-        <div className="mt-3"><Field label={t("Source (state that it is a demo)")} error={err("source")}><Input value={d.source} maxLength={500} onChange={(e) => { setD({ ...d, source: e.target.value }); }} /></Field></div>
+        <div className="mt-3"><Field label={t("Source (state that it is a demo)")} error={fieldError("source")}><Input value={d.source} maxLength={500} onChange={(e) => { setD({ ...d, source: e.target.value }); }} /></Field></div>
         {sel && <p className="mt-3 rounded-xl bg-surface2 p-3 text-xs">{t("Existing reports keep the factor version they reference.")}</p>}
         {live.canFactors && (
           <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
             {sel && <span className="mr-auto text-[12px] text-muted-foreground">{t(isDirty ? "Unsaved changes" : "No unsaved changes")}</span>}
-            {!sel && live.factors[0] && <Btn onClick={() => { setSelId(live.factors[0].id); }}>{t("Cancel")}</Btn>}
+            {!sel && firstFactor && <Btn onClick={() => { setSelId(firstFactor.id); }}>{t("Cancel")}</Btn>}
             {sel && saved && <Btn disabled={pending || !isDirty} onClick={() => { setD(saved); setTried(false); }}>{t("Discard")}</Btn>}
             <Btn variant="primary" disabled={pending || (!!sel && !isDirty)} onClick={save}>{sel ? t("Save as v{n}", { n: sel.version + 1 }) : t("Create factor")}</Btn>
           </div>

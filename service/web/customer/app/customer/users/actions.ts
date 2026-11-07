@@ -12,23 +12,23 @@ async function run<T>(fn: () => Promise<T>): Promise<ActionResult<T>> {
   try {
     return { ok: true, value: await fn() };
   } catch (error) {
-    return error instanceof CoreError ? { ok: false, messageKey: error.error.messageKey, code: error.error.code, fieldErrors: error.error.fieldErrors ?? {}, retryAfterSeconds: error.error.retryAfterSeconds } : { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
+    return error instanceof CoreError ? { ok: false, messageKey: error.error.messageKey, code: error.error.code, fieldErrors: error.error.fieldErrors, retryAfterSeconds: error.error.retryAfterSeconds } : { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
   } finally {
     refresh();
   }
 }
 
 export async function inviteUser(customerId: string, email: string, clientRole: "owner" | "member", displayName: string) {
-  return run(() => coreOp<{ id: string }>("clientUsers.save", { customerId, clientRole, email: email.trim(), displayName: displayName.trim() }, { write: true }).then(() => null));
+  return run(async () => { await coreOp<{ id: string }>("clientUsers.save", { customerId, clientRole, email: email.trim(), displayName: displayName.trim() }, { write: true }); return null; });
 }
 /** A user's role and access (status), with a reason; the e-mail is sent unchanged. */
 export async function updateUser(id: string, version: number, customerId: string, email: string, clientRole: "owner" | "member", status: "active" | "disabled" | null, reason: string) {
-  return run(() => coreOp("clientUsers.save", { id, customerId, email: email.trim(), clientRole, ...(status && { status }), reason: reason.trim() }, { write: true, expectedVersion: version }).then(() => null));
+  return run(async () => { await coreOp("clientUsers.save", { id, customerId, email: email.trim(), clientRole, ...(status && { status }), reason: reason.trim() }, { write: true, expectedVersion: version }); return null; });
 }
 export async function removeUser(id: string, version: number, reason: string) {
-  return run(() => coreOp("clientUsers.remove", { id, reason: reason.trim() }, { write: true, expectedVersion: version }).then(() => null));
+  return run(async () => { await coreOp("clientUsers.remove", { id, reason: reason.trim() }, { write: true, expectedVersion: version }); return null; });
 }
 /** Sends the set-up e-mail again (IR461). */
 export async function resendInvite(id: string) {
-  return run(() => coreOp("clientUsers.resendInvite", { id }, { write: true }).then(() => null));
+  return run(async () => { await coreOp("clientUsers.resendInvite", { id }, { write: true }); return null; });
 }

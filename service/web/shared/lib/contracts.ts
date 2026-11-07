@@ -3,6 +3,10 @@
 // (`t` / `i`, IR300); contract periods are Kuala Lumpur business days, typed as such and written in the user's language.
 import { businessDay, money, type ApiCustomer, type ApiProperty } from "@ac/web/lib/billing";
 import { EN, translator, type I18n, type T } from "@ac/web/lib/i18n";
+import { codePoints } from "@ac/web/lib/text";
+import { isAfter } from "@ac/web/lib/order";
+
+const KL = "Asia/Kuala_Lumpur";
 
 const en = translator("en");
 
@@ -17,7 +21,10 @@ export interface ApiUnitBrief { id: string; customerOrgId: string; propertyId: s
 
 export const planLabel: Record<PlanType, string> = { rto: "RTO", general: "General", energy: "Energy", environment: "Environment" };
 /** A plan type as the screen words it. */
-export const planWord = (p: PlanType, t: T = en) => ({ rto: t("RTO"), general: t("General"), energy: t("Energy"), environment: t("Environment") })[p] ?? p;
+export const planWord = (p: PlanType, t: T = en) => {
+  const words = new Map(Object.entries({ rto: t("RTO"), general: t("General"), energy: t("Energy"), environment: t("Environment") }));
+  return words.get(p) ?? p; // a value the API adds before this table does
+};
 
 export interface ContractRow {
   id: string; version: number; planType: PlanType; plan: string; customerId: string; cust: string; unitIds: string[]; units: string;
@@ -26,7 +33,6 @@ export interface ContractRow {
 }
 export interface UnitOption { id: string; customerId: string; label: string; where: string; otherContracts: string[] }
 
-const KL = "Asia/Kuala_Lumpur";
 /** The Kuala Lumpur calendar day of an instant (yyyy-mm-dd). */
 export const klDay = (iso: string) => new Date(iso).toLocaleDateString("en-CA", { timeZone: KL });
 
@@ -51,9 +57,10 @@ export function unitOptions(units: ApiUnitBrief[], customers: ApiCustomer[], pro
   const property = new Map(properties.map((p) => [p.id, p.name]));
   const contractsOf = new Map<string, string[]>();
   for (const k of contracts) for (const u of k.unitIds) contractsOf.set(u, [...(contractsOf.get(u) ?? []), k.id]);
-  return units.filter((u) => !u.archived && customerOfOrg.has(u.customerOrgId)).map((u) => {
+  const owned = units.filter((u) => !u.archived).map((u) => ({ u, customerId: customerOfOrg.get(u.customerOrgId) }));
+  return owned.filter((x): x is { u: ApiUnitBrief; customerId: string } => x.customerId !== undefined).map(({ u, customerId }) => {
     return {
-      id: u.id, customerId: customerOfOrg.get(u.customerOrgId)!, label: u.displayName, where: property.get(u.propertyId) ?? "", otherContracts: contractsOf.get(u.id) ?? [],
+      customerId, id: u.id, label: u.displayName, where: property.get(u.propertyId) ?? "", otherContracts: contractsOf.get(u.id) ?? [],
     };
   });
 }
@@ -67,10 +74,10 @@ export function draftErrors(d: ContractDraft, t: T = en): Partial<Record<keyof C
   if (!d.customerId) e.customerId = t("Choose a customer");
   if (d.unitIds.length === 0) e.unitIds = t("Include at least one unit");
   if (!d.start) e.start = t("Required");
-  if (!d.end || (d.start && d.end <= d.start)) e.end = t("End must be after start");
+  if (!d.end || (d.start && !isAfter(d.end, d.start))) e.end = t("End must be after start");
   if (!/^\d+(\.\d{1,2})?$/.test(d.price.trim())) e.price = t("A price ≥ 0 with at most 2 decimals");
   if (d.restrictionEligible && d.planType !== "rto") e.restrictionEligible = t("Only RTO contracts can be restriction eligible");
-  if (d.restrictionEligible && ([...d.rulesVersion.trim()].length === 0 || [...d.rulesVersion.trim()].length > 64)) e.rulesVersion = t("Required when eligible (1–64 characters)");
+  if (d.restrictionEligible && (codePoints(d.rulesVersion.trim()) === 0 || codePoints(d.rulesVersion.trim()) > 64)) e.rulesVersion = t("Required when eligible (1–64 characters)");
   return e;
 }
 

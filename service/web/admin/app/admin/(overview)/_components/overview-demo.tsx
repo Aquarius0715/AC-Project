@@ -11,9 +11,9 @@ const jobs = [["requested", 1], ["offered", 0], ["accepted", 0], ["assigned", 1]
 export function AdminOverviewDemo() {
   const kpis: Kpis = mockKpis;
   const [state, setState] = useState<"ok" | "loading" | "error" | "empty">("ok");
-  const k = kpis;
   if (state === "error") return <Page><ErrorState title="Couldn’t load the dashboard" onRetry={() => { setState("ok"); }}>Initial load failed — nothing is shown as zero.</ErrorState></Page>;
-  if (state === "loading") return <Page><div className="grid-fluid" style={{ ["--min"as string]: "200px" }}>{Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-28 animate-pulse rounded-2xl bg-surface2" />)}</div><Btn onClick={() => { setState("ok"); }}>Finish loading</Btn></Page>;
+  if (state === "loading") return <Page><div className="grid-fluid" style={{ ["--min"as string]: "200px" }}>{Array.from({ length: 8 }, (_, i) => <div key={i} className="h-28 animate-pulse rounded-2xl bg-surface2" />)}</div><Btn onClick={() => { setState("ok"); }}>Finish loading</Btn></Page>;
+  const k = kpis;
   const isEmpty = state === "empty";
   return (
     <Page>
@@ -37,11 +37,11 @@ export function AdminOverviewDemo() {
       </Card>
       <div className="grid-fluid" style={{ ["--min"as string]: "300px" }}>
         <Card title="Operation (power state)" action={<TextLink href="/admin/units">Open units <Icon name="arrowRight" /></TextLink>}>
-          {[["Running", "powerState=on", 2], ["Stopped", "powerState=off", 2], ["Unknown (stale / no valid power signal)", "powerState=unknown", 1]].map(([a, b, n]) => <div key={a as string} className="flex items-center justify-between gap-2 border-t border-line py-2 first:border-0"><span className="text-[13px]">{a}<span className="block text-[10px] text-muted-foreground">{b} <Icon name="arrowRight" /></span></span><b className="text-lg">{isEmpty ? 0 : n}</b></div>)}
+          {[{ label: "Running", query: "powerState=on", count: 2 }, { label: "Stopped", query: "powerState=off", count: 2 }, { label: "Unknown (stale / no valid power signal)", query: "powerState=unknown", count: 1 }].map(({ label: a, query: b, count: n }) => <div key={a} className="flex items-center justify-between gap-2 border-t border-line py-2 first:border-0"><span className="text-[13px]">{a}<span className="block text-[10px] text-muted-foreground">{b} <Icon name="arrowRight" /></span></span><b className="text-lg">{isEmpty ? 0 : n}</b></div>)}
           <p className="text-[11px] text-muted-foreground">Operation rate = ON ÷ (ON + OFF) = 2 ÷ 4</p>
         </Card>
         <Card title="Connection" action={<TextLink href="/admin/units">Open units <Icon name="arrowRight" /></TextLink>}>
-          {[["Online", "connections=online", 5], ["Offline", "connections=offline", 0], ["Unknown / connecting / error", "connections=connecting,error,unknown", 0]].map(([a, b, n]) => <div key={a as string} className="flex items-center justify-between gap-2 border-t border-line py-2 first:border-0"><span className="text-[13px]">{a}<span className="block text-[10px] text-muted-foreground">{b} <Icon name="arrowRight" /></span></span><b className="text-lg">{isEmpty ? 0 : n}</b></div>)}
+          {[{ label: "Online", query: "connections=online", count: 5 }, { label: "Offline", query: "connections=offline", count: 0 }, { label: "Unknown / connecting / error", query: "connections=connecting,error,unknown", count: 0 }].map(({ label: a, query: b, count: n }) => <div key={a} className="flex items-center justify-between gap-2 border-t border-line py-2 first:border-0"><span className="text-[13px]">{a}<span className="block text-[10px] text-muted-foreground">{b} <Icon name="arrowRight" /></span></span><b className="text-lg">{isEmpty ? 0 : n}</b></div>)}
           <p className="text-[11px] text-muted-foreground">Connection is a separate axis from power</p>
         </Card>
         <Card title="Maintenance jobs by status — this period" action={<TextLink href="/admin/jobs">Open jobs <Icon name="arrowRight" /></TextLink>}>

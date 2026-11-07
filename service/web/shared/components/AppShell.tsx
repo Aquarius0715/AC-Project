@@ -1,9 +1,10 @@
 "use client";
+const signOut = "flex w-full items-center gap-2.5 rounded-control px-3 py-2 text-[13px] font-semibold text-crit hover:bg-crit-soft/50";
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
-import { ROLES, ROLE_KEY, Role, roleFromPath, type ShellLive, SHARED_PAGES, documentTitle, pageLabel } from "@ac/web/lib/nav";
+import { isRole, roleConfig, ROLE_KEY, Role, roleFromPath, type ShellLive, SHARED_PAGES, documentTitle, pageLabel } from "@ac/web/lib/nav";
 import { Badge, Banner, Btn, Modal, SummaryList, ToastProvider, cx } from "./ui";
 import { Icon, type IconName } from "./Icon";
 import { useJobStore } from "@ac/web/lib/jobs";
@@ -16,18 +17,19 @@ import { I18nProvider } from "./I18n";
 import { useBffSession } from "@ac/web/lib/useOp";
 import { Sheet, SheetContent } from "@ac/web/components/ui/sheet";
 import { Button } from "@ac/web/components/ui/button";
+import { lookup } from "@ac/web/lib/lookup";
 
 export function useStoredRole(): Role {
   const pathname = usePathname();
   const fromPath = roleFromPath(pathname);
-  const saved = useStoredValue(ROLE_KEY) as Role | null; // last role, external store (no effect)
+  const stored = useStoredValue(ROLE_KEY); // last role, external store (no effect)
+  const saved = stored !== null && isRole(stored) ? stored : null;
   useEffect(() => {
     if (fromPath) setStoredValue(ROLE_KEY, fromPath); // sync the external system only
   }, [fromPath]);
-  return fromPath ?? (saved && ROLES[saved] ? saved : "client");
+  return fromPath ?? saved ?? "client";
 }
 
-const signOut = "flex w-full items-center gap-2.5 rounded-control px-3 py-2 text-[13px] font-semibold text-crit hover:bg-crit-soft/50";
 const SHARED = SHARED_PAGES.map((s) => ({ ...s, icon: (s.href === "/notifications" ? "notifications" : "preferences") as IconName }));
 
 function NavLink({ href, label, icon, badge, active }: Readonly<{ href: string; label: string; icon: IconName; badge?: string; active: boolean }>) {
@@ -47,7 +49,7 @@ function RoleNav({ items, base, pathname, search }: Readonly<{ items: NavItem[];
   const query = new URLSearchParams(search);
   const score = (href: string, match?: string[]) => {
     const hits = [href, ...(match ?? [])].filter((h) => {
-      const [path, q] = h.split("?", 2);
+      const [path = "", q] = h.split("?", 2);
       if (q) return pathname === path && [...new URLSearchParams(q)].every(([k, v]) => query.get(k) === v);
       return path === base ? pathname === path : pathname === path || pathname.startsWith(path + "/");
     });
@@ -64,17 +66,20 @@ function RoleNavWithQuery(props: Readonly<{ items: NavItem[]; base: string; path
 /** The app frame. In API mode the layout passes `live` (IR241): the organization as the scope label, the signed-in user
 in the chip, the sidebar badges counted by the Core API (no badge for 0) and the user's display language and time
 zone (IR258, IR259); the demo keeps the fixed ones, the language chosen in this browser and Asia/Kuala_Lumpur. */
-export function AppShell({ role: forced, live, children }: Readonly<{ role?: Role; live?: ShellLive; children: React.ReactNode }>) {
+export function AppShell({ appRole: forced, live, children }: Readonly<{ appRole?: Role; live?: ShellLive; children: React.ReactNode }>) {
   const detected = useStoredRole();
   const role = forced ?? detected;
-  const cfg = ROLES[role];
+  const config = roleConfig(role);
   const stored = useStoredValue(LOCALE_KEY);
   const display: Display = live ? live.display : { ...DEFAULT_DISPLAY, locale: isLocale(stored) ? stored : "en" };
   const t = (text: string) => translate(display.locale, text);
-  const scope = live ? (live.organization || cfg.scope).toUpperCase() : cfg.scope;
-  const [roleWord, persona] = cfg.chip.split(" — ", 2);
+  const scope = live ? (live.organization || config.scope).toUpperCase() : config.scope;
+  const [roleWord = "", persona = ""] = config.chip.split(" — ", 2);
   const chip = `${t(roleWord)} — ${live ? live.user || t("signed in") : persona}`;
-  const count = (href: string) => (live?.badges[href] ? String(live.badges[href]) : undefined);
+  const count = (href: string) => {
+    const badge = lookup(live?.badges ?? {}, href);
+    return badge ? String(badge) : undefined;
+  };
   const pathname = usePathname();
   const session = useBffSession();
   // Users is owner-only (FR-C19): the session's client role in API mode, the demo persona otherwise
@@ -89,8 +94,9 @@ export function AppShell({ role: forced, live, children }: Readonly<{ role?: Rol
   const [assistant, setAssistant] = useState(false);
   const [qr, setQr] = useState(false);
   const unread = useJobStore().notes.filter((n) => n.role === role && !n.read).length;
+  const unreadBadge = (href: string) => (live ? count(href) : String(3 + unread)); // the demo counts its own unread
 
-  const items = (live ? cfg.nav.map((i) => ({ ...i, badge: count(i.href) })) : cfg.nav).map((i) => ({ ...i, label: t(i.label) }));
+  const items = (live ? config.nav.map((i) => ({ ...i, badge: count(i.href) })) : config.nav).map((i) => ({ ...i, label: t(i.label) }));
   // the page's name: the menu item with the longest matching path (/customer/units/x is "Units & locations")
   const label = pageLabel(role, pathname);
   const title = label ? t(label) : "AC Project";
@@ -98,20 +104,19 @@ export function AppShell({ role: forced, live, children }: Readonly<{ role?: Rol
   useEffect(() => { document.title = documentTitle(role, pathname, display.locale); }, [role, pathname, display.locale]);
   const isDemo = pathname === "/demo";
 
-
   const sidebar = (
     <>
-          <Link href={cfg.base} className="mb-3 flex items-center gap-2.5">
+          <Link href={config.base} className="mb-3 flex items-center gap-2.5">
             <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary text-lg text-white"><Icon name="cooling" /></span>
-            <span className="leading-tight"><span className="block text-[15px] font-bold">{cfg.app}</span><span className="block text-[11px] text-muted-foreground">{t(cfg.sub)}</span></span>
+            <span className="leading-tight"><span className="block text-[15px] font-bold">{config.app}</span><span className="block text-[11px] text-muted-foreground">{t(config.sub)}</span></span>
           </Link>
           <div className="px-3 pb-1 text-[10px] font-bold tracking-wider text-muted-foreground">{scope}</div>
-          <Suspense fallback={<RoleNav items={items} base={cfg.base} pathname={pathname} search="" />}><RoleNavWithQuery items={items} base={cfg.base} pathname={pathname} /></Suspense>
+          <Suspense fallback={<RoleNav items={items} base={config.base} pathname={pathname} search="" />}><RoleNavWithQuery items={items} base={config.base} pathname={pathname} /></Suspense>
           <div className="my-2 border-t border-line" />
           <nav className="flex flex-col gap-0.5">
             {role === "client" && isOwner && <NavLink href="/customer/users" label={t("Users")} icon="users" active={pathname === "/customer/users"} />}
             {role === "contractor" && <NavLink href="/partner/users" label={t("Users")} icon="users" active={pathname === "/partner/users"} />}
-            {SHARED.map((s) => <NavLink key={s.href} {...s} label={t(s.label)} active={pathname === s.href} badge={s.href === "/notifications" ? (live ? count(s.href) : String(3 + unread)) : undefined} />)}
+            {SHARED.map((s) => <NavLink key={s.href} {...s} label={t(s.label)} active={pathname === s.href} badge={s.href === "/notifications" ? unreadBadge(s.href) : undefined} />)}
             <Link href="/demo" className={cx("flex items-center gap-2.5 rounded-control px-3 py-2 text-[13px] font-semibold text-warn hover:bg-warn-soft/50", pathname === "/demo" && "bg-warn-soft/60")}>
               <Icon name="demo" className="text-[15px]" />
               <span className="flex-1">{t("Demo controls")}</span>

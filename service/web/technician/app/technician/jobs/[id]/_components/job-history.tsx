@@ -1,4 +1,4 @@
-import { Card, LinkBtn, Page, SummaryList } from "@ac/web/components/ui";
+import { Card, LinkButton, Page, SummaryList } from "@ac/web/components/ui";
 import type { historyCard } from "@ac/web/lib/techJob";
 import { Icon } from "@ac/web/components/Icon";
 
@@ -11,7 +11,7 @@ export function JobHistory({ card }: Readonly<{ card: ReturnType<typeof historyC
       <Card title={card.title} sub={card.sub}>
         <SummaryList items={card.rows} />
         <p className="mt-3 text-xs text-muted-foreground">{card.note}</p>
-        <div className="mt-3"><LinkBtn href="/technician" size="sm"><Icon name="arrowLeft" />{card.back}</LinkBtn></div>
+        <div className="mt-3"><LinkButton href="/technician" size="sm"><Icon name="arrowLeft" />{card.back}</LinkButton></div>
       </Card>
     </Page>
   );

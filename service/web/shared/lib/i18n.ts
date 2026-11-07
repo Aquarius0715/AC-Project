@@ -2,8 +2,9 @@
 // Malay dictionary (lib/i18n-ms.ts, a draft until Business / UI / UX review it) and stays English when it has no entry,
 // with a warning in development (IR44). The language never changes stored values, units, IDs or UTC times. As in the
 // Next.js internationalization guide, the dictionary is a plain object and the locale comes from the server (the
-// user's Preferences). lib/__tests__/i18n.test.ts keeps the code's texts and the dictionary's keys the same (NFR-07).
+// user's Preferences). lib/tests/i18n.test.ts keeps the code's texts and the dictionary's keys the same (NFR-07).
 import { ms } from "@ac/web/lib/i18n-ms";
+import { lookup } from "@ac/web/lib/lookup";
 
 export type Locale = "en" | "ms";
 export const isLocale = (v: unknown): v is Locale => v === "en" || v === "ms";
@@ -22,13 +23,13 @@ export function translate(locale: Locale, text: string, params?: Params): string
   const english = text.includes("::") ? text.slice(text.indexOf("::") + 2) : text;
   let base = english;
   if (locale === "ms") {
-    base = ms[text] ?? english;
-    if (!(text in ms) && process.env.NODE_ENV === "development" && !warned.has(text)) {
+    base = lookup(ms, text) ?? english;
+    if (!Object.hasOwn(ms, text) && process.env.NODE_ENV === "development" && !warned.has(text)) {
       warned.add(text);
       console.warn(`[i18n] no Malay text for "${text}"`);
     }
   }
-  return params ? base.replaceAll(/\{(\w+)\}/g, (all, k: string) => (k in params ? String(params[k]) : all)) : base;
+  return params ? base.replaceAll(/\{(\w+)\}/g, (all, k: string) => { const v = lookup(params, k); return v === undefined ? all : String(v); }) : base;
 }
 
 export const translator = (locale: Locale): T => (text, params) => translate(locale, text, params);
@@ -41,18 +42,18 @@ export interface Display { locale: Locale; timeZone: string }
 export const DEFAULT_DISPLAY: Display = { locale: "en", timeZone: "Asia/Kuala_Lumpur" };
 
 /** Intl output with plain spaces: ICU puts narrow and thin spaces around times and ranges, and versions differ, so a time rendered on the server reads the same after hydration in any browser. */
-const plain = (s: string) => s.replaceAll(/[\u00A0\u2009\u202F]/g, " ");
+const plain = (s: string) => s.replaceAll(/[\u{A0}\u{2009}\u{202F}]/gu, " ");
 
 /** `opts` in the user's language and display time zone with the zone's abbreviation (unless `withZone` is false); a
 zone this runtime does not know falls back to the default one. */
-function zoned(iso: string | null, d: Display, opts: Intl.DateTimeFormatOptions, withZone = true): string {
+function zoned(iso: string | null, d: Display, options: Intl.DateTimeFormatOptions, withZone = true): string {
   if (!iso) return "—";
   const at = new Date(iso);
   const tag = intlTag(d.locale);
   for (const timeZone of [d.timeZone, DEFAULT_DISPLAY.timeZone]) {
     try {
       const zone = withZone ? new Intl.DateTimeFormat(tag, { timeZone, timeZoneName: "short" }).formatToParts(at).find((p) => p.type === "timeZoneName")?.value : undefined;
-      const text = plain(at.toLocaleString(tag, { ...opts, timeZone }));
+      const text = plain(at.toLocaleString(tag, { ...options, timeZone }));
       return zone ? `${text} ${zone}` : text;
     } catch {
       // RangeError: unknown time zone
@@ -131,7 +132,7 @@ export function showSpan(startIso: string, endIso: string, d: Display = DEFAULT_
 function wallMs(ms: number, timeZone: string): number {
   const p = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" })
     .formatToParts(ms).map((x) => [x.type, x.value]));
-  return Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second);
+  return Date.UTC(Number(p.year ?? 0), Number(p.month ?? 1) - 1, Number(p.day ?? 1), Number(p.hour ?? 0), Number(p.minute ?? 0), Number(p.second ?? 0)); // Intl gives every part asked for
 }
 const knownZone = (tz: string) => {
   try {
@@ -190,4 +191,24 @@ export function relativeTime(iso: string, nowMs: number, i: I18n = EN): string {
   if (day === dayKey(nowMs - 86_400_000, tz)) return i.t("yesterday {time}", { time });
   if (day === dayKey(nowMs + 86_400_000, tz)) return i.t("tomorrow {time}", { time });
   return showTime(iso, i.display);
+}
+
+const textTables = new WeakMap<object, ReadonlyMap<string, string>>();
+
+/** textOf is the translated text of `key` in a table of English texts, or undefined when the table has none. */
+export function textOf(table: Readonly<Partial<Record<string, string>>>, key: string | null | undefined, t: T): string | undefined {
+  if (key === null || key === undefined) return undefined;
+  let texts = textTables.get(table);
+  if (!texts) {
+    texts = new Map(Object.entries(table).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
+    textTables.set(table, texts);
+  }
+  const text = texts.get(key);
+  return text ? t(text) : undefined;
+}
+
+/** byCount picks the already translated text for a count: `none` for 0 (when given), `one` for 1, else `many`. */
+export function byCount(n: number, texts: { none?: string; one: string; many: string }): string {
+  if (n === 0 && texts.none !== undefined) return texts.none;
+  return n === 1 ? texts.one : texts.many;
 }

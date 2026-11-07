@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { Select, cx } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
+import { setParams } from "@ac/web/lib/searchParams";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 
 interface Scope { customerId?: string; propertyId?: string; unitId?: string }
 const keep = (q: Scope, extra: Record<string, string> = {}) => {
-  const sp = new URLSearchParams({ ...Object.fromEntries(Object.entries(q).filter(([, v]) => v) as [string, string][]), ...extra });
+  const sp = new URLSearchParams([...setParams(q), ...Object.entries(extra)]);
   return sp.size > 0 ? `/admin/jobs?${sp}` : "/admin/jobs";
 };
 

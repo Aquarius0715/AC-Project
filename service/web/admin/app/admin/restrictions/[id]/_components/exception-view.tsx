@@ -42,20 +42,24 @@ export function ExceptionView({ live }: Readonly<{ live: Live }>) {
   const outcome = actionOutcome(act, r.state, t);
   const untilAt = until ? zonedInstant(until.slice(0, 10), until.slice(11, 16), zone) : "";
   const untilMs = untilAt ? Date.parse(untilAt) : NaN;
-  const dateErr = isNeedsDate && !(untilMs > now.getTime() && untilMs <= now.getTime() + 90 * 24 * 3600 * 1000) ? t("A future date within 90 days") : undefined;
-  const reasonErr = reason.trim().length === 0 || reason.length > 1000 ? t("A reason is required (1–1000 characters)") : undefined;
+  const dateError = isNeedsDate && !(untilMs > now.getTime() && untilMs <= now.getTime() + 90 * 24 * 3600 * 1000) ? t("A future date within 90 days") : undefined;
+  const reasonError = reason.trim().length === 0 || reason.length > 1000 ? t("A reason is required (1–1000 characters)") : undefined;
   const isRelease = r.projection === "release";
   const save = () => {
     setTried(true);
-    if (!outcome.allowed || reasonErr || (isNeedsDate && dateErr)) return;
+    if (!outcome.allowed || reasonError || (isNeedsDate && dateError)) return;
     const why = reason.trim();
-    const fn = act === "defer" ? () => deferRestriction(r.id, r.version, untilAt, why)
-      : act === "exempt" ? () => exemptRestriction(r.id, r.version, untilAt, why)
-      : act === "cancel" ? () => cancelRestriction(r.id, r.version, why) : () => overrideRestriction(r.id, r.version, why);
-    run(fn, recorded[act], () => { setReason(""); setTried(false); });
+    const send = () => {
+      if (act === "defer") return deferRestriction(r.id, r.version, untilAt, why);
+      if (act === "exempt") return exemptRestriction(r.id, r.version, untilAt, why);
+      if (act === "cancel") return cancelRestriction(r.id, r.version, why);
+      return overrideRestriction(r.id, r.version, why);
+    };
+    run(send, recorded[act], () => { setReason(""); setTried(false); });
   };
   // IR96: override-only callers see reconcile / release retry only for an override release intent or unresolved recovery
   const isFollowUp = live.canWrite || (live.canOverride && (r.releaseIntent?.source === "override" || r.recoveryCases.some((c) => c.state !== "resolved")));
+  const needs = (k: string) => t(k === "override" ? "Needs restriction.override" : "Needs restriction.write");
   return (
     <Page>
       <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground"><Link href={`/admin/restrictions?restrictionId=${r.id}`} className="font-semibold text-primary"><Icon name="arrowLeft" /> {t("Restrictions")}</Link>/ <b className="text-ink">{r.id.slice(0, 8)}</b> <Badge tone={stateTone(r.state)}>{stateWord(r.state, t)}</Badge></div>
@@ -67,21 +71,19 @@ export function ExceptionView({ live }: Readonly<{ live: Live }>) {
               const isPermitted = allowedFor(k);
               return (
                 <Plain key={k} disabled={!isPermitted || !o.allowed} onClick={() => { setAct(k); }} aria-pressed={act === k} className={`rounded-xl border p-3 text-left disabled:opacity-50 ${act === k ? "border-primary bg-primary-soft/60" : "border-line hover:bg-surface2"}`}>
-                  <b className="text-[13px]">{label[k]}</b><div className="font-mono text-[10px] text-muted-foreground">{ops[k]}</div><div className="mt-1 text-xs text-muted-foreground">{isPermitted ? o.result : (t(k === "override" ? "Needs restriction.override" : "Needs restriction.write"))}</div>
+                  <b className="text-[13px]">{label[k]}</b><div className="font-mono text-[10px] text-muted-foreground">{ops[k]}</div><div className="mt-1 text-xs text-muted-foreground">{isPermitted ? o.result : needs(k)}</div>
                 </Plain>
               );
             })}</div>
-            {isNeedsDate && <div className="mt-4 max-w-xs"><Field label={t("Until · future, at most 90 days")} error={tried ? dateErr : undefined} hint={t("Expiry never reapplies the restriction — conditions are checked again · times in {zone}", { zone })}><Input type="datetime-local" value={until} onChange={(e) => { setUntil(e.target.value); }} /></Field></div>}
-            <div className="mt-3"><Field label={t("Reason · required")} error={tried ? reasonErr : undefined} hint={`${String(reason.length)} / 1000`}><Textarea value={reason} maxLength={1000} onChange={(e) => { setReason(e.target.value); }} /></Field></div>
+            {isNeedsDate && <div className="mt-4 max-w-xs"><Field label={t("Until · future, at most 90 days")} error={tried ? dateError : undefined} hint={t("Expiry never reapplies the restriction — conditions are checked again · times in {zone}", { zone })}><Input type="datetime-local" value={until} onChange={(e) => { setUntil(e.target.value); }} /></Field></div>}
+            <div className="mt-3"><Field label={t("Reason · required")} error={tried ? reasonError : undefined} hint={`${String(reason.length)} / 1000`}><Textarea value={reason} maxLength={1000} onChange={(e) => { setReason(e.target.value); }} /></Field></div>
             <div className="mt-3 flex justify-end"><Btn variant={act === "override" ? "danger" : "primary"} disabled={pending || !outcome.allowed || !allowedFor(act)} onClick={save}>{button[act]}</Btn></div>
           </Card>
           <Card title={t("What happens")}><ul className="list-disc pl-5 text-[13px]"><li>{outcome.result}</li><li>{t("A release still needs per-unit evidence (released or not required)")}</li><li>{t("Cause invoices stay unpaid — no action here settles billing")}</li><li>{t("Before/after, expiry, reason and your name are recorded in the audit log")}</li></ul></Card>
           {isFollowUp && live.units.some((u) => u.reconcile || u.retryRelease) && (
-            <Card title={t("Units needing follow-up")}>{live.units.filter((u) => u.reconcile || u.retryRelease).map((u) => {
-              return (
+            <Card title={t("Units needing follow-up")}>{live.units.filter((u) => u.reconcile || u.retryRelease).map((u) => (
                 <div key={u.unitId} className="flex items-center justify-between gap-2 border-t border-line py-1.5 text-[13px] first:border-0"><span>{u.name} <span className="text-xs text-muted-foreground">{t("apply {apply} · release {release}", { apply: u.apply, release: u.release })}{u.pending ? ` · ${u.pending}` : ""}</span></span><span className="flex gap-1">{u.reconcile && <Btn size="sm" disabled={pending} onClick={() => { run(() => reconcileUnits(r.id, r.version, [u.unitId]), t("Reconciled")); }}>{t("Reconcile")}</Btn>}{u.retryRelease && <Btn size="sm" disabled={pending} onClick={() => { run(() => retryUnits(r.id, r.version, [u.unitId], "release", r.rulesVersion, "Retry release from the exception screen"), t("Release retried")); }}>{t("Retry release")}</Btn>}</span></div>
-              );
-            })}</Card>
+              ))}</Card>
           )}
         </div>
         <div className="flex min-w-0 flex-col gap-4">

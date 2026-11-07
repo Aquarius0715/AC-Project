@@ -8,7 +8,7 @@ import { useT } from "@ac/web/components/I18n";
 import { jobActions, useNotes } from "@ac/web/lib/jobs";
 import type { InboxRow } from "@ac/web/lib/notifications";
 import { actionMessage, type ActionFailure } from "@ac/web/lib/actionMessage";
-import type { T } from "@ac/web/lib/i18n";
+import { byCount, type T } from "@ac/web/lib/i18n";
 import { markAllRead, markRead } from "../actions";
 import { Button } from "@ac/web/components/ui/button";
 
@@ -21,8 +21,8 @@ const initial = [
 
 // why a notification was not marked read, in the display language (the write limit says how long to wait, IR380)
 const readFailure = (f: ActionFailure, t: T) => {
-  return f.messageKey === "error.versionConflict" ? t("This notification changed — the latest state is shown.")
-    : (f.messageKey === "error.notFound" ? t("This notification is no longer available.") : t("Not marked as read: {reason}", { reason: actionMessage(f, t) }));
+  if (f.messageKey === "error.versionConflict") return t("This notification changed — the latest state is shown.");
+  return f.messageKey === "error.notFound" ? t("This notification is no longer available.") : t("Not marked as read: {reason}", { reason: actionMessage(f, t) });
 };
 
 /** The inbox. `rows` come from the Server Component in API mode; without them the Phase 1A demo rows are shown. */
@@ -59,7 +59,7 @@ export function NotificationsView({ rows }: Readonly<{ rows?: InboxRow[] }>) {
       const r = await markAllRead(unread.map((n) => n.id));
       setFailed(null);
       if (r.failure) { toast(readFailure(r.failure, t), "crit"); return; }
-      toast(r.skipped ? t("{n} marked as read · {skipped} skipped — read meanwhile or no longer available", { n: r.marked, skipped: r.skipped }) : t(r.marked === 1 ? "1 notification marked as read" : "{n} notifications marked as read", { n: r.marked }));
+      toast(r.skipped ? t("{n} marked as read · {skipped} skipped — read meanwhile or no longer available", { n: r.marked, skipped: r.skipped }) : byCount(r.marked, { one: t("1 notification marked as read"), many: t("{n} notifications marked as read", { n: r.marked }) }));
     });
   };
   return (

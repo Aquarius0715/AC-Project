@@ -11,12 +11,12 @@ export interface App {
   state: string;
 }
 
-const url = (name: string, port: number) => (process.env[name] ?? `http://localhost:${String(port)}`).replace(/\/$/, "");
+const url = (override: string | undefined, port: number) => (override ?? `http://localhost:${String(port)}`).replace(/\/$/, "");
 const state = (id: string) => path.resolve(__dirname, "../.auth", `${id}.json`);
 
 export const APPS: App[] = [
-  { id: "customer", url: url("E2E_CUSTOMER_URL", 3000), home: "/customer", user: "customer-a", otp: false, state: state("customer") },
-  { id: "partner", url: url("E2E_PARTNER_URL", 3001), home: "/partner", user: "contractor-a", otp: false, state: state("partner") },
-  { id: "technician", url: url("E2E_TECHNICIAN_URL", 3002), home: "/technician", user: "tech-internal-a", otp: false, state: state("technician") },
-  { id: "admin", url: url("E2E_ADMIN_URL", 3003), home: "/admin", user: "hq-operator", otp: true, state: state("admin") },
+  { id: "customer", url: url(process.env.E2E_CUSTOMER_URL, 3000), home: "/customer", user: "customer-a", otp: false, state: state("customer") },
+  { id: "partner", url: url(process.env.E2E_PARTNER_URL, 3001), home: "/partner", user: "contractor-a", otp: false, state: state("partner") },
+  { id: "technician", url: url(process.env.E2E_TECHNICIAN_URL, 3002), home: "/technician", user: "tech-internal-a", otp: false, state: state("technician") },
+  { id: "admin", url: url(process.env.E2E_ADMIN_URL, 3003), home: "/admin", user: "hq-operator", otp: true, state: state("admin") },
 ];

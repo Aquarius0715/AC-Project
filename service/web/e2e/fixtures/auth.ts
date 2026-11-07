@@ -7,12 +7,16 @@ import path from "node:path";
 import { createHmac } from "node:crypto";
 import type { Page } from "@playwright/test";
 import type { App } from "./apps";
+import { must } from "./must";
+import { z } from "zod";
 
-interface Credential { type: string; value?: string; secretData?: string }
+const credentialSchema = z.object({ type: z.string(), value: z.string().optional(), secretData: z.string().optional() });
+const realmSchema = z.object({ users: z.array(z.object({ username: z.string(), credentials: z.array(credentialSchema).optional() })).optional() });
+type Credential = z.infer<typeof credentialSchema>;
 const REALM = path.resolve(__dirname, "../../../../docker/keycloak/realm-ac.json");
 
 function credential(user: string, type: string): Credential | undefined {
-  const realm = JSON.parse(readFileSync(REALM, "utf8")) as { users?: { username: string; credentials?: Credential[] }[] };
+  const realm = realmSchema.parse(JSON.parse(readFileSync(REALM, "utf8")));
   return realm.users?.find((u) => u.username === user)?.credentials?.find((c) => c.type === type);
 }
 
@@ -24,7 +28,7 @@ function passwordOf(user: string): string {
 
 function otpSecretOf(user: string): string {
   const raw = credential(user, "otp")?.secretData;
-  const value = process.env.E2E_TOTP_SECRET ?? (raw ? (JSON.parse(raw) as { value?: string }).value : undefined);
+  const value = process.env.E2E_TOTP_SECRET ?? (raw ? z.object({ value: z.string().optional() }).parse(JSON.parse(raw)).value : undefined);
   if (!value) throw new Error(`No one-time-code secret for ${user}: set E2E_TOTP_SECRET`);
   return value;
 }
@@ -34,7 +38,7 @@ export function totp(secret: string, at = Date.now()): string {
   const counter = Buffer.alloc(8);
   counter.writeBigUInt64BE(BigInt(Math.floor(at / 30_000)));
   const h = createHmac("sha1", Buffer.from(secret, "utf8")).update(counter).digest();
-  const o = h[h.length - 1] & 15;
+  const o = must(h.at(-1)) & 15;
   return String((h.readUInt32BE(o) & 0x7F_FF_FF_FF) % 1_000_000).padStart(6, "0");
 }
 
@@ -47,10 +51,19 @@ export function totpBase32(key: string, at = Date.now()): string {
   const counter = Buffer.alloc(8);
   counter.writeBigUInt64BE(BigInt(Math.floor(at / 30_000)));
   const h = createHmac("sha1", bytes).update(counter).digest();
-  const o = h[h.length - 1] & 15;
+  const o = must(h.at(-1)) & 15;
   return String((h.readUInt32BE(o) & 0x7F_FF_FF_FF) % 1_000_000).padStart(6, "0");
 }
 
+/** `ok` when the wait ends in time, `timedOut` when it fails (a Playwright wait rejects on its timeout). */
+export async function settles<T>(wait: Promise<unknown>, ok: T, timedOut: T): Promise<T> {
+  try {
+    await wait;
+    return ok;
+  } catch {
+    return timedOut;
+  }
+}
 const home = (app: App) => (u: URL) => u.origin === new URL(app.url).origin && (u.pathname === app.home || u.pathname.startsWith(app.home + "/"));
 
 /** `as` signs in another account of the same role (the identity provider's username field takes it). */
@@ -76,12 +89,13 @@ export async function signIn(page: Page, app: App, as = app.user): Promise<void>
     // page or the refusal is waited for, not a fixed time: 8 s once ran out on a slow first page, and the retry then
     // waited for a code field that never came.
     const refused = page.locator("#input-error-otp, #input-error-otp-code, #input-error-totp").or(page.getByText(/invalid authenticator code/i)).first();
+    const atHome = home(app);
     for (let attempt = 0; attempt < 2; attempt++) {
       await page.locator("#otp").fill(totp(otpSecretOf(as)));
       await page.locator("#kc-login").click();
       const outcome = await Promise.race([
-        page.waitForURL(home(app), { timeout: 60_000 }).then(() => "home", () => "slow"),
-        refused.waitFor({ timeout: 60_000 }).then(() => "refused", () => "slow"),
+        settles(page.waitForURL(atHome, { timeout: 60_000 }), "home", "slow"),
+        settles(refused.waitFor({ timeout: 60_000 }), "refused", "slow"),
       ]);
       if (outcome !== "refused") break;
       await page.waitForTimeout(31_000 - (Date.now() % 30_000));

@@ -2,18 +2,22 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, Field, Input, LinkBtn, Modal, Page, Select, SummaryList, Textarea } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Field, Input, LinkButton, Modal, Page, Select, SummaryList, Textarea } from "@ac/web/components/ui";
 import { OriginBadge } from "@ac/web/components/JobBits";
 import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { alertTitle } from "@ac/web/lib/alerts";
-import { zonedInstant } from "@ac/web/lib/i18n";
+import { zonedInstant, textOf } from "@ac/web/lib/i18n";
 import { decisionRefusal, originLabel, qualificationLabel, typeLabel, type ApiDetail, type ApiOffer, type FitRow } from "@ac/web/lib/partnerJobDetail";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import { acceptOffer, declineOffer, proposeSlot, withdrawProposal } from "../actions";
 import type { JobDetailLive } from "../_lib/load";
 import { Icon } from "@ac/web/components/Icon";
+import { isBefore } from "@ac/web/lib/order";
 
+// a step's dot and label by its state; a step to do keeps the plain dot and a done step the plain label
+const STEP_DOT = new Map<string, string>([["done", "bg-primary text-white"], ["current", "border-2 border-primary text-primary"]]);
+const STEP_LABEL = new Map<string, string>([["todo", "text-muted-foreground"], ["current", "text-primary"]]);
 const scopeLabel: Record<string, string> = { indoor: "Indoor unit", outdoor: "Outdoor unit", electrical: "Electrical / control" };
 const statusTone: Record<string, "primary" | "ok" | "warn" | "crit" | "muted"> = { accepted: "primary", assigned: "primary", in_progress: "primary", submitted: "primary", completed: "ok", rework_requested: "warn", on_hold: "warn", cancelled: "muted" };
 const statusWord: Record<string, string> = {
@@ -29,7 +33,7 @@ export function JobDetailView({ live }: Readonly<{ live: JobDetailLive }>) {
   if (live.kind === "offer") return <OfferView live={live} />;
   if (live.kind === "detail") return <DetailView live={live} />;
   const h = live.job;
-  const status = statusWord[h.status] ? t(statusWord[h.status]) : h.status.replaceAll('_', " ");
+  const status = textOf(statusWord, h.status, t) ?? h.status.replaceAll('_', " ");
   return (
     <Page narrow>
       <Crumb text={t("{id} · history", { id: h.jobId.slice(0, 8) })} />
@@ -85,16 +89,16 @@ function OfferView({ live }: Readonly<{ live: Extract<JobDetailLive, { kind: "of
   const short = j.jobId.slice(0, 8);
   const quals = j.requiredQualifications.map((q) => qualificationLabel(q, t));
   if (declined) {
-    return <Page narrow><Crumb text={t("{id} · declined", { id: short })} /><Banner tone="warn" action={<LinkBtn size="sm" href="/partner/jobs">{t("Back to jobs")}</LinkBtn>}>{t("Declined with your reason — HQ was notified and the job is no longer offered to your company.")}</Banner></Page>;
+    return <Page narrow><Crumb text={t("{id} · declined", { id: short })} /><Banner tone="warn" action={<LinkButton size="sm" href="/partner/jobs">{t("Back to jobs")}</LinkButton>}>{t("Declined with your reason — HQ was notified and the job is no longer offered to your company.")}</Banner></Page>;
   }
   return (
     <Page narrow>
       <Crumb text={`${short} · ${j.siteAddress ?? typeLabel(j.type, t)} · ${t(j.status === "offered" ? "offer" : "accepted")}`} />
       {refused && <Banner tone="crit">{refused}</Banner>}
-      {isOpen && <Banner tone="warn">{t(p!.status === "sent_to_client" ? "HQ asked the client about your proposed time ({slot} · {name}) — the offer stays reserved for you; Accept is disabled until it is answered." : "Your proposed time is with HQ ({slot} · {name}) — the offer stays reserved for you; Accept is disabled until it is answered.", { slot: x.proposal ?? "", name: live.names[p!.technicianMembershipId] ?? t("technician") })}</Banner>}
+      {isOpen && <Banner tone="warn">{t(p.status === "sent_to_client" ? "HQ asked the client about your proposed time ({slot} · {name}) — the offer stays reserved for you; Accept is disabled until it is answered." : "Your proposed time is with HQ ({slot} · {name}) — the offer stays reserved for you; Accept is disabled until it is answered.", { slot: x.proposal ?? "", name: live.names[p.technicianMembershipId] ?? t("technician") })}</Banner>}
       {p?.status === "approved" && <Banner tone="ok">{t("The client approved your proposed time — the visit is now {slot}. Accept the offer to continue.", { slot: x.visit })}</Banner>}
       {(p?.status === "declined" || p?.status === "kept") && <Banner tone="warn">{t("Your time change was not taken — the agreed time stays {slot}. Accept or decline.", { slot: x.visit })}</Banner>}
-      {j.status === "accepted" && <Banner tone="ok" action={<LinkBtn size="sm" variant="primary" href={`/partner/schedule?jobId=${j.jobId}`}>{t("Assign technician")} <Icon name="arrowRight" /></LinkBtn>}>{t("Accepted — the delegation period starts {time}; unit details open then. Assign your technician for exactly {slot}.", { time: x.accessFrom, slot: x.visit })}</Banner>}
+      {j.status === "accepted" && <Banner tone="ok" action={<LinkButton size="sm" variant="primary" href={`/partner/schedule?jobId=${j.jobId}`}>{t("Assign technician")} <Icon name="arrowRight" /></LinkButton>}>{t("Accepted — the delegation period starts {time}; unit details open then. Assign your technician for exactly {slot}.", { time: x.accessFrom, slot: x.visit })}</Banner>}
       <Card title={t("{id} · Offer from HQ", { id: short })} action={j.status === "offered" ? <Badge tone="warn">{t("Expires {time}", { time: x.expires })}</Badge> : <Badge tone="primary">{t("Accepted")}</Badge>}>
         <Banner>{t("Before acceptance: job type, registered installation address and required qualifications only. No live telemetry, entry instructions or billing.")}</Banner>
         <div className="mt-3"><SummaryList items={[
@@ -112,7 +116,7 @@ function OfferView({ live }: Readonly<{ live: Extract<JobDetailLive, { kind: "of
               <Input value={reason} maxLength={1000} onChange={(e) => { setReason(e.target.value); }} placeholder={t("No qualified technician available in this window.")} />
             </Field>
             <Btn variant="danger" disabled={pending} onClick={() => { setTried(true); if (reason.trim()) setModal("decline"); }}>{t("Decline")}</Btn>
-            {isOpen ? <Btn disabled={pending} onClick={() => { run(() => withdrawProposal(j.jobId, p!.id, j.jobVersion), t("Proposal withdrawn"), () => { setRefused(null); }, failed); }}>{t("Withdraw my proposal")}</Btn>
+            {isOpen ? <Btn disabled={pending} onClick={() => { run(() => withdrawProposal(j.jobId, p.id, j.jobVersion), t("Proposal withdrawn"), () => { setRefused(null); }, failed); }}>{t("Withdraw my proposal")}</Btn>
               : <Btn disabled={pending || live.technicians.length === 0} onClick={() => { setModal("propose"); }}>{t("Propose another time…")}</Btn>}
             <Btn variant="primary" disabled={pending || isOpen || Date.parse(j.offerExpiresAt) <= now} onClick={() => { run(() => acceptOffer(j.jobId, j.offerId, j.termsVersion, j.jobVersion), t("Offer accepted — assign a technician next"), () => { setRefused(null); }, failed); }}>{t("Accept job")}</Btn>
           </div>
@@ -145,9 +149,9 @@ function ProposeModal({ j, x, technicians, onClose, onSend, pending }: Readonly<
   const [reason, setReason] = useState("");
   const [tried, setTried] = useState(false);
   const startAt = zonedInstant(date, from, x.propose.zone), endAt = zonedInstant(date, to, x.propose.zone);
-  const isOrder = !!startAt && !!endAt && startAt < endAt;
+  const isOrder = !!startAt && !!endAt && isBefore(startAt, endAt);
   return (
-    <Modal open onClose={onClose} title={t("Propose another time")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (!reason.trim() || !isOrder || !tech) return; onSend({ startAt, endAt }, tech, reason.trim()); }}>{t("Send to HQ")}</Btn></>}>
+    <Modal open onClose={onClose} title={t("Propose another time")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (!reason.trim() || !isOrder || !tech) { return; } onSend({ startAt, endAt }, tech, reason.trim()); }}>{t("Send to HQ")}</Btn></>}>
       <p className="text-xs text-muted-foreground">{t("{id} · agreed with the client: {slot} · times in {zone}", { id: j.jobId.slice(0, 8), slot: x.visit, zone: x.propose.zone })}</p>
       <div className="grid-fluid" style={{ ["--min" as string]: "140px" }}>
         <Field label={t("Date")}><Input type="date" value={date} onChange={(e) => { setDate(e.target.value); }} /></Field>
@@ -168,11 +172,11 @@ function DetailView({ live }: Readonly<{ live: Extract<JobDetailLive, { kind: "d
   const u = live.unit;
   const now = Date.parse(live.now);
   const short = j.id.slice(0, 8);
-  const isSettled = j.status === "submitted" || j.status === "completed" || j.status === "cancelled"; // the work is done: no technician to find any more
-  const reading = u?.latestMeasurements?.find((m) => m.value !== null);
+  const isSettled = ["submitted", "completed", "cancelled"].includes(j.status); // the work is done: no technician to find any more
+  const reading = u?.latestMeasurements.find((m) => m.value !== null);
   const isNeedsTech = j.status === "accepted" || (j.assignment?.acknowledgement === "cant_make") || (!!j.assignment && Date.parse(j.assignment.scheduledEnd) <= now && (j.status === "assigned" || j.status === "in_progress"));
-  const status = statusWord[j.status] ? t(statusWord[j.status]) : j.status.replaceAll('_', " ");
-  const connection = u ? (connectionWord[u.connection] ? t(connectionWord[u.connection]) : u.connection) : "";
+  const status = textOf(statusWord, j.status, t) ?? j.status.replaceAll('_', " ");
+  const connection = u ? (textOf(connectionWord, u.connection, t) ?? u.connection) : "";
   return (
     <Page>
       <Crumb text={`${short} · ${u?.displayName ?? typeLabel(j.type, t)}`} />
@@ -189,13 +193,13 @@ function DetailView({ live }: Readonly<{ live: Extract<JobDetailLive, { kind: "d
               [t("Required qualification"), live.required.map((q) => qualificationLabel(q, t)).join(" · ") || "—"],
               [t("Visit time (fixed)"), `${x.visit} · ${originLabel(j.origin, t)}`],
               [t("Delegation (access) period"), x.access ?? "—"],
-              [t("Scheduled slot"), x.scheduled ? `${x.scheduled} · ${x.tech}` : <b key="n" className="text-crit">{t("Not assigned yet")}</b>],
+              [t("Scheduled slot"), x.scheduled ? `${x.scheduled} · ${x.tech ?? "—"}` : <b key="n" className="text-crit">{t("Not assigned yet")}</b>],
             ]} />
             <div className="mt-4 flex flex-wrap gap-2">
-              {isNeedsTech && <LinkBtn variant="primary" href={`/partner/schedule?jobId=${j.id}`}>{t(j.assignment ? "Reassign technician" : "Assign technician")}<Icon name="arrowRight" /></LinkBtn>}
-              {j.status === "submitted" && <LinkBtn variant="primary" href={`/partner/jobs/${j.id}/review`}>{t("Review report")} <Icon name="arrowRight" /></LinkBtn>}
-              <LinkBtn href={`/partner/units/${j.unitId}?jobId=${j.id}`}>{t("Open unit")} <Icon name="arrowRight" /></LinkBtn>
-              <LinkBtn href={`/partner/history?jobId=${j.id}`}>{t("Job history")} <Icon name="arrowRight" /></LinkBtn>
+              {isNeedsTech && <LinkButton variant="primary" href={`/partner/schedule?jobId=${j.id}`}>{t(j.assignment ? "Reassign technician" : "Assign technician")}<Icon name="arrowRight" /></LinkButton>}
+              {j.status === "submitted" && <LinkButton variant="primary" href={`/partner/jobs/${j.id}/review`}>{t("Review report")} <Icon name="arrowRight" /></LinkButton>}
+              <LinkButton href={`/partner/units/${j.unitId}?jobId=${j.id}`}>{t("Open unit")} <Icon name="arrowRight" /></LinkButton>
+              <LinkButton href={`/partner/history?jobId=${j.id}`}>{t("Job history")} <Icon name="arrowRight" /></LinkButton>
             </div>
           </Card>
           <Card title={t("Target unit — {name}", { name: u?.displayName ?? t("not readable now") })} action={<Link className="text-xs font-semibold text-primary" href={`/partner/units/${j.unitId}?jobId=${j.id}`}>{t("Open unit")} <Icon name="arrowRight" /></Link>}>
@@ -208,9 +212,9 @@ function DetailView({ live }: Readonly<{ live: Extract<JobDetailLive, { kind: "d
                     [t("Connection"), x.seen ? t("{state} · seen {time}", { state: connection, time: x.seen }) : connection],
                   ]} />
                   <SummaryList items={[
-                    [t("Open alerts"), live.alerts.length > 0 ? <span key="a" className="text-crit">{live.alerts.length} · {alertTitle(live.alerts[0], t)}</span> : t("none")],
-                    [t("Last reading"), reading ? `${reading.metric.replaceAll('_', " ")} ${reading.value} ${reading.unit}` : "—"],
-                    [t("Maintenance scope"), u.serviceScope.map((s) => (scopeLabel[s] ? t(scopeLabel[s]) : s)).join(" · ")],
+                    [t("Open alerts"), live.alerts.length > 0 ? <span key="a" className="text-crit">{live.alerts.length} · {live.alerts[0] ? alertTitle(live.alerts[0], t) : ""}</span> : t("none")],
+                    [t("Last reading"), reading ? `${reading.metric.replaceAll('_', " ")} ${String(reading.value ?? "—")} ${reading.unit}` : "—"],
+                    [t("Maintenance scope"), u.serviceScope.map((s) => (textOf(scopeLabel, s, t) ?? s)).join(" · ")],
                   ]} />
                 </div>
                 {live.alerts.map((a) => <div key={a.id} className="mt-2"><Banner tone={a.severity === "critical" ? "crit" : "warn"}>{t("{alert} — raised {time} · linked to this job. Completing the job does not resolve the alert.", { alert: alertTitle(a, t), time: x.raised[a.id] ?? "" })}</Banner></div>)}
@@ -223,8 +227,8 @@ function DetailView({ live }: Readonly<{ live: Extract<JobDetailLive, { kind: "d
             <ol className="flex flex-col gap-2">
               {x.steps.map((s, i) => (
                 <li key={s.label} className="flex items-start gap-2 text-xs">
-                  <span className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full text-[10px] font-bold ${s.state === "done" ? "bg-primary text-white" : (s.state === "current" ? "border-2 border-primary text-primary" : "border border-line text-muted-foreground")}`}>{s.state === "done" ? <Icon name="check" /> : i + 1}</span>
-                  <span><b className={s.state === "todo" ? "text-muted-foreground" : (s.state === "current" ? "text-primary" : "")}>{s.label}</b><span className="block text-[11px] text-muted-foreground">{s.atText ?? (s.state === "todo" ? t("next") : "")} · {s.sub}</span></span>
+                  <span className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full text-[10px] font-bold ${STEP_DOT.get(s.state) ?? "border border-line text-muted-foreground"}`}>{s.state === "done" ? <Icon name="check" /> : i + 1}</span>
+                  <span><b className={STEP_LABEL.get(s.state) ?? ""}>{s.label}</b><span className="block text-[11px] text-muted-foreground">{s.atText ?? (s.state === "todo" ? t("next") : "")} · {s.sub}</span></span>
                 </li>
               ))}
             </ol>

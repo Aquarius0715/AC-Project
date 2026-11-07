@@ -3,14 +3,22 @@
 // it. Texts in the display language (`i` / `t`, IR295); instants in the user's display time zone, and a campaign's
 // start is typed there (NFR-08), while its install window stays the device's local time. Metric and status codes
 // stay codes where the API shows them.
-import { EN, showTime, translator, zonedInstant, type I18n, type T } from "@ac/web/lib/i18n";
+import { EN, showTime, translator, zonedInstant, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import type { OpInput } from "@ac/web/lib/opTypes";
 import type { UnitSymbol } from "@ac/web/lib/contracts.gen";
+import { byText } from "@ac/web/lib/order";
+import { z } from "@ac/web/lib/zod";
+import { codePoints, wrapped } from "@ac/web/lib/text";
+
+const KL = "Asia/Kuala_Lumpur";
 
 const en = translator("en");
 export type Mode = "cool" | "dry" | "fan";
 export type Fan = "low" | "mid" | "high";
-export type Metric = "temperature" | "humidity" | "co2" | "pm25" | "power" | "vibration" | "refrigerant_pressure" | "compressor_cycles" | "airflow_drop" | "heartbeat_gap";
+export const metrics = ["temperature", "humidity", "co2", "pm25", "power", "vibration", "refrigerant_pressure", "compressor_cycles", "airflow_drop", "heartbeat_gap"] as const;
+export type Metric = (typeof metrics)[number];
+/** A metric as a form or request value (for Server Actions to validate with). */
+export const metricSchema = z.enum(metrics);
 export type Connection = "online" | "offline" | "unknown" | "connecting" | "error";
 
 /** The fixed unit of each metric (DD-A04 boundary cases). */
@@ -18,7 +26,6 @@ export const metricUnit: Record<Metric, UnitSymbol> = {
   temperature: "°C", humidity: "%", co2: "ppm", pm25: "µg/m³", power: "kW", vibration: "mm/s", refrigerant_pressure: "kPa", compressor_cycles: "cycles/h",
   airflow_drop: "%", heartbeat_gap: "min",
 };
-export const metrics = Object.keys(metricUnit) as Metric[];
 export const modes: Mode[] = ["cool", "dry", "fan"];
 export const fans: Fan[] = ["low", "mid", "high"];
 
@@ -47,7 +54,6 @@ export interface ApiCampaign {
   results: { deviceId: string; waveIndex: number; status: "pending" | "installing" | "succeeded" | "failed" | "skipped"; reasonKey: string | null; at: string | null }[]; reason: string | null;
 }
 
-const KL = "Asia/Kuala_Lumpur";
 export const klTime = (iso: string) =>
   new Date(iso).toLocaleString("en-CA", { timeZone: KL, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).replace(",", "");
 
@@ -81,31 +87,34 @@ export function capabilityDraft(k?: ApiCapability): CapabilityDraft {
   };
 }
 
-const num = (s: string) => (s.trim() === "" ? NaN : Number(s));
+const toNumber = (s: string) => (s.trim() === "" ? NaN : Number(s));
 
+/** The temperature range of a model: min below max (both numbers), and a step that fits in it. */
+function temperatureError(d: CapabilityDraft, t: T): string | null {
+  const [min, max, step] = [toNumber(d.min), toNumber(d.max), toNumber(d.step)];
+  if (Number.isNaN(min) || Number.isNaN(max) || min >= max) return t("min must be below max");
+  return step > 0 && step <= max - min ? null : t("0 < step ≤ max − min");
+}
 /** The capability rules of DD-A04 (boundary cases) checked before capabilities.save; the API checks them again. */
 export function capabilityErrors(d: CapabilityDraft, update: boolean, t: T = en): Record<string, string> {
   const e: Record<string, string> = {};
-  if ([...d.manufacturer.trim()].length === 0 || [...d.manufacturer.trim()].length > 120) e.manufacturer = t("1–120 characters");
-  if ([...d.model.trim()].length === 0 || [...d.model.trim()].length > 120) e.model = t("1–120 characters");
+  if (codePoints(d.manufacturer.trim()) === 0 || codePoints(d.manufacturer.trim()) > 120) e.manufacturer = t("1–120 characters");
+  if (codePoints(d.model.trim()) === 0 || codePoints(d.model.trim()) > 120) e.model = t("1–120 characters");
   if ((d.modeControl || d.fanControl || d.temperatureOn) && !d.control) e.control = t("Mode, fan or temperature control needs power control");
   if (d.modeControl && d.modes.length === 0) e.modes = t("Choose at least one mode");
   if (d.fanControl && d.fanLevels.length === 0) e.fanLevels = t("Choose at least one fan level");
-  if (d.temperatureOn) {
-    const [min, max, step] = [num(d.min), num(d.max), num(d.step)];
-    if (!(min < max)) e.temperature = t("min must be below max");
-    else if (!(step > 0 && step <= max - min)) e.temperature = t("0 < step ≤ max − min");
-  }
+  const temperature = d.temperatureOn ? temperatureError(d, t) : null;
+  if (temperature) e.temperature = temperature;
   if (d.ventilation && (d.ventilationLevels.length === 0 || !d.ventilationLevels.includes("low"))) e.ventilationLevels = t("Ventilation levels must include Low");
   const seen = new Set<string>();
   for (const s of d.sensors) {
     if (seen.has(s.metric)) e.sensors = t("One sensor per metric ({metric} twice)", { metric: s.metric });
     seen.add(s.metric);
-    const v = num(s.staleAfterSeconds);
-    if (!(Number.isInteger(v) && v >= 10 && v <= 86_400)) e.sensors = t("Stale after must be 10–86400 seconds");
+    const v = toNumber(s.staleAfterSeconds);
+    if (!(Number.isSafeInteger(v) && v >= 10 && v <= 86_400)) e.sensors = t("Stale after must be 10–86400 seconds");
   }
   if (d.firmware.some((x) => x.length > 32)) e.firmware = t("Firmware versions are at most 32 characters");
-  if (update && ([...d.changeReason.trim()].length === 0 || [...d.changeReason.trim()].length > 1000)) e.changeReason = t("A reason is required (1–1000 characters)");
+  if (update && (codePoints(d.changeReason.trim()) === 0 || codePoints(d.changeReason.trim()) > 1000)) e.changeReason = t("A reason is required (1–1000 characters)");
   return e;
 }
 
@@ -114,17 +123,17 @@ export function capabilityInput(d: CapabilityDraft, id?: string): OpInput<"capab
   return {
     ...(id && { id, changeReason: d.changeReason.trim() }),
     manufacturer: d.manufacturer.trim(), model: d.model.trim(), control: d.control, modeControl: d.modeControl, fanControl: d.fanControl,
-    temperature: d.temperatureOn ? { min: num(d.min), max: num(d.max), step: num(d.step) } : null,
+    temperature: d.temperatureOn ? { min: toNumber(d.min), max: toNumber(d.max), step: toNumber(d.step) } : null,
     modes: d.modeControl ? d.modes : [], fanLevels: d.fanControl ? d.fanLevels : [], ventilation: d.ventilation, ventilationLevels: d.ventilation ? d.ventilationLevels : [],
-    sensors: d.sensors.map((s) => ({ metric: s.metric, unit: metricUnit[s.metric], staleAfterSeconds: num(s.staleAfterSeconds), boundaryId: s.metric === "power" ? "ac_input_electricity" : null })),
+    sensors: d.sensors.map((s) => ({ metric: s.metric, unit: metricUnit[s.metric], staleAfterSeconds: toNumber(s.staleAfterSeconds), boundaryId: s.metric === "power" ? "ac_input_electricity" : null })),
     firmwareCandidates: [...new Set(d.firmware.map((x) => x.trim()).filter(Boolean))],
   };
 }
 
 const CAPABILITY_PARTS: [string, (d: CapabilityDraft) => unknown][] = [
   ["identity", (d) => [d.manufacturer.trim(), d.model.trim()]], ["controls", (d) => [d.control, d.modeControl, d.fanControl, d.temperatureOn]],
-  ["temperature", (d) => (d.temperatureOn ? [num(d.min), num(d.max), num(d.step)] : null)], ["modes", (d) => [...d.modes].sort()], ["fan levels", (d) => [...d.fanLevels].sort()],
-  ["ventilation levels", (d) => [d.ventilation, [...d.ventilationLevels].sort()]], ["sensors", (d) => d.sensors.map((x) => [x.metric, num(x.staleAfterSeconds)])],
+  ["temperature", (d) => (d.temperatureOn ? [toNumber(d.min), toNumber(d.max), toNumber(d.step)] : null)], ["modes", (d) => [...d.modes].toSorted(byText)], ["fan levels", (d) => [...d.fanLevels].toSorted(byText)],
+  ["ventilation levels", (d) => [d.ventilation, [...d.ventilationLevels].toSorted(byText)]], ["sensors", (d) => d.sensors.map((x) => [x.metric, toNumber(x.staleAfterSeconds)])],
   ["firmware candidates", (d) => d.firmware],
 ];
 /** What a model's draft changes against its saved capability (Figma Admin 106:3 “1 change · ventilation levels”); the
@@ -146,10 +155,12 @@ export interface DeviceRow { id: string; version: number; serial: string; unitId
 
 export function deviceRows(devices: ApiDevice[], units: ApiUnitLite[], t: T = en): DeviceRow[] {
   const name = new Map(units.map((u) => [u.id, u.displayName]));
+  // an unbound device: the unit it is planned for, or none
+  const planned = (target: string | null) => (target ? t("Not bound yet — planned for {unit}", { unit: name.get(target) ?? t("unit") }) : t("Unbound"));
   return devices.map((d) => {
     return {
       id: d.id, version: d.version, serial: d.serial, unitId: d.unitId, targetUnitId: d.targetUnitId ?? null, conn: d.connection, fw: d.firmwareVersion,
-      unit: d.unitId ? name.get(d.unitId) ?? t("unit") : (d.targetUnitId ? t("Not bound yet — planned for {unit}", { unit: name.get(d.targetUnitId) ?? t("unit") }) : t("Unbound")),
+      unit: d.unitId ? name.get(d.unitId) ?? t("unit") : planned(d.targetUnitId ?? null),
       tamper: d.tamper === "detected", power: d.powerSignal,
     };
   });
@@ -171,8 +182,8 @@ export function campaignRows(cs: ApiCampaign[], caps: ApiCapability[], i: I18n =
 
 /** The signed artifact digest as Figma Admin 04-9 shows it: "sha256 9f3c…a1". */
 export function shortChecksum(sum: string): string {
-  const [algo, hex] = sum.includes(":") ? sum.split(":", 2) : ["", sum];
-  return `${algo ? `${algo} ` : ""}${hex.length > 8 ? `${hex.slice(0, 4)}…${hex.slice(-2)}` : hex}`;
+  const [algo = "", hex = ""] = sum.includes(":") ? sum.split(":", 2) : ["", sum];
+  return `${wrapped(algo, "", " ")}${hex.length > 8 ? `${hex.slice(0, 4)}…${hex.slice(-2)}` : hex}`;
 }
 
 /** The campaign's facts above its waves (Figma Admin 04-9): model and versions with the signed digest, the install
@@ -199,8 +210,7 @@ const RESULT_REASON: Record<string, string> = {
   "errors.install_timeout": "Failed — no answer within 60 s; the old version is kept",
 };
 export function resultReason(key: string | null, t: T = en): string {
-  if (!key) return "";
-  return RESULT_REASON[key] ? t(RESULT_REASON[key]) : key.replace(/^errors?\./, "").replaceAll('_', " ");
+  return key ? textOf(RESULT_REASON, key, t) ?? key.replace(/^errors?\./, "").replaceAll('_', " ") : "";
 }
 
 /** Each wave's state for its chip: Done once 95 % of its devices succeeded (BR-A20), the first wave that has not is
@@ -223,9 +233,9 @@ labels are stored with the campaign, so they stay English data; the screen words
 export interface CampaignDraft { modelId: string; targetVersion: string; deviceIds: string[]; waves: string; startLocal: string; endLocal: string; autoPause: string; startAt: string }
 export function parseWaves(s: string): { label: string; percent: number }[] | null {
   const ps = s.split(",").map((x) => Number(x.replace("%", "").trim()));
-  if (ps.length === 0 || ps.some((p) => !Number.isInteger(p) || p < 1 || p > 100)) return null;
-  for (let i = 1; i < ps.length; i++) if (ps[i] <= ps[i - 1]) return null;
-  return ps[ps.length - 1] === 100 ? ps.map((p, i) => ({ label: i === ps.length - 1 ? `Wave ${String(i + 1)} · 100 %` : `Wave ${String(i + 1)} · ${String(p)} %`, percent: p })) : null;
+  if (ps.length === 0 || ps.some((p) => !Number.isSafeInteger(p) || p < 1 || p > 100)) return null;
+  for (let i = 1; i < ps.length; i++) if ((ps.at(i) ?? 0) <= (ps.at(i - 1) ?? 0)) return null;
+  return ps.at(-1) === 100 ? ps.map((p, i) => ({ label: i === ps.length - 1 ? `Wave ${String(i + 1)} · 100 %` : `Wave ${String(i + 1)} · ${String(p)} %`, percent: p })) : null;
 }
 /** The campaign's start as an instant: the datetime-local value read in the display time zone ("" while empty). */
 export const campaignStart = (d: Pick<CampaignDraft, "startAt">, zone: string) => (d.startAt ? zonedInstant(d.startAt.slice(0, 10), d.startAt.slice(11, 16), zone) : "");
@@ -236,9 +246,9 @@ export function campaignErrors(d: CampaignDraft, now: Date, zone = "Asia/Kuala_L
   if (d.deviceIds.length === 0) e.deviceIds = t("Choose at least one device");
   if (!parseWaves(d.waves)) e.waves = t("Ascending percentages ending at 100, e.g. 10, 50, 100");
   const ap = Number(d.autoPause);
-  if (!(Number.isInteger(ap) && ap >= 1 && ap <= 50)) e.autoPause = t("1–50 %");
+  if (!(Number.isSafeInteger(ap) && ap >= 1 && ap <= 50)) e.autoPause = t("1–50 %");
   if (!/^\d{2}:\d{2}$/.test(d.startLocal) || !/^\d{2}:\d{2}$/.test(d.endLocal)) e.window = t("HH:MM – HH:MM");
   const at = Date.parse(campaignStart(d, zone));
-  if (!d.startAt || !(at >= now.getTime() + 24 * 3600 * 1000)) e.startAt = t("At least 24 hours ahead");
+  if (!d.startAt || Number.isNaN(at) || at < now.getTime() + 24 * 3600 * 1000) e.startAt = t("At least 24 hours ahead");
   return e;
 }

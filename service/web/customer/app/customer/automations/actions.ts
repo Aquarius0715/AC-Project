@@ -13,7 +13,7 @@ async function run<T>(fn: () => Promise<T>, write = true): Promise<ActionResult<
   try {
     return { ok: true, value: await fn() };
   } catch (error) {
-    return error instanceof CoreError ? { ok: false, messageKey: error.error.messageKey, code: error.error.code, fieldErrors: error.error.fieldErrors ?? {}, retryAfterSeconds: error.error.retryAfterSeconds } : { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
+    return error instanceof CoreError ? { ok: false, messageKey: error.error.messageKey, code: error.error.code, fieldErrors: error.error.fieldErrors, retryAfterSeconds: error.error.retryAfterSeconds } : { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
   } finally {
     if (write) refresh();
   }
@@ -35,7 +35,8 @@ export async function updateConsent(granted: boolean, version: number) {
 rules decide, nothing is stored or sent. */
 export async function testEvent(unitId: string, facts: Omit<OpInput<"automations.simulate">["facts"][number], "unitId" | "observedAt">[]) {
   return run(async () => {
-    const at = new Date(Math.floor((await coreNow()).getTime() / 60_000) * 60_000).toISOString();
+    const now = await coreNow();
+    const at = new Date(Math.floor(now.getTime() / 60_000) * 60_000).toISOString();
     const r = await coreOp<{ results: ApiDecision[] }>("automations.simulate", {
       eventId: crypto.randomUUID(), occurredAt: at, unitIds: [unitId], phase: "condition", facts: facts.map((f) => ({ ...f, unitId, observedAt: at })),
     });

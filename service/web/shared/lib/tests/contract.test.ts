@@ -1,0 +1,162 @@
+// @vitest-environment node
+import { readdirSync, readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import ts from "typescript";
+import { describe, expect, it } from "vitest";
+import { coreWrites } from "@ac/web/lib/routes.gen";
+import { must } from "./must";
+
+// The web's calls against the Core API contract (IR312): every coreOp / callOp / coreAll call with a literal operation
+// and an object literal input may use only the input fields of OperationContracts[op] (docs/02-design/
+// service-contracts.ts; the API refuses unknown fields), only the filters the operation's catalog row allows (the REST
+// binding refuses others), and literal values the contract fixes (count: 8 of automations.nextRuns). Inputs built
+// elsewhere are typed by their own mappers' tests.
+// a field seen before keeps allowing anything, or allows the literals of both member types; a new field takes these
+const mergeLiterals = <V>(seen: V[] | null | undefined, lit: V[]): V[] | null => {
+  if (seen === undefined) return lit;
+  return seen === null ? null : [...new Set([...seen, ...lit])];
+};
+const KEYWORD_VALUE = new Map([[ts.SyntaxKind.TrueKeyword, true], [ts.SyntaxKind.FalseKeyword, false]]);
+const web = fileURLToPath(new URL("../../../", import.meta.url));
+const contractFile = path.join(web, "../../docs/02-design/service-contracts.ts");
+const catalogFile = path.join(web, "../api/internal/ops/catalog_gen.go");
+
+interface Field { literals: (string | number | boolean)[] | null } // the literal values the contract allows, null: any
+function contractInputs(): Map<string, Map<string, Field>> {
+  const program = ts.createProgram([contractFile], { strict: true, noEmit: true });
+  const checker = program.getTypeChecker();
+  const source = must(program.getSourceFile(contractFile));
+  const literalsOf = (t: ts.Type): Field["literals"] => {
+    const parts = t.isUnion() ? t.types : [t];
+    const values: (string | number | boolean)[] = [];
+    for (const p of parts) {
+      if (p.isStringLiteral() || p.isNumberLiteral()) values.push(p.value);
+      else if (p.flags & ts.TypeFlags.BooleanLiteral) values.push(checker.typeToString(p) === "true");
+      else if (p.flags & (ts.TypeFlags.Undefined | ts.TypeFlags.Null)) continue;
+      else return null;
+    }
+    return values.length > 0 ? values : null;
+  };
+  const out = new Map<string, Map<string, Field>>();
+  ts.forEachChild(source, (n) => {
+    if (!ts.isTypeAliasDeclaration(n) || n.name.text !== "OperationContracts") return;
+    const ops = checker.getPropertiesOfType(checker.getTypeAtLocation(n.name));
+    for (const op of ops) {
+      const input = checker.getTypeOfSymbolAtLocation(op, n).getProperty("input");
+      if (!input) continue;
+      const t = checker.getTypeOfSymbolAtLocation(input, n);
+      const fields = new Map<string, Field>();
+      const members = t.isUnion() ? t.types : [t];
+      for (const member of members) {
+        for (const p of checker.getPropertiesOfType(member)) {
+          const lit = literalsOf(checker.getTypeOfSymbolAtLocation(p, n));
+          // a field of several union members allows the literals of all of them; any non-literal type allows anything
+          const before = fields.get(p.getName());
+          const literals = lit ? mergeLiterals(before?.literals, lit) : null;
+          fields.set(p.getName(), { literals });
+        }
+      }
+      out.set(op.getName(), fields);
+    }
+  });
+  return out;
+}
+
+function catalogFilters(): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  for (const m of readFileSync(catalogFile, "utf8").matchAll(/\{Name: "([\w.]+)".*?Filters: (nil|\[\]string\{([^}]*)\})\}/g)) {
+    out.set(must(m[1]), m[2] === "nil" ? [] : must(m[3]).matchAll(/"([^"]+)"/g).map((x) => must(x[1])).toArray());
+  }
+  return out;
+}
+
+function sources(): string[] {
+  const files: string[] = [];
+  const walk = (d: string) => {
+    const entries = readdirSync(d, { withFileTypes: true });
+    for (const e of entries) {
+      if (["node_modules", ".next", "tests", "e2e"].includes(e.name)) continue;
+      const p = path.join(d, e.name);
+      if (e.isDirectory()) walk(p);
+      else if (/\.tsx?$/.test(e.name)) files.push(p);
+    }
+  };
+  for (const d of ["customer", "partner", "technician", "admin", "shared"]) walk(path.join(web, d));
+  return files;
+}
+
+const name = (p: ts.ObjectLiteralElementLike) => (p.name ? p.name.getText().replaceAll(/^["']|["']$/g, "") : null);
+
+describe("the web's calls against the Core API contract (IR312)", () => {
+  it("use only known operations, input fields, catalog filters and the values the contract fixes", () => {
+    const inputs = contractInputs(), filters = catalogFilters();
+    const problems: string[] = [];
+    let calls = 0;
+    for (const f of sources()) {
+      const sf = ts.createSourceFile(f, readFileSync(f, "utf8"), ts.ScriptTarget.Latest, true, f.endsWith("x") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+      const visit = (n: ts.Node) => {
+        if (ts.isCallExpression(n) && ts.isIdentifier(n.expression) && ["coreOp", "callOp", "coreAll"].includes(n.expression.text) && n.arguments[0] && ts.isStringLiteral(n.arguments[0])) {
+          const op = n.arguments[0].text;
+          const where = `${path.relative(web, f)}:${String(sf.getLineAndCharacterOfPosition(n.getStart(sf)).line + 1)}`;
+          const fields = inputs.get(op);
+          if (!fields) problems.push(`${where} ${op}: not an operation of the contract`);
+          const argument = n.arguments[1];
+          if (fields && argument && ts.isObjectLiteralExpression(argument)) {
+            calls++;
+            for (const p of argument.properties) {
+              const key = name(p);
+              if (!key || ts.isSpreadAssignment(p)) continue;
+              const field = fields.get(key);
+              if (!field) { problems.push(`${where} ${op}: unknown field ${key}`); continue; }
+              const init = ts.isPropertyAssignment(p) ? p.initializer : null;
+              // the value of a literal initializer, or undefined for anything else
+              const keyword = init ? KEYWORD_VALUE.get(init.kind) : undefined;
+              const text = init && ts.isStringLiteral(init) ? init.text : keyword;
+              const value = init && ts.isNumericLiteral(init) ? Number(init.text) : text;
+              if (field.literals && value !== undefined && !field.literals.includes(value)) problems.push(`${where} ${op}: ${key} ${JSON.stringify(value)} is not one of ${JSON.stringify(field.literals)}`);
+            }
+            const property = (o: ts.ObjectLiteralExpression, k: string) => o.properties.find((p): p is ts.PropertyAssignment => ts.isPropertyAssignment(p) && name(p) === k);
+            const q = property(argument, "query");
+            const fp = property(argument, "filters") ?? (q && ts.isObjectLiteralExpression(q.initializer) ? property(q.initializer, "filters") : undefined);
+            if (fp && ts.isObjectLiteralExpression(fp.initializer)) {
+              for (const p of fp.initializer.properties) {
+                const key = name(p);
+                if (key && !ts.isSpreadAssignment(p) && !(filters.get(op) ?? []).includes(key)) problems.push(`${where} ${op}: filter ${key} is not in the catalog`);
+              }
+            }
+          }
+        }
+        ts.forEachChild(n, visit);
+      };
+      visit(sf);
+    }
+    expect(problems).toEqual([]);
+    expect(calls).toBeGreaterThan(300); // the scan sees the calls
+  });
+});
+
+// IR358: the browser reaches the Core API through the BFF relay for reads only; its writes are Server Actions
+describe("the browser's calls through the BFF relay", () => {
+  it("name read operations only", () => {
+    const problems: string[] = [];
+    let calls = 0;
+    for (const f of sources()) {
+      const sf = ts.createSourceFile(f, readFileSync(f, "utf8"), ts.ScriptTarget.Latest, true, f.endsWith("x") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+      const visit = (n: ts.Node) => {
+        if (ts.isCallExpression(n) && ts.isIdentifier(n.expression) && ["callOp", "useOp"].includes(n.expression.text) && n.arguments[0] && ts.isStringLiteral(n.arguments[0])) {
+          calls++;
+          if (coreWrites.has(n.arguments[0].text)) {
+        const line = sf.getLineAndCharacterOfPosition(n.getStart(sf)).line + 1;
+        problems.push(`${path.relative(web, f)}:${String(line)} ${n.arguments[0].text}`);
+      }
+        }
+        ts.forEachChild(n, visit);
+      };
+      visit(sf);
+    }
+    expect(problems, "writes sent through the relay").toEqual([]);
+    expect(calls).toBeGreaterThan(10); // the scan sees the relay's calls (17 in R350)
+  });
+});
+

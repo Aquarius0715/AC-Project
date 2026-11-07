@@ -6,22 +6,19 @@
 // Texts in the user's display language; the job's instants are formatted here in their display time zone and the
 // team's week keeps Kuala Lumpur days and hours (IR275).
 import "server-only";
-import { coreAll, coreDisplay, coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
+import { coreAll, coreDisplay, coreNow, coreOp, CoreError, orWhenRefused, coreItems } from "@ac/web/lib/dal";
 import { i18nOf, showDay, showSpan, showTime, zonedParts } from "@ac/web/lib/i18n";
 import type { ApiUnitDetail } from "@ac/web/lib/units";
 import { requiredFor, type ApiPartnerJobDetail } from "@ac/web/lib/partnerJobDetail";
 import { klDay, weekOf, type ApiCapacity, type ApiMember, type ApiPartnerJob, type Slot } from "@ac/web/lib/partnerOverview";
 import { candidates, formMode, SCHEDULE_STATUSES, scheduleRow, scheduleTeam, sortOf, SORTS, type ScheduleRow } from "@ac/web/lib/partnerSchedule";
+import { recover } from "@ac/web/lib/promises";
 
-const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => {
-  return p.catch((error) => {
-    if (error instanceof CoreError && error.error.code !== "UNAVAILABLE" && error.error.code !== "TIMEOUT") return fallback;
-    throw error;
-  });
-};
+const KL = "Asia/Kuala_Lumpur";
+
+const optional = orWhenRefused;
 const plusDays = (date: string, n: number) => new Date(Date.parse(`${date}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 const klDate = (iso: string) => new Date(Date.parse(iso) + 8 * 3_600_000).toISOString().slice(0, 10);
-const KL = "Asia/Kuala_Lumpur";
 
 export async function loadSchedule(sp: { jobId?: string; sort?: string }) {
   interface Page<T> { items: T[]; total: number }
@@ -43,7 +40,7 @@ export async function loadSchedule(sp: { jobId?: string; sort?: string }) {
   const base = { now: now.toISOString(), sorts: SORTS.map((s) => ({ id: s.id, text: t(s.text) })), zone: display.timeZone, otherZone: display.timeZone !== KL, sort, rows, members };
   const picked = rows.find((r) => r.id === sp.jobId) ?? rows[0];
   if (!picked) return { ...base, selected: null, week: null };
-  const job = await coreOp<ApiPartnerJobDetail>("jobs.get", { jobId: picked.id }).catch((error) => {
+  const job = await recover(coreOp<ApiPartnerJobDetail>("jobs.get", { jobId: picked.id }), (error: unknown) => {
     if (error instanceof CoreError && (error.error.code === "NOT_FOUND" || error.error.code === "FORBIDDEN")) return null; // delegation ended meanwhile
     throw error;
   });
@@ -58,9 +55,9 @@ export async function loadSchedule(sp: { jobId?: string; sort?: string }) {
   const currentId = job.projection === "detail" ? job.assignment?.technicianMembershipId ?? null : null;
   const technicians = scheduleTeam(members, nowMs, currentId); // the choice and the week leave former technicians out (IR624)
   const [capacity, eligible, booked] = await Promise.all([
-    Promise.all(dates.map((date) => optional(coreOp<Page<ApiCapacity>>("members.capacity", { date, query: { limit: 100 } }).then((r) => r.items), []))),
+    Promise.all(dates.map((date) => optional(coreItems<ApiCapacity>("members.capacity", { date, query: { limit: 100 } }), []))),
     slot && mode.kind !== "blocked" ? optional(coreOp<Page<ApiMember>>("members.eligible", { jobId: picked.id, startAt: slot.startAt, endAt: slot.endAt, query: { limit: 100 } }).then((r) => r.items.map((m) => m.id)), []) : Promise.resolve([] as string[]),
-    Promise.all(technicians.map((t) => optional(coreOp<Page<ApiPartnerJob>>("jobs.list", { filters: { membershipId: t.id }, limit: 100 }), { items: [], total: 0 }).then((r) => [t.id, r.items.flatMap((j) => (j.projection === "summary" && j.scheduledSlot && j.status !== "completed" && j.status !== "cancelled" ? [{ short: j.id.slice(0, 8), slot: j.scheduledSlot }] : [])) /* completion released them (IR234) */] as const))),
+    Promise.all(technicians.map(async (t) => { const r = await optional(coreOp<Page<ApiPartnerJob>>("jobs.list", { filters: { membershipId: t.id }, limit: 100 }), { items: [], total: 0 }); return [t.id, r.items.flatMap((j) => (j.projection === "summary" && j.scheduledSlot && j.status !== "completed" && j.status !== "cancelled" ? { short: j.id.slice(0, 8), slot: j.scheduledSlot } : [])) /* completion released them (IR234) */] as const; })),
   ]);
   const day = slot ? capacity[dates.indexOf(klDate(slot.startAt))] ?? [] : [];
   const alternative = job.projection === "detail" ? job.assignment?.alternativeSlot ?? null : null;

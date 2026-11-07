@@ -1,6 +1,11 @@
 import type { IconName } from "@ac/web/components/Icon";
 import { translate, type Display, type Locale } from "@ac/web/lib/i18n";
 
+const AC_PROJECT = "AC Project";
+const CONTRACTOR_2 = "contractor";
+const TECHNICIAN = "technician";
+const TECHNICIAN_2 = "/technician";
+
 export type Role = "client" | "admin" | "contractor" | "technician";
 
 export interface NavItem { href: string; label: string; icon: IconName; badge?: string; match?: string[] }
@@ -27,7 +32,7 @@ export const ROLES: Record<Role, RoleConfig> = {
   client: {
     role: "client",
     base: "/customer",
-    app: "AC Project",
+    app: AC_PROJECT,
     sub: "Customer app",
     scope: "CUSTOMER-A",
     chip: "Client — customer-a",
@@ -47,9 +52,9 @@ export const ROLES: Record<Role, RoleConfig> = {
     ],
   },
   contractor: {
-    role: "contractor",
+    role: CONTRACTOR_2,
     base: "/partner",
-    app: "AC Project",
+    app: AC_PROJECT,
     sub: "Partner portal",
     scope: "CONTRACTOR-A",
     chip: "Contractor — contractor-a",
@@ -67,9 +72,9 @@ export const ROLES: Record<Role, RoleConfig> = {
     ],
   },
   technician: {
-    role: "technician",
-    base: "/technician",
-    app: "AC Project",
+    role: TECHNICIAN,
+    base: TECHNICIAN_2,
+    app: AC_PROJECT,
     sub: "Technician",
     scope: "TECH-EXTERNAL-A",
     chip: "Technician — tech-external-a",
@@ -78,7 +83,7 @@ export const ROLES: Record<Role, RoleConfig> = {
     loginTitle: "Technician",
     loginSub: "Sign in to view assigned jobs and devices",
     nav: [
-      { href: "/technician", label: "Overview", icon: "overview" },
+      { href: TECHNICIAN_2, label: "Overview", icon: "overview" },
       { href: "/technician?tab=all", label: "Assigned jobs", icon: "jobs", match: ["/technician/jobs", "/technician/units"] }, // a job and its unit (IR490)
       { href: "/technician/devices", label: "Devices", icon: "devices" },
     ],
@@ -86,7 +91,7 @@ export const ROLES: Record<Role, RoleConfig> = {
   admin: {
     role: "admin",
     base: "/admin",
-    app: "AC Project",
+    app: AC_PROJECT,
     sub: "HQ Admin",
     scope: "HQ TENANT",
     chip: "Admin — hq-operator",
@@ -113,9 +118,22 @@ export const ROLES: Record<Role, RoleConfig> = {
   },
 };
 
+/** roleConfig is the configuration of a role. */
+export function roleConfig(role: Role): RoleConfig {
+  switch (role) {
+    case "client": { return ROLES.client; }
+    case CONTRACTOR_2: { return ROLES.contractor; }
+    case TECHNICIAN: { return ROLES.technician; }
+    case "admin": { return ROLES.admin; }
+  }
+}
+
 export const ROLE_KEY = "ac-role";
-export const roleFromPath = (p: string): Role | null =>
-  p.startsWith("/customer") ? "client" : p.startsWith("/partner") ? "contractor" : p.startsWith("/technician") ? "technician" : p.startsWith("/admin") ? "admin" : null;
+// each role's path prefix, in the order they are tried
+const ROLE_PREFIX: [string, Role][] = [["/customer", "client"], ["/partner", CONTRACTOR_2], [TECHNICIAN_2, TECHNICIAN], ["/admin", "admin"]];
+/** A stored or sent role name that is one of the four roles. */
+export const isRole = (v: string): v is Role => Object.hasOwn(ROLES, v);
+export const roleFromPath = (p: string): Role | null => ROLE_PREFIX.find(([prefix]) => p.startsWith(prefix))?.[1] ?? null;
 
 /** The shared pages every role's shell lists below its menu (FR-X01, FR-X07). */
 export const SHARED_PAGES = [
@@ -131,7 +149,7 @@ export function pageLabel(role: Role, pathname: string): string | null {
   if (shared) return shared.label;
   if (pathname === "/customer/users" || pathname === "/partner/users") return "Users";
   if (pathname === "/demo") return "Demo controls";
-  const { base, nav } = ROLES[role];
+  const { base, nav } = roleConfig(role);
   const score = (href: string, match?: string[]) => {
     const hits = [href, ...(match ?? [])].filter((h) => (h === base ? pathname === h : pathname === h || pathname.startsWith(h + "/")));
     return hits.length > 0 ? Math.max(...hits.map((h) => h.length)) : 0;
@@ -142,7 +160,7 @@ export function pageLabel(role: Role, pathname: string): string | null {
 
 /** The document title in the display language: "<page> — AC Project", or the app's name off the menu. */
 export function documentTitle(role: Role, pathname: string, locale: Locale): string {
-  const { app, sub } = ROLES[role];
+  const { app, sub } = roleConfig(role);
   const label = pageLabel(role, pathname);
   return label ? `${translate(locale, label)} — ${app}` : `${app} — ${translate(locale, sub)}`;
 }

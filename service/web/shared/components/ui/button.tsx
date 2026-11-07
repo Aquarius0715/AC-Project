@@ -1,4 +1,4 @@
-import * as React from "react"
+import { useState } from "react"
 import { Button as ButtonPrimitive } from "@base-ui/react/button"
 import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "cn"
@@ -54,7 +54,7 @@ function Button({
   onBlur,
   ...props
 }: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
-  const [focused, setFocused] = React.useState(false)
+  const [focused, setFocused] = useState(false)
   return (
     <ButtonPrimitive
       data-slot="button"

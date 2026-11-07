@@ -22,34 +22,26 @@ test("Page unavailable leads a signed-in user to their Overview and anyone else 
     await expect(page.getByRole("link", { name: "Go to Overview" })).toHaveAttribute("href", app.home);
     await expect(page.getByText(/NOT_FOUND|IR57/)).toHaveCount(0); // no design notes on the screen
   }
-  const context = await browser.newContext({ baseURL: app.url, storageState: { cookies: [], origins: [] } });
-  try {
-    const out = await context.newPage();
-    await out.goto("/no-such-page");
-    await expect(out.getByRole("link", { name: "Go to sign in" })).toHaveAttribute("href", "/login");
-  } finally {
-    await context.close();
-  }
+  await using context = await browser.newContext({ baseURL: app.url, storageState: { cookies: [], origins: [] } });
+  const out = await context.newPage();
+  await out.goto("/no-such-page");
+  await expect(out.getByRole("link", { name: "Go to sign in" })).toHaveAttribute("href", "/login");
 });
 
 test("Sign out ends the session, at the identity provider too", async ({ browser, app }) => {
   // a sign-in of its own: ending the provider's session must not end the one the project's other tests share
-  const context = await browser.newContext({ baseURL: app.url, storageState: { cookies: [], origins: [] } });
-  try {
-    const page = await context.newPage();
-    await signIn(page, app);
-    await page.getByRole("button", { name: "Sign out" }).click();
-    await page.waitForURL(/\/login$/);
-    await page.goto(app.home);
-    await expect(page).toHaveURL(new RegExp(String.raw`/login\?returnTo=${encodeURIComponent(app.home)}`));
-    const again = page.getByRole("link", { name: `Continue as ${app.user}` });
-    await expect(again).toHaveAttribute("href", new RegExp(String.raw`^/bff/auth/login\?login_hint=${app.user}&returnTo=`));
-    // the provider's session ended with the sign-out: signing in again asks for the password instead of coming back
-    await again.click();
-    await expect(page.locator("#password")).toBeVisible();
-  } finally {
-    await context.close();
-  }
+  await using context = await browser.newContext({ baseURL: app.url, storageState: { cookies: [], origins: [] } });
+  const page = await context.newPage();
+  await signIn(page, app);
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await page.waitForURL(/\/login$/);
+  await page.goto(app.home);
+  await expect(page).toHaveURL(new RegExp(String.raw`/login\?returnTo=${encodeURIComponent(app.home)}`));
+  const again = page.getByRole("link", { name: `Continue as ${app.user}` });
+  await expect(again).toHaveAttribute("href", new RegExp(String.raw`^/bff/auth/login\?login_hint=${app.user}&returnTo=`));
+  // the provider's session ended with the sign-out: signing in again asks for the password instead of coming back
+  await again.click();
+  await expect(page.locator("#password")).toBeVisible();
 });
 
 test("a copy of the session cookie stops working at sign-out", async ({ browser, app }) => {
@@ -61,7 +53,8 @@ test("a copy of the session cookie stops working at sign-out", async ({ browser,
   try {
     const page = await context.newPage();
     await signIn(page, app);
-    const copy = (await context.cookies()).filter((c) => c.name.includes("ac_session_"));
+    const cookies = await context.cookies();
+    const copy = cookies.filter((c) => c.name.includes("ac_session_"));
     expect(copy).toHaveLength(1);
     await other.addCookies(copy);
     const elsewhere = await other.newPage();

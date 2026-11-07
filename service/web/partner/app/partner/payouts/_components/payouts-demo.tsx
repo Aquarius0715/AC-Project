@@ -4,12 +4,13 @@
 
 import { useState } from "react";
 import { Badge, Banner, Btn, Card, DataTable, Field, Kpi, ListRow, Modal, Page, Select, SummaryList, Textarea, useToast } from "@ac/web/components/ui";
+import { nonEmpty } from "@ac/web/lib/lists";
 
-const statements = [
+const statements = nonEmpty([
   { id: "stmt-2026-09", period: "September 2026", st: "Approved", total: "1,990.00 MYR", pay: "Pays 10-15" },
   { id: "stmt-2026-08", period: "August 2026", st: "Paid", total: "1,760.00 MYR", pay: "Paid 09-15" },
   { id: "stmt-2026-07", period: "July 2026", st: "Paid", total: "2,040.00 MYR", pay: "Paid 08-15" },
-];
+]);
 const lines = [
   { job: "job-contractor-a", d: "Repair · Bedroom AC", amt: "450.00", note: "" },
   { job: "job-p02", d: "Periodic inspection · unit-p-rooftop", amt: "380.00", note: "" },
@@ -23,7 +24,7 @@ export function PayoutsDemo() {
   const toast = useToast();
   const [sel, setSel] = useState(statements[0]);
   const [ask, setAsk] = useState(false);
-  const [msg, setMsg] = useState("");
+  const [message, setMessage] = useState("");
   const [tried, setTried] = useState(false);
   return (
     <Page>
@@ -35,9 +36,9 @@ export function PayoutsDemo() {
           <div className="mt-3"><SummaryList items={[["Total", <b key="t">{sel.total}</b>], ["Priced by", "the rate card effective when each job was accepted"]]} /></div>
         </Card>
       </div>
-      <Modal open={ask} onClose={() => { setAsk(false); }} title="Ask HQ about this line" footer={<><Btn onClick={() => { setAsk(false); }}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!msg.trim()) return; setAsk(false); toast("Question sent — HQ answers on the statement"); }}>Send</Btn></>}>
+      <Modal open={ask} onClose={() => { setAsk(false); }} title="Ask HQ about this line" footer={<><Btn onClick={() => { setAsk(false); }}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!message.trim()) { return; } setAsk(false); toast("Question sent — HQ answers on the statement"); }}>Send</Btn></>}>
         <Field label="Line"><Select disabled><option>job-p07 · Rework deduction (2nd return) · − 120.00 MYR</option></Select></Field>
-        <Field label="Question (required)" error={tried && !msg.trim() ? "Enter your question" : undefined}><Textarea value={msg} onChange={(e) => { setMsg(e.target.value); }} placeholder="The 2nd return was caused by a missing part from HQ stock." /></Field>
+        <Field label="Question (required)" error={tried && !message.trim() ? "Enter your question" : undefined}><Textarea value={message} onChange={(e) => { setMessage(e.target.value); }} placeholder="The 2nd return was caused by a missing part from HQ stock." /></Field>
         <Banner>If HQ agrees, an adjustment line is added to the next statement.</Banner>
       </Modal>
     </Page>

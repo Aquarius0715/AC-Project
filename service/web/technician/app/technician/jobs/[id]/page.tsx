@@ -17,7 +17,11 @@ export default async function TechnicianJobPage({ params }: Readonly<PageProps<"
   if (!apiMode()) return <WorkspaceDemo id={id} />;
   const live = await loadWorkspace(id);
   if (live === "not_found") notFound();
-  if ("kind" in live) return <JobHistory card={live.card} />; // the viewing window ended (completion releases the assignment, IR234)
-  // a new job or report version starts the editor from the server state (key); unsaved edits are saved before transitions
-  return <WorkspaceView key={`${String(live.job.version)}:${live.report?.id ?? "-"}:${String(live.job.draftReportRef?.reportVersion ?? 0)}`} live={live} />;
+  // the viewing window ended (completion releases the assignment, IR234): the history; otherwise a new job or report
+  // version starts the editor from the server state (key), and unsaved edits are saved before transitions
+  return "kind" in live ? (
+    <JobHistory card={live.card} />
+  ) : (
+    <WorkspaceView key={`${String(live.job.version)}:${live.report?.id ?? "-"}:${String(live.job.draftReportRef?.reportVersion ?? 0)}`} live={live} />
+  );
 }

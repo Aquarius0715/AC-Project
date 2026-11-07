@@ -4,7 +4,7 @@
 // required, then one checkbox per candidate — remeasurements and device recoveries, the newest first — and the evidence
 // attached to the alert at detection last (“none attached” when it has none). The rows come from alertEvidence.ts.
 import { useT } from "./I18n";
-import { evidenceHeading, togglePick, type EvidenceRow } from "@ac/web/lib/alertEvidence";
+import { optionalEvidenceHeading, requiredEvidenceHeading, togglePick, type EvidenceRow } from "@ac/web/lib/alertEvidence";
 import { Icon } from "./Icon";
 import { Checkbox } from "@ac/web/components/ui/checkbox";
 
@@ -19,7 +19,7 @@ function Row({ title, sub, checked, disabled, onChange }: Readonly<{ title: stri
 
 export function EvidencePicker({ rows, policyless, picked, onChange, loading, error }: Readonly<{ rows: EvidenceRow[]; policyless: boolean; picked: string[]; onChange: (ids: string[]) => void; loading?: boolean; error?: string | null }>) {
   const t = useT();
-  const h = evidenceHeading(policyless, t);
+  const h = policyless ? requiredEvidenceHeading(t) : optionalEvidenceHeading(t);
   const attached = rows.filter((r) => r.kind === "detection");
   const later = rows.filter((r) => r.kind !== "detection");
   const row = (r: EvidenceRow) => <Row key={r.id} title={r.title} sub={r.sub} checked={picked.includes(r.id)} onChange={(on) => { onChange(togglePick(picked, r.id, on)); }} />;
@@ -29,8 +29,8 @@ export function EvidencePicker({ rows, policyless, picked, onChange, loading, er
       <p className="mb-1 text-[11px] text-muted-foreground">{h.sub}</p>
       {loading ? <p className="py-2 text-xs text-muted-foreground">{t("Loading the evidence…")}</p> : (
         <div className="flex flex-col">
-          {later.length > 0 ? later.map(row) : <p className="py-2 text-xs text-muted-foreground">{t("No remeasurement since detection yet — remeasure the unit or record an inspection.")}</p>}
-          {attached.length > 0 ? attached.map(row) : <Row title={t("Evidence attached to this alert")} sub={t("none attached")} checked={false} disabled />}
+          {later.length > 0 ? later.map((item) => row(item)) : <p className="py-2 text-xs text-muted-foreground">{t("No remeasurement since detection yet — remeasure the unit or record an inspection.")}</p>}
+          {attached.length > 0 ? attached.map((item) => row(item)) : <Row title={t("Evidence attached to this alert")} sub={t("none attached")} checked={false} disabled />}
         </div>
       )}
       {error && <p className="flex items-center gap-1 pb-2 text-xs font-medium text-crit"><Icon name="error" />{error}</p>}

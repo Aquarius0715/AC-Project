@@ -7,7 +7,7 @@
 // projection without billing fields. Writes are Server Actions (actions.ts). Texts in the display language; the times
 // of the first render are formatted here, in the display time zone (IR282, IR301). The Phase 1A demo keeps the fixtures.
 import { connection } from "next/server";
-import { apiMode, coreAll, coreDisplay, coreNow, coreOp, corePermissions } from "@ac/web/lib/dal";
+import { apiMode, coreAll, coreDisplay, coreNow, coreOp, corePermissions, coreAllPage } from "@ac/web/lib/dal";
 import type { ApiContract, ApiCustomer, ApiInvoice } from "@ac/web/lib/billing";
 import type { ApiCapability } from "@ac/web/lib/devices";
 import { i18nOf, showTime } from "@ac/web/lib/i18n";
@@ -16,6 +16,10 @@ import {
 } from "@ac/web/lib/restrictions";
 import { RestrictionsDemo } from "./_components/restrictions-demo";
 import { RestrictionsView, type RestrictionsLive } from "./_components/restrictions-view";
+import { queryReader } from "@ac/web/lib/searchParams";
+import { orNull } from "@ac/web/lib/promises";
+
+const INVOICES_LIST = "invoices.list";
 
 const active = new Set<RestrictionState>(["scheduled", "requested", "applied", "release_requested"]);
 
@@ -25,7 +29,7 @@ export default async function AdminRestrictionsPage({ searchParams }: Readonly<P
   await connection();
   if (!apiMode()) return <RestrictionsDemo />;
   const sp = await searchParams;
-  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k] as string) : undefined);
+  const one = queryReader(sp);
   const [now, perms, display] = await Promise.all([coreNow(), corePermissions(), coreDisplay()]);
   const i = i18nOf(display), { t } = i;
   const isFull = perms.has("restriction.read") || perms.has("restriction.write");
@@ -36,25 +40,27 @@ export default async function AdminRestrictionsPage({ searchParams }: Readonly<P
   const filters = { ...(scope.contractId && { contractId: scope.contractId }), ...(scope.invoiceId && { invoiceId: scope.invoiceId }), ...(status && { status }) };
   const [scoped, units] = await Promise.all([
     coreOp<Page<ApiRestriction>>("restrictions.list", { limit: 100, filters }),
-    perms.has("asset.read") ? coreAll<Unit>("units.list").then((items) => ({ items, total: items.length })) : Promise.resolve({ items: [] as Unit[] }), // override-only callers see unit IDs
+    perms.has("asset.read") ? coreAllPage<Unit>("units.list") : Promise.resolve({ items: [] as Unit[] }), // override-only callers see unit IDs
   ]);
   const names = new Map(units.items.map((u) => [u.id, u.displayName]));
   const [contracts, customers] = isFull
-    ? await Promise.all([coreAll<ApiContract & { rulesVersion: string | null }>("contracts.list").then((items) => ({ items, total: items.length })), coreAll<ApiCustomer>("customers.list").then((items) => ({ items, total: items.length }))])
+    ? await Promise.all([coreAllPage<ApiContract & { rulesVersion: string | null }>("contracts.list"), coreAllPage<ApiCustomer>("customers.list")])
     : [{ items: [] }, { items: [] }];
   const customerName = new Map(customers.items.map((c) => [c.id, c.name]));
   const contractLabel = (id?: string) => {
     const k = contracts.items.find((c) => c.id === id);
-    return k ? `${customerName.get(k.customerId) ?? t("customer")} · ${t("{plan} contract v{version}", { plan: k.planType, version: k.version })}` : (t(isFull ? "contract" : "release view"));
+    if (!k) return t(isFull ? "contract" : "release view");
+    return `${customerName.get(k.customerId) ?? t("customer")} · ${t("{plan} contract v{version}", { plan: k.planType, version: k.version })}`;
   };
   const rows = restrictionRows(scoped.items, contractLabel, i);
-  const counts = Object.fromEntries(states.map((s) => [s, rows.filter((r) => r.state === s).length])) as Record<RestrictionState, number>;
+  const countOf = (state: RestrictionState) => rows.filter((r) => r.state === state).length;
+  const counts: Record<RestrictionState, number> = { scheduled: countOf("scheduled"), requested: countOf("requested"), applied: countOf("applied"), release_requested: countOf("release_requested"), released: countOf("released"), cancelled: countOf("cancelled") };
   // every restriction (the scope may narrow the list): the cause invoices of the filter and the units under restriction
   const all = Object.keys(filters).length > 0 ? await coreOp<Page<ApiRestriction>>("restrictions.list", { limit: 100 }) : scoped;
-  const invoicesOf = isFull ? await coreAll<ApiInvoice>("invoices.list") : [];
+  const invoicesOf = isFull ? await coreAll<ApiInvoice>(INVOICES_LIST) : [];
   const contractOf = new Map(contracts.items.map((k) => [k.id, k]));
   const causeIds = new Set(new Set(all.items.flatMap((x) => x.causeInvoiceIds ?? [])));
-  const causes = invoicesOf.filter((x) => causeIds.has(x.id)).sort((a, b) => a.number.localeCompare(b.number))
+  const causes = invoicesOf.filter((x) => causeIds.has(x.id)).toSorted((a, b) => a.number.localeCompare(b.number))
     .map((x) => ({ id: x.id, label: `${x.number} · ${customerName.get(contractOf.get(x.contractId)?.customerId ?? "") ?? t("customer")}` }));
   const live: RestrictionsLive = {
     now: now.toISOString(),
@@ -73,8 +79,8 @@ export default async function AdminRestrictionsPage({ searchParams }: Readonly<P
     const r = await coreOp<ApiRestriction>("restrictions.get", { id });
     const commandIds = r.perUnit.flatMap((u) => [u.applyCommandIds.at(-1), u.releaseCommandIds.at(-1)]).filter((x): x is string => !!x);
     const [commands, invoices] = await Promise.all([
-      Promise.all(commandIds.map((c) => coreOp<ApiCommand>("commands.get", { id: c }).catch(() => null))),
-      isFull && r.contractId ? coreOp<Page<ApiInvoice>>("invoices.list", { limit: 100, filters: { contractId: r.contractId } }) : Promise.resolve({ items: [] as ApiInvoice[] }),
+      Promise.all(commandIds.map((c) => orNull(coreOp<ApiCommand>("commands.get", { id: c })))),
+      isFull && r.contractId ? coreOp<Page<ApiInvoice>>(INVOICES_LIST, { limit: 100, filters: { contractId: r.contractId } }) : Promise.resolve({ items: [] as ApiInvoice[] }),
     ]);
     const invoice = new Map(invoices.items.map((i) => [i.id, i]));
     const causes = (r.causeInvoiceIds ?? []).map((i) => ({ id: i, number: invoice.get(i)?.number ?? i.slice(0, 8), paid: invoice.get(i)?.status === "paid", amountMinor: invoice.get(i)?.amountMinor ?? null, currency: invoice.get(i)?.currency ?? "" }));
@@ -96,23 +102,25 @@ export default async function AdminRestrictionsPage({ searchParams }: Readonly<P
 
   if (canWrite) { // the schedule form: eligible contracts, their overdue unpaid invoices, units and recipients
     const [overdue, caps, clients] = await Promise.all([
-      coreOp<Page<ApiInvoice>>("invoices.list", { limit: 100, filters: { overdueOnly: true } }),
-      coreAll<ApiCapability>("capabilities.list").then((items) => ({ items, total: items.length })),
+      coreOp<Page<ApiInvoice>>(INVOICES_LIST, { limit: 100, filters: { overdueOnly: true } }),
+      coreAllPage<ApiCapability>("capabilities.list"),
       coreOp<Page<{ customerId: string; status: string }>>("clientUsers.list", { limit: 100, filters: { status: "active" } }),
     ]);
     const busy = new Map<string, string>();
-    for (const x of all.items) if (active.has(x.state)) for (const u of x.unitIds) busy.set(u, t("under restriction {id} ({state})", { id: x.id.slice(0, 8), state: stateWord(x.state, t) }));
-    for (const x of all.items) for (const c of x.recoveryCases) if (c.state !== "resolved") busy.set(c.unitId, t("unresolved recovery case"));
+    const restricted = all.items.filter((x) => active.has(x.state)).flatMap((x) => x.unitIds.map((u) => [u, t("under restriction {id} ({state})", { id: x.id.slice(0, 8), state: stateWord(x.state, t) })] as const));
+    const recovering = all.items.flatMap((x) => x.recoveryCases).filter((c) => c.state !== "resolved").map((c) => [c.unitId, t("unresolved recovery case")] as const);
+    for (const [u, why] of [...restricted, ...recovering]) busy.set(u, why);
     const cap = new Map(caps.items.map((k) => [k.id, k]));
     const term = (k: ApiContract) => Date.parse(k.startAt) <= now.getTime() && now.getTime() < Date.parse(k.endAt);
     live.schedule = contracts.items.filter((k) => k.planType === "rto" && k.restrictionEligible && k.rulesVersion && term(k)).map((k) => {
       return {
-        id: k.id, version: k.version, label: contractLabel(k.id), rulesVersion: k.rulesVersion!, recipients: clients.items.filter((c) => c.customerId === k.customerId).length,
+        id: k.id, version: k.version, label: contractLabel(k.id), rulesVersion: k.rulesVersion ?? "", recipients: clients.items.filter((c) => c.customerId === k.customerId).length,
         invoices: overdue.items.filter((i) => i.contractId === k.id && i.status === "unpaid").map((i) => ({ id: i.id, number: i.number })),
         units: k.unitIds.map((u) => {
           const unit = units.items.find((x) => x.id === u);
           const c = unit ? cap.get(unit.modelId) : undefined;
-          return { id: u, name: names.get(u) ?? u.slice(0, 8), blocked: !unit || unit.archived ? t("archived") : busy.get(u) ?? (c?.control ? null : t("no power control")), temperature: c?.temperature ?? null };
+          const noControl = c?.control ? null : t("no power control");
+          return { id: u, name: names.get(u) ?? u.slice(0, 8), blocked: !unit || unit.archived ? t("archived") : busy.get(u) ?? noControl, temperature: c?.temperature ?? null };
         }),
       };
     });

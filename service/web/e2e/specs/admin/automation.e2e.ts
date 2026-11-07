@@ -6,15 +6,17 @@
 // HTTP, as the shared test environment's are (DEC-93).
 import { randomUUID } from "node:crypto";
 import { test, expect } from "../../fixtures/test";
+import { must } from "../../fixtures/must";
 
 let created: { id: string; version: number } | null = null;
 
 test.afterEach(async ({ page }) => {
   if (!created) return;
   const status = await page.evaluate(async ({ id, version, key }) => {
-    return (await fetch("/bff/ops/policies.delete", {
+    const deleted = await fetch("/bff/ops/policies.delete", {
       method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": key, "X-Expected-Version": String(version) }, body: JSON.stringify({ policyId: id }),
-    })).status;
+    });
+    return deleted.status;
   }, { ...created, key: randomUUID() });
   expect(status).toBe(200);
   created = null;
@@ -28,7 +30,7 @@ test("the policy editor's footer, Show disabled and a simulation with an added f
   await main.getByRole("checkbox", { name: "Bedroom AC", exact: true }).check();
   await main.getByRole("button", { name: "Create policy" }).click();
   await page.waitForURL(/policyId=[0-9a-f-]{36}/);
-  created = { id: new URL(page.url()).searchParams.get("policyId")!, version: 1 };
+  created = { id: must(new URL(page.url()).searchParams.get("policyId")), version: 1 };
 
   // the footer: a loaded form is clean, an edit marks it, Discard puts it back
   await expect(main).toContainText("No unsaved changes · form loaded from policy v1");

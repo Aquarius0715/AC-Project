@@ -3,6 +3,7 @@
 // again. Demo Customer B, so the customer app's own users spec (customer A) sees nothing of it.
 import { test, expect } from "../../fixtures/test";
 import { expectAccessible } from "../../fixtures/a11y";
+import { answers, messageCount } from "../../fixtures/mailpit";
 
 test("HQ adds a client user, listed as not signed in yet, and removes them", async ({ page }) => {
   await page.goto("/admin/units");
@@ -23,8 +24,8 @@ test("HQ adds a client user, listed as not signed in yet, and removes them", asy
   const row = main.getByRole("row").filter({ hasText: email });
   await expect(row).toContainText("Not signed in yet");
   const search = `http://localhost:8025/api/v1/search?query=${encodeURIComponent(`to:"${email}"`)}`;
-  if ((await fetch(search).catch(() => null))?.ok) {
-    await expect.poll(async () => ((await (await fetch(search)).json()) as { messages_count: number }).messages_count, { timeout: 30_000 }).toBeGreaterThanOrEqual(1);
+  if (await answers(search)) {
+    await expect.poll(() => messageCount(search), { timeout: 30_000 }).toBeGreaterThanOrEqual(1);
   }
   await row.getByRole("button", { name: `Actions for ${email}` }).click();
   await page.getByRole("menuitem", { name: "Remove from customer" }).click();

@@ -25,20 +25,20 @@ export function AlertEvidenceView({ live }: Readonly<{ live: AlertsLive }>) {
   const patch = useUrlPatch();
   const [reason, setReason] = useState("");
   const [picked, setPicked] = useState<string[]>([]);
-  const [msg, setMsg] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const a = live.alert;
   const act = async (op: "acknowledge" | "resolve") => {
     if (!a) return;
+    if (op === "resolve" && !reason.trim()) { setMessage(t("A resolution reason is required (1–1000 characters).")); return; }
     const ids = picked.filter((id) => live.evidence?.some((r) => r.id === id)); // a re-read list drops what is no longer a candidate
-    if (op === "resolve" && !reason.trim()) { setMsg(t("A resolution reason is required (1–1000 characters).")); return; }
     const problem = op === "resolve" && live.evidence ? evidenceProblem(a.policyless, ids, t) : null;
-    if (problem) { setMsg(problem); return; }
+    if (problem) { setMessage(problem); return; }
     setBusy(true);
-    setMsg(null);
+    setMessage(null);
     const res = op === "resolve" ? await resolveAlert(a.id, a.version, reason.trim(), ids) : await acknowledgeAlert(a.id, a.version);
     setBusy(false);
-    if (!res.ok) { setMsg(evidenceRefusal(res.fieldErrors, t) ?? refusal(res, a.resolution.forbidden, t)); return; }
+    if (!res.ok) { setMessage(evidenceRefusal(res.fieldErrors, t) ?? refusal(res, a.resolution.forbidden, t)); return; }
     toast(t(op === "resolve" ? "Alert resolved" : "Alert acknowledged"));
     setReason("");
     setPicked([]);
@@ -50,7 +50,7 @@ export function AlertEvidenceView({ live }: Readonly<{ live: AlertsLive }>) {
         <>
           <div className={cx("flex flex-wrap items-center justify-between gap-3 rounded-2xl border px-4 py-3", BANNER[a.banner.tone])}>
             <div className="min-w-0"><b className="block text-[15px]">{a.banner.title}</b><span className="text-xs">{a.banner.sub}</span></div>
-            <div className="flex items-center gap-2"><SeverityBadge s={a.severity} />{a.status === "open" ? <Btn size="sm" disabled={busy} onClick={() => act("acknowledge")}>{t("Acknowledge")}</Btn> : <b className="text-xs">{a.banner.state}</b>}</div>
+            <div className="flex items-center gap-2"><SeverityBadge s={a.severity} />{a.status === "open" ? <Btn size="sm" disabled={busy} onClick={() => { void act("acknowledge"); }}>{t("Acknowledge")}</Btn> : <b className="text-xs">{a.banner.state}</b>}</div>
           </div>
           <div className="grid-fluid" style={{ ["--min" as string]: "260px" }}>
             {a.cards.map((c) => (
@@ -63,13 +63,13 @@ export function AlertEvidenceView({ live }: Readonly<{ live: AlertsLive }>) {
             ))}
           </div>
           <Card title={t("Resolution")}>
-            {msg && <div className="mb-3"><Banner tone="crit">{msg}</Banner></div>}
+            {message && <div className="mb-3"><Banner tone="crit">{message}</Banner></div>}
             {a.resolution.done ? <Banner tone="ok">{a.resolution.done}</Banner> : (
               <>
                 {a.resolution.info && <Banner>{a.resolution.info}</Banner>}
                 {live.evidence && <div className="mt-3"><EvidencePicker rows={live.evidence} policyless={a.policyless} picked={picked.filter((id) => live.evidence?.some((r) => r.id === id))} onChange={setPicked} /></div>}
                 <div className="mt-3"><Field label={t("Resolution reason (required, 1–1000 characters)")}><Textarea value={reason} maxLength={1000} placeholder={t("e.g. Confirmed on site that airflow is restored after filter cleaning.")} onChange={(e) => { setReason(e.target.value); }} /></Field></div>
-                <div className="mt-3"><Btn variant="primary" className="w-full" disabled={busy} onClick={() => act("resolve")}>{t("Resolve alert")}</Btn></div>
+                <div className="mt-3"><Btn variant="primary" className="w-full" disabled={busy} onClick={() => { void act("resolve"); }}>{t("Resolve alert")}</Btn></div>
               </>
             )}
             <p className="mt-2 text-[11px] text-muted-foreground">{a.resolution.note}</p>
@@ -87,7 +87,7 @@ export function AlertEvidenceView({ live }: Readonly<{ live: AlertsLive }>) {
               {live.count > 1 && (
                 <Card title={t("Alerts on this unit ({n})", { n: live.count })}>
                   {live.choices.map((x) => (
-                    <Plain key={x.id} type="button" onClick={() => { setMsg(null); setPicked([]); patch({ alertId: x.id }); }} className={cx("flex w-full items-center justify-between gap-2 border-t border-line py-2 text-left first:border-0", x.id === a.id && "font-bold")}>
+                    <Plain key={x.id} type="button" onClick={() => { setMessage(null); setPicked([]); patch({ alertId: x.id }); }} className={cx("flex w-full items-center justify-between gap-2 border-t border-line py-2 text-left first:border-0", x.id === a.id && "font-bold")}>
                       <span className="min-w-0"><span className="block text-[13px]">{x.title}</span><span className="text-xs font-normal text-muted-foreground">{x.sub}</span></span><SeverityBadge s={x.severity} />
                     </Plain>
                   ))}

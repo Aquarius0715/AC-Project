@@ -4201,7 +4201,7 @@ No UI kit, icon set, or form, schema, query or translation library is added. Rea
 
 IR313 typed every call's input. The results were still typed by hand in the web, and nothing compared them with the contract. A new check does, and it found faults in the contract and in the web.
 
-1. **The check.** `shared/lib/__tests__/results.test.ts` (Vitest) runs on every coreOp / coreAll / callOp / useOp call with a literal operation. The result type the caller names, or TypeScript infers, must accept `OperationContracts[op].result`; for coreAll, an item of its page. The rules:
+1. **The check.** `shared/lib/tests/results.test.ts` (Vitest) runs on every coreOp / coreAll / callOp / useOp call with a literal operation. The result type the caller names, or TypeScript infers, must accept `OperationContracts[op].result`; for coreAll, an item of its page. The rules:
    - Every field the web reads is in the contract, with a type the web accepts. A field the contract allows to be null must allow null in the web too.
    - Below the top of a result, every variant the contract allows must fit, for example the kinds of a command's action.
    - At the top, and for the items of a page, the request or the role picks the variant. The screen names the projection or kind it reads, and each variant it names must fit. This applies to a union with a field that tells every variant apart. A union without such a field needs one variant that fits (payments.simulate, where the event decides).
@@ -6283,7 +6283,7 @@ The web's last character icons are Lucide icons, a test keeps characters from co
    - **"→ {version} installed"** in the technician's device history reads "{version} installed".
    - The web's `Icon` map gains `more` (Ellipsis), as the Figma set has.
 2. **Spacing.** Two icons that touched their text now have a gap: the location consent heading, and the Single AC / Group control buttons.
-3. **The guard, `shared/lib/__tests__/icons.test.ts`.**
+3. **The guard, `shared/lib/tests/icons.test.ts`.**
    - It parses every source file of the four apps and the shared package with the TypeScript parser. It reads string literals, template text and JSX text, but not comments. The Malay dictionary is included.
    - It refuses symbol and pictograph characters, an arrow, ‹ or › at the start or end of a text, and "+ " before a label.
    - An arrow between words, and a separator with spaces on both sides on the same line, are typography and pass.
