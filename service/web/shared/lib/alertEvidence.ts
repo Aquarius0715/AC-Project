@@ -38,12 +38,10 @@ export function evidenceRows(items: ApiEvidenceCandidate[], nowMs: number, i: I1
   });
 }
 
-/** The picker's heading: required for an alert without a policy (IR66), optional for a policy alert. */
-export function evidenceHeading(policyless: boolean, t: T): { title: string; sub: string } {
-  return policyless
-    ? { title: t("Resolution evidence · required"), sub: t("At least one · measurements after detection") }
-    : { title: t("Resolution evidence · optional"), sub: t("A policy alert may also be resolved by hand without evidence") };
-}
+/** The picker's heading for an alert without a policy: the evidence is required (IR66). */
+export const requiredEvidenceHeading = (t: T): { title: string; sub: string } => ({ title: t("Resolution evidence · required"), sub: t("At least one · measurements after detection") });
+/** The picker's heading for a policy alert: the evidence is optional. */
+export const optionalEvidenceHeading = (t: T): { title: string; sub: string } => ({ title: t("Resolution evidence · optional"), sub: t("A policy alert may also be resolved by hand without evidence") });
 
 /** At most this many evidence IDs go with one resolution (the Core API's bound). */
 export const MAX_EVIDENCE = 20;

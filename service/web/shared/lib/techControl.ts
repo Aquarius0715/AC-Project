@@ -53,9 +53,8 @@ export function actionWord(a: UnitAction, t: T = en): string {
 
 /** One history row: what was sent, its device outcome and the badge. Test-run commands name their run. */
 export interface HistoryRow { id: string; at: string; title: string; sub: string; badge: { text: string; tone: "ok" | "warn" | "crit" | "muted" | "primary" }; run: boolean }
-function runTitle(run: ApiRun, isStart: boolean, t: T): string {
-  return isStart ? t("test run start ({action}, {n} min)", { action: actionWord(run.startAction, t), n: run.durationMinutes }) : t("test run end ({action})", { action: actionWord(run.endAction, t) });
-}
+const runStartTitle = (run: ApiRun, t: T): string => t("test run start ({action}, {n} min)", { action: actionWord(run.startAction, t), n: run.durationMinutes });
+const runEndTitle = (run: ApiRun, t: T): string => t("test run end ({action})", { action: actionWord(run.endAction, t) });
 /** What became of a command: acknowledged when, rejected (with the device's code), no response, cancelled or waiting. */
 function commandOutcome(c: ApiCommandRow, i: I18n): string {
   const { t } = i;
@@ -79,7 +78,7 @@ export function historyRows(cs: ApiCommandRow[], runs: ApiRun[], i: I18n = EN): 
   return cs.map((c) => {
     const run = runs.find((r) => r.startCommandId === c.id || r.endCommandId === c.id);
     const isStart = !!run && run.startCommandId === c.id;
-    const title = run ? runTitle(run, isStart, t) : actionCode(c.action);
+    const title = run ? (isStart ? runStartTitle(run, t) : runEndTitle(run, t)) : actionCode(c.action);
     const outcome = commandOutcome(c, i);
     const ends = isStart && run.state === "running" && run.endAt ? ` · ${t("ends {time}", { time: clock(run.endAt, i) })}` : "";
     const badge = isStart && run.state === "running" ? { text: t("Running"), tone: "primary" as const } : commandBadge(c.status, t);

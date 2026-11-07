@@ -4,7 +4,7 @@
 // required, then one checkbox per candidate — remeasurements and device recoveries, the newest first — and the evidence
 // attached to the alert at detection last (“none attached” when it has none). The rows come from alertEvidence.ts.
 import { useT } from "./I18n";
-import { evidenceHeading, togglePick, type EvidenceRow } from "@ac/web/lib/alertEvidence";
+import { optionalEvidenceHeading, requiredEvidenceHeading, togglePick, type EvidenceRow } from "@ac/web/lib/alertEvidence";
 import { Icon } from "./Icon";
 import { Checkbox } from "@ac/web/components/ui/checkbox";
 
@@ -19,7 +19,7 @@ function Row({ title, sub, checked, disabled, onChange }: Readonly<{ title: stri
 
 export function EvidencePicker({ rows, policyless, picked, onChange, loading, error }: Readonly<{ rows: EvidenceRow[]; policyless: boolean; picked: string[]; onChange: (ids: string[]) => void; loading?: boolean; error?: string | null }>) {
   const t = useT();
-  const h = evidenceHeading(policyless, t);
+  const h = policyless ? requiredEvidenceHeading(t) : optionalEvidenceHeading(t);
   const attached = rows.filter((r) => r.kind === "detection");
   const later = rows.filter((r) => r.kind !== "detection");
   const row = (r: EvidenceRow) => <Row key={r.id} title={r.title} sub={r.sub} checked={picked.includes(r.id)} onChange={(on) => { onChange(togglePick(picked, r.id, on)); }} />;

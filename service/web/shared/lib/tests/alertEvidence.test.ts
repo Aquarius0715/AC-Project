@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { evidenceHeading, evidenceProblem, evidenceRefusal, evidenceRows, MAX_EVIDENCE, togglePick, type ApiEvidenceCandidate } from "@ac/web/lib/alertEvidence";
+import { optionalEvidenceHeading, requiredEvidenceHeading, evidenceProblem, evidenceRefusal, evidenceRows, MAX_EVIDENCE, togglePick, type ApiEvidenceCandidate } from "@ac/web/lib/alertEvidence";
 import { EN, i18nOf } from "@ac/web/lib/i18n";
 
 const REMEASUREMENT = "remeasurement";
@@ -29,12 +29,12 @@ describe("alert resolution evidence (IR327)", () => {
   it("words the rows in the display language", () => {
     const [r] = evidenceRows(items.slice(0, 1), NOW, MS);
     expect([r?.title.startsWith("Pengukuran semula · "), r?.sub]).toEqual([true, "diukur · sah"]);
-    expect(evidenceHeading(true, MS.t).title).toBe("Bukti penyelesaian · wajib");
+    expect(requiredEvidenceHeading(MS.t).title).toBe("Bukti penyelesaian · wajib");
   });
 
   it("requires evidence without a policy and leaves it optional with one (IR66)", () => {
-    expect(evidenceHeading(true, EN.t)).toEqual({ title: "Resolution evidence · required", sub: "At least one · measurements after detection" });
-    expect(evidenceHeading(false, EN.t)).toEqual({ title: "Resolution evidence · optional", sub: "A policy alert may also be resolved by hand without evidence" });
+    expect(requiredEvidenceHeading(EN.t)).toEqual({ title: "Resolution evidence · required", sub: "At least one · measurements after detection" });
+    expect(optionalEvidenceHeading(EN.t)).toEqual({ title: "Resolution evidence · optional", sub: "A policy alert may also be resolved by hand without evidence" });
     expect(evidenceProblem(true, [], EN.t)).toBe("Pick at least one evidence record — this alert has no policy");
     expect([evidenceProblem(true, ["m-temp"], EN.t), evidenceProblem(false, [], EN.t)]).toEqual([null, null]);
     expect(evidenceProblem(false, Array.from({ length: MAX_EVIDENCE + 1 }, (_, i) => `m${String(i)}`), EN.t)).toBe("Pick at most 20 evidence records");
