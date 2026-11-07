@@ -15,6 +15,7 @@ import { previewReport, recordReview, saveFactor, saveReportDraft } from "../act
 import { EvidenceList, EvidencePicker } from "./evidence";
 import { oneOf } from "@ac/web/lib/oneOf";
 import { Icon } from "@ac/web/components/Icon";
+import { DateTimeSelect } from "@ac/web/components/TimeSelect";
 
 interface UnitOption { id: string; label: string; organizationId: string }
 export interface MRVLive {
@@ -98,8 +99,8 @@ function Reports({ live, r }: Readonly<{ live: MRVLive; r: NonNullable<MRVLive["
         <Field label={t("Customer")}><Select value={r.scope.organizationId ?? ""} onChange={(e) => { nav({ organizationId: e.target.value || null, unitId: null, reportId: null, reportVersion: null }); }}><option value="">{t("All customers")}</option>{live.orgs.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}</Select></Field>
         <Field label={t("Unit")}><Select value={r.scope.unitId ?? ""} onChange={(e) => { nav({ unitId: e.target.value || null, reportId: null, reportVersion: null }); }}><option value="">{t("All units")}</option>{scopeUnits.map((u) => <option key={u.id} value={u.id}>{u.label}</option>)}</Select></Field>
         <Field label={t("Status")}><Select value={r.scope.status ?? ""} onChange={(e) => { nav({ status: e.target.value || null, reportId: null, reportVersion: null }); }}><option value="">{t("All")}</option><option value="draft">{t("Draft")}</option><option value="demo_reviewed">{t("Demo reviewed")}</option></Select></Field>
-        <Field label={t("Period starts from (Kuala Lumpur)")}><Input type="datetime-local" value={from} onChange={(e) => { setFrom(e.target.value); }} /></Field>
-        <Field label={t("Period starts before")}><Input type="datetime-local" value={to} onChange={(e) => { setTo(e.target.value); }} /></Field>
+        <Field label={t("Period starts from (Kuala Lumpur)")}><DateTimeSelect value={from} onChange={(v) => { setFrom(v); }} /></Field>
+        <Field label={t("Period starts before")}><DateTimeSelect value={to} onChange={(v) => { setTo(v); }} /></Field>
         <Btn size="sm" disabled={from === r.scope.from && to === r.scope.to} onClick={() => { nav({ from: from || null, to: to || null, reportId: null, reportVersion: null }); }}>{t("Apply")}</Btn>
       </div>
       <div className="split-rev">
@@ -129,8 +130,8 @@ function Reports({ live, r }: Readonly<{ live: MRVLive; r: NonNullable<MRVLive["
         {d && <>
           <div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>
             <Field label={t("Customer organization")} error={tried ? errors.organizationId : undefined}><Select value={d.organizationId} onChange={(e) => { setD({ organizationId: e.target.value, unitIds: [] }); }}><option value="">{t("Select…")}</option>{live.orgs.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}</Select></Field>
-            <Field label={t("Start (Kuala Lumpur)")} error={tried ? errors.period : undefined}><Input type="datetime-local" value={d.from} onChange={(e) => { setD({ from: e.target.value }); }} /></Field>
-            <Field label={t("End")}><Input type="datetime-local" value={d.to} onChange={(e) => { setD({ to: e.target.value }); }} /></Field>
+            <Field label={t("Start (Kuala Lumpur)")} error={tried ? errors.period : undefined}><DateTimeSelect value={d.from} onChange={(v) => { setD({ from: v }); }} /></Field>
+            <Field label={t("End")}><DateTimeSelect value={d.to} onChange={(v) => { setD({ to: v }); }} /></Field>
             <Field label={t("Baseline version")} error={tried ? errors.baseline : undefined}><Select value={d.baseline} onChange={(e) => { setD({ baseline: e.target.value }); }}><option value="">{t("Select…")}</option>{live.baselines.map((b) => <option key={b.id} value={versionKey(b.id, b.version)}>{b.id.slice(0, 8)} v{b.version} · {b.value} · {b.units}</option>)}</Select></Field>
             <Field label={t("Emission factor version")} error={tried ? errors.factor : undefined}><Select value={d.factor} onChange={(e) => { setD({ factor: e.target.value }); }}><option value="">{t("Select…")}</option>{live.factors.map((f) => <option key={f.id} value={versionKey(f.id, f.version)}>{f.region} {f.year} v{f.version} · {f.kgCO2ePerKWh}</option>)}</Select></Field>
             <Field label={t("Boundary")}><Select value={d.boundaryId} onChange={(e) => { setD({ boundaryId: oneOf(["ac_input_electricity", "whole_building_electricity"] as const, e.target.value, d.boundaryId) }); }}><option value="ac_input_electricity">ac_input_electricity</option><option value="whole_building_electricity">whole_building_electricity</option></Select></Field>

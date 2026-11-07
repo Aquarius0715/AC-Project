@@ -23,6 +23,7 @@ import { JobsTabs, ScopeBar } from "./jobs-header";
 import { Icon } from "@ac/web/components/Icon";
 import { Checkbox } from "@ac/web/components/ui/checkbox";
 import { isBefore } from "@ac/web/lib/order";
+import { DateTimeSelect, TimeSelect } from "@ac/web/components/TimeSelect";
 
 type Detail = NonNullable<JobsLive["detail"]>;
 const TYPES = [{ id: "", label: "All" }, { id: "reactive", label: "Repair" }, { id: "periodic", label: "Periodic" }, { id: "preventive", label: "Preventive" }];
@@ -339,9 +340,9 @@ function BookModal({ d, live, row: first, fresh, onClose, onFail }: ModalProps &
             <Field label={t("Terms version")}><Input value={terms} onChange={(e) => { setTerms(e.target.value); }} /></Field>
           </div>
           <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}>
-            <Field label={t("Offer expires at")}><Input type="datetime-local" value={expires} onChange={(e) => { setExpires(e.target.value); }} /></Field>
-            <Field label={t("Access valid from")}><Input type="datetime-local" value={from} onChange={(e) => { setFrom(e.target.value); }} /></Field>
-            <Field label={t("Access valid until")}><Input type="datetime-local" value={until} onChange={(e) => { setUntil(e.target.value); }} /></Field>
+            <Field label={t("Offer expires at")}><DateTimeSelect value={expires} onChange={(v) => { setExpires(v); }} /></Field>
+            <Field label={t("Access valid from")}><DateTimeSelect value={from} onChange={(v) => { setFrom(v); }} /></Field>
+            <Field label={t("Access valid until")}><DateTimeSelect value={until} onChange={(v) => { setUntil(v); }} /></Field>
           </div>
           <p className="text-[11px] text-muted-foreground">{t("Times in {zone}", { zone })}</p>
         </>
@@ -379,8 +380,8 @@ function ProposeModal({ d, live, onClose, onFail }: Readonly<ModalProps>) {
       <p className="text-xs text-muted-foreground">{j.id.slice(0, 8)} · {d.customer} · {d.title} · {t("times in {zone}", { zone })}</p>
       <div className="grid-fluid" style={{ ["--min" as string]: "140px" }}>
         <Field label={t("Date")}><Input type="date" value={date} onChange={(e) => { setDate(e.target.value); }} /></Field>
-        <Field label={t("From")}><Input type="time" value={from} onChange={(e) => { setFrom(e.target.value); }} /></Field>
-        <Field label={t("To")} error={tried && !isBefore(from, to) ? t("The end must be after the start") : undefined}><Input type="time" value={to} onChange={(e) => { setTo(e.target.value); }} /></Field>
+        <Field label={t("From")}><TimeSelect value={from} onChange={(v) => { setFrom(v); }} /></Field>
+        <Field label={t("To")} error={tried && !isBefore(from, to) ? t("The end must be after the start") : undefined}><TimeSelect value={to} onChange={(v) => { setTo(v); }} /></Field>
       </div>
       {isPreferred && <p className="flex items-center gap-1 text-xs text-crit"><Icon name="error" />{t("This is one of the client’s own times — book it directly instead.")}</p>}
       <Field label={t("Capacity held for the time")}><Select value={who} onChange={(e) => { setWho(e.target.value); }}>{options.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}</Select></Field>
@@ -553,7 +554,7 @@ function ExtendModal({ d, live, until, onClose, onFail }: ModalProps & { until: 
   return (
     <Modal open onClose={() => { onClose(); }} title={t("Extend contractor access")} footer={<><Btn onClick={() => { onClose(); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={save}>{t("Extend")}</Btn></>}>
       <p className="text-xs text-muted-foreground">{j.id.slice(0, 8)} · {d.title} · {t(Date.parse(until) <= now ? "access ended {time}" : "access now ends {time}", { time: d.texts.accessUntil ?? showTime(until, i.display) })}</p>
-      <Field label={t("New end · required")} hint={t("Times in {zone}", { zone })} error={tried ? endError : undefined}><Input type="datetime-local" value={end} onChange={(e) => { setEnd(e.target.value); }} /></Field>
+      <Field label={t("New end · required")} hint={t("Times in {zone}", { zone })} error={tried ? endError : undefined}><DateTimeSelect value={end} onChange={(v) => { setEnd(v); }} /></Field>
       <Field label={t(REASON_REQUIRED_1_1000)} error={tried && !r.trim() ? t(A_REASON_IS_REQUIRED) : undefined}><Textarea value={r} maxLength={1000} onChange={(e) => { setR(e.target.value); }} placeholder={t("The rework visit runs into the next day.")} /></Field>
       <Banner>{t("Only the end moves; the contractor sees the access instructions until then.")}</Banner>
     </Modal>
@@ -610,15 +611,15 @@ export function NewJobModal({ live, initial, onClose, onCreated }: Readonly<{ li
           <div key={n} className="flex flex-wrap items-end gap-2">
             <span className="mb-2 w-8 text-xs font-semibold text-primary">{t(RANK[n] ?? "")}</span>
             <Field label={t("Date {n}", { n: n + 1 })} error={tried ? errors[`slot${String(n)}`] : undefined}><Input type="date" value={x.date} onChange={(e) => { set(n, "date", e.target.value); }} /></Field>
-            <Field label={t("From {n}", { n: n + 1 })}><Input type="time" value={x.from} onChange={(e) => { set(n, "from", e.target.value); }} /></Field>
-            <Field label={t("To {n}", { n: n + 1 })}><Input type="time" value={x.to} onChange={(e) => { set(n, "to", e.target.value); }} /></Field>
+            <Field label={t("From {n}", { n: n + 1 })}><TimeSelect value={x.from} onChange={(v) => { set(n, "from", v); }} /></Field>
+            <Field label={t("To {n}", { n: n + 1 })}><TimeSelect value={x.to} onChange={(v) => { set(n, "to", v); }} /></Field>
             {n > 0 && <Btn size="sm" className="mb-1" onClick={() => { setTimes(times.filter((_, m) => m !== n)); }}>{t("Remove")}</Btn>}
           </div>
         ))}
         {times.length < 3 && <div><Btn size="sm" onClick={() => { const last = times.at(-1); if (last) setTimes([...times, { ...last, date: nextDay(last.date) }]); }}><Icon name="add" /> {t("Add another time")}</Btn></div>}
       </div>
       <div className="grid-fluid" style={{ ["--min" as string]: "220px" }}>
-        <Field label={t("Due · optional")} hint={t("Defaults to the end of the 1st time.")} error={tried ? dueError : undefined}><Input type="datetime-local" value={due} onChange={(e) => { setDue(e.target.value); }} /></Field>
+        <Field label={t("Due · optional")} hint={t("Defaults to the end of the 1st time.")} error={tried ? dueError : undefined}><DateTimeSelect value={due} onChange={(v) => { setDue(v); }} /></Field>
         <Field label={t("Contact window · optional")} hint={t("When to call — no phone numbers or e-mail addresses.")}><Input value={contact} maxLength={200} onChange={(e) => { setContact(e.target.value); }} /></Field>
       </div>
       <Banner>{t("Saving creates the job as requested. Step 2 books one of these times — assign an HQ technician or offer it to a contractor.")}</Banner>

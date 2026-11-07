@@ -12,6 +12,7 @@ import { showTime, textOf } from "@ac/web/lib/i18n";
 import { conceptText, kg3, quoteErrors, quoteInput, type ApiQuote, type QuoteDraft, type RecordRow } from "@ac/web/lib/offsets";
 import { quoteOffset, requestOffset, retryOffset, simulateOffset } from "../actions";
 import { Icon } from "@ac/web/components/Icon";
+import { DateTimeSelect } from "@ac/web/components/TimeSelect";
 
 interface Live {
   tab: "records" | "market"; canWrite: boolean; rows: RecordRow[]; selectedId: string | null; customers: { id: string; name: string }[];
@@ -111,8 +112,8 @@ export function OffsetsView({ live }: Readonly<{ live: Live }>) {
         <div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>
           <Field label={t("Customer")} error={tried ? errors.customerId : undefined}><Select value={d.customerId} onChange={(e) => { set({ customerId: e.target.value, unitIds: [] }); }}><option value="">{t("Select…")}</option>{live.customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field>
           <Field label={t("Amount (kgCO₂e)")} error={tried ? errors.amountKg : undefined}><Input type="number" min="0" step="0.001" value={d.amountKg} onChange={(e) => { set({ amountKg: e.target.value }); }} /></Field>
-          <Field label={t("Period start (Kuala Lumpur)")} error={tried ? errors.period : undefined}><Input type="datetime-local" value={d.from} onChange={(e) => { set({ from: e.target.value }); }} /></Field>
-          <Field label={t("Period end")}><Input type="datetime-local" value={d.to} onChange={(e) => { set({ to: e.target.value }); }} /></Field>
+          <Field label={t("Period start (Kuala Lumpur)")} error={tried ? errors.period : undefined}><DateTimeSelect value={d.from} onChange={(v) => { set({ from: v }); }} /></Field>
+          <Field label={t("Period end")}><DateTimeSelect value={d.to} onChange={(v) => { set({ to: v }); }} /></Field>
         </div>
         <Field label={t("Purpose")} error={tried ? errors.purpose : undefined}><Textarea value={d.purpose} maxLength={1000} onChange={(e) => { set({ purpose: e.target.value }); }} placeholder={t("Offset the demo office's Scope 2 for August (simulation)")} /></Field>
         <div><p className="mb-1 text-[13px] font-semibold">{t("Units")}</p>{d.customerId ? <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-[13px]">{units.map((u) => <Check key={u.id} label={u.label} checked={d.unitIds.includes(u.id)} onChange={(on) => { set({ unitIds: on ? [...d.unitIds, u.id] : d.unitIds.filter((x) => x !== u.id) }); }} />)}</div> : <p className="text-xs text-muted-foreground">{t("Choose the customer first.")}</p>}{tried && errors.unitIds && <p className="mt-1 text-xs text-crit">{errors.unitIds}</p>}</div>

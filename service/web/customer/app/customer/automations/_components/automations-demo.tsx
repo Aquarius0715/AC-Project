@@ -6,6 +6,7 @@ import { Badge, Banner, Btn, Card, Choice, EmptyState, Field, Input, Modal, OnOf
 import { Icon, type IconName } from "@ac/web/components/Icon";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@ac/web/components/ui/dropdown-menu";
 import { Button } from "@ac/web/components/ui/button";
+import { TimeSelect } from "@ac/web/components/TimeSelect";
 
 /** One “Then” row: a schedule's start and end at their times, or an event rule's action (as the live cards). */
 interface Step { label: string; time: string | null; action: string }
@@ -103,7 +104,7 @@ export function AutomationsDemo() {
             <Field label="Trigger" error={errorText.kind}><Choice<string> value={f.kind} onChange={(v) => { setF({ ...f, kind: v }); }} options={["Schedule", "Location", "Presence", "Weather"].map((k) => ({ id: k, label: k }))} /></Field>
             <div className="grid-fluid" style={{ ["--min" as string]: "160px" }}>
               <Field label="Air conditioner"><Select value={f.unit} onChange={(e) => { setF({ ...f, unit: e.target.value }); }}>{[BEDROOM_AC, "Bedroom AC #2", "Living room AC", "Kitchen AC", "Study AC"].map((u) => <option key={u}>{u}</option>)}</Select></Field>
-              {f.kind === "Schedule" && <Field label="Time"><Input type="time" value={f.time} onChange={(e) => { setF({ ...f, time: e.target.value }); }} /></Field>}
+              {f.kind === "Schedule" && <Field label="Time"><TimeSelect value={f.time} onChange={(v) => { setF({ ...f, time: v }); }} /></Field>}
               <Field label="Set temperature (°C)" error={errorText.temp}><Input type="number" value={f.temp} onChange={(e) => { setF({ ...f, temp: e.target.value }); }} /></Field>
             </div>
             {f.kind === "Location" && <Banner tone={consent ? "ok" : "warn"}>{consent ? "Location consent granted — demo location events only." : "Location consent withdrawn."}</Banner>}

@@ -4,9 +4,10 @@ const RELEASE_REQUESTED = "Release requested";
 import { useOpenedAt } from "@ac/web/lib/useOpenedAt";
 import Link from "next/link";
 import { useState } from "react";
-import { Badge, Btn, Card, DataTable, Field, Input, ListRow, Modal, Page, Select, Steps, SummaryList, useToast } from "@ac/web/components/ui";
+import { Badge, Btn, Card, DataTable, Field, ListRow, Modal, Page, Select, Steps, SummaryList, useToast } from "@ac/web/components/ui";
 import { Icon } from "@ac/web/components/Icon";
 import type { NonEmpty } from "@ac/web/lib/lists";
+import { DateTimeSelect } from "@ac/web/components/TimeSelect";
 
 interface R { id: string; meta: string; policy: string; st: "Scheduled" | "Requested" | "Applied" | "Release requested" | "Released"; prog: string; tone: "primary" | "warn" | "ok" | "unknown" }
 const seed: NonEmpty<R> = [
@@ -50,7 +51,7 @@ export function RestrictionsDemo() {
       <Modal open={modal} onClose={() => { setModal(false); setTried(false); }} title="Schedule restriction" footer={<><Btn onClick={() => { setModal(false); }}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!f.contract || !f.exec || execError) { return; } setList((l) => [...l, { id: "restriction-new", meta: `${f.contract} · customer-a`, policy: f.policy + " · 1 unit", st: "Scheduled", prog: "scheduled", tone: "primary" }]); toast("Restriction scheduled; notice sent"); setModal(false); setTried(false); }}>Schedule</Btn></>}>
         <Field label="Contract" error={tried && !f.contract ? "No client can view every unit (IR05) — pick an eligible contract" : undefined}><Select value={f.contract} onChange={(e) => { setF({ ...f, contract: e.target.value }); }}><option value="">Select eligible contract…</option><option>contract-rto-a</option><option>contract-rto-b</option></Select></Field>
         <Field label="Policy"><Select value={f.policy} onChange={(e) => { setF({ ...f, policy: e.target.value }); }}><option>Temperature limit</option><option>Power off</option></Select></Field>
-        <Field label="Execute after (≥ 24 h from notice)" error={execError}><Input type="datetime-local" value={f.exec} onChange={(e) => { setF({ ...f, exec: e.target.value }); }} /></Field>
+        <Field label="Execute after (≥ 24 h from notice)" error={execError}><DateTimeSelect value={f.exec} onChange={(v) => { setF({ ...f, exec: v }); }} /></Field>
       </Modal>
     </Page>
   );

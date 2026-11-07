@@ -9,6 +9,7 @@ import { APPS } from "../../fixtures/apps";
 import { totpBase32 } from "../../fixtures/auth";
 import { mailpitUp, setupLink } from "../../fixtures/mailpit";
 import { must } from "../../fixtures/must";
+import { pickDateTime } from "../../fixtures/time";
 
 const adminApp = must(APPS.find((a) => a.id === "admin"));
 const open = async (browser: Browser, signedIn = true): Promise<Page> => {
@@ -32,7 +33,7 @@ test("a new HQ administrator sets a password and a one-time-code device, then si
     await main.getByRole("textbox", { name: /^Email/ }).fill(email);
     await main.getByRole("button", { name: "Admin", exact: true }).last().click(); // the role, after the role filter
     await main.getByRole("combobox", { name: /^Organization/ }).selectOption({ label: "Demo HQ" });
-    await main.getByLabel("Valid from").fill("2026-09-01T09:00"); // before the seed's demo clock
+    await pickDateTime(main.getByRole("group", { name: "Valid from" }), "2026-09-01T09:00"); // before the seed's demo clock
     await main.getByRole("textbox", { name: /^Change reason/ }).fill("E2E: a second administrator");
     await main.getByRole("button", { name: "Create membership" }).click();
     await expect(admin.getByText("Membership created").first()).toBeVisible();

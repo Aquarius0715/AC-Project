@@ -8,6 +8,7 @@ import { Icon } from "@ac/web/components/Icon";
 import { byNumber } from "@ac/web/lib/order";
 import { oneOf } from "@ac/web/lib/oneOf";
 import { textOf } from "@ac/web/lib/i18n";
+import { TimeSelect } from "@ac/web/components/TimeSelect";
 
 type Window = NonNullable<ApiPolicy["activeWindow"]>;
 /** A condition as both editors hold it: an alert policy's and a default rule's (IR120 item 3). */
@@ -52,7 +53,7 @@ export function WindowEditor({ value, onChange, timezone, error }: Readonly<{ va
         <div className="flex flex-wrap items-center gap-2">
           <Btn size="sm" onClick={() => { set({ weekdays: [1, 2, 3, 4, 5] }); }}>{t("Mon–Fri")}</Btn><Btn size="sm" onClick={() => { set({ weekdays: [1, 2, 3, 4, 5, 6, 7] }); }}>{t("Every day")}</Btn>
           {DAYS.map((d, i) => <Plain key={d} type="button" aria-pressed={value.weekdays.includes(i + 1)} onClick={() => { set({ weekdays: value.weekdays.includes(i + 1) ? value.weekdays.filter((x) => x !== i + 1) : [...value.weekdays, i + 1].toSorted(byNumber) }); }} className={cx("rounded-control border px-2 py-1 text-xs font-semibold", value.weekdays.includes(i + 1) ? "border-primary bg-primary-soft text-primary" : "border-line")}>{t(d)}</Plain>)}
-          <Input aria-label={t("From")} type="time" className="w-32" value={value.startLocal} onChange={(e) => { set({ startLocal: e.target.value }); }} /> – <Input aria-label={t("To")} type="time" className="w-32" value={value.endLocal} onChange={(e) => { set({ endLocal: e.target.value }); }} />
+          <TimeSelect aria-label={t("From")} className="w-40" value={value.startLocal} onChange={(v) => { set({ startLocal: v }); }} /> – <TimeSelect aria-label={t("To")} className="w-40" value={value.endLocal} onChange={(v) => { set({ endLocal: v }); }} />
           <span className="text-xs text-muted-foreground">{timezone}</span>
         </div>
       ) : <p className="text-[13px]">{t("Any day · any time")}</p>}

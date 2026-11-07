@@ -18,6 +18,7 @@ import { deletePolicy, savePolicy, setDefaultRule } from "../actions";
 import type { AlertsLive } from "../_lib/load";
 import { Icon } from "@ac/web/components/Icon";
 import { byCount, type T } from "@ac/web/lib/i18n";
+import { TimeSelect } from "@ac/web/components/TimeSelect";
 
 type Live = AlertsLive["policies"];
 interface Props { p: Live; onDone: (text: string) => void; onFail: (f: ActionFailure) => void }
@@ -192,7 +193,7 @@ function PolicyEditor({ p, editor, onDone, onFail }: Props & { editor: NonNullab
             <div id={policyFieldId("window")} className="flex flex-wrap items-center gap-2">
               <Btn size="sm" onClick={() => { set({ weekdays: [1, 2, 3, 4, 5] }); }}>{t("Mon–Fri")}</Btn><Btn size="sm" onClick={() => { set({ weekdays: [1, 2, 3, 4, 5, 6, 7] }); }}>{t("Every day")}</Btn>
               {days.map((d, i) => <Plain key={d} type="button" aria-pressed={f.weekdays.includes(i + 1)} onClick={() => { set({ weekdays: f.weekdays.includes(i + 1) ? f.weekdays.filter((x) => x !== i + 1) : [...f.weekdays, i + 1] }); }} className={cx("rounded-control border px-2 py-1 text-xs font-semibold", f.weekdays.includes(i + 1) ? "border-primary bg-primary-soft text-primary" : "border-line")}>{t(d)}</Plain>)}
-              <Input aria-label={t("From")} type="time" className="w-32" value={f.start} onChange={(e) => { set({ start: e.target.value }); }} /> – <Input aria-label={t("To")} type="time" className="w-32" value={f.end} onChange={(e) => { set({ end: e.target.value }); }} />
+              <TimeSelect aria-label={t("From")} className="w-40" value={f.start} onChange={(v) => { set({ start: v }); }} /> – <TimeSelect aria-label={t("To")} className="w-40" value={f.end} onChange={(v) => { set({ end: v }); }} />
               <span className="text-xs text-muted-foreground">{editor.policy?.timezone ?? p.timezone}</span>
             </div>
           )}

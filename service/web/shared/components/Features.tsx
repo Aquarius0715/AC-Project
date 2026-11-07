@@ -6,6 +6,7 @@ const CONTRACT_RTO_A = "contract-rto-a";
 import { useState } from "react";
 import { Badge, Banner, Btn, Card, Check, Choice, DataTable, Field, Input, Kpi, ListRow, Modal, PowerBadge, Select, Steps, SummaryList,  UtilizationBar, cx, useToast, type Tone } from "./ui";
 import { Icon } from "./Icon";
+import { DateTimeSelect } from "./TimeSelect";
 import { Button } from "@ac/web/components/ui/button";
 
 /* ───── Client · Energy export (FR-C16) ───── */
@@ -123,6 +124,7 @@ export function FirmwareCampaigns() {
   const toast = useToast();
   const [modal, setModal] = useState(false);
   const [paused, setPaused] = useState(false);
+  const [start, setStart] = useState("2026-10-03T02:00");
   const waves = [["Pilot · 5", 100, "5 / 5 · done"], ["Wave 1 · 20 %", 100, "30 / 30 · done"], ["Wave 2 · 100 %", 24, "12 / 50 · running"]] as const;
   return (
     <div className="split-rev">
@@ -138,7 +140,7 @@ export function FirmwareCampaigns() {
       <Modal open={modal} onClose={() => { setModal(false); }} title="New firmware campaign" footer={<><Btn onClick={() => { setModal(false); }}>Cancel</Btn><Btn variant="primary" onClick={() => { setModal(false); toast("Campaign scheduled"); }}>Schedule</Btn></>}>
         <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}><Field label="Model"><Select><option>Split 1.5HP (demo)</option></Select></Field><Field label="Target version"><Select><option>v2.0.0-demo</option></Select></Field></div>
         <Field label="Waves (ascending, ends at 100 %)"><Input defaultValue="10 %, 50 %, 100 %" /></Field>
-        <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}><Field label="Auto-pause at failures above"><Input defaultValue="5 %" /></Field><Field label="Start"><Input type="datetime-local" defaultValue="2026-10-03T02:00" /></Field></div>
+        <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}><Field label="Auto-pause at failures above"><Input defaultValue="5 %" /></Field><Field label="Start"><DateTimeSelect value={start} onChange={(v) => { setStart(v); }} /></Field></div>
         <Banner>Devices with an active diagnostic run, firmware operation or open tamper are skipped with a reason.</Banner>
       </Modal>
     </div>

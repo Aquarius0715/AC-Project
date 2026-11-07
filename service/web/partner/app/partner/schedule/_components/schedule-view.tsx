@@ -4,7 +4,7 @@ const TEXT_PRIMARY = "text-primary";
 
 import Link from "next/link";
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, EmptyState, Field, Input, ListRow, Page, Select, Textarea, cx, Plain, ScrollX } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, EmptyState, Field, ListRow, Page, Select, Textarea, cx, Plain, ScrollX } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
@@ -14,6 +14,7 @@ import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import { assignTechnician } from "../actions";
 import type { ScheduleLive } from "../_lib/load";
 import { Icon } from "@ac/web/components/Icon";
+import { DateTimeSelect } from "@ac/web/components/TimeSelect";
 
 const toneText: Record<string, string> = { crit: "text-crit", warn: "text-warn", muted: TEXT_MUTED_FOREGROUND, primary: TEXT_PRIMARY, ok: "text-ok" };
 const barTone: Record<string, string> = { crit: "bg-crit", warn: "bg-warn", primary: "bg-primary", muted: "bg-muted-foreground", ok: "bg-ok" };
@@ -162,7 +163,7 @@ function AssignCard({ sel, choice, zone, otherZone }: Readonly<{ sel: Selected; 
         {m.endEditable ? (
           <div className="grid-fluid" style={{ ["--min" as string]: "220px" }}>
             <Field label={t("Work start (kept)")}><div className="rounded-control border border-line bg-surface2 px-3 py-2 text-[13px] font-semibold"><Icon name="locked" /> {sel.text.start}</div></Field>
-            <Field label={t("Work end (same or later)")} hint={t("Times in {zone}.", { zone })} error={tried && !endOk ? t("The end must be at or after the current end") : undefined}><Input type="datetime-local" value={end} min={sel.text.end} onChange={(e) => { setEnd(e.target.value); }} /></Field>
+            <Field label={t("Work end (same or later)")} hint={t("Times in {zone}.", { zone })} error={tried && !endOk ? t("The end must be at or after the current end") : undefined}><DateTimeSelect value={end} min={sel.text.end} onChange={(v) => { setEnd(v); }} /></Field>
           </div>
         ) : (
           <Field label={t("Visit time (agreed with the client)")} hint={t("Fixed. A different time needs the client’s approval via HQ.")}>

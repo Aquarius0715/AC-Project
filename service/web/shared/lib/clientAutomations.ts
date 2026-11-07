@@ -329,13 +329,14 @@ const minutes = (s: string) => Number(s.slice(0, 2)) * 60 + Number(s.slice(3, 5)
 /** The checks automations.save makes, shown before saving (the API checks again). */
 export function draftErrors(d: Draft, tr: T = en): Record<string, string> {
   const e: Record<string, string> = {};
+  const noTime = tr("Choose a time");
   const n = codePoints(d.name.trim());
   if (n < 1 || n > 120) e.name = tr("1–120 characters");
   if (!d.unitId) e.unitId = tr("Choose the AC");
   if (d.trigger === "schedule") {
     if (d.weekdays.length === 0) e.weekdays = tr("Choose at least one weekday");
-    if (!hhmm.test(d.startLocal)) e.startLocal = "HH:mm";
-    if (!hhmm.test(d.endLocal)) e.endLocal = "HH:mm";
+    if (!hhmm.test(d.startLocal)) e.startLocal = noTime;
+    if (!hhmm.test(d.endLocal)) e.endLocal = noTime;
     if (!e.startLocal && !e.endLocal) {
       const s = minutes(d.startLocal);
       const t = minutes(d.endLocal);
@@ -346,7 +347,7 @@ export function draftErrors(d: Draft, tr: T = en): Record<string, string> {
       if (endsNext) e.endsNextDay = endsNext;
     }
   }
-  if (d.trigger === "routine" && !hhmm.test(d.localTime)) e.localTime = "HH:mm";
+  if (d.trigger === "routine" && !hhmm.test(d.localTime)) e.localTime = noTime;
   if (d.trigger === "weather" && !(d.value.trim() !== "" && Number(d.value) >= -50 && Number(d.value) <= 100)) e.value = tr("−50 to 100 °C");
   for (const [i, x] of fitExtras(d).entries()) {
     if (x.type === "weekday" && x.weekdays.length === 0) e[`extra${String(i)}`] = tr("Choose at least one weekday");

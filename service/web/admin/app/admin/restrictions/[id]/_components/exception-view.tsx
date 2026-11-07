@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, Field, Input, Page, SummaryList, Textarea, Timeline, Plain } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Field, Page, SummaryList, Textarea, Timeline, Plain } from "@ac/web/components/ui";
 import { useI18n } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { zonedInstant, zonedParts } from "@ac/web/lib/i18n";
 import { actionOutcome, policyText, stateTone, stateWord, type ActionKind, type ApiRestriction, type UnitRow } from "@ac/web/lib/restrictions";
 import { cancelRestriction, deferRestriction, exemptRestriction, overrideRestriction, reconcileUnits, retryUnits } from "../../actions";
 import { Icon } from "@ac/web/components/Icon";
+import { DateTimeSelect } from "@ac/web/components/TimeSelect";
 
 interface Live {
   now: string; r: ApiRestriction; units: UnitRow[]; canWrite: boolean; canOverride: boolean; canAudit: boolean;
@@ -75,7 +76,7 @@ export function ExceptionView({ live }: Readonly<{ live: Live }>) {
                 </Plain>
               );
             })}</div>
-            {isNeedsDate && <div className="mt-4 max-w-xs"><Field label={t("Until · future, at most 90 days")} error={tried ? dateError : undefined} hint={t("Expiry never reapplies the restriction — conditions are checked again · times in {zone}", { zone })}><Input type="datetime-local" value={until} onChange={(e) => { setUntil(e.target.value); }} /></Field></div>}
+            {isNeedsDate && <div className="mt-4 max-w-xs"><Field label={t("Until · future, at most 90 days")} error={tried ? dateError : undefined} hint={t("Expiry never reapplies the restriction — conditions are checked again · times in {zone}", { zone })}><DateTimeSelect value={until} onChange={(v) => { setUntil(v); }} /></Field></div>}
             <div className="mt-3"><Field label={t("Reason · required")} error={tried ? reasonError : undefined} hint={`${String(reason.length)} / 1000`}><Textarea value={reason} maxLength={1000} onChange={(e) => { setReason(e.target.value); }} /></Field></div>
             <div className="mt-3 flex justify-end"><Btn variant={act === "override" ? "danger" : "primary"} disabled={pending || !outcome.allowed || !allowedFor(act)} onClick={save}>{button[act]}</Btn></div>
           </Card>

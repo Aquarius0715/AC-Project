@@ -4,12 +4,13 @@ const TECH_EXTERNAL_A = "tech-external-a";
 
 import Link from "next/link";
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, EmptyState, Field, Input, ListRow, Page, Select, Textarea, cx, useToast, type Tone } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, EmptyState, Field, ListRow, Page, Select, Textarea, cx, useToast, type Tone } from "@ac/web/components/ui";
 import { OriginBadge } from "@ac/web/components/JobBits";
 import { fmt, jobActions, longDate, useJobs } from "@ac/web/lib/jobs";
 import { Icon } from "@ac/web/components/Icon";
 import { orDash } from "@ac/web/lib/text";
 import { nonEmpty } from "@ac/web/lib/lists";
+import { DateTimeSelect } from "@ac/web/components/TimeSelect";
 
 const staticJobs = nonEmpty([
   { id: "job-p02", unit: "Rooftop unit", st: ACCEPTED_AWAITING_ASSIGNMENT, win: "09-14 01:00 → 09-22 00:00", left: "14 h left" },
@@ -73,8 +74,8 @@ export function ScheduleDemo({ jobId }: Readonly<{ jobId?: string }>) {
             <div className="grid-fluid" style={{ ["--min"as string]: "200px" }}>
               <Field label="Technician (own company, active, qualified)"><Select value={tech} onChange={(e) => { setTech(e.target.value); }}><option value="tech-external-a">tech-external-a — refrigerant handling, active</option><option value="tech-external-a2">tech-external-a2 — general maintenance, active</option></Select></Field>
               {lj ? <Field label="Visit time (agreed with the client)" hint="Fixed. A different time needs the client’s approval via HQ."><div className="rounded-control border border-line bg-surface2 px-3 py-2 text-[13px] font-semibold"><Icon name="locked" /> {lj.scheduled ? longDate(lj.scheduled) : "—"}</div></Field> : <>
-              <Field label="Work start"><Input type="datetime-local" value={start} onChange={(e) => { setStart(e.target.value); }} /></Field>
-              <Field label="Work end"><Input type="datetime-local" value={end} onChange={(e) => { setEnd(e.target.value); }} /></Field></>}
+              <Field label="Work start"><DateTimeSelect value={start} onChange={(v) => { setStart(v); }} /></Field>
+              <Field label="Work end"><DateTimeSelect value={end} onChange={(v) => { setEnd(v); }} /></Field></>}
             </div>
             {isInProg && <div className="mt-3"><Field label="Reassign reason (required)" hint="Reassigning a job already in progress requires a reason and immediately revokes the previous technician's access."><Textarea value={reason} onChange={(e) => { setReason(e.target.value); }} /></Field></div>}
             <p className="mt-2 flex items-center gap-1 text-xs text-ok"><Icon name="check" />No overlapping confirmed schedule for {tech} in this window.</p>

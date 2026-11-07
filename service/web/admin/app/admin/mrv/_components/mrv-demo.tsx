@@ -6,6 +6,7 @@ import { Banner, Btn, Card, DataTable, Field, Input, ListRow, Modal, Page, Selec
 import { useUrlTab } from "@ac/web/lib/useUrlTab";
 import { Icon } from "@ac/web/components/Icon";
 import { nonEmpty } from "@ac/web/lib/lists";
+import { DateTimeSelect } from "@ac/web/components/TimeSelect";
 
 const reports = nonEmpty([
   { id: "mrv-a14-a", meta: "org-customer-a · unit-online-rto · 09-14 08:00–09:00", sub: "40.0 kgCO₂e · v1", ok: true, versions: 1 },
@@ -46,7 +47,7 @@ export function MRVDemo() {
       )}
       <Modal open={cmp} onClose={() => { setCmp(false); }} title="Compare conditions · v1 (demo reviewed) and v2 (draft)" footer={<Btn onClick={() => { setCmp(false); }}>Close</Btn>}><DataTable rows={[{ k: "Electricity used", a: "80.0 kWh", b: "80.0 kWh" }, { k: "Scope 2 emissions", a: TEXT_40_0_KGCO_E, b: TEXT_40_0_KGCO_E }, { k: "Baseline", a: "baseline-energy-100 v1", b: "baseline-energy-100 v1" }, { k: "Factor", a: "factor-demo-2026 v1", b: "factor-demo-2026 v2" }]} rowKey={(r) => r.k} cols={[{ key: "k", label: "Field", render: (r) => r.k }, { key: "a", label: "v1", render: (r) => r.a }, { key: "b", label: "v2", render: (r) => <span className={r.a === r.b ? "" : "font-bold text-warn"}>{r.b}</span> }]} /></Modal>
       <Modal open={nw} onClose={() => { setNw(false); setPrev(false); }} title="New Scope 2 report" wide footer={<><Btn onClick={() => { setNw(false); }}>Cancel</Btn>{prev ? <Btn variant="primary" onClick={() => { toast("Report created (demo — unverified)"); setNw(false); setPrev(false); }}>Create report</Btn> : <Btn variant="primary" onClick={() => { setPrev(true); }}>Preview</Btn>}</>}>
-        <div className="grid-fluid" style={{ ["--min"as string]: "200px" }}><Field label="Customer"><Select value={f.cust} onChange={(e) => { setF({ ...f, cust: e.target.value }); }}><option>org-customer-a</option><option>org-customer-b</option></Select></Field><Field label="Unit(s)"><Input value={f.unit} onChange={(e) => { setF({ ...f, unit: e.target.value }); }} /></Field><Field label="Start"><Input type="datetime-local" value={f.start} onChange={(e) => { setF({ ...f, start: e.target.value }); }} /></Field><Field label="End"><Input type="datetime-local" value={f.end} onChange={(e) => { setF({ ...f, end: e.target.value }); }} /></Field></div>
+        <div className="grid-fluid" style={{ ["--min"as string]: "200px" }}><Field label="Customer"><Select value={f.cust} onChange={(e) => { setF({ ...f, cust: e.target.value }); }}><option>org-customer-a</option><option>org-customer-b</option></Select></Field><Field label="Unit(s)"><Input value={f.unit} onChange={(e) => { setF({ ...f, unit: e.target.value }); }} /></Field><Field label="Start"><DateTimeSelect value={f.start} onChange={(v) => { setF({ ...f, start: v }); }} /></Field><Field label="End"><DateTimeSelect value={f.end} onChange={(v) => { setF({ ...f, end: v }); }} /></Field></div>
         {prev && <Banner tone="ok">Preview: 80.0 kWh × 0.5 kgCO₂e/kWh = 40.0 kgCO₂e · coverage 100% · baseline-energy-100 v1 · factor-demo-2026 v1</Banner>}
       </Modal>
     </Page>

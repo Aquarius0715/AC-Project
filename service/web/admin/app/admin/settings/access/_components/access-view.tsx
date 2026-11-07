@@ -18,6 +18,7 @@ import {
 import { revokeMember, saveMember, signOutEverywhere } from "../actions";
 import { oneOf } from "@ac/web/lib/oneOf";
 import { Icon } from "@ac/web/components/Icon";
+import { DateTimeSelect } from "@ac/web/components/TimeSelect";
 
 interface Live {
   now: string; canWrite: boolean; selfUserId: string; tenantId: string; scope: { role?: string; status?: string; organizationId?: string }; rows: MemberRow[];
@@ -165,8 +166,8 @@ export function AccessView({ live }: Readonly<{ live: Live }>) {
             <section>
               <h3 className="mb-2 text-[13px] font-bold">{t("Valid period")}</h3>
               <div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>
-                <Field label={t("Valid from")} error={fieldError("validFrom")} hint={t("Times in {zone}", { zone })}><Input id={memberFieldId("validFrom")} type="datetime-local" value={d.validFrom} disabled={!live.canWrite} onChange={(e) => { set({ validFrom: e.target.value }); }} /></Field>
-                <Field label={t("Valid until")} error={fieldError("validUntil")} hint={t(d.role === TECHNICIAN && d.employment === "external" ? "Required for external technicians" : "Optional — revoking sets it to now")}><Input id={memberFieldId("validUntil")} type="datetime-local" value={d.validUntil} disabled={!live.canWrite} onChange={(e) => { set({ validUntil: e.target.value }); }} /></Field>
+                <Field label={t("Valid from")} error={fieldError("validFrom")} hint={t("Times in {zone}", { zone })}><DateTimeSelect id={memberFieldId("validFrom")} value={d.validFrom} disabled={!live.canWrite} onChange={(v) => { set({ validFrom: v }); }} /></Field>
+                <Field label={t("Valid until")} error={fieldError("validUntil")} hint={t(d.role === TECHNICIAN && d.employment === "external" ? "Required for external technicians" : "Optional — revoking sets it to now")}><DateTimeSelect id={memberFieldId("validUntil")} value={d.validUntil} disabled={!live.canWrite} onChange={(v) => { set({ validUntil: v }); }} /></Field>
               </div>
             </section>
             <section>

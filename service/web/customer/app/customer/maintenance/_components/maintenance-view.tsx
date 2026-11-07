@@ -18,6 +18,7 @@ import { FilterCareTab, type CleaningPrefill } from "./filter-care";
 import { Icon } from "@ac/web/components/Icon";
 import { Checkbox } from "@ac/web/components/ui/checkbox";
 import { oneOf } from "@ac/web/lib/oneOf";
+import { TimeSelect } from "@ac/web/components/TimeSelect";
 
 type Detail = NonNullable<MaintenanceLive["detail"]>;
 interface Slot { startAt: string; endAt: string }
@@ -202,8 +203,8 @@ function TimesInput({ rows, onChange, error, label, firstId }: Readonly<{ rows: 
         <div key={i} className="flex flex-wrap items-end gap-2">
           <span className="mb-2 w-8 text-xs font-semibold text-primary">{t(["1st", "2nd", "3rd"][i] ?? "")}</span>
           <Field label={t("Date {n}", { n: i + 1 })}><Input id={i === 0 ? firstId : undefined} type="date" value={r.date} onChange={(e) => { set(i, "date", e.target.value); }} /></Field>
-          <Field label={t("From {n}", { n: i + 1 })}><Input type="time" value={r.from} onChange={(e) => { set(i, "from", e.target.value); }} /></Field>
-          <Field label={t("To {n}", { n: i + 1 })}><Input type="time" value={r.to} onChange={(e) => { set(i, "to", e.target.value); }} /></Field>
+          <Field label={t("From {n}", { n: i + 1 })}><TimeSelect value={r.from} onChange={(v) => { set(i, "from", v); }} /></Field>
+          <Field label={t("To {n}", { n: i + 1 })}><TimeSelect value={r.to} onChange={(v) => { set(i, "to", v); }} /></Field>
         </div>
       ))}
       {error && <p id={errorId} className="flex items-center gap-1 text-xs text-crit"><Icon name="error" />{error}</p>}

@@ -20,6 +20,7 @@ import { InputGroupAddon } from "@ac/web/components/ui/input-group";
 import { NativeSelect } from "@ac/web/components/ui/native-select";
 import { Progress } from "@ac/web/components/ui/progress";
 import { Switch } from "@ac/web/components/ui/switch";
+import { DateTimeSelect, TimeSelect } from "@ac/web/components/TimeSelect";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@ac/web/components/ui/table";
 import { Tabs as UITabs, TabsList, TabsTrigger } from "@ac/web/components/ui/tabs";
 import { Toaster } from "@ac/web/components/ui/sonner";
@@ -327,7 +328,9 @@ export function Field({ label, hint, error, children, className, labelHidden }: 
   const Tag = isGroup ? "div" : "label";
   // an error marks its control invalid, so assistive technology tells which field to fix; the error text is part of
   // the label, and so of the control's name (IR573)
-  const field = element && isControl && hasContent(error) ? cloneElement(element, { "aria-invalid": true }) : children;
+  // the time pickers are groups of controls: an error marks each of their controls invalid the same way (IR573, IR638)
+  const isPicker = element !== null && (element.type === TimeSelect || element.type === DateTimeSelect);
+  const field = element && (isControl || isPicker) && hasContent(error) ? cloneElement(element, { "aria-invalid": true }) : children;
   return (
     <Tag role={isGroup ? "group" : undefined} aria-label={isGroup ? label : undefined} className={cx("flex min-w-0 flex-col gap-1 text-xs text-ink", className)}>
       <span aria-hidden={isGroup || undefined} className={cx("font-semibold", labelHidden && "sr-only")}>{label}</span>

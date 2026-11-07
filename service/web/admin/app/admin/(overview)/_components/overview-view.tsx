@@ -2,9 +2,11 @@
 const OPEN_UNITS = "Open units";
 
 import Link from "next/link";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Badge, Banner, Btn, Card, Input, Kpi, Page, Select, TextLink, cx } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Kpi, Page, Select, TextLink, cx } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
+import { DateTimeSelect } from "@ac/web/components/TimeSelect";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { axisRows, billingView, forecastView, jobRows, kpisFrom, overviewLinks, type AdminSummary, type AxisRow } from "@ac/web/lib/adminSummary";
 import { Icon } from "@ac/web/components/Icon";
@@ -17,6 +19,19 @@ interface Live {
 }
 const PERIODS = [{ id: "today", label: "Today" }, { id: "7d", label: "Last 7 days" }, { id: "30d", label: "Last 30 days" }, { id: "custom", label: "Custom" }];
 const barTone: Record<AxisRow["tone"], string> = { primary: "bg-primary", muted: "bg-muted-foreground/50", warn: "bg-warn", ok: "bg-ok", crit: "bg-crit" };
+
+// The custom period's two ends. Each is kept here too, so a picker shows its choice while the page reads the new period.
+function CustomPeriod({ from, to }: Readonly<{ from: string; to: string }>) {
+  const t = useT();
+  const patch = useUrlPatch();
+  const [range, setRange] = useState({ from, to });
+  return (
+    <span role="group" aria-label={t("Custom period")} className="flex flex-wrap items-center gap-1 text-xs">
+      <DateTimeSelect aria-label={t("From")} value={range.from} onChange={(v) => { setRange((r) => ({ ...r, from: v })); patch({ from: v || null }); }} />–
+      <DateTimeSelect aria-label={t("To")} value={range.to} onChange={(v) => { setRange((r) => ({ ...r, to: v })); patch({ to: v || null }); }} />
+    </span>
+  );
+}
 
 /** The HQ dashboard (FR-A01, DD-A01, Figma Admin 01) from one admin.summary: scope and period in the URL. Texts in the
 user's display language; the as-of time and the period come formatted from the page (IR289). */
@@ -44,10 +59,7 @@ export function AdminOverviewView({ live }: Readonly<{ live: Live }>) {
             {PERIODS.map((p) => <option key={p.id} value={p.id}>{t("Period: {period}", { period: t(p.label) })}</option>)}
           </Select>
           {live.period.kind === "custom" && (
-            <span className="flex items-center gap-1 text-xs">
-              <Input aria-label={t("From")} type="datetime-local" className="w-auto text-xs" defaultValue={live.custom.from} onBlur={(e) => { patch({ from: e.target.value || null }); }} />–
-              <Input aria-label={t("To")} type="datetime-local" className="w-auto text-xs" defaultValue={live.custom.to} onBlur={(e) => { patch({ to: e.target.value || null }); }} />
-            </span>
+            <CustomPeriod from={live.custom.from} to={live.custom.to} />
           )}
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">{live.asOf && <span>{live.asOf}</span>}<Btn size="sm" onClick={() => { router.refresh(); }}><Icon name="refresh" />{t("Refresh")}</Btn></div>

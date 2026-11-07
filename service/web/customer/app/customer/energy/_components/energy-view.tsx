@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Badge, BarChart, Banner, Btn, Card, Check, Choice, DataTable, DemoBadge, Field, Input, Kpi, LinkButton, Modal, Page, Select, SummaryList, Tabs, Plain } from "@ac/web/components/ui";
+import { Badge, BarChart, Banner, Btn, Card, Check, Choice, DataTable, DemoBadge, Field, Kpi, LinkButton, Modal, Page, Select, SummaryList, Tabs, Plain } from "@ac/web/components/ui";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { klLocal, one, type SummaryView } from "@ac/web/lib/energy";
@@ -12,6 +12,7 @@ import { exportReport, type ReportFile, type ReportInput } from "../actions";
 import { keysOf } from "@ac/web/lib/keysOf";
 import { oneOf } from "@ac/web/lib/oneOf";
 import { Icon } from "@ac/web/components/Icon";
+import { DateTimeSelect } from "@ac/web/components/TimeSelect";
 
 export interface EnergyLive {
   units: { id: string; name: string }[]; unitIds: string[]; period: Period; baselines: { id: string; label: string }[]; baselineId: string | null;
@@ -81,8 +82,8 @@ export function EnergyView({ live }: Readonly<{ live: EnergyLive }>) {
         {live.period.kind === "custom" && (
           <div className="mt-3 flex flex-wrap items-end gap-3">
             {/* the periods are Kuala Lumpur days (REV18-035), so the custom range is typed in Kuala Lumpur time and says so */}
-            <Field label={t("From")} hint="Asia/Kuala_Lumpur"><Input type="datetime-local" value={from} onChange={(e) => { setFrom(e.target.value); }} /></Field>
-            <Field label={t("To")} hint="Asia/Kuala_Lumpur"><Input type="datetime-local" value={to} onChange={(e) => { setTo(e.target.value); }} /></Field>
+            <Field label={t("From")} hint="Asia/Kuala_Lumpur"><DateTimeSelect value={from} onChange={(v) => { setFrom(v); }} /></Field>
+            <Field label={t("To")} hint="Asia/Kuala_Lumpur"><DateTimeSelect value={to} onChange={(v) => { setTo(v); }} /></Field>
             <Btn size="sm" variant="primary" onClick={() => { nav({ period: "custom", from, to }); }}>{t("Apply")}</Btn>
             {live.period.error && <span className="text-xs text-crit">{live.period.error}</span>}
           </div>
