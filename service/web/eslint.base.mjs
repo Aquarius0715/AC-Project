@@ -293,6 +293,18 @@ export function webConfig(tsconfigRootDir) {
       files: ["**/tests/contractInputs.test.ts"],
       rules: { "vitest/expect-expect": ["error", { assertFunctionNames: ["expect", "check"] }] },
     },
+    {
+      // a region that scrolls takes the focus so a keyboard can scroll it (axe scrollable-region-focusable, IR501, IR607);
+      // it is named with aria-label
+      files: ["**/*.tsx"],
+      rules: { "jsx-a11y/no-noninteractive-tabindex": ["error", { roles: ["tabpanel", "region"], allowExpressionValues: true }] },
+    },
+    {
+      // shadcn/ui's input-group addon: a click on the addon focuses the input beside it (a pointer convenience); the
+      // input and its buttons are the keyboard path
+      files: ["**/components/ui/input-group.tsx"],
+      rules: { "jsx-a11y/click-events-have-key-events": "off", "jsx-a11y/no-noninteractive-element-interactions": "off" },
+    },
     { linterOptions: { reportUnusedDisableDirectives: "error" } },
     // generated files are fixed by their generators (make swagger / go run ./cmd/gen/ops), never by hand or by a fix
     globalIgnores([
