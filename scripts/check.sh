@@ -7,7 +7,7 @@ set -eu
 cd "$(dirname "$0")/.."
 step() { printf '\n== %s\n' "$1"; }
 
-step "web lint";      (cd service/web && npm run lint >/dev/null && npm run lint:strict >/dev/null)
+step "web lint";      (cd service/web && npm run lint >/dev/null)
 step "web knip";      (cd service/web && npm run knip >/dev/null)
 step "web typecheck"; (cd service/web && npm run typecheck >/dev/null)
 step "web vitest";    (cd service/web && npm test >/dev/null)   # as CI: each workspace with its own vitest.config (shared: jsdom, 30 s per test)

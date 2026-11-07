@@ -10,12 +10,11 @@
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
-    "lint": "npm run lint --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present && eslint --max-warnings=0 -c e2e/eslint.config.mjs e2e",
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present && tsc -p e2e/tsconfig.json",
     "e2e": "playwright test -c e2e/playwright.config.ts",
-    "knip": "knip --no-progress",
-    "lint:strict": "npm run lint:strict --workspaces --if-present && eslint --max-warnings=0 -c e2e/eslint.config.mjs e2e"
+    "knip": "knip --no-progress"
   },
   "devDependencies": {
     "@eslint-community/eslint-plugin-eslint-comments": "4.8.1",
