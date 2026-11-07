@@ -292,6 +292,11 @@ test("the notification preview and the demo test of a policy attached to a unit"
   // the alert of Demo Customer A's Bedroom AC, not the first one: once the live IoT unit of Demo Customer B has an alert of
   // its own, the first one belongs to a customer this policy is not for
   await main.getByRole("button", { name: /Possible open window.*Demo Customer A · Bedroom AC/ }).click();
+  // the detail follows the URL after the server re-render: wait for it to show the clicked alert, or "Open unit" belongs to
+  // the alert selected before (the first one, the live unit of Demo Customer B)
+  await page.waitForURL(/alertId=/);
+  const picked = new URL(page.url()).searchParams.get("alertId") ?? "";
+  await expect(main.getByRole("link", { name: "Request maintenance" })).toHaveAttribute("href", new RegExp(`alertId=${picked}`));
   await main.getByRole("link", { name: "Open unit", exact: true }).click();
   await page.waitForURL(/unitId=/);
   await main.getByRole("button", { name: "Attach policy" }).click();
