@@ -63,7 +63,7 @@ export function useBffSession(): BffSession | null {
 
 /** Reads an operation in API mode; returns the mock value in mock mode (and while the data source is unknown).
 The fetch result is stored with the request it answers; `loading` is derived (no setState in the effect body). */
-export function useOp<T, R>(...[operation, input, mock, map, enabled = true]: [...OpCall, mock: R, map: (data: T) => R, enabled?: boolean]): { data: R; loading: boolean; error: OpError | null; source: "mock" | "api" | null } {
+export function useOp<T, R>(...[operation, input, mock, map, enabled = true]: [...call: OpCall, mock: R, map: (data: T) => R, enabled?: boolean]): { data: R; loading: boolean; error: OpError | null; source: "mock" | "api" | null } {
   const session = useBffSession();
   const rev = useRevision();
   const request = `${operation}|${JSON.stringify(input)}|${String(rev)}`;

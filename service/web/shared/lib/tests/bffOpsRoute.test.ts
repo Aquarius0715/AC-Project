@@ -16,7 +16,8 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-const relay = (operation: string, body: unknown, headers: Record<string, string> = { origin: "http://localhost:3000", host: LOCALHOST_3000, "sec-fetch-site": "same-origin" }) =>
+const SAME_ORIGIN = { origin: "http://localhost:3000", host: LOCALHOST_3000, "sec-fetch-site": "same-origin" };
+const relay = (operation: string, body: unknown, headers: Record<string, string> = SAME_ORIGIN) =>
   POST(new NextRequest(`http://localhost:3000/bff/ops/${operation}`, { method: "POST", body: JSON.stringify(body), headers }), { params: Promise.resolve({ operation }) });
 
 // IR358: the BFF relay serves the app's own pages only (CSRF)
@@ -50,7 +51,7 @@ const note = (bytes: number) => {
 };
 
 describe("the relay's input limit", () => {
-  const same = { origin: "http://localhost:3000", host: LOCALHOST_3000, "sec-fetch-site": "same-origin" };
+  const same = SAME_ORIGIN;
   const post = (body: BodyInit) => {
     const init = { method: "POST", duplex: "half" as const, headers: same, body };
     return POST(new NextRequest("http://localhost:3000/bff/ops/jobs.addNote", init), { params: Promise.resolve({ operation: "jobs.addNote" }) });
