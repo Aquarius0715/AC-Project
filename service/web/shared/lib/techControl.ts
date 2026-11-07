@@ -78,7 +78,8 @@ export function historyRows(cs: ApiCommandRow[], runs: ApiRun[], i: I18n = EN): 
   return cs.map((c) => {
     const run = runs.find((r) => r.startCommandId === c.id || r.endCommandId === c.id);
     const isStart = !!run && run.startCommandId === c.id;
-    const title = run ? (isStart ? runStartTitle(run, t) : runEndTitle(run, t)) : actionCode(c.action);
+    let title = actionCode(c.action);
+    if (run) title = isStart ? runStartTitle(run, t) : runEndTitle(run, t);
     const outcome = commandOutcome(c, i);
     const ends = isStart && run.state === "running" && run.endAt ? ` · ${t("ends {time}", { time: clock(run.endAt, i) })}` : "";
     const badge = isStart && run.state === "running" ? { text: t("Running"), tone: "primary" as const } : commandBadge(c.status, t);

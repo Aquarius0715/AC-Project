@@ -75,6 +75,7 @@ function paymentState(st: InvoiceStatus, hasPayment: boolean, state: string | nu
 const INQUIRY_TAB = new Map([["received", "Received"], ["answered", "Answered"]]);
 const STATEMENT_WORD = new Map<string, "Draft" | "Approved" | "Paid">([["draft", "Draft"], ["approved", "Approved"], ["paid", "Paid"]]);
 const STATEMENT_TONE = new Map<string, "ok" | "muted">([["Paid", "ok"], ["Draft", "muted"]]);
+const statementTone = (s: string) => STATEMENT_TONE.get(s) ?? "primary";
 const noReminder = { recipient: "", channel: "email", reason: "", preview: "" };
 
 /** HQ billing: invoices, inquiries and contractor payouts. `live` comes from the Server Component in API mode (the
@@ -370,7 +371,6 @@ function PayoutsTab({ live, nav, act, pending }: Readonly<{ live: BillingLive; n
   const isFiltered = [p.period, p.contractorOrgId, p.status].some((v) => filled(v) !== undefined);
   const isEnded = /^\d{4}-\d{2}$/.test(month) && !isAfter(month, p.lastClosed);
   const generate = () => { act(() => generatePayouts(month), (n) => t(n === 1 ? "1 draft statement generated for {period}" : "{n} draft statements generated for {period}", { n, period: month }), () => { setGenerating(false); nav({ period: month, status: null, statementId: null }); }); };
-  const tone = (s: StatementRow["status"]) => STATEMENT_TONE.get(s) ?? "primary";
   return (
     <>
       <div className="flex flex-wrap items-end gap-3">
@@ -386,7 +386,7 @@ function PayoutsTab({ live, nav, act, pending }: Readonly<{ live: BillingLive; n
               { key: "c", label: t("Contractor / statement"), render: (r) => <span><b className="text-[13px]">{r.contractor}</b><span className="block text-[11px] text-muted-foreground">{r.period} · {t(r.jobs === 1 ? "1 job" : "{n} jobs", { n: r.jobs })}</span></span> },
               { key: "q", label: t("Queries"), render: (r) => (r.queryCount === 0 ? "—" : <span>{t(r.queryCount === 1 ? "1 query" : "{n} queries", { n: r.queryCount })}{r.openQueries > 0 && <> <Badge tone="warn">{t("{n} open", { n: r.openQueries })}</Badge></>}</span>) },
               { key: "n", label: t("Net"), render: (r) => <span className="font-semibold">{r.net}</span> },
-              { key: "s", label: t("Status"), render: (r) => <Badge tone={tone(r.status)}>{r.statusText}</Badge> },
+              { key: "s", label: t("Status"), render: (r) => <Badge tone={statementTone(r.status)}>{r.statusText}</Badge> },
               { key: "a", label: "", render: (r) => <span className="text-xs font-semibold text-primary">{t(r.status === "Draft" ? "Review" : "Open")}</span> },
             ]} />
           )}

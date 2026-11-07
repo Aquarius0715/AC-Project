@@ -28,7 +28,7 @@ function check(): { checked: number; problems: string[] } {
   let checked = 0;
   for (const p of projects) {
     const directory = path.join(web, p);
-    const roleConfig = ts.readConfigFile(path.join(directory, "tsconfig.json"), ts.sys.readFile);
+    const roleConfig = ts.readConfigFile(path.join(directory, "tsconfig.json"), (file) => ts.sys.readFile(file));
     const parsed = ts.parseJsonConfigFileContent(roleConfig.config, ts.sys, directory);
     const program = ts.createProgram(parsed.fileNames, { ...parsed.options, noEmit: true, incremental: false });
     const c = program.getTypeChecker();
