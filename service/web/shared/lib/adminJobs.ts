@@ -12,6 +12,11 @@ import { actionMessage, fieldName } from "@ac/web/lib/actionMessage";
 import { statusWord, typeLabel } from "@ac/web/lib/partnerJobDetail";
 import type { Slot } from "@ac/web/lib/partnerOverview";
 import { inspectionRows, readingRows, resultText, reworkItems, type ApiWorkReport } from "@ac/web/lib/partnerReview";
+import { money } from "@ac/web/lib/money";
+import { codePoints, wrapped } from "@ac/web/lib/text";
+import { oneOf } from "@ac/web/lib/oneOf";
+import { isAfter } from "@ac/web/lib/order";
+import { entryOf, lookup } from "@ac/web/lib/lookup";
 
 const TIME_PROPOSED = "time_proposed";
 const IN_PROGRESS = "in_progress";
@@ -314,11 +319,6 @@ export function hqRefusal(f: { code: string; messageKey: string; fieldErrors: Re
 export interface CostLine { kind: "estimate" | "actual"; description: string; visibility: "internal" | "customer"; amountMinor: number; currency: "MYR" | "USD" }
 /** “80.00 MYR” from minor units. */
 export { money } from "@ac/web/lib/money";
-import { money } from "@ac/web/lib/money";
-import { codePoints, wrapped } from "@ac/web/lib/text";
-import { oneOf } from "@ac/web/lib/oneOf";
-import { isAfter } from "@ac/web/lib/order";
-import { entryOf, lookup } from "@ac/web/lib/lookup";
 
 /** Estimate and actual totals per currency, never converted (“80.00 MYR + 6.20 USD”). */
 export function costTotals(lines: CostLine[]): { estimate: string; actual: string } {

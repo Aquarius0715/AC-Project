@@ -129,9 +129,9 @@ export function showSpan(startIso: string, endIso: string, d: Display = DEFAULT_
 }
 
 /** The wall clock (as if UTC) of an instant in a time zone. */
-function wallMs(ms: number, timeZone: string): number {
+function wallMs(epochMs: number, timeZone: string): number {
   const p = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" })
-    .formatToParts(ms).map((x) => [x.type, x.value]));
+    .formatToParts(epochMs).map((x) => [x.type, x.value]));
   return Date.UTC(Number(p.year ?? 0), Number(p.month ?? 1) - 1, Number(p.day ?? 1), Number(p.hour ?? 0), Number(p.minute ?? 0), Number(p.second ?? 0)); // Intl gives every part asked for
 }
 const knownZone = (tz: string) => {
@@ -165,11 +165,11 @@ export const i18nOf = (display: Display): I18n => ({ t: translator(display.local
 export const EN: I18n = i18nOf(DEFAULT_DISPLAY);
 
 /** The calendar day (YYYY-MM-DD) of an instant in a time zone (the default zone for one the runtime does not know). */
-function dayKey(ms: number, timeZone: string): string {
+function dayKey(epochMs: number, timeZone: string): string {
   try {
-    return new Date(ms).toLocaleDateString("en-CA", { timeZone });
+    return new Date(epochMs).toLocaleDateString("en-CA", { timeZone });
   } catch {
-    return new Date(ms).toLocaleDateString("en-CA", { timeZone: DEFAULT_DISPLAY.timeZone });
+    return new Date(epochMs).toLocaleDateString("en-CA", { timeZone: DEFAULT_DISPLAY.timeZone });
   }
 }
 

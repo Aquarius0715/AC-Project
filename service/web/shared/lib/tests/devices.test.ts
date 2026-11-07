@@ -17,7 +17,7 @@ const cap: ApiCapability = {
   id: "m1", version: 3, updatedAt: "2026-09-10T02:00:00Z", manufacturer: "DemoAir", model: "SPL-100", control: true, modeControl: true, fanControl: false, temperature: { min: 16, max: 30, step: 1 },
   modes: ["cool"], fanLevels: [], ventilation: false, ventilationLevels: [], sensors: [{ metric: "temperature", unit: "°C", staleAfterSeconds: 120, boundaryId: null }], firmwareCandidates: ["v1", "v2"],
 };
-const device = (over: Partial<ApiDevice>): ApiDevice => ({ id: "d1", version: 2, unitId: "u1", serial: "AC-DEMO-0001", connection: "online", lastSeenAt: null, firmwareVersion: "v1", powerSignal: "on", tamper: "clear", sensors: [], ...over });
+const row = (over: Partial<ApiDevice>): ApiDevice => ({ id: "d1", version: 2, unitId: "u1", serial: "AC-DEMO-0001", connection: "online", lastSeenAt: null, firmwareVersion: "v1", powerSignal: "on", tamper: "clear", sensors: [], ...over });
 const units = [{ id: "u1", displayName: "Bedroom AC", modelId: "m1", customerOrgId: "org-a", archived: false }, { id: "u2", displayName: "Old AC", modelId: "m1", customerOrgId: "org-a", archived: true }];
 const draft = (over: Partial<CampaignDraft>): CampaignDraft => ({ modelId: "m1", targetVersion: "v2", deviceIds: ["d1"], waves: "10, 50, 100", startLocal: "02:00", endLocal: "05:00", autoPause: "5", startAt: "2026-09-16T10:00", ...over });
 
@@ -25,8 +25,8 @@ const r = (waveIndex: number, status: ApiCampaign["results"][number]["status"]) 
 
 describe("HQ device registry", () => {
   it("lists models and devices", () => {
-    expect(modelRows([cap], units, [device({}), device({ id: "d2", unitId: null })])[0]).toMatchObject({ name: "DemoAir SPL-100", used: "1 unit · 1 device", updated: "10 Sept 2026, 10:00 am MYT" });
-    expect(deviceRows([device({}), device({ id: "d2", unitId: null, tamper: "detected" })], units).map((r) => [r.unit, r.tamper])).toEqual([["Bedroom AC", false], ["Unbound", true]]);
+    expect(modelRows([cap], units, [row({}), row({ id: "d2", unitId: null })])[0]).toMatchObject({ name: "DemoAir SPL-100", used: "1 unit · 1 device", updated: "10 Sept 2026, 10:00 am MYT" });
+    expect(deviceRows([row({}), row({ id: "d2", unitId: null, tamper: "detected" })], units).map((device) => [device.unit, device.tamper])).toEqual([["Bedroom AC", false], ["Unbound", true]]);
     expect(capabilityErrors({ ...capabilityDraft(cap), control: false, changeReason: "" }, true)).toEqual({ control: "Mode, fan or temperature control needs power control", changeReason: "A reason is required (1–1000 characters)" });
   });
 
@@ -68,7 +68,7 @@ describe("HQ device registry", () => {
 describe("HQ device registry in Malay with the display time zone (IR295)", () => {
   it("words the rows, operations and campaign checks", () => {
     expect(modelRows([cap], units, [], MS)[0]).toMatchObject({ used: "1 unit · 0 peranti", updated: "10 Sep 2026, 11:00 PG GMT+9" });
-    expect(deviceRows([device({ unitId: null })], units, MS.t)[0]?.unit).toBe("Tidak terikat");
+    expect(deviceRows([row({ unitId: null })], units, MS.t)[0]?.unit).toBe("Tidak terikat");
     expect(campaignErrors(draft({ modelId: "" }), NOW, ASIA_TOKYO, MS.t)).toEqual({ modelId: "Pilih model" });
     expect(campaignRows([{ id: "k", version: 1, modelId: "x", fromVersions: [], targetVersion: "v2", deviceIds: [], waves: [], window: { startLocal: "00:00", endLocal: "23:59" }, autoPauseFailurePercent: 10, startAt: "2026-09-16T02:00:00Z", state: "paused", checksum: "", createdAt: "2026-09-15T00:00:00Z", createdByMembershipId: null, progress: { succeeded: 0, installing: 0, pending: 0, failed: 0, skipped: 0 }, results: [], reason: null }], [], MS)[0])
       .toMatchObject({ model: "model", versions: "mana-mana → v2", start: "16 Sep 2026, 11:00 PG GMT+9" });

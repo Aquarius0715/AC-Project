@@ -223,6 +223,20 @@ export function webConfig(tsconfigRootDir) {
         // a render prop (recharts' tick, dot and labelFormatter, a table column's render) is a function the library calls, not
         // a component that React mounts; a component declared inside another is still reported
         "react/no-unstable-nested-components": ["error", { allowAsProps: true }],
+        // the ARIA roles here are chosen on purpose and checked by axe in the E2E suite: role="status" and "alert" are live regions
+        // (<output> is for a calculation's result), role="img" labels a drawing (an <img> cannot hold the bar's segments),
+        // role="radio" on a button is a radio group of buttons (a native <input type="radio"> cannot be styled as the chips),
+        // role="group" and "region" name a block (<fieldset> brings a legend and form semantics, <section> no change at all)
+        "jsx-a11y/prefer-tag-over-role": "off",
+        // the lists keyed by index here have no identity of their own to key by: an append-only log (the assistant's messages),
+        // the cells of a schedule row, the series of a chart, the rows of a static demo table, a text split at its separators.
+        // The lists whose items can move or go (units, jobs, members, alerts) carry an id and use it
+        "react/no-array-index-key": "off",
+        // a state and its setter are named as a pair ([tab, setTab]); a wrapper that does more than set it has its own name (selectTab)
+        "react/hook-use-state": "error",
+        "import/no-mutable-exports": "error",
+        "require-atomic-updates": "error",
+        "no-await-in-loop": "error",
         // an import names a package of the workspace root or of the workspace itself (shared, an app, e2e); `@ac/web/*` is the
         // shared package's own path alias (tsconfig paths), an internal module and no dependency of itself (see settings above)
         "import/no-extraneous-dependencies": ["error", { packageDir: [tsconfigRootDir, path.resolve(tsconfigRootDir, "..")] }],
@@ -235,6 +249,17 @@ export function webConfig(tsconfigRootDir) {
         // `import { type A }` leaves an empty import at runtime under verbatimModuleSyntax; a file that imports only types
         // writes `import type { A }`
         "@typescript-eslint/no-import-type-side-effects": "error",
+        // a `default` that stands for the other members of a union (a case per kind, then "the other kinds") is the author's
+        // statement that the rest behave alike, so it counts as exhaustive. Without a default, every member must have a case.
+        // (@typescript-eslint/consistent-return is not enabled: tsc's noImplicitReturns checks the same with the exhaustiveness
+        // analysis, and the rule reports a switch that covers a whole union as falling off the end.)
+        "@typescript-eslint/switch-exhaustiveness-check": ["error", { considerDefaultExhaustiveForUnions: true }],
+        "@typescript-eslint/strict-void-return": "error",
+        // a file reads top-down: the exported function first, its helpers below. A helper (a function, or a const holding one)
+        // that a function calls is defined by the time the call runs; only a use in the same scope before the declaration (the
+        // temporal dead zone) is a mistake, and that is what `variables: false` leaves
+        "@typescript-eslint/no-use-before-define": ["error", { functions: false, variables: false }],
+        "@typescript-eslint/no-shadow": "error",
       },
     },
     {
@@ -260,6 +285,11 @@ export function webConfig(tsconfigRootDir) {
         "sonarjs/regex-complexity": "off",
         "sonarjs/expression-complexity": "off",
         "unicorn/max-nested-calls": "off",
+        // vi.fn() and the spies return any, so passing one as a callback reads as a value-returning function; a test steps through
+        // pages, retries and polls in order, one await after the other, and assigns a variable after an await in a helper
+        "@typescript-eslint/strict-void-return": "off",
+        "no-await-in-loop": "off",
+        "require-atomic-updates": "off",
         // a mock consumes its queue with shift(), and a case passes undefined on purpose to show the default
         "unicorn/no-array-front-mutation": "off",
         // the tests scan the repository's own sources with regular expressions
@@ -325,6 +355,31 @@ export function webConfig(tsconfigRootDir) {
       // root is not a package that resolves by name (it is no dependency of any workspace)
       files: ["**/eslint.*config.mjs"],
       rules: { "import/no-relative-packages": "off" },
+    },
+    {
+      // These loops run one await after the other because each step depends on the one before or may end the loop: a cursor
+      // (pagination of the Core API and of the telemetry series, the response stream), a poll that waits between reads (a
+      // command's result, the demo clock), writes paced by the API's rate limit (a bulk send, one unit's commands), and a search
+      // that stops at the first match (the restriction behind a contract's first invoices). Running them at once would send
+      // requests the first answer makes needless. Everywhere else the rule stays on.
+      files: [
+        "**/lib/dal.ts",
+        "**/bff/ops/*/route.ts",
+        "**/lib/unitCommands.ts",
+        "**/lib/writeLimit.ts",
+        "**/screens/shell/demo/actions.ts",
+        "**/customer/payments/page.tsx",
+        "**/customer/properties/_components/properties-view.tsx",
+        "**/customer/units/*/_components/unit-view.tsx",
+        "**/customer/units/*/page.tsx",
+        "**/technician/units/*/_lib/load.ts",
+      ],
+      rules: { "no-await-in-loop": "off" },
+    },
+    {
+      // useOpenedAt keeps the first value of a state that is never set again; a setter it did not use would only be dropped
+      files: ["**/lib/useOpenedAt.ts"],
+      rules: { "react/hook-use-state": "off" },
     },
     {
       // Next.js runs next.config.ts as CommonJS here (the packages have no "type": "module"), where __dirname is the

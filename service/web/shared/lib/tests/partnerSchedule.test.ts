@@ -106,11 +106,11 @@ describe("partner schedule", () => {
     expect(freeText(day[0])).toBe("free 09:00–13:00, 15:00–17:00");
     expect(freeText(day[2])).toBe("no hours");
     expect(freeText(cap("m-a", "d", [workday(TEXT_2026_09_22)], [workday(TEXT_2026_09_22)], 480))).toBe("fully booked");
-    const rows = candidates(members, new Set(["m-a"]), [DEMO_INDOOR, DEMO_ELECTRICAL], visit, day, null);
-    expect(rows.map((c) => [c.name, c.badge.text, c.eligible])).toEqual([
+    const candidateRows = candidates(members, new Set(["m-a"]), [DEMO_INDOOR, DEMO_ELECTRICAL], visit, day, null);
+    expect(candidateRows.map((c) => [c.name, c.badge.text, c.eligible])).toEqual([
       [TECH_EXTERNAL_A, "Qualified", true], ["tech-external-a2", "Missing: Electrical work", false], ["tech-external-a3", "Unavailable (annual leave)", false],
     ]);
-    expect(rows[0]?.sub).toBe("Indoor unit work · Outdoor unit work · Electrical work · free 09:00–13:00, 15:00–17:00");
+    expect(candidateRows[0]?.sub).toBe("Indoor unit work · Outdoor unit work · Electrical work · free 09:00–13:00, 15:00–17:00");
     const busy = candidates(members, new Set(), [DEMO_INDOOR], visit, [cap("m-a", TEXT_2026_09_22, [workday(TEXT_2026_09_22)], [["2026-09-22T01:00:00Z", "2026-09-22T09:00:00Z"]], 480)], null);
     expect(busy[0]?.badge.text).toBe("Busy at this time");
     expect(candidates(members, new Set(["m-a"]), [DEMO_INDOOR], visit, [], "m-a")[0]?.badge.text).toBe("Current");
@@ -124,12 +124,12 @@ describe("partner schedule", () => {
       [cap("m-a", must(dates[2]), [], [], 0), cap("m-b", must(dates[2]), [workday(must(dates[2]))], [], 480)],
     ];
     const jobsOf = new Map([["m-a", [{ short: "job-9", slot: slot("2026-09-21T02:00:00Z", "2026-09-21T04:00:00Z") }]]]);
-    const rows = weekGrid(dates, members.slice(0, 2), week, jobsOf, { technicianId: "m-a", slot: visit, short: "job-1" });
-    expect(rows[0]?.cells).toEqual([{ kind: "booked", text: "10:00–12:00", sub: "job-9" }, { kind: "proposal", text: "10:00–12:00", sub: "job-1" }, { kind: "none", text: "no hours" }]);
-    expect(rows[1]?.cells).toEqual([{ kind: "free", text: "free" }, { kind: "leave", text: "Leave", sub: "annual leave" }, { kind: "free", text: "free" }]);
+    const gridRows = weekGrid(dates, members.slice(0, 2), week, jobsOf, { technicianId: "m-a", slot: visit, short: "job-1" });
+    expect(gridRows[0]?.cells).toEqual([{ kind: "booked", text: "10:00–12:00", sub: "job-9" }, { kind: "proposal", text: "10:00–12:00", sub: "job-1" }, { kind: "none", text: "no hours" }]);
+    expect(gridRows[1]?.cells).toEqual([{ kind: "free", text: "free" }, { kind: "leave", text: "Leave", sub: "annual leave" }, { kind: "free", text: "free" }]);
     const training = weekGrid(dates.slice(0, 1), members.slice(1, 2), [[cap("m-b", must(dates[0]), [], [], 0, "training")]], new Map(), null);
     expect(training[0]?.cells).toEqual([{ kind: "leave", text: "Unavailable", sub: "training" }]);
-    expect([rows[0]?.sub, rows[1]?.sub]).toEqual(["Indoor, Outdoor, Electrical · 16 h avail.", "Indoor · 16 h avail."]);
+    expect([gridRows[0]?.sub, gridRows[1]?.sub]).toEqual(["Indoor, Outdoor, Electrical · 16 h avail.", "Indoor · 16 h avail."]);
   });
 
   it("states the refusals of the assignment", () => {

@@ -41,7 +41,7 @@ export interface ApiContractLite { id: string; customerId: string; unitIds: stri
 export interface ApiInvoiceLite { id: string; contractId: string; amountMinor: number; currency: Currency }
 export interface ApiRestrictionLite { id: string; contractId?: string; state: string; unitIds: string[] }
 
-const byName = <T extends { name: string }>(a: T, b: T) => a.name.localeCompare(b.name);
+const byName = <Item extends { name: string }>(a: Item, b: Item) => a.name.localeCompare(b.name);
 const en = translator("en");
 /** “Apr 2026”: the month an account was created, in the user's language (a Kuala Lumpur month). */
 const monthYear = (iso: string, locale: Locale) => new Date(iso).toLocaleDateString(intlTag(locale), { month: "short", year: "numeric", timeZone: "Asia/Kuala_Lumpur" }).replaceAll(/[\u{A0}\u{2009}\u{202F}]/gu, " ");
@@ -437,11 +437,11 @@ export interface CoverageRow {
 }
 const dayMs = 86_400_000;
 /** A unit's cover in words: contract, warranty, ending soon, or none. */
-function coverageText(c: ApiCoverage, days: number | null, t: T): string {
+function coverageText(c: ApiCoverage, warrantyDays: number | null, t: T): string {
   switch (c.status) {
     case "contract": { return t("Covered by contract"); }
     case "under_warranty": { return t("Under warranty"); }
-    case "expiring": { return t("Ends in {n} d · no contract", { n: days ?? 0 }); }
+    case "expiring": { return t("Ends in {n} d · no contract", { n: warrantyDays ?? 0 }); }
     default: { return t(c.warrantyEndsAt ? "Warranty ended · no contract" : "No warranty · no contract"); }
   }
 }
@@ -457,8 +457,8 @@ export function coverageRows(cs: ApiCoverage[], x: { unit: (id: string) => { nam
   const { t } = i;
   return cs.map((c) => {
     const u = x.unit(c.unitId);
-    const days = c.warrantyEndsAt ? Math.ceil((Date.parse(c.warrantyEndsAt) - now.getTime()) / dayMs) : null;
-    const statusText = coverageText(c, days, t);
+    const warrantyDays = c.warrantyEndsAt ? Math.ceil((Date.parse(c.warrantyEndsAt) - now.getTime()) / dayMs) : null;
+    const statusText = coverageText(c, warrantyDays, t);
     return {
       unitId: c.unitId,
       unit: u?.name ?? c.unitId.slice(0, 8),
@@ -472,7 +472,7 @@ export function coverageRows(cs: ApiCoverage[], x: { unit: (id: string) => { nam
       contractIds: c.contractIds,
       contracts: c.contractIds.map((id) => x.contract(id)).join(", ") || "—",
       status: c.status,
-      days,
+      days: warrantyDays,
       statusText,
     };
   }).toSorted(byWarrantyEnd);

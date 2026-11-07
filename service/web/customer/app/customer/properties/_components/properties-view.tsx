@@ -199,14 +199,14 @@ function GroupPanel({ live, space }: Readonly<{ live: PropertiesLive; space: str
   const [review, setReview] = useState<PlanRow[] | null>(null);
   const [track, setTrack] = useState<Record<string, Track>>({});
   const [sending, setSending] = useState(false);
-  const caps = live.details.filter((d) => sel.includes(d.id)).map((d) => d.capabilities.temperature).filter((t): t is NonNullable<typeof t> => !!t);
-  const lo = caps.length > 0 ? Math.min(...caps.map((t) => t.min)) : 16;
-  const hi = caps.length > 0 ? Math.max(...caps.map((t) => t.max)) : 30;
+  const caps = live.details.filter((d) => sel.includes(d.id)).map((d) => d.capabilities.temperature).filter((cap): cap is NonNullable<typeof cap> => !!cap);
+  const lo = caps.length > 0 ? Math.min(...caps.map((cap) => cap.min)) : 16;
+  const hi = caps.length > 0 ? Math.max(...caps.map((cap) => cap.max)) : 30;
   const toggle = (id: string) => { setSel((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id])); };
   const send = async (rows: PlanRow[]) => {
     setSending(true);
     setReview(null);
-    setTrack((t) => ({ ...t, ...Object.fromEntries(rows.map((r) => [r.id, { status: "Sending" as const, note: "" }])) }));
+    setTrack((prev) => ({ ...prev, ...Object.fromEntries(rows.map((r) => [r.id, { status: "Sending" as const, note: "" }])) }));
     // each AC on its own (no rollback across ACs); its settings one after the other, stopping at the first failure. A
     // command over the member's write limit waits the advised seconds and is sent again (IR375, IR380)
     const wait = (id: string) => (s: number) => { setTrack((x) => ({ ...x, [id]: { status: "Waiting", note: t("Write limit reached — sending again in {s} s", { s }) } })); };

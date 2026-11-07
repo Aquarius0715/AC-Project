@@ -74,12 +74,12 @@ export function PropertiesDemo() {
   const [sel, setSel] = useState("home-a");
   const [renaming, setRenaming] = useState<Node | null>(null);
   const [name, setName] = useState("");
-  const [errorText, setError] = useState<string>();
+  const [errorText, setErrorText] = useState<string>();
   const [mode, setMode] = useState<"single" | "group">("single");
-  const startRename = (n: Node) => { setRenaming(n); setName(n.name); setError(undefined); };
+  const startRename = (n: Node) => { setRenaming(n); setName(n.name); setErrorText(undefined); };
   const save = () => {
-    if (!name.trim()) { setError("Name is required (1–120 characters)"); return; }
-    if (name.trim().toLowerCase() === "office a" && renaming?.id !== "office-a") { setError("A location with this name already exists"); return; }
+    if (!name.trim()) { setErrorText("Name is required (1–120 characters)"); return; }
+    if (name.trim().toLowerCase() === "office a" && renaming?.id !== "office-a") { setErrorText("A location with this name already exists"); return; }
     toast(`Renamed to “${name}”`); setRenaming(null);
   };
   const us = roomUnits[sel];

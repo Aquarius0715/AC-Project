@@ -136,7 +136,7 @@ export default async function AdminUnitsPage({ searchParams }: Readonly<PageProp
     units: unitRows(filterUnits(at, { powerState, connections: conns, search: "" }), spaces, models, t),
     lastEdit: lastEdit ? `${showDate(lastEdit.occurredAt, i.display)} · ${memberName.get(lastEdit.actorId) ?? t("HQ")}` : null,
     policies: policies ? policyLines(policies, orgUnits.map((u) => u.id), (m) => memberName.get(m) ?? cust.name, i) : null,
-    rules: (() => { const d = policies?.find((p) => p.kind === DEFAULT_ALERT); return d ? { policyId: d.id, items: defaultRules(d, i) } : null; })(),
+    rules: (() => { const defaultPolicy = policies?.find((p) => p.kind === DEFAULT_ALERT); return defaultPolicy ? { policyId: defaultPolicy.id, items: defaultRules(defaultPolicy, i) } : null; })(),
     canRules: has("alert.policy.write"),
     canAttach: has("asset.write", "alert.policy.write") && canPolicies,
     tree,

@@ -27,22 +27,22 @@ interface Scope { customerId?: string; unitId?: string; kind?: PlanType }
 interface Live { scope: Scope; rows: ContractRow[]; counts: Record<PlanType | "all", number>; selectedId: string | null; customers: { id: string; name: string }[]; units: UnitOption[] }
 
 const demoCustomers = [{ id: CUSTOMER_A, name: CUSTOMER_A }, { id: CUSTOMER_B, name: CUSTOMER_B }];
-const demoRow = (id: string, cust: string, planType: PlanType, unitIds: string[], priceMinor: number, start: string, end: string, eligible: boolean, restrictionIds: string[]): ContractRow => {
+const demoRow = (id: string, cust: string, planType: PlanType, unitIds: string[], price: number, start: string, end: string, eligible: boolean, restrictionIds: string[]): ContractRow => {
   return {
     id,
     planType,
     cust,
     unitIds,
-    priceMinor,
     start,
     end,
     restrictionIds,
+    priceMinor: price,
     version: 1,
     plan: planLabel[planType],
     customerId: cust,
     units: `${String(unitIds.length)} unit${unitIds.length === 1 ? "" : "s"}`,
     currency: "MYR",
-    price: money(priceMinor, "MYR"),
+    price: money(price, "MYR"),
     startAt: `${start}T00:00:00+08:00`,
     endAt: `${end}T00:00:00+08:00`,
     period: `${start} → ${end}`,

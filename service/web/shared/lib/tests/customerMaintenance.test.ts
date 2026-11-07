@@ -106,8 +106,8 @@ describe("customer maintenance", () => {
     const i = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
     const t = translator("ms");
     const one = slot(TEXT_2026_09_16T02_00_00Z, TEXT_2026_09_16T04_00_00Z);
-    const [row] = clientRows([{ projection: "summary", id: JOB_1_AAAA, version: 1, unitId: "u1", type: "reactive", status: "requested", displayStatus: "requested", origin: CLIENT_REQUEST, dueAt: "2026-09-20T00:00:00Z", requestedSlot: one, scheduledSlot: null, preferredSlots: [one, one, one], assignmentAcknowledgement: null }], () => ({ name: "Bedroom AC", place: "" }), i);
-    expect([row?.type, row?.line]).toEqual(["Pembaikan", "Pilihan 16 Sep, 11:00 PG – 1:00 PTG GMT+9 · +2 lagi (belum disahkan)"]);
+    const [built] = clientRows([{ projection: "summary", id: JOB_1_AAAA, version: 1, unitId: "u1", type: "reactive", status: "requested", displayStatus: "requested", origin: CLIENT_REQUEST, dueAt: "2026-09-20T00:00:00Z", requestedSlot: one, scheduledSlot: null, preferredSlots: [one, one, one], assignmentAcknowledgement: null }], () => ({ name: "Bedroom AC", place: "" }), i);
+    expect([built?.type, built?.line]).toEqual(["Pembaikan", "Pilihan 16 Sep, 11:00 PG – 1:00 PTG GMT+9 · +2 lagi (belum disahkan)"]);
     expect(preferredError([one, { startAt: "", endAt: "" }, one], NOW, 3, t)).toBe("Masukkan tarikh dan kedua-dua masa bagi setiap masa pilihan.");
     expect(contactError("call 0123456789", t)).toMatch(/^Tiada alamat e-mel/);
     expect(clientJobRefusal({ code: "CONFLICT", messageKey: "error.versionConflict", fieldErrors: {} }, t)).toBe("Tidak disimpan: permintaan telah berubah — keadaan terkini dipaparkan.");

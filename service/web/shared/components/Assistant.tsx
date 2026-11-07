@@ -72,7 +72,7 @@ function Frame({ title, state, children, footer, lang, setLang, onClose, context
 
 function LiveAssistant({ onClose, context }: Readonly<{ onClose: () => void; context: string }>) {
   const i = useI18n();
-  const [lang, setLangState] = useState<Locale>(i.display.locale);
+  const [lang, setLang] = useState<Locale>(i.display.locale);
   const t = translator(lang); // the assistant's own language; times stay in the user's time zone
   const display = { ...i.display, locale: lang };
   const ex = examples(lang);
@@ -100,8 +100,8 @@ function LiveAssistant({ onClose, context }: Readonly<{ onClose: () => void; con
   const failure = (e: unknown) => (e instanceof OpError ? actionMessage({ code: e.error.code, messageKey: e.error.messageKey, fieldErrors: e.error.fieldErrors, retryAfterSeconds: e.error.retryAfterSeconds }, t) : t("The assistant is unavailable — try again."));
   const unit = (id: string) => orNull(callOp<ApiUnitDetail>("units.get", { id }));
   // D09: a language change discards an unconfirmed intent but keeps what was typed
-  const setLang = (l: Locale) => {
-    setLangState(l);
+  const changeLang = (l: Locale) => {
+    setLang(l);
     setMsgs((s) => s.filter((m) => m.kind !== "confirm" && m.kind !== CANDIDATES));
     if (state === "confirm" || state === "listening") setState("idle");
   };
@@ -171,7 +171,7 @@ function LiveAssistant({ onClose, context }: Readonly<{ onClose: () => void; con
   const lastQuestion = msgs.findLast((m): m is Extract<ChatMessage, { kind: "user" }> => m.kind === "user")?.text ?? "";
 
   return (
-    <Frame title={t("Assistant")} state={stateText(state, t)} lang={lang} setLang={setLang} onClose={onClose} context={context} t={t}
+    <Frame title={t("Assistant")} state={stateText(state, t)} lang={lang} setLang={changeLang} onClose={onClose} context={context} t={t}
       footer={<>
         <form className="flex items-center gap-2 border-t border-line p-3" onSubmit={(e) => { e.preventDefault(); if (!text.trim() || busy) {
           return;

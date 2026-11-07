@@ -77,9 +77,9 @@ function Workspace({ id }: Readonly<{ id: string }>) {
   // URL key `tab` selects the checklist group (SCR-T04: indoor default · outdoor · electrical, IR115).
   const sp = useSearchParams();
   const initialTab = sp.get("tab");
-  const [tab, setTabState] = useState<GroupTab>(initialTab === "outdoor" || initialTab === "electrical" ? initialTab : "indoor");
-  const setTab = (t: "indoor" | "outdoor" | "electrical") => {
-    setTabState(t);
+  const [tab, setTab] = useState<GroupTab>(initialTab === "outdoor" || initialTab === "electrical" ? initialTab : "indoor");
+  const selectTab = (t: "indoor" | "outdoor" | "electrical") => {
+    setTab(t);
     const u = new URL(location.href);
     u.searchParams.set("tab", t);
     history.replaceState(null, "", u);
@@ -129,7 +129,7 @@ function Workspace({ id }: Readonly<{ id: string }>) {
       {errs.length > 0 && <Banner tone="crit"><b>Can’t submit:</b><ul className="list-disc pl-5 text-xs">{errs.slice(0, 5).map((e) => <li key={e}>{e}</li>)}</ul></Banner>}
       <div className="split">
         <div className="flex min-w-0 flex-col gap-4">
-          <Card title="Inspection checklist" action={<Tabs value={tab} onChange={setTab} tabs={groupTabs} />}>
+          <Card title="Inspection checklist" action={<Tabs value={tab} onChange={selectTab} tabs={groupTabs} />}>
             <ul className="divide-y divide-line">
               {(lookup(groups, tab) ?? []).map((k) => (
                 <li key={k} className="py-2.5">

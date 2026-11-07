@@ -61,7 +61,7 @@ export function AlertsLiveView({ live }: Readonly<{ live: AlertsLive }>) {
   );
   return (
     <Page>
-      <Tabs value={live.tab} onChange={(t) => { setResult(null); patch({ tab: t === "policies" ? "policies" : null, policyId: null }); }} tabs={[{ id: "alerts", label: t("Alerts"), count: live.total }, { id: "policies", label: t("Alert policies"), count: live.policies.count }]} />
+      <Tabs value={live.tab} onChange={(next) => { setResult(null); patch({ tab: next === "policies" ? "policies" : null, policyId: null }); }} tabs={[{ id: "alerts", label: t("Alerts"), count: live.total }, { id: "policies", label: t("Alert policies"), count: live.policies.count }]} />
       {result && <Banner tone={result.tone}>{result.text}</Banner>}
       {live.tab === "alerts" ? (
         <>

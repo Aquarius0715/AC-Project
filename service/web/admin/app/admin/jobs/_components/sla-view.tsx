@@ -75,16 +75,16 @@ function TargetsModal({ live, first, onClose, onFail }: Readonly<{ live: SlaLive
   const now = Date.parse(live.now);
   const [pending, run] = useAction();
   const [plan, setPlan] = useState(first.plan);
-  const current = live.targets.find((t) => t.plan === plan) ?? first;
+  const current = live.targets.find((target) => target.plan === plan) ?? first;
   const [f, setF] = useState({ responseHours: String(current.now.responseHours), arrival: String(current.now.arrivalInWindowPercent), ftf: String(current.now.firstTimeFixPercent), from: zonedInput(new Date(now + 5 * 60_000).toISOString(), zone) });
   const [tried, setTried] = useState(false);
   const effectiveFrom = f.from ? fromZonedInput(f.from, zone) || null : null; // typed in the display time zone (NFR-08)
   const errors = targetErrors({ responseHours: f.responseHours, arrival: f.arrival, ftf: f.ftf, effectiveFrom }, now, t);
   const pick = (p: string) => {
-    const t = live.targets.find((x) => x.plan === p);
-    if (!t) return;
-    setPlan(t.plan);
-    setF({ ...f, responseHours: String(t.now.responseHours), arrival: String(t.now.arrivalInWindowPercent), ftf: String(t.now.firstTimeFixPercent) });
+    const target = live.targets.find((x) => x.plan === p);
+    if (!target) return;
+    setPlan(target.plan);
+    setF({ ...f, responseHours: String(target.now.responseHours), arrival: String(target.now.arrivalInWindowPercent), ftf: String(target.now.firstTimeFixPercent) });
   };
   const save = () => {
     setTried(true);

@@ -146,10 +146,10 @@ export function until(iso: string, now: number, t: T = en): string {
 export interface KpiTile { label: string; value: number; sub: string; href: string; link: string; tone?: "warn" | "crit" }
 /** The five KPI tiles (DD-P01): offers, review and overdue from summaries.get; the accepted jobs without a technician
 from the list, and in progress / scheduled as the summary's active jobs without them. Each opens the job list. */
-export function kpis(counts: ApiCounts, jobs: PartnerJob[], now: number, names: Map<string, string>, period?: { from: string; to: string }, i: I18n = EN): KpiTile[] {
+export function kpis(counts: ApiCounts, jobs: PartnerJob[], now: number, names: Map<string, string>, range?: { from: string; to: string }, i: I18n = EN): KpiTile[] {
   const { t } = i;
   type Offered = PartnerJob & { offerExpiresAt: string }; // an offer with its answer deadline
-  const list = (tab: string) => `/partner/jobs?tab=${tab}${period ? `&from=${period.from}&to=${period.to}` : ""}`; // the list with the same period
+  const list = (tab: string) => `/partner/jobs?tab=${tab}${range ? `&from=${range.from}&to=${range.to}` : ""}`; // the list with the same period
   const offers = jobs.filter((j): j is Offered => j.status === "offered" && j.offerExpiresAt !== null).toSorted((a, b) => Date.parse(a.offerExpiresAt) - Date.parse(b.offerExpiresAt));
   const unassigned = jobs.filter((j) => bucket(j, now) === UNASSIGNED);
   type Slotted = PartnerJob & { slot: Slot }; // a job with its visit window

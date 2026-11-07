@@ -9,11 +9,11 @@ import { isEmail } from "@ac/web/lib/text";
 export default function Forgot() {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
-  const [errorText, setError] = useState<string>();
+  const [errorText, setErrorText] = useState<string>();
   const submit = (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!isEmail(email)) { setError("Enter an email like name@example.com"); return; }
-    setError(undefined);
+    if (!isEmail(email)) { setErrorText("Enter an email like name@example.com"); return; }
+    setErrorText(undefined);
     setSent(true);
   };
   return (

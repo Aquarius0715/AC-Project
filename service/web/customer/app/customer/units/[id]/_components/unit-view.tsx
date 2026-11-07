@@ -174,7 +174,7 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
   const policy = d?.effectiveControlPolicy.state === "restricted" ? d.effectiveControlPolicy.policy : null;
   const isRestricted = d ? policy?.kind === "temperature_limit" : id === "unit-limited";
   const isBlocked = d?.controlAvailability.state === "blocked";
-  const [setpoint, setTemperature] = useState(24);
+  const [setpoint, setSetpoint] = useState(24);
   const [mode, setMode] = useState<ControlMode>("cool");
   const [fan, setFan] = useState<FanLevel>("mid");
   const [edited, setEdited] = useState<Edits>({}); // settings the user changed since the last report
@@ -187,7 +187,7 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
   if (d && reported !== seenReport) {
     setSeenReport(reported);
     setEdited({});
-    if (d.observedState.celsius !== null) setTemperature(d.observedState.celsius);
+    if (d.observedState.celsius !== null) setSetpoint(d.observedState.celsius);
     if (d.observedState.mode) setMode(d.observedState.mode);
     if (d.observedState.fanLevel) setFan(d.observedState.fanLevel);
   }
@@ -198,15 +198,15 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
     { id: "policy-humidity-a", name: "Night humidity", rule: "Humidity ≥ 70 % for 30 min · 22:00–06:00 → Info" },
   ];
   const customerPolicies = apiPolicies.data ?? mockPolicies;
-  const [mockAttached, setAttached] = useState<string[]>(["policy-temp-a"]);
+  const [mockAttached, setMockAttached] = useState<string[]>(["policy-temp-a"]);
   const attached = d ? d.alertPolicyIds : mockAttached;
   const [attachOpen, setAttachOpen] = useState(false);
   const [picked, setPicked] = useState<string[]>([]);
   const [waiting, setWaiting] = useState(false);
-  const [mockOn, setOn] = useState(unit.state === "running");
+  const [mockOn, setMockOn] = useState(unit.state === "running");
   const isOn = d ? d.observedState.power === true : mockOn;
   const [sent, setSent] = useState<ApiCommand[]>([]);
-  const [mockHist, setHist] = useState<CommandRow[]>([
+  const [mockHist, setMockHist] = useState<CommandRow[]>([
     { id: "cmd-0230", text: "Set power ON", when: "09:15" },
     { id: "cmd-0229", text: "Set mode COOL", when: "Yesterday 21:02" },
     { id: "cmd-0228", text: "Set fan MID", when: "Yesterday 21:02" },
@@ -271,12 +271,12 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
   };
   const togglePower = (v: boolean) => {
     if (d) { void sendApi([{ kind: "set_power", power: v }]); return; }
-    setOn(v);
+    setMockOn(v);
     toast(t(v ? "Power ON sent" : "Power OFF sent"));
   };
   const savePolicies = (ids: string[], message: string, tone?: "warn") => {
     if (!d) {
-      setAttached(ids);
+      setMockAttached(ids);
       toast(message, tone);
       return;
     }
@@ -298,7 +298,7 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
       return;
     }
     setWaiting(true);
-    setTimeout(() => { setWaiting(false); setHist((h) => [{ id: "cmd-0231", text: t("Set temperature {celsius}°C", { celsius: setpoint }), when: t("now") }, ...h]); toast(t("{name}: {celsius}°C acknowledged by device", { name: unit.name, celsius: setpoint })); }, 1500);
+    setTimeout(() => { setWaiting(false); setMockHist((h) => [{ id: "cmd-0231", text: t("Set temperature {celsius}°C", { celsius: setpoint }), when: t("now") }, ...h]); toast(t("{name}: {celsius}°C acknowledged by device", { name: unit.name, celsius: setpoint })); }, 1500);
   };
   return (
     <Page>
@@ -323,7 +323,7 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
             modes={isShowMode ? modes : []} mode={mode} fans={isShowFan ? fans : []} fan={fan}
             review={layout.review ? { count: changeCount, summary: d ? changes().map((item) => changeText(item)).join(" · ") || t("No change yet") : t(SET_TEMPERATURE_FROM_C_TO_C, { from: 26, to: setpoint }), target: unit.name, canSend: d === null || changes().length > 0 } : null}
             repairHref={`/customer/maintenance?new=${d?.id ?? unit.id}`}
-            onPower={togglePower} onStep={(delta) => { setTemperature((x) => x + delta); setEdited((e) => ({ ...e, temp: true })); }}
+            onPower={togglePower} onStep={(delta) => { setSetpoint((x) => x + delta); setEdited((e) => ({ ...e, temp: true })); }}
             onMode={(m) => { setMode(m); setEdited((e) => ({ ...e, mode: true })); }} onFan={(f) => { setFan(f); setEdited((e) => ({ ...e, fan: true })); }} onReview={() => { setConfirm(true); }}
           />
           <div className="split-even">

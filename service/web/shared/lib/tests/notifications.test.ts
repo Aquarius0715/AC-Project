@@ -98,8 +98,8 @@ describe("inbox rows and alert rows", () => {
       params: { targetName: BEDROOM_AC, at: "2026-10-13T16:00:00Z", status: "expiring", reason: null, message: null } });
     const r = inboxRow(n, "admin");
     expect([r.t, r.d, r.href]).toEqual(["Warranty ending — Bedroom AC", "Warranty ends 14 Oct 2026 · no maintenance contract", "/admin/units?tab=warranty"]);
-    const ms = inboxRow(n, "admin", { locale: "ms", timeZone: "UTC" });
-    expect([ms.t, ms.d]).toEqual(["Waranti hampir tamat — Bedroom AC", "Waranti tamat 13 Okt 2026 · tiada kontrak penyelenggaraan"]);
+    const malay = inboxRow(n, "admin", { locale: "ms", timeZone: "UTC" });
+    expect([malay.t, malay.d]).toEqual(["Waranti hampir tamat — Bedroom AC", "Waranti tamat 13 Okt 2026 · tiada kontrak penyelenggaraan"]);
   });
 
   it("lists alerts with their status and the read state of their notifications (DD-C08, IR242)", () => {

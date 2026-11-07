@@ -9,8 +9,8 @@ import { Banner, ToastProvider, useToast } from "@ac/web/components/ui";
 afterEach(() => { cleanup(); toast.dismiss(); });
 
 function Pusher() {
-  const toast = useToast();
-  return <><button type="button" onClick={() => { toast("Saved"); }}>ok</button><button type="button" onClick={() => { toast("Not saved: CONFLICT", "crit"); }}>crit</button></>;
+  const notify = useToast();
+  return <><button type="button" onClick={() => { notify("Saved"); }}>ok</button><button type="button" onClick={() => { notify("Not saved: CONFLICT", "crit"); }}>crit</button></>;
 }
 
 // IR362: critical errors are announced at once (UX-06), other results politely

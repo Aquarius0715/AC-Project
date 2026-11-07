@@ -1,6 +1,7 @@
 "use client";
 const RELEASE_REQUESTED = "Release requested";
 
+import { useOpenedAt } from "@ac/web/lib/useOpenedAt";
 import Link from "next/link";
 import { useState } from "react";
 import { Badge, Btn, Card, DataTable, Field, Input, ListRow, Modal, Page, Select, Steps, SummaryList, useToast } from "@ac/web/components/ui";
@@ -26,7 +27,7 @@ export function RestrictionsDemo() {
   const [tried, setTried] = useState(false);
   const setSt = (st: R["st"]) => { setList((l) => l.map((x) => (x.id === sel.id ? { ...x, st } : x))); setSel({ ...sel, st }); };
   const currentRow = flow.indexOf(sel.st);
-  const [openedAt] = useState(() => Date.now()); // reference time for the 24 h rule (render stays pure)
+  const openedAt = useOpenedAt(); // reference time for the 24 h rule (render stays pure)
   const tooSoon = new Date(f.exec).getTime() - openedAt < 24 * 3600e3 ? "Execute-after must be at least 24 h after the notice" : undefined;
   const execError = tried && (f.exec ? tooSoon : "Execute-after is required");
   return (

@@ -636,8 +636,8 @@ export function LineChart({ points, min, max, threshold, height = 120, color = "
   const gaps: [number, number][] = [];
   for (const [i, p] of points.entries()) {
     if (p !== null) continue;
-    const last = gaps.at(-1);
-      if (last?.[1] === i - 1) last[1] = i;
+    const lastGap = gaps.at(-1);
+      if (lastGap?.[1] === i - 1) lastGap[1] = i;
     else gaps.push([i, i]);
   }
   const isolated = (i: number) => points.at(i) !== null && (i === 0 || points.at(i - 1) === null) && (i === last || points.at(i + 1) === null);
@@ -654,7 +654,7 @@ export function LineChart({ points, min, max, threshold, height = 120, color = "
         {threshold !== undefined && <ReferenceLine y={threshold} stroke="var(--color-crit)" strokeDasharray="4 3" />}
         <ChartTooltip content={<ChartTooltipContent hideLabel />} />
         <Line dataKey="v" type="linear" stroke="var(--color-v)" strokeWidth={2} isAnimationActive={false}
-          dot={({ index, cx, cy }) => (isolated(index) ? <circle key={index} cx={cx} cy={cy} r={3} fill="var(--color-v)" /> : null)} />
+          dot={({ index, cx: centerX, cy }) => (isolated(index) ? <circle key={index} cx={centerX} cy={cy} r={3} fill="var(--color-v)" /> : null)} />
       </RLineChart>
     </ChartContainer>
   );

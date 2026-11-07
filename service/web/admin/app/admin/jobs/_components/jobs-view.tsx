@@ -362,7 +362,7 @@ function ProposeModal({ d, live, onClose, onFail }: Readonly<ModalProps>) {
   const [to, setTo] = useState("12:00");
   const options = [...live.internalTechs.map((x) => ({ id: `i:${x.id}`, label: t("{name} (HQ)", { name: x.name }) })), ...live.contractors.filter((c) => c.status === "active").map((c) => ({ id: `c:${c.id}`, label: t("{name} (offer)", { name: c.name }) }))];
   const [who, setWho] = useState(options[0]?.id ?? "");
-  const [notice, setMessage] = useState("");
+  const [notice, setNotice] = useState("");
   const [reply, setReply] = useState("48");
   const [tried, setTried] = useState(false);
   const slot = { startAt: zonedInstant(date, from, zone), endAt: zonedInstant(date, to, zone) }; // typed in the display time zone (NFR-08)
@@ -384,7 +384,7 @@ function ProposeModal({ d, live, onClose, onFail }: Readonly<ModalProps>) {
       </div>
       {isPreferred && <p className="flex items-center gap-1 text-xs text-crit"><Icon name="error" />{t("This is one of the client’s own times — book it directly instead.")}</p>}
       <Field label={t("Capacity held for the time")}><Select value={who} onChange={(e) => { setWho(e.target.value); }}>{options.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}</Select></Field>
-      <Field label={t("Message to the client · required (1–1000)")} error={tried && !notice.trim() ? t("A message is required") : undefined}><Textarea value={notice} maxLength={1000} onChange={(e) => { setMessage(e.target.value); }} placeholder={t("All qualified technicians are booked on your times. The earliest free slot is Thursday morning.")} /></Field>
+      <Field label={t("Message to the client · required (1–1000)")} error={tried && !notice.trim() ? t("A message is required") : undefined}><Textarea value={notice} maxLength={1000} onChange={(e) => { setNotice(e.target.value); }} placeholder={t("All qualified technicians are booked on your times. The earliest free slot is Thursday morning.")} /></Field>
       <Field label={t("Reply by")}><Select value={reply} onChange={(e) => { setReply(e.target.value); }}>{["24", "48", "72"].map((h) => <option key={h} value={h}>{t("{n} h", { n: h })}</option>)}</Select></Field>
       <Banner>{t("The client sees “Time proposed” with Accept / Decline. Accept → booked with the held capacity. Decline → the client sends new times.")}</Banner>
     </Modal>
@@ -498,7 +498,7 @@ function ReviewModal({ d, report, decision, onClose, onFail }: Omit<ModalProps, 
       <p className="text-xs text-muted-foreground">jobs.review · decision={decision}{report.mode === "hq_escalation" ? ` · ${t("HQ escalation")}` : ""} · {t("report v{v} by {name}", { v: report.version, name: report.author })}</p>
       {decision === "return" && (
         <fieldset className="flex flex-col gap-1.5"><legend className="mb-1 text-[13px] font-semibold">{t("Items that need rework")}</legend>
-          {report.rework.map((x) => <label key={x.label} className="flex items-start gap-2 text-[13px]"><Checkbox className="mt-0.5" checked={items.includes(x.label)} onCheckedChange={(v) => { setItems(v ? [...items, x.label] : items.filter((v) => v !== x.label)); }} />{x.label}</label>)}
+          {report.rework.map((x) => <label key={x.label} className="flex items-start gap-2 text-[13px]"><Checkbox className="mt-0.5" checked={items.includes(x.label)} onCheckedChange={(v) => { setItems(v ? [...items, x.label] : items.filter((item) => item !== x.label)); }} />{x.label}</label>)}
         </fieldset>
       )}
       <Field label={t("Reason · required")} hint={t("1–1000 characters · shown to the technician and kept in the review history.")} error={tried ? error : undefined}><Textarea value={r} maxLength={1000} onChange={(e) => { setR(e.target.value); }} placeholder={t(decision === "return" ? "Airflow still low after cleaning; re-check the blower and attach an after photo." : "The contractor has not reviewed within the agreed time; HQ accepts on the evidence.")} /></Field>

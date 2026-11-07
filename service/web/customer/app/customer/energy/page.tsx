@@ -61,7 +61,7 @@ export default async function CustomerEnergyPage({ searchParams }: Readonly<Page
       const base = total.totals.savedKWh === null ? null : total.baselineSnapshot?.baselineKWh ?? null;
       live.summary = summaryView(total, i);
       live.raw = { kWh: total.totals.kWh, baseline: base, tariff: total.tariffVersion, factor: total.factorSnapshot ? i.t("{region} {year} · {factor} kgCO₂e/kWh (demo factor)", { region: total.factorSnapshot.region, year: total.factorSnapshot.year, factor: total.factorSnapshot.kgCO2ePerKWh }) : null, coverage: total.coverage };
-      live.daily = days.map((d, i) => ({ label: d.label, actual: perDay.at(i)?.totals.kWh ?? null, baseline: base === null ? null : (base * (Date.parse(d.to) - Date.parse(d.from))) / 60_000 / minutes }));
+      live.daily = days.map((d, index) => ({ label: d.label, actual: perDay.at(index)?.totals.kWh ?? null, baseline: base === null ? null : (base * (Date.parse(d.to) - Date.parse(d.from))) / 60_000 / minutes }));
       if (unitIds.length > 1) {
         const rows = await Promise.all(unitIds.map(async (u) => {
           const b = baselinesFor(baselines, [u])[0];

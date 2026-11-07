@@ -248,7 +248,7 @@ function ProposeModal({ j, onClose }: Readonly<{ j: Job; onClose: () => void }>)
   const [date, setDate] = useState("2026-10-01");
   const [win, setWin] = useState(TEXT_10_00_12_00);
   const [who, setWho] = useState("contractor-a · tech-external-a");
-  const [messageText, setMessage] = useState("All qualified technicians are booked Sep 28–30. The earliest free slot is Thursday morning. Sorry for the wait.");
+  const [messageText, setMessageText] = useState("All qualified technicians are booked Sep 28–30. The earliest free slot is Thursday morning. Sorry for the wait.");
   const [tried, setTried] = useState(false);
   const isPre = j.preferred.some((s) => s.date === date && s.win === win);
   return (
@@ -263,7 +263,7 @@ function ProposeModal({ j, onClose }: Readonly<{ j: Job; onClose: () => void }>)
         <Field label="Who does it" className="mt-2"><Select value={who} onChange={(e) => { setWho(e.target.value); }}><option>contractor-a · tech-external-a</option><option>tech-internal-a</option></Select></Field>
         {isPre && <p className="mt-1 flex items-center gap-1 text-xs text-crit"><Icon name="error" />This is one of the client’s own times — book it directly instead.</p>}
       </div>
-      <Field label="Message to the client · required" error={tried && !messageText.trim() ? "A message is required" : undefined}><Textarea value={messageText} onChange={(e) => { setMessage(e.target.value); }} /></Field>
+      <Field label="Message to the client · required" error={tried && !messageText.trim() ? "A message is required" : undefined}><Textarea value={messageText} onChange={(e) => { setMessageText(e.target.value); }} /></Field>
       <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}><Field label="Reply by"><Select><option>09-24 18:00 (48 h)</option><option>09-23 18:00 (24 h)</option></Select></Field><Field label="If no reply"><Select><option>Keep “Requested” and call the client</option></Select></Field></div>
       <Banner>The client sees “Time proposed” with Accept / Decline. Accept → booked automatically with the held partner. Decline → the client sends new times. Held capacity is released on decline or timeout.</Banner>
     </Modal>

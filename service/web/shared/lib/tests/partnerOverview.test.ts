@@ -114,15 +114,15 @@ describe("partner overview", () => {
   });
 
   it("keeps the overview's technicians to the team that can work, busiest first (IR575)", () => {
-    const now = Date.parse(TEXT_2026_09_21T01_00_00Z);
+    const later = Date.parse(TEXT_2026_09_21T01_00_00Z);
     const team: ApiMember[] = [
       ...members,
       { id: "m-r", userId: "user-r", displayName: "revoked", role: TECHNICIAN, revokedAt: "2026-09-20T00:00:00Z" },
       { id: "m-e", userId: "user-e", displayName: "ended", role: TECHNICIAN, validUntil: "2026-09-21T00:00:00Z" },
       { id: "m-f", userId: "user-f", displayName: "until next month", role: TECHNICIAN, validUntil: "2026-10-21T00:00:00Z" },
     ];
-    expect(onTeam(team, now).map((m) => m.id)).toEqual(["m-a", "m-b", "m-f"]); // no coordinator, no revoked or ended access
-    const crew = onTeam(team, now);
+    expect(onTeam(team, later).map((m) => m.id)).toEqual(["m-a", "m-b", "m-f"]); // no coordinator, no revoked or ended access
+    const crew = onTeam(team, later);
     expect(capacity([[day("m-a", 0), day("m-b", 120), day("m-f", 0)]], crew).map((r) => r.id)).toEqual(["m-b", "m-a", "m-f"]); // most assigned first, then by name
     expect(timeline([day("m-a", 0), day("m-b", 120), day("m-f", 0)], crew, TEXT_2026_09_21).map((r) => r.id)).toEqual(["m-b", "m-f", "m-a"]); // work, then away, then free
     expect(OVERVIEW_ROWS).toBe(8);

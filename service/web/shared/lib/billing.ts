@@ -4,6 +4,10 @@
 // days written in the user's language; inquiries are instants in the display time zone.
 import type { Currency } from "@ac/web/lib/contracts.gen";
 import { EN, intlTag, showDate, showTime, translator, zonedInstant, zonedParts, type I18n, type Locale, type T } from "@ac/web/lib/i18n";
+import { money } from "@ac/web/lib/money";
+import { isAfter } from "@ac/web/lib/order";
+import { withoutYear } from "@ac/web/lib/text";
+import { entryOf, lookup } from "@ac/web/lib/lookup";
 
 const PROCESSING = "processing";
 
@@ -62,10 +66,6 @@ export function monthsText(from: string | undefined, to: string | undefined, i: 
   return null;
 }
 export { money } from "@ac/web/lib/money";
-import { money } from "@ac/web/lib/money";
-import { isAfter } from "@ac/web/lib/order";
-import { withoutYear } from "@ac/web/lib/text";
-import { entryOf, lookup } from "@ac/web/lib/lookup";
 
 /** An amount with its sign: + for an addition, a minus sign for a deduction. */
 const signedMoney = (minor: number, currency: string) => `${minor > 0 ? "+" : "−"}${money(Math.abs(minor), currency)}`;

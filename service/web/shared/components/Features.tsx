@@ -34,7 +34,7 @@ export function GroupControl({ space, units }: Readonly<{ space: string; units: 
   const toast = useToast();
   const [sel, setSel] = useState<string[]>(units.filter((u) => u.online).slice(0, 4).map((u) => u.id));
   const [power, setPower] = useState<"on" | "off">("on");
-  const [setpoint, setTemperature] = useState(24);
+  const [setpoint, setSetpoint] = useState(24);
   const [mode, setMode] = useState<"cool" | "auto" | "fan">("cool");
   const [review, setReview] = useState(false);
   const toggle = (id: string) => { setSel((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id])); };
@@ -55,7 +55,7 @@ export function GroupControl({ space, units }: Readonly<{ space: string; units: 
       <Card title={`Apply to ${String(sel.length)} selected ACs`}>
         <div className="flex flex-wrap items-center gap-4">
           <Choice value={power} onChange={setPower} options={[{ id: "on", label: "On" }, { id: "off", label: "Off" }]} />
-          <div className="flex items-center gap-2"><Btn size="sm" onClick={() => { setTemperature((t) => Math.max(16, t - 1)); }} aria-label="Lower the temperature"><Icon name="remove" /></Btn><b className="w-14 text-center">{setpoint} °C</b><Btn size="sm" onClick={() => { setTemperature((t) => Math.min(30, t + 1)); }} aria-label="Raise the temperature"><Icon name="add" /></Btn></div>
+          <div className="flex items-center gap-2"><Btn size="sm" onClick={() => { setSetpoint((t) => Math.max(16, t - 1)); }} aria-label="Lower the temperature"><Icon name="remove" /></Btn><b className="w-14 text-center">{setpoint} °C</b><Btn size="sm" onClick={() => { setSetpoint((t) => Math.min(30, t + 1)); }} aria-label="Raise the temperature"><Icon name="add" /></Btn></div>
           <Choice value={mode} onChange={setMode} options={[{ id: "cool", label: "Cool" }, { id: "auto", label: "Auto" }, { id: "fan", label: "Fan" }]} />
           <Btn variant="primary" disabled={sel.length === 0} onClick={() => { setReview(true); }}>Review & send</Btn>
         </div>

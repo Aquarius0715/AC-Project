@@ -11,7 +11,7 @@ export function ControlDemo({ id }: Readonly<{ id: string }>) {
   const isRestricted = id === "unit-limited";
   const [reason, setReason] = useState("Confirming mode change resolves reported airflow complaint.");
   const [mode, setMode] = useState("cool");
-  const [setpoint, setTemperature] = useState("24");
+  const [setpoint, setSetpoint] = useState("24");
   const [dur, setDur] = useState("5");
   const [trReason, setTrReason] = useState("Verify cooling recovers after coil clean.");
   const [confirm, setConfirm] = useState<null | "cmd" | "test">(null);
@@ -38,7 +38,7 @@ export function ControlDemo({ id }: Readonly<{ id: string }>) {
       <div className="split">
         <div className="flex min-w-0 flex-col gap-4">
           <Card title="Normal diagnostic action">
-            <div className="grid-fluid" style={{ ["--min"as string]: "180px" }}><Field label="Job"><Input readOnly value="job-contractor-a" /></Field><Field label="Action"><Select value={mode} onChange={(e) => { setMode(e.target.value); }}><option value="cool">set_mode = cool</option><option value="dry">set_mode = dry</option><option value="fan">set_mode = fan</option></Select></Field><Field label="Set temp (°C)"><Input type="number" value={setpoint} onChange={(e) => { setTemperature(e.target.value); }} /></Field></div>
+            <div className="grid-fluid" style={{ ["--min"as string]: "180px" }}><Field label="Job"><Input readOnly value="job-contractor-a" /></Field><Field label="Action"><Select value={mode} onChange={(e) => { setMode(e.target.value); }}><option value="cool">set_mode = cool</option><option value="dry">set_mode = dry</option><option value="fan">set_mode = fan</option></Select></Field><Field label="Set temp (°C)"><Input type="number" value={setpoint} onChange={(e) => { setSetpoint(e.target.value); }} /></Field></div>
             <div className="mt-3"><Field label="Reason (required)"><Textarea value={reason} onChange={(e) => { setReason(e.target.value); }} /></Field></div>
             <div className="mt-3 flex justify-end"><Btn variant="primary" onClick={() => { check("cmd"); }}>Review & send</Btn></div>
           </Card>

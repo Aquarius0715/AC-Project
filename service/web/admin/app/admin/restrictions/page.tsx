@@ -82,13 +82,13 @@ export default async function AdminRestrictionsPage({ searchParams }: Readonly<P
       Promise.all(commandIds.map((c) => orNull(coreOp<ApiCommand>("commands.get", { id: c })))),
       isFull && r.contractId ? coreOp<Page<ApiInvoice>>(INVOICES_LIST, { limit: 100, filters: { contractId: r.contractId } }) : Promise.resolve({ items: [] as ApiInvoice[] }),
     ]);
-    const invoice = new Map(invoices.items.map((i) => [i.id, i]));
-    const causes = (r.causeInvoiceIds ?? []).map((i) => ({ id: i, number: invoice.get(i)?.number ?? i.slice(0, 8), paid: invoice.get(i)?.status === "paid", amountMinor: invoice.get(i)?.amountMinor ?? null, currency: invoice.get(i)?.currency ?? "" }));
-    const isAllPaid = causes.length > 0 && causes.every((c) => c.paid);
+    const invoice = new Map(invoices.items.map((inv) => [inv.id, inv]));
+    const causeRows = (r.causeInvoiceIds ?? []).map((invoiceId) => ({ id: invoiceId, number: invoice.get(invoiceId)?.number ?? invoiceId.slice(0, 8), paid: invoice.get(invoiceId)?.status === "paid", amountMinor: invoice.get(invoiceId)?.amountMinor ?? null, currency: invoice.get(invoiceId)?.currency ?? "" }));
+    const isAllPaid = causeRows.length > 0 && causeRows.every((c) => c.paid);
     const notices = r.noticeNotificationIds?.length ?? 0;
     live.selected = {
       r,
-      causes,
+      causes: causeRows,
       contract: contractLabel(r.contractId),
       allPaid: isAllPaid,
       units: unitRows(r, names, new Map(commands.filter((c): c is ApiCommand => !!c).map((c) => [c.id, c])), i),
@@ -115,7 +115,7 @@ export default async function AdminRestrictionsPage({ searchParams }: Readonly<P
     live.schedule = contracts.items.filter((k) => k.planType === "rto" && k.restrictionEligible && k.rulesVersion && term(k)).map((k) => {
       return {
         id: k.id, version: k.version, label: contractLabel(k.id), rulesVersion: k.rulesVersion ?? "", recipients: clients.items.filter((c) => c.customerId === k.customerId).length,
-        invoices: overdue.items.filter((i) => i.contractId === k.id && i.status === "unpaid").map((i) => ({ id: i.id, number: i.number })),
+        invoices: overdue.items.filter((inv) => inv.contractId === k.id && inv.status === "unpaid").map((inv) => ({ id: inv.id, number: inv.number })),
         units: k.unitIds.map((u) => {
           const unit = units.items.find((x) => x.id === u);
           const c = unit ? cap.get(unit.modelId) : undefined;

@@ -63,8 +63,8 @@ export function TechDevicesView({ live }: Readonly<{ live: TechDevicesLive }>) {
   const closeRefused = () => { setRefused(null); close(); };
   const isBusy = !!dv?.detail.activeOperation;
   useEffect(() => { // an operation starts on the scheduler and finishes with the device's answer or at its deadline (IR67)
-    const t = isBusy ? setInterval(() => { router.refresh(); }, 4000) : null;
-    return () => { if (t) clearInterval(t); };
+    const timer = isBusy ? setInterval(() => { router.refresh(); }, 4000) : null;
+    return () => { if (timer) clearInterval(timer); };
   }, [isBusy, router]);
   const canWrite = live.canMaintain && !!dv?.jobId;
   const regUnit = live.register.find((u) => u.unitId === reg.unitId);
@@ -145,11 +145,11 @@ export function TechDevicesView({ live }: Readonly<{ live: TechDevicesLive }>) {
                   : <Link href={`/technician/devices/${dv.detail.id}`} className="rounded-control border border-line px-3 py-1.5 text-xs font-semibold">{t("Device events")} <Icon name="arrowRight" /></Link>}
               </div>
               <div className="grid-fluid" style={{ ["--min" as string]: "150px" }}>
-                {dv.tiles.map((t) => (
-                  <div key={t.label} className={cx("rounded-xl border p-3", t.warn ? "border-[#fdba74] bg-warn-soft/50" : "border-line")}>
-                    <div className="text-[11px] text-muted-foreground">{t.label}</div>
-                    <div className="flex items-center gap-1.5 text-[15px] font-bold">{t.dot && <span className={cx("h-2 w-2 rounded-full", dot[t.dot])} />}<span className={t.warn ? "text-warn" : ""}>{t.value}</span></div>
-                    <div className="text-[10px] text-muted-foreground">{t.sub}</div>
+                {dv.tiles.map((tile) => (
+                  <div key={tile.label} className={cx("rounded-xl border p-3", tile.warn ? "border-[#fdba74] bg-warn-soft/50" : "border-line")}>
+                    <div className="text-[11px] text-muted-foreground">{tile.label}</div>
+                    <div className="flex items-center gap-1.5 text-[15px] font-bold">{tile.dot && <span className={cx("h-2 w-2 rounded-full", dot[tile.dot])} />}<span className={tile.warn ? "text-warn" : ""}>{tile.value}</span></div>
+                    <div className="text-[10px] text-muted-foreground">{tile.sub}</div>
                   </div>
                 ))}
               </div>

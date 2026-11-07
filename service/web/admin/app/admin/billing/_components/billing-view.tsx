@@ -211,7 +211,7 @@ export function BillingView({ live }: Readonly<{ live?: BillingLive }>) {
     }
     router.replace(q.size > 0 ? `${pathname}?${q}` : pathname, { scroll: false });
   };
-  const act = <T,>(fn: () => Promise<ActionResult<T>>, ok: string | ((v: T) => string), after?: (v: T) => void) => {
+  const act = <Value,>(fn: () => Promise<ActionResult<Value>>, ok: string | ((v: Value) => string), after?: (v: Value) => void) => {
     start(async () => {
       const r = await fn();
       if (r.ok) {
@@ -422,7 +422,7 @@ function BillingMonths({ from, to, onChange }: Readonly<{ from?: string; to?: st
   );
 }
 
-type Act = <T>(fn: () => Promise<ActionResult<T>>, ok: string | ((v: T) => string), after?: (v: T) => void) => void;
+type Act = <Value>(fn: () => Promise<ActionResult<Value>>, ok: string | ((v: Value) => string), after?: (v: Value) => void) => void;
 
 /** The contractor payouts tab (FR-A23, DD-A23, Figma Admin 699:22119): the statement period, contractor and status
 filters in the URL, the statements table, Generate drafts for a month that has ended, and the selected statement

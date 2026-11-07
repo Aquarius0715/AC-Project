@@ -224,7 +224,7 @@ function RelatedRecords({ related, demo }: Readonly<{ related: Related; demo: bo
   );
 }
 
-function CommandLine({ r, demo, line }: Readonly<{ r: RelatedRef; demo: boolean; line: ReactNode }>) {
+function CommandLine({ r, demo, line: lineText }: Readonly<{ r: RelatedRef; demo: boolean; line: ReactNode }>) {
   type Loaded = { state: "idle" | "loading" } | { state: "done"; text: string; when: string; unitId: string | null } | { state: "error"; text: string };
   const { t, display } = useI18n();
   const [c, setC] = useState<Loaded>({ state: "idle" });
@@ -242,7 +242,7 @@ function CommandLine({ r, demo, line }: Readonly<{ r: RelatedRef; demo: boolean;
   };
   return (
     <span className="flex flex-col gap-1">
-      <span className="flex flex-wrap items-center justify-between gap-2">{line}{c.state !== "done" && <Btn size="sm" disabled={c.state === "loading"} onClick={() => { void load(); }}>{t("Load command")}</Btn>}</span>
+      <span className="flex flex-wrap items-center justify-between gap-2">{lineText}{c.state !== "done" && <Btn size="sm" disabled={c.state === "loading"} onClick={() => { void load(); }}>{t("Load command")}</Btn>}</span>
       {c.state === "done" && <span className="flex flex-wrap items-center justify-between gap-2 text-xs"><span>{c.text} · {c.when}</span>{c.unitId && <TextLink href={`/admin/units?unitId=${c.unitId}`}>{t("Open unit")} <Icon name="arrowRight" /></TextLink>}</span>}
       {c.state === "error" && <span className="text-xs text-crit">{c.text}</span>}
     </span>

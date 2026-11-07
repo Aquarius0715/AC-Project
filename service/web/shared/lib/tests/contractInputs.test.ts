@@ -39,10 +39,10 @@ function contract(): { inputs: Record<string, string[]>; results: Record<string,
   const results: Record<string, ResultFields> = {};
   const sortedOps = c.getPropertiesOfType(must(ops)).toSorted((a, b) => a.getName().localeCompare(b.getName()));
   for (const op of sortedOps) {
-    const contract = c.getTypeOfSymbol(op);
-    const input = must(contract.getProperty("input"));
+    const opType = c.getTypeOfSymbol(op);
+    const input = must(opType.getProperty("input"));
     inputs[op.getName()] = sorted(c.getTypeOfSymbol(input));
-    const result = c.getTypeOfSymbol(must(contract.getProperty("result")));
+    const result = c.getTypeOfSymbol(must(opType.getProperty("result")));
     const array = element(result);
     if (array) {
       results[op.getName()] = { fields: [], items: sorted(array) };
