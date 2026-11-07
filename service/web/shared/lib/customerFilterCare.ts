@@ -175,7 +175,7 @@ export const reminderForm = (s: ApiFilterSettings): ReminderForm => {
     useDefault: s.thresholdHours === null, hours: String(s.thresholdHours ?? DEFAULT_FILTER_HOURS), days: String(s.fallbackDays), recipients: s.recipients, email: s.channels.includes("email"),
   };
 };
-const whole = (v: string, lo: number, hi: number) => /^\d+$/.test(v.trim()) && +v >= lo && +v <= hi;
+const whole = (v: string, lo: number, hi: number) => /^\d+$/.test(v.trim()) && Number(v) >= lo && Number(v) <= hi;
 export function reminderErrors(f: ReminderForm, t: T = en): { hours?: string; days?: string } {
   return {
     ...(!f.useDefault && !whole(f.hours, 50, 2000) && { hours: t("Whole hours from 50 to 2000.") }),

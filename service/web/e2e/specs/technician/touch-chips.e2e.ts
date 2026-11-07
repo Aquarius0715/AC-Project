@@ -1,13 +1,14 @@
 // A technician's phone (IR615, IR616): on a 390×844 touch screen the overview's job tabs and the devices' state
 // filters are at least 44 px tall, as the shared controls are, and still filter; a filter that hides the open device
 // opens its first device instead. Nothing is written.
+import type { Locator } from "@playwright/test";
 import { test, expect } from "../../fixtures/test";
 import { expectAccessible } from "../../fixtures/a11y";
 
 test.use({ hasTouch: true, viewport: { width: 390, height: 844 } });
 
 test("the job tabs and the device filters are touch-sized and filter", async ({ page }) => {
-  const tall = async (loc: import("@playwright/test").Locator) => {
+  const tall = async (loc: Locator) => {
     const heights = await loc.evaluateAll((els) => els.map((el) => el.getBoundingClientRect().height));
     for (const box of heights) expect(box).toBeGreaterThanOrEqual(43.5);
   };

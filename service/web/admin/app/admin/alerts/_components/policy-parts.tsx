@@ -30,9 +30,9 @@ export function ConditionFields({ c, onChange, errors, tried, fixedMetric }: Rea
           ? <Field label={t("Metric")} hint={unit && t("unit fixed: {unit}", { unit })}><Input readOnly value={textOf(metricLabel, c.metric, t) ?? c.metric} /></Field>
           : <Field label={t("Metric")}><Select value={c.metric} onChange={(e) => { onChange({ metric: e.target.value }); }}>{HQ_METRICS.map((k) => <option key={k} value={k}>{(textOf(metricLabel, k, t) ?? k)}</option>)}</Select></Field>}
         <Field label={t("Comparison")}><Select value={c.operator} onChange={(e) => { onChange({ operator: oneOf(OPERATORS, e.target.value, c.operator) }); }}>{OPERATORS.map((o) => <option key={o} value={o}>{opSymbol[o]}</option>)}</Select></Field>
-        <Field label={t("Alert when {op}", { op: opSymbol[c.operator] })} error={tried ? errors.threshold : undefined}><Input type="number" value={c.threshold} onChange={(e) => { onChange({ threshold: +e.target.value }); }} /></Field>
-        <Field label={t("For (s)")} error={tried ? errors.duration : undefined}><Input type="number" value={c.duration} onChange={(e) => { onChange({ duration: +e.target.value }); }} /></Field>
-        <Field label={t("Recover")} error={errors.recovery}><Input type="number" value={c.recovery} onChange={(e) => { onChange({ recovery: +e.target.value }); }} /></Field>
+        <Field label={t("Alert when {op}", { op: opSymbol[c.operator] })} error={tried ? errors.threshold : undefined}><Input type="number" value={c.threshold} onChange={(e) => { onChange({ threshold: Number(e.target.value) }); }} /></Field>
+        <Field label={t("For (s)")} error={tried ? errors.duration : undefined}><Input type="number" value={c.duration} onChange={(e) => { onChange({ duration: Number(e.target.value) }); }} /></Field>
+        <Field label={t("Recover")} error={errors.recovery}><Input type="number" value={c.recovery} onChange={(e) => { onChange({ recovery: Number(e.target.value) }); }} /></Field>
       </div>
       {/* an illustrative curve that crosses the threshold and comes back (not real readings) */}
       <div className="mt-2"><LineChart points={(c.operator === "lt" || c.operator === "lte" ? FALL : RISE).map((k) => Math.round(k * c.threshold * 10) / 10)} threshold={c.threshold} height={90} /></div>

@@ -25,10 +25,10 @@ export function AutomationDemo() {
   const [result, setResult] = useState<null | { unit: string; d: string }[]>(null);
   const [fired, setFired] = useState(false);
   const [conflict, setConflict] = useState(false);
-  const temperatureError = +setpoint < 16 || +setpoint > 30 ? "Outside 16–30 °C on at least one unit" : undefined;
+  const temperatureError = Number(setpoint) < 16 || Number(setpoint) > 30 ? "Outside 16–30 °C on at least one unit" : undefined;
   const outcome = (f: (typeof facts)[number]) => {
     if (f.value === "") return { unit: f.unit, d: "missing_data — tariff reading unavailable, action skipped" };
-    return +f.value > +inputValue ? { unit: f.unit, d: `${sel.name} → set ${setpoint} °C` } : { unit: f.unit, d: "no rule matched" };
+    return Number(f.value) > Number(inputValue) ? { unit: f.unit, d: `${sel.name} → set ${setpoint} °C` } : { unit: f.unit, d: "no rule matched" };
   };
   const simulate = () => { setResult(facts.map((f) => outcome(f))); };
   return (

@@ -13,7 +13,7 @@ export function OffsetsDemo() {
   const [ack, setAck] = useState(false);
   const [done, setDone] = useState(false);
   const [explain, setExplain] = useState(false);
-  const isValid = +amount > 0;
+  const isValid = Number(amount) > 0;
   return (
     <Page>
       <div className="text-[13px] text-muted-foreground"><Link href="/customer/energy" className="font-semibold text-primary"><Icon name="arrowLeft" /> Energy & cost</Link> › Carbon offsets (demo)</div>

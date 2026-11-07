@@ -10,10 +10,13 @@ export type AppLinks = Partial<Record<Role, string>>;
 type Params = Record<string, string | string[] | undefined>;
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
+const NO_LINKS: AppLinks = {};
+const NO_PARAMS: Params = {};
+
 /** Sign-in of one role's app (FR-X01, DDC-07, SCR-X-login, Figma Login frames), rendered on the server (IR251): the data
 source and the kept returnTo decide where Continue goes, and a sign-in that came back says why. `others` are the
 base URLs of the other apps (plain links: separate apps). */
-export function LoginScreen({ appRole: role, others = {}, params = {}, api }: Readonly<{ appRole: Role; others?: AppLinks; params?: Params; api: boolean }>) {
+export function LoginScreen({ appRole: role, others = NO_LINKS, params = NO_PARAMS, api }: Readonly<{ appRole: Role; others?: AppLinks; params?: Params; api: boolean }>) {
   const config = roleConfig(role);
   const href = continueHref(api, role, safeReturnTo(role, one(params.returnTo)));
   const error = loginError(one(params.error));

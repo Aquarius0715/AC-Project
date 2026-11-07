@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Badge, Btn, Card, DataTable, Field, Input, ListRow, Modal, Page, Select, Steps, SummaryList, useToast } from "@ac/web/components/ui";
 import { Icon } from "@ac/web/components/Icon";
-import { type NonEmpty } from "@ac/web/lib/lists";
+import type { NonEmpty } from "@ac/web/lib/lists";
 
 interface R { id: string; meta: string; policy: string; st: "Scheduled" | "Requested" | "Applied" | "Release requested" | "Released"; prog: string; tone: "primary" | "warn" | "ok" | "unknown" }
 const seed: NonEmpty<R> = [

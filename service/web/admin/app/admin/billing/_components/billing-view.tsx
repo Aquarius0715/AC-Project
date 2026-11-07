@@ -28,7 +28,7 @@ import {
   answerInquiry, confirmCardPayment, createInvoice, generatePayouts, previewReminder, recordManualPayment, resolvePayoutQuery, sendReminder, transitionStatement, type ActionResult,
 } from "../actions";
 import { Icon } from "@ac/web/components/Icon";
-import { type NonEmpty } from "@ac/web/lib/lists";
+import type { NonEmpty } from "@ac/web/lib/lists";
 import { oneOf } from "@ac/web/lib/oneOf";
 import { filled } from "@ac/web/lib/filled";
 import { entryOf } from "@ac/web/lib/lookup";
@@ -188,7 +188,7 @@ function PaymentModal({ modal, close, onRecord, pending, tried, live, sel, m, se
   const { t } = useI18n();
   return (
     <Modal open={modal === "manual" || modal === "confirm"} onClose={close} title={t(modal === "confirm" ? "Confirm card payment" : "Record manual payment")} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={onRecord}>{t(modal === "confirm" ? "Confirm payment" : "Record payment")}</Btn></>}>
-      {sel && <Field label={t("Amount (must equal invoice — full payment only)")} error={tried && Math.round(+m.amount * 100) !== sel.amountMinor ? t("Must equal {amount}", { amount: sel.amt }) : undefined}><Input type="number" value={m.amount} onChange={(e) => { setM({ ...m, amount: e.target.value }); }} disabled={modal === "confirm"} /></Field>}
+      {sel && <Field label={t("Amount (must equal invoice — full payment only)")} error={tried && Math.round(Number(m.amount) * 100) !== sel.amountMinor ? t("Must equal {amount}", { amount: sel.amt }) : undefined}><Input type="number" value={m.amount} onChange={(e) => { setM({ ...m, amount: e.target.value }); }} disabled={modal === "confirm"} /></Field>}
       <Field label={t("Reference")} error={tried && !m.ref.trim() ? t("Reference is required") : undefined}><Input value={m.ref} onChange={(e) => { setM({ ...m, ref: e.target.value }); }} placeholder="manual-2026-0189" maxLength={128} /></Field>
       {live ? <Field label={t("Reason")} error={tried && !m.reason.trim() ? t("A reason is required") : undefined}><Input value={m.reason} onChange={(e) => { setM({ ...m, reason: e.target.value }); }} placeholder={t("Bank transfer received")} maxLength={1000} /></Field> : <Field label={t("Paid on")}><Input type="date" value={m.paidAt} onChange={(e) => { setM({ ...m, paidAt: e.target.value }); }} /></Field>}
       {modal === "manual" && <p className="text-[11px] text-muted-foreground">{t("Marks the invoice paid; the payment method stays “not selected”. Related restrictions move to “release requested” when all their cause invoices are paid. Resubmitting the same reference returns the same result.")}</p>}
@@ -270,7 +270,7 @@ export function BillingView({ live }: Readonly<{ live?: BillingLive }>) {
   };
   const record = () => {
     setTried(true);
-    if (!sel || !m.ref.trim() || Math.round(+m.amount * 100) !== sel.amountMinor || (live && !m.reason.trim())) return;
+    if (!sel || !m.ref.trim() || Math.round(Number(m.amount) * 100) !== sel.amountMinor || (live && !m.reason.trim())) return;
     if (live) { act(() => recordManualPayment(sel.id, sel.version, m.ref.trim(), sel.amountMinor, sel.currency, m.reason.trim()), t("Manual payment recorded"), close); return; }
     if (demoReminded) setConflict(true);
     setDemoList((l) => l.map((x) => (x.id === sel.id ? { ...x, st: "Paid", method: "Method not selected · confirmed", methodName: NO_METHOD, paymentState: "confirmed" } : x)));
@@ -477,7 +477,7 @@ function PayoutsTab({ live, nav, act, pending }: Readonly<{ live: BillingLive; n
                 {q.reply ? <p className="mt-1 text-xs text-muted-foreground">{q.adjustment ? t("Reply: {reply} · adjustment {amount}, added to the contractor's next draft", { reply: q.reply, amount: q.adjustment }) : t("Reply: {reply}", { reply: q.reply })}</p> : (
                   <div className="mt-2 flex flex-col gap-2">
                     <Textarea aria-label={t("Reply to the contractor")} value={answer(q.id).reply} onChange={(e) => { setAnswer(q.id, { reply: e.target.value }); }} placeholder={t("Reply to the contractor")} />
-                    <div className="flex flex-wrap items-center gap-2"><Input aria-label={t("Adjustment")} type="number" value={answer(q.id).adjustment} onChange={(e) => { setAnswer(q.id, { adjustment: e.target.value }); }} placeholder={t("Adjustment (optional)")} className="w-48" /><Btn size="sm" disabled={pending || !answer(q.id).reply.trim()} onClick={() => { act(() => resolvePayoutQuery(st.id, st.version, q.id, answer(q.id).reply.trim(), answer(q.id).adjustment ? Math.round(+answer(q.id).adjustment * 100) : null), t("Answered")); }}>{t("Answer")}</Btn></div>
+                    <div className="flex flex-wrap items-center gap-2"><Input aria-label={t("Adjustment")} type="number" value={answer(q.id).adjustment} onChange={(e) => { setAnswer(q.id, { adjustment: e.target.value }); }} placeholder={t("Adjustment (optional)")} className="w-48" /><Btn size="sm" disabled={pending || !answer(q.id).reply.trim()} onClick={() => { act(() => resolvePayoutQuery(st.id, st.version, q.id, answer(q.id).reply.trim(), answer(q.id).adjustment ? Math.round(Number(answer(q.id).adjustment) * 100) : null), t("Answered")); }}>{t("Answer")}</Btn></div>
                   </div>
                 )}
               </div>

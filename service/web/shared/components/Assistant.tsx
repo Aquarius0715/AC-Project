@@ -302,7 +302,7 @@ function DemoAssistant({ onClose, context }: Readonly<{ onClose: () => void; con
     const setpoint = (/(\d{2})/.exec(q))?.[1];
     const named = demoUnits.find((u) => q.toLowerCase().includes(u.toLowerCase().replace(" #2", "")));
     if (setpoint && /set|change/i.test(q)) {
-      add(named ? { kind: "confirm", target: named, temp: +setpoint } : { kind: "ask", options: ["Bedroom AC", "Bedroom AC #2"], temp: +setpoint });
+      add(named ? { kind: "confirm", target: named, temp: Number(setpoint) } : { kind: "ask", options: ["Bedroom AC", "Bedroom AC #2"], temp: Number(setpoint) });
       return;
     }
     if (/temperature/i.test(q)) { add({ kind: "bot", text: "Bedroom AC is 28.0 °C (observed 09:12). Bedroom AC #2 is 27.0 °C." }); return; }

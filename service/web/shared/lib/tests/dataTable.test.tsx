@@ -24,7 +24,7 @@ function Page() {
   return (
     <>
       <p>Opened {n}</p>
-      <DataTable rows={units} rowKey={(u) => u.id} cols={[{ key: "a", label: "Actions", render: (u) => <button onClick={() => { setN(n + 1); }}>Edit {u.name}</button> }]} />
+      <DataTable rows={units} rowKey={(u) => u.id} cols={[{ key: "a", label: "Actions", render: (u) => <button type="button" onClick={() => { setN(n + 1); }}>Edit {u.name}</button> }]} />
     </>
   );
 }

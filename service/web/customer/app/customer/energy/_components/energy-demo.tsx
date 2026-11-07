@@ -28,12 +28,12 @@ export function EnergyDemo() {
       return s.length >= 4 ? s : [...s, u];
     });
   };
-  const actual = days.map((_, i) => +sel.reduce((a, u) => a + (lookup(perUnit, u)?.actual.at(i) ?? 0), 0).toFixed(1));
+  const actual = days.map((_, i) => Number(sel.reduce((a, u) => a + (lookup(perUnit, u)?.actual.at(i) ?? 0), 0).toFixed(1)));
   const base = days.map((_, i) => sel.reduce((a, u) => a + (lookup(perUnit, u)?.base.at(i) ?? 0), 0));
   const scopeLabel = sel.length === 1 ? sel[0] ?? "" : `${String(sel.length)} units`;
-  const sumA = +actual.reduce((a, b) => a + b, 0).toFixed(1);
+  const sumA = Number(actual.reduce((a, b) => a + b, 0).toFixed(1));
   const sumB = base.reduce((a, b) => a + b, 0);
-  const saved = +(sumB - sumA).toFixed(1);
+  const saved = Number((sumB - sumA).toFixed(1));
   return (
     <Page>
       <Card>

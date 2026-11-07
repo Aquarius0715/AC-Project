@@ -21,7 +21,7 @@ afterEach(() => {
 
 function Runner({ result, after, failed }: Readonly<{ result: Result; after: (v: string) => void; failed: () => void }>) {
   const [pending, run] = useAction();
-  return <button disabled={pending} onClick={() => { run(() => Promise.resolve(result), (v: string) => `Saved ${v}`, after, failed); }}>go</button>;
+  return <button type="button" disabled={pending} onClick={() => { run(() => Promise.resolve(result), (v: string) => `Saved ${v}`, after, failed); }}>go</button>;
 }
 
 const press = async (result: Result) => {

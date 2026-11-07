@@ -37,7 +37,7 @@ export function AutomationsDemo() {
   const review = () => {
     const e: Record<string, string> = {};
     if (!f.name.trim()) e.name = "Name is required";
-    const t = +f.temp; if (!(t >= 16 && t <= 30)) e.temp = "16–30°C only (device capability)";
+    const t = Number(f.temp); if (!(t >= 16 && t <= 30)) e.temp = "16–30°C only (device capability)";
     if (f.kind === "Location" && !consent) e.kind = "Location consent is withdrawn — grant it to use location triggers";
     setError(e); if (Object.keys(e).length === 0) setStep("review");
   };

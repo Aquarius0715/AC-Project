@@ -206,15 +206,35 @@ export function webConfig(tsconfigRootDir) {
         "react/jsx-no-leaked-render": "off",
         "eqeqeq": "error",
         "no-promise-executor-return": "error",
+        // `!!x` narrows the type of x in `!!x && x.y`; `Boolean(x)` does not (it returns a plain boolean), so the boolean form
+        // stays. Numbers (`+x`) and strings (`"" + x`) are coerced with Number() and String()
+        "no-implicit-coercion": ["error", { boolean: false }],
         "react/jsx-no-constructed-context-values": "error",
         "react/jsx-no-useless-fragment": "error",
         "import/no-relative-packages": "error",
         // console.warn and console.error are the logs of the Next.js server process (a failing session store, a missing
         // translation); console.log, info and debug stay forbidden, as leftovers of debugging
         "no-console": ["error", { allow: ["warn", "error"] }],
+        "react/button-has-type": "error",
+        "react/no-object-type-as-default-prop": "error",
+        // jsx-a11y reads a <td> as a gridcell, a widget role, and asks for a label; an empty cell (the corner of a schedule grid,
+        // a column of badges) is a plain data cell. Buttons, links and inputs are still checked
+        "jsx-a11y/control-has-associated-label": ["error", { ignoreElements: ["td"] }],
+        // a render prop (recharts' tick, dot and labelFormatter, a table column's render) is a function the library calls, not
+        // a component that React mounts; a component declared inside another is still reported
+        "react/no-unstable-nested-components": ["error", { allowAsProps: true }],
         // an import names a package of the workspace root or of the workspace itself (shared, an app, e2e); `@ac/web/*` is the
         // shared package's own path alias (tsconfig paths), an internal module and no dependency of itself (see settings above)
         "import/no-extraneous-dependencies": ["error", { packageDir: [tsconfigRootDir, path.resolve(tsconfigRootDir, "..")] }],
+      },
+    },
+    {
+      files: ["**/*.{ts,tsx,mts,cts}"],
+      rules: {
+        "@typescript-eslint/consistent-type-imports": ["error", { fixStyle: "inline-type-imports" }],
+        // `import { type A }` leaves an empty import at runtime under verbatimModuleSyntax; a file that imports only types
+        // writes `import type { A }`
+        "@typescript-eslint/no-import-type-side-effects": "error",
       },
     },
     {

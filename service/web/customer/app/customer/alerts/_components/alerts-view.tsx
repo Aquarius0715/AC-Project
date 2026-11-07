@@ -4,8 +4,8 @@ import { useState } from "react";
 import { CURRENT_CLIENT } from "@ac/web/lib/clientUsers";
 import { Badge, Btn, Card, Check, Choice, ErrorState, Field, Input, Modal, Page, Select, SeverityBadge, SummaryList, Tabs, Toggle, cx, useToast, Plain, ScrollX } from "@ac/web/components/ui";
 import { useUrlTab } from "@ac/web/lib/useUrlTab";
-import { type Alert } from "@ac/web/lib/alerts";
-import { type Severity } from "@ac/web/lib/adminAlerts";
+import type { Alert } from "@ac/web/lib/alerts";
+import type { Severity } from "@ac/web/lib/adminAlerts";
 import { Icon } from "@ac/web/components/Icon";
 
 const seed: Alert[] = [
@@ -42,8 +42,9 @@ export function AlertsView({ rows = seed }: Readonly<{ rows?: Alert[] }>) {
   const info = list.filter((a) => a.group === "info" && show(a));
   const openAlert = (a: Alert) => { setOpen(a); setList((l) => l.map((x) => (x.id === a.id ? { ...x, read: true } : x))); };
 
-  const Item = ({ a }: { a: Alert }) => (
-    <Plain onClick={() => { openAlert(a); }} className="flex w-full items-start gap-3 border-t border-line px-1 py-3 text-left first:border-0 hover:bg-surface2/50">
+  // a function, not a component: a component declared here would be a new type on every render and remount its rows
+  const renderItem = (a: Alert) => (
+    <Plain key={a.id} onClick={() => { openAlert(a); }} className="flex w-full items-start gap-3 border-t border-line px-1 py-3 text-left first:border-0 hover:bg-surface2/50">
       <Icon name={a.icon} className="mt-0.5" />
       <span className="min-w-0 flex-1"><span className="flex flex-wrap items-center gap-2"><b className={cx(!a.read && "text-primary")}>{a.title}</b><Badge tone="muted" icon={a.kindIcon}>{a.kind}</Badge>{a.read && <Badge tone="ok" icon="check">Read</Badge>}</span><span className="block text-xs text-muted-foreground">{a.where}</span><span className="mt-1 block text-xs">{a.ev}</span></span>
       <span className="text-muted-foreground"><Icon name="chevronRight" /></span>
@@ -58,8 +59,8 @@ export function AlertsView({ rows = seed }: Readonly<{ rows?: Alert[] }>) {
           <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground"><Check label="Unread only" checked={unread} onChange={setUnread} /><span>Updated 09:13 · {list.filter((a) => !a.read).length} unread</span><Plain className="underline" onClick={() => { setFailed((x) => !x); }}>{failed ? "show list" : "show load error"}</Plain></div>
           {failed ? <ErrorState title="Couldn’t load alerts" onRetry={() => { setFailed(false); }}>This is not “0 alerts”. Previous values are not shown as current. Retry or open units directly.</ErrorState> : (
             <>
-              <Card title="Needs attention" sub="Unresolved warnings & faults — stays here until resolved, even after you read it" action={<Badge tone="warn">{attn.length}</Badge>}>{attn.length > 0 ? attn.map((a) => <Item key={a.id} a={a} />) : <p className="text-xs text-muted-foreground">Nothing here.</p>}</Card>
-              <Card title="Reminders & information" sub="Maintenance reminders, inspection records and system notices" action={<Badge tone="muted">{info.length}</Badge>}>{info.length > 0 ? info.map((a) => <Item key={a.id} a={a} />) : <p className="text-xs text-muted-foreground">Nothing here.</p>}</Card>
+              <Card title="Needs attention" sub="Unresolved warnings & faults — stays here until resolved, even after you read it" action={<Badge tone="warn">{attn.length}</Badge>}>{attn.length > 0 ? attn.map((a) => renderItem(a)) : <p className="text-xs text-muted-foreground">Nothing here.</p>}</Card>
+              <Card title="Reminders & information" sub="Maintenance reminders, inspection records and system notices" action={<Badge tone="muted">{info.length}</Badge>}>{info.length > 0 ? info.map((a) => renderItem(a)) : <p className="text-xs text-muted-foreground">Nothing here.</p>}</Card>
             </>
           )}
         </>
@@ -78,7 +79,7 @@ export function PoliciesPanel() {
   const [policies, setPolicies] = useState(seedPolicies);
   const [edit, setEdit] = useState<string | null>(null);
   const [f, setF] = useState<{ name: string; metric: string; op: string; val: string; dur: string; rec: string; sev: Severity }>({ name: "", metric: "co2", op: "≥", val: "1200", dur: "15", rec: "1000", sev: "warning" });
-  const isRecOk = +f.rec < +f.val;
+  const isRecOk = Number(f.rec) < Number(f.val);
   // policies.setDefaultRule is owner-only in the customer app (FR-C15, IR115); members see the rules read-only.
   const isOwner = CURRENT_CLIENT.role === "owner";
   return (

@@ -50,7 +50,7 @@ function List({ live }: Readonly<{ live: HistoryLive }>) {
         {live.rows.length === 0 ? emptyState() : (
           <ScrollX>
             <table className="w-full min-w-[880px] text-[13px]">
-              <thead><tr className="text-left text-[11px] uppercase tracking-wide text-muted-foreground"><th className="py-2 font-semibold">{t("Job")}</th><th className="py-2 font-semibold">{t("Technician")}</th><th className="py-2 font-semibold">{t("Last event")}</th><th className="py-2 font-semibold">{t("Status")}</th><th /></tr></thead>
+              <thead><tr className="text-left text-[11px] uppercase tracking-wide text-muted-foreground"><th className="py-2 font-semibold">{t("Job")}</th><th className="py-2 font-semibold">{t("Technician")}</th><th className="py-2 font-semibold">{t("Last event")}</th><th className="py-2 font-semibold">{t("Status")}</th><td /></tr></thead>
               <tbody>
                 {live.rows.map((r) => (
                   <tr key={r.id} className="border-t border-line align-top hover:bg-surface2/60">

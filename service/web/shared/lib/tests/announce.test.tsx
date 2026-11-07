@@ -10,7 +10,7 @@ afterEach(() => { cleanup(); toast.dismiss(); });
 
 function Pusher() {
   const toast = useToast();
-  return <><button onClick={() => { toast("Saved"); }}>ok</button><button onClick={() => { toast("Not saved: CONFLICT", "crit"); }}>crit</button></>;
+  return <><button type="button" onClick={() => { toast("Saved"); }}>ok</button><button type="button" onClick={() => { toast("Not saved: CONFLICT", "crit"); }}>crit</button></>;
 }
 
 // IR362: critical errors are announced at once (UX-06), other results politely

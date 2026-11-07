@@ -200,7 +200,7 @@ function WeekCard({ week, members, sel, choice, zone }: Readonly<{ week: NonNull
       {rows.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No technicians in your company yet.")}</p> : (
         <ScrollX>
           <table className="w-full min-w-[720px] text-[11px]">
-            <thead><tr><th className="p-1 text-left" />{week.dates.map((d, k) => <th key={d} className={cx("p-1 text-center font-semibold", d === week.today ? TEXT_PRIMARY : TEXT_MUTED_FOREGROUND)}>{week.days[k]}</th>)}</tr></thead>
+            <thead><tr><td className="p-1 text-left" />{week.dates.map((d, k) => <th key={d} className={cx("p-1 text-center font-semibold", d === week.today ? TEXT_PRIMARY : TEXT_MUTED_FOREGROUND)}>{week.days[k]}</th>)}</tr></thead>
             <tbody>
               {rows.map((r) => (
                 <tr key={r.id} className="border-t border-line">

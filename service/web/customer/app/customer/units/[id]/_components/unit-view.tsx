@@ -154,10 +154,12 @@ function RemoteControlCard(p: Readonly<RemoteControlProps>) {
   );
 }
 
+const NO_COMMANDS: ApiCommand[] = [];
+
 /** Unit detail and remote control. In API mode the Server Component passes the unit, its room, the policies and the
 scenario's now; the texts and times follow the user's display language and time zone (FR-X01, IR44, IR259), and a
 time of another day keeps its date (IR613). */
-export function UnitView({ id, detail, room: roomRows, policies, defaults = null, history = [], restrictionHref = null, nowMs = 0 }: Readonly<{ id: string; detail?: ApiUnitDetail; room?: UnitRow[]; policies?: PolicyOption[]; defaults?: { on: number; n: number } | null; history?: ApiCommand[]; restrictionHref?: string | null; nowMs?: number }>) {
+export function UnitView({ id, detail, room: roomRows, policies, defaults = null, history = NO_COMMANDS, restrictionHref = null, nowMs = 0 }: Readonly<{ id: string; detail?: ApiUnitDetail; room?: UnitRow[]; policies?: PolicyOption[]; defaults?: { on: number; n: number } | null; history?: ApiCommand[]; restrictionHref?: string | null; nowMs?: number }>) {
   const t = useT();
   const display = useDisplay();
   const toast = useToast();

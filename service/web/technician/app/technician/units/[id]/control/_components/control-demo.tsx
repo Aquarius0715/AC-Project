@@ -20,8 +20,8 @@ export function ControlDemo({ id }: Readonly<{ id: string }>) {
   const [run, setRun] = useState<"running" | "ended" | null>("running");
   const check = (kind: "cmd" | "test") => {
     const e: string[] = [];
-    if (kind === "cmd") { if (!reason.trim()) { e.push("Reason is required."); } if (+setpoint < (isRestricted ? 24 : 16) || +setpoint > 30) e.push(isRestricted ? `FORBIDDEN — ${setpoint} °C is below the restriction minimum 24 °C.` : "VALIDATION — temperature must be 16–30 °C."); }
-    else { if (+dur < 1 || +dur > 15) { e.push("VALIDATION — test run is 1–15 minutes only."); } if (!trReason.trim()) e.push("Reason is required."); }
+    if (kind === "cmd") { if (!reason.trim()) { e.push("Reason is required."); } if (Number(setpoint) < (isRestricted ? 24 : 16) || Number(setpoint) > 30) e.push(isRestricted ? `FORBIDDEN — ${setpoint} °C is below the restriction minimum 24 °C.` : "VALIDATION — temperature must be 16–30 °C."); }
+    else { if (Number(dur) < 1 || Number(dur) > 15) { e.push("VALIDATION — test run is 1–15 minutes only."); } if (!trReason.trim()) e.push("Reason is required."); }
     setErrs(e); if (e.length === 0) setConfirm(kind);
   };
   const send = () => {

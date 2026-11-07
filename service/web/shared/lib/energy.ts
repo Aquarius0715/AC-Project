@@ -158,7 +158,7 @@ export function baselineErrors(d: BaselineDraft, t: T = en): Record<string, stri
   if (d.unitIds.length === 0 || d.unitIds.length > 100) e.unitIds = t("Choose 1–100 units");
   const period = periodError(d.from, d.to, t) ?? (Date.parse(klInstant(d.to)) - Date.parse(klInstant(d.from)) > 366 * 24 * 3600 * 1000 ? t("At most 366 days") : undefined);
   if (period) e.period = period;
-  if (d.method === DEMO_FIXED && !(d.baselineKWh.trim() !== "" && Number.isFinite(+d.baselineKWh) && +d.baselineKWh >= 0)) e.baselineKWh = t("A value ≥ 0 kWh");
+  if (d.method === DEMO_FIXED && !(d.baselineKWh.trim() !== "" && Number.isFinite(Number(d.baselineKWh)) && Number(d.baselineKWh) >= 0)) e.baselineKWh = t("A value ≥ 0 kWh");
   if (d.method === "demo_period_comparison" && d.boundaryId === "whole_building_electricity") e.boundaryId = t("Period comparison measures AC input electricity only");
   if (codePoints(d.boundary.trim()) === 0 || d.boundary.length > 500) e.boundary = t("1–500 characters");
   if (codePoints(d.assumptions.trim()) === 0 || d.assumptions.length > 2000) e.assumptions = t("1–2000 characters");

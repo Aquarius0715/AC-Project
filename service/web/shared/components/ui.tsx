@@ -596,8 +596,10 @@ export function ListRow({ id, selected, onClick, href, children, className }: { 
 
 /* ───────────── Charts: shadcn/ui's chart on Recharts (DEC-75); full width, `height` pixels tall ───────────── */
 const axisTick = { fontSize: 10 };
+const defaultBarColors = ["#c9d8ee", "#005bea"];
+
 /** Grouped bars, one group per label. `names` name the series in the tooltip and the legend under the chart. */
-export function BarChart({ labels, series, names, unit, height = 160, colors = ["#c9d8ee", "#005bea"] }: Readonly<{ labels: string[]; series: number[][]; names?: string[]; unit?: string; height?: number; colors?: string[] }>) {
+export function BarChart({ labels, series, names, unit, height = 160, colors = defaultBarColors }: Readonly<{ labels: string[]; series: number[][]; names?: string[]; unit?: string; height?: number; colors?: string[] }>) {
   const t = useT();
   const max = Math.max(1, ...series.flat()) * 1.1;
   const data = labels.map((label, i) => ({ label, ...Object.fromEntries(series.map((s, j) => [`s${String(j)}`, s.at(i)])) }));

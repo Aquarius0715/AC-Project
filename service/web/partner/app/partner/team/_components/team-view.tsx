@@ -177,7 +177,7 @@ function WeekCard({ live }: Readonly<{ live: Live }>) {
     <Card title={w.title} action={<TextLink href="/partner/schedule">{t(OPEN_SCHEDULE)} <Icon name="arrowRight" /></TextLink>}>
       <ScrollX>
         <table className="w-full min-w-[560px] text-xs">
-          <thead><tr><th />{w.days.map((d, k) => <th key={w.dates[k]} className={cx("p-1 text-center font-semibold", k === w.dayIndex ? "text-primary" : "text-muted-foreground")}>{d}</th>)}</tr></thead>
+          <thead><tr><td />{w.days.map((d, k) => <th key={w.dates[k]} className={cx("p-1 text-center font-semibold", k === w.dayIndex ? "text-primary" : "text-muted-foreground")}>{d}</th>)}</tr></thead>
           <tbody>{w.rows.map((r) => (
             <tr key={r.id} className="border-t border-line">
               <td className="py-1.5 pr-2 font-semibold">{r.name}</td>

@@ -260,7 +260,7 @@ function PolicyEditorCard({ draft, p, isNew, errors, tried, canWrite, demo, set,
             <section><h3 className="mb-2 text-[13px] font-bold">{t("Basics")}</h3>
               <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}>
                 <Field label={t("Name")} hint={t("1–120 characters")} error={tried ? errors.name : undefined}><Input value={draft.name} placeholder={t("e.g. Bedroom too hot")} onChange={(e) => { set("name", e.target.value); }} /></Field>
-                <Field label={t("Priority")} hint="0–100" error={tried ? errors.priority : undefined}><Input type="number" value={draft.priority} onChange={(e) => { set("priority", +e.target.value); }} /></Field>
+                <Field label={t("Priority")} hint="0–100" error={tried ? errors.priority : undefined}><Input type="number" value={draft.priority} onChange={(e) => { set("priority", Number(e.target.value)); }} /></Field>
                 <Field label={t("Timezone")} hint={t("The zone the policy’s active window is evaluated in")}><Select value={draft.timezone} onChange={(e) => { set("timezone", e.target.value); }}>{[...new Set([draft.timezone, ...ZONES])].map((z) => <option key={z}>{z}</option>)}</Select></Field>
               </div>
             </section>
@@ -294,7 +294,7 @@ function PolicyEditorCard({ draft, p, isNew, errors, tried, canWrite, demo, set,
               <div className="flex flex-wrap gap-3 border-t border-line pt-2"><span className="text-xs text-muted-foreground">{t("Channels for every recipient:")}</span><Check label={t("In-app")} checked disabled /><Check label={t("Email")} checked={draft.channels.includes("email")} onChange={(v) => { onChannel("email", v); }} /><Check label="WhatsApp" checked={draft.channels.includes("whatsapp")} onChange={(v) => { onChannel("whatsapp", v); }} /></div>
               <p className="text-[11px] text-muted-foreground">{t("In-app is always on. WhatsApp reaches only recipients who allowed that channel.")}</p>
             </section>
-            <section className="grid-fluid" style={{ ["--min" as string]: "180px" }}><Field label={t("Cooldown (min)")} hint={t("Same severity is not re-sent within this window (1–1440)")} error={tried ? errors.cooldown : undefined}><Input type="number" value={draft.cooldown} onChange={(e) => { set("cooldown", +e.target.value); }} /></Field><Field label={t("Escalate after (min)")} hint={t("Escalate if still unacknowledged (1–1440)")} error={tried ? errors.escalate : undefined}><Input type="number" value={draft.escalate} onChange={(e) => { set("escalate", +e.target.value); }} /></Field></section>
+            <section className="grid-fluid" style={{ ["--min" as string]: "180px" }}><Field label={t("Cooldown (min)")} hint={t("Same severity is not re-sent within this window (1–1440)")} error={tried ? errors.cooldown : undefined}><Input type="number" value={draft.cooldown} onChange={(e) => { set("cooldown", Number(e.target.value)); }} /></Field><Field label={t("Escalate after (min)")} hint={t("Escalate if still unacknowledged (1–1440)")} error={tried ? errors.escalate : undefined}><Input type="number" value={draft.escalate} onChange={(e) => { set("escalate", Number(e.target.value)); }} /></Field></section>
           </fieldset>
           <div className="mt-5 flex flex-col gap-5">
             <NotificationPreview recipients={draft.recipients} severity={draft.severity} customerName={draft.customerName} unit={previewUnit} demo={demo} />
