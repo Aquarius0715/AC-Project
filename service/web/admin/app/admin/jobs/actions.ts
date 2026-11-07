@@ -43,8 +43,8 @@ export async function assignInternal(jobId: string, version: number, technicianM
   return run(() => coreOp("jobs.assign", { jobId, technicianMembershipId, startAt: slot.startAt, endAt: slot.endAt, ...(reason?.trim() && { reason: reason.trim() }) }, write(version)));
 }
 
-/** jobs.offer: the agreed time offered to a contractor with the offer and access windows and the terms version. */
-export async function offerToContractor(jobId: string, version: number, input: { contractorOrgId: string; visitSlot: Slot; offerExpiresAt: string; accessValidFrom: string; accessValidUntil: string; termsVersion: string }) {
+/** jobs.offer: the job offered to a contractor with all the client's agreed times (IR636) and the offer and access windows and the terms version. */
+export async function offerToContractor(jobId: string, version: number, input: { contractorOrgId: string; offerExpiresAt: string; accessValidFrom: string; accessValidUntil: string; termsVersion: string }) {
   return run(() => coreOp("jobs.offer", { jobId, ...input }, write(version)));
 }
 

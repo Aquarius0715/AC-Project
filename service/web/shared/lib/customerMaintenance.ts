@@ -72,6 +72,13 @@ function requestedLine(j: ApiClientRow, isPlan: boolean, slot: (s: Slot) => stri
   const more = j.preferredSlots.length - 1;
   return more > 0 ? t("Preferred {slot} · +{n} more (not confirmed yet)", { slot: slot(first), n: more }) : t("Preferred {slot} (not confirmed yet)", { slot: slot(first) });
 }
+/** A booked partner without a technician: the plan visit, a time already confirmed, or — until the contractor assigns —
+one of the preferred times (IR636). */
+function bookedLine(j: ApiClientRow, isPlan: boolean, slot: (s: Slot) => string, t: T): string {
+  if (isPlan) return t("Scheduled {slot} · booking the technician", { slot: slot(j.scheduledSlot ?? j.requestedSlot) });
+  if (j.scheduledSlot) return t("Confirmed {slot} · booking the technician", { slot: slot(j.scheduledSlot) });
+  return t("Service partner booked · one of your preferred times, confirmed when a technician is assigned");
+}
 /** One request of the list (Figma 07a): unit and place, origin, type and what is next — business status order. */
 export function clientRows(rows: ApiClientRow[], unit: (id: string) => { name: string; place: string }, i: I18n = EN): ClientRow[] {
   const { t } = i;
@@ -91,7 +98,7 @@ export function clientRows(rows: ApiClientRow[], unit: (id: string) => { name: s
       }
       case "cancelled": { [line, icon] = [t("Cancelled"), "cancelled"]; break;
       }
-      case "offered": case "accepted": { line = t(isPlan ? "Scheduled {slot} · booking the technician" : "Confirmed {slot} · booking the technician", { slot: j.scheduledSlot ? slot(j.scheduledSlot) : "" }); break;
+      case "offered": case "accepted": { line = bookedLine(j, isPlan, slot, t); break;
  }
       default: { line = `${t(isPlan ? "Scheduled {slot}" : "Confirmed {slot}", { slot: j.scheduledSlot ? slot(j.scheduledSlot) : "" })}${j.assignmentAcknowledgement === "accepted" ? t(" · technician confirmed") : ""}`;
       }
@@ -111,6 +118,7 @@ export function detailFacts(j: ApiClientJob, unit: { name: string; place: string
   if (photos) out.push([t("Your photos"), t(photos === 1 ? "1 photo sent with your report" : "{n} photos sent with your report", { n: photos })]);
   if (j.contactWindow) out.push([t("Contact window"), j.contactWindow]);
   if (j.scheduledSlot && j.slotProposal?.status !== "pending") out.push([t(isPlan ? "Scheduled" : "Confirmed time"), isPlan ? t("{slot} · set by HQ from your plan", { slot: slotLong(j.scheduledSlot, i) }) : slotLong(j.scheduledSlot, i)]);
+  if (!isPlan && !j.scheduledSlot && ["offered", "accepted"].includes(j.status)) out.push([t("Confirmed time"), t("being arranged — it will be one of your preferred times, and you are told when the service partner assigns a technician")]);
   const a = j.assignment;
   if (a?.acknowledgement === "accepted") out.push([t("Technician"), `${a.technicianName ?? t("your technician")} · ${t(j.contractorOrgId ? "service partner" : "HQ")}`]);
   if (a?.acknowledgement !== "accepted" && j.scheduledSlot && ["offered", "accepted", "assigned"].includes(j.status)) out.push([t("Technician"), t("being confirmed — the name shows once the technician accepts")]);

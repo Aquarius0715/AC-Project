@@ -12,6 +12,6 @@ export default async function PartnerSchedulePage({ searchParams }: Readonly<Pag
   await connection();
   const sp = await searchParams;
   if (!apiMode()) return <ScheduleDemo jobId={one(sp.jobId)} />;
-  const live = await loadSchedule({ jobId: one(sp.jobId), sort: one(sp.sort) });
+  const live = await loadSchedule({ jobId: one(sp.jobId), sort: one(sp.sort), slot: one(sp.slot) });
   return <ScheduleView live={live} />;
 }

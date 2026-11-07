@@ -144,7 +144,7 @@ export async function loadJobs(sp: SP) {
         // the plan occurrence is an instant: its date in the display zone, as on the Plans tab (IR291)
         occurrence: job.occurrenceAt ? planDate(job.occurrenceAt, i.display) : null, classifyBy: classifyBy(job.createdAt, i),
         declinedAt: sp2?.decidedAt ? showTime(sp2.decidedAt, i.display) : null, replyBy: sp2 ? showTime(sp2.replyBy, i.display) : null, proposed: sp2 ? longSlot(sp2.slot, i) : null,
-        agreed: job.offer ? slotText(job.offer.visitSlot, i) : null, partnerSlot: pp ? longSlot(pp.slot, i) : null, partnerSent: pp ? showTime(pp.sentAt, i.display) : null,
+        agreed: job.offer ? job.offer.candidateSlots.map((s) => slotText(s, i)).join(" / ") : null, partnerSlot: pp ? longSlot(pp.slot, i) : null, partnerSent: pp ? showTime(pp.sentAt, i.display) : null,
         accessUntil: job.offer ? showTime(job.offer.accessValidUntil, i.display) : null,
       },
       report: report ? { ...reportCard(job, report, byUser, i), photos } : null, draft: !!job.draftReportRef,

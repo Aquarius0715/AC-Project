@@ -86,7 +86,7 @@ type OfferSummary struct {
 	OfferExpiresAt         time.Time `json:"offerExpiresAt"`
 	TermsVersion           string    `json:"termsVersion"`
 	Origin                 string    `json:"origin"`
-	VisitSlot              Slot      `json:"visitSlot"`
+	CandidateSlots         []Slot    `json:"candidateSlots"`   // the times the contractor may pick from (IR636)
 	OfferedAt              time.Time `json:"offeredAt"`        // when HQ sent the offer (IR226)
 	AccessValidFrom        time.Time `json:"accessValidFrom"`  // the delegation (access) period if accepted (IR226)
 	AccessValidUntil       time.Time `json:"accessValidUntil"` //
@@ -128,7 +128,7 @@ type SiteAddresses interface {
 func (m Jobs) offers(ctx context.Context, call *ops.Call, job *uuid.UUID) ([]OfferSummary, error) {
 	stmt := `SELECT j.id, j.version, j.type, j.unit_id, lower(j.requested_slot), upper(j.requested_slot), j.due_at,
 		j.origin,
-		o.id, o.decision, o.offer_expires_at, o.terms_version, lower(o.visit_slot), upper(o.visit_slot), o.offered_at,
+		o.id, o.decision, o.offer_expires_at, o.terms_version, o.candidate_slots, o.offered_at,
 		o.access_valid_from, o.access_valid_until
 		FROM maintenance.offers o JOIN maintenance.jobs j ON j.id = o.job_id
 		WHERE o.contractor_org_id = $1 AND ((o.decision IS NULL AND $2 < o.offer_expires_at AND j.status = 'offered') OR
@@ -171,8 +171,7 @@ func (m Jobs) offers(ctx context.Context, call *ops.Call, job *uuid.UUID) ([]Off
 			&decision,
 			&offerSummary.OfferExpiresAt,
 			&offerSummary.TermsVersion,
-			&offerSummary.VisitSlot.StartAt,
-			&offerSummary.VisitSlot.EndAt,
+			&offerSummary.CandidateSlots,
 			&offerSummary.OfferedAt,
 			&offerSummary.AccessValidFrom,
 			&offerSummary.AccessValidUntil,

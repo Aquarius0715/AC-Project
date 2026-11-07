@@ -86,8 +86,8 @@ describe("HQ maintenance jobs", () => {
     ]);
     const internal = deliveryOf(job({ status: "assigned", assignment: { technicianMembershipId: "m-int", scheduledStart: TEXT_2026_09_22T02_00_00Z, scheduledEnd: TEXT_2026_09_22T04_00_00Z, status: "active", acknowledgement: "cant_make", cantMakeReason: "sick", alternativeSlot: null } }), names, NOW);
     expect([internal.kind, internal.lines, internal.ack?.text, internal.cantMake]).toStrictEqual(["internal", [[TECHNICIAN, "tech-internal-a · assignment 22 Sept, 10:00 am – 12:00 pm MYT"]], "tech-internal-a can’t make this time: “sick”. Any new time needs the client’s approval.", true]);
-    const offered = deliveryOf(job({ status: "offered", contractorOrgId: "org-c", offer: { id: "o", contractorOrgId: "org-c", visitSlot: slot(TEXT_2026_09_22T02_00_00Z, TEXT_2026_09_22T04_00_00Z), offerExpiresAt: "2026-09-21T10:00:00Z", accessValidFrom: "2026-09-21T01:00:00Z", accessValidUntil: TEXT_2026_09_23T04_00_00Z, decision: null, decidedAt: null, declineReason: null } }), names, NOW);
-    expect([offered.title, offered.lines]).toStrictEqual(["Delivery · contractor Demo Contractor A", [["Visit", "22 Sept, 10:00 am – 12:00 pm MYT · offer open · expires 21 Sept 2026, 6:00 pm MYT"], ["Access", "21 Sept, 9:00 am – 23 Sept, 12:00 pm MYT"], [TECHNICIAN, "not assigned by the contractor yet"]]]);
+    const offered = deliveryOf(job({ status: "offered", contractorOrgId: "org-c", offer: { id: "o", contractorOrgId: "org-c", candidateSlots: [slot(TEXT_2026_09_22T02_00_00Z, TEXT_2026_09_22T04_00_00Z)], offerExpiresAt: "2026-09-21T10:00:00Z", accessValidFrom: "2026-09-21T01:00:00Z", accessValidUntil: TEXT_2026_09_23T04_00_00Z, decision: null, decidedAt: null, declineReason: null } }), names, NOW);
+    expect([offered.title, offered.lines]).toStrictEqual(["Delivery · contractor Demo Contractor A", [["Times offered", "22 Sept, 10:00 am – 12:00 pm MYT · offer open · expires 21 Sept 2026, 6:00 pm MYT"], ["Access", "21 Sept, 9:00 am – 23 Sept, 12:00 pm MYT"], [TECHNICIAN, "not assigned by the contractor yet"]]]);
     expect(delivery(job({}), names, NOW)).toBeNull();
   });
 
@@ -96,8 +96,10 @@ describe("HQ maintenance jobs", () => {
     expect(rows.map((r) => [r.rank, r.text, r.hq, r.fits])).toStrictEqual([[1, "Tue, 22 Sept, 10:00 am – 12:00 pm MYT", TECH_INTERNAL_A, true], [2, "Sun, 20 Sept, 10:00 am – 12:00 pm MYT", "in the past", false]]);
     expect(longSlot(slot("2026-09-28T06:00:00Z", "2026-09-28T08:00:00Z"))).toBe("Mon, 28 Sept, 2:00 – 4:00 pm MYT");
     expect(slotText(slot("2026-09-14T00:00:00Z", "2026-09-20T00:00:00Z"))).toBe("14 Sept, 8:00 am – 20 Sept, 8:00 am MYT");
-    expect(offerDefaults(slot(TEXT_2026_09_22T02_00_00Z, TEXT_2026_09_22T04_00_00Z), NOW)).toStrictEqual({ offerExpiresAt: TEXT_2026_09_22T01_30_00_000Z, accessValidFrom: "2026-09-21T01:30:00.000Z", accessValidUntil: "2026-09-23T04:00:00.000Z" });
-    expect(offerDefaults(slot("2026-09-21T05:00:00Z", "2026-09-21T07:00:00Z"), NOW).offerExpiresAt).toBe("2026-09-21T05:00:00.000Z");
+    expect(offerDefaults([slot(TEXT_2026_09_22T02_00_00Z, TEXT_2026_09_22T04_00_00Z)], NOW)).toStrictEqual({ offerExpiresAt: TEXT_2026_09_22T01_30_00_000Z, accessValidFrom: "2026-09-21T01:30:00.000Z", accessValidUntil: "2026-09-23T04:00:00.000Z" });
+    expect(offerDefaults([slot("2026-09-21T05:00:00Z", "2026-09-21T07:00:00Z")], NOW).offerExpiresAt).toBe("2026-09-21T05:00:00.000Z");
+    // several offered times (IR636): the answer is due before the last one starts, and access reaches a day past the last one
+    expect(offerDefaults([slot(TEXT_2026_09_22T02_00_00Z, TEXT_2026_09_22T04_00_00Z), slot("2026-09-24T02:00:00Z", "2026-09-24T04:00:00Z")], NOW)).toStrictEqual({ offerExpiresAt: TEXT_2026_09_22T01_30_00_000Z, accessValidFrom: "2026-09-21T01:30:00.000Z", accessValidUntil: "2026-09-25T04:00:00.000Z" });
     expect(controls(IN_PROGRESS)).toStrictEqual({ hold: true, resume: false, cancel: false, cancelWhy: "Put the job on hold first." });
     expect(controls("on_hold")).toStrictEqual({ hold: false, resume: true, cancel: true, cancelWhy: null });
     expect(controls("completed").cancelWhy).toBe("Completed and cancelled jobs cannot be cancelled.");

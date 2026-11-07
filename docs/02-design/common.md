@@ -175,13 +175,13 @@ Record responses received after the deadline as late events in history. Do not s
 | Current state | Authorized person or event | Next state |
 |---|---|---|
 | requested | HQ assigns an internal staff member at one of the client's preferred times (IR113) | assigned |
-| requested | HQ offers the job to an external contractor with a fixed agreed visit slot (IR113) | offered |
+| requested | HQ offers the job to an external contractor with all the times the client agreed; the contractor settles one when it assigns a technician (IR113, IR636) | offered |
 | requested | None of the preferred times fits: HQ proposes another time (`jobs.proposeSlot`) | requested (UI “Time proposed” until the client answers, IR113) |
 | requested (proposal pending) | The client accepts / declines with new preferred times / does not answer by replyBy | assigned or offered automatically with the held partner / requested (next round) / requested (expired, HQ calls the client) |
-| offered | The contractor proposes another time (`jobs.proposePartnerSlot`); HQ sends it to the client or keeps the agreed slot | offered (visitSlot updated only after the client accepts, IR113) |
+| offered | The contractor proposes another time (`jobs.proposePartnerSlot`); HQ sends it to the client or keeps the offered times | offered (candidateSlots become the new time only after the client accepts, IR113, IR636) |
 | offered | The selected contractor accepts or declines within the valid period | accepted / requested (keep the decline in history) |
 | offered | offerExpiresAt is reached without a response (IR48) | requested (keep the Offer as expired) |
-| accepted | The contractor assigns an active technician from its own company at the offer's visit slot | assigned |
+| accepted | The contractor assigns an active technician from its own company at one of the offer's candidate times (IR636) | assigned |
 | assigned | The assigned technician accepts the assignment (受領) or reports it cannot make the time (`jobs.acknowledgeAssignment`) | assigned (acknowledgement accepted / cant_make; coordinator reassigns or HQ proposes a new time, IR113) |
 | assigned | The assigned technician starts work within the valid period | in_progress |
 | assigned / in_progress | HQ (internal work) or the receiving contractor (outsourced work) changes the assignee with a reason | Keep the state. Invalidate the old assignment and create a new one. Keep the original author on work-in-progress records |

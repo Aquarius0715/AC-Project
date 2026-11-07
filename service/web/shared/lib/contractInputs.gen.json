@@ -576,8 +576,7 @@
   "contractorOrgId",
   "jobId",
   "offerExpiresAt",
-  "termsVersion",
-  "visitSlot"
+  "termsVersion"
  ],
  "jobs.pauseWork": [
   "jobId",

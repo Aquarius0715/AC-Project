@@ -7,7 +7,7 @@
 // and the week — stays on Kuala Lumpur working days and clock times, and the screen says so.
 import { EN, showSpan, showTime, translator, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import { actionMessage } from "@ac/web/lib/actionMessage";
-import { hhmm, onTeam, shortQualification, unavailabilityLabel, until, type ApiCapacity, type ApiMember, type ApiPartnerJob, type Slot } from "@ac/web/lib/partnerOverview";
+import { firstSlot, hhmm, onTeam, shortQualification, unavailabilityLabel, until, type ApiCapacity, type ApiMember, type ApiPartnerJob, type Slot } from "@ac/web/lib/partnerOverview";
 import { oneOf } from "@ac/web/lib/oneOf";
 import { qualificationLabel, qualified, statusWord, type ApiDetail, type ApiOffer } from "@ac/web/lib/partnerJobDetail";
 
@@ -71,27 +71,39 @@ export function scheduleRow(j: ApiPartnerJob, now: number, units: Map<string, st
 }
 
 export type FormMode =
-  | { kind: "assign" | "reassign" | "extend"; title: string; slot: Slot; endEditable: boolean; reasonRequired: boolean; button: string; banner?: { tone: Tone; text: string }; currentTech: string | null }
+  | { kind: "assign" | "reassign" | "extend"; title: string; slot: Slot; choices: Slot[]; endEditable: boolean; reasonRequired: boolean; button: string; banner?: { tone: Tone; text: string }; currentTech: string | null }
   | { kind: "blocked"; title: string; slot: Slot | null; banner: { tone: Tone; text: string } };
-/** What the form of the selected job allows (IR123 item 4): the agreed visit time from accepted, the same slot from
-assigned, an extension (same start, later end, reason) while in progress, on hold or in rework; an accepted offer
-before its delegation period and an assigned job whose agreed time has passed cannot be booked here. */
-export function formMode(j: ApiDetail | ApiOffer, label: string, now: number, names: Map<string, string>, i: I18n = EN): FormMode {
+/** The candidate times of the job's offer that are not over, earliest first (IR636): the times the contractor picks from. */
+function openChoices(j: ApiDetail | ApiOffer, now: number): Slot[] {
+  const all = j.projection === "offer" ? j.candidateSlots : j.offer?.candidateSlots ?? [];
+  return all.filter((s) => !ended(s, now)).toSorted((a, b) => Date.parse(a.startAt) - Date.parse(b.startAt));
+}
+/** What the form of the selected job allows (IR123 item 4, IR636): one of the offer's candidate times from accepted
+(`pick` is the index in the open choices), the current or another candidate from assigned, an extension (same start,
+later end, reason) while in progress, on hold or in rework; an accepted offer before its delegation period and a job
+with no agreed time left cannot be booked here. */
+export function formMode(j: ApiDetail | ApiOffer, label: string, now: number, names: Map<string, string>, i: I18n = EN, pick: number | null = null): FormMode {
   const { t, display } = i;
   const span = (s: Slot) => showSpan(s.startAt, s.endAt, display);
   const assign = t("Assign — {job}", { job: label }), reschedule = t("Reschedule — {job}", { job: label });
   if (j.projection === "offer") {
-    return { kind: "blocked", title: assign, slot: j.visitSlot, banner: { tone: "primary", text: t("Accepted — the delegation period starts {time}; the technician can be assigned from then, for exactly {slot}.", { time: showTime(j.accessValidFrom, display), slot: span(j.visitSlot) }) } };
+    return { kind: "blocked", title: assign, slot: firstSlot(j.candidateSlots), banner: { tone: "primary", text: t("Accepted — the delegation period starts {time}; the technician can be assigned from then, for one of the times the client agreed: {slots}.", { time: showTime(j.accessValidFrom, display), slots: j.candidateSlots.map((s) => span(s)).join(" · ") }) } };
   }
   const current = j.assignment ? names.get(j.assignment.technicianMembershipId) ?? t(TECHNICIAN) : null;
-  const slot = j.assignment ? { startAt: j.assignment.scheduledStart, endAt: j.assignment.scheduledEnd } : j.scheduledSlot ?? j.offer?.visitSlot ?? null;
+  const choices = openChoices(j, now);
+  const picked = pick === null ? undefined : choices.at(pick);
+  const slot = j.assignment ? { startAt: j.assignment.scheduledStart, endAt: j.assignment.scheduledEnd } : j.scheduledSlot ?? firstSlot(j.offer?.candidateSlots ?? []);
   if (!slot) return { kind: "blocked", title: assign, slot: null, banner: { tone: "warn", text: t("No agreed visit time — HQ agrees one with the client first.") } };
   switch (j.status) {
     case "accepted": {
-      return { kind: "assign", title: assign, endEditable: false, reasonRequired: false, button: t("Confirm assignment"), currentTech: null, slot };
+      const first = picked ?? choices.at(0);
+      return first
+        ? { kind: "assign", title: assign, endEditable: false, reasonRequired: false, button: t("Confirm assignment"), currentTech: null, slot: first, choices }
+        : { kind: "blocked", title: assign, banner: { tone: "crit", text: t("Every time the client agreed has passed. A new time needs the client’s agreement — HQ proposes it; tell HQ in the job history.") }, slot };
     }
     case "assigned": {
-      if (ended(slot, now)) {
+      const target = picked ?? (ended(slot, now) ? choices.at(0) : slot);
+      if (!target) {
         return { kind: "blocked", title: reschedule, banner: { tone: "crit", text: t("Work window ended; reassignment required. The agreed time {slot} passed while the job is still “assigned”. A new time needs the client’s agreement — HQ proposes it; tell HQ in the job history.", { slot: span(slot) }) }, slot };
       }
       const why = j.assignment?.cantMakeReason;
@@ -105,10 +117,11 @@ export function formMode(j: ApiDetail | ApiOffer, label: string, now: number, na
         currentTech: current,
         banner: j.assignment?.acknowledgement === "cant_make" ? {
           tone: "warn",
-          text: why ? t("{name} can’t make this time: “{reason}”. Reassign another technician for the same agreed time, or ask HQ to propose a new time to the client.", { name, reason: why })
-            : t("{name} can’t make this time. Reassign another technician for the same agreed time, or ask HQ to propose a new time to the client.", { name }),
+          text: why ? t("{name} can’t make this time: “{reason}”. Reassign another technician, or pick another time the client agreed — or ask HQ to propose a new time to the client.", { name, reason: why })
+            : t("{name} can’t make this time. Reassign another technician, or pick another time the client agreed — or ask HQ to propose a new time to the client.", { name }),
         } : undefined,
-        slot,
+        slot: target,
+        choices,
       };
     }
     case IN_PROGRESS:
@@ -122,6 +135,7 @@ export function formMode(j: ApiDetail | ApiOffer, label: string, now: number, na
         button: t("Confirm reassignment"),
         currentTech: current,
         banner: ended(slot, now) ? { tone: "crit", text: t("Work window ended; reassignment required. The work window {slot} ended while the job is “{status}” — keep the start and set a later end (same or another technician).", { slot: span(slot), status: statusWord(j.status, t) }) } : undefined,
+        choices: [],
         slot,
       };
     }

@@ -7,7 +7,7 @@ const A_REASON_IS_REQUIRED = "A reason is required";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Badge, Banner, Btn, Card, Choice, EmptyState, Field, Input, ListRow, Modal, Page, Select, SummaryList, Textarea, cx, Plain, ScrollX } from "@ac/web/components/ui";
 import { JobStatusBadge, OriginBadge } from "@ac/web/components/JobBits";
 import { useI18n, useT } from "@ac/web/components/I18n";
@@ -135,7 +135,7 @@ function ProposalCards({ ctx }: Readonly<{ ctx: DetailCtx }>) {
                 <thead><tr className="text-left text-[11px] uppercase text-muted-foreground"><th className="py-1.5">{t("Rank")}</th><th>{t("Time")}</th><th>{t("HQ technicians")}</th><th>{t("Contractors")}</th><th>{t("Action")}</th></tr></thead>
                 <tbody>{d.preferred.map((r) => <tr key={r.rank} className="border-t border-line"><td className="py-2"><span className="rounded-lg bg-primary-soft px-2 py-0.5 text-xs font-semibold text-primary">{r.plan ? t("Plan") : t(RANK[r.rank - 1] ?? "{n}th", { n: r.rank })}</span></td><td className="font-semibold">{r.text}</td><td className={cx("text-xs", r.fits ? "text-ok" : TEXT_MUTED_FOREGROUND)}>{r.hq}</td><td className="text-xs text-muted-foreground">{t("{names} — confirm in the offer", { names: contractorNames(live.contractors.filter((x) => x.status === "active").map((x) => x.name), t) })}</td><td><Btn size="sm" variant="primary" disabled={pending || Date.parse(r.slot.startAt) <= now} onClick={() => { setModal({ kind: "book", row: r }); }}>{t("Use this time")}</Btn></td></tr>)}</tbody>
               </table></ScrollX>
-              <p className="mt-2 text-[11px] text-muted-foreground">{t(firstPreferred.plan ? "“Use this time” opens Assign internally / Offer to contractor with that time locked. HQ cannot book a time outside the plan occurrence without the client’s approval." : "“Use this time” opens Assign internally / Offer to contractor with that time locked. HQ cannot book a time outside these without the client’s approval.")}</p>
+              <p className="mt-2 text-[11px] text-muted-foreground">{t(firstPreferred.plan ? "“Use this time” opens Assign internally with that time locked, or Offer to contractor — the contractor gets all the times and picks one when it assigns a technician. HQ cannot book a time outside the plan occurrence without the client’s approval." : "“Use this time” opens Assign internally with that time locked, or Offer to contractor — the contractor gets all the times and picks one when it assigns a technician. HQ cannot book a time outside these without the client’s approval.")}</p>
             </Card>
           ) : <Banner>{t("No agreed time on this job (HQ request without alternatives) — propose a time to the client.")}</Banner>}
           <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-[#f5c473] bg-[#fff8ec] p-4">
@@ -304,31 +304,29 @@ function BookModal({ d, live, row: first, fresh, onClose, onFail }: ModalProps &
   const [tech, setTech] = useState(row.people[0]?.id ?? "");
   const active = live.contractors.filter((c) => c.status === "active");
   const [org, setOrg] = useState(active[0]?.id ?? "");
-  const defaults = offerDefaults(row.slot, now);
+  const defaults = offerDefaults(ahead.map((r) => r.slot), now);
   const [expires, setExpires] = useState(zonedInput(defaults.offerExpiresAt, zone));
   const [from, setFrom] = useState(zonedInput(defaults.accessValidFrom, zone));
   const [until, setUntil] = useState(zonedInput(defaults.accessValidUntil, zone));
   const pick = (r: number) => {
     const next = ahead.find((x) => x.rank === r);
     if (!next) return;
-    const nd = offerDefaults(next.slot, now);
     setRank(r);
     setTech(next.people[0]?.id ?? "");
     if (next.people.length === 0) setWho(CONTRACTOR);
-    setExpires(zonedInput(nd.offerExpiresAt, zone));
-    setFrom(zonedInput(nd.accessValidFrom, zone));
-    setUntil(zonedInput(nd.accessValidUntil, zone));
   };
   const [terms, setTerms] = useState("terms-demo-v1");
   const book = () => {
-    if (who === "internal") run(() => assignInternal(j.id, j.version, tech, row.slot), t("Assigned — the technician must accept"), () => { onClose(t("Assigned {name} for {slot}. The technician must accept the assignment.", { name: row.people.find((p) => p.id === tech)?.displayName ?? "", slot: slotText(row.slot, i) })); }, onFail); else run(() => offerToContractor(j.id, j.version, { contractorOrgId: org, visitSlot: row.slot, offerExpiresAt: fromZonedInput(expires, zone), accessValidFrom: fromZonedInput(from, zone), accessValidUntil: fromZonedInput(until, zone), termsVersion: terms.trim() }), t("Offer sent"), () => { onClose(t("Offered {slot} to {name}. They accept, decline or propose another time — a different time goes back to the client.", { slot: slotText(row.slot, i), name: active.find((c) => c.id === org)?.name ?? "" })); }, onFail);
+    if (who === "internal") run(() => assignInternal(j.id, j.version, tech, row.slot), t("Assigned — the technician must accept"), () => { onClose(t("Assigned {name} for {slot}. The technician must accept the assignment.", { name: row.people.find((p) => p.id === tech)?.displayName ?? "", slot: slotText(row.slot, i) })); }, onFail); else run(() => offerToContractor(j.id, j.version, { contractorOrgId: org, offerExpiresAt: fromZonedInput(expires, zone), accessValidFrom: fromZonedInput(from, zone), accessValidUntil: fromZonedInput(until, zone), termsVersion: terms.trim() }), t("Offer sent"), () => { onClose(t("Offered {slot} to {name}. They accept or decline, then pick one of these times when they assign a technician; a different time goes back to the client.", { slot: ahead.map((r) => slotText(r.slot, i)).join(" / "), name: active.find((c) => c.id === org)?.name ?? "" })); }, onFail);
   };
+  let visitField: ReactNode;
+  if (who === CONTRACTOR) visitField = <Field label={t("Times offered · the contractor picks one")} hint={t("Only the times the customer agreed. The contractor settles one when it assigns a technician; another time needs a proposal the customer accepts.")}><div className="grid gap-1">{ahead.map((r) => <div key={r.rank} className="rounded-control border border-line bg-surface2 px-3 py-2 text-[13px] font-semibold"><Icon name="locked" /> {longSlot(r.slot, i)}</div>)}</div></Field>;
+  else if (fresh && ahead.length > 1) visitField = <Field label={t("Visit time · one of the customer’s preferred times")} hint={t("Only these times are agreed; another time needs a proposal the customer accepts.")}><Select value={String(rank)} onChange={(e) => { pick(Number(e.target.value)); }}>{ahead.map((r) => <option key={r.rank} value={r.rank}>{t(RANK[r.rank - 1] ?? "{n}th", { n: r.rank })} · {r.text}{r.fits ? "" : ` · ${t("no HQ technician free")}`}</option>)}</Select></Field>;
+  else visitField = <Field label={t(row.plan ? "Visit time · the plan occurrence" : "Visit time · from the client")} hint={t("Fixed here. Need another time? Use “Propose another time…” — the client must accept it.")}><div className="rounded-control border border-line bg-surface2 px-3 py-2 text-[13px] font-semibold"><Icon name="locked" /> {longSlot(row.slot, i)}</div></Field>;
   return (
     <Modal open onClose={() => { onClose(); }} title={fresh ? t("New maintenance job · step 2 of 2") : t("Book {id}", { id: j.id.slice(0, 8) })} footer={<><Btn onClick={() => { onClose(); }}>{!fresh && <Icon name="arrowLeft" />}{t(fresh ? "Leave it requested" : "Back")}</Btn><Btn variant="primary" disabled={pending || (who === "internal" ? !tech : !org || !terms.trim())} onClick={book}>{t(who === "internal" ? "Assign" : "Send offer")}</Btn></>}>
       <p className="text-xs text-muted-foreground">{fresh ? `${t("Created {id} (requested) · choose who does the work —", { id: j.id.slice(0, 8) })} ` : ""}{d.title} · {d.customer} · {t(j.origin === PERIODIC_PLAN ? "Periodic plan" : "Client request")}</p>
-      {fresh && ahead.length > 1 ? (
-        <Field label={t("Visit time · one of the customer’s preferred times")} hint={t("Only these times are agreed; another time needs a proposal the customer accepts.")}><Select value={String(rank)} onChange={(e) => { pick(Number(e.target.value)); }}>{ahead.map((r) => <option key={r.rank} value={r.rank}>{t(RANK[r.rank - 1] ?? "{n}th", { n: r.rank })} · {r.text}{r.fits ? "" : ` · ${t("no HQ technician free")}`}</option>)}</Select></Field>
-      ) : <Field label={t(row.plan ? "Visit time · the plan occurrence" : "Visit time · from the client")} hint={t("Fixed here. Need another time? Use “Propose another time…” — the client must accept it.")}><div className="rounded-control border border-line bg-surface2 px-3 py-2 text-[13px] font-semibold"><Icon name="locked" /> {longSlot(row.slot, i)}</div></Field>}
+      {visitField}
       <Field label={t("Who does the work")} hint={row.people.length > 0 ? undefined : t("No qualified HQ technician is free at this time — offer it to a contractor.")}><Choice value={who} onChange={setWho} options={[...(row.people.length > 0 ? [{ id: "internal" as const, label: t("Assign internally") }] : []), { id: "contractor" as const, label: t("Offer to contractor") }]} /></Field>
       {who === "internal" ? (
         <Field label={t("Technician")} hint={t("Free and qualified for the whole slot")}><Select value={tech} onChange={(e) => { setTech(e.target.value); }}>{row.people.map((p) => <option key={p.id} value={p.id}>{p.displayName}</option>)}</Select></Field>

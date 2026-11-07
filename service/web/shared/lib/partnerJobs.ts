@@ -4,7 +4,7 @@
 // Pure code shared by the server loader and the client view; Vitest covers it. Rows in the display language with the
 // slots and deadlines in the user's display time zone (IR271).
 import { EN, showSpan, showTime, type I18n, textOf } from "@ac/web/lib/i18n";
-import { bucket, partnerJob, until, type ApiPartnerJob, type Slot } from "@ac/web/lib/partnerOverview";
+import { bucket, firstSlot, partnerJob, until, type ApiPartnerJob, type Slot } from "@ac/web/lib/partnerOverview";
 import type { OpInput } from "@ac/web/lib/opTypes";
 
 export const TABS = [
@@ -46,6 +46,13 @@ const typeText: Record<string, string> = { periodic: "Periodic inspection", reac
 const ack: Record<string, { sub: string; tone?: Tone }> = { pending: { sub: "awaiting the technician’s acceptance" }, accepted: { sub: "accepted" }, cant_make: { sub: "can’t make it — reassign", tone: "warn" } };
 const historyStatus: Record<string, string> = { completed: "Completed", cancelled: "Cancelled" };
 
+/** An offer's candidate times (IR636) on one line: the only time, or the earliest and how many more the contractor may pick. */
+function candidatesText(slots: readonly Slot[], span: (s: Slot) => string, t: I18n["t"]): string {
+  const first = firstSlot(slots);
+  if (!first) return "—";
+  return slots.length > 1 ? t("{slot} · +{n} more to choose from", { slot: span(first), n: slots.length - 1 }) : span(first);
+}
+
 /** One list row: what the company sees of a job in its projection (offer, summary inside the window, history after). */
 export function jobRow(raw: ApiPartnerJob, now: number, units: Map<string, string>, names: Map<string, string>, i: I18n = EN): JobRow {
   const { t, display } = i;
@@ -66,7 +73,7 @@ export function jobRow(raw: ApiPartnerJob, now: number, units: Map<string, strin
     return {
       id: j.id,
       href: detail,
-      line: pending ? t("Time change proposed · waiting for HQ and the client") : t("Offered by HQ · visit {slot} (fixed)", { slot: raw.visitSlot ? span(raw.visitSlot) : "—" }),
+      line: pending ? t("Time change proposed · waiting for HQ and the client") : t("Offered by HQ · {times}", { times: candidatesText(raw.candidateSlots, span, t) }),
       tech: { name: "—", sub: t("not assignable before acceptance") },
       slot: { main: t("Answer by {time}", { time: at(raw.offerExpiresAt) }), sub: Date.parse(raw.offerExpiresAt) <= now ? left : t("{left} left", { left }), tone: Date.parse(raw.offerExpiresAt) - now < 6 * 3_600_000 ? "warn" : undefined },
       badge: pending ? { text: t("Time proposed"), tone: "warn" } : { text: t("Offered"), tone: "primary" },
@@ -78,9 +85,9 @@ export function jobRow(raw: ApiPartnerJob, now: number, units: Map<string, strin
     return {
       id: j.id,
       href: `/partner/schedule?jobId=${j.id}`,
-      line: t("Accepted · {type} · visit {slot}", { type: typeLabel(raw.type), slot: raw.visitSlot ? span(raw.visitSlot) : "—" }),
+      line: t("Accepted · {type} · {times}", { type: typeLabel(raw.type), times: candidatesText(raw.candidateSlots, span, t) }),
       tech: { name: t("Unassigned"), sub: t("assign before the visit"), tone: "warn" },
-      slot: { main: raw.visitSlot ? span(raw.visitSlot) : "—", sub: t("Due {time}", { time: at(raw.dueAt) }) },
+      slot: { main: candidatesText(raw.candidateSlots, span, t), sub: t("Due {time}", { time: at(raw.dueAt) }) },
       badge: { text: t("Accepted"), tone: "primary" },
       title,
       origin,
