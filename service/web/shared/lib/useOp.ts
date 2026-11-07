@@ -3,7 +3,7 @@
 // Data-source switch for screens: in the Phase 1A demo (DATA_SOURCE=mock) screens keep their fixture data; with
 // DATA_SOURCE=API the same screen reads the Core API through the BFF relay.
 import { useEffect, useEffectEvent, useState } from "react";
-import { z } from "zod";
+import { z } from "@ac/web/lib/zod";
 import { callRelay, OpError } from "@ac/web/lib/ops";
 import type { OpCall } from "@ac/web/lib/opTypes";
 import { recover } from "@ac/web/lib/promises";

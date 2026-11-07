@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "@ac/web/lib/zod";
 
 export interface Answer<T> { data: T; meta?: { snapshotAt?: string } }
 

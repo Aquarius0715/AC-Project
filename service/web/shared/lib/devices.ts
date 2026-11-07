@@ -7,7 +7,7 @@ import { EN, showTime, translator, zonedInstant, type I18n, type T, textOf } fro
 import type { OpInput } from "@ac/web/lib/opTypes";
 import type { UnitSymbol } from "@ac/web/lib/contracts.gen";
 import { byText } from "@ac/web/lib/order";
-import { z } from "zod";
+import { z } from "@ac/web/lib/zod";
 import { codePoints, wrapped } from "@ac/web/lib/text";
 
 const KL = "Asia/Kuala_Lumpur";

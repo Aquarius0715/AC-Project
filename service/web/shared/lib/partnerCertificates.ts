@@ -11,7 +11,7 @@ import { qualificationLabel } from "@ac/web/lib/partnerJobDetail";
 import type { ApiCertificate } from "@ac/web/lib/adminContractors";
 import { activeNow, klStart, QUALIFICATION_CODES, type ApiTeamMember } from "@ac/web/lib/partnerTeam";
 import { oneOf } from "@ac/web/lib/oneOf";
-import { z } from "zod";
+import { z } from "@ac/web/lib/zod";
 
 /** The codes a certificate is filed under (Certificate.code of the contract). */
 export const certificateCode = z.enum(["demo_indoor", "demo_outdoor", "demo_electrical", "other"]);

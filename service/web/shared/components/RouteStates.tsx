@@ -6,7 +6,7 @@
 import { useEffect } from "react";
 import { Btn, Card, Page } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
-import { z } from "zod";
+import { z } from "@ac/web/lib/zod";
 import { signInAgainHref } from "@ac/web/lib/login";
 import { orNull } from "@ac/web/lib/promises";
 

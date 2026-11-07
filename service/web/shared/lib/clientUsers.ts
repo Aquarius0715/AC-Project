@@ -8,7 +8,7 @@ Demo only: adding users and set-up e-mail resends are previews; state lives in t
 restores the seed, FR-X05).
 */
 import { useSyncExternalStore } from "react";
-import { z } from "zod";
+import { z } from "@ac/web/lib/zod";
 import { readDemoAs, writeDemo } from "@ac/web/lib/demoStore";
 import { isEmail } from "@ac/web/lib/text";
 

@@ -1,6 +1,6 @@
 // The DomainError body of a refused Core API or BFF call (service-contracts.ts), validated where it enters: a field the
 // body leaves out takes its empty value, and a body that is not a DomainError at all reads as unavailable.
-import { z } from "zod";
+import { z } from "@ac/web/lib/zod";
 
 const domainErrorSchema = z.object({
   code: z.string(),

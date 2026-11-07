@@ -25,7 +25,7 @@ seed, FR-X05). Phase 1A only: with DATA_SOURCE=API the job screens write through
 stay local and return their refusals at once.
 */
 import { useSyncExternalStore } from "react";
-import { z } from "zod";
+import { z } from "@ac/web/lib/zod";
 import { readDemoAs, writeDemo } from "@ac/web/lib/demoStore";
 import { oneOf } from "@ac/web/lib/oneOf";
 import { useOp } from "@ac/web/lib/useOp";

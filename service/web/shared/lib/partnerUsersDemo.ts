@@ -13,7 +13,7 @@ partnerUsers.* (own account untouched, the last active contractor kept, an accep
 State lives in the tab (lib/demoStore: a reload or /demo reset restores the seed, FR-X05); nothing is sent.
 */
 import { useSyncExternalStore } from "react";
-import { z } from "zod";
+import { z } from "@ac/web/lib/zod";
 import { readDemoAs, writeDemo } from "@ac/web/lib/demoStore";
 import type { ApiPartnerUser, PartnerRole } from "@ac/web/lib/partnerUsers";
 

@@ -7,7 +7,7 @@ import { EN, showDate, showSpan, showTime, translator, type I18n, type T, textOf
 import { actionMessage } from "@ac/web/lib/actionMessage";
 import type { Slot } from "@ac/web/lib/partnerOverview";
 import type { IconName } from "@ac/web/components/Icon";
-import { z } from "zod";
+import { z } from "@ac/web/lib/zod";
 
 const TIME_PROPOSED = "time_proposed";
 const PERIODIC_PLAN = "periodic_plan";
