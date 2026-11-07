@@ -17,6 +17,11 @@ describe("actionMessage (one toast line per failed Server Action)", () => {
     expect(actionMessage(failure({ fieldErrors: { unit: "errors.unit_mismatch" } }))).toBe("Unit — unit mismatch");
     expect(actionMessage(failure({ fieldErrors: { sitePhoto: "error.invalidFile" } }))).toBe("Site photo is not an accepted file — check its type and size"); // IR308
   });
+  it("says a malformed or taken MQTT node ID in words (IR635)", () => {
+    expect(actionMessage(failure({ fieldErrors: { mqttNode: "error.mqttNodeFormat" } }))).toBe("The MQTT node ID needs 1–64 letters, digits, hyphens or underscores");
+    expect(actionMessage(failure({ code: "CONFLICT", messageKey: "error.duplicateMqttNode" }))).toBe("Another device already has this MQTT node ID");
+    expect(actionMessage(failure({ code: "CONFLICT", messageKey: "error.duplicateMqttNode" }), translator("ms"))).toBe("Peranti lain sudah mempunyai ID nod MQTT ini");
+  });
   it("explains version conflicts, domain errors and bare codes", () => {
     expect(actionMessage(failure({ code: "CONFLICT", messageKey: "error.versionConflict" }))).toMatch(/changed this in the meantime/);
     expect(actionMessage(failure({ code: "CONFLICT", messageKey: "errors.operation_not_running" }))).toBe("Operation not running");

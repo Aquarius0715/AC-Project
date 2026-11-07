@@ -97,3 +97,33 @@ test("a registered device is not bound yet, and Bind starts from its planned uni
   await expect(dialog.getByRole("combobox", { name: /^Unit/ }).locator("option:checked")).toHaveText(unit);
   await dialog.getByRole("button", { name: "Cancel" }).click();
 });
+
+test("a device is registered with its MQTT node ID, which Edit… changes and clears (IR635)", async ({ page }) => {
+  await page.goto("/admin/devices?tab=devices");
+  const main = page.getByRole("main");
+  const stamp = String(Date.now());
+  const node = `e2e_${stamp}`;
+  await main.getByRole("button", { name: "Register device" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("textbox", { name: /^Serial/ }).fill(`AC-E2E-${stamp}`);
+  await dialog.getByRole("combobox", { name: /^Planned unit/ }).selectOption({ index: 1 });
+  const nodeBox = dialog.getByRole("textbox", { name: /^MQTT node ID/ });
+  await nodeBox.fill("bad node");
+  await dialog.getByRole("button", { name: "Register", exact: true }).click();
+  await expect(dialog).toContainText("Use 1–64 letters, digits, hyphens or underscores");
+  await nodeBox.fill(node);
+  await dialog.getByRole("button", { name: "Register", exact: true }).click();
+  await page.waitForURL(/deviceId=/);
+  await expect(main.getByText(node, { exact: true })).toBeVisible();
+  const renamed = `${node}_b`;
+  await main.getByRole("button", { name: "Edit…" }).click();
+  await dialog.getByRole("textbox", { name: "Node ID" }).fill(renamed);
+  await dialog.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByText("MQTT node ID saved").first()).toBeVisible();
+  await expect(main.getByText(renamed, { exact: true })).toBeVisible();
+  await main.getByRole("button", { name: "Edit…" }).click();
+  await dialog.getByRole("textbox", { name: "Node ID" }).fill("");
+  await dialog.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByText("MQTT node ID cleared").first()).toBeVisible();
+  await expect(main.getByText("Not set", { exact: true })).toBeVisible();
+});

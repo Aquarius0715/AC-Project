@@ -7013,6 +7013,127 @@
                 }
             }
         },
+        "/v1/devices/{deviceId}/set-mqtt-node": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Authorization: admin:device.write\nValidation: D01; node_id 1–64 letters, digits, hyphens or underscores; one device per node_id in the tenant; expectedVersion required for updates\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A04",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "devices"
+                ],
+                "summary": "devices.setMqttNode (write)",
+                "operationId": "devices.setMqttNode",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "D04: the same key replays the stored response; another body for the same key is CONFLICT",
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "all: required (target device, read devices.get)",
+                        "name": "X-Expected-Version",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "input field deviceId",
+                        "name": "deviceId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "input; the path parameters come from the route",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/devices.SetMqttNodeInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ops.Envelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/devices.Device"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "403": {
+                        "description": "FORBIDDEN",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "409": {
+                        "description": "CONFLICT",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "422": {
+                        "description": "VALIDATION (fieldErrors)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "429": {
+                        "description": "RATE_LIMITED (retryAfterSeconds)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "503": {
+                        "description": "UNAVAILABLE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "504": {
+                        "description": "TIMEOUT",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    }
+                }
+            }
+        },
         "/v1/devices/{deviceId}/update-firmware": {
             "post": {
                 "security": [
@@ -30096,6 +30217,9 @@
                 "lastSeenAt": {
                     "type": "string"
                 },
+                "mqttNode": {
+                    "type": "string"
+                },
                 "powerSignal": {
                     "type": "string"
                 },
@@ -30159,6 +30283,9 @@
                     "type": "string"
                 },
                 "lastSeenAt": {
+                    "type": "string"
+                },
+                "mqttNode": {
                     "type": "string"
                 },
                 "powerSignal": {
@@ -30414,6 +30541,10 @@
                 "jobId": {
                     "type": "string"
                 },
+                "mqttNode": {
+                    "description": "MqttNode is the node_id the device's ESP32 sends as the \u003cnode\u003e of smarthome/ac/\u003cnode\u003e/… (IR635); the IoT bridge\ntakes its readings and sends its commands by it once the device is bound.",
+                    "type": "string"
+                },
                 "sensorTypes": {
                     "type": "array",
                     "items": {
@@ -30513,6 +30644,17 @@
                     "type": "integer"
                 },
                 "unit": {
+                    "type": "string"
+                }
+            }
+        },
+        "devices.SetMqttNodeInput": {
+            "type": "object",
+            "properties": {
+                "deviceId": {
+                    "type": "string"
+                },
+                "mqttNode": {
                     "type": "string"
                 }
             }

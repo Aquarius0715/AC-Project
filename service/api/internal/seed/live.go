@@ -22,10 +22,10 @@ type LiveSensor struct {
 }
 
 // LiveModule is a unit of the live site with its model and its module, by fixture-style names: the air conditioner,
-// or a node's own sensor unit. A module has one sensor of a metric, so the readings of a node that repeat another
-// node's metrics go to a unit of their own (DEC-91).
+// or a node's own sensor unit. A module is one device with one node (IR635), and has one sensor of a metric.
 type LiveModule struct {
 	Unit, UnitName, Device, Serial, Binding string
+	Node                                    string // the ESP32 node's ID, the <node> of smarthome/ac/<node>/… (IR635)
 	Capability, Manufacturer, Model         string
 	Control                                 bool // the model takes power commands
 	Sensors                                 []LiveSensor
@@ -69,12 +69,13 @@ type liveExec func(what, sql string, args ...any) error
 
 // LiveSite is where the readings of real sensor nodes land (DEC-86, IR524): a property of the fixture's Demo Customer
 // B, so that its client customer-b sees the real devices while customer-a keeps the demo data (DEC-92, IR628), with one
-// Daikin air conditioner (DEC-89, IR528); LiveSiteAt puts it at another customer. The two nodes in front of it make
-// one module: node_1 measures the room, node_2 the air conditioner's supply, and node_1's infrared LED switches it on
-// and off. The model offers the power only, the one setting the nodes' firmware takes (ON, OFF and a cooling preset).
-// node_2 measures the room too since November 2026; its temperature and humidity go to a sensor unit of its own in the
-// same room (DEC-91, IR627). The IoT bridge subscribes to the nodes' broker (REAL_MQTT_URL), sends their readings to
-// these sensors and the power commands to node_1. Development and the shared test environment only.
+// Daikin air conditioner (DEC-89, IR528); LiveSiteAt puts it at another customer. One device per unit, one node per
+// device (IR635): node_1 is the air conditioner's device (the room's temperature and humidity, and its infrared LED
+// switches the air conditioner on and off; the model offers the power only, the one setting the nodes' firmware
+// takes), node_2 the device of a sensor unit of its own in the same room (temperature, humidity and the air
+// conditioner's supply power, DEC-91). The IoT bridge subscribes to the nodes' broker (REAL_MQTT_URL) and sends the
+// readings of each node that a device has registered (devices.mqttNodes) to that device's sensors and the power
+// commands to its node. Development and the shared test environment only.
 func LiveSite() Site {
 	return Site{
 		Tenant:        demoTenant,
@@ -91,29 +92,25 @@ func LiveSite() Site {
 			Model:        "IR via node_1",
 			Control:      true,
 			UnitName:     "Live · Daikin AC",
-			Serial:       "node_1+node_2",
+			Serial:       "LIVE-AC-NODE-1",
+			Node:         "node_1",
 			Unit:         "unit-live-ac",
 			Device:       "device-live-ac",
 			Binding:      "binding-live-ac",
 			Sensors: []LiveSensor{
 				{Name: "sensor-live-temperature", Metric: keyTemperature, Unit: "°C", Boundary: ""},
 				{Name: "sensor-live-humidity", Metric: keyHumidity, Unit: "%", Boundary: ""},
-				{
-					Name:     "sensor-live-power",
-					Metric:   keyPower,
-					Unit:     "kW",
-					Boundary: "ac_input_electricity",
-				},
 			},
 		},
 		SensorUnits: []LiveModule{
 			{
 				Capability:   "cap-live-node-2-sensors",
 				Manufacturer: "ESP32 node",
-				Model:        "BME680 on node_2",
+				Model:        "BME680 and PZEM on node_2",
 				Control:      false,
 				UnitName:     "Live · node_2 sensors",
-				Serial:       "node_2",
+				Serial:       "LIVE-NODE-2",
+				Node:         "node_2",
 				Unit:         "unit-live-node-2-sensors",
 				Device:       "device-live-node-2-sensors",
 				Binding:      "binding-live-node-2-sensors",
@@ -129,6 +126,12 @@ func LiveSite() Site {
 						Metric:   keyHumidity,
 						Unit:     "%",
 						Boundary: "",
+					},
+					{
+						Name:     "sensor-live-node-2-power",
+						Metric:   keyPower,
+						Unit:     "kW",
+						Boundary: "ac_input_electricity",
 					},
 				},
 			},
@@ -350,8 +353,8 @@ func liveModuleOf(
 		ctx,
 		`INSERT INTO devices.devices (id, tenant_id, serial, binding_id, unit_id, target_unit_id, created_by_membership_id,
 			connection, last_seen_at,
-		firmware_version, power_signal, tamper) VALUES ($1,$2,$3,$4,$5,$5,$6,'online',$7,'external','unknown','clear') ON
-		CONFLICT DO NOTHING`,
+		firmware_version, power_signal, tamper, mqtt_node)
+		VALUES ($1,$2,$3,$4,$5,$5,$6,'online',$7,'external','unknown','clear',$8) ON CONFLICT DO NOTHING`,
 		device,
 		tenant,
 		module.Serial,
@@ -359,6 +362,7 @@ func liveModuleOf(
 		unit,
 		ID("system-demo"),
 		now,
+		module.Node,
 	)
 	if err != nil {
 		return fmt.Errorf("live site module: %w", err)
