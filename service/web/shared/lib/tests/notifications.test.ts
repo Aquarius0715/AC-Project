@@ -28,7 +28,7 @@ const alert = (id: string, severity: ApiAlert["severity"], status: string, over:
 describe("inbox rows and alert rows", () => {
   it("titles by template, links the target and hides the in-app channel", () => {
     const r = inboxRow(note({}), "client");
-    expect([r.t, r.d, r.href, r.read]).toEqual(["Job update — job-1", "Requested", "/customer/maintenance?jobId=job-1", false]);
+    expect([r.t, r.d, r.href, r.read]).toStrictEqual(["Job update — job-1", "Requested", "/customer/maintenance?jobId=job-1", false]);
     expect(inboxRow(note({ channel: "email" }), "client").d).toBe("Requested · email");
     expect(inboxRow(note({ channel: "email" }), "client", { locale: "ms", timeZone: "UTC" }).d).toBe("Diminta · e-mel"); // the channel in words too (IR488)
     expect(inboxRow(note({ type: "fault", templateKey: "alert", sourceAlertId: "a1", target: { kind: "unit", id: "u1" }, params: { ...note({}).params, targetName: BEDROOM_AC, status: "open" } }), "client"))
@@ -38,7 +38,7 @@ describe("inbox rows and alert rows", () => {
   it("does not link a notice whose page no longer opens for the reader (IR602)", () => {
     // an offer HQ withdrew before the company accepted it: the notice stays, readable, without a dead link
     const withdrawn = inboxRow(note({ params: { ...note({}).params, status: "cancelled" }, targetOpen: false }), CONTRACTOR);
-    expect([withdrawn.t, withdrawn.d, withdrawn.href]).toEqual(["Job update — job-1", "Cancelled", ""]);
+    expect([withdrawn.t, withdrawn.d, withdrawn.href]).toStrictEqual(["Job update — job-1", "Cancelled", ""]);
     expect(inboxRow(note({ targetOpen: true }), CONTRACTOR).href).toBe("/partner/jobs/job-1");
     expect(inboxRow(note({}), TECHNICIAN).href).toBe("/technician/jobs/job-1"); // a fixture without the field links as before
   });
@@ -46,18 +46,18 @@ describe("inbox rows and alert rows", () => {
   it("titles and times a row in the user's display language and time zone (FR-X01, IR258)", () => {
     expect(inboxRow(note({}), "client").w).toBe("14 Sept 2026, 9:00 am MYT");
     const r = inboxRow(note({}), "client", { locale: "ms", timeZone: "Asia/Tokyo" });
-    expect([r.t, r.d, r.w]).toEqual(["Kemas kini kerja — job-1", "Diminta", "14 Sep 2026, 10:00 PG GMT+9"]);
+    expect([r.t, r.d, r.w]).toStrictEqual(["Kemas kini kerja — job-1", "Diminta", "14 Sep 2026, 10:00 PG GMT+9"]);
     expect(inboxRow(note({ templateKey: "unknown" }), TECHNICIAN, { locale: "ms", timeZone: "UTC" }).t).toBe("Pemberitahuan — job-1");
   });
 
   it("opens Filter care from a cleaning reminder (IR239)", () => {
     const r = inboxRow(note({ type: "cleaning_due", templateKey: "alert", sourceAlertId: "a1", target: { kind: "unit", id: "u1" },
       params: { targetName: BEDROOM_AC, at: TEXT_2026_09_14T01_00_00Z, status: "open", reason: null, message: "Cleaning due (268 h of run time since the last cleaning). Not a fault." } }), "client");
-    expect([r.t, r.d, r.href]).toEqual(["Filter cleaning due on Bedroom AC", "Cleaning due (268 h of run time since the last cleaning). Not a fault. · Unresolved", "/customer/maintenance?tab=filter-care"]);
+    expect([r.t, r.d, r.href]).toStrictEqual(["Filter cleaning due on Bedroom AC", "Cleaning due (268 h of run time since the last cleaning). Not a fault. · Unresolved", "/customer/maintenance?tab=filter-care"]);
   });
 
   it("words the status, the reason and the message in the display language (IR481)", () => {
-    expect(NOTIFICATION_KEYS.filter((key) => !Object.hasOwn(ms, key))).toEqual([]);
+    expect(NOTIFICATION_KEYS.filter((key) => !Object.hasOwn(ms, key))).toStrictEqual([]);
     const malay = { locale: "ms" as const, timeZone: "UTC" };
     // an access-release notice (IR439): the job is back to accepted and the reason is a code
     const released = note({ params: { ...note({}).params, status: "accepted", reason: "technician_access_ended" } });
@@ -79,7 +79,7 @@ describe("inbox rows and alert rows", () => {
   it("names the amount of a payment reminder (IR488)", () => {
     const n = note({ type: PAYMENT_REMINDER, templateKey: PAYMENT_REMINDER, target: { kind: "invoice", id: "i1" },
       params: { targetName: "INV-2026-09-0003", at: TEXT_2026_09_14T01_00_00Z, status: PAYMENT_REMINDER, reason: null, message: null, amountMinor: 12_000, currency: "MYR" } });
-    expect([inboxRow(n, "client").t, inboxRow(n, "client").d, inboxRow(n, "client").href]).toEqual(["Payment reminder — INV-2026-09-0003", "Amount due 120.00 MYR", "/customer/payments/i1"]);
+    expect([inboxRow(n, "client").t, inboxRow(n, "client").d, inboxRow(n, "client").href]).toStrictEqual(["Payment reminder — INV-2026-09-0003", "Amount due 120.00 MYR", "/customer/payments/i1"]);
     expect(inboxRow(n, "client", { locale: "ms", timeZone: "UTC" }).d).toBe("Jumlah perlu dibayar 120.00 MYR");
     expect(inboxRow(note({ ...n, params: { ...n.params, amountMinor: null } }), "client").d).toBe(""); // no amount, no line
   });
@@ -88,18 +88,18 @@ describe("inbox rows and alert rows", () => {
     const n = note({ type: "certificate_expiry", templateKey: "certificate_expiry", target: { kind: "certificate", id: "c1" },
       params: { targetName: "Aisha · Indoor AC", at: "2026-10-13T20:00:00Z", status: "expiring", reason: null, message: null } });
     const r = inboxRow(n, CONTRACTOR);
-    expect([r.t, r.d, r.href]).toEqual(["Certificate expiring — Aisha · Indoor AC", "Expires 14 Oct 2026", "/partner/team?tab=certifications"]);
+    expect([r.t, r.d, r.href]).toStrictEqual(["Certificate expiring — Aisha · Indoor AC", "Expires 14 Oct 2026", "/partner/team?tab=certifications"]);
     expect([inboxRow(n, CONTRACTOR, { locale: "ms", timeZone: "UTC" }).t, inboxRow(n, CONTRACTOR, { locale: "ms", timeZone: "UTC" }).d])
-      .toEqual(["Sijil hampir tamat — Aisha · Indoor AC", "Tamat tempoh 13 Okt 2026"]);
+      .toStrictEqual(["Sijil hampir tamat — Aisha · Indoor AC", "Tamat tempoh 13 Okt 2026"]);
   });
 
   it("opens Warranty & coverage from a warranty reminder and names the end day (BR-A19, IR340)", () => {
     const n = note({ type: "warranty_expiring", templateKey: "warranty_expiring", target: { kind: "unit", id: "u1" },
       params: { targetName: BEDROOM_AC, at: "2026-10-13T16:00:00Z", status: "expiring", reason: null, message: null } });
     const r = inboxRow(n, "admin");
-    expect([r.t, r.d, r.href]).toEqual(["Warranty ending — Bedroom AC", "Warranty ends 14 Oct 2026 · no maintenance contract", "/admin/units?tab=warranty"]);
+    expect([r.t, r.d, r.href]).toStrictEqual(["Warranty ending — Bedroom AC", "Warranty ends 14 Oct 2026 · no maintenance contract", "/admin/units?tab=warranty"]);
     const malay = inboxRow(n, "admin", { locale: "ms", timeZone: "UTC" });
-    expect([malay.t, malay.d]).toEqual(["Waranti hampir tamat — Bedroom AC", "Waranti tamat 13 Okt 2026 · tiada kontrak penyelenggaraan"]);
+    expect([malay.t, malay.d]).toStrictEqual(["Waranti hampir tamat — Bedroom AC", "Waranti tamat 13 Okt 2026 · tiada kontrak penyelenggaraan"]);
   });
 
   it("lists alerts with their status and the read state of their notifications (DD-C08, IR242)", () => {
@@ -108,18 +108,18 @@ describe("inbox rows and alert rows", () => {
       alert("win", "warning", ACKNOWLEDGED, { causeCode: "window_open", acknowledgedAt: "2026-09-14T01:30:00Z", detectedAt: "2026-09-14T00:30:00Z" }), alert("hot", "critical", "open"),
     ], [{ id: "n1", version: 1, sourceAlertId: "win", readAt: null }, { id: "n2", version: 2, sourceAlertId: "hot", readAt: "2026-09-14T01:05:00Z" }, { id: "n3", version: 1, sourceAlertId: null, readAt: null }],
     () => ({ name: BEDROOM_AC, place: "Home A › Bedroom" }));
-    expect(rows.map((r) => [r.id, r.group, r.status.text, r.unread.length, r.notes])).toEqual([["hot", "attn", "Unresolved", 0, 1], ["win", "attn", "Acknowledged", 1, 1], ["old", "info", "Resolved", 0, 0], ["rem", "info", "Unresolved", 0, 0]]);
+    expect(rows.map((r) => [r.id, r.group, r.status.text, r.unread.length, r.notes])).toStrictEqual([["hot", "attn", "Unresolved", 0, 1], ["win", "attn", "Acknowledged", 1, 1], ["old", "info", "Resolved", 0, 0], ["rem", "info", "Unresolved", 0, 0]]);
     expect([rows[3]?.title, rows[3]?.kind, rows[3]?.status.tone, rows[2]?.status.detail, rows[1]?.unread, rows[0]?.where])
-      .toEqual(["Filter cleaning reminder", "Maintenance reminder", "muted", "Resolved 14 Sept 2026, 10:00 am MYT · filter cleaned", [{ id: "n1", version: 1 }], "Bedroom AC · Home A › Bedroom · detected 14 Sept 2026, 9:00 am MYT"]);
-    expect(rows.map((r) => r.status.state)).toEqual(["open", ACKNOWLEDGED, "resolved", "open"]);
+      .toStrictEqual(["Filter cleaning reminder", "Maintenance reminder", "muted", "Resolved 14 Sept 2026, 10:00 am MYT · filter cleaned", [{ id: "n1", version: 1 }], "Bedroom AC · Home A › Bedroom · detected 14 Sept 2026, 9:00 am MYT"]);
+    expect(rows.map((r) => r.status.state)).toStrictEqual(["open", ACKNOWLEDGED, "resolved", "open"]);
     // a load cause is only suspected, never a fault (Figma 06a, DD-C08, IR315); an inspection record says so first
-    expect(rows.map((r) => r.kind)).toEqual(["Fault", "Load cause (possible)", "Fault", "Maintenance reminder"]);
+    expect(rows.map((r) => r.kind)).toStrictEqual(["Fault", "Load cause (possible)", "Fault", "Maintenance reminder"]);
     expect(inboxAlerts([alert("ins", "normal", "open", { causeCode: "insulation_loss", evidenceKind: "inspection" }), alert("loss", "warning", "open", { causeCode: "insulation_loss" })], [], vi.fn()).map((r) => r.kind))
-      .toEqual(["Load cause (possible)", "Inspection record"]);
+      .toStrictEqual(["Load cause (possible)", "Inspection record"]);
     // the user's language and display time zone (IR261); a resolution reason the system wrote is worded too (IR481)
     const [, win, old] = inboxAlerts([alert("hot", "critical", "open"), alert("win", "warning", ACKNOWLEDGED, { causeCode: "window_open", acknowledgedAt: "2026-09-14T01:30:00Z" }), alert("old", "critical", "resolved", { resolvedAt: "2026-09-14T02:00:00Z", resolutionReason: "filter cleaned" })],
       [], () => ({ name: BEDROOM_AC, place: "" }), i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" }));
-    expect([win?.title, win?.kind, win?.status.text, win?.status.detail, old?.status.detail, old?.where, old?.evidence.split(":", 1)[0]]).toEqual([
+    expect([win?.title, win?.kind, win?.status.text, win?.status.detail, old?.status.detail, old?.where, old?.evidence.split(":", 1)[0]]).toStrictEqual([
       "Kemungkinan tingkap terbuka", "Punca beban (mungkin)", "Diakui", "Diakui 14 Sep 2026, 10:30 PG GMT+9 · masih belum selesai", "Diselesaikan 14 Sep 2026, 11:00 PG GMT+9 · penapis dibersihkan", "Bedroom AC · dikesan 14 Sep 2026, 10:00 PG GMT+9", "Bukti (disimpulkan)",
     ]);
   });

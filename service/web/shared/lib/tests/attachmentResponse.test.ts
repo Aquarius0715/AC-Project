@@ -24,8 +24,8 @@ describe("a stored report photo as a response", () => {
     const res = await open();
     expect(dal.coreOp).toHaveBeenCalledWith("attachments.getContent", { jobId: "j1", reportId: "r1", reportVersion: 2, attachmentId: "a1" });
     expect([res.status, res.headers.get("content-type"), res.headers.get("content-disposition")])
-      .toEqual([200, "image/jpeg", `inline; filename="__ 1.jpg"; filename*=UTF-8''%E5%86%99%E7%9C%9F%201.jpg`]);
-    expect(new Uint8Array(await res.arrayBuffer())).toEqual(new Uint8Array([0xFF, 0xD8, 0xFF, 0x01]));
+      .toStrictEqual([200, "image/jpeg", `inline; filename="__ 1.jpg"; filename*=UTF-8''%E5%86%99%E7%9C%9F%201.jpg`]);
+    expect(new Uint8Array(await res.arrayBuffer())).toStrictEqual(new Uint8Array([0xFF, 0xD8, 0xFF, 0x01]));
     expect(res.headers.get("cache-control")).toBe("no-store"); // a signature is personal data (IR434)
   });
   it("passes the API's refusals on", async () => {
@@ -33,6 +33,6 @@ describe("a stored report photo as a response", () => {
     dal.coreOp.mockRejectedValueOnce(new dal.CoreError(domainError({ code: "FORBIDDEN", messageKey: "errors.assignment_ended" })));
     const missing = await open();
     const denied = await open();
-    expect([missing.status, denied.status]).toEqual([404, 403]);
+    expect([missing.status, denied.status]).toStrictEqual([404, 403]);
   });
 });

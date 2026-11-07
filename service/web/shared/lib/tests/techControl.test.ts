@@ -38,7 +38,7 @@ describe("historyRows", () => {
       deviceCommand(), deviceCommand({ id: "cmd-00000002", status: "failed", failureCode: "DEVICE_REJECTED", acknowledgedAt: null }), deviceCommand({ id: "cmd-00000003", status: "expired", acknowledgedAt: null }),
       deviceCommand({ id: "cmd-00000004", status: "requested", acknowledgedAt: null }), deviceCommand({ id: "cmd-00000005", status: "cancelled", acknowledgedAt: null }),
     ], []);
-    expect(rows[0]).toEqual({ id: "cmd-00000001", at: "9:00 am MYT", title: "set_mode = cool", sub: "cmd-0000 · acknowledged 9:00 am MYT", badge: { text: "Acked", tone: "ok" }, run: false });
+    expect(rows[0]).toStrictEqual({ id: "cmd-00000001", at: "9:00 am MYT", title: "set_mode = cool", sub: "cmd-0000 · acknowledged 9:00 am MYT", badge: { text: "Acked", tone: "ok" }, run: false });
     expect(rows[1]).toMatchObject({ sub: "cmd-0000 · rejected by the device (DEVICE_REJECTED)", badge: { text: "Rejected", tone: "crit" } });
     expect(rows[2]).toMatchObject({ sub: "cmd-0000 · no device response (expired)", badge: { text: "No response", tone: "crit" } });
     expect(rows[3]).toMatchObject({ sub: "cmd-0000 · waiting for the device", badge: { text: "Waiting", tone: "warn" } });
@@ -63,18 +63,18 @@ describe("run banner and state", () => {
     expect(runBanner(run({ state: "start_failed", failureCode: "TIMEOUT" }))).toMatchObject({ tone: "crit", text: "The device reported TIMEOUT · no end command is needed." });
     expect(runBanner(run({ state: "end_failed" }))?.text).toBe("The unit may still be running; check it on site.");
     expect(runBanner(run({ state: "end_blocked" }))?.title).toMatch(/^End blocked/);
-    expect([null, run({ state: "completed" }), run({ state: "end_failed" })].map((item) => runActive(item))).toEqual([false, false, false]);
-    expect((["awaiting_start", "running", "end_requested"] as const).map((s) => runActive(run({ state: s })))).toEqual([true, true, true]);
+    expect([null, run({ state: "completed" }), run({ state: "end_failed" })].map((item) => runActive(item))).toStrictEqual([false, false, false]);
+    expect((["awaiting_start", "running", "end_requested"] as const).map((s) => runActive(run({ state: s })))).toStrictEqual([true, true, true]);
   });
 });
 
 describe("state tiles", () => {
   it("shows the observed state and the room temperature with its quality", () => {
     const tiles = stateTiles({ observedState: { power: true, celsius: 24, mode: "cool", fanLevel: "auto", observedAt: "2026-09-14T01:00:00Z" }, latestMeasurements: [{ metric: "temperature", value: 31.26, quality: "valid" }] });
-    expect(tiles.map((t) => [t.label, t.value])).toEqual([["Power", "On"], ["Mode", "Cool"], ["Setpoint", "24 °C"], ["Fan", "Auto"], ["Room", "31.3 °C"]]);
+    expect(tiles.map((t) => [t.label, t.value])).toStrictEqual([["Power", "On"], ["Mode", "Cool"], ["Setpoint", "24 °C"], ["Fan", "Auto"], ["Room", "31.3 °C"]]);
     expect(tiles[4]?.warn).toBe(true);
     const unknown = stateTiles({ observedState: { power: null, celsius: null, mode: null, fanLevel: null, observedAt: null }, latestMeasurements: [{ metric: "temperature", value: 25, quality: "stale" }] });
-    expect(unknown.map((t) => t.value)).toEqual(["Unknown", "—", "—", "—", "25.0 °C (stale)"]);
+    expect(unknown.map((t) => t.value)).toStrictEqual(["Unknown", "—", "—", "—", "25.0 °C (stale)"]);
     expect(unknown[4]?.warn).toBe(false);
     expect(stateTiles({ observedState: { power: false, celsius: 22, mode: "dry", fanLevel: "low", observedAt: null }, latestMeasurements: [] })[4]?.value).toBe("—");
   });
@@ -98,7 +98,7 @@ describe("capability, restriction and refusals (IR286)", () => {
   it("words what the unit allows and why control waits", () => {
     expect(capabilityText(unit)).toBe("Capability v3 allows: set_mode (cool/dry/fan), set_temperature 16–30 °C, set_fan (low/mid/high), test run 1–15 min.");
     expect([restrictionText(unit), restrictionText({ effectiveControlPolicy: { state: "restricted", phase: "active", policy: { kind: "power_off" } } }), restrictionText({ effectiveControlPolicy: { state: "unrestricted" } })])
-      .toEqual(["min 24 °C", "power off only", null]);
+      .toStrictEqual(["min 24 °C", "power off only", null]);
     expect(blockedText(unit)).toBe("the unit must be reconciled after a restriction");
     expect(blockedText({ controlAvailability: { state: "available" } })).toBeNull();
     expect(connectionText("offline")).toBe("Connection: Offline.");
@@ -108,12 +108,12 @@ describe("capability, restriction and refusals (IR286)", () => {
     expect(refusal({ code: "OFFLINE", messageKey: "error.offline" })).toMatch(/^The device is not reachable/);
     expect(refusal({ code: "VALIDATION", messageKey: "error.validation" })).toBeNull(); // the fields say it
     expect(refusal({ code: "RATE_LIMITED", messageKey: "error.rateLimited" })).toBe("Too many changes in a short time — try again shortly"); // IR380
-    expect([fieldText("error.range"), fieldText("errors.unit_busy")]).toEqual(["1–15 minutes", "unit busy"]);
+    expect([fieldText("error.range"), fieldText("errors.unit_busy")]).toStrictEqual(["1–15 minutes", "unit busy"]);
   });
   it("speaks Malay with the display time zone", () => {
     expect(historyRows([deviceCommand()], [], MS)[0]).toMatchObject({ at: "10:00 PG GMT+9", sub: "cmd-0000 · diakui 10:00 PG GMT+9", badge: { text: "Diakui" } });
     expect(runBanner(run(), MS)?.title).toBe("Berjalan — tamat 10:10 PG GMT+9 (permulaan diakui 10:05 PG GMT+9)");
-    expect(stateTiles({ observedState: { power: true, celsius: 24, mode: "cool", fanLevel: "low", observedAt: null }, latestMeasurements: [] }, MS.t).map((x) => x.label)).toEqual(["Kuasa", "Mod", "Titik set", "Kipas", "Bilik"]);
+    expect(stateTiles({ observedState: { power: true, celsius: 24, mode: "cool", fanLevel: "low", observedAt: null }, latestMeasurements: [] }, MS.t).map((x) => x.label)).toStrictEqual(["Kuasa", "Mod", "Titik set", "Kipas", "Bilik"]);
     expect(capabilityText(unit, MS.t)).toBe("Versi keupayaan v3 membenarkan: set_mode (cool/dry/fan), set_temperature 16–30 °C, set_fan (low/mid/high), larian ujian 1–15 min.");
   });
 });

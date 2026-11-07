@@ -11,8 +11,8 @@ beforeAll(() => {
     return this.classList.contains("recharts-responsive-container") ? box(600, 200) : box(0, 0);
   });
 });
-afterAll(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 afterEach(cleanup);
+afterAll(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 // the drawn pieces of a path: a move followed by at least one line (a lone move draws nothing)
 const pieces = (d: string | null) => (d ?? "").split("M").filter((x) => x.includes("L")).length;
@@ -31,14 +31,14 @@ describe("charts", () => {
 
   it("shades nothing and draws no gridline unless asked", () => {
     const { container } = render(<LineChart points={[3, null, 4, 5]} />);
-    expect([container.querySelectorAll(".recharts-reference-area").length, container.querySelectorAll(".recharts-cartesian-grid").length]).toEqual([0, 0]);
+    expect([container.querySelectorAll(".recharts-reference-area").length, container.querySelectorAll(".recharts-cartesian-grid").length]).toStrictEqual([0, 0]);
   });
 
   it("draws one bar per label and series, and names the series in a legend", () => {
     const { container } = render(<BarChart labels={["Mon", "Tue", "Wed"]} series={[[1, 2, 3], [2, 3, 4]]} names={["7 days before", "Last 7 days"]} unit="kWh" />);
     expect(screen.getByRole("application", { name: "Bar chart" })).toBeTruthy();
     expect(container.querySelectorAll(".recharts-bar-rectangle")).toHaveLength(6);
-    expect([...(container.querySelector(":scope .recharts-legend-wrapper > div")?.children ?? [])].map((x) => x.textContent)).toEqual(["7 days before", "Last 7 days"]);
+    expect([...(container.querySelector(":scope .recharts-legend-wrapper > div")?.children ?? [])].map((x) => x.textContent)).toStrictEqual(["7 days before", "Last 7 days"]);
     expect(container.textContent).toContain("kWh");
   });
 
@@ -58,6 +58,6 @@ describe("charts", () => {
   it("names a progress bar and leaves an unknown value out", () => {
     render(<><UtilizationBar pct={40} tone="warn" label="Filter life" /><UtilizationBar pct={null} label="Unknown" /></>);
     const [known, unknown] = screen.getAllByRole("progressbar");
-    expect([known?.getAttribute("aria-label"), known?.getAttribute("aria-valuenow"), unknown?.getAttribute("aria-label"), unknown?.getAttribute("aria-valuenow")]).toEqual(["Filter life", "40", "Unknown", null]);
+    expect([known?.getAttribute("aria-label"), known?.getAttribute("aria-valuenow"), unknown?.getAttribute("aria-label"), unknown?.getAttribute("aria-valuenow")]).toStrictEqual(["Filter life", "40", "Unknown", null]);
   });
 });

@@ -86,8 +86,8 @@ describe("one icon library (DEC-74)", () => {
       ["requested → offered", false], ["10 → 12 kW", false], [" › Invoice ", false], ["Home A › 1F › ", false], [" → ", false],
       ["+2 reminders", false], ["≤ 350 kPa", false], ["© 2026", false], ["26 °C", false], ["", false], ["⊘ Offline", true],
     ];
-    expect(cases.filter(([text, icon]) => (iconProblem(text) !== null) !== icon).map(([text]) => text)).toEqual([]);
-    expect(([["+", true], ["−", true], ["–", true], ["×", true], ["5", false], ["Add", false], ["%", false], ["°", false]] as const).filter(([t, sign]) => signButton(t) !== sign)).toEqual([]);
+    expect(cases.filter(([text, icon]) => (iconProblem(text) !== null) !== icon).map(([text]) => text)).toStrictEqual([]);
+    expect(([["+", true], ["−", true], ["–", true], ["×", true], ["5", false], ["Add", false], ["%", false], ["°", false]] as const).filter(([t, sign]) => signButton(t) !== sign)).toStrictEqual([]);
   });
 
   it("no UI string of the four apps uses a character as an icon", () => {
@@ -99,6 +99,6 @@ describe("one icon library (DEC-74)", () => {
         return why ? `${path.relative(root, file)}:${String(line)} ${JSON.stringify(text.trim().slice(0, 60))} — ${why}; use <Icon name="…" /> (shared/components/Icon.tsx)` : [];
       });
     });
-    expect(problems).toEqual([]);
+    expect(problems).toStrictEqual([]);
   });
 });

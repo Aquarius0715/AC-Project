@@ -21,29 +21,29 @@ describe("customer filter care", () => {
   it("words the rows, an area and the reminders in Malay, days in the display time zone (IR262)", () => {
     const i = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
     const r = filterRow(st({}), unit("u1", { name: BEDROOM_AC }), NOW, i);
-    expect([r.run, r.progress, r.last]).toEqual(["212 j sejak pembersihan", "85 % daripada 250 j", "kali terakhir dibersihkan 30 Ogo"]);
+    expect([r.run, r.progress, r.last]).toStrictEqual(["212 j sejak pembersihan", "85 % daripada 250 j", "kali terakhir dibersihkan 30 Ogo"]);
     const many = ["a", "b", "c", "d"].map((id) => st({ unitId: id, status: id === "a" ? "overdue" : "ok" }));
     const [line] = filterLines(many, many.map((m) => unit(m.unitId)), NOW, i);
-    expect(line?.kind === "group" && [line.group.title, line.group.run, line.group.badge.label]).toEqual(["1F · 4 AC", "1 tertunggak", "1 perlu"]);
+    expect(line?.kind === "group" && [line.group.title, line.group.run, line.group.badge.label]).toStrictEqual(["1F · 4 AC", "1 tertunggak", "1 perlu"]);
     const t = translator("ms");
-    expect(reminderLines(settings, t)).toEqual([["Ingatkan pada", "250 j (lalai model)"], ["Juga ingatkan", "setiap 30 hari jika masa berjalan tidak diketahui"], ["Hantar melalui", "Aplikasi sahaja"], ["Siapa", "Pemilik lokasi"]]);
-    expect([cleaningSymptom(r, t), filterRefusal({ code: "FORBIDDEN", messageKey: "", fieldErrors: {} }, t)]).toEqual(["Pembersihan penapis: 212 j berjalan sejak pembersihan terakhir (peringatan pada 250 j).", "Tidak disimpan: hanya pemilik akaun boleh mengubah peringatan."]);
+    expect(reminderLines(settings, t)).toStrictEqual([["Ingatkan pada", "250 j (lalai model)"], ["Juga ingatkan", "setiap 30 hari jika masa berjalan tidak diketahui"], ["Hantar melalui", "Aplikasi sahaja"], ["Siapa", "Pemilik lokasi"]]);
+    expect([cleaningSymptom(r, t), filterRefusal({ code: "FORBIDDEN", messageKey: "", fieldErrors: {} }, t)]).toStrictEqual(["Pembersihan penapis: 212 j berjalan sejak pembersihan terakhir (peringatan pada 250 j).", "Tidak disimpan: hanya pemilik akaun boleh mengubah peringatan."]);
   });
 
   it("shows run time, progress and the last cleaning per AC (Figma 07j)", () => {
     const r = filterRow(st({}), unit("u1", { name: BEDROOM_AC }), NOW);
-    expect([r.unit, r.run, r.pct, r.progress, r.last, r.jobId, r.state]).toEqual([BEDROOM_AC, "212 h since cleaning", 85, "85 % of 250 h", "last cleaned 30 Aug", null, "due_soon"]);
+    expect([r.unit, r.run, r.pct, r.progress, r.last, r.jobId, r.state]).toStrictEqual([BEDROOM_AC, "212 h since cleaning", 85, "85 % of 250 h", "last cleaned 30 Aug", null, "due_soon"]);
     const over = filterRow(st({ runHoursSinceCleaning: 268, status: "overdue", lastCleanedAt: "2026-07-21T02:00:00Z" }), unit("u2"), NOW);
-    expect([over.pct, over.progress, over.last]).toEqual([100, "100 % of 250 h", "last cleaned 21 Jul"]);
+    expect([over.pct, over.progress, over.last]).toStrictEqual([100, "100 % of 250 h", "last cleaned 21 Jul"]);
     const tech = filterRow(st({ runHoursSinceCleaning: 40, status: "ok", lastCleanedAt: "2026-09-08T03:00:00Z", lastCleanedBy: "technician", lastCleaningJobId: "job-c02" }), unit("u3"), NOW);
-    expect([tech.last, tech.jobId, tech.pct]).toEqual(["cleaned by technician 8 Sept", "job-c02", 16]);
+    expect([tech.last, tech.jobId, tech.pct]).toStrictEqual(["cleaned by technician 8 Sept", "job-c02", 16]);
   });
 
   it("falls back to days without run time and never shows 0 for unknown (AT-C18-B)", () => {
     const days = filterRow(st({ runHoursSinceCleaning: null, lastCleanedAt: "2026-09-02T01:00:00Z", status: "ok" }), unit("u1", { connection: "offline" }), NOW);
-    expect([days.run, days.runNote, days.pct, days.progress, days.offline]).toEqual(["—", "offline", 40, "40 % of 30 days", true]);
+    expect([days.run, days.runNote, days.pct, days.progress, days.offline]).toStrictEqual(["—", "offline", 40, "40 % of 30 days", true]);
     const unknown = filterRow(st({ runHoursSinceCleaning: null, lastCleanedAt: null, lastCleanedBy: null, status: "unknown" }), unit("u1", { connection: "offline" }), NOW);
-    expect([unknown.run, unknown.pct, unknown.progress, unknown.last]).toEqual(["—", null, "run time unknown", "no cleaning recorded yet"]);
+    expect([unknown.run, unknown.pct, unknown.progress, unknown.last]).toStrictEqual(["—", null, "run time unknown", "no cleaning recorded yet"]);
     expect(filterRow(st({ runHoursSinceCleaning: 0, lastCleanedAt: "2026-09-14T01:00:00Z", status: "ok" }), unit("u1"), NOW).run).toBe("0 h since cleaning");
     expect(filterRow(st({ runHoursSinceCleaning: 12.4, lastCleanedAt: null, lastCleanedBy: null, status: "ok" }), unit("u1"), NOW).run).toBe("12 h so far");
     expect(filterRow(st({ runHoursSinceCleaning: null, lastCleanedAt: null, lastCleanedBy: null, status: "unknown" }), unit("u1"), NOW).runNote).toBe("no power readings");
@@ -57,22 +57,22 @@ describe("customer filter care", () => {
     ];
     const items = [st({ unitId: "m1", runHoursSinceCleaning: 268, status: "overdue" }), must(g[0]?.[0]), must(g[1]?.[0]), st({ unitId: "b1", status: "ok", runHoursSinceCleaning: 20 }), must(g[2]?.[0]), must(g[3]?.[0])];
     const lines = filterLines(items, [unit("m1", { spaceId: "s-meet" }), unit("b1", { spaceId: null }), ...g.map((x) => x[1])], NOW);
-    expect(lines.map((l) => (l.kind === "unit" ? l.row.unitId : l.group.key))).toEqual(["m1", "s-open", "b1"]);
+    expect(lines.map((l) => (l.kind === "unit" ? l.row.unitId : l.group.key))).toStrictEqual(["m1", "s-open", "b1"]);
     const sum = lines[1]?.kind === "group" ? lines[1].group : null;
-    expect([sum?.title, sum?.place, sum?.run, sum?.pct, sum?.progress, sum?.badge, sum?.rows.length]).toEqual([
+    expect([sum?.title, sum?.place, sum?.run, sum?.pct, sum?.progress, sum?.badge, sum?.rows.length]).toStrictEqual([
       "Open office · 4 ACs", "Office A › Open office", "2 due soon · 1 offline", 72, "72 % of 250 h (average)", { label: "2 due", tone: "warn" }, 4,
     ]);
   });
 
   it("writes the reminders and checks the dialog (AT-C18-E)", () => {
-    expect(reminderLines(settings)).toEqual([["Remind at", "250 h (model default)"], ["Also remind", "every 30 days if run time unknown"], ["Send by", "App only"], ["Who", "Owners of the location"]]);
-    expect(reminderLines({ ...settings, thresholdHours: 300, channels: ["inApp", "email"], recipients: "all_users" }).map((l) => l[1])).toEqual(["300 h of running", "every 30 days if run time unknown", "App + email", "All users of the location"]);
+    expect(reminderLines(settings)).toStrictEqual([["Remind at", "250 h (model default)"], ["Also remind", "every 30 days if run time unknown"], ["Send by", "App only"], ["Who", "Owners of the location"]]);
+    expect(reminderLines({ ...settings, thresholdHours: 300, channels: ["inApp", "email"], recipients: "all_users" }).map((l) => l[1])).toStrictEqual(["300 h of running", "every 30 days if run time unknown", "App + email", "All users of the location"]);
     const f = reminderForm(settings);
-    expect([f.useDefault, f.hours, f.days, f.email]).toEqual([true, "250", "30", false]);
-    expect(reminderErrors({ ...f, useDefault: false, hours: "20" })).toEqual({ hours: "Whole hours from 50 to 2000." });
-    expect(reminderErrors({ ...f, days: "181" })).toEqual({ days: "Whole days from 7 to 180." });
-    expect(reminderErrors({ ...f, useDefault: true, hours: "x" })).toEqual({});
-    expect(reminderInput({ ...f, useDefault: false, hours: "120", email: true })).toEqual({ thresholdHours: 120, fallbackDays: 30, recipients: "owners", channels: ["inApp", "email"] });
+    expect([f.useDefault, f.hours, f.days, f.email]).toStrictEqual([true, "250", "30", false]);
+    expect(reminderErrors({ ...f, useDefault: false, hours: "20" })).toStrictEqual({ hours: "Whole hours from 50 to 2000." });
+    expect(reminderErrors({ ...f, days: "181" })).toStrictEqual({ days: "Whole days from 7 to 180." });
+    expect(reminderErrors({ ...f, useDefault: true, hours: "x" })).toStrictEqual({});
+    expect(reminderInput({ ...f, useDefault: false, hours: "120", email: true })).toStrictEqual({ thresholdHours: 120, fallbackDays: 30, recipients: "owners", channels: ["inApp", "email"] });
     expect(reminderInput(f).thresholdHours).toBeNull();
   });
 

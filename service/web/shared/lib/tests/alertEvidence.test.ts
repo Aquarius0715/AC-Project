@@ -17,7 +17,7 @@ const items: ApiEvidenceCandidate[] = [
 
 describe("alert resolution evidence (IR327)", () => {
   it("lists each candidate with what it is, when, and where it comes from", () => {
-    expect(evidenceRows(items, NOW)).toEqual([
+    expect(evidenceRows(items, NOW)).toStrictEqual([
       { id: "m-temp", kind: REMEASUREMENT, title: "Remeasurement · Temperature 26.4 °C · today 9:20 am MYT", sub: "measured · valid" },
       { id: "m-co2", kind: REMEASUREMENT, title: "Remeasurement · CO₂ 650 ppm · today 9:15 am MYT", sub: "recorded on site · valid" }, // the label's “(ppm)” left to the value
       { id: "e-restored", kind: "device_event", title: "Device event · today 9:12 am MYT", sub: "The device's signal is back" },
@@ -28,15 +28,15 @@ describe("alert resolution evidence (IR327)", () => {
 
   it("words the rows in the display language", () => {
     const [r] = evidenceRows(items.slice(0, 1), NOW, MS);
-    expect([r?.title.startsWith("Pengukuran semula · "), r?.sub]).toEqual([true, "diukur · sah"]);
+    expect([r?.title.startsWith("Pengukuran semula · "), r?.sub]).toStrictEqual([true, "diukur · sah"]);
     expect(requiredEvidenceHeading(MS.t).title).toBe("Bukti penyelesaian · wajib");
   });
 
   it("requires evidence without a policy and leaves it optional with one (IR66)", () => {
-    expect(requiredEvidenceHeading(EN.t)).toEqual({ title: "Resolution evidence · required", sub: "At least one · measurements after detection" });
-    expect(optionalEvidenceHeading(EN.t)).toEqual({ title: "Resolution evidence · optional", sub: "A policy alert may also be resolved by hand without evidence" });
+    expect(requiredEvidenceHeading(EN.t)).toStrictEqual({ title: "Resolution evidence · required", sub: "At least one · measurements after detection" });
+    expect(optionalEvidenceHeading(EN.t)).toStrictEqual({ title: "Resolution evidence · optional", sub: "A policy alert may also be resolved by hand without evidence" });
     expect(evidenceProblem(true, [], EN.t)).toBe("Pick at least one evidence record — this alert has no policy");
-    expect([evidenceProblem(true, ["m-temp"], EN.t), evidenceProblem(false, [], EN.t)]).toEqual([null, null]);
+    expect([evidenceProblem(true, ["m-temp"], EN.t), evidenceProblem(false, [], EN.t)]).toStrictEqual([null, null]);
     expect(evidenceProblem(false, Array.from({ length: MAX_EVIDENCE + 1 }, (_, i) => `m${String(i)}`), EN.t)).toBe("Pick at most 20 evidence records");
   });
 
@@ -44,11 +44,11 @@ describe("alert resolution evidence (IR327)", () => {
     expect(evidenceRefusal({ resolutionEvidenceIds: "errors.evidence_required" }, EN.t)).toBe("Pick at least one evidence record — this alert has no policy");
     expect(evidenceRefusal({ resolutionEvidenceIds: "errors.evidence_unknown" }, EN.t)).toBe("An evidence record is no longer a candidate of this alert — pick again from the list");
     expect(evidenceRefusal({ resolutionEvidenceIds: "error.invalid" }, EN.t)).toBe("Pick each evidence record once, at most 20");
-    expect([evidenceRefusal({ resolutionReason: "error.length" }, EN.t), evidenceRefusal(undefined, EN.t)]).toEqual([null, null]);
+    expect([evidenceRefusal({ resolutionReason: "error.length" }, EN.t), evidenceRefusal(undefined, EN.t)]).toStrictEqual([null, null]);
   });
 
   it("ticks a candidate on once and off again, in the order picked", () => {
-    expect(togglePick(togglePick(["a"], "b", true), "b", true)).toEqual(["a", "b"]);
-    expect(togglePick(["a", "b"], "a", false)).toEqual(["b"]);
+    expect(togglePick(togglePick(["a"], "b", true), "b", true)).toStrictEqual(["a", "b"]);
+    expect(togglePick(["a", "b"], "a", false)).toStrictEqual(["b"]);
   });
 });

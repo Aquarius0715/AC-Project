@@ -10,7 +10,7 @@ describe("narrowing a form control's text to its options", () => {
   });
 
   it("gives the fallback for text that is no option", () => {
-    expect([oneOf(options, "", "all"), oneOf(options, "OVERDUE", "none"), oneOf(options, "toString", "all")]).toEqual(["all", "none", "all"]);
+    expect([oneOf(options, "", "all"), oneOf(options, "OVERDUE", "none"), oneOf(options, "toString", "all")]).toStrictEqual(["all", "none", "all"]);
   });
 });
 

@@ -22,7 +22,7 @@ describe("a certificate document as a response", () => {
     const res = await documentResponse("c1");
     expect(dal.coreOp).toHaveBeenCalledWith("certificates.getContent", { certificateId: "c1" });
     expect([res.status, res.headers.get("content-type"), res.headers.get("cache-control"), res.headers.get("content-disposition")])
-      .toEqual([200, "application/pdf", "no-store", `inline; filename="licence.pdf"; filename*=UTF-8''licence.pdf`]);
+      .toStrictEqual([200, "application/pdf", "no-store", `inline; filename="licence.pdf"; filename*=UTF-8''licence.pdf`]);
     expect(Buffer.from(await res.arrayBuffer()).toString()).toBe("%PDF-1.4 x");
   });
   it("passes the API's refusals on", async () => {
@@ -30,6 +30,6 @@ describe("a certificate document as a response", () => {
     dal.coreOp.mockRejectedValueOnce(new dal.CoreError(domainError({ code: "FORBIDDEN", messageKey: "error.forbidden" })));
     const missing = await documentResponse("x");
     const denied = await documentResponse("x");
-    expect([missing.status, denied.status]).toEqual([404, 403]);
+    expect([missing.status, denied.status]).toStrictEqual([404, 403]);
   });
 });

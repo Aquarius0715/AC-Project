@@ -4,6 +4,6 @@ import { cssVariables } from "@ac/web/lib/cssVariables";
 
 describe("inline CSS custom properties", () => {
   it("passes them on as a style object", () => {
-    expect(cssVariables({ "--gap": 2, "--color-bg": "red" })).toEqual({ "--gap": 2, "--color-bg": "red" });
+    expect(cssVariables({ "--gap": 2, "--color-bg": "red" })).toStrictEqual({ "--gap": 2, "--color-bg": "red" });
   });
 });

@@ -22,13 +22,12 @@ beforeEach(() => dal.coreOp.mockReset());
 describe("Mark all as read", () => {
   it("sends the listed notifications in one write", async () => {
     dal.coreOp.mockResolvedValueOnce({ markedIds: ["n1", "n3"], skippedIds: ["n2"] });
-    expect(await markAllRead(["n1", "n2", "n3"])).toEqual({ marked: 2, skipped: 1, failure: null });
-    expect(dal.coreOp).toHaveBeenCalledTimes(1);
-    expect(dal.coreOp).toHaveBeenCalledWith("notifications.markAllRead", { ids: ["n1", "n2", "n3"] }, { write: true });
+    expect(await markAllRead(["n1", "n2", "n3"])).toStrictEqual({ marked: 2, skipped: 1, failure: null });
+    expect(dal.coreOp).toHaveBeenCalledExactlyOnceWith("notifications.markAllRead", { ids: ["n1", "n2", "n3"] }, { write: true });
   });
   it("passes a refusal on, with the wait of the write limit", async () => {
     dal.coreOp.mockRejectedValueOnce(new dal.CoreError(domainError({ code: "RATE_LIMITED", messageKey: "error.rateLimited", fieldErrors: {}, retryAfterSeconds: 12 })));
-    expect(await markAllRead(["n1"])).toEqual({ marked: 0, skipped: 0, failure: { code: "RATE_LIMITED", messageKey: "error.rateLimited", fieldErrors: {}, retryAfterSeconds: 12 } });
+    expect(await markAllRead(["n1"])).toStrictEqual({ marked: 0, skipped: 0, failure: { code: "RATE_LIMITED", messageKey: "error.rateLimited", fieldErrors: {}, retryAfterSeconds: 12 } });
   });
   it("marks nothing when the Core API is unreachable", async () => {
     dal.coreOp.mockRejectedValueOnce(new TypeError("fetch failed"));

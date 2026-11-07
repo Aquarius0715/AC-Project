@@ -24,14 +24,14 @@ const statement = (over: Partial<ApiPayoutStatement> = {}): ApiPayoutStatement =
 
 describe("labels and money", () => {
   it("prints periods and signed amounts", () => {
-    expect([periodLabel("2026-09"), periodLabel("2026-09", "ms"), periodLabel("Q3")]).toEqual(["Sept 2026", "Sep 2026", "Q3"]);
+    expect([periodLabel("2026-09"), periodLabel("2026-09", "ms"), periodLabel("Q3")]).toStrictEqual(["Sept 2026", "Sep 2026", "Q3"]);
     expect(money(199_000, "MYR")).toBe("MYR 1,990.00");
     expect(money(-12_000, "MYR")).toBe("− MYR 120.00");
     expect(money(0, "USD")).toBe("USD 0.00");
   });
   it("lists statements newest first with their badge", () => {
     const rows = statementRows([statement(), statement({ id: "stmt-2026-07-bbbb", period: "2026-07", status: "paid", netMinor: 204_000, paidAt: "2026-08-15T02:00:00Z" })]);
-    expect(rows[0]).toEqual({ id: "stmt-2026-08-aaaa", period: "2026-08", label: "Aug 2026 · stmt-202", sub: "MYR 1,160.00 · pays 15 Sept 2026", badge: { label: "Approved", tone: "primary" } });
+    expect(rows[0]).toStrictEqual({ id: "stmt-2026-08-aaaa", period: "2026-08", label: "Aug 2026 · stmt-202", sub: "MYR 1,160.00 · pays 15 Sept 2026", badge: { label: "Approved", tone: "primary" } });
     expect(rows[1]).toMatchObject({ label: "Jul 2026 · stmt-202", sub: "MYR 2,040.00 · paid 15 Aug", badge: { label: "Paid 15 Aug", tone: "ok" } });
   });
 });
@@ -39,12 +39,12 @@ describe("labels and money", () => {
 describe("KPIs", () => {
   it("counts distinct paid jobs and deductions and shows the pay date", () => {
     const k = kpis(statement(), "e8c270a5 v3");
-    expect(k.map((x) => [x.label, x.value])).toEqual([["Jobs paid", "3"], ["Gross", "MYR 1,280.00"], ["Deductions", "− MYR 120.00"], ["Net payable", "MYR 1,160.00"]]);
+    expect(k.map((x) => [x.label, x.value])).toStrictEqual([["Jobs paid", "3"], ["Gross", "MYR 1,280.00"], ["Deductions", "− MYR 120.00"], ["Net payable", "MYR 1,160.00"]]);
     expect(k[0]?.sub).toBe("review-accepted in August");
     expect(k[1]?.sub).toBe("rate card e8c270a5 v3");
     expect(k[2]?.sub).toBe("1 rework deduction");
-    expect(k[3]?.badge).toEqual({ label: "Approved · pays 15 Sept 2026", tone: "primary" });
-    expect(kpis(statement({ status: "paid", paidAt: "2026-09-15T02:00:00Z", deductionsMinor: 0, lines: [line()] }), null)[3]?.badge).toEqual({ label: "Paid 15 Sept 2026", tone: "ok" });
+    expect(k[3]?.badge).toStrictEqual({ label: "Approved · pays 15 Sept 2026", tone: "primary" });
+    expect(kpis(statement({ status: "paid", paidAt: "2026-09-15T02:00:00Z", deductionsMinor: 0, lines: [line()] }), null)[3]?.badge).toStrictEqual({ label: "Paid 15 Sept 2026", tone: "ok" });
     expect(kpis(statement({ lines: [line()] }), null)[2]?.sub).toBe("none");
     expect(kpis(statement(), null)[1]?.sub).toBe("rate card set by HQ");
   });
@@ -55,7 +55,7 @@ describe("lines table", () => {
   it("prices charges, deductions and adjustments and appends the jobs still in review", () => {
     const s = statement({ lines: [...statement().lines, line({ id: "l5", jobId: "job-dddddddd", kind: "adjustment", amountMinor: -5000, note: null, acceptedAt: null })] });
     const rows = lineRows(s, jobs, [{ id: "job-cccccccc", type: "reactive", unitName: "Lobby AC" }, { id: JOB_EEEEEEEE, type: "periodic", unitName: null }]);
-    expect(rows.map((r) => [r.job, r.work, r.accepted, r.status, r.statusText, r.amount])).toEqual([
+    expect(rows.map((r) => [r.job, r.work, r.accepted, r.status, r.statusText, r.amount])).toStrictEqual([
       ["job-aaaa", "Repair · Bedroom AC", "5 Aug", "accepted", "Accepted", "450.00"], ["job-bbbb", PERIODIC_INSPECTION, "12 Aug", "accepted", "Accepted", "380.00"],
       ["job-bbbb", "Rework deduction", "12 Aug", "deduction", "Deduction", "− 120.00"], ["job-cccc", "Repair", "20 Aug", "accepted", "Accepted", "450.00"],
       ["job-dddd", "Adjustment from HQ", "—", "adjustment", "Adjustment", "− 50.00"], ["job-eeee", PERIODIC_INSPECTION, "—", "not_included", "Not included", "—"],
@@ -68,10 +68,10 @@ describe("lines table", () => {
   it("binds questions to their line and asks only on approved statements", () => {
     const q = { id: "q1", lineId: "l3", topic: "deduction" as const, message: "Why?", state: "open" as const, reply: null, adjustmentMinor: null };
     const rows = lineRows(statement({ status: "paid", queries: [q] }), new Map(), []);
-    expect(rows.find((r) => r.lineId === "l3")?.question).toEqual(q);
+    expect(rows.find((r) => r.lineId === "l3")?.question).toStrictEqual(q);
     expect(rows.every((r) => !r.askable)).toBe(true);
     const qs = questionRows(statement({ queries: [q, { ...q, id: "q2", lineId: "l1", state: "adjusted", reply: "Agreed", adjustmentMinor: 12_000 }, { ...q, id: "q3", lineId: null, state: "answered", reply: "No" }] }), rows);
-    expect(qs.map((x) => [x.title, x.state, x.tone])).toEqual([
+    expect(qs.map((x) => [x.title, x.state, x.tone])).toStrictEqual([
       ["Deduction · job-bbbb · Rework deduction", "Waiting for HQ", "warn"], ["Deduction · job-aaaa · Repair", "Adjusted MYR 120.00 on the next statement", "ok"], ["Deduction · statement", "Answered", "ok"],
     ]);
   });
@@ -101,11 +101,11 @@ describe("payoutPdf", () => {
 describe("payouts in Malay (IR279)", () => {
   it("words the statements, KPIs, lines, questions and the PDF in Malay", () => {
     expect(statementRows([statement()], MS)[0]).toMatchObject({ label: "Ogo 2026 · stmt-202", sub: "MYR 1,160.00 · dibayar pada 15 Sep 2026", badge: { label: "Diluluskan" } });
-    expect(kpis(statement(), "e8c270a5 v3", MS).map((k) => [k.label, k.sub])).toEqual([
+    expect(kpis(statement(), "e8c270a5 v3", MS).map((k) => [k.label, k.sub])).toStrictEqual([
       ["Kerja dibayar", "diterima dalam semakan pada Ogos"], ["Kasar", "kad kadar e8c270a5 v3"], ["Potongan", "1 potongan kerja semula"], ["Bersih perlu dibayar", ""],
     ]);
     const rows = lineRows(statement(), new Map(), [{ id: JOB_EEEEEEEE, type: "periodic", unitName: null }], MS);
-    expect(rows.map((r) => [r.work, r.accepted, r.statusText])).toEqual([
+    expect(rows.map((r) => [r.work, r.accepted, r.statusText])).toStrictEqual([
       ["Pembaikan", "5 Ogo", "Diterima"], ["Pemeriksaan berkala", "12 Ogo", "Diterima"], ["Potongan kerja semula", "12 Ogo", "Potongan"], ["Pembaikan", "20 Ogo", "Diterima"], ["Pemeriksaan berkala", "—", "Tidak termasuk"],
     ]);
     const q = { id: "q1", lineId: "l3", topic: "deduction" as const, message: "Why?", state: "open" as const, reply: null, adjustmentMinor: null };

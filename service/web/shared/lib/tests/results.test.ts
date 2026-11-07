@@ -147,7 +147,7 @@ function check(): { checked: number; problems: string[] } {
 describe("the web's result types against the Core API contract (IR314)", () => {
   it("accept what the contract answers: every field, null and variant the screen reads", () => {
     const { checked, problems } = check();
-    expect(problems).toEqual([]);
+    expect(problems).toStrictEqual([]);
     expect(checked).toBeGreaterThan(350); // the scan sees the typed calls
   }, 120_000);
 });

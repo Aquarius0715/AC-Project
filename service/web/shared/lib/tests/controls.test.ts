@@ -55,6 +55,6 @@ describe("the screens' controls are shadcn/ui components (DEC-75)", () => {
       const c = rawElements(f);
       if (Object.keys(c).length > 0) got[path.relative(root, f)] = c;
     }
-    expect(got).toEqual(BASELINE);
+    expect(got).toStrictEqual(BASELINE);
   });
 });

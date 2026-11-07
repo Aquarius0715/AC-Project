@@ -21,11 +21,11 @@ describe("coreRequest", () => {
   it("covers every operation of the catalog", () => {
     expect(Object.keys(coreRoutes)).toHaveLength(212); // IR612 members.unavailability + members.clearUnavailability, IR437 jobs.getAttachment, IR436 certificates.getContent, IR416 partnerUsers.*, IR238 filterCare.getSettings, IR327 alerts.evidence, IR349 attachments.list, IR379 notifications.markAllRead, IR384 members.revokeSessions
     expect(Object.values(coreRoutes).flat()).toHaveLength(233);
-    expect(coreRequest("filterCare.getSettings", {})).toEqual({ method: "GET", path: "/v1/filter-care/settings" });
-    expect(coreRequest("alerts.evidence", { alertId: "a1", query: { limit: 100 } })).toEqual({ method: "GET", path: "/v1/alerts/a1/evidence?limit=100" });
+    expect(coreRequest("filterCare.getSettings", {})).toStrictEqual({ method: "GET", path: "/v1/filter-care/settings" });
+    expect(coreRequest("alerts.evidence", { alertId: "a1", query: { limit: 100 } })).toStrictEqual({ method: "GET", path: "/v1/alerts/a1/evidence?limit=100" });
     // IR349: the MRV evidence candidates take their units and period in the query string
     expect(query(requestOf("attachments.list", { unitIds: ["u1", "u2"], from: TEXT_2026_09_01T00_00_00Z, to: "2026-09-14T00:00:00Z", query: { limit: 100 } }).path))
-      .toEqual({ pathname: "/v1/attachments", out: { unitIds: ["u1", "u2"], from: [TEXT_2026_09_01T00_00_00Z], to: ["2026-09-14T00:00:00Z"], limit: ["100"] } });
+      .toStrictEqual({ pathname: "/v1/attachments", out: { unitIds: ["u1", "u2"], from: [TEXT_2026_09_01T00_00_00Z], to: ["2026-09-14T00:00:00Z"], limit: ["100"] } });
     for (const routes of Object.values(coreRoutes)) for (const r of routes) expect(r.path).toMatch(/^\/v1(\/([a-z0-9-]+|\{[A-Za-z]\w*(\.[A-Za-z]\w*)?\}))+$/);
   });
 
@@ -33,7 +33,7 @@ describe("coreRequest", () => {
     const r = requestOf("jobs.list", { filters: { status: "open", unitIds: ["u1", "u2"], overdueOnly: false, statuses: [], origin: null }, sort: { field: "dueAt", direction: "asc" }, limit: 50 });
     expect(r.method).toBe("GET");
     expect(r.body).toBeUndefined();
-    expect(query(r.path)).toEqual({ pathname: "/v1/jobs", out: { status: ["open"], unitIds: ["u1", "u2"], overdueOnly: ["false"], statuses: [""], sort: ["dueAt:asc"], limit: ["50"] } });
+    expect(query(r.path)).toStrictEqual({ pathname: "/v1/jobs", out: { status: ["open"], unitIds: ["u1", "u2"], overdueOnly: ["false"], statuses: [""], sort: ["dueAt:asc"], limit: ["50"] } });
   });
 
   it("names no route when a path parameter is a dot segment (IR372)", () => {
@@ -51,19 +51,19 @@ describe("coreRequest", () => {
   });
 
   it("fills and encodes path parameters and keeps the other fields in the query", () => {
-    expect(coreRequest("units.get", { id: "a/b c", jobId: "j1" })).toEqual({ method: "GET", path: "/v1/units/a%2Fb%20c?jobId=j1" });
-    expect(coreRequest("session.get", undefined)).toEqual({ method: "GET", path: "/v1/session" });
+    expect(coreRequest("units.get", { id: "a/b c", jobId: "j1" })).toStrictEqual({ method: "GET", path: "/v1/units/a%2Fb%20c?jobId=j1" });
+    expect(coreRequest("session.get", undefined)).toStrictEqual({ method: "GET", path: "/v1/session" });
     const r = requestOf("commands.list", { unitId: "u1", query: { limit: 20, sort: { field: "requestedAt", direction: "desc" } } });
-    expect(query(r.path)).toEqual({ pathname: "/v1/commands", out: { unitId: ["u1"], limit: ["20"], sort: ["requestedAt:desc"] } });
-    expect(query(requestOf("sla.scorecard", { period: { from: "2026-08-01T00:00:00Z", to: TEXT_2026_09_01T00_00_00Z } }).path).out).toEqual({ "period.from": ["2026-08-01T00:00:00Z"], "period.to": [TEXT_2026_09_01T00_00_00Z] });
-    expect(query(requestOf("devices.events", { id: "d1", query: { limit: 50, filters: { from: "x" } } }).path)).toEqual({ pathname: "/v1/devices/d1/events", out: { limit: ["50"], from: ["x"] } });
+    expect(query(r.path)).toStrictEqual({ pathname: "/v1/commands", out: { unitId: ["u1"], limit: ["20"], sort: ["requestedAt:desc"] } });
+    expect(query(requestOf("sla.scorecard", { period: { from: "2026-08-01T00:00:00Z", to: TEXT_2026_09_01T00_00_00Z } }).path).out).toStrictEqual({ "period.from": ["2026-08-01T00:00:00Z"], "period.to": [TEXT_2026_09_01T00_00_00Z] });
+    expect(query(requestOf("devices.events", { id: "d1", query: { limit: 50, filters: { from: "x" } } }).path)).toStrictEqual({ pathname: "/v1/devices/d1/events", out: { limit: ["50"], from: ["x"] } });
   });
 
   it("creates on the collection and updates on the item", () => {
-    expect(coreRequest(UNITS_SAVE, { displayName: "A", spaceId: null })).toEqual({ method: "POST", path: "/v1/units", body: '{"displayName":"A","spaceId":null}' });
-    expect(coreRequest(UNITS_SAVE, { id: "u1", displayName: "A" })).toEqual({ method: "PUT", path: "/v1/units/u1", body: '{"displayName":"A"}' });
-    expect(coreRequest("units.delete", { id: "u1", reason: "duplicate entry" })).toEqual({ method: "DELETE", path: "/v1/units/u1?reason=duplicate+entry" });
-    expect(coreRequest("jobs.checkIn", { jobId: "j1", method: "manual", reason: "no signal" })).toEqual({ method: "POST", path: "/v1/jobs/j1/check-in", body: '{"method":"manual","reason":"no signal"}' });
+    expect(coreRequest(UNITS_SAVE, { displayName: "A", spaceId: null })).toStrictEqual({ method: "POST", path: "/v1/units", body: '{"displayName":"A","spaceId":null}' });
+    expect(coreRequest(UNITS_SAVE, { id: "u1", displayName: "A" })).toStrictEqual({ method: "PUT", path: "/v1/units/u1", body: '{"displayName":"A"}' });
+    expect(coreRequest("units.delete", { id: "u1", reason: "duplicate entry" })).toStrictEqual({ method: "DELETE", path: "/v1/units/u1?reason=duplicate+entry" });
+    expect(coreRequest("jobs.checkIn", { jobId: "j1", method: "manual", reason: "no signal" })).toStrictEqual({ method: "POST", path: "/v1/jobs/j1/check-in", body: '{"method":"manual","reason":"no signal"}' });
   });
 
   it("names no operation by an inherited property", () => {
@@ -71,18 +71,18 @@ describe("coreRequest", () => {
   });
 
   it("chooses the route of the fixed field and takes nested path parameters out of the body", () => {
-    expect(coreRequest(PAYOUTS_TRANSITION, { statementId: "s1", action: "mark_paid", reason: "paid" })).toEqual({ method: "POST", path: "/v1/payouts/s1/mark-paid", body: '{"reason":"paid"}' });
-    expect(coreRequest(PAYOUTS_TRANSITION, { statementId: "s1", action: "approve" })).toEqual({ method: "POST", path: "/v1/payouts/s1/approve", body: "{}" });
+    expect(coreRequest(PAYOUTS_TRANSITION, { statementId: "s1", action: "mark_paid", reason: "paid" })).toStrictEqual({ method: "POST", path: "/v1/payouts/s1/mark-paid", body: '{"reason":"paid"}' });
+    expect(coreRequest(PAYOUTS_TRANSITION, { statementId: "s1", action: "approve" })).toStrictEqual({ method: "POST", path: "/v1/payouts/s1/approve", body: "{}" });
     // an action no route fixes stays in the body, so the API refuses it (error.pathMismatch)
-    expect(coreRequest(PAYOUTS_TRANSITION, { statementId: "s1", action: "nope" })).toEqual({ method: "POST", path: "/v1/payouts/s1/approve", body: '{"action":"nope"}' });
-    expect(coreRequest("firmwareCampaigns.control", { campaignId: "c1", action: "retry_device", deviceId: "d1" })).toEqual({ method: "POST", path: "/v1/firmware-campaigns/c1/devices/d1/retry", body: "{}" });
-    expect(coreRequest("locations.rename", { target: { kind: "space", id: "s1" }, name: "Lobby" })).toEqual({ method: "POST", path: "/v1/locations/space/s1/rename", body: '{"target":{},"name":"Lobby"}' });
+    expect(coreRequest(PAYOUTS_TRANSITION, { statementId: "s1", action: "nope" })).toStrictEqual({ method: "POST", path: "/v1/payouts/s1/approve", body: '{"action":"nope"}' });
+    expect(coreRequest("firmwareCampaigns.control", { campaignId: "c1", action: "retry_device", deviceId: "d1" })).toStrictEqual({ method: "POST", path: "/v1/firmware-campaigns/c1/devices/d1/retry", body: "{}" });
+    expect(coreRequest("locations.rename", { target: { kind: "space", id: "s1" }, name: "Lobby" })).toStrictEqual({ method: "POST", path: "/v1/locations/space/s1/rename", body: '{"target":{},"name":"Lobby"}' });
   });
 
   it("does not change the caller's input and knows only catalogued operations", () => {
     const input = { id: "u1", displayName: "A" };
     coreRequest(UNITS_SAVE, input);
-    expect(input).toEqual({ id: "u1", displayName: "A" });
+    expect(input).toStrictEqual({ id: "u1", displayName: "A" });
     expect(coreRequest("nope.nope", {})).toBeNull();
   });
 });

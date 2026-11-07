@@ -6,6 +6,6 @@ describe("isNone", () => {
   it("is true for null and undefined only", () => {
     expect(isNone(null)).toBe(true);
     expect(isNone(undefined)).toBe(true);
-    expect([0, "", false, NaN, [], {}].map((value) => isNone(value))).toEqual([false, false, false, false, false, false]);
+    expect([0, "", false, NaN, [], {}].map((value) => isNone(value))).toStrictEqual([false, false, false, false, false, false]);
   });
 });

@@ -33,36 +33,36 @@ describe("HQ overview sections (DD-A01, IR244)", () => {
     expect(overviewLinks({ customerId: "c1", propertyId: null, period: { from: "2026-09-14T00:00:00Z", to: "2026-09-15T00:00:00Z" } }).waiting).toBe("/admin/jobs?customerId=c1&stage=requested");
     const l = overviewLinks({ customerId: "c1", propertyId: null });
     expect([l.units, l.power("off"), l.connection("connecting,error,unknown"), l.jobs("assigned"), l.billing, overviewLinks({ customerId: null, propertyId: null }).units])
-      .toEqual(["/admin/units?customerId=c1", "/admin/units?customerId=c1&powerState=off", "/admin/units?customerId=c1&connections=connecting%2Cerror%2Cunknown", "/admin/jobs?customerId=c1&stage=assigned", "/admin/billing?overdueOnly=true", "/admin/units"]);
+      .toStrictEqual(["/admin/units?customerId=c1", "/admin/units?customerId=c1&powerState=off", "/admin/units?customerId=c1&connections=connecting%2Cerror%2Cunknown", "/admin/jobs?customerId=c1&stage=assigned", "/admin/billing?overdueOnly=true", "/admin/units"]);
     const withPeriod = overviewLinks({ customerId: null, propertyId: null, period: { from: "2026-09-13T16:00:00.000Z", to: "2026-09-14T01:00:00.000Z" } });
-    expect([withPeriod.jobs("completed"), withPeriod.units]).toEqual(["/admin/jobs?stage=completed&from=2026-09-13T16%3A00%3A00.000Z&to=2026-09-14T01%3A00%3A00.000Z", "/admin/units"]);
+    expect([withPeriod.jobs("completed"), withPeriod.units]).toStrictEqual(["/admin/jobs?stage=completed&from=2026-09-13T16%3A00%3A00.000Z&to=2026-09-14T01%3A00%3A00.000Z", "/admin/units"]);
   });
 
   it("shows the forecast with its direction, or why there is none (IR78)", () => {
     const f = forecastView(forecast());
-    expect(f).toEqual({
+    expect(f).toStrictEqual({
       state: "ok", saved: { text: "Expected reduction 9.9 kWh", tone: "ok" }, rate: { text: "Expected reduction 30.6%", tone: "ok" },
       baseline: { value: "32.4 kWh", sub: "baseline v1 · demo_fixed · 2,592 kWh" }, actual: { value: "22.5 kWh", sub: "9.0 kWh on valid slots ÷ 1,080 × 2,700 unit-min" },
       coverage: "1,080 / 2,700 unit-min", warnings: ["Modeled baseline", "Partial coverage", "Prorated forecast"], // in words (IR577)
     });
     expect(forecastView(forecast({ forecastSavedKWh: -2.5, forecastSavingPercentage: -8.1 }))).toMatchObject({ saved: { text: "Expected increase 2.5 kWh", tone: "crit" }, rate: { text: "Expected increase 8.1%" } });
     expect(forecastView(forecast({ forecastSavedKWh: 0, forecastSavingPercentage: 0 }))).toMatchObject({ saved: { text: "No change 0.0", tone: "muted" } });
-    expect(forecastView(forecast({ forecastSavedKWh: null, predictedBaselineKWh: null, qualityWarnings: ["baseline_unavailable"] }))).toEqual({ state: "none", text: "Baseline not set", warnings: [] }); // the title says it once (IR577)
-    expect(forecastView(forecast({ forecastSavedKWh: null, predictedBaselineKWh: null, qualityWarnings: ["baseline_unavailable", "partial_coverage"] })).warnings).toEqual(["Partial coverage"]);
+    expect(forecastView(forecast({ forecastSavedKWh: null, predictedBaselineKWh: null, qualityWarnings: ["baseline_unavailable"] }))).toStrictEqual({ state: "none", text: "Baseline not set", warnings: [] }); // the title says it once (IR577)
+    expect(forecastView(forecast({ forecastSavedKWh: null, predictedBaselineKWh: null, qualityWarnings: ["baseline_unavailable", "partial_coverage"] })).warnings).toStrictEqual(["Partial coverage"]);
     expect(forecastView(forecast({ forecastSavedKWh: null, qualityWarnings: ["no_units"] }))).toMatchObject({ text: "No target equipment" });
-    expect(forecastView(null)).toEqual({ state: "none", text: "Cannot calculate", warnings: [] });
+    expect(forecastView(null)).toStrictEqual({ state: "none", text: "Cannot calculate", warnings: [] });
   });
 
   it("splits the power and connection axes, lists all job statuses and keeps currencies apart", () => {
     const s = summary();
     const a = axisRows(s, overviewLinks({ customerId: null, propertyId: null }));
-    expect(a.power.map((r) => [r.label.split(" ", 1)[0], r.count, r.pct])).toEqual([["Running", 2, 40], ["Stopped", 2, 40], ["Unknown", 1, 20]]);
-    expect(a.connection.map((r) => r.count)).toEqual([5, 0, 0]);
+    expect(a.power.map((r) => [r.label.split(" ", 1)[0], r.count, r.pct])).toStrictEqual([["Running", 2, 40], ["Stopped", 2, 40], ["Unknown", 1, 20]]);
+    expect(a.connection.map((r) => r.count)).toStrictEqual([5, 0, 0]);
     expect(a.rateNote).toMatch(/= 2 ÷ 4 = 50\.0%/);
     const jobs = jobRows(s.jobCounts, overviewLinks({ customerId: null, propertyId: null }));
-    expect([jobs.length, jobs[0], jobs.at(-1)]).toEqual([10, { status: "requested", label: "requested", count: 1, href: "/admin/jobs?stage=requested" }, { status: "cancelled", label: "cancelled", count: 0, href: "/admin/jobs" }]);
-    expect(billingView(summary({ amountsByCurrency: [{ amountMinor: 12_000, currency: "MYR" }, { amountMinor: 5000, currency: "USD" }] }))).toEqual({ forbidden: false, overdue: 1, rows: [{ currency: "MYR", text: "120.00 MYR" }, { currency: "USD", text: "50.00 USD" }] });
-    expect(billingView(summary({ billingVisibility: "forbidden", amountsByCurrency: null, overdueInvoiceCount: null }))).toEqual({ forbidden: true });
+    expect([jobs.length, jobs[0], jobs.at(-1)]).toStrictEqual([10, { status: "requested", label: "requested", count: 1, href: "/admin/jobs?stage=requested" }, { status: "cancelled", label: "cancelled", count: 0, href: "/admin/jobs" }]);
+    expect(billingView(summary({ amountsByCurrency: [{ amountMinor: 12_000, currency: "MYR" }, { amountMinor: 5000, currency: "USD" }] }))).toStrictEqual({ forbidden: false, overdue: 1, rows: [{ currency: "MYR", text: "120.00 MYR" }, { currency: "USD", text: "50.00 USD" }] });
+    expect(billingView(summary({ billingVisibility: "forbidden", amountsByCurrency: null, overdueInvoiceCount: null }))).toStrictEqual({ forbidden: true });
     expect(kpisFrom(s)).toMatchObject({ rate: "50.0%", kwh: "9.0 kWh", billing: "120.00 MYR", jobs: 2, kwhSub: "measured · coverage 40% · cost 3.29 MYR", billingSub: "1 overdue invoice · unpaid, per currency" });
   });
 });
@@ -75,8 +75,8 @@ describe("HQ overview in Malay with the display time zone (IR289)", () => {
     expect(forecastView(forecast(), MS.t)).toMatchObject({ saved: { text: "Jangkaan pengurangan 9.9 kWh" }, coverage: "1,080 / 2,700 unit-min" });
     expect(forecastView(null, MS.t)).toMatchObject({ text: "Tidak dapat dikira" });
     const a = axisRows(s, overviewLinks({ customerId: null, propertyId: null }), MS.t);
-    expect([a.power[0]?.label, a.connection[1]?.label]).toEqual(["Berjalan", "Luar talian"]);
-    expect(jobRows(s.jobCounts, overviewLinks({ customerId: null, propertyId: null }), MS.t).slice(0, 2).map((j) => j.label)).toEqual(["diminta", "ditawarkan"]);
+    expect([a.power[0]?.label, a.connection[1]?.label]).toStrictEqual(["Berjalan", "Luar talian"]);
+    expect(jobRows(s.jobCounts, overviewLinks({ customerId: null, propertyId: null }), MS.t).slice(0, 2).map((j) => j.label)).toStrictEqual(["diminta", "ditawarkan"]);
   });
 });
 
@@ -85,7 +85,7 @@ describe("HQ Jobs tab period (IR245)", () => {
     const { filtersOf, periodChip, periodOfQuery } = await import("@ac/web/lib/adminJobs");
     const q = { from: "2026-09-13T16:00:00.000Z", to: "2026-09-14T01:00:00.000Z", customerId: "c1" };
     expect(filtersOf(q, null)).toMatchObject({ customerId: "c1", from: q.from, to: q.to });
-    expect([periodOfQuery({ from: q.to, to: q.from }), periodOfQuery({ from: "x", to: q.to }), periodOfQuery({})]).toEqual([null, null, null]);
+    expect([periodOfQuery({ from: q.to, to: q.from }), periodOfQuery({ from: "x", to: q.to }), periodOfQuery({})]).toStrictEqual([null, null, null]);
     const asked = must(periodOfQuery(q));
     expect(periodChip(asked)).toBe("Requested time 14 Sept, 12:00 – 9:00 am MYT"); // one span in the display time zone (IR290)
   });

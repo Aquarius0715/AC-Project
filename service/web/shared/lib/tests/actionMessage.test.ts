@@ -35,13 +35,13 @@ describe("actionMessage (one toast line per failed Server Action)", () => {
     // a notice the person does not get on that channel reads in words, not "Recipient membership id — recipient ineligible" (IR578)
     expect(actionMessage(failure({ fieldErrors: { recipientMembershipId: "errors.recipient_ineligible" } }))).toBe("This person does not get this notice on that channel");
     // IR508: HQ ended the access — only HQ gives it back, in the display language
-    expect([actionMessage(failure({ code: "CONFLICT", messageKey: "errors.revoked_by_hq" })), actionMessage(failure({ fieldErrors: { email: "errors.revoked_by_hq" } }), translator("ms"))]).toEqual([
+    expect([actionMessage(failure({ code: "CONFLICT", messageKey: "errors.revoked_by_hq" })), actionMessage(failure({ fieldErrors: { email: "errors.revoked_by_hq" } }), translator("ms"))]).toStrictEqual([
       "HQ ended this account's access — only HQ can give it back", "HQ telah menamatkan akses orang ini — hanya HQ boleh memulihkannya"]);
     // IR510: an HQ membership on another app's token
     expect(actionMessage(failure({ code: "FORBIDDEN", messageKey: "errors.hq_app_required" }))).toBe("An HQ account works in the HQ app — sign in there");
     // IR486: a QR check-in with another unit's label says what to do, in the display language
     const qr = failure({ fieldErrors: { qrUnitId: "errors.qr_unit_mismatch" } });
-    expect([actionMessage(qr), actionMessage(qr, translator("ms"))]).toEqual([
+    expect([actionMessage(qr), actionMessage(qr, translator("ms"))]).toStrictEqual([
       "The scanned QR label is not this job's unit — scan the label on this AC, or check in manually with a reason",
       "Label QR yang diimbas bukan unit kerja ini — imbas label pada AC ini, atau daftar masuk secara manual dengan sebab",
     ]);
@@ -53,7 +53,7 @@ describe("actionMessage (one toast line per failed Server Action)", () => {
       actionMessage(failure({ fieldErrors: { unit: "errors.unit_mismatch" } }), t), actionMessage(failure({ code: "CONFLICT", messageKey: "error.versionConflict" }), t),
       actionMessage(failure({ code: "NOT_FOUND", messageKey: "error.notFound" }), t), actionMessage(failure({ code: "UNAUTHENTICATED", messageKey: "error.unauthenticated" }), t),
       actionMessage(failure({ code: "CONFLICT", messageKey: "errors.operation_not_running" }), t), actionMessage(failure({ code: RATE_LIMITED_2, messageKey: ERROR_RATELIMITED }), t),
-    ]).toEqual([
+    ]).toStrictEqual([
       "Reason terlalu pendek atau terlalu panjang", "Duration minutes di luar julat", "Unit — unit mismatch", "Seseorang telah mengubahnya sebentar tadi — skrin kini menunjukkan versi terkini",
       "Item ini tidak lagi wujud atau di luar skop anda", "Sesi anda telah tamat — log masuk semula", "Operation not running", "Terlalu banyak perubahan dalam masa yang singkat — cuba lagi sebentar lagi",
     ]);
@@ -77,11 +77,11 @@ describe("actionMessage for the user management refusals (IR416–IR421)", () =>
 describe("fieldErrorTexts", () => {
   it("words each known field as the toast does, under the form's own names, and leaves the rest out", () => {
     const f = failure({ fieldErrors: { email: "errors.email_taken", accessUntil: ERROR_RANGE, tenantId: "error.invalid" } });
-    expect(fieldErrorTexts(f, { email: "email", accessUntil: "until" })).toEqual({
+    expect(fieldErrorTexts(f, { email: "email", accessUntil: "until" })).toStrictEqual({
       email: "Email belongs to someone who still has access — use another address or ask HQ",
       until: "Access until is out of range",
     });
-    expect(fieldErrorTexts(failure({ code: "CONFLICT", messageKey: "errors.own_account" }), { email: "email" })).toEqual({});
+    expect(fieldErrorTexts(failure({ code: "CONFLICT", messageKey: "errors.own_account" }), { email: "email" })).toStrictEqual({});
   });
   it("words them in the display language", () => {
     const ms = fieldErrorTexts(failure({ fieldErrors: { reason: ERROR_LENGTH } }), { reason: "reason" }, translator("ms"));

@@ -70,7 +70,18 @@ export function webConfig(tsconfigRootDir) {
     comments.recommended,
     { files: ["**/tests/**", "**/*.test.{ts,tsx}"], ...vitest.configs.recommended },
     // Vitest's expect takes a message as its second argument (expect(value, "what failed"))
-    { files: ["**/tests/**", "**/*.test.{ts,tsx}"], rules: { "vitest/valid-expect": ["error", { maxArgs: 2 }] } },
+    {
+      files: ["**/tests/**", "**/*.test.{ts,tsx}"],
+      rules: {
+        "vitest/valid-expect": ["error", { maxArgs: 2 }],
+        // Round 3: the assertions that tell more. toStrictEqual compares undefined properties and classes; a throw is matched
+        // by its message; hooks run in their order; a spy is checked for its one call
+        "vitest/prefer-strict-equal": "error",
+        "vitest/require-to-throw-message": "error",
+        "vitest/prefer-hooks-in-order": "error",
+        "vitest/prefer-called-once": "error",
+      },
+    },
     // Where a rule needs a fact of this project, or contradicts a contract or platform it has to follow:
     {
       rules: {
@@ -385,6 +396,18 @@ export function webConfig(tsconfigRootDir) {
         "**/technician/units/*/_lib/load.ts",
       ],
       rules: { "no-await-in-loop": "off" },
+    },
+    {
+      // These rows carry `tone: undefined` (or `error: undefined`) for "no tone"; the expected rows list the tones they have.
+      // toStrictEqual tells an undefined property from a missing one, which is not what these tests are about
+      files: [
+        "**/tests/energy.test.ts",
+        "**/tests/partnerHistory.test.ts",
+        "**/tests/partnerJobs.test.ts",
+        "**/tests/partnerUnit.test.ts",
+        "**/tests/techUnit.test.ts",
+      ],
+      rules: { "vitest/prefer-strict-equal": "off" },
     },
     {
       // useOpenedAt keeps the first value of a state that is never set again; a setter it did not use would only be dropped

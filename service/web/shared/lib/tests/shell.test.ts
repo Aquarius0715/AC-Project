@@ -47,20 +47,20 @@ describe("loadShell", () => {
   it("shows the contractor's offers waiting for an answer", async () => {
     coreOp.mockImplementation((op: string) => Promise.resolve(op === NOTIFICATIONS_LIST ? { total: 0 } : { counts: { offerCount: 4 } }));
     const shell = await loadShell("contractor");
-    expect(shell?.badges).toEqual({ "/notifications": 0, "/partner/jobs": 4 });
+    expect(shell?.badges).toStrictEqual({ "/notifications": 0, "/partner/jobs": 4 });
   });
 
   it("sums HQ's critical and warning alerts over open and acknowledged", async () => {
     coreOp.mockImplementation((op: string, input: { filters: { severity?: string; status?: string } }) =>
       Promise.resolve({ total: op === NOTIFICATIONS_LIST ? 1 : alertTotal(input.filters) }));
     const shell = await loadShell("admin");
-    expect(shell?.badges).toEqual({ "/notifications": 1, "/admin/alerts": 2 + 1 + 5 + 5 });
+    expect(shell?.badges).toStrictEqual({ "/notifications": 1, "/admin/alerts": 2 + 1 + 5 + 5 });
     expect(coreOp.mock.calls.filter(([op]) => op === "alerts.list")).toHaveLength(4);
   });
 
   it("drops a badge whose count cannot be read", async () => {
     coreOp.mockImplementation((op: string) => (op === "summaries.get" ? Promise.reject(new Error("unavailable")) : Promise.resolve({ total: 6 })));
     const shell = await loadShell("client");
-    expect(shell?.badges).toEqual({ "/notifications": 6 });
+    expect(shell?.badges).toStrictEqual({ "/notifications": 6 });
   });
 });

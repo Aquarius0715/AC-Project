@@ -48,8 +48,8 @@ const day = (id: string, assignedMinutes: number): ApiCapacity => ({ membershipI
 
 describe("partner overview", () => {
   it("defaults to the KL week and accepts a URL period up to 366 days", () => {
-    expect(weekOf(NOW)).toEqual({ from: TEXT_2026_09_21, to: TEXT_2026_09_27 });
-    expect(weekOf("2026-09-20T16:30:00Z")).toEqual({ from: TEXT_2026_09_21, to: TEXT_2026_09_27 }); // Mon 00:30 KL
+    expect(weekOf(NOW)).toStrictEqual({ from: TEXT_2026_09_21, to: TEXT_2026_09_27 });
+    expect(weekOf("2026-09-20T16:30:00Z")).toStrictEqual({ from: TEXT_2026_09_21, to: TEXT_2026_09_27 }); // Mon 00:30 KL
     const p = period(NOW);
     expect(p).toMatchObject({ from: TEXT_2026_09_21, to: TEXT_2026_09_27, fromAt: "2026-09-20T16:00:00.000Z", toAt: "2026-09-27T16:00:00.000Z", label: "This week" });
     expect(p.days).toHaveLength(7);
@@ -62,8 +62,8 @@ describe("partner overview", () => {
 
   it("buckets jobs, with ended work windows overdue (IR89)", () => {
     const j = fixture();
-    expect(j.map((x) => bucket(x, now))).toEqual(["offered", UNASSIGNED, UNASSIGNED, "overdue", "active", "review", "completed", "other", "completed"]);
-    expect(progress(j, now)).toEqual({ counts: { offered: 1, unassigned: 2, active: 1, overdue: 1, review: 1, completed: 2 }, total: 8, completedPct: 25 });
+    expect(j.map((x) => bucket(x, now))).toStrictEqual(["offered", UNASSIGNED, UNASSIGNED, "overdue", "active", "review", "completed", "other", "completed"]);
+    expect(progress(j, now)).toStrictEqual({ counts: { offered: 1, unassigned: 2, active: 1, overdue: 1, review: 1, completed: 2 }, total: 8, completedPct: 25 });
     expect(until(TEXT_2026_09_21T17_00_00Z, now)).toBe("15 h");
     expect(until("2026-09-24T17:00:00Z", now)).toBe("3 d 15 h");
     expect(until(TEXT_2026_09_21T01_00_00Z, now)).toBe("ended");
@@ -71,7 +71,7 @@ describe("partner overview", () => {
 
   it("builds the KPI tiles from the summary counts and the list", () => {
     const tiles = kpis({ offerCount: 1, activeCount: 5, reviewCount: 1, overdueCount: 1 }, fixture(), now, names, { from: TEXT_2026_09_21, to: TEXT_2026_09_27 });
-    expect(tiles.map((t) => [t.label, t.value, t.sub, t.href])).toEqual([
+    expect(tiles.map((t) => [t.label, t.value, t.sub, t.href])).toStrictEqual([
       ["Offers to answer", 1, "p09 · expires in 15 h", "/partner/jobs?tab=offered&from=2026-09-21&to=2026-09-27"],
       ["Awaiting assignment", 2, "Accepted, no technician yet", "/partner/schedule"],
       ["In progress / scheduled", 3, "tech-external-a on site from today 10:00 am MYT", "/partner/jobs?tab=active&from=2026-09-21&to=2026-09-27"],
@@ -81,12 +81,12 @@ describe("partner overview", () => {
     expect(tiles[1]?.tone).toBe("warn");
     expect(tiles[4]?.tone).toBe("crit");
     const empty = kpis({ offerCount: 0, activeCount: 0, reviewCount: 0, overdueCount: 0 }, [], now, names);
-    expect(empty.map((t) => t.sub)).toEqual(["No open offers", "—", "—", "—", "—"]);
+    expect(empty.map((t) => t.sub)).toStrictEqual(["No open offers", "—", "—", "—", "—"]);
     expect(empty.every((t) => !t.tone)).toBe(true);
   });
 
   it("lists what needs the company's action in order", () => {
-    expect(actions(fixture(), now, names).map((r) => [r.kind, r.title, r.button, r.href])).toEqual([
+    expect(actions(fixture(), now, names).map((r) => [r.kind, r.title, r.button, r.href])).toStrictEqual([
       ["offer", "p09 · Jalan 1, KL", "Respond", "/partner/jobs/p09"],
       ["overdue", "p07 · Server room AC", "Reassign", "/partner/schedule?jobId=p07"],
       ["review", "p05 · Server room AC", "Review", "/partner/jobs/p05/review"],
@@ -102,12 +102,12 @@ describe("partner overview", () => {
     expect(timelinePct("2026-09-21T00:00:00Z", TEXT_2026_09_21)).toBe(0);
     expect(timelinePct("2026-09-21T05:00:00Z", TEXT_2026_09_21)).toBe(50);
     const rows = timeline(today, members, TEXT_2026_09_21);
-    expect(rows).toEqual([
+    expect(rows).toStrictEqual([
       { id: "m-a", name: TECH_EXTERNAL_A, sub: "refrigerant", blocks: [{ left: 20, width: 20, text: "10:00–12:00" }], off: null },
       { id: "m-b", name: TECH_EXTERNAL_A2, sub: "Technician", blocks: [], off: null },
     ]);
     const week = capacity([today, [{ ...must(today[0]), date: "2026-09-22", assignedMinutes: 480 }, { membershipId: "m-b", date: "2026-09-22", availableSlots: [], assignedSlots: [], availableMinutes: null, assignedMinutes: 0, unavailability: "leave" }]], members);
-    expect(week).toEqual([
+    expect(week).toStrictEqual([
       { id: "m-a", name: TECH_EXTERNAL_A, text: "10 h / 16 h · 63%", pct: 63 },
       { id: "m-b", name: TECH_EXTERNAL_A2, text: "0 h / — · —", pct: null },
     ]);
@@ -121,10 +121,10 @@ describe("partner overview", () => {
       { id: "m-e", userId: "user-e", displayName: "ended", role: TECHNICIAN, validUntil: "2026-09-21T00:00:00Z" },
       { id: "m-f", userId: "user-f", displayName: "until next month", role: TECHNICIAN, validUntil: "2026-10-21T00:00:00Z" },
     ];
-    expect(onTeam(team, later).map((m) => m.id)).toEqual(["m-a", "m-b", "m-f"]); // no coordinator, no revoked or ended access
+    expect(onTeam(team, later).map((m) => m.id)).toStrictEqual(["m-a", "m-b", "m-f"]); // no coordinator, no revoked or ended access
     const crew = onTeam(team, later);
-    expect(capacity([[day("m-a", 0), day("m-b", 120), day("m-f", 0)]], crew).map((r) => r.id)).toEqual(["m-b", "m-a", "m-f"]); // most assigned first, then by name
-    expect(timeline([day("m-a", 0), day("m-b", 120), day("m-f", 0)], crew, TEXT_2026_09_21).map((r) => r.id)).toEqual(["m-b", "m-f", "m-a"]); // work, then away, then free
+    expect(capacity([[day("m-a", 0), day("m-b", 120), day("m-f", 0)]], crew).map((r) => r.id)).toStrictEqual(["m-b", "m-a", "m-f"]); // most assigned first, then by name
+    expect(timeline([day("m-a", 0), day("m-b", 120), day("m-f", 0)], crew, TEXT_2026_09_21).map((r) => r.id)).toStrictEqual(["m-b", "m-f", "m-a"]); // work, then away, then free
     expect(OVERVIEW_ROWS).toBe(8);
   });
 
@@ -136,7 +136,7 @@ describe("partner overview", () => {
       { id: "e3", jobId: "ca", actorUserId: "user-a", action: "job.checked_in", occurredAt: "2026-09-21T01:05:00Z" },
       { id: "e4", jobId: "zz-unknown-job", actorUserId: "someone", action: "custom.thing", occurredAt: "2026-09-19T00:00:00Z" },
     ], jobs, members, now, 3);
-    expect(rows.map((r) => [r.time, r.text, r.href])).toEqual([
+    expect(rows.map((r) => [r.time, r.text, r.href])).toStrictEqual([
       ["today 9:05 am MYT", "Checked in on site — ca · Bedroom AC (tech-external-a)", "/partner/history?jobId=ca"],
       ["yesterday 6:10 pm MYT", "Report submitted — p05 · Server room AC (tech-external-a)", "/partner/history?jobId=p05"],
       ["yesterday 11:00 am MYT", "Offer received from HQ — p09 · Jalan 1, KL", "/partner/history?jobId=p09"],
@@ -146,20 +146,20 @@ describe("partner overview", () => {
   it("speaks the display language, with instants in its time zone and the timeline in Kuala Lumpur hours (IR270)", () => {
     const i = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
     expect([until(TEXT_2026_09_21T17_00_00Z, now, i.t), until("2026-09-24T17:00:00Z", now, i.t), until("2026-09-23T01:30:00Z", now, i.t), until(TEXT_2026_09_21T01_00_00Z, now, i.t), until("2026-09-21T01:50:00Z", now, i.t)])
-      .toEqual(["15 j", "3 hari 15 j", "2 hari", "tamat", "20 min"]);
+      .toStrictEqual(["15 j", "3 hari 15 j", "2 hari", "tamat", "20 min"]);
     const tiles = kpis({ offerCount: 1, activeCount: 5, reviewCount: 1, overdueCount: 1 }, fixture(), now, names, undefined, i);
-    expect(tiles.map((t) => [t.label, t.sub, t.link])).toEqual([
+    expect(tiles.map((t) => [t.label, t.sub, t.link])).toStrictEqual([
       ["Tawaran untuk dijawab", "p09 · tamat dalam 15 j", "Buka tawaran"], ["Menunggu penugasan", "Diterima, belum ada juruteknik", "Tugaskan"],
       ["Sedang berjalan / dijadualkan", "tech-external-a di tapak sejak hari ini 11:00 PG GMT+9", "Lihat kerja"], ["Laporan untuk disemak", "p05 · Server room AC · menunggu semakan", "Semak"],
       ["Tertunggak", "Melepasi tarikh akhir atau tetingkap kerja", "Lihat"],
     ]);
-    expect(actions(fixture(), now, names, i).slice(0, 2).map((r) => [r.badge, r.detail, r.button])).toEqual([
+    expect(actions(fixture(), now, names, i).slice(0, 2).map((r) => [r.badge, r.detail, r.button])).toStrictEqual([
       ["Tawaran", "Jawab sebelum 22 Sep 2026, 2:00 PG GMT+9 (15 j lagi)", "Jawab"], ["Tertunggak", "Tetingkap kerja tamat 20 Sep 2026, 6:00 PTG GMT+9 · tech-external-a", "Tugaskan semula"],
     ]);
     const today: ApiCapacity[] = [{ membershipId: "m-a", date: TEXT_2026_09_21, availableSlots: [], assignedSlots: [slot(TEXT_2026_09_21T02_00_00Z, TEXT_2026_09_21T04_00_00Z)], availableMinutes: 480, assignedMinutes: 120, unavailability: null }];
-    expect(timeline(today, members, TEXT_2026_09_21, i.t).map((r) => [r.sub, r.blocks.map((b) => b.text)])).toEqual([["refrigerant", ["10:00–12:00"]], ["Juruteknik", []]]); // Kuala Lumpur hours, like the axis
-    expect(capacity([today], members, i.t).map((r) => r.text)).toEqual(["2 j / 8 j · 25%", "0 j / — · —"]);
+    expect(timeline(today, members, TEXT_2026_09_21, i.t).map((r) => [r.sub, r.blocks.map((b) => b.text)])).toStrictEqual([["refrigerant", ["10:00–12:00"]], ["Juruteknik", []]]); // Kuala Lumpur hours, like the axis
+    expect(capacity([today], members, i.t).map((r) => r.text)).toStrictEqual(["2 j / 8 j · 25%", "0 j / — · —"]);
     const rows = activity([{ id: "e2", jobId: "p09", actorUserId: null, action: "job.offered", occurredAt: "2026-09-20T03:00:00Z" }], new Map(fixture().map((j) => [j.id, j])), members, now, 6, i);
-    expect(rows.map((r) => [r.time, r.text])).toEqual([["semalam 12:00 PTG GMT+9", "Tawaran diterima daripada HQ — p09 · Jalan 1, KL"]]);
+    expect(rows.map((r) => [r.time, r.text])).toStrictEqual([["semalam 12:00 PTG GMT+9", "Tawaran diterima daripada HQ — p09 · Jalan 1, KL"]]);
   });
 });

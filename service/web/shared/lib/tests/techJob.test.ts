@@ -33,9 +33,9 @@ const report = (over: Partial<ApiTechReport> = {}): ApiTechReport => {
 describe("components", () => {
   it("follows the unit's service scope in canonical order", () => {
     expect(all).toHaveLength(18);
-    expect(componentsFor(["indoor"]).map((c) => c.key)).toEqual(["filter", "evaporator_coil", "blower_motor", "blower_fan", "drain_pipe", "drain_pan", "outlet", "louver"]);
-    expect(componentsFor([ELECTRICAL, "outdoor"]).map((c) => c.group)).toEqual([...Array.from({ length: 5 }, () => "outdoor"), ...Array.from({ length: 5 }, () => ELECTRICAL)]);
-    expect(componentsFor([])).toEqual([]);
+    expect(componentsFor(["indoor"]).map((c) => c.key)).toStrictEqual(["filter", "evaporator_coil", "blower_motor", "blower_fan", "drain_pipe", "drain_pan", "outlet", "louver"]);
+    expect(componentsFor([ELECTRICAL, "outdoor"]).map((c) => c.group)).toStrictEqual([...Array.from({ length: 5 }, () => "outdoor"), ...Array.from({ length: 5 }, () => ELECTRICAL)]);
+    expect(componentsFor([])).toStrictEqual([]);
     expect(groupOf(COMPRESSOR)).toBe("outdoor");
     expect(groupOf("nope")).toBeNull();
   });
@@ -47,8 +47,8 @@ describe("draft", () => {
     expect(d.items).toHaveLength(18);
     expect(d.items.find((i) => i.componentKey === "filter")).toMatchObject({ result: "attention", reason: "dusty" });
     expect(d.items.find((i) => i.componentKey === "louver")).toMatchObject({ result: null, reason: "" });
-    expect(d.readings).toEqual([{ id: "m1", componentKey: "outlet", metric: TEMPERATURE, value: "13.9", observedAt: TEXT_2026_09_14T02_10_00Z }]);
-    expect(d.attachmentIds).toEqual(["a1"]); // a failed upload is not part of the draft
+    expect(d.readings).toStrictEqual([{ id: "m1", componentKey: "outlet", metric: TEMPERATURE, value: "13.9", observedAt: TEXT_2026_09_14T02_10_00Z }]);
+    expect(d.attachmentIds).toStrictEqual(["a1"]); // a failed upload is not part of the draft
     expect(draftFrom(null, componentsFor(["indoor"])).items.every((i) => i.result === null)).toBe(true);
   });
   it("builds the saveDraft body with trimmed reasons and numeric readings", () => {
@@ -58,12 +58,12 @@ describe("draft", () => {
     d.nextAction = { kind: "follow_up", date: "2026-10-01T00:00:00.000Z", note: "  replace filter  " };
     const body = draftInput("job", "rep", d);
     expect(body.reportId).toBe("rep");
-    expect(body.items[1]).toEqual({ componentGroup: "indoor", componentKey: "evaporator_coil", result: "normal", reason: null, evidenceIds: [] });
-    expect(body.measurements).toEqual([
+    expect(body.items[1]).toStrictEqual({ componentGroup: "indoor", componentKey: "evaporator_coil", result: "normal", reason: null, evidenceIds: [] });
+    expect(body.measurements).toStrictEqual([
       { id: "m1", componentKey: "outlet", metric: TEMPERATURE, value: 13.9, unit: "°C", observedAt: TEXT_2026_09_14T02_10_00Z },
       { componentKey: COMPRESSOR, metric: "vibration", value: null, unit: "mm/s", observedAt: "2026-09-14T02:20:00Z" },
     ]);
-    expect(body.nextAction).toEqual({ kind: "follow_up", date: "2026-10-01T00:00:00.000Z", note: "replace filter" });
+    expect(body.nextAction).toStrictEqual({ kind: "follow_up", date: "2026-10-01T00:00:00.000Z", note: "replace filter" });
     expect("reportId" in draftInput("job", null, d)).toBe(false);
   });
 });
@@ -73,19 +73,19 @@ describe("photos linked to a finding", () => {
   const photos = [...report().attachmentRefs, { id: "a3", name: "p3.png", mime: "image/png", size: 10, status: "processing" as const }];
   it("links a ready photo once, unlinks it, and sends the links with the draft", () => {
     const d0 = draftFrom(report(), all);
-    expect(itemPhotos(d0, "filter", photos)).toEqual({ linked: [], free: [photos[0]] }); // failed and processing photos are not offered
+    expect(itemPhotos(d0, "filter", photos)).toStrictEqual({ linked: [], free: [photos[0]] }); // failed and processing photos are not offered
     const d1 = linkPhoto(linkPhoto(d0, "filter", "a1", true), "filter", "a1", true);
-    expect(d1.items.find((i) => i.componentKey === "filter")?.evidenceIds).toEqual(["a1"]);
-    expect(d0.items.find((i) => i.componentKey === "filter")?.evidenceIds).toEqual([]); // the draft is not changed in place
-    expect(itemPhotos(d1, "filter", photos)).toEqual({ linked: [photos[0]], free: [] });
-    expect(itemPhotos(d1, "louver", photos).free).toEqual([photos[0]]); // a photo may also back another finding
-    expect(draftInput("job", "rep", d1).items.find((i) => i.componentKey === "filter")?.evidenceIds).toEqual(["a1"]);
-    expect(linkPhoto(d1, "filter", "a1", false).items.find((i) => i.componentKey === "filter")?.evidenceIds).toEqual([]);
+    expect(d1.items.find((i) => i.componentKey === "filter")?.evidenceIds).toStrictEqual(["a1"]);
+    expect(d0.items.find((i) => i.componentKey === "filter")?.evidenceIds).toStrictEqual([]); // the draft is not changed in place
+    expect(itemPhotos(d1, "filter", photos)).toStrictEqual({ linked: [photos[0]], free: [] });
+    expect(itemPhotos(d1, "louver", photos).free).toStrictEqual([photos[0]]); // a photo may also back another finding
+    expect(draftInput("job", "rep", d1).items.find((i) => i.componentKey === "filter")?.evidenceIds).toStrictEqual(["a1"]);
+    expect(linkPhoto(d1, "filter", "a1", false).items.find((i) => i.componentKey === "filter")?.evidenceIds).toStrictEqual([]);
   });
   it("keeps a linked photo the report no longer lists by its ID", () => {
     const first = must(report().items[0]);
     const d = draftFrom(report({ items: [{ ...first, evidenceIds: ["0123456789abcdef"] }] }), all);
-    expect(itemPhotos(d, "filter", photos).linked).toEqual([{ id: "0123456789abcdef", name: "01234567", status: "missing" }]);
+    expect(itemPhotos(d, "filter", photos).linked).toStrictEqual([{ id: "0123456789abcdef", name: "01234567", status: "missing" }]);
   });
 });
 
@@ -97,7 +97,7 @@ const complete = (): Draft => {
 };
 
 describe("submit checks", () => {
-  it("passes a complete draft", () => { expect(submitIssues(complete(), report().attachmentRefs, NOW)).toEqual([]); });
+  it("passes a complete draft", () => { expect(submitIssues(complete(), report().attachmentRefs, NOW)).toStrictEqual([]); });
   it("lists every blocking issue with its group", () => {
     const d = complete();
     d.items[7] = { ...must(d.items[7]), result: null };
@@ -108,11 +108,11 @@ describe("submit checks", () => {
     d.parts = [{ name: "Filter", quantity: 0, catalogCode: null, source: "van_stock", lotSerial: null, replacesComponentKey: null, oldPartDisposal: null, receiptAttachmentId: null }];
     d.attachmentIds = ["a1", "a2"];
     const issues = submitIssues(d, report().attachmentRefs, NOW);
-    expect(issues.map((i) => i.text)).toEqual([
+    expect(issues.map((i) => i.text)).toStrictEqual([
       "Indoor › Drain pipe needs a reason", "Indoor › Louver has no result", "Fan reading is not a number", "Work performed must be 10–4000 characters",
       "A follow-up needs a future date and a note", "Part 1 (Filter) needs a quantity of 1–999", "Photo p2.heic is failed — remove or retry it",
     ]);
-    expect(progress(d, issues).map((g) => [g.group, g.done, g.total, g.issues])).toEqual([["indoor", 7, 8, 2], ["outdoor", 5, 5, 1], [ELECTRICAL, 5, 5, 0]]);
+    expect(progress(d, issues).map((g) => [g.group, g.done, g.total, g.issues])).toStrictEqual([["indoor", 7, 8, 2], ["outdoor", 5, 5, 1], [ELECTRICAL, 5, 5, 0]]);
   });
 });
 
@@ -120,11 +120,11 @@ describe("work window (IR76 / IR89)", () => {
   const a = { scheduledStart: TEXT_2026_09_14T02_00_00Z, scheduledEnd: TEXT_2026_09_14T04_00_00Z }; // 10:00–12:00
   it("tells before, open, ending and ended apart", () => {
     expect(windowState(null, NOW).phase).toBe("none");
-    expect(windowState(a, Date.parse("2026-09-14T01:00:00Z"))).toEqual({ phase: "before", text: "Starts 14 Sept 2026, 10:00 am MYT · 14 Sept, 10:00 am – 12:00 pm MYT" });
+    expect(windowState(a, Date.parse("2026-09-14T01:00:00Z"))).toStrictEqual({ phase: "before", text: "Starts 14 Sept 2026, 10:00 am MYT · 14 Sept, 10:00 am – 12:00 pm MYT" });
     const line = "14 Sept, 10:00 am – 12:00 pm MYT · warning at 11:45 am MYT · discard at 12:00 pm MYT"; // Figma Technician 02
-    expect(windowState(a, NOW)).toEqual({ phase: "open", text: line });
+    expect(windowState(a, NOW)).toStrictEqual({ phase: "open", text: line });
     expect(windowState(a, Date.parse("2026-09-14T03:44:59Z")).phase).toBe("open");
-    expect(windowState(a, Date.parse("2026-09-14T03:45:00Z"))).toEqual({ phase: "ending", text: line, notice: "Work window ends in 15 min — unsaved input will be discarded at 12:00 pm MYT." });
+    expect(windowState(a, Date.parse("2026-09-14T03:45:00Z"))).toStrictEqual({ phase: "ending", text: line, notice: "Work window ends in 15 min — unsaved input will be discarded at 12:00 pm MYT." });
     expect(windowState(a, Date.parse("2026-09-14T03:59:30Z")).notice).toBe("Work window ends in 1 min — unsaved input will be discarded at 12:00 pm MYT.");
     expect(windowState(a, Date.parse(TEXT_2026_09_14T04_00_00Z)).phase).toBe("ended");
     expect(warnAt(a.scheduledEnd)).toBe("2026-09-14T03:45:00.000Z");
@@ -133,24 +133,24 @@ describe("work window (IR76 / IR89)", () => {
 
 describe("time on site and versions", () => {
   it("shows the check-in evidence, pauses and the counted minutes", () => {
-    expect(timeRows(null, NOW)).toEqual([["Arrived", "not checked in"]]);
+    expect(timeRows(null, NOW)).toStrictEqual([["Arrived", "not checked in"]]);
     const rows = timeRows({ arrivedAt: TEXT_2026_09_14T02_05_00Z, checkInMethod: LOCATION_QR, distanceMeters: 78.4, startedAt: TEXT_2026_09_14T02_05_00Z, pauses: [{ from: "2026-09-14T02:30:00Z", to: "2026-09-14T02:40:00Z" }], finishedAt: null }, NOW);
-    expect(rows).toEqual([["Arrived", "10:05 am MYT · checked in"], ["Location", "78 m from site · QR matched"], ["Started", "10:05 am MYT"], ["Paused", "1 pause · 10 min"], ["Finished", "— (on submit)"], [ON_SITE_TIME, "45 min"]]);
+    expect(rows).toStrictEqual([["Arrived", "10:05 am MYT · checked in"], ["Location", "78 m from site · QR matched"], ["Started", "10:05 am MYT"], ["Paused", "1 pause · 10 min"], ["Finished", "— (on submit)"], [ON_SITE_TIME, "45 min"]]);
     const paused = timeRows({ arrivedAt: TEXT_2026_09_14T02_05_00Z, checkInMethod: "manual", checkInReason: "no GPS", startedAt: TEXT_2026_09_14T02_05_00Z, pauses: [{ from: "2026-09-14T02:50:00Z", to: null }], finishedAt: null }, NOW);
-    expect(paused[1]).toEqual(["Location", "manual — no GPS"]);
-    expect(paused[3]).toEqual(["Paused", "since 10:50 am MYT"]);
-    expect(paused[5]).toEqual([ON_SITE_TIME, "45 min"]);
-    expect(timeRows({ arrivedAt: TEXT_2026_09_14T02_05_00Z, startedAt: TEXT_2026_09_14T02_05_00Z, finishedAt: TEXT_2026_09_14T04_00_00Z, onSiteMinutes: 115, pauses: [] }, NOW)[5]).toEqual([ON_SITE_TIME, "1 h 55 min"]);
+    expect(paused[1]).toStrictEqual(["Location", "manual — no GPS"]);
+    expect(paused[3]).toStrictEqual(["Paused", "since 10:50 am MYT"]);
+    expect(paused[5]).toStrictEqual([ON_SITE_TIME, "45 min"]);
+    expect(timeRows({ arrivedAt: TEXT_2026_09_14T02_05_00Z, startedAt: TEXT_2026_09_14T02_05_00Z, finishedAt: TEXT_2026_09_14T04_00_00Z, onSiteMinutes: 115, pauses: [] }, NOW)[5]).toStrictEqual([ON_SITE_TIME, "1 h 55 min"]);
   });
   it("lists the draft and the submitted versions with their review", () => {
     const reviews = report({ reviewHistory: [{ reviewerUserId: "c", reportVersion: 2, decision: "return", reason: "photo missing", occurredAt: "2026-09-14T02:30:00Z" }] }).reviewHistory;
-    expect(versionRows({ version: 3, results: 2, photos: 1, savedAt: "2026-09-14T02:44:00Z" }, [{ reportVersion: 2 }], reviews)).toEqual([
+    expect(versionRows({ version: 3, results: 2, photos: 1, savedAt: "2026-09-14T02:44:00Z" }, [{ reportVersion: 2 }], reviews)).toStrictEqual([
       { title: "Draft v3 · saved 10:44 am MYT", sub: "2 results · 1 photo", badge: { text: "Draft", tone: "warn" } },
       { title: "v2 · returned", sub: "14 Sept 2026, 10:30 am MYT — photo missing", badge: { text: "Returned", tone: "warn" } },
     ]);
     // a first save made the draft without a reload: no saved time yet from the page, one result
-    expect(versionRows({ version: 1, results: 1, photos: 0, savedAt: null }, [], [])).toEqual([{ title: "Draft v1", sub: "1 result · 0 photos", badge: { text: "Draft", tone: "warn" } }]);
-    expect(versionRows(null, [{ reportVersion: 1 }], [])).toEqual([{ title: "v1 · submitted", sub: "awaiting quality review", badge: { text: "Submitted", tone: "primary" } }]);
+    expect(versionRows({ version: 1, results: 1, photos: 0, savedAt: null }, [], [])).toStrictEqual([{ title: "Draft v1", sub: "1 result · 0 photos", badge: { text: "Draft", tone: "warn" } }]);
+    expect(versionRows(null, [{ reportVersion: 1 }], [])).toStrictEqual([{ title: "v1 · submitted", sub: "awaiting quality review", badge: { text: "Submitted", tone: "primary" } }]);
   });
 });
 
@@ -158,11 +158,11 @@ describe("the server's formatting and Malay (IR282)", () => {
   const a = { scheduledStart: TEXT_2026_09_14T02_00_00Z, scheduledEnd: TEXT_2026_09_14T04_00_00Z };
   it("uses the instants the loader formatted and the browser only for new ones", () => {
     const known = knownOf(MS, [TEXT_2026_09_14T04_00_00Z], [TEXT_2026_09_14T02_00_00Z], [[a.scheduledStart, a.scheduledEnd]]);
-    expect(known).toEqual({ clock: { "2026-09-14T04:00:00Z": "1:00 PTG GMT+9" }, stamp: { "2026-09-14T02:00:00Z": "14 Sep 2026, 11:00 PG GMT+9" }, span: { "2026-09-14T02:00:00Z|2026-09-14T04:00:00Z": "14 Sep, 11:00 PG – 1:00 PTG GMT+9" } });
+    expect(known).toStrictEqual({ clock: { "2026-09-14T04:00:00Z": "1:00 PTG GMT+9" }, stamp: { "2026-09-14T02:00:00Z": "14 Sep 2026, 11:00 PG GMT+9" }, span: { "2026-09-14T02:00:00Z|2026-09-14T04:00:00Z": "14 Sep, 11:00 PG – 1:00 PTG GMT+9" } });
     const f = fmtOf(MS, { clock: { "2026-09-14T04:00:00Z": "SERVER" }, stamp: {}, span: {} }); // a known instant is never formatted again
-    expect([f.clock(TEXT_2026_09_14T04_00_00Z), f.clock("2026-09-14T05:00:00Z")]).toEqual(["SERVER", "2:00 PTG GMT+9"]);
+    expect([f.clock(TEXT_2026_09_14T04_00_00Z), f.clock("2026-09-14T05:00:00Z")]).toStrictEqual(["SERVER", "2:00 PTG GMT+9"]);
     const ending = windowState(a, Date.parse("2026-09-14T03:46:00Z"), fmtOf(MS, known));
-    expect([ending.notice, ending.text]).toEqual(["Tetingkap kerja tamat dalam 14 min — input yang belum disimpan akan dibuang pada 1:00 PTG GMT+9.",
+    expect([ending.notice, ending.text]).toStrictEqual(["Tetingkap kerja tamat dalam 14 min — input yang belum disimpan akan dibuang pada 1:00 PTG GMT+9.",
       "14 Sep, 11:00 PG – 1:00 PTG GMT+9 · amaran pada 12:45 PTG GMT+9 · dibuang pada 1:00 PTG GMT+9"]);
   });
   it("words the checks, time on site, versions and the history in Malay", () => {
@@ -170,10 +170,10 @@ describe("the server's formatting and Malay (IR282)", () => {
     const d = draftFrom(null, componentsFor(["indoor"]));
     expect(submitIssues(d, [], NOW, ms)[0]?.text).toBe("Dalaman › Penapis tiada keputusan");
     expect(progress(d, [], ms)[0]?.label).toBe("Dalaman");
-    expect(timeRows(null, NOW, fmtOf(MS))).toEqual([["Tiba", "belum daftar masuk"]]);
-    expect(versionRows(null, [{ reportVersion: 1 }], [], fmtOf(MS))).toEqual([{ title: "v1 · dihantar", sub: "menunggu semakan kualiti", badge: { text: "Dihantar", tone: "primary" } }]);
+    expect(timeRows(null, NOW, fmtOf(MS))).toStrictEqual([["Tiba", "belum daftar masuk"]]);
+    expect(versionRows(null, [{ reportVersion: 1 }], [], fmtOf(MS))).toStrictEqual([{ title: "v1 · dihantar", sub: "menunggu semakan kualiti", badge: { text: "Dihantar", tone: "primary" } }]);
     expect(followUpText({ kind: "follow_up", date: "2026-09-25T01:00:00Z", note: "Replace filter" }, MS)).toBe("Susulan 25 Sep 2026 — Replace filter");
-    expect(historyCard({ projection: "history", jobId: "job-9-aaaa", type: "periodic", status: "completed", asOf: "2026-09-21T08:00:00Z", completedAt: "2026-09-21T07:00:00Z", redactedReportSummary: { hasReport: true, acceptance: "accepted" } }, MS)).toEqual({
+    expect(historyCard({ projection: "history", jobId: "job-9-aaaa", type: "periodic", status: "completed", asOf: "2026-09-21T08:00:00Z", completedAt: "2026-09-21T07:00:00Z", redactedReportSummary: { hasReport: true, acceptance: "accepted" } }, MS)).toStrictEqual({
       title: "job-9-aa · Pemeriksaan berkala", sub: "Selesai — tugasan anda tamat bersama kerja",
       rows: [["Status", "Selesai 21 Sep 2026"], ["Laporan anda", "Diterima dalam semakan kualiti"], ["Tugasan tamat", "21 Sep 2026, 5:00 PTG GMT+9"]],
       note: "Masa anda lapang untuk kerja lain. Laporan, unit dan perantinya kekal dengan HQ dan pelanggan.", back: "Gambaran keseluruhan",
@@ -184,33 +184,33 @@ describe("the server's formatting and Malay (IR282)", () => {
 // IR620: Check in at site names the field to fix, so the form shows the error there and focuses it
 describe("check-in checks", () => {
   it("asks for the site within 200 m and the scanned label, or a reason for a manual check-in", () => {
-    expect(checkInErrors(LOCATION_QR, "40", "ac-unit:u-1", "")).toEqual({});
-    expect(checkInErrors(LOCATION_QR, "250", "", "")).toEqual({
+    expect(checkInErrors(LOCATION_QR, "40", "ac-unit:u-1", "")).toStrictEqual({});
+    expect(checkInErrors(LOCATION_QR, "250", "", "")).toStrictEqual({
       distance: "Location check-in needs you within 200 m of the site — check in manually with a reason otherwise",
       qr: "Scan the unit’s QR label",
     });
-    expect(Object.keys(checkInErrors(LOCATION_QR, "-1", "x", ""))).toEqual(["distance"]);
-    expect(checkInErrors("manual", "250", "", "  ")).toEqual({ reason: "A reason is required for a manual check-in (1–1000 characters)" });
-    expect(checkInErrors("manual", "", "", "No GPS in the plant room")).toEqual({});
+    expect(Object.keys(checkInErrors(LOCATION_QR, "-1", "x", ""))).toStrictEqual(["distance"]);
+    expect(checkInErrors("manual", "250", "", "  ")).toStrictEqual({ reason: "A reason is required for a manual check-in (1–1000 characters)" });
+    expect(checkInErrors("manual", "", "", "No GPS in the plant room")).toStrictEqual({});
     expect(checkInErrors("manual", "", "", "x".repeat(1001))).toHaveProperty("reason");
   });
   it("words them in Malay and maps the Core API's fields onto the form's", () => {
     expect(checkInErrors("manual", "", "", "", translator("ms")).reason).not.toBe("A reason is required for a manual check-in (1–1000 characters)");
-    expect(CHECK_IN_API_FIELDS).toEqual({ distanceMeters: "distance", qrUnitId: "qr", reason: "reason" });
+    expect(CHECK_IN_API_FIELDS).toStrictEqual({ distanceMeters: "distance", qrUnitId: "qr", reason: "reason" });
   });
 });
 
 // IR625: Add part and Refrigerant name the field to fix, so the dialog shows the error there and focuses it
 describe("part and refrigerant checks", () => {
   it("ask for a part and 1–999 pieces", () => {
-    expect(partErrors("Run capacitor 35 µF", "1")).toEqual({});
-    expect(partErrors(" ", "0")).toEqual({ name: "Choose a catalog part or name it", qty: "Quantity must be 1–999" });
-    expect(Object.keys(partErrors("Filter", "1.5"))).toEqual(["qty"]);
+    expect(partErrors("Run capacitor 35 µF", "1")).toStrictEqual({});
+    expect(partErrors(" ", "0")).toStrictEqual({ name: "Choose a catalog part or name it", qty: "Quantity must be 1–999" });
+    expect(Object.keys(partErrors("Filter", "1.5"))).toStrictEqual(["qty"]);
   });
   it("ask for the cylinder and kilograms of 0 or more, each on its own field", () => {
-    expect(refrigerantErrors("CYL-R32-0182", "0.4", "0.6")).toEqual({});
-    expect(refrigerantErrors(" ", "-1", "x")).toEqual({ cylinder: "The cylinder ID is required", recovered: "Kilograms, 0 or more", charged: "Kilograms, 0 or more" });
-    expect(refrigerantErrors("CYL", "0", "0")).toEqual({}); // nothing recovered or charged is a valid line
+    expect(refrigerantErrors("CYL-R32-0182", "0.4", "0.6")).toStrictEqual({});
+    expect(refrigerantErrors(" ", "-1", "x")).toStrictEqual({ cylinder: "The cylinder ID is required", recovered: "Kilograms, 0 or more", charged: "Kilograms, 0 or more" });
+    expect(refrigerantErrors("CYL", "0", "0")).toStrictEqual({}); // nothing recovered or charged is a valid line
     expect(refrigerantErrors(" ", "0", "0", translator("ms")).cylinder).toBe("ID silinder diperlukan");
   });
 });

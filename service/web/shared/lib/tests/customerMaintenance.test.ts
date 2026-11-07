@@ -36,13 +36,13 @@ const unit = { name: "Bedroom AC", place: "Home A › 1F › Bedroom" };
 
 describe("customer maintenance", () => {
   it("groups the requests and says what is next", () => {
-    expect([tabOf("time_proposed"), tabOf("accepted"), tabOf("submitted"), tabOf("on_hold")]).toEqual(["reply", "scheduled", "progress", "progress"]);
+    expect([tabOf("time_proposed"), tabOf("accepted"), tabOf("submitted"), tabOf("on_hold")]).toStrictEqual(["reply", "scheduled", "progress", "progress"]);
     const rows = clientRows([
       row({ id: "job-c-done", status: "completed", displayStatus: "completed", scheduledSlot: slot("2026-09-08T02:00:00Z", "2026-09-08T03:00:00Z") }),
       row({}), row({ id: "job-prop", displayStatus: "time_proposed" }),
       row({ id: "job-plan", origin: PERIODIC_PLAN, status: "assigned", displayStatus: "assigned", preferredSlots: [], scheduledSlot: slot("2026-12-08T02:00:00Z", "2026-12-08T03:00:00Z"), assignmentAcknowledgement: "accepted" }),
     ], () => unit);
-    expect(rows.map((r) => [r.id, r.tab, r.origin, r.type, r.line, r.warn])).toEqual([
+    expect(rows.map((r) => [r.id, r.tab, r.origin, r.type, r.line, r.warn])).toStrictEqual([
       ["job-prop", "reply", "request", "Repair", "A new visit time needs your reply — nothing is booked until you accept", true],
       [JOB_1_AAAA, "requested", "request", "Repair", "Preferred 16 Sept, 10:00 am – 12:00 pm MYT · +2 more (not confirmed yet)", false],
       ["job-plan", "scheduled", "plan", "Periodic inspection", "Scheduled 8 Dec, 10:00 – 11:00 am MYT · technician confirmed", false],
@@ -54,24 +54,24 @@ describe("customer maintenance", () => {
 
   it("shows the detail facts, the preferred times and the technician once accepted", () => {
     const booked = job({ status: "assigned", scheduledSlot: row({}).preferredSlots[1], assignment: { acknowledgement: "accepted", technicianName: "tech-internal-a", scheduledStart: "2026-09-17T02:00:00Z", scheduledEnd: "2026-09-17T04:00:00Z", status: "active" } });
-    expect(detailFacts(booked, unit)).toEqual([
+    expect(detailFacts(booked, unit)).toStrictEqual([
       ["Unit", "Bedroom AC · Home A › 1F › Bedroom"], ["Origin · type", "Client request · Repair"], ["Request", "“Water dripping from the indoor unit”"],
       ["Confirmed time", "Thu, 17 Sept, 10:00 am – 12:00 pm MYT"], ["Technician", "tech-internal-a · HQ"],
     ]);
-    expect(detailFacts(job({ status: "offered", contractorOrgId: "org-c", scheduledSlot: row({}).preferredSlots[0] }), unit).at(-1)).toEqual(["Technician", "being confirmed — the name shows once the technician accepts"]);
+    expect(detailFacts(job({ status: "offered", contractorOrgId: "org-c", scheduledSlot: row({}).preferredSlots[0] }), unit).at(-1)).toStrictEqual(["Technician", "being confirmed — the name shows once the technician accepts"]);
     // the photos sent with a problem report are counted on the follow-up (IR437); one still processing is not
     const follow = job({ problemPhotos: [{ id: "p1", name: "a.png", status: "ready" }, { id: "p2", name: "b.png", status: "ready" }, { id: "p3", name: "c.png", status: "processing" }] });
     expect(detailFacts(follow, unit)).toContainEqual(["Your photos", "2 photos sent with your report"]);
-    expect(preferredLines(booked).map((l) => [l.text, l.note])).toEqual([["1st · Wed, 16 Sept, 10:00 am – 12:00 pm MYT", null], ["2nd · Thu, 17 Sept, 10:00 am – 12:00 pm MYT", "booked"], ["3rd · Fri, 18 Sept, 10:00 am – 12:00 pm MYT", null]]);
-    expect(detailFacts(job({ followUpOfJobId: "job-0-zzzz", followUpClass: "pending" }), unit)[2]).toEqual(["Follow-up of", "job-0-zz · Under HQ review"]);
+    expect(preferredLines(booked).map((l) => [l.text, l.note])).toStrictEqual([["1st · Wed, 16 Sept, 10:00 am – 12:00 pm MYT", null], ["2nd · Thu, 17 Sept, 10:00 am – 12:00 pm MYT", "booked"], ["3rd · Fri, 18 Sept, 10:00 am – 12:00 pm MYT", null]]);
+    expect(detailFacts(job({ followUpOfJobId: "job-0-zzzz", followUpClass: "pending" }), unit)[2]).toStrictEqual(["Follow-up of", "job-0-zz · Under HQ review"]);
   });
 
   it("explains the proposal, the declined notice and the plan visit", () => {
     const p = proposalOf(job({ slotProposal: { id: "p1", source: "hq", slot: slot("2026-09-19T06:00:00Z", "2026-09-19T08:00:00Z"), hold: { kind: "internal" }, message: "All booked on your times.", replyBy: "2026-09-16T01:00:00Z", status: "pending", decidedAt: null, declineReason: null, declineComment: null } }), NOW);
-    expect([p.title, p.when, p.who, p.replyBy, p.late]).toEqual(["HQ proposes a new time", "Sat, 19 Sept, 2:00 – 4:00 pm MYT", "An HQ technician (name shown once confirmed)", "16 Sept 2026, 9:00 am MYT", false]);
+    expect([p.title, p.when, p.who, p.replyBy, p.late]).toStrictEqual(["HQ proposes a new time", "Sat, 19 Sept, 2:00 – 4:00 pm MYT", "An HQ technician (name shown once confirmed)", "16 Sept 2026, 9:00 am MYT", false]);
     expect(proposalCard(job({}), NOW)).toBeNull();
     expect(declinedNotice(job({ slotProposal: { ...p, hold: { kind: "internal" }, source: "hq", slot: slot("2026-09-19T06:00:00Z", "2026-09-19T08:00:00Z"), status: "declined", decidedAt: null, declineReason: "not_home", declineComment: null, replyBy: "" } }))).toBe("You declined the proposed time (not at home). HQ is looking at your new times.");
-    expect(planVisit(job({ origin: PERIODIC_PLAN, status: "assigned", scheduledSlot: slot("2026-12-08T02:00:00Z", "2026-12-08T03:00:00Z") }), NOW)).toEqual({ can: true, why: null });
+    expect(planVisit(job({ origin: PERIODIC_PLAN, status: "assigned", scheduledSlot: slot("2026-12-08T02:00:00Z", "2026-12-08T03:00:00Z") }), NOW)).toStrictEqual({ can: true, why: null });
     expect(planVisit(job({ origin: PERIODIC_PLAN, status: "assigned", scheduledSlot: slot("2026-09-15T02:00:00Z", "2026-09-15T03:00:00Z") }), NOW)?.can).toBe(false);
     expect(planVisit(job({}), NOW)).toBeNull();
   });
@@ -80,11 +80,11 @@ describe("customer maintenance", () => {
     expect(feedback(job({ status: "completed", completedAt: TEXT_2026_09_13T01_00_00Z }), NOW).kind).toBe("rate");
     expect(feedback(job({ status: "completed", completedAt: "2026-09-01T01:00:00Z" }), NOW).kind).toBe("none");
     const rated = job({ status: "completed", completedAt: TEXT_2026_09_13T01_00_00Z, rating: { stars: 4, tags: ["On time"], comment: null, ratedAt: "2026-09-13T02:00:00Z", editableUntil: "2026-09-20T02:00:00Z" } });
-    expect(feedback(rated, NOW)).toEqual({ kind: "edit", stars: 4, report: true, text: " · On time · editable until 20 Sept 2026, 10:00 am MYT" });
+    expect(feedback(rated, NOW)).toStrictEqual({ kind: "edit", stars: 4, report: true, text: " · On time · editable until 20 Sept 2026, 10:00 am MYT" });
     expect(feedback({ ...rated, rating: { ...must(rated.rating), editableUntil: "2026-09-13T03:00:00Z" } }, NOW).kind).toBe("rated");
     // a problem can be reported within 7 days of completion only, rated or not (as jobs.reportProblem allows)
     const late = { ...rated, completedAt: "2026-09-01T01:00:00Z", rating: { ...must(rated.rating), ratedAt: "2026-09-07T02:00:00Z", editableUntil: "2026-09-14T02:00:00Z" } };
-    expect([feedback(late, NOW).kind, feedback(late, NOW).report]).toEqual(["edit", false]);
+    expect([feedback(late, NOW).kind, feedback(late, NOW).report]).toStrictEqual(["edit", false]);
   });
 
   it("checks the times, the contact window and names refusals", () => {
@@ -94,9 +94,9 @@ describe("customer maintenance", () => {
     expect(preferredError([slot("2026-09-14T06:00:00Z", "2026-09-14T08:00:00Z"), ...three.slice(1)], NOW)).toBe("Times start on a later day than today (Kuala Lumpur).");
     expect(preferredError([must(three[0]), must(three[0]), must(three[1])], NOW)).toBe("The 3 times must be different.");
     expect(preferredError([slot(TEXT_2026_09_16T02_00_00Z, "2026-09-16T08:00:00Z"), ...three.slice(1)], NOW)).toBe("Each time is 1–4 hours long.");
-    expect([contactError("Weekdays 09:00-18:00"), contactError("call +60 12-345 6789"), contactError("me@x.com")]).toEqual([null, expect.stringMatching(/No e-mail/), expect.stringMatching(/No e-mail/)]);
+    expect([contactError("Weekdays 09:00-18:00"), contactError("call +60 12-345 6789"), contactError("me@x.com")]).toStrictEqual([null, expect.stringMatching(/No e-mail/), expect.stringMatching(/No e-mail/)]);
     expect(notesOf([{ id: "e1", action: "note.added", occurredAt: "2026-09-14T01:00:00Z", actorUserId: "me", note: { visibility: "customer", message: "Gate code 4821" } }, { id: "e2", action: "job.created", occurredAt: TEXT_2026_09_13T01_00_00Z, actorUserId: "me", note: null }], "me"))
-      .toEqual([{ id: "e1", who: "You", at: "14 Sept 2026, 9:00 am MYT", text: "Gate code 4821" }]);
+      .toStrictEqual([{ id: "e1", who: "You", at: "14 Sept 2026, 9:00 am MYT", text: "Gate code 4821" }]);
     expect(clientJobRefusal({ code: "CONFLICT", messageKey: "errors.reschedule_too_late", fieldErrors: {} })).toBe("Not saved: less than 48 h before the visit — contact HQ.");
     // IR446: the proposal's hold no longer holds when the client accepts
     expect(clientJobRefusal({ code: "CONFLICT", messageKey: "errors.proposal_unavailable", fieldErrors: {} })).toBe("Not saved: the proposed time can no longer be booked — HQ will look again.");
@@ -107,7 +107,7 @@ describe("customer maintenance", () => {
     const t = translator("ms");
     const one = slot(TEXT_2026_09_16T02_00_00Z, TEXT_2026_09_16T04_00_00Z);
     const [built] = clientRows([{ projection: "summary", id: JOB_1_AAAA, version: 1, unitId: "u1", type: "reactive", status: "requested", displayStatus: "requested", origin: CLIENT_REQUEST, dueAt: "2026-09-20T00:00:00Z", requestedSlot: one, scheduledSlot: null, preferredSlots: [one, one, one], assignmentAcknowledgement: null }], () => ({ name: "Bedroom AC", place: "" }), i);
-    expect([built?.type, built?.line]).toEqual(["Pembaikan", "Pilihan 16 Sep, 11:00 PG – 1:00 PTG GMT+9 · +2 lagi (belum disahkan)"]);
+    expect([built?.type, built?.line]).toStrictEqual(["Pembaikan", "Pilihan 16 Sep, 11:00 PG – 1:00 PTG GMT+9 · +2 lagi (belum disahkan)"]);
     expect(preferredError([one, { startAt: "", endAt: "" }, one], NOW, 3, t)).toBe("Masukkan tarikh dan kedua-dua masa bagi setiap masa pilihan.");
     expect(contactError("call 0123456789", t)).toMatch(/^Tiada alamat e-mel/);
     expect(clientJobRefusal({ code: "CONFLICT", messageKey: "error.versionConflict", fieldErrors: {} }, t)).toBe("Tidak disimpan: permintaan telah berubah — keadaan terkini dipaparkan.");
@@ -116,9 +116,9 @@ describe("customer maintenance", () => {
 
   it("writes multi-day slots and the history in the client's words", () => {
     const week = slot("2026-09-14T00:00:00Z", "2026-09-20T00:00:00Z");
-    expect([slotShort(week), slotLong(week)]).toEqual(["14 Sept, 8:00 am – 20 Sept, 8:00 am MYT", "Mon, 14 Sept, 8:00 am – Sun, 20 Sept, 8:00 am MYT"]);
+    expect([slotShort(week), slotLong(week)]).toStrictEqual(["14 Sept, 8:00 am – 20 Sept, 8:00 am MYT", "Mon, 14 Sept, 8:00 am – Sun, 20 Sept, 8:00 am MYT"]);
     expect([clientEventTitle("job.offered", { "job.offered": "Offer received from HQ" }), clientEventTitle("job.checked_in", { "job.checked_in": "Checked in on site" }), clientEventTitle("x.y", {})])
-      .toEqual(["HQ booked a service partner", "Checked in on site", "x y"]);
+      .toStrictEqual(["HQ booked a service partner", "Checked in on site", "x y"]);
     // a report review is the service partner's or HQ's: the client's history does not name either (review 2026-10-15)
     expect(clientEventTitle("job.reviewed", { "job.reviewed": "Report reviewed by HQ" })).toBe("Report reviewed");
   });

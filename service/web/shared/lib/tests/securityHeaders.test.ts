@@ -20,7 +20,7 @@ const directives = (csp: string): Record<string, string> => Object.fromEntries(c
 describe("the page Content-Security-Policy", () => {
   it("allows the app's own scripts and styles with the request's nonce only", () => {
     const d = directives(contentSecurityPolicy("abc=", { dev: false, https: false, formActions: ["http://localhost:8081"] }));
-    expect(d).toEqual({
+    expect(d).toStrictEqual({
       "default-src": "'self'", "script-src": "'self' 'nonce-abc=' 'strict-dynamic'", "style-src": `'self' 'nonce-abc=' ${STYLE_HASHES.join(" ")}`, "style-src-attr": "'unsafe-inline'",
       "img-src": "'self' blob: data:", "font-src": "'self'", "connect-src": "'self'", "object-src": "'none'", "base-uri": "'self'",
       "form-action": "'self' http://localhost:8081", "frame-ancestors": "'none'",
@@ -28,14 +28,14 @@ describe("the page Content-Security-Policy", () => {
   });
   it("adds what next dev needs, and upgrades requests over HTTPS", () => {
     const development = directives(contentSecurityPolicy("n", { dev: true, https: false, formActions: [] }));
-    expect([development["script-src"], development["style-src"], development["form-action"]]).toEqual(["'self' 'nonce-n' 'strict-dynamic' 'unsafe-eval'", "'self' 'unsafe-inline'", "'self'"]);
+    expect([development["script-src"], development["style-src"], development["form-action"]]).toStrictEqual(["'self' 'nonce-n' 'strict-dynamic' 'unsafe-eval'", "'self' 'unsafe-inline'", "'self'"]);
     expect(contentSecurityPolicy("n", { dev: false, https: true, formActions: [] }).endsWith("; upgrade-insecure-requests")).toBe(true);
   });
   it("makes a fresh nonce each time and reads origins", () => {
     const [a, b] = [makeNonce(), makeNonce()];
     expect(a).not.toBe(b);
     expect(a).toMatch(/^[A-Za-z0-9+/]+=*$/);
-    expect([originOf("https://id.example.com/realms/ac"), originOf("not a url")]).toEqual(["https://id.example.com", null]);
+    expect([originOf("https://id.example.com/realms/ac"), originOf("not a url")]).toStrictEqual(["https://id.example.com", null]);
   });
 });
 
@@ -80,7 +80,7 @@ describe("a same-origin request", () => {
       sameOriginRequest(h({ origin: "https://app.example.com", host: "app.internal:3000", "x-forwarded-host": "app.example.com" })), // behind the edge
       sameOriginRequest(h({ host: LOCALHOST_3000 })), // no Origin: not a browser page
       sameOriginRequest(h({ "sec-fetch-site": "none", host: LOCALHOST_3000 })), // typed in the address bar
-    ]).toEqual([true, true, true, true]);
+    ]).toStrictEqual([true, true, true, true]);
   });
   it("refuses another site, another host or a broken Origin", () => {
     expect([
@@ -88,6 +88,6 @@ describe("a same-origin request", () => {
       sameOriginRequest(h({ "sec-fetch-site": "same-site", origin: "http://localhost:3001", host: LOCALHOST_3000 })), // another app of the same site
       sameOriginRequest(h({ origin: "https://evil.example", host: LOCALHOST_3000 })),
       sameOriginRequest(h({ origin: "null", host: LOCALHOST_3000 })),
-    ]).toEqual([false, false, false, false]);
+    ]).toStrictEqual([false, false, false, false]);
   });
 });

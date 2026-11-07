@@ -25,24 +25,24 @@ describe("touch-sized controls", () => {
       <Choice value="x" onChange={vi.fn()} options={[{ id: "x", label: "Cool" }, { id: "y", label: "Dry" }]} />
     </>);
     for (const name of ["Save", "Small", "One", "Cool"]) expect(coarse(screen.getByRole(/One|Two/.test(name) ? "tab" : "button", { name })), name).toContain(POINTER_COARSE_MIN_H_11);
-    expect(coarse(screen.getByRole("button", { name: "More" }))).toEqual(expect.arrayContaining([POINTER_COARSE_MIN_H_11, "pointer-coarse:min-w-11"]));
+    expect(coarse(screen.getByRole("button", { name: "More" }))).toStrictEqual(expect.arrayContaining([POINTER_COARSE_MIN_H_11, "pointer-coarse:min-w-11"]));
     expect(coarse(screen.getByRole("textbox", { name: "Name" }))).toContain(POINTER_COARSE_MIN_H_11);
     expect(coarse(screen.getByRole("combobox", { name: "Type" }))).toContain(POINTER_COARSE_MIN_H_11);
   });
   it("leaves a plain button its parent's size", () => {
     render(<Plain>Open card</Plain>);
     const b = screen.getByRole("button", { name: "Open card" });
-    expect(coarse(b)).toEqual(["pointer-coarse:min-h-0"]);
+    expect(coarse(b)).toStrictEqual(["pointer-coarse:min-h-0"]);
     expect(Object.hasOwn(b.dataset, "plain")).toBe(true);
   });
   it("sizes a Plain action marked touch to 44×44 (IR618)", () => {
     render(<Plain touch aria-label="Rename Home A">✎</Plain>);
-    expect(coarse(screen.getByRole("button", { name: "Rename Home A" }))).toEqual(expect.arrayContaining([POINTER_COARSE_MIN_H_11, "pointer-coarse:min-w-11", "pointer-coarse:justify-center"]));
+    expect(coarse(screen.getByRole("button", { name: "Rename Home A" }))).toStrictEqual(expect.arrayContaining([POINTER_COARSE_MIN_H_11, "pointer-coarse:min-w-11", "pointer-coarse:justify-center"]));
   });
   it("sizes a chip or a tab built from Plain (IR617)", () => {
     render(<><Plain aria-pressed={false}>Offline</Plain><Plain role="tab" aria-selected>Today</Plain></>);
     for (const el of [screen.getByRole("button", { name: "Offline" }), screen.getByRole("tab", { name: "Today" })]) {
-      expect(coarse(el)).toEqual(expect.arrayContaining([POINTER_COARSE_MIN_H_11, "pointer-coarse:inline-flex", "pointer-coarse:items-center"]));
+      expect(coarse(el)).toStrictEqual(expect.arrayContaining([POINTER_COARSE_MIN_H_11, "pointer-coarse:inline-flex", "pointer-coarse:items-center"]));
       expect(coarse(el)).not.toContain("pointer-coarse:min-h-0");
     }
   });

@@ -38,17 +38,17 @@ describe("POST /bff/auth/logout", () => {
     const fetch = vi.fn(() => Promise.resolve(new Response(null, { status: 204 })));
     vi.stubGlobal("fetch", fetch);
     const res = await signOut(seal(session));
-    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledOnce();
     expect(sentForm(fetch.mock.calls).get("refresh_token")).toBe("r-1");
-    expect([res.status, res.headers.get("location"), dropped(res)]).toEqual([303, "http://localhost:3000/login", true]);
+    expect([res.status, res.headers.get("location"), dropped(res)]).toStrictEqual([303, "http://localhost:3000/login", true]);
   });
   it("still signs out when the provider cannot be reached, and calls nothing without a session", async () => {
     vi.stubGlobal("fetch", vi.fn(() => Promise.reject(new TypeError("fetch failed"))));
     const failed = await signOut(seal(session));
-    expect([failed.status, dropped(failed)]).toEqual([303, true]);
+    expect([failed.status, dropped(failed)]).toStrictEqual([303, true]);
     const fetch = vi.fn();
     vi.stubGlobal("fetch", fetch);
-    for (const res of [await signOut(), await signOut("forged"), await signOut(seal({ ...session, refreshToken: null }))]) expect([res.status, dropped(res)]).toEqual([303, true]);
+    for (const res of [await signOut(), await signOut("forged"), await signOut(seal({ ...session, refreshToken: null }))]) expect([res.status, dropped(res)]).toStrictEqual([303, true]);
     expect(fetch).not.toHaveBeenCalled();
   });
   it("on https drops the __Host- session cookie with Secure and Path=/, as a browser requires (IR374)", async () => {
@@ -62,14 +62,14 @@ describe("POST /bff/auth/logout", () => {
       method: "POST", headers: { cookie: `${s.SESSION_COOKIE}=${s.seal(session)}`, origin: "https://ac.example.com", host: "ac.example.com", "sec-fetch-site": "same-origin" },
     }));
     const set = res.headers.get("set-cookie") ?? "";
-    expect([res.status, set.startsWith("__Host-ac_session_client=;"), /;\s*Secure/i.test(set), /;\s*Path=\/(;|$)/.test(set), set.includes('Max-Age=0')]).toEqual([303, true, true, true, true]);
+    expect([res.status, set.startsWith("__Host-ac_session_client=;"), /;\s*Secure/i.test(set), /;\s*Path=\/(;|$)/.test(set), set.includes('Max-Age=0')]).toStrictEqual([303, true, true, true, true]);
     vi.resetModules();
   });
   it("refuses a sign-out another site posts (CSRF, IR358)", async () => {
     const fetch = vi.fn();
     vi.stubGlobal("fetch", fetch);
     const res = await signOut(seal(session), { origin: "https://evil.example", "sec-fetch-site": "cross-site" });
-    expect([res.status, dropped(res)]).toEqual([403, false]);
+    expect([res.status, dropped(res)]).toStrictEqual([403, false]);
     expect(fetch).not.toHaveBeenCalled();
   });
 });
@@ -83,7 +83,7 @@ describe("POST /bff/auth/logout with the session store", () => {
     const cookie = await createSessionCookie(session);
     const copy = cookie;
     const res = await signOut(cookie);
-    expect([res.status, dropped(res), kv.size]).toEqual([303, true, 0]);
+    expect([res.status, dropped(res), kv.size]).toStrictEqual([303, true, 0]);
     expect(sentForm(fetch.mock.calls).get("refresh_token")).toBe("r-1");
     expect(await loadSession(copy)).toBeNull();
   });

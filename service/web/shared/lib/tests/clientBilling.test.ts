@@ -42,12 +42,12 @@ const commands = new Map<string, ApiCommand>([["c2", { id: "c2", status: "sent",
 
 describe("customer contracts & payments in the display language (FR-C10–C12, IR267)", () => {
   it("names contracts and keeps their periods and the due dates on Kuala Lumpur business days", () => {
-    expect(contractCards([contract], unit, NOW).map((c) => [c.name, c.sub, c.period, c.plan, c.status])).toEqual([["RTO Plan", "k1aaaaaa · 1 Sept → 1 Sept 2027", "1 Sept 2026 → 1 Sept 2027", "Rent-to-own (RTO)", "Active"]]);
+    expect(contractCards([contract], unit, NOW).map((c) => [c.name, c.sub, c.period, c.plan, c.status])).toStrictEqual([["RTO Plan", "k1aaaaaa · 1 Sept → 1 Sept 2027", "1 Sept 2026 → 1 Sept 2027", "Rent-to-own (RTO)", "Active"]]);
     const old = { ...contract, id: "k2bbbbbbbb", planType: "general", startAt: "2025-08-31T16:00:00Z", endAt: TEXT_2026_08_31T16_00_00Z };
-    expect(contractCards([old, contract], unit, NOW, MS_TOKYO).map((c) => [c.name, c.period, c.status])).toEqual([["Pelan RTO", "1 Sep 2026 → 1 Sep 2027", "Active"], ["Penyelenggaraan am", "1 Sep 2025 → 1 Sep 2026", "Expired"]]);
-    expect(clientInvoiceRows([invoice], NOW).map((r) => [r.due, r.status, r.payable])).toEqual([["Due 10 Sept 2026", "Overdue", true]]);
+    expect(contractCards([old, contract], unit, NOW, MS_TOKYO).map((c) => [c.name, c.period, c.status])).toStrictEqual([["Pelan RTO", "1 Sep 2026 → 1 Sep 2027", "Active"], ["Penyelenggaraan am", "1 Sep 2025 → 1 Sep 2026", "Expired"]]);
+    expect(clientInvoiceRows([invoice], NOW).map((r) => [r.due, r.status, r.payable])).toStrictEqual([["Due 10 Sept 2026", "Overdue", true]]);
     const paid = { ...invoice, id: "i2", number: "INV-2026-08", dueAt: "2026-08-10T15:59:59Z", status: "paid" as const, paidAt: "2026-08-09T23:30:00Z" }; // paid 08:30 on 10 Aug in Tokyo
-    expect(clientInvoiceRows([invoice, paid], NOW, MS_TOKYO).map((r) => r.due)).toEqual(["Tarikh akhir 10 Sep 2026", "Tarikh akhir 10 Ogo 2026 · dibayar 10 Ogo 2026"]);
+    expect(clientInvoiceRows([invoice, paid], NOW, MS_TOKYO).map((r) => r.due)).toStrictEqual(["Tarikh akhir 10 Sep 2026", "Tarikh akhir 10 Ogo 2026 · dibayar 10 Ogo 2026"]);
   });
 
   it("times payments, restriction events and inquiries in the display time zone", () => {
@@ -55,33 +55,33 @@ describe("customer contracts & payments in the display language (FR-C10–C12, I
       id: "p1aaaaaaaa", version: 2, amountMinor: 12_000, currency: "MYR", invoiceId: "i1", method: "demo_credit_card", status: "confirmed", paymentReference: "DEMO-PAY-1",
       confirmedAt: TEXT_2026_09_13T02_05_00Z, confirmationReason: null, createdAt: "2026-09-13T02:00:00Z", updatedAt: TEXT_2026_09_13T02_05_00Z,
     };
-    expect(paymentLines([p]).map((l) => [l.label, l.at])).toEqual([["p1aaaaaa · Credit card (demo)", "13 Sept 2026, 10:05 am MYT"]]);
-    expect(paymentLines([{ ...p, method: null }], MS_TOKYO).map((l) => [l.label, l.at])).toEqual([["p1aaaaaa · Pindahan bank (direkod oleh HQ)", "13 Sep 2026, 11:05 PG GMT+9"]]);
-    expect(noticeTimeline(restriction, MS_TOKYO)).toEqual([
+    expect(paymentLines([p]).map((l) => [l.label, l.at])).toStrictEqual([["p1aaaaaa · Credit card (demo)", "13 Sept 2026, 10:05 am MYT"]]);
+    expect(paymentLines([{ ...p, method: null }], MS_TOKYO).map((l) => [l.label, l.at])).toStrictEqual([["p1aaaaaa · Pindahan bank (direkod oleh HQ)", "13 Sep 2026, 11:05 PG GMT+9"]]);
+    expect(noticeTimeline(restriction, MS_TOKYO)).toStrictEqual([
       { time: "10 Sep 2026, 10:00 PG GMT+9", title: "Dijadualkan" }, { time: "11 Sep 2026, 10:00 PG GMT+9", title: "Dikenakan", tone: "warn" },
       { time: "13 Sep 2026, 11:05 PG GMT+9", title: "Pelepasan diminta selepas pembayaran" }, { time: "—", title: "Dilepaskan (hanya apabila setiap unit mengesahkan)", tone: "ok" },
     ]);
-    expect(noticeTimeline(restriction)[2]).toEqual({ time: "13 Sept 2026, 10:05 am MYT", title: "Release requested after payment" });
+    expect(noticeTimeline(restriction)[2]).toStrictEqual({ time: "13 Sept 2026, 10:05 am MYT", title: "Release requested after payment" });
     expect(inquiryLines([{ id: "q1", version: 1, customerId: "c", invoiceId: "i1", restrictionId: null, subjectType: "payment", message: "Hi", state: "received", reply: null, createdAt: "2026-09-13T03:00:00Z" }], MS_TOKYO)
-      .map((q) => [q.subject, q.at])).toEqual([["Pembayaran", "13 Sep 2026, 12:00 PTG GMT+9"]]);
+      .map((q) => [q.subject, q.at])).toStrictEqual([["Pembayaran", "13 Sep 2026, 12:00 PTG GMT+9"]]);
   });
 
   it("words the restriction notice per unit in Malay, never released before the unit confirms", () => {
     expect(restrictionNotice(restriction, unit)).toMatchObject({ label: "Release requested", policy: "Temperature limit — cooling setpoint ≥ 27 °C", units: "2 units in scope · Bedroom AC (Home A › 1F), Bedroom AC (Home A › 1F)" });
     expect(restrictionNotice(restriction, unit, MS_TOKYO.t)).toMatchObject({ label: "Pelepasan diminta", policy: "Had suhu — suhu tetapan penyejukan ≥ 27 °C", units: "2 unit dalam skop · Bedroom AC (Home A › 1F), Bedroom AC (Home A › 1F)" });
-    expect(noticeUnits(restriction, unit, commands, MS_TOKYO.t).map((u) => [u.apply, u.release, u.releaseTone, u.note, u.tone])).toEqual([
+    expect(noticeUnits(restriction, unit, commands, MS_TOKYO.t).map((u) => [u.apply, u.release, u.releaseTone, u.note, u.tone])).toStrictEqual([
       ["Dikenakan", "Pelepasan dihantar", "primary", "menunggu unit mengesahkan", "warn"], ["Keputusan tidak diketahui", "Pelepasan gagal", "crit", "unit di luar talian · arahan terakhir tamat tempoh", "unknown"],
     ]);
     const busy = { ...restriction, perUnit: [{ ...must(restriction.perUnit[0]), releaseState: "none" as const, releaseCommandIds: [], applyCommandIds: [], pendingReason: "device_operation_running" }] };
-    expect([noticeUnits(busy, unit, commands)[0]?.note, noticeUnits(busy, unit, commands, MS_TOKYO.t)[0]?.note]).toEqual(["the unit is busy with a device update", "unit sedang sibuk dengan kemas kini peranti"]);
-    expect([policyText({ kind: "power_off" }), policyText({ kind: "power_off" }, MS_TOKYO.t)]).toEqual(["Power off", "Matikan kuasa"]);
+    expect([noticeUnits(busy, unit, commands)[0]?.note, noticeUnits(busy, unit, commands, MS_TOKYO.t)[0]?.note]).toStrictEqual(["the unit is busy with a device update", "unit sedang sibuk dengan kemas kini peranti"]);
+    expect([policyText({ kind: "power_off" }), policyText({ kind: "power_off" }, MS_TOKYO.t)]).toStrictEqual(["Power off", "Matikan kuasa"]);
   });
 
   it("writes the payment message preview in the recipient's language", () => {
     const inv = { number: "INV-2026-09", amount: "120.00 MYR", dueDate: "10 Sep 2026", status: "Overdue" as const };
-    expect(previewText("email", inv)).toEqual({ subject: "Payment reminder — INV-2026-09", body: "Hello, INV-2026-09 (120.00 MYR) was due on 10 Sep 2026. Pay with a demo card or view payment instructions in the app." });
-    expect(previewText("whatsapp", { ...inv, status: "Unpaid" }, MS_TOKYO.t)).toEqual({ subject: null, body: "Helo, INV-2026-09 (120.00 MYR) perlu dibayar pada 10 Sep 2026. Bayar dengan kad demo atau lihat arahan pembayaran dalam aplikasi." });
-    expect(previewText("email", { ...inv, status: "Paid" }, MS_TOKYO.t)).toEqual({ subject: "Pembayaran diterima — INV-2026-09", body: "Helo, INV-2026-09 (120.00 MYR) telah dibayar — terima kasih." });
+    expect(previewText("email", inv)).toStrictEqual({ subject: "Payment reminder — INV-2026-09", body: "Hello, INV-2026-09 (120.00 MYR) was due on 10 Sep 2026. Pay with a demo card or view payment instructions in the app." });
+    expect(previewText("whatsapp", { ...inv, status: "Unpaid" }, MS_TOKYO.t)).toStrictEqual({ subject: null, body: "Helo, INV-2026-09 (120.00 MYR) perlu dibayar pada 10 Sep 2026. Bayar dengan kad demo atau lihat arahan pembayaran dalam aplikasi." });
+    expect(previewText("email", { ...inv, status: "Paid" }, MS_TOKYO.t)).toStrictEqual({ subject: "Pembayaran diterima — INV-2026-09", body: "Helo, INV-2026-09 (120.00 MYR) telah dibayar — terima kasih." });
   });
 });
 
@@ -92,14 +92,14 @@ describe("the customer's users in the display language (FR-C19, IR267)", () => {
   ];
 
   it("keeps HQ's register in English and Kuala Lumpur and gives the owner their language and time zone", () => {
-    expect(clientUserRows(users, (m) => (m === "m1" ? "you" : "HQ"), "m1").map((u) => [u.sub, u.lastSignIn, u.channels])).toEqual([[OWNER_X_COM, "2026-09-14 07:30", "In-app · Email"], ["invited 2026-09-14 by you", "—", "—"]]);
-    expect(clientUserRows(users, (m) => (m === "m1" ? MS_TOKYO.t("you") : "HQ"), "m1", MS_TOKYO).map((u) => [u.sub, u.lastSignIn, u.channels, u.lastOwner, u.you])).toEqual([
+    expect(clientUserRows(users, (m) => (m === "m1" ? "you" : "HQ"), "m1").map((u) => [u.sub, u.lastSignIn, u.channels])).toStrictEqual([[OWNER_X_COM, "2026-09-14 07:30", "In-app · Email"], ["invited 2026-09-14 by you", "—", "—"]]);
+    expect(clientUserRows(users, (m) => (m === "m1" ? MS_TOKYO.t("you") : "HQ"), "m1", MS_TOKYO).map((u) => [u.sub, u.lastSignIn, u.channels, u.lastOwner, u.you])).toStrictEqual([
       [OWNER_X_COM, "14 Sep 2026, 8:30 PG GMT+9", "Dalam aplikasi · E-mel", true, true], ["dijemput 14 Sep 2026 oleh anda", "—", "—", false, false],
     ]);
   });
 
   it("checks an invite address in either language", () => {
-    expect([inviteError("bad", []), inviteError("lim@x.com", [{ email: "LIM@x.com" }], translator("ms")), inviteError("new@x.com", [])]).toEqual(["A valid email address (up to 254 characters)", "Sudah menjadi pengguna pelanggan ini", undefined]);
+    expect([inviteError("bad", []), inviteError("lim@x.com", [{ email: "LIM@x.com" }], translator("ms")), inviteError("new@x.com", [])]).toStrictEqual(["A valid email address (up to 254 characters)", "Sudah menjadi pengguna pelanggan ini", undefined]);
   });
 });
 
@@ -107,18 +107,18 @@ describe("the overview's notice (DEC-90, IR610)", () => {
   const inv = (id: string, number: string, amountMinor: number) => ({ id, number, amountMinor, currency: "MYR" as const });
   const limit = { id: "r1", state: "applied" as const, policy: { kind: "temperature_limit" as const, minimumCoolingSetpoint: 24 }, unitIds: ["u1"], executeAfter: "2026-09-15T00:00:00Z" };
   it("names the overdue invoice and the restriction it caused, with where to act", () => {
-    expect(dueNotice([inv("i1", "INV-202608-0001", 12_000)], { r: limit, invoiceId: "i1" })).toEqual([
+    expect(dueNotice([inv("i1", "INV-202608-0001", 12_000)], { r: limit, invoiceId: "i1" })).toStrictEqual([
       { text: "Invoice INV-202608-0001 is overdue — 120.00 MYR", href: "/customer/payments/i1", link: "Pay now" },
       { text: "Cooling is limited to 24 °C or warmer on 1 unit until it is paid", href: "/customer/payments/i1?tab=restriction&restrictionId=r1", link: "View restriction details" },
     ]);
   });
   it("counts several invoices, words a power-off and a scheduled restriction, and says nothing when all is paid", () => {
     const two = [inv("i1", "INV-1", 12_000), inv("i2", "INV-2", 3050)];
-    expect(dueNotice(two, null)).toEqual([{ text: "2 invoices are overdue — 150.50 MYR in total", href: "/customer/payments?status=overdue", link: "View invoices" }]);
+    expect(dueNotice(two, null)).toStrictEqual([{ text: "2 invoices are overdue — 150.50 MYR in total", href: "/customer/payments?status=overdue", link: "View invoices" }]);
     expect(dueNoticeOf(two, { r: { ...limit, policy: { kind: "power_off" }, unitIds: ["u1", "u2"] }, invoiceId: "i1" })[1]?.text).toBe("2 units are switched off until it is paid");
     expect(dueNoticeOf(two, { r: { ...limit, state: "scheduled" }, invoiceId: "i1" })[1]?.text).toBe("A restriction starts 15 Sept 2026, 8:00 am MYT unless it is paid — Temperature limit — cooling setpoint ≥ 24 °C");
     expect(dueNotice(two, { r: { ...limit, state: "released" }, invoiceId: "i1" })).toHaveLength(1); // a released restriction is not said
     expect(dueNotice([], { r: limit, invoiceId: "i1" })).toBeNull();
-    expect(dueNoticeOf([inv("i1", "INV-1", 12_000)], { r: limit, invoiceId: "i1" }, MS_TOKYO).map((l) => l.link)).toEqual(["Bayar sekarang", "Lihat butiran sekatan"]);
+    expect(dueNoticeOf([inv("i1", "INV-1", 12_000)], { r: limit, invoiceId: "i1" }, MS_TOKYO).map((l) => l.link)).toStrictEqual(["Bayar sekarang", "Lihat butiran sekatan"]);
   });
 });
