@@ -16,7 +16,7 @@ export interface CoreRequest { method: CoreRoute["method"]; path: string; body?:
 
 type Json = Record<string, unknown>;
 const isObject = (v: unknown): v is Json => typeof v === "object" && v !== null && !Array.isArray(v);
-const EMPTY_VALUES: readonly unknown[] = [undefined, null, ""];
+const EMPTY_VALUES = new Set<unknown>([undefined, null, ""]);
 const pathParams = (path: string) => [...path.matchAll(/\{([^{}]+)\}/g)].map((m) => m[1] ?? "");
 
 function lookup(node: Json, at: string[]): unknown {
@@ -50,7 +50,7 @@ function pick(routes: readonly CoreRoute[], input: Json): CoreRoute {
   for (const r of routes) {
     if (r.fixed && text(input[r.fixed[0]]) !== r.fixed[1]) continue;
     const names = pathParams(r.path);
-    const isHeld = names.every((n) => { const v = lookup(input, n.split(".")); return !EMPTY_VALUES.includes(v); });
+    const isHeld = names.every((n) => { const v = lookup(input, n.split(".")); return !EMPTY_VALUES.has(v); });
     if (!(isHeld && names.length > score)) {
       continue;
     }

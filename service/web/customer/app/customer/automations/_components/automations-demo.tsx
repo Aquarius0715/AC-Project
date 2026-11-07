@@ -11,7 +11,7 @@ import { Button } from "@ac/web/components/ui/button";
 interface Step { label: string; time: string | null; action: string }
 interface Auto { id: string; name: string; kind: string; icon: IconName; when: string; steps: Step[]; unit: string; note?: string; on: boolean }
 const start = (time: string, action: string): Step => ({ label: "Start", time, action });
-const end = (time: string): Step => ({ label: "End", time, action: "Power OFF" });
+const end = (time: string): Step => ({ time, label: "End", action: "Power OFF" });
 const then = (action: string): Step[] => [{ label: "Then", time: null, action }];
 const seed: Auto[] = [
   { id: "a1", name: "Weekday pre-cool", kind: "Schedule", icon: "schedule", when: "Mon, Wed at 18:00 (Asia/Kuala_Lumpur)", steps: [start("18:00", "Set temperature 25°C"), end("22:00")], unit: "Bedroom AC · Home A › 1F › Bedroom · next run Mon Sep 28 18:00", on: true },

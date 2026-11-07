@@ -18,7 +18,7 @@ const NOW = Date.parse("2026-09-14T01:35:00Z"); // 09:35 in Kuala Lumpur
 const ALL = componentGroups.flatMap((g) => g.keys);
 type Reading = ApiTechUnit["latestMeasurements"][number];
 const m = (metric: Reading["metric"], value: number | null, unit: Reading["unit"], quality: Reading["quality"] = "valid"): Reading =>
-  ({ id: metric, unitId: "u1", sensorId: "s", origin: "measured", qualityReason: null, metric, value, unit, observedAt: "2026-09-14T01:35:00Z", quality });
+  ({ metric, value, unit, quality, id: metric, unitId: "u1", sensorId: "s", origin: "measured", qualityReason: null, observedAt: "2026-09-14T01:35:00Z" });
 const unit: ApiTechUnit = {
   id: "unit-online-rto", version: 1, spaceId: null, alertPolicyIds: [], effectivePowerState: "on", displayName: "Bedroom AC", type: "split", connection: "online", lastSeenAt: "2026-09-14T01:34:00Z", installedAt: "2025-03-01T00:00:00Z", capabilityVersion: 3,
   serviceScope: ["indoor", "outdoor", "electrical"], components: ALL,

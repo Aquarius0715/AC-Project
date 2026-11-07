@@ -60,7 +60,7 @@ export function TechDevicesView({ live }: Readonly<{ live: TechDevicesLive }>) {
     setErrors(Object.fromEntries(Object.entries(f.fieldErrors).map(([k, v]) => [k, deviceFieldText(v, t)])));
     setRefused(deviceRefusal(f, t));
   };
-  const ok = () => () => { setRefused(null); close(); };
+  const closeRefused = () => { setRefused(null); close(); };
   const isBusy = !!dv?.detail.activeOperation;
   useEffect(() => { // an operation starts on the scheduler and finishes with the device's answer or at its deadline (IR67)
     const t = isBusy ? setInterval(() => { router.refresh(); }, 4000) : null;
@@ -76,7 +76,7 @@ export function TechDevicesView({ live }: Readonly<{ live: TechDevicesLive }>) {
     if (!reg.jobId) e.jobId = t("Choose the job");
     setErrors(e);
     if (Object.keys(e).length > 0) return;
-    run(() => registerDevice(reg.serial.trim(), reg.sensors, reg.unitId, reg.jobId), t("Device registered and bound — run Check connection"), ok(), failed);
+    run(() => registerDevice(reg.serial.trim(), reg.sensors, reg.unitId, reg.jobId), t("Device registered and bound — run Check connection"), closeRefused, failed);
   };
   const rebind = () => {
     const target = live.rebind.find((u) => u.unitId === bind.unitId);
@@ -85,7 +85,7 @@ export function TechDevicesView({ live }: Readonly<{ live: TechDevicesLive }>) {
     if (bind.reason.trim().length === 0 || bind.reason.trim().length > 1000) e.reason = t("A reason is required (1–1000 characters)");
     setErrors(e);
     if (Object.keys(e).length > 0 || !dv || !target) return;
-    run(() => bindDevice(dv.detail.id, dv.detail.version, target.unitId, target.jobId, bind.reason), t("Device rebound — new sensor IDs issued"), ok(), failed);
+    run(() => bindDevice(dv.detail.id, dv.detail.version, target.unitId, target.jobId, bind.reason), t("Device rebound — new sensor IDs issued"), closeRefused, failed);
   };
   const calibrate = () => {
     const s = dv?.detail.sensors.find((x) => x.id === cal.sensorId);
@@ -96,17 +96,17 @@ export function TechDevicesView({ live }: Readonly<{ live: TechDevicesLive }>) {
     setErrors(e);
     const jobId = dv?.jobId;
     if (Object.keys(e).length > 0 || !dv || !s || !jobId) return;
-    run(() => calibrateSensor(dv.detail.id, dv.detail.version, s.id, s.metric, s.unit, +cal.reference, +cal.measured, jobId), t("Calibration recorded — earlier readings unchanged"), ok(), failed);
+    run(() => calibrateSensor(dv.detail.id, dv.detail.version, s.id, s.metric, s.unit, +cal.reference, +cal.measured, jobId), t("Calibration recorded — earlier readings unchanged"), closeRefused, failed);
   };
   const firmware = () => {
     const jobId = dv?.jobId;
     if (!dv || !fw || !jobId) { setErrors({ firmwareVersion: t("Choose a version") }); return; }
-    run(() => updateFirmware(dv.detail.id, dv.detail.version, fw, jobId), t("Firmware update to {version} requested", { version: fw }), ok(), failed);
+    run(() => updateFirmware(dv.detail.id, dv.detail.version, fw, jobId), t("Firmware update to {version} requested", { version: fw }), closeRefused, failed);
   };
   const saveNote = () => {
     const event = dv?.events?.find((x) => x.id === note.eventId);
     if (!dv || !event || note.text.trim().length === 0 || note.text.trim().length > 1000) { setErrors({ responseNote: t("A note of 1–1000 characters") }); return; }
-    run(() => addResponseNote(dv.detail.id, event.id, event.version, note.text), t("Response note added — the device state is unchanged"), ok(), failed);
+    run(() => addResponseNote(dv.detail.id, event.id, event.version, note.text), t("Response note added — the device state is unchanged"), closeRefused, failed);
   };
 
   return (
@@ -161,7 +161,7 @@ export function TechDevicesView({ live }: Readonly<{ live: TechDevicesLive }>) {
               {live.canMaintain && (
                 <div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>
                   {[
-                    { label: t("Check connection"), sub: t("ping the device"), act: () => { const jobId = dv.jobId; if (jobId) run(() => checkDevice(dv.detail.id, dv.detail.version, jobId), t("Connection check requested"), ok(), failed); }, off: false },
+                    { label: t("Check connection"), sub: t("ping the device"), act: () => { const jobId = dv.jobId; if (jobId) run(() => checkDevice(dv.detail.id, dv.detail.version, jobId), t("Connection check requested"), closeRefused, failed); }, off: false },
                     { label: t("Calibrate sensor"), sub: t("reference vs measured"), act: () => { setCal({ sensorId: dv.detail.sensors[0]?.id ?? "", reference: "", measured: "" }); setErrors({}); setModal("calibrate"); }, off: dv.detail.sensors.length === 0 },
                     { label: t("Update firmware"), sub: firmwareSub(dv.detail.activeOperation?.kind === "firmware", dv.firmware, t), act: () => { setFw(dv.firmware.at(-1) ?? ""); setErrors({}); setModal("firmware"); }, off: dv.firmware.length === 0 },
                   ].map((a) => (
@@ -203,7 +203,7 @@ export function TechDevicesView({ live }: Readonly<{ live: TechDevicesLive }>) {
                       {live.canAcknowledge && openAlerts(dv.events).map((a) => {
                         return (
                           <Plain key={a.id} type="button" disabled={pending} className="text-[13px] font-semibold text-primary disabled:opacity-50"
-                            onClick={() => { run(() => acknowledgeAlert(a.id, a.version), t("Alert acknowledged — the tamper state stays until the device reports it clear"), ok(), failed); }}>{t("Acknowledge {type} alert {id}", { type: a.type, id: a.id.slice(0, 8) })} <Icon name="arrowRight" /></Plain>
+                            onClick={() => { run(() => acknowledgeAlert(a.id, a.version), t("Alert acknowledged — the tamper state stays until the device reports it clear"), closeRefused, failed); }}>{t("Acknowledge {type} alert {id}", { type: a.type, id: a.id.slice(0, 8) })} <Icon name="arrowRight" /></Plain>
                         );
                       })}
                     </div>
