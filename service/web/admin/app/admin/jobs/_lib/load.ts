@@ -104,7 +104,7 @@ export async function loadJobs(sp: SP) {
     throw error;
   });
   if (!job) return { ...base, detail: null, missing: pick };
-  const ref = job.reportRefs?.at(-1);
+  const ref = job.reportRefs.at(-1);
   const [events, unit, eligible, report] = await Promise.all([
     optional(coreItems<ApiJobEvent>("jobs.events", { jobId: job.id, query: { limit: 100 } }), [] as ApiJobEvent[]),
     optional(coreOp<{ displayName: string; location: { pathLabels: string[] } }>("units.get", { id: job.unitId }), null),

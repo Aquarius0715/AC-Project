@@ -47,9 +47,9 @@ export async function loadMaintenance(sp: Record<string, string | string[] | und
     return { ...common, rows: [], rateBanner: null, detail: null, filters: { lines, settings, reminders: reminderLines(settings, t), form: reminderForm(settings) } };
   }
   const list = await coreAll<ApiClientRow>("jobs.list", { sort: { field: "status", direction: "asc" } });
-  const rows = clientRows(list.filter((j) => j.projection === "summary"), unitOf, i);
+  const rows = clientRows(list, unitOf, i);
   // the newest completed requests: the first one still waiting for Confirm & rate gets the banner (IR110, DD-C17)
-  const done = await Promise.all(list.filter((j) => j.projection === "summary" && j.status === "completed")
+  const done = await Promise.all(list.filter((j) => j.status === "completed")
     .toSorted((a, b) => Date.parse(b.scheduledSlot?.startAt ?? b.dueAt) - Date.parse(a.scheduledSlot?.startAt ?? a.dueAt)).slice(0, 3)
     .map((j) => quiet(coreOp<ApiClientJob>("jobs.get", { jobId: j.id }), null)));
   const toRate = done.find((j) => j?.projection === "detail" && feedback(j, nowMs).kind === "rate") ?? null;
