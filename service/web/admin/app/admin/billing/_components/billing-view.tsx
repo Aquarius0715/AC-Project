@@ -82,6 +82,119 @@ const noReminder = { recipient: "", channel: "email", reason: "", preview: "" };
 scope and selection live in the URL; writes are Server Actions that re-render the route); the demo keeps fixtures.
 Texts in the display language; billing periods, due dates and pay dates are Kuala Lumpur days, named so when the
 display time zone is another one, and HQ types them as Kuala Lumpur days (IR299). */
+type Inquiry = BillingLive["inquiries"][number];
+type InquiryState = "all" | "received" | "answered";
+
+interface InquiriesPanelProps {
+  inquiries: Inquiry[]; iqState: InquiryState; setIqState: (s: InquiryState) => void; iqShown: Inquiry[]; iq: Inquiry | null; iqInvoice: string | null;
+  openInquiry: (id: string) => void; openInvoice: (id: string) => void; reply: string; setReply: (s: string) => void; tried: boolean; setTried: (b: boolean) => void;
+  pending: boolean; act: Act; invoiceLabel: (id: string) => string; live: BillingLive | undefined; toast: ReturnType<typeof useToast>;
+}
+
+/** The inquiries tab: the customers' questions about invoices and the HQ reply. */
+function InquiriesPanel({ inquiries, iqState, setIqState, iqShown, iq, iqInvoice, openInquiry, openInvoice, reply, setReply, tried, setTried, pending, act, invoiceLabel, live, toast }: Readonly<InquiriesPanelProps>) {
+  const { t } = useI18n();
+  return inquiries.length === 0 ? <Card title={t(CUSTOMER_INQUIRIES)}><EmptyState title={t("No inquiries")}>{t("Customers have not sent any inquiry.")}</EmptyState></Card> : (
+    <>
+      <Tabs value={iqState} onChange={setIqState} tabs={(["all", "received", "answered"] as const).map((k) => ({ id: k, label: t(k === "all" ? "All" : INQUIRY_TAB.get(k) ?? k), count: k === "all" ? inquiries.length : inquiries.filter((x) => x.state === k).length }))} />
+      <div className="split-rev">
+        <Card title={t(CUSTOMER_INQUIRIES)} className="self-start">{iqShown.length === 0 ? <EmptyState title={t(iqState === "received" ? "No received inquiries" : "No answered inquiries")}>{t("Choose another state.")}</EmptyState> : <div className="flex flex-col gap-2">{iqShown.map((x) => <ListRow key={x.id} selected={iq?.id === x.id} onClick={() => { openInquiry(x.id); }}><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="truncate text-[13px]">{x.text}</b>{x.state === "answered" ? <Badge tone="ok">{t("Answered")}</Badge> : <Badge tone="warn">{t("Received")}</Badge>}</div><div className="text-[11px] text-muted-foreground">{x.kind} · {x.cust} · {x.at}</div></div></ListRow>)}</div>}</Card>
+        {iq && (
+          <Card title={t("{kind} inquiry · {customer}", { kind: iq.kind, customer: iq.cust })} sub={t("received {time}", { time: iq.at })}>
+            <p className="rounded-xl bg-surface2 p-3 text-[13px]">{iq.text}</p>
+            <SummaryList items={[[t("Invoice"), iqInvoice ? <Plain key="i" className="font-semibold text-primary" onClick={() => { openInvoice(iqInvoice); }}>{invoiceLabel(iqInvoice)} <Icon name="arrowRight" /></Plain> : "—"], [t("Restriction"), restrictionCell(iq.restrictionId, !!live)]]} />
+            {iq.reply ? <p className="mt-3 text-[13px]"><b>{t("Reply:")}</b> {iq.reply}</p> : <>
+              <div className="mt-3"><Field label={t("Reply (in-app only)")} error={tried && !reply.trim() ? t("A reply is required") : undefined}><Textarea value={reply} onChange={(e) => { setReply(e.target.value); }} maxLength={2000} /></Field></div>
+              <p className="mt-1 text-[11px] text-muted-foreground">{t("A reply never changes invoices or restrictions.")}</p>
+              <div className="mt-2 flex justify-end"><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (!reply.trim()) { return; } if (!live) { toast(t("Reply recorded in-app")); return; } act(() => answerInquiry(iq.id, iq.version, reply.trim()), t("Reply sent in-app"), () => { setReply(""); setTried(false); }); }}>{t("Send reply")}</Btn></div>
+            </>}
+          </Card>
+        )}
+      </div>
+    </>
+  );
+}
+
+type Reminder = typeof noReminder;
+
+interface ReminderCardProps {
+  live: BillingLive | undefined; recipients: ApiRecipient[]; recipient: ApiRecipient | undefined; reminder: Reminder; setReminder: (r: Reminder) => void;
+  channel: string; channels: string[]; channelName: (c: string) => string; message: ReturnType<typeof previewText> | null | undefined; pending: boolean;
+  onPreview: () => void; onSend: () => void;
+}
+
+/** The payment reminder of an overdue invoice: recipient, channel, reason, the preview and the buttons. */
+function ReminderCard({ live, recipients, recipient, reminder, setReminder, channel, channels, channelName, message, pending, onPreview, onSend }: Readonly<ReminderCardProps>) {
+  const { t } = useI18n();
+  return (
+      <Card title={t("Payment reminder")} sub={t("Only overdue unpaid invoices can be reminded. If payment arrives first, the reminder is stopped. Delivery is simulated.")}>
+        {live && recipients.length === 0 ? <p className="text-xs text-muted-foreground">{t("No client of this customer can receive the reminder.")}</p> : <>
+          <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}><Field label={t("Recipient")}>{live ? <Select value={recipient?.id ?? ""} onChange={(e) => { setReminder({ ...reminder, recipient: e.target.value, preview: "" }); }}>{recipients.map((r) => <option key={r.id} value={r.id}>{r.displayLabel} · {t(ROLE_WORD[r.role] ?? r.role)}</option>)}</Select> : <Select><option>customer-a · Client</option></Select>}</Field><Field label={t("Channel")}><Select value={channel} onChange={(e) => { setReminder({ ...reminder, channel: e.target.value, preview: "" }); }}>{channels.map((c) => <option key={c} value={c}>{channelName(c)}</option>)}</Select></Field></div>
+          <Field label={t("Reason · e.g. “2nd reminder after due date”")}><Input value={reminder.reason} onChange={(e) => { setReminder({ ...reminder, reason: e.target.value, preview: "" }); }} /></Field>
+          {message && <div className="my-3 rounded-xl bg-surface2 p-3 text-xs"><b>{t("Preview · {channel}", { channel: channelName(channel) })}</b> <span className="text-muted-foreground">{t("nothing is sent yet")}</span><br />{message.subject && <><b>{message.subject}</b><br /></>}{message.body}</div>}
+          <div className="mt-3 flex justify-end gap-2">{live && <Btn disabled={pending || !reminder.reason.trim()} onClick={onPreview}>{t("Preview")}</Btn>}<Btn variant="primary" disabled={pending || !reminder.reason.trim() || (live && !reminder.preview)} onClick={onSend}>{t("Send reminder")}</Btn></div>
+        </>}
+      </Card>
+  );
+}
+
+interface NewInvoice { contractId: string; from: string; to: string; dueAt: string }
+
+/** The scope filters of the invoices tab: customer, property, contract, billing months, overdue only. */
+function ScopeBar({ live, nav }: Readonly<{ live: BillingLive; nav: (patch: Record<string, string | null>) => void }>) {
+  const { t } = useI18n();
+  const scopeProps = live.properties.filter((p) => !live.scope.customerId || p.customerId === live.scope.customerId);
+  const scopeContracts = live.contractsOfCustomer.filter((k) => !live.scope.customerId || k.customerId === live.scope.customerId);
+  const { contracts } = live;
+  return (
+      <div className="flex flex-wrap items-end gap-3">
+        <Field label={t("Customer")}><Select value={live.scope.customerId ?? ""} onChange={(e) => { nav({ customerId: e.target.value || null, propertyId: null, contractId: null, invoiceId: null }); }}><option value="">{t("All customers")}</option>{live.customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field>
+        <Field label={t("Property")}><Select value={live.scope.propertyId ?? ""} onChange={(e) => { nav({ propertyId: e.target.value || null, invoiceId: null }); }}><option value="">{t("All properties")}</option>{scopeProps.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></Field>
+        <Field label={t("Contract")}><Select value={live.scope.contractId ?? ""} onChange={(e) => { nav({ contractId: e.target.value || null, invoiceId: null }); }}><option value="">{t("All contracts")}</option>{scopeContracts.map((k) => <option key={k.id} value={k.id}>{contracts.find((c) => c.id === k.id)?.label ?? k.id}</option>)}</Select></Field>
+        <BillingMonths from={live.scope.from} to={live.scope.to} onChange={(from, to) => { nav({ from, to, invoiceId: null }); }} />
+        {live.scope.overdueOnly && <Btn size="sm" onClick={() => { nav({ overdueOnly: null, invoiceId: null }); }} aria-label={t("Overdue only — show all invoices")}>{t("Overdue only")} <Icon name="close" /></Btn>}
+      </div>
+  );
+}
+
+interface CreateInvoiceModalProps {
+  open: boolean; close: () => void; create: () => void; pending: boolean; tried: boolean;
+  nw: NewInvoice; setNw: (n: NewInvoice) => void; contract: ContractOption | undefined; contracts: ContractOption[];
+}
+
+/** The create-invoice dialog: the contract, the billing period and the due date. */
+function CreateInvoiceModal({ open, close, create, pending, tried, nw, setNw, contract, contracts }: Readonly<CreateInvoiceModalProps>) {
+  const { t } = useI18n();
+  return (
+    <Modal open={open} onClose={close} title={t("Create invoice")} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={create}>{t("Create")}</Btn></>}>
+      <Field label={t("Contract")}><Select value={contract?.id ?? ""} onChange={(e) => { setNw({ ...nw, contractId: e.target.value }); }}>{contracts.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}</Select></Field>
+      <div className="grid-fluid" style={{ ["--min" as string]: "150px" }}><Field label={t("Billing period start")} error={tried && !nw.from ? t("Required") : undefined}><Input type="date" value={nw.from} onChange={(e) => { setNw({ ...nw, from: e.target.value }); }} /></Field><Field label={t("Billing period end")} error={tried && (!nw.to || !isBefore(nw.from, nw.to)) ? t("After the start") : undefined}><Input type="date" value={nw.to} onChange={(e) => { setNw({ ...nw, to: e.target.value }); }} /></Field><Field label={t("Due date")} error={tried && !nw.dueAt ? t("Required") : undefined}><Input type="date" value={nw.dueAt} onChange={(e) => { setNw({ ...nw, dueAt: e.target.value }); }} /></Field></div>
+      <p className="text-xs text-muted-foreground">{t("Dates are Kuala Lumpur days ({zone}).", { zone: KL })}</p>
+      {contract && <p className="text-xs text-muted-foreground">{t("Amount from the contract version: {amount}", { amount: money(contract.priceMinor, contract.currency) })}</p>}
+    </Modal>
+  );
+}
+
+interface PaymentFields { amount: string; ref: string; reason: string; paidAt: string }
+
+interface PaymentModalProps {
+  modal: "create" | "manual" | "confirm" | null; close: () => void; onRecord: () => void; pending: boolean; tried: boolean; live: BillingLive | undefined;
+  sel: InvoiceRow | null; m: PaymentFields; setM: (m: PaymentFields) => void;
+}
+
+/** The dialog that records a manual payment or confirms a card payment of the selected invoice. */
+function PaymentModal({ modal, close, onRecord, pending, tried, live, sel, m, setM }: Readonly<PaymentModalProps>) {
+  const { t } = useI18n();
+  return (
+    <Modal open={modal === "manual" || modal === "confirm"} onClose={close} title={t(modal === "confirm" ? "Confirm card payment" : "Record manual payment")} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={onRecord}>{t(modal === "confirm" ? "Confirm payment" : "Record payment")}</Btn></>}>
+      {sel && <Field label={t("Amount (must equal invoice — full payment only)")} error={tried && Math.round(+m.amount * 100) !== sel.amountMinor ? t("Must equal {amount}", { amount: sel.amt }) : undefined}><Input type="number" value={m.amount} onChange={(e) => { setM({ ...m, amount: e.target.value }); }} disabled={modal === "confirm"} /></Field>}
+      <Field label={t("Reference")} error={tried && !m.ref.trim() ? t("Reference is required") : undefined}><Input value={m.ref} onChange={(e) => { setM({ ...m, ref: e.target.value }); }} placeholder="manual-2026-0189" maxLength={128} /></Field>
+      {live ? <Field label={t("Reason")} error={tried && !m.reason.trim() ? t("A reason is required") : undefined}><Input value={m.reason} onChange={(e) => { setM({ ...m, reason: e.target.value }); }} placeholder={t("Bank transfer received")} maxLength={1000} /></Field> : <Field label={t("Paid on")}><Input type="date" value={m.paidAt} onChange={(e) => { setM({ ...m, paidAt: e.target.value }); }} /></Field>}
+      {modal === "manual" && <p className="text-[11px] text-muted-foreground">{t("Marks the invoice paid; the payment method stays “not selected”. Related restrictions move to “release requested” when all their cause invoices are paid. Resubmitting the same reference returns the same result.")}</p>}
+    </Modal>
+  );
+}
+
 export function BillingView({ live }: Readonly<{ live?: BillingLive }>) {
   const i = useI18n(), { t } = i;
   const toast = useToast();
@@ -218,23 +331,13 @@ export function BillingView({ live }: Readonly<{ live?: BillingLive }>) {
     setTab("invoices");
   };
 
-  const scopeProps = live ? live.properties.filter((p) => !live.scope.customerId || p.customerId === live.scope.customerId) : [];
-  const scopeContracts = live ? live.contractsOfCustomer.filter((k) => !live.scope.customerId || k.customerId === live.scope.customerId) : [];
   const isOtherZone = i.display.timeZone !== KL;
   return (
     <Page>
       <Tabs value={tab} onChange={setTab} tabs={[{ id: "invoices", label: t("Invoices"), count: list.length }, { id: "inquiries", label: t("Inquiries"), count: inquiries.length }, { id: "payouts", label: t("Contractor payouts"), count: live ? live.statements?.length : 1 }]} />
       {tab === "payouts" && (live ? <PayoutsTab live={live} nav={nav} act={act} pending={pending} /> : <ContractorPayouts />)}{tab === "invoices" && (
         <>
-          {live && (
-            <div className="flex flex-wrap items-end gap-3">
-              <Field label={t("Customer")}><Select value={live.scope.customerId ?? ""} onChange={(e) => { nav({ customerId: e.target.value || null, propertyId: null, contractId: null, invoiceId: null }); }}><option value="">{t("All customers")}</option>{live.customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field>
-              <Field label={t("Property")}><Select value={live.scope.propertyId ?? ""} onChange={(e) => { nav({ propertyId: e.target.value || null, invoiceId: null }); }}><option value="">{t("All properties")}</option>{scopeProps.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></Field>
-              <Field label={t("Contract")}><Select value={live.scope.contractId ?? ""} onChange={(e) => { nav({ contractId: e.target.value || null, invoiceId: null }); }}><option value="">{t("All contracts")}</option>{scopeContracts.map((k) => <option key={k.id} value={k.id}>{contracts.find((c) => c.id === k.id)?.label ?? k.id}</option>)}</Select></Field>
-              <BillingMonths from={live.scope.from} to={live.scope.to} onChange={(from, to) => { nav({ from, to, invoiceId: null }); }} />
-              {live.scope.overdueOnly && <Btn size="sm" onClick={() => { nav({ overdueOnly: null, invoiceId: null }); }} aria-label={t("Overdue only — show all invoices")}>{t("Overdue only")} <Icon name="close" /></Btn>}
-            </div>
-          )}
+          {live && <ScopeBar live={live} nav={nav} />}
           <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}>{[[t("Outstanding"), totals(list, ["Unpaid", "Overdue", PROCESSING]), t("unpaid · processing")], [t("Overdue"), totals(list, ["Overdue"]), t("reminders allowed")], [t(PROCESSING), totals(list, [PROCESSING]), t("awaiting HQ confirmation")], live?.months ? [t("Paid in period"), totals(list, ["Paid"]), live.months] : [t("Paid"), totals(list, ["Paid"]), t("in this scope")]].map(([a, b, c]) => <div key={a} className="rounded-2xl border border-line bg-surface p-4"><div className="text-xs text-muted-foreground">{a}</div><div className="text-xl font-bold">{b}</div><div className="text-[11px] text-muted-foreground">{c}</div></div>)}</div>
           <p className="text-[11px] text-muted-foreground">{t("Totals per currency — never converted")}{isOtherZone && ` · ${t("Billing periods and due dates are Kuala Lumpur dates ({zone}).", { zone: KL })}`}</p>
           <div className="flex flex-wrap items-center justify-between gap-3"><Tabs value={f} onChange={setF} tabs={(["All", "Unpaid", "Overdue", PROCESSING, "Paid"] as const).map((k) => ({ id: k, label: k === "All" ? t("All") : entryOf(statusText, k), count: k === "All" ? list.length : list.filter((x) => x.st === k).length }))} /><Btn size="sm" variant="primary" onClick={() => { setNw({ contractId: contracts[0]?.id ?? "", from: "", to: "", dueAt: "" }); setModal("create"); }}><Icon name="add" /> {t("Create invoice")}</Btn></div>
@@ -251,14 +354,7 @@ export function BillingView({ live }: Readonly<{ live?: BillingLive }>) {
                     : <><p className="mt-3 text-xs text-muted-foreground">{t(hasPayment ? "The customer's card payment did not go through. Record a manual payment if it was received outside the app (e.g. bank transfer)." : "The customer has not started a payment. Record a manual payment if it was received outside the app (e.g. bank transfer).")}</p><div className="mt-2"><Btn onClick={() => { openPayment("manual"); }}>{t("Record manual payment…")}</Btn></div></>)}
                   {conflict && <div className="mt-3"><Banner tone="warn">{t("The invoice changed first (for example a payment arrived), so the action was stopped. The screen shows the latest version.")}</Banner></div>}
                 </Card>
-                {sel.st === "Overdue" && <Card title={t("Payment reminder")} sub={t("Only overdue unpaid invoices can be reminded. If payment arrives first, the reminder is stopped. Delivery is simulated.")}>
-                  {live && recipients.length === 0 ? <p className="text-xs text-muted-foreground">{t("No client of this customer can receive the reminder.")}</p> : <>
-                    <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}><Field label={t("Recipient")}>{live ? <Select value={recipient?.id ?? ""} onChange={(e) => { setReminder({ ...reminder, recipient: e.target.value, preview: "" }); }}>{recipients.map((r) => <option key={r.id} value={r.id}>{r.displayLabel} · {t(ROLE_WORD[r.role] ?? r.role)}</option>)}</Select> : <Select><option>customer-a · Client</option></Select>}</Field><Field label={t("Channel")}><Select value={channel} onChange={(e) => { setReminder({ ...reminder, channel: e.target.value, preview: "" }); }}>{channels.map((c) => <option key={c} value={c}>{channelName(c)}</option>)}</Select></Field></div>
-                    <Field label={t("Reason · e.g. “2nd reminder after due date”")}><Input value={reminder.reason} onChange={(e) => { setReminder({ ...reminder, reason: e.target.value, preview: "" }); }} /></Field>
-                    {message && <div className="my-3 rounded-xl bg-surface2 p-3 text-xs"><b>{t("Preview · {channel}", { channel: channelName(channel) })}</b> <span className="text-muted-foreground">{t("nothing is sent yet")}</span><br />{message.subject && <><b>{message.subject}</b><br /></>}{message.body}</div>}
-                    <div className="mt-3 flex justify-end gap-2">{live && <Btn disabled={pending || !reminder.reason.trim()} onClick={preview}>{t("Preview")}</Btn>}<Btn variant="primary" disabled={pending || !reminder.reason.trim() || (live && !reminder.preview)} onClick={send}>{t("Send reminder")}</Btn></div>
-                  </>}
-                </Card>}
+                {sel.st === "Overdue" && <ReminderCard live={live} recipients={recipients} recipient={recipient} reminder={reminder} setReminder={setReminder} channel={channel} channels={channels} channelName={channelName} message={message} pending={pending} onPreview={preview} onSend={send} />}
                 <RelatedRestrictions ids={live ? detail?.restrictionIds ?? [] : ["restriction-limited-a"]} />
                 <Card title={t(CUSTOMER_INQUIRIES)}>
                   {linked.length === 0 ? <p className="text-xs text-muted-foreground">{t("No inquiry about this invoice.")}</p> : <div className="flex flex-col gap-2">{linked.map((q) => (
@@ -269,37 +365,9 @@ export function BillingView({ live }: Readonly<{ live?: BillingLive }>) {
             </div>
           ) : <Card title={t("Invoices")}><EmptyState title={t("No invoices")}>{t("No invoice matches this scope.")}</EmptyState></Card>}
         </>
-      )}{tab !== "payouts" && tab !== "invoices" && (inquiries.length === 0 ? <Card title={t(CUSTOMER_INQUIRIES)}><EmptyState title={t("No inquiries")}>{t("Customers have not sent any inquiry.")}</EmptyState></Card> : (
-        <>
-          <Tabs value={iqState} onChange={setIqState} tabs={(["all", "received", "answered"] as const).map((k) => ({ id: k, label: t(k === "all" ? "All" : INQUIRY_TAB.get(k) ?? k), count: k === "all" ? inquiries.length : inquiries.filter((x) => x.state === k).length }))} />
-          <div className="split-rev">
-            <Card title={t(CUSTOMER_INQUIRIES)} className="self-start">{iqShown.length === 0 ? <EmptyState title={t(iqState === "received" ? "No received inquiries" : "No answered inquiries")}>{t("Choose another state.")}</EmptyState> : <div className="flex flex-col gap-2">{iqShown.map((x) => <ListRow key={x.id} selected={iq?.id === x.id} onClick={() => { openInquiry(x.id); }}><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="truncate text-[13px]">{x.text}</b>{x.state === "answered" ? <Badge tone="ok">{t("Answered")}</Badge> : <Badge tone="warn">{t("Received")}</Badge>}</div><div className="text-[11px] text-muted-foreground">{x.kind} · {x.cust} · {x.at}</div></div></ListRow>)}</div>}</Card>
-            {iq && (
-              <Card title={t("{kind} inquiry · {customer}", { kind: iq.kind, customer: iq.cust })} sub={t("received {time}", { time: iq.at })}>
-                <p className="rounded-xl bg-surface2 p-3 text-[13px]">{iq.text}</p>
-                <SummaryList items={[[t("Invoice"), iqInvoice ? <Plain key="i" className="font-semibold text-primary" onClick={() => { openInvoice(iqInvoice); }}>{invoiceLabel(iqInvoice)} <Icon name="arrowRight" /></Plain> : "—"], [t("Restriction"), restrictionCell(iq.restrictionId, !!live)]]} />
-                {iq.reply ? <p className="mt-3 text-[13px]"><b>{t("Reply:")}</b> {iq.reply}</p> : <>
-                  <div className="mt-3"><Field label={t("Reply (in-app only)")} error={tried && !reply.trim() ? t("A reply is required") : undefined}><Textarea value={reply} onChange={(e) => { setReply(e.target.value); }} maxLength={2000} /></Field></div>
-                  <p className="mt-1 text-[11px] text-muted-foreground">{t("A reply never changes invoices or restrictions.")}</p>
-                  <div className="mt-2 flex justify-end"><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (!reply.trim()) { return; } if (!live) { toast(t("Reply recorded in-app")); return; } act(() => answerInquiry(iq.id, iq.version, reply.trim()), t("Reply sent in-app"), () => { setReply(""); setTried(false); }); }}>{t("Send reply")}</Btn></div>
-                </>}
-              </Card>
-            )}
-          </div>
-        </>
-      ))}
-      <Modal open={modal === "manual" || modal === "confirm"} onClose={close} title={t(modal === "confirm" ? "Confirm card payment" : "Record manual payment")} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={modal === "confirm" ? confirm : record}>{t(modal === "confirm" ? "Confirm payment" : "Record payment")}</Btn></>}>
-        {sel && <Field label={t("Amount (must equal invoice — full payment only)")} error={tried && Math.round(+m.amount * 100) !== sel.amountMinor ? t("Must equal {amount}", { amount: sel.amt }) : undefined}><Input type="number" value={m.amount} onChange={(e) => { setM({ ...m, amount: e.target.value }); }} disabled={modal === "confirm"} /></Field>}
-        <Field label={t("Reference")} error={tried && !m.ref.trim() ? t("Reference is required") : undefined}><Input value={m.ref} onChange={(e) => { setM({ ...m, ref: e.target.value }); }} placeholder="manual-2026-0189" maxLength={128} /></Field>
-        {live ? <Field label={t("Reason")} error={tried && !m.reason.trim() ? t("A reason is required") : undefined}><Input value={m.reason} onChange={(e) => { setM({ ...m, reason: e.target.value }); }} placeholder={t("Bank transfer received")} maxLength={1000} /></Field> : <Field label={t("Paid on")}><Input type="date" value={m.paidAt} onChange={(e) => { setM({ ...m, paidAt: e.target.value }); }} /></Field>}
-        {modal === "manual" && <p className="text-[11px] text-muted-foreground">{t("Marks the invoice paid; the payment method stays “not selected”. Related restrictions move to “release requested” when all their cause invoices are paid. Resubmitting the same reference returns the same result.")}</p>}
-      </Modal>
-      <Modal open={modal === "create"} onClose={close} title={t("Create invoice")} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={create}>{t("Create")}</Btn></>}>
-        <Field label={t("Contract")}><Select value={contract?.id ?? ""} onChange={(e) => { setNw({ ...nw, contractId: e.target.value }); }}>{contracts.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}</Select></Field>
-        <div className="grid-fluid" style={{ ["--min" as string]: "150px" }}><Field label={t("Billing period start")} error={tried && !nw.from ? t("Required") : undefined}><Input type="date" value={nw.from} onChange={(e) => { setNw({ ...nw, from: e.target.value }); }} /></Field><Field label={t("Billing period end")} error={tried && (!nw.to || !isBefore(nw.from, nw.to)) ? t("After the start") : undefined}><Input type="date" value={nw.to} onChange={(e) => { setNw({ ...nw, to: e.target.value }); }} /></Field><Field label={t("Due date")} error={tried && !nw.dueAt ? t("Required") : undefined}><Input type="date" value={nw.dueAt} onChange={(e) => { setNw({ ...nw, dueAt: e.target.value }); }} /></Field></div>
-        <p className="text-xs text-muted-foreground">{t("Dates are Kuala Lumpur days ({zone}).", { zone: KL })}</p>
-        {contract && <p className="text-xs text-muted-foreground">{t("Amount from the contract version: {amount}", { amount: money(contract.priceMinor, contract.currency) })}</p>}
-      </Modal>
+      )}{tab === "inquiries" && <InquiriesPanel inquiries={inquiries} iqState={iqState} setIqState={setIqState} iqShown={iqShown} iq={iq} iqInvoice={iqInvoice} openInquiry={openInquiry} openInvoice={openInvoice} reply={reply} setReply={setReply} tried={tried} setTried={setTried} pending={pending} act={act} invoiceLabel={invoiceLabel} live={live} toast={toast} />}
+      <PaymentModal modal={modal} close={close} onRecord={modal === "confirm" ? confirm : record} pending={pending} tried={tried} live={live} sel={sel} m={m} setM={setM} />
+      <CreateInvoiceModal open={modal === "create"} close={close} create={create} pending={pending} tried={tried} nw={nw} setNw={setNw} contract={contract} contracts={contracts} />
     </Page>
   );
 }
