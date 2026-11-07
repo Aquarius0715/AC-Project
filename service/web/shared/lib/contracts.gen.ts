@@ -69,7 +69,7 @@ export type JobDisplayStatus = JobStatus|'time_proposed';
 export type JobStatus = 'requested'|'offered'|'accepted'|'assigned'|'in_progress'|'submitted'|'completed'|'rework_requested'|'cancelled'|'on_hold';
 /** DEC-18: display ranking only, not a transition sequence. */
 export const JOB_STATUS_ORDER = ['requested','offered','accepted','assigned','in_progress','on_hold','submitted','rework_requested','completed','cancelled'] as const satisfies readonly JobStatus[];
-export type Offer = Entity & {jobId:ID;contractorOrgId:ID;termsVersion:ID;visitSlot:Slot;offeredAt:Instant;offerExpiresAt:Instant;accessValidFrom:Instant;accessValidUntil:Instant;decision:'accept'|'decline'|null;decidedBy:ID|null;decidedAt:Instant|null;declineReason:string|null};
+export type Offer = Entity & {jobId:ID;contractorOrgId:ID;termsVersion:ID;candidateSlots:Slot[];offeredAt:Instant;offerExpiresAt:Instant;accessValidFrom:Instant;accessValidUntil:Instant;decision:'accept'|'decline'|null;decidedBy:ID|null;decidedAt:Instant|null;declineReason:string|null};
 export type Assignment = Entity & {jobId:ID;technicianMembershipId:ID;validFrom:Instant;validUntil:Instant;scheduledStart:Instant;scheduledEnd:Instant;status:'active'|'revoked'|'completed';reason:string|null;acknowledgement:'pending'|'accepted'|'cant_make';acknowledgedAt:Instant|null;cantMakeReason:string|null;alternativeSlot:Slot|null;technicianName:string|null};
 export type ReportRef = {reportId:ID;reportVersion:number};
 export type CostLine = Money & {kind:'estimate'|'actual';description:string;visibility:'internal'|'customer'};
@@ -77,7 +77,7 @@ export type MaintenanceJob = Entity & {planId:ID|null;occurrenceAt:Instant|null;
 /** IR506: the job's events the caller reads with jobs.events, counted for lists; customerVisible counts those the client reads (IR42, IR442). */
 export type JobEventSummary = {count:number;customerVisible:number;notes:number;latest:{action:string;occurredAt:Instant}|null};
 export type JobSummary = Pick<MaintenanceJob,'id'|'version'|'createdAt'|'unitId'|'type'|'status'|'dueAt'|'requestedSlot'|'scheduledSlot'|'assignmentId'|'origin'|'preferredSlots'|'followUpOfJobId'|'followUpClass'> & {projection:'summary';severity:Severity;isDemo:true;displayStatus:JobDisplayStatus;assignmentAcknowledgement:Assignment['acknowledgement']|null;technicianMembershipId:ID|null;accessValidFrom:Instant|null;accessValidUntil:Instant|null;eventSummary:JobEventSummary};
-export type JobOfferSummary = {projection:'offer';status:'offered'|'accepted';severity:null;jobId:ID;jobVersion:number;offerId:ID;type:MaintenanceJob['type'];siteAddress:string|null;requiredQualifications:QualificationCode[];requestedSlot:Slot;dueAt:Instant;offerExpiresAt:Instant;termsVersion:ID;origin:JobOrigin;visitSlot:Slot;offeredAt:Instant;accessValidFrom:Instant;accessValidUntil:Instant;partnerSlotProposal:PartnerSlotProposal|null};
+export type JobOfferSummary = {projection:'offer';status:'offered'|'accepted';severity:null;jobId:ID;jobVersion:number;offerId:ID;type:MaintenanceJob['type'];siteAddress:string|null;requiredQualifications:QualificationCode[];requestedSlot:Slot;dueAt:Instant;offerExpiresAt:Instant;termsVersion:ID;origin:JobOrigin;candidateSlots:Slot[];offeredAt:Instant;accessValidFrom:Instant;accessValidUntil:Instant;partnerSlotProposal:PartnerSlotProposal|null};
 export type JobDetail = MaintenanceJob & {projection:'detail';assignment:Assignment|null;offer:Offer|null;eventCursor:number;problemPhotos:JobAttachment[]};
 /** A photo the customer sent with jobs.reportProblem, kept with the follow-up job (no work report), opened with jobs.getAttachment (IR437). */
 export type JobAttachment = Entity & {jobId:ID;name:string;mime:'image/jpeg'|'image/png';size:number;status:'processing'|'ready'|'failed'};
@@ -329,7 +329,7 @@ export type OperationContracts = {
   'jobs.getAttachment': {input:{jobId:ID;attachmentId:ID};result:BlobContent;mode:'read'};
   'jobs.hold': {input:{jobId:ID;reason:string};result:MaintenanceJob;mode:'write'};
   'jobs.list': {input:Query;result:Page<JobSummary|JobOfferSummary|JobHistorySnapshot>;mode:'read'};
-  'jobs.offer': {input:{jobId:ID;contractorOrgId:ID;visitSlot:Slot;offerExpiresAt:Instant;accessValidFrom:Instant;accessValidUntil:Instant;termsVersion:ID};result:MaintenanceJob;mode:'write'};
+  'jobs.offer': {input:{jobId:ID;contractorOrgId:ID;offerExpiresAt:Instant;accessValidFrom:Instant;accessValidUntil:Instant;termsVersion:ID};result:MaintenanceJob;mode:'write'};
   'jobs.resumeHold': {input:{jobId:ID;reason:string};result:MaintenanceJob;mode:'write'};
   'jobs.resumeRework': {input:{jobId:ID};result:MaintenanceJob;mode:'write'};
   'jobs.review': {input:{jobId:ID;reportVersion:number;decision:'accept'|'return';reason?:string;reviewMode:'normal'|'hq_escalation'};result:MaintenanceJob;mode:'write'};

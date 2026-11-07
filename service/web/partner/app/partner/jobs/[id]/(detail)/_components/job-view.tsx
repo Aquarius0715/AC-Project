@@ -106,7 +106,7 @@ function OfferView({ live }: Readonly<{ live: Extract<JobDetailLive, { kind: "of
           [t("Job type"), typeLabel(j.type, t)],
           [t("Installation address"), t("{address} (registered)", { address: j.siteAddress ?? "—" })],
           [t("Required qualification"), quals.join(" · ") || t("none")],
-          [t("Visit time (fixed)"), <b key="v">{x.visit} · {originLabel(j.origin, t)}</b>],
+          [t(x.count > 1 ? "Times offered · you pick one when you assign a technician" : "Visit time (fixed)"), <b key="v">{x.visit} · {originLabel(j.origin, t)}</b>],
           [t("Access period if accepted"), x.access],
           [t("Offer / delegation terms"), t("{id} · terms {version}", { id: j.offerId.slice(0, 8), version: j.termsVersion })],
         ]} /></div>
@@ -122,7 +122,7 @@ function OfferView({ live }: Readonly<{ live: Extract<JobDetailLive, { kind: "of
           </div>
         )}
       </Card>
-      <FitCard title={t("Can your team take it? — visit {slot}", { slot: x.visit })} rows={live.fits}
+      <FitCard title={t(x.count > 1 ? "Can your team take it? — earliest time {slot}" : "Can your team take it? — visit {slot}", { slot: x.first })} rows={live.fits}
         note={t("Own-company technicians holding {quals}. Free hours per day — no customer data is shown before acceptance.", { quals: quals.join(", ") || t("the required qualifications") })}
         footer={<div className="mt-2 grid grid-cols-3 gap-2 rounded-xl bg-surface2 p-3 text-[11px]">
           <span><span className="block uppercase text-muted-foreground">{t("Offered")}</span>{t("{time} by HQ", { time: x.offered })}</span>
@@ -191,7 +191,7 @@ function DetailView({ live }: Readonly<{ live: Extract<JobDetailLive, { kind: "d
               [t("Site address"), u?.location.address ?? "—"],
               [t("Entry instructions"), u?.location.accessInstructions ?? "—"],
               [t("Required qualification"), live.required.map((q) => qualificationLabel(q, t)).join(" · ") || "—"],
-              [t("Visit time (fixed)"), `${x.visit} · ${originLabel(j.origin, t)}`],
+              [t(x.scheduled ? "Visit time (fixed)" : "Times the client agreed"), `${x.visit} · ${originLabel(j.origin, t)}`],
               [t("Delegation (access) period"), x.access ?? "—"],
               [t("Scheduled slot"), x.scheduled ? `${x.scheduled} · ${x.tech ?? "—"}` : <b key="n" className="text-crit">{t("Not assigned yet")}</b>],
             ]} />

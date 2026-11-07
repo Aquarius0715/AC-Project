@@ -37,12 +37,11 @@ func TestOfferAcceptAssign(t *testing.T) {
 	stamp := func(h int) string { return clock().Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
 	_, resp := write(srv, customerA(), "jobs.create", jobBody(unit, nil), 0)
 	job := asStr(t, data(resp)["id"])
-	slot2 := slotJSON(49, 2)
+	slot2 := slotJSON(49, 2) // the client's second preferred time (jobBody)
 	offerBody := func(extra map[string]string) string {
 		bodyFields := map[string]string{
 			fieldJobID:           `"` + job + `"`,
 			fieldContractorOrgID: `"` + seed.ID("org-contractor-a").String() + `"`,
-			fieldVisitSlot:       slot2,
 			fieldOfferExpiresAt: `"` + stamp(
 				12,
 			) + `"`,
@@ -68,7 +67,7 @@ func TestOfferAcceptAssign(t *testing.T) {
 		"blank terms":           "termsVersion=error.length",
 		"expiry after access":   "offerExpiresAt=error.afterAccess",
 		"expiry in the past":    "offerExpiresAt=error.past",
-		"slot not agreed":       "visitSlot=errors.slot_not_agreed",
+		"access starts late":    "accessValidFrom=error.accessMustCoverVisit",
 	}
 
 	for name, testCase := range map[string]struct {
@@ -78,7 +77,7 @@ func TestOfferAcceptAssign(t *testing.T) {
 		"expiry in the past":    {map[string]string{fieldOfferExpiresAt: `"` + stamp(-1) + `"`}, 422},
 		"expiry after access":   {map[string]string{fieldOfferExpiresAt: `"` + stamp(101) + `"`}, 422},
 		"access does not cover": {map[string]string{fieldAccessValidUntil: `"` + stamp(50) + `"`}, 422},
-		"slot not agreed":       {map[string]string{fieldVisitSlot: slotJSON(30, 2)}, 422},
+		"access starts late":    {map[string]string{"accessValidFrom": `"` + stamp(30) + `"`}, 422},
 		"blank terms":           {map[string]string{fieldTermsVersion: `""`}, 422},
 		"customer organization": {
 			map[string]string{fieldContractorOrgID: `"` + seed.ID("org-customer-a").String() + `"`},
@@ -227,12 +226,12 @@ func TestOfferAcceptAssign(t *testing.T) {
 		contrA(),
 		job,
 		"tech-external-a",
-		slotJSON(25, 2),
+		slotJSON(30, 2),
 		3,
 		"",
 	); code != 422 ||
 		fields(res) != refusedSlotNotAgreed {
-		t.Errorf("contractor slot must be the visit slot: %d %s", code, fields(res))
+		t.Errorf("contractor slot must be one of the offer's candidates: %d %s", code, fields(res))
 	}
 
 	if code, _ := asg(contrB(), job, "tech-external-b", slot2, 3, ""); code != 404 {
@@ -592,9 +591,8 @@ func TestAgreedSlotsAndInputs(t *testing.T) {
 		fields []string
 	}{
 		"jobs.offer": {`{"jobId":"` + job + `","contractorOrgId":"` + seed.ID("org-contractor-a").String() +
-			`","visitSlot":{"startAt":"` + stamp(3) + `","endAt":"` + stamp(2) +
-			`"},"offerExpiresAt":"` + stamp(5) + `","accessValidFrom":"` + stamp(6) + `","accessValidUntil":"` + stamp(4) +
-			`","termsVersion":"t"}`, []string{fieldVisitSlot, fieldAccessValidUntil}},
+			`","offerExpiresAt":"` + stamp(5) + `","accessValidFrom":"` + stamp(6) + `","accessValidUntil":"` + stamp(4) +
+			`","termsVersion":"t"}`, []string{fieldAccessValidUntil}},
 		opJobsAccept:  {`{"jobId":"` + job + `","offerId":"` + uuid.NewString() + `","reason":"x"}`, []string{"_"}},
 		opJobsDecline: {`{"jobId":"` + job + `","offerId":"` + uuid.NewString() + `","termsVersion":"t"}`, []string{"_"}},
 		opJobsAssign: {`{"jobId":"` + job + `","technicianMembershipId":"` + seed.ID("tech-internal-a").String() +
@@ -697,10 +695,7 @@ func TestAgreedSlotsAndInputs(t *testing.T) {
 		"jobs.offer",
 		`{"jobId":"`+job2+`","contractorOrgId":"`+seed.ID("org-contractor-a").
 			String()+
-			`","visitSlot":`+slotJSON(
-			49,
-			2,
-		)+`,"offerExpiresAt":"`+stamp(
+			`","offerExpiresAt":"`+stamp(
 			12,
 		)+`","accessValidFrom":"`+stamp(
 			1,
@@ -981,11 +976,7 @@ func TestReleaseEndedAccessContractor(t *testing.T) {
 		"jobs.offer",
 		`{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").
 			String()+
-			`","visitSlot":`+slotJSON(
-			49,
-			2,
-		)+
-			`,"offerExpiresAt":"`+stamp(
+			`","offerExpiresAt":"`+stamp(
 			12,
 		)+`","accessValidFrom":"`+stamp(
 			0,
@@ -1152,11 +1143,7 @@ func TestReleaseQualificationEnded(t *testing.T) {
 		"jobs.offer",
 		`{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").
 			String()+
-			`","visitSlot":`+slotJSON(
-			49,
-			2,
-		)+
-			`,"offerExpiresAt":"`+stamp(
+			`","offerExpiresAt":"`+stamp(
 			12,
 		)+`","accessValidFrom":"`+stamp(
 			0,
@@ -1328,19 +1315,14 @@ func TestPastSlotsRefused(t *testing.T) {
 		fields(res) != "endAt=error.past" {
 		t.Errorf("assign a time that is over: %d %s", code, fields(res))
 	}
-	// an offer must be answered by the visit's start (IR457), so a visit that has begun cannot be offered either
+	// a job with no preferred time left has nothing to offer (IR636 item 1): HQ proposes another time
 	if code, res := write(
 		srv,
 		hq(),
 		"jobs.offer",
 		`{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").
 			String()+
-			`","visitSlot":{"startAt":"`+stamp(
-			-3,
-		)+`","endAt":"`+stamp(
-			-1,
-		)+`"}`+
-			`,"offerExpiresAt":"`+stamp(
+			`","offerExpiresAt":"`+stamp(
 			12,
 		)+`","accessValidFrom":"`+stamp(
 			-4,
@@ -1349,10 +1331,10 @@ func TestPastSlotsRefused(t *testing.T) {
 		)+`","termsVersion":"t"}`,
 		1,
 	); code != 422 ||
-		fields(res) != "offerExpiresAt=error.afterVisit" {
-		t.Errorf("offer a visit that is over: %d %s", code, fields(res))
+		fields(res) != "candidateSlots=error.past" {
+		t.Errorf("offer a job whose times are over: %d %s", code, fields(res))
 	}
-	// IR457: a future visit whose offer could still be answered after it begins
+	// IR457: an offer that could still be answered after the last candidate time began
 	_, resp = write(
 		srv,
 		customerA(),
@@ -1368,12 +1350,8 @@ func TestPastSlotsRefused(t *testing.T) {
 		"jobs.offer",
 		`{"jobId":"`+later+`","contractorOrgId":"`+seed.ID("org-contractor-a").
 			String()+
-			`","visitSlot":`+slotJSON(
-			49,
-			2,
-		)+
-			`,"offerExpiresAt":"`+stamp(
-			50,
+			`","offerExpiresAt":"`+stamp(
+			80,
 		)+`","accessValidFrom":"`+stamp(
 			0,
 		)+`","accessValidUntil":"`+stamp(
@@ -1382,7 +1360,7 @@ func TestPastSlotsRefused(t *testing.T) {
 		1,
 	); code != 422 ||
 		fields(res) != "offerExpiresAt=error.afterVisit" {
-		t.Errorf("offer answered after the visit began: %d %s", code, fields(res))
+		t.Errorf("offer answered after the last visit began: %d %s", code, fields(res))
 	}
 }
 

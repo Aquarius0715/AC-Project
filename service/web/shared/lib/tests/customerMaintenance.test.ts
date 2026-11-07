@@ -59,6 +59,9 @@ describe("customer maintenance", () => {
       ["Confirmed time", "Thu, 17 Sept, 10:00 am – 12:00 pm MYT"], ["Technician", "tech-internal-a · HQ"],
     ]);
     expect(detailFacts(job({ status: "offered", contractorOrgId: "org-c", scheduledSlot: row({}).preferredSlots[0] }), unit).at(-1)).toStrictEqual(["Technician", "being confirmed — the name shows once the technician accepts"]);
+    // IR636: a service partner is booked but no technician yet — the time is one of the preferred ones, not fixed
+    expect(detailFacts(job({ status: "offered", contractorOrgId: "org-c", scheduledSlot: null }), unit).at(-1)).toStrictEqual(["Confirmed time", "being arranged — it will be one of your preferred times, and you are told when the service partner assigns a technician"]);
+    expect(clientRows([row({ status: "offered", displayStatus: "offered", scheduledSlot: null })], () => ({ name: "Lobby AC", place: "" }))[0]?.line).toBe("Service partner booked · one of your preferred times, confirmed when a technician is assigned");
     // the photos sent with a problem report are counted on the follow-up (IR437); one still processing is not
     const follow = job({ problemPhotos: [{ id: "p1", name: "a.png", status: "ready" }, { id: "p2", name: "b.png", status: "ready" }, { id: "p3", name: "c.png", status: "processing" }] });
     expect(detailFacts(follow, unit)).toContainEqual(["Your photos", "2 photos sent with your report"]);

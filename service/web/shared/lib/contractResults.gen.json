@@ -1987,6 +1987,7 @@
    "asOf",
    "assignment",
    "assignmentId",
+   "candidateSlots",
    "completedAt",
    "contactWindow",
    "contractorOrgId",
@@ -2033,7 +2034,6 @@
    "unitId",
    "updatedAt",
    "version",
-   "visitSlot",
    "warrantyClaims"
   ],
   "items": null
@@ -2099,6 +2099,7 @@
    "asOf",
    "assignmentAcknowledgement",
    "assignmentId",
+   "candidateSlots",
    "completedAt",
    "contractorOrgId",
    "createdAt",
@@ -2130,8 +2131,7 @@
    "termsVersion",
    "type",
    "unitId",
-   "version",
-   "visitSlot"
+   "version"
   ]
  },
  "jobs.offer": {

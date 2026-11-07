@@ -685,9 +685,12 @@ func TestJobsReadAndTransitions(t *testing.T) {
 	owner(t, `UPDATE maintenance.jobs SET status = 'offered' WHERE id = $1`, job3)
 	owner(
 		t,
-		`INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, visit_slot, offered_at,
+		`INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, candidate_slots, offered_at,
 			offer_expires_at, access_valid_from, access_valid_until)
-		VALUES ($1,$2,$3,'t1',tstzrange($4,$5),$4,$5,$4,$5)`,
+		VALUES ($1,$2,$3,'t1',`+oneSlotSQL(
+			"$4",
+			"$5",
+		)+`,$4,$5,$4,$5)`,
 		seed.ID("tenant-a"),
 		job3,
 		seed.ID("org-contractor-a"),

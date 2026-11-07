@@ -18,7 +18,7 @@ const en = translator("en");
 interface ApiProposal { id: string; offerId: string; slot: Slot; technicianMembershipId: string; reason: string; sentAt: string; status: "pending" | "sent_to_client" | "kept" | "approved" | "declined" | "withdrawn" }
 export interface ApiOffer {
   projection: "offer"; status: "offered" | "accepted"; jobId: string; jobVersion: number; offerId: string; type: string; siteAddress: string | null;
-  requiredQualifications: string[]; requestedSlot: Slot; dueAt: string; offerExpiresAt: string; termsVersion: string; origin: string; visitSlot: Slot;
+  requiredQualifications: string[]; requestedSlot: Slot; dueAt: string; offerExpiresAt: string; termsVersion: string; origin: string; candidateSlots: Slot[];
   offeredAt: string; accessValidFrom: string; accessValidUntil: string; partnerSlotProposal: ApiProposal | null;
 }
 export interface ApiDetail {
@@ -28,7 +28,7 @@ export interface ApiDetail {
   /** the photos the client sent with the problem report this follow-up answers (IR437) */
   problemPhotos?: { id: string; name: string; status: string }[];
   assignment: { technicianMembershipId: string; scheduledStart: string; scheduledEnd: string; status: string; acknowledgement: string; cantMakeReason: string | null; alternativeSlot?: Slot | null } | null;
-  offer: { id: string; termsVersion: string; visitSlot: Slot; offeredAt: string; accessValidFrom: string; accessValidUntil: string; decision: string | null; decidedAt: string | null } | null;
+  offer: { id: string; termsVersion: string; candidateSlots: Slot[]; offeredAt: string; accessValidFrom: string; accessValidUntil: string; decision: string | null; decidedAt: string | null } | null;
 }
 export interface ApiHistory { projection: "history"; jobId: string; type: string; status: string; asOf: string; completedAt: string | null; ownDecisionEvents: ApiJobEvent[]; redactedReportSummary?: ReportHistorySummary }
 export type ApiPartnerJobDetail = ApiOffer | ApiDetail | ApiHistory;

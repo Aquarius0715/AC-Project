@@ -1642,13 +1642,11 @@ func (s *seeding) jobs() error {
 // offers inserts the contractors' offers.
 func (s *seeding) offers() error {
 	for _, offer := range s.fixture.DemoSeed.Offers {
-		visitStart, visitEnd := rng(offer, "visitSlot", "startAt", "endAt")
-
 		err := s.exec(
-			`INSERT INTO maintenance.offers (id, tenant_id, job_id, contractor_org_id, terms_version, visit_slot, offered_at,
-				offer_expires_at, access_valid_from, access_valid_until,
+			`INSERT INTO maintenance.offers (id, tenant_id, job_id, contractor_org_id, terms_version, candidate_slots,
+				offered_at, offer_expires_at, access_valid_from, access_valid_until,
 			decision, decided_by, decided_at, decline_reason, created_at, updated_at)
-			VALUES ($1,$2,$3,$4,$5,tstzrange($6::timestamptz,$7::timestamptz),$8,$9,$10,$11,$12,$13,$14,$15,$8,$8) ON CONFLICT DO
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$7,$7) ON CONFLICT DO
 			NOTHING`,
 			ID(
 				str(offer, "id"),
@@ -1657,8 +1655,7 @@ func (s *seeding) offers() error {
 			ID(str(offer, "jobId")),
 			ID(str(offer, "contractorOrgId")),
 			str(offer, "termsVersion"),
-			visitStart,
-			visitEnd,
+			raw(offer["candidateSlots"]),
 			str(offer, "offeredAt"),
 			str(offer, "offerExpiresAt"),
 			str(

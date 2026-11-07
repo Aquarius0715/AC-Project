@@ -41,7 +41,7 @@ export interface ApiHqJob {
   /** the photos the client sent with the problem report (IR437); absent in the demo data */
   problemPhotos?: { id: string; name: string; status: string }[];
   assignment: { technicianMembershipId: string; scheduledStart: string; scheduledEnd: string; status: string; acknowledgement: string; cantMakeReason: string | null; alternativeSlot: Slot | null } | null;
-  offer: { id: string; contractorOrgId: string; visitSlot: Slot; offerExpiresAt: string; accessValidFrom: string; accessValidUntil: string; decision: string | null; decidedAt: string | null; declineReason: string | null } | null;
+  offer: { id: string; contractorOrgId: string; candidateSlots: Slot[]; offerExpiresAt: string; accessValidFrom: string; accessValidUntil: string; decision: string | null; decidedAt: string | null; declineReason: string | null } | null;
   reportRefs: { reportId: string; reportVersion: number }[]; draftReportRef: { reportId: string; reportVersion: number } | null; costs: CostLine[] | null;
 }
 export interface Names { units: Map<string, string>; customers: Map<string, string>; people: Map<string, string>; orgs: Map<string, string> }
@@ -216,7 +216,7 @@ export function delivery(j: ApiHqJob, n: Names, now: number, i: I18n = EN): Deli
     const state = offerState(o, now, i);
     return {
       kind: CONTRACTOR, title: t("Delivery · contractor {name}", { name: org }),
-      lines: [[t("Visit"), `${slotText(o.visitSlot, i)} · ${state}`], [t("Access"), `${showSpan(o.accessValidFrom, o.accessValidUntil, display)}${o.decision === "accept" && Date.parse(o.accessValidUntil) <= now ? ` · ${t("ended")}` : ""}`],
+      lines: [[t("Times offered"), `${o.candidateSlots.map((s) => slotText(s, i)).join(" / ")} · ${state}`], [t("Access"), `${showSpan(o.accessValidFrom, o.accessValidUntil, display)}${o.decision === "accept" && Date.parse(o.accessValidUntil) <= now ? ` · ${t("ended")}` : ""}`],
         [t("Technician"), a ? `${tech} · ${window}${done}` : t("not assigned by the contractor yet")]],
       ack: ackLine, cantMake: a?.status !== "completed" && a?.acknowledgement === "cant_make",
     };
@@ -251,10 +251,13 @@ export function contractorNames(names: string[], t: T = en): string {
   return sorted.length > 3 ? t("{names} and {n} more", { names: sorted.slice(0, 3).join(", "), n: sorted.length - 3 }) : sorted.join(", ") || "—";
 }
 
-/** The default windows of an HQ offer (IR141 item 2): answer within 24 h (not after the visit), access from now to a day after. */
-export function offerDefaults(slot: Slot, now: number): { offerExpiresAt: string; accessValidFrom: string; accessValidUntil: string } {
-  const expires = Math.min(now + 24 * 3_600_000, Date.parse(slot.startAt));
-  return { offerExpiresAt: new Date(expires).toISOString(), accessValidFrom: new Date(now).toISOString(), accessValidUntil: new Date(Date.parse(slot.endAt) + 24 * 3_600_000).toISOString() };
+/** The default windows of an HQ offer (IR141 item 2, IR636): answer within 24 h (not after the last offered time starts),
+access from now to a day after the last offered time ends. */
+export function offerDefaults(slots: readonly Slot[], now: number): { offerExpiresAt: string; accessValidFrom: string; accessValidUntil: string } {
+  const lastStart = Math.max(now, ...slots.map((s) => Date.parse(s.startAt)));
+  const lastEnd = Math.max(now, ...slots.map((s) => Date.parse(s.endAt)));
+  const expires = Math.min(now + 24 * 3_600_000, lastStart);
+  return { offerExpiresAt: new Date(expires).toISOString(), accessValidFrom: new Date(now).toISOString(), accessValidUntil: new Date(lastEnd + 24 * 3_600_000).toISOString() };
 }
 
 /** Which of hold / resume / cancel HQ may use (IR56; hold only from in progress or submitted). */

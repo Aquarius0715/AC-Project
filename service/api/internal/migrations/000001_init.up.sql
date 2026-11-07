@@ -1066,7 +1066,7 @@ CREATE TABLE maintenance.offers (
   job_id             uuid NOT NULL,
   contractor_org_id  uuid NOT NULL,
   terms_version      text NOT NULL,
-  visit_slot         tstzrange NOT NULL,
+  candidate_slots    jsonb NOT NULL CHECK (jsonb_typeof(candidate_slots) = 'array' AND jsonb_array_length(candidate_slots) >= 1), -- Slot[]: the client's agreed times; the contractor picks one when it assigns a technician (IR636)
   offered_at         timestamptz NOT NULL,
   offer_expires_at   timestamptz NOT NULL,
   access_valid_from  timestamptz NOT NULL,

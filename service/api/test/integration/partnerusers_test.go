@@ -1363,11 +1363,7 @@ func TestContractorAddedTechnicianAssigned(t *testing.T) {
 		"jobs.offer",
 		`{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").
 			String()+
-			`","visitSlot":`+slotJSON(
-			49,
-			2,
-		)+
-			`,"offerExpiresAt":"`+stamp(
+			`","offerExpiresAt":"`+stamp(
 			12,
 		)+`","accessValidFrom":"`+stamp(
 			0,

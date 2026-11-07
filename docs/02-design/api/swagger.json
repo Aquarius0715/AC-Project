@@ -11156,7 +11156,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: contractor:partner.assign:own-valid-offer | admin:job.write:internal-job\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR89 success updates Job.assignmentId/scheduledSlot and version; IR94 technician scope must include Job.unitId; IR113 client_request/periodic_plan: [startAt,endAt) must equal the agreed slot (offer visitSlot for contractors) else VALIDATION errors.slot_not_agreed; IR433 the technician's access must last until endAt else FORBIDDEN errors.technician_access_ends; creates acknowledgement=pending\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A06, DD-P03",
+                "description": "Authorization: contractor:partner.assign:own-valid-offer | admin:job.write:internal-job\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR89 success updates Job.assignmentId/scheduledSlot and version; IR94 technician scope must include Job.unitId; IR113 client_request/periodic_plan: [startAt,endAt) must equal an agreed slot (one of the offer candidateSlots for contractors, IR636, also to move an assigned job to another candidate that is not over) else VALIDATION errors.slot_not_agreed; IR433 the technician's access must last until endAt else FORBIDDEN errors.technician_access_ends; creates acknowledgement=pending\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A06, DD-P03",
                 "consumes": [
                     "application/json"
                 ],
@@ -12478,7 +12478,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: admin:job.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR48 requested only; offerExpiresAt\u003c=accessValidUntil and \u003c= visit start (IR457); expiry returns requested; IR113 visitSlot must be an agreed slot (preferred or accepted proposal; plan occurrence) else VALIDATION errors.slot_not_agreed; access window covers visitSlot\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A06",
+                "description": "Authorization: admin:job.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR48 requested only; offerExpiresAt\u003c=accessValidUntil and \u003c= the last candidate start (IR457); expiry returns requested; IR636 the offer carries the job's agreed times that have not ended (candidateSlots: preferred times or accepted proposals or else the plan occurrence); none left is VALIDATION candidateSlots=error.past; the access window covers every candidate; the contractor picks one when it assigns a technician\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A06",
                 "consumes": [
                     "application/json"
                 ],
@@ -33520,9 +33520,6 @@
                 },
                 "termsVersion": {
                     "type": "string"
-                },
-                "visitSlot": {
-                    "$ref": "#/definitions/maintenance.Slot"
                 }
             }
         },
