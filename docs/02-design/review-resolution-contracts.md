@@ -9069,3 +9069,13 @@ The user asked for Japanese to be selectable beside English and Malay, with ever
 6. **The payout PDF.** The statement PDF has a Courier font and ASCII only (everything else printed as "-"), so a Japanese user's PDF is written in English; the screen is Japanese.
 7. **Tests.** Vitest runs the dictionary checks per language and covers the Japanese date, the ordinal, the assistant's examples against the grammar, the PDF and the locale list; the Go integration tests save `ja` and resolve the three phrases; Playwright saves Japanese in Preferences, reads the shell back in Japanese and puts English back.
 
+## IR641 The Demo clock moves by 1, 2, 4, 8, 12 and 24 hours as well — 2026-11-08
+
+The user asked for more jumps than a minute and an hour, to reach a deadline (an offer's expiry, an invoice's due date, a day's schedule) without pressing +1 hour many times.
+
+1. **The buttons.** Demo controls (FR-X05, DDC-07) show `+1 min`, `+1 hour`, `+2 hours`, `+4 hours`, `+8 hours`, `+12 hours` and `+24 hours`, in the Core API mode and in the browser demo; one list (`CLOCK_JUMPS`) drives the buttons, the target (`advanceTarget`) and the toasts.
+2. **The API is unchanged.** `demo.advanceClock` takes the target time and refuses only a time in the past (`errors.clock_backwards`, IR36); a jump of a day runs the deadlines once at the target time, like a jump of an hour.
+3. **A caution.** The clock never goes back and the running API cannot be reset (`make resetdb` rebuilds it offline), so a few presses of +24 hours move the dev stack past its seed's dates (bookings, qualifications).
+4. **Tests.** Vitest covers the jump list, the target of a day and the texts in English, Malay and Japanese; a component test presses the buttons; Playwright checks that the seven buttons are there (it does not press them, as the dev clock cannot be put back).
+5. **Not done here.** Figma Client 10e still shows two buttons.
+

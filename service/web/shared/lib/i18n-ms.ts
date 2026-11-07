@@ -5727,6 +5727,7 @@ export const ms: Record<string, string> = {
   "Real-time speed · advancing jumps do not consume session lifetime": "Kelajuan masa nyata · lompatan ke hadapan tidak menggunakan hayat sesi",
   "+1 min": "+1 min",
   "+1 hour": "+1 jam",
+  "+{n} hours": "+{n} jam",
   "Returns clock, subscriptions, image URLs, caches, and business data to their initial seed": "Mengembalikan jam, langganan, URL imej, cache dan data perniagaan kepada data asal",
   "Reset demo data": "Tetapkan semula data demo",
   "The running Core API keeps shared data: rebuild it offline with make resetdb.": "Core API yang sedang berjalan menyimpan data dikongsi: bina semula secara luar talian dengan make resetdb.",
@@ -5746,6 +5747,7 @@ export const ms: Record<string, string> = {
   "Your devices need a current assignment here": "Peranti anda memerlukan tugasan semasa di sini",
   "Clock advanced 1 minute": "Jam dimajukan 1 minit",
   "Clock advanced 1 hour": "Jam dimajukan 1 jam",
+  "Clock advanced {n} hours": "Jam dimajukan {n} jam",
   "{unit}: connection lost": "{unit}: sambungan terputus",
   "{unit}: connection restored": "{unit}: sambungan dipulihkan",
   "Not done: {reason}": "Tidak dilakukan: {reason}",
@@ -5762,6 +5764,7 @@ export const ms: Record<string, string> = {
   // the demo controls of the browser demo
   "Clock advanced +1 min (demo)": "Jam dimajukan +1 min (demo)",
   "Clock advanced +1 hour (demo)": "Jam dimajukan +1 jam (demo)",
+  "Clock advanced +{n} hours (demo)": "Jam dimajukan +{n} jam (demo)",
   "simulator = false (baseline seed)": "simulator = false (data asal)",
   "The demo seed in fixture-contract.json is the source of truth": "Benih demo dalam fixture-contract.json ialah sumber rujukan",
   "Demo data reset to seed": "Data demo ditetapkan semula kepada data asal",
