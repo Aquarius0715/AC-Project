@@ -173,7 +173,7 @@ function DetailView({ live }: Readonly<{ live: Extract<JobDetailLive, { kind: "d
   const now = Date.parse(live.now);
   const short = j.id.slice(0, 8);
   const isSettled = ["submitted", "completed", "cancelled"].includes(j.status); // the work is done: no technician to find any more
-  const reading = u?.latestMeasurements?.find((m) => m.value !== null);
+  const reading = u?.latestMeasurements.find((m) => m.value !== null);
   const isNeedsTech = j.status === "accepted" || (j.assignment?.acknowledgement === "cant_make") || (!!j.assignment && Date.parse(j.assignment.scheduledEnd) <= now && (j.status === "assigned" || j.status === "in_progress"));
   const status = textOf(statusWord, j.status, t) ?? j.status.replaceAll('_', " ");
   const connection = u ? (textOf(connectionWord, u.connection, t) ?? u.connection) : "";

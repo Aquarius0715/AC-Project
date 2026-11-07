@@ -27,7 +27,7 @@ export type ExtraCondition = { type: "weekday"; weekdays: number[] } | { type: "
 export interface ApiRun { at: string; outcome: "command_created" | "skipped"; reason: string | null; commandId: string | null }
 interface RuleBase {
   id: string; version: number; createdAt: string; updatedAt: string; name: string; unitIds: string[]; ownerMembershipId: string; timezone: string;
-  enabled: boolean; priority: number; disabledReason: "capability_changed" | "unit_archived" | "consent_revoked" | null; onlyIf: ExtraCondition[]; lastRun: ApiRun | null;
+  enabled: boolean; priority: number; disabledReason: "capability_changed" | "unit_archived" | "consent_revoked" | null; onlyIf: ExtraCondition[] | null; lastRun: ApiRun | null;
 }
 /** Automation of service-contracts.ts. */
 export type ApiAutomation = RuleBase & (
@@ -96,9 +96,9 @@ function conditionText(c: ClientCondition, place: string, t: T): string {
 export function whenText(a: ApiAutomation, place: string, t: T = en): string {
   if (a.kind === "schedule") {
     return (a.endsNextDay ? t("{days} {start} → {end} next day (overnight)", { days: weekdaysText(a.weekdays, false, t), start: a.startLocal, end: a.endLocal })
-      : t("{days} at {start} ({zone})", { days: weekdaysText(a.weekdays, false, t), start: a.startLocal, zone: a.timezone })) + onlyIfText(a.onlyIf, t);
+      : t("{days} at {start} ({zone})", { days: weekdaysText(a.weekdays, false, t), start: a.startLocal, zone: a.timezone })) + onlyIfText(a.onlyIf ?? [], t);
   }
-  return conditionText(a.condition, place, t) + onlyIfText(a.onlyIf, t);
+  return conditionText(a.condition, place, t) + onlyIfText(a.onlyIf ?? [], t);
 }
 /** “someone is home”, “outdoor ≥ 30°C”, “weekdays” — the “Only if” clause of a sentence. */
 export function extraText(x: ExtraCondition, t: T = en): string {

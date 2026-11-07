@@ -23,7 +23,7 @@ const TECHNICIAN = "technician";
 
 interface Page<T> { items: T[]; total: number }
 interface Org { id: string; name: string; kind: string; status: string }
-interface Member { id: string; userId: string; displayName: string; role: string; employment: string | null; organizationId: string; validUntil: string | null; qualifications: ApiTechnician["qualifications"] }
+interface Member { id: string; userId: string; displayName: string; role: string; employment: string | null; organizationId: string; validUntil: string | null; qualifications?: ApiTechnician["qualifications"] }
 const optional = orWhenRefused;
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 

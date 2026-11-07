@@ -63,7 +63,7 @@ export async function loadWorkspace(jobId: string): Promise<WorkspaceLive | "not
       assignment: job.assignment, timeOnSite: job.timeOnSite, draftReportRef: job.draftReportRef, reportRefs: job.reportRefs,
       problemPhotos: (job.problemPhotos ?? []).filter((p) => p.status === "ready").map((p) => ({ id: p.id, name: p.name })), // IR437
     },
-    unit: u ? { name: u.displayName, place: u.location.pathLabels.join(" › "), access: u.location.accessInstructions, model: `${u.capabilities.manufacturer} ${u.capabilities.model}`, scope: u.serviceScope ?? ["indoor", "outdoor", "electrical"] } : null,
+    unit: u ? { name: u.displayName, place: u.location.pathLabels.join(" › "), access: u.location.accessInstructions, model: `${u.capabilities.manufacturer} ${u.capabilities.model}`, scope: u.serviceScope } : null,
     unitRefused: isRefused(unit) ? unit.refused : null,
     unitName: u?.displayName ?? (listed && !isRefused(listed) ? listed.items[0]?.displayName ?? null : null),
     components: componentsFor(u?.serviceScope ?? ["indoor", "outdoor", "electrical"]),
