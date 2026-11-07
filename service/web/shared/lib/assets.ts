@@ -267,8 +267,11 @@ export const connections: Connection[] = ["online", "offline", "unknown", "conne
 export function filterUnits(us: ApiUnitRow[], f: { powerState?: PowerState; connections: Connection[]; search: string }): ApiUnitRow[] {
   const q = f.search.trim().toLowerCase();
   return us.filter((u) => {
-    return (!f.powerState || u.effectivePowerState === f.powerState) && (f.connections.length === 0 || f.connections.includes(u.connection))
-      && (!q || u.displayName.toLowerCase().includes(q) || u.id.toLowerCase().includes(q));
+    return [
+      !f.powerState || u.effectivePowerState === f.powerState,
+      f.connections.length === 0 || f.connections.includes(u.connection),
+      !q || u.displayName.toLowerCase().includes(q) || u.id.toLowerCase().includes(q),
+    ].every(Boolean);
   });
 }
 
@@ -487,8 +490,11 @@ export function coverageKpis(rows: CoverageRow[], t: T = en) {
 export const withinDays = ["30", "90", "180", "365"] as const;
 export interface CoverageFilter { customerId: string; coverage: "" | CoverageStatus; within: "" | (typeof withinDays)[number] }
 export const coverageMatch = (r: CoverageRow, f: CoverageFilter) => {
-  return (!f.customerId || r.customerId === f.customerId) && (!f.coverage || r.status === f.coverage)
-    && (!f.within || (r.days !== null && r.days > 0 && r.days <= Number(f.within)));
+  return [
+    !f.customerId || r.customerId === f.customerId,
+    !f.coverage || r.status === f.coverage,
+    !f.within || (r.days !== null && r.days > 0 && r.days <= Number(f.within)),
+  ].every(Boolean);
 };
 export const toCsv = (header: string[], rows: string[][]) => [header, ...rows].map((r) => r.map((item) => csvCell(item)).join(",")).join("\n") + "\n";
 export const coverageCsv = (rows: CoverageRow[]) => {

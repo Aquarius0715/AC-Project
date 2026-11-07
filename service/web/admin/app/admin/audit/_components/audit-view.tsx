@@ -71,8 +71,13 @@ export function AuditView({ live }: Readonly<{ live?: AuditLive }>) {
   const periodProblem = periodError(f, t);
   const all = live ? live.rows : seed;
   const rows = live ? all : all.filter((l) => {
-    return (f.result === "All" || l.res === f.result) && (!f.correlationId || l.corr.includes(f.correlationId)) && (!f.actorId || l.actorId === f.actorId)
-      && (!f.targetKind || l.targetKind === f.targetKind) && (!f.targetId || l.targetId === f.targetId);
+    return [
+      f.result === "All" || l.res === f.result,
+      !f.correlationId || l.corr.includes(f.correlationId),
+      !f.actorId || l.actorId === f.actorId,
+      !f.targetKind || l.targetKind === f.targetKind,
+      !f.targetId || l.targetId === f.targetId,
+    ].every(Boolean);
   }).slice(0, shown);
   const sel = live ? rows.find((r) => r.id === live.selected) ?? null : rows.find((r) => r.id === selId) ?? rows[0] ?? null;
   const total = live ? live.total : rows.length;
