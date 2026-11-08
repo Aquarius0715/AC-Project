@@ -284,6 +284,7 @@ const (
 	fieldJobID          = "jobId"
 	fieldName           = "name"
 	fieldNextAction     = "nextAction"
+	fieldWorkText       = "workText"
 	fieldOrganizationID = "organizationId"
 	fieldReason         = "reason"
 	fieldReportVersion  = "reportVersion"

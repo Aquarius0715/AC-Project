@@ -9057,3 +9057,11 @@ The user found it a chore to type a time as digits, a colon and digits, and aske
 6. **Not changed.** Date-only fields stay native date inputs, with the browser's calendar. The contact-window text of a maintenance request is free text and keeps its `HH:mm` hint.
 7. **Tests.** Vitest covers the string handling (`timeParts`) and the pickers in a `Field`; the Playwright specs that filled a date-and-time field use `pickDateTime` (the date typed, the hour and minute chosen).
 
+
+## IR644 A report's work text and follow-up note are counted after trimming (review round 9) — 2026-11-08
+
+Submitting a report counted the work text and the follow-up note as typed, so a work text of ten spaces, or a follow-up note of spaces, passed the API although the technician's form refuses both (it counts the trimmed text). A report could therefore be submitted with nothing written.
+
+1. **The rule.** On submit, `workText` is 10–4000 Unicode code points after trimming, and a follow-up's `note` must have at least one character after trimming. This is the same trimming D12 applies to the reason fields; the stored text is not changed.
+2. **Not changed.** Saving a draft still accepts an unfinished text (the draft only caps the length); the technician's form already trims, so no web change.
+3. **Tests.** `TestSubmitErrors` covers a blank work text, a padded short one and a blank follow-up note.

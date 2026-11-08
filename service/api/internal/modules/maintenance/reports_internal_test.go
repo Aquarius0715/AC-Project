@@ -2,6 +2,7 @@ package maintenance
 
 import (
 	"maps"
+	"strings"
 	"testing"
 	"time"
 
@@ -179,10 +180,24 @@ func TestSubmitErrors(t *testing.T) {
 			func(r *Report) { r.Items[1].ComponentKey = componentFilter },
 			map[string]string{fieldItems: "errors.components_mismatch"},
 		},
-		"short work text": {func(r *Report) { r.WorkText = "Done." }, map[string]string{"workText": apperr.KeyLength}},
-		"no next action":  {func(r *Report) { r.NextAction = nil }, map[string]string{fieldNextAction: apperr.KeyRequired}},
+		"short work text": {func(r *Report) { r.WorkText = "Done." }, map[string]string{fieldWorkText: apperr.KeyLength}},
+		"blank work text": {
+			func(r *Report) { r.WorkText = strings.Repeat(" ", 12) },
+			map[string]string{fieldWorkText: apperr.KeyLength},
+		},
+		"padded short work text": {
+			func(r *Report) { r.WorkText = "  Done.     " },
+			map[string]string{fieldWorkText: apperr.KeyLength},
+		},
+		"no next action": {func(r *Report) { r.NextAction = nil }, map[string]string{fieldNextAction: apperr.KeyRequired}},
 		"follow-up no note": {
 			func(r *Report) { r.NextAction = &NextAction{Kind: nextActionFollowUp, Date: inHours(48), Note: nil} },
+			map[string]string{fieldNextAction: apperr.KeyInvalid},
+		},
+		"follow-up blank note": {
+			func(r *Report) {
+				r.NextAction = &NextAction{Kind: nextActionFollowUp, Date: inHours(48), Note: new("   ")}
+			},
 			map[string]string{fieldNextAction: apperr.KeyInvalid},
 		},
 		"follow-up past": {
