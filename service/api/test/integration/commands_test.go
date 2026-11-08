@@ -330,6 +330,9 @@ func TestCommands(t *testing.T) {
 	}
 }
 
+// airflowCheck is the reason the technician gives its command in TestCommandHistory.
+const airflowCheck = "airflow check"
+
 // IR216: commands.list is the unit's Command history, newest first: a client sees its unit's commands with the
 // reason of others' withheld; a technician sees one job it holds (jobId required); HQ sees every command and reason.
 //
@@ -365,7 +368,7 @@ func TestCommandHistory(t *testing.T) {
 		srv,
 		techInt(),
 		"commands.create",
-		`{"unitId":"`+unit+`","jobId":"`+job+`","action":{"kind":"set_mode","mode":"cool"},"reason":"airflow check",`+
+		`{"unitId":"`+unit+`","jobId":"`+job+`","action":{"kind":"set_mode","mode":"cool"},"reason":"`+airflowCheck+`",`+
 			`"expectedUnitVersion":`+itoa(
 			unitVersion,
 		)+`}`,
@@ -438,6 +441,27 @@ func TestCommandHistory(t *testing.T) {
 		t.Fatalf("client history: %d %v", code, got[tech])
 	}
 
+	// commands.get shows the client what the list shows: the reason another actor gave stays hidden, its own stays
+	if code, res := post(
+		srv,
+		customerA(),
+		"commands.get",
+		`{"id":"`+tech+`"}`,
+	); code != 200 ||
+		data(res)["reason"] != nil {
+		t.Errorf("client get of a technician's command: %d reason %v", code, data(res)["reason"])
+	}
+
+	if code, res := post(
+		srv,
+		techInt(),
+		"commands.get",
+		`{"id":"`+tech+`"}`,
+	); code != 200 ||
+		data(res)["reason"] != airflowCheck {
+		t.Errorf("technician get of its own command: %d reason %v", code, data(res)["reason"])
+	}
+
 	for i := 1; i < len(rows); i++ {
 		if asStr(t, rows[i-1]["requestedAt"]) < asStr(t, rows[i]["requestedAt"]) {
 			t.Fatalf("newest first: %v before %v", rows[i-1]["requestedAt"], rows[i]["requestedAt"])
@@ -463,7 +487,7 @@ func TestCommandHistory(t *testing.T) {
 	}
 
 	code, got, _ = list(techInt(), `{"unitId":"`+unit+`","jobId":"`+job+`","query":{"limit":100}}`)
-	if code != 200 || got[tech] == nil || got[tech]["reason"] != "airflow check" ||
+	if code != 200 || got[tech] == nil || got[tech]["reason"] != airflowCheck ||
 		got[own] != nil {
 		t.Fatalf("technician job history: %d %v", code, got)
 	}
@@ -482,7 +506,7 @@ func TestCommandHistory(t *testing.T) {
 	if _, got, _ := list(
 		hq(),
 		`{"unitId":"`+unit+`","query":{"limit":100}}`,
-	); got[tech]["reason"] != "airflow check" ||
+	); got[tech]["reason"] != airflowCheck ||
 		got[own] == nil {
 		t.Errorf("HQ history: %v", got[tech])
 	}
