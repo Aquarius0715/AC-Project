@@ -518,6 +518,40 @@ func runAcknowledged(ctx context.Context, txn pgx.Tx, command uuid.UUID, when ti
 	return apperr.Wrap(err, "update control.diagnostic_runs")
 }
 
+// RunCommandFailed moves a run when the device rejects its start or end command: the start becomes start_failed and
+// the end end_failed, both with the device's code, and the unit is free again (implementation-contracts.md, the
+// DiagnosticRun table: "Start failure" and "Failure or expiry").
+func RunCommandFailed(
+	ctx context.Context,
+	txn pgx.Tx,
+	command uuid.UUID,
+	code string,
+	when time.Time,
+) error {
+	_, err := txn.Exec(
+		ctx,
+		`UPDATE control.diagnostic_runs SET state = 'start_failed', failure_code = $2, version = version + 1,
+			updated_at = $3 WHERE start_command_id = $1 AND state = 'awaiting_start'`,
+		command,
+		code,
+		when,
+	)
+	if err != nil {
+		return apperr.Wrap(err, "update control.diagnostic_runs")
+	}
+
+	_, err = txn.Exec(
+		ctx,
+		`UPDATE control.diagnostic_runs SET state = 'end_failed', failure_code = $2, version = version + 1,
+			updated_at = $3 WHERE end_command_id = $1 AND state = 'end_requested'`,
+		command,
+		code,
+		when,
+	)
+
+	return apperr.Wrap(err, "update control.diagnostic_runs")
+}
+
 // AdvanceRuns is the worker step of IR139 item 2: failed starts / ends from expired commands, and end commands at
 // endAt.
 func AdvanceRuns(ctx context.Context, call *ops.Call, commands Commands) (int, error) {
