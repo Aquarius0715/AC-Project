@@ -19,6 +19,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/modules/identity"
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
+	"github.com/pradita/ac-project/service/api/internal/platform/money"
 	"github.com/pradita/ac-project/service/api/internal/platform/paging"
 )
 
@@ -912,7 +913,7 @@ func (in *RateCardInput) Validate() map[string]string {
 	for i := range in.Lines {
 		rateLine := &in.Lines[i]
 		if !slices.Contains(workTypes(), rateLine.WorkType) || seen[rateLine.WorkType] ||
-			rateLine.AmountMinor < 0 {
+			!money.InRange(int64(rateLine.AmountMinor)) {
 			fieldErrs["lines"] = apperr.KeyInvalid
 		}
 

@@ -9057,3 +9057,11 @@ The user found it a chore to type a time as digits, a colon and digits, and aske
 6. **Not changed.** Date-only fields stay native date inputs, with the browser's calendar. The contact-window text of a maintenance request is free text and keeps its `HH:mm` hint.
 7. **Tests.** Vitest covers the string handling (`timeParts`) and the pickers in a `Field`; the Playwright specs that filled a date-and-time field use `pickDateTime` (the date typed, the hour and minute chosen).
 
+
+## IR647 An amount in minor units stays within the safe-integer range (review round 13) — 2026-11-08
+
+The contract for money (implementation-contracts.md, Money) says an `amountMinor` is a nonnegative integer within JavaScript's safe-integer range. The API checked only the lower end, so HQ or a contractor could store 9,000,000,000,000,000,000 sen: the web shows such an amount rounded, and a sum of a few of them (an invoice total, a payout) wraps around in 64 bits.
+
+1. **The rule.** `money.InRange` (`platform/money`): 0 ≤ amount ≤ 2^53 − 1 (9,007,199,254,740,991). The refusal is the field's existing one: `amountMinor` / `priceMinor` / `costLines` / `lines` with `error.range` or `error.invalid`.
+2. **Where.** The inputs a person types an amount into: `contracts.save` (`priceMinor`), `invoices.create` (`amountMinor`), `jobs.saveCost` (cost lines), `jobs.recordWarrantyClaim` and the rate card's lines. Payment amounts are compared with the invoice's, and payout lines are computed by the server, so they need no input check.
+3. **Tests.** `TestAmountsStayInSafeRange` in `billing` and `maintenance` (over the range refused, the last valid amount accepted) and `money.TestInRange`.
