@@ -512,7 +512,7 @@ func TestPartnerUserAccess(t *testing.T) {
 		"active",
 		userVersion+3,
 	); code != 409 ||
-		res["messageKey"] != "errors.access_expired" {
+		res["messageKey"] != keyAccessExpired {
 		t.Errorf("enable after the access end: %d %v", code, res)
 	}
 	// the last active contractor: another contractor account, with the company's other active contractor accounts
@@ -847,7 +847,7 @@ func TestPartnerResendAfterAccessEnd(t *testing.T) {
 		`{"id":"`+partnerUserID+`"}`,
 		0,
 	); code != 409 ||
-		res["messageKey"] != "errors.access_expired" {
+		res["messageKey"] != keyAccessExpired {
 		t.Errorf("resend after the access end: %d %v", code, res)
 	}
 
