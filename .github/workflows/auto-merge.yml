@@ -31,7 +31,7 @@ jobs:
 
           query = (
               "mutation($id: ID!) { enablePullRequestAutoMerge(input: {pullRequestId: $id, mergeMethod: MERGE}) "
-              "{ pullRequest { number autoMergeRequest { enabledAt } } } }"
+              "{ pullRequest { number } } }"
           )
           request = urllib.request.Request(
               "https://api.github.com/graphql",
