@@ -101,6 +101,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
 0.524.0 (2026-11-09): the adjustment HQ enters when it answers a payout question stays within the safe-integer range, like every other amount (IR659; no operation changes).
+0.522.0 (2026-11-09): a membership names each scope once, as it names each permission once; a repeated scope no longer slips past the scope-version check (IR661; no operation changes).
 0.521.0 (2026-11-09): a customer's owner cannot send a user the set-up e-mail again once the access has ended, as a contractor cannot (IR664; no operation changes).
 0.517.0 (2026-11-09): saving a customer's user without changing its status keeps the end HQ gave the membership instead of clearing it (IR662; no operation changes).
 0.516.0 (2026-11-09): an emission factor too small for the six-decimal column is refused on its field instead of failing the database check (IR660; no operation changes).
