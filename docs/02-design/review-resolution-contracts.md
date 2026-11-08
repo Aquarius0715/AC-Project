@@ -9273,3 +9273,10 @@ The user chose to delete accounts that were never used and to keep ending the ot
 
 1. **The rule.** The membership's end is rewritten only by a change to or from `disabled`: disabling ends it now (at least a second after its start); enabling again clears it. A save that leaves the status as it was changes the client role and the scope version and keeps the end.
 2. **Tests.** `TestClientUserSaveKeepsTheEndHQSet` failed before the fix (the end came back empty); `TestClientUserMembershipSync` still covers disable and enable. No operation, route or screen changes; 224 operations, 245 routes.
+
+## IR665 A new CSV import preview removes the expired ones (review round 51) — 2026-11-09
+
+database-design.md says the 30-minute import previews (`assets.unit_import_previews`) are "purged after expiry", and the table has an index on `expires_at` for it, but nothing deleted them: a preview left only when its import was committed or its customer deleted, so every file anyone previewed and did not commit stayed in the table (the rows of up to 1,000 lines, resolved IDs included).
+
+1. **The rule.** `units.importPreview` deletes the previews of its tenant whose `expires_at` is at or before now (business time) in the transaction that stores the new one. A commit with an expired preview is unchanged (CONFLICT, as `units.importCommit` answers it today); the commit still deletes the preview it takes.
+2. **Tests.** `TestUnitsImportPreviewPurgesExpiredPreviews` (an expired and a live preview; only the live one is left after a new preview) failed before the fix. No operation, route or screen changes; 224 operations, 245 routes.
