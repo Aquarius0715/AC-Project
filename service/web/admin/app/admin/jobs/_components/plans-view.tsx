@@ -3,14 +3,14 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Banner, Btn, Card, EmptyState, Field, Input, ListRow, Modal, Page, Select, ScrollX } from "@ac/web/components/ui";
+import { Banner, Btn, Card, EmptyState, Field, Input, ListRow, Modal, Page, Select, ScrollX, Textarea } from "@ac/web/components/ui";
 import { JobStatusBadge } from "@ac/web/components/JobBits";
 import { useI18n, useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { byCount, zonedParts } from "@ac/web/lib/i18n";
 import { fromZonedInput, zonedInput } from "@ac/web/lib/adminJobs";
 import { anchorOf, cadence, everyText, generateConflict, nextBox, nextOccurrence, planDate, planErrors, planRefusal } from "@ac/web/lib/adminPlans";
-import { generateJob, savePlan } from "../actions";
+import { deletePlan, generateJob, savePlan } from "../actions";
 import type { PlansLive } from "../_lib/load";
 import { JobsTabs, ScopeBar } from "./jobs-header";
 import { setParams } from "@ac/web/lib/searchParams";
@@ -66,7 +66,12 @@ export function PlansView({ live }: Readonly<{ live: PlansLive }>) {
 function PlanDetail({ d, now, notice, setNotice }: Readonly<{ d: Detail; now: number; notice: Notice | null; setNotice: (n: Notice | null) => void }>) {
   const i = useI18n(), { t } = i, zone = i.display.timeZone;
   const p = d.plan;
+  const router = useRouter();
   const [pending, run] = useAction();
+  const [removing, setRemoving] = useState<string | null>(null);
+  const remove = () => {
+    if (removing?.trim()) run(() => deletePlan(p.id, p.version, removing), t("Plan deleted"), () => { setRemoving(null); router.push("/admin/jobs?tab=plans"); });
+  };
   const [every, setEvery] = useState(p.recurrence.intervalMonths);
   const [next, setNext] = useState(zonedInput(p.nextDueAt, zone));
   const nextIso = next ? fromZonedInput(next, zone) || null : null;
@@ -122,11 +127,16 @@ function PlanDetail({ d, now, notice, setNotice }: Readonly<{ d: Detail; now: nu
           </table></ScrollX>
         )}
         <div className="mt-4 flex items-center justify-end gap-2">
+          {d.occurrences.length === 0 && <Btn variant="danger" disabled={pending} onClick={() => { setRemoving(""); }}>{t("Delete plan…")}</Btn>}
           {isDirty && <Btn disabled={pending} onClick={() => { setEvery(p.recurrence.intervalMonths); setNext(zonedInput(p.nextDueAt, zone)); }}>{t("Discard")}</Btn>}
           <Btn variant="primary" disabled={pending || !isDirty || Object.keys(errors).length > 0} onClick={save}>{t("Save plan")}</Btn>
         </div>
         <p className="mt-2 text-[11px] text-muted-foreground">{t("Generating creates one job for the saved next date only — no automatic generation or catch-up. Saving does not change jobs already generated.")}</p>
       </Card>
+      <Modal open={removing !== null} onClose={() => { setRemoving(null); }} title={t("Delete plan")} footer={<><Btn onClick={() => { setRemoving(null); }}>{t("Cancel")}</Btn><Btn variant="danger" disabled={pending || !removing?.trim()} onClick={remove}>{t("Delete")}</Btn></>}>
+        <p className="text-[13px]">{t("Delete this plan of {unit}? A plan that has made a job cannot be deleted.", { unit: d.unit })}</p>
+        <Field label={t("Reason")}><Textarea value={removing ?? ""} maxLength={1000} onChange={(e) => { setRemoving(e.target.value); }} /></Field>
+      </Modal>
     </div>
   );
 }

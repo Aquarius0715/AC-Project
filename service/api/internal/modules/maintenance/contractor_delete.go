@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/google/uuid"
@@ -138,6 +139,71 @@ func (Partners) delete(
 			input.Reason,
 		),
 	)
+
+	return DeletedResource{ID: input.ID, Deleted: true}, nil
+}
+
+// RateCardDeleteInput is rateCards.delete input.
+type RateCardDeleteInput = ContractorDeleteInput
+
+// delete deletes a rate card that has not started (DEC-103, IR655): a card in effect, or one that was, prices the
+// payouts and stays (CONFLICT error.rateCardStarted). Rate cards have no expected version, as in rateCards.save.
+//
+//	@Summary		rateCards.delete (write)
+//	@ID				rateCards.delete
+//	@Description	Authorization: admin:job.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR655 only a rate card that has not started (CONFLICT error.rateCardStarted)
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A21
+//	@Tags			rateCards
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key	header		string	true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			id				path		string	true	"input field id"
+//	@Param			reason			query		string	false	"input field reason"
+//	@Success		200				{object}	ops.Envelope{data=DeletedResource}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/rate-cards/{id} [delete]
+func (Partners) deleteRateCard(
+	ctx context.Context,
+	call *ops.Call,
+	input *RateCardDeleteInput,
+) (DeletedResource, error) {
+	var starts time.Time
+
+	err := call.Tx.QueryRow(
+		ctx,
+		`SELECT effective_from FROM maintenance.rate_cards WHERE id = $1 FOR UPDATE`,
+		input.ID,
+	).Scan(&starts)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return DeletedResource{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
+	}
+
+	if err != nil {
+		return DeletedResource{}, apperr.Wrap(err, "select maintenance.rate_cards")
+	}
+
+	if !starts.After(call.Now) {
+		return DeletedResource{}, apperr.E(apperr.Conflict, "error.rateCardStarted")
+	}
+
+	_, err = call.Tx.Exec(ctx, `DELETE FROM maintenance.rate_cards WHERE id = $1`, input.ID)
+	if err != nil {
+		return DeletedResource{}, apperr.Wrap(err, "delete maintenance.rate_cards")
+	}
+
+	call.Emit(outboxEvent("rate_card", input.ID, "RateCardDeleted", nil))
+	call.Audit(auditEntry("rateCards.delete", "rate_card", input.ID, nil, nil, input.Reason))
 
 	return DeletedResource{ID: input.ID, Deleted: true}, nil
 }

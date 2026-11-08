@@ -94,7 +94,7 @@ func TestRESTRoutesResolve(t *testing.T) {
 		}
 	}
 
-	if routes != 240 {
-		t.Fatalf("%d routes, want 240", routes)
+	if routes != 242 {
+		t.Fatalf("%d routes, want 242", routes)
 	}
 }

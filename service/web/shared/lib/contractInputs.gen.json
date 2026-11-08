@@ -945,6 +945,10 @@
   "reason",
   "statementId"
  ],
+ "plans.delete": [
+  "id",
+  "reason"
+ ],
  "plans.generateNext": [
   "id",
   "occurrenceDate"
@@ -1030,6 +1034,10 @@
   "id",
   "kind",
   "name"
+ ],
+ "rateCards.delete": [
+  "id",
+  "reason"
  ],
  "rateCards.list": [
   "cursor",

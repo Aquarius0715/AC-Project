@@ -3722,6 +3722,13 @@
   ],
   "items": null
  },
+ "plans.delete": {
+  "fields": [
+   "deleted",
+   "id"
+  ],
+  "items": null
+ },
  "plans.generateNext": {
   "fields": [
    "alertIds",
@@ -4009,6 +4016,13 @@
    "tenantId",
    "updatedAt",
    "version"
+  ],
+  "items": null
+ },
+ "rateCards.delete": {
+  "fields": [
+   "deleted",
+   "id"
   ],
   "items": null
  },
