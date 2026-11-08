@@ -11,7 +11,8 @@ import {
   factorErrors, factorInput, mrvConditions, mrvDraftErrors, mrvDraftOf, mrvView, statusWord, versionKey,
   type ApiFactor, type ApiMRVReport, type FactorDraft, type MRVDraft, type MRVView as Figures, type ReportRow,
 } from "@ac/web/lib/mrv";
-import { previewReport, recordReview, saveFactor, saveReportDraft } from "../actions";
+import { deleteFactor, deleteReport, previewReport, recordReview, saveFactor, saveReportDraft } from "../actions";
+import { DeleteDialog } from "@ac/web/components/DeleteDialog";
 import { EvidenceList, EvidencePicker } from "./evidence";
 import { oneOf } from "@ac/web/lib/oneOf";
 import { Icon } from "@ac/web/components/Icon";
@@ -63,6 +64,7 @@ function Reports({ live, r }: Readonly<{ live: MRVLive; r: NonNullable<MRVLive["
   const [pending, run] = useAction();
   const sel = r.selected;
   const [comment, setComment] = useState("");
+  const [removing, setRemoving] = useState(false);
   const [draft, setDraft] = useState<null | { id?: string; version?: number; d: MRVDraft; evidenceIds: string[] }>(null);
   const [preview, setPreview] = useState<Figures | null>(null);
   const [tried, setTried] = useState(false);
@@ -110,7 +112,7 @@ function Reports({ live, r }: Readonly<{ live: MRVLive; r: NonNullable<MRVLive["
         </Card>
         {sel ? (
           <div className="flex min-w-0 flex-col gap-4">
-            <Card title={t("Scope 2 electricity — demo summary")} sub={`${sel.report.id.slice(0, 8)} · ${statusWord(sel.report.status, t)}`} action={<div className="flex items-center gap-2"><DemoBadge /><Select aria-label={t("Version")} className="w-auto" value={sel.report.version} onChange={(e) => { nav({ reportVersion: Number(e.target.value) === sel.latestVersion ? null : e.target.value }); }}>{sel.versions.map((v) => <option key={v.version} value={v.version}>{t(v.version === sel.latestVersion ? "Version {n} (latest) · {status}" : "Version {n} · {status}", { n: v.version, status: statusWord(v.status, t) })}</option>)}</Select>{live.canWrite && isLatest && <Btn size="sm" onClick={() => { openDraft(sel.report); }}>{t("New version…")}</Btn>}</div>}>
+            <Card title={t("Scope 2 electricity — demo summary")} sub={`${sel.report.id.slice(0, 8)} · ${statusWord(sel.report.status, t)}`} action={<div className="flex items-center gap-2"><DemoBadge /><Select aria-label={t("Version")} className="w-auto" value={sel.report.version} onChange={(e) => { nav({ reportVersion: Number(e.target.value) === sel.latestVersion ? null : e.target.value }); }}>{sel.versions.map((v) => <option key={v.version} value={v.version}>{t(v.version === sel.latestVersion ? "Version {n} (latest) · {status}" : "Version {n} · {status}", { n: v.version, status: statusWord(v.status, t) })}</option>)}</Select>{live.canWrite && isLatest && <Btn size="sm" onClick={() => { openDraft(sel.report); }}>{t("New version…")}</Btn>}{live.canWrite && isLatest && sel.versions.every((v) => v.status === "draft") && <Btn size="sm" variant="danger" onClick={() => { setRemoving(true); }}>{t("Delete report…")}</Btn>}</div>}>
               <FiguresGrid v={sel.view} />
               {!isLatest && <p className="mt-2 text-[11px] text-muted-foreground">{t("An earlier version — read only. Its conditions and results never change.")}</p>}
             </Card>
@@ -126,6 +128,8 @@ function Reports({ live, r }: Readonly<{ live: MRVLive; r: NonNullable<MRVLive["
           </div>
         ) : <Card title={t("Report")}><EmptyState title={t("Nothing selected")}>{t("Choose a report or create one.")}</EmptyState></Card>}
       </div>
+      {removing && sel && <DeleteDialog title={t("Delete report")} text={t("Delete report {id}? Every version goes. A report that was reviewed cannot be deleted.", { id: sel.report.id.slice(0, 8) })} pending={pending}
+        onClose={() => { setRemoving(false); }} onConfirm={(reason) => { run(() => deleteReport(sel.report.id, sel.report.version, reason), t("Report deleted"), () => { setRemoving(false); nav({ reportId: null, reportVersion: null }); }); }} />}
       <Modal open={!!draft} onClose={() => { setDraft(null); }} title={t(draft?.id ? "New report version" : "New Scope 2 report")} wide footer={<><Btn onClick={() => { setDraft(null); }}>{t("Cancel")}</Btn><Btn disabled={pending} onClick={doPreview}>{t("Preview")}</Btn><Btn variant="primary" disabled={pending || !preview} onClick={doSave}>{t("Save draft")}</Btn></>}>
         {d && <>
           <div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>
@@ -159,6 +163,7 @@ function Factors({ live }: Readonly<{ live: MRVLive }>) {
   const [source, setSource] = useState(key);
   const [d, setD] = useState<FactorDraft>(sel ? { region: sel.region, year: String(sel.year), kgCO2ePerKWh: String(sel.kgCO2ePerKWh), source: sel.source } : blank);
   const [tried, setTried] = useState(false);
+  const [removing, setRemoving] = useState(false);
   if (source !== key) {
     setSource(key);
     setD(sel ? { region: sel.region, year: String(sel.year), kgCO2ePerKWh: String(sel.kgCO2ePerKWh), source: sel.source } : blank);
@@ -192,11 +197,14 @@ function Factors({ live }: Readonly<{ live: MRVLive }>) {
           <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
             {sel && <span className="mr-auto text-[12px] text-muted-foreground">{t(isDirty ? "Unsaved changes" : "No unsaved changes")}</span>}
             {!sel && firstFactor && <Btn onClick={() => { setSelId(firstFactor.id); }}>{t("Cancel")}</Btn>}
+            {sel && <Btn variant="danger" disabled={pending} onClick={() => { setRemoving(true); }}>{t("Delete factor…")}</Btn>}
             {sel && saved && <Btn disabled={pending || !isDirty} onClick={() => { setD(saved); setTried(false); }}>{t("Discard")}</Btn>}
             <Btn variant="primary" disabled={pending || (!!sel && !isDirty)} onClick={save}>{sel ? t("Save as v{n}", { n: sel.version + 1 }) : t("Create factor")}</Btn>
           </div>
         )}
       </Card>
+      {removing && sel && <DeleteDialog title={t("Delete factor")} text={t("Delete the factor of {region} {year}? Every version goes. A factor an MRV report cites, and the default factor, cannot be deleted.", { region: sel.region, year: sel.year })} pending={pending}
+        onClose={() => { setRemoving(false); }} onConfirm={(reason) => { run(() => deleteFactor(sel.id, sel.version, reason), t("Factor deleted"), () => { setRemoving(false); setSelId(live.factors.find((x) => x.id !== sel.id)?.id ?? "new"); }); }} />}
     </div>
   );
 }

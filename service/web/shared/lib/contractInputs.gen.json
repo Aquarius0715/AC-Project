@@ -98,6 +98,10 @@
   "phase",
   "unitIds"
  ],
+ "baselines.delete": [
+  "id",
+  "reason"
+ ],
  "baselines.list": [
   "cursor",
   "filters",
@@ -420,6 +424,10 @@
   "tariffVersion",
   "to",
   "unitIds"
+ ],
+ "factors.delete": [
+  "id",
+  "reason"
  ],
  "factors.list": [
   "cursor",
@@ -761,6 +769,10 @@
   "filters",
   "limit",
   "sort"
+ ],
+ "mrv.deleteDraft": [
+  "id",
+  "reason"
  ],
  "mrv.get": [
   "id",

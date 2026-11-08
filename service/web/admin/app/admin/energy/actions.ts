@@ -8,6 +8,18 @@ import type { OpInput } from "@ac/web/lib/opTypes";
 
 export type ActionResult<T = null> = { ok: true; value: T } | { ok: false; messageKey: string; code: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null };
 
+/** baselines.delete: a baseline no MRV report cites, every version (DEC-103). */
+export async function deleteBaseline(id: string, version: number, reason: string): Promise<ActionResult> {
+  try {
+    await coreOp("baselines.delete", { id, reason }, { write: true, expectedVersion: version });
+    return { ok: true, value: null };
+  } catch (error) {
+    return error instanceof CoreError ? { ok: false, messageKey: error.error.messageKey, code: error.error.code, fieldErrors: error.error.fieldErrors, retryAfterSeconds: error.error.retryAfterSeconds } : { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {}, retryAfterSeconds: null };
+  } finally {
+    refresh();
+  }
+}
+
 /** A new baseline (no id) or the next version of one (id + the version it was read at). */
 export async function saveBaseline(input: OpInput<"baselines.save">, version?: number): Promise<ActionResult<{ id: string; version: number }>> {
   try {

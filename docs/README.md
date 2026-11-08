@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.512.0 / Created: 2026-09-14 / Updated: 2026-11-07 / Status: Draft for review / Language: English
+Version: 0.513.0 / Created: 2026-09-14 / Updated: 2026-11-07 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -100,6 +100,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.513.0 (2026-11-09): HQ deletes a baseline and an emission factor that no MRV report cites (`baselines.delete`, `factors.delete`) and an MRV report no review touched (`mrv.deleteDraft`); the default factor and reviewed reports stay (224 operations, 245 routes; DEC-103 phase 5, IR656).
 0.512.0 (2026-11-08): HQ deletes a maintenance plan that has made no job (`plans.delete`) and a rate card that has not started (`rateCards.delete`); a plan with jobs and a rate card in effect stay (221 operations, 242 routes; DEC-103 phase 4, IR655).
 0.511.0 (2026-11-08): HQ deletes a customer or a contractor company that has no record anywhere: the profile (`customers.delete`, `contractors.delete`) and then its organization (`organizations.delete`); one with units, jobs, contracts, invoices, reports, certificates, payouts or users is refused with the reason (219 operations, 240 routes; DEC-103 phase 2, IR654).
 0.510.0 (2026-11-08): HQ deletes a firmware campaign that has ended (aborted or completed) with its device results (`firmwareCampaigns.delete`: 216 operations, 237 routes); one that has not is refused with the reason (DEC-103 phase 1b, IR653).

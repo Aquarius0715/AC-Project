@@ -34,6 +34,16 @@ export async function recordReview(reportId: string, version: number, reviewComm
   return run(async () => { const r = await coreOp<{ version: number }>("mrv.recordReview", { reportVersion: version, reportId, reviewComment }, { write: true, expectedVersion: version }); return r.version; });
 }
 
+/** mrv.deleteDraft: a report no review touched, every version (DEC-103). */
+export async function deleteReport(id: string, version: number, reason: string) {
+  return run(async () => { await coreOp("mrv.deleteDraft", { id, reason }, { write: true, expectedVersion: version }); return null; });
+}
+
+/** factors.delete: a factor no MRV report cites and that is not the default, every version (DEC-103). */
+export async function deleteFactor(id: string, version: number, reason: string) {
+  return run(async () => { await coreOp("factors.delete", { id, reason }, { write: true, expectedVersion: version }); return null; });
+}
+
 /** factors.save: a new factor or the next version (id + the version it was read at). */
 export async function saveFactor(input: OpInput<"factors.save">, version?: number) {
   return run(async () => { const f = await coreOp<{ id: string; version: number }>("factors.save", input, { write: true, expectedVersion: input.id ? version : undefined }); return ({ id: f.id, version: f.version }); });

@@ -6,6 +6,7 @@ automations.delete,all,automations,automations.list,required,none,D01; version m
 automations.fire,all,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 automations.save,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 automations.save,id present,automations,automations.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+baselines.delete,all,baselines,baselines.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 baselines.save,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 baselines.save,id present,baselines,baselines.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 capabilities.delete,all,capabilities,capabilities.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
@@ -46,6 +47,7 @@ devices.setMqttNode,all,device,devices.get,required,none,D01; version mismatch C
 devices.unbind,all,device,devices.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 devices.updateFirmware,all,device,devices.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 diagnosticRuns.create,all,none,units.get;jobs.get,omit,expectedUnitVersion=UnitDetail.version;expectedJobVersion=JobDetail.version,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+factors.delete,all,factors,factors.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 factors.save,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 factors.save,id present,factors,factors.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 filterCare.markCleaned,all,none,filterCare.list,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
@@ -94,6 +96,7 @@ members.revokeSessions,all,none,members.list,omit,none,D01; version mismatch CON
 members.save,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 members.save,id present,members,members.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 members.setUnavailability,all,none,members.capacity,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+mrv.deleteDraft,all,mrv,mrv.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 mrv.recordReview,all,mrv,mrv.get,required,reportVersion=MRVReport.version,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 mrv.saveDraft,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 mrv.saveDraft,id present,mrv,mrv.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
