@@ -662,15 +662,17 @@ func syncClientMembership(
 ) error {
 	// $4 is cast: inside CASE … ELSE NULL the parameter's type would be taken as text
 	// an account created this instant (IR461) ends a second after it starts, as the membership's check requires
+	// the end is rewritten only by a change to or from disabled: any other save keeps the end HQ gave it (IR662)
 	_, err := call.Tx.Exec(
 		ctx,
 		`UPDATE identity.memberships SET client_role = $2, valid_until = CASE WHEN $3 = 'disabled' THEN
-			GREATEST($4::timestamptz, valid_from + interval '1 second') ELSE NULL END,
+			GREATEST($4::timestamptz, valid_from + interval '1 second') WHEN $5 = 'disabled' THEN NULL ELSE valid_until END,
 		scope_version = scope_version + 1, version = version + 1, updated_at = $4 WHERE id = $1`,
 		*clientUser.MembershipID,
 		input.ClientRole,
 		status,
 		call.Now,
+		clientUser.Status,
 	)
 	if err != nil {
 		return apperr.Wrap(err, "update identity.memberships")
