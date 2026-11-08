@@ -38,3 +38,9 @@ const (
 	levelRoom      = "room"
 	statusInactive = "inactive"
 )
+
+// The tables of the places units stand in.
+const (
+	tableProperties = "assets.properties"
+	tableSpaces     = "assets.spaces"
+)

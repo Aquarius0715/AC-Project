@@ -9280,3 +9280,11 @@ The user chose to delete accounts that were never used and to keep ending the ot
 
 1. **The rule.** `clientUsers.resendInvite` is CONFLICT `errors.access_expired` when the user's membership has an end at or before now, as the partner one is; the resend gap (IR423) is checked after it.
 2. **Tests.** `TestClientUserResendRefusedAfterTheAccessEnded` answered 200 before the fix. No operation, route or screen changes; 224 operations, 245 routes.
+
+## IR666 A CSV import keeps sibling names unique and is undone only while its places hold nothing else (review round 51) — 2026-11-09
+
+admin.md says unit names are unique among the non-archived units of a space (CONFLICT `error.duplicateSiblingName`) and that a property or space that still holds non-archived units or child spaces cannot be archived (CONFLICT `error.notEmpty`). Two parts of the CSV import (IR109, FR-A18) did not hold to this.
+
+1. **The commit.** The preview checks every row's name against the units there are; between the preview and the commit (up to 30 minutes) a unit with the same name could be saved, and `units.importCommit` inserted its unit without looking again, so two units of one space shared a name. The commit now checks the name after each insert, as `units.save` does: a name taken since the preview is CONFLICT `error.duplicateSiblingName` and the whole commit rolls back.
+2. **The undo.** `units.importUndo` archived the properties and spaces the import created with a plain update. A unit saved into such a property afterwards (or a second import into it) was left active inside an archived property. The undo is now CONFLICT `error.importPlaceInUse` while a created property or space holds a non-archived unit, or a non-archived location, that the import did not create; the created places are locked first, as the archive does (IR478).
+3. **Tests.** `TestUnitsImportCommitKeepsSiblingNamesUnique` and `TestUnitsImportUndoKeepsPlacesThatHoldOtherUnits` both answered 200 before the fix. No operation, route or screen changes; 224 operations, 245 routes.
