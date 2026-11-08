@@ -126,7 +126,7 @@ AT-X04 verifies rejection for seven cases: another tenant, another customer in t
 - **Company request basis**: SRC-06 BIZ-05 — Start with split AC units and clickable UI/UX, then expand to the full solution.
 - **Added design details**: Shared mocks, reset, and separation from real processing.
 
-Use a fixed seed. Four roles in one tab read the same business IDs. Role switching does not reset business data. Only page reload or explicit reset restores initial data. Delayed events from before reset cannot enter the new seed. Visually separate the state-control panel from business screens and always label it “Demo.” AT-X05 checks `demo.reset`, `demo.trigger`, and `demoSession.switchMembership` for repeatable seed data, cross-role consistency, discarded old delayed events, and zero real payment/notification/IoT/trading connections.
+Use a fixed seed. Four roles in one tab read the same business IDs. Role switching does not reset business data. Only page reload or explicit reset restores initial data. Delayed events from before reset cannot enter the new seed. Visually separate the state-control panel from business screens and always label it “Demo.” The Demo clock only moves forward, by a minute or by 1, 2, 4, 8, 12 or 24 hours per press (IR641). AT-X05 checks `demo.reset`, `demo.trigger`, and `demoSession.switchMembership` for repeatable seed data, cross-role consistency, discarded old delayed events, and zero real payment/notification/IoT/trading connections.
 
 ### FR-X06 Capabilities and contract types
 
