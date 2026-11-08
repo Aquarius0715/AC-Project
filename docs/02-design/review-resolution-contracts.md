@@ -9273,3 +9273,10 @@ The user chose to delete accounts that were never used and to keep ending the ot
 
 1. **The rule.** The membership's end is rewritten only by a change to or from `disabled`: disabling ends it now (at least a second after its start); enabling again clears it. A save that leaves the status as it was changes the client role and the scope version and keeps the end.
 2. **Tests.** `TestClientUserSaveKeepsTheEndHQSet` failed before the fix (the end came back empty); `TestClientUserMembershipSync` still covers disable and enable. No operation, route or screen changes; 224 operations, 245 routes.
+
+## IR664 A customer's owner cannot send the set-up e-mail again after the access has ended (review round 42) — 2026-11-09
+
+`partnerUsers.resendInvite` refuses once the user's access has ended (`errors.access_expired`, IR461). `clientUsers.resendInvite` checked only that the user was still invited. When HQ ends the access of an invited customer user (`members.save`, IR508) the membership ends and the sign-in account is turned off; the user's list row stays `invited`. A resend then queued `AccountRequested`, whose consumer updates the provider account and sets it enabled again, so the customer's owner could open the sign-in account HQ had turned off (the API still refused the ended membership, but the provider account was on and a set-up e-mail went out).
+
+1. **The rule.** `clientUsers.resendInvite` is CONFLICT `errors.access_expired` when the user's membership has an end at or before now, as the partner one is; the resend gap (IR423) is checked after it.
+2. **Tests.** `TestClientUserResendRefusedAfterTheAccessEnded` answered 200 before the fix. No operation, route or screen changes; 224 operations, 245 routes.
