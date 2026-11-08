@@ -579,6 +579,8 @@ func Register(reg *ops.Registry) {
 	ops.Register(reg, "factors.save", saveFactor)
 	ops.Register(reg, "baselines.list", listBaselines)
 	ops.Register(reg, "baselines.save", saveBaseline)
+	ops.Register(reg, "baselines.delete", deleteBaseline)
+	ops.Register(reg, "factors.delete", deleteFactor)
 	ops.Register(reg, "energy.summary", summary)
 	ops.Register(reg, "energy.exportReport", exportReport)
 }

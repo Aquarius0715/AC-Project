@@ -9231,3 +9231,13 @@ A customer and a contractor company are made in two steps (the organization, the
 4. **The screens.** Admin > Jobs > Plans: Delete plan… on a plan with no generated occurrence. Admin > Jobs > Contractors: Delete rate card… beside each scheduled card. English, Malay and Japanese.
 5. **Counts.** 219 → 221 operations, 240 → 242 routes.
 6. **Tests.** `TestPlansDelete`, `TestRateCardsDelete` and the dictionary and contract tests. No E2E in this round.
+
+## IR656 HQ deletes a baseline, an emission factor and an MRV draft that nothing depends on (DEC-103, phase 5) — 2026-11-09
+
+1. **`baselines.delete {id, reason}`** (`admin:energy.write`, `DELETE /v1/baselines/{id}`, DD-A13). Every version of a baseline that no MRV report cites (a report's conditions name `baselineId`): CONFLICT `error.baselineCited` otherwise. The expected version is the current one (`baselines.list`). Event `BaselineDeleted`, audit `baselines.delete`.
+2. **`factors.delete {id, reason}`** (`admin:mrv.factors`, `DELETE /v1/factors/{id}`, DD-A14). Every version of a factor that no MRV report cites (`error.factorCited`) and that is not the default factor `energy.summary` uses (`error.factorDefault`). Event `EmissionFactorDeleted`, audit `factors.delete`.
+3. **`mrv.deleteDraft {id, reason}`** (`admin:mrv.write`, `DELETE /v1/mrv/{id}`, DD-A14). Every version of a report none of whose versions was reviewed (all `draft`, no review row): CONFLICT `error.reportReviewed` otherwise. The expected version is the latest version (`mrv.get`). Event `MRVReportDeleted`, audit `mrv.deleteDraft`. A reviewed report is a record and stays.
+4. **The reason** is 1–1000 characters after trimming; an unknown ID is NOT_FOUND; a stale version is CONFLICT.
+5. **The screens.** Admin > Energy > Baselines: Delete baseline…. Admin > MRV: Delete report… (on the latest version of an unreviewed report) and, in the factors tab, Delete factor…. All three use one dialog with a required reason. English, Malay and Japanese.
+6. **Counts.** 221 → 224 operations, 242 → 245 routes.
+7. **Tests.** `TestMRVDeletes` (cited and uncited, the default factor, a reviewed report, roles, versions) and the dictionary and contract tests. No E2E in this round.

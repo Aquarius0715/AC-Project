@@ -277,6 +277,7 @@ export type OperationContracts = {
   'automations.simulate': {input:EvaluationInput;result:SimulationResult;mode:'read'};
   'baselines.list': {input:Query;result:Page<EnergyBaseline>;mode:'read'};
   'baselines.save': {input:BaselineInput;result:EnergyBaseline;mode:'write'};
+  'baselines.delete': {input:{id:ID;reason:string};result:DeletedResource;mode:'write'};
   'capabilities.list': {input:Query;result:Page<Capability>;mode:'read'};
   'capabilities.save': {input:Save<Capability> & {changeReason?:string};result:Capability;mode:'write'};
   'capabilities.delete': {input:{id:ID;reason:string};result:DeletedResource;mode:'write'};
@@ -314,6 +315,7 @@ export type OperationContracts = {
   'energy.summary': {input:Range & {unitIds:ID[];baselineId?:ID;tariffVersion?:ID};result:EnergySummary;mode:'read'};
   'factors.list': {input:Query;result:Page<EmissionFactor>;mode:'read'};
   'factors.save': {input:Save<EmissionFactor>;result:EmissionFactor;mode:'write'};
+  'factors.delete': {input:{id:ID;reason:string};result:DeletedResource;mode:'write'};
   'inquiries.answer': {input:{inquiryId:ID;reply:string};result:Inquiry;mode:'write'};
   'inquiries.create': {input:{subjectType:'payment'|'restriction';invoiceId?:ID;restrictionId?:ID;message:string};result:Inquiry;mode:'write'};
   'inquiries.list': {input:Query;result:Page<Inquiry>;mode:'read'};
@@ -358,6 +360,7 @@ export type OperationContracts = {
   'mrv.preview': {input:MRVConditions;result:MRVPreview;mode:'read'};
   'mrv.recordReview': {input:{reportId:ID;reportVersion:number;reviewComment:string};result:MRVReport;mode:'write'};
   'mrv.saveDraft': {input:{id?:ID;conditions:MRVConditions;evidenceIds:ID[]};result:MRVReport;mode:'write'};
+  'mrv.deleteDraft': {input:{id:ID;reason:string};result:DeletedResource;mode:'write'};
   'notifications.list': {input:Query;result:Page<Notification>;mode:'read'};
   'notifications.markAllRead': {input:{ids:ID[]};result:NotificationsMarked;mode:'write'};
   'notifications.markRead': {input:{id:ID};result:Notification;mode:'write'};

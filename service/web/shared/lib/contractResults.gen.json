@@ -333,6 +333,13 @@
   ],
   "items": null
  },
+ "baselines.delete": {
+  "fields": [
+   "deleted",
+   "id"
+  ],
+  "items": null
+ },
  "baselines.list": {
   "fields": [
    "items",
@@ -1385,6 +1392,13 @@
    "tariffVersion",
    "totals",
    "unitIds"
+  ],
+  "items": null
+ },
+ "factors.delete": {
+  "fields": [
+   "deleted",
+   "id"
   ],
   "items": null
  },
@@ -3108,6 +3122,13 @@
    "updatedAt",
    "version"
   ]
+ },
+ "mrv.deleteDraft": {
+  "fields": [
+   "deleted",
+   "id"
+  ],
+  "items": null
  },
  "mrv.get": {
   "fields": [

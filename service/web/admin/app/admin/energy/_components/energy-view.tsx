@@ -8,7 +8,8 @@ import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { baselineDraft, baselineErrors, baselineInput, type BaselineDraft, type BaselineRow, type SummaryView } from "@ac/web/lib/energy";
 import { focusField } from "@ac/web/lib/focusField";
-import { saveBaseline } from "../actions";
+import { deleteBaseline, saveBaseline } from "../actions";
+import { DeleteDialog } from "@ac/web/components/DeleteDialog";
 import { keysOf } from "@ac/web/lib/keysOf";
 import { Icon } from "@ac/web/components/Icon";
 import { DateTimeSelect } from "@ac/web/components/TimeSelect";
@@ -101,6 +102,7 @@ function Baselines({ live, l }: Readonly<{ live: EnergyLive; l: NonNullable<Ener
   const nav = useUrlPatch();
   const [pending, run] = useAction();
   const [creating, setCreating] = useState(false);
+  const [removing, setRemoving] = useState(false);
   const sel = creating ? null : l.rows.find((r) => r.id === l.selectedId) ?? null;
   const selKey = sel ? `${sel.id}:${String(sel.version)}` : "none";
   const key = creating ? "new" : selKey;
@@ -160,11 +162,13 @@ function Baselines({ live, l }: Readonly<{ live: EnergyLive; l: NonNullable<Ener
               <Field label={t("Assumptions")} error={fieldError("assumptions")} hint={t("1–2000 characters")}><Textarea id={ids.assumptions} value={d.assumptions} maxLength={2000} onChange={(e) => { set({ assumptions: e.target.value }); }} /></Field>
               <Field label={t("Source")} error={fieldError("source")}><Input id={ids.source} value={d.source} maxLength={500} onChange={(e) => { set({ source: e.target.value }); }} placeholder={t("Demo source (fictional)")} /></Field>
               {sel && <Banner tone="warn">{t("MRV reports that already reference version {v} keep version {v}. Results are labelled “adjusted” only if an adjustment model exists — none does in this demo.", { v: sel.version })}</Banner>}
-              {live.canWrite && <div className="flex justify-end gap-2">{creating ? <Btn onClick={() => { setCreating(false); }}>{t("Cancel")}</Btn> : <Btn disabled={pending} onClick={() => { setD(baselineDraft(sel?.b)); setTried(false); }}>{t("Discard")}</Btn>}<Btn variant="primary" disabled={pending} onClick={save}>{sel ? t("Save as version {n}", { n: sel.version + 1 }) : t("Create baseline")}</Btn></div>}
+              {live.canWrite && <div className="flex justify-end gap-2">{creating ? <Btn onClick={() => { setCreating(false); }}>{t("Cancel")}</Btn> : <Btn disabled={pending} onClick={() => { setD(baselineDraft(sel?.b)); setTried(false); }}>{t("Discard")}</Btn>}{sel && <Btn variant="danger" disabled={pending} onClick={() => { setRemoving(true); }}>{t("Delete baseline…")}</Btn>}<Btn variant="primary" disabled={pending} onClick={save}>{sel ? t("Save as version {n}", { n: sel.version + 1 }) : t("Create baseline")}</Btn></div>}
             </div>
           </Card>
         ) : <Card title={t("Baseline")}><EmptyState title={t("Nothing selected")}>{t("Choose a baseline or create one.")}</EmptyState></Card>}
       </div>
+      {removing && sel && <DeleteDialog title={t("Delete baseline")} text={t("Delete baseline {id}? Every version goes. A baseline an MRV report cites cannot be deleted.", { id: sel.id.slice(0, 8) })} pending={pending}
+        onClose={() => { setRemoving(false); }} onConfirm={(reason) => { run(() => deleteBaseline(sel.id, sel.version, reason), t("Baseline deleted"), () => { setRemoving(false); nav({ baselineId: null }); }); }} />}
     </>
   );
 }
