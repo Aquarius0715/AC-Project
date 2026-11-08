@@ -1,13 +1,15 @@
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { intlTag, isLocale, showRecent, showSpan, showTime, translate, translator, zonedInstant, zonedParts } from "@ac/web/lib/i18n";
+import { DICTIONARIES, intlTag, isLocale, showRecent, showSpan, showTime, translate, translator, zonedInstant, zonedParts, type Locale } from "@ac/web/lib/i18n";
+import { ja } from "@ac/web/lib/i18n-ja";
 import { ms } from "@ac/web/lib/i18n-ms";
+import { ordinal } from "@ac/web/lib/partnerJobDetail";
 import { ROLES } from "@ac/web/lib/nav";
 import { consentNote } from "@ac/web/lib/preferences";
 import { byText } from "@ac/web/lib/order";
 import { must } from "./must";
-import { lookup } from "@ac/web/lib/lookup";
+import { entryOf, lookup } from "@ac/web/lib/lookup";
 
 const TEXT_2026_09_16 = "2026-09-16";
 const ASIA_KUALA_LUMPUR = "Asia/Kuala_Lumpur";
@@ -28,12 +30,15 @@ function literalText(literal: string): string | null {
 }
 /** The TypeScript sources under a directory, without dependencies, builds and tests. */
 const sources = (directory: string): string[] => readdirSync(directory, { recursive: true, encoding: "utf8" })
-  .filter((f) => f.split(path.sep).every((part) => !["node_modules", ".next", "tests", "e2e"].includes(part)) && /\.tsx?$/.test(f) && !f.endsWith("i18n-ms.ts"))
+  .filter((f) => f.split(path.sep).every((part) => !["node_modules", ".next", "tests", "e2e"].includes(part)) && /\.tsx?$/.test(f) && !f.endsWith("i18n-ms.ts") && !f.endsWith("i18n-ja.ts"))
   .map((f) => path.join(directory, f));
 
 const names = (text: string) => text.matchAll(/\{(\w+)\}/g).map((m) => must(m[1])).toArray().toSorted(byText);
 
-describe("Display language (FR-X01, AT-X01-N, IR258)", () => {
+/** The dictionaries every check below runs on: each language that is not English (IR639). */
+const LANGUAGES: [Exclude<Locale, "en">, string, Readonly<Record<string, string>>][] = [["ms", "Malay", ms], ["ja", "Japanese", ja]];
+
+describe("Display language (FR-X01, AT-X01-N, IR258, IR639)", () => {
   it("keeps English as the key and falls back to it when Malay has no entry", () => {
     expect([translate("en", "Sign out"), translate("ms", "Sign out")]).toStrictEqual(["Sign out", "Log keluar"]);
     expect(translate("ms", "A text nobody translated yet")).toBe("A text nobody translated yet");
@@ -51,40 +56,62 @@ describe("Display language (FR-X01, AT-X01-N, IR258)", () => {
     expect(translate("en", "{a} and {b}", { a: "x" })).toBe("x and {b}");
   });
 
-  it("keeps every placeholder of an English key in its Malay text", () => {
-    for (const [en, text] of Object.entries(ms)) expect(names(text), en).toStrictEqual(names(en));
+  it("has the same English keys, in the same order, in every dictionary", () => {
+    expect(Object.keys(ja)).toStrictEqual(Object.keys(ms));
+  });
+
+  describe.each(LANGUAGES)("the %s dictionary (%s)", (locale, _name, dictionary) => {
+    it("keeps every placeholder of an English key in its text", () => {
+      for (const [en, text] of Object.entries(dictionary)) expect(names(text), en).toStrictEqual(names(en));
+    });
+    it("is the dictionary translate() reads", () => {
+      expect(entryOf(DICTIONARIES, locale)).toBe(dictionary);
+    });
   });
 
   // NFR-07 / IR44 key check: the English texts the code translates and the dictionary's keys are the same set
   const root = path.resolve(import.meta.dirname, "../../..");
   const code = ["shared", "customer/app", "partner/app", "technician/app", "admin/app"].flatMap((d) => sources(path.join(root, d))).map((f) => readFileSync(f, "utf8")).join("\n");
 
-  it("has a Malay text for every literal the code translates", () => {
+  it.each(LANGUAGES)("has a %s text for every literal the code translates", (_locale, _name, dictionary) => {
     const literals = [
       ...code.matchAll(/\b(?:t\(|translate\(\s*[\w.]+,)\s*"((?:[^"\\]|\\.)*)"/g),
       ...code.matchAll(/<Route(?:Loading|Error) what="((?:[^"\\]|\\.)*)"/g), // the route states translate what loads (IR269)
     ].map((m) => String(JSON.parse(`"${m[1] ?? ""}"`)));
     expect(literals.length).toBeGreaterThan(100);
-    expect([...new Set(literals.filter((text) => !Object.hasOwn(ms, text)))]).toStrictEqual([]);
+    expect([...new Set(literals.filter((text) => !Object.hasOwn(dictionary, text)))]).toStrictEqual([]);
   });
 
-  it("lists each English text once in the Malay dictionary (a renamed key can collide with an existing one)", () => {
-    const keys = readFileSync(path.join(root, "shared/lib/i18n-ms.ts"), "utf8").matchAll(/^\s*("(?:[^"\\]|\\.)*"):/gm).map((m) => m[1]).toArray();
+  it.each(["ms", "ja"])("lists each English text once in the %s dictionary (a renamed key can collide with an existing one)", (locale) => {
+    const keys = readFileSync(path.join(root, `shared/lib/i18n-${locale}.ts`), "utf8").matchAll(/^\s*("(?:[^"\\]|\\.)*"):/gm).map((m) => m[1]).toArray();
     expect(keys.length).toBeGreaterThan(1000);
     expect(keys.filter((k, n) => keys.indexOf(k) !== n)).toStrictEqual([]);
   });
 
   // it searches the whole code once per key: seconds of work, beyond the default 5 s while the other files run beside it
-  it("has no Malay entry the code no longer shows", () => {
+  it("has no entry the code no longer shows (the dictionaries share their keys)", () => {
     const dynamic = new Set(Object.values(ROLES).flatMap((config) => [config.sub, config.chip.split(" — ", 1)[0], ...config.nav.map((i) => i.label)]));
     expect(Object.keys(ms).filter((key) => !dynamic.has(key) && !code.includes(JSON.stringify(key)))).toStrictEqual([]);
   }, 30_000);
+
+  // IR639: a Japanese text is Japanese; only names and formats that read the same in every language stay as written
+  it("leaves in English only the Japanese texts that read the same in every language", () => {
+    const same = Object.entries(ja).filter(([key, text]) => text === (key.includes("::") ? key.slice(key.indexOf("::") + 2) : key)).map(([key]) => key);
+    expect(same).toStrictEqual(["CO2", "PM2.5", "CO₂", "WhatsApp", "MRV", "{field} — {problem}", "v{version} · {state}", "fw {version}", "RTO", "HH:MM – HH:MM", "{from} – {to}"]);
+  });
+  it("writes every Japanese text with Japanese characters unless it is a name or a format", () => {
+    const proper = new Set(["CO2", "PM2.5", "CO₂", "WhatsApp", "MRV", "RTO"]);
+    const japanese = /[\u{3040}-\u{30FF}\u{4E00}-\u{9FFF}]/u;
+    // a text of placeholders, numbers and signs alone ("{from}～{to}") has no word to translate
+    const english = Object.entries(ja).filter(([key, text]) => !proper.has(key) && !japanese.test(text) && /[A-Za-z]{4,}/.test(text.replaceAll(/\{\w+\}/g, ""))).map(([key]) => key);
+    expect(english).toStrictEqual([]);
+  });
 
   it("speaks to customers, contractors, technicians and HQ without error codes or spec IDs (IR584, IR585, IR587, IR590, IR591, IR595, IR622, IR626)", () => {
     const files = ["customer/app", "partner/app", "technician/app", "admin/app", "shared/lib", "shared/components", "shared/screens"].flatMap((d) => sources(path.join(root, d)));
     // each string literal as written in the source, read as the text it stands for
     const strings = files.flatMap((f) => readFileSync(f, "utf8").matchAll(/"((?:[^"\\\n]|\\.)*)"/g).map((m) => literalText(`"${m[1] ?? ""}"`)).filter((x) => x !== null).toArray());
-    const texts = [...new Set(strings.filter((text) => Object.hasOwn(ms, text)))]; // every literal the dictionary translates, maps of texts included
+    const texts = [...new Set(strings.filter((text) => Object.hasOwn(ms, text)))]; // every literal the dictionaries translate (they share their keys), maps of texts included
     expect(texts.length).toBeGreaterThan(100);
     // screen IDs as well ("Access & roles (A03)")
     const coded = /\b(?:IR\d+|(?:FR|DD|BR|NFR|DEC|AT|SCR|DDC|REV)-[A-Z]*\d+|SR\d+|D\d{2,})\b|^(?:CONFLICT|NOT_FOUND|FORBIDDEN|UNAVAILABLE|VALIDATION|TIMEOUT|OFFLINE)\b|\((?:CONFLICT|NOT_FOUND|FORBIDDEN|UNAVAILABLE|VALIDATION|TIMEOUT|OFFLINE)\)|\([ACPTX]\d{2}[a-z]?\)/;
@@ -104,29 +131,50 @@ describe("Display language (FR-X01, AT-X01-N, IR258)", () => {
     expect(Object.keys(ms).filter((text) => named.test(text.replaceAll(/\{\w+\}/g, "")))).toStrictEqual([]);
   });
 
-  // IR624: the apps speak English and Malay; a Japanese term of the specification ("受領") once reached the partner's schedule
-  it("shows no Japanese term in a text the apps translate", () => {
+  // IR624: the keys are English; a Japanese term of the specification ("受領") once reached the partner's schedule as one
+  it("shows no Japanese term in an English key", () => {
     expect(Object.keys(ms).filter((text) => /[\u{3040}-\u{30FF}\u{4E00}-\u{9FFF}]/u.test(text))).toStrictEqual([]);
   });
 
-  it("names every sidebar item and the role words of the four apps in Malay", () => {
+  it.each(LANGUAGES)("names every sidebar item and the role words of the four apps in %s", (_locale, _name, dictionary) => {
     for (const config of Object.values(ROLES)) {
-      const translated = config.nav.filter((i) => i.label !== "MRV"); // the MRV label is the same in both languages
-      for (const item of translated) expect(ms[item.label], item.label).toBeTruthy();
-      expect(ms[config.sub], config.sub).toBeTruthy();
+      const translated = config.nav.filter((i) => i.label !== "MRV"); // the MRV label is the same in every language
+      for (const item of translated) expect(lookup(dictionary, item.label), item.label).toBeTruthy();
+      expect(lookup(dictionary, config.sub), config.sub).toBeTruthy();
       const word = must(config.chip.split(" — ", 1)[0]); // the role chip of the header
-      expect(lookup(ms, word), word).toBeTruthy();
+      expect(lookup(dictionary, word), word).toBeTruthy();
     }
   });
 
   it("puts the consent line in the display language", () => {
     const c = { id: "c1", version: 2, granted: true, grantedAt: "2026-09-14T01:00:00Z", revokedAt: null };
     expect([consentNote(c, translator("ms")), consentNote(null, translator("ms"))]).toStrictEqual(["Diberikan 2026-09-14", "Belum diberikan"]);
+    expect([consentNote(c, translator("ja")), consentNote(null, translator("ja"))]).toStrictEqual(["2026-09-14 に同意", "まだ同意していません"]);
   });
 
-  it("accepts only the two locales and formats both for Malaysia", () => {
-    expect([isLocale("en"), isLocale("ms"), isLocale("ja"), isLocale(null)]).toStrictEqual([true, true, false, false]);
-    expect([intlTag("en"), intlTag("ms")]).toStrictEqual(["en-MY", "ms-MY"]);
+  it("speaks Japanese, with the same placeholders and fallbacks as Malay (IR639)", () => {
+    expect([translate("ja", "Sign out"), translate("ja", "Not saved: {reason}", { reason: "conflict" })]).toStrictEqual(["ログアウト", "保存できませんでした: conflict"]);
+    expect([translate("ja", "tamper::Clear"), translate("ja", "Clear")]).toStrictEqual(["解除", "クリア"]);
+    expect(translate("ja", "A text nobody translated yet")).toBe("A text nobody translated yet");
+    expect(translate("ja", "nobody::Untranslated")).toBe("Untranslated");
+  });
+
+  it("counts in each language: 1st, ke-1, 第1", () => {
+    expect([ordinal(1), ordinal(2), ordinal(11), ordinal(3, "ms"), ordinal(3, "ja")]).toStrictEqual(["1st", "2nd", "11th", "ke-3", "第3"]);
+  });
+
+  it("accepts only the three locales; English and Malay format for Malaysia, Japanese for Japan", () => {
+    expect([isLocale("en"), isLocale("ms"), isLocale("ja"), isLocale("fr"), isLocale(null)]).toStrictEqual([true, true, true, false, false]);
+    expect([intlTag("en"), intlTag("ms"), intlTag("ja")]).toStrictEqual(["en-MY", "ms-MY", "ja-JP"]);
+  });
+
+  it("shows a Japanese date and time with the zone's abbreviation, as in English (IR639)", () => {
+    const display = { locale: "ja" as const, timeZone: ASIA_KUALA_LUMPUR };
+    const text = showTime("2026-09-14T01:00:00Z", display);
+    expect(text).toBe("2026/09/14 9:00 MYT"); // Japan's medium date, and the zone is MYT, not GMT+8
+    expect(showTime("2026-09-14T01:00:00Z", { locale: "ja", timeZone: ASIA_TOKYO })).toBe("2026/09/14 10:00 GMT+9");
+    // English and Malay keep the abbreviations of their own data (the Malay one says SGT for Singapore)
+    expect(showTime("2026-09-14T01:00:00Z", { locale: "ms", timeZone: "Asia/Singapore" })).toMatch(/SGT$/);
   });
 
   it("reads a typed date and time in the display time zone and prefills it back (NFR-08)", () => {

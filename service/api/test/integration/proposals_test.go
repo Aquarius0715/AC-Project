@@ -9,6 +9,7 @@ import (
 
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/seed"
+	apiserver "github.com/pradita/ac-project/service/api/internal/server"
 )
 
 const (
@@ -1567,12 +1568,15 @@ func TestPartnerProposalEndsWithOffer(t *testing.T) {
 	ended(job, partner)
 }
 
-// TestDeclineWithdrawsClientProposal (IR445): a contractor that declines its offer while HQ has sent its time change to
-// the client ends that client proposal too, so the client's acceptance cannot offer the job again to that company.
-//
-//nolint:paralleltest // the integration tests share one server and the seeded test database
-func TestDeclineWithdrawsClientProposal(t *testing.T) {
-	srv := server(t)
+// openedProposals names what openProposals leaves.
+type openedProposals struct{ job, offer, partner, proposal string }
+
+// openProposals leaves a job offered to contractor-a with the company's time change waiting at HQ and HQ's proposal of
+// it waiting for the client (IR444, IR445). It returns the job, the offer, the time change and the client proposal; the
+// job's version is 4 afterwards.
+func openProposals(t *testing.T, srv *apiserver.Server) openedProposals {
+	t.Helper()
+
 	owner(
 		t,
 		`UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = $1 AND status = 'active' AND
@@ -1591,6 +1595,9 @@ func TestDeclineWithdrawsClientProposal(t *testing.T) {
 	)
 
 	job := asStr(t, data(resp)["id"])
+
+	var offer, partner, proposal string
+
 	if code, res := write(
 		srv,
 		hq(),
@@ -1609,7 +1616,6 @@ func TestDeclineWithdrawsClientProposal(t *testing.T) {
 		t.Fatalf("offer: %d %v", code, res)
 	}
 
-	var offer, partner, proposal string
 	ownerScan(
 		t,
 		`SELECT id::text FROM maintenance.offers WHERE job_id = $1 AND decision IS NULL`,
@@ -1654,6 +1660,18 @@ func TestDeclineWithdrawsClientProposal(t *testing.T) {
 		&proposal,
 	)
 
+	return openedProposals{job: job, offer: offer, partner: partner, proposal: proposal}
+}
+
+// TestDeclineWithdrawsClientProposal (IR445): a contractor that declines its offer while HQ has sent its time change to
+// the client ends that client proposal too, so the client's acceptance cannot offer the job again to that company.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
+func TestDeclineWithdrawsClientProposal(t *testing.T) {
+	srv := server(t)
+	opened := openProposals(t, srv)
+	job, offer, partner, proposal := opened.job, opened.offer, opened.partner, opened.proposal
+
 	if code, res := write(
 		srv,
 		contrA(),
@@ -1697,6 +1715,67 @@ func TestDeclineWithdrawsClientProposal(t *testing.T) {
 
 	if offers != 1 {
 		t.Errorf("offers after the decline: %d", offers)
+	}
+}
+
+// TestCancelWithdrawsOpenProposals (IR444, IR445): HQ cancelling a job ends the proposals still open on it: the
+// company's time change waiting for HQ and HQ's proposal waiting for the client, so neither is answered on a cancelled
+// job. The offer ends too (declined as job_cancelled).
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
+func TestCancelWithdrawsOpenProposals(t *testing.T) {
+	srv := server(t)
+	opened := openProposals(t, srv)
+	job, offer, partner, proposal := opened.job, opened.offer, opened.partner, opened.proposal
+
+	if code, res := write(
+		srv,
+		hq(),
+		"jobs.cancel",
+		`{"jobId":"`+job+`","cancelReason":"the customer withdrew"}`,
+		4,
+	); code != 200 {
+		t.Fatalf("cancel: %d %v", code, res)
+	}
+
+	var clientStatus, partnerStatus, decision, reason string
+	ownerScan(
+		t,
+		`SELECT (SELECT status FROM maintenance.slot_proposals WHERE id = $1),
+			(SELECT status FROM maintenance.partner_slot_proposals WHERE id = $2),
+			(SELECT decision FROM maintenance.offers WHERE id = $3),
+			(SELECT decline_reason FROM maintenance.offers WHERE id = $3)`,
+		[]any{proposal, partner, offer},
+		&clientStatus,
+		&partnerStatus,
+		&decision,
+		&reason,
+	)
+
+	if clientStatus != statusWithdrawn || partnerStatus != statusWithdrawn {
+		t.Errorf(
+			"after the cancel: client proposal %s, time change %s",
+			clientStatus,
+			partnerStatus,
+		)
+	}
+
+	if decision != "decline" || reason != "job_cancelled" {
+		t.Errorf(
+			"after the cancel the offer is %q (%q), want a decline as job_cancelled",
+			decision,
+			reason,
+		)
+	}
+
+	if code, _ := write(
+		srv,
+		customerA(),
+		"jobs.respondProposal",
+		`{"jobId":"`+job+`","proposalId":"`+proposal+`","decision":"accept"}`,
+		5,
+	); code != 409 {
+		t.Errorf("the client accepted a proposal on a cancelled job: %d", code)
 	}
 }
 

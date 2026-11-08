@@ -2,7 +2,7 @@
 // (Malay puts the shell and the screen in Malay), a client's location consent and monthly report e-mail too, and
 // two-step verification turns on (setup QR, six code boxes, recovery codes once) and off. Every change is put back.
 import { test, expect } from "../../fixtures/test";
-import { displayZone, ENGLISH, savePreferences as save, setDisplay } from "../../fixtures/display";
+import { displayZone, ENGLISH, JAPANESE, savePreferences as save, setDisplay } from "../../fixtures/display";
 import { expectAccessible } from "../../fixtures/a11y";
 
 // English and the earlier zone come back at the end of the language test, or here when it fails (also on a timeout)
@@ -35,6 +35,26 @@ test("language and time zone are saved and read back", async ({ page }) => {
   zoneBefore = null;
   await page.reload();
   await expect(page.locator("main select").first()).toHaveValue(before);
+  await expect(page.getByRole("button", { name: ENGLISH })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
+});
+
+test("Japanese is saved and read back, with the shell, the screen and the times in Japanese (IR639)", async ({ page }) => {
+  const before = await displayZone(page);
+  zoneBefore = before;
+  await page.getByRole("button", { name: JAPANESE }).click();
+  await save(page);
+  await page.reload();
+  await expect(page.getByRole("button", { name: JAPANESE })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("html")).toHaveAttribute("lang", "ja"); // the page declares the language it speaks
+  await expect(page.getByRole("button", { name: "ログアウト" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "設定", exact: true })).toBeVisible();
+  await expect(page.getByText("表示言語", { exact: true })).toBeVisible();
+  await page.goto("/notifications");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("通知");
+  await setDisplay(page, ENGLISH, before);
+  zoneBefore = null;
+  await page.reload();
   await expect(page.getByRole("button", { name: ENGLISH })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
 });

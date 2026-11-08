@@ -8,6 +8,7 @@
 import { refresh } from "next/cache";
 import { coreOp, CoreError } from "@ac/web/lib/dal";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
+import type { Locale } from "@ac/web/lib/i18n";
 
 type Result<T> = { ok: true; value: T } | ({ ok: false } & ActionFailure);
 const run = async <T,>(fn: () => Promise<T>): Promise<Result<T>> => {
@@ -26,7 +27,7 @@ const run = async <T,>(fn: () => Promise<T>): Promise<Result<T>> => {
 
 /** preferences.update with the display language and time zone (and a client's monthly report e-mail); a changed
 location consent goes with it. */
-export async function savePreferences(input: { locale: "en" | "ms"; timezone: string; monthlyReportEmail?: boolean }, consent: { granted: boolean; version: number } | null) {
+export async function savePreferences(input: { locale: Locale; timezone: string; monthlyReportEmail?: boolean }, consent: { granted: boolean; version: number } | null) {
   return run(async () => {
     await coreOp("preferences.update", input, { write: true });
     if (consent) await coreOp("consents.update", { purpose: "location_automation", granted: consent.granted }, { write: true, expectedVersion: consent.version });

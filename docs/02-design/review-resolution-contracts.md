@@ -9057,6 +9057,18 @@ The user found it a chore to type a time as digits, a colon and digits, and aske
 6. **Not changed.** Date-only fields stay native date inputs, with the browser's calendar. The contact-window text of a maintenance request is free text and keeps its `HH:mm` hint.
 7. **Tests.** Vitest covers the string handling (`timeParts`) and the pickers in a `Field`; the Playwright specs that filled a date-and-time field use `pickDateTime` (the date typed, the hour and minute chosen).
 
+## IR639 Japanese is a third display language (DEC-99) — 2026-11-08
+
+The user asked for Japanese to be selectable beside English and Malay, with every text translated and the voice assistant understanding Japanese.
+
+1. **The language.** `Locale` is `en|ms|ja` in `service-contracts.ts`, in the Go validators of `preferences.update` and `voice.resolveIntent`, and in the `CHECK`s of `identity.preferences.locale` and `notify.templates.locale`. Preferences, the Assistant's language select and the browser demo offer "日本語" under its own name. Anything else is still VALIDATION.
+2. **The texts.** `shared/lib/i18n-ja.ts` holds a Japanese text for each of the 5,754 English keys of `i18n-ms.ts`, in the same order, with the same `{placeholders}`. The key check of IR44 now runs on both dictionaries: every literal the code translates has a text in each, no entry is unused, no key repeats, every placeholder is kept, and no Japanese text stays English except names and formats that read the same (CO2, WhatsApp, MRV, RTO, templates of placeholders). The text is a draft until Business / UI / UX review it, like the Malay one.
+3. **Dates and times.** Japanese uses `ja-JP` formats ("2026/09/14 9:00 MYT"). Japanese takes the zone abbreviation from the English data, because `ja-JP` names Kuala Lumpur and Singapore "GMT+8"; English and Malay keep the abbreviations of their own data (the Malay one says SGT for Singapore, as before). One helper (`zoneName`) serves the times and the automation run times. Ordinals read "第1" (`partnerJobDetail.ordinal`).
+4. **Voice.** `voice.resolveIntent` accepts `温度 <room>`, `<room>を<integer>度に設定` and `ヘルプ` for `ja`, matched like the other grammars (the room by its exact Space name). An English phrase in Japanese, or the reverse, is unsupported.
+5. **A fixed bug.** The customer's report export saved the language as `en` or `ms` only, so a Japanese user who turned the monthly e-mail on would have been put back to English; it now keeps any language.
+6. **The payout PDF.** The statement PDF has a Courier font and ASCII only (everything else printed as "-"), so a Japanese user's PDF is written in English; the screen is Japanese.
+7. **Tests.** Vitest runs the dictionary checks per language and covers the Japanese date, the ordinal, the assistant's examples against the grammar, the PDF and the locale list; the Go integration tests save `ja` and resolve the three phrases; Playwright saves Japanese in Preferences, reads the shell back in Japanese and puts English back.
+
 
 ## IR647 An amount in minor units stays within the safe-integer range (review round 13) — 2026-11-08
 
