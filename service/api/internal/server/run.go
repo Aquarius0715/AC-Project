@@ -184,11 +184,20 @@ func identityProvider(values []string) (*idp.Keycloak, error) {
 		}
 	}
 
+	// IDP_PUBLIC_URL is optional: the address people open the identity provider by, when it answers on several (IR651)
+	public := os.Getenv("IDP_PUBLIC_URL")
+	if public != "" {
+		u, err := url.Parse(public)
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+			return nil, fmt.Errorf("IDP_PUBLIC_URL: %w", errNotHTTPURL)
+		}
+	}
+
 	return &idp.Keycloak{
 		TokenURL:     values[0],
 		AdminURL:     strings.TrimRight(values[1], "/"),
 		ClientID:     values[2],
-		ClientSecret: values[3], Client: nil, Now: nil,
+		ClientSecret: values[3], PublicURL: public, Client: nil, Now: nil,
 	}, nil
 }
 

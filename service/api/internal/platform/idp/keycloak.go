@@ -48,8 +48,13 @@ type Keycloak struct {
 	AdminURL     string // the realm's admin API, e.g. http://keycloak:8080/admin/realms/ac
 	ClientID     string // a confidential client whose service account holds realm-management manage-users
 	ClientSecret string
-	Client       *http.Client
-	Now          func() time.Time
+	// PublicURL is the address people reach the identity provider by (IDP_PUBLIC_URL, IR651), e.g.
+	// http://10.100.1.17:8281. When the provider takes its host name from the request (several addresses for one
+	// deployment), the links in its e-mails come from the request's forwarded host: every request of this client names
+	// it, so a set-up link points at an address people can open, not at the internal one.
+	PublicURL string
+	Client    *http.Client
+	Now       func() time.Time
 
 	mu    sync.Mutex
 	token string
@@ -79,6 +84,7 @@ func (k *Keycloak) EndSessions(ctx context.Context, subject string) error {
 	}
 
 	req.Header.Set("Authorization", "Bearer "+tok)
+	k.forward(req)
 
 	res, err := k.client().Do(req)
 	if err != nil {
@@ -256,6 +262,18 @@ func (k *Keycloak) SetEnabled(ctx context.Context, subject string, enabled bool)
 	return &statusError{what: "enable", code: res.StatusCode}
 }
 
+// forward names the public address of the identity provider on a request, for the provider to build its links from
+// (X-Forwarded-Host and -Proto); nothing when PublicURL is unset or is no address.
+func (k *Keycloak) forward(req *http.Request) {
+	public, err := url.Parse(k.PublicURL)
+	if k.PublicURL == "" || err != nil || public.Host == "" {
+		return
+	}
+
+	req.Header.Set("X-Forwarded-Host", public.Host)
+	req.Header.Set("X-Forwarded-Proto", public.Scheme)
+}
+
 func (k *Keycloak) client() *http.Client {
 	if k.Client != nil {
 		return k.Client
@@ -298,6 +316,7 @@ func (k *Keycloak) accessToken(ctx context.Context) (string, error) {
 	}
 
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	k.forward(req)
 
 	res, err := k.client().Do(req)
 	if err != nil {
@@ -351,6 +370,7 @@ func (k *Keycloak) do(ctx context.Context, method, path string, body any) (*http
 	}
 
 	req.Header.Set("Authorization", "Bearer "+tok)
+	k.forward(req)
 
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")

@@ -1,13 +1,13 @@
 import { createHash, randomBytes } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { loginHint, uiLocale } from "@ac/web/lib/login";
-import { OIDC_COOKIE, oidcConfig, oidcCookieOptions, safeReturnTo, seal } from "@ac/web/lib/session";
+import { OIDC_COOKIE, oidcConfigFor, oidcCookieOptions, safeReturnTo, seal } from "@ac/web/lib/session";
 
 // GET /bff/auth/login?login_hint=<e-mail>&returnTo=<path>[&ui_locales=en|ms|ja][&reauth=1]: starts the OIDC authorization-code flow with
 // PKCE. reauth=1 asks the identity provider for the password again (prompt=login): after HQ signed the user out
 // everywhere, its single sign-on would answer with the old sign-in, which the Core API refuses (IR385).
 export function GET(req: NextRequest) {
-  const config = oidcConfig();
+  const config = oidcConfigFor(req.headers.get("host")); // the listed address the browser came by (IR651)
   const state = randomBytes(16).toString("base64url");
   const verifier = randomBytes(32).toString("base64url");
   const challenge = createHash("sha256").update(verifier).digest("base64url");

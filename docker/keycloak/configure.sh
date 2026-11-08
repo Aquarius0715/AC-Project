@@ -24,4 +24,29 @@ SERVER=${KEYCLOAK_INTERNAL_URL:-http://keycloak:8080}
 # HQ Admin has its own title and accent
 id=$("$KC" get clients -r ac -q clientId=ac-admin-web --fields id --format csv --noquotes)
 "$KC" update "clients/$id" -r ac -s 'attributes.login_theme=ac-hq'
+# the apps answer on more than one address (PUBLIC_HOSTS, IR651): each address of each app may return a sign-in
+if [ -n "${PUBLIC_HOSTS:-}" ]; then
+  # urls_on_hosts URL...: every URL on its own host and on each listed host, as the quoted, comma-separated URIs
+  urls_on_hosts() {
+    out=""
+    for url in "$@"; do
+      scheme=${url%%://*}
+      rest=${url#*://}
+      hostport=${rest%%/*}
+      port=${hostport#*:}
+      [ "$port" = "$hostport" ] && port="" || port=":$port"
+      out="$out\"$url/*\","
+      for host in $(printf '%s' "$PUBLIC_HOSTS" | tr ',' ' '); do
+        out="$out\"$scheme://$host$port/*\","
+      done
+    done
+    printf '%s' "${out%,}"
+  }
+  origins() { printf '%s' "$1" | sed 's#/\*"#"#g'; }
+  web=$(urls_on_hosts "${CUSTOMER_WEB_URL%/}" "${PARTNER_WEB_URL%/}" "${TECHNICIAN_WEB_URL%/}")
+  admin=$(urls_on_hosts "${ADMIN_WEB_URL%/}")
+  webid=$("$KC" get clients -r ac -q clientId=ac-web --fields id --format csv --noquotes)
+  "$KC" update "clients/$webid" -r ac -s "redirectUris=[$web]" -s "webOrigins=[$(origins "$web")]"
+  "$KC" update "clients/$id" -r ac -s "redirectUris=[$admin]" -s "webOrigins=[$(origins "$admin")]"
+fi
 echo "realm ac: AC Project sign-in themes and languages are set"

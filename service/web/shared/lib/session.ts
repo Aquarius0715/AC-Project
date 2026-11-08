@@ -9,6 +9,7 @@ import { cookies } from "next/headers";
 import { createClient } from "@redis/client";
 import { z } from "zod";
 import { filled } from "@ac/web/lib/filled";
+import { addressFor, issuerHeaders } from "@ac/web/lib/publicOrigin";
 
 
 const roleSchema = z.enum(["client", "contractor", "technician", "admin"]);
@@ -136,7 +137,7 @@ export async function refresh(s: Session): Promise<Session | null> {
   try {
     const r = await fetch(`${roleConfig.internalIssuer}/protocol/openid-connect/token`, {
       method: "POST", cache: "no-store",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      headers: { "Content-Type": "application/x-www-form-urlencoded", ...issuerHeaders(s.refreshToken) },
       body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: s.refreshToken, client_id: roleConfig.clientId, client_secret: roleConfig.clientSecret }),
     });
     if (!r.ok) return null;
@@ -158,7 +159,7 @@ export async function endIdpSession(refreshToken: string): Promise<boolean> {
   try {
     const r = await fetch(`${roleConfig.internalIssuer}/protocol/openid-connect/logout`, {
       method: "POST", cache: "no-store",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      headers: { "Content-Type": "application/x-www-form-urlencoded", ...issuerHeaders(refreshToken) },
       body: new URLSearchParams({ refresh_token: refreshToken, client_id: roleConfig.clientId, client_secret: roleConfig.clientSecret }),
       signal: AbortSignal.timeout(3000),
     });
@@ -332,6 +333,13 @@ export function jwtClaims(token: string): Record<string, unknown> {
   } catch {
     return {};
   }
+}
+
+/** oidcConfig for a request that came by `hostHeader`: the issuer the browser is sent to and the app's own address take
+the listed host the request named (PUBLIC_HOSTS, IR651), so a sign-in started on one address returns to that address. */
+export function oidcConfigFor(hostHeader: string | null | undefined) {
+  const base = oidcConfig();
+  return { ...base, issuer: addressFor(base.issuer, hostHeader), appUrl: addressFor(base.appUrl, hostHeader) };
 }
 
 export function oidcConfig() {

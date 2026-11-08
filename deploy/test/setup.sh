@@ -58,6 +58,8 @@ PARTNER_WEB_URL=http://$host:3201
 TECHNICIAN_WEB_URL=http://$host:3202
 ADMIN_WEB_URL=http://$host:3203
 KEYCLOAK_URL=http://$host:8281
+# more than one address (IR651): the lab network and the Tailnet, the canonical one first, e.g.
+# PUBLIC_HOSTS=10.100.1.17,100.99.169.116
 KEYCLOAK_REALM_FILE=$ROOT/realm-ac.json
 # this environment's own secrets, in place of the local values in compose.yaml and the realm
 KEYCLOAK_ADMIN_PASSWORD=$(secret)

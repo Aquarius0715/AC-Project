@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.507.0 / Created: 2026-09-14 / Updated: 2026-11-07 / Status: Draft for review / Language: English
+Version: 0.508.0 / Created: 2026-09-14 / Updated: 2026-11-07 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -100,6 +100,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.508.0 (2026-11-08): The shared test environment answers on several addresses listed in `PUBLIC_HOSTS`: the sign-in goes to Keycloak on the address it started on and returns to it (DEC-102, IR651).
 0.507.0 (2026-11-08): The AI assistant is removed: the Client header button and panel, `voice.resolveIntent` (212 operations, 233 routes), the microphone consent and the `voice` source of a command; FR-X02 is withdrawn and BIZ-03 is out of scope (DEC-101, IR648).
 0.506.0 (2026-11-08): The sign-in pages are product pages: the e-mail address, then the identity provider's own AC Project pages for the password, the one-time code and a reset, in the language chosen on the page; the demo-account button is gone (DEC-100, IR646).
 0.505.0 (2026-11-08): Japanese is a third display language beside English and Malay: every translated text, the voice assistant's grammar and the date and time formats (DEC-99, IR639).

@@ -1,0 +1,33 @@
+# The shared test environment on more than one address (IR651): compose.yaml and compose.test.yaml with this file on
+# top when the server's environment file lists PUBLIC_HOSTS (deploy.sh adds it). The same apps and Keycloak then answer
+# on each listed host (for example the lab network's address and the Tailnet's): a sign-in that starts on one comes back
+# to it.
+#
+# Keycloak builds its links, its issuer and its pages from the host of the request instead of one fixed host name. A
+# header anyone can send must not choose that host (a password-reset e-mail would link wherever the sender said), so
+# the published port is nginx's: it answers 421 for a host that is not listed, and gives Keycloak the host it checked in
+# X-Forwarded-Host. Keycloak itself is on the compose network only. The tokens of a sign-in name the address it started
+# on, so the APIs accept the issuer of each listed address (API_OIDC_ISSUER, set by deploy.sh).
+services:
+  keycloak:
+    environment:
+      KC_HOSTNAME: !reset null
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: !reset null
+      KC_HOSTNAME_STRICT: "false"
+      KC_PROXY_HEADERS: xforwarded
+    ports: !reset []
+  keycloak-edge:
+    image: nginx:1.29-alpine@sha256:5616878291a2eed594aee8db4dade5878cf7edcb475e59193904b198d9b830de   # pinned by digest (IR373)
+    restart: unless-stopped
+    environment:
+      PUBLIC_HOSTS: ${PUBLIC_HOSTS:?PUBLIC_HOSTS lists the addresses Keycloak answers on}
+    ports: ["${PUBLISH_ADDR:-127.0.0.1}:${KEYCLOAK_PORT:-8081}:80"]
+    volumes:
+      - "./deploy/test/keycloak-edge.conf.template:/etc/nginx/templates/default.conf.template:ro"
+      - "./deploy/test/keycloak-edge-hosts.sh:/docker-entrypoint.d/05-hosts.sh:ro"
+    depends_on: { keycloak: { condition: service_healthy } }
+    networks: [edge, app]
+    profiles: [infra, backend, full]
+  identity-api:
+    environment:
+      IDP_PUBLIC_URL: ${KEYCLOAK_URL:?KEYCLOAK_URL is the address the e-mails of Keycloak link to}
