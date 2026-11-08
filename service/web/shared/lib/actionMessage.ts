@@ -56,6 +56,8 @@ const keyText: Record<string, string> = {
   "error.orgHasProfile": "This organization still has a customer or contractor profile — delete that first",
   "error.orgHasUsers": "This organization still has users — remove them first",
   "error.orgOperator": "The operator organization cannot be deleted",
+  "error.planHasJobs": "This plan has made a job, so it cannot be deleted",
+  "error.rateCardStarted": "This rate card has started, so it cannot be deleted",
   "error.notBound": "This device is not bound to a unit",
   "error.modelInUse": "Units still use this model — change their model first",
   "error.modelInCampaign": "A firmware campaign names this model, so it cannot be deleted",

@@ -21922,6 +21922,122 @@
                         }
                     }
                 }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Authorization: admin:job.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR655 only a plan that has made no job (CONFLICT error.planHasJobs)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A06",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "plans"
+                ],
+                "summary": "plans.delete (write)",
+                "operationId": "plans.delete",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "D04: the same key replays the stored response; another body for the same key is CONFLICT",
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "all: required (target plans, read plans.get)",
+                        "name": "X-Expected-Version",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "input field id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "input field reason",
+                        "name": "reason",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ops.Envelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/maintenance.DeletedResource"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "403": {
+                        "description": "FORBIDDEN",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "409": {
+                        "description": "CONFLICT / OFFLINE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "422": {
+                        "description": "VALIDATION (fieldErrors)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "429": {
+                        "description": "RATE_LIMITED (retryAfterSeconds)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "503": {
+                        "description": "UNAVAILABLE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "504": {
+                        "description": "TIMEOUT",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    }
+                }
             }
         },
         "/v1/plans/{id}/generate-next": {
@@ -23571,6 +23687,117 @@
                                     "properties": {
                                         "data": {
                                             "$ref": "#/definitions/maintenance.RateCard"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "403": {
+                        "description": "FORBIDDEN",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "409": {
+                        "description": "CONFLICT / OFFLINE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "422": {
+                        "description": "VALIDATION (fieldErrors)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "429": {
+                        "description": "RATE_LIMITED (retryAfterSeconds)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "503": {
+                        "description": "UNAVAILABLE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "504": {
+                        "description": "TIMEOUT",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/rate-cards/{id}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Authorization: admin:job.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR655 only a rate card that has not started (CONFLICT error.rateCardStarted)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A21",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "rateCards"
+                ],
+                "summary": "rateCards.delete (write)",
+                "operationId": "rateCards.delete",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "D04: the same key replays the stored response; another body for the same key is CONFLICT",
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "input field id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "input field reason",
+                        "name": "reason",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ops.Envelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/maintenance.DeletedResource"
                                         }
                                     }
                                 }

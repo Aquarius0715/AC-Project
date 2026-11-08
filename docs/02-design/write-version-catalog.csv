@@ -118,6 +118,7 @@ payouts.generate,all,none,payouts.list,omit,none,D01; version mismatch CONFLICT;
 payouts.query,all,payout_statement,payouts.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 payouts.resolveQuery,all,payout_statement,payouts.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 payouts.transition,all,payout_statement,payouts.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+plans.delete,all,plans,plans.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 plans.generateNext,all,plan,plans.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 plans.save,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 plans.save,id present,plans,plans.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
@@ -129,6 +130,7 @@ preferences.update,all,none,none,omit,none,D01; version mismatch CONFLICT; missi
 properties.archive,all,properties,properties.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 properties.save,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 properties.save,id present,properties,properties.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+rateCards.delete,all,none,rateCards.list,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 rateCards.save,all,none,rateCards.list,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 reports.signOff,all,report,reports.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 restrictions.cancel,all,restrictions,restrictions.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects

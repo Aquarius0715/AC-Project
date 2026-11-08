@@ -1917,6 +1917,7 @@ func RegisterPartners(reg *ops.Registry, partners Partners) {
 	ops.Register(reg, "contractors.delete", partners.delete)
 	ops.Register(reg, "contractors.setOfferStatus", partners.setOfferStatus)
 	ops.Register(reg, "rateCards.save", partners.saveRateCard)
+	ops.Register(reg, "rateCards.delete", partners.deleteRateCard)
 	ops.Register(reg, "rateCards.list", partners.listRateCards)
 	ops.Register(reg, "sla.saveTargets", partners.saveTargets)
 	ops.Register(reg, "sla.scorecard", partners.scorecard)

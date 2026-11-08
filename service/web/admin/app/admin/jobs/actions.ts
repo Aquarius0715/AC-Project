@@ -167,6 +167,16 @@ export async function saveContractor(input: { id: string | null; version: number
   });
 }
 
+/** plans.delete: a plan that has made no job (DEC-103); a plan with jobs stays with its history. */
+export async function deletePlan(id: string, version: number, reason: string) {
+  return value(async () => { await coreOp("plans.delete", { id, reason: reason.trim() }, write(version)); return null; });
+}
+
+/** rateCards.delete: a rate card that has not started (DEC-103); rate cards have no expected version. */
+export async function deleteRateCard(id: string, reason: string) {
+  return value(async () => { await coreOp("rateCards.delete", { id, reason: reason.trim() }, { write: true }); return null; });
+}
+
 /** contractors.delete (when the company has a profile) and then organizations.delete: a company registered by mistake is
 removed as it was made (DEC-103); one with jobs, offers, certificates, payouts or users is refused with the reason. */
 export async function deleteContractor(org: { id: string; version: number }, profile: { id: string; version: number } | null, reason: string) {

@@ -376,6 +376,7 @@ export type OperationContracts = {
   'plans.list': {input:Query;result:Page<MaintenancePlan>;mode:'read'};
   'plans.generateNext': {input:{id:ID;occurrenceDate:Instant};result:MaintenanceJob;mode:'write'};
   'plans.save': {input:{id?:ID;unitId:ID;recurrence:MaintenancePlan["recurrence"];nextDueAt:Instant};result:MaintenancePlan;mode:'write'};
+  'plans.delete': {input:{id:ID;reason:string};result:DeletedResource;mode:'write'};
   'policies.get': {input:{policyId:ID};result:Policy;mode:'read'};
   'policies.list': {input:Query;result:Page<Policy>;mode:'read'};
   'policies.save': {input:PolicyInput;result:Policy;mode:'write'};
@@ -439,6 +440,7 @@ export type OperationContracts = {
   'contractors.setOfferStatus': {input:{contractorOrgId:ID;status:'active'|'suspended';reason:string};result:ContractorProfile;mode:'write'};
   'rateCards.list': {input:Query;result:Page<RateCard>;mode:'read'};
   'rateCards.save': {input:{contractorOrgId:ID;effectiveFrom:Instant;currency:Currency;lines:RateCard['lines']};result:RateCard;mode:'write'};
+  'rateCards.delete': {input:{id:ID;reason:string};result:DeletedResource;mode:'write'};
   'certificates.getContent': {input:{certificateId:ID};result:DocumentContent;mode:'read'};
   'certificates.list': {input:Query;result:Page<Certificate>;mode:'read'};
   'certificates.submit': {input:{membershipId:ID;code:Certificate['code'];name:string;number:string;issuedAt:Instant;expiresAt:Instant;file:DocumentInput;renewalOf?:ID};result:Certificate;mode:'write'};

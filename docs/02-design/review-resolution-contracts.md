@@ -9222,3 +9222,12 @@ A customer and a contractor company are made in two steps (the organization, the
 6. **The screens.** Admin > Customers (Edit customer…): Delete customer… runs `customers.delete` and then `organizations.delete` with one reason, and returns to the list. Admin > Jobs > Contractors: Delete contractor… runs `contractors.delete` (when there is a profile) and then `organizations.delete`. A refusal shows the text of its key. English, Malay and Japanese.
 7. **Counts.** 216 → 219 operations, 237 → 240 routes.
 8. **Tests.** `TestCustomersAndOrganizationsDelete`, `TestContractorsDelete` (the refusals with their keys, the roles, the versions, the order), the E2E of a contractor company added by mistake, and the dictionary and contract tests. Not run against a rebuilt stack in this round: the E2E waits for the nightly run.
+
+## IR655 HQ deletes a maintenance plan and a rate card that nothing depends on (DEC-103, phase 4) — 2026-11-08
+
+1. **`plans.delete {id, reason}`** (`admin:job.write`, `DELETE /v1/plans/{id}`, DD-A06). A plan that has made no job; a plan with any job (finished or not) stays with its history: CONFLICT `error.planHasJobs`. The expected version is the plan's (`plans.get`). Event `PlanDeleted`, audit `plans.delete`. How to stop a running plan that has jobs is not part of this phase (it stays a proposal).
+2. **`rateCards.delete {id, reason}`** (`admin:job.write`, `DELETE /v1/rate-cards/{id}`, DD-A21). A rate card whose start is still ahead; one in effect, or one that was, prices payouts and stays: CONFLICT `error.rateCardStarted`. As in `rateCards.save`, rate cards take no expected version (a version sent is VALIDATION). The next card's version number is the highest left plus one. Event `RateCardDeleted`, audit `rateCards.delete`.
+3. **The reason** is 1–1000 characters after trimming; an unknown ID is NOT_FOUND.
+4. **The screens.** Admin > Jobs > Plans: Delete plan… on a plan with no generated occurrence. Admin > Jobs > Contractors: Delete rate card… beside each scheduled card. English, Malay and Japanese.
+5. **Counts.** 219 → 221 operations, 240 → 242 routes.
+6. **Tests.** `TestPlansDelete`, `TestRateCardsDelete` and the dictionary and contract tests. No E2E in this round.
