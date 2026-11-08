@@ -98,6 +98,10 @@ describe("customer maintenance", () => {
     expect(preferredError([must(three[0]), must(three[0]), must(three[1])], NOW)).toBe("The 3 times must be different.");
     expect(preferredError([slot(TEXT_2026_09_16T02_00_00Z, "2026-09-16T08:00:00Z"), ...three.slice(1)], NOW)).toBe("Each time is 1–4 hours long.");
     expect([contactError("Weekdays 09:00-18:00"), contactError("call +60 12-345 6789"), contactError("me@x.com")]).toStrictEqual([null, expect.stringMatching(/No e-mail/), expect.stringMatching(/No e-mail/)]);
+    // IR640: a number or an address typed with a Japanese input method (full-width) is refused like the ASCII one, as the API refuses it
+    const refused = ["０９０１２３４５６７８", "０９０－１２３４－５６７８", "でんわ ０９０\u{3000}１２３４\u{3000}５６７８", "（０３）１２３４\u{3000}５６７８", "＋６０\u{3000}１２－３４５\u{3000}６７８９", "me＠example.com", "٠١٢٣٤٥٦٧٨٩"];
+    expect(refused.filter((text) => contactError(text) === null)).toStrictEqual([]);
+    expect(["へいじつ 9:00〜18:00", "ごごならだいじょうぶです", "Weekdays 09:00–18:00", "１２３４５６"].filter((text) => contactError(text) !== null)).toStrictEqual([]);
     expect(notesOf([{ id: "e1", action: "note.added", occurredAt: "2026-09-14T01:00:00Z", actorUserId: "me", note: { visibility: "customer", message: "Gate code 4821" } }, { id: "e2", action: "job.created", occurredAt: TEXT_2026_09_13T01_00_00Z, actorUserId: "me", note: null }], "me"))
       .toStrictEqual([{ id: "e1", who: "You", at: "14 Sept 2026, 9:00 am MYT", text: "Gate code 4821" }]);
     expect(clientJobRefusal({ code: "CONFLICT", messageKey: "errors.reschedule_too_late", fieldErrors: {} })).toBe("Not saved: less than 48 h before the visit — contact HQ.");

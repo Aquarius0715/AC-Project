@@ -415,7 +415,7 @@ Return AdminSummary.energySummary to dashboard.read holders. Targets are nonarch
 
 ## IR64 Contact-window input and visibility — REV18-020
 
-contactWindow is 0–200 code points after trim. If it contains '@', or if removing whitespace, hyphens, parentheses, and '+' leaves at least seven consecutive digits, return VALIDATION (fieldErrors.contactWindow, messageKey=errors.contact_details_forbidden). Return JobDetail.contactWindow only to the client (own job), HQ job.write, the assigned technician within the viewing window (IR49), and the accepted contractor within the access window. Other projections use null. Do not include it in JobOfferSummary, JobHistorySnapshot, or notification params. Complete detection in free text is not guaranteed (DDC-09). Input guidance and handling of time notation follow IR90 (REV19-017).
+contactWindow is 0–200 code points after trim. If it contains '@', or if removing whitespace, hyphens, parentheses, and '+' leaves at least seven consecutive digits, return VALIDATION (fieldErrors.contactWindow, messageKey=errors.contact_details_forbidden). The digits are the digits of any script and the separators, '+' and '@' include their full-width forms (０９０－１２３４－５６７８, ＋, ＠), so a number typed with a Japanese input method is refused like the ASCII one (IR640). Return JobDetail.contactWindow only to the client (own job), HQ job.write, the assigned technician within the viewing window (IR49), and the accepted contractor within the access window. Other projections use null. Do not include it in JobOfferSummary, JobHistorySnapshot, or notification params. Complete detection in free text is not guaranteed (DDC-09). Input guidance and handling of time notation follow IR90 (REV19-017).
 
 ## IR65 Voice target matching and syntax — REV18-021
 
@@ -9068,6 +9068,10 @@ The user asked for Japanese to be selectable beside English and Malay, with ever
 5. **A fixed bug.** The customer's report export saved the language as `en` or `ms` only, so a Japanese user who turned the monthly e-mail on would have been put back to English; it now keeps any language.
 6. **The payout PDF.** The statement PDF has a Courier font and ASCII only (everything else printed as "-"), so a Japanese user's PDF is written in English; the screen is Japanese.
 7. **Tests.** Vitest runs the dictionary checks per language and covers the Japanese date, the ordinal, the assistant's examples against the grammar, the PDF and the locale list; the Go integration tests save `ja` and resolve the three phrases; Playwright saves Japanese in Preferences, reads the shell back in Japanese and puts English back.
+
+## IR640 The contact window refuses full-width phone numbers and addresses — 2026-11-08
+
+Review round 3 of the maintenance module. `ContactWindowOK` (IR64) counted ASCII digits and looked for the ASCII `@` only, so a Japanese input method's `０９０１２３４５６７８`, `０９０－１２３４－５６７８`, `（０３）１２３４　５６７８`, `＋６０…` or `me＠example.com` was accepted, and so were Arabic-Indic digits; the request form's check (`contactError`) had the same gap. Both now read digits of any script (`unicode.IsDigit`, `\p{Nd}`) and the full-width separators (`－`, `（`, `）`, `＋`, the ideographic space) and `＠`; the Go test and the Vitest case use the same samples, plus times such as `平日 9:00〜18:00` that stay accepted.
 
 ## IR641 The Demo clock moves by 1, 2, 4, 8, 12 and 24 hours as well — 2026-11-08
 
