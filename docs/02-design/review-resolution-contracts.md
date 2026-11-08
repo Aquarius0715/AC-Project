@@ -9259,3 +9259,10 @@ The user chose to delete accounts that were never used and to keep ending the ot
 1. **The gap.** The DiagnosticRun table of implementation-contracts.md says that a start failure moves `awaiting_start` to `start_failed` and that a failure or expiry of the end Command moves `end_requested` to `end_failed`. Only the expiry (IR139 item 2) did. When the device rejected the Command (`command_fail`, status `failed`, code `DEVICE_REJECTED`), the run stayed `awaiting_start` or `end_requested` for good: the unit counted as busy for every other Command and run (D05) and the technician never saw the failure.
 2. **The rule.** A rejected start Command makes the run `start_failed` and a rejected end Command `end_failed`, both with `failureCode` = the device's code (`DEVICE_REJECTED`), in the transaction that fails the Command (`control.RunCommandFailed`). The end timer is not started and nothing is resent (the table's rule); the unit is free again.
 3. **Tests.** `TestDiagnosticRunDeviceRejection` (a rejected start, then a second run on the same unit, then a rejected end). No operation, route or screen changes; 224 operations, 245 routes.
+
+## IR661 A membership names each scope once (review round 32) — 2026-11-09
+
+`members.save` refused a permission named twice (`error.invalid`) but took a scope named twice and stored it once (`ON CONFLICT DO NOTHING`). The check that moves the membership's `scopeVersion` when an update changes its scopes compares the lengths and then asks whether every sent scope was there before, so an update that replaced the scopes [A, B] by [A, A] kept the same length, found every sent scope in the old list, and left the version where it was: B was gone and the sessions and cursors scoped to [A, B] stayed valid.
+
+1. **The rule.** The scopes of a membership are distinct (kind and ID): a repeated scope is VALIDATION `error.duplicate` on `scopes`, as a repeated permission is on `permissions`. An unknown kind keeps its `error.invalid`.
+2. **Tests.** `TestMembersSave` (a scope named twice is refused on its field). No operation, route or screen changes; 224 operations, 245 routes.
