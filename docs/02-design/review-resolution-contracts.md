@@ -9253,3 +9253,10 @@ The user chose to delete accounts that were never used and to keep ending the ot
 5. **The screen.** Admin > Settings > Access & roles: Delete account… beside Revoke access…, with the shared dialog (a required reason). English, Malay and Japanese.
 6. **Counts.** 224 → 225 operations, 245 → 246 routes.
 7. **Tests.** `TestMembersDelete` (roles, reason, version, a person with two accounts, an account that acted, the caller's own, the clean account and its person gone), `TestMembersDeleteRemovesTheProviderAccount`, the Keycloak client test, and the dictionary and contract tests. Not built: Cognito's `DeleteAccount` (the Cognito adapter is still planned, IR386).
+
+## IR659 A payout adjustment stays within the safe-integer range (review round 24) — 2026-11-09
+
+IR647 left the payout lines out of the amount range check because the server computes them. One kind is not computed: the adjustment line of an answered question carries the `adjustmentMinor` that HQ typed in `payouts.resolveQuery` (signed, non-zero). It was only refused when zero, so HQ could enter 9,000,000,000,000,000,000 or its negative: the next generated draft added it to the statement's gross or deductions, and a few of them wrap a 64-bit sum around.
+
+1. **The rule.** `adjustmentMinor` is a non-zero whole number whose size is at most 2^53 − 1 (`money.InRange` on its absolute value; the smallest int64, whose absolute value does not exist, is refused too): VALIDATION `error.range` on `adjustmentMinor` otherwise.
+2. **Tests.** `TestAmountsStayInSafeRange` (both signs, the last valid amount accepted) and `TestPayoutAdjustmentMinInt64`. No operation, route or screen changes; 224 operations, 245 routes.
