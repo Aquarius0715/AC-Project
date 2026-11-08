@@ -228,6 +228,10 @@ type FactorInput struct {
 	IsDemo       bool       `json:"isDemo"`
 }
 
+// minFactor is the smallest factor the column can hold: kg_co2e_per_kwh is numeric(10,6) and positive, so a value
+// that rounds to zero at the sixth decimal (below half of 0.000001) would fail the database's check (IR660).
+const minFactor = 5e-7
+
 // Validate implements ops.Validator (DD-A14, IR147 item 1).
 func (in *FactorInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
@@ -241,7 +245,7 @@ func (in *FactorInput) Validate() map[string]string {
 		fieldErrs["year"] = apperr.KeyRange
 	}
 
-	if math.IsNaN(in.KgCO2ePerKWh) || in.KgCO2ePerKWh <= 0 || in.KgCO2ePerKWh > 10 {
+	if math.IsNaN(in.KgCO2ePerKWh) || in.KgCO2ePerKWh < minFactor || in.KgCO2ePerKWh > 10 {
 		fieldErrs["kgCO2ePerKWh"] = apperr.KeyRange
 	}
 

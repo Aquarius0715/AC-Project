@@ -9260,6 +9260,13 @@ The user chose to delete accounts that were never used and to keep ending the ot
 2. **The rule.** A rejected start Command makes the run `start_failed` and a rejected end Command `end_failed`, both with `failureCode` = the device's code (`DEVICE_REJECTED`), in the transaction that fails the Command (`control.RunCommandFailed`). The end timer is not started and nothing is resent (the table's rule); the unit is free again.
 3. **Tests.** `TestDiagnosticRunDeviceRejection` (a rejected start, then a second run on the same unit, then a rejected end). No operation, route or screen changes; 224 operations, 245 routes.
 
+## IR660 An emission factor too small for its column is refused on its field (review round 29) — 2026-11-09
+
+`factors.save` accepted any kgCO2ePerKWh above 0 and up to 10. The column is `numeric(10,6)` with a check that the value is positive, so a value such as 0.0000004, which rounds to 0.000000 when it is stored, passed the validation and then failed the database's check: a 422 with no field named, the one case of this operation that VALIDATION did not explain.
+
+1. **The rule.** kgCO2ePerKWh is at least 0.0000005 (half of the column's step, the smallest value that is stored as 0.000001) and at most 10; below it VALIDATION `error.range` on `kgCO2ePerKWh`. Values with more than six decimals are still stored rounded to six, as before; the response shows the stored value.
+2. **Tests.** `TestFactors` (0.0000004 refused on its field) and `TestFactorRangeFollowsTheColumn` (the edges). No operation, route or screen changes; 224 operations, 245 routes.
+
 ## IR661 A membership names each scope once (review round 32) — 2026-11-09
 
 `members.save` refused a permission named twice (`error.invalid`) but took a scope named twice and stored it once (`ON CONFLICT DO NOTHING`). The check that moves the membership's `scopeVersion` when an update changes its scopes compares the lengths and then asks whether every sent scope was there before, so an update that replaced the scopes [A, B] by [A, A] kept the same length, found every sent scope in the old list, and left the version where it was: B was gone and the sessions and cursors scoped to [A, B] stayed valid.
