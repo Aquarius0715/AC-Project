@@ -68,7 +68,7 @@ FR-A21,Figma-confirmed screen specification 2026-10-01,BIZ-12,"Figma wireframe (
 FR-A22,Figma-confirmed screen specification 2026-10-01,BIZ-12,"Figma wireframe (VOeKPrid46kOf24ktEfe8r), confirmed by the user 2026-10-01",SLA definitions and scorecard
 FR-A23,Figma-confirmed screen specification 2026-10-01,BIZ-12;BIZ-21,"Figma wireframe (VOeKPrid46kOf24ktEfe8r), confirmed by the user 2026-10-01",Monthly contractor payouts
 FR-X01,Company original SRC-06 + added design details,BIZ-01;BIZ-02,Sign In / Sign Out / Forget Password; In any language text,"Four-role demo, initial en/ms, and reset wording"
-FR-X02,Company original SRC-06 + added design details,BIZ-03,respond to voice ai,"Extend voice responses to temperature queries, device control, and inquiries; voice demo, text fallback, and change confirmation"
+FR-X02,Company original SRC-06 (out of scope),BIZ-03,respond to voice ai,"Withdrawn (DEC-101): the assistant was removed"
 FR-X03,Company original SRC-06 + added design details,BIZ-09;BIZ-18,Signals & Notifications; How do you calculate the CO2 and air quality,"Color meanings, units, quality, and non-color cues"
 FR-X04,Added design details (supporting a company goal),BIZ-04,For End Users/Clients / Technicians / Admin/HQ,"Display limits by role, assignment, period, and capability"
 FR-X05,Company original SRC-06 + added design details,BIZ-05,For Split Unit Air Con (phase 1),"Shared mocks, reset, and distinction from real processing"

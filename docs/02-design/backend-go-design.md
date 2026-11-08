@@ -57,7 +57,7 @@ service/api/        (IR174; under service/api since IR179; the Next.js apps are 
                     logging (slog handler), ratelimit (the write limit, IR375), idp (the identity provider's admin API: the
                     people's accounts, their set-up e-mails, turning them off, sign-out everywhere; IR386, IR461–IR463)
     modules/        one package per business area: identity assets devices control monitoring maintenance billing
-                    restrictions energy notify audit summaries voice writes
+                    restrictions energy notify audit summaries writes
     scheduler/      the clock-driven transitions per domain (IR195, IR356)
     migrate/ migrations/ seed/ bootstrap/ (the first HQ administrator of a tenant, IR509)
     iotbridge/ devicesim/   the tools' conversions and the simulated fleet, and the live nodes' mapping (DEC-86, IR524)

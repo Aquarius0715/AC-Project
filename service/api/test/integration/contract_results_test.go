@@ -27,7 +27,6 @@ func resultsDecidedAtRunTime() map[string]string {
 		opPoliciesGet:                 "Policy writes the fields of its kind (alert, default alert, automation)",
 		opPoliciesList:                "the listed policies write the fields of their kinds",
 		opPoliciesSave:                "Policy writes the fields of its kind",
-		"voice.resolveIntent":         "ResolvedIntent writes the fields of the intent it resolved",
 		opDemoSessionSignIn:           "the BFF answers it; the Core API refuses it (errors.session_via_bff, IR154)",
 		opDemoSessionSwitchMembership: "the BFF answers it; the Core API refuses it (IR154)",
 		opDemoSessionExtend:           "the BFF answers it; the Core API refuses it (IR154)",

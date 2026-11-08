@@ -3926,7 +3926,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: client:control.execute | technician:control.diagnose:job-required | admin:control.execute\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR46 restriction action table; IR47 derived connection/powerSignal OFFLINE; IR74 client omits reason; IR94 technician write table (assignment and work window, jobId required when typed); IR109 group control sends one command per selected unit (owner only); IR306 source ui (default) or voice, voice only from a client (the assistant of the Client app)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-C03, DD-T10, DD-A11 through automations.fire, DD-C04, DD-C05, DD-A02, DD-C14 · Input versions: expectedUnitVersion=UnitDetail.version",
+                "description": "Authorization: client:control.execute | technician:control.diagnose:job-required | admin:control.execute\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR46 restriction action table; IR47 derived connection/powerSignal OFFLINE; IR74 client omits reason; IR94 technician write table (assignment and work window, jobId required when typed); IR109 group control sends one command per selected unit (owner only); a command asked for here is always source ui (the voice channel was withdrawn, IR648)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-C03, DD-T10, DD-A11 through automations.fire, DD-C04, DD-C05, DD-A02, DD-C14 · Input versions: expectedUnitVersion=UnitDetail.version",
                 "consumes": [
                     "application/json"
                 ],
@@ -27254,106 +27254,6 @@
                 }
             }
         },
-        "/v1/voice/resolve-intent": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Authorization: client:control.execute | technician:control.diagnose | admin:control.execute\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR65 regex grammar and Space.name matching\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DDC-07",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "voice"
-                ],
-                "summary": "voice.resolveIntent (read)",
-                "operationId": "voice.resolveIntent",
-                "parameters": [
-                    {
-                        "description": "input",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/voice.Input"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/ops.Envelope"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/voice.Intent"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "401": {
-                        "description": "UNAUTHENTICATED",
-                        "schema": {
-                            "$ref": "#/definitions/apperr.DomainError"
-                        }
-                    },
-                    "403": {
-                        "description": "FORBIDDEN",
-                        "schema": {
-                            "$ref": "#/definitions/apperr.DomainError"
-                        }
-                    },
-                    "404": {
-                        "description": "NOT_FOUND",
-                        "schema": {
-                            "$ref": "#/definitions/apperr.DomainError"
-                        }
-                    },
-                    "409": {
-                        "description": "CONFLICT / OFFLINE",
-                        "schema": {
-                            "$ref": "#/definitions/apperr.DomainError"
-                        }
-                    },
-                    "422": {
-                        "description": "VALIDATION (fieldErrors)",
-                        "schema": {
-                            "$ref": "#/definitions/apperr.DomainError"
-                        }
-                    },
-                    "429": {
-                        "description": "RATE_LIMITED (retryAfterSeconds)",
-                        "schema": {
-                            "$ref": "#/definitions/apperr.DomainError"
-                        }
-                    },
-                    "503": {
-                        "description": "UNAVAILABLE",
-                        "schema": {
-                            "$ref": "#/definitions/apperr.DomainError"
-                        }
-                    },
-                    "504": {
-                        "description": "TIMEOUT",
-                        "schema": {
-                            "$ref": "#/definitions/apperr.DomainError"
-                        }
-                    }
-                }
-            }
-        },
         "/v1/writes/{idempotencyKey}": {
             "get": {
                 "security": [
@@ -29418,7 +29318,7 @@
                     "type": "string"
                 },
                 "source": {
-                    "description": "ui | voice | automation | restriction | diagnostic | group (IR216)",
+                    "description": "ui | automation | restriction | diagnostic | group (IR216)",
                     "type": "string"
                 },
                 "status": {
@@ -29472,14 +29372,6 @@
                 },
                 "reason": {
                     "type": "string"
-                },
-                "source": {
-                    "description": "the channel the user chose; ui when omitted (IR306)",
-                    "type": "string",
-                    "enum": [
-                        "ui",
-                        "voice"
-                    ]
                 },
                 "unitId": {
                     "type": "string"
@@ -36494,63 +36386,6 @@
                     "$ref": "#/definitions/summaries.Counts"
                 },
                 "kind": {
-                    "type": "string"
-                }
-            }
-        },
-        "voice.Candidate": {
-            "type": "object",
-            "properties": {
-                "pathLabel": {
-                    "type": "string"
-                },
-                "unitId": {
-                    "type": "string"
-                }
-            }
-        },
-        "voice.Input": {
-            "type": "object",
-            "properties": {
-                "locale": {
-                    "type": "string"
-                },
-                "selectedUnitId": {
-                    "type": "string"
-                },
-                "text": {
-                    "type": "string"
-                }
-            }
-        },
-        "voice.Intent": {
-            "type": "object",
-            "properties": {
-                "before": {
-                    "type": "object"
-                },
-                "candidates": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/voice.Candidate"
-                    }
-                },
-                "celsius": {
-                    "type": "integer"
-                },
-                "expectedVersion": {
-                    "type": "integer"
-                },
-                "kind": {
-                    "type": "string"
-                },
-                "measurement": {
-                    "$ref": "#/definitions/monitoring.Measurement"
-                },
-                "messageKey": {
-                    "type": "string"
-                },
-                "unitId": {
                     "type": "string"
                 }
             }

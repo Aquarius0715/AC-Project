@@ -1,4 +1,4 @@
-// Package control implements the Control module (commands, diagnostic runs, automations, voice).
+// Package control implements the Control module (commands, diagnostic runs, automations).
 package control
 
 import (

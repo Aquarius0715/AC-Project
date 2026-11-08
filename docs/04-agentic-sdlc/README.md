@@ -48,7 +48,7 @@ G1 checks in detail: Each feature must have start conditions; a field table with
 
 ## 3. Task breakdown and execution units
 
-Recommended order: shared foundation and FR-X → S01 unit control → S02 internal maintenance + S08 outsourcing → S03 invoices/restrictions → S04 environment/automation → S05 energy/MRV → S06 IoT → S07 language/voice → full verification.
+Recommended order: shared foundation and FR-X → S01 unit control → S02 internal maintenance + S08 outsourcing → S03 invoices/restrictions → S04 environment/automation → S05 energy/MRV → S06 IoT → S07 language → full verification.
 
 Each task must have a clear set of requirement IDs, owned files, acceptance criteria, dependencies, and exclusions. Task status moves from planned → ready → in_progress → in_review → done. Use blocked when dependencies are unmet. Return rejected work from in_review to in_progress. Before returning blocked work to ready, recheck dependencies and the baseline. Evidence is required for done. When using multiple agents, do not let different agents edit the same shared schemas, tokens, or state transitions at the same time. Orchestration assigns a single owner.
 

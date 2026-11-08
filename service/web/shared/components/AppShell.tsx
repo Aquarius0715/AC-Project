@@ -8,7 +8,6 @@ import { isRole, roleConfig, ROLE_KEY, type Role, roleFromPath, type ShellLive, 
 import { Badge, Banner, Btn, Modal, SummaryList, ToastProvider, cx } from "./ui";
 import { Icon, type IconName } from "./Icon";
 import { useDemoInbox } from "@ac/web/lib/jobs";
-import { AssistantPanel } from "./Assistant";
 import { QrScan } from "./QrScan";
 import { CURRENT_CLIENT } from "@ac/web/lib/clientUsers";
 import { setStoredValue, useStoredValue } from "@ac/web/lib/urlState";
@@ -91,7 +90,6 @@ export function AppShell({ appRole: forced, live, children }: Readonly<{ appRole
     setMenuPath(pathname);
     setOpen(false);
   }
-  const [assistant, setAssistant] = useState(false);
   const [qr, setQr] = useState(false);
   const demoUnread = useDemoInbox(role).unread;
   const demoBadge = demoUnread > 0 ? String(demoUnread) : undefined; // no badge for 0, like the Core API's counts
@@ -157,9 +155,6 @@ export function AppShell({ appRole: forced, live, children }: Readonly<{ appRole
             </div>
             <div className="flex shrink-0 items-center gap-2">
               {role === "technician" && <Btn size="sm" onClick={() => { setQr(true); }} aria-label={t("Scan QR")} className="gap-1.5 font-bold"><Icon name="qr" /> <span className="max-sm:hidden">{t("Scan QR")}</span></Btn>}
-              {role === "client" && (
-                <Button variant="outline" size="sm" onClick={() => { setAssistant(true); }} aria-label={t("Assistant")} className="gap-1.5 rounded-full border-primary bg-primary-soft/50 font-bold text-primary hover:bg-primary-soft"><Icon name="mic" /> <span className="max-sm:hidden">{t("Assistant")}</span></Button>
-              )}
               <span className="inline-flex items-center gap-1.5 rounded-control bg-surface2 px-3 py-1.5 text-xs font-semibold"><Icon name="account" /> <span className="max-sm:hidden">{chip}</span><span className="sm:hidden">{chip.split(" — ", 1)[0]}</span></span>
             </div>
           </header>
@@ -172,7 +167,6 @@ export function AppShell({ appRole: forced, live, children }: Readonly<{ appRole
         <SummaryList items={[["Result", <Badge key="m" tone="ok" icon="check">Matched</Badge>], ["Label", "AC-QR-online-rto · scanned 10:04"], ["Unit", "Bedroom AC · unit-online-rto · customer-a · Home A › 1F › Bedroom"], ["Your job today", "job-contractor-a"]]} />
         <Banner>Units outside your assignments show “Not in your assignments” (NOT_FOUND).</Banner>
       </Modal>
-      {role === "client" && <AssistantPanel open={assistant} onClose={() => { setAssistant(false); }} context={title} live={!!live} />}
     </ToastProvider>
     </I18nProvider>
   );

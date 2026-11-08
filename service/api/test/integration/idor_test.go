@@ -441,12 +441,6 @@ func TestForeignTargets(t *testing.T) {
 			`{"target":{"kind":"unit","id":"` + unitA + `"},"templateKey":"alert","channel":"inApp","query":{}}`,
 			0,
 		},
-		{
-			customerB(),
-			"voice.resolveIntent",
-			`{"text":"temperature Bedroom","locale":"en","selectedUnitId":"` + unitA + `"}`,
-			0,
-		},
 		// contractor B → contractor A
 		{contrB(), opPartnerUsersResendInvite, `{"id":"` + partnerUserA + `"}`, 0},
 		{contrB(), "certificates.getContent", `{"certificateId":"` + certA + `"}`, 0},

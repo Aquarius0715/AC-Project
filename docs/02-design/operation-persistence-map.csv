@@ -210,5 +210,4 @@ units.save,write,Assets,assets.units,assets.units,,audit.audit_log;platform.idem
 units.setAlertPolicies,write,Assets,,assets.unit_alert_policies,Monitoring & alerts,audit.audit_log;platform.idempotency_keys;platform.outbox,
 ventilation.list,read,Monitoring & alerts,monitoring.ventilation_logs,,Assets,,
 ventilation.log,write,Monitoring & alerts,monitoring.measurements,monitoring.ventilation_logs,Assets,audit.audit_log;platform.idempotency_keys;platform.outbox,
-voice.resolveIntent,read,Control,control.commands,,Assets,,
 writes.getResult,read,Audit,platform.idempotency_keys,,,,

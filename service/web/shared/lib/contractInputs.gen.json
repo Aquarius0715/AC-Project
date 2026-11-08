@@ -192,7 +192,6 @@
   "expectedUnitVersion",
   "jobId",
   "reason",
-  "source",
   "unitId"
  ],
  "commands.get": [
@@ -1214,11 +1213,6 @@
   "method",
   "spaceId",
   "unitId"
- ],
- "voice.resolveIntent": [
-  "locale",
-  "selectedUnitId",
-  "text"
  ],
  "writes.getResult": [
   "idempotencyKey",
