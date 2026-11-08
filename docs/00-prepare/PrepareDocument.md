@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.520.0
+version: 0.524.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -300,7 +300,8 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
-0.520.0: the adjustment HQ enters when it answers a payout question stays within the safe-integer range, like every other amount (IR659). No operation changes. Phase 1A unchanged.
+0.524.0: the adjustment HQ enters when it answers a payout question stays within the safe-integer range, like every other amount (IR659). No operation changes. Phase 1A unchanged.
+0.521.0: a customer's owner cannot send a user the set-up e-mail again once the access has ended, as a contractor cannot (IR664). No operation changes. Phase 1A unchanged.
 0.517.0: saving a customer's user without changing its status keeps the end HQ gave the membership instead of clearing it (IR662). No operation changes. Phase 1A unchanged.
 0.516.0: an emission factor too small for the six-decimal column is refused on its field instead of failing the database check (IR660). No operation changes. Phase 1A unchanged.
 0.515.0: a device that rejects the start or the end Command of a diagnostic test run ends the run as `start_failed` / `end_failed` with the device's code (IR658). No operation changes. Phase 1A unchanged.
