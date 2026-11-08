@@ -186,7 +186,13 @@ export function facts(j: ApiHqJob, n: Names, i: I18n = EN): { label: string; val
   ];
 }
 
-export interface Delivery { kind: "internal" | "contractor"; title: string; lines: [string, string][]; ack: { tone: Tone; text: string } | null; cantMake: boolean }
+export interface Delivery {
+  kind: "internal" | "contractor"; title: string; lines: [string, string][]; ack: { tone: Tone; text: string } | null; cantMake: boolean;
+  /** HQ may propose another time (IR642): the technician cannot make it, the booked time is over, or every time offered is */
+  proposable: boolean;
+  /** why a time passed with nobody working, when it did */
+  overdue: string | null;
+}
 /** The technician's answer to an assignment: completed, accepted, can't make it (with reason and another time), or waiting. */
 function acknowledgement(a: NonNullable<ApiHqJob["assignment"]>, tech: string, i: I18n): { tone: Tone; text: string } {
   const { t } = i;
@@ -203,10 +209,19 @@ function offerState(o: NonNullable<ApiHqJob["offer"]>, now: number, i: I18n): st
   if (o.decision === "accept") return o.decidedAt ? t("accepted {time}", { time: showTime(o.decidedAt, display) }) : t("accepted");
   return Date.parse(o.offerExpiresAt) <= now ? t("expired") : t("offer open · expires {time}", { time: showTime(o.offerExpiresAt, display) });
 }
+/** When a time passed with nobody working (IR642): the booked time of an assigned job, or every time offered to the contractor
+for a job it accepted and did not assign. */
+function overdueText(j: ApiHqJob, now: number, t: T): string | null {
+  const a = j.assignment, o = j.offer;
+  if (j.status === "assigned" && a && a.status !== "completed" && Date.parse(a.scheduledEnd) <= now) return t("The booked time passed and nobody started. Propose another time — the client must accept it.");
+  if (j.status === "accepted" && !a && o?.decision === "accept" && o.candidateSlots.length > 0 && o.candidateSlots.every((s) => Date.parse(s.endAt) <= now)) return t("Every time offered to the contractor has passed. Propose another time — the client must accept it.");
+  return null;
+}
 /** Who does the work: the internal assignment, or the contractor's offer with its access window and the technician. */
 export function delivery(j: ApiHqJob, n: Names, now: number, i: I18n = EN): Delivery | null {
   const { t, display } = i;
   const a = j.assignment, o = j.offer;
+  const overdue = overdueText(j, now, t);
   const tech = a ? n.people.get(a.technicianMembershipId) ?? t(TECHNICIAN) : "";
   const window = a ? slotText({ startAt: a.scheduledStart, endAt: a.scheduledEnd }, i) : "";
   const done = a?.status === "completed" ? ` · ${t("ended at completion")}` : "";
@@ -219,9 +234,10 @@ export function delivery(j: ApiHqJob, n: Names, now: number, i: I18n = EN): Deli
       lines: [[t("Times offered"), `${o.candidateSlots.map((s) => slotText(s, i)).join(" / ")} · ${state}`], [t("Access"), `${showSpan(o.accessValidFrom, o.accessValidUntil, display)}${o.decision === "accept" && Date.parse(o.accessValidUntil) <= now ? ` · ${t("ended")}` : ""}`],
         [t("Technician"), a ? `${tech} · ${window}${done}` : t("not assigned by the contractor yet")]],
       ack: ackLine, cantMake: a?.status !== "completed" && a?.acknowledgement === "cant_make",
+      proposable: overdue !== null || (a?.status !== "completed" && a?.acknowledgement === "cant_make"), overdue,
     };
   }
-  return a ? { kind: "internal", title: t("Delivery · internal"), lines: [[t("Technician"), `${tech} · ${t("assignment {slot}", { slot: window })}${done}`]], ack: ackLine, cantMake: a.status !== "completed" && a.acknowledgement === "cant_make" } : null;
+  return a ? { kind: "internal", title: t("Delivery · internal"), lines: [[t("Technician"), `${tech} · ${t("assignment {slot}", { slot: window })}${done}`]], ack: ackLine, cantMake: a.status !== "completed" && a.acknowledgement === "cant_make", proposable: overdue !== null || (a.status !== "completed" && a.acknowledgement === "cant_make"), overdue } : null;
 }
 
 /** The times HQ may book (IR113): the client's preferred times, or — for a plan's job without them — the plan

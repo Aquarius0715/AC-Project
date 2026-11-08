@@ -415,7 +415,7 @@ Return AdminSummary.energySummary to dashboard.read holders. Targets are nonarch
 
 ## IR64 Contact-window input and visibility — REV18-020
 
-contactWindow is 0–200 code points after trim. If it contains '@', or if removing whitespace, hyphens, parentheses, and '+' leaves at least seven consecutive digits, return VALIDATION (fieldErrors.contactWindow, messageKey=errors.contact_details_forbidden). Return JobDetail.contactWindow only to the client (own job), HQ job.write, the assigned technician within the viewing window (IR49), and the accepted contractor within the access window. Other projections use null. Do not include it in JobOfferSummary, JobHistorySnapshot, or notification params. Complete detection in free text is not guaranteed (DDC-09). Input guidance and handling of time notation follow IR90 (REV19-017).
+contactWindow is 0–200 code points after trim. If it contains '@', or if removing whitespace, hyphens, parentheses, and '+' leaves at least seven consecutive digits, return VALIDATION (fieldErrors.contactWindow, messageKey=errors.contact_details_forbidden). The digits are the digits of any script and the separators, '+' and '@' include their full-width forms (０９０－１２３４－５６７８, ＋, ＠), so a number typed with a Japanese input method is refused like the ASCII one (IR640). Return JobDetail.contactWindow only to the client (own job), HQ job.write, the assigned technician within the viewing window (IR49), and the accepted contractor within the access window. Other projections use null. Do not include it in JobOfferSummary, JobHistorySnapshot, or notification params. Complete detection in free text is not guaranteed (DDC-09). Input guidance and handling of time notation follow IR90 (REV19-017).
 
 ## IR65 Voice target matching and syntax — REV18-021
 
@@ -9037,7 +9037,7 @@ User request 2026-11-07: a maintenance job goes customer → HQ → contractor, 
 
 1. **An Offer holds the agreed times.** `Offer.visitSlot` and `JobOfferSummary.visitSlot` become `candidateSlots: Slot[]` (1 or more). `jobs.offer` no longer takes `visitSlot`: the server stores the job's agreed times that have not ended — the current `preferredSlots` in the order the client ranked them, then the slots of accepted SlotProposals, or, when there are none, the plan occurrence (IR113 item 3). If none is left the call is VALIDATION `candidateSlots=error.past`; HQ proposes another time (IR113 item 4).
 2. **Offer rules.** `offerExpiresAt ≤ accessValidUntil` (`error.afterAccess`, clock-free) and not after the last candidate starts (`error.afterVisit`, IR457); the access window covers every candidate (`accessValidFrom ≤` the earliest start and the latest end `≤ accessValidUntil`, `error.accessMustCoverVisit`). The rules that need the candidates are checked after the job is read, so they are VALIDATION like the others.
-3. **The contractor's assignment.** From `accepted`, `jobs.assign` by the contractor takes a slot equal to one of the offer's `candidateSlots` that has not ended (otherwise VALIDATION `errors.slot_not_agreed`; an ended one `endAt=error.past`, IR456). From `assigned` the contractor keeps the booked time or moves to another candidate that has not ended — for example when the technician cannot make it (IR113 item 8) — and the new Assignment is `acknowledgement=pending` with `scheduledSlot` following it. HQ's assignments (from `requested`, a reassignment at the same slot) and the extension rules of IR49 are unchanged.
+3. **The contractor's assignment.** From `accepted`, `jobs.assign` by the contractor takes a slot equal to one of the offer's `candidateSlots` that has not ended (otherwise VALIDATION `errors.slot_not_agreed`; an ended one `endAt=error.past`, IR456). From `assigned` the contractor keeps the booked time while it has not ended (IR642) or moves to another candidate that has not ended — for example when the technician cannot make it (IR113 item 8) — and the new Assignment is `acknowledgement=pending` with `scheduledSlot` following it. HQ's assignments (from `requested`, a reassignment at the same slot) and the extension rules of IR49 are unchanged.
 4. **One candidate left.** When the client accepts a proposal that creates an Offer (IR113 item 5) or moves one (a contractor's time change, IR113 item 7), the Offer's candidates become that one time, and the access window follows as in IR454.
 5. **Reschedule.** For `jobs.requestReschedule` (IR113 item 6), until a technician is assigned the 48 hours count from the offer's earliest candidate.
 6. **Time change.** `jobs.proposePartnerSlot` with a time that is one of the offer's candidates is VALIDATION `slot=errors.slot_is_preferred`: the contractor assigns for it directly.
@@ -9068,6 +9068,40 @@ The user asked for Japanese to be selectable beside English and Malay, with ever
 5. **A fixed bug.** The customer's report export saved the language as `en` or `ms` only, so a Japanese user who turned the monthly e-mail on would have been put back to English; it now keeps any language.
 6. **The payout PDF.** The statement PDF has a Courier font and ASCII only (everything else printed as "-"), so a Japanese user's PDF is written in English; the screen is Japanese.
 7. **Tests.** Vitest runs the dictionary checks per language and covers the Japanese date, the ordinal, the assistant's examples against the grammar, the PDF and the locale list; the Go integration tests save `ja` and resolve the three phrases; Playwright saves Japanese in Preferences, reads the shell back in Japanese and puts English back.
+
+## IR640 The contact window refuses full-width phone numbers and addresses — 2026-11-08
+
+Review round 3 of the maintenance module. `ContactWindowOK` (IR64) counted ASCII digits and looked for the ASCII `@` only, so a Japanese input method's `０９０１２３４５６７８`, `０９０－１２３４－５６７８`, `（０３）１２３４　５６７８`, `＋６０…` or `me＠example.com` was accepted, and so were Arabic-Indic digits; the request form's check (`contactError`) had the same gap. Both now read digits of any script (`unicode.IsDigit`, `\p{Nd}`) and the full-width separators (`－`, `（`, `）`, `＋`, the ideographic space) and `＠`; the Go test and the Vitest case use the same samples, plus times such as `平日 9:00〜18:00` that stay accepted.
+
+## IR641 The Demo clock moves by 1, 2, 4, 8, 12 and 24 hours as well — 2026-11-08
+
+The user asked for more jumps than a minute and an hour, to reach a deadline (an offer's expiry, an invoice's due date, a day's schedule) without pressing +1 hour many times.
+
+1. **The buttons.** Demo controls (FR-X05, DDC-07) show `+1 min`, `+1 hour`, `+2 hours`, `+4 hours`, `+8 hours`, `+12 hours` and `+24 hours`, in the Core API mode and in the browser demo; one list (`CLOCK_JUMPS`) drives the buttons, the target (`advanceTarget`) and the toasts.
+2. **The API is unchanged.** `demo.advanceClock` takes the target time and refuses only a time in the past (`errors.clock_backwards`, IR36); a jump of a day runs the deadlines once at the target time, like a jump of an hour.
+3. **A caution.** The clock never goes back and the running API cannot be reset (`make resetdb` rebuilds it offline), so a few presses of +24 hours move the dev stack past its seed's dates (bookings, qualifications).
+4. **Tests.** Vitest covers the jump list, the target of a day and the texts in English, Malay and Japanese; a component test presses the buttons; Playwright checks that the seven buttons are there (it does not press them, as the dev clock cannot be put back).
+5. **Not done here.** Figma Client 10e still shows two buttons.
+
+## IR642 A job whose booked time passed unworked is rescheduled by HQ's proposal — 2026-11-08
+
+Found in the review (B-1) and in the user's report: a job still `assigned` after its booked time had no way back. `jobs.assign` accepted a reassignment at the same, already ended time (IR456 refused only a first assignment), so the new technician could never open it; `jobs.proposeSlot` allowed an assigned job only after "can't make it", so an accepted assignment nobody started, and an accepted job whose offered times had all passed with nobody assigned, could not be rescheduled; the screens showed no way either.
+
+1. **Reassignment.** From `assigned`, `jobs.assign` keeps the booked time only while its end is after now; otherwise VALIDATION `endAt=error.past`, as for a first assignment. Moving to another candidate that has not ended (IR636) and the extension of a started job (D06) are unchanged.
+2. **HQ proposes another time.** `jobs.proposeSlot` is allowed for an `assigned` job when the technician cannot make it **or** the booked time has ended, and for an `accepted` job when the contractor's time change is pending **or** every candidate time of the accepted offer has ended (`INVALID_STATE` otherwise). The client's acceptance works as before: the assignment is revoked and the contractor's job returns to `accepted` with the proposed time as the offer's only candidate and its access window extended (IR454, IR636 item 4); an internal job gets the new assignment.
+3. **HQ's screen.** The delivery card of such a job shows why (the booked time passed and nobody started, or every time offered has passed) and **Propose another time…** (also on the "can't make it" banner); the jobs list keeps its `window ended` text and overdue filter.
+4. **The contractor's list** says "Ask HQ for a new time" for an unstarted job whose time ended, and keeps "Extend or reassign" for a started one.
+5. **The technician** keeps the viewing window of IR49 and IR124 (the unit and job detail close with it). The overview lists the job as "Work window ended — ask your contractor or HQ to extend or reassign" from its history snapshot, when the snapshot still reads assigned or in progress and the job was not completed.
+6. **Not done here.** A notification to HQ and the contractor when a booked time ends unworked (a scheduler job, notification type and templates) is a separate change; Figma is not updated.
+7. **Tests.** `TestOverdueAssignedJobIsRescheduled` (the past time is refused, HQ proposes, the client accepts, the contractor assigns the new time), `TestAcceptedJobWithNoTimeLeftIsRescheduled`; Vitest for HQ's `proposable`, the technician's ended row and the contractor's hint.
+
+## IR643 A second rate card for the same start time is refused on the field — 2026-11-08
+
+Review round 6 of the maintenance module. A contractor has one rate card per start time (`UNIQUE (contractor_org_id, effective_from)`), but `rateCards.save` did not check it: a second card for the same `effectiveFrom` hit the constraint and came back as an empty `409 CONFLICT`, which HQ's screen could only show as an unexplained conflict.
+
+1. `rateCards.save` is VALIDATION `effectiveFrom=error.duplicate` when the company already has a card starting at that time; HQ's screen reads "a rate card already starts then".
+2. The company's row in `maintenance.contractors` is locked for the save (`FOR UPDATE`), so two saves for it run one after the other: the next version number (`max(version) + 1`) and the check above see the first, instead of two concurrent saves taking the same version.
+3. Test: `TestContractorRegister` (a second card at the start time of version 2); Vitest for the refusal text in the three languages' dictionaries.
 
 
 ## IR644 A report's work text and follow-up note are counted after trimming (review round 9) — 2026-11-08

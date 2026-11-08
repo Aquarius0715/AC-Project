@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Btn, Select, useToast } from "@ac/web/components/ui";
+import { jumpDoneDemo } from "@ac/web/lib/demoPanel";
 import { jobActions } from "@ac/web/lib/jobs";
 import { clientUserActions } from "@ac/web/lib/clientUsers";
 import { useT } from "@ac/web/components/I18n";
@@ -15,7 +16,7 @@ export function DemoMock() {
   const [sim, setSim] = useState(false);
   return (
     <DemoFrame
-      clock={<ClockFace time="2026-09-14 09:41 UTC" onMinute={() => { toast(t("Clock advanced +1 min (demo)")); }} onHour={() => { toast(t("Clock advanced +1 hour (demo)")); }} />}
+      clock={<ClockFace time="2026-09-14 09:41 UTC" onJump={(minutes) => { toast(jumpDoneDemo(minutes, t)); }} />}
       scenario={<><Select aria-label={t("Scenario")} value={sim ? "on" : "off"} onChange={(e) => { setSim(e.target.value === "on"); }}><option value="off">{t("simulator = false (baseline seed)")}</option><option value="on">simulator = true</option></Select><p className="mt-2 text-[11px] text-muted-foreground">{t("The demo seed in fixture-contract.json is the source of truth")}</p></>}
       reset={<><p className="text-[11px] text-muted-foreground">{t("Returns clock, subscriptions, image URLs, caches, and business data to their initial seed")}</p><Btn variant="danger" className="mt-3" onClick={() => { setSim(false); jobActions.reset(); clientUserActions.reset(); toast(t("Demo data reset to seed")); }}>{t("Reset demo data")}</Btn></>}
       triggers={
