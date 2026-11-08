@@ -9281,6 +9281,13 @@ The user chose to delete accounts that were never used and to keep ending the ot
 1. **The rule.** `clientUsers.resendInvite` is CONFLICT `errors.access_expired` when the user's membership has an end at or before now, as the partner one is; the resend gap (IR423) is checked after it.
 2. **Tests.** `TestClientUserResendRefusedAfterTheAccessEnded` answered 200 before the fix. No operation, route or screen changes; 224 operations, 245 routes.
 
+## IR661 A membership names each scope once (review round 32) — 2026-11-09
+
+`members.save` refused a permission named twice (`error.invalid`) but took a scope named twice and stored it once (`ON CONFLICT DO NOTHING`). The check that moves the membership's `scopeVersion` when an update changes its scopes compares the lengths and then asks whether every sent scope was there before, so an update that replaced the scopes [A, B] by [A, A] kept the same length, found every sent scope in the old list, and left the version where it was: B was gone and the sessions and cursors scoped to [A, B] stayed valid.
+
+1. **The rule.** The scopes of a membership are distinct (kind and ID): a repeated scope is VALIDATION `error.duplicate` on `scopes`, as a repeated permission is on `permissions`. An unknown kind keeps its `error.invalid`.
+2. **Tests.** `TestMembersSave` (a scope named twice is refused on its field). No operation, route or screen changes; 224 operations, 245 routes.
+
 ## IR663 A write run again after a deadlock records its events and audit entries once (review round 40) — 2026-11-09
 
 `TxManager.Run` runs a transaction again, up to three times, when PostgreSQL ends it with a deadlock (40P01) or a serialization failure (40001). The operation pipeline builds the `Call` of a write before `Run` and the callback appended the events (`Call.Emit`) and audit entries (`Call.Audit`) of the handler to it; nothing emptied them when the callback ran a second time. The attempt that committed therefore wrote the events and audit entries of the attempt that had rolled back as well: the outbox carried every event twice (a notification, a projection or an account event handled twice) and the audit log every entry twice. The retry is rare (two writes that lock the same rows in opposite order), but when it happened the duplicates were silent.
