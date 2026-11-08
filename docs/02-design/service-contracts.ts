@@ -427,6 +427,7 @@ export type OperationContracts = {
   'firmwareCampaigns.get': {input:{id:ID};result:FirmwareCampaign;mode:'read'};
   'firmwareCampaigns.schedule': {input:{modelId:ID;targetVersion:string;deviceIds:ID[];waves:FirmwareCampaign['waves'];window:FirmwareCampaign['window'];autoPauseFailurePercent:number;startAt:Instant};result:FirmwareCampaign;mode:'write'};
   'firmwareCampaigns.control': {input:{campaignId:ID;action:'pause'|'resume'|'abort'|'retry_device';deviceId?:ID;reason?:string};result:FirmwareCampaign;mode:'write'};
+  'firmwareCampaigns.delete': {input:{id:ID;reason:string};result:DeletedResource;mode:'write'};
   'contractors.list': {input:Query;result:Page<ContractorProfile>;mode:'read'};
   'contractors.save': {input:{id?:ID;organizationId:ID;registrationNo:string;serviceAreas:string[];contactEmail:string;insuranceValidUntil:Instant|null};result:ContractorProfile;mode:'write'};
   'contractors.setOfferStatus': {input:{contractorOrgId:ID;status:'active'|'suspended';reason:string};result:ContractorProfile;mode:'write'};

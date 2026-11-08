@@ -99,6 +99,11 @@ export async function scheduleCampaign(d: CampaignDraft, startAt: string) {
     }, { write: true }); return c.id; });
 }
 
+/** firmwareCampaigns.delete: a campaign that has ended (aborted or completed), with its device results (DEC-103). */
+export async function deleteCampaign(id: string, version: number, reason: string) {
+  return run(async () => { await coreOp("firmwareCampaigns.delete", { id, reason }, { write: true, expectedVersion: version }); return null; });
+}
+
 export async function controlCampaign(campaignId: string, version: number, action: "pause" | "resume" | "abort" | "retry_device", deviceId?: string, reason?: string) {
   return run(async () => { await coreOp("firmwareCampaigns.control", { campaignId, action, ...(deviceId && { deviceId }), ...(reason && { reason }) }, { write: true, expectedVersion: version }); return null; });
 }

@@ -49,6 +49,7 @@ factors.save,id present,factors,factors.list,required,none,D01; version mismatch
 filterCare.markCleaned,all,none,filterCare.list,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 filterCare.saveSettings,all,none,filterCare.list,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 firmwareCampaigns.control,all,firmware_campaign,firmwareCampaigns.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+firmwareCampaigns.delete,all,firmware_campaign,firmwareCampaigns.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 firmwareCampaigns.schedule,all,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 inquiries.answer,all,inquiries,inquiries.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 inquiries.create,all,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects

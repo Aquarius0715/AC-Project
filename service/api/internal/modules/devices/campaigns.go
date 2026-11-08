@@ -916,10 +916,121 @@ func retryDevice(ctx context.Context, call *ops.Call, input *ControlInput, state
 	return nil
 }
 
+// CampaignDeleteInput is firmwareCampaigns.delete input.
+type CampaignDeleteInput struct {
+	ID     uuid.UUID `json:"id"`
+	Reason string    `json:"reason"`
+}
+
+// Validate implements ops.Validator.
+func (in *CampaignDeleteInput) Validate() map[string]string {
+	fieldErrs := map[string]string{}
+	if in.ID == uuid.Nil {
+		fieldErrs["id"] = apperr.KeyRequired
+	}
+
+	reasonErrors(&in.Reason, fieldErrs)
+
+	return fieldErrs
+}
+
+// campaignsDelete deletes a campaign that has ended, aborted or completed, with its device rows (DEC-103); one that is
+// scheduled, running or paused is CONFLICT error.campaignActive. The devices stay and so do the install operations in
+// their history.
+//
+//	@Summary		firmwareCampaigns.delete (write)
+//	@ID				firmwareCampaigns.delete
+//	@Description	Authorization: admin:device.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR653 only a campaign that has ended (aborted or completed; CONFLICT error.campaignActive); deletes \
+//	@Description	its device rows
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A20
+//	@Tags			firmwareCampaigns
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string	true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer	true	"all: required (target firmware_campaign, read firmwareCampaigns.get)"
+//	@Param			id					path		string	true	"input field id"
+//	@Param			reason				query		string	false	"input field reason"
+//	@Success		200					{object}	ops.Envelope{data=DeletedResource}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/firmware-campaigns/{id} [delete]
+func campaignsDelete(
+	ctx context.Context,
+	call *ops.Call,
+	input *CampaignDeleteInput,
+) (DeletedResource, error) {
+	var (
+		state   string
+		version int
+	)
+
+	err := call.Tx.QueryRow(
+		ctx,
+		`SELECT state, version FROM devices.firmware_campaigns WHERE id = $1 FOR UPDATE`,
+		input.ID,
+	).Scan(&state, &version)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return DeletedResource{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
+	}
+
+	if err != nil {
+		return DeletedResource{}, apperr.Wrap(err, "select devices.firmware_campaigns")
+	}
+
+	if call.ExpectedVersion != nil && version != *call.ExpectedVersion {
+		return DeletedResource{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
+	}
+
+	if state != stateAborted && state != stateCompleted {
+		return DeletedResource{}, apperr.E(apperr.Conflict, "error.campaignActive")
+	}
+
+	for _, stmt := range []string{
+		`DELETE FROM devices.firmware_campaign_devices WHERE campaign_id = $1`,
+		`DELETE FROM devices.firmware_campaigns WHERE id = $1`,
+	} {
+		_, execErr := call.Tx.Exec(ctx, stmt, input.ID)
+		if execErr != nil {
+			return DeletedResource{}, apperr.Wrap(execErr, "delete devices.firmware_campaigns")
+		}
+	}
+
+	call.Emit(
+		ops.Event{
+			AggregateType: entityCampaign,
+			AggregateID:   input.ID,
+			Type:          "FirmwareCampaignDeleted",
+			Payload:       nil,
+		},
+	)
+	call.Audit(
+		ops.AuditEntry{
+			Action:          "firmwareCampaigns.delete",
+			TargetKind:      entityCampaign,
+			TargetID:        input.ID.String(),
+			PreviousVersion: call.ExpectedVersion,
+			Reason:          input.Reason, NextVersion: nil, Result: "", Before: nil, After: nil,
+		},
+	)
+
+	return DeletedResource{ID: input.ID, Deleted: true}, nil
+}
+
 // RegisterCampaigns binds the firmware campaign operations.
 func RegisterCampaigns(r *ops.Registry, m *Module) {
 	ops.Register(r, "firmwareCampaigns.list", campaignsList)
 	ops.Register(r, "firmwareCampaigns.get", campaignsGet)
 	ops.Register(r, "firmwareCampaigns.schedule", m.campaignsSchedule)
 	ops.Register(r, "firmwareCampaigns.control", campaignsControl)
+	ops.Register(r, "firmwareCampaigns.delete", campaignsDelete)
 }
