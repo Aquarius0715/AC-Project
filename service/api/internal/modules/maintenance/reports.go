@@ -547,7 +547,7 @@ func (in *DraftInput) Validate() map[string]string {
 	in.validateRecords(seen, fieldErrs)
 
 	if utf8.RuneCountInString(in.WorkText) > maxWorkTextLength {
-		fieldErrs["workText"] = apperr.KeyLength
+		fieldErrs[fieldWorkText] = apperr.KeyLength
 	}
 
 	validateNextAction(in.NextAction, fieldErrs)
@@ -1485,8 +1485,8 @@ func submitErrors(report *Report, components []string, now time.Time) map[string
 		fieldErrs[fieldItems] = "errors.components_mismatch"
 	}
 
-	if n := utf8.RuneCountInString(report.WorkText); n < 10 || n > 4000 {
-		fieldErrs["workText"] = apperr.KeyLength
+	if n := utf8.RuneCountInString(strings.TrimSpace(report.WorkText)); n < 10 || n > 4000 {
+		fieldErrs[fieldWorkText] = apperr.KeyLength
 	}
 
 	switch {
@@ -1494,7 +1494,7 @@ func submitErrors(report *Report, components []string, now time.Time) map[string
 		fieldErrs[fieldNextAction] = apperr.KeyRequired
 	case report.NextAction.Kind == nextActionFollowUp &&
 		(report.NextAction.Date == nil || !report.NextAction.Date.After(now) || report.NextAction.Note == nil ||
-			utf8.RuneCountInString(*report.NextAction.Note) < 1):
+			strings.TrimSpace(*report.NextAction.Note) == ""):
 		fieldErrs[fieldNextAction] = apperr.KeyInvalid
 	}
 

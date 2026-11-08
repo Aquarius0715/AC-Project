@@ -243,6 +243,15 @@ func (m Proposals) proposeSlotJob(
 		}
 
 		allowed = count > 0
+
+		if !allowed && job.status == statusAccepted {
+			over, overErr := candidatesOver(ctx, call, input.JobID)
+			if overErr != nil {
+				return Job{}, overErr
+			}
+
+			allowed = over // the contractor can no longer assign any time it was offered (IR642)
+		}
 	case statusAssigned:
 		var ack string // no active assignment: not allowed
 
@@ -254,7 +263,9 @@ func (m Proposals) proposeSlotJob(
 			return Job{}, apperr.Wrap(err, "select maintenance.assignments")
 		}
 
-		allowed = ack == ackCantMake
+		// the technician cannot make it, or the booked time is over and nobody started (IR642)
+		allowed = ack == ackCantMake ||
+			(job.scheduled != nil && !job.scheduled.EndAt.After(call.Now))
 	}
 
 	if !allowed {
@@ -890,6 +901,21 @@ func moveOffer(
 	}
 
 	return nil
+}
+
+// candidatesOver reports whether every candidate time of the job's accepted offer has ended (IR642): the contractor can
+// assign none of them, so HQ may propose another time like it does after a technician cannot make it.
+func candidatesOver(ctx context.Context, call *ops.Call, jobID uuid.UUID) (bool, error) {
+	var over bool
+
+	err := call.Tx.QueryRow(ctx, `SELECT COALESCE(bool_and((c->>'endAt')::timestamptz <= $2), false)
+		FROM jsonb_array_elements((SELECT candidate_slots FROM maintenance.offers WHERE job_id = $1 AND decision = 'accept'
+			ORDER BY decided_at DESC LIMIT 1)) c`, jobID, call.Now).Scan(&over)
+	if err != nil {
+		return false, apperr.Wrap(err, "select maintenance.offers")
+	}
+
+	return over, nil
 }
 
 // ---- jobs.requestReschedule ----

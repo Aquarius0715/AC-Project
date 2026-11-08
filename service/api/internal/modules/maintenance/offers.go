@@ -788,7 +788,7 @@ func (in *AssignInput) Validate() map[string]string {
 	}
 
 	if !in.StartAt.Before(in.EndAt) {
-		fieldErrs["endAt"] = apperr.KeyRange
+		fieldErrs[fieldEndAt] = apperr.KeyRange
 	}
 
 	if in.Reason != nil {
@@ -966,8 +966,8 @@ func assignmentScope(
 
 // slotRules applies the state and slot rules of an assignment (IR113 / IR49 / IR123 item 4 / IR636): a first assignment
 // takes an agreed time, which is not over (IR456), and a contractor picks one of its offer's candidate times; a
-// reassignment keeps the scheduled time, and a contractor may move to another candidate that is not over; a job under
-// way may only be extended, with a reason (D06).
+// reassignment keeps the scheduled time while it is not over (IR642), and a contractor may move to another candidate
+// that is not over; a job under way may only be extended, with a reason (D06).
 func (m Delivery) slotRules(
 	ctx context.Context,
 	call *ops.Call,
@@ -982,7 +982,7 @@ func (m Delivery) slotRules(
 		if !slot.EndAt.After(
 			call.Now,
 		) { // a time already over cannot be worked (IR456): HQ proposes another
-			return apperr.Fields(map[string]string{"endAt": apperr.KeyPast})
+			return apperr.Fields(map[string]string{fieldEndAt: apperr.KeyPast})
 		}
 
 		agreed := contractor && slotIn(offered, slot)
@@ -1006,6 +1006,10 @@ func (m Delivery) slotRules(
 
 		if !keeps && !moves {
 			return slotNotAgreed()
+		}
+		// a time that is over cannot be worked by a new technician either (IR456, IR642): HQ proposes another time
+		if !slot.EndAt.After(call.Now) {
+			return apperr.Fields(map[string]string{fieldEndAt: apperr.KeyPast})
 		}
 	case locked.status == statusInProgress || locked.status == statusReworkRequested || locked.status == statusOnHold:
 		// D06 extension / reassignment

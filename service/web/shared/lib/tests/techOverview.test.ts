@@ -39,6 +39,13 @@ describe("technician overview", () => {
     expect(techRowOf(row({ status: IN_PROGRESS, scheduledSlot: slot("2026-09-21T00:00:00Z", TEXT_2026_09_21T02_00_00Z) }), NOW, units).badge).toStrictEqual({ text: "Work window ended", tone: "crit" });
     expect(techRowOf(row({ status: "rework_requested" }), NOW, units).badge.text).toBe("Rework requested");
     expect(techRow({ projection: "history", jobId: "h", type: "periodic", status: "completed", completedAt: null }, NOW, units)).toBeNull();
+    // IR642: a window that ended with nobody having finished the job is shown, with who to ask; a finished or cancelled one is not
+    expect(techRow({ projection: "history", jobId: "h1234567-aaaa", type: "reactive", status: "assigned", completedAt: null }, NOW, units)).toMatchObject({
+      id: "h1234567-aaaa", short: "h1234567", title: "Repair", status: "ended", today: false, badge: { text: "Work window ended", tone: "crit" }, line: "Repair · ask your contractor or HQ to extend or reassign",
+    });
+    expect(techRow({ projection: "history", jobId: "h", type: "reactive", status: IN_PROGRESS, completedAt: null }, NOW, units)?.badge.text).toBe("Work window ended");
+    expect(techRow({ projection: "history", jobId: "h", type: "reactive", status: "assigned", completedAt: "2026-09-20T01:00:00Z" }, NOW, units)).toBeNull();
+    expect(techRow({ projection: "history", jobId: "h", type: "reactive", status: "cancelled", completedAt: null }, NOW, units)).toBeNull();
     expect([tabOf("all"), tabOf("x"), sortOf("dueAt"), sortOf("x")]).toStrictEqual(["all", "today", "dueAt", "severity"]);
   });
 

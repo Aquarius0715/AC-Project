@@ -55,10 +55,23 @@ export interface TechJobRow {
   id: string; short: string; title: string; origin: string | null; line: string; badge: { text: string; tone: Tone }; today: boolean;
   slot: Slot | null; slotText: string; ackPending: boolean; opensAt: string | null; opens: string | null; status: string; severity: string;
 }
+/** A job whose work window ended with nobody having finished it: the history snapshot still reads assigned or in progress
+(IR642). The technician is told, with who to ask — the unit stays closed (IR49); the status is "ended", so it counts as no
+draft report and no job to start. A past assignment that was completed or cancelled is not part of today's work. */
+function endedRow(j: Extract<ApiTechJobRow, { projection: "history" }>, i: I18n): TechJobRow | null {
+  if (j.completedAt !== null || (j.status !== "assigned" && j.status !== IN_PROGRESS)) return null;
+  const { t } = i;
+
+  return {
+    id: j.jobId, short: j.jobId.slice(0, 8), title: typeLabel(j.type, t), origin: null, status: "ended", severity: "normal",
+    line: [typeLabel(j.type, t), t("ask your contractor or HQ to extend or reassign")].join(" · "),
+    today: false, slot: null, ackPending: false, opensAt: null, opens: null, slotText: "", badge: { text: t("Work window ended"), tone: "crit" },
+  };
+}
 /** One assigned job: what the technician can do now, read from the status, the acknowledgement and the work window. */
 export function techRow(j: ApiTechJobRow, now: number, units: Map<string, string>, i: I18n = EN): TechJobRow | null {
   const { t, display } = i;
-  if (j.projection === "history") return null; // past assignments are not part of today's work
+  if (j.projection === "history") return endedRow(j, i);
   const s = j.scheduledSlot;
   const isBefore = !!s && Date.parse(s.startAt) > now;
   const isEnded = !!s && Date.parse(s.endAt) <= now && (j.status === "assigned" || j.status === IN_PROGRESS);
