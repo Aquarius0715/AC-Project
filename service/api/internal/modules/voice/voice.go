@@ -1,4 +1,4 @@
-// Package voice implements voice.resolveIntent (D09, IR65): a fixed en/ms grammar over Space names.
+// Package voice implements voice.resolveIntent (D09, IR65, IR639): a fixed en/ms/ja grammar over Space names.
 package voice
 
 import (
@@ -37,7 +37,7 @@ type Input struct {
 	SelectedUnitID *uuid.UUID `json:"selectedUnitId,omitempty"`
 }
 
-// Validate implements ops.Validator: 1–200 code points after trim, locale en|ms.
+// Validate implements ops.Validator: 1–200 code points after trim, locale en|ms|ja.
 func (in *Input) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 
@@ -46,7 +46,7 @@ func (in *Input) Validate() map[string]string {
 		fieldErrs["text"] = apperr.KeyLength
 	}
 
-	if in.Locale != "en" && in.Locale != "ms" {
+	if !slices.Contains([]string{"en", "ms", "ja"}, in.Locale) {
 		fieldErrs["locale"] = apperr.KeyInvalid
 	}
 
@@ -63,15 +63,20 @@ var (
 	msTemperature = regexp.MustCompile(`(?i)^suhu (.+)$`)
 	msSet         = regexp.MustCompile(`(?i)^tetapkan (.+) kepada (\d{1,3}) darjah$`)
 	msHelp        = regexp.MustCompile(`(?i)^bantuan$`)
+	jaTemperature = regexp.MustCompile(`^温度\s*(.+)$`)
+	jaSet         = regexp.MustCompile(`^(.+?)\s*を\s*(\d{1,3})\s*度に設定$`)
+	jaHelp        = regexp.MustCompile(`^ヘルプ$`)
 )
 
-// grammarOf returns the grammar of the locale: en or ms (Validate allows no other).
+// grammarOf returns the grammar of the locale: en, ms or ja (Validate allows no other).
 func grammarOf(locale string) grammar {
 	switch locale {
 	case "en":
 		return grammar{temperature: enTemperature, set: enSet, help: enHelp}
 	case "ms":
 		return grammar{temperature: msTemperature, set: msSet, help: msHelp}
+	case "ja":
+		return grammar{temperature: jaTemperature, set: jaSet, help: jaHelp}
 	default:
 		return grammar{temperature: nil, set: nil, help: nil}
 	}

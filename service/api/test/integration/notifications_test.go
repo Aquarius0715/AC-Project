@@ -654,6 +654,22 @@ func TestPreferencesAndConsents(t *testing.T) {
 		t.Fatalf("update: %d %v", code, res)
 	}
 
+	// Japanese is a display language too (IR639)
+	if code, res := write(
+		srv,
+		customerB(),
+		"preferences.update",
+		`{"locale":"ja","timezone":"Asia/Tokyo"}`,
+		0,
+	); code != 200 ||
+		data(res)["locale"] != "ja" {
+		t.Fatalf("update to Japanese: %d %v", code, res)
+	}
+
+	if _, m := post(srv, customerB(), "preferences.get", `{}`); data(m)["locale"] != "ja" {
+		t.Error("the saved Japanese preference")
+	}
+
 	if code, res := write(
 		srv,
 		customerB(),

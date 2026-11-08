@@ -115,4 +115,10 @@ describe("payouts in Malay (IR279)", () => {
     expect(pdf).toContain("(Bersih perlu dibayar");
     expect(pdf).not.toMatch(/\P{ASCII}/u);
   });
+
+  // IR639: the PDF's font has ASCII only, so a Japanese user's statement is the English one, not a page of “-”
+  it("writes a Japanese user's statement in English", () => {
+    const rows = lineRows(statement(), new Map(), [{ id: JOB_EEEEEEEE, type: "periodic", unitName: null }]);
+    expect(payoutPdf(statement(), rows, "Demo Contractor A", translator("ja"), "ja")).toBe(payoutPdf(statement(), rows, "Demo Contractor A"));
+  });
 });
