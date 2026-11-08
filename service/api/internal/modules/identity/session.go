@@ -46,6 +46,7 @@ const SessionTTL = 30 * time.Minute
 func Register(r *ops.Registry) {
 	ops.Register(r, "organizations.list", organizationsList)
 	ops.Register(r, "organizations.save", organizationsSave)
+	ops.Register(r, "organizations.delete", organizationsDelete)
 	ops.Register(r, "session.get", sessionGet)
 }
 

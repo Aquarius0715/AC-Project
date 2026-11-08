@@ -1914,6 +1914,7 @@ func customerStatus(metrics Metrics, tgt SlaTargets) string {
 func RegisterPartners(reg *ops.Registry, partners Partners) {
 	ops.Register(reg, "contractors.list", partners.list)
 	ops.Register(reg, "contractors.save", partners.save)
+	ops.Register(reg, "contractors.delete", partners.delete)
 	ops.Register(reg, "contractors.setOfferStatus", partners.setOfferStatus)
 	ops.Register(reg, "rateCards.save", partners.saveRateCard)
 	ops.Register(reg, "rateCards.list", partners.listRateCards)

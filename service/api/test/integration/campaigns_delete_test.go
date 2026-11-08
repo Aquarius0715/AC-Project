@@ -71,7 +71,7 @@ func TestFirmwareCampaignsDelete(t *testing.T) {
 
 	version = ver(t, resp)
 
-	for name, who := range map[string]*actor{"client": customerB(), "technician": techInt()} {
+	for name, who := range map[string]*actor{roleClient: customerB(), roleTechnician: techInt()} {
 		if code, _ := remove(who, version); code == 200 {
 			t.Errorf("%s deletes a campaign", name)
 		}

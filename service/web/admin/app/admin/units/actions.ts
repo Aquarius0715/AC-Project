@@ -54,6 +54,17 @@ export async function updateCustomer(id: string, version: number, org: { id: str
   });
 }
 
+/** customers.delete and then organizations.delete: a customer registered by mistake is removed as it was made (DEC-103);
+a customer with units, jobs, contracts, invoices or users is refused with the reason. */
+export async function deleteCustomer(id: string, version: number, org: { id: string; version: number }, reason: string) {
+  return run(async () => {
+    const why = reason.trim();
+    await coreOp("customers.delete", { id, reason: why }, write(version));
+    await coreOp("organizations.delete", { id: org.id, reason: why }, write(org.version));
+    return null;
+  });
+}
+
 export interface PropertyInput { id?: string; customerOrgId: string; kind: "home" | "office"; name: string; address: string | null; accessInstructions: string | null }
 export async function saveProperty(input: PropertyInput, version?: number) {
   return run(async () => { const p = await coreOp<{ id: string }>("properties.save", input, write(version)); return p.id; });

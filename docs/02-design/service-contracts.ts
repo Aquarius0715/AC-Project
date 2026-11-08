@@ -286,6 +286,7 @@ export type OperationContracts = {
   'contracts.save': {input:{id?:ID;customerId:ID;unitIds:ID[];planType:Contract['planType'];startAt:Instant;endAt:Instant;priceMinor:number;currency:Currency;restrictionEligible:boolean;rulesVersion:ID|null};result:Contract;mode:'write'};
   'customers.list': {input:Query;result:Page<Customer>;mode:'read'};
   'customers.save': {input:{id?:ID;name:string;organizationId:ID;serviceProfile:Customer['serviceProfile'];status:'active'|'inactive'};result:Customer;mode:'write'};
+  'customers.delete': {input:{id:ID;reason:string};result:DeletedResource;mode:'write'};
   'demo.advanceClock': {input:{to:Instant};result:DemoGeneration;mode:'write'};
   'demo.reset': {input:{confirmation:true};result:DemoGeneration;mode:'write'};
   'demo.trigger': {input:DemoTrigger;result:DemoEvent;mode:'write'};
@@ -364,6 +365,7 @@ export type OperationContracts = {
   'offsets.simulate': {input:({event:'request';quoteId:ID;quoteVersion:number}|{event:'purchase_confirm'|'retire'|'fail';recordId:ID;attemptId:ID;eventId:ID}|{event:'retry';recordId:ID;attemptId:ID}) & {demoConfirmed:true};result:OffsetRecord;mode:'write'};
   'organizations.list': {input:Query;result:Page<Organization>;mode:'read'};
   'organizations.save': {input:Save<Organization>;result:Organization;mode:'write'};
+  'organizations.delete': {input:{id:ID;reason:string};result:DeletedResource;mode:'write'};
   'payments.confirm': {input:{paymentId:ID;paymentReference:string;confirmedAmountMinor:number;currency:Currency;reason:string};result:Payment;mode:'write'};
   'payments.recordManual': {input:{invoiceId:ID;paymentReference:string;confirmedAmountMinor:number;currency:Currency;reason:string};result:Payment;mode:'write'};
   'payments.simulate': {input:{event:'initiate';invoiceId:ID;method:PaymentMethod;demoConfirmed:true}|{event:'instructions';invoiceId:ID;demoConfirmed:true}|{event:'processing'|'confirm'|'fail';paymentId:ID;eventId:ID;paymentReference:string};result:Payment|NotificationPreview;mode:'write'};
@@ -430,6 +432,7 @@ export type OperationContracts = {
   'firmwareCampaigns.delete': {input:{id:ID;reason:string};result:DeletedResource;mode:'write'};
   'contractors.list': {input:Query;result:Page<ContractorProfile>;mode:'read'};
   'contractors.save': {input:{id?:ID;organizationId:ID;registrationNo:string;serviceAreas:string[];contactEmail:string;insuranceValidUntil:Instant|null};result:ContractorProfile;mode:'write'};
+  'contractors.delete': {input:{id:ID;reason:string};result:DeletedResource;mode:'write'};
   'contractors.setOfferStatus': {input:{contractorOrgId:ID;status:'active'|'suspended';reason:string};result:ContractorProfile;mode:'write'};
   'rateCards.list': {input:Query;result:Page<RateCard>;mode:'read'};
   'rateCards.save': {input:{contractorOrgId:ID;effectiveFrom:Instant;currency:Currency;lines:RateCard['lines']};result:RateCard;mode:'write'};

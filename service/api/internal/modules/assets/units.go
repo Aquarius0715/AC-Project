@@ -133,6 +133,7 @@ func Register(reg *ops.Registry, module *Module) {
 	ops.Register(reg, "units.archive", module.unitsArchive)
 	ops.Register(reg, "customers.list", module.customersList)
 	ops.Register(reg, "customers.save", module.customersSave)
+	ops.Register(reg, "customers.delete", module.customersDelete)
 	ops.Register(reg, "properties.list", module.propertiesList)
 	ops.Register(reg, "spaces.list", module.spacesList)
 	ops.Register(reg, "locations.rename", module.locationsRename)

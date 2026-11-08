@@ -167,6 +167,17 @@ export async function saveContractor(input: { id: string | null; version: number
   });
 }
 
+/** contractors.delete (when the company has a profile) and then organizations.delete: a company registered by mistake is
+removed as it was made (DEC-103); one with jobs, offers, certificates, payouts or users is refused with the reason. */
+export async function deleteContractor(org: { id: string; version: number }, profile: { id: string; version: number } | null, reason: string) {
+  return value(async () => {
+    const why = reason.trim();
+    if (profile) await coreOp("contractors.delete", { id: profile.id, reason: why }, write(profile.version));
+    await coreOp("organizations.delete", { id: org.id, reason: why }, write(org.version));
+    return null;
+  });
+}
+
 /** contractors.setOfferStatus: suspend or resume new offers with a reason (open offers and jobs continue, IR111). */
 export async function setOfferStatus(contractorOrgId: string, version: number, status: "active" | "suspended", reason: string) {
   return value(async () => { await coreOp("contractors.setOfferStatus", { contractorOrgId, status, reason: reason.trim() }, write(version)); return null; });

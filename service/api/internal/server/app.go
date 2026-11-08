@@ -266,6 +266,7 @@ func registerEquipment(reg *ops.Registry, txm *db.TxManager) (*assets.Module, eq
 		models: devices.Models{},
 	} // other domains' view (IR193)
 	devices.Register(reg, devices.Capabilities{Units: assetsModule})
+	assets.RegisterQueries(reg)
 	devices.RegisterQueries(
 		reg,
 	) // internal: a device's open connection fault for the IoT gateway (IR532 system query)
