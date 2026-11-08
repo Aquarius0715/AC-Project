@@ -62,6 +62,24 @@ func (m Files) lockDraft(
 	return &draft, nil
 }
 
+// dropSignOffFiles removes the files of the sign-off of one version of the report (a draft), which is being replaced or
+// cleared: the signature or site photo belongs to that sign-off alone, so it is no part of the report any more. Left in
+// place it would show among the technician's photos and count toward the 10 attachments of a report (DD-T09). A frozen
+// version keeps its sign-off and its files.
+func dropSignOffFiles(ctx context.Context, call *ops.Call, report uuid.UUID, version int) error {
+	_, err := call.Tx.Exec(
+		ctx,
+		`DELETE FROM maintenance.attachments WHERE id IN (
+			SELECT (sign_off->>'signatureAttachmentId')::uuid FROM maintenance.work_reports WHERE id = $1 AND version = $2
+			UNION
+			SELECT (sign_off->>'sitePhotoAttachmentId')::uuid FROM maintenance.work_reports WHERE id = $1 AND version = $2)`,
+		report,
+		version,
+	)
+
+	return apperr.Wrap(err, "delete maintenance.attachments")
+}
+
 // store saves one file as a ready Attachment of the report and returns its ID.
 func (m Files) store(
 	ctx context.Context,
@@ -156,6 +174,16 @@ func (m Files) add(ctx context.Context, call *ops.Call, input *AddInput) (Attach
 
 	if draft.Version != *call.ExpectedVersion {
 		return AttachmentRef{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
+	}
+
+	dropErr := dropSignOffFiles(
+		ctx,
+		call,
+		input.ReportID,
+		draft.Version,
+	) // adding a file clears the sign-off below
+	if dropErr != nil {
+		return AttachmentRef{}, dropErr
 	}
 
 	var count int
@@ -315,6 +343,16 @@ func (m Files) signOff(ctx context.Context, call *ops.Call, input *SignOffInput)
 
 	if draft.Version != *call.ExpectedVersion || draft.Version != input.ReportVersion {
 		return Report{}, apperr.E(apperr.Conflict, "errors.report_version_changed")
+	}
+
+	dropErr := dropSignOffFiles(
+		ctx,
+		call,
+		input.ReportID,
+		draft.Version,
+	) // the new sign-off replaces the earlier one
+	if dropErr != nil {
+		return Report{}, dropErr
 	}
 
 	signOff := SignOff{
