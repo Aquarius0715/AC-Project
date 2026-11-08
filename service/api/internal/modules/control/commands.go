@@ -483,7 +483,18 @@ func (m Commands) get(ctx context.Context, call *ops.Call, in *GetInput) (Comman
 		}
 	}
 
+	hideForeignReason(call, &command)
+
 	return command, nil
+}
+
+// hideForeignReason withholds from a client the reason of a command that someone else sent: a technician's or HQ's
+// reason is not the customer's (IR216). commands.list and commands.get both apply it.
+func hideForeignReason(call *ops.Call, command *Command) {
+	if call.Principal.Role == authz.RoleClient &&
+		command.ActorMembershipID != call.Principal.MembershipID {
+		command.Reason = nil
+	}
 }
 
 // ListInput is commands.list input (IR216).
@@ -606,10 +617,7 @@ func (m Commands) list(
 			return paging.Page[Command]{}, err
 		}
 
-		if call.Principal.Role == authz.RoleClient &&
-			command.ActorMembershipID != call.Principal.MembershipID {
-			command.Reason = nil // another actor's reason (a technician's or HQ's) is not the customer's
-		}
+		hideForeignReason(call, &command)
 
 		items = append(items, command)
 	}

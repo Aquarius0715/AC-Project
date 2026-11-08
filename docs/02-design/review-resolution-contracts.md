@@ -9164,3 +9164,11 @@ A sign-off binds one signature (or an absence reason with a site photo) to the d
 1. **The rule.** The files of a draft's sign-off are deleted (rows of `maintenance.attachments`; the objects in the store stay, as for every upload that is not used) when the sign-off is replaced (`reports.signOff`) or cleared (`attachments.add`, `jobs.saveDraft`). In `attachments.add` this happens before the count, so the limit counts photos and the sign-off still to come.
 2. **Not changed.** A frozen version keeps its sign-off and its file (a returned or accepted report is read as it was signed); only the draft's are deleted. The limit stays 10 attachments of a report, and the current sign-off's file counts toward it.
 3. **Test.** `TestSignOffFilesFollowTheSignOff`: a second sign-off leaves one file, a photo added leaves the photo only, and saving the draft leaves the photo only (the second and the last two checks failed before the change).
+
+## IR650 `commands.get` withholds another actor's reason from a client, as `commands.list` does (review round 19) — 2026-11-08
+
+IR216 says that a client sees the commands of its organization's unit with the reason of a command someone else sent (a technician or HQ) withheld, and `commands.list` did so. `commands.get` did not: a client that knew a command's ID (the list shows every ID) read the internal reason a technician or HQ had written, for example “airflow check”.
+
+1. **The rule.** `commands.get` and `commands.list` apply the same function (`hideForeignReason`): for a client, the `reason` is null unless the client itself sent the command. HQ and a technician see the reason as before.
+2. **Test.** `TestCommandHistory`: a client's `commands.get` of a technician's command has no reason (it showed it before), and the technician's own `commands.get` still does.
+3. **Noted, not changed.** The documented authorization of `commands.get` for a technician is "assigned", while the code lets a technician with the unit in scope read any command of that unit; `commands.list` requires a held job. Proposal B-4 in the review proposals asks whether to apply the job rule to `get` too.
