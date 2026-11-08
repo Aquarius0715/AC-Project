@@ -55,6 +55,9 @@ describe("partner job list", () => {
     });
     expect(jobRow(summary("assigned", { ...assigned, assignmentAcknowledgement: "cant_make" }), NOW, units, names).tech).toEqual({ name: TECH_EXTERNAL_A, sub: "can’t make it — reassign", tone: "warn", subTone: "warn" });
     expect(jobRow(summary(IN_PROGRESS, { ...assigned, scheduledSlot: slot("2026-09-20T01:00:00Z", "2026-09-20T09:00:00Z") }), NOW, units, names)).toMatchObject({ line: "Work window ended 20 Sept 2026, 5:00 pm MYT · report not submitted", slot: { main: "Ended 20 Sept 2026, 5:00 pm MYT", tone: "crit" }, badge: { text: "Overdue", tone: "crit" } });
+    // IR642: a job nobody started is not extended: the contractor asks HQ for a new time; a started one is extended
+    const ended = { ...assigned, scheduledSlot: slot("2026-09-20T01:00:00Z", "2026-09-20T09:00:00Z") };
+    expect([jobRow(summary("assigned", ended), NOW, units, names).slot.sub, jobRow(summary(IN_PROGRESS, ended), NOW, units, names).slot.sub]).toStrictEqual(["Ask HQ for a new time", "Extend or reassign"]);
     expect(jobRow(summary(IN_PROGRESS, assigned), NOW, units, names)).toMatchObject({ line: "In progress · tech-external-a on site", badge: { text: "In progress" } });
     expect(jobRow(summary("submitted", assigned), NOW, units, names)).toMatchObject({ href: "/partner/jobs/11111111-aaaa/review", line: "Submitted by tech-external-a · awaiting your review", badge: { text: "Submitted" } });
     expect(jobRow(summary("rework_requested", assigned), NOW, units, names).badge).toEqual({ text: "Rework", tone: "warn" });

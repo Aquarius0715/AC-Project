@@ -281,6 +281,7 @@ const (
 	fieldFrom           = "from"
 	fieldHold           = "hold"
 	fieldItems          = "items"
+	fieldEndAt          = "endAt"
 	fieldJobID          = "jobId"
 	fieldName           = "name"
 	fieldNextAction     = "nextAction"
