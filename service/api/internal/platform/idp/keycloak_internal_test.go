@@ -90,6 +90,7 @@ func newTestKeycloak(base, secret string, now func() time.Time, client *http.Cli
 		AdminURL:     base + "/admin/realms/ac",
 		ClientID:     testClientID,
 		ClientSecret: secret,
+		PublicURL:    "",
 		Now:          now,
 		Client:       client,
 		mu:           sync.Mutex{},
@@ -211,5 +212,65 @@ func TestKeycloakTokenAnswers(t *testing.T) {
 		}
 
 		srv.Close()
+	}
+}
+
+// TestKeycloakNamesItsPublicAddress: with a PublicURL, the token request and the admin request carry the forwarded host
+// and scheme the identity provider builds its links from (IR651); without one they carry nothing of the kind.
+func TestKeycloakNamesItsPublicAddress(t *testing.T) {
+	t.Parallel()
+
+	for public, want := range map[string]string{"http://10.100.1.17:8281": "10.100.1.17:8281 http", "": " "} {
+		var (
+			lock sync.Mutex
+			seen []string
+		)
+
+		srv := httptest.NewServer(
+			http.HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
+				lock.Lock()
+
+				seen = append(
+					seen,
+					req.Header.Get("X-Forwarded-Host")+" "+req.Header.Get("X-Forwarded-Proto"),
+				)
+
+				lock.Unlock()
+
+				if strings.HasSuffix(req.URL.Path, "/token") {
+					_, _ = writer.Write([]byte(`{"access_token":"admin-token","expires_in":300}`))
+
+					return
+				}
+
+				writer.WriteHeader(http.StatusNoContent)
+			}),
+		)
+
+		keycloak := newTestKeycloak(srv.URL, testSecret, nil, nil)
+		keycloak.PublicURL = public
+		keycloak.ClientID = ""
+		keycloak.ClientSecret = ""
+
+		err := keycloak.EndSessions(t.Context(), "09f7f651-9f19-5407-b222-8730fe8fd5c3")
+
+		srv.Close()
+
+		if err != nil {
+			t.Fatalf("%q: %v", public, err)
+		}
+
+		lock.Lock()
+		got := strings.Join(seen, "|")
+		lock.Unlock()
+
+		if got != want+"|"+want {
+			t.Errorf(
+				"%q: the token and the admin request carried %q, want %q twice",
+				public,
+				got,
+				want,
+			)
+		}
 	}
 }

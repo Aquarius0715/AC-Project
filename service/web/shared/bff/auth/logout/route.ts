@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { clearedCookieOptions, dropSession, endIdpSession, loadSession, oidcConfig, SESSION_COOKIE } from "@ac/web/lib/session";
+import { clearedCookieOptions, dropSession, endIdpSession, loadSession, oidcConfigFor, SESSION_COOKIE } from "@ac/web/lib/session";
 import { sameOriginRequest } from "@ac/web/lib/securityHeaders";
 
 // POST /bff/auth/logout: deletes the stored session, so a copy of the cookie stops working at once (IR382), ends the
@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
   const session = await loadSession(cookie);
   await dropSession(cookie);
   if (session?.refreshToken) await endIdpSession(session.refreshToken);
-  const res = NextResponse.redirect(new URL("/login", oidcConfig().appUrl), 303);
+  const res = NextResponse.redirect(new URL("/login", oidcConfigFor(req.headers.get("host")).appUrl), 303);
   res.cookies.set(SESSION_COOKIE, "", clearedCookieOptions());
   return res;
 }

@@ -9,6 +9,7 @@ usage: python3 deploy/test/realm.py REALM_IN REALM_OUT SETTINGS  (the URLs and s
 import json
 import os
 import sys
+from urllib.parse import urlsplit, urlunsplit
 
 APPS = {  # client -> the apps that sign in with it
     "ac-web": ["CUSTOMER_WEB_URL", "PARTNER_WEB_URL", "TECHNICIAN_WEB_URL"],
@@ -19,6 +20,13 @@ SECRETS = {
     "ac-admin-web": "AC_ADMIN_WEB_CLIENT_SECRET",
     "ac-identity-admin": "IDP_ADMIN_CLIENT_SECRET",
 }
+
+
+def on_host(url: str, host: str) -> str:
+    """The app's address with its host name replaced: the same port and scheme, another address it answers on (IR651)."""
+    parts = urlsplit(url)
+    port = f":{parts.port}" if parts.port else ""
+    return urlunsplit((parts.scheme, host + port, parts.path, "", "")).rstrip("/")
 
 
 def read_settings(path: str) -> dict[str, str]:
@@ -48,9 +56,11 @@ def main() -> None:
     with open(source, encoding="utf-8") as f:
         realm = json.load(f)
     clients = {c["clientId"]: c for c in realm["clients"]}
+    hosts = [h.strip() for h in settings.get("PUBLIC_HOSTS", "").split(",") if h.strip()]
     for client_id, apps in APPS.items():
         client = clients[client_id]
         urls = [setting(app).rstrip("/") for app in apps]
+        urls += [on_host(url, host) for url in list(urls) for host in hosts if on_host(url, host) not in urls]  # IR651
         client["redirectUris"] = [f"{url}/*" for url in urls]
         client["webOrigins"] = urls
     for client_id, name in SECRETS.items():

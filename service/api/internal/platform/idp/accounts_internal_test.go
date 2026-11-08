@@ -93,6 +93,7 @@ func newAccountsKeycloak(t *testing.T) (*Keycloak, *accountsRealm) {
 		AdminURL:     srv.URL + "/admin",
 		ClientID:     testClientID,
 		ClientSecret: "s",
+		PublicURL:    "",
 		Client:       nil,
 		Now:          nil,
 		mu:           sync.Mutex{},

@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { APP_ROLE, cookieOptions, createSessionCookie, OIDC_COOKIE, oidcConfig, oidcCookieOptions, roleHome, SESSION_COOKIE, sessionFromTokens, tokenResponse, unsealAs, type Session } from "@ac/web/lib/session";
+import { APP_ROLE, cookieOptions, createSessionCookie, OIDC_COOKIE, oidcConfigFor, oidcCookieOptions, roleHome, SESSION_COOKIE, sessionFromTokens, tokenResponse, unsealAs, type Session } from "@ac/web/lib/session";
 import { z } from "zod";
 import { orNull } from "@ac/web/lib/promises";
 
@@ -25,7 +25,7 @@ async function revokedSignIn(s: Session): Promise<boolean> {
 // GET /bff/auth/callback: exchanges the code, reads tenant / membership / role claims and starts the session: a new
 // stored record and its sealed ID in the cookie (IR382), or the sealed session itself without the store.
 export async function GET(req: NextRequest) {
-  const config = oidcConfig();
+  const config = oidcConfigFor(req.headers.get("host")); // the address the sign-in started on (IR651)
   const pending = unsealAs(req.cookies.get(OIDC_COOKIE)?.value, pendingSignIn);
   const code = req.nextUrl.searchParams.get("code");
   if (!pending || !code || req.nextUrl.searchParams.get("state") !== pending.state) {

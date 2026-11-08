@@ -33,6 +33,7 @@ API_SERVICES=(gateway identity-api equipment-api maintenance-api billing-api ene
 MIGRATIONS=service/api/internal/migrations
 LIVE=deploy/test/compose.live.yaml # this environment's data (DEC-96); a tag before it has none
 LEFT_OUT=mock-fleet                # the profile compose.live.yaml moves the mock fleet's services to
+MULTIHOST=deploy/test/compose.multihost.yaml # more than one address (IR651); a tag before it has none
 
 log() { printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"; }
 
@@ -44,14 +45,33 @@ state() { cat "$STATE/$1" 2>/dev/null || true; }
 # person's own and may hold any character)
 setting() { sed -n "s/^$1=//p" "$SETTINGS" | tail -n 1 | sed -e "s/^'\(.*\)'$/\1/" -e 's/^"\(.*\)"$/\1/'; }
 
-# compose for the tag $1, on the tree, with this environment's data on the real clock
+# the issuers the APIs accept when Keycloak answers on several addresses: the tokens of a sign-in name the address it
+# started on, so Keycloak's own URL and the same URL on each host of PUBLIC_HOSTS (IR651)
+issuers() {
+  local url list host
+  url=$(setting KEYCLOAK_URL)
+  list="$url/realms/ac"
+  for host in $(setting PUBLIC_HOSTS | tr ',' ' '); do
+    list+=",$(printf '%s' "$url" | sed -E "s#^(https?://)[^:/]+#\1$host#")/realms/ac"
+  done
+  printf '%s' "$list"
+}
+
+# compose for the tag $1, on the tree, with this environment's data on the real clock. When the environment file lists
+# PUBLIC_HOSTS the stack answers on each of those addresses (IR651): Keycloak takes its host from the request behind an
+# nginx that checks it, and the APIs accept the tokens of a sign-in on any of those addresses.
 compose() {
   local tag=$1 files=(-f "$REPO/compose.yaml" -f "$REPO/deploy/test/compose.test.yaml")
+  local env=(IMAGE_TAG="$tag" DEMO_CLOCK_START=now)
   shift
   if [ -f "$REPO/$LIVE" ]; then
     files+=(-f "$REPO/$LIVE")
   fi
-  IMAGE_TAG=$tag DEMO_CLOCK_START=now docker compose -p "$PROJECT" --progress plain --env-file "$SETTINGS" \
+  if [ -n "$(setting PUBLIC_HOSTS)" ] && [ -f "$REPO/$MULTIHOST" ]; then
+    files+=(-f "$REPO/$MULTIHOST")
+    env+=(API_OIDC_ISSUER="$(issuers)")
+  fi
+  env "${env[@]}" docker compose -p "$PROJECT" --progress plain --env-file "$SETTINGS" \
     "${files[@]}" --profile full --profile iot "$@"
 }
 

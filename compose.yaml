@@ -53,7 +53,7 @@ x-backend: &backend          # Core API business-domain services (service/api/cm
     AWS_ENDPOINT_URL: http://localstack:4566
     AWS_ACCESS_KEY_ID: test
     AWS_SECRET_ACCESS_KEY: test
-    OIDC_ISSUER: ${KEYCLOAK_URL:-http://localhost:8081}/realms/ac          # must equal the iss claim seen by browsers
+    OIDC_ISSUER: ${API_OIDC_ISSUER:-${KEYCLOAK_URL:-http://localhost:8081}/realms/ac}   # must equal the iss claim of the tokens the BFF gets (the browser's address, or keycloak:8080 when the provider has several, IR651)
     OIDC_JWKS_URL: http://keycloak:8080/realms/ac/protocol/openid-connect/certs
     OIDC_ADMIN_CLIENT_ID: ac-admin-web
     OIDC_APP_CLIENT_ID: ac-web
@@ -94,6 +94,7 @@ x-web: &web                   # one Next.js app per entry point (service/web/<na
     PARTNER_WEB_URL: ${PARTNER_WEB_URL:-http://localhost:3001}
     TECHNICIAN_WEB_URL: ${TECHNICIAN_WEB_URL:-http://localhost:3002}
     ADMIN_WEB_URL: ${ADMIN_WEB_URL:-http://localhost:3003}
+    PUBLIC_HOSTS: ${PUBLIC_HOSTS:-}   # more addresses the apps and Keycloak answer on besides the URLs above (IR651); empty: those only
   read_only: true
   cap_drop: [ALL]               # distroless, non-root, a port above 1024: no Linux capability needed (IR373)
   security_opt: [no-new-privileges:true]
@@ -259,6 +260,7 @@ services:
       IDP_ADMIN_URL: http://keycloak:8080/admin/realms/ac
       IDP_ADMIN_CLIENT_ID: ac-identity-admin
       IDP_ADMIN_CLIENT_SECRET: ${IDP_ADMIN_CLIENT_SECRET:-local-identity-admin-08e3e9c976792a4915e39541}   # local only; production calls Cognito with identity-api's task role, no secret
+      IDP_PUBLIC_URL: ${IDP_PUBLIC_URL:-}   # the address the links of the provider's e-mails use when it has several (IR651)
     healthcheck: { test: ["CMD", "/app/server", "healthcheck"], interval: 10s, timeout: 3s, retries: 5 }
 
   equipment-api:        # units, devices, control, monitoring, read models (internal; reached through the gateway)
@@ -495,6 +497,11 @@ services:
     entrypoint: ["sh", "/configure.sh"]
     environment:
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      PUBLIC_HOSTS: ${PUBLIC_HOSTS:-}   # the realm's redirect URIs for each address of each app (IR651)
+      CUSTOMER_WEB_URL: ${CUSTOMER_WEB_URL:-http://localhost:3000}
+      PARTNER_WEB_URL: ${PARTNER_WEB_URL:-http://localhost:3001}
+      TECHNICIAN_WEB_URL: ${TECHNICIAN_WEB_URL:-http://localhost:3002}
+      ADMIN_WEB_URL: ${ADMIN_WEB_URL:-http://localhost:3003}
     volumes: ["./docker/keycloak/configure.sh:/configure.sh:ro"]
     depends_on: { keycloak: { condition: service_healthy } }
     restart: "no"
