@@ -6,6 +6,7 @@
 import type { Browser, Page } from "@playwright/test";
 import { test, expect, FAILED_PAGE } from "../../fixtures/test";
 import { APPS, type App } from "../../fixtures/apps";
+import { startSignIn } from "../../fixtures/auth";
 import { mailpitUp, setupLink } from "../../fixtures/mailpit";
 import { must } from "../../fixtures/must";
 import { pickDateTime } from "../../fixtures/time";
@@ -68,8 +69,7 @@ test("HQ adds a contractor company and its first contractor, who signs in to the
     await expect(me.getByText(/Your account has been updated/)).toBeVisible();
     const partner = app("partner");
     await me.goto(`${partner.url}/login`);
-    await me.getByRole("link", { name: /^Continue as / }).click();
-    await me.locator("#username").fill(email);
+    await startSignIn(me, email);
     await me.locator("#password").fill(password);
     await me.locator("#kc-login").click();
     await me.waitForURL((u) => u.origin === new URL(partner.url).origin && (u.pathname === partner.home || u.pathname.startsWith(partner.home + "/")));

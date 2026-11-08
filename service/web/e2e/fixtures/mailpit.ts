@@ -21,6 +21,9 @@ export async function messageCount(search: string): Promise<number> {
   return body.messages_count;
 }
 
+/** How many e-mails the inbox holds for `email` (a recipient search). */
+export const mailsTo = (email: string): Promise<number> => messageCount(`${MAILPIT}/search?query=${encodeURIComponent(`to:"${email}"`)}`);
+
 /** The set-up link of the newest e-mail to `email`, waiting up to 30 s for it. */
 export async function setupLink(email: string): Promise<string> {
   const search = `${MAILPIT}/search?query=${encodeURIComponent(`to:"${email}"`)}`;

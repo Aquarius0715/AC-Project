@@ -1,12 +1,12 @@
 {
   "version": "0.210.0",
-  "spec_baseline_id": "3a159738817cf113d455d6b7f7ac343625d56a01012c1902e0166aa48981ec9f",
+  "spec_baseline_id": "69e87320d86331c8b2291e51a616d08e4670ada6c9a0dfd1539b081e562ee5fe",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
     {
       "path": "00-prepare/PrepareDocument.md",
-      "sha256": "b73e1d65948c4be7419ae37c298726e812854d1b4b29951ed06f0b6fc8249518"
+      "sha256": "ca295596b5eaa800dd5812d7dde262a88e21ce8fc4c62ee364876590b81e6c3f"
     },
     {
       "path": "00-prepare/company-requirement-map.csv",
@@ -82,7 +82,7 @@
     },
     {
       "path": "01-requirements/common.md",
-      "sha256": "f47aa84527c206cfb1b5d104ac6360c82ba83d012db1bdd9633533aa34e38434"
+      "sha256": "501666f4c5fa9b12f337152251cbbe5833002a0f45d4e48c586e70b965ea4052"
     },
     {
       "path": "01-requirements/contractor.md",
@@ -118,7 +118,7 @@
     },
     {
       "path": "02-design/common.md",
-      "sha256": "f6bbcbc6e2107172cc0aa6486035762ce089b46cbb45e4d0f3ff2f667dc149ad"
+      "sha256": "6f68bf2329861726f1ad3f4c93bd2e55f026b4738a02c630c1c4ae9e48bc4b51"
     },
     {
       "path": "02-design/container-design.md",
@@ -166,7 +166,7 @@
     },
     {
       "path": "02-design/review-resolution-contracts.md",
-      "sha256": "d25f31ddcdcd46f3af45450d0dd9160fa093346ddc8934e7f7b0bde9b6f8cc0b"
+      "sha256": "b6c48b5026bb8831fa39768985fce44725376e6a3c4172ded1028b60455e7b57"
     },
     {
       "path": "02-design/service-contracts.ts",
@@ -194,7 +194,7 @@
     },
     {
       "path": "03-uiux/screen-catalog.csv",
-      "sha256": "69e9360b99359604378e8c92b0573df4babd7a5425254619823e6078eb490692"
+      "sha256": "5aba209b191c0c11893303e0105d5616009a29a67fa7c189abadb332106d9acb"
     },
     {
       "path": "04-agentic-sdlc/README.md",
@@ -294,7 +294,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "a1cb2c70d6c7fce92ed4aed5293cba431f4f8839a36a4c78f2c575269cf97d81"
+      "sha256": "c5fd429248653f4986a68cb7d77bf237023546bc449f8ac3d59fb6181164336a"
     },
     {
       "path": "tools/check_review_regressions.py",

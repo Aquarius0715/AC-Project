@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { coreAll, coreDisplay, CoreError, coreNow, coreOp, corePermissions, corePrincipal, getSession } from "@ac/web/lib/dal";
+import { SIGN_IN_LOCALE_COOKIE } from "@ac/web/lib/login";
 import { SESSION_COOKIE, seal, type Session } from "@ac/web/lib/session";
 import { must } from "./must";
 import { bodyText } from "./http";
@@ -13,6 +14,8 @@ vi.mock("next/navigation", () => ({ redirect: (to: string) => { throw new Error(
 
 const NOW = Date.parse("2026-09-15T01:00:00Z");
 const session: Session = { accessToken: "access-1", refreshToken: "r-1", tenantId: "t-1", membershipId: "m-1", role: "client", expiresAt: NOW / 1000 + 300 };
+/** The cookie jar keeps only the sign-in language `value` (none when it is missing), as it is before sign-in (IR646). */
+const chosen = (value?: string) => jar.get.mockImplementation((name: string) => (name === SIGN_IN_LOCALE_COOKIE && value ? { value } : undefined));
 /** The CoreError a call is refused with (a call that succeeds fails the test). */
 const refusal = async (p: Promise<unknown>): Promise<CoreError> => {
   try {
@@ -124,5 +127,17 @@ describe("the session's principal, clock and display settings", () => {
     expect(await coreDisplay()).toStrictEqual({ locale: "en", timeZone: "Asia/Kuala_Lumpur" });
     reply([503, { code: "UNAVAILABLE", messageKey: "error.unavailable", fieldErrors: {}, correlationId: "", retryAfterSeconds: 1 }]);
     expect(await coreDisplay()).toStrictEqual({ locale: "en", timeZone: "Asia/Kuala_Lumpur" });
+  });
+
+  it("speaks the language chosen on the sign-in page before sign-in, and English when none or an unknown one is kept (IR646)", async () => {
+    const f = reply([200, { data: { locale: "ms", timezone: "Asia/Tokyo" } }]);
+    chosen("ja");
+    expect(await coreDisplay()).toStrictEqual({ locale: "ja", timeZone: "Asia/Kuala_Lumpur" });
+    chosen("jp");
+    const unknown = await coreDisplay();
+    chosen();
+    const none = await coreDisplay();
+    expect([unknown.locale, none.locale]).toStrictEqual(["en", "en"]);
+    expect(f).not.toHaveBeenCalled(); // no session: preferences are not asked for
   });
 });

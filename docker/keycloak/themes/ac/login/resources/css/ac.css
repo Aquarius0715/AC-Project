@@ -1,0 +1,48 @@
+/* AC Project brand on the identity provider's pages (IR646): the logo, the card accent and a quiet background. */
+:root {
+    --keycloak-logo-url: url('../img/ac-logo.svg');
+    --keycloak-bg-logo-url: none;
+    --keycloak-logo-height: 56px;
+    --keycloak-logo-width: 240px;
+    --keycloak-card-top-color: #0057e7;
+    --pf-v5-global--primary-color--100: #0057e7;
+    --pf-v5-global--primary-color--200: #004bc4;
+    --pf-v5-global--link--Color: #0057e7;
+    --pf-v5-global--link--Color--hover: #004bc4;
+}
+
+.login-pf body {
+    background: #f4f7fc;
+}
+
+/* the logo replaces the realm name in the header (a url() in a custom property would be read against the page) */
+#kc-header-wrapper {
+    width: 240px;
+    height: 56px;
+    margin: 0 auto;
+    font-size: 0;
+    color: transparent;
+    background: url('../img/ac-logo.svg') no-repeat center / contain;
+}
+
+@media (prefers-color-scheme: dark) {
+    .login-pf body {
+        background: #0e1626;
+    }
+}
+
+.pf-v5-c-login__main {
+    border-radius: 16px;
+    overflow: hidden;
+}
+
+/* the service name above the card (HQ Admin overrides it) */
+.pf-v5-c-login__main-header-desc {
+    font-size: 0.8125rem;
+}
+
+@media (max-width: 480px) {
+    .pf-v5-c-login__container {
+        grid-template-columns: 1fr;
+    }
+}
