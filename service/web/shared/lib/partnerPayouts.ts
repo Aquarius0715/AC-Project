@@ -151,7 +151,7 @@ const STATEMENT_STATUS = new Map([["paid", "Paid"], ["approved", "Approved"]]);
 other characters print as “-” — the result is a byte string the browser wraps in a Blob. */
 const col = (x: string, w: number) => (x.length > w ? x.slice(0, w - 1) + "…" : x).padEnd(w);
 const esc = (x: string) => x.replaceAll(/[^\u{20}-\u{7E}]/gu, "-").replaceAll(/[\\()]/g, (c) => "\\" + c);
-export function payoutPdf(s: ApiPayoutStatement, rows: LineRow[], company: string, t: T = en, locale: Locale = "en"): string {
+function statementPdf(s: ApiPayoutStatement, rows: LineRow[], company: string, t: T, locale: Locale): string {
   const text = [
     `${t("PAYOUT STATEMENT")} ${s.id.slice(0, 8)}  ${periodLabel(s.period, locale)}`, `${company}  -  ${t(STATEMENT_STATUS.get(s.status) ?? "Draft").toUpperCase()}  -  ${t("pay date {date}", { date: s.payDate.slice(0, 10) })}`, "",
     `${col(t("Job"), 10)} ${col(t("Work"), 36)} ${col(t("Accepted"), 9)} ${t("Amount").padStart(12)}`, "-".repeat(70),
@@ -174,3 +174,8 @@ export function payoutPdf(s: ApiPayoutStatement, rows: LineRow[], company: strin
   out += `trailer\n<< /Size ${String(objects.length + 1)} /Root 1 0 R >>\nstartxref\n${String(xref)}\n%%EOF\n`;
   return out;
 }
+
+/** The statement as a PDF in the user's language. The PDF has no font for Japanese (IR639), so a Japanese user's
+statement is written in English rather than as a page of “-”. */
+export const payoutPdf = (s: ApiPayoutStatement, rows: LineRow[], company: string, t: T = en, locale: Locale = "en"): string =>
+  locale === "ja" ? statementPdf(s, rows, company, en, "en") : statementPdf(s, rows, company, t, locale);

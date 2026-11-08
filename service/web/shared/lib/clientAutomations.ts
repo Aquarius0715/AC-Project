@@ -1,7 +1,7 @@
 // Customer automations & schedules (FR-C04, FR-C05, DATA_SOURCE=API): the rule cards of the list (Figma Client 03a,
 // 03d, 03f, 03i), the editor draft with its automations.save input and checks (03b, 03e), the schedule preview and the
 // event test (03c), and the location consent card. Pure code shared by the Server Component and the client view.
-import { EN, intlTag, showDate, showTime, translator, type I18n, type T, textOf } from "@ac/web/lib/i18n";
+import { EN, intlTag, showDate, showTime, translator, type I18n, type T, textOf, zoneName } from "@ac/web/lib/i18n";
 import type { UnitAction } from "@ac/web/lib/contracts.gen";
 import type { OpInput } from "@ac/web/lib/opTypes";
 import type { IconName } from "@ac/web/components/Icon";
@@ -121,7 +121,7 @@ export function runText(iso: string, tz = KL, i: I18n = EN): string {
   const d = new Date(iso);
   const tag = intlTag(i.display.locale);
   try {
-    const zone = new Intl.DateTimeFormat(tag, { timeZone: tz, timeZoneName: "short" }).formatToParts(d).find((p) => p.type === "timeZoneName")?.value;
+    const zone = zoneName(d, tz, i.display.locale);
     return `${d.toLocaleString(tag, { timeZone: tz, weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })}${wrapped(zone, " ")}`;
   } catch {
     return runText(iso, KL, i);
@@ -132,7 +132,7 @@ export function runClock(iso: string, tz = KL, i: I18n = EN): string {
   const d = new Date(iso);
   const tag = intlTag(i.display.locale);
   try {
-    const zone = new Intl.DateTimeFormat(tag, { timeZone: tz, timeZoneName: "short" }).formatToParts(d).find((p) => p.type === "timeZoneName")?.value;
+    const zone = zoneName(d, tz, i.display.locale);
     return `${d.toLocaleTimeString(tag, { timeZone: tz, hour: "2-digit", minute: "2-digit", hourCycle: "h23" })}${wrapped(zone, " ")}`;
   } catch {
     return runClock(iso, KL, i);

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Badge, Banner, Btn, Card, Check, Choice, CodeInput, Modal, Page, QrCode, Select, Toggle, useToast } from "@ac/web/components/ui";
 import { useStoredRole } from "@ac/web/components/AppShell";
 import { useT } from "@ac/web/components/I18n";
-import { isLocale, LOCALE_KEY, translate } from "@ac/web/lib/i18n";
+import { isLocale, LOCALE_KEY, languageOptions, translate } from "@ac/web/lib/i18n";
 import { setStoredValue, useStoredValue } from "@ac/web/lib/urlState";
 import { codeComplete, groupKey, otpauthUri, qrPath } from "@ac/web/lib/twoFactor";
 
@@ -27,8 +27,8 @@ export function PreferencesDemo() {
   const [codes, setCodes] = useState<string[] | null>(null);
   return (
     <Page className="max-w-3xl">
-      <Card title={t("Display language")} sub={t("Affects the screens, notifications and date/time display. Stored data stays UTC. Malay text is a draft under review; text not translated yet stays in English.")}>
-        <Choice value={lang} onChange={(v) => { setStoredValue(LOCALE_KEY, v); toast(translate(v, "Language saved")); }} options={[{ id: "en", label: t("English (default)") }, { id: "ms", label: "Bahasa Melayu" }]} />
+      <Card title={t("Display language")} sub={t("Affects the screens, notifications and date/time display. Stored data stays UTC. Malay and Japanese text is a draft under review; text not translated yet stays in English.")}>
+        <Choice value={lang} onChange={(v) => { setStoredValue(LOCALE_KEY, v); toast(translate(v, "Language saved")); }} options={languageOptions(t)} />
       </Card>
       <Card title={t("Display timezone")} sub={t("Booked times keep their meaning across timezone changes.")}>
         <Select defaultValue="kl" onChange={() => { toast(t("Timezone saved")); }}><option value="kl">Asia/Kuala_Lumpur (UTC+8)</option><option value="sg">Asia/Singapore (UTC+8)</option><option value="tk">Asia/Tokyo (UTC+9)</option></Select>
