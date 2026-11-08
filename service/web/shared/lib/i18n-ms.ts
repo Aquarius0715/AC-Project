@@ -5862,4 +5862,5 @@ export const ms: Record<string, string> = {
   "Your session ended — sign in again.": "Sesi anda telah tamat — log masuk semula.",
   "You were signed out everywhere — sign in again with your password.": "Anda telah dilog keluar di semua tempat — log masuk semula dengan kata laluan anda.",
   "The sign-in did not complete — try again.": "Log masuk tidak selesai — cuba lagi.",
+  "Language": "Bahasa",
 };

@@ -5712,4 +5712,5 @@ export const ja: Record<string, string> = {
   "Your session ended — sign in again.": "セッションが終了しました。もう一度サインインしてください。",
   "You were signed out everywhere — sign in again with your password.": "すべての場所からサインアウトされました。パスワードでもう一度サインインしてください。",
   "The sign-in did not complete — try again.": "サインインが完了しませんでした。もう一度お試しください。",
+  "Language": "言語",
 };
