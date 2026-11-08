@@ -9253,3 +9253,9 @@ The user chose to delete accounts that were never used and to keep ending the ot
 5. **The screen.** Admin > Settings > Access & roles: Delete account… beside Revoke access…, with the shared dialog (a required reason). English, Malay and Japanese.
 6. **Counts.** 224 → 225 operations, 245 → 246 routes.
 7. **Tests.** `TestMembersDelete` (roles, reason, version, a person with two accounts, an account that acted, the caller's own, the clean account and its person gone), `TestMembersDeleteRemovesTheProviderAccount`, the Keycloak client test, and the dictionary and contract tests. Not built: Cognito's `DeleteAccount` (the Cognito adapter is still planned, IR386).
+
+## IR658 A device that rejects a test run's start or end Command ends the run (review round 22) — 2026-11-09
+
+1. **The gap.** The DiagnosticRun table of implementation-contracts.md says that a start failure moves `awaiting_start` to `start_failed` and that a failure or expiry of the end Command moves `end_requested` to `end_failed`. Only the expiry (IR139 item 2) did. When the device rejected the Command (`command_fail`, status `failed`, code `DEVICE_REJECTED`), the run stayed `awaiting_start` or `end_requested` for good: the unit counted as busy for every other Command and run (D05) and the technician never saw the failure.
+2. **The rule.** A rejected start Command makes the run `start_failed` and a rejected end Command `end_failed`, both with `failureCode` = the device's code (`DEVICE_REJECTED`), in the transaction that fails the Command (`control.RunCommandFailed`). The end timer is not started and nothing is resent (the table's rule); the unit is free again.
+3. **Tests.** `TestDiagnosticRunDeviceRejection` (a rejected start, then a second run on the same unit, then a rejected end). No operation, route or screen changes; 224 operations, 245 routes.
