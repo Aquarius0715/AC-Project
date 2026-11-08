@@ -9259,3 +9259,10 @@ The user chose to delete accounts that were never used and to keep ending the ot
 1. **The gap.** The DiagnosticRun table of implementation-contracts.md says that a start failure moves `awaiting_start` to `start_failed` and that a failure or expiry of the end Command moves `end_requested` to `end_failed`. Only the expiry (IR139 item 2) did. When the device rejected the Command (`command_fail`, status `failed`, code `DEVICE_REJECTED`), the run stayed `awaiting_start` or `end_requested` for good: the unit counted as busy for every other Command and run (D05) and the technician never saw the failure.
 2. **The rule.** A rejected start Command makes the run `start_failed` and a rejected end Command `end_failed`, both with `failureCode` = the device's code (`DEVICE_REJECTED`), in the transaction that fails the Command (`control.RunCommandFailed`). The end timer is not started and nothing is resent (the table's rule); the unit is free again.
 3. **Tests.** `TestDiagnosticRunDeviceRejection` (a rejected start, then a second run on the same unit, then a rejected end). No operation, route or screen changes; 224 operations, 245 routes.
+
+## IR660 An emission factor too small for its column is refused on its field (review round 29) — 2026-11-09
+
+`factors.save` accepted any kgCO2ePerKWh above 0 and up to 10. The column is `numeric(10,6)` with a check that the value is positive, so a value such as 0.0000004, which rounds to 0.000000 when it is stored, passed the validation and then failed the database's check: a 422 with no field named, the one case of this operation that VALIDATION did not explain.
+
+1. **The rule.** kgCO2ePerKWh is at least 0.0000005 (half of the column's step, the smallest value that is stored as 0.000001) and at most 10; below it VALIDATION `error.range` on `kgCO2ePerKWh`. Values with more than six decimals are still stored rounded to six, as before; the response shows the stored value.
+2. **Tests.** `TestFactors` (0.0000004 refused on its field) and `TestFactorRangeFollowsTheColumn` (the edges). No operation, route or screen changes; 224 operations, 245 routes.
