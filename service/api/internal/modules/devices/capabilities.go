@@ -393,6 +393,122 @@ type UnitCapabilities interface {
 // Capabilities is the operation set for the model register.
 type Capabilities struct{ Units UnitCapabilities }
 
+// CapabilityDeleteInput is capabilities.delete input.
+type CapabilityDeleteInput struct {
+	ID     uuid.UUID `json:"id"`
+	Reason string    `json:"reason"`
+}
+
+// Validate implements ops.Validator.
+func (in *CapabilityDeleteInput) Validate() map[string]string {
+	fieldErrs := map[string]string{}
+	if in.ID == uuid.Nil {
+		fieldErrs["id"] = apperr.KeyRequired
+	}
+
+	reasonErrors(&in.Reason, fieldErrs)
+
+	return fieldErrs
+}
+
+// delete deletes a model that is in no use (DEC-103), every version of it: no unit has it, and no firmware campaign
+// (unfinished or finished, whose history names the model) targets it; otherwise CONFLICT with the reason.
+//
+//	@Summary		capabilities.delete (write)
+//	@ID				capabilities.delete
+//	@Description	Authorization: admin:device.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR652 only a model no unit uses and no firmware campaign targets (CONFLICT error.modelInUse / \
+//	@Description	error.modelInCampaign); deletes every version of the model
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A04
+//	@Tags			capabilities
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string	true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer	true	"all: required (target capabilities, read capabilities.list)"
+//	@Param			id					path		string	true	"input field id"
+//	@Param			reason				query		string	false	"input field reason"
+//	@Success		200					{object}	ops.Envelope{data=DeletedResource}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/capabilities/{id} [delete]
+func (Capabilities) delete(
+	ctx context.Context,
+	call *ops.Call,
+	input *CapabilityDeleteInput,
+) (DeletedResource, error) {
+	var version int
+
+	err := call.Tx.QueryRow(
+		ctx,
+		`SELECT version FROM devices.capabilities WHERE id = $1 AND is_current FOR UPDATE`,
+		input.ID,
+	).Scan(&version)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return DeletedResource{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
+	}
+
+	if err != nil {
+		return DeletedResource{}, apperr.Wrap(err, "select devices.capabilities")
+	}
+
+	if call.ExpectedVersion != nil && version != *call.ExpectedVersion {
+		return DeletedResource{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
+	}
+
+	var units, campaigns bool
+
+	scanErr := call.Tx.QueryRow(
+		ctx,
+		`SELECT EXISTS (SELECT 1 FROM assets.units WHERE model_id = $1),
+		EXISTS (SELECT 1 FROM devices.firmware_campaigns WHERE model_id = $1)`,
+		input.ID,
+	).Scan(&units, &campaigns)
+	if scanErr != nil {
+		return DeletedResource{}, apperr.Wrap(scanErr, "select devices.capabilities")
+	}
+
+	switch {
+	case units:
+		return DeletedResource{}, apperr.E(apperr.Conflict, "error.modelInUse")
+	case campaigns:
+		return DeletedResource{}, apperr.E(apperr.Conflict, "error.modelInCampaign")
+	}
+
+	_, execErr := call.Tx.Exec(ctx, `DELETE FROM devices.capabilities WHERE id = $1`, input.ID)
+	if execErr != nil {
+		return DeletedResource{}, apperr.Wrap(execErr, "delete devices.capabilities")
+	}
+
+	call.Emit(
+		ops.Event{
+			AggregateType: entityCapability,
+			AggregateID:   input.ID,
+			Type:          "CapabilityDeleted",
+			Payload:       nil,
+		},
+	)
+	call.Audit(
+		ops.AuditEntry{
+			Action:          "capabilities.delete",
+			TargetKind:      entityCapability,
+			TargetID:        input.ID.String(),
+			PreviousVersion: call.ExpectedVersion,
+			Reason:          input.Reason, NextVersion: nil, Result: "", Before: nil, After: nil,
+		},
+	)
+
+	return DeletedResource{ID: input.ID, Deleted: true}, nil
+}
+
 func nz(a []string) []string {
 	if a == nil {
 		return []string{}
@@ -607,7 +723,7 @@ func capabilitySaved(call *ops.Call, revision capabilityRevision, capability Cap
 
 	call.Emit(
 		ops.Event{
-			AggregateType: "capability",
+			AggregateType: entityCapability,
 			AggregateID:   revision.modelID,
 			Type:          "CapabilityChanged",
 			Payload:       map[string]int{"version": revision.version},
@@ -618,7 +734,7 @@ func capabilitySaved(call *ops.Call, revision capabilityRevision, capability Cap
 	call.Audit(
 		ops.AuditEntry{
 			Action:          "capabilities.save",
-			TargetKind:      "capability",
+			TargetKind:      entityCapability,
 			TargetID:        revision.modelID.String(),
 			PreviousVersion: prev,
 			NextVersion:     &revision.version,
@@ -633,6 +749,7 @@ func capabilitySaved(call *ops.Call, revision capabilityRevision, capability Cap
 func Register(r *ops.Registry, m Capabilities) {
 	ops.Register(r, "capabilities.list", capabilitiesList)
 	ops.Register(r, "capabilities.save", m.save)
+	ops.Register(r, "capabilities.delete", m.delete)
 }
 
 // LoadCapability returns a capability version (UnitDetail.capabilities).

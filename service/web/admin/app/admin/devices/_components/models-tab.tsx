@@ -7,7 +7,7 @@ import { useAction } from "@ac/web/lib/useAction";
 import { byCount, showTime } from "@ac/web/lib/i18n";
 import { capabilityChanges, capabilityDraft, capabilityErrors, capabilityInput, fans, firmwareProblem, metrics, metricUnit, modes, type CapabilityDraft, type Fan, type Metric, type Mode } from "@ac/web/lib/devices";
 import { metricText } from "@ac/web/lib/techDevices";
-import { capabilityHistory, saveCapability, type HistoryEntry } from "../actions";
+import { capabilityHistory, deleteCapability, saveCapability, type HistoryEntry } from "../actions";
 import type { DevicesLive } from "./devices-view";
 import { oneOf } from "@ac/web/lib/oneOf";
 import { Icon } from "@ac/web/components/Icon";
@@ -37,6 +37,7 @@ export function ModelsTab({ live }: Readonly<{ live: DevicesLive }>) {
   const errors = capabilityErrors(d, !!sel, t);
   const set = (patch: Partial<CapabilityDraft>) => { setD((x) => ({ ...x, ...patch })); };
   const [history, setHistory] = useState<HistoryEntry[] | null>(null);
+  const [removing, setRemoving] = useState<string | null>(null); // the reason being typed in the delete dialog (DEC-103)
   const [addedSensor, setAddedSensor] = useState<Metric>("temperature");
   const [adding, setAdding] = useState<string | null>(null); // the firmware version being typed after “+ Add version”
   const units = sel ? live.units.filter((u) => u.modelId === sel.id) : [];
@@ -60,6 +61,11 @@ export function ModelsTab({ live }: Readonly<{ live: DevicesLive }>) {
     run(() => saveCapability(capabilityInput(d, sel?.id), sel?.version), (k) => (sel ? t("Saved — capability version {v}", { v: k.version }) : t("Model created")), (k) => { setSelId(k.id); });
   };
   const openHistory = () => { if (sel) run(() => capabilityHistory(sel.id), (xs) => t(xs.length === 1 ? "1 version entry" : "{n} version entries", { n: xs.length }), setHistory); };
+  const remove = () => {
+    setTried(true);
+    if (!sel || !removing?.trim()) return;
+    run(() => deleteCapability(sel.id, sel.version, removing.trim()), t("Model deleted"), () => { setRemoving(null); setTried(false); setSelId(live.models.find((m) => m.id !== sel.id)?.id ?? "new"); });
+  };
   const fieldError = (k: string) => (tried ? errors[k] : undefined);
 
   return (
@@ -69,7 +75,7 @@ export function ModelsTab({ live }: Readonly<{ live: DevicesLive }>) {
         <p className="mt-3 text-[11px] text-muted-foreground">{t("Saving a change creates a new capability version. Unverified capabilities stay false/unknown.")}</p>
       </Card>
       <Card title={sel ? <span className="inline-flex flex-wrap items-center gap-2">{sel.name}<Badge>{t("Capability v{v}", { v: sel.version })}</Badge>{isDirty && <Badge tone="warn">{t("Editing → v{v}", { v: sel.version + 1 })}</Badge>}</span> : t("New model")}
-        sub={sel ? `${t("updated {time}", { time: sel.updated })} · ${sel.used}` : t("Saving creates capability version 1")} action={sel && live.canAudit && <Btn size="sm" disabled={pending} onClick={openHistory}>{t("Version history")}</Btn>}>
+        sub={sel ? `${t("updated {time}", { time: sel.updated })} · ${sel.used}` : t("Saving creates capability version 1")} action={sel && <span className="flex flex-wrap gap-2">{live.canAudit && <Btn size="sm" disabled={pending} onClick={openHistory}>{t("Version history")}</Btn>}{live.canWrite && <Btn size="sm" variant="danger" disabled={pending} onClick={() => { setRemoving(""); setTried(false); }}>{t("Delete model…")}</Btn>}</span>}>
         <div className="flex flex-col gap-5">
           <section><h3 className="mb-2 text-[13px] font-bold">{t("Identity")}</h3><div className="grid-fluid" style={{ ["--min" as string]: "200px" }}><Field label={t("Manufacturer")} error={fieldError("manufacturer")}><Input value={d.manufacturer} maxLength={120} onChange={(e) => { set({ manufacturer: e.target.value }); }} /></Field><Field label={t("Model")} hint={t("Manufacturer + model must be unique")} error={fieldError("model")}><Input value={d.model} maxLength={120} onChange={(e) => { set({ model: e.target.value }); }} /></Field></div></section>
           <section>
@@ -132,6 +138,10 @@ export function ModelsTab({ live }: Readonly<{ live: DevicesLive }>) {
           )}
         </div>
       </Card>
+      <Modal open={removing !== null} onClose={() => { setRemoving(null); setTried(false); }} title={t("Delete model")} footer={<><Btn onClick={() => { setRemoving(null); setTried(false); }}>{t("Cancel")}</Btn><Btn variant="danger" disabled={pending} onClick={remove}>{t("Delete")}</Btn></>}>
+        <p className="text-[13px]">{t("Delete {name}? A model that units use, or that a firmware campaign names, cannot be deleted.", { name: sel?.name ?? "" })}</p>
+        <Field label={t("Reason")} error={tried && !removing?.trim() ? t("A reason is required") : undefined}><Textarea value={removing ?? ""} maxLength={1000} onChange={(e) => { setRemoving(e.target.value); }} /></Field>
+      </Modal>
       <Modal open={history !== null} onClose={() => { setHistory(null); }} title={t("Version history · {name}", { name: sel?.name ?? "" })} footer={<Btn onClick={() => { setHistory(null); }}>{t("Close")}</Btn>}>
         {history?.length === 0 ? <p className="text-xs text-muted-foreground">{t("No saved versions in the last 12 months.")}</p> : <Timeline items={(history ?? []).map((h) => ({ time: showTime(h.at, i.display), title: `v${String(h.from ?? "—")} → v${String(h.to ?? "—")}${h.reason ? ` — ${h.reason}` : ""}`, detail: `${h.actor}${h.changes.length > 0 ? ` · ${t("changed {fields}", { fields: h.changes.join(", ") })}` : ""}` }))} />}
         <p className="text-[11px] text-muted-foreground">{t("From the audit log (audit.read); values are masked as recorded.")}</p>

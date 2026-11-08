@@ -8,6 +8,7 @@ automations.save,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; 
 automations.save,id present,automations,automations.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 baselines.save,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 baselines.save,id present,baselines,baselines.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+capabilities.delete,all,capabilities,capabilities.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 capabilities.save,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 capabilities.save,id present,capabilities,capabilities.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 certificates.requestTraining,all,certificate,certificates.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
@@ -37,8 +38,10 @@ devices.addResponseNote,all,device event,devices.events,required,none,D01; versi
 devices.bind,all,device,devices.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 devices.calibrate,all,device,devices.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 devices.check,all,device,devices.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+devices.delete,all,device,devices.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 devices.register,all,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 devices.setMqttNode,all,device,devices.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+devices.unbind,all,device,devices.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 devices.updateFirmware,all,device,devices.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 diagnosticRuns.create,all,none,units.get;jobs.get,omit,expectedUnitVersion=UnitDetail.version;expectedJobVersion=JobDetail.version,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 factors.save,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects

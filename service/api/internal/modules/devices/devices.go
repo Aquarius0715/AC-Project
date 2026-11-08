@@ -82,7 +82,8 @@ const devCols = `d.id, d.tenant_id, d.version, d.created_at, d.updated_at, d.bin
 // The aggregate and audit target kind of a device, its connection states, the tamper state that blocks binding (D05),
 // and the roles the device scope tells apart.
 const (
-	entityDevice = "device"
+	entityDevice     = "device"
+	entityCapability = "capability"
 
 	connOnline     = "online"
 	connOffline    = "offline"
@@ -918,6 +919,8 @@ func RegisterDevices(reg *ops.Registry, module *Module) {
 	ops.Register(reg, "devices.get", module.get)
 	ops.Register(reg, "devices.register", module.register)
 	ops.Register(reg, opBind, module.bind)
+	ops.Register(reg, "devices.unbind", module.unbind)
+	ops.Register(reg, "devices.delete", module.deleteDevice)
 	ops.Register(reg, opSetMqttNode, module.setMqttNode)
 	ops.Register(reg, "devices.check", module.check)
 	ops.Register(reg, "devices.updateFirmware", module.updateFirmware)

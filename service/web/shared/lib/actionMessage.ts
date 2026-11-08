@@ -45,6 +45,13 @@ const keyText: Record<string, string> = {
   "errors.invoice_has_payment": "This invoice already has a payment in progress or recorded — finish or fail that one first",
   // an invoice of the contract already covers part of the period (IR469)
   "errors.invoice_period_exists": "This contract already has an invoice for part of this period — choose a period after it",
+  // deleting or unbinding a device, deleting a model (DEC-103): what keeps it, and what to do first
+  "error.deviceBound": "This device is bound to a unit — unbind it first",
+  "error.deviceBusy": "This device has an operation under way — wait until it ends",
+  "error.deviceInCampaign": "This device is in a firmware campaign that has not ended — wait for it or abort the campaign",
+  "error.notBound": "This device is not bound to a unit",
+  "error.modelInUse": "Units still use this model — change their model first",
+  "error.modelInCampaign": "A firmware campaign names this model, so it cannot be deleted",
   "errors.technician_booked": "This technician still has an assigned job — reassign it first",
   "errors.technician_access_ends": "This technician's access ends before the visit — choose another technician or ask HQ to extend it",
   "errors.invite_pending": "This user hasn’t signed in yet — remove them, or wait until they have",

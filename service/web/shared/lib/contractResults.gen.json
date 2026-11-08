@@ -376,6 +376,13 @@
   ],
   "items": null
  },
+ "capabilities.delete": {
+  "fields": [
+   "deleted",
+   "id"
+  ],
+  "items": null
+ },
  "capabilities.list": {
   "fields": [
    "items",
@@ -1067,6 +1074,13 @@
   ],
   "items": null
  },
+ "devices.delete": {
+  "fields": [
+   "deleted",
+   "id"
+  ],
+  "items": null
+ },
  "devices.events": {
   "fields": [
    "items",
@@ -1194,6 +1208,28 @@
   "items": null
  },
  "devices.setMqttNode": {
+  "fields": [
+   "bindingId",
+   "connection",
+   "createdAt",
+   "createdByMembershipId",
+   "firmwareVersion",
+   "id",
+   "lastSeenAt",
+   "mqttNode",
+   "powerSignal",
+   "sensors",
+   "serial",
+   "tamper",
+   "targetUnitId",
+   "tenantId",
+   "unitId",
+   "updatedAt",
+   "version"
+  ],
+  "items": null
+ },
+ "devices.unbind": {
   "fields": [
    "bindingId",
    "connection",
