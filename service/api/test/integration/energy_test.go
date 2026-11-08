@@ -63,6 +63,7 @@ func TestFactors(t *testing.T) {
 	for payload, want := range map[string]string{
 		strings.Replace(body(""), `"year":2030`, `"year":1999`, 1):      "year=error.range",
 		strings.Replace(body(""), `0.42`, `0`, 1):                       "kgCO2ePerKWh=error.range",
+		strings.Replace(body(""), `0.42`, `0.0000004`, 1):               "kgCO2ePerKWh=error.range",
 		strings.Replace(body(""), `"isDemo":true`, `"isDemo":false`, 1): "isDemo=error.invalid",
 		strings.Replace(body(""), `"demo test factor"`, `" "`, 1):       "source=error.length",
 	} {
