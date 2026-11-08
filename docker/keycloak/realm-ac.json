@@ -1,7 +1,14 @@
 {
   "realm": "ac",
   "enabled": true,
-  "displayName": "AC Project (local Cognito stand-in)",
+  "displayName": "AC Project",
+  "loginTheme": "ac",
+  "emailTheme": "ac",
+  "internationalizationEnabled": true,
+  "supportedLocales": ["en", "ms", "ja"],
+  "defaultLocale": "en",
+  "resetPasswordAllowed": true,
+  "loginWithEmailAllowed": true,
   "accessTokenLifespan": 300,
   "ssoSessionIdleTimeout": 1800,
   "otpPolicyType": "totp",
@@ -9,7 +16,7 @@
   "otpPolicyDigits": 6,
   "otpPolicyPeriod": 30,
   "bruteForceProtected": true,
-  "smtpServer": { "host": "mailpit", "port": "1025", "from": "no-reply@ac-project.local", "fromDisplayName": "AC Project (demo)" },
+  "smtpServer": { "host": "mailpit", "port": "1025", "from": "no-reply@ac-project.local", "fromDisplayName": "AC Project" },
   "permanentLockout": false,
   "failureFactor": 10,
   "waitIncrementSeconds": 60,
@@ -151,7 +158,8 @@
         "http://localhost:3003"
       ],
       "attributes": {
-        "pkce.code.challenge.method": "S256"
+        "pkce.code.challenge.method": "S256",
+        "login_theme": "ac-hq"
       },
       "protocolMappers": [
         {

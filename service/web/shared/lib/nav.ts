@@ -22,8 +22,6 @@ export interface RoleConfig {
   scope: string;
   chip: string;
   nav: NavItem[];
-  loginUser: string;
-  loginDesc: string;
   loginTitle: string; // the service name on its sign-in page (Figma Login frames)
   loginSub: string;
 }
@@ -36,8 +34,6 @@ export const ROLES: Record<Role, RoleConfig> = {
     sub: "Customer app",
     scope: "CUSTOMER-A",
     chip: "Client — customer-a",
-    loginUser: "customer-a",
-    loginDesc: "Views units, controls temperature, requests maintenance",
     loginTitle: "Client",
     loginSub: "Sign in to manage your units and account",
     nav: [
@@ -58,8 +54,6 @@ export const ROLES: Record<Role, RoleConfig> = {
     sub: "Partner portal",
     scope: "CONTRACTOR-A",
     chip: "Contractor — contractor-a",
-    loginUser: "contractor-a",
-    loginDesc: "Accepts jobs, assigns own technicians",
     loginTitle: "Partner",
     loginSub: "Sign in to manage jobs and your technicians",
     nav: [
@@ -78,8 +72,6 @@ export const ROLES: Record<Role, RoleConfig> = {
     sub: "Technician",
     scope: "TECH-EXTERNAL-A",
     chip: "Technician — tech-external-a",
-    loginUser: "tech-internal-a",
-    loginDesc: "Internal · inspections & work reports",
     loginTitle: "Technician",
     loginSub: "Sign in to view assigned jobs and devices",
     nav: [
@@ -95,8 +87,6 @@ export const ROLES: Record<Role, RoleConfig> = {
     sub: "HQ Admin",
     scope: "HQ TENANT",
     chip: "Admin — hq-operator",
-    loginUser: "hq-operator",
-    loginDesc: "Manages customers, contracts, restrictions",
     loginTitle: "Admin",
     loginSub: "Sign in to manage customers, contracts, and access",
     nav: [

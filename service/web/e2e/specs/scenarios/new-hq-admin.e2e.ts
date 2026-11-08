@@ -6,7 +6,7 @@
 import type { Browser, Page } from "@playwright/test";
 import { test, expect, FAILED_PAGE } from "../../fixtures/test";
 import { APPS } from "../../fixtures/apps";
-import { totpBase32 } from "../../fixtures/auth";
+import { startSignIn, totpBase32 } from "../../fixtures/auth";
 import { mailpitUp, setupLink } from "../../fixtures/mailpit";
 import { must } from "../../fixtures/must";
 import { pickDateTime } from "../../fixtures/time";
@@ -80,8 +80,7 @@ test("a new HQ administrator sets a password and a one-time-code device, then si
   await test.step("the admin app asks for the password and a code", async () => {
     const hq = adminApp;
     await me.goto(`${hq.url}/login`);
-    await me.getByRole("link", { name: /^Continue as / }).click();
-    await me.locator("#username").fill(email);
+    await startSignIn(me, email);
     await me.locator("#password").fill(password);
     await me.locator("#kc-login").click();
     await expect(me.locator("#otp")).toBeVisible(); // two steps

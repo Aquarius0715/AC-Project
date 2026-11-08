@@ -343,6 +343,8 @@ export function Field({ label, hint, error, children, className, labelHidden }: 
 // The form controls are the shadcn/ui Input, Textarea and NativeSelect. A width in className (w-auto, w-40) replaces the
 // default one (cn merges), and a select stays a native select, so the platform's own picker works everywhere.
 export const Input = ({ className, ...p }: React.ComponentProps<"input">) => <UIInput {...p} className={className} />; // React 19: ref is a prop
+/** A value a form sends without showing it (a hidden input). */
+export const Hidden = ({ name, value }: Readonly<{ name: string; value: string }>) => <input type="hidden" name={name} value={value} />;
 export const Select = ({ className, children, ...p }: Omit<React.SelectHTMLAttributes<HTMLSelectElement>, "size">) => (
     <NativeSelect {...p} className={cn("w-full", className)}>{children}</NativeSelect>
   );

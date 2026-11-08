@@ -994,17 +994,33 @@ func (Partners) saveRateCard(
 		return RateCard{}, apperr.Fields(map[string]string{fieldEffectiveFrom: apperr.KeyPast})
 	}
 
-	var exists bool
+	// the company's row is locked, so two saves for it run one after the other: the next version number and the check
+	// of the start time below see the first one
+	var locked uuid.UUID
 
-	err := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.contractors WHERE organization_id =
-		$1)`, input.ContractorOrgID).
-		Scan(&exists)
+	err := call.Tx.QueryRow(ctx, `SELECT organization_id FROM maintenance.contractors WHERE organization_id = $1
+		FOR UPDATE`, input.ContractorOrgID).
+		Scan(&locked)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return RateCard{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
+	}
+
 	if err != nil {
 		return RateCard{}, apperr.Wrap(err, "select maintenance.contractors")
 	}
 
-	if !exists {
-		return RateCard{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
+	// a company has one card for a start time: a second is refused on the field, not as an unexplained conflict (IR643)
+	var taken bool
+
+	err = call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.rate_cards WHERE contractor_org_id = $1 AND
+		effective_from = $2)`, input.ContractorOrgID, input.EffectiveFrom).
+		Scan(&taken)
+	if err != nil {
+		return RateCard{}, apperr.Wrap(err, "select maintenance.rate_cards")
+	}
+
+	if taken {
+		return RateCard{}, apperr.Fields(map[string]string{fieldEffectiveFrom: apperr.KeyDuplicate})
 	}
 
 	lines, marshalErr := json.Marshal(input.Lines)

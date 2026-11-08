@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="190" height="63" viewBox="0 0 190 63" role="img" aria-label="AC Project">
+  <rect x="2" y="9" width="45" height="45" rx="11" fill="#0057e7"/>
+  <path d="M14 27h22M14 33h22M14 39h22" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+  <text x="58" y="42" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="26" font-weight="700" fill="#0b1f44">AC Project</text>
+</svg>
