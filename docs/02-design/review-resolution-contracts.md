@@ -9241,3 +9241,15 @@ A customer and a contractor company are made in two steps (the organization, the
 5. **The screens.** Admin > Energy > Baselines: Delete baseline…. Admin > MRV: Delete report… (on the latest version of an unreviewed report) and, in the factors tab, Delete factor…. All three use one dialog with a required reason. English, Malay and Japanese.
 6. **Counts.** 221 → 224 operations, 242 → 245 routes.
 7. **Tests.** `TestMRVDeletes` (cited and uncited, the default factor, a reviewed report, roles, versions) and the dictionary and contract tests. No E2E in this round.
+
+## IR657 HQ deletes an account made by mistake (DEC-103, phase 3) — 2026-11-09
+
+The user chose to delete accounts that were never used and to keep ending the others by revoking the access (a save with `validUntil`, IR492).
+
+1. **`members.delete {id, reason}`** (`admin:identity.write`, `DELETE /v1/members/{id}`, DD-A03). The expected version is the membership's (`members.list`). CONFLICT: `error.memberSelf` for the caller's own account; `error.memberHasOthers` while the person has another membership; `error.memberUsed` when an audit entry names the membership as the actor (every audited write, in any domain, leaves one, which covers the actor columns of the other tables) or when maintenance holds an assignment, a certificate (held or verified) or a filter cleaning marked by it (internal query `maintenance.membershipRecords`).
+2. **What goes.** The membership with its permissions, scopes and qualification grants, its location consent, its entry in a customer's or a contractor company's user list, and its person: preferences, two-step setting and the user row. Notifications addressed to the account in another domain keep the ID and are never shown. The audit entries about the account stay (the log is append-only).
+3. **The provider account.** When the person has a provider subject, the event `AccountDeleted` makes the `identity-accounts` consumer delete the user at the provider (`Provider.DeleteAccount`; Keycloak `DELETE /users/{id}`, an unknown user is already gone). Like the other account events it is best effort: a provider that does not answer is logged; the account has no membership, so it cannot sign in.
+4. **The reason** is 1–1000 characters after trimming; an unknown ID is NOT_FOUND; a stale version is CONFLICT.
+5. **The screen.** Admin > Settings > Access & roles: Delete account… beside Revoke access…, with the shared dialog (a required reason). English, Malay and Japanese.
+6. **Counts.** 224 → 225 operations, 245 → 246 routes.
+7. **Tests.** `TestMembersDelete` (roles, reason, version, a person with two accounts, an account that acted, the caller's own, the clean account and its person gone), `TestMembersDeleteRemovesTheProviderAccount`, the Keycloak client test, and the dictionary and contract tests. Not built: Cognito's `DeleteAccount` (the Cognito adapter is still planned, IR386).

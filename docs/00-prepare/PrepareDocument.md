@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.513.0
+version: 0.514.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -300,6 +300,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.514.0: HQ deletes an account that was made by mistake and never acted, with its person and provider account: `members.delete` (225 operations, 246 routes; DEC-103 phase 3, IR657). Phase 1A unchanged.
 0.513.0: HQ deletes a baseline and an emission factor no MRV report cites, and an MRV report no review touched: `baselines.delete`, `factors.delete`, `mrv.deleteDraft` (224 operations, 245 routes; DEC-103 phase 5, IR656). Phase 1A unchanged.
 0.512.0: HQ deletes a maintenance plan that has made no job and a rate card that has not started: `plans.delete`, `rateCards.delete` (221 operations, 242 routes; DEC-103 phase 4, IR655). Phase 1A unchanged.
 0.511.0: HQ deletes a customer or a contractor company registered by mistake: `customers.delete`, `contractors.delete`, `organizations.delete` (219 operations, 240 routes; DEC-103 phase 2, IR654). Phase 1A unchanged.

@@ -168,6 +168,18 @@ func TestKeycloakAccounts(t *testing.T) {
 	if err != nil || realm.calls[0].body != `{"enabled":false}` {
 		t.Errorf("disable: %v %v", err, realm.calls)
 	}
+
+	realm.calls = nil
+
+	err = keycloak.DeleteAccount(t.Context(), "new-id")
+	if err != nil || realm.calls[0].method != http.MethodDelete ||
+		realm.calls[0].path != "/users/new-id" {
+		t.Errorf("delete: %v %v", err, realm.calls)
+	}
+
+	if keycloak.DeleteAccount(t.Context(), "") == nil {
+		t.Error("delete without a subject passes")
+	}
 }
 
 // checkExistingEmail: creating an account whose e-mail exists updates that user instead, and the whole user goes

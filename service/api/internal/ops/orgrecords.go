@@ -26,6 +26,15 @@ const (
 	QueryOrgHasContractor = "maintenance.orgHasContractor"
 )
 
+// QueryMembershipRecords is the internal query that reports an assignment or a certificate of a membership
+// (maintenance): an account with one is not deleted (DEC-103, IR657).
+const QueryMembershipRecords = "maintenance.membershipRecords"
+
+// MembershipRecordsInput names a membership.
+type MembershipRecordsInput struct {
+	MembershipID uuid.UUID `json:"membershipId"`
+}
+
 // OrgRecordsInput names an organization and, for a customer, its customer ID (some records are keyed by it).
 type OrgRecordsInput struct {
 	OrgID      uuid.UUID  `json:"orgId"`

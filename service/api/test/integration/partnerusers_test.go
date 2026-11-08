@@ -586,6 +586,7 @@ func TestPartnerAccountCreated(t *testing.T) {
 		updated:    nil,
 		setups:     nil,
 		switched:   nil,
+		removed:    nil,
 		failing:    false,
 		lost:       nil,
 		generation: 0,

@@ -543,7 +543,8 @@ func TestCatalogShape(t *testing.T) {
 
 	if len(
 		Catalog,
-	) != 224 {
+	) != 225 {
+		// IR657 members.delete,
 		// IR656 baselines.delete + factors.delete + mrv.deleteDraft,
 		// IR655 plans.delete + rateCards.delete,
 		// IR654 customers.delete + contractors.delete + organizations.delete, IR653 firmwareCampaigns.delete, IR652
