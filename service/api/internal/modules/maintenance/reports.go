@@ -725,6 +725,13 @@ func (m Reports) saveDraft(ctx context.Context, call *ops.Call, input *DraftInpu
 		return Report{}, err
 	}
 
+	if input.ReportID != nil { // saving the draft clears its sign-off (writeDraft), so the sign-off's file goes too
+		err = dropSignOffFiles(ctx, call, prev.ID, prev.Version)
+		if err != nil {
+			return Report{}, err
+		}
+	}
+
 	err = writeDraft(ctx, call, input, prev, items, meas)
 	if err != nil {
 		return Report{}, err
