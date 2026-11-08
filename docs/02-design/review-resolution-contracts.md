@@ -9057,3 +9057,10 @@ The user found it a chore to type a time as digits, a colon and digits, and aske
 6. **Not changed.** Date-only fields stay native date inputs, with the browser's calendar. The contact-window text of a maintenance request is free text and keeps its `HH:mm` hint.
 7. **Tests.** Vitest covers the string handling (`timeParts`) and the pickers in a `Field`; the Playwright specs that filled a date-and-time field use `pickDateTime` (the date typed, the hour and minute chosen).
 
+
+## IR645 A refrigerant record's cylinder ID is trimmed (review round 10) — 2026-11-08
+
+A report draft accepted a refrigerant record whose cylinder ID was only spaces (it counted the ID as typed), although the technician's form refuses it. The cylinder ID is what traces the refrigerant, so a record without one is worthless to the inspector.
+
+1. **The rule.** The cylinder ID is trimmed when a draft is saved, and it must have 1–`maxCodeLength` code points after trimming (`refrigerant=error.invalid` otherwise), as the part name already is.
+2. **Tests.** `TestDraftRefrigerantCylinder` covers a named, a padded, a blank, an empty and a tab-and-newline cylinder.

@@ -286,6 +286,7 @@ const (
 	fieldNextAction     = "nextAction"
 	fieldOrganizationID = "organizationId"
 	fieldReason         = "reason"
+	fieldRefrigerant    = "refrigerant"
 	fieldReportVersion  = "reportVersion"
 	fieldSlot           = "slot"
 	fieldStatus         = "status"

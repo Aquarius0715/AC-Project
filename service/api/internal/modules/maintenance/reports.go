@@ -608,12 +608,16 @@ func (in *DraftInput) validateRecords(seen map[string]bool, fieldErrs map[string
 		}
 	}
 
-	for _, r := range in.Refrigerant {
-		n := utf8.RuneCountInString(r.CylinderID)
-		if !validRefrigerant(r.Refrigerant) || n < 1 || n > maxCodeLength || r.RecoveredKg < 0 ||
-			r.ChargedKg < 0 ||
-			!validLeakCheck(r.LeakCheck) {
-			fieldErrs["refrigerant"] = apperr.KeyInvalid
+	for i := range in.Refrigerant {
+		rec := &in.Refrigerant[i]
+		rec.CylinderID = strings.TrimSpace(rec.CylinderID)
+
+		n := utf8.RuneCountInString(rec.CylinderID)
+		if !validRefrigerant(rec.Refrigerant) || n < 1 || n > maxCodeLength ||
+			rec.RecoveredKg < 0 ||
+			rec.ChargedKg < 0 ||
+			!validLeakCheck(rec.LeakCheck) {
+			fieldErrs[fieldRefrigerant] = apperr.KeyInvalid
 		}
 	}
 }

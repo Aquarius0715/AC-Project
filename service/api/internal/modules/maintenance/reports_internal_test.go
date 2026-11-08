@@ -216,3 +216,45 @@ func TestSubmitErrors(t *testing.T) {
 		}
 	}
 }
+
+// TestDraftRefrigerantCylinder checks that the cylinder of a refrigerant record is counted after trimming, as the
+// technician's form does: a cylinder of spaces names no cylinder.
+func TestDraftRefrigerantCylinder(t *testing.T) {
+	t.Parallel()
+
+	for name, testCase := range map[string]struct {
+		cylinder string
+		want     map[string]string
+	}{
+		"named":   {"C-1", map[string]string{}},
+		"padded":  {"  C-1  ", map[string]string{}},
+		"blank":   {"   ", map[string]string{fieldRefrigerant: apperr.KeyInvalid}},
+		"empty":   {"", map[string]string{fieldRefrigerant: apperr.KeyInvalid}},
+		"newline": {"\n\t", map[string]string{fieldRefrigerant: apperr.KeyInvalid}},
+	} {
+		draft := DraftInput{
+			JobID:        uuid.New(),
+			Items:        []ItemInput{},
+			Measurements: []MeasurementInput{},
+			Parts:        []Part{},
+			Refrigerant: []Refrigerant{
+				{
+					Refrigerant:     "R32",
+					CylinderID:      testCase.cylinder,
+					RecoveredKg:     0,
+					ChargedKg:       0.3,
+					LeakCheck:       "pass",
+					LeakCheckMethod: nil,
+				},
+			},
+			AttachmentIDs: []uuid.UUID{},
+			WorkText:      "",
+			NextAction:    nil,
+			ReportID:      nil,
+		}
+
+		if fe := draft.Validate(); !maps.Equal(fe, testCase.want) {
+			t.Errorf("%s: %v want %v", name, fe, testCase.want)
+		}
+	}
+}
