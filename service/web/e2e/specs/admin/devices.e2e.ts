@@ -127,3 +127,33 @@ test("a device is registered with its MQTT node ID, which Edit… changes and cl
   await expect(page.getByText("MQTT node ID cleared").first()).toBeVisible();
   await expect(main.getByText("Not set", { exact: true })).toBeVisible();
 });
+
+// A registered device that is in no use is deleted from its detail, with a reason (DEC-103, IR652); a bound one is not
+// offered for deletion until it is unbound.
+test("a device registered by mistake is deleted, and a bound device must be unbound first", async ({ page }) => {
+  await page.goto("/admin/devices?tab=devices");
+  const main = page.getByRole("main");
+  const dialog = page.getByRole("dialog");
+  const serial = `AC-E2E-${String(Date.now())}`;
+  await main.getByRole("button", { name: "Register device" }).click();
+  await dialog.getByRole("textbox", { name: /^Serial/ }).fill(serial);
+  await dialog.getByRole("combobox", { name: /^Planned unit/ }).selectOption({ index: 1 });
+  await dialog.getByRole("button", { name: "Register", exact: true }).click();
+  await page.waitForURL(/deviceId=/);
+  await expect(main.getByRole("heading", { name: serial })).toBeVisible();
+
+  await main.getByRole("button", { name: "Delete…", exact: true }).click();
+  await dialog.getByRole("button", { name: "Delete", exact: true }).click();
+  await expect(dialog.getByText("A reason is required")).toBeVisible(); // nothing is deleted without one
+  await dialog.getByRole("textbox", { name: "Reason" }).fill("E2E: registered by mistake");
+  await dialog.getByRole("button", { name: "Delete", exact: true }).click();
+  await expect(page.getByText("Device deleted").first()).toBeVisible();
+  await expect(main.getByRole("button", { name: new RegExp(serial) })).toHaveCount(0);
+
+  // a bound device: Unbind… is offered, Delete… is not
+  await main.getByRole("button", { name: /AC-DEMO-0001/ }).click();
+  await page.waitForURL(/deviceId=/);
+  await expect(main.getByRole("button", { name: "Unbind…" })).toBeVisible();
+  await expect(main.getByRole("button", { name: "Delete…", exact: true })).toBeDisabled();
+  await expect(main).toContainText("A bound device cannot be deleted: unbind it first.");
+});

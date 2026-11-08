@@ -59,6 +59,21 @@ export async function bindDevice(deviceId: string, version: number, unitId: stri
   return run(async () => { await coreOp("devices.bind", { deviceId, unitId, reason }, { write: true, expectedVersion: version }); return null; });
 }
 
+/** devices.unbind: the device leaves its unit and stays registered (DEC-103). */
+export async function unbindDevice(deviceId: string, version: number, reason: string) {
+  return run(async () => { await coreOp("devices.unbind", { deviceId, reason }, { write: true, expectedVersion: version }); return null; });
+}
+
+/** devices.delete: a device that is not bound, has no operation under way and is in no unfinished campaign (DEC-103). */
+export async function deleteDevice(deviceId: string, version: number, reason: string) {
+  return run(async () => { await coreOp("devices.delete", { deviceId, reason }, { write: true, expectedVersion: version }); return null; });
+}
+
+/** capabilities.delete: a model no unit uses and no campaign targets, with every version (DEC-103). */
+export async function deleteCapability(id: string, version: number, reason: string) {
+  return run(async () => { await coreOp("capabilities.delete", { id, reason }, { write: true, expectedVersion: version }); return null; });
+}
+
 export async function checkDevice(deviceId: string, version: number) {
   return run(async () => { await coreOp("devices.check", { id: deviceId }, { write: true, expectedVersion: version }); return null; });
 }

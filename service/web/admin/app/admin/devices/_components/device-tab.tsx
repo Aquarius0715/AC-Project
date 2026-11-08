@@ -7,7 +7,7 @@ import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { metrics, metricUnit, mqttNodeValue, type Metric } from "@ac/web/lib/devices";
 import { connectionDot, filterOf, firmwareCardLook, firmwareSub, followFilter, HQ_FILTERS, operationTone, type Filter, metricText } from "@ac/web/lib/techDevices";
-import { bindDevice, calibrateSensor, checkDevice, registerDevice, setMqttNode, updateFirmware } from "../actions";
+import { bindDevice, calibrateSensor, checkDevice, deleteDevice, registerDevice, setMqttNode, unbindDevice, updateFirmware } from "../actions";
 import type { DevicesLive } from "./devices-view";
 import { Icon } from "@ac/web/components/Icon";
 
@@ -24,11 +24,13 @@ export function DeviceTab({ live }: Readonly<{ live: DevicesLive }>) {
   const [pending, run] = useAction();
   const [filter, setFilter] = useState<Filter>("all");
   const [q, setQ] = useState("");
-  const [modal, setModal] = useState<null | "register" | "bind" | "calibrate" | "firmware" | "node">(null);
+  const [modal, setModal] = useState<null | "register" | "bind" | "unbind" | "delete" | "calibrate" | "firmware" | "node">(null);
   const [tried, setTried] = useState(false);
   const [reg, setReg] = useState({ serial: "", unitId: "", sensors: [] as Metric[], node: "" });
   const [node, setNode] = useState("");
   const [bind, setBind] = useState({ unitId: "", reason: "" });
+  const reasonMissing = t("A reason is required");
+  const [why, setWhy] = useState(""); // the reason of an unbind or a delete (DEC-103)
   const [cal, setCal] = useState({ sensorId: "", reference: "", measured: "" });
   const [fw, setFw] = useState("");
   const rows = live.rows ?? [];
@@ -57,6 +59,12 @@ export function DeviceTab({ live }: Readonly<{ live: DevicesLive }>) {
     setTried(true);
     if (!dv || !bind.unitId || !bind.reason.trim()) return;
     run(() => bindDevice(dv.detail.id, dv.detail.version, bind.unitId, bind.reason.trim()), t(isFirst ? "Device bound to the unit — it is connected now" : "Device bound — new sensor IDs issued"), close);
+  };
+  const leave = (kind: "unbind" | "delete") => {
+    setTried(true);
+    if (!dv || !why.trim()) return;
+    const act = kind === "unbind" ? unbindDevice : deleteDevice;
+    run(() => act(dv.detail.id, dv.detail.version, why.trim()), t(kind === "unbind" ? "Device unbound — it stays registered" : "Device deleted"), () => { close(); setWhy(""); if (kind === "delete") nav({ deviceId: null }); });
   };
   const calibrate = () => {
     setTried(true);
@@ -115,7 +123,8 @@ export function DeviceTab({ live }: Readonly<{ live: DevicesLive }>) {
                   {isFirst && <div className="text-xs text-muted-foreground">{t("Registered only: bind it once it is installed, then the unit's data and controls use it.")}</div>}</div>
                 {live.canWrite && (isFirst
                   ? <Btn size="sm" variant="primary" disabled={pending} onClick={() => { setBind({ unitId: dv.row.targetUnitId ?? "", reason: t("Installed on site") }); setModal("bind"); }}>{t("Bind…")}</Btn>
-                  : <Btn size="sm" disabled={pending} onClick={() => { setBind({ unitId: "", reason: "" }); setModal("bind"); }}>{t("Rebind…")}</Btn>)}
+                  : <span className="flex flex-wrap gap-2"><Btn size="sm" disabled={pending} onClick={() => { setBind({ unitId: "", reason: "" }); setModal("bind"); }}>{t("Rebind…")}</Btn>
+                    <Btn size="sm" disabled={pending || isBusy} onClick={() => { setWhy(""); setModal("unbind"); }}>{t("Unbind…")}</Btn></span>)}
               </div>
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line p-3">
                 <div className="text-[13px]"><div className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">{t("MQTT node ID")}</div>
@@ -134,6 +143,13 @@ export function DeviceTab({ live }: Readonly<{ live: DevicesLive }>) {
                       <div className="text-[13px] font-semibold">{a.label}</div><div className="text-[11px] text-muted-foreground">{a.sub}</div>
                     </Plain>
                   ))}
+                </div>
+              )}
+              {live.canWrite && (
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line p-3">
+                  <div className="text-[13px]"><div className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">{t("Delete device")}</div>
+                    <div className="text-xs text-muted-foreground">{t(isFirst ? "Removes the device with its sensors, binding history, operations, events and calibrations. It cannot be undone." : "A bound device cannot be deleted: unbind it first.")}</div></div>
+                  <Btn size="sm" variant="danger" disabled={pending || isBusy || !isFirst} onClick={() => { setWhy(""); setModal("delete"); }}>{t("Delete…")}</Btn>
                 </div>
               )}
               {isBusy && <p className="-mt-2 text-xs text-muted-foreground">{t("One operation at a time: check, calibration and firmware update are disabled until the active one finishes.")}</p>}
@@ -202,8 +218,16 @@ export function DeviceTab({ live }: Readonly<{ live: DevicesLive }>) {
       </Modal>
       <Modal open={modal === "bind"} onClose={close} title={t(isFirst ? "Bind device" : "Rebind device")} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={rebind}>{t(isFirst ? "Bind" : "Rebind")}</Btn></>}>
         <Field label={t(isFirst ? "Unit" : "New unit")} error={tried && !bind.unitId ? t("Choose a unit") : undefined}><Select value={bind.unitId} onChange={(e) => { setBind({ ...bind, unitId: e.target.value }); }}><option value="">{t("Select…")}</option>{live.units.filter((u) => u.id !== dv?.row.unitId).map((u) => <option key={u.id} value={u.id}>{u.label}</option>)}</Select></Field>
-        <Field label={t("Reason")} error={tried && !bind.reason.trim() ? t("A reason is required") : undefined}><Textarea value={bind.reason} maxLength={1000} onChange={(e) => { setBind({ ...bind, reason: e.target.value }); }} /></Field>
+        <Field label={t("Reason")} error={tried && !bind.reason.trim() ? reasonMissing : undefined}><Textarea value={bind.reason} maxLength={1000} onChange={(e) => { setBind({ ...bind, reason: e.target.value }); }} /></Field>
         <p className="text-[11px] text-muted-foreground">{t(isFirst ? "The device's sensors start reporting for this unit." : "History stays with the previous binding; the device gets new sensor IDs on the new unit.")}</p>
+      </Modal>
+      <Modal open={modal === "unbind"} onClose={close} title={t("Unbind device")} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { leave("unbind"); }}>{t("Unbind")}</Btn></>}>
+        <Field label={t("Reason")} error={tried && !why.trim() ? reasonMissing : undefined}><Textarea value={why} maxLength={1000} onChange={(e) => { setWhy(e.target.value); }} /></Field>
+        <p className="text-[11px] text-muted-foreground">{t("The device leaves its unit and stays registered; history stays with the binding, and the unit has no device until you bind another.")}</p>
+      </Modal>
+      <Modal open={modal === "delete"} onClose={close} title={t("Delete device")} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant="danger" disabled={pending} onClick={() => { leave("delete"); }}>{t("Delete")}</Btn></>}>
+        <p className="text-[13px]">{t("Delete {serial}? Its sensors, binding history, operations, events and calibrations are removed with it.", { serial: dv?.row.serial ?? "" })}</p>
+        <Field label={t("Reason")} error={tried && !why.trim() ? reasonMissing : undefined}><Textarea value={why} maxLength={1000} onChange={(e) => { setWhy(e.target.value); }} /></Field>
       </Modal>
       <Modal open={modal === "calibrate"} onClose={close} title={t("Calibrate sensor")} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={calibrate}>{t("Record")}</Btn></>}>
         <Field label={t("Sensor")}><Select value={cal.sensorId} onChange={(e) => { setCal({ ...cal, sensorId: e.target.value }); }}>{dv?.detail.sensors.map((s) => <option key={s.id} value={s.id}>{metricText(s.metric, t)} ({s.unit})</option>)}</Select></Field>

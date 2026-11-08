@@ -279,6 +279,7 @@ export type OperationContracts = {
   'baselines.save': {input:BaselineInput;result:EnergyBaseline;mode:'write'};
   'capabilities.list': {input:Query;result:Page<Capability>;mode:'read'};
   'capabilities.save': {input:Save<Capability> & {changeReason?:string};result:Capability;mode:'write'};
+  'capabilities.delete': {input:{id:ID;reason:string};result:DeletedResource;mode:'write'};
   'commands.create': {input:{unitId:ID;action:UnitAction;jobId?:ID;reason?:string;expectedUnitVersion:number};result:Command;mode:'write'};
   'commands.get': {input:{id:ID};result:Command;mode:'read'};
   'commands.list': {input:{unitId:ID;jobId?:ID;query:Query};result:Page<Command>;mode:'read'};
@@ -297,6 +298,8 @@ export type OperationContracts = {
   'demoSession.extend': {input:Record<string,never>;result:Session;mode:'write'};
   'devices.addResponseNote': {input:{deviceId:ID;eventId:ID;responseNote:string};result:DeviceEvent;mode:'write'};
   'devices.bind': {input:{deviceId:ID;unitId:ID;jobId?:ID;reason:string};result:Device;mode:'write'};
+  'devices.unbind': {input:{deviceId:ID;reason:string};result:Device;mode:'write'};
+  'devices.delete': {input:{deviceId:ID;reason:string};result:DeletedResource;mode:'write'};
   'devices.calibrate': {input:{deviceId:ID;sensorId:ID;metric:Metric;unit:UnitSymbol;referenceValue:number;measuredValue:number;calibratedAt:Instant;jobId?:ID};result:CalibrationRecord;mode:'write'};
   'devices.check': {input:{id:ID;jobId?:ID};result:DeviceOperation;mode:'write'};
   'devices.events': {input:{id:ID;query:Query};result:Page<DeviceEvent>;mode:'read'};

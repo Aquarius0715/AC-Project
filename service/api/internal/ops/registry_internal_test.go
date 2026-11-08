@@ -543,7 +543,7 @@ func TestCatalogShape(t *testing.T) {
 
 	if len(
 		Catalog,
-	) != 212 {
+	) != 215 {
 		// IR648 voice.resolveIntent removed, IR612 members.unavailability + members.clearUnavailability, IR437
 		// jobs.getAttachment, IR436
 		// certificates.getContent, IR214 automations.delete, IR216 commands.list, IR238 filterCare.getSettings, IR327
