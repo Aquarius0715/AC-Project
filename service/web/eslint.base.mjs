@@ -426,6 +426,13 @@ export function webConfig(tsconfigRootDir) {
       rules: { "sonarjs/max-lines": "off" },
     },
     {
+      // the Japanese dictionary is the same table (IR639). Besides its length: the same Japanese text answers several
+      // English keys (a constant per repeated text would make the table harder to read), and the texts about passwords
+      // and sign-in ("パスワードを再設定") are labels, not credentials
+      files: ["**/lib/i18n-ja.ts"],
+      rules: { "sonarjs/max-lines": "off", "sonarjs/no-duplicate-string": "off", "sonarjs/no-hardcoded-passwords": "off" },
+    },
+    {
       // this test runs the compiled string literal of the build output in a vm to read the CSS the browser gets
       files: ["**/tests/styleHashes.test.ts"],
       rules: { "sonarjs/code-eval": "off" },

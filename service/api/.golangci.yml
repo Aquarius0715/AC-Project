@@ -156,6 +156,11 @@ linters:
           - revive
         text: 'deep-exit'
         path: ^cmd/gen/
+      # the Japanese voice grammar (IR639) and its test are Japanese: the words of the phrases (温度, 設定) are the product,
+      # as the Malay "suhu" and "tetapkan" are; every other file keeps its texts out of the code
+      - linters:
+          - gosmopolitan
+        path: (^internal/modules/voice/voice\.go$|^test/integration/voice_test\.go$)
       # the tests compare decoded JSON (map[string]any) with true and false, which `!x` cannot express for an any
       - linters:
           - revive

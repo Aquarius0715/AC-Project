@@ -11,12 +11,13 @@ const BEDROOM_AC = "Bedroom AC";
 const TEXT_2026_09_15T01_12_00Z = "2026-09-15T01:12:00Z";
 const ACKNOWLEDGED = "acknowledged";
 
-const en = translator("en"), ms = translator("ms");
+const en = translator("en"), ms = translator("ms"), ja = translator("ja");
 const TOKYO = { locale: "ms" as const, timeZone: "Asia/Tokyo" };
 // the fixed grammar of voice.resolveIntent (D09; service/api/internal/modules/voice): the suggestions must parse
 const grammar = {
   en: [/^temperature (.+)$/i, /^set (.+) to (\d{1,3}) degrees$/i, /^help$/i],
   ms: [/^suhu (.+)$/i, /^tetapkan (.+) kepada (\d{1,3}) darjah$/i, /^bantuan$/i],
+  ja: [/^温度\s*(.+)$/, /^(.+?)\s*を\s*(\d{1,3})\s*度に設定$/, /^ヘルプ$/],
 };
 const unit = (over: Partial<ApiUnitDetail> = {}) => {
   return unitDetail({
@@ -31,12 +32,13 @@ const command = (status: ApiCommand["status"], failureCode: string | null = null
 
 describe("the customer assistant (FR-X02, D09, Figma Client 09a–09g)", () => {
   it("suggests only sentences the fixed grammar accepts, in each language", () => {
-    for (const locale of ["en", "ms"] as const) {
+    for (const locale of ["en", "ms", "ja"] as const) {
       const ex = examples(locale);
       expect([ex.temperature, ex.change, ex.help].map((s, i) => entryOf(grammar, locale).at(i)?.test(s))).toStrictEqual([true, true, true]);
     }
     expect(examples("ms").change).toBe("tetapkan Bedroom kepada 24 darjah");
-    expect([helpText(en).startsWith("Ask “temperature <room>”"), helpText(ms).startsWith("Tanya “suhu <bilik>”")]).toStrictEqual([true, true]); // the help speaks its language's grammar
+    expect(examples("ja").change).toBe("Bedroomを24度に設定");
+    expect([helpText(en).startsWith("Ask “temperature <room>”"), helpText(ms).startsWith("Tanya “suhu <bilik>”"), helpText(ja).startsWith("「温度 <部屋>」")]).toStrictEqual([true, true, true]); // the help speaks its language's grammar
   });
 
   it("names the target with its place and answers a temperature question without inventing a zero", () => {

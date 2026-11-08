@@ -20,11 +20,11 @@ assistant text only, and turning it off while listening discards the voice reque
 export const MICROPHONE = "ac-voice-microphone";
 
 /** Sentences the fixed grammar accepts (D09): the suggestions and the simulated voice transcript (no real microphone). */
-export const examples = (locale: Locale) => {
-  return locale === "ms"
-    ? { temperature: "suhu Bedroom", change: "tetapkan Bedroom kepada 24 darjah", help: "bantuan" }
-    : { temperature: "temperature Bedroom", change: "set Bedroom to 24 degrees", help: "help" };
-};
+export const examples = (locale: Locale) => entryOf<Locale, { temperature: string; change: string; help: string }>({
+  en: { temperature: "temperature Bedroom", change: "set Bedroom to 24 degrees", help: "help" },
+  ms: { temperature: "suhu Bedroom", change: "tetapkan Bedroom kepada 24 darjah", help: "bantuan" },
+  ja: { temperature: "温度 Bedroom", change: "Bedroomを24度に設定", help: "ヘルプ" },
+}, locale);
 
 /** The grammar's own help (voice.help): what can be asked, in the assistant's language. */
 export const helpText = (t: T) =>
