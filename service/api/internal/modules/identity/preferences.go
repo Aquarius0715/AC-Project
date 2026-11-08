@@ -3,6 +3,7 @@ package identity
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"time"
 
@@ -72,7 +73,7 @@ func ValidTimezone(tz string) bool {
 // Validate implements ops.Validator.
 func (in *PreferencesInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
-	if in.Locale != "en" && in.Locale != "ms" {
+	if !slices.Contains([]string{"en", "ms", "ja"}, in.Locale) {
 		fieldErrs["locale"] = apperr.KeyInvalid
 	}
 

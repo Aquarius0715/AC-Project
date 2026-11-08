@@ -5,7 +5,7 @@
 // Pure code shared by the server loader and the client view; Vitest covers it. Texts in the display language (`t` / `i`,
 // IR272); the loader formats every time on the server — instants in the user's display time zone, the capacity days
 // as Kuala Lumpur dates.
-import { EN, intlTag, showSpan, showTime, translator, type I18n, type T, textOf } from "@ac/web/lib/i18n";
+import { EN, intlTag, showSpan, showTime, translator, type I18n, type Locale, type T, textOf } from "@ac/web/lib/i18n";
 import { actionMessage } from "@ac/web/lib/actionMessage";
 import { jobEventTitle, klDay, until, type ApiCapacity, type ApiJobEvent, type ApiMember, type Slot } from "@ac/web/lib/partnerOverview";
 import type { ReportHistorySummary } from "@ac/web/lib/contracts.gen";
@@ -47,9 +47,10 @@ const STATUS_WORDS: Record<string, string> = {
 };
 /** A job status inside a sentence (“the job is on hold”), in the display language. */
 export const statusWord = (status: string, t: T = en) => (textOf(STATUS_WORDS, status, t) ?? status.replaceAll('_', " "));
-/** “1st”, “2nd”, “3rd”, “4th” … in English, “ke-1” in Malay. */
-export function ordinal(n: number, locale: "en" | "ms" = "en"): string {
+/** “1st”, “2nd”, “3rd”, “4th” … in English, “ke-1” in Malay, “第1” in Japanese. */
+export function ordinal(n: number, locale: Locale = "en"): string {
   if (locale === "ms") return `ke-${String(n)}`;
+  if (locale === "ja") return `第${String(n)}`;
   const teen = n % 100 >= 11 && n % 100 <= 13;
   const suffix = teen ? "th" : (["th", "st", "nd", "rd"].at(n % 10) ?? "th");
   return `${String(n)}${suffix}`;
@@ -80,7 +81,7 @@ function fitBadge(isOk: boolean, isFree: boolean, fit: string, notOk: string, t:
   return isFree ? { text: t(fit), tone: "ok" } : { text: t("Busy at the visit"), tone: "warn" };
 }
 /** The visit days as one range (“Mon 22 – Wed 24”), one day, or nothing. */
-function daySpan(days: { date: string }[], locale: "en" | "ms"): string {
+function daySpan(days: { date: string }[], locale: Locale): string {
   const first = days.at(0), last = days.at(-1);
   if (!first || !last) return "";
   return days.length > 1 ? `${klDay(first.date, locale)} – ${klDay(last.date, locale)}` : klDay(first.date, locale);
