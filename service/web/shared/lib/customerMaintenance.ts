@@ -206,8 +206,10 @@ export function symptomLength(v: string): number {
 export function contactError(v: string, tr: T = en): string | null {
   const t = v.trim();
   if (t.length > 200) return tr("Up to 200 characters.");
-  if (t.includes("@") || /\d{7,}/.test(t.replaceAll(/[\s\-()+]/g, ""))) return tr("No e-mail addresses or phone numbers — use HH:mm for times (example: Weekdays 09:00-18:00).");
-  return null;
+  // NFKC reads full-width digits, hyphens, parentheses, plus and "＠" as the ASCII ones, and \p{Nd} is a digit of any script (IR640)
+  const folded = t.normalize("NFKC");
+  const hasContact = folded.includes("@") || /\p{Nd}{7,}/u.test(folded.replaceAll(/[\s\-()+]/g, ""));
+  return hasContact ? tr("No e-mail addresses or phone numbers — use HH:mm for times (example: Weekdays 09:00-18:00).") : null;
 }
 
 /** The client's notes and the job history from jobs.events (internal notes never reach the client, IR42). */

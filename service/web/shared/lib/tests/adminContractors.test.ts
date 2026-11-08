@@ -97,5 +97,7 @@ describe("HQ contractor register in Malay (IR291)", () => {
     expect([v.current?.title, v.current?.lines[0]?.label]).toStrictEqual(["Kad kadar v3 (dari 1 Jun 2026)", "Pembaikan — lawatan asas"]);
     expect(technicianRows([tech({})], [cert({})], NOW, MS)[0]?.badge.label).toBe("1 hampir tamat · 15 Okt");
     expect(contractorRefusal({ code: "NOT_FOUND", messageKey: "error.notFound", fieldErrors: {} }, MS.t)).toBe("Kontraktor atau sijil tidak lagi wujud.");
+    // IR643: a second rate card for the same start time is refused on the field, and the screen says so
+    expect(contractorRefusal({ code: "VALIDATION", messageKey: "error.validation", fieldErrors: { effectiveFrom: "error.duplicate" } })).toBe("effectiveFrom: a rate card already starts then");
   });
 });

@@ -1,7 +1,10 @@
-// Sign-in page helpers (FR-X01, DDC-07, SCR-X-login, IR251; Figma Login frames): where Continue goes, the other services,
-// and why a sign-in came back (the BFF callback's ?error=, or an expired session).
+// Sign-in page helpers (FR-X01, DDC-07, SCR-X-login, IR251, IR646; Figma Login frames): the e-mail hint and language the
+// BFF passes to the identity provider, the other services, and why a sign-in came back (the BFF callback's ?error=, or
+// an expired session).
 import { roleConfig, type Role } from "@ac/web/lib/nav";
 import { lookup } from "@ac/web/lib/lookup";
+import { isLocale, type Locale } from "@ac/web/lib/i18n";
+import { isEmail } from "@ac/web/lib/text";
 
 /** returnTo kept only inside this role's area (the BFF validates it again); otherwise the role home. */
 export function safeReturnTo(role: Role, asked: string | undefined): string {
@@ -9,11 +12,23 @@ export function safeReturnTo(role: Role, asked: string | undefined): string {
   return asked && (asked === base || asked.startsWith(base + "/")) && !asked.startsWith("//") ? asked : base;
 }
 
-/** API mode: the BFF OIDC sign-in with the demo identity as login hint; the browser demo opens the role home. */
-export function continueHref(api: boolean, role: Role, returnTo: string): string {
-  const config = roleConfig(role);
-  return api ? `/bff/auth/login?login_hint=${encodeURIComponent(config.loginUser)}&returnTo=${encodeURIComponent(returnTo)}` : config.base;
+/** The browser demo (no identity service in that build) opens the role home; API mode signs in through the BFF form. */
+export const demoHref = (role: Role): string => roleConfig(role).base;
+
+/** The cookie that keeps the language chosen on the sign-in page, before there is a session with preferences. */
+export const SIGN_IN_LOCALE_COOKIE = "ac_sign_in_locale";
+
+/** Longest e-mail address (RFC 5321). */
+const EMAIL_MAX = 320;
+
+/** The address a person typed as the sign-in hint of the identity provider, or undefined when it is not an address. */
+export function loginHint(asked: string | null): string | undefined {
+  const text = asked?.trim();
+  return text && text.length <= EMAIL_MAX && isEmail(text) ? text : undefined;
 }
+
+/** The language to ask the identity provider's pages in: one of the display languages, otherwise none. */
+export const uiLocale = (asked: string | null | undefined): Locale | undefined => (isLocale(asked) ? asked : undefined);
 
 const ORDER: Role[] = ["client", "admin", "contractor", "technician"];
 /** The other services in Figma's order (“Admin, Partner, and Technician”). */

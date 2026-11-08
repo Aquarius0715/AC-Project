@@ -547,7 +547,7 @@ func (in *DraftInput) Validate() map[string]string {
 	in.validateRecords(seen, fieldErrs)
 
 	if utf8.RuneCountInString(in.WorkText) > maxWorkTextLength {
-		fieldErrs["workText"] = apperr.KeyLength
+		fieldErrs[fieldWorkText] = apperr.KeyLength
 	}
 
 	validateNextAction(in.NextAction, fieldErrs)
@@ -608,12 +608,16 @@ func (in *DraftInput) validateRecords(seen map[string]bool, fieldErrs map[string
 		}
 	}
 
-	for _, r := range in.Refrigerant {
-		n := utf8.RuneCountInString(r.CylinderID)
-		if !validRefrigerant(r.Refrigerant) || n < 1 || n > maxCodeLength || r.RecoveredKg < 0 ||
-			r.ChargedKg < 0 ||
-			!validLeakCheck(r.LeakCheck) {
-			fieldErrs["refrigerant"] = apperr.KeyInvalid
+	for i := range in.Refrigerant {
+		rec := &in.Refrigerant[i]
+		rec.CylinderID = strings.TrimSpace(rec.CylinderID)
+
+		n := utf8.RuneCountInString(rec.CylinderID)
+		if !validRefrigerant(rec.Refrigerant) || n < 1 || n > maxCodeLength ||
+			rec.RecoveredKg < 0 ||
+			rec.ChargedKg < 0 ||
+			!validLeakCheck(rec.LeakCheck) {
+			fieldErrs[fieldRefrigerant] = apperr.KeyInvalid
 		}
 	}
 }
@@ -1481,8 +1485,8 @@ func submitErrors(report *Report, components []string, now time.Time) map[string
 		fieldErrs[fieldItems] = "errors.components_mismatch"
 	}
 
-	if n := utf8.RuneCountInString(report.WorkText); n < 10 || n > 4000 {
-		fieldErrs["workText"] = apperr.KeyLength
+	if n := utf8.RuneCountInString(strings.TrimSpace(report.WorkText)); n < 10 || n > 4000 {
+		fieldErrs[fieldWorkText] = apperr.KeyLength
 	}
 
 	switch {
@@ -1490,7 +1494,7 @@ func submitErrors(report *Report, components []string, now time.Time) map[string
 		fieldErrs[fieldNextAction] = apperr.KeyRequired
 	case report.NextAction.Kind == nextActionFollowUp &&
 		(report.NextAction.Date == nil || !report.NextAction.Date.After(now) || report.NextAction.Note == nil ||
-			utf8.RuneCountInString(*report.NextAction.Note) < 1):
+			strings.TrimSpace(*report.NextAction.Note) == ""):
 		fieldErrs[fieldNextAction] = apperr.KeyInvalid
 	}
 

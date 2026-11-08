@@ -53,6 +53,16 @@ const job = (over: Partial<ApiHqJob>): ApiHqJob => {
   });
 };
 
+/** An assigned job whose booked time ends at `scheduledEnd` (IR642). */
+const assigned = (scheduledEnd: string, over: Partial<ApiHqJob["assignment"] & object> = {}) => job({
+  status: "assigned", assignment: { technicianMembershipId: "m-int", scheduledStart: "2026-09-20T02:00:00Z", scheduledEnd, status: "active", acknowledgement: "accepted", cantMakeReason: null, alternativeSlot: null, ...over },
+});
+/** A job the contractor accepted and assigned nobody, with the candidate times it was offered (IR642). */
+const accepted = (candidateSlots: ReturnType<typeof slot>[]) => deliveryOf(job({
+  status: "accepted", contractorOrgId: "org-c",
+  offer: { id: "o", contractorOrgId: "org-c", offerExpiresAt: "2026-09-19T10:00:00Z", accessValidFrom: "2026-09-19T01:00:00Z", accessValidUntil: "2026-09-25T01:00:00Z", decision: "accept", decidedAt: "2026-09-19T02:00:00Z", declineReason: null, candidateSlots },
+}), names, NOW);
+
 describe("HQ maintenance jobs", () => {
   it("builds the filters of the scope and the filter bar", () => {
     expect(filtersOf({ customerId: "c1", origin: PERIODIC_PLAN, delivery: "internal", assignee: "m-int", overdue: "1", stage: TIME_PROPOSED }, "org-hq")).toStrictEqual({ customerId: "c1", origin: PERIODIC_PLAN, organizationId: "org-hq", membershipId: "m-int", overdueOnly: true, proposalPending: true });
@@ -89,6 +99,17 @@ describe("HQ maintenance jobs", () => {
     const offered = deliveryOf(job({ status: "offered", contractorOrgId: "org-c", offer: { id: "o", contractorOrgId: "org-c", candidateSlots: [slot(TEXT_2026_09_22T02_00_00Z, TEXT_2026_09_22T04_00_00Z)], offerExpiresAt: "2026-09-21T10:00:00Z", accessValidFrom: "2026-09-21T01:00:00Z", accessValidUntil: TEXT_2026_09_23T04_00_00Z, decision: null, decidedAt: null, declineReason: null } }), names, NOW);
     expect([offered.title, offered.lines]).toStrictEqual(["Delivery · contractor Demo Contractor A", [["Times offered", "22 Sept, 10:00 am – 12:00 pm MYT · offer open · expires 21 Sept 2026, 6:00 pm MYT"], ["Access", "21 Sept, 9:00 am – 23 Sept, 12:00 pm MYT"], [TECHNICIAN, "not assigned by the contractor yet"]]]);
     expect(delivery(job({}), names, NOW)).toBeNull();
+  });
+
+  // IR642: HQ may propose another time when the booked time is over and nobody started, or every offered time is over
+  it("offers another time when the booked time or every offered time has passed", () => {
+    const over = deliveryOf(assigned("2026-09-20T04:00:00Z"), names, NOW);
+    expect([over.proposable, over.overdue, over.cantMake]).toStrictEqual([true, "The booked time passed and nobody started. Propose another time — the client must accept it.", false]);
+    expect([deliveryOf(assigned("2026-09-22T04:00:00Z"), names, NOW).proposable, deliveryOf(assigned("2026-09-22T04:00:00Z"), names, NOW).overdue]).toStrictEqual([false, null]);
+    expect(deliveryOf(assigned("2026-09-22T04:00:00Z", { acknowledgement: "cant_make" }), names, NOW)).toMatchObject({ proposable: true, overdue: null, cantMake: true });
+    expect(deliveryOf(assigned("2026-09-20T04:00:00Z", { status: "completed" }), names, NOW).proposable).toBe(false);
+    expect(accepted([slot("2026-09-20T02:00:00Z", "2026-09-20T04:00:00Z"), slot("2026-09-21T00:00:00Z", "2026-09-21T01:00:00Z")])).toMatchObject({ proposable: true, overdue: "Every time offered to the contractor has passed. Propose another time — the client must accept it." });
+    expect(accepted([slot("2026-09-20T02:00:00Z", "2026-09-20T04:00:00Z"), slot(TEXT_2026_09_22T02_00_00Z, TEXT_2026_09_22T04_00_00Z)])).toMatchObject({ proposable: false, overdue: null });
   });
 
   it("checks the preferred times, the offer defaults and the controls", () => {

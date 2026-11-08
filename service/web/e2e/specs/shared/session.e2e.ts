@@ -3,7 +3,7 @@
 // sign-in that came back says why.
 import type { Page } from "@playwright/test";
 import { test, expect } from "../../fixtures/test";
-import { signIn } from "../../fixtures/auth";
+import { emailOf, signIn, startSignIn } from "../../fixtures/auth";
 
 // the page's own alerts, not Next.js's route announcer (role alert too)
 const notice = (page: Page) => page.locator('[role="alert"]:not(#__next-route-announcer__)');
@@ -37,10 +37,9 @@ test("Sign out ends the session, at the identity provider too", async ({ browser
   await page.waitForURL(/\/login$/);
   await page.goto(app.home);
   await expect(page).toHaveURL(new RegExp(String.raw`/login\?returnTo=${encodeURIComponent(app.home)}`));
-  const again = page.getByRole("link", { name: `Continue as ${app.user}` });
-  await expect(again).toHaveAttribute("href", new RegExp(String.raw`^/bff/auth/login\?login_hint=${app.user}&returnTo=`));
+  await expect(page.locator('input[name="returnTo"]')).toHaveValue(app.home);
   // the provider's session ended with the sign-out: signing in again asks for the password instead of coming back
-  await again.click();
+  await startSignIn(page, emailOf(app.user));
   await expect(page.locator("#password")).toBeVisible();
 });
 
@@ -85,7 +84,6 @@ test.describe("signed out", () => {
   test("a protected page keeps where it was going", async ({ page, app }) => {
     await page.goto(`${app.home}/x-not-a-page`);
     await expect(page).toHaveURL(new RegExp(String.raw`/login\?returnTo=${encodeURIComponent(`${app.home}/x-not-a-page`)}`));
-    const href = await page.getByRole("link", { name: /^Continue as / }).getAttribute("href");
-    expect(decodeURIComponent(href ?? "")).toContain(`returnTo=${app.home}/x-not-a-page`);
+    await expect(page.locator('input[name="returnTo"]')).toHaveValue(`${app.home}/x-not-a-page`);
   });
 });

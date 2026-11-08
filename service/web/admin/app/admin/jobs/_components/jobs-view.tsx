@@ -108,6 +108,12 @@ function JobsTab({ live, patch, fresh, onFresh }: Readonly<{ live: JobsLive; pat
 type ModalState = null | { kind: "book"; row: PreferredRow; fresh?: boolean } | { kind: "propose" } | { kind: "reason"; what: "hold" | "resume" | "cancel" | "reassign" } | { kind: "classify" }
   | { kind: "review"; decision: "accept" | "return" } | { kind: "cost" } | { kind: "extend" } | { kind: "report" };
 
+/** The button that opens the dialog proposing another time to the client. */
+function ProposeBtn({ onClick, disabled, variant, size }: Readonly<{ onClick: () => void; disabled: boolean; variant?: "primary" | "secondary"; size?: "sm" }>) {
+  const t = useT();
+  return <Btn variant={variant} size={size} disabled={disabled} onClick={onClick}>{t("Propose another time…")}</Btn>;
+}
+
 /** What the cards of a job share: the job, the list data, the running action and the modal switch. */
 interface DetailCtx { d: Detail; live: JobsLive; pending: boolean; run: ReturnType<typeof useAction>[1]; setModal: (m: ModalState) => void; close: (text?: string) => void; failed: (f: ActionFailure) => void; now: number }
 
@@ -141,7 +147,7 @@ function ProposalCards({ ctx }: Readonly<{ ctx: DetailCtx }>) {
           ) : <Banner>{t("No agreed time on this job (HQ request without alternatives) — propose a time to the client.")}</Banner>}
           <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-[#f5c473] bg-[#fff8ec] p-4">
             <div className="min-w-0 flex-1"><b className="text-warn">{t(d.preferred.some((r) => r.fits) ? "Prefer another time?" : "None of the times works — propose another time")}</b><p className="text-xs">{t("One option with the capacity held; nothing is booked until the client accepts.")}</p></div>
-            <Btn variant={d.preferred.some((r) => r.fits) ? "secondary" : "primary"} disabled={pending} onClick={() => { setModal({ kind: "propose" }); }}>{t("Propose another time…")}</Btn>
+            <ProposeBtn variant={d.preferred.some((r) => r.fits) ? "secondary" : "primary"} disabled={pending} onClick={() => { setModal({ kind: "propose" }); }} />
           </div>
         </>
       )}
@@ -157,7 +163,8 @@ function ProposalCards({ ctx }: Readonly<{ ctx: DetailCtx }>) {
       {d.delivery && (
         <Card title={d.delivery.title} action={d.extend ? <Btn size="sm" disabled={pending} onClick={() => { setModal({ kind: "extend" }); }}>{t("Extend access…")}</Btn> : undefined}>
           <SummaryList items={d.delivery.lines} />
-          {d.delivery.ack && <div className="mt-3"><Banner tone={okOrWarn(d.delivery.ack.tone)} action={d.delivery.cantMake ? <span className="flex gap-2">{d.delivery.kind === "internal" && <Btn size="sm" disabled={pending} onClick={() => { setModal({ kind: "reason", what: "reassign" }); }}>{t("Reassign…")}</Btn>}</span> : undefined}>{d.delivery.ack.text}</Banner></div>}
+          {d.delivery.ack && <div className="mt-3"><Banner tone={okOrWarn(d.delivery.ack.tone)} action={d.delivery.cantMake ? <span className="flex gap-2">{d.delivery.kind === "internal" && <Btn size="sm" disabled={pending} onClick={() => { setModal({ kind: "reason", what: "reassign" }); }}>{t("Reassign…")}</Btn>}{sp?.status !== "pending" && <ProposeBtn size="sm" disabled={pending} onClick={() => { setModal({ kind: "propose" }); }} />}</span> : undefined}>{d.delivery.ack.text}</Banner></div>}
+          {d.delivery.overdue && sp?.status !== "pending" && <div className="mt-3"><Banner tone="crit" icon="error" action={<ProposeBtn size="sm" disabled={pending} onClick={() => { setModal({ kind: "propose" }); }} />}>{d.delivery.overdue}</Banner></div>}
         </Card>
       )}
 

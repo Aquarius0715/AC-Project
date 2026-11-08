@@ -1,5 +1,5 @@
-// Signing in through the UI as a person would: the app's sign-in page → the identity provider (account prefilled by the
-// login hint) → password → for HQ a one-time code → back in the role home. The credentials are the local demo realm's
+// Signing in through the UI as a person would: the app's sign-in page (the e-mail address) → the identity provider (the
+// address prefilled by the login hint) → password → for HQ a one-time code → back in the role home. The credentials are the local demo realm's
 // test values, read from its import file (docker/keycloak/realm-ac.json) so they live in one place; E2E_PASSWORD and
 // E2E_TOTP_SECRET replace them for another identity provider.
 import { readFileSync } from "node:fs";
@@ -66,7 +66,16 @@ export async function settles<T>(wait: Promise<unknown>, ok: T, timedOut: T): Pr
 }
 const home = (app: App) => (u: URL) => u.origin === new URL(app.url).origin && (u.pathname === app.home || u.pathname.startsWith(app.home + "/"));
 
-/** `as` signs in another account of the same role (the identity provider's username field takes it). */
+/** The e-mail address of a demo account: its user name at the realm's domain. */
+export const emailOf = (user: string): string => (user.includes("@") ? user : `${user}@ac.local`);
+
+/** The app's own sign-in step (IR646): the e-mail address, then Continue to the identity provider, which shows it already filled in. */
+export async function startSignIn(page: Page, email: string): Promise<void> {
+  const form = page.locator('form[action="/bff/auth/login"]'); // the same in every display language
+  await form.locator('input[name="login_hint"]').fill(email);
+  await form.getByRole("button").click();
+}
+
 /** The identity provider asks for the password again (prompt=login, after a revocation, IR385): enter it for `user`.
 The account may already be shown; the credentials stay in this file's realm reader. */
 export async function enterPassword(page: Page, user: string): Promise<void> {
@@ -79,8 +88,7 @@ export async function enterPassword(page: Page, user: string): Promise<void> {
 
 export async function signIn(page: Page, app: App, as = app.user): Promise<void> {
   await page.goto(`${app.url}/login`);
-  await page.getByRole("link", { name: `Continue as ${app.user}` }).click();
-  if (as !== app.user) await page.locator("#username").fill(as);
+  await startSignIn(page, emailOf(as));
   await page.locator("#password").fill(passwordOf(as));
   await page.locator("#kc-login").click();
   if (app.otp) {

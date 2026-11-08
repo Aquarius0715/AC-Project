@@ -13,6 +13,12 @@ test("the panel is labelled demo and shows the Core API clock", async ({ page })
   await expect(page.getByRole("button", { name: /Delay transport/ })).toBeDisabled();
 });
 
+// IR641: a minute, then 1, 2, 4, 8, 12 and 24 hours (nothing is pressed: the demo clock never goes back)
+test("the clock has a button for each jump", async ({ page }) => {
+  await page.goto("/demo");
+  for (const name of ["+1 min", "+1 hour", "+2 hours", "+4 hours", "+8 hours", "+12 hours", "+24 hours"]) await expect(page.getByRole("button", { name, exact: true })).toBeEnabled();
+});
+
 test("the clock moves forward by a minute", async ({ page }) => {
   test.skip(!process.env.E2E_ADVANCE_CLOCK, "moves the shared demo clock for good; set E2E_ADVANCE_CLOCK=1");
   await page.goto("/demo");
