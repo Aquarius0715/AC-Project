@@ -1,0 +1,46 @@
+# A pull request of this repository merges into main by itself once every required check has passed: this workflow turns
+# on GitHub's auto-merge when the pull request is opened. Which checks are required, and that the branch is up to date with
+# main, is the branch protection of main (the 14 jobs of ci.yml); GitHub waits for them and merges, or keeps waiting.
+# A pull request from a fork never gets it.
+name: Auto-merge
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  enable:
+    name: Turn on auto-merge
+    if: github.event.pull_request.head.repo.full_name == github.repository && !github.event.pull_request.draft
+    runs-on: [self-hosted, ac-test]
+    container: { image: "python:3.13-bookworm" }
+    steps:
+      - name: ask GitHub to merge the pull request when its required checks pass
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PULL_REQUEST_ID: ${{ github.event.pull_request.node_id }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import urllib.request
+
+          query = (
+              "mutation($id: ID!) { enablePullRequestAutoMerge(input: {pullRequestId: $id, mergeMethod: MERGE}) "
+              "{ pullRequest { number } } }"
+          )
+          request = urllib.request.Request(
+              "https://api.github.com/graphql",
+              data=json.dumps({"query": query, "variables": {"id": os.environ["PULL_REQUEST_ID"]}}).encode(),
+              headers={"Authorization": "Bearer " + os.environ["GITHUB_TOKEN"], "Content-Type": "application/json"},
+          )
+          with urllib.request.urlopen(request, timeout=30) as response:
+              answer = json.load(response)
+          print(json.dumps(answer, indent=2))
+          if answer.get("errors"):
+              raise SystemExit(1)
+          PY
