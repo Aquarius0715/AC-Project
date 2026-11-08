@@ -664,7 +664,7 @@ CREATE TABLE control.commands (
   unit_id             uuid NOT NULL,
   device_id           uuid,
   actor_membership_id uuid NOT NULL,             -- system-restriction / automation memberships for system paths
-  source              text NOT NULL CHECK (source IN ('ui','voice','automation','restriction','diagnostic','group')),
+  source              text NOT NULL CHECK (source IN ('ui','automation','restriction','diagnostic','group')),
   action              jsonb NOT NULL,            -- UnitAction | RestrictionAction
   diagnostic_run_id   uuid,
   job_id              uuid,

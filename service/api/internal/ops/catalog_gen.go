@@ -215,7 +215,6 @@ var Catalog = []Spec{
 	{Name: "units.setAlertPolicies", Mode: Write, Module: "Assets", Authorization: "client:self-customer:own-customer-policies | admin:asset.write | admin:alert.policy.write", Versions: []VersionRule{{Branch: "all", Rule: "required"}}, DesignIDs: "DD-C03;DD-C15;DD-A02;DD-A05", Routes: []Route{{Method: "PUT", Path: "/v1/units/{unitId}/alert-policies"}}, Filters: nil},
 	{Name: "ventilation.list", Mode: Read, Module: "Monitoring & alerts", Authorization: "client:self | technician:assigned | admin:alert.read", Versions: []VersionRule{}, DesignIDs: "DD-C07", Routes: []Route{{Method: "GET", Path: "/v1/ventilation"}}, Filters: []string{"spaceId", "unitId", "from", "to"}},
 	{Name: "ventilation.log", Mode: Write, Module: "Monitoring & alerts", Authorization: "client:self", Versions: []VersionRule{{Branch: "all", Rule: "omit"}}, DesignIDs: "DD-C07", Routes: []Route{{Method: "POST", Path: "/v1/ventilation"}}, Filters: nil},
-	{Name: "voice.resolveIntent", Mode: Read, Module: "Control", Authorization: "client:control.execute | technician:control.diagnose | admin:control.execute", Versions: []VersionRule{}, DesignIDs: "DDC-07", Routes: []Route{{Method: "POST", Path: "/v1/voice/resolve-intent"}}, Filters: nil},
 	{Name: "writes.getResult", Mode: Read, Module: "Audit", Authorization: "authenticated:original-user-and-current-target-scope", Versions: []VersionRule{}, DesignIDs: "DDC-03", Routes: []Route{{Method: "GET", Path: "/v1/writes/{idempotencyKey}"}}, Filters: nil},
 }
 

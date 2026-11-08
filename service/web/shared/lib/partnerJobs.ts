@@ -116,7 +116,7 @@ export function jobRow(raw: ApiPartnerJob, now: number, units: Map<string, strin
     }
     case "overdue": {
       const ended = j.slot ? at(j.slot.endAt) : "—";
-      return { id: j.id, href: detail, line: t("Work window ended {time} · report not submitted", { time: ended }), tech: technician ?? none, slot: { main: t("Ended {time}", { time: ended }), sub: t("Extend or reassign"), tone: "crit" }, badge: { text: t("Overdue"), tone: "crit" }, title, origin };
+      return { id: j.id, href: detail, line: t("Work window ended {time} · report not submitted", { time: ended }), tech: technician ?? none, slot: { main: t("Ended {time}", { time: ended }), sub: t(raw.status === "assigned" ? "Ask HQ for a new time" : "Extend or reassign"), tone: "crit" }, badge: { text: t("Overdue"), tone: "crit" }, title, origin };
     }
     case "review": {
       return { id: j.id, href: `/partner/jobs/${j.id}/review`, line: tech ? t("Submitted by {name} · awaiting your review", { name: tech }) : t("Submitted · awaiting your review"), tech: tech ? { name: tech, sub: t("report author") } : none, slot: { main: t("Report submitted"), sub: due }, badge: { text: t("Submitted"), tone: "primary" }, title, origin };

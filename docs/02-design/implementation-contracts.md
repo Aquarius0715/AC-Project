@@ -227,10 +227,9 @@ If the main grouped data fetch fails, show a page error. If an independent suppo
 | /forgot-password | demoEmail: empty; valid format, at most 254 characters | Show the same demo completion message for registered and unregistered addresses: “Instructions will be shown if applicable” | Send no real email. Invalid format shows a field error |
 | /settings/preferences | locale=en, zone=Asia/Kuala_Lumpur, currency=MYR (read-only) | Apply locale immediately. zone is a display setting. currency is a fixed MYR demo display attribute. Show invoices with Money.currency without conversion. Data/contract currencies do not change | Reject unsupported locale or invalid IANA timezone |
 | Shared notifications | unreadOnly=false, cursor=null, limit=25 | Show scoped notifications as Pages. Allow mark-read mutations and navigation via reference IDs. “Mark all as read” sends the listed unread notifications in one `notifications.markAllRead` write and names how many were marked (IR351, IR379) | Expired-scope links show a safe “Unavailable” message. A listed notification that is already read or no longer available is skipped |
-| Voice/text panel | text: empty; intent: unresolved; target: unselected; language: the display language | Resolve intent and target candidates; confirm changes and use existing Command handling. Queries are read-only. API mode (IR306): `voice.resolveIntent` with the panel's locale; an ambiguous room asks for the room, then the AC; Confirm is one `commands.create` with `source: voice` and the resolved `expectedVersion` | Unrecognized input, duplicate names, or cancelled confirmation create zero Commands. A language switch discards an unconfirmed change and keeps the text. With the device's microphone consent off, the panel is text only |
 | /demo | scenarioId (1–64-character label), eventType, clockAdvance, reset | Use only allowed synthetic events. IR37 covers transport/network fault injection; IR36 covers clock jumps. Reset updates generation | Reject arbitrary URLs, scripts, and real-device payloads |
 
-Shared logical operations are `demoSession.signIn/signOut/switchMembership/extend`, `auth.previewPasswordReset`, `preferences.get/update`, `voice.resolveIntent`, `notifications.list/markRead/markAllRead`, and `demo.trigger/reset`. demo/auth/voice are mock-only in phase 1A; real authentication integration is outside scope. Keep preferences in a Provider for infrequently changed display settings, separate from business Repository data and invoice currencies.
+Shared logical operations are `demoSession.signIn/signOut/switchMembership/extend`, `auth.previewPasswordReset`, `preferences.get/update`, `notifications.list/markRead/markAllRead`, and `demo.trigger/reset`. demo/auth are mock-only in phase 1A; real authentication integration is outside scope. Keep preferences in a Provider for infrequently changed display settings, separate from business Repository data and invoice currencies.
 
 ### Permission Names and Eligible Roles
 
@@ -360,7 +359,7 @@ type RestrictionAction =
       rulesVersion: string };
 ```
 
-`RestrictionAction` is an internal action created only by shared mock restriction transitions. Reject it through `commands.create`, voice, customer automation, or diagnosis. `Command.action` is `UnitAction` or `RestrictionAction`. Device confirmed state holds `observedRestriction: {restrictionId, rulesVersion, policy} | null` and confirmation time, separately from ordinary settings.
+`RestrictionAction` is an internal action created only by shared mock restriction transitions. Reject it through `commands.create`, customer automation, or diagnosis. `Command.action` is `UnitAction` or `RestrictionAction`. Device confirmed state holds `observedRestriction: {restrictionId, rulesVersion, policy} | null` and confirmation time, separately from ordinary settings.
 
 | Acknowledged action | Confirmed state change | Values kept unchanged |
 |---|---|---|

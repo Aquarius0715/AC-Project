@@ -3856,39 +3856,6 @@
         }
       ]
     },
-    "AT-X02-B": {
-      "clock": "2026-09-14T01:00:00.000Z",
-      "simulator": false,
-      "patches": [
-        {
-          "entity": "spaces",
-          "id": "room-1b",
-          "set": {
-            "propertyId": "property-home-a",
-            "parentSpaceId": "floor-1",
-            "kind": "room",
-            "name": "Bedroom",
-            "archived": false
-          }
-        },
-        {
-          "entity": "units",
-          "id": "unit-non-rto",
-          "set": {
-            "spaceId": "room-1b",
-            "displayName": "Bedroom AC"
-          }
-        }
-      ],
-      "expected": {
-        "actor": "customer-a",
-        "candidates": [
-          "unit-non-rto",
-          "unit-online-rto"
-        ],
-        "samePathLabel": true
-      }
-    },
     "AT-X06-B.1": {
       "clock": "2026-09-14T01:00:00.000Z",
       "simulator": false,

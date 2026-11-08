@@ -26,7 +26,6 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/modules/notify"
 	"github.com/pradita/ac-project/service/api/internal/modules/restrictions"
 	"github.com/pradita/ac-project/service/api/internal/modules/summaries"
-	"github.com/pradita/ac-project/service/api/internal/modules/voice"
 	"github.com/pradita/ac-project/service/api/internal/modules/writes"
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
@@ -355,7 +354,7 @@ func (w *wiring) registerControl() {
 	)
 }
 
-// registerReads registers the account settings, writes, QR access, energy, voice, the internal queries of the read
+// registerReads registers the account settings, writes, QR access, energy, the internal queries of the read
 // models (IR190), the summaries and the notifications.
 func (w *wiring) registerReads() {
 	identity.RegisterPreferences(w.reg)
@@ -368,7 +367,6 @@ func (w *wiring) registerReads() {
 		maintenance.QrAccess{},
 	) // an Assets operation; maintenance answers the assignment (IR194)
 	energy.Register(w.reg)
-	voice.Register(w.reg, voice.Voice{Units: w.assets})
 	energy.RegisterMRV(w.reg)
 	energy.RegisterOffsets(w.reg)
 	sums := summaries.Summaries{Units: w.assets, Registry: w.reg}

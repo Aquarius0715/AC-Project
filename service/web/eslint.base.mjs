@@ -244,7 +244,7 @@ export function webConfig(tsconfigRootDir) {
         // role="radio" on a button is a radio group of buttons (a native <input type="radio"> cannot be styled as the chips),
         // role="group" and "region" name a block (<fieldset> brings a legend and form semantics, <section> no change at all)
         "jsx-a11y/prefer-tag-over-role": "off",
-        // the lists keyed by index here have no identity of their own to key by: an append-only log (the assistant's messages),
+        // the lists keyed by index here have no identity of their own to key by: an append-only log,
         // the cells of a schedule row, the series of a chart, the rows of a static demo table, a text split at its separators.
         // The lists whose items can move or go (units, jobs, members, alerts) carry an id and use it
         "react/no-array-index-key": "off",
@@ -470,9 +470,9 @@ export function webConfig(tsconfigRootDir) {
       rules: { "@typescript-eslint/no-unnecessary-type-parameters": "off" },
     },
     {
-      // these four files keep a handler that closes over a useState setter or a local table (setChange, setMsgs, commands);
+      // these three files keep a handler that closes over a useState setter or a local table (setChange, commands);
       // it cannot move out of its component without passing them in. Everywhere else the rule stays on
-      files: ["**/units/_components/units-view.tsx", "**/components/Assistant.tsx", "**/components/ui.tsx", "**/lib/restrictions.ts"],
+      files: ["**/units/_components/units-view.tsx", "**/components/ui.tsx", "**/lib/restrictions.ts"],
       rules: { "unicorn/consistent-function-scoping": "off" },
     },
     { linterOptions: { reportUnusedDisableDirectives: "error" } },

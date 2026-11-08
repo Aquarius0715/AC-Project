@@ -20,6 +20,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/platform/blob"
+	"github.com/pradita/ac-project/service/api/internal/platform/money"
 )
 
 // WarrantyUnits returns a unit's warranty end (Assets).
@@ -717,7 +718,7 @@ func (in *CostInput) Validate() map[string]string {
 		costLine.Description = strings.TrimSpace(costLine.Description)
 
 		n := utf8.RuneCountInString(costLine.Description)
-		if costLine.AmountMinor < 0 ||
+		if !money.InRange(int64(costLine.AmountMinor)) ||
 			(costLine.Currency != currencyMYR && costLine.Currency != currencyUSD) ||
 			(costLine.Kind != "estimate" && costLine.Kind != "actual") ||
 			n < 1 ||
@@ -936,7 +937,7 @@ func (in *ClaimInput) Validate() map[string]string {
 
 	trimmedReason(&in.PartLabel, maxNameLength, "partLabel", fieldErrs)
 
-	if in.AmountMinor < 1 {
+	if in.AmountMinor < 1 || int64(in.AmountMinor) > money.MaxMinor {
 		fieldErrs["amountMinor"] = apperr.KeyRange
 	}
 

@@ -16,7 +16,7 @@ afterEach(() => {
   callOp.mockReset();
 });
 
-describe("following a command until the device answers (D04, Unit Control and the assistant)", () => {
+describe("following a command until the device answers (D04, Unit Control)", () => {
   it("reports every state every 2 s and stops at the first final one", async () => {
     callOp.mockResolvedValueOnce(deviceCommand("sent")).mockResolvedValueOnce(deviceCommand(ACKNOWLEDGED));
     const seen: string[] = [];

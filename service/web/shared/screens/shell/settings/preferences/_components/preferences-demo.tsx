@@ -20,7 +20,6 @@ export function PreferencesDemo() {
   const stored = useStoredValue(LOCALE_KEY);
   const lang = isLocale(stored) ? stored : "en";
   const [loc, setLoc] = useState(true);
-  const [mic, setMic] = useState(true);
   const [twoFa, setTwoFa] = useState(false);
   const [modal, setModal] = useState(false);
   const [code, setCode] = useState("");
@@ -40,8 +39,7 @@ export function PreferencesDemo() {
       {role === "client" && (
         <Card title={t("Consent")}>
           <div className="flex flex-col gap-4">
-            <div className="flex items-center justify-between gap-3"><div><div className="text-[13px] font-semibold">{t("Location, for voice room disambiguation")}</div><div className="text-xs text-muted-foreground">{t("Withdrawal discards pending voice requests only")}</div></div><Toggle on={loc} onChange={setLoc} label={t("Location consent")} /></div>
-            <div className="flex items-center justify-between gap-3"><div><div className="text-[13px] font-semibold">{t("Microphone, for voice actions")}</div><div className="text-xs text-muted-foreground">{t("Text input always available as a fallback")}</div></div><Toggle on={mic} onChange={setMic} label={t("Microphone consent")} /></div>
+            <div className="flex items-center justify-between gap-3"><div><div className="text-[13px] font-semibold">{t("Location, for location automations")}</div><div className="text-xs text-muted-foreground">{t("Withdrawal turns off location automations")}</div></div><Toggle on={loc} onChange={setLoc} label={t("Location consent")} /></div>
             <Check label={t("Allow WhatsApp notifications")} checked={false} />
             <Check label={t("Email me the monthly energy report (1st of each month)")} checked={false} />
           </div>

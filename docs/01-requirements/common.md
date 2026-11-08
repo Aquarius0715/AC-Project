@@ -19,7 +19,7 @@ This document reorganizes the [original company requirements in English (SRC-06)
 | ID | Priority | Status | Requirement | Acceptance criteria (AT-X number) |
 |---|---|---|---|---|
 | FR-X01 | P0 | Company original SRC-06 + added design details / BIZ-01, BIZ-02 | Sign in/out, reset passwords, select demo role and display language | Switch among four roles. Sign-out clears screen content and cache. Password reset uses generic wording that does not reveal whether the recipient exists. Language changes affect key screens, notifications, and date/time display. Authentication only simulates the demo experience |
-| FR-X02 | P1 | Company original SRC-06 + added design details / BIZ-03 | Voice status checks, actions, and help in the chosen language, with equivalent text input | Temperature query/change demo works. Confirm target/details before changes and use the same permission checks as normal actions. Text input can complete actions when voice is unavailable or denied |
+| FR-X02 | — | Company original SRC-06 / BIZ-03 (out of scope) | Withdrawn (DEC-101): the voice and text assistant was removed | No requirement. The number stays so that earlier records still read |
 | FR-X03 | P0 | Company original SRC-06 + added design details / BIZ-09, BIZ-18 | Distinguish severity, measured/estimated/inspection results, data quality, and units | Urgent = red, caution = orange, normal = green, with text/icons as well as color. Show unknown for unmeasured/stale/disconnected data. Do not confuse ppm (volume ratio) with kgCO₂e (carbon dioxide equivalent) |
 | FR-X04 | P0 | Added design details (supporting a company goal) / BIZ-04 | Limit viewing/actions by tenant, role, assigned scope, period, and capability | Menus, direct URLs, and service calls cannot retrieve out-of-scope data. Role switches never display the previous role's cached screen. State that APIs must check permissions again |
 | FR-X05 | P0 | Company original SRC-06 + added design details / BIZ-05 | Clarify shared demo data, reset, and differences from real processing | Role switches in one tab show the same jobs/invoices/units. Reset returns to the same seed. No real card input, external sending, real device control, or real trades |
@@ -54,7 +54,7 @@ Assess each AT-NFR using the measurement method above and the [verification plan
 | Create/move/delete properties/locations/units | No (rename locations and units only, IR109) | No | No | asset.write within managed scope |
 | Alert policies | Own customer's policies; default-rule on/off for own customer; attach on own units (IR108) | No | No | alert.policy.write; default policy limits HQ only |
 | Client user accounts | Owner lists, adds (the account is created at once, IR461), changes the role of, disables and removes the customer's users (FR-C19, IR417) | No | No | asset.write (Customers & units › Users) |
-| Normal AC control | Within scope/capabilities | No (do not grant commands.create/voice.resolveIntent to contractors) | Diagnostic permission and valid target/period | control.execute permission |
+| Normal AC control | Within scope/capabilities | No (do not grant commands.create to contractors) | Diagnostic permission and valid target/period | control.execute permission |
 | Maintenance requests | Own units | Coordinate accepted jobs | Handle assigned jobs | Create/assign within managed scope |
 | Contractor acceptance/own assignment | No | Accepted jobs, own company, valid qualifications/period | No | Outsource or assign internally |
 | Inspection/work reports | View results | View, quality review, return for rework | Create for assigned jobs | View/quality review |
@@ -77,7 +77,7 @@ Short terms in this text refer to canonical names: unit = ACUnit (AC itself, `un
 - Room/set temperature and requested/device-confirmed values are distinct. Completion requires a device response event, even in the demo.
 - Work completion and alert resolution are separate. Resolution requires remeasurement or a recorded confirmation action.
 - Making a payment and confirming receipt are separate. Release requires confirmed payment followed by a release request and either an applied device's release response or evidence of confirmed non-delivery/non-application (D03).
-- Restrictions, diagnostics, firmware updates, and voice setting changes share capability, permission, and scope checks.
+- Restrictions, diagnostics and firmware updates share capability, permission, and scope checks.
 - Do not replace missing indoor CO₂, dust, or power-related emissions with zero. Do not guarantee savings percentages or issue emissions as credits.
 - Demo thresholds and contract rules are provisional, not formal medical, legal, or electrical-work decisions.
 
@@ -88,18 +88,15 @@ Short terms in this text refer to canonical names: unit = ACUnit (AC itself, `un
 - **Company request basis**: SRC-06 BIZ-01, BIZ-02 — Sign in/out, reset passwords, and choose a display language.
 - **Added design details**: Four-role demo, initial languages (English default, Malay available), reset wording.
 
+**Product sign-in (IR646, DEC-100).** Where an identity service is connected (API mode) each app's sign-in page is a product page, not a demo-account chooser: it names the service (Client, Partner, Technician, HQ Admin), asks for the person's e-mail address and continues to the identity provider's own pages for the password, the one-time code (HQ and anyone with two-step verification) and a forgotten password, which the identity provider resets by e-mail. The password never passes through the app. The language (English, Bahasa Melayu, 日本語) is chosen on the page and the identity provider's pages and e-mails use it. The text below describes the browser demo build, which has no identity service and keeps the demo accounts.
+
 Demo login selects from predefined fictional accounts. The demo clock measures the 30-minute session life, but `demo.advanceClock` jumps do not consume it (IR36). Show an extension prompt 120 seconds before expiry; choosing extension adds 30 minutes from that moment (IR55). Login supports four roles and internal/external technician Memberships without real email/password input. Unauthenticated access to a protected route redirects to `/login?returnTo=…`. Keep only allowed relative return routes and ignore invalid values (IR82). Sign-out/role switches clear old screen content, Queries, image previews, and permission-dependent drafts.
 
 The password reset demo checks only email format and returns the same completion message/send preview whether registered or not. Language changes affect English, Malay and Japanese display but not stored UTC, units, or IDs. AT-X01 covers `demoSession.signIn/signOut/switchMembership`, `auth.previewPasswordReset`, and `preferences.update` (locale): direct protected-route access, Back after logout, stale responses during role switches, and no existence disclosure for valid-format unregistered demo emails.
 
-### FR-X02 Voice and questions
+### FR-X02 Withdrawn (DEC-101)
 
-- **Company request basis**: SRC-06 BIZ-03 — Voice AI responses.
-- **Added design details**: Extend responses to temperature queries, device actions, and questions; voice demo/text fallback; confirmation before changes. Voice device changes are not explicitly stated in the company original.
-
-Supported intents are temperature query, set-temperature change, and help (read operation instructions; do not create an FR-C12 Inquiry). The assistant is offered only in the Client app header (Figma Client 09a–09g, IR115); the HQ, Contractor, and Technician apps do not show it (IR44). When room names match multiple candidates, show extra context such as container/floor to narrow the target. If still indistinguishable, switch to text input for target selection. Never guess and execute. For unknown intents, show “Action unavailable” and return to text input. Before sending a voice change as a Command, show target, previous value, and new value. No business writes occur before confirmation.
-
-AT-X02 checks duplicate room names (including identical container/floor context requiring text input), unauthorized rooms, unsupported temperatures, microphone refusal, and cancelled confirmation. Withdrawing location or microphone consent discards the pending request; it does not undo earlier device responses. No real voice service is connected.
+The AI assistant of the Client app (voice and text, temperature questions, a confirmed change and help) was removed on 2026-11-08 (DEC-101, IR648), with `voice.resolveIntent`, the microphone consent, the `voice` source of a command and the Figma Client screens 09a–09g. BIZ-03 (voice AI responses) is out of scope. Temperature is changed in Unit Control, with the same permission checks. Earlier review records still name FR-X02; they are history and stay as they were.
 
 ### FR-X03 Status and quality
 
@@ -124,7 +121,7 @@ AT-X04 verifies rejection for seven cases: another tenant, another customer in t
 - **Company request basis**: SRC-06 BIZ-05 — Start with split AC units and clickable UI/UX, then expand to the full solution.
 - **Added design details**: Shared mocks, reset, and separation from real processing.
 
-Use a fixed seed. Four roles in one tab read the same business IDs. Role switching does not reset business data. Only page reload or explicit reset restores initial data. Delayed events from before reset cannot enter the new seed. Visually separate the state-control panel from business screens and always label it “Demo.” AT-X05 checks `demo.reset`, `demo.trigger`, and `demoSession.switchMembership` for repeatable seed data, cross-role consistency, discarded old delayed events, and zero real payment/notification/IoT/trading connections.
+Use a fixed seed. Four roles in one tab read the same business IDs. Role switching does not reset business data. Only page reload or explicit reset restores initial data. Delayed events from before reset cannot enter the new seed. Visually separate the state-control panel from business screens and always label it “Demo.” The Demo clock only moves forward, by a minute or by 1, 2, 4, 8, 12 or 24 hours per press (IR641). AT-X05 checks `demo.reset`, `demo.trigger`, and `demoSession.switchMembership` for repeatable seed data, cross-role consistency, discarded old delayed events, and zero real payment/notification/IoT/trading connections.
 
 ### FR-X06 Capabilities and contract types
 
@@ -154,10 +151,7 @@ The table below governs Given/When/Then for AT-X01–X08 (IR101). Unstated setup
 |---|---|---|
 | AT-X01-N | Open `/customer/units/unit-online-rto` unauthenticated → demoSession.signIn as customer-a → preferences.update(locale=ms, timezone=Asia/Kuala_Lumpur) | ① Redirect to `/login?returnTo=%2Fcustomer%2Funits%2Funit-online-rto` ② Show returnTo after signIn (IR82) ③ Malay display; stored UTC, units, and IDs unchanged |
 | AT-X01-E | ① Browser Back after customer-a signs out ② During demo.trigger(transport, operation=units.list, outcome=DELAY, delayMs=3000, retryAfterSeconds=null, remainingCalls=1), switchMembership(hq-operator) ③ auth.previewPasswordReset for a@example.com and b@example.com ④ demoEmail=not-an-email ⑤ signIn with returnTo=https://example.com/x | ① /login, no old screen values ② Discard delayed response from old viewEpoch; no customer list on HQ screen (IR17) ③ Both return `{messageKey:auth.reset_generic, deliveryState:preview}` ④ VALIDATION ⑤ Ignore returnTo; go to role home (IR82) |
-| AT-X01-B | In customer-a Session: ① Reach expiresAt−120 seconds ② Without extending, demo.trigger(session_expired) ③ Change locale to ms while an unconfirmed voice change is shown | ① Extension prompt (IR55) ② Discard screen/Query/unsaved draft; /login (D09) ③ Discard unconfirmed intent, retain input text (D09) |
-| AT-X02-N | customer-a: “set Bedroom to 24 degrees” → confirm | ① voice.resolveIntent returns change (unitId=unit-online-rto, celsius=24, before=26). Same-name Space in property-home-b is out of scope and contributes zero matches (IR65) ② Zero Commands before confirmation ③ Confirmation creates one commands.create (no jobId, expectedUnitVersion=7, IR09) |
-| AT-X02-E | ① customer-a: “set Bedroom to 31 degrees” → confirm ② customer-b: “set Living room to 24 degrees” ③ demo.trigger(microphone_denied) ④ Cancel change confirmation | ① commands.create returns VALIDATION (Capability.temperature 16–30; model choices at D01 priority 7), zero Commands ② Out-of-scope Space gives zero matches, unsupported, zero Commands ③ Switch to text input, zero Commands (D09) ④ Zero writes (IR09) |
-| AT-X02-B | `acceptancePatches["AT-X02-B"]` (move unit-non-rto to the same “Home A > 1F > Bedroom” as room-1, displayName “Bedroom AC”). customer-a: ① “temperature Bedroom” ② Select unit-non-rto from candidates ③ Send selectedUnitId=unit-limited | ① Two candidates; identical pathLabel, so also show unitId and require text selection (IR101) ② temperature (unitId=unit-non-rto) ③ NOT_FOUND (IR65) |
+| AT-X01-B | In customer-a Session: ① Reach expiresAt−120 seconds ② Without extending, demo.trigger(session_expired) ③ Change locale to ms while a form has an unsaved draft | ① Extension prompt (IR55) ② Discard screen/Query/unsaved draft; /login (D09) ③ Keep the draft text (D09) |
 | AT-X03-N | For unit-online-rto: demo.trigger(device, deviceId=device-online-rto, bindingId=binding-online-rto, kind=communication_lost, sequence=2) | ① Show separate simultaneous labels: “Offline,” “Last known power: ON (2026-09-14T00:59:30Z),” and “Unresolved warning (alert-window-a)”; do not claim running ② Show CO₂ (ppm) and emissions (kgCO₂e) as separate metrics/units |
 | AT-X03-E | For unit-online-rto via demo.trigger(telemetry): ① humidity value=null ② power unit=W, value=1000 ③ Advance to 2026-09-14T01:02:31Z (181 seconds after latest temperature observedAt) | ① “Not measured,” not zero ② suspect (unit_mismatch), exclude from aggregation/control (IR12) ③ stale, with last value/time/quality (D07) |
 | AT-X03-B | For unit-online-rto via demo.trigger(telemetry): ① humidity=0 ② co2=10000 ③ co2=10001 | ① “0%” ② valid ③ suspect (outside D07 range) |
@@ -183,7 +177,7 @@ See [frontend input/output contracts](../02-design/implementation-contracts.md) 
 
 This version resolves ambiguity in existing FRs under DEC-11; it adds no feature scope. Use this document's permission matrix for Actor/scope, the operation catalog for required permissions, each DD/canonical DTO for Trigger/Input/Processing/Output/success conditions, and deterministic contracts D01–D13 for Failure/Validation/Error handling.
 
-FR-X01/X02 require D09's 30-minute session and fixed en/ms/ja grammar; FR-X03/X05 use D05/D07 connectivity/quality/subscriptions; FR-X04 uses D01/D06/D12 authorization/projections; FR-X07 uses D08 recipients/notification links. NFR01/02/04 use D10 measurement environment, counts, maximums, and accessibility acceptance; NFR03/05 use D04/D08 retries/safe display; NFR06 uses D11 production separation; NFR07 uses verification plans/evidence; NFR08 uses D09 fixed display currency. Do not add new User CRUD, real payments, real voice, or real IoT control.
+FR-X01 requires D09's 30-minute session; FR-X03/X05 use D05/D07 connectivity/quality/subscriptions; FR-X04 uses D01/D06/D12 authorization/projections; FR-X07 uses D08 recipients/notification links. NFR01/02/04 use D10 measurement environment, counts, maximums, and accessibility acceptance; NFR03/05 use D04/D08 retries/safe display; NFR06 uses D11 production separation; NFR07 uses verification plans/evidence; NFR08 uses D09 fixed display currency. Do not add new User CRUD, real payments, or real IoT control.
 
 0.9.0 correction contracts: Read [strict review correction contracts](../02-design/strict-review-contracts.md) and [operation version contracts](../02-design/write-version-catalog.csv) together.
 

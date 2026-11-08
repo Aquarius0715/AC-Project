@@ -34,7 +34,7 @@ const (
 	reasonNoMatch         = "no_match"
 	reasonOffline         = "offline"
 	reasonSuperseded      = "superseded"
-	sourceVoice           = "voice"
+	sourceUI              = "ui"    // the source of a command a person asked for (commands.create)
 	unitEvent             = "event" // the unit of a location fact (an arrival or a departure)
 	valueBoolean          = "boolean"
 	valueLocation         = "location"

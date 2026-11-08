@@ -49,7 +49,7 @@ export type UnitSummary = ACUnit & {effectivePowerState:EffectivePowerState;late
 export type UnitDetail = UnitSummary & {capabilities:Capability;effectiveControlPolicy:EffectiveControlPolicy;controlAvailability:ControlAvailability;components:ComponentKey[];pendingCommands:Command[];pendingCommandIds:ID[];location:{pathLabels:string[];address:string|null;accessInstructions:string|null}};
 export type UnitAction = {kind:'set_power';power:boolean}|{kind:'set_temperature';celsius:number}|{kind:'set_mode';mode:Mode}|{kind:'set_fan';fanLevel:Fan}|{kind:'ventilate';level:Fan};
 export type RestrictionAction = {kind:'apply_restriction';restrictionId:ID;rulesVersion:ID;policy:RestrictionPolicy}|{kind:'remove_restriction';restrictionId:ID;rulesVersion:ID};
-export type Command = Entity & {unitId:ID;actorMembershipId:ID;action:UnitAction|RestrictionAction;diagnosticRunId:ID|null;jobId:ID|null;reason:string|null;status:'requested'|'sent'|'acknowledged'|'failed'|'expired'|'cancelled';delivery:'not_sent'|'sent';requestedAt:Instant;sentAt:Instant|null;acknowledgedAt:Instant|null;expiresAt:Instant;failureCode:ErrorCode|null;correlationId:ID;source:'ui'|'voice'|'automation'|'restriction'|'diagnostic'|'group'};
+export type Command = Entity & {unitId:ID;actorMembershipId:ID;action:UnitAction|RestrictionAction;diagnosticRunId:ID|null;jobId:ID|null;reason:string|null;status:'requested'|'sent'|'acknowledged'|'failed'|'expired'|'cancelled';delivery:'not_sent'|'sent';requestedAt:Instant;sentAt:Instant|null;acknowledgedAt:Instant|null;expiresAt:Instant;failureCode:ErrorCode|null;correlationId:ID;source:'ui'|'automation'|'restriction'|'diagnostic'|'group'};
 export type DiagnosticRun = Entity & {jobId:ID;unitId:ID;actorMembershipId:ID;startAction:UnitAction;endAction:UnitAction;durationMinutes:number;reason:string;state:'awaiting_start'|'running'|'end_requested'|'completed'|'start_failed'|'end_failed'|'end_blocked';startCommandId:ID;endCommandId:ID|null;startedAt:Instant|null;endAt:Instant|null;failureCode:ErrorCode|null};
 export type Severity = 'critical'|'warning'|'normal';
 export type Alert = Entity & {unitId:ID;policyId:ID|null;type:'sensor'|'quality'|'maintenance'|'tamper'|'reconciliation_required';severity:Severity;status:'open'|'acknowledged'|'resolved';causeCode:'window_open'|'insulation_loss'|'unknown';evidenceKind:'demo_observation'|'inferred'|'inspection';evidenceText:string;observedAt:Instant;evidenceIds:ID[];detectedAt:Instant;acknowledgedAt:Instant|null;resolvedAt:Instant|null;resolutionReason:string|null;previousAlertId:ID|null;deliveryFailures:DeliveryFailure[];rule:AlertRule|null};
@@ -164,7 +164,6 @@ export type AdminSummary = {customerCount:number;total:number;online:number;offl
 export type EnergyForecast = {period:Range;unitIds:ID[];basis:'prorated_modeled_baseline';baselineRef:{id:ID;version:number}|null;baselineSnapshot:EnergyBaseline|null;expectedUnitMinutes:number;validUnitMinutes:number;actualKWhOnValidSlots:number|null;predictedBaselineKWh:number|null;predictedActualKWh:number|null;forecastSavedKWh:number|null;forecastSavingPercentage:number|null;qualityWarnings:('actual_unavailable'|'baseline_unavailable'|'modeled_baseline'|'no_units'|'partial_coverage'|'prorated_forecast')[]};
 export type Summary = {kind:'customer'|'partner'|'technician';counts:{total:number;online:number;offline:number;unknown:number;powerOn:number;powerOff:number;powerUnknown:number;alertCount:number;offerCount:number;activeCount:number;reviewCount:number;scheduledCount:number;inProgressCount:number;overdueCount:number;assignedCount:number};asOf:Instant};
 export type Capacity = {membershipId:ID;date:string;availableSlots:Slot[];assignedSlots:Slot[];availableMinutes:number|null;assignedMinutes:number;utilization:number|null;unavailability:Unavailability['type']|null};
-export type ResolvedIntent = {kind:'unsupported'}|{kind:'help';messageKey:'voice.help'}|{kind:'candidates';candidates:{unitId:ID;pathLabel:string}[]}|{kind:'temperature';unitId:ID;measurement:Measurement|null}|{kind:'change';unitId:ID;celsius:number;before:ObservedState;expectedVersion:number};
 export type ResetPreview = {messageKey:'auth.reset_generic';deliveryState:'preview'};
 export type ArchivedResource = {id:ID;version:number;archived:true};
 export type DemoGeneration = {generation:number};
@@ -280,7 +279,7 @@ export type OperationContracts = {
   'baselines.save': {input:BaselineInput;result:EnergyBaseline;mode:'write'};
   'capabilities.list': {input:Query;result:Page<Capability>;mode:'read'};
   'capabilities.save': {input:Save<Capability> & {changeReason?:string};result:Capability;mode:'write'};
-  'commands.create': {input:{unitId:ID;action:UnitAction;jobId?:ID;reason?:string;expectedUnitVersion:number;source?:'ui'|'voice'};result:Command;mode:'write'};
+  'commands.create': {input:{unitId:ID;action:UnitAction;jobId?:ID;reason?:string;expectedUnitVersion:number};result:Command;mode:'write'};
   'commands.get': {input:{id:ID};result:Command;mode:'read'};
   'commands.list': {input:{unitId:ID;jobId?:ID;query:Query};result:Page<Command>;mode:'read'};
   'consents.get': {input:{purpose:'location_automation'};result:Consent;mode:'read'};
@@ -405,7 +404,6 @@ export type OperationContracts = {
   'units.get': {input:{id:ID;jobId?:ID};result:UnitDetail;mode:'read'};
   'units.list': {input:Query;result:Page<UnitSummary>;mode:'read'};
   'units.save': {input:{id?:ID;customerOrgId:ID;propertyId:ID;spaceId:ID|null;displayName:string;modelId:ID;type:'split';installedAt:Instant|null;warrantyEndsAt?:Instant|null;serviceScope:ACUnit['serviceScope'];changeReason?:string};result:ACUnit;mode:'write'};
-  'voice.resolveIntent': {input:{text:string;locale:Locale;selectedUnitId?:ID};result:ResolvedIntent;mode:'read'};
   'locations.rename': {input:{target:LocationTarget;name:string};result:Property|Space|ACUnit;mode:'write'};
   'units.setAlertPolicies': {input:{unitId:ID;alertPolicyIds:ID[]};result:ACUnit;mode:'write'};
   'policies.setDefaultRule': {input:{policyId:ID;ruleKey:ID;customerId:ID;enabled:boolean;reason?:string};result:DefaultRuleSetting;mode:'write'};

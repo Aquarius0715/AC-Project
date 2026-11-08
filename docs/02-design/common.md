@@ -54,14 +54,13 @@ service/web/
 
 Forms and translation are still the build's own; they move to React Hook Form with Zod and to a translation library in their DEC-75 phases. No query library is added: reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08), and TanStack Query comes in only where a client component needs a cache, polling or optimistic updates (DEC-75).
 
-**Language — built for every business screen and the assistant (IR258–IR306).** FR-X01 asks that a language change reach key screens, notifications and dates.
+**Language — built for every business screen (IR258–IR306).** FR-X01 asks that a language change reach key screens, notifications and dates.
 - These show the saved language: the shell, a failed Server Action's toast, each route's loading and error states, Preferences, Demo controls, the notifications inbox and every customer screen (AT-X01-N) — overview, units & locations (with group control), automations, alerts (inbox and policies), maintenance (requests and Filter care), energy & cost with carbon offsets, air quality, contracts & payments with the invoice page, users and the unit screen — and the contractor overview, job list, offer / job page, quality review, schedule, team & capacity with its certifications, job history, payouts and the unit view — every contractor screen — and the technician overview with its QR scan, job workspace, unit screen, alert evidence, diagnostic control and devices with their events — every technician screen — and the HQ overview, maintenance jobs with their plans, contractors and SLA tabs, the alerts with their policies, customers & units with warranty & coverage, the device registry, the energy analysis, the MRV workspace, the offset demo, billing with contractor payouts, contracts, restrictions with their exception screen, access & roles, automation policies and the audit log — every business screen.
-- Every page declares the display language as its language (`<html lang>`, `en` or `ms`): the root layout reads it on the server, English before sign-in (WCAG 3.1.1, IR489).
+- Every page declares the display language as its language (`<html lang>`, `en`, `ms` or `ja`): the root layout reads it on the server, the language chosen on the sign-in page before sign-in, English when none was (WCAG 3.1.1, IR489, IR646).
 - Every page is titled with its name in the display language, "<page> — AC Project" (the shell's menu item for the path, the shared pages, Users and Demo controls; `documentTitle` in `lib/nav.ts`). The root layout titles the first load on the server from the path the proxy passes, and the shell titles each client-side navigation (WCAG 2.4.2, IR490).
 - The English text is the key of the Malay dictionary (`shared/lib/i18n-ms.ts`, a draft not yet reviewed). A text without an entry stays English. When one English text means two things, its key names the context before `::` ("tamper::Clear" is a state, "Clear" a button); English shows the text after it (IR287).
 - Their times follow IR44: the user's language and display time zone, with the zone's abbreviation (`showTime` / `showClock`). Times on the days next to now show "today", "yesterday" or "tomorrow" instead of the date (`relativeTime`). Business days stay in Asia/Kuala_Lumpur, where they are cut, and the screens say so: the periods of the overview and the energy screens, the 7-day air-quality window, contract periods and invoice due dates (HQ billing and contracts too, with the payout pay dates), the contractor's timeline, team weeks, free hours and unavailable days, the technician's today and its timeline, a follow-up visit date, a unit's 7-day period, HQ's classify-by business day, the contractor register's dates, and a unit's installation and warranty dates (named when the display time zone is another one), and HQ's energy analysis, baseline, MRV report and offset quote periods, which HQ also types in Kuala Lumpur time (IR296–IR298). Booked and preferred times show as one span (`showSpan`), and the times users type — preferred and proposed times, an offer's expiry and access window, an extended work or access end, a plan's next date, an SLA target's start, a firmware campaign's start, a restriction's execute-after and a grace or exception end, a membership's valid period, the audit log's period days — are read in the display time zone (`zonedInstant`, NFR-08).
-- The customer assistant speaks its own chosen language (IR306). It starts in the display language, and its header switches between English and Bahasa Melayu. A switch discards an unconfirmed change and keeps the typed text (D09). Its suggestions are sentences of the fixed grammar.
-- Still English: the Phase 1A browser demo's fixture screens, including its simulated assistant.
+- Still English: the Phase 1A browser demo's fixture screens.
 
 **Tests.** Vitest covers the shared mappers and validators, the BFF session and the DAL (IR307), and checks the web's calls against the Core API contract: inputs (IR312) and result types (IR314). Playwright end-to-end tests run against the local stack. The Core API has its Go integration and unit tests.
 
@@ -71,15 +70,15 @@ The stack is TypeScript (strict mode), React 19 and Next.js 16 App Router (DEC-6
 
 | Route | Responsibility |
 |---|---|
-| /login | Select a fictional account and one of four roles. Show that this is not real authentication |
-| /forgot-password | Check the email format, then show a message that does not reveal whether the email exists. Sending is a preview only |
+| /login | With an identity service (API mode): the service's name, an e-mail address and Continue to the identity provider's pages for the password, the one-time code and a reset; the display language is chosen here (IR646). The browser demo build selects a fictional account and says that this is not real authentication |
+| /forgot-password | Browser demo: check the email format, then show a message that does not reveal whether the email exists; sending is a preview only. With an identity service the address goes to /login, and the identity provider resets the password by e-mail (IR646) |
 | /settings/preferences | Language, display timezone, read-only demo currency MYR, consent settings (client only), monthly report email (client), and Security › two-step verification (demo, FR-X08, IR112; in the HQ app Required, with nothing to turn on or off, DEC-85, IR510) |
 | /notifications | List notifications within the user's scope and manage read status. Keep this separate from business state |
 | /demo | Switch scenarios, trigger failures, control the demo clock, and reset. Demo-only screen |
 | /forbidden | Show the shared “Page unavailable” view (same component as `*`). Do not redirect automatically; show a link to the role home (IR57, IR112): “Go to Overview” for a signed-in user, “Go to sign in” for anyone else (IR571) |
 | `*` (undefined routes) | Show the shared “Page unavailable” view (SCR-X-not-found), using the D01 not-found text. Do not redirect automatically; show a link to the role home (IR57), as on /forbidden (IR571) |
 
-The shared header contains language selection, notifications, voice/text switching, and sign-out. Demo role switching has its own menu, separate from changing users in normal business use.
+The shared header contains language selection, notifications, and sign-out. Demo role switching has its own menu, separate from changing users in normal business use.
 
 Use the following screen states.
 
@@ -148,7 +147,7 @@ interface CommandRepository {
 
 `DemoViewContext` describes the selected fictional user, role, and visible scope. `DemoWriteOptions` carries a key to prevent duplicate demo actions and the version before the change. These do not define production authentication or server permissions. See the [Frontend Input and Output Contract](implementation-contracts.md) for the fields.
 
-The [Operation Catalog](operation-catalog.csv) lists the 213 local service operations needed by the screens, with their inputs, return values, and screens that use them. Its `rest_routes` column gives each operation's Core API REST route (IR222); database tables and transactions are in the [database design](database-design.md).
+The [Operation Catalog](operation-catalog.csv) lists the 212 local service operations needed by the screens, with their inputs, return values, and screens that use them. Its `rest_routes` column gives each operation's Core API REST route (IR222); database tables and transactions are in the [database design](database-design.md).
 
 Successful mock operations return ServiceResult<T>; failures reject with DomainError. Pending processing is shown through Command.status or similar fields in the success DTO. Do not create a custom pending Promise response type.
 
@@ -226,7 +225,7 @@ Automation follows this priority order.
 2. HQ policy.
 3. Customer rules.
 
-Within one level, a higher priority number wins; ties use ascending ID order (DEC-09). Do not trigger automation when condition data is unavailable or consent has been withdrawn. Every path ultimately passes through the same Command policy, so voice actions and automation cannot bypass restrictions.
+Within one level, a higher priority number wins; ties use ascending ID order (DEC-09). Do not trigger automation when condition data is unavailable or consent has been withdrawn. Every path ultimately passes through the same Command policy, so automation cannot bypass restrictions.
 
 ## 6. Queries and Demo State
 

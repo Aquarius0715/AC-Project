@@ -415,7 +415,7 @@ Return AdminSummary.energySummary to dashboard.read holders. Targets are nonarch
 
 ## IR64 Contact-window input and visibility — REV18-020
 
-contactWindow is 0–200 code points after trim. If it contains '@', or if removing whitespace, hyphens, parentheses, and '+' leaves at least seven consecutive digits, return VALIDATION (fieldErrors.contactWindow, messageKey=errors.contact_details_forbidden). Return JobDetail.contactWindow only to the client (own job), HQ job.write, the assigned technician within the viewing window (IR49), and the accepted contractor within the access window. Other projections use null. Do not include it in JobOfferSummary, JobHistorySnapshot, or notification params. Complete detection in free text is not guaranteed (DDC-09). Input guidance and handling of time notation follow IR90 (REV19-017).
+contactWindow is 0–200 code points after trim. If it contains '@', or if removing whitespace, hyphens, parentheses, and '+' leaves at least seven consecutive digits, return VALIDATION (fieldErrors.contactWindow, messageKey=errors.contact_details_forbidden). The digits are the digits of any script and the separators, '+' and '@' include their full-width forms (０９０－１２３４－５６７８, ＋, ＠), so a number typed with a Japanese input method is refused like the ASCII one (IR640). Return JobDetail.contactWindow only to the client (own job), HQ job.write, the assigned technician within the viewing window (IR49), and the accepted contractor within the access window. Other projections use null. Do not include it in JobOfferSummary, JobHistorySnapshot, or notification params. Complete detection in free text is not guaranteed (DDC-09). Input guidance and handling of time notation follow IR90 (REV19-017).
 
 ## IR65 Voice target matching and syntax — REV18-021
 
@@ -9037,7 +9037,7 @@ User request 2026-11-07: a maintenance job goes customer → HQ → contractor, 
 
 1. **An Offer holds the agreed times.** `Offer.visitSlot` and `JobOfferSummary.visitSlot` become `candidateSlots: Slot[]` (1 or more). `jobs.offer` no longer takes `visitSlot`: the server stores the job's agreed times that have not ended — the current `preferredSlots` in the order the client ranked them, then the slots of accepted SlotProposals, or, when there are none, the plan occurrence (IR113 item 3). If none is left the call is VALIDATION `candidateSlots=error.past`; HQ proposes another time (IR113 item 4).
 2. **Offer rules.** `offerExpiresAt ≤ accessValidUntil` (`error.afterAccess`, clock-free) and not after the last candidate starts (`error.afterVisit`, IR457); the access window covers every candidate (`accessValidFrom ≤` the earliest start and the latest end `≤ accessValidUntil`, `error.accessMustCoverVisit`). The rules that need the candidates are checked after the job is read, so they are VALIDATION like the others.
-3. **The contractor's assignment.** From `accepted`, `jobs.assign` by the contractor takes a slot equal to one of the offer's `candidateSlots` that has not ended (otherwise VALIDATION `errors.slot_not_agreed`; an ended one `endAt=error.past`, IR456). From `assigned` the contractor keeps the booked time or moves to another candidate that has not ended — for example when the technician cannot make it (IR113 item 8) — and the new Assignment is `acknowledgement=pending` with `scheduledSlot` following it. HQ's assignments (from `requested`, a reassignment at the same slot) and the extension rules of IR49 are unchanged.
+3. **The contractor's assignment.** From `accepted`, `jobs.assign` by the contractor takes a slot equal to one of the offer's `candidateSlots` that has not ended (otherwise VALIDATION `errors.slot_not_agreed`; an ended one `endAt=error.past`, IR456). From `assigned` the contractor keeps the booked time while it has not ended (IR642) or moves to another candidate that has not ended — for example when the technician cannot make it (IR113 item 8) — and the new Assignment is `acknowledgement=pending` with `scheduledSlot` following it. HQ's assignments (from `requested`, a reassignment at the same slot) and the extension rules of IR49 are unchanged.
 4. **One candidate left.** When the client accepts a proposal that creates an Offer (IR113 item 5) or moves one (a contractor's time change, IR113 item 7), the Offer's candidates become that one time, and the access window follows as in IR454.
 5. **Reschedule.** For `jobs.requestReschedule` (IR113 item 6), until a technician is assigned the 48 hours count from the offer's earliest candidate.
 6. **Time change.** `jobs.proposePartnerSlot` with a time that is one of the offer's candidates is VALIDATION `slot=errors.slot_is_preferred`: the contractor assigns for it directly.
@@ -9069,3 +9069,90 @@ The user asked for Japanese to be selectable beside English and Malay, with ever
 6. **The payout PDF.** The statement PDF has a Courier font and ASCII only (everything else printed as "-"), so a Japanese user's PDF is written in English; the screen is Japanese.
 7. **Tests.** Vitest runs the dictionary checks per language and covers the Japanese date, the ordinal, the assistant's examples against the grammar, the PDF and the locale list; the Go integration tests save `ja` and resolve the three phrases; Playwright saves Japanese in Preferences, reads the shell back in Japanese and puts English back.
 
+## IR640 The contact window refuses full-width phone numbers and addresses — 2026-11-08
+
+Review round 3 of the maintenance module. `ContactWindowOK` (IR64) counted ASCII digits and looked for the ASCII `@` only, so a Japanese input method's `０９０１２３４５６７８`, `０９０－１２３４－５６７８`, `（０３）１２３４　５６７８`, `＋６０…` or `me＠example.com` was accepted, and so were Arabic-Indic digits; the request form's check (`contactError`) had the same gap. Both now read digits of any script (`unicode.IsDigit`, `\p{Nd}`) and the full-width separators (`－`, `（`, `）`, `＋`, the ideographic space) and `＠`; the Go test and the Vitest case use the same samples, plus times such as `平日 9:00〜18:00` that stay accepted.
+
+## IR641 The Demo clock moves by 1, 2, 4, 8, 12 and 24 hours as well — 2026-11-08
+
+The user asked for more jumps than a minute and an hour, to reach a deadline (an offer's expiry, an invoice's due date, a day's schedule) without pressing +1 hour many times.
+
+1. **The buttons.** Demo controls (FR-X05, DDC-07) show `+1 min`, `+1 hour`, `+2 hours`, `+4 hours`, `+8 hours`, `+12 hours` and `+24 hours`, in the Core API mode and in the browser demo; one list (`CLOCK_JUMPS`) drives the buttons, the target (`advanceTarget`) and the toasts.
+2. **The API is unchanged.** `demo.advanceClock` takes the target time and refuses only a time in the past (`errors.clock_backwards`, IR36); a jump of a day runs the deadlines once at the target time, like a jump of an hour.
+3. **A caution.** The clock never goes back and the running API cannot be reset (`make resetdb` rebuilds it offline), so a few presses of +24 hours move the dev stack past its seed's dates (bookings, qualifications).
+4. **Tests.** Vitest covers the jump list, the target of a day and the texts in English, Malay and Japanese; a component test presses the buttons; Playwright checks that the seven buttons are there (it does not press them, as the dev clock cannot be put back).
+5. **Not done here.** Figma Client 10e still shows two buttons.
+
+## IR642 A job whose booked time passed unworked is rescheduled by HQ's proposal — 2026-11-08
+
+Found in the review (B-1) and in the user's report: a job still `assigned` after its booked time had no way back. `jobs.assign` accepted a reassignment at the same, already ended time (IR456 refused only a first assignment), so the new technician could never open it; `jobs.proposeSlot` allowed an assigned job only after "can't make it", so an accepted assignment nobody started, and an accepted job whose offered times had all passed with nobody assigned, could not be rescheduled; the screens showed no way either.
+
+1. **Reassignment.** From `assigned`, `jobs.assign` keeps the booked time only while its end is after now; otherwise VALIDATION `endAt=error.past`, as for a first assignment. Moving to another candidate that has not ended (IR636) and the extension of a started job (D06) are unchanged.
+2. **HQ proposes another time.** `jobs.proposeSlot` is allowed for an `assigned` job when the technician cannot make it **or** the booked time has ended, and for an `accepted` job when the contractor's time change is pending **or** every candidate time of the accepted offer has ended (`INVALID_STATE` otherwise). The client's acceptance works as before: the assignment is revoked and the contractor's job returns to `accepted` with the proposed time as the offer's only candidate and its access window extended (IR454, IR636 item 4); an internal job gets the new assignment.
+3. **HQ's screen.** The delivery card of such a job shows why (the booked time passed and nobody started, or every time offered has passed) and **Propose another time…** (also on the "can't make it" banner); the jobs list keeps its `window ended` text and overdue filter.
+4. **The contractor's list** says "Ask HQ for a new time" for an unstarted job whose time ended, and keeps "Extend or reassign" for a started one.
+5. **The technician** keeps the viewing window of IR49 and IR124 (the unit and job detail close with it). The overview lists the job as "Work window ended — ask your contractor or HQ to extend or reassign" from its history snapshot, when the snapshot still reads assigned or in progress and the job was not completed.
+6. **Not done here.** A notification to HQ and the contractor when a booked time ends unworked (a scheduler job, notification type and templates) is a separate change; Figma is not updated.
+7. **Tests.** `TestOverdueAssignedJobIsRescheduled` (the past time is refused, HQ proposes, the client accepts, the contractor assigns the new time), `TestAcceptedJobWithNoTimeLeftIsRescheduled`; Vitest for HQ's `proposable`, the technician's ended row and the contractor's hint.
+
+## IR643 A second rate card for the same start time is refused on the field — 2026-11-08
+
+Review round 6 of the maintenance module. A contractor has one rate card per start time (`UNIQUE (contractor_org_id, effective_from)`), but `rateCards.save` did not check it: a second card for the same `effectiveFrom` hit the constraint and came back as an empty `409 CONFLICT`, which HQ's screen could only show as an unexplained conflict.
+
+1. `rateCards.save` is VALIDATION `effectiveFrom=error.duplicate` when the company already has a card starting at that time; HQ's screen reads "a rate card already starts then".
+2. The company's row in `maintenance.contractors` is locked for the save (`FOR UPDATE`), so two saves for it run one after the other: the next version number (`max(version) + 1`) and the check above see the first, instead of two concurrent saves taking the same version.
+3. Test: `TestContractorRegister` (a second card at the start time of version 2); Vitest for the refusal text in the three languages' dictionaries.
+
+
+## IR644 A report's work text and follow-up note are counted after trimming (review round 9) — 2026-11-08
+
+Submitting a report counted the work text and the follow-up note as typed, so a work text of ten spaces, or a follow-up note of spaces, passed the API although the technician's form refuses both (it counts the trimmed text). A report could therefore be submitted with nothing written.
+
+1. **The rule.** On submit, `workText` is 10–4000 Unicode code points after trimming, and a follow-up's `note` must have at least one character after trimming. This is the same trimming D12 applies to the reason fields; the stored text is not changed.
+2. **Not changed.** Saving a draft still accepts an unfinished text (the draft only caps the length); the technician's form already trims, so no web change.
+3. **Tests.** `TestSubmitErrors` covers a blank work text, a padded short one and a blank follow-up note.
+
+
+## IR645 A refrigerant record's cylinder ID is trimmed (review round 10) — 2026-11-08
+
+A report draft accepted a refrigerant record whose cylinder ID was only spaces (it counted the ID as typed), although the technician's form refuses it. The cylinder ID is what traces the refrigerant, so a record without one is worthless to the inspector.
+
+1. **The rule.** The cylinder ID is trimmed when a draft is saved, and it must have 1–`maxCodeLength` code points after trimming (`refrigerant=error.invalid` otherwise), as the part name already is.
+2. **Tests.** `TestDraftRefrigerantCylinder` covers a named, a padded, a blank, an empty and a tab-and-newline cylinder.
+
+
+## IR646 The sign-in pages are product pages (DEC-100) — 2026-11-08
+
+Every app's sign-in page was built for the demo: a fixed account, a “Continue as customer-a” button, “not real authentication” notices and English only; the password was typed on Keycloak's plain pages; and the reset page sent nothing. The user asked for a product sign-in for each service. They chose to brand the identity provider's pages (the password never passes through the apps), to remove the demo button, one theme for Client, Partner and Technician plus one for HQ Admin, and a language choice with a real reset.
+
+1. **The app's page.** Server-rendered (IR251). It shows the service name (`loginTitle`: Client, Partner, Technician, Admin) and its line, an `Email address` field and Continue. Continue is a plain GET form to `/bff/auth/login` with `login_hint` (the address), `returnTo` (kept inside the app's area, IR251) and `ui_locales`; it works without JavaScript. Other services are listed as links, and `?error=` still says why a sign-in came back. `nav.ts` no longer has a demo user or description per role.
+2. **The BFF.** `login_hint` is passed on only when it is an address of at most 320 characters (`loginHint`), and `ui_locales` only when it is `en`, `ms` or `ja` (`uiLocale`); anything else is left out, so neither can carry another value to the identity provider. State, PKCE and `reauth=1` (IR385) are unchanged.
+3. **The language before sign-in.** The language buttons post to a Server Action that keeps one of the three languages in the `ac_sign_in_locale` cookie (checked with `isLocale`; httpOnly, `SameSite=Lax`, a year). `coreDisplay()` reads it when there is no session, so `<html lang>` and the page speak it (IR489); with a session the saved preference still wins. English when none is kept.
+4. **The identity provider's pages.** Keycloak themes in `docker/keycloak/themes`: `ac` (parent `keycloak.v2`, so the element ids the E2E suite uses stay) with the AC Project logo, colour and texts in English, Bahasa Melayu and 日本語, and `ac-hq` (HQ Admin's title and accent), used by the `ac-admin-web` client. Keycloak ships no Malay, so `messages_ms` covers the sign-in path (sign-in, one-time code, reset, new password, two-step set-up, errors) and the reset and invitation e-mails (`ac` email theme); any other text falls back to English. The realm turns on the three languages, `resetPasswordAllowed` and the themes; the e-mail sender name is “AC Project”.
+5. **A password reset.** There is no reset page in the apps: the identity provider's sign-in page has Forgot password?, which sends the e-mail (to Mailpit in development) and sets the new password. `/forgot-password` leads to `/login` when an identity service is connected; the browser demo keeps its preview.
+6. **Existing realms.** Keycloak imports the realm file only when the realm does not exist, so `docker/keycloak/configure.sh` (the one-shot `keycloak-config` service of the compose stack, safe to run again) brings a realm that exists — the development stack, the shared test environment — to the same settings with `kcadm.sh`. In production Cognito's managed login takes the same branding, languages and recovery by e-mail.
+7. **The browser demo build** (no identity service, `DATA_SOURCE=mock`) keeps a Continue to the role home with a line saying so; it is the only place a demo account remains.
+8. **Not done.** The Figma Login frames of the four roles (the Figma tool was not available), and a Malay and Japanese review by Business / UI / UX (DEC-99's rule).
+9. **Tests.** Vitest: `login.ts` (`loginHint`, `uiLocale`), the BFF route (hint, language, PKCE, `reauth`), the language action, `coreDisplay` before sign-in, the dictionaries (both languages), the controls baseline. E2E: every spec signs in through the e-mail step; `sign-in.e2e.ts` chooses 日本語 and finds the identity provider's page in it with the address filled in, and sends a reset e-mail to Mailpit.
+
+
+## IR647 An amount in minor units stays within the safe-integer range (review round 13) — 2026-11-08
+
+The contract for money (implementation-contracts.md, Money) says an `amountMinor` is a nonnegative integer within JavaScript's safe-integer range. The API checked only the lower end, so HQ or a contractor could store 9,000,000,000,000,000,000 sen: the web shows such an amount rounded, and a sum of a few of them (an invoice total, a payout) wraps around in 64 bits.
+
+1. **The rule.** `money.InRange` (`platform/money`): 0 ≤ amount ≤ 2^53 − 1 (9,007,199,254,740,991). The refusal is the field's existing one: `amountMinor` / `priceMinor` / `costLines` / `lines` with `error.range` or `error.invalid`.
+2. **Where.** The inputs a person types an amount into: `contracts.save` (`priceMinor`), `invoices.create` (`amountMinor`), `jobs.saveCost` (cost lines), `jobs.recordWarrantyClaim` and the rate card's lines. Payment amounts are compared with the invoice's, and payout lines are computed by the server, so they need no input check.
+3. **Tests.** `TestAmountsStayInSafeRange` in `billing` and `maintenance` (over the range refused, the last valid amount accepted) and `money.TestInRange`.
+
+
+## IR648 The AI assistant is removed (DEC-101) — 2026-11-08
+
+The user no longer wants the AI assistant of the Client app (FR-X02: voice and text status checks, a confirmed temperature change and help, Figma Client 09a–09g). It is taken out of the code, the API, the database, the specification and Figma. The user decided two things: past data is deleted (a command with the source `voice` becomes `ui`, and the history label “· by voice” goes), and FR-X02 stays as a number recorded as withdrawn, with BIZ-03 out of scope. The older sections about it (IR09, IR44, IR65, IR115, IR153, IR258, IR306, IR537 and the review records) describe what was built then and stay as written.
+
+1. **Operations (213 → 212, 234 → 233 routes).** `voice.resolveIntent` and the `voice` module are gone, with the catalogs' rows, `ResolvedIntent` and its tests (`voice_test.go`, the IDOR and contract-result lines). The count checks (`validate_documents.py`, the Go tests of the generator, the registry, the gateway and the REST routes, `rest.test.ts`) say 212 and 233. The generated files (`catalog_gen.go`, `routes.gen.ts`, `contracts.gen.ts`, `contractInputs.gen.json`, `contractResults.gen.json`, swagger) are produced again.
+2. **`commands.create` has no `source` input.** A command a person asks for is always `ui` (`AuditResult` records only those, as before). The `source` of a stored command is `ui | automation | restriction | diagnostic | group`: the CHECK of `control.commands.source` (`schema.sql`, migration 000001) no longer has `'voice'`. A request that still sends `source` is a malformed input.
+3. **Existing databases.** A running database is brought to the same schema by hand (the project's rule for schema.sql edits): `UPDATE control.commands SET source = 'ui' WHERE source = 'voice'`, then the CHECK constraint is replaced without `'voice'`. The development database and `ac-test` are shared and are changed only after the user says so.
+4. **Web.** The header button and `AssistantPanel`, `lib/assistant.ts`, its Server Action, the microphone switch of Preferences (both the API and the browser demo views), the `assistant` and `mic` icons and the history label “· by voice” are gone; the Malay texts that nothing shows any more (71) are removed. Preferences keeps the location consent, now worded “Location, for location automations” / “withdrawal turns off location automations”. `Permissions-Policy` still denies the microphone, which nothing uses.
+5. **Specification.** FR-X02 is recorded as withdrawn (requirements, origins, traceability, company map, DEC-08); AT-X02-N/E/B, UC-C08/C09, `VoicePanel` / `VoiceContainer`, the D09 voice grammar, the Speech service rows, the persistence map row and the `FR-X02` ids of the screens are removed. The validators no longer expect them (`WITHDRAWN_CASES` for the acceptance patch AT-X02-B, the VoiceContainer checks, the `voice_panel_fetches` regression case).
+6. **Not done.** Figma: Client 09a–09g and their flow arrows, the header's Assistant button in the shell components, UC-C08/C09 on the Use Cases page, the User Flows page, the op and route counts of the System Architecture board (212 / 233) and the Preferences rows 10d/10g — the Figma tool was not available.
+7. **Tests.** `TestCommands` (a `source` input is malformed; the command is stored as `ui`), `units.test.ts` (no “by voice” label), `rest.test.ts` (212 / 233), the dictionary test (no entry that nothing shows), `icons.test.ts` (no unused icon), and the document validators.

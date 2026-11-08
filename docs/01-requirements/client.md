@@ -21,7 +21,7 @@ This document covers only what users can view, enter, and do in the frontend. Re
 
 The goal is to help users comfortably use their organization’s units and understand status, costs, maintenance, and payments.
 
-Required reading: [PrepareDocument](../00-prepare/PrepareDocument.md) and [common requirements](common.md). All common authentication, language, voice, permission, notification, and non-functional requirements apply.
+Required reading: [PrepareDocument](../00-prepare/PrepareDocument.md) and [common requirements](common.md). All common authentication, language, permission, notification, and non-functional requirements apply.
 
 P0 means the core foundational flow. P1 is also required for completion in phase 1A. Each row is verified under its `AT-C` number. This document separates coverage of company requests from proposed screen design and provisional values.
 

@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { Banner, Btn, Select } from "@ac/web/components/ui";
 import { useAction } from "@ac/web/lib/useAction";
-import { demoRefusal, type DeviceOption } from "@ac/web/lib/demoPanel";
+import { demoRefusal, jumpDone, type DeviceOption } from "@ac/web/lib/demoPanel";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import { useT } from "@ac/web/components/I18n";
 import { advanceClock, deviceSignal, expireSession } from "../actions";
@@ -32,7 +32,7 @@ export function DemoView({ live }: Readonly<{ live: DemoLive }>) {
   return (
     <DemoFrame
       above={failed && <Banner tone="crit">{t("Not done: {reason}", { reason: t(failed) })}</Banner>}
-      clock={<ClockFace time={live.clock} disabled={isBusy} onMinute={() => { run(() => advanceClock(1), t("Clock advanced 1 minute"), ok, fail); }} onHour={() => { run(() => advanceClock(60), t("Clock advanced 1 hour"), ok, fail); }} />}
+      clock={<ClockFace time={live.clock} disabled={isBusy} onJump={(minutes) => { run(() => advanceClock(minutes), jumpDone(minutes, t), ok, fail); }} />}
       scenario={<><Select aria-label={t("Scenario")} disabled value="seed"><option value="seed">{t("Core API seed · generation 1")}</option></Select><p className="mt-2 text-[11px] text-muted-foreground">{t("The demo seed in fixture-contract.json is the source of truth. The Core API demo runs this one scenario; the simulator switch is in the browser demo.")}</p></>}
       reset={<><p className="text-[11px] text-muted-foreground">{t("Returns clock, subscriptions, image URLs, caches, and business data to their initial seed")}</p><Btn variant="danger" className="mt-3" disabled>{t("Reset demo data")}</Btn><p className="mt-2 text-[11px] text-muted-foreground">{t("The running Core API keeps shared data: rebuild it offline with make resetdb.")}</p></>}
       triggers={

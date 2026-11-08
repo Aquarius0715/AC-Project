@@ -217,7 +217,6 @@ export const coreRoutes: Readonly<Record<string, readonly CoreRoute[]>> = {
   "units.setAlertPolicies": [{ method: "PUT", path: "/v1/units/{unitId}/alert-policies" }],
   "ventilation.list": [{ method: "GET", path: "/v1/ventilation" }],
   "ventilation.log": [{ method: "POST", path: "/v1/ventilation" }],
-  "voice.resolveIntent": [{ method: "POST", path: "/v1/voice/resolve-intent" }],
   "writes.getResult": [{ method: "GET", path: "/v1/writes/{idempotencyKey}" }],
 };
 

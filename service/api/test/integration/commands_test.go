@@ -45,12 +45,10 @@ func TestCommands(t *testing.T) {
 	refused := map[string]string{ // the field each VALIDATION case is refused for
 		caseBadAction:       refusedActionInvalid,
 		"client reason":     "reason=error.notAllowed",
-		"hq voice":          "source=error.notAllowed",
 		"hq without reason": refusedReasonRequired,
 		"out of range":      refusedActionUnsupported,
 		"technician no job": "jobId=error.required",
-		"technician voice":  "source=error.notAllowed",
-		"unknown source":    "source=error.invalid",
+		"unknown source":    "_=error.malformedInput", // the source is no input any more: the channel is always ui (IR648)
 	}
 
 	for name, testCase := range map[string]struct {
@@ -67,10 +65,6 @@ func TestCommands(t *testing.T) {
 		"technician no job":  {techInt(), actionPowerOn, `,"reason":"test"`, 422},
 		"stale unit version": {customerA(), actionPowerOn, "", 409},
 		"unknown source":     {customerA(), actionPowerOn, `,"source":"automation"`, 422},
-		"hq voice":           {hq(), actionPowerOn, `,"reason":"check","source":"voice"`, 422},
-		"technician voice": {techInt(), `{"kind":"set_power",` +
-			`"power":true}`, `,"reason":"test",` +
-			`"jobId":"` + uuid.NewString() + `","source":"voice"`, 422},
 	} {
 		uv := version
 		if name == "stale unit version" {
@@ -84,17 +78,17 @@ func TestCommands(t *testing.T) {
 			t.Errorf("%s: %d want %d", name, code, testCase.code)
 		}
 	}
-	// the assistant's confirmed change (IR306): the same command, labelled voice
+	// a command asked for here is a ui command (the voice channel was withdrawn, IR648)
 	code, resp := cmd(
 		customerA(),
 		`{"kind":"set_temperature","celsius":24}`,
-		`,"source":"voice"`,
+		"",
 		version,
 	)
 	if code != 200 || data(resp)["status"] != statusRequested ||
 		data(resp)["delivery"] != statusNotSent ||
 		data(resp)["sentAt"] != nil ||
-		data(resp)["source"] != "voice" ||
+		data(resp)["source"] != "ui" ||
 		data(resp)["expiresAt"] != clock().Add(30*time.Second).Format(time.RFC3339) {
 		t.Fatalf("create: %d %v", code, resp)
 	}

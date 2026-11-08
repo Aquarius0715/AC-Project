@@ -41,7 +41,6 @@ Decisions applied (DEC-67, DEC-68, DEC-69):
 | Stripe | Hosted Stripe Checkout (cards, FPX) and signed result webhooks | HTTPS redirect + webhook |
 | E-mail and WhatsApp providers | Deliver notifications, payment guidance, reports (a new account's set-up e-mail comes from the identity provider, IR461) | HTTPS API (egress) |
 | Weather and location sources | Automation triggers (weather), client location with consent (FR-C05) | HTTPS API / browser |
-| Speech service | Optional voice recognition for the assistant (FR-X02) | HTTPS API (egress) |
 | Carbon registry / market | Future offset purchase and retirement (FR-A15, FR-C13 remain demo) | HTTPS API (egress), OPEN |
 
 ## 3. Runtime components
@@ -50,7 +49,7 @@ Decisions applied (DEC-67, DEC-68, DEC-69):
 |---|---|---|---|---|
 | Edge (CDN, WAF, DDoS protection) | TLS termination for public names, static asset caching, request filtering, rate limits | Managed edge service | Provider | None |
 | Web / BFF (Next.js) | Serves the four role apps and shared routes; OIDC login flow; server-side session; relays `/bff/ops/<operation>` (the browser's operation call with its JSON input) to the operation's REST route of the Core API with the user context (IR223); pushes change notifications to browsers (SSE) | Stateless containers behind the load balancer | Requests | Session in cache |
-| Core API (modular monolith) | Executes the 213 operations: validation, authorization, state transitions, versions, audit, outbox events | Stateless containers in the app zone | Requests, CPU | Database |
+| Core API (modular monolith) | Executes the 212 operations: validation, authorization, state transitions, versions, audit, outbox events | Stateless containers in the app zone | Requests, CPU | Database |
 | IoT gateway service | Device registry and credentials, MQTT bridge, command dispatch and acknowledgement matching, heartbeat and connection state, firmware operations | Containers next to the MQTT broker | Connected devices, messages | Database, broker |
 | Telemetry processor | Validates and stores measurements (quality valid / missing / stale / suspect), evaluates alert policies, feeds automation conditions; a separate rollup role writes the 15-minute and hourly aggregates | Stream consumers | Messages per second | Time-series store |
 | Automation engine | Evaluates schedules and event conditions; arbitrates capability → restriction → HQ policy → customer rule (DEC-09); creates Commands through the same Command policy | Workers | Rules due | Database |
@@ -93,7 +92,6 @@ As built, the table above is the target. What runs today (IR180, IR335, IR375, I
 | MQTT and device management | AWS IoT Core (X.509 certificates, IoT policies, custom domain), IoT rules → Amazon Kinesis Data Streams, AWS IoT Jobs for firmware | Configurable custom endpoint `mqtt.<domain>` |
 | Scheduler triggers | Amazon EventBridge Scheduler → ECS task / SQS | Each tick still takes the domain and tenant lock (§10, IR356) |
 | E-mail | Amazon SES | SPF, DKIM, DMARC; bounce and complaint events via SNS |
-| Speech (optional) | Amazon Transcribe | Only if en / ms languages meet the assistant's needs |
 | Secrets and keys | AWS Secrets Manager, AWS KMS | Automatic rotation; separate keys per environment |
 | Observability | Amazon CloudWatch, AWS X-Ray / AWS Distro for OpenTelemetry | Logs 90 days hot, archived to S3 |
 | Security and audit of the platform | AWS CloudTrail, Amazon GuardDuty, AWS Security Hub, AWS Config | Organization-wide, delegated security account |
@@ -109,7 +107,7 @@ Each module owns its tables and is reached by other modules only through its pub
 | Identity & access | session, demoSession (replaced by real sign-in), members (list, save), organizations, twoFactor, preferences, consents, clientUsers, auth | User, Membership, Permission grants, QualificationGrant, Preferences, Consent, ClientUser invite | MembershipChanged, ConsentChanged |
 | Assets | customers, properties, spaces, locations, units | Organization, Customer, Property, Space, ACUnit, import batches | UnitChanged, LocationChanged |
 | Devices | capabilities, devices, firmwareCampaigns | Capability, Device, Sensor, Calibration, Firmware operation and campaign | DeviceConnectionChanged, DeviceEventRaised, FirmwareOperationChanged |
-| Control | commands, diagnosticRuns, automations, voice | Command, DiagnosticRun, Automation, Trigger log | CommandRequested, CommandSettled |
+| Control | commands, diagnosticRuns, automations | Command, DiagnosticRun, Automation, Trigger log | CommandRequested, CommandSettled |
 | Monitoring & alerts | telemetry, alerts, policies, ventilation, energy (read side of measurements) | Alert, AlertPolicy, DefaultRuleSetting, Ventilation log | AlertOpened, AlertResolved |
 | Maintenance | jobs, plans, reports, attachments, parts, members (capacity, eligible, setUnavailability), certificates, contractors, rateCards, sla, filterCare | MaintenanceJob, Offer, Assignment, SlotProposal, Plan, WorkReport, Attachment, Certificate, Contractor, RateCard | JobStatusChanged, OfferIssued, ReportSubmitted |
 | Billing | contracts, invoices, payments, inquiries, payouts | Contract, Invoice, PaymentAttempt, Receipt, Inquiry, PayoutStatement | InvoiceIssued, PaymentConfirmed, PayoutChanged |
@@ -122,11 +120,11 @@ Each module owns its tables and is reached by other modules only through its pub
 
 The last column names the design's events. The events the domain services exchange as built are listed in §8 (IR552); the modules also write other event types to the outbox for the planned consumers.
 
-The [operation persistence map](operation-persistence-map.csv) lists, for each of the 213 operations, the owning module, the tables it reads and writes in its own schema, the other modules it calls through their interfaces, and the write side effects (audit row, idempotency record, outbox event); it is generated by `docs/tools/gen_operation_persistence_map.py` from the operation catalog and `db/schema.sql`.
+The [operation persistence map](operation-persistence-map.csv) lists, for each of the 212 operations, the owning module, the tables it reads and writes in its own schema, the other modules it calls through their interfaces, and the write side effects (audit row, idempotency record, outbox event); it is generated by `docs/tools/gen_operation_persistence_map.py` from the operation catalog and `db/schema.sql`.
 
 Cross-module rules that the modules must keep:
 
-- One Command policy for every path (UI, voice, automation, restriction release): capabilities, restrictions and exceptions, online state, permission, and job requirements are checked in the Control module only (common design §5).
+- One Command policy for every path (UI, automation, restriction release): capabilities, restrictions and exceptions, online state, permission, and job requirements are checked in the Control module only (common design §5).
 - Restriction release after payment (IR35) is an event chain: PaymentConfirmed → Restrictions sets release_requested → Control sends release Commands → the restriction is released only after the device observation confirms it.
 - Maintenance job, offer, assignment, and slot rules follow IR113; follow-up classification follows IR114.
 
@@ -304,7 +302,6 @@ Items of the table above that are not scheduled yet:
 | E-mail (Amazon SES) | Notification worker → SES | Templated send; bounce and complaint events via SNS. As built (IR418): the notification worker sends over SMTP (Mailpit locally); the SES adapter is planned | IAM role, SPF / DKIM / DMARC on the sending domain |
 | WhatsApp provider | Notification worker → provider | Business messaging API with approved templates; status webhooks | Provider credentials, signed webhooks |
 | Weather source | Automation engine → provider | Polling per service area | API key, egress allowlist |
-| Speech service (optional) | BFF → provider | Short audio upload or browser speech API; intents resolved by `voice.resolveIntent` | Microphone consent, no audio stored by default |
 | Carbon registry (future) | Energy & carbon → registry | OPEN | OPEN |
 
 ## 12. Cross-cutting requirements

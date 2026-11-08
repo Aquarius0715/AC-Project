@@ -21,7 +21,7 @@ This document covers only what users can view, enter, and do in the frontend. Re
 
 The goal is to let contractors accept jobs within their delegated scope and manage their own technicians, schedules, and work quality. These detailed workflows are proposals under DEC-01. A separate contractor role is a production policy absent from the company original. The original instruction behind it is not archived ([verification status](../00-prepare/sources/production-instructions.md)). Company confirmation is tracked as OPEN-10.
 
-Required reading: [PrepareDocument](../00-prepare/PrepareDocument.md) and [common requirements](common.md). All common authentication, language, voice, permission, notification, and non-functional requirements apply.
+Required reading: [PrepareDocument](../00-prepare/PrepareDocument.md) and [common requirements](common.md). All common authentication, language, permission, notification, and non-functional requirements apply.
 
 P0 means the core foundational flow. P1 is also required for completion in phase 1A. Each row is verified under its `AT-P` number. This document separates coverage of company requests from proposed screen design and provisional values.
 

@@ -106,7 +106,7 @@ export function actionText(a: CommandAction, t: T = en): string {
 }
 
 const statusText: Record<ApiCommand["status"], string> = { requested: "requested", sent: "waiting for device", acknowledged: "acknowledged by device", failed: "failed", expired: "no device response (expired)", cancelled: "cancelled" };
-const sourceText: Record<string, string> = { voice: " · by voice", automation: " · by an automation", restriction: " · by a restriction", diagnostic: " · technician test run" };
+const sourceText: Record<string, string> = { automation: " · by an automation", restriction: " · by a restriction", diagnostic: " · technician test run" };
 
 /** One command history row: the sentence, its state and who sent it, and when it was requested (IR44 time). */
 export function historyRow(c: ApiCommand, t: T = en, display: Display = DEFAULT_DISPLAY) {

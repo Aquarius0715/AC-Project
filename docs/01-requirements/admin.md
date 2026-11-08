@@ -21,7 +21,7 @@ This document covers what users can view, enter, and do in the frontend. Registr
 
 Administrators manage customers, units, maintenance, billing, control policies, and environmental results for their managed organizations.
 
-Required reading: [PrepareDocument](../00-prepare/PrepareDocument.md) and [common requirements](common.md). All common authentication, language, voice, permission, notification, and non-functional requirements apply unchanged.
+Required reading: [PrepareDocument](../00-prepare/PrepareDocument.md) and [common requirements](common.md). All common authentication, language, permission, notification, and non-functional requirements apply unchanged.
 
 P0 items are core foundational features. P1 items must also be completed in phase 1A. Verify each row under its `AT-A` number. Separate company-request coverage from concrete screen proposals and provisional values.
 

@@ -16,8 +16,6 @@ UC-C04,Control an AC,Client,—,«include» C05,FR-C03,02e; 02h; 02k
 UC-C05,Confirm & track AC command,—,AC unit / IoT device,included by C04; C06; C09,FR-C03,02f; 02g
 UC-C06,Control a group of ACs (one room / area),Client owner,—,«include» C05,FR-C14,02m; 02n
 UC-C07,Attach / detach alert policy on this AC,Client,—,—,FR-C15 · IR108,02e; 02l
-UC-C08,Ask status or help via assistant,Client,—,—,FR-X02,09a; 09b; 09d; 09g
-UC-C09,Change temperature via assistant,—,—,«extend» C08 · «include» C05,FR-X02,09c; 09e; 09f
 UC-C10,Manage schedules,Client,—,—,FR-C04,03a; 03b; 03c; 03d; 03g; 03h; 03i
 UC-C11,Manage condition automations,Client,—,—,FR-C05,03e; 03f
 UC-C12,Grant / withdraw location consent,—,—,«extend» C11,FR-C05 · IR53,03e; 03f; 10d
