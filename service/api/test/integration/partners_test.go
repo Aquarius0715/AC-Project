@@ -259,6 +259,10 @@ func TestContractorRegister(t *testing.T) {
 		t.Fatalf("rate card v2, a blank note is none: %d %v", code, res)
 	}
 
+	// a card already starts at that time: a refusal on the field, not an unexplained conflict (IR643)
+	code, res := saveRateCard(clock().Add(48*time.Hour).Format(time.RFC3339), line)
+	refusal(t, "same start", code, res, "effectiveFrom=error.duplicate")
+
 	if code, _ := write(
 		srv,
 		hq(),

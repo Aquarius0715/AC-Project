@@ -3793,6 +3793,7 @@ export const ms: Record<string, string> = {
   "the plan changed meanwhile — the latest version is shown": "pelan telah berubah sementara itu — versi terkini dipaparkan",
   "a plan’s unit cannot change": "unit pelan tidak boleh diubah",
   "must be in the future": "mesti pada masa hadapan",
+  "a rate card already starts then": "kad kadar sudah bermula pada masa itu",
   "must not be after the access ends": "tidak boleh selepas akses tamat",
   "must not be after the visit starts": "tidak boleh selepas lawatan bermula",
   "not a valid value (monthly, every 1–12 months)": "bukan nilai yang sah (bulanan, setiap 1–12 bulan)",

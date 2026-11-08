@@ -3700,6 +3700,7 @@ export const ja: Record<string, string> = {
   "the plan changed meanwhile — the latest version is shown": "その間に計画が変更されました — 最新の版を表示しています",
   "a plan’s unit cannot change": "計画のユニットは変更できません",
   "must be in the future": "未来の日時にしてください",
+  "a rate card already starts then": "その時刻から始まる料金表がすでにあります",
   "must not be after the access ends": "アクセスの終了より後にはできません",
   "must not be after the visit starts": "訪問の開始より後にはできません",
   "not a valid value (monthly, every 1–12 months)": "無効な値です（毎月、1～12 か月ごと）",

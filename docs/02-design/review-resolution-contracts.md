@@ -9069,3 +9069,11 @@ The user asked for Japanese to be selectable beside English and Malay, with ever
 6. **The payout PDF.** The statement PDF has a Courier font and ASCII only (everything else printed as "-"), so a Japanese user's PDF is written in English; the screen is Japanese.
 7. **Tests.** Vitest runs the dictionary checks per language and covers the Japanese date, the ordinal, the assistant's examples against the grammar, the PDF and the locale list; the Go integration tests save `ja` and resolve the three phrases; Playwright saves Japanese in Preferences, reads the shell back in Japanese and puts English back.
 
+## IR643 A second rate card for the same start time is refused on the field — 2026-11-08
+
+Review round 6 of the maintenance module. A contractor has one rate card per start time (`UNIQUE (contractor_org_id, effective_from)`), but `rateCards.save` did not check it: a second card for the same `effectiveFrom` hit the constraint and came back as an empty `409 CONFLICT`, which HQ's screen could only show as an unexplained conflict.
+
+1. `rateCards.save` is VALIDATION `effectiveFrom=error.duplicate` when the company already has a card starting at that time; HQ's screen reads "a rate card already starts then".
+2. The company's row in `maintenance.contractors` is locked for the save (`FOR UPDATE`), so two saves for it run one after the other: the next version number (`max(version) + 1`) and the check above see the first, instead of two concurrent saves taking the same version.
+3. Test: `TestContractorRegister` (a second card at the start time of version 2); Vitest for the refusal text in the three languages' dictionaries.
+
