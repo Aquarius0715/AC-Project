@@ -62,7 +62,7 @@ Show retry only for recoverable errors. For forbidden and not-found, follow IR57
 | DD-A17 / FR-A17 | `/admin/units?customerId=&tab=users` / `ClientUserList` | `clientUsers.list`、`clientUsers.save`、`clientUsers.remove`、`clientUsers.resendInvite`、`members.revokeSessions` | Email unique per customer; role owner/member; reason for removal | Last active owner cannot be demoted, disabled, or removed |
 | DD-A18 / FR-A18 | `/admin/units` (Import CSV) / `UnitImportWizard` | `units.importPreview`、`units.importCommit`、`units.importUndo`、`customers.list` | UTF-8 CSV ≤ 1000 rows; 8 mapped columns; nothing written before import | Error rows skipped; undo only 24 h and before telemetry/jobs |
 | DD-A19 / FR-A19 | `/admin/units?tab=warranty` / `WarrantyCoverage` | `units.coverage`、`jobs.recordWarrantyClaim`、`contracts.list` | Coverage = warranty or active contract; claim amount > 0 | Claims only for parts replaced under warranty |
-| DD-A20 / FR-A20 | `/admin/devices?tab=firmware` / `FirmwareCampaigns` | `firmwareCampaigns.list`、`firmwareCampaigns.get`、`firmwareCampaigns.schedule`、`firmwareCampaigns.control`、`devices.list` | Signed version; start ≥ 24 h ahead; waves end at 100 %; auto-pause 1–50 % | Busy/offline/tampered devices skipped; failed devices keep the old version |
+| DD-A20 / FR-A20 | `/admin/devices?tab=firmware` / `FirmwareCampaigns` | `firmwareCampaigns.list`、`firmwareCampaigns.get`、`firmwareCampaigns.schedule`、`firmwareCampaigns.control`、`firmwareCampaigns.delete`、`devices.list` | Signed version; start ≥ 24 h ahead; waves end at 100 %; auto-pause 1–50 % | Busy/offline/tampered devices skipped; failed devices keep the old version |
 | DD-A21 / FR-A21 | `/admin/jobs?tab=contractors` / `ContractorRegister` | `contractors.list`、`contractors.save`、`contractors.setOfferStatus`、`rateCards.list`、`rateCards.save`、`certificates.list`、`certificates.getContent`、`certificates.verify`、`organizations.save` | Rate card from a future date; suspension reason 1–1000; a new company's name is unique (IR465) | Suspension blocks new offers only |
 | DD-A22 / FR-A22 | `/admin/jobs?tab=sla` / `SlaScorecard` | `sla.scorecard`、`sla.saveTargets` | Percentages 0–100; response 1–168 h; targets per plan | New targets apply only to new jobs |
 | DD-A23 / FR-A23 | `/admin/billing?tab=payouts` / `ContractorPayouts` | `payouts.list`、`payouts.get`、`payouts.generate`、`payouts.transition`、`payouts.resolveQuery`、`rateCards.list` | billing.payment for every write; mark paid on or after the pay date | Approved/paid statements are never regenerated |
@@ -782,7 +782,7 @@ Scope: FR-A19 / Main display pattern: **UI-LIST**. Service boundary: `units.cove
 
 **Source mapping**: SRC-06 BIZ-06, BIZ-20 → FR-A20 → DD-A20. Source category: Figma-confirmed screen specification (Admin 04-9/04-10, 2026-10-01).
 
-Scope: FR-A20 / Main display pattern: **UI-LIST / UI-DETAIL**. Service boundary: `firmwareCampaigns.list, firmwareCampaigns.get, firmwareCampaigns.schedule, firmwareCampaigns.control, devices.list`.
+Scope: FR-A20 / Main display pattern: **UI-LIST / UI-DETAIL**. Service boundary: `firmwareCampaigns.list, firmwareCampaigns.get, firmwareCampaigns.schedule, firmwareCampaigns.control, firmwareCampaigns.delete, devices.list`.
 
 **Initial view and prerequisites**: device.read; tab `firmware`; URL `campaignId`.
 
@@ -797,7 +797,7 @@ Scope: FR-A20 / Main display pattern: **UI-LIST / UI-DETAIL**. Service boundary:
 **Steps**
 
 1. List of campaigns with state badges; detail with version/checksum, window, auto-pause, created by, wave progress bars, result counts, and a failure/skip table with Retry.
-2. Pause / resume / abort (reason) / retry_device → `firmwareCampaigns.control`; + New campaign (centered modal) → `firmwareCampaigns.schedule`.
+2. Pause / resume / abort (reason) / retry_device → `firmwareCampaigns.control`; Delete (reason, a campaign that has ended only) → `firmwareCampaigns.delete` (IR653); + New campaign (centered modal) → `firmwareCampaigns.schedule`.
 3. Customer notices are created 24 h before start (templateKey device_operation preview).
 4. **As built (IR339): the equipment scheduler runs the campaign.**
    - **Notice.** 24 h before startAt, each client member of each affected unit's customer gets one in-app device_operation notification about the unit, once: "Firmware update from <day>, <window> local time. The AC may restart for about 2 minutes."

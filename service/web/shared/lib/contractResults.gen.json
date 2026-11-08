@@ -1494,6 +1494,13 @@
   ],
   "items": null
  },
+ "firmwareCampaigns.delete": {
+  "fields": [
+   "deleted",
+   "id"
+  ],
+  "items": null
+ },
  "firmwareCampaigns.get": {
   "fields": [
    "autoPauseFailurePercent",

@@ -9199,3 +9199,13 @@ The user could not delete what HQ registers (devices first of all) and asked for
 6. **Counts.** 212 → 215 operations, 233 → 236 routes (the generated files, the validators, the Go and web tests).
 7. **Not in this phase.** Firmware campaigns (`firmwareCampaigns.delete`), customers and contractor companies, HQ accounts, maintenance plans and rate cards, MRV baselines and factors; Figma (the tool was not available).
 8. **Tests.** `TestDevicesUnbindAndDelete` and `TestCapabilitiesDelete` (the refusals, the roles, the versions, the records left behind), the E2E of the device row, and the dictionary and contract tests.
+
+## IR653 HQ deletes a firmware campaign that has ended (DEC-103, phase 1b) — 2026-11-08
+
+The second part of the device area: the model delete of IR652 is refused while any firmware campaign names the model, finished or not, so the finished campaigns must be deletable.
+
+1. **`firmwareCampaigns.delete {id, reason}`** (`admin:device.write`, `DELETE /v1/firmware-campaigns/{id}`, DD-A20). Only a campaign whose state is `aborted` or `completed`; a `scheduled`, `running` or `paused` one is CONFLICT `error.campaignActive` (abort it first). The campaign and its device rows (`firmware_campaign_devices`) are deleted. The devices stay registered and the install operations stay in their history. Answers `DeletedResource`. Event `FirmwareCampaignDeleted`, audit `firmwareCampaigns.delete`.
+2. **The expected version** is the campaign's (`firmwareCampaigns.get`); a stale one is CONFLICT; the reason is 1–1000 characters after trimming; an unknown ID is NOT_FOUND.
+3. **The screen.** Admin > Devices & models > Firmware: a campaign that has ended offers Delete campaign… (reason required); after the delete the selection clears. English, Malay and Japanese.
+4. **Counts.** 215 → 216 operations, 236 → 237 routes.
+5. **Tests.** `TestFirmwareCampaignsDelete` (scheduled refused, roles, reason, versions, rows gone, device kept) and the dictionary and contract tests.

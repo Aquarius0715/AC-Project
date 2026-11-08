@@ -49,6 +49,7 @@ const keyText: Record<string, string> = {
   "error.deviceBound": "This device is bound to a unit — unbind it first",
   "error.deviceBusy": "This device has an operation under way — wait until it ends",
   "error.deviceInCampaign": "This device is in a firmware campaign that has not ended — wait for it or abort the campaign",
+  "error.campaignActive": "This campaign has not ended — abort it first",
   "error.notBound": "This device is not bound to a unit",
   "error.modelInUse": "Units still use this model — change their model first",
   "error.modelInCampaign": "A firmware campaign names this model, so it cannot be deleted",

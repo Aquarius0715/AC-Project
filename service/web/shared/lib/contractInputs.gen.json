@@ -449,6 +449,10 @@
   "deviceId",
   "reason"
  ],
+ "firmwareCampaigns.delete": [
+  "id",
+  "reason"
+ ],
  "firmwareCampaigns.get": [
   "id"
  ],
