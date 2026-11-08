@@ -9267,6 +9267,13 @@ The user chose to delete accounts that were never used and to keep ending the ot
 1. **The rule.** kgCO2ePerKWh is at least 0.0000005 (half of the column's step, the smallest value that is stored as 0.000001) and at most 10; below it VALIDATION `error.range` on `kgCO2ePerKWh`. Values with more than six decimals are still stored rounded to six, as before; the response shows the stored value.
 2. **Tests.** `TestFactors` (0.0000004 refused on its field) and `TestFactorRangeFollowsTheColumn` (the edges). No operation, route or screen changes; 224 operations, 245 routes.
 
+## IR662 A save of a customer's user keeps the end HQ gave the membership (review round 33) — 2026-11-09
+
+`clientUsers.save` keeps the user's membership in step with the list (IR461). For any status other than `disabled` it wrote `valid_until = NULL`, so a customer owner (or HQ) who changed only the role, or saved the user with the same status, removed an end that HQ had given the membership in `members.save` (a leaving date, an access that was meant to stop): the access became open-ended.
+
+1. **The rule.** The membership's end is rewritten only by a change to or from `disabled`: disabling ends it now (at least a second after its start); enabling again clears it. A save that leaves the status as it was changes the client role and the scope version and keeps the end.
+2. **Tests.** `TestClientUserSaveKeepsTheEndHQSet` failed before the fix (the end came back empty); `TestClientUserMembershipSync` still covers disable and enable. No operation, route or screen changes; 224 operations, 245 routes.
+
 ## IR659 A payout adjustment stays within the safe-integer range (review round 24) — 2026-11-09
 
 IR647 left the payout lines out of the amount range check because the server computes them. One kind is not computed: the adjustment line of an answered question carries the `adjustmentMinor` that HQ typed in `payouts.resolveQuery` (signed, non-zero). It was only refused when zero, so HQ could enter 9,000,000,000,000,000,000 or its negative: the next generated draft added it to the statement's gross or deductions, and a few of them wrap a 64-bit sum around.
