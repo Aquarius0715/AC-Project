@@ -94,6 +94,8 @@ func registerUsage(reg *ops.Registry) {
 	ops.RegisterQuery(reg, ops.DomainMaintenance, QueryClaimableJobs, claimableJobs)
 	ops.RegisterQuery(reg, ops.DomainMaintenance, QueryUnitActive, unitActive)
 	ops.RegisterQuery(reg, ops.DomainMaintenance, QueryOrgActive, orgActive)
+	ops.RegisterQuery(reg, ops.DomainMaintenance, ops.QueryOrgRecordsMaintenance, orgRecords)
+	ops.RegisterQuery(reg, ops.DomainMaintenance, ops.QueryOrgHasContractor, orgHasContractor)
 	ops.RegisterQuery(reg, ops.DomainMaintenance, QueryTechnicianBooked, technicianBooked)
 	ops.RegisterQuery(reg, ops.DomainMaintenance, QueryBookedTechnicians, bookedTechnicians)
 }
@@ -193,6 +195,37 @@ func unitActive(ctx context.Context, c *ops.Call, in *UnitInput) (bool, error) {
 		Scan(&active)
 
 	return active, apperr.Wrap(err, "select maintenance.jobs")
+}
+
+// orgHasContractor reports a contractor profile of the organization.
+func orgHasContractor(ctx context.Context, c *ops.Call, input *ops.OrgRecordsInput) (bool, error) {
+	var found bool
+
+	err := c.Tx.QueryRow(
+		ctx,
+		`SELECT EXISTS (SELECT 1 FROM maintenance.contractors WHERE organization_id = $1)`,
+		input.OrgID,
+	).Scan(&found)
+
+	return found, apperr.Wrap(err, "select maintenance.contractors")
+}
+
+// orgRecords reports any job, offer, cleaning reminder, history snapshot or certificate of the organization, as a
+// customer or as a contractor company: records that stay, so the organization is not deleted (DEC-103).
+func orgRecords(ctx context.Context, c *ops.Call, input *ops.OrgRecordsInput) (bool, error) {
+	var held bool
+
+	err := c.Tx.QueryRow(
+		ctx,
+		`SELECT EXISTS (SELECT 1 FROM maintenance.jobs WHERE customer_org_id = $1 OR contractor_org_id = $1)
+		OR EXISTS (SELECT 1 FROM maintenance.offers WHERE contractor_org_id = $1)
+		OR EXISTS (SELECT 1 FROM maintenance.filter_reminders WHERE customer_org_id = $1)
+		OR EXISTS (SELECT 1 FROM maintenance.job_history_snapshots WHERE contractor_org_id = $1)
+		OR EXISTS (SELECT 1 FROM maintenance.certificates WHERE organization_id = $1)`,
+		input.OrgID,
+	).Scan(&held)
+
+	return held, apperr.Wrap(err, "select maintenance.jobs")
 }
 
 func orgActive(ctx context.Context, c *ops.Call, in *OrgInput) (bool, error) {

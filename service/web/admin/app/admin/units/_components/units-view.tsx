@@ -24,7 +24,7 @@ import {
 import { nameError as personNameError } from "@ac/web/lib/partnerUsers";
 import { amount } from "@ac/web/lib/energy";
 import { typeLabel } from "@ac/web/lib/partnerJobDetail";
-import { archiveLocation, archiveUnit, createCustomer, deleteUnit, importCommit, importPreview, importUndo, inviteClientUser, previewPasswordReset, recordWarrantyClaim, removeClientUser, resendInvite, saveProperty, saveSpace, saveUnit, setDefaultRule, setUnitPolicies, updateClientUser, updateCustomer, signOutEverywhere } from "../actions";
+import { archiveLocation, archiveUnit, createCustomer, deleteCustomer, deleteUnit, importCommit, importPreview, importUndo, inviteClientUser, previewPasswordReset, recordWarrantyClaim, removeClientUser, resendInvite, saveProperty, saveSpace, saveUnit, setDefaultRule, setUnitPolicies, updateClientUser, updateCustomer, signOutEverywhere } from "../actions";
 import { Icon, type IconName } from "@ac/web/components/Icon";
 import { NeedsAccess } from "@ac/web/components/NeedsAccess";
 import { entryOf, lookup } from "@ac/web/lib/lookup";
@@ -168,7 +168,7 @@ function CustomerModal({ row, pending, onClose, onSave }: Readonly<{ row?: Custo
 // ---- one customer ----
 
 type ModalState =
-  | null | { kind: "customer" } | { kind: "property"; p?: TreeProperty } | { kind: "space"; propertyId: string; parentSpaceId: string | null; spaceKind: TreeSpace["kind"] }
+  | null | { kind: "customer" } | { kind: "deleteCustomer" } | { kind: "property"; p?: TreeProperty } | { kind: "space"; propertyId: string; parentSpaceId: string | null; spaceKind: TreeSpace["kind"] }
   // a location is a property or a space, never both
   | { kind: "rename" | "archive"; p: TreeProperty; s?: undefined } | { kind: "rename" | "archive"; p?: undefined; s: TreeSpace } | { kind: "unit"; propertyId: string; spaceId: string };
 
@@ -193,6 +193,7 @@ function CustomerScreen({ live, c }: Readonly<{ live: UnitsLive; c: CustomerLive
         {r.marks.map((x) => <Badge key={x.label} tone={x.tone} icon={x.icon}>{x.label}</Badge>)}
         <div className="ml-auto flex gap-2">
           {canWrite && <Btn size="sm" onClick={() => { setM({ kind: "customer" }); }}>{t("Edit customer")}</Btn>}
+          {canWrite && <Btn size="sm" variant="danger" onClick={() => { setM({ kind: "deleteCustomer" }); }}>{t("Delete customer…")}</Btn>}
           {canWrite && r.status === "active" && c.tree.length > 0 && <Btn size="sm" variant="primary" onClick={addUnitHere}><Icon name="add" /> {t("New unit")}</Btn>}
         </div>
       </div>
@@ -246,6 +247,8 @@ function CustomerScreen({ live, c }: Readonly<{ live: UnitsLive; c: CustomerLive
         </div>
       )}
       {m?.kind === "customer" && <CustomerModal row={r} pending={pending} onClose={close} onSave={(d) => { run(() => updateCustomer(r.id, r.version, { id: r.orgId, version: r.orgVersion ?? 1, name: r.billingName, status: r.orgStatus }, { billingName: d.billingName, name: d.name, serviceProfile: d.profile, status: d.status }), t("Customer saved"), close); }} />}
+      {m?.kind === "deleteCustomer" && <DeleteCustomerModal name={r.name} pending={pending} onClose={close}
+        onSave={(reason) => { run(() => deleteCustomer(r.id, r.version, { id: r.orgId, version: r.orgVersion ?? 1 }, reason), t("Customer deleted"), () => { close(); nav({ customerId: null, tab: null, locationId: null, propertyId: null, unitId: null, powerState: null, connections: null, search: null }); }); }} />}
       {m?.kind === "property" && <PropertyModal p={m.p} pending={pending} onClose={close} onSave={(d) => { run(() => saveProperty(propertyInput(d, r.orgId, m.p?.id), m.p?.version), t(m.p ? "Property saved" : "Property added"), (id) => { close(); nav({ locationId: id, ...clearUnit }); }); }} />}
       {m?.kind === "space" && <SpaceModal c={c} init={m} pending={pending} onClose={close} onSave={(x) => { run(() => saveSpace(x), t("{kind} “{name}” added", { kind: (textOf(kindLabel, x.kind, t) ?? x.kind), name: x.name }), (id) => { close(); nav({ locationId: id, ...clearUnit }); }); }} />}
       {m?.kind === "rename" && <RenameModal name={m.p?.name ?? m.s?.name ?? ""} where={m.p ? t("{kind} · property", { kind: (textOf(kindLabel, m.p.kind, t) ?? m.p.kind) }) : (textOf(kindLabel, m.s.kind, t) ?? m.s.kind)} pending={pending} onClose={close}
@@ -555,6 +558,22 @@ function RenameModal({ name, where, pending, onClose, onSave }: Readonly<{ name:
         <p className="text-[13px] text-muted-foreground">{t("Only the name changes; units, child locations and history stay attached. The customer sees the new name immediately.")}</p>
         <SummaryList items={[[t("Location"), `${name} · ${where}`]]} />
         <Field label={t("New name")} hint={t("1–120 characters, unique among its siblings. Saved with a version check — an older version is CONFLICT.")} error={tried ? e : undefined}><Input value={v} onChange={(x) => { setV(x.target.value); }} /></Field>
+      </div>
+    </Modal>
+  );
+}
+
+/** customers.delete (DEC-103): a reason, and what is removed with the customer and what stops it. */
+function DeleteCustomerModal({ name, pending, onClose, onSave }: Readonly<{ name: string; pending: boolean; onClose: () => void; onSave: (reason: string) => void }>) {
+  const t = useT();
+  const [reason, setReason] = useState("");
+  const [tried, setTried] = useState(false);
+  const problem = reasonError(reason, t);
+  return (
+    <Modal open onClose={onClose} title={t("Delete customer")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="danger" disabled={pending} onClick={() => { setTried(true); if (!problem) onSave(reason.trim()); }}>{t("Delete")}</Btn></>}>
+      <div className="flex flex-col gap-3">
+        <p className="text-[13px]">{t("Delete {name}? Its locations (properties and spaces) are removed with it. A customer with units, jobs, contracts, invoices or users cannot be deleted.", { name })}</p>
+        <Field label={t("Reason")} error={tried ? problem : undefined}><Textarea value={reason} maxLength={1000} onChange={(e) => { setReason(e.target.value); }} /></Field>
       </div>
     </Modal>
   );

@@ -42,7 +42,25 @@ func RegisterQueries(reg *ops.Registry) {
 	ops.RegisterQuery(reg, ops.DomainIdentity, QueryNotificationsStored, notificationsStored)
 	ops.RegisterQuery(reg, ops.DomainIdentity, QueryConsent, consent)
 	ops.RegisterQuery(reg, ops.DomainIdentity, QueryLoadMembers, loadMembers)
+	ops.RegisterQuery(reg, ops.DomainIdentity, ops.QueryOrgRecordsIdentity, orgUsers)
 	registerDirectory(reg)
+}
+
+// orgUsers reports any account of the organization: a membership, a contractor company user, or a customer user. They
+// are removed first, so the organization is not deleted with people in it (DEC-103).
+func orgUsers(ctx context.Context, c *ops.Call, input *ops.OrgRecordsInput) (bool, error) {
+	var held bool
+
+	err := c.Tx.QueryRow(
+		ctx,
+		`SELECT EXISTS (SELECT 1 FROM identity.memberships WHERE organization_id = $1)
+		OR EXISTS (SELECT 1 FROM identity.partner_users WHERE organization_id = $1)
+		OR EXISTS (SELECT 1 FROM identity.client_users WHERE customer_id = $2)`,
+		input.OrgID,
+		input.CustomerID,
+	).Scan(&held)
+
+	return held, apperr.Wrap(err, "select identity.memberships")
 }
 
 // QueryMembers returns the memberships active at the caller's business time that match every given filter, sorted

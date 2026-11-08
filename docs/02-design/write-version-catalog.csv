@@ -20,11 +20,13 @@ clientUsers.save,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; 
 clientUsers.save,id present,client_user,clientUsers.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 commands.create,all,none,units.get,omit,expectedUnitVersion=UnitDetail.version,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 consents.update,all,consent,consents.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+contractors.delete,all,contractor,contractors.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 contractors.save,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 contractors.save,id present,contractor,contractors.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 contractors.setOfferStatus,all,contractor,contractors.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 contracts.save,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 contracts.save,id present,contracts,contracts.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+customers.delete,all,customers,customers.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 customers.save,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 customers.save,id present,customers,customers.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 demo.advanceClock,all,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
@@ -101,6 +103,7 @@ offsets.preview,all,none,none,omit,none,D01; version mismatch CONFLICT; missing/
 offsets.simulate,event=purchase_confirm|retire|fail,offset record,offsets.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 offsets.simulate,event=request,none,offsets.preview,omit,quoteVersion=OffsetQuote.version,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 offsets.simulate,event=retry,offset record,offsets.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+organizations.delete,all,organizations,organizations.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 organizations.save,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 organizations.save,id present,organizations,organizations.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 partnerUsers.remove,all,partner_user,partnerUsers.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects

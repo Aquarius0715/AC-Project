@@ -63,7 +63,7 @@ func TestDevicesUnbindAndDelete(t *testing.T) {
 		t.Errorf("delete of a bound device: %d %v", code, res["messageKey"])
 	}
 
-	for name, who := range map[string]*actor{"client": customerB(), "technician": techInt()} {
+	for name, who := range map[string]*actor{roleClient: customerB(), roleTechnician: techInt()} {
 		if code, _ := unbind(who, version); code == 200 {
 			t.Errorf("%s unbinds", name)
 		}

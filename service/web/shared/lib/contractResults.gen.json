@@ -725,6 +725,13 @@
   ],
   "items": null
  },
+ "contractors.delete": {
+  "fields": [
+   "deleted",
+   "id"
+  ],
+  "items": null
+ },
  "contractors.list": {
   "fields": [
    "items",
@@ -839,6 +846,13 @@
    "unitIds",
    "updatedAt",
    "version"
+  ],
+  "items": null
+ },
+ "customers.delete": {
+  "fields": [
+   "deleted",
+   "id"
   ],
   "items": null
  },
@@ -3368,6 +3382,13 @@
    "tenantId",
    "updatedAt",
    "version"
+  ],
+  "items": null
+ },
+ "organizations.delete": {
+  "fields": [
+   "deleted",
+   "id"
   ],
   "items": null
  },

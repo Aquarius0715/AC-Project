@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.510.0
+version: 0.511.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -300,6 +300,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.511.0: HQ deletes a customer or a contractor company registered by mistake: `customers.delete`, `contractors.delete`, `organizations.delete` (219 operations, 240 routes; DEC-103 phase 2, IR654). Phase 1A unchanged.
 0.510.0: HQ deletes a firmware campaign that has ended: `firmwareCampaigns.delete` (216 operations, 237 routes; DEC-103 phase 1b, IR653). Phase 1A unchanged.
 0.509.0: HQ deletes devices and models that are in no use, after an Unbind step: `devices.unbind`, `devices.delete`, `capabilities.delete` (215 operations, 236 routes; DEC-103, IR652). Phase 1A unchanged.
 0.508.0: The shared test environment answers on several addresses (PUBLIC_HOSTS): a sign-in returns to the address it started on (DEC-102, IR651). Phase 1A unchanged.

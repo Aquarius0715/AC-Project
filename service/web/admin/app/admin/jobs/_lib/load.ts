@@ -22,7 +22,7 @@ import { recover } from "@ac/web/lib/promises";
 const TECHNICIAN = "technician";
 
 interface Page<T> { items: T[]; total: number }
-interface Org { id: string; name: string; kind: string; status: string }
+interface Org { id: string; version: number; name: string; kind: string; status: string }
 interface Member { id: string; userId: string; displayName: string; role: string; employment: string | null; organizationId: string; validUntil: string | null; qualifications?: ApiTechnician["qualifications"] }
 const optional = orWhenRefused;
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
@@ -218,7 +218,7 @@ export async function loadContractors(sp: SP) {
   return {
     ...base,
     detail: {
-      org: { id: org.id, name: org.name },
+      org: { id: org.id, name: org.name, version: org.version },
       kpis: profile ? kpiTiles(profile.kpis, t) : null,
       facts: profile ? profileFacts(profile, nowMs, i) : null,
       rates: rateCardView(cards, inEffect, nowMs, i),

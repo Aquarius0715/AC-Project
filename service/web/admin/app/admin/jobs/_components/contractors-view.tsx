@@ -6,11 +6,12 @@ import { useState } from "react";
 import { Badge, Banner, Btn, Card, EmptyState, Field, Input, Kpi, ListRow, Modal, Page, Select, SummaryList, Textarea, ScrollX } from "@ac/web/components/ui";
 import { useI18n, useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
+import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { businessDay, KL } from "@ac/web/lib/clientBilling";
 import { klDate, klStart } from "@ac/web/lib/partnerTeam";
 import { areasOf, contractorRefusal, nextMonthStart, profileErrors, rateCardErrors, WORK_TYPES } from "@ac/web/lib/adminContractors";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
-import { createContractorOrganization, saveContractor, saveRateCard, setOfferStatus, verifyCertificate } from "../actions";
+import { createContractorOrganization, deleteContractor, saveContractor, saveRateCard, setOfferStatus, verifyCertificate } from "../actions";
 import type { ContractorsLive } from "../_lib/load";
 import { JobsTabs } from "./jobs-header";
 import { NewJobModal } from "./jobs-view";
@@ -24,7 +25,7 @@ type Detail = NonNullable<ContractorsLive["detail"]>;
 /** The organization choice of a company still to create (IR465). */
 const NEW_COMPANY = "new";
 
-type ModalState = null | { kind: "profile"; organizationId: string | null } | { kind: "status" } | { kind: "rates" } | { kind: "verify" } | { kind: "job" };
+type ModalState = null | { kind: "profile"; organizationId: string | null } | { kind: "status" } | { kind: "rates" } | { kind: "verify" } | { kind: "job" } | { kind: "delete" };
 
 /** HQ contractor register (FR-A21, DD-A21, Figma Admin 06-9) from the Core API. Texts in the display language; the
 register's dates are Kuala Lumpur days, typed and shown so, and said so in another display time zone (IR291). */
@@ -54,6 +55,7 @@ export function ContractorsView({ live }: Readonly<{ live: ContractorsLive }>) {
         {d ? <ContractorDetail key={`${d.org.id}:${String(d.profile?.version ?? 0)}`} d={d} open={setModal} /> : <Card title={t("Contractor")}><p className="text-[13px] text-muted-foreground">{t("missing" in live ? "That contractor no longer exists." : "Pick a contractor.")}</p></Card>}
       </div>
       {modal?.kind === "profile" && <ProfileModal live={live} d={d} organizationId={modal.organizationId} onClose={close} onFail={fail} />}
+      {modal?.kind === "delete" && d && <DeleteModal d={d} onClose={close} onFail={fail} />}
       {modal?.kind === "status" && d?.profile && <StatusModal p={d.profile} onClose={close} onFail={fail} />}
       {modal?.kind === "rates" && d && <RatesModal d={d} now={Date.parse(live.now)} onClose={close} onFail={fail} />}
       {modal?.kind === "verify" && d && <VerifyModal d={d} onClose={close} onFail={fail} />}
@@ -71,8 +73,8 @@ function ContractorDetail({ d, open }: Readonly<{ d: Detail; open: (m: ModalStat
       {d.kpis && <div className="grid-fluid" style={{ ["--min" as string]: "170px" }}>{d.kpis.map((k) => <Kpi key={k.label} label={k.label} value={k.value} icon={k.icon} sub={k.sub} tone={k.tone} />)}</div>}
       <div className="split">
         <Card title={d.org.name} sub={p ? undefined : t("No contractor profile yet — offers still work; add one to record its registration, areas and insurance")}
-          action={p ? <span className="flex gap-2"><Btn size="sm" onClick={() => { open({ kind: "profile", organizationId: p.organizationId }); }}>{t("Edit")}</Btn><Btn size="sm" variant={p.status === "active" ? "danger" : "primary"} onClick={() => { open({ kind: "status" }); }}>{t(p.status === "active" ? "Suspend offers" : "Resume offers")}</Btn></span>
-            : <Btn size="sm" variant="primary" onClick={() => { open({ kind: "profile", organizationId: d.org.id }); }}><Icon name="add" /> {t("Add profile")}</Btn>}>
+          action={p ? <span className="flex gap-2"><Btn size="sm" onClick={() => { open({ kind: "profile", organizationId: p.organizationId }); }}>{t("Edit")}</Btn><Btn size="sm" variant={p.status === "active" ? "danger" : "primary"} onClick={() => { open({ kind: "status" }); }}>{t(p.status === "active" ? "Suspend offers" : "Resume offers")}</Btn><Btn size="sm" variant="danger" onClick={() => { open({ kind: "delete" }); }}>{t("Delete contractor…")}</Btn></span>
+            : <span className="flex gap-2"><Btn size="sm" variant="primary" onClick={() => { open({ kind: "profile", organizationId: d.org.id }); }}><Icon name="add" /> {t("Add profile")}</Btn><Btn size="sm" variant="danger" onClick={() => { open({ kind: "delete" }); }}>{t("Delete contractor…")}</Btn></span>}>
           {p?.status === "suspended" && <div className="mb-3"><Banner tone="crit">{p.suspendedReason ? t("Offers suspended — “{reason}”. New offers to {name} are refused; open offers and jobs continue.", { reason: p.suspendedReason, name: p.name }) : t("Offers suspended. New offers to {name} are refused; open offers and jobs continue.", { name: p.name })}</Banner></div>}
           {d.facts && <SummaryList items={d.facts} />}
           <p className="mt-3 text-[13px] font-bold">{r.current ? r.current.title : t("No rate card in effect")}</p>
@@ -147,6 +149,27 @@ function ProfileModal({ live, d, organizationId, onClose, onFail }: ModalProps &
         <Field label={t("Insurance valid until")} hint={t("A Kuala Lumpur day · empty: not recorded — the delegation then runs a year")}><Input type="date" value={f.insurance} onChange={(e) => { setF({ ...f, insurance: e.target.value }); }} /></Field>
       </div>
       <Banner>{t("The delegation period runs from the profile’s creation to the insurance end (or one year).")}</Banner>
+    </Modal>
+  );
+}
+
+/** contractors.delete and organizations.delete (DEC-103): a reason, and what is removed with the company and what stops it. */
+function DeleteModal({ d, onClose, onFail }: ModalProps & { d: Detail }) {
+  const t = useT();
+  const nav = useUrlPatch();
+  const [pending, run] = useAction();
+  const [reason, setReason] = useState("");
+  const [tried, setTried] = useState(false);
+  const confirm = () => {
+    setTried(true);
+    if (!reason.trim()) return;
+    const profile = d.profile ? { id: d.profile.id, version: d.profile.version } : null;
+    run(() => deleteContractor({ id: d.org.id, version: d.org.version }, profile, reason), t("Contractor deleted"), () => { onClose(t("Contractor deleted")); nav({ contractorId: null }); }, onFail);
+  };
+  return (
+    <Modal open onClose={() => { onClose(); }} title={t("Delete contractor")} footer={<><Btn onClick={() => { onClose(); }}>{t("Cancel")}</Btn><Btn variant="danger" disabled={pending} onClick={confirm}>{t("Delete")}</Btn></>}>
+      <p className="text-[13px]">{t("Delete {name}? Its profile, rate cards and unavailability are removed with it. A company with jobs, offers, certificates, payouts or users cannot be deleted.", { name: d.org.name })}</p>
+      <Field label={t("Reason · required (1–1000)")} error={tried && !reason.trim() ? t("A reason is required") : undefined}><Textarea value={reason} maxLength={1000} onChange={(e) => { setReason(e.target.value); }} /></Field>
     </Modal>
   );
 }

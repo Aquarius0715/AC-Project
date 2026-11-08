@@ -213,6 +213,10 @@
   "granted",
   "purpose"
  ],
+ "contractors.delete": [
+  "id",
+  "reason"
+ ],
  "contractors.list": [
   "cursor",
   "filters",
@@ -249,6 +253,10 @@
   "rulesVersion",
   "startAt",
   "unitIds"
+ ],
+ "customers.delete": [
+  "id",
+  "reason"
  ],
  "customers.list": [
   "cursor",
@@ -840,6 +848,10 @@
   "quoteId",
   "quoteVersion",
   "recordId"
+ ],
+ "organizations.delete": [
+  "id",
+  "reason"
  ],
  "organizations.list": [
   "cursor",

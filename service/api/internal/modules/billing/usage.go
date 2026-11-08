@@ -80,6 +80,7 @@ func registerUsage(r *ops.Registry) {
 	ops.RegisterQuery(r, ops.DomainBilling, QueryActiveContracts, activeContracts)
 	ops.RegisterQuery(r, ops.DomainBilling, QueryUnitActive, unitActive)
 	ops.RegisterQuery(r, ops.DomainBilling, QueryOrgActive, orgActive)
+	ops.RegisterQuery(r, ops.DomainBilling, ops.QueryOrgRecordsBilling, orgRecords)
 }
 
 func unitInUse(ctx context.Context, c *ops.Call, in *UnitInput) (bool, error) {
@@ -129,6 +130,24 @@ func unitActive(ctx context.Context, c *ops.Call, in *UnitInput) (bool, error) {
 		Scan(&active)
 
 	return active, apperr.Wrap(err, "select billing.contract_units")
+}
+
+// orgRecords reports any contract, invoice, inquiry or payout statement of the organization, as a customer or as a
+// contractor company: records that stay, so the organization is not deleted (DEC-103).
+func orgRecords(ctx context.Context, c *ops.Call, input *ops.OrgRecordsInput) (bool, error) {
+	var held bool
+
+	err := c.Tx.QueryRow(
+		ctx,
+		`SELECT EXISTS (SELECT 1 FROM billing.contracts WHERE customer_org_id = $1)
+		OR EXISTS (SELECT 1 FROM billing.payout_statements WHERE contractor_org_id = $1)
+		OR EXISTS (SELECT 1 FROM billing.invoices WHERE customer_id = $2)
+		OR EXISTS (SELECT 1 FROM billing.inquiries WHERE customer_id = $2)`,
+		input.OrgID,
+		input.CustomerID,
+	).Scan(&held)
+
+	return held, apperr.Wrap(err, "select billing.contracts")
 }
 
 func orgActive(ctx context.Context, c *ops.Call, in *OrgInput) (bool, error) {
