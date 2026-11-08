@@ -567,8 +567,8 @@ func (d *demoOps) commandAcknowledged(
 	)
 }
 
-// commandFailed fails a requested or sent command as the device rejected it, audits the result and ends the
-// restriction commands it belonged to.
+// commandFailed fails a requested or sent command as the device rejected it, audits the result, fails the test run it
+// started or ended and ends the restriction commands it belonged to.
 func (d *demoOps) commandFailed(ctx context.Context, call *ops.Call, input *TriggerInput) error {
 	return d.inTenant(
 		ctx,
@@ -599,6 +599,17 @@ func (d *demoOps) commandFailed(ctx context.Context, call *ops.Call, input *Trig
 			)
 			if auditResultErr != nil {
 				return apperr.Wrap(auditResultErr, "control.AuditResult")
+			}
+
+			runErr := control.RunCommandFailed(
+				ctx,
+				txn,
+				*input.CommandID,
+				"DEVICE_REJECTED",
+				input.OccurredAt,
+			)
+			if runErr != nil {
+				return apperr.Wrap(runErr, "control.RunCommandFailed")
 			}
 
 			return control.EndRestrictionCommands(

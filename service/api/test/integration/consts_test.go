@@ -309,11 +309,15 @@ const (
 
 // API error codes and the failure codes of device operations.
 const (
-	codeConflict    = "CONFLICT"
-	codeOffline     = "OFFLINE"
-	codeTimeout     = "TIMEOUT"
-	codeUnavailable = "UNAVAILABLE"
+	codeConflict       = "CONFLICT"
+	codeDeviceRejected = "DEVICE_REJECTED"
+	codeOffline        = "OFFLINE"
+	codeTimeout        = "TIMEOUT"
+	codeUnavailable    = "UNAVAILABLE"
 )
+
+// States of a diagnostic test run.
+const stateEndFailed = "end_failed"
 
 // Units and their readings: connection, power, metrics, measurement quality and alert severity.
 const (

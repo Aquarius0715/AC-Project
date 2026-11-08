@@ -321,7 +321,7 @@ func TestDiagnosticRuns(t *testing.T) {
 		hq(),
 		"diagnosticRuns.get",
 		`{"diagnosticRunId":"`+run4+`"}`,
-	); data(res)["state"] != "end_failed" || data(res)["failureCode"] != codeOffline ||
+	); data(res)["state"] != stateEndFailed || data(res)["failureCode"] != codeOffline ||
 		data(res)["endCommandId"] != nil {
 		t.Fatalf("end offline: %v", res)
 	}
