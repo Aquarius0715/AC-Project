@@ -1491,5 +1491,6 @@ func membersRevokeSessions(
 func RegisterMembers(r *ops.Registry) {
 	ops.Register(r, "members.list", membersList)
 	ops.Register(r, "members.save", membersSave)
+	ops.Register(r, "members.delete", membersDelete)
 	ops.Register(r, "members.revokeSessions", membersRevokeSessions)
 }

@@ -2996,6 +2996,13 @@
   ],
   "items": null
  },
+ "members.delete": {
+  "fields": [
+   "deleted",
+   "id"
+  ],
+  "items": null
+ },
  "members.eligible": {
   "fields": [
    "items",

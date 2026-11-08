@@ -262,6 +262,27 @@ func (k *Keycloak) SetEnabled(ctx context.Context, subject string, enabled bool)
 	return &statusError{what: "enable", code: res.StatusCode}
 }
 
+// DeleteAccount deletes the person's user at the realm (HQ deleted an account that was never used, DEC-103); a user
+// the realm does not know is already gone.
+func (k *Keycloak) DeleteAccount(ctx context.Context, subject string) error {
+	if subject == "" {
+		return errNoSubject
+	}
+
+	res, err := k.do(ctx, http.MethodDelete, "/users/"+url.PathEscape(subject), nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = res.Body.Close() }()
+
+	switch res.StatusCode {
+	case http.StatusNoContent, http.StatusOK, http.StatusNotFound:
+		return nil
+	}
+
+	return &statusError{what: "delete", code: res.StatusCode}
+}
+
 // forward names the public address of the identity provider on a request, for the provider to build its links from
 // (X-Forwarded-Host and -Proto); nothing when PublicURL is unset or is no address.
 func (k *Keycloak) forward(req *http.Request) {

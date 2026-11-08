@@ -288,6 +288,7 @@ type fakeIDP struct {
 	updated  []idp.Account
 	setups   []string
 	switched []string
+	removed  []string // the accounts deleted (DEC-103)
 	// failing: creating and updating accounts fail (the provider does not answer); lost: subjects the provider no longer
 	// knows (UpdateAccount is idp.ErrNoAccount); generation: a new account's subject is "sub-<email>" plus "#n" from 1 on
 	failing    bool
@@ -346,6 +347,15 @@ func (f *fakeIDP) SetEnabled(_ context.Context, subject string, enabled bool) er
 	return nil
 }
 
+func (f *fakeIDP) DeleteAccount(_ context.Context, subject string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	f.removed = append(f.removed, subject)
+
+	return nil
+}
+
 func (f *fakeIDP) EndSessions(_ context.Context, subject string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -380,6 +390,7 @@ func TestRevokeSessionsEndsIdentityProviderSessions(t *testing.T) {
 		updated:    nil,
 		setups:     nil,
 		switched:   nil,
+		removed:    nil,
 		failing:    false,
 		lost:       nil,
 		generation: 0,

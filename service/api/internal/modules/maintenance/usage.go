@@ -96,6 +96,7 @@ func registerUsage(reg *ops.Registry) {
 	ops.RegisterQuery(reg, ops.DomainMaintenance, QueryOrgActive, orgActive)
 	ops.RegisterQuery(reg, ops.DomainMaintenance, ops.QueryOrgRecordsMaintenance, orgRecords)
 	ops.RegisterQuery(reg, ops.DomainMaintenance, ops.QueryOrgHasContractor, orgHasContractor)
+	ops.RegisterQuery(reg, ops.DomainMaintenance, ops.QueryMembershipRecords, membershipRecords)
 	ops.RegisterQuery(reg, ops.DomainMaintenance, QueryTechnicianBooked, technicianBooked)
 	ops.RegisterQuery(reg, ops.DomainMaintenance, QueryBookedTechnicians, bookedTechnicians)
 }
@@ -195,6 +196,26 @@ func unitActive(ctx context.Context, c *ops.Call, in *UnitInput) (bool, error) {
 		Scan(&active)
 
 	return active, apperr.Wrap(err, "select maintenance.jobs")
+}
+
+// membershipRecords reports an assignment, a certificate it holds or verified, or a filter cleaning it marked: records
+// about the person that stay, so the account is not deleted (DEC-103).
+func membershipRecords(
+	ctx context.Context,
+	c *ops.Call,
+	input *ops.MembershipRecordsInput,
+) (bool, error) {
+	var held bool
+
+	err := c.Tx.QueryRow(
+		ctx,
+		`SELECT EXISTS (SELECT 1 FROM maintenance.assignments WHERE technician_membership_id = $1)
+		OR EXISTS (SELECT 1 FROM maintenance.certificates WHERE membership_id = $1 OR verified_by_membership_id = $1)
+		OR EXISTS (SELECT 1 FROM maintenance.filter_cleanings WHERE marked_by_membership_id = $1)`,
+		input.MembershipID,
+	).Scan(&held)
+
+	return held, apperr.Wrap(err, "select maintenance.assignments")
 }
 
 // orgHasContractor reports a contractor profile of the organization.

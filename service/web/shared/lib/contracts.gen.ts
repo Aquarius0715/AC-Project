@@ -355,6 +355,7 @@ export type OperationContracts = {
   'members.list': {input:Query;result:Page<Membership>;mode:'read'};
   'members.revokeSessions': {input:{membershipId:ID;reason:string};result:SessionsRevoked;mode:'write'};
   'members.save': {input:{id?:ID;userId:ID;organizationId:ID;role:Role;employment:Membership["employment"];permissions:Permission[];scopes:ScopeRef[];validFrom:Instant;validUntil:Instant|null;reason:string;newUser?:{email:string;displayName:string}};result:Membership;mode:'write'};
+  'members.delete': {input:{id:ID;reason:string};result:DeletedResource;mode:'write'};
   'mrv.get': {input:{id:ID;reportVersion?:number};result:MRVReport;mode:'read'};
   'mrv.list': {input:Query;result:Page<MRVReport>;mode:'read'};
   'mrv.preview': {input:MRVConditions;result:MRVPreview;mode:'read'};

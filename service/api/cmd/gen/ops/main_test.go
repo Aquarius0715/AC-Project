@@ -13,7 +13,7 @@ func TestGeneratedFilesAreCurrent(t *testing.T) {
 	t.Parallel()
 
 	src, routesTS, contractsTS, operations := generate("../../../../../docs/02-design")
-	if operations != 224 {
+	if operations != 225 {
 		t.Fatalf("%d operations", operations)
 	}
 

@@ -728,6 +728,10 @@
   "from",
   "id"
  ],
+ "members.delete": [
+  "id",
+  "reason"
+ ],
  "members.eligible": [
   "endAt",
   "jobId",

@@ -15,7 +15,8 @@ import {
   allowedFor, allPermissions, MEMBER_FIELDS, memberDraft, memberErrors, memberFieldId, memberInput, orgKind, permissionRows, resourceWord, roleDefaults, roleWord, selfBlocked,
   type ApiOrganization, type MemberDraft, type MemberRow, type PermissionRow, type Role, type ScopeRef,
 } from "@ac/web/lib/members";
-import { revokeMember, saveMember, signOutEverywhere } from "../actions";
+import { deleteMember, revokeMember, saveMember, signOutEverywhere } from "../actions";
+import { DeleteDialog } from "@ac/web/components/DeleteDialog";
 import { oneOf } from "@ac/web/lib/oneOf";
 import { Icon } from "@ac/web/components/Icon";
 import { DateTimeSelect } from "@ac/web/components/TimeSelect";
@@ -48,6 +49,7 @@ export function AccessView({ live }: Readonly<{ live: Live }>) {
   const [d, setD] = useState<MemberDraft>(memberDraft(sel?.m, live.tenantId, zone, live.now));
   const [tried, setTried] = useState(false);
   const [revoke, setRevoke] = useState<string | null>(null);
+  const [removing, setRemoving] = useState(false);
   const revoked = useRef(false); // the revoke took "Revoke access…" away with it: focus goes to the membership's row (IR622)
   const [signOut, setSignOut] = useState<string | null>(null); // the reason while the Sign out everywhere modal is open (IR385)
   const [scopeKind, setScopeKind] = useState<"unit" | "property" | "organization">("unit");
@@ -183,7 +185,7 @@ export function AccessView({ live }: Readonly<{ live: Live }>) {
             </section>
             {live.canWrite && <>
               <Field label={t("Change reason · required")} error={fieldError("reason")} hint={t("1–1000 characters, stored in the audit log")}><Textarea id={memberFieldId("reason")} value={d.reason} maxLength={1000} onChange={(e) => { set({ reason: e.target.value }); }} /></Field>
-              <div className="flex flex-wrap justify-end gap-2">{sel?.active && <Btn variant="danger" disabled={pending} onClick={() => { revoked.current = false; setRevoke(""); }}>{t("Revoke access…")}</Btn>}{sel?.active && <Btn disabled={pending} onClick={() => { setSignOut(""); }}>{t("Sign out everywhere…")}</Btn>}<Btn variant="primary" disabled={pending} onClick={save}>{t(sel ? "Save changes" : "Create membership")}</Btn></div>
+              <div className="flex flex-wrap justify-end gap-2">{sel?.active && <Btn variant="danger" disabled={pending} onClick={() => { revoked.current = false; setRevoke(""); }}>{t("Revoke access…")}</Btn>}{sel?.active && <Btn disabled={pending} onClick={() => { setSignOut(""); }}>{t("Sign out everywhere…")}</Btn>}{sel && <Btn variant="danger" disabled={pending} onClick={() => { setRemoving(true); }}>{t("Delete account…")}</Btn>}<Btn variant="primary" disabled={pending} onClick={save}>{t(sel ? "Save changes" : "Create membership")}</Btn></div>
             </>}
           </div>
         </Card>
@@ -199,6 +201,8 @@ export function AccessView({ live }: Readonly<{ live: Live }>) {
         <Field label={t("Reason · required")} hint={t("1–1000 characters, stored in the audit log")}><Textarea value={signOut ?? ""} maxLength={1000} onChange={(e) => { setSignOut(e.target.value); }} /></Field>
         <p className="mt-2 text-[11px] text-muted-foreground">{t("For a lost device or a suspected takeover. Revoke access ends the membership instead.")}</p>
       </Modal>
+      {removing && sel && <DeleteDialog title={t("Delete account — {name}", { name: sel.name })} text={t("Delete the account of {name}? The person and their sign-in are deleted with it. Only an account that never acted, with no assignment or certificate, can be deleted; otherwise revoke the access.", { name: sel.name })} pending={pending}
+        onClose={() => { setRemoving(false); }} onConfirm={(reason) => { run(() => deleteMember(sel.id, sel.version, reason), t("Account deleted"), () => { setRemoving(false); nav({ membershipId: null }); }); }} />}
     </Page>
   );
 }
