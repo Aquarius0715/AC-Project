@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"regexp"
 	"slices"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/google/uuid"
@@ -358,24 +358,38 @@ func jobTypes() map[string]bool {
 // maxContactWindowLength is the longest contact window, in characters after trimming.
 const maxContactWindowLength = 200
 
-var contactDigits = regexp.MustCompile(`\d{7,}`)
+// minPhoneDigits is the length of a run of digits that reads as a phone number.
+const minPhoneDigits = 7
 
-// ContactWindowOK applies IR64: no '@' and no run of seven digits once spaces, hyphens, parentheses and '+' are
-// removed.
+// contactSeparators are what a phone number is written with between its digits besides spaces: the ASCII characters and
+// the full-width ones a Japanese input method produces.
+const contactSeparators = "-()+\t－（）＋"
+
+// ContactWindowOK applies IR64 and IR640: no '@' and no run of seven digits, once spaces, hyphens, parentheses and '+'
+// are set aside. Digits are the digits of every script and the symbols include their full-width forms, so a number
+// typed with a Japanese input method (０９０－１２３４－５６７８, ＠) is refused like the ASCII one.
 func ContactWindowOK(contactWindow string) bool {
-	if strings.Contains(contactWindow, "@") {
+	if strings.ContainsAny(contactWindow, "@＠") {
 		return false
 	}
 
-	stripped := strings.Map(func(r rune) rune {
-		if r == ' ' || r == '-' || r == '(' || r == ')' || r == '+' || r == '\t' {
-			return -1
+	digits := 0
+
+	for _, char := range contactWindow {
+		switch {
+		case unicode.IsDigit(char):
+			digits++
+			if digits >= minPhoneDigits {
+				return false
+			}
+		case unicode.IsSpace(char) || strings.ContainsRune(contactSeparators, char):
+			// a separator between digits does not end the run
+		default:
+			digits = 0
 		}
+	}
 
-		return r
-	}, contactWindow)
-
-	return !contactDigits.MatchString(stripped)
+	return true
 }
 
 // Validate implements ops.Validator (shape only; slot timing needs the clock).

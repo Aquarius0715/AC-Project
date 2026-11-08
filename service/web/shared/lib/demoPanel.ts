@@ -1,12 +1,35 @@
 // Demo controls in API mode (FR-X05, DDC-07, SCR-X-demo, IR154, IR249; Figma Client 10e): the scenario clock of the Core
 // API, the devices the signed-in role can see for the device fault and its recovery, and the refusals of demo.*.
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
+import type { T } from "@ac/web/lib/i18n";
 
 /** “2026-09-14 09:41 UTC”, the clock as Figma 10e shows it. */
 export const clockText = (iso: string) => `${iso.slice(0, 10)} ${iso.slice(11, 16)} UTC`;
 
 /** demo.advanceClock moves forward only: the target is the clock now plus the jump. */
 export const advanceTarget = (now: Date, minutes: number) => new Date(now.getTime() + minutes * 60_000).toISOString();
+
+/** The jumps of the Demo clock, in minutes: a minute, then 1, 2, 4, 8, 12 and 24 hours (IR641). The clock never goes back. */
+export const CLOCK_JUMPS: readonly number[] = [1, 60, 120, 240, 480, 720, 1440];
+const MINUTES_PER_HOUR = 60;
+
+/** The button of a jump: “+1 min”, “+1 hour”, “+2 hours” … */
+export function jumpLabel(minutes: number, t: T): string {
+  if (minutes === 1) return t("+1 min");
+  return minutes === MINUTES_PER_HOUR ? t("+1 hour") : t("+{n} hours", { n: minutes / MINUTES_PER_HOUR });
+}
+
+/** The toast after the Core API moved the clock. */
+export function jumpDone(minutes: number, t: T): string {
+  if (minutes === 1) return t("Clock advanced 1 minute");
+  return minutes === MINUTES_PER_HOUR ? t("Clock advanced 1 hour") : t("Clock advanced {n} hours", { n: minutes / MINUTES_PER_HOUR });
+}
+
+/** The toast of the browser demo, which only says so. */
+export function jumpDoneDemo(minutes: number, t: T): string {
+  if (minutes === 1) return t("Clock advanced +1 min (demo)");
+  return minutes === MINUTES_PER_HOUR ? t("Clock advanced +1 hour (demo)") : t("Clock advanced +{n} hours (demo)", { n: minutes / MINUTES_PER_HOUR });
+}
 
 export interface ApiDevice { id: string; serial: string; unitId: string | null; bindingId: string | null; connection: string }
 export interface ApiDeviceEvent { id: string; eventType: string; sequence: number; occurredAt: string; restoredAt: string | null }
