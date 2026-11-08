@@ -175,6 +175,7 @@ const (
 	keyAssignmentEnded      = "errors.assignment_ended"
 	keyAssignmentNotStarted = "errors.assignment_not_started"
 	keyOwnAccount           = "errors.own_account"
+	keyAccessExpired        = "errors.access_expired"
 	keyUnitBusy             = "errors.unit_busy"
 )
 
