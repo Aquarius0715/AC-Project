@@ -90,7 +90,7 @@ Short terms in this text refer to canonical names: unit = ACUnit (AC itself, `un
 
 Demo login selects from predefined fictional accounts. The demo clock measures the 30-minute session life, but `demo.advanceClock` jumps do not consume it (IR36). Show an extension prompt 120 seconds before expiry; choosing extension adds 30 minutes from that moment (IR55). Login supports four roles and internal/external technician Memberships without real email/password input. Unauthenticated access to a protected route redirects to `/login?returnTo=…`. Keep only allowed relative return routes and ignore invalid values (IR82). Sign-out/role switches clear old screen content, Queries, image previews, and permission-dependent drafts.
 
-The password reset demo checks only email format and returns the same completion message/send preview whether registered or not. Language changes affect English/Malay display but not stored UTC, units, or IDs. AT-X01 covers `demoSession.signIn/signOut/switchMembership`, `auth.previewPasswordReset`, and `preferences.update` (locale): direct protected-route access, Back after logout, stale responses during role switches, and no existence disclosure for valid-format unregistered demo emails.
+The password reset demo checks only email format and returns the same completion message/send preview whether registered or not. Language changes affect English, Malay and Japanese display but not stored UTC, units, or IDs. AT-X01 covers `demoSession.signIn/signOut/switchMembership`, `auth.previewPasswordReset`, and `preferences.update` (locale): direct protected-route access, Back after logout, stale responses during role switches, and no existence disclosure for valid-format unregistered demo emails.
 
 ### FR-X02 Withdrawn (DEC-101)
 

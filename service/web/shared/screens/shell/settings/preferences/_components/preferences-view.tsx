@@ -7,11 +7,12 @@ import { actionMessage } from "@ac/web/lib/actionMessage";
 import { consentNote, type Consent } from "@ac/web/lib/preferences";
 import { codeComplete, groupKey, type QrPath } from "@ac/web/lib/twoFactor";
 import { useT } from "@ac/web/components/I18n";
+import { languageOptions, type Locale } from "@ac/web/lib/i18n";
 import { disableTwoFactor, enableTwoFactor, savePreferences } from "../actions";
 import { Icon } from "@ac/web/components/Icon";
 
 export interface PreferencesLive {
-  prefs: { locale: "en" | "ms"; timezone: string; currency: "MYR"; monthlyReportEmail: boolean; twoFactorEnabled: boolean };
+  prefs: { locale: Locale; timezone: string; currency: "MYR"; monthlyReportEmail: boolean; twoFactorEnabled: boolean };
   twoFactor: { enabled: boolean; enabledAt: string | null; recoveryCodesLeft: number | null; setupKey: string | null };
   consent: Consent | null;
   client: boolean;
@@ -44,8 +45,8 @@ export function PreferencesView({ live }: Readonly<{ live: PreferencesLive }>) {
     <Page className="max-w-3xl">
       {failed && <Banner tone="crit">{t("Not saved: {reason}", { reason: failed })}</Banner>}
       <Card>
-        <Field label={t("Display language")} hint={t("Affects the screens, notifications and date/time display. Stored data stays UTC. Malay text is a draft under review; text not translated yet stays in English.")}>
-          <Choice value={locale} onChange={setLocale} options={[{ id: "en", label: t("English (default)") }, { id: "ms", label: "Bahasa Melayu" }]} />
+        <Field label={t("Display language")} hint={t("Affects the screens, notifications and date/time display. Stored data stays UTC. Malay and Japanese text is a draft under review; text not translated yet stays in English.")}>
+          <Choice value={locale} onChange={setLocale} options={languageOptions(t)} />
         </Field>
         <div className="my-4 border-t border-line" />
         <Field label={t("Display timezone")} hint={t("Booked times keep their meaning across timezone changes.")}>

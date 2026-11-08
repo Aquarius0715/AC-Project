@@ -1,13 +1,22 @@
-// Display language (FR-X01, AT-X01-N, IR44, IR258). English is the default and the key: each text is looked up in the
-// Malay dictionary (lib/i18n-ms.ts, a draft until Business / UI / UX review it) and stays English when it has no entry,
-// with a warning in development (IR44). The language never changes stored values, units, IDs or UTC times. As in the
+// Display language (FR-X01, AT-X01-N, IR44, IR258, IR639). English is the default and the key: each text is looked up in
+// the dictionary of the language (lib/i18n-ms.ts, lib/i18n-ja.ts: drafts until Business / UI / UX review them) and stays
+// English when it has no entry, with a warning in development (IR44). The language never changes stored values, units, IDs or UTC times. As in the
 // Next.js internationalization guide, the dictionary is a plain object and the locale comes from the server (the
 // user's Preferences). lib/tests/i18n.test.ts keeps the code's texts and the dictionary's keys the same (NFR-07).
+import { ja } from "@ac/web/lib/i18n-ja";
 import { ms } from "@ac/web/lib/i18n-ms";
-import { lookup } from "@ac/web/lib/lookup";
+import { entryOf, lookup } from "@ac/web/lib/lookup";
 
-export type Locale = "en" | "ms";
-export const isLocale = (v: unknown): v is Locale => v === "en" || v === "ms";
+export type Locale = "en" | "ms" | "ja";
+export const LOCALES: readonly Locale[] = ["en", "ms", "ja"];
+export const isLocale = (v: unknown): v is Locale => LOCALES.some((l) => l === v);
+/** Each language's own name, as its speakers read it (not translated). */
+export const LANGUAGE_NAMES: Readonly<Record<Locale, string>> = { en: "English", ms: "Bahasa Melayu", ja: "日本語" };
+/** The choices of the display language: English first and marked as the default. */
+export const languageOptions = (t: T): { id: Locale; label: string }[] =>
+  LOCALES.map((id) => ({ id, label: id === "en" ? t("English (default)") : entryOf(LANGUAGE_NAMES, id) }));
+/** The dictionary of each language that is not English (the keys are the English texts). */
+export const DICTIONARIES: Readonly<Record<Exclude<Locale, "en">, Readonly<Record<string, string>>>> = { ms, ja };
 /** The browser demo keeps the chosen language in this browser (Preferences demo). */
 export const LOCALE_KEY = "ac-locale";
 
@@ -16,17 +25,18 @@ export type T = (text: string, params?: Params) => string;
 
 const warned = new Set<string>();
 
-/** The text in `locale`, with `{name}` placeholders filled from params; English when Malay has no entry. When one English
+/** The text in `locale`, with `{name}` placeholders filled from params; English when the language has no entry. When one English
 text means two things, its key names the context before "::" ("tamper::Clear" is a state, "Clear" a button); English
 shows the text after it. */
 export function translate(locale: Locale, text: string, params?: Params): string {
   const english = text.includes("::") ? text.slice(text.indexOf("::") + 2) : text;
   let base = english;
-  if (locale === "ms") {
-    base = lookup(ms, text) ?? english;
-    if (!Object.hasOwn(ms, text) && process.env.NODE_ENV === "development" && !warned.has(text)) {
-      warned.add(text);
-      console.warn(`[i18n] no Malay text for "${text}"`);
+  if (locale !== "en") {
+    const dictionary = entryOf(DICTIONARIES, locale);
+    base = lookup(dictionary, text) ?? english;
+    if (!Object.hasOwn(dictionary, text) && process.env.NODE_ENV === "development" && !warned.has(`${locale}:${text}`)) {
+      warned.add(`${locale}:${text}`);
+      console.warn(`[i18n] no ${locale} text for "${text}"`);
     }
   }
   return params ? base.replaceAll(/\{(\w+)\}/g, (all, k: string) => { const v = lookup(params, k); return v === undefined ? all : String(v); }) : base;
@@ -34,8 +44,16 @@ export function translate(locale: Locale, text: string, params?: Params): string
 
 export const translator = (locale: Locale): T => (text, params) => translate(locale, text, params);
 
-/** The BCP 47 tag for dates and numbers shown in `locale` (Malaysia for both). */
-export const intlTag = (locale: Locale) => (locale === "ms" ? "ms-MY" : "en-MY");
+/** The BCP 47 tag for dates and numbers shown in `locale` (Malaysia for English and Malay, Japan's formats for Japanese). */
+export const intlTag = (locale: Locale) => entryOf<Locale, string>({ en: "en-MY", ms: "ms-MY", ja: "ja-JP" }, locale);
+
+/** The abbreviation of a time zone at an instant (“MYT”, “SGT”) in the language's own data. Japanese data names most
+zones as GMT+8 (Kuala Lumpur, Singapore) or by Japanese names, so Japanese takes the abbreviation from the English data,
+which reads the same as in an English user's screen. */
+export function zoneName(at: Date, timeZone: string, locale: Locale): string | undefined {
+  const tag = intlTag(locale === "ja" ? "en" : locale);
+  return new Intl.DateTimeFormat(tag, { timeZone, timeZoneName: "short" }).formatToParts(at).find((p) => p.type === "timeZoneName")?.value;
+}
 
 /** How a user's screens show text and times: the display language and time zone of Preferences. */
 export interface Display { locale: Locale; timeZone: string }
@@ -52,7 +70,7 @@ function zoned(iso: string | null, d: Display, options: Intl.DateTimeFormatOptio
   const tag = intlTag(d.locale);
   for (const timeZone of [d.timeZone, DEFAULT_DISPLAY.timeZone]) {
     try {
-      const zone = withZone ? new Intl.DateTimeFormat(tag, { timeZone, timeZoneName: "short" }).formatToParts(at).find((p) => p.type === "timeZoneName")?.value : undefined;
+      const zone = withZone ? zoneName(at, timeZone, d.locale) : undefined;
       const text = plain(at.toLocaleString(tag, { ...options, timeZone }));
       return zone ? `${text} ${zone}` : text;
     } catch {
@@ -118,7 +136,7 @@ export function showSpan(startIso: string, endIso: string, d: Display = DEFAULT_
   const tag = intlTag(d.locale);
   for (const timeZone of [d.timeZone, DEFAULT_DISPLAY.timeZone]) {
     try {
-      const zone = new Intl.DateTimeFormat(tag, { timeZone, timeZoneName: "short" }).formatToParts(a).find((p) => p.type === "timeZoneName")?.value;
+      const zone = zoneName(a, timeZone, d.locale);
       const range = plain(new Intl.DateTimeFormat(tag, { timeZone, ...(weekday && { weekday: "short" }), month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).formatRange(a, b));
       return zone ? `${range} ${zone}` : range;
     } catch {

@@ -243,7 +243,7 @@ CREATE INDEX qualification_grants_membership ON identity.qualification_grants (m
 
 CREATE TABLE identity.preferences (
   user_id               uuid PRIMARY KEY REFERENCES identity.users(id),
-  locale                text NOT NULL DEFAULT 'en' CHECK (locale IN ('en','ms')),
+  locale                text NOT NULL DEFAULT 'en' CHECK (locale IN ('en','ms','ja')),
   timezone              text NOT NULL DEFAULT 'Asia/Kuala_Lumpur',
   currency              char(3) NOT NULL DEFAULT 'MYR' CHECK (currency = 'MYR'),
   monthly_report_email  boolean NOT NULL DEFAULT false,
@@ -1769,7 +1769,7 @@ CREATE TABLE notify.deliveries (
 CREATE TABLE notify.templates (
   key        text NOT NULL,
   channel    text NOT NULL CHECK (channel IN ('inApp','email','whatsapp')),
-  locale     text NOT NULL CHECK (locale IN ('en','ms')),
+  locale     text NOT NULL CHECK (locale IN ('en','ms','ja')),
   version    int NOT NULL,
   subject    text,
   body       text NOT NULL,

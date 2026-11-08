@@ -5,7 +5,7 @@
 export type ID = string;
 export type Instant = string; // ISO UTC, millisecond precision
 export type Role = 'client'|'contractor'|'technician'|'admin';
-export type Locale = 'en'|'ms';
+export type Locale = 'en'|'ms'|'ja';
 export type Currency = 'MYR'|'USD';
 export type ErrorCode = 'VALIDATION'|'UNAUTHENTICATED'|'FORBIDDEN'|'NOT_FOUND'|'CONFLICT'|'OFFLINE'|'TIMEOUT'|'RATE_LIMITED'|'UNAVAILABLE';
 export type DomainError = {code:ErrorCode;messageKey:string;fieldErrors:Record<string,string>;correlationId:ID;retryAfterSeconds:number|null};
