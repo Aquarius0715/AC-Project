@@ -13,6 +13,8 @@ type Dispatcher struct {
 	queues []chan func()
 	count  uint32 // len(queues), for the hash
 	wg     sync.WaitGroup
+	lock   sync.RWMutex // keeps Submit from a closed queue
+	closed bool
 }
 
 // NewDispatcher starts workers workers, each with a queue of depth jobs; at least one of each.
@@ -24,6 +26,8 @@ func NewDispatcher(workers, depth int) *Dispatcher {
 		queues: make([]chan func(), workers),
 		count:  uint32(workers), //nolint:gosec // G115: workers is at least 1 and a small number
 		wg:     sync.WaitGroup{},
+		lock:   sync.RWMutex{},
+		closed: false,
 	}
 
 	for i := range dispatcher.queues {
@@ -48,17 +52,38 @@ func (d *Dispatcher) Index(key string) int {
 	return int(sum.Sum32() % d.count)
 }
 
-// Submit queues job on the worker of key. It waits while that worker's queue is full, which holds the caller back and
-// so lets the pressure go back to the broker. It must not be called after Close.
-func (d *Dispatcher) Submit(key string, job func()) {
+// Submit queues job on the worker of key and reports whether it was taken. It waits while that worker's queue is full,
+// which holds the caller back and so lets the pressure go back to the broker. After Close it drops the job: a handler
+// still running when the bridge stops must not panic on a closed queue.
+func (d *Dispatcher) Submit(key string, job func()) bool {
+	d.lock.RLock()
+	defer d.lock.RUnlock()
+
+	if d.closed {
+		return false
+	}
+
 	d.queues[d.Index(key)] <- job
+
+	return true
 }
 
-// Close waits for every submitted job to run, then stops the workers.
+// Close refuses further jobs, waits for every job taken to run, then stops the workers. Closing again does nothing.
 func (d *Dispatcher) Close() {
+	d.lock.Lock()
+
+	if d.closed {
+		d.lock.Unlock()
+
+		return
+	}
+
+	d.closed = true
+
 	for _, queue := range d.queues {
 		close(queue)
 	}
 
+	d.lock.Unlock()
 	d.wg.Wait()
 }

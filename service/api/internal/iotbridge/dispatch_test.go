@@ -3,6 +3,7 @@ package iotbridge_test
 import (
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -130,5 +131,54 @@ func TestDispatcherNeedsOneWorker(t *testing.T) {
 
 	if !ran {
 		t.Fatal("the job did not run")
+	}
+}
+
+// A handler still running when the bridge stops may submit after Close: the job is dropped, without a panic.
+func TestDispatcherDropsAJobAfterClose(t *testing.T) {
+	t.Parallel()
+
+	dispatcher := iotbridge.NewDispatcher(2, 2)
+	dispatcher.Close()
+
+	ran := false
+
+	if dispatcher.Submit("k", func() { ran = true }) {
+		t.Error("Submit took a job after Close")
+	}
+
+	dispatcher.Close() // closing again does nothing
+
+	if ran {
+		t.Fatal("a job submitted after Close ran")
+	}
+}
+
+// Submits racing with Close never panic, and every job that was taken runs.
+func TestDispatcherSubmitRacesWithClose(t *testing.T) {
+	t.Parallel()
+
+	dispatcher := iotbridge.NewDispatcher(4, 1)
+
+	var (
+		submitters sync.WaitGroup
+		taken, ran atomic.Int64
+	)
+
+	for sender := range 8 {
+		submitters.Go(func() {
+			for i := range 200 {
+				if dispatcher.Submit(fmt.Sprintf("%d-%d", sender, i), func() { ran.Add(1) }) {
+					taken.Add(1)
+				}
+			}
+		})
+	}
+
+	dispatcher.Close()
+	submitters.Wait()
+
+	if ran.Load() != taken.Load() {
+		t.Fatalf("%d jobs taken, %d ran", taken.Load(), ran.Load())
 	}
 }
