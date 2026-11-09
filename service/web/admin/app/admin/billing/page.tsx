@@ -11,10 +11,11 @@ import { apiMode, coreAll, coreDisplay, coreNow, coreOp, orWhenRefused, coreAllP
 import { i18nOf } from "@ac/web/lib/i18n";
 import {
   billingMonths, contractOptions, inquiryRows, invoiceDetail, invoiceRows, lastClosedMonth, monthsText, statementDetail, statementRows,
-  type ApiContract, type ApiCustomer, type ApiInquiry, type ApiInvoice, type ApiInvoiceDetail, type ApiOrganization, type ApiProperty, type ApiRecipient, type ApiStatement,
+  type ApiContract, type ApiCustomer, type ApiInvoice, type ApiInvoiceDetail, type ApiOrganization, type ApiProperty, type ApiRecipient, type ApiStatement,
 } from "@ac/web/lib/billing";
 import { withAccess } from "@ac/web/lib/withAccess";
 import { BillingView, type BillingLive } from "./_components/billing-view";
+import { billingInquiries } from "./_lib/inquiries";
 import { queryReader } from "@ac/web/lib/searchParams";
 
 interface Page<T> { items: T[] }
@@ -49,7 +50,7 @@ async function AdminBillingPageContent({ searchParams }: Readonly<PageProps<"/ad
     coreAllPage<ApiContract>("contracts.list"),
     coreAllPage<ApiCustomer>("customers.list"),
     coreAllPage<ApiProperty>("properties.list"),
-    coreOp<Page<ApiInquiry>>("inquiries.list", { limit: 100 }),
+    billingInquiries(), // every received inquiry, then the newest answered (IR713)
   ]);
   const i = i18nOf(display);
   const rows = invoiceRows(invoices.items, contracts.items, customers.items, now, i);
@@ -60,7 +61,7 @@ async function AdminBillingPageContent({ searchParams }: Readonly<PageProps<"/ad
     rows,
     months: monthsText(months.from, months.to, i),
     contracts: contractOptions(contracts.items, customers.items, i.t),
-    inquiries: inquiryRows(inquiries.items, customers.items, i),
+    inquiries: inquiryRows(inquiries, customers.items, i),
     customers: customers.items.map((c) => ({ id: c.id, name: c.name })),
     properties: properties.items.filter((p) => !p.archived).map((p) => ({ id: p.id, name: p.name, customerId: orgCustomer.get(p.customerOrgId) ?? "" })),
     contractsOfCustomer: contracts.items.map((k) => ({ id: k.id, customerId: k.customerId })),

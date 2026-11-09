@@ -9716,3 +9716,19 @@ Each read one page of `alerts.list` for the unit over every status: 50 alerts on
 1. **Reproduced.** `shared/lib/tests/unitAlerts.test.ts` serves 50 resolved critical alerts, one open warning and one acknowledged alert for a unit, in the list's order. With one page of every status, the two unresolved alerts are missing (the test fails). With the fix both are read.
 2. **Fix.** `unitAlerts` (`shared/lib/unitAlerts.ts`) reads the unit's open and acknowledged alerts each in full (`coreAll`), and its latest resolved alerts up to the page's former limit (50 or 20), newest change first (`updatedAt` desc, so the events of the period and the evidence list show the recent ones). The three loaders use it. A refusal still answers as before: the technician's alert page shows its unavailable states, and the other two show no alerts.
 3. **Not changed.** What the pages show and how they order it. Every operation, route and count stays the same.
+
+## IR713 HQ billing reads every inquiry waiting for a reply (review round 193, 2026-11-10)
+
+The Customer inquiries tab of `/admin/billing` (FR-A08, DD-A08) shows the customers' questions as All, Received and Answered, with a count on each, and puts the received ones first. The page read one page of `inquiries.list` (limit 100), which sorts the newest first across the states. So once more than 100 newer inquiries had been answered, an older one still waiting for a reply was missing from the Received tab and its count, and HQ could not answer it. Inquiries only accumulate. This is the class of IR710 to IR712.
+
+1. **Reproduced.** The admin app's unit test `inquiriesLoad.test.ts` serves 100 answered inquiries and one older received inquiry, in the list's order. With one page the received inquiry is missing (the test fails). With the fix it is listed, and the Answered tab still shows the newest 100.
+2. **Fix.** `billingInquiries` (`admin/app/admin/billing/_lib/inquiries.ts`) reads the received inquiries in full (`coreAll` with `status: received`) and the newest 100 answered ones (`status: answered`). The view, its order and the reply flow are unchanged.
+3. **Not changed.** The customer's payment page already reads every inquiry of its invoice and restriction (`coreAll`). Every operation, route and count stays the same.
+
+## IR714 The HQ restrictions screen counts every state of its scope (review round 194, 2026-11-10)
+
+`/admin/restrictions` (FR-A09, SCR-A09) shows a chip with a count for each state: scheduled, requested, applied, release requested, released and cancelled. A chip picks that state as the `status` filter of the list. The counts were taken from the listed rows: one page of `restrictions.list` (limit 100, newest first). So with a state picked, every other chip showed 0. Without one, the counts stopped at the newest 100 restrictions, and an older restriction still applied did not count. Released and cancelled restrictions only accumulate.
+
+1. **Reproduced.** The admin app's unit test `restrictionCounts.test.ts` serves 120 released restrictions and one older applied one in a contract's scope. Counting the listed page gives applied 0 and released 100 (the test fails). With the fix the counts are 1 and 120.
+2. **Fix.** `stateCounts` (`admin/app/admin/restrictions/_lib/counts.ts`) reads the `total` of `restrictions.list` per state (limit 1), in the contract / invoice scope of the URL whichever state is picked. The list, the detail and the schedule form are unchanged.
+3. **Not changed.** The unfiltered list still shows the newest 100. A state chip, now counted right, lists that state on the server. Every operation, route and count stays the same.
