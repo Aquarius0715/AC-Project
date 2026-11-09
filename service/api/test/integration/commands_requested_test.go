@@ -136,7 +136,7 @@ func TestAcknowledgementAheadOfTheSentReport(t *testing.T) {
 	keepObserved(t, command)
 	t.Cleanup(func() { owner(t, `DELETE FROM control.commands WHERE id = $1`, command) })
 
-	trigger := func(kind string, at time.Duration) {
+	trigger := func(kind string, ago time.Duration) {
 		t.Helper()
 
 		code, res := write(
@@ -144,7 +144,9 @@ func TestAcknowledgementAheadOfTheSentReport(t *testing.T) {
 			hq(),
 			"demo.trigger",
 			`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+
-				clock().Add(at).Format(time.RFC3339)+`","eventType":"`+kind+`","commandId":"`+command+`"}`,
+				clock().Add(-ago).
+					Format(time.RFC3339)+
+				`","eventType":"`+kind+`","commandId":"`+command+`"}`,
 			0,
 		)
 		if code != http.StatusOK {
@@ -152,8 +154,8 @@ func TestAcknowledgementAheadOfTheSentReport(t *testing.T) {
 		}
 	}
 
-	trigger("command_ack", -2*time.Second)
-	trigger("command_sent", -time.Second) // the report that lost the race changes nothing
+	trigger("command_ack", 2*time.Second)
+	trigger("command_sent", time.Second) // the report that lost the race changes nothing
 
 	var (
 		status, delivery string

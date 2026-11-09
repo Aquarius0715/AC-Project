@@ -287,6 +287,7 @@ func TestSendReusesItsConnections(t *testing.T) {
 		}
 	}
 	api.Start()
+
 	defer api.Close()
 
 	const (
@@ -296,12 +297,15 @@ func TestSendReusesItsConnections(t *testing.T) {
 
 	client := newHTTPClient()
 
-	var running sync.WaitGroup
+	var (
+		running sync.WaitGroup
+		trigger iotbridge.Trigger
+	)
 
 	for range senders {
 		running.Go(func() {
 			for range each {
-				err := send(t.Context(), client, api.URL, iotbridge.Trigger{})
+				err := send(t.Context(), client, api.URL, trigger)
 				if err != nil {
 					t.Error(err)
 				}

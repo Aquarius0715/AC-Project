@@ -97,6 +97,7 @@ func restOp(mode Mode, input func() any) *Operation {
 		Expr:     authz.Expr{Alternatives: nil, Notes: nil, Remark: ""},
 		Result:   nil,
 		Handle:   nil,
+		OwnTx:    false,
 	}
 }
 
