@@ -9373,3 +9373,10 @@ The technician's “Scan unit QR” dialog (FR-T13, DD-T13) calls `units.resolve
 
 1. **The refusal.** `qrRefusalOf(error)` words whatever a scan threw: a refused call by its code as before, anything else as `Scan failed` / “The label could not be checked — try again.”, so the dialog is ready for another scan.
 2. **Test.** `techQr.test.ts` reads a network error as the failed scan and a NOT_FOUND refusal as before. No operation, route or screen layout changes.
+
+## IR675 A Server Action of the technician's job workspace answers unavailable when the Core API gives no answer (review round 76) — 2026-11-09
+
+The Server Actions of the technician's job workspace (acknowledge, check-in, pause, draft save, photo upload, sign-off, submit, resume rework) turned a refused Core API call into a result with its code and message, and threw every other error again. A call that gets no answer — the Core API is restarting or unreachable from the web server — is such an error: the page that called the action fell to its error boundary and was built again, and the checklist the technician had typed but not saved was gone, although the draft save is designed to leave the page as it is so that unsaved edits survive. The actions of the other apps return the unavailable result for it. The thrown error was only needed for the redirect to sign-in that the Data Access Layer raises when the session cookie is missing.
+
+1. **The failure.** `actionFailure(error)` words what a Server Action's call threw: a refused call by its code, message key and field errors; Next's own control flow (the redirect to sign-in) is thrown on as before; anything else is `UNAVAILABLE`, which the page shows as a message and keeps its state. The actions of the job workspace use it.
+2. **Test.** `actionFailure.test.ts` covers the refused call, the call without an answer and the redirect. No operation, route or screen layout changes.

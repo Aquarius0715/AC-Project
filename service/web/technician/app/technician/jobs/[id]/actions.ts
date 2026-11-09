@@ -6,6 +6,7 @@
 // so unsaved checklist edits survive; job transitions refresh the page.
 import { refresh } from "next/cache";
 import { coreOp, CoreError } from "@ac/web/lib/dal";
+import { actionFailure } from "@ac/web/lib/actionFailure";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import type { ApiTechReport } from "@ac/web/lib/techJob";
 import { uploadName, uploadType } from "@ac/web/lib/files";
@@ -15,15 +16,11 @@ import { formValue } from "@ac/web/lib/formValue";
 import { imageMime } from "@ac/web/lib/uploads";
 
 type Result<T> = { ok: true; value: T } | ({ ok: false } & ActionFailure);
-const failed = (e: unknown): Result<never> => {
-  if (e instanceof CoreError) return { ok: false, code: e.error.code, messageKey: e.error.messageKey, fieldErrors: e.error.fieldErrors, retryAfterSeconds: e.error.retryAfterSeconds };
-  throw e;
-};
 const run = async <T,>(fn: () => Promise<T>, reload = false): Promise<Result<T>> => {
   try {
     return { ok: true, value: await fn() };
   } catch (error) {
-    return failed(error);
+    return actionFailure(error);
   } finally {
     if (reload) refresh();
   }
@@ -46,7 +43,7 @@ export async function checkIn(jobId: string, version: number, method: "location_
       const resolved = await coreOp<{ unitId: string }>("units.resolveQr", { code: qrCode });
       qrUnitId = resolved.unitId;
     } catch (error) {
-      return error instanceof CoreError && error.error.code === "NOT_FOUND" ? { ok: false, code: "VALIDATION", messageKey: "error.validation", fieldErrors: { qrUnitId: "errors.qr_unit_mismatch" } } : failed(error);
+      return error instanceof CoreError && error.error.code === "NOT_FOUND" ? { ok: false, code: "VALIDATION", messageKey: "error.validation", fieldErrors: { qrUnitId: "errors.qr_unit_mismatch" } } : actionFailure(error);
     }
   }
   return run(() => coreOp("jobs.checkIn", { jobId, method, distanceMeters: method === "location_qr" ? distanceMeters : null, qrUnitId, ...(method === "manual" && reason !== null && { reason }) }, { write: true, expectedVersion: version }), true);
