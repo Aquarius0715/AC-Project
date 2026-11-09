@@ -568,3 +568,35 @@ func TestEventCursorIsAPosition(t *testing.T) {
 		t.Errorf("the cursor went back from %v to %v when an event was removed", before, after)
 	}
 }
+
+// TestEventCursorIsTheTenantsOwn: the outbox is read across tenants (it has no row level security, for the relay), so
+// the cursor has to name its tenant: another tenant's events neither move it nor show how busy that tenant is.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
+func TestEventCursorIsTheTenantsOwn(t *testing.T) {
+	srv := server(t)
+
+	cursor := func() float64 {
+		t.Helper()
+
+		_, res := post(srv, hq(), "session.get", `{}`)
+
+		return asNum(t, asObj(t, res["meta"])["eventCursor"])
+	}
+
+	before := cursor()
+
+	event := uuid.NewString()
+	owner(
+		t,
+		`INSERT INTO platform.outbox (id, tenant_id, aggregate_type, aggregate_id, event_type, payload, correlation_id)
+		VALUES ($1, $2, 'test', $1, 'test.other-tenant', '{}', 'corr-other-tenant')`,
+		event,
+		seed.ID("tenant-b"),
+	)
+	t.Cleanup(func() { owner(t, `DELETE FROM platform.outbox WHERE id = $1`, event) })
+
+	if after := cursor(); after != before {
+		t.Errorf("another tenant's event moved the cursor from %v to %v", before, after)
+	}
+}
