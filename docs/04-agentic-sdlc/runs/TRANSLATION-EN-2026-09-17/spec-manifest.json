@@ -1,12 +1,12 @@
 {
   "version": "0.210.0",
-  "spec_baseline_id": "f215abaae5a869a22dff81273502476de3927118977d11dbc3cdf3decae341e7",
+  "spec_baseline_id": "0e3b760156cf3528ddf13f259afcdc114ab5e6034f45812cdd8e27f3ae2ab31c",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
     {
       "path": "00-prepare/PrepareDocument.md",
-      "sha256": "0be963fda3f2d65c7d648e7ff79843d0a85cb1571a2d76b7aca63e05784c3613"
+      "sha256": "a3a69efff42fd0b4d16ade5b219ef3afae42ec47786af868d63e0152af25dfcf"
     },
     {
       "path": "00-prepare/company-requirement-map.csv",
@@ -110,7 +110,7 @@
     },
     {
       "path": "02-design/backend-go-design.md",
-      "sha256": "af8399672ce7d66a24f64bf47ec2d25abf25931757ab130a6299e325a8e60786"
+      "sha256": "f0868632fff3b2a77ad1963163e72fd51eb3356dcdd2b215d25d6074e407333f"
     },
     {
       "path": "02-design/client.md",
@@ -150,7 +150,7 @@
     },
     {
       "path": "02-design/load-test.md",
-      "sha256": "8a2da3fc93e54350b73e5039ce30669414c00b783cd5ec17929f9be4e8608b2e"
+      "sha256": "886d42e3dc624575573c4c50a5ca7f2d0b8ef0c8b19a2f7020f46dbc40920bcc"
     },
     {
       "path": "02-design/network-architecture.md",
@@ -170,7 +170,7 @@
     },
     {
       "path": "02-design/review-resolution-contracts.md",
-      "sha256": "abd226e44b8b4be383c5f275ce6c97e89c444420759d337b8c57db3e576f6c42"
+      "sha256": "08dc8415b613405ccfd9639818f3fc15bf863e2335f8e5de43ff4eed0d0c0306"
     },
     {
       "path": "02-design/service-contracts.ts",
@@ -298,7 +298,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "fb10cd50b214b6ec99d1c4bf4f2e19f61c532f88a8b0e8eaf32f600d2a701b93"
+      "sha256": "fb16ad623b0bd954729b8c8efa7e085ca502984def7088f1041c4f073dff4687"
     },
     {
       "path": "tools/check_review_regressions.py",
