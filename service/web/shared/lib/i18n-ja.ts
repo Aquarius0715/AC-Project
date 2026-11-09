@@ -4097,6 +4097,7 @@ export const ja: Record<string, string> = {
   "A new policy needs an active owner customer — start it again with + New policy.": "新しいポリシーには、有効なオーナーの顧客が必要です — 「+ 新しいポリシー」からやり直してください。",
   "e.g. Bedroom too hot": "例: 寝室が暑すぎる",
   "A whole number 0–100": "0～100 の整数",
+  "A whole number 1–1440": "1～1440 の整数",
   "A policy belongs to one customer. Units pick it up on their own page (Customers & units › unit › Alert policies) — units are never assigned from here.": "ポリシーは1つの顧客に属します。ユニットは、各ユニットのページ（顧客とユニット › ユニット › アラートポリシー）で適用します — ここからユニットを割り当てることはありません。",
   "Owner (customer) · fixed after creation": "オーナー（顧客）· 作成後は変更できません",
   "Attached to {units} of {customer}: {names}": "{customer} の {units} に適用: {names}",

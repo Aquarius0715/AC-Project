@@ -4200,6 +4200,7 @@ export const ms: Record<string, string> = {
   "A new policy needs an active owner customer — start it again with + New policy.": "Polisi baharu memerlukan pelanggan pemilik yang aktif — mulakan semula dengan + Polisi baharu.",
   "e.g. Bedroom too hot": "cth. Bilik tidur terlalu panas",
   "A whole number 0–100": "Nombor bulat 0–100",
+  "A whole number 1–1440": "Nombor bulat 1–1440",
   "A policy belongs to one customer. Units pick it up on their own page (Customers & units › unit › Alert policies) — units are never assigned from here.": "Polisi dimiliki oleh seorang pelanggan. Unit memilihnya pada halaman sendiri (Pelanggan & unit › unit › Polisi amaran) — unit tidak pernah ditetapkan dari sini.",
   "Owner (customer) · fixed after creation": "Pemilik (pelanggan) · tetap selepas dicipta",
   "Attached to {units} of {customer}: {names}": "Dilampirkan pada {units} milik {customer}: {names}",
