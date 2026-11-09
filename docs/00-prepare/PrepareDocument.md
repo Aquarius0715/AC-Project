@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.523.0
+version: 0.527.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -300,6 +300,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.527.0: a property or unit is saved into a customer only after a delete of the customer has finished or never starts: the customer row is read with a share lock (IR667). No operation changes. Phase 1A unchanged.
 0.523.0: a write that PostgreSQL runs again after a deadlock records its events and audit entries once, not once per attempt (IR663). No operation changes. Phase 1A unchanged.
 0.522.0: a membership names each scope once, as it names each permission once; a repeated scope no longer slips past the scope-version check (IR661). No operation changes. Phase 1A unchanged.
 0.521.0: a customer's owner cannot send a user the set-up e-mail again once the access has ended, as a contractor cannot (IR664). No operation changes. Phase 1A unchanged.
