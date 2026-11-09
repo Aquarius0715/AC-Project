@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { qrMatch, qrRefusal, scanCode } from "@ac/web/lib/techQr";
+import { qrMatch, qrRefusal, qrRefusalOf, scanCode } from "@ac/web/lib/techQr";
+import { OpError } from "@ac/web/lib/ops";
 import { i18nOf } from "@ac/web/lib/i18n";
 
 const JOB_C_AAAA = "job-c-aaaa";
@@ -31,6 +32,12 @@ describe("technician QR scan", () => {
     expect(qrRefusal({ code: "VALIDATION" }).title).toBe("Not a label");
     expect(qrRefusal({ code: "UNAVAILABLE" }).text).toBe("The label could not be checked — try again.");
     expect(scanCode("  ac-unit:u1 ")).toBe("ac-unit:u1");
+  });
+
+  it("reads a call that failed without an answer (network down) as a failed scan, not as an exception", () => {
+    const refused = new OpError({ code: "NOT_FOUND", messageKey: "error.notFound", fieldErrors: {}, correlationId: "", retryAfterSeconds: null }, { status: 404 });
+    expect(qrRefusalOf(refused)).toMatchObject({ title: "Page unavailable", absent: true });
+    expect(qrRefusalOf(new TypeError("Failed to fetch"))).toMatchObject({ title: "Scan failed", absent: false });
   });
 });
 

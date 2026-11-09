@@ -9366,3 +9366,10 @@ IR49(b) makes equipment reads (`telemetry.*`, `alerts.*`, `devices.*`, `units.ge
 
 1. **The gate.** The `spaceId` path of `telemetry.series` passes the units of the space through `unitscope.Gate`, as the `unitIds` path does. Everyone but an external technician passes; the answer for the technician is the same FORBIDDEN `errors.assignment_not_started` as by unit ID.
 2. **Test.** `TestUnitScopeExternalTechnicianAndContractor` also reads the series by the room of the unit: before the fix it answered 200 with the measurement before the work window, now 403 `errors.assignment_not_started`, and 200 inside the window. No operation, route or screen changes.
+
+## IR674 The unit QR scan answers a failed scan when the call has no answer (review round 72) — 2026-11-09
+
+The technician's “Scan unit QR” dialog (FR-T13, DD-T13) calls `units.resolveQr` and then `units.get` and `jobs.get` through the BFF. A refused call arrives as an error with its code and the dialog words it (`Page unavailable`, `Not a label`, `Scan failed`). A call that gets no answer at all — the phone loses the network on site, the request is cut — throws a plain network error instead. The dialog threw it again from its handler: the state stayed on `Reading the label…`, the Scan button stayed disabled, and only closing the dialog helped. Other forms word the same failure as `Not sent`.
+
+1. **The refusal.** `qrRefusalOf(error)` words whatever a scan threw: a refused call by its code as before, anything else as `Scan failed` / “The label could not be checked — try again.”, so the dialog is ready for another scan.
+2. **Test.** `techQr.test.ts` reads a network error as the failed scan and a NOT_FOUND refusal as before. No operation, route or screen layout changes.
