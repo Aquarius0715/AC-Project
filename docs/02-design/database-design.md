@@ -11,7 +11,7 @@ scope: production-target-implementation
 
 ## 1. Purpose and scope
 
-This document designs the production relational database for the Go backend ([backend Go design](backend-go-design.md), [backend architecture](backend-architecture.md)). The executable schema is [db/schema.sql](db/schema.sql) (99 tables including default partitions as of 2026-10-08, 38 permission rows). It was applied to PostgreSQL 16 on 2026-10-07 and checked for tenant isolation (RLS), the append-only audit trigger, and the no-overlap assignment constraint. Status `PROPOSED` (IR118, DEC-69).
+This document designs the production relational database for the Go backend ([backend Go design](backend-go-design.md), [backend architecture](backend-architecture.md)). The executable schema is [db/schema.sql](db/schema.sql) (99 tables including default partitions as of 2026-10-08, 39 permission rows). It was applied to PostgreSQL 16 on 2026-10-07 and checked for tenant isolation (RLS), the append-only audit trigger, and the no-overlap assignment constraint. Status `PROPOSED` (IR118, DEC-69).
 
 The source of truth for fields and states is [service-contracts.ts](service-contracts.ts); this document says how each type is stored. Phase 1A still uses the in-browser mock and does not use this schema.
 
@@ -20,7 +20,7 @@ The source of truth for fields and states is [service-contracts.ts](service-cont
 | Schema | Owning module | Main tables |
 |---|---|---|
 | platform | shared infrastructure | tenants, outbox, idempotency_keys, scheduled_items, processed_events, event_failures (IR427), stream_checkpoints, demo_clock (demo environment only, IR168) |
-| identity | Identity & access | users, organizations, memberships, membership_permissions, membership_scopes, qualification_grants, permissions (38), preferences, two_factor, consents, client_users (the customer owners' user lists, IR417), partner_users (the contractors' user lists, IR416) |
+| identity | Identity & access | users, organizations, memberships, membership_permissions, membership_scopes, qualification_grants, permissions (39), preferences, two_factor, consents, client_users (the customer owners' user lists, IR417), partner_users (the contractors' user lists, IR416) |
 | assets | Assets | customers, properties, spaces, units, unit_alert_policies, unit_imports, unit_import_previews (30-minute CSV validation results written outside the read transaction of `units.importPreview`, purged after expiry), warranty_reminders (the BR-A19 reminders sent, IR340), unit_offer_access and unit_assignment_access (projections of accepted Offers and of Assignments with an `active` flag for the unit scope and the diagnostic-run scope, fed by change-capture events, IR186, IR187) |
 | devices | Devices | capabilities (versioned), devices, sensors, device_bindings, device_operations, device_events, device_event_notes, calibration_records, firmware_campaigns, firmware_campaign_devices |
 | control | Control | commands, diagnostic_runs, automations, automation_units, automation_policies, automation_policy_units, automation_runs, evaluation_events, schedule_watermarks |

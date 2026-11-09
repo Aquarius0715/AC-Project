@@ -218,6 +218,7 @@
   "purpose"
  ],
  "contractors.delete": [
+  "force",
   "id",
   "reason"
  ],
@@ -259,6 +260,7 @@
   "unitIds"
  ],
  "customers.delete": [
+  "force",
   "id",
   "reason"
  ],
@@ -729,6 +731,7 @@
   "id"
  ],
  "members.delete": [
+  "force",
   "id",
   "reason"
  ],

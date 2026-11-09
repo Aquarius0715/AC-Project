@@ -5046,7 +5046,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: admin:job.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR654 only a contractor company with no job, offer, history, certificate, payout or account (CONFLICT error.contractorInUse); deletes its rate cards and unavailability\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A21",
+                "description": "Authorization: admin:job.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR654 only a contractor company with no job, offer, history, certificate, payout or account (CONFLICT error.contractorInUse); deletes its rate cards and unavailability; IR690 force (data.forceDelete, else FORBIDDEN errors.force_delete_not_allowed): the accounts of the company do not stop the delete, the caller deletes them afterwards with members.delete force, every other record still stops it; the reason is recorded as [forced]\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A21",
                 "consumes": [
                     "application/json"
                 ],
@@ -5084,6 +5084,12 @@
                         "type": "string",
                         "description": "input field reason",
                         "name": "reason",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "input field force",
+                        "name": "force",
                         "in": "query"
                     }
                 ],
@@ -5868,7 +5874,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: admin:asset.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR654 only a customer with no unit (CONFLICT error.customerHasUnits) and no job, contract, invoice, inquiry, restriction, report or account (CONFLICT error.customerInUse); deletes its properties, spaces and unit imports\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A02",
+                "description": "Authorization: admin:asset.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR654 only a customer with no unit (CONFLICT error.customerHasUnits) and no job, contract, invoice, inquiry, restriction, report or account (CONFLICT error.customerInUse); deletes its properties, spaces and unit imports; IR690 force (data.forceDelete, else FORBIDDEN errors.force_delete_not_allowed): the accounts of its organization do not stop the delete, the caller deletes them afterwards with members.delete force, every other record still stops it; the reason is recorded as [forced]\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A02",
                 "consumes": [
                     "application/json"
                 ],
@@ -5906,6 +5912,12 @@
                         "type": "string",
                         "description": "input field reason",
                         "name": "reason",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "input field force",
+                        "name": "force",
                         "in": "query"
                     }
                 ],
@@ -17457,7 +17469,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: admin:identity.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR657 only an account that never acted (no audit entry names it) and has no assignment or certificate (CONFLICT error.memberUsed); not the caller own (error.memberSelf); the only account of its person (error.memberHasOthers); deletes the person, its entry in a user list and the provider account\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A03",
+                "description": "Authorization: admin:identity.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR657 only an account that never acted (no audit entry names it) and has no assignment or certificate (CONFLICT error.memberUsed); not the caller own (error.memberSelf); the only account of its person (error.memberHasOthers); deletes the person, its entry in a user list and the provider account; IR690 force (data.forceDelete, else FORBIDDEN errors.force_delete_not_allowed) also deletes an account that acted or marked a filter cleaning, an assignment or a certificate still stops it; the reason is recorded as [forced]\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A03",
                 "consumes": [
                     "application/json"
                 ],
@@ -17495,6 +17507,12 @@
                         "type": "string",
                         "description": "input field reason",
                         "name": "reason",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "input field force",
+                        "name": "force",
                         "in": "query"
                     }
                 ],

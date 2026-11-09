@@ -292,7 +292,8 @@
         "mrv.factors",
         "offset.read",
         "offset.write",
-        "audit.read"
+        "audit.read",
+        "data.forceDelete"
       ],
       "tenantId": "tenant-a",
       "validFrom": "2026-09-01T00:00:00.000Z",

@@ -22,7 +22,7 @@ import { Icon } from "@ac/web/components/Icon";
 import { DateTimeSelect } from "@ac/web/components/TimeSelect";
 
 interface Live {
-  now: string; canWrite: boolean; selfUserId: string; tenantId: string; scope: { role?: string; status?: string; organizationId?: string }; rows: MemberRow[];
+  now: string; canWrite: boolean; canForce: boolean; selfUserId: string; tenantId: string; scope: { role?: string; status?: string; organizationId?: string }; rows: MemberRow[];
   /** a membership ID, "new" for the blank form, or "missing" when the URL names one the list does not hold */
   selected: string;
   users: { id: string; name: string }[]; orgs: ApiOrganization[]; properties: { id: string; name: string }[]; units: { id: string; name: string }[];
@@ -202,7 +202,8 @@ export function AccessView({ live }: Readonly<{ live: Live }>) {
         <p className="mt-2 text-[11px] text-muted-foreground">{t("For a lost device or a suspected takeover. Revoke access ends the membership instead.")}</p>
       </Modal>
       {removing && sel && <DeleteDialog title={t("Delete account — {name}", { name: sel.name })} text={t("Delete the account of {name}? The person and their sign-in are deleted with it. Only an account that never acted, with no assignment or certificate, can be deleted; otherwise revoke the access.", { name: sel.name })} pending={pending}
-        onClose={() => { setRemoving(false); }} onConfirm={(reason) => { run(() => deleteMember(sel.id, sel.version, reason), t("Account deleted"), () => { setRemoving(false); nav({ membershipId: null }); }); }} />}
+        onClose={() => { setRemoving(false); }} force={live.canForce ? { name: sel.name, what: t("also deletes an account that has history (it keeps its audit rows); not one with assignments or certificates") } : undefined}
+        onConfirm={(reason, force) => { run(() => deleteMember(sel.id, sel.version, reason, force), t("Account deleted"), () => { setRemoving(false); nav({ membershipId: null }); }); }} />}
     </Page>
   );
 }

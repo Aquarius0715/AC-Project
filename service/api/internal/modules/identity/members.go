@@ -859,14 +859,14 @@ func checkScopes(ctx context.Context, call *ops.Call, input *MemberInput) error 
 	return nil
 }
 
-// checkSelfPromotion refuses a user granting themselves identity.write or restriction.override they did not hold
-// already (DD-A03).
+// checkSelfPromotion refuses a user granting themselves identity.write, restriction.override or data.forceDelete they
+// did not hold already (DD-A03).
 func checkSelfPromotion(ctx context.Context, call *ops.Call, input *MemberInput) error {
 	if input.UserID != call.Principal.UserID {
 		return nil
 	}
 
-	for _, permission := range []string{"identity.write", "restriction.override"} {
+	for _, permission := range []string{"identity.write", "restriction.override", "data.forceDelete"} {
 		if !slices.Contains(input.Permissions, permission) {
 			continue
 		}

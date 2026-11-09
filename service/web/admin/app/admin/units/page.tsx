@@ -9,6 +9,7 @@
 // the first render are formatted here in the user's language and display time zone (IR293).
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
+import { DATA_FORCE_DELETE } from "@ac/web/lib/members";
 import { apiMode, coreAll, coreDisplay, coreNow, coreOp, corePermissions, CoreError } from "@ac/web/lib/dal";
 import { klStamp } from "@ac/web/lib/energy";
 import { i18nOf, relativeTime, showDate, type I18n, textOf } from "@ac/web/lib/i18n";
@@ -71,6 +72,7 @@ export default async function AdminUnitsPage({ searchParams }: Readonly<PageProp
     now: now.toISOString(),
     todayKL: klStamp(now.toISOString()).slice(0, 10),
     canWrite: has("asset.write"),
+    canForce: has(DATA_FORCE_DELETE),
     standingKnown: !!(contracts && overdue),
     kpis: registerKpis(rows, units, t),
     search: one("search") ?? "",

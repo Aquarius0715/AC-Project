@@ -8,7 +8,7 @@
 import { connection } from "next/server";
 import { apiMode, coreAll, coreDisplay, coreNow, corePermissions, corePrincipal } from "@ac/web/lib/dal";
 import { i18nOf } from "@ac/web/lib/i18n";
-import { memberRows, type ApiMember, type ApiOrganization } from "@ac/web/lib/members";
+import { DATA_FORCE_DELETE, memberRows, type ApiMember, type ApiOrganization } from "@ac/web/lib/members";
 import { AccessDemo } from "./_components/access-demo";
 import { AccessView } from "./_components/access-view";
 import { withAccess } from "@ac/web/lib/withAccess";
@@ -53,6 +53,7 @@ async function AdminAccessPageContent({ searchParams }: Readonly<PageProps<"/adm
     <AccessView live={{
       now: now.toISOString(),
       canWrite: perms.has("identity.write"),
+      canForce: perms.has(DATA_FORCE_DELETE),
       selfUserId: me.userId,
       tenantId: me.tenantId,
       scope: { role, status, organizationId },

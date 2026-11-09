@@ -1,5 +1,5 @@
 // HQ access and roles (FR-A03, DATA_SOURCE=API): memberships of HQ, contractor and technician users projected for
-// /admin/settings/access, with the 38 canonical permissions (BR-A03, IR107) and the members.save rules (IR members.save
+// /admin/settings/access, with the 39 canonical permissions (BR-A03, IR107, IR690) and the members.save rules (IR members.save
 // item 1). Pure code shared by the Server Component and the client view. Texts in the display language; the valid period
 // is shown and typed in the display time zone (`t` / `i` / `zone`, IR302).
 import { EN, showTime, translator, zonedInstant, zonedParts, type I18n, type T } from "@ac/web/lib/i18n";
@@ -15,6 +15,7 @@ const IDENTITY_WRITE = "identity.write";
 const DEVICE_MAINTAIN = "device.maintain";
 const CONTROL_DIAGNOSE = "control.diagnose";
 const RESTRICTION_OVERRIDE = "restriction.override";
+export const DATA_FORCE_DELETE = "data.forceDelete";
 
 const en = translator("en");
 
@@ -50,13 +51,14 @@ export const permissionRows: PermissionRow[] = [
   { res: "Offsets", read: "offset.read", write: "offset.write" },
   { res: "Audit", read: "audit.read" },
   { res: "Partners", actions: [...PARTNER_ACTIONS] },
+  { res: "Data deletion", actions: [DATA_FORCE_DELETE] },
 ];
 /** A matrix resource as the screen words it. */
 export function resourceWord(res: string, t: T = en): string {
   const words: Record<string, string> = {
     Dashboard: t("Dashboard"), "Customers & units": t("Customers & units"), "Users & roles": t("Users & roles"), "Devices & models": t("Devices & models"), "AC control": t("AC control"),
     Alerts: t("Alerts"), "Alert policies": t("Alert policies"), "Maintenance jobs": t("Maintenance jobs"), Contracts: t("Contracts"), Billing: t("Billing"), Restrictions: t("Restrictions"),
-    "Automation policies": t("Automation policies"), Energy: t("Energy"), MRV: t("MRV"), Offsets: t("Offsets"), Audit: t("Audit"), Partners: t("Partners"),
+    "Automation policies": t("Automation policies"), Energy: t("Energy"), MRV: t("MRV"), Offsets: t("Offsets"), Audit: t("Audit"), Partners: t("Partners"), "Data deletion": t("Data deletion"),
   };
   return lookup(words, res) ?? res;
 }
@@ -74,10 +76,10 @@ export const allowedFor: Record<Role, string[]> = {
   admin: allPermissions, contractor: [...PARTNER_ACTIONS], technician: ["alert.read", "alert.resolve", CONTROL_DIAGNOSE, DEVICE_MAINTAIN],
 };
 /** The defaults a role choice pre-checks; every permission stays editable within the role's allowed set. */
-const adminDefaults = allPermissions.filter((p) => ![...PARTNER_ACTIONS, DEVICE_MAINTAIN, CONTROL_DIAGNOSE, "restriction.write", RESTRICTION_OVERRIDE, IDENTITY_WRITE].includes(p));
+const adminDefaults = allPermissions.filter((p) => ![...PARTNER_ACTIONS, DEVICE_MAINTAIN, CONTROL_DIAGNOSE, "restriction.write", RESTRICTION_OVERRIDE, IDENTITY_WRITE, DATA_FORCE_DELETE].includes(p));
 export const roleDefaults: Record<Role, string[]> = { admin: adminDefaults, contractor: allowedFor.contractor, technician: allowedFor.technician };
 /** Granting these to one's own user is FORBIDDEN (another identity administrator must do it). */
-export const selfBlocked = [IDENTITY_WRITE, RESTRICTION_OVERRIDE];
+export const selfBlocked = [IDENTITY_WRITE, RESTRICTION_OVERRIDE, DATA_FORCE_DELETE];
 
 export const isActive = (m: Pick<ApiMember, "validFrom" | "validUntil">, now: Date) => Date.parse(m.validFrom) <= now.getTime() && (!m.validUntil || Date.parse(m.validUntil) > now.getTime());
 
