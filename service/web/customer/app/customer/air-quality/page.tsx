@@ -12,8 +12,8 @@ import { i18nOf, showClock } from "@ac/web/lib/i18n";
 import type { ApiPropertyRow, ApiSpaceRow, ApiUnitRow } from "@ac/web/lib/assets";
 import { setsTemperature, type ApiUnitDetail } from "@ac/web/lib/units";
 import {
-  airGuidance, airMetrics, airPeriods, airRooms, airRows, airSelection, airWindow, allergenView, axisLabels, axisRange, axisTicks, cleanNote, co2Now,
-  metricCard, metricInfo, ventRow, ventStrip, windowSub, windowTitle, type AirSlot, type AirWindow, type ApiAirSeries, type ApiVentilationLog,
+  airChartSeries, airGuidance, airMetricsOf, airPeriods, airRooms, airRows, airSelection, airWindow, allergenView, axisLabels, cleanNote, co2Now,
+  metricCard, metricInfo, slotHeadings, ventRow, ventStrip, windowSub, windowTitle, type AirSlot, type AirWindow, type ApiAirSeries, type ApiVentilationLog,
 } from "@ac/web/lib/air";
 import { AirQualityDemo } from "./_components/air-quality-demo";
 import { AirQualityView, type AirLive } from "./_components/air-quality-view";
@@ -41,12 +41,12 @@ export default async function CustomerAirQualityPage({ searchParams }: Readonly<
   const rooms = airRooms(properties, spaces, units, i.t);
   const sel = airSelection(rooms, one("unitId"), one("spaceId"));
   if (!sel) return <AirQualityView live={null} />;
-  const metric = airMetrics.find((m) => m === one("metric")) ?? "co2";
+  const metrics = airMetricsOf(one("metric")); // "co2,pm25": several metrics in one chart (IR689); a single name is the old link
   const period = airPeriods.find((p) => p === one("period")) ?? "24h";
   const w = airWindow(period, now);
-  const [d, series, logs] = await Promise.all([
+  const [d, results, logs] = await Promise.all([
     coreOp<ApiUnitDetail>("units.get", { id: sel.unitId }),
-    readSeries(sel.unitId, metric, w),
+    Promise.all(metrics.map((m) => readSeries(sel.unitId, m, w))),
     sel.room.spaceId ? coreOp<{ items: ApiVentilationLog[]; total: number }>("ventilation.list", { filters: { spaceId: sel.room.spaceId }, limit: 10 }) : null,
   ]);
   const latest = (m: string) => d.latestMeasurements.find((x) => x.metric === m);
@@ -54,10 +54,11 @@ export default async function CustomerAirQualityPage({ searchParams }: Readonly<
   const isFreshAir = d.capabilities.ventilation && d.capabilities.ventilationLevels.includes("low");
   const guidance = airGuidance(latest("co2"), latest("pm25"), isFreshAir);
   const roomName = sel.room.spaceId ? spaces.find((s) => s.id === sel.room.spaceId)?.name ?? i.t("this room") : sel.room.path; // outside rooms: the property
-  const slots = series.slots; // the whole window: never cut off, so no slot is "not loaded" (IR592 → IR607)
-  const points = slots.map((s) => s.avg);
-  const info = entryOf(metricInfo, metric);
-  const range = axisRange(points, info.guide);
+  const byMetric = Object.fromEntries(metrics.map((m, k) => [m, results.at(k)]));
+  const lines = airChartSeries(metrics, byMetric, sensors, i); // the whole window: never cut off, so no slot is "not loaded" (IR592 → IR607)
+  const first = results.at(0);
+  const metric = metrics[0] ?? "co2";
+  const heading = metrics.map((m) => i.t(entryOf(metricInfo, m).label)).join(" · ");
   const names = new Map(units.map((u) => [u.id, u.displayName]));
   const live: AirLive = {
     rooms: rooms.map((r) => ({ key: r.key, spaceId: r.spaceId, label: r.label, units: r.units })),
@@ -72,15 +73,16 @@ export default async function CustomerAirQualityPage({ searchParams }: Readonly<
     cards: (["co2", "pm25", "temperature", "humidity"] as const).map((m) => metricCard(m, latest(m), sensors.has(m), i, setsTemperature(d.capabilities))),
     strip: ventStrip(guidance, latest("co2"), roomName, d.displayName, isFreshAir, i.t),
     clean: cleanNote(guidance, latest("pm25"), roomName, i.t),
-    allergen: allergenView(series.allergen, i),
+    allergen: allergenView(first?.allergen ?? null, i),
     chart: {
-      title: `${i.t(info.label)} — ${windowTitle(period, i.t)}`, sub: windowSub(w, info.unit, roomName, i), points, labels: axisLabels(w, i), guide: info.guide, ...range, ticks: axisTicks(range.min, range.max),
-      hasSensor: sensors.has(metric), readings: series.total, total: series.total, valid: slots.some((s) => s.avg !== null), gaps: slots.some((s) => s.avg === null),
+      title: `${heading} — ${windowTitle(period, i.t)}`, sub: windowSub(w, [...new Set(lines.map((l) => l.unit))].join(" / "), roomName, i), labels: axisLabels(w, i), times: slotHeadings(first?.slots ?? [], w.slotMs, i),
+      series: lines, gaps: results.some((r) => r.slots.some((s) => s.avg === null)),
     },
-    rows: airRows(slots, metric, w.slotMs, i),
+    tables: metrics.map((m, k) => ({ metric: m, label: i.t(entryOf(metricInfo, m).label), unit: entryOf(metricInfo, m).unit, rows: airRows(results.at(k)?.slots ?? [], m, w.slotMs, i) })),
     co2Now: co2Now(latest("co2"), display),
     history: logs ? { rows: logs.items.map((v) => ventRow(v, me.membershipId, names, now.getTime(), i)), total: logs.total } : null,
     metric,
+    metrics,
     period,
   };
   return <AirQualityView live={live} />;

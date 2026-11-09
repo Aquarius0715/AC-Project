@@ -6,6 +6,7 @@
 import { periodRange } from "@ac/web/lib/clientEnergy";
 import { evidenceText } from "@ac/web/lib/evidence";
 import { roundAway } from "@ac/web/lib/energy";
+import { toggleSeries, unitAxes } from "@ac/web/lib/chartScale";
 import { spacePath, type ApiPropertyRow, type ApiSpaceRow, type ApiUnitRow } from "@ac/web/lib/assets";
 import { DEFAULT_DISPLAY, EN, relativeTime, showClock, showDate, showDay, showSpan, translator, type Display, type I18n, type T } from "@ac/web/lib/i18n";
 import type { IconName } from "@ac/web/components/Icon";
@@ -228,6 +229,34 @@ export function windowSub(w: AirWindow, unit: string, room: string, i: I18n = EN
   return `${unit} · ${room} · ${span}`;
 }
 
+/** The metrics the URL's `metric` names ("co2,pm25"; a single name is the old form of the link): the known ones, each once,
+and no more than a chart has axes for — one unit on the left axis, another on the right, a third is left out (IR689). CO2
+when none is left. */
+export function airMetricsOf(text = ""): AirMetric[] {
+  const named = [...new Set(text.split(",").filter((m): m is AirMetric => (airMetrics as string[]).includes(m)))];
+  const axes = unitAxes(named.map((m) => entryOf(metricInfo, m).unit));
+  const fits = named.filter((m) => axes.has(entryOf(metricInfo, m).unit));
+  return fits.length > 0 ? fits : ["co2"];
+}
+/** The selection after a metric is pressed: taken out (never the last one) or put in; null when its unit would be a third on a chart with two axes. */
+export const toggleAirMetric = (selected: AirMetric[], metric: AirMetric): AirMetric[] | null => toggleSeries(selected, metric, (m) => entryOf(metricInfo, m).unit);
+/** The heading of each slot in the chart's tooltip: its span in the display time zone ("Mon 9 Nov, 15:00 – 15:05 MYT"). */
+export function slotHeadings(slots: AirSlot[], slotMs: number, i: I18n = EN): string[] {
+  return slots.map((s) => showSpan(s.start, new Date(Date.parse(s.start) + slotMs).toISOString(), i.display, true));
+}
+/** One line of the chart: a metric with its values per slot, the axis of its unit and what the screen says when it has none. */
+export interface AirChartSeries { metric: AirMetric; name: string; unit: string; points: (number | null)[]; guide: number | null; axis: "left" | "right"; hasSensor: boolean; valid: boolean; readings: number }
+/** The lines of the chart for the selected metrics, each on the axis of its unit (the first unit left, the second right). */
+export function airChartSeries(metrics: AirMetric[], series: Partial<Record<AirMetric, { slots: AirSlot[]; total: number }>>, sensors: ReadonlySet<string>, i: I18n = EN): AirChartSeries[] {
+  const axes = unitAxes(metrics.map((m) => entryOf(metricInfo, m).unit));
+  return metrics.map((metric) => {
+    const info = entryOf(metricInfo, metric);
+    const got = lookup(series, metric);
+    const points = (got?.slots ?? []).map((s) => s.avg);
+    return { metric, points, name: i.t(info.label), unit: info.unit, guide: info.guide, axis: axes.get(info.unit) ?? "left", hasSensor: sensors.has(metric), valid: points.some((p) => p !== null), readings: got?.total ?? 0 };
+  });
+}
+
 /** The averages of valid readings per slot of the window (null = no valid reading: a gap the chart never joins). */
 export interface AirSlot { start: string; avg: number | null; n: number }
 export function airSlots(items: ApiMeasurement[], w: AirWindow): AirSlot[] {
@@ -257,24 +286,6 @@ export function axisLabels(w: AirWindow, i: I18n = EN): string[] {
     if (w.period === "7d") return showDay(at, display); // "Tue 8"
     return k === 0 && w.period === "24h" ? t("{time} yesterday", { time }) : time;
   });
-}
-/** The y range of the chart: the values and the guide line with some room around them. */
-export function axisRange(points: (number | null)[], guide: number | null): { min: number; max: number } {
-  const vals = [...points.filter((p): p is number => p !== null), ...(guide === null ? [] : [guide])];
-  if (vals.length === 0) return { min: 0, max: 1 };
-  const lo = Math.min(...vals);
-  const hi = Math.max(...vals);
-  const pad = Math.max((hi - lo) * 0.15, Math.abs(hi) * 0.05, 1);
-  return { min: Math.floor(lo - pad), max: Math.ceil(hi + pad) };
-}
-/** About four round y-axis grid values inside [min, max] (steps of 1, 2 or 5 × 10ⁿ). */
-export function axisTicks(min: number, max: number): number[] {
-  const raw = (max - min) / 4;
-  const mag = 10 ** Math.floor(Math.log10(raw || 1));
-  const stepSize = [1, 2, 5, 10].map((f) => f * mag).find((s) => s >= raw) ?? 10 * mag;
-  const out: number[] = [];
-  for (let t = Math.ceil(min / stepSize) * stepSize; t <= max; t += stepSize) out.push(roundAway(t, 6));
-  return out;
 }
 /** The table view: newest slot first, consecutive empty slots merged into one gap row; each row's slot as a span in the display time zone. */
 export interface AirRow { key: string; time: string; value: string; note: string; gap: boolean }

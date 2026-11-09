@@ -18,7 +18,7 @@ import type { ApiAlert } from "@ac/web/lib/alerts";
 import type { ApiPropertyRow, ApiSpaceRow } from "@ac/web/lib/assets";
 import type { ApiBaseline, ApiEnergySummary } from "@ac/web/lib/energy";
 import {
-  attentionCard, bucketPoints, emissionsCard, energyCard, nextRunText, overviewRows, overviewScope, periodLabel, periodNote, periodOf, previousRange, type OverviewUnit,
+  attentionCard, bucketPoints, bucketTimes, emissionsCard, energyCard, nextRunText, overviewRows, overviewScope, periodLabel, periodNote, periodOf, previousRange, type OverviewUnit,
 } from "@ac/web/lib/customerOverview";
 import { orNull, recover } from "@ac/web/lib/promises";
 import { entryOf } from "@ac/web/lib/lookup";
@@ -57,7 +57,7 @@ export async function loadOverview(sp: Record<string, string | string[] | undefi
   const series = async (unit: OverviewUnit) => {
     const to = Math.floor(nowMs / 60_000) * 60_000;
     const page: ApiAirSeries = await coreOp("telemetry.series", { from: new Date(to - 86_400_000).toISOString(), to: new Date(to).toISOString(), unitIds: [unit.id], metric: "co2", bucketMinutes: 60, query: {} });
-    return bucketPoints(page.buckets ?? []);
+    return { points: bucketPoints(page.buckets ?? []), times: bucketTimes(page.buckets ?? [], i) };
   };
   // what is due or restricted (DEC-90, IR610): the overdue invoices and the restriction they caused, read as the payments
   // page reads them; a member without billing access sees no notice
@@ -99,7 +99,7 @@ export async function loadOverview(sp: Record<string, string | string[] | undefi
     emissions: sums ? { ...emissionsCard(sums[0], baseline ? baseline.method : null, i), scope: scopeText } : null,
     air: air ? {
       id: air.id, room: roomOf(air), unit: air.displayName, co2: metricCard("co2", air.latestMeasurements.find((m) => m.metric === "co2"), true, i),
-      pm25: metricCard("pm25", air.latestMeasurements.find((m) => m.metric === "pm25"), true, i), points: co2 ?? [],
+      pm25: metricCard("pm25", air.latestMeasurements.find((m) => m.metric === "pm25"), true, i), points: co2?.points ?? [], times: co2?.times ?? [],
     } : null,
     attention: attentionCard(alerts, sel.scope, nowMs, 3, i),
     automations: {

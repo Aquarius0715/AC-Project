@@ -84,7 +84,7 @@ export function OverviewView({ live }: Readonly<{ live: OverviewLive }>) {
             <div className="text-[28px] font-bold"><span className="text-xs font-normal text-muted-foreground">CO2 </span>{live.air.co2.value ?? "—"} <span className="text-sm font-medium text-muted-foreground">ppm</span></div>
             {live.air.co2.warn && <div className="my-1"><Badge tone="warn" icon="warning">{t("Ventilation recommended")}</Badge></div>}
             <p className="mb-2 text-[11px] text-muted-foreground">{t("{sub} · {unit} sensor · threshold 1000 ppm", { sub: live.air.co2.sub, unit: live.air.unit })}</p>
-            {live.air.points.some((p) => p !== null) ? <LineChart points={live.air.points} min={400} max={Math.max(1200, ...live.air.points.filter((p): p is number => p !== null).map((p) => p + 100))} threshold={1000} height={90} />
+            {live.air.points.some((p) => p !== null) ? <LineChart points={live.air.points} name="CO2" unit="ppm" times={live.air.times} min={400} max={Math.max(1200, ...live.air.points.filter((p): p is number => p !== null).map((p) => p + 100))} threshold={1000} height={90} />
               : <p className="text-[11px] text-muted-foreground">{t("No CO2 readings in the last 24 h.")}</p>}
             <p className="mt-1 text-xs">PM2.5 <b>{live.air.pm25.value === null ? "—" : `${live.air.pm25.value} µg/m³`}</b> <span className="text-muted-foreground">· {live.air.pm25.advice}</span></p>
           </> : <p className="text-[13px] text-muted-foreground">{t("No units in this selection.")}</p>}

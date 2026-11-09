@@ -36,7 +36,7 @@ export function ConditionFields({ c, onChange, errors, tried, fixedMetric }: Rea
         <Field label={t("Recover")} error={errors.recovery}><Input type="number" value={c.recovery} onChange={(e) => { onChange({ recovery: Number(e.target.value) }); }} /></Field>
       </div>
       {/* an illustrative curve that crosses the threshold and comes back (not real readings) */}
-      <div className="mt-2"><LineChart points={(c.operator === "lt" || c.operator === "lte" ? FALL : RISE).map((k) => Math.round(k * c.threshold * 10) / 10)} threshold={c.threshold} height={90} /></div>
+      <div className="mt-2"><LineChart points={(c.operator === "lt" || c.operator === "lte" ? FALL : RISE).map((k) => Math.round(k * c.threshold * 10) / 10)} name={t("Illustration (not readings)")} threshold={c.threshold} height={90} /></div>
       <p className={cx("text-xs", errors.recovery ? "text-crit" : "text-ok")}><span className="inline-flex items-center gap-1"><Icon name={errors.recovery ? "error" : "check"} />{errors.recovery ?? t("Recovery {recovery} is on the safe side of the {threshold} threshold ({op})", { recovery: c.recovery, threshold: c.threshold, op: opSymbol[c.operator] })}</span></p>
     </>
   );
