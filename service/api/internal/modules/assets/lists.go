@@ -743,7 +743,8 @@ func (m *Module) locationsRename(
 	}
 
 	if err != nil {
-		return nil, apperr.Wrap(err, "update (locationsRename)")
+		// a sibling saved with the name since the check above: the unique index refuses it (properties_name, spaces_name)
+		return nil, apperr.Wrap(dupSibling(err), "update (locationsRename)")
 	}
 
 	typ := eventLocationChanged

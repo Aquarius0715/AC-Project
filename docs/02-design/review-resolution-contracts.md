@@ -9331,6 +9331,13 @@ admin.md says unit names are unique among the non-archived units of a space (CON
 2. **The undo.** `units.importUndo` archived the properties and spaces the import created with a plain update. A unit saved into such a property afterwards (or a second import into it) was left active inside an archived property. The undo is now CONFLICT `error.importPlaceInUse` while a created property or space holds a non-archived unit, or a non-archived location, that the import did not create; the created places are locked first, as the archive does (IR478).
 3. **Tests.** `TestUnitsImportCommitKeepsSiblingNamesUnique` and `TestUnitsImportUndoKeepsPlacesThatHoldOtherUnits` both answered 200 before the fix. No operation, route or screen changes; 224 operations, 245 routes.
 
+## IR669 A rename refused by the unique index answers the sibling-name conflict (review round 54) — 2026-11-09
+
+`locations.rename` checks before it writes that no sibling has the new name (DD-A02: unique among the non-archived siblings, CONFLICT `error.duplicateSiblingName`). A sibling saved with that name after the check and before the update (not committed when the check ran) is refused by the unique index (`properties_name`, `spaces_name`) at the update, and the refusal reached the caller as the generic CONFLICT `error.conflict`: the form could not show that the name is taken. The saves (`properties.save`, `spaces.save`) already map the index to `error.duplicateSiblingName` (IR208).
+
+1. **The mapping.** The update of `locations.rename` passes its error through the same `dupSibling` mapping as the saves. Nothing else changes (units have no index; their check is unchanged).
+2. **Test.** `TestRenameToANameTakenAtTheSameMomentIsAConflict` holds an uncommitted sibling with the new name and sends the rename: before the fix it answered CONFLICT with `error.conflict`, now `error.duplicateSiblingName`. No operation, route or screen changes.
+
 ## IR670 The coverage list sorted by id follows the direction (review round 55) — 2026-11-09
 
 `units.coverage` takes the sort fields `id`, `name` and `dueAt` with a direction (DD-A19). The sort of the list put `id` ascending whatever the direction: the branch that breaks ties by unit ID also served the `id` field, so `sort=id:desc` answered the same order as `id:asc`.
