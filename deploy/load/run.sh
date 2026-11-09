@@ -1,0 +1,121 @@
+#!/bin/sh
+# One load run (docs/02-design/backend-go-design.md, load tests): builds the Go images, starts the throwaway compose
+# project ac-load (deploy/load/compose.load.yaml: no published port, its own database ac_load, Keycloak, broker and
+# Valkey), fills it with the launch-size data, runs one k6 scenario inside its network, and removes it.
+#   sh deploy/load/run.sh smoke|load|stress     (the GitHub workflow load.yml runs the same script)
+# The results are in $LOAD_OUT (default ./load-out): summary.json, k6.log, postgres.csv (connections and CPU sampled while
+# k6 ran), compose-logs.txt after a failure. The exit status is k6's: non-zero when a threshold is breached.
+# For trying a scenario again: KEEP_STACK=1 leaves the stack (and the settings) up at the end, and REUSE_STACK=1 then runs
+# only k6 against it; remove it with `docker compose -p ac-load down --volumes` afterwards.
+# It never touches the shared test environment ac-test or the real MQTT broker: the project name is fixed, the images
+# are tagged `load` (a development stack's :dev images stay as they are), and REAL_MQTT_* is emptied here.
+set -eu
+cd "$(dirname "$0")/../.."
+
+scenario=${1:-smoke}
+case $scenario in
+  smoke | load | stress) ;;
+  *) echo "usage: sh deploy/load/run.sh smoke|load|stress" >&2; exit 2 ;;
+esac
+
+PROJECT=ac-load
+LOAD_OUT=$(mkdir -p "${LOAD_OUT:-load-out}" && cd "${LOAD_OUT:-load-out}" && pwd)
+LOAD_UID=$(id -u)
+LOAD_GID=$(id -g)
+LOAD_WRITES=$([ "$scenario" = stress ] && echo 0 || echo 1)   # not from the settings file: a reused stack may have been made for another scenario
+export LOAD_OUT LOAD_UID LOAD_GID LOAD_WRITES
+unset REAL_MQTT_URL REAL_MQTT_USER REAL_MQTT_PASSWORD REAL_MQTT_COMMANDS REAL_MQTT_TOPIC
+
+rand() { openssl rand -hex "$1"; }
+settings=$LOAD_OUT/settings.env
+umask 077
+[ "${REUSE_STACK:-}" = 1 ] || cat >"$settings" <<EOS
+IMAGE_TAG=load
+KEYCLOAK_URL=http://keycloak:8080
+DEMO_CLOCK_START=now
+KEYCLOAK_REALM_FILE=$LOAD_OUT/realm-load.json
+MQTT_DEVICE_SIM_KEY=$(rand 12)
+MQTT_IOT_BRIDGE_KEY=$(rand 12)
+AC_WEB_CLIENT_SECRET=$(rand 16)
+AC_ADMIN_WEB_CLIENT_SECRET=$(rand 16)
+IDP_ADMIN_CLIENT_SECRET=$(rand 16)
+LOAD_CLIENT_SECRET=$(rand 16)
+LOAD_PASSWORD=$(rand 12)
+LOAD_OUT=$LOAD_OUT
+LOAD_UID=$LOAD_UID
+LOAD_GID=$LOAD_GID
+LOAD_WRITES=$([ "$scenario" = stress ] && echo 0 || echo 1)
+REAL_MQTT_URL=
+EOS
+umask 022
+
+compose() { docker compose -p "$PROJECT" --env-file "$settings" -f compose.yaml -f deploy/load/compose.load.yaml "$@"; }
+all_profiles() { compose --profile backend --profile load --profile k6 "$@"; }
+
+sampler=
+cleanup() {
+  status=$?
+  [ -z "$sampler" ] || kill "$sampler" 2>/dev/null || true
+  if [ "$status" -ne 0 ] || [ "${KEEP_LOGS:-}" = 1 ]; then
+    all_profiles logs --no-color --tail 300 >"$LOAD_OUT/compose-logs.txt" 2>&1 || true
+  fi
+  if [ "${KEEP_STACK:-}" != 1 ]; then
+    all_profiles down --volumes --remove-orphans >/dev/null 2>&1 || true
+    rm -f "$settings" "$LOAD_OUT/realm-load.json"   # the run's secrets go with its stack
+  fi
+  exit "$status"
+}
+trap cleanup EXIT INT TERM
+
+if [ "${REUSE_STACK:-}" != 1 ]; then
+echo "== remove what an earlier run left"
+all_profiles down --volumes --remove-orphans >/dev/null 2>&1 || true
+
+echo "== build the images"
+compose --profile backend --profile load build gateway identity-api equipment-api maintenance-api billing-api energy-api migrate worker-outbox loadseed
+
+echo "== accounts and realm (the realm is imported when Keycloak first starts)"
+compose --profile load run --rm --no-deps -T loadseed /app/loadseed -manifest-only -manifest /out/manifest.json   # the password comes from LOAD_PASSWORD in the service's environment
+python3 deploy/load/realm.py docker/keycloak/realm-ac.json "$LOAD_OUT/realm-load.json" "$settings" "$LOAD_OUT/manifest.json"
+
+echo "== start the stack"
+# valkey holds the write limit (60 a minute per membership), mosquitto, stripe-mock and weather-mock are what the services
+# call; none is a dependency of the gateway, so they are named here. The limit stays on.
+compose --profile backend up -d --wait --wait-timeout 600 valkey mosquitto stripe-mock weather-mock gateway worker-outbox worker-scheduler-equipment worker-scheduler-maintenance \
+  worker-scheduler-billing worker-iot worker-telemetry worker-rollup worker-automation worker-notification worker-importexport
+
+echo "== isolation: nothing of this project is published on the host, and no real broker is named"
+published=$(docker ps --filter "label=com.docker.compose.project=$PROJECT" --format '{{.Names}} {{.Ports}}' | grep -- '->' || true)
+[ -z "$published" ] || { echo "published ports:"; echo "$published"; exit 1; }
+real=$(docker ps -q --filter "label=com.docker.compose.project=$PROJECT" | xargs docker inspect --format '{{.Name}} {{range .Config.Env}}{{println .}}{{end}}' | grep -E 'REAL_MQTT_(URL|USER|PASSWORD)=.' || true)
+[ -z "$real" ] || { echo "a container names the real broker:"; echo "$real"; exit 1; }
+
+echo "== fill the database ac_load with the launch-size data"
+compose --profile load run --rm --no-deps -T loadseed
+fi
+
+echo "== sample connections and CPU while k6 runs"
+(
+  echo "time,pg_connections,pg_active,cpu_percent_by_container" >"$LOAD_OUT/postgres.csv"
+  while true; do
+    conns=$(compose exec -T postgres psql -U postgres -d ac_load -tA -F, -c "select count(*), count(*) filter (where state = 'active') from pg_stat_activity where datname = 'ac_load'" 2>/dev/null || echo ",")
+    cpu=$(docker stats --no-stream --format '{{.Name}}={{.CPUPerc}}' $(docker ps -q --filter "label=com.docker.compose.project=$PROJECT") 2>/dev/null | tr '\n' ' ' || true)
+    echo "$(date +%s),$conns,$cpu" >>"$LOAD_OUT/postgres.csv"
+    sleep 10
+  done
+) &
+sampler=$!
+
+echo "== k6 $scenario"
+# k6's exit status goes through a file, because the pipe to tee would hide it: non-zero when a threshold is breached
+{ status=0; compose --profile k6 run --rm --no-deps -T k6 run "/load/scenarios/$scenario.ts" 2>&1 || status=$?; echo "$status" >"$LOAD_OUT/k6.status"; } | tee "$LOAD_OUT/k6.log"
+rc=$(cat "$LOAD_OUT/k6.status")
+# the write limit must have been checked on every write: a service that could not reach its store lets the write through
+# (fail open) and logs it, which would make the writes look fast and the limit absent
+unchecked=$(all_profiles logs --no-color 2>&1 | grep -c 'write limit not checked' || true)
+if [ "$unchecked" -gt 0 ]; then
+  echo "FAILED: the write limit was not checked $unchecked times (is valkey up?)" >&2
+  [ "$rc" -ne 0 ] || rc=98
+fi
+echo "k6 finished; status $rc"
+exit "$rc"
