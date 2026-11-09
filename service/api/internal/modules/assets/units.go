@@ -312,7 +312,11 @@ func (m *Module) enrich(ctx context.Context, call *ops.Call, units []Unit) error
 		return apperr.Wrap(err, "unitscope.EquipmentReadable")
 	}
 
-	counts, err := m.Mon.ActiveAlertCounts(ctx, call, readable) // the count is an alert read too (IR705)
+	counts, err := m.Mon.ActiveAlertCounts(
+		ctx,
+		call,
+		readable,
+	) // the count is an alert read too (IR705)
 	if err != nil {
 		return apperr.Wrap(err, "assets.Monitoring.ActiveAlertCounts")
 	}
