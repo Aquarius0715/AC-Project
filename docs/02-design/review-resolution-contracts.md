@@ -9308,3 +9308,10 @@ IR667 made `properties.save` and `units.save` read the customer row with a share
 
 1. **The lock.** `canDeactivate` now locks the customer row (`FOR UPDATE`) before it looks for units: a unit save in flight is waited for and seen (CONFLICT `error.customerActive`), and a unit save that starts later waits for the deactivation and finds the customer inactive (CONFLICT `error.customerInactive`).
 2. **Test.** `TestCustomerDeactivateWaitsForAUnitBeingAdded` holds a unit insert with a share lock on the customer open in a second transaction and sends the deactivation; before the fix it answered 200 and left the unit under the inactive customer, now it waits and answers 409. No operation, route or screen changes.
+
+## IR659 A payout adjustment stays within the safe-integer range (review round 24) — 2026-11-09
+
+IR647 left the payout lines out of the amount range check because the server computes them. One kind is not computed: the adjustment line of an answered question carries the `adjustmentMinor` that HQ typed in `payouts.resolveQuery` (signed, non-zero). It was only refused when zero, so HQ could enter 9,000,000,000,000,000,000 or its negative: the next generated draft added it to the statement's gross or deductions, and a few of them wrap a 64-bit sum around.
+
+1. **The rule.** `adjustmentMinor` is a non-zero whole number whose size is at most 2^53 − 1 (`money.InRange` on its absolute value; the smallest int64, whose absolute value does not exist, is refused too): VALIDATION `error.range` on `adjustmentMinor` otherwise.
+2. **Tests.** `TestAmountsStayInSafeRange` (both signs, the last valid amount accepted) and `TestPayoutAdjustmentMinInt64`. No operation, route or screen changes; 224 operations, 245 routes.
