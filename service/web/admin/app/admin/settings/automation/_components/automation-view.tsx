@@ -7,7 +7,7 @@ import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { randomId } from "@ac/web/lib/randomId";
 import {
-  acModes, actionKinds, actionText, autoDraft, autoErrors, autoInput, conditionText, decisionWord, disabledReasonWord, evaluationInput, factOf, factQualities, fanLevels, reasonWord, subjectText,
+  acModes, actionKinds, actionText, autoDraft, autoErrors, autoInput, conditionText, decisionWord, disabledReasonWord, evaluationInput, evaluationKey, factOf, factQualities, fanLevels, reasonWord, subjectText,
   type ApiAutoPolicy, type AutoCondition, type AutoDraft, type Compare, type FactRow, type PolicyGroup,
 } from "@ac/web/lib/automation";
 import { oneOf } from "@ac/web/lib/oneOf";
@@ -42,7 +42,7 @@ export function AutomationView({ live }: Readonly<{ live: Live }>) {
   const [tried, setTried] = useState(false);
   const [facts, setFacts] = useState<FactRow[]>((sel?.unitIds ?? []).map((u) => ({ unitId: u, value: "", quality: "valid" })));
   const [results, setResults] = useState<{ fired: boolean; rows: Result[] } | null>(null);
-  const [event, setEvent] = useState<{ id: string; at: string } | null>(null); // the last Fire: its one-time key and tick
+  const [event, setEvent] = useState<{ id: string; at: string; key: string } | null>(null); // the last Fire: its one-time key, tick and what it asked
   const [showOff, setShowOff] = useState(true);
   if (source !== key) { // restart from each saved policy version (adjust state during render)
     setSource(key);
@@ -72,10 +72,13 @@ export function AutomationView({ live }: Readonly<{ live: Live }>) {
   const evaluate = (fire: boolean) => {
     if (facts.length === 0) return;
     // the Server Action stamps the Core API's current tick (IR491); a repeated Fire sends its event's own tick
-    const input = evaluationInput(d.type, facts, new Date(live.now), fire ? (event?.id ?? randomId()) : randomId());
+    // a repeat of the same evaluation keeps its key; anything else, the condition type included, is a new event (IR704)
+    const asked = evaluationKey(d.type, facts);
+    const repeat = fire && event?.key === asked ? event : null;
+    const input = evaluationInput(d.type, facts, new Date(live.now), repeat?.id ?? randomId());
     if (!fire) { run(() => simulateAuto(input), t("Simulated — no commands created"), (rows) => { setResults({ fired: false, rows }); }); return; }
-    run(() => fireAuto(input, event?.id === input.eventId ? event.at : undefined), t("Fired (demo) — commands go through the shared command rules"), (v) => {
-      setEvent({ id: input.eventId, at: v.at });
+    run(() => fireAuto(input, repeat?.at), t("Fired (demo) — commands go through the shared command rules"), (v) => {
+      setEvent({ id: input.eventId, at: v.at, key: asked });
       setResults({ fired: true, rows: v.results });
     });
   };
