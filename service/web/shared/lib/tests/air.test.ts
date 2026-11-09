@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  airGuidance, airNumber, airRooms, airRows, airSlots, airWindow, allergenView, axisLabels, cleanNote, co2Now, metricCard, ventRow, ventStrip, windowSub, windowTitle,
+  airChartSeries, airGuidance, airMetricsOf, airNumber, airRooms, airRows, airSlots, airWindow, allergenView, axisLabels, cleanNote, co2Now, metricCard, slotHeadings, toggleAirMetric, ventRow, ventStrip, windowSub, windowTitle,
   type ApiAllergen, type ApiMeasurement, type ApiVentilationLog,
 } from "@ac/web/lib/air";
 import type { ApiPropertyRow, ApiSpaceRow, ApiUnitRow } from "@ac/web/lib/assets";
@@ -142,5 +142,32 @@ describe("the air-quality screen in the display language and time zone (FR-C07, 
     expect(ventRow(v, "me", new Map([["u1", BEDROOM_AC]]), NOW.getTime())).toStrictEqual({ id: "v1", text: "Window opened · 15 min · Bedroom AC", co2: "CO2 1180 ppm at 9:00 am MYT", by: "by you", when: "today 9:05 am MYT" });
     expect(ventRow({ ...v, unitId: "u9", co2AtLog: null, loggedByMembershipId: "x", loggedAt: "2026-09-13T01:05:00Z" }, "me", new Map(), NOW.getTime(), MS_TOKYO))
       .toStrictEqual({ id: "v1", text: "Tingkap dibuka · 15 min · unit lain", co2: "CO2 tidak diukur semasa merekod", by: "oleh ahli lain", when: "semalam 10:05 PG GMT+9" });
+  });
+});
+
+const slotsOf = (avgs: (number | null)[]) => avgs.map((avg, k) => ({ avg, start: `2026-09-14T0${String(k)}:00:00.000Z`, n: avg === null ? 0 : 3 }));
+// IR689: several metrics in one chart, each on the axis of its unit, with the time of every slot in the tooltip
+describe("metrics in one chart", () => {
+  it("reads the metrics of the URL: known ones, each once, two units at most, CO2 when none is left", () => {
+    expect([airMetricsOf(undefined), airMetricsOf("pm25"), airMetricsOf("co2,pm25"), airMetricsOf("pm25,pm25,nonsense,co2"), airMetricsOf("co2,pm25,humidity,temperature"), airMetricsOf("nonsense")])
+      .toStrictEqual([["co2"], ["pm25"], ["co2", "pm25"], ["pm25", "co2"], ["co2", "pm25"], ["co2"]]);
+  });
+
+  it("puts a metric in or takes it out, never the last one, and refuses a third unit", () => {
+    expect([toggleAirMetric(["co2"], "pm25"), toggleAirMetric(["co2", "pm25"], "co2"), toggleAirMetric(["co2"], "co2"), toggleAirMetric(["co2", "pm25"], TEMPERATURE)])
+      .toStrictEqual([["co2", "pm25"], ["pm25"], ["co2"], null]);
+  });
+
+  it("gives the first unit the left axis and the second the right one, with the values of each metric", () => {
+    const lines = airChartSeries(["pm25", "co2"], { pm25: { slots: slotsOf([10, 12]), total: 6 }, co2: { slots: slotsOf([500, null]), total: 6 } }, new Set(["co2", "pm25"]));
+    expect(lines.map((l) => [l.metric, l.name, l.unit, l.axis, l.points, l.guide, l.valid, l.hasSensor])).toStrictEqual([
+      ["pm25", "PM2.5", "µg/m³", "left", [10, 12], 35, true, true], ["co2", "CO2", "ppm", "right", [500, null], 1000, true, true],
+    ]);
+    expect(airChartSeries(["co2"], {}, new Set())[0]).toMatchObject({ points: [], valid: false, hasSensor: false, readings: 0 });
+  });
+
+  it("heads each slot with its span in the display time zone", () => {
+    const slots = [{ start: "2026-09-14T01:00:00.000Z", avg: 1, n: 1 }, { start: "2026-09-14T01:05:00.000Z", avg: null, n: 0 }];
+    expect(slotHeadings(slots, 300_000, MS_TOKYO)).toStrictEqual(["Isn, 14 Sep, 10:00–10:05 PG GMT+9", "Isn, 14 Sep, 10:05–10:10 PG GMT+9"]);
   });
 });

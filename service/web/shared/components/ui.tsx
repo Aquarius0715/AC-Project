@@ -4,6 +4,7 @@ import { hasContent } from "@ac/web/lib/hasContent";
 import Link from "next/link";
 import { Children, cloneElement, createContext, isValidElement, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useT } from "@ac/web/components/I18n";
+import type { T as Translate } from "@ac/web/lib/i18n";
 import { Icon, type IconName } from "@ac/web/components/Icon";
 import { Alert } from "@ac/web/components/ui/alert";
 import { Badge as UIBadge } from "@ac/web/components/ui/badge";
@@ -28,6 +29,7 @@ import { Textarea as UITextarea } from "@ac/web/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@ac/web/components/ui/toggle-group";
 import { cn } from "@ac/web/lib/utils";
 import { tableFeatures, useTable, type ColumnDef, type RowData } from "@tanstack/react-table";
+import { axisRange, axisTicks } from "@ac/web/lib/chartScale";
 import { Bar, BarChart as RBarChart, CartesianGrid, Line, LineChart as RLineChart, ReferenceArea, ReferenceLine, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
 
@@ -633,37 +635,98 @@ function tickAnchor(index: number, count: number): "start" | "end" | "middle" {
   if (index === 0) return "start";
   return index === count - 1 ? "end" : "middle";
 }
+/** One line of a line chart: its name and unit (the tooltip and the legend), its values (null is a gap), the axis it is read on and an optional guide value drawn on that axis. */
+export interface ChartSeries { name: string; unit?: string; points: (number | null)[]; color?: string; axis?: "left" | "right"; threshold?: number; format?: (v: number) => string }
+const seriesColors = ["var(--color-primary)", "var(--color-warn)", "var(--color-ok)"];
+const noPoints: (number | null)[] = [];
+/** The legend's text of a line: its name with its unit and, when the chart has two axes, the side it is read on. */
+function legendText(l: ChartSeries, hasRight: boolean, t: Translate): string {
+  const unit = l.unit ? ` (${l.unit})` : "";
+  if (!hasRight) return `${l.name}${unit}`;
+  return `${l.name}${unit} · ${t(l.axis === "right" ? "right axis" : "left axis")}`;
+}
+/** A value in the tooltip: formatted (`format`), with its unit; a gap reads "—". */
+function tooltipValue(l: ChartSeries | undefined, value: unknown): string {
+  if (typeof value !== "number") return "—";
+  const text = l?.format ? l.format(value) : value.toLocaleString();
+  return l?.unit ? `${text} ${l.unit}` : text;
+}
+/** The point a tooltip is on: the `i` of the hovered row, -1 when there is none. */
+function hoveredIndex(payload: readonly { payload?: unknown }[]): number {
+  const row = payload.at(0)?.payload;
+  return typeof row === "object" && row !== null && "i" in row && typeof row.i === "number" ? row.i : -1;
+}
+
 /** A line chart; null points are gaps, never joined (a value between two gaps is a dot). `labels` spread evenly under
-the chart, `ticks` draw gridlines with their values, `shadeGaps` shades the gaps; `name` names the value in the tooltip. */
-export function LineChart({ points, min, max, threshold, height = 120, color = "var(--color-primary)", labels, ticks, shadeGaps, name }: Readonly<{ points: (number | null)[]; min?: number; max?: number; threshold?: number; height?: number; color?: string; labels?: string[]; ticks?: number[]; shadeGaps?: boolean; name?: string }>) {
+the chart, `ticks` draw gridlines with their values, `shadeGaps` shades the gaps. The tooltip names what each value is
+(`name`, `unit`) and, with `times`, when it was measured (one heading per point). `series` draws several lines in one
+chart, each on the left or the right axis with its own scale (IR689); `points` / `name` / `threshold` are the one-line form. */
+export function LineChart({ points = noPoints, series, times, min, max, threshold, height = 120, color = "var(--color-primary)", labels, ticks, shadeGaps, name, unit, format }: Readonly<{ points?: (number | null)[]; series?: ChartSeries[]; times?: string[]; min?: number; max?: number; threshold?: number; height?: number; color?: string; labels?: string[]; ticks?: number[]; shadeGaps?: boolean; name?: string; unit?: string; format?: (v: number) => string }>) {
   const t = useT();
-  const vals = points.filter((p): p is number => p !== null);
-  const lo = min ?? Math.min(...vals, threshold ?? Infinity);
-  const hi = max ?? Math.max(...vals, threshold ?? -Infinity);
-  const last = Math.max(0, points.length - 1);
-  const data = points.map((v, i) => ({ i, v }));
+  const lines: ChartSeries[] = series ?? [{ name: name ?? t("Value"), points, color, ...(unit && { unit }), ...(format && { format }), ...(threshold !== undefined && { threshold }) }];
+  const slots = Math.max(0, ...lines.map((l) => l.points.length));
+  const last = Math.max(0, slots - 1);
+  const valueAt = (l: ChartSeries, i: number) => l.points.at(i) ?? null;
+  const data = Array.from({ length: slots }, (_, i) => ({ i, ...Object.fromEntries(lines.map((l, j) => [`v${String(j)}`, valueAt(l, i)])) }));
+  const sideOf = (l: ChartSeries) => l.axis ?? "left";
+  // each axis is scaled on its own lines (and their guides): the single-line form keeps its own scale (min / max / ticks)
+  const scaleOf = (side: "left" | "right") => {
+    const own = lines.filter((l) => sideOf(l) === side);
+    if (own.length === 0) return null;
+    if (!series) {
+      const vals = points.filter((p): p is number => p !== null);
+      return { domain: [min ?? Math.min(...vals, threshold ?? Infinity), max ?? Math.max(...vals, threshold ?? -Infinity)] as [number, number], ticks };
+    }
+    const guides = own.flatMap((l) => l.threshold ?? []);
+    const range = axisRange(own.flatMap((l) => l.points), null);
+    const lo = Math.min(range.min, ...guides), hi = Math.max(range.max, ...guides);
+    return { domain: [lo, hi] as [number, number], ticks: axisTicks(lo, hi) };
+  };
+  const scales = { left: scaleOf("left"), right: scaleOf("right") };
+  const isGap = (i: number) => lines.every((l) => valueAt(l, i) === null);
   const gaps: [number, number][] = [];
-  for (const [i, p] of points.entries()) {
-    if (p !== null) continue;
+  for (let i = 0; i < slots; i++) {
+    if (!isGap(i)) continue;
     const lastGap = gaps.at(-1);
-      if (lastGap?.[1] === i - 1) lastGap[1] = i;
+    if (lastGap?.[1] === i - 1) lastGap[1] = i;
     else gaps.push([i, i]);
   }
-  const isolated = (i: number) => points.at(i) !== null && (i === 0 || points.at(i - 1) === null) && (i === last || points.at(i + 1) === null);
+  const isolated = (l: ChartSeries, i: number) => valueAt(l, i) !== null && (i === 0 || valueAt(l, i - 1) === null) && (i === last || valueAt(l, i + 1) === null);
   // the labels sit evenly from the first point to the last, the outer ones flush with the ends
   const at = (k: number) => (labels && labels.length > 1 ? (last * k) / (labels.length - 1) : 0);
+  const isMulti = lines.length > 1;
+  const mainAxis = scales.left ? "left" : "right";
+  // the legend names each line with its unit and, with two axes, the side it is read on
+  const config: ChartConfig = Object.fromEntries(lines.map((l, j) => [`v${String(j)}`, { label: legendText({ ...l, axis: sideOf(l) }, scales.right !== null, t), color: l.color ?? seriesColors.at(j % seriesColors.length) }]));
   return (
-    <ChartContainer config={{ v: { label: name ?? t("Value"), color } }} className="aspect-auto w-full" style={{ height }}>
+    <ChartContainer config={config} className="aspect-auto w-full" style={{ height: height + (isMulti ? 28 : 0) }}>
       <RLineChart data={data} margin={{ top: 8, right: 6, bottom: labels ? 0 : 4, left: 6 }} title={t("Line chart")}>
-        {ticks && <CartesianGrid vertical={false} />}
+        {(ticks !== undefined || series !== undefined) && <CartesianGrid vertical={false} />}
         <XAxis type="number" dataKey="i" domain={[0, last]} hide={!labels} ticks={labels?.map((_, k) => at(k))} interval={0} tickLine={false} axisLine={false}
           tick={({ x, y, index }) => <text x={x} y={y} dy={8} fontSize={10} className="fill-muted-foreground" textAnchor={tickAnchor(index, labels?.length ?? 0)}>{labels?.at(index)}</text>} />
-        <YAxis domain={[lo, hi]} hide={!ticks} ticks={ticks} mirror tickLine={false} axisLine={false} tick={axisTick} />
-        {shadeGaps && vals.length > 0 && gaps.map(([a, b]) => <ReferenceArea key={a} x1={Math.max(0, a - 0.5)} x2={Math.min(last, b + 0.5)} fill="#94a3b8" fillOpacity={0.14} />)}
-        {threshold !== undefined && <ReferenceLine y={threshold} stroke="var(--color-crit)" strokeDasharray="4 3" />}
-        <ChartTooltip content={<ChartTooltipContent hideLabel />} />
-        <Line dataKey="v" type="linear" stroke="var(--color-v)" strokeWidth={2} isAnimationActive={false}
-          dot={({ index, cx: centerX, cy }) => (isolated(index) ? <circle key={index} cx={centerX} cy={cy} r={3} fill="var(--color-v)" /> : null)} />
+        {scales.left && <YAxis yAxisId="left" domain={scales.left.domain} hide={!scales.left.ticks} ticks={scales.left.ticks} mirror tickLine={false} axisLine={false} tick={axisTick} />}
+        {scales.right && <YAxis yAxisId="right" orientation="right" domain={scales.right.domain} ticks={scales.right.ticks} mirror tickLine={false} axisLine={false} tick={axisTick} />}
+        {shadeGaps && gaps.length > 0 && gaps.length < slots && gaps.map(([a, b]) => <ReferenceArea key={a} yAxisId={mainAxis} x1={Math.max(0, a - 0.5)} x2={Math.min(last, b + 0.5)} fill="#94a3b8" fillOpacity={0.14} />)}
+        {lines.map((l, j) => l.threshold !== undefined && <ReferenceLine key={`g${String(j)}`} yAxisId={sideOf(l)} y={l.threshold} stroke="var(--color-crit)" strokeDasharray="4 3" />)}
+        <ChartTooltip
+          labelFormatter={(_, payload) => times?.at(hoveredIndex(payload)) ?? null}
+          content={<ChartTooltipContent hideLabel={!times} formatter={(value, _name, item) => {
+            const l = lines.at(Number(String(item.dataKey).slice(1)));
+            return (
+              <>
+                <span className="h-2.5 w-2.5 shrink-0 rounded-[2px]" style={{ backgroundColor: item.color }} />
+                <span className="flex flex-1 justify-between gap-3 leading-none">
+                  <span className="text-muted-foreground">{l?.name}</span>
+                  <span className="font-mono font-medium text-foreground tabular-nums">{tooltipValue(l, value)}</span>
+                </span>
+              </>
+            );
+          }} />} />
+        {isMulti && <ChartLegend content={<ChartLegendContent />} />}
+        {lines.map((l, j) => (
+          <Line key={`l${String(j)}`} yAxisId={sideOf(l)} dataKey={`v${String(j)}`} name={l.name} type="linear" stroke={`var(--color-v${String(j)})`} strokeWidth={2} isAnimationActive={false}
+            dot={({ index, cx: centerX, cy }) => (isolated(l, index) ? <circle key={index} cx={centerX} cy={cy} r={3} fill={`var(--color-v${String(j)})`} /> : null)} />
+        ))}
       </RLineChart>
     </ChartContainer>
   );

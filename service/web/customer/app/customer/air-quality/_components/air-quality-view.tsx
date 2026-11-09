@@ -7,7 +7,7 @@ import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import {
-  airMetrics, airNumber, airPeriods, metricInfo, ventDurations, ventMethods, type AirMetric, type AirPeriod, type AirRow, type MetricCard, type VentMethod,
+  airMetrics, airNumber, airPeriods, metricInfo, toggleAirMetric, ventDurations, ventMethods, type AirChartSeries, type AirMetric, type AirPeriod, type AirRow, type MetricCard, type VentMethod,
 } from "@ac/web/lib/air";
 import { logVentilation } from "../actions";
 import { Icon, type IconName } from "@ac/web/components/Icon";
@@ -22,12 +22,14 @@ export interface AirLive {
   connection: "online" | "offline" | "unknown" | "connecting" | "error"; updated: string; freshAir: boolean;
   cards: MetricCard[]; strip: { tone: "warn" | "primary"; title: string; text: string }; clean: string | null;
   allergen: { title: string; badge: { text: string; tone: Tone; icon: IconName }; text: string };
-  metric: AirMetric; period: AirPeriod;
+  /** the first metric of the chart, and every metric shown in it (IR689) */
+  metric: AirMetric; metrics: AirMetric[]; period: AirPeriod;
   chart: {
-    title: string; sub: string; points: (number | null)[]; labels: string[]; guide: number | null; min: number; max: number; ticks: number[];
-    hasSensor: boolean; readings: number; total: number; valid: boolean; gaps: boolean;
+    title: string; sub: string; labels: string[]; times: string[]; series: AirChartSeries[]; gaps: boolean;
   };
-  rows: AirRow[]; co2Now: string | null;
+  /** one table per metric of the chart: the slots newest first, empty ones merged */
+  tables: { metric: AirMetric; label: string; unit: string; rows: AirRow[] }[];
+  co2Now: string | null;
   history: { rows: { id: string; text: string; co2: string; by: string; when: string }[]; total: number } | null;
 }
 
@@ -45,18 +47,19 @@ export function AirQualityView({ live }: Readonly<{ live: AirLive | null }>) {
   }
   const room = live.rooms.find((r) => r.key === live.roomKey) ?? live.rooms[0];
   const c = live.chart;
-  const info = metricInfo[live.metric];
-  const label = t(info.label);
   const pickRoom = (key: string) => {
     const r = live.rooms.find((x) => x.key === key);
     const first = r?.units[0];
     if (r && first) patch({ spaceId: r.spaceId, unitId: first.id });
   };
-  const noValid = byCount(c.readings, {
-    none: t("No valid {metric} readings in this window — missing data is never drawn as a line.", { metric: label }),
-    one: t("No valid {metric} readings in this window (1 reading without a valid value) — missing data is never drawn as a line.", { metric: label, n: 1 }),
-    many: t("No valid {metric} readings in this window ({n} readings without a valid value) — missing data is never drawn as a line.", { metric: label, n: c.readings }),
+  const noValid = (l: AirChartSeries) => byCount(l.readings, {
+    none: t("No valid {metric} readings in this window — missing data is never drawn as a line.", { metric: l.name }),
+    one: t("No valid {metric} readings in this window (1 reading without a valid value) — missing data is never drawn as a line.", { metric: l.name, n: 1 }),
+    many: t("No valid {metric} readings in this window ({n} readings without a valid value) — missing data is never drawn as a line.", { metric: l.name, n: l.readings }),
   });
+  const shown = c.series.filter((l) => l.hasSensor && l.valid);
+  // a chip or a card puts its metric in the chart or takes it out; a third unit starts the chart again with that metric alone
+  const press = (metric: AirMetric, alone: boolean) => { patch({ metric: (toggleAirMetric(live.metrics, metric) ?? (alone ? [metric] : live.metrics)).join(",") }); };
   return (
     <Page>
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-line bg-surface px-4 py-3 text-xs">
@@ -73,8 +76,8 @@ export function AirQualityView({ live }: Readonly<{ live: AirLive | null }>) {
       </div>
       <div className="grid-fluid" style={{ ["--min" as string]: "210px" }}>
         {live.cards.map((m) => (
-          <Plain key={m.metric} type="button" aria-pressed={m.metric === live.metric} onClick={() => { patch({ metric: m.metric }); }}
-            className={cx("flex min-w-0 flex-col gap-1 rounded-2xl border bg-surface p-4 text-left", m.metric === live.metric ? "border-primary ring-1 ring-primary" : "border-line hover:border-primary/50")}>
+          <Plain key={m.metric} type="button" aria-pressed={live.metrics.includes(m.metric)} onClick={() => { press(m.metric, true); }}
+            className={cx("flex min-w-0 flex-col gap-1 rounded-2xl border bg-surface p-4 text-left", live.metrics.includes(m.metric) ? "border-primary ring-1 ring-primary" : "border-line hover:border-primary/50")}>
             <span className="flex items-center justify-between gap-2 text-xs text-muted-foreground">{m.label}<Badge tone={m.feed.tone} icon={m.feed.icon}>{m.feed.text}</Badge></span>
             <span className="text-[28px] font-bold leading-9">{m.value ?? "—"}{m.value !== null && <span className="ml-1 text-sm font-medium text-muted-foreground">{m.unit}</span>}</span>
             <span><Badge tone={m.status.tone} icon={m.status.icon}>{m.status.text}</Badge></span>
@@ -89,33 +92,45 @@ export function AirQualityView({ live }: Readonly<{ live: AirLive | null }>) {
         <b>{live.strip.title}</b><div className="text-xs text-muted-foreground">{live.strip.text}{!live.spaceId && ` ${t("Ventilation logs belong to a room — HQ sets up the rooms, so ask HQ to place this unit in one.")}`}</div>
       </Banner>
       <Card title={c.title} sub={c.sub} action={<div className="flex flex-wrap gap-2">
-        <Tabs value={live.metric} onChange={(m) => { patch({ metric: m }); }} tabs={airMetrics.map((k) => ({ id: k, label: t(entryOf(metricInfo, k).tab) }))} />
+        <div className="flex flex-wrap gap-1" role="group" aria-label={t("Metrics in the chart")}>
+          {airMetrics.map((k) => {
+            const isOn = live.metrics.includes(k);
+            const isFull = !isOn && toggleAirMetric(live.metrics, k) === null;
+            return (
+              <Plain key={k} type="button" aria-pressed={isOn} disabled={isFull} title={isFull ? t("A chart shows two units at most — take one out first") : undefined} onClick={() => { press(k, false); }}
+                className={cx("rounded-control border px-3 py-1.5 text-xs font-semibold", isOn ? "border-primary bg-primary-soft text-primary" : "border-line text-muted-foreground hover:bg-surface2", isFull && "opacity-50")}>
+                {t(entryOf(metricInfo, k).tab)}
+              </Plain>
+            );
+          })}
+        </div>
         <Tabs value={live.period} onChange={(p) => { patch({ period: p }); }} tabs={airPeriods.map((p) => ({ id: p, label: t(p) }))} />
         <Tabs value={view} onChange={setView} tabs={[{ id: "chart", label: t("Chart") }, { id: "table", label: t("Table") }]} />
       </div>}>
-        {view === "chart" && c.hasSensor && c.valid ? (
+        {view === "chart" && shown.length > 0 ? (
             <>
-              <LineChart points={c.points} min={c.min} max={c.max} threshold={c.guide ?? undefined} ticks={c.ticks} shadeGaps height={300} labels={c.labels} />
+              <LineChart series={shown.map((l) => ({ name: l.name, unit: l.unit, points: l.points, axis: l.axis, ...(l.guide !== null && { threshold: l.guide }), format: (v: number) => airNumber(l.metric, v) }))}
+                times={c.times} shadeGaps height={300} labels={c.labels} />
               <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
-                <span className="text-primary">— {label} ({info.unit})</span>
-                {c.guide !== null && <span className="text-crit">- - {c.guide} {info.unit} {t(live.metric === "co2" ? "ventilation guide" : "cleaning guide")}</span>}
+                {shown.length === 1 && shown.map((l) => <span key={l.metric} className="text-primary">— {l.name} ({l.unit})</span>)}
+                {shown.map((l) => l.guide !== null && <span key={`g${l.metric}`} className="text-crit">- - {l.guide} {l.unit} {t(l.metric === "co2" ? "ventilation guide" : "cleaning guide")}</span>)}
                 {c.gaps && <span className="inline-flex items-center gap-1"><span aria-hidden className="inline-block h-2.5 w-2.5 rounded-sm border border-dashed border-muted-foreground" />{t("No data (gap, not joined)")}</span>}
               </div>
             </>
           ) : null}
-        {view !== "chart" && c.hasSensor && c.valid ? (
+        {view === "table" ? live.tables.filter((tb) => shown.some((l) => l.metric === tb.metric)).map((tb) => (
             // the table scrolls on its own: it takes the focus so a keyboard can scroll it, named as the chart is (axe
             // scrollable-region-focusable, IR607)
-            <div className="max-h-[420px] overflow-y-auto" tabIndex={0} role="region" aria-label={c.title}>
-              <DataTable rows={live.rows} rowKey={(r) => r.key} cols={[
+            <div key={tb.metric} className="max-h-[420px] overflow-y-auto" tabIndex={0} role="region" aria-label={shown.length > 1 ? `${c.title} · ${tb.label}` : c.title}>
+              <DataTable rows={tb.rows} rowKey={(r) => r.key} cols={[
                 { key: "t", label: t("Time"), render: (r) => r.time },
-                { key: "v", label: `${label} (${info.unit})`, render: (r) => (r.gap ? <span className="text-muted-foreground">{r.value}</span> : r.value) },
+                { key: "v", label: `${tb.label} (${tb.unit})`, render: (r) => (r.gap ? <span className="text-muted-foreground">{r.value}</span> : r.value) },
                 { key: "n", label: t("Readings"), render: (r) => <span className="text-xs text-muted-foreground">{r.note}</span> },
               ]} />
             </div>
-          ) : null}
-        {c.hasSensor && !c.valid ? <p className="text-[13px] text-muted-foreground">{noValid}</p> : null}
-        {c.hasSensor ? null : <p className="text-[13px] text-muted-foreground">{t("{unit} has no {metric} sensor — nothing to chart.", { unit: live.unitName, metric: label })}</p>}
+          )) : null}
+        {c.series.filter((l) => l.hasSensor && !l.valid).map((l) => <p key={`n${l.metric}`} className="text-[13px] text-muted-foreground">{noValid(l)}</p>)}
+        {c.series.filter((l) => !l.hasSensor).map((l) => <p key={`s${l.metric}`} className="text-[13px] text-muted-foreground">{t("{unit} has no {metric} sensor — nothing to chart.", { unit: live.unitName, metric: l.name })}</p>)}
       </Card>
       <Card title={t("Ventilation history")} sub={live.history ? `${live.path} · ${byCount(live.history.total, { one: t("{n} log", { n: 1 }), many: t("{n} logs", { n: live.history.total }) })} · ${t("manual records, nothing sent to the AC or to HQ")}` : live.path}>
         {live.history?.rows.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No ventilation logged in this room yet.")}</p> : null}

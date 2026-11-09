@@ -94,7 +94,7 @@ export function OverviewDemo() {
           <div className="text-[28px] font-bold"><span className="text-xs font-normal text-muted-foreground">CO2 </span>1000 <span className="text-sm font-medium text-muted-foreground">ppm</span></div>
           <div className="my-1"><Badge tone="warn" icon="warning">Ventilation recommended</Badge></div>
           <p className="mb-2 text-[11px] text-muted-foreground">Observed 09:12 · Bedroom AC sensor · threshold 1000 ppm</p>
-          <LineChart points={[640, 650, 700, 760, 820, 880, 930, 960, 980, 1000]} min={400} max={1200} threshold={1000} height={90} />
+          <LineChart points={[640, 650, 700, 760, 820, 880, 930, 960, 980, 1000]} name="CO2" unit="ppm" min={400} max={1200} threshold={1000} height={90} />
           <p className="mt-1 text-xs">PM2.5 <b>12 µg/m³</b> <span className="text-muted-foreground">· No current advice</span></p>
           <TextLink href="/customer/air-quality" className="mt-1 inline-block">Air quality details <Icon name="arrowRight" /></TextLink>
         </Card>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  attentionCard, bucketPoints, emissionsCard, energyCard, nextRunText, overviewRows, overviewScope, periodNote, periodOf, previousRange, whenText, type OverviewUnit,
+  attentionCard, bucketPoints, bucketTimes, emissionsCard, energyCard, nextRunText, overviewRows, overviewScope, periodNote, periodOf, previousRange, whenText, type OverviewUnit,
 } from "@ac/web/lib/customerOverview";
 import type { ApiAlert } from "@ac/web/lib/alerts";
 import type { ApiEnergySummary } from "@ac/web/lib/energy";
@@ -93,5 +93,12 @@ describe("customer overview", () => {
     const hours = Array.from({ length: 24 }, (_, k) => ({ value: sample.get(k) ?? null }));
     const pts = bucketPoints(hours);
     expect([pts.length, pts[23], pts[5], pts.filter((p) => p !== null).length]).toStrictEqual([24, 1000, 713, 2]);
+  });
+});
+
+// IR689: the hour of each point of the air card heads its tooltip, in the display time zone
+describe("air card tooltip headings", () => {
+  it("gives each hourly point the hour it averages", () => {
+    expect(bucketTimes([{ start: "2026-09-14T01:00:00.000Z" }, { start: "2026-09-14T02:00:00.000Z" }])).toStrictEqual(["Mon, 14 Sept, 9:00 – 10:00 am MYT", "Mon, 14 Sept, 10:00 – 11:00 am MYT"]);
   });
 });

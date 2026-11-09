@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  componentCards, controlJob, jobRows, liveTiles, metricOf, openAlerts, otherMetrics, periodOf, periodRange, registerRows, seriesChart, stoppedBanner, windowEvents, type ApiTechUnit,
+  componentCards, controlJob, jobRows, liveTiles, metricOf, metricsOf, openAlerts, otherMetrics, periodOf, periodRange, registerRows, seriesChart, seriesCharts, stoppedBanner, windowEvents, type ApiTechUnit,
 } from "@ac/web/lib/techUnit";
 import { componentGroups } from "@ac/web/lib/techJob";
 import type { ApiAlert } from "@ac/web/lib/alerts";
@@ -87,7 +87,7 @@ describe("technician unit screen", () => {
     expect(c.gap).toBe("no data 13 Sept, 1:35 pm – 14 Sept, 7:35 am MYT (gap not connected)");
     const week = seriesChart(TEMPERATURE, "°C", [], "7d", NOW);
     expect([week.title, week.labels[0], week.empty, week.gap, week.count]).toEqual(["Temperature (°C) · last 7 days (Kuala Lumpur calendar days)", "8 Sept", true, null, "0 measurements in this period"]);
-    expect(otherMetrics(unit, TEMPERATURE, { power: [{ value: 1.2, observedAt: "2026-09-14T01:30:00Z" }] }, "24h", NOW).map((x) => [x.metric, x.value, x.tone, x.points[11], x.cut])).toEqual([["power", "1.2 kW", undefined, 1.2, false], ["humidity", "60.0 % (stale)", "warn", null, false]]);
+    expect(otherMetrics(unit, [TEMPERATURE], { power: [{ value: 1.2, observedAt: "2026-09-14T01:30:00Z" }] }, "24h", NOW).map((x) => [x.metric, x.value, x.tone, x.points[11], x.cut])).toEqual([["power", "1.2 kW", undefined, 1.2, false], ["humidity", "60.0 % (stale)", "warn", null, false]]);
   });
 
   it("says what a cut series does not load instead of counting the period (IR598)", () => {
@@ -101,7 +101,7 @@ describe("technician unit screen", () => {
     const averages = Array.from({ length: 288 }, (_, k) => ({ value: 24, observedAt: new Date(NOW - 86_400_000 + k * 300_000).toISOString() }));
     expect(seriesChart(TEMPERATURE, "°C", averages, "24h", NOW, undefined, 1438, true)).toMatchObject({ count: "1438 measurements in this period", cut: null });
     const power = Array.from({ length: 100 }, (_, k) => ({ value: 1, observedAt: new Date(NOW - k * 60_000).toISOString() }));
-    expect(otherMetrics(unit, TEMPERATURE, { power }, "24h", NOW, undefined, { power: 1440 }).map((x) => [x.metric, x.cut])).toEqual([["power", true], ["humidity", false]]);
+    expect(otherMetrics(unit, [TEMPERATURE], { power }, "24h", NOW, undefined, { power: 1440 }).map((x) => [x.metric, x.cut])).toEqual([["power", true], ["humidity", false]]);
   });
 
   it("lists the period's alert and device events, newest first", () => {
@@ -131,5 +131,27 @@ describe("technician unit screen", () => {
     expect(liveTiles(offline, NOW, MS).connection).toEqual({ label: "Sambungan", value: "Luar talian", sub: "kali terakhir dilihat hari ini 10:34 PG GMT+9", tone: "crit" });
     expect(seriesChart(TEMPERATURE, "°C", [], "24h", NOW, MS).title).toBe("Suhu (°C) · 24 j terakhir (bergerak)");
     expect(openAlerts(alerts, NOW, MS)[0]?.ack).toBe("Diakui hari ini 10:20 PG GMT+9. Menyelesaikan kerja tidak menyelesaikan amaran ini.");
+  });
+});
+
+// IR689: the metrics of the URL in one chart, each on the axis of its unit, and the slots' headings for the tooltip
+describe("metrics in one chart", () => {
+  it("reads the metrics of the URL: those the unit measures, each once, in two units at most", () => {
+    const three = { ...unit, latestMeasurements: [m(TEMPERATURE, 24.5, "°C"), m("power", 1.2, "kW"), m("humidity", 60, "%")] };
+    expect([metricsOf(three, "power,humidity"), metricsOf(three, "humidity"), metricsOf(three, "power,power,co2"), metricsOf(three, "temperature,power,humidity"), metricsOf(three, "co2"), metricsOf(three)])
+      .toEqual([["power", "humidity"], ["humidity"], ["power"], [TEMPERATURE, "power"], [TEMPERATURE], [TEMPERATURE]]);
+  });
+
+  it("draws each metric on the axis of its unit with the span of every slot as its heading", () => {
+    const temperature = [{ value: 25, observedAt: "2026-09-14T01:00:00Z" }];
+    const power = [{ value: 1.2, observedAt: "2026-09-14T01:30:00Z" }];
+    const c = seriesCharts([
+      { metric: TEMPERATURE, unit: "°C", items: temperature, total: 1, complete: false }, { metric: "power", unit: "kW", items: power, total: 1, complete: false },
+    ], "24h", NOW);
+    expect(c.title).toBe("Temperature (°C) · Power (kW) · last 24 h (rolling)");
+    expect(c.lines.map((l) => [l.metric, l.name, l.unit, l.axis, l.points[11], l.empty])).toEqual([[TEMPERATURE, "Temperature", "°C", "left", 25, false], ["power", "Power", "kW", "right", 1.2, false]]);
+    expect([c.times.length, c.times[0], c.times[11]]).toEqual([12, "Sun, 13 Sept, 9:35 – 11:35 am MYT", "Mon, 14 Sept, 7:35 – 9:35 am MYT"]);
+    // one metric reads as the single chart does
+    expect(seriesCharts([{ metric: TEMPERATURE, unit: "°C", items: temperature, total: 1, complete: false }], "24h", NOW).title).toBe("Temperature (°C) · last 24 h (rolling)");
   });
 });
