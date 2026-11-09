@@ -12,7 +12,7 @@ import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { focusField } from "@ac/web/lib/focusField";
 import {
-  allowedFor, allPermissions, MEMBER_FIELDS, memberDraft, memberErrors, memberFieldId, memberInput, orgKind, permissionRows, resourceWord, roleDefaults, roleWord, selfBlocked,
+  allowedFor, allPermissions, MEMBER_FIELDS, memberDraft, memberErrors, memberFieldId, memberInput, orgKind, permissionRows, resourceWord, revokeInput, roleDefaults, roleWord, selfBlocked,
   type ApiOrganization, type MemberDraft, type MemberRow, type PermissionRow, type Role, type ScopeRef,
 } from "@ac/web/lib/members";
 import { deleteMember, revokeMember, saveMember, signOutEverywhere } from "../actions";
@@ -112,7 +112,7 @@ export function AccessView({ live }: Readonly<{ live: Live }>) {
   const doRevoke = () => {
     if (!sel || !revoke?.trim()) return;
     run(
-      () => revokeMember(memberInput({ ...d, permissions: sel.m.permissions, scopes: sel.m.scopes, reason: revoke.trim() }, sel.id, zone), sel.version), // ends now (IR492)
+      () => revokeMember(revokeInput(sel.m, live.tenantId, zone, revoke), sel.version), // the saved membership, ending now (IR492, IR703)
       t("Access revoked — the membership is now inactive"), () => { revoked.current = true; setRevoke(null); });
   };
   const doSignOut = () => {
