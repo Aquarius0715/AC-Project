@@ -9703,3 +9703,24 @@ The technician overview (FR-T01, SCR-T01) lists the open and acknowledged alerts
 1. **Reproduced.** `technician/tests/overviewLoad.test.ts` serves 50 resolved critical alerts and one open warning, in the list's order. With one page of every status the card is empty (the test fails). With the fix it lists the open warning.
 2. **Fix.** The loader reads the open and the acknowledged alerts each with its own status filter, in full (`coreAll`), most severe first. The card's order (worst, then newest) and its links are unchanged. A role that may not read alerts still gets an empty card (`orWhenRefused`).
 3. **Not changed.** The technician unit pages read their unit's alerts as before. Every operation, route and count stays the same.
+
+## IR712 The unit pages read every unresolved alert of the unit (review round 187, 2026-11-10)
+
+Three unit pages list a unit's unresolved alerts first:
+- the technician's unit page (FR-T05): the open alerts card and the events of the period;
+- its alert evidence page (FR-T07): the alert picker, which opens the worst unresolved alert;
+- the contractor's unit view (FR-P04): the evidence list.
+
+Each read one page of `alerts.list` for the unit over every status: 50 alerts on the technician pages, 20 on the contractor's. The list sorts the most severe first, then by ID, across the statuses. So once a unit held that many resolved alerts of a higher severity, its open and acknowledged alerts were missing from these pages. A unit's resolved alerts only accumulate. This is the class of IR710 and IR711.
+
+1. **Reproduced.** `shared/lib/tests/unitAlerts.test.ts` serves 50 resolved critical alerts, one open warning and one acknowledged alert for a unit, in the list's order. With one page of every status, the two unresolved alerts are missing (the test fails). With the fix both are read.
+2. **Fix.** `unitAlerts` (`shared/lib/unitAlerts.ts`) reads the unit's open and acknowledged alerts each in full (`coreAll`), and its latest resolved alerts up to the page's former limit (50 or 20), newest change first (`updatedAt` desc, so the events of the period and the evidence list show the recent ones). The three loaders use it. A refusal still answers as before: the technician's alert page shows its unavailable states, and the other two show no alerts.
+3. **Not changed.** What the pages show and how they order it. Every operation, route and count stays the same.
+
+## IR713 HQ billing reads every inquiry waiting for a reply (review round 193, 2026-11-10)
+
+The Customer inquiries tab of `/admin/billing` (FR-A08, DD-A08) shows the customers' questions as All, Received and Answered, with a count on each, and puts the received ones first. The page read one page of `inquiries.list` (limit 100), which sorts the newest first across the states. So once more than 100 newer inquiries had been answered, an older one still waiting for a reply was missing from the Received tab and its count, and HQ could not answer it. Inquiries only accumulate. This is the class of IR710 to IR712.
+
+1. **Reproduced.** The admin app's unit test `inquiriesLoad.test.ts` serves 100 answered inquiries and one older received inquiry, in the list's order. With one page the received inquiry is missing (the test fails). With the fix it is listed, and the Answered tab still shows the newest 100.
+2. **Fix.** `billingInquiries` (`admin/app/admin/billing/_lib/inquiries.ts`) reads the received inquiries in full (`coreAll` with `status: received`) and the newest 100 answered ones (`status: answered`). The view, its order and the reply flow are unchanged.
+3. **Not changed.** The customer's payment page already reads every inquiry of its invoice and restriction (`coreAll`). Every operation, route and count stays the same.
