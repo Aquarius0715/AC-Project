@@ -17,6 +17,8 @@ import (
 type MemberDeleteInput struct {
 	ID     uuid.UUID `json:"id"`
 	Reason string    `json:"reason"`
+	// Force (data.forceDelete, IR690): an account that acted, or marked a filter cleaning, is deleted too
+	Force bool `json:"force,omitempty"`
 }
 
 // Validate implements ops.Validator.
@@ -47,7 +49,9 @@ func (in *MemberDeleteInput) Validate() map[string]string {
 //	@Description	IR657 only an account that never acted (no audit entry names it) and has no assignment or \
 //	@Description	certificate (CONFLICT error.memberUsed); not the caller own (error.memberSelf); the only account of \
 //	@Description	its person (error.memberHasOthers); deletes the person, its entry in a user list and the provider \
-//	@Description	account
+//	@Description	account; IR690 force (data.forceDelete, else FORBIDDEN errors.force_delete_not_allowed) also deletes \
+//	@Description	an account that acted or marked a filter cleaning, an assignment or a certificate still stops it; \
+//	@Description	the reason is recorded as [forced]
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-A03
 //	@Tags			members
@@ -57,6 +61,7 @@ func (in *MemberDeleteInput) Validate() map[string]string {
 //	@Param			X-Expected-Version	header		integer	true	"all: required (target members, read members.list)"
 //	@Param			id					path		string	true	"input field id"
 //	@Param			reason				query		string	false	"input field reason"
+//	@Param			force				query		boolean	false	"input field force"
 //	@Success		200					{object}	ops.Envelope{data=Deleted}
 //	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 //	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -69,6 +74,11 @@ func (in *MemberDeleteInput) Validate() map[string]string {
 //	@Security		BearerAuth
 //	@Router			/v1/members/{id} [delete]
 func membersDelete(ctx context.Context, call *ops.Call, input *MemberDeleteInput) (Deleted, error) {
+	forbidden := ops.CheckForce(call, input.Force)
+	if forbidden != nil {
+		return Deleted{}, apperr.Wrap(forbidden, "ops.CheckForce")
+	}
+
 	var (
 		user    uuid.UUID
 		version int
@@ -91,7 +101,7 @@ func membersDelete(ctx context.Context, call *ops.Call, input *MemberDeleteInput
 		return Deleted{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
-	refusal := refuseMemberDelete(ctx, call, input.ID, user)
+	refusal := refuseMemberDelete(ctx, call, input.ID, user, input.Force)
 	if refusal != nil {
 		return Deleted{}, refusal
 	}
@@ -152,7 +162,14 @@ func membersDelete(ctx context.Context, call *ops.Call, input *MemberDeleteInput
 			TargetKind:      kindMembership,
 			TargetID:        input.ID.String(),
 			PreviousVersion: call.ExpectedVersion,
-			Reason:          input.Reason, NextVersion: nil, Result: "", Before: nil, After: nil,
+			Reason: ops.ForcedReason(
+				input.Reason,
+				input.Force,
+			),
+			NextVersion: nil,
+			Result:      "",
+			Before:      nil,
+			After:       nil,
 		},
 	)
 
@@ -160,7 +177,12 @@ func membersDelete(ctx context.Context, call *ops.Call, input *MemberDeleteInput
 }
 
 // refuseMemberDelete is the CONFLICT for an account that is not deleted, or nil.
-func refuseMemberDelete(ctx context.Context, call *ops.Call, membership, user uuid.UUID) error {
+func refuseMemberDelete(
+	ctx context.Context,
+	call *ops.Call,
+	membership, user uuid.UUID,
+	force bool,
+) error {
 	if membership == call.Principal.MembershipID {
 		return apperr.E(apperr.Conflict, "error.memberSelf")
 	}
@@ -181,7 +203,7 @@ func refuseMemberDelete(ctx context.Context, call *ops.Call, membership, user uu
 	switch {
 	case others:
 		return apperr.E(apperr.Conflict, "error.memberHasOthers")
-	case acted:
+	case acted && !force: // a forced delete does not stop at what the account did (the audit log keeps it)
 		return apperr.E(apperr.Conflict, "error.memberUsed")
 	}
 
@@ -189,7 +211,7 @@ func refuseMemberDelete(ctx context.Context, call *ops.Call, membership, user uu
 		ctx,
 		call,
 		ops.QueryMembershipRecords,
-		ops.MembershipRecordsInput{MembershipID: membership},
+		ops.MembershipRecordsInput{MembershipID: membership, IgnoreCleanings: force},
 	)
 	if err != nil {
 		return apperr.Wrap(err, "ask "+ops.QueryMembershipRecords)

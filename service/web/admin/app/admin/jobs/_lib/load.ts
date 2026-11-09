@@ -8,7 +8,8 @@
 // the selected plan and jobs.list (the unit's periodic jobs) for the status of each generated occurrence.
 import "server-only";
 import { evidenceText } from "@ac/web/lib/evidence";
-import { coreAll, coreDisplay, coreNow, coreOp, CoreError, orWhenRefused, coreItems } from "@ac/web/lib/dal";
+import { coreAll, coreDisplay, coreNow, coreOp, CoreError, corePermissions, orWhenRefused, coreItems } from "@ac/web/lib/dal";
+import { DATA_FORCE_DELETE } from "@ac/web/lib/members";
 import { i18nOf, showTime, textOf } from "@ac/web/lib/i18n";
 import { alertTitle } from "@ac/web/lib/alerts";
 import { jobEventTitle, type ApiJobEvent } from "@ac/web/lib/partnerOverview";
@@ -195,14 +196,14 @@ export type PlansLive = Awaited<ReturnType<typeof loadPlans>>;
 90-day KPIs, the delegation and the rate card in effect) and for contractorId its rate cards (rateCards.list, newest
 first), technicians (members.list) and uploaded certificates (certificates.list). */
 export async function loadContractors(sp: SP) {
-  const { now, i, members, contractors: orgs, names, head } = await shared(sp);
+  const [{ now, i, members, contractors: orgs, names, head }, perms] = await Promise.all([shared(sp), corePermissions()]);
   const { t } = i;
   const nowMs = now.getTime();
   const profiles = await optional(coreAll<ApiProfile>("contractors.list"), [] as ApiProfile[]);
   const technicians: ApiTechnician[] = members.filter((m) => m.role === TECHNICIAN && orgs.some((o) => o.id === m.organizationId))
     .map((m) => ({ id: m.id, displayName: m.displayName, organizationId: m.organizationId, role: m.role, validUntil: m.validUntil ?? null, qualifications: m.qualifications ?? [] }));
   const rows = contractorRows(orgs.map((o) => ({ id: o.id, name: o.name })), profiles, technicians, t);
-  const base = { ...head, q: {}, rows, withoutProfile: orgs.filter((o) => profiles.every((p) => p.organizationId !== o.id)).map((o) => ({ id: o.id, name: o.name })) };
+  const base = { ...head, canForce: perms.has(DATA_FORCE_DELETE), q: {}, rows, withoutProfile: orgs.filter((o) => profiles.every((p) => p.organizationId !== o.id)).map((o) => ({ id: o.id, name: o.name })) };
   const pick = one(sp.contractorId) ?? rows[0]?.id;
   if (!pick) return { ...base, detail: null };
   const org = orgs.find((o) => o.id === pick);

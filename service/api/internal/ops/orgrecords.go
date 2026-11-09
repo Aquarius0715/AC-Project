@@ -30,15 +30,20 @@ const (
 // (maintenance): an account with one is not deleted (DEC-103, IR657).
 const QueryMembershipRecords = "maintenance.membershipRecords"
 
-// MembershipRecordsInput names a membership.
+// MembershipRecordsInput names a membership. IgnoreCleanings leaves a filter cleaning it marked out of the answer: a
+// forced delete of an account (data.forceDelete, IR690) does not stop at it; an assignment or a certificate still does.
 type MembershipRecordsInput struct {
-	MembershipID uuid.UUID `json:"membershipId"`
+	MembershipID    uuid.UUID `json:"membershipId"`
+	IgnoreCleanings bool      `json:"ignoreCleanings,omitempty"`
 }
 
 // OrgRecordsInput names an organization and, for a customer, its customer ID (some records are keyed by it).
+// SkipAccounts leaves the organization's accounts out of the answer: a forced delete (data.forceDelete, IR690) deletes
+// them itself afterwards, and every other record still stops it.
 type OrgRecordsInput struct {
-	OrgID      uuid.UUID  `json:"orgId"`
-	CustomerID *uuid.UUID `json:"customerId"`
+	OrgID        uuid.UUID  `json:"orgId"`
+	CustomerID   *uuid.UUID `json:"customerId"`
+	SkipAccounts bool       `json:"skipAccounts,omitempty"`
 }
 
 // OrgHasRecords asks every domain whether it holds records of the organization (jobs, offers, contracts, invoices,
@@ -51,6 +56,10 @@ func OrgHasRecords(ctx context.Context, call *Call, input OrgRecordsInput) (bool
 		QueryOrgRecordsEnergy,
 		QueryOrgRecordsIdentity,
 	} {
+		if input.SkipAccounts && name == QueryOrgRecordsIdentity {
+			continue
+		}
+
 		held, err := Query[bool](ctx, call, name, input)
 		if err != nil {
 			return false, apperr.Wrap(err, "ask "+name)

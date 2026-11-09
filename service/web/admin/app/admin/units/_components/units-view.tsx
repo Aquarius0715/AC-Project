@@ -27,6 +27,7 @@ import { typeLabel } from "@ac/web/lib/partnerJobDetail";
 import { archiveLocation, archiveUnit, createCustomer, deleteCustomer, deleteUnit, importCommit, importPreview, importUndo, inviteClientUser, previewPasswordReset, recordWarrantyClaim, removeClientUser, resendInvite, saveProperty, saveSpace, saveUnit, setDefaultRule, setUnitPolicies, updateClientUser, updateCustomer, signOutEverywhere } from "../actions";
 import { Icon, type IconName } from "@ac/web/components/Icon";
 import { NeedsAccess } from "@ac/web/components/NeedsAccess";
+import { ForceDeleteField, forceReady, noForce } from "@ac/web/components/DeleteDialog";
 import { entryOf, lookup } from "@ac/web/lib/lookup";
 
 export interface UnitLive {
@@ -42,7 +43,7 @@ export interface CustomerLive {
 }
 interface WarrantyLive { rows: CoverageRow[]; kpis: ReturnType<typeof coverageKpis>; customers: { id: string; name: string }[]; claims: ClaimCandidate[] | null; canClaim: boolean }
 export interface UnitsLive {
-  now: string; todayKL: string; canWrite: boolean; standingKnown: boolean; rows: CustomerRow[]; kpis: ReturnType<typeof registerKpis>; search: string; missing: boolean;
+  now: string; todayKL: string; canWrite: boolean; canForce: boolean; standingKnown: boolean; rows: CustomerRow[]; kpis: ReturnType<typeof registerKpis>; search: string; missing: boolean;
   top: "customers" | "warranty"; activeCustomers: { id: string; name: string }[]; coverageAttention: number | null; warranty?: WarrantyLive | null; customer?: CustomerLive;
 }
 type Nav = ReturnType<typeof useUrlPatch>;
@@ -247,8 +248,8 @@ function CustomerScreen({ live, c }: Readonly<{ live: UnitsLive; c: CustomerLive
         </div>
       )}
       {m?.kind === "customer" && <CustomerModal row={r} pending={pending} onClose={close} onSave={(d) => { run(() => updateCustomer(r.id, r.version, { id: r.orgId, version: r.orgVersion ?? 1, name: r.billingName, status: r.orgStatus }, { billingName: d.billingName, name: d.name, serviceProfile: d.profile, status: d.status }), t("Customer saved"), close); }} />}
-      {m?.kind === "deleteCustomer" && <DeleteCustomerModal name={r.name} pending={pending} onClose={close}
-        onSave={(reason) => { run(() => deleteCustomer(r.id, r.version, { id: r.orgId, version: r.orgVersion ?? 1 }, reason), t("Customer deleted"), () => { close(); nav({ customerId: null, tab: null, locationId: null, propertyId: null, unitId: null, powerState: null, connections: null, search: null }); }); }} />}
+      {m?.kind === "deleteCustomer" && <DeleteCustomerModal name={r.name} canForce={live.canForce} pending={pending} onClose={close}
+        onSave={(reason, force) => { run(() => deleteCustomer(r.id, r.version, { id: r.orgId, version: r.orgVersion ?? 1 }, reason, force), t("Customer deleted"), () => { close(); nav({ customerId: null, tab: null, locationId: null, propertyId: null, unitId: null, powerState: null, connections: null, search: null }); }); }} />}
       {m?.kind === "property" && <PropertyModal p={m.p} pending={pending} onClose={close} onSave={(d) => { run(() => saveProperty(propertyInput(d, r.orgId, m.p?.id), m.p?.version), t(m.p ? "Property saved" : "Property added"), (id) => { close(); nav({ locationId: id, ...clearUnit }); }); }} />}
       {m?.kind === "space" && <SpaceModal c={c} init={m} pending={pending} onClose={close} onSave={(x) => { run(() => saveSpace(x), t("{kind} “{name}” added", { kind: (textOf(kindLabel, x.kind, t) ?? x.kind), name: x.name }), (id) => { close(); nav({ locationId: id, ...clearUnit }); }); }} />}
       {m?.kind === "rename" && <RenameModal name={m.p?.name ?? m.s?.name ?? ""} where={m.p ? t("{kind} · property", { kind: (textOf(kindLabel, m.p.kind, t) ?? m.p.kind) }) : (textOf(kindLabel, m.s.kind, t) ?? m.s.kind)} pending={pending} onClose={close}
@@ -564,16 +565,18 @@ function RenameModal({ name, where, pending, onClose, onSave }: Readonly<{ name:
 }
 
 /** customers.delete (DEC-103): a reason, and what is removed with the customer and what stops it. */
-function DeleteCustomerModal({ name, pending, onClose, onSave }: Readonly<{ name: string; pending: boolean; onClose: () => void; onSave: (reason: string) => void }>) {
+function DeleteCustomerModal({ name, canForce, pending, onClose, onSave }: Readonly<{ name: string; canForce: boolean; pending: boolean; onClose: () => void; onSave: (reason: string, force: boolean) => void }>) {
   const t = useT();
   const [reason, setReason] = useState("");
   const [tried, setTried] = useState(false);
+  const [force, setForce] = useState(noForce);
   const problem = reasonError(reason, t);
   return (
-    <Modal open onClose={onClose} title={t("Delete customer")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="danger" disabled={pending} onClick={() => { setTried(true); if (!problem) onSave(reason.trim()); }}>{t("Delete")}</Btn></>}>
+    <Modal open onClose={onClose} title={t("Delete customer")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="danger" disabled={pending || !forceReady(force, name)} onClick={() => { setTried(true); if (!problem) onSave(reason.trim(), force.on); }}>{t("Delete")}</Btn></>}>
       <div className="flex flex-col gap-3">
         <p className="text-[13px]">{t("Delete {name}? Its locations (properties and spaces) are removed with it. A customer with units, jobs, contracts, invoices or users cannot be deleted.", { name })}</p>
         <Field label={t("Reason")} error={tried ? problem : undefined}><Textarea value={reason} maxLength={1000} onChange={(e) => { setReason(e.target.value); }} /></Field>
+        {canForce && <ForceDeleteField name={name} what={t("also deletes its accounts, even those with history. Units, jobs, contracts, invoices and reports still stop it.")} force={force} onChange={setForce} />}
       </div>
     </Modal>
   );

@@ -66,7 +66,7 @@ Assess each AT-NFR using the measurement method above and the [verification plan
 | MRV/audit | Own estimates/history | History needed for jobs only | History of assigned actions | mrv.read/mrv.write; mrv.review records reviews; mrv.factors changes factors; audit.read |
 | Change users/roles | No | Own company's contractors and technicians (FR-P11): add, a technician's access end of at most a year, disable, remove (IR416, IR461); permissions and qualifications stay with HQ | No | identity.read to view, identity.write to change (HQ/contractor/technician only); identity.write and restriction.override are granted only by another identity administrator |
 
-HQ permissions are the 38 values of IR107: Read/Write per resource plus independent actions; Write implies Read. Use IR46 for allowed AC actions under restrictions, and IR47 for rejection based on connectivity/power signals. Do not disclose details, including existence, of inaccessible data. Show reasons for blocked actions only when viewing the data itself is allowed. Contractors do not automatically gain technician control permissions. If one manager has several roles, switch Membership so the active role is clear.
+HQ permissions are the 39 values of IR107 and IR690: Read/Write per resource plus independent actions; Write implies Read. Use IR46 for allowed AC actions under restrictions, and IR47 for rejection based on connectivity/power signals. Do not disclose details, including existence, of inaccessible data. Show reasons for blocked actions only when viewing the data itself is allowed. Contractors do not automatically gain technician control permissions. If one manager has several roles, switch Membership so the active role is clear.
 
 ## Canonical terms
 

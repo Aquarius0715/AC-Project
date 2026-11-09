@@ -18,6 +18,8 @@ import (
 type ContractorDeleteInput struct {
 	ID     uuid.UUID `json:"id"`
 	Reason string    `json:"reason"`
+	// Force (data.forceDelete, IR690): the company's accounts do not stop the delete; the caller deletes them after it
+	Force bool `json:"force,omitempty"`
 }
 
 // Validate implements ops.Validator.
@@ -50,7 +52,10 @@ type DeletedResource struct {
 //	@Description	Authorization: admin:job.write
 //	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
 //	@Description	IR654 only a contractor company with no job, offer, history, certificate, payout or account \
-//	@Description	(CONFLICT error.contractorInUse); deletes its rate cards and unavailability
+//	@Description	(CONFLICT error.contractorInUse); deletes its rate cards and unavailability; IR690 force \
+//	@Description	(data.forceDelete, else FORBIDDEN errors.force_delete_not_allowed): the accounts of the company do \
+//	@Description	not stop the delete, the caller deletes them afterwards with members.delete force, every other \
+//	@Description	record still stops it; the reason is recorded as [forced]
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-A21
 //	@Tags			contractors
@@ -60,6 +65,7 @@ type DeletedResource struct {
 //	@Param			X-Expected-Version	header		integer	true	"all: required (target contractor, read contractors.list)"
 //	@Param			id					path		string	true	"input field id"
 //	@Param			reason				query		string	false	"input field reason"
+//	@Param			force				query		boolean	false	"input field force"
 //	@Success		200					{object}	ops.Envelope{data=DeletedResource}
 //	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 //	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -76,6 +82,11 @@ func (Partners) delete(
 	call *ops.Call,
 	input *ContractorDeleteInput,
 ) (DeletedResource, error) {
+	forbidden := ops.CheckForce(call, input.Force)
+	if forbidden != nil {
+		return DeletedResource{}, apperr.Wrap(forbidden, "ops.CheckForce")
+	}
+
 	var (
 		org     uuid.UUID
 		version int
@@ -98,7 +109,11 @@ func (Partners) delete(
 		return DeletedResource{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
-	held, err := ops.OrgHasRecords(ctx, call, ops.OrgRecordsInput{OrgID: org, CustomerID: nil})
+	held, err := ops.OrgHasRecords(
+		ctx,
+		call,
+		ops.OrgRecordsInput{OrgID: org, CustomerID: nil, SkipAccounts: input.Force},
+	)
 	if err != nil {
 		return DeletedResource{}, apperr.Wrap(err, "ops.OrgHasRecords")
 	}
@@ -136,7 +151,7 @@ func (Partners) delete(
 			input.ID,
 			call.ExpectedVersion,
 			nil,
-			input.Reason,
+			ops.ForcedReason(input.Reason, input.Force),
 		),
 	)
 
@@ -162,6 +177,7 @@ type RateCardDeleteInput = ContractorDeleteInput
 //	@Param			Idempotency-Key	header		string	true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 //	@Param			id				path		string	true	"input field id"
 //	@Param			reason			query		string	false	"input field reason"
+//	@Param			force			query		boolean	false	"input field force"
 //	@Success		200				{object}	ops.Envelope{data=DeletedResource}
 //	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
 //	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"

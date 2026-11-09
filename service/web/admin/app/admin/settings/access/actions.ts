@@ -32,10 +32,11 @@ export async function revokeMember(input: OpInput<"members.save">, version: numb
   return saveMember({ ...input, validUntil: now.toISOString() }, version);
 }
 
-/** members.delete: an account that never acted, with its person and its provider account (DEC-103). */
-export async function deleteMember(id: string, version: number, reason: string): Promise<ActionResult> {
+/** members.delete: an account that never acted, with its person and its provider account (DEC-103). `force` (the
+data.forceDelete holder) also removes one that has history; the Core API refuses it without the permission. */
+export async function deleteMember(id: string, version: number, reason: string, force = false): Promise<ActionResult> {
   try {
-    await coreOp("members.delete", { id, reason: reason.trim() }, { write: true, expectedVersion: version });
+    await coreOp("members.delete", { id, force, reason: reason.trim() }, { write: true, expectedVersion: version });
     return { ok: true, value: null };
   } catch (error) {
     return actionFailure(error);

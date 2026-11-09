@@ -65,6 +65,8 @@ const keyText: Record<string, string> = {
   "error.memberUsed": "This account has acted or has an assignment or certificate, so it cannot be deleted — revoke the access instead",
   "error.memberHasOthers": "This person has another account — delete or end that first",
   "error.memberSelf": "You cannot delete the account you are signed in with",
+  // a forced delete without the Data deletion permission (data.forceDelete)
+  "errors.force_delete_not_allowed": "You are not allowed to force a delete — ask HQ for the Data deletion permission",
   "error.notBound": "This device is not bound to a unit",
   "error.modelInUse": "Units still use this model — change their model first",
   "error.modelInCampaign": "A firmware campaign names this model, so it cannot be deleted",

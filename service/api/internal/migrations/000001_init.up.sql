@@ -151,7 +151,7 @@ CREATE TABLE platform.demo_clock (             -- demo environment only (DEMO_OP
 -- ---------------------------------------------------------------------------------------------
 -- identity
 -- ---------------------------------------------------------------------------------------------
-CREATE TABLE identity.permissions (           -- reference data: the 38 Permission values (IR107)
+CREATE TABLE identity.permissions (           -- reference data: the 39 Permission values (IR107, IR690)
   code        text PRIMARY KEY,
   resource    text NOT NULL,
   kind        text NOT NULL CHECK (kind IN ('read','write','action'))
@@ -1981,7 +1981,7 @@ BEGIN
 END $$;
 -- Later migrations: ALTER DEFAULT PRIVILEGES in each schema grants the same rights on new tables.
 
--- Reference data: the 38 permissions (IR107)
+-- Reference data: the 39 permissions (IR107, IR690)
 INSERT INTO identity.permissions (code, resource, kind) VALUES
  ('dashboard.read','dashboard','read'),
  ('asset.read','asset','read'),('asset.write','asset','write'),
@@ -1999,4 +1999,5 @@ INSERT INTO identity.permissions (code, resource, kind) VALUES
  ('mrv.read','mrv','read'),('mrv.write','mrv','write'),('mrv.review','mrv','action'),('mrv.factors','mrv','action'),
  ('offset.read','offset','read'),('offset.write','offset','write'),
  ('audit.read','audit','read'),
- ('partner.accept','partner','action'),('partner.assign','partner','action'),('partner.review','partner','action');
+ ('partner.accept','partner','action'),('partner.assign','partner','action'),('partner.review','partner','action'),
+ ('data.forceDelete','data','action');

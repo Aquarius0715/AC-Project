@@ -211,8 +211,9 @@ func membershipRecords(
 		ctx,
 		`SELECT EXISTS (SELECT 1 FROM maintenance.assignments WHERE technician_membership_id = $1)
 		OR EXISTS (SELECT 1 FROM maintenance.certificates WHERE membership_id = $1 OR verified_by_membership_id = $1)
-		OR EXISTS (SELECT 1 FROM maintenance.filter_cleanings WHERE marked_by_membership_id = $1)`,
+		OR (NOT $2 AND EXISTS (SELECT 1 FROM maintenance.filter_cleanings WHERE marked_by_membership_id = $1))`,
 		input.MembershipID,
+		input.IgnoreCleanings,
 	).Scan(&held)
 
 	return held, apperr.Wrap(err, "select maintenance.assignments")
