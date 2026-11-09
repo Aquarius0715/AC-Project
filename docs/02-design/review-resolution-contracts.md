@@ -9576,3 +9576,13 @@ The test environment answers on two addresses (DEC-102, IR651), and the links of
 1. **Fix.** A time that is not complete is a field error, in the words the customer form already uses ("Enter the date and both times of each preferred time.", with its Malay and Japanese texts); `nextDay` moved to `shared/lib/adminJobs.ts` and answers "" for such a date, so the new row starts empty.
 2. **Checked for the same shape.** `preferredError` (customer) already refuses an empty time first, and `unavailabilityConflicts` (partner) checks `isDate` first. Times that come from the API are not form input and were not changed.
 3. **Tests.** `adminJobs.test.ts`: an empty start, an empty end, an empty later time, the Malay text, and `nextDay` across a month and a year and on empty and malformed dates. No operation, route or count changes.
+
+## IR697 `Meta.eventCursor` is the outbox position, not a count of the outbox (review round 125, 2026-11-09)
+
+Every operation with a principal ended by answering `SELECT count(*) FROM platform.outbox` as `Meta.eventCursor`, which the contract calls the tenant's outbox position and says only increases (deterministic contracts §events).
+
+1. **Wrong value.** Housekeeping removes events older than 7 days, so the count fell. A test with two events shows it: removing the older one took the cursor from 55 to 54.
+2. **Cost on every request.** The count reads the whole of the tenant's outbox, on every read and write. On a development database of 45,010 events it took 5.7 ms; `max(seq)` took 0.04 ms. The outbox keeps power samples for 7 days, one a minute per device, so 3,000 devices hold about 30 million rows. That would be about 4 seconds on every request by extrapolation, not measured, against the read target of 300 ms in backend architecture §13. The load test does not show it, because a run's outbox is small: a short run with no history cannot.
+3. **Fix.** `SELECT COALESCE(max(seq), 0) FROM platform.outbox`, in the pipeline and in a measured baseline's `sourceSnapshot.eventCursor`. Baselines saved earlier keep the value they recorded.
+4. **Limits.** Under row level security the index is read backwards to the tenant's latest event, so a tenant with few events among many of another's takes longer; it is never slower than the count was, and today there is one tenant. A tenant whose events have all been removed reads 0. No screen reads this value, so neither case shows.
+5. **The load test.** The data has no outbox history: a run does not measure a service with 7 days of events. This is a gap in `docs/02-design/load-test.md` to keep in mind when reading its results.
