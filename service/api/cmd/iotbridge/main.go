@@ -99,9 +99,16 @@ func run(broker, api, equipment, tenant string) error {
 		return apperr.Wrap(err, "devicesim.MockFleet")
 	}
 
-	resolver := iotbridge.NewResolver(
-		append(append([]iotbridge.Link{}, iotbridge.Links()...), iotbridge.FleetLinks(fleet)...),
-	)
+	// devices outside the demo fixture (the load test's) come from a file the environment names
+	extra, err := iotbridge.LoadLinks(os.Getenv("IOT_LINKS_FILE"))
+	if err != nil {
+		return apperr.Wrap(err, "iotbridge.LoadLinks")
+	}
+
+	links := append(
+		append([]iotbridge.Link{}, iotbridge.Links()...),
+		iotbridge.FleetLinks(fleet)...)
+	resolver := iotbridge.NewResolver(append(links, extra...))
 	httpc := &http.Client{Timeout: httpTimeout, Transport: nil, CheckRedirect: nil, Jar: nil}
 	endpoint := api + "/v1/demo/trigger"
 
@@ -510,7 +517,7 @@ func send(
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Idempotency-Key", trigger.EventID.String())
 
-	resp, err := client.Do(req)
+	resp, err := client.Do(req) //nolint:gosec // G704: URL is --api, the file fills the body only
 	if err != nil {
 		return apperr.Wrap(err, "http.Client.Do")
 	}

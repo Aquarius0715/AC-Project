@@ -16,9 +16,9 @@ on:
   workflow_dispatch:
     inputs:
       scenario:
-        description: "smoke (1 minute, 4 users, must have no error), load (15 minutes, 300 users, §13 thresholds) or stress (to 1,500 users, records only)"
+        description: "API: smoke (1 min, must have no error), load (15 min, 300 users, §13 thresholds), stress (to 1,500 users, records only). Web apps: web-smoke (1 min, no error), web (15 min, 285 users), spike (11 min, a sign-in rush), soak (2 hours). IoT path: iot-smoke (1.5 min, no error), iot (10 min, 3,000 devices a minute), iot-design (10 min, 333 batches a second)"
         type: choice
-        options: [smoke, load, stress]
+        options: [smoke, load, stress, web-smoke, web, spike, soak, iot-smoke, iot, iot-design]
         default: smoke
 
 permissions:
@@ -32,7 +32,7 @@ jobs:
   load:
     name: k6 (compose project ac-load)
     runs-on: [self-hosted, ac-test]
-    timeout-minutes: 90
+    timeout-minutes: 210   # the 2-hour soak, and the images and the stack before it
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: build, start, fill, run k6, remove
@@ -50,6 +50,8 @@ jobs:
             ${{ env.LOAD_OUT }}/summary.json
             ${{ env.LOAD_OUT }}/k6.log
             ${{ env.LOAD_OUT }}/postgres.csv
+            ${{ env.LOAD_OUT }}/iotload.json
+            ${{ env.LOAD_OUT }}/iotload.log
             ${{ env.LOAD_OUT }}/compose-logs.txt
           if-no-files-found: warn
           retention-days: 30

@@ -69,6 +69,34 @@ func TestBuildLaunchSize(t *testing.T) {
 		)
 	}
 
+	if len(got.Devices) != 3000 || len(result.Links.Links) != 3000 {
+		t.Errorf(
+			"devices %d, links %d, want one device on each of the 3000 units",
+			len(got.Devices),
+			len(result.Links.Links),
+		)
+	}
+
+	probes := 0
+
+	for _, link := range result.Links.Links {
+		if link.Probe {
+			probes++
+		}
+
+		if len(link.Sensors) != 2 || link.Unit == "" || link.Connection != "online" {
+			t.Fatalf("link %+v is incomplete", link)
+		}
+	}
+
+	if probes != 60 {
+		t.Errorf("probe devices = %d, want 60", probes)
+	}
+
+	if len(got.Consents) != 210 {
+		t.Errorf("consents = %d, want one for each of the 210 customer accounts", len(got.Consents))
+	}
+
 	if len(got.Organizations) != 610 || len(got.Offers) != 300 {
 		t.Errorf(
 			"organizations %d (want 610), offers %d (want 300)",
@@ -112,6 +140,7 @@ func TestBuildIsDeterministicAndConsistent(t *testing.T) {
 		PartnerUsers:     2,
 		TechnicianUsers:  2,
 		HQUsers:          1,
+		Probes:           0,
 		Password:         "pw",
 		Now:              now,
 	}
@@ -172,6 +201,7 @@ func TestBuildRefusesABadConfig(t *testing.T) {
 		"negative accounts":   func(c *loadseed.Config) { c.HQUsers = -1 },
 		"no password":         func(c *loadseed.Config) { c.Password = "" },
 		"no time":             func(c *loadseed.Config) { c.Now = time.Time{} },
+		"too many probes":     func(c *loadseed.Config) { c.Probes = c.Customers*c.UnitsPerCustomer + 1 },
 		"no units a customer": func(c *loadseed.Config) { c.UnitsPerCustomer = 0 },
 	} {
 		cfg := good

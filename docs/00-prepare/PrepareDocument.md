@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.554.0
+version: 0.556.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -300,6 +300,8 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.556.0: IR693: load test of the IoT path: 3,000 devices on the stack's own broker and bridge, the iot-smoke, iot and iot-design scenarios (telemetry freshness, command round trip), the generator cmd/iotload; the broker's drops are reported.
+0.555.0: IR692: load test of the web layer (sign-in, BFF, server-rendered pages): web-smoke, web, spike and soak scenarios, the web apps in the ac-load stack; the customer accounts get the location consent.
 0.554.0: IR691: load test of the Core API at the launch size (cmd/loadseed, deploy/load, service/web/load k6 smoke/load/stress, load.yml) and the test sufficiency measured; results are lab measurements, §13 stays PROPOSED.
 0.553.0: IR690: the permission data.forceDelete (39th) lets a holder delete a customer or a contractor company with its accounts, even those with history (force on customers.delete, contractors.delete, members.delete; [forced] in the audit reason).
 0.552.0: IR689: LineChart tooltip with the name, unit and time of each value; air quality and unit monitoring take several metrics (metric=a,b), two units at most on two axes.

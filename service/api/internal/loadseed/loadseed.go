@@ -40,6 +40,7 @@ const (
 	launchPartnerAcc  = 45
 	launchTechAcc     = 30
 	launchHQAcc       = 15
+	launchProbes      = 60 // a probe sends once a minute, so 60 of them make a reading a second
 )
 
 // The size of one customer's records, and the dates of its contract and invoices (days before or after now).
@@ -69,6 +70,7 @@ const (
 	keyCustomerOrgID = "customerOrgId"
 	keyPropertyID    = "propertyId"
 	keyUnitIDs       = "unitIds"
+	roleClient       = "client"
 	keyTenantID      = "tenantId"
 	keyName          = "name"
 	keyStatus        = "status"
@@ -97,6 +99,7 @@ type Config struct {
 	PartnerUsers     int       // synthetic accounts of the contractor companies
 	TechnicianUsers  int       // synthetic technicians of the contractor companies
 	HQUsers          int       // synthetic HQ operators
+	Probes           int       // devices of the IoT scenario that only measure the delay of a reading (on the last units)
 	Password         string    // the password of every synthetic account
 	Now              time.Time // the time the data is dated from
 }
@@ -112,6 +115,7 @@ func LaunchConfig(password string, now time.Time) Config {
 		PartnerUsers:     launchPartnerAcc,
 		TechnicianUsers:  launchTechAcc,
 		HQUsers:          launchHQAcc,
+		Probes:           launchProbes,
 		Password:         password,
 		Now:              now,
 	}
@@ -125,6 +129,8 @@ func (c Config) Validate() error {
 			"%w: customers, units per customer and contractors must be at least 1",
 			ErrBadConfig,
 		)
+	case c.Probes < 0 || c.Probes > c.Customers*c.UnitsPerCustomer:
+		return fmt.Errorf("%w: the probes must be between 0 and the number of units", ErrBadConfig)
 	case c.CustomerUsers > c.Customers:
 		return fmt.Errorf("%w: there cannot be more customer accounts than customers", ErrBadConfig)
 	case c.PartnerUsers < 0 || c.TechnicianUsers < 0 || c.HQUsers < 0 || c.CustomerUsers < 0:
@@ -161,10 +167,26 @@ type Manifest struct {
 	Users     []User `json:"users"`
 }
 
-// Result is what Build returns: the fixture to apply and the manifest.
+// Link ties a device to its unit and sensors, in the shape internal/iotbridge reads (Links); Probe marks a device that
+// only measures the delay of a reading and sends no routine telemetry.
+type Link struct {
+	Device     string            `json:"device"`
+	Unit       string            `json:"unit"`
+	Sensors    map[string]string `json:"sensors"`
+	Connection string            `json:"connection"`
+	Probe      bool              `json:"probe"`
+}
+
+// LinksFile is the file the IoT scenario reads: the bridge and the simulator learn the load devices from it.
+type LinksFile struct {
+	Links []Link `json:"links"`
+}
+
+// Result is what Build returns: the fixture to apply, the manifest and the links of the devices.
 type Result struct {
 	Fixture  *seed.Fixture
 	Manifest Manifest
+	Links    LinksFile
 }
 
 const (
@@ -209,7 +231,8 @@ func hqPermissions() []string {
 type builder struct {
 	cfg                                                                   Config
 	orgs, customers, properties, spaces, units, contracts, invoices, jobs []map[string]any
-	offers, actors                                                        []map[string]any
+	offers, actors, consents, devices                                     []map[string]any
+	links                                                                 []Link
 	manifest                                                              Manifest
 	customerUnits, customerJobs                                           map[int][]string
 	contractorOf                                                          func(i int) string
@@ -227,6 +250,9 @@ func newBuilder(cfg Config) *builder {
 		invoices:      nil,
 		jobs:          nil,
 		offers:        nil,
+		consents:      nil,
+		devices:       nil,
+		links:         nil,
 		actors:        nil,
 		manifest:      Manifest{Customers: 0, Units: 0, Jobs: 0, Users: nil},
 		customerUnits: map[int][]string{},
@@ -274,6 +300,8 @@ func Build(cfg Config) (*Result, error) {
 			"invoices":      data.invoices,
 			"jobs":          data.jobs,
 			"offers":        data.offers,
+			"consents":      data.consents,
+			"devices":       data.devices,
 		},
 	}
 
@@ -295,7 +323,11 @@ func Build(cfg Config) (*Result, error) {
 		data.jobs,
 	)
 
-	return &Result{Fixture: &fixture, Manifest: data.manifest}, nil
+	return &Result{
+		Fixture:  &fixture,
+		Manifest: data.manifest,
+		Links:    LinksFile{Links: data.links},
+	}, nil
 }
 
 func org(id, kind, name string) map[string]any {
@@ -380,6 +412,7 @@ func (b *builder) customerUnitRecords(i int, orgID, propID, room string) []strin
 	for unit := range b.cfg.UnitsPerCustomer {
 		id := fmt.Sprintf("load-unit-%04d-%d", i+1, unit+1)
 		unitIDs = append(unitIDs, id)
+		b.device(i*b.cfg.UnitsPerCustomer+unit, i+1, unit+1, id)
 		b.units = append(b.units, map[string]any{
 			keyID:            id,
 			keyVersion:       1,
@@ -405,6 +438,71 @@ func (b *builder) customerUnitRecords(i int, orgID, propID, room string) []strin
 	}
 
 	return unitIDs
+}
+
+// The sensors every load device has: the metric, its unit, and the measurement boundary power is counted at.
+func loadSensors() []struct{ metric, unit, boundary string } {
+	return []struct{ metric, unit, boundary string }{
+		{"temperature", "°C", ""},
+		{"power", "kW", "ac_input_electricity"},
+	}
+}
+
+const (
+	staleAfterSeconds = 120
+	probeUnitsPrefix  = "load-probe-"
+)
+
+// device adds the IoT module bound to unit `index` (counted over all units) of customer n: the device with its two
+// sensors, and its link for the bridge and the simulator. The last cfg.Probes units get probe devices instead, whose
+// readings only measure the delay of the path.
+func (b *builder) device(index, n, number int, unitID string) {
+	units := b.cfg.Customers * b.cfg.UnitsPerCustomer
+	probe := index >= units-b.cfg.Probes
+	name := fmt.Sprintf("load-dev-%04d-%d", n, number)
+
+	if probe {
+		name = fmt.Sprintf("%s%02d", probeUnitsPrefix, index-(units-b.cfg.Probes)+1)
+	}
+
+	sensors := make([]map[string]any, 0, len(loadSensors()))
+	byMetric := map[string]string{}
+
+	for _, sensor := range loadSensors() {
+		sensorID := fmt.Sprintf("load-sens-%s-%s", strings.TrimPrefix(name, "load-"), sensor.metric)
+		byMetric[sensor.metric] = sensorID
+
+		var boundary any
+		if sensor.boundary != "" {
+			boundary = sensor.boundary
+		}
+
+		sensors = append(sensors, map[string]any{
+			keyID: sensorID, "deviceId": name, "metric": sensor.metric, "unit": sensor.unit,
+			"staleAfterSeconds": staleAfterSeconds, "boundaryId": boundary, "calibratedAt": nil,
+		})
+	}
+
+	b.devices = append(b.devices, map[string]any{
+		keyID:       name,
+		"unitId":    unitID,
+		"bindingId": "load-bind-" + strings.TrimPrefix(name, "load-"),
+		"serial": strings.ToUpper(
+			"AC-" + strings.TrimPrefix(name, "load-"),
+		),
+		"connection":            "online",
+		"lastSeenAt":            b.stamp(0),
+		"firmwareVersion":       "v1",
+		"powerSignal":           "on",
+		"tamper":                "clear",
+		"targetUnitId":          unitID,
+		"createdByMembershipId": "hq-operator",
+		"sensors":               sensors,
+	})
+	b.links = append(
+		b.links,
+		Link{Device: name, Unit: unitID, Sensors: byMetric, Connection: "online", Probe: probe},
+	)
 }
 
 // contractAndInvoices adds the customer's contract over all its units and its last three monthly invoices: the older
@@ -536,7 +634,7 @@ func (b *builder) accounts() {
 		b.addAccount(account{
 			group:       "customer",
 			name:        fmt.Sprintf("load-customer-%04d", n),
-			role:        "client",
+			role:        roleClient,
 			orgID:       orgID,
 			permissions: []string{"control.execute"},
 			employment:  nil,
@@ -641,7 +739,7 @@ func (b *builder) addAccount(entry account) {
 	}
 
 	var clientRole any
-	if entry.role == "client" {
+	if entry.role == roleClient {
 		clientRole = "owner"
 	}
 
@@ -673,6 +771,24 @@ func (b *builder) addAccount(entry account) {
 	}
 
 	b.manifest.Users = append(b.manifest.Users, user)
+
+	// the customer overview reads the location consent, which the demo seed gives its customers
+	if entry.role == roleClient {
+		b.consents = append(b.consents, map[string]any{
+			keyID:       "consent-" + entry.name + "-location",
+			keyTenantID: tenant,
+			keyVersion:  1,
+			"createdAt": b.stamp(seedAgeDays),
+			"updatedAt": b.stamp(
+				seedAgeDays,
+			),
+			"membershipId": entry.name,
+			"purpose":      "location_automation",
+			"granted":      false,
+			"grantedAt":    nil,
+			"revokedAt":    nil,
+		})
+	}
 }
 
 // ids turns fixture IDs into the UUIDs the database holds.

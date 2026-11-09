@@ -4,6 +4,8 @@
 import exec from "k6/execution";
 import { env } from "./env.ts";
 import { visit } from "./flows.ts";
+import { markStart, phaseNames } from "./phase.ts";
+import { webGroup, webVisit } from "./web.ts";
 import { loadUsers, type User } from "./manifest.ts";
 import { CLASSES, report, WRITE_NAMES } from "./summary.ts";
 
@@ -22,6 +24,30 @@ function accountOf(vu: number, balanced: boolean): User {
   const found = users[(vu - 1) % users.length];
   if (!found) throw new Error("the manifest has no accounts");
   return found;
+}
+
+/** The accounts that have a web app: everyone but HQ, whose sign-in needs a one-time code. */
+const webUsers = users.filter((u) => webGroup(u) !== null);
+
+/** What setup() hands every scenario: when the test started, which the time windows are counted from. */
+export interface Setup { startedAtMs: number }
+
+/** Called once before the scenarios start. */
+export function setup(): Setup {
+  return { startedAtMs: Date.now() };
+}
+
+/** One iteration of a virtual user of a web scenario (the BFF and the server-rendered pages); `balanced` takes one account
+of each kind first (smoke). */
+export function webIteration(data: Setup, balanced: boolean): void {
+  markStart(data.startedAtMs);
+  const vu = exec.vu.idInTest;
+  const kinds = ["customer", "partner", "technician"];
+  const user = balanced
+    ? webUsers.filter((u) => u.group === kinds[(vu - 1) % kinds.length])[Math.floor((vu - 1) / kinds.length)]
+    : webUsers[(vu - 1) % webUsers.length];
+  if (!user) throw new Error("the manifest has no account for this virtual user");
+  webVisit(user, exec.vu.iterationInScenario);
 }
 
 /** One iteration of a virtual user. */
@@ -48,6 +74,15 @@ export function watched(): Record<string, string[]> {
     out[`ac_errors{kind:${kind}}`] = [];
   }
   for (const c of CLASSES) out[`ac_status{class:${c}}`] = [];
+  for (const kind of ["page", "signin", "command"]) {
+    out[`ac_requests{kind:${kind}}`] = [];
+    out[`ac_errors{kind:${kind}}`] = [];
+  }
+  for (const phase of phaseNames()) {
+    out[`ac_page_duration{phase:${phase}}`] = [];
+    out[`ac_signin_duration{phase:${phase}}`] = [];
+    out[`ac_errors{phase:${phase}}`] = [];
+  }
   for (const name of WRITE_NAMES) out[`ac_write_duration{name:${name}}`] = [];
   return out;
 }

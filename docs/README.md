@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.554.0 / Created: 2026-09-14 / Updated: 2026-11-07 / Status: Draft for review / Language: English
+Version: 0.556.0 / Created: 2026-09-14 / Updated: 2026-11-07 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -100,6 +100,8 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.556.0 (2026-11-09): IR693: load test of the IoT path: 3,000 devices on the stack's own broker and bridge, the iot-smoke, iot and iot-design scenarios (telemetry freshness, command round trip), the generator cmd/iotload; the broker's drops are reported.
+0.555.0 (2026-11-09): IR692: load test of the web layer (sign-in, BFF, server-rendered pages): web-smoke, web, spike and soak scenarios, the web apps in the ac-load stack; the customer accounts get the location consent.
 0.554.0 (2026-11-09): IR691: load test of the Core API at the launch size (cmd/loadseed, deploy/load, service/web/load k6 smoke/load/stress, load.yml) and the test sufficiency measured; results are lab measurements, §13 stays PROPOSED.
 0.553.0 (2026-11-09): IR690: data.forceDelete — force delete of a customer or contractor company with its accounts; units, jobs, contracts, invoices and reports still stop it.
 0.552.0 (2026-11-09): IR689: LineChart tooltip with the name, unit and time of each value; air quality and unit monitoring take several metrics (metric=a,b), two units at most on two axes.
