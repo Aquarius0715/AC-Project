@@ -6,6 +6,7 @@
 // (IR76, jobs.get of the URL's job). Texts in the user's display language; every time is formatted here (IR283).
 import "server-only";
 import { coreDisplay, coreNow, coreOp, CoreError, orWhenRefused, coreItems } from "@ac/web/lib/dal";
+import { unitAlerts } from "@ac/web/lib/unitAlerts";
 import { i18nOf, showTime } from "@ac/web/lib/i18n";
 import type { ApiAlert } from "@ac/web/lib/alerts";
 import type { TechJobRead } from "@ac/web/lib/techJob";
@@ -79,7 +80,7 @@ export async function loadTechUnit(id: string, sp: { jobId?: string; metric?: st
   const unitOf = (m: string) => d.latestMeasurements.find((x) => x.metric === m)?.unit ?? "";
   const others = tab === MONITORING ? d.latestMeasurements.filter((m) => !metrics.includes(m.metric)).slice(0, 3).map((m) => m.metric) : [];
   const [alerts, jobs, pointsList, more, devices] = await Promise.all([
-    optional(coreItems<ApiAlert>("alerts.list", { limit: 50, filters: { unitId: id } }), [] as ApiAlert[]),
+    optional(unitAlerts<ApiAlert>(id, 50), [] as ApiAlert[]), // every unresolved one, then the latest resolved (IR712)
     optional(coreItems<ApiTechJobRow>("jobs.list", { limit: 20, filters: { unitId: id } }), [] as ApiTechJobRow[]),
     Promise.all(metrics.map((m) => optional(series(id, m, from, to, period, 4), NONE))),
     Promise.all(others.map((m) => optional(series(id, m, from, to, period, 1), NONE))),
