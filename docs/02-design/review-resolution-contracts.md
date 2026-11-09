@@ -9281,6 +9281,13 @@ The user chose to delete accounts that were never used and to keep ending the ot
 1. **The rule.** `clientUsers.resendInvite` is CONFLICT `errors.access_expired` when the user's membership has an end at or before now, as the partner one is; the resend gap (IR423) is checked after it.
 2. **Tests.** `TestClientUserResendRefusedAfterTheAccessEnded` answered 200 before the fix. No operation, route or screen changes; 224 operations, 245 routes.
 
+## IR661 A membership names each scope once (review round 32) — 2026-11-09
+
+`members.save` refused a permission named twice (`error.invalid`) but took a scope named twice and stored it once (`ON CONFLICT DO NOTHING`). The check that moves the membership's `scopeVersion` when an update changes its scopes compares the lengths and then asks whether every sent scope was there before, so an update that replaced the scopes [A, B] by [A, A] kept the same length, found every sent scope in the old list, and left the version where it was: B was gone and the sessions and cursors scoped to [A, B] stayed valid.
+
+1. **The rule.** The scopes of a membership are distinct (kind and ID): a repeated scope is VALIDATION `error.duplicate` on `scopes`, as a repeated permission is on `permissions`. An unknown kind keeps its `error.invalid`.
+2. **Tests.** `TestMembersSave` (a scope named twice is refused on its field). No operation, route or screen changes; 224 operations, 245 routes.
+
 ## IR665 A new CSV import preview removes the expired ones (review round 51) — 2026-11-09
 
 database-design.md says the 30-minute import previews (`assets.unit_import_previews`) are "purged after expiry", and the table has an index on `expires_at` for it, but nothing deleted them: a preview left only when its import was committed or its customer deleted, so every file anyone previewed and did not commit stayed in the table (the rows of up to 1,000 lines, resolved IDs included).

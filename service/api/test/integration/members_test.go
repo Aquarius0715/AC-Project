@@ -75,6 +75,7 @@ func TestMembersSave(t *testing.T) {
 	refused := map[string]string{ // the field each VALIDATION case is refused for
 		"admin unit scope":       "scopes=error.invalid",
 		"admin two tenants":      "scopes=error.invalid",
+		"duplicate scope":        "scopes=error.duplicate",
 		caseBlankReason:          refusedReasonLength,
 		"employment for admin":   "employment=error.notAllowed",
 		"external without end":   "validUntil=errors.external_needs_end",
@@ -129,6 +130,8 @@ func TestMembersSave(t *testing.T) {
 		caseBlankReason:          {map[string]string{fieldReason: jsonBlank}, 422},
 		"internal at contractor": {map[string]string{fieldOrganizationID: `"` + contractor + `"`}, 422},
 		"unknown scope":          {map[string]string{fieldScopes: `[{"kind":"unit","id":"` + uuid.NewString() + `"}]`}, 422},
+		"duplicate scope": {map[string]string{fieldScopes: `[{"kind":"unit","id":"` + seed.ID("unit-non-rto").String() +
+			`"},{"kind":"unit","id":"` + seed.ID("unit-non-rto").String() + `"}]`}, 422},
 		"unknown property": {map[string]string{fieldScopes: `[{"kind":"property",` +
 			`"id":"` + uuid.NewString() + `"}]`}, 422},
 		"unknown user":         {map[string]string{fieldUserID: `"` + uuid.NewString() + `"`}, 404},
