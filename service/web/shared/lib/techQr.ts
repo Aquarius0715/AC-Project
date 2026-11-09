@@ -9,6 +9,7 @@ import type { Slot } from "@ac/web/lib/partnerOverview";
 import type { TechJobRead } from "@ac/web/lib/techJob";
 import { wrapped } from "@ac/web/lib/text";
 import { isAfter } from "@ac/web/lib/order";
+import { OpError } from "@ac/web/lib/ops";
 
 const en = translator("en");
 
@@ -51,4 +52,10 @@ export function qrRefusal(f: { code: string }, t: T = en): { title: string; text
   if (f.code === "NOT_FOUND") return { title: t("Page unavailable"), text: t("This label is not on a unit in your assignments, or it is unknown. Check the label, or enter the unit ID manually."), absent: true };
   if (f.code === "VALIDATION") return { title: t("Not a label"), text: t("Enter the label code, a device serial or the unit ID."), absent: false };
   return { title: t("Scan failed"), text: t("The label could not be checked — try again."), absent: false };
+}
+
+/** The refusal for whatever a scan threw: a refused call says its code; a call that failed without an answer (the network
+is down, the request was cut) reads as unavailable, so the dialog never stays on “Reading the label…”. */
+export function qrRefusalOf(error: unknown, t: T = en): { title: string; text: string; absent: boolean } {
+  return qrRefusal({ code: error instanceof OpError ? error.error.code : "UNAVAILABLE" }, t);
 }

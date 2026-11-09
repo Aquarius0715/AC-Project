@@ -13,7 +13,7 @@ import { callOp, OpError } from "@ac/web/lib/ops";
 import { useNow, useOp } from "@ac/web/lib/useOp";
 import { showClock } from "@ac/web/lib/i18n";
 import { useI18n } from "./I18n";
-import { qrMatch, qrRefusal, scanCode, type ApiQrJob, type ApiQrResolution, type ApiQrUnit, type QrMatch } from "@ac/web/lib/techQr";
+import { qrMatch, qrRefusal, qrRefusalOf, scanCode, type ApiQrJob, type ApiQrResolution, type ApiQrUnit, type QrMatch } from "@ac/web/lib/techQr";
 import { Icon } from "@ac/web/components/Icon";
 import { Button } from "@ac/web/components/ui/button";
 import { orNull, recover } from "@ac/web/lib/promises";
@@ -49,8 +49,7 @@ export function QrScan({ open, onClose }: Readonly<{ open: boolean; onClose: () 
       const name = units.data.find((u) => u.id === r.unitId)?.displayName;
       setState({ kind: "matched", code: c, match: qrMatch(r, unit, job, Date.parse(at), { name, locked: isLocked }, i18n), at });
     } catch (error) {
-      if (!(error instanceof OpError)) throw error;
-      setState({ kind: "refused", ...qrRefusal(error.error, t) });
+      setState({ kind: "refused", ...qrRefusalOf(error, t) });
     }
   };
   const m = state.kind === "matched" ? state.match : null;
