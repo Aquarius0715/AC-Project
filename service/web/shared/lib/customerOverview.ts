@@ -5,7 +5,7 @@
 // card. Pure code shared by the Server Component and the client view; texts and times in the user's display language and
 // time zone (`i`, IR260), the period note in Asia/Kuala_Lumpur, where the periods are cut.
 import { alertTitle, type ApiAlert } from "@ac/web/lib/alerts";
-import { EN, intlTag, relativeTime, showClock, showTime, type I18n } from "@ac/web/lib/i18n";
+import { EN, intlTag, relativeTime, showClock, showSpan, showTime, type I18n } from "@ac/web/lib/i18n";
 import { airNumber, type ApiMeasurement } from "@ac/web/lib/air";
 import type { ApiPropertyRow, ApiUnitRow } from "@ac/web/lib/assets";
 import type { ApiEnergySummary } from "@ac/web/lib/energy";
@@ -135,6 +135,9 @@ export function attentionCard(alerts: ApiAlert[], units: OverviewUnit[], nowMs: 
 /** The air card's 24 points: the hourly averages of the valid CO2 readings of the last 24 hours, whole (bucketMinutes 60,
 IR607), rounded; an hour without a valid reading stays empty. */
 export const bucketPoints = (buckets: { value: number | null }[]): (number | null)[] => buckets.map((b) => (b.value === null ? null : Math.round(b.value)));
+
+/** The tooltip heading of each hourly point of the air card: the hour as a span in the display time zone (IR689). */
+export const bucketTimes = (buckets: { start: string }[], i: I18n = EN): string[] => buckets.map((b) => showSpan(b.start, new Date(Date.parse(b.start) + 3_600_000).toISOString(), i.display, true));
 
 /** “today 6:00 pm MYT”, “tomorrow 7:30 am MYT”, else the date and time — the next run of a schedule rule (IR260). */
 export const nextRunText = (iso: string, nowMs: number, i: I18n = EN) => relativeTime(iso, nowMs, i);

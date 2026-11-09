@@ -301,6 +301,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
 0.553.0: IR690: the permission data.forceDelete (39th) lets a holder delete a customer or a contractor company with its accounts, even those with history (force on customers.delete, contractors.delete, members.delete; [forced] in the audit reason).
+0.552.0: IR689: LineChart tooltip with the name, unit and time of each value; air quality and unit monitoring take several metrics (metric=a,b), two units at most on two axes.
 0.551.0: IR688: the HQ alert policy form refuses a cooldown or an escalation that is not a whole number of minutes.
 0.550.0: IR687: a time that cannot be formatted is shown as it came instead of recursing without end (runText / runClock).
 0.549.0: IR686: the shared shell's Server Actions (notifications, preferences, demo panel) word a failed call with actionFailure; the guard test reads them too.

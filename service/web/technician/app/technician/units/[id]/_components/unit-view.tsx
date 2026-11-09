@@ -4,7 +4,8 @@ import Link from "next/link";
 import { Badge, Banner, Card, ConnBadge, LineChart, LinkButton, Page, SeverityBadge, SummaryList, Tabs, TextLink, cx, Plain } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
-import type { Period, SeriesChart, Tile } from "@ac/web/lib/techUnit";
+import { airNumber } from "@ac/web/lib/air";
+import type { Period, SeriesCharts, Tile } from "@ac/web/lib/techUnit";
 import type { UnitLive } from "../_lib/load";
 import { Icon } from "@ac/web/components/Icon";
 
@@ -22,7 +23,7 @@ export function TechUnitView({ live }: Readonly<{ live: UnitLive }>) {
       <div className="flex flex-wrap items-center gap-2 text-[13px]">
         <Link href={live.back} className="font-semibold text-primary" aria-label={t("Back")}><Icon name="chevronLeft" /></Link><h1 className="text-base font-bold">{live.name}</h1><span className="text-muted-foreground">· {live.short}</span><ConnBadge s={live.connection} />
       </div>
-      <div><Tabs value={live.tab} onChange={(v) => { patch({ metric: v === "monitoring" ? live.metric : null }); }} tabs={live.tabs} /></div>
+      <div><Tabs value={live.tab} onChange={(v) => { patch({ metric: v === "monitoring" ? live.metrics.join(",") : null }); }} tabs={live.tabs} /></div>
       {live.tab === "register" ? (
         <div className="split-rev">
           <div className="flex min-w-0 flex-col gap-4">
@@ -46,7 +47,15 @@ export function TechUnitView({ live }: Readonly<{ live: UnitLive }>) {
             <Card title={t("Time-series monitoring")} action={periods}>
               {live.stopped && <div className="mb-3"><Banner tone="warn">{live.stopped}</Banner></div>}
               <div className="grid-fluid" style={{ ["--min" as string]: "160px" }}>{[live.tiles.temperature, live.tiles.power, live.tiles.connection].map((x) => <TileBox key={x.label} tile={x} />)}</div>
-              <Series chart={live.chart} />
+              <div className="mt-3 flex flex-wrap gap-1" role="group" aria-label={t("Metrics in the chart")}>
+              {live.choices.map((c) => (
+                <Plain key={c.metric} type="button" aria-pressed={c.on} disabled={c.next === null} title={c.next === null ? t("A chart shows two units at most — take one out first") : undefined} onClick={() => { if (c.next) patch({ metric: c.next.join(",") }); }}
+                  className={cx("rounded-control border px-3 py-1.5 text-xs font-semibold", c.on ? "border-primary bg-primary-soft text-primary" : "border-line text-muted-foreground hover:bg-surface2", c.next === null && "opacity-50")}>
+                  {c.name}
+                </Plain>
+              ))}
+            </div>
+            <Series chart={live.chart} />
             </Card>
             <Card title={t("Maintenance history")}>
               {live.history.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No jobs of yours on this unit.")}</p> : live.history.map((j) => (
@@ -71,15 +80,23 @@ export function TechUnitView({ live }: Readonly<{ live: UnitLive }>) {
           <Card title={live.chart.title} action={periods}>
             {live.stopped && <div className="mb-3"><Banner tone="warn">{live.stopped}</Banner></div>}
             <div className="grid-fluid" style={{ ["--min" as string]: "160px" }}>{[live.tiles.temperature, live.tiles.power, live.tiles.operation, live.tiles.connection].map((x) => <TileBox key={x.label} tile={x} />)}</div>
+            <div className="mt-3 flex flex-wrap gap-1" role="group" aria-label={t("Metrics in the chart")}>
+              {live.choices.map((c) => (
+                <Plain key={c.metric} type="button" aria-pressed={c.on} disabled={c.next === null} title={c.next === null ? t("A chart shows two units at most — take one out first") : undefined} onClick={() => { if (c.next) patch({ metric: c.next.join(",") }); }}
+                  className={cx("rounded-control border px-3 py-1.5 text-xs font-semibold", c.on ? "border-primary bg-primary-soft text-primary" : "border-line text-muted-foreground hover:bg-surface2", c.next === null && "opacity-50")}>
+                  {c.name}
+                </Plain>
+              ))}
+            </div>
             <Series chart={live.chart} />
           </Card>
           {live.others.length > 0 && (
             <div className="grid-fluid" style={{ ["--min" as string]: "260px" }}>
               {live.others.map((m) => (
                 <Card key={m.metric} title={m.label} action={<b className={cx("text-[13px]", m.tone === "warn" && "text-warn")}>{m.value}</b>}>
-                  {m.points.every((v) => v === null) ? <p className="text-xs text-muted-foreground">{t("No valid readings in this period.")}</p> : <LineChart points={m.points} height={56} />}
+                  {m.points.every((v) => v === null) ? <p className="text-xs text-muted-foreground">{t(NO_VALID)}</p> : <LineChart points={m.points} name={m.label} unit={m.unit} format={(v) => airNumber(m.metric, v)} times={live.chart.times} height={56} />}
                   {m.cut && <p className="mt-1 text-[11px] font-semibold text-warn">{t("Earlier readings are not loaded")}</p>}
-                  <div className="mt-1 flex justify-between gap-2 text-[11px] text-muted-foreground"><span>{m.sub}</span><Plain type="button" className="font-semibold text-primary" onClick={() => { patch({ metric: m.metric }); }}>{t("Chart")} <Icon name="arrowRight" /></Plain></div>
+                  <div className="mt-1 flex justify-between gap-2 text-[11px] text-muted-foreground"><span>{m.sub}</span><Plain type="button" className="font-semibold text-primary" onClick={() => { patch({ metric: (live.choices.find((c) => c.metric === m.metric)?.next ?? [m.metric]).join(",") }); }}>{t("Chart")} <Icon name="arrowRight" /></Plain></div>
                 </Card>
               ))}
             </div>
@@ -107,13 +124,20 @@ function TileBox({ tile }: Readonly<{ tile: Tile }>) {
   );
 }
 
-function Series({ chart }: Readonly<{ chart: SeriesChart }>) {
+const NO_VALID = "No valid readings in this period.";
+function Series({ chart }: Readonly<{ chart: SeriesCharts }>) {
   const t = useT();
+  const drawn = chart.lines.filter((l) => !l.empty);
+  const many = chart.lines.length > 1;
+  const named = (l: SeriesCharts["lines"][number], text: string) => (many ? `${l.name}: ${text}` : text);
   return (
     <div className="mt-3">
-      {chart.empty ? <div className="rounded-xl border border-dashed border-line p-6 text-center text-[13px] text-muted-foreground">{t("No valid readings in this period.")}</div> : <LineChart points={chart.points} height={200} labels={chart.labels} />}
-      {chart.cut && <p className="mt-2 text-xs font-semibold text-warn">{chart.cut}</p>}
-      <p className="mt-1 text-[11px] text-muted-foreground">{[chart.count, chart.gap, t("Gaps in missing data are not connected by lines. Reordered or duplicate demo events never roll values backward.")].filter(Boolean).join(" · ")}</p>
+      {drawn.length === 0
+        ? <div className="rounded-xl border border-dashed border-line p-6 text-center text-[13px] text-muted-foreground">{t(NO_VALID)}</div>
+        : <LineChart series={drawn.map((l) => ({ name: l.name, unit: l.unit, points: l.points, axis: l.axis, format: (v: number) => airNumber(l.metric, v) }))} times={chart.times} height={200} labels={chart.labels} />}
+      {chart.lines.filter((l) => l.empty && many).map((l) => <p key={`e${l.metric}`} className="mt-2 text-xs text-muted-foreground">{named(l, t(NO_VALID))}</p>)}
+      {chart.lines.map((l) => l.cut && <p key={`c${l.metric}`} className="mt-2 text-xs font-semibold text-warn">{named(l, l.cut)}</p>)}
+      <p className="mt-1 text-[11px] text-muted-foreground">{[...chart.lines.flatMap((l) => [l.count && named(l, l.count), l.gap && named(l, l.gap)]), t("Gaps in missing data are not connected by lines. Reordered or duplicate demo events never roll values backward.")].filter(Boolean).join(" · ")}</p>
     </div>
   );
 }

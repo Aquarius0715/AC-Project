@@ -13,7 +13,7 @@ import type { ApiTechJobRow } from "@ac/web/lib/techOverview";
 import type { ApiDeviceEventFull } from "@ac/web/lib/techDevices";
 import type { OpInput } from "@ac/web/lib/opTypes";
 import {
-  componentCards, controlJob, jobRows, liveTiles, metricOf, openAlerts, otherMetrics, PERIODS, periodOf, periodRange, registerRows, seriesChart, stoppedBanner,
+  componentCards, controlJob, jobRows, liveTiles, metricChoices, metricsOf, openAlerts, otherMetrics, PERIODS, periodOf, periodRange, registerRows, seriesCharts, stoppedBanner,
   windowEvents, type ApiTechUnit, type Period, type Point,
 } from "@ac/web/lib/techUnit";
 import { recover } from "@ac/web/lib/promises";
@@ -74,14 +74,14 @@ export async function loadTechUnit(id: string, sp: { jobId?: string; metric?: st
     };
   }
   const tab = sp.metric ? "monitoring" as const : "register" as const;
-  const metric = metricOf(d, sp.metric), period = periodOf(sp.period);
+  const metrics = metricsOf(d, sp.metric), period = periodOf(sp.period); // "temperature,humidity": several metrics in one chart (IR689); one name is the old link
   const { from, to } = periodRange(period, nowMs);
   const unitOf = (m: string) => d.latestMeasurements.find((x) => x.metric === m)?.unit ?? "";
-  const others = tab === MONITORING ? d.latestMeasurements.filter((m) => m.metric !== metric).slice(0, 3).map((m) => m.metric) : [];
-  const [alerts, jobs, points, more, devices] = await Promise.all([
+  const others = tab === MONITORING ? d.latestMeasurements.filter((m) => !metrics.includes(m.metric)).slice(0, 3).map((m) => m.metric) : [];
+  const [alerts, jobs, pointsList, more, devices] = await Promise.all([
     optional(coreItems<ApiAlert>("alerts.list", { limit: 50, filters: { unitId: id } }), [] as ApiAlert[]),
     optional(coreItems<ApiTechJobRow>("jobs.list", { limit: 20, filters: { unitId: id } }), [] as ApiTechJobRow[]),
-    optional(series(id, metric, from, to, period, 4), NONE),
+    Promise.all(metrics.map((m) => optional(series(id, m, from, to, period, 4), NONE))),
     Promise.all(others.map((m) => optional(series(id, m, from, to, period, 1), NONE))),
     tab === MONITORING ? optional(coreItems<{ id: string }>("devices.list", { limit: 5, filters: { unitId: id } }), []) : Promise.resolve([]),
   ]);
@@ -107,17 +107,19 @@ export async function loadTechUnit(id: string, sp: { jobId?: string; metric?: st
     components: componentCards(d, i),
     componentCount: d.components.length,
     tiles: liveTiles(d, nowMs, i),
-    chart: seriesChart(metric, unitOf(metric), points.items, period, nowMs, i, points.total, points.complete),
-    others: otherMetrics(d, metric, Object.fromEntries(others.map((m, k) => [m, more.at(k)?.items ?? []])), period, nowMs, i,
+    chart: seriesCharts(metrics.map((m, k) => ({ metric: m, unit: unitOf(m), items: pointsList.at(k)?.items ?? [], total: pointsList.at(k)?.total ?? 0, complete: pointsList.at(k)?.complete ?? false })), period, nowMs, i),
+    others: otherMetrics(d, metrics, Object.fromEntries(others.map((m, k) => [m, more.at(k)?.items ?? []])), period, nowMs, i,
       Object.fromEntries(others.map((m, k) => [m, more.at(k)?.complete ? 0 : more.at(k)?.total ?? 0]))),
     events: windowEvents(alerts, events, period, nowMs, i),
     history: jobRows(jobs, i),
     alerts: openAlerts(alerts, nowMs, i).map((a) => ({ ...a, href: `${alertsHref}${job ? "&" : "?"}alertId=${a.id}` })),
     controlHref: control ? `/technician/units/${id}/control?jobId=${control}` : null,
+    metric: metrics[0] ?? "temperature",
+    choices: metricChoices(d, metrics, t),
     id,
     back,
     tab,
-    metric,
+    metrics,
     period,
     alertsHref,
   };

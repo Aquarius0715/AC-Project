@@ -9,6 +9,7 @@ import { evidenceText, resolutionText } from "@ac/web/lib/evidence";
 import { alertTitle, type ApiAlert } from "@ac/web/lib/alerts";
 import { metricLabel } from "@ac/web/lib/adminAlerts";
 import { airNumber } from "@ac/web/lib/air";
+import { toggleSeries, unitAxes } from "@ac/web/lib/chartScale";
 import { bucket, type ApiUnitDetail } from "@ac/web/lib/units";
 import { componentGroups, componentLabel, groupLabel, type Group } from "@ac/web/lib/techJob";
 import { statusWord, typeLabel } from "@ac/web/lib/partnerJobDetail";
@@ -44,6 +45,22 @@ export function metricOf(d: ApiTechUnit, v?: string): Metric {
   const asked = measured.find((m) => m === v);
   if (asked) return asked;
   return measured.includes(TEMPERATURE) ? TEMPERATURE : measured[0] ?? TEMPERATURE;
+}
+/** The metrics of the URL's `metric` ("temperature,humidity"; one name is the old link): those the unit measures, each
+once, in two units at most (a chart has a left and a right axis, IR689); the one metric `metricOf` gives when none is left. */
+export function metricsOf(d: ApiTechUnit, text = ""): Metric[] {
+  const unit = (m: string) => d.latestMeasurements.find((x) => x.metric === m)?.unit ?? "";
+  const measured = new Set<string>(d.latestMeasurements.map((x) => x.metric));
+  const isMeasured = (m: string): m is Metric => measured.has(m);
+  const named = [...new Set(text.split(","))].filter((m) => isMeasured(m));
+  const axes = unitAxes(named.map((m) => unit(m)));
+  const fits = named.filter((m) => axes.has(unit(m)));
+  return fits.length > 0 ? fits : [metricOf(d)];
+}
+/** The metrics the unit measures, for the chart's choice: each with its name and unit, and the selection after it is pressed (null when its unit would be a third one). */
+export function metricChoices(d: ApiTechUnit, selected: readonly string[], t: T): { metric: string; name: string; unit: string; next: string[] | null; on: boolean }[] {
+  const unit = (m: string) => d.latestMeasurements.find((x) => x.metric === m)?.unit ?? "";
+  return d.latestMeasurements.map((x) => ({ metric: x.metric, name: label(x.metric, t), unit: x.unit, on: selected.includes(x.metric), next: toggleSeries(selected, x.metric, unit) }));
 }
 const label = (metric: string, t: T) => (textOf(metricLabel, metric, t) ?? metric.replaceAll('_', " "));
 
@@ -126,7 +143,7 @@ export function stoppedBanner(d: ApiTechUnit, nowMs: number, i: I18n = EN): stri
     : i.t("No data has reached the server from this unit yet — nothing here is real-time.");
 }
 
-export interface SeriesChart { title: string; points: (number | null)[]; labels: string[]; gap: string | null; count: string | null; cut: string | null; empty: boolean }
+export interface SeriesChart { title: string; points: (number | null)[]; labels: string[]; times: string[]; gap: string | null; count: string | null; cut: string | null; empty: boolean }
 /** The chart's first label: the Kuala Lumpur day for 7 days, the day and time for 24 h, the time for 1 h. */
 function windowStart(at: string, p: Period, display: I18n["display"]): string {
   if (p === "7d") return showDayMonth(at, { ...display, timeZone: "Asia/Kuala_Lumpur" });
@@ -158,6 +175,8 @@ export function seriesChart(metric: string, unit: string, items: Point[], p: Per
   return {
     title: p === "7d" ? t("{metric} · last 7 days (Kuala Lumpur calendar days)", { metric: name }) : t("{metric} · last {period} (rolling)", { metric: name, period: t(p === "1h" ? "1 h" : "24 h") }),
     labels: [start, "", "", "", t("now")],
+    // the heading of each slot in the tooltip: the span the slot's reading was taken in, in the display time zone
+    times: points.map((_, k) => showSpan(new Date(from + k * slot).toISOString(), new Date(from + (k + 1) * slot).toISOString(), display, true)),
     empty: points.every((v) => v === null),
     count: isCut ? null : byCount(n, { one: t("1 measurement in this period"), many: t("{n} measurements in this period", { n }) }),
     cut: isCut ? t("Showing the latest {n} of {total} readings — earlier readings in this period are not loaded.", { n: items.length, total }) : null,
@@ -166,17 +185,38 @@ export function seriesChart(metric: string, unit: string, items: Point[], p: Per
   };
 }
 
-export interface MiniMetric { metric: string; label: string; value: string; sub: string; points: (number | null)[]; cut: boolean; tone?: "warn" }
+/** One metric to chart: its readings of the period and how many the period holds. */
+export interface SeriesSpec { metric: string; unit: string; items: Point[]; total: number; complete: boolean }
+/** One line of the chart and what the screen says about its readings. */
+interface ChartLine { metric: string; name: string; unit: string; points: (number | null)[]; axis: "left" | "right"; empty: boolean; count: string | null; gap: string | null; cut: string | null }
+export interface SeriesCharts { title: string; labels: string[]; times: string[]; lines: ChartLine[] }
+/** The metrics over the period in one chart (IR689): each on the axis of its unit (the first unit left, the second
+right), with the slots' headings for the tooltip. One metric reads as `seriesChart` does, with its title. */
+export function seriesCharts(specs: SeriesSpec[], p: Period, nowMs: number, i: I18n = EN): SeriesCharts {
+  const { t } = i;
+  const charts = specs.map((s) => ({ s, c: seriesChart(s.metric, s.unit, s.items, p, nowMs, i, s.total, s.complete) }));
+  const axes = unitAxes(specs.map((s) => s.unit));
+  const first = charts.at(0)?.c;
+  const names = specs.map((s) => `${label(s.metric, t)}${wrapped(s.unit, " (", ")")}`).join(" · ");
+  const joined = p === "7d" ? t("{metric} · last 7 days (Kuala Lumpur calendar days)", { metric: names }) : t("{metric} · last {period} (rolling)", { metric: names, period: t(p === "1h" ? "1 h" : "24 h") });
+  const title = charts.length === 1 && first ? first.title : joined;
+  return {
+    title, labels: first?.labels ?? [], times: first?.times ?? [],
+    lines: charts.map(({ s, c }) => ({ metric: s.metric, name: label(s.metric, t), unit: s.unit, points: c.points, axis: axes.get(s.unit) ?? "left", empty: c.empty, count: c.count, gap: c.gap, cut: c.cut })),
+  };
+}
+
+export interface MiniMetric { metric: string; label: string; unit: string; value: string; sub: string; points: (number | null)[]; cut: boolean; tone?: "warn" }
 /** A reading's quality beside its value, when it is not valid. */
 const qualityNote = (quality: string, t: T) => (quality === "valid" ? "" : ` (${textOf(QUALITY, quality, t) ?? quality})`);
 /** Up to three other metrics of the unit with their latest value and the period's slots (Figma: humidity, power,
 supply air); `cut` when the period holds more readings (`totals`) than were loaded (IR598). */
-export function otherMetrics(d: ApiTechUnit, shown: string, series: Record<string, Point[]>, p: Period, nowMs: number, i: I18n = EN, totals: Record<string, number> = {}): MiniMetric[] {
+export function otherMetrics(d: ApiTechUnit, shown: readonly string[], series: Record<string, Point[]>, p: Period, nowMs: number, i: I18n = EN, totals: Record<string, number> = {}): MiniMetric[] {
   const { t } = i;
   const { from, to } = periodRange(p, nowMs);
-  return d.latestMeasurements.filter((m) => m.metric !== shown).slice(0, 3).map((m) => {
+  return d.latestMeasurements.filter((m) => !shown.includes(m.metric)).slice(0, 3).map((m) => {
     return {
-      metric: m.metric, label: label(m.metric, t), tone: m.quality === "valid" ? undefined : "warn" as const,
+      metric: m.metric, label: label(m.metric, t), unit: m.unit, tone: m.quality === "valid" ? undefined : "warn" as const,
       value: m.value === null ? "—" : `${airNumber(m.metric, m.value)} ${m.unit}${qualityNote(m.quality, t)}`,
       sub: t(d.connection === "online" ? "observed {time}" : "last known · observed {time}", { time: relativeTime(m.observedAt, nowMs, i) }),
       points: bucket(lookup(series, m.metric) ?? [], new Date(from), new Date(to)), cut: (lookup(totals, m.metric) ?? 0) > (series[m.metric]?.length ?? 0),

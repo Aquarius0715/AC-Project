@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { BarChart, LineChart, UtilizationBar } from "@ac/web/components/ui";
 
 // jsdom lays nothing out: give the chart's box a size, as a browser would, so that Recharts draws (the legend stays 0 high)
@@ -13,6 +13,12 @@ beforeAll(() => {
 });
 afterEach(cleanup);
 afterAll(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+
+// the keyboard layer of Recharts moves the tooltip along the points: focus it and press the right arrow once
+const hover = (layer: HTMLElement) => {
+  fireEvent.focus(layer);
+  fireEvent.keyDown(layer, { key: "ArrowRight" });
+};
 
 // the drawn pieces of a path: a move followed by at least one line (a lone move draws nothing)
 const pieces = (d: string | null) => (d ?? "").split("M").filter((x) => x.includes("L")).length;
@@ -27,6 +33,41 @@ describe("charts", () => {
     expect(container.querySelectorAll(":scope svg circle")).toHaveLength(1); // Recharts draws the dots in a layer of their own
     expect(container.querySelectorAll(".recharts-reference-area")).toHaveLength(2); // both gaps shaded
     expect(container.querySelectorAll(".recharts-reference-line")).toHaveLength(1); // the threshold
+  });
+
+  // IR689: what the values are, when, and several lines in one chart
+  it("draws one line per series, a second axis for another unit, and names the series in a legend", () => {
+    const { container } = render(<LineChart height={200} labels={["a", "b", "c"]} series={[
+      { name: "CO₂", unit: "ppm", points: [500, 800, 1200], threshold: 1000 },
+      { name: "Temperature", unit: "°C", points: [24, 25, 26], axis: "right" },
+    ]} />);
+    expect(container.querySelectorAll(".recharts-line-curve")).toHaveLength(2);
+    expect(container.querySelectorAll(".recharts-yAxis")).toHaveLength(2);
+    expect(container.querySelectorAll(".recharts-reference-line")).toHaveLength(1); // the CO₂ guide, on the CO₂ axis
+    expect([...(container.querySelector(":scope .recharts-legend-wrapper > div")?.children ?? [])].map((x) => x.textContent)).toStrictEqual(["CO₂ (ppm) · left axis", "Temperature (°C) · right axis"]);
+    expect(container.textContent).toContain("ppm");
+    expect(container.textContent).toContain("°C");
+  });
+
+  it("shows the time, the name and the value with its unit in the tooltip", () => {
+    const { container } = render(<LineChart height={200} times={["Mon 9 Nov, 15:00–15:05", "Mon 9 Nov, 15:05–15:10", "Mon 9 Nov, 15:10–15:15"]} series={[
+      { name: "CO₂", unit: "ppm", points: [500, 800, 1200], format: (v) => String(Math.round(v)) },
+      { name: "Temperature", unit: "°C", points: [24, 25.5, null], axis: "right" },
+    ]} />);
+    hover(screen.getByRole("application", { name: "Line chart" }));
+    const text = container.ownerDocument.body.textContent;
+    expect(text).toContain("Mon 9 Nov, 15:05–15:10");
+    expect(text).toContain("CO₂");
+    expect(text).toContain("800 ppm");
+    expect(text).toContain("Temperature");
+    expect(text).toContain("25.5 °C");
+  });
+
+  it("names a single line in the tooltip too, not just \"Value\"", () => {
+    const { container } = render(<LineChart height={200} name="Humidity" times={["t0", "t1"]} points={[40, 50]} />);
+    hover(screen.getByRole("application", { name: "Line chart" }));
+    const text = container.ownerDocument.body.textContent;
+    expect([text.includes("Humidity"), text.includes("Value"), text.includes("t1")]).toStrictEqual([true, false, true]);
   });
 
   it("shades nothing and draws no gridline unless asked", () => {

@@ -101,6 +101,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
 0.553.0 (2026-11-09): IR690: data.forceDelete — force delete of a customer or contractor company with its accounts; units, jobs, contracts, invoices and reports still stop it.
+0.552.0 (2026-11-09): IR689: LineChart tooltip with the name, unit and time of each value; air quality and unit monitoring take several metrics (metric=a,b), two units at most on two axes.
 0.551.0 (2026-11-09): IR688: policyErrors checks the cooldown and the escalation as whole minutes 1–1440, as the Core API's integers.
 0.550.0 (2026-11-09): IR687: runText and runClock fall back to Kuala Lumpur only for another zone; what is no instant is shown as it came.
 0.549.0 (2026-11-09): IR686: notifications, preferences and the demo panel use actionFailure, so the sign-in redirect is not swallowed and an unreachable Core API keeps the page.
