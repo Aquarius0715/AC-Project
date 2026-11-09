@@ -2,13 +2,16 @@
 // takes a few milliseconds), so counting it in would make the percentiles look better the more the system fails. Errors
 // are counted on their own, by kind and status class, and the thresholds fail the run on any of them above the limit.
 import { Counter, Rate, Trend } from "k6/metrics";
+import { currentPhase } from "./phase.ts";
 
-export type Kind = "read" | "write" | "auth";
+export type Kind = "read" | "write" | "auth" | "page" | "signin";
 
 const duration: Record<Kind, Trend> = {
   read: new Trend("ac_read_duration", true),
   write: new Trend("ac_write_duration", true),
   auth: new Trend("ac_auth_duration", true),
+  page: new Trend("ac_page_duration", true),
+  signin: new Trend("ac_signin_duration", true),
 };
 const requests = new Counter("ac_requests");
 const errors = new Rate("ac_errors");
@@ -25,9 +28,10 @@ export function record(kind: Kind, name: string, status: number, ms: number, val
   const ok = status >= 200 && status < 300 && valid;
   requests.add(1, { kind });
   statusClass.add(1, { kind, class: classOf(status) });
-  errors.add(!ok, { kind });
+  const phase = currentPhase();
+  errors.add(!ok, { kind, phase });
   if (ok) {
-    duration[kind].add(ms, { name });
+    duration[kind].add(ms, { name, phase });
     return;
   }
   failedDuration.add(ms, { kind });

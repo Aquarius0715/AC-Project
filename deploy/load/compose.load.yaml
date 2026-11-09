@@ -68,6 +68,21 @@ services:
       DATABASE_URL: postgres://ac_billing_login:local@postgres:5432/ac_load?sslmode=disable
       DATABASE_READER_URL: postgres://ac_billing_login:local@postgres:5432/ac_load?sslmode=disable
 
+  # the web apps (phase 2, web scenarios only): nothing published, and the load client signs them in, so the Core API
+  # (OIDC_APP_CLIENT_ID ac-load) takes the tokens they get
+  customer-web-api:
+    ports: !reset []
+    environment: { OIDC_APP_CLIENT_ID: ac-load, OIDC_APP_CLIENT_SECRET: "${LOAD_CLIENT_SECRET:-}" }
+    healthcheck: { test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/login').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"], interval: 5s, timeout: 5s, retries: 30 }
+  partner-web-api:
+    ports: !reset []
+    environment: { OIDC_APP_CLIENT_ID: ac-load, OIDC_APP_CLIENT_SECRET: "${LOAD_CLIENT_SECRET:-}" }
+    healthcheck: { test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/login').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"], interval: 5s, timeout: 5s, retries: 30 }
+  technician-web-api:
+    ports: !reset []
+    environment: { OIDC_APP_CLIENT_ID: ac-load, OIDC_APP_CLIENT_SECRET: "${LOAD_CLIENT_SECRET:-}" }
+    healthcheck: { test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/login').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"], interval: 5s, timeout: 5s, retries: 30 }
+
   # one-off: the launch-size data and the account manifest. It refuses any database but ac_load.
   loadseed:
     image: ac-api:${IMAGE_TAG:-tools}
@@ -99,6 +114,11 @@ services:
       ADMIN_CLIENT_SECRET: ${AC_ADMIN_WEB_CLIENT_SECRET:-}
       MANIFEST: /out/manifest.json
       WRITES: ${LOAD_WRITES:-1}
+      CUSTOMER_URL: http://customer-web-api:3000
+      PARTNER_URL: http://partner-web-api:3000
+      TECHNICIAN_URL: http://technician-web-api:3000
+      TIME_SCALE: ${LOAD_TIME_SCALE:-1}
+      VU_SCALE: ${LOAD_VU_SCALE:-1}
     volumes: ["./service/web/load:/load:ro", "${LOAD_OUT:-./load-out}:/out"]
     read_only: true
     tmpfs: [/tmp]

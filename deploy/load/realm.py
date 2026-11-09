@@ -2,8 +2,9 @@
 that allows the password grant and the synthetic accounts of the manifest loadseed made. The shared realm file itself is
 never changed: the copy is imported by the throwaway Keycloak of the compose project ac-load only.
 
-- client ac-load: confidential, password grant on, sign-in pages off; it carries the same claims as ac-web. The Core API
-  takes it as its app client (OIDC_APP_CLIENT_ID in deploy/load/compose.load.yaml).
+- client ac-load: confidential, password grant on (the API scenarios) and the authorization code flow with PKCE for the
+  three web apps (the web scenarios), which sign in with it; it carries the same claims as ac-web. The Core API takes it as
+  its app client (OIDC_APP_CLIENT_ID in deploy/load/compose.load.yaml).
 - client ac-admin-web: password grant on in the copy, because HQ's accounts may only use their own app's client (the Core
   API refuses an HQ membership on another client, IR510). The copy's accounts have no one-time code device.
 - one user per account of the manifest, with the manifest's user ID (the token's subject) and the one password of the run.
@@ -40,16 +41,17 @@ def read_settings(path: str) -> dict[str, str]:
     return values
 
 
-def load_client(app: dict) -> dict:
-    """The load client: the app client's claims (tenant, membership, role) with the password grant instead of the pages."""
+def load_client(app: dict, urls: list[str]) -> dict:
+    """The load client: the app client's claims (tenant, membership, role), the password grant, and the code flow for the
+    web apps' addresses in the load stack."""
     client = copy.deepcopy(app)
     client["clientId"] = LOAD_CLIENT
-    client["name"] = "Load test (password grant, deploy/load only)"
-    client["standardFlowEnabled"] = False
+    client["name"] = "Load test (deploy/load only)"
+    client["standardFlowEnabled"] = True
     client["directAccessGrantsEnabled"] = True
-    client["redirectUris"] = []
-    client["webOrigins"] = []
-    client["attributes"] = {}
+    client["redirectUris"] = [f"{url}/*" for url in urls]
+    client["webOrigins"] = urls
+    client["attributes"] = {"pkce.code.challenge.method": "S256"}
     return client
 
 
@@ -88,7 +90,8 @@ def main() -> None:
         manifest = json.load(f)
 
     clients = {c["clientId"]: c for c in realm["clients"]}
-    realm["clients"].append(load_client(clients["ac-web"]))
+    urls = [settings[name].rstrip("/") for name in ("CUSTOMER_WEB_URL", "PARTNER_WEB_URL", "TECHNICIAN_WEB_URL") if settings.get(name)]
+    realm["clients"].append(load_client(clients["ac-web"], urls))
     clients[LOAD_CLIENT] = realm["clients"][-1]
     clients["ac-admin-web"]["directAccessGrantsEnabled"] = True
     for client_id, name in SECRETS.items():

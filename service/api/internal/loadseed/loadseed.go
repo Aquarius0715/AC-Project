@@ -69,6 +69,7 @@ const (
 	keyCustomerOrgID = "customerOrgId"
 	keyPropertyID    = "propertyId"
 	keyUnitIDs       = "unitIds"
+	roleClient       = "client"
 	keyTenantID      = "tenantId"
 	keyName          = "name"
 	keyStatus        = "status"
@@ -209,7 +210,7 @@ func hqPermissions() []string {
 type builder struct {
 	cfg                                                                   Config
 	orgs, customers, properties, spaces, units, contracts, invoices, jobs []map[string]any
-	offers, actors                                                        []map[string]any
+	offers, actors, consents                                              []map[string]any
 	manifest                                                              Manifest
 	customerUnits, customerJobs                                           map[int][]string
 	contractorOf                                                          func(i int) string
@@ -227,6 +228,7 @@ func newBuilder(cfg Config) *builder {
 		invoices:      nil,
 		jobs:          nil,
 		offers:        nil,
+		consents:      nil,
 		actors:        nil,
 		manifest:      Manifest{Customers: 0, Units: 0, Jobs: 0, Users: nil},
 		customerUnits: map[int][]string{},
@@ -274,6 +276,7 @@ func Build(cfg Config) (*Result, error) {
 			"invoices":      data.invoices,
 			"jobs":          data.jobs,
 			"offers":        data.offers,
+			"consents":      data.consents,
 		},
 	}
 
@@ -536,7 +539,7 @@ func (b *builder) accounts() {
 		b.addAccount(account{
 			group:       "customer",
 			name:        fmt.Sprintf("load-customer-%04d", n),
-			role:        "client",
+			role:        roleClient,
 			orgID:       orgID,
 			permissions: []string{"control.execute"},
 			employment:  nil,
@@ -641,7 +644,7 @@ func (b *builder) addAccount(entry account) {
 	}
 
 	var clientRole any
-	if entry.role == "client" {
+	if entry.role == roleClient {
 		clientRole = "owner"
 	}
 
@@ -673,6 +676,24 @@ func (b *builder) addAccount(entry account) {
 	}
 
 	b.manifest.Users = append(b.manifest.Users, user)
+
+	// the customer overview reads the location consent, which the demo seed gives its customers
+	if entry.role == roleClient {
+		b.consents = append(b.consents, map[string]any{
+			keyID:       "consent-" + entry.name + "-location",
+			keyTenantID: tenant,
+			keyVersion:  1,
+			"createdAt": b.stamp(seedAgeDays),
+			"updatedAt": b.stamp(
+				seedAgeDays,
+			),
+			"membershipId": entry.name,
+			"purpose":      "location_automation",
+			"granted":      false,
+			"grantedAt":    nil,
+			"revokedAt":    nil,
+		})
+	}
 }
 
 // ids turns fixture IDs into the UUIDs the database holds.
