@@ -24,14 +24,14 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function Runner({ result, after, failed }: Readonly<{ result: Result; after: (v: string) => void; failed: () => void }>) {
+function Runner({ result, after, failed, reload }: Readonly<{ result: Result; after: (v: string) => void; failed: () => void; reload?: boolean }>) {
   const [pending, run] = useAction();
-  return <button type="button" disabled={pending} onClick={() => { run(() => Promise.resolve(result), (v: string) => `Saved ${v}`, after, failed); }}>go</button>;
+  return <button type="button" disabled={pending} onClick={() => { run(() => Promise.resolve(result), (v: string) => `Saved ${v}`, after, failed, { reload }); }}>go</button>;
 }
 
-const press = async (result: Result) => {
+const press = async (result: Result, reload = true) => {
   const after = vi.fn(), failed = vi.fn();
-  render(<ToastProvider><Runner result={result} after={after} failed={failed} /></ToastProvider>);
+  render(<ToastProvider><Runner result={result} after={after} failed={failed} reload={reload} /></ToastProvider>);
   await act(() => { screen.getByRole("button", { name: "go" }).click(); return Promise.resolve(); });
   return { after, failed };
 };
@@ -55,6 +55,12 @@ describe("useAction", () => {
     await press({ ok: false, code: "CONFLICT", messageKey: "error.versionConflict", fieldErrors: {} });
     await screen.findByRole("alert");
     expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it("does not read the screen again when the change takes the screen away (a declined offer), and still shows the toast and runs after", async () => {
+    const { after } = await press({ ok: true, value: "job-1" }, false);
+    const status = await screen.findByRole("status");
+    expect([status.textContent, after.mock.calls, refresh.mock.calls.length]).toStrictEqual(["Saved job-1", [["job-1"]], 0]); // IR685
   });
 
   it("shows a refusal as an error toast and runs failed", async () => {
