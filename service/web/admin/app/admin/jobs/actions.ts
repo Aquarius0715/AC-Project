@@ -11,6 +11,7 @@
 // on an existing record carries its version as the expected version; CONFLICT refreshes the page.
 import { refresh } from "next/cache";
 import { coreOp, CoreError } from "@ac/web/lib/dal";
+import { actionFailure } from "@ac/web/lib/actionFailure";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import type { CostLine } from "@ac/web/lib/adminJobs";
 import type { OpInput } from "@ac/web/lib/opTypes";
@@ -27,7 +28,7 @@ const run = async (fn: () => Promise<unknown>): Promise<Result> => {
       if (error.error.code === "CONFLICT") refresh();
       return { ok: false, code: error.error.code, messageKey: error.error.messageKey, fieldErrors: error.error.fieldErrors, retryAfterSeconds: error.error.retryAfterSeconds };
     }
-    throw error;
+    return actionFailure(error);
   }
 };
 const write = (version: number) => ({ write: true, expectedVersion: version });
@@ -101,8 +102,7 @@ export async function createJob(input: { unitId: string; type: OpInput<"jobs.cre
     }, { write: true });
     return { ok: true, value: { id: job.id } };
   } catch (error) {
-    if (error instanceof CoreError) return { ok: false, code: error.error.code, messageKey: error.error.messageKey, fieldErrors: error.error.fieldErrors, retryAfterSeconds: error.error.retryAfterSeconds };
-    throw error;
+    return actionFailure(error);
   }
 }
 
@@ -112,7 +112,7 @@ const failure = (e: unknown): Failure => {
     if (e.error.code === "CONFLICT") refresh();
     return { ok: false, code: e.error.code, messageKey: e.error.messageKey, fieldErrors: e.error.fieldErrors, retryAfterSeconds: e.error.retryAfterSeconds };
   }
-  throw e;
+  return actionFailure(e);
 };
 
 /** plans.save: a new plan for a unit, or the plan's recurrence and next date (monthly, every 1–12 months, the next date in

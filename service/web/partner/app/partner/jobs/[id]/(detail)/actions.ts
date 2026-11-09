@@ -5,6 +5,7 @@
 // A decline takes the job away from the company, so it does not refresh (the page would be not found); the others do.
 import { refresh } from "next/cache";
 import { coreOp, CoreError } from "@ac/web/lib/dal";
+import { actionFailure } from "@ac/web/lib/actionFailure";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 
 type Result<T> = { ok: true; value: T } | ({ ok: false } & ActionFailure);
@@ -18,7 +19,7 @@ const run = async <T,>(fn: () => Promise<T>, reload: boolean): Promise<Result<T>
       if (error.error.code === "CONFLICT") refresh(); // expired, cancelled or changed elsewhere: show the latest state
       return { ok: false, code: error.error.code, messageKey: error.error.messageKey, fieldErrors: error.error.fieldErrors, retryAfterSeconds: error.error.retryAfterSeconds };
     }
-    throw error;
+    return actionFailure(error);
   }
 };
 
