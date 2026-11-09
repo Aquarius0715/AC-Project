@@ -248,6 +248,12 @@ export function blankPolicyDraft(customer: { id: string; name: string }, timezon
 
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
 
+/** Whole minutes 1–1440 (the Core API's integers, IR688): a fraction would not decode there. */
+function minutesError(minutes: number, t: T): string | undefined {
+  if (!Number.isSafeInteger(minutes)) return t("A whole number 1–1440");
+  return minutes >= 1 && minutes <= 1440 ? undefined : t("1–1440");
+}
+
 /** The policy form checks (IR66, IR120 item 3): name 1–120, priority 0–100, duration 1–86400 s, 1–20 recipients,
 cooldown and escalation 1–1440 min, the recovery on the safe side of the threshold, and an “Only if …” window with
 at least one day and two different HH:mm times. */
@@ -255,8 +261,9 @@ export function policyErrors(p: Pick<AdminPolicy, "name" | "priority" | "duratio
   const e: Record<string, string> = conditionErrors(p, t);
   if (!p.name.trim() || p.name.length > 120) e.name = t("1–120 characters");
   if (!(Number.isSafeInteger(p.priority) && p.priority >= 0 && p.priority <= 100)) e.priority = t("A whole number 0–100");
-  if (!(p.cooldown >= 1 && p.cooldown <= 1440)) e.cooldown = t("1–1440");
-  if (!(p.escalate >= 1 && p.escalate <= 1440)) e.escalate = t("1–1440");
+  const cooldown = minutesError(p.cooldown, t), escalate = minutesError(p.escalate, t);
+  if (cooldown) e.cooldown = cooldown;
+  if (escalate) e.escalate = escalate;
   if (p.recipients.length === 0 || p.recipients.length > 20) e.recipients = t(p.recipients.length === 0 ? "Add at least one recipient" : "At most 20 recipients");
   return e;
 }

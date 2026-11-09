@@ -79,6 +79,8 @@ describe("HQ alerts and alert policies", () => {
     // IR120 item 3: a whole priority 0–100 and 1–20 recipients
     expect(policyErrors({ ...p, priority: 50.5, recipients: [] })).toStrictEqual({ priority: "A whole number 0–100", recipients: "Add at least one recipient" });
     expect(policyErrors({ ...p, priority: 101, recipients: Array.from({ length: 21 }, (_, n) => ({ id: `m-${String(n)}`, label: "", role: "" })) })).toStrictEqual({ priority: "A whole number 0–100", recipients: "At most 20 recipients" });
+    // cooldown and escalation are whole minutes, as the Core API's integers (IR688)
+    expect(policyErrors({ ...p, cooldown: 1.5, escalate: 59.9 })).toStrictEqual({ cooldown: "A whole number 1–1440", escalate: "A whole number 1–1440" });
     // “Only if …”: at least one day and two different HH:mm times (IR120 item 3)
     const win = (weekdays: number[], startLocal: string, endLocal: string) => policyErrors({ ...p, activeWindow: { weekdays, startLocal, endLocal } }).activeWindow;
     expect([win([1, 2, 3, 4, 5], "08:00", "19:00"), win([6, 7], "22:00", "06:00")]).toStrictEqual([undefined, undefined]); // past midnight is allowed

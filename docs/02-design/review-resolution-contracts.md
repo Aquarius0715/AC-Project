@@ -9472,3 +9472,10 @@ IR683 moved the 24 action files of the four apps that worded a non-Core error as
 
 1. **The fall-back.** It retries in Kuala Lumpur only when the zone was another one; in Kuala Lumpur a value that does not format is shown as it came. An unknown zone still reads in Kuala Lumpur time.
 2. **Test.** `clientAutomations.test.ts`: a value that does not format comes back as it was (for both functions, in Kuala Lumpur and another zone; it failed before), and an unknown zone still falls back. No screen, route, operation or count changes; the values of the API are instants, so this only guards a malformed answer.
+
+## IR688 The HQ alert policy form refuses a cooldown or an escalation that is not a whole number of minutes (review round 121) — 2026-11-09
+
+The policy form (`policyErrors`, FR-A05) checked the priority and the duration to be whole numbers, but the cooldown and the escalation only to lie between 1 and 1440. The Core API takes both as integers (`cooldownMinutes`, `escalateAfterMinutes`): a `1.5` passed the form and then failed to decode on the server, so the person saw a refusal that named no field instead of the field's own message.
+
+1. **The check.** `minutesError`: a value that is not a whole number reads "A whole number 1–1440" at the field; a whole number outside 1–1440 keeps "1–1440". The new text is in the Malay and Japanese dictionaries.
+2. **Test.** `adminAlerts.test.ts`: `1.5` and `59.9` are refused at the two fields (it failed before). No operation, route, screen or count changes.
