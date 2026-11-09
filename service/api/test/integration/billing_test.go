@@ -211,6 +211,48 @@ func TestContractsAndInvoices(t *testing.T) {
 
 	owner(t, `UPDATE restrictions.restrictions SET state = 'cancelled' WHERE id = $1`, rid)
 
+	// an unresolved recovery case of an ended restriction also blocks revisions (IR135 item 1), until it is resolved
+	recovering := func(state string) bool {
+		t.Helper()
+
+		owner(
+			t,
+			`UPDATE restrictions.restrictions SET recovery_cases = jsonb_build_array(jsonb_build_object('id', $2::text,
+				'unitId', $3::text, 'state', $4::text)) WHERE id = $1`,
+			rid,
+			uuid.NewString(),
+			unit,
+			state,
+		)
+
+		_, res := post(
+			srv,
+			hq(),
+			"contracts.list",
+			`{"filters":{"customerId":"`+cust+`","unitId":"`+unit+`"}}`,
+		)
+
+		return items(t, res)[0]["hasUnresolvedRecovery"] == true
+	}
+
+	if !recovering("pending") {
+		t.Error("an unresolved recovery case is not listed")
+	}
+
+	if code, _ := write(
+		srv,
+		hq(),
+		"contracts.save",
+		body(map[string]string{"id": `"` + key + `"`}),
+		2,
+	); code != 409 {
+		t.Errorf("revision with an unresolved recovery case: %d", code)
+	}
+
+	if recovering("resolved") {
+		t.Error("a resolved recovery case is listed as unresolved")
+	}
+
 	// invoices
 	inv := func(extra map[string]string) (int, map[string]any) {
 		bodyFields := map[string]string{
