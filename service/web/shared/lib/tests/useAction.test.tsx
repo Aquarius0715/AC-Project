@@ -5,11 +5,16 @@ import { toast } from "sonner";
 import { ToastProvider } from "@ac/web/components/ui";
 import { useAction } from "@ac/web/lib/useAction";
 
+// the router of the page the action runs on: a change that succeeded asks it to read the screen again (IR680)
+const refresh = vi.hoisted(() => vi.fn());
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
+
 type Result = { ok: true; value: string } | { ok: false; code: string; messageKey: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null };
 
 const assign = vi.fn();
 beforeEach(() => {
   assign.mockClear();
+  refresh.mockClear();
   // the page the action runs on; jsdom cannot navigate, so the sign-in redirect is caught here
   vi.stubGlobal("location", { href: location.href, origin: location.origin, protocol: location.protocol, host: location.host, hostname: location.hostname, port: location.port, hash: location.hash, pathname: "/admin/units", search: "?customerId=c-1&tab=users", assign });
 });
@@ -38,6 +43,18 @@ describe("useAction", () => {
     const { after, failed } = await press({ ok: true, value: "unit-1" });
     const status = await screen.findByRole("status");
     expect([status.textContent, after.mock.calls, failed.mock.calls.length, assign.mock.calls.length]).toStrictEqual(["Saved unit-1", [["unit-1"]], 0, 0]);
+  });
+
+  it("reads the screen again once after a change that succeeded, and not after one that was refused", async () => {
+    await press({ ok: true, value: "unit-1" });
+    await screen.findByRole("status");
+    expect(refresh).toHaveBeenCalledOnce();
+    cleanup();
+    toast.dismiss();
+    refresh.mockClear();
+    await press({ ok: false, code: "CONFLICT", messageKey: "error.versionConflict", fieldErrors: {} });
+    await screen.findByRole("alert");
+    expect(refresh).not.toHaveBeenCalled();
   });
 
   it("shows a refusal as an error toast and runs failed", async () => {
