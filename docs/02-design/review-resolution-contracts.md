@@ -9344,3 +9344,10 @@ admin.md says unit names are unique among the non-archived units of a space (CON
 
 1. **The order.** `id` now follows the direction. `name` and `dueAt` are unchanged: they follow the direction, ties go by unit ID ascending, and the units without a warranty end stay last either way.
 2. **Test.** `TestSortCoverage` covers all three fields in both directions; before the fix `id` descending came out ascending. No operation, route or screen changes.
+
+## IR672 A unit is saved with a model only while the model row is read with a share lock (review round 59) — 2026-11-09
+
+`capabilities.delete` (DEC-103) locks the model row, then looks for units and campaigns that use it. `units.save` read the model's current capability version with a plain `SELECT` (`Models.CurrentVersion`) and then inserted or updated the unit, so a save that ran at the same moment as the delete read the model before the delete committed and wrote after the delete looked, and a unit remained whose model no longer exists. A new version of the model (`capabilities.save`, which moves the units to it) is the same case: a unit saved at that moment kept the old version.
+
+1. **The lock.** `Models.CurrentVersion` reads the current row `FOR SHARE`, as the parent reads of IR478 and IR667 do: the delete, or the update that retires the old version, waits for the save, or the save waits for it and finds no model (VALIDATION `modelId` `error.unknownModel`) or the new version. Nothing else changes.
+2. **Test.** `TestModelDeleteWaitsForAUnitSavedWithIt` holds a delete of the model row open in a second transaction and sends `units.save` with that model; before the fix the save answered 200 at once with the unit, now it waits for the commit and answers 422 `modelId=error.unknownModel`. No operation, route or screen changes.
