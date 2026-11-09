@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.552.0 / Created: 2026-09-14 / Updated: 2026-11-07 / Status: Draft for review / Language: English
+Version: 0.553.0 / Created: 2026-09-14 / Updated: 2026-11-07 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -20,7 +20,7 @@ Document authors and final decision makers for the 1A specification: **Masaki Ki
 | 8 | [Reference design analysis](00-prepare/reference-design-analysis.md) / [Frontend input/output contracts](02-design/implementation-contracts.md) / [Operation catalog](02-design/operation-catalog.csv) | Visual values from the source and detailed input/output definitions |
 | 9 | [Verification plan](04-agentic-sdlc/verification.md) / [Traceability matrix](00-prepare/traceability.csv) | Check the links from requirements to design and tests |
 | 10 | [Backend architecture](02-design/backend-architecture.md) / [Network architecture](02-design/network-architecture.md) | Production target (PROPOSED; AWS, Stripe and HQ company-network access per DEC-68 / IR117): BFF, Core API modules, data, IoT, integrations, zones and traffic flows; not Phase 1A acceptance inputs (IR116) |
-| 11 | [Backend Go design](02-design/backend-go-design.md) / [Database design](02-design/database-design.md) / [db/schema.sql](02-design/db/schema.sql) / [Operation persistence map](02-design/operation-persistence-map.csv) | Production target implementation (PROPOSED): Go + Echo service layout, request pipeline, workers, tests; PostgreSQL schemas, constraints, RLS, partitions, migrations (IR118) |
+| 11 | [Backend Go design](02-design/backend-go-design.md) / [Database design](02-design/database-design.md) / [db/schema.sql](02-design/db/schema.sql) / [Operation persistence map](02-design/operation-persistence-map.csv) / [Load test](02-design/load-test.md) | Production target implementation (PROPOSED): Go + Echo service layout, request pipeline, workers, tests; PostgreSQL schemas, constraints, RLS, partitions, migrations (IR118) |
 | 12 | [Container design](02-design/container-design.md) / `compose.yaml` | Everything runs in Docker: images, Dockerfile standards, Compose profiles with local stand-ins for AWS services, ECS Fargate runtime (IR119) |
 | 13 | [Service contracts](02-design/service-contracts.ts) / [Deterministic contracts](02-design/deterministic-contracts.md) / [Strict review contracts](02-design/strict-review-contracts.md) / [Review resolution contracts](02-design/review-resolution-contracts.md) (the IR log) / [Write version catalog](02-design/write-version-catalog.csv) / [Query catalog](02-design/query-catalog.csv) / [API description](02-design/api/swagger.json) / [Demo fixture](04-agentic-sdlc/fixture-contract.json) | The binding contracts behind the documents above: types, the D / SR / IR rules (the newest IR applies, IR72), the expected version of each write, the filters and sorts of each list, the REST API generated from the handlers, and the fixture the tests and the local stack load |
 
@@ -100,6 +100,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.553.0 (2026-11-09): IR691: load test of the Core API at the launch size (cmd/loadseed, deploy/load, service/web/load k6 smoke/load/stress, load.yml) and the test sufficiency measured; results are lab measurements, §13 stays PROPOSED.
 0.552.0 (2026-11-09): IR689: LineChart tooltip with the name, unit and time of each value; air quality and unit monitoring take several metrics (metric=a,b), two units at most on two axes.
 0.551.0 (2026-11-09): IR688: policyErrors checks the cooldown and the escalation as whole minutes 1–1440, as the Core API's integers.
 0.550.0 (2026-11-09): IR687: runText and runClock fall back to Kuala Lumpur only for another zone; what is no instant is shown as it came.
