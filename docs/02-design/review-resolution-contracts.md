@@ -9337,3 +9337,10 @@ admin.md says unit names are unique among the non-archived units of a space (CON
 
 1. **The mapping.** The update of `locations.rename` passes its error through the same `dupSibling` mapping as the saves. Nothing else changes (units have no index; their check is unchanged).
 2. **Test.** `TestRenameToANameTakenAtTheSameMomentIsAConflict` holds an uncommitted sibling with the new name and sends the rename: before the fix it answered CONFLICT with `error.conflict`, now `error.duplicateSiblingName`. No operation, route or screen changes.
+
+## IR670 The coverage list sorted by id follows the direction (review round 55) — 2026-11-09
+
+`units.coverage` takes the sort fields `id`, `name` and `dueAt` with a direction (DD-A19). The sort of the list put `id` ascending whatever the direction: the branch that breaks ties by unit ID also served the `id` field, so `sort=id:desc` answered the same order as `id:asc`.
+
+1. **The order.** `id` now follows the direction. `name` and `dueAt` are unchanged: they follow the direction, ties go by unit ID ascending, and the units without a warranty end stay last either way.
+2. **Test.** `TestSortCoverage` covers all three fields in both directions; before the fix `id` descending came out ascending. No operation, route or screen changes.
