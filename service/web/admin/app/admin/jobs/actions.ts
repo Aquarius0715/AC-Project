@@ -11,6 +11,7 @@
 // on an existing record carries its version as the expected version; CONFLICT refreshes the page.
 import { refresh } from "next/cache";
 import { coreOp, CoreError } from "@ac/web/lib/dal";
+import { deleteAccounts } from "@ac/web/lib/forceDelete";
 import { actionFailure } from "@ac/web/lib/actionFailure";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import type { CostLine } from "@ac/web/lib/adminJobs";
@@ -178,11 +179,13 @@ export async function deleteRateCard(id: string, reason: string) {
 }
 
 /** contractors.delete (when the company has a profile) and then organizations.delete: a company registered by mistake is
-removed as it was made (DEC-103); one with jobs, offers, certificates, payouts or users is refused with the reason. */
-export async function deleteContractor(org: { id: string; version: number }, profile: { id: string; version: number } | null, reason: string) {
+removed as it was made (DEC-103); one with jobs, offers, certificates, payouts or users is refused with the reason. With
+`force` (the data.forceDelete holder) its accounts go too, even those with history, before the organization. */
+export async function deleteContractor(org: { id: string; version: number }, profile: { id: string; version: number } | null, reason: string, force = false) {
   return value(async () => {
     const why = reason.trim();
-    if (profile) await coreOp("contractors.delete", { id: profile.id, reason: why }, write(profile.version));
+    if (profile) await coreOp("contractors.delete", { force, id: profile.id, reason: why }, write(profile.version));
+    if (force) await deleteAccounts(org.id, why);
     await coreOp("organizations.delete", { id: org.id, reason: why }, write(org.version));
     return null;
   });

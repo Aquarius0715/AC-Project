@@ -20,8 +20,8 @@ export type ServiceResult<T> = {data:T;meta:Meta};
 export type Page<T> = {items:T[];nextCursor:string|null;total:number;snapshotVersion:number};
 export type Range = {from:Instant;to:Instant};
 export type Money = {amountMinor:number;currency:Currency};
-/** IR107: 38 values = Read/Write per resource + independent actions. Write implies Read. */
-export type Permission = 'dashboard.read'|'asset.read'|'asset.write'|'identity.read'|'identity.write'|'device.read'|'device.write'|'device.maintain'|'control.execute'|'control.diagnose'|'alert.read'|'alert.resolve'|'alert.policy.read'|'alert.policy.write'|'job.read'|'job.write'|'contract.read'|'contract.write'|'billing.read'|'billing.write'|'billing.payment'|'restriction.read'|'restriction.write'|'restriction.override'|'automation.policy.read'|'automation.policy.write'|'energy.read'|'energy.write'|'mrv.read'|'mrv.write'|'mrv.review'|'mrv.factors'|'offset.read'|'offset.write'|'audit.read'|'partner.accept'|'partner.assign'|'partner.review';
+/** IR107: 39 values (IR690 adds data.forceDelete) = Read/Write per resource + independent actions. Write implies Read. */
+export type Permission = 'dashboard.read'|'asset.read'|'asset.write'|'identity.read'|'identity.write'|'device.read'|'device.write'|'device.maintain'|'control.execute'|'control.diagnose'|'alert.read'|'alert.resolve'|'alert.policy.read'|'alert.policy.write'|'job.read'|'job.write'|'contract.read'|'contract.write'|'billing.read'|'billing.write'|'billing.payment'|'restriction.read'|'restriction.write'|'restriction.override'|'automation.policy.read'|'automation.policy.write'|'energy.read'|'energy.write'|'mrv.read'|'mrv.write'|'mrv.review'|'mrv.factors'|'offset.read'|'offset.write'|'audit.read'|'partner.accept'|'partner.assign'|'partner.review'|'data.forceDelete';
 export type Session = Context & {userId:ID;role:Role;clientRole:ClientRole|null;displayName:string;organizationName:string;organizationId:ID;customerId:ID|null;permissions:Permission[];generation:number;viewEpoch:number;issuedAt:Instant;expiresAt:Instant};
 export type Preferences = {locale:Locale;timezone:string;currency:'MYR';monthlyReportEmail:boolean;twoFactorEnabled:boolean};
 export type User = {id:ID;displayName:string};
@@ -290,7 +290,7 @@ export type OperationContracts = {
   'contracts.save': {input:{id?:ID;customerId:ID;unitIds:ID[];planType:Contract['planType'];startAt:Instant;endAt:Instant;priceMinor:number;currency:Currency;restrictionEligible:boolean;rulesVersion:ID|null};result:Contract;mode:'write'};
   'customers.list': {input:Query;result:Page<Customer>;mode:'read'};
   'customers.save': {input:{id?:ID;name:string;organizationId:ID;serviceProfile:Customer['serviceProfile'];status:'active'|'inactive'};result:Customer;mode:'write'};
-  'customers.delete': {input:{id:ID;reason:string};result:DeletedResource;mode:'write'};
+  'customers.delete': {input:{id:ID;reason:string;force?:boolean};result:DeletedResource;mode:'write'};
   'demo.advanceClock': {input:{to:Instant};result:DemoGeneration;mode:'write'};
   'demo.reset': {input:{confirmation:true};result:DemoGeneration;mode:'write'};
   'demo.trigger': {input:DemoTrigger;result:DemoEvent;mode:'write'};
@@ -355,7 +355,7 @@ export type OperationContracts = {
   'members.list': {input:Query;result:Page<Membership>;mode:'read'};
   'members.revokeSessions': {input:{membershipId:ID;reason:string};result:SessionsRevoked;mode:'write'};
   'members.save': {input:{id?:ID;userId:ID;organizationId:ID;role:Role;employment:Membership["employment"];permissions:Permission[];scopes:ScopeRef[];validFrom:Instant;validUntil:Instant|null;reason:string;newUser?:{email:string;displayName:string}};result:Membership;mode:'write'};
-  'members.delete': {input:{id:ID;reason:string};result:DeletedResource;mode:'write'};
+  'members.delete': {input:{id:ID;reason:string;force?:boolean};result:DeletedResource;mode:'write'};
   'mrv.get': {input:{id:ID;reportVersion?:number};result:MRVReport;mode:'read'};
   'mrv.list': {input:Query;result:Page<MRVReport>;mode:'read'};
   'mrv.preview': {input:MRVConditions;result:MRVPreview;mode:'read'};
@@ -440,7 +440,7 @@ export type OperationContracts = {
   'firmwareCampaigns.delete': {input:{id:ID;reason:string};result:DeletedResource;mode:'write'};
   'contractors.list': {input:Query;result:Page<ContractorProfile>;mode:'read'};
   'contractors.save': {input:{id?:ID;organizationId:ID;registrationNo:string;serviceAreas:string[];contactEmail:string;insuranceValidUntil:Instant|null};result:ContractorProfile;mode:'write'};
-  'contractors.delete': {input:{id:ID;reason:string};result:DeletedResource;mode:'write'};
+  'contractors.delete': {input:{id:ID;reason:string;force?:boolean};result:DeletedResource;mode:'write'};
   'contractors.setOfferStatus': {input:{contractorOrgId:ID;status:'active'|'suspended';reason:string};result:ContractorProfile;mode:'write'};
   'rateCards.list': {input:Query;result:Page<RateCard>;mode:'read'};
   'rateCards.save': {input:{contractorOrgId:ID;effectiveFrom:Instant;currency:Currency;lines:RateCard['lines']};result:RateCard;mode:'write'};

@@ -143,7 +143,7 @@ func refuseOrganizationDelete(
 		ctx,
 		call,
 		profile,
-		ops.OrgRecordsInput{OrgID: org, CustomerID: nil},
+		ops.OrgRecordsInput{OrgID: org, CustomerID: nil, SkipAccounts: false},
 	)
 	if err != nil {
 		return apperr.Wrap(err, "ask "+profile)

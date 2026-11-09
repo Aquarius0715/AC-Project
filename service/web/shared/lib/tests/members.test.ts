@@ -29,8 +29,8 @@ const draft = (over: Partial<MemberDraft>): MemberDraft => {
 };
 
 describe("HQ access & roles (FR-A03, BR-A03, IR107)", () => {
-  it("has the 38 permissions and the role limits of members.save", () => {
-    expect([allPermissions.length, allowedFor.contractor, roleDefaults.admin.includes("identity.write"), roleDefaults.admin.includes(IDENTITY_READ)]).toStrictEqual([38, ["partner.accept", "partner.assign", "partner.review"], false, true]);
+  it("has the 39 permissions and the role limits of members.save", () => {
+    expect([allPermissions.length, allowedFor.contractor, roleDefaults.admin.includes("identity.write"), roleDefaults.admin.includes(IDENTITY_READ)]).toStrictEqual([39, ["partner.accept", "partner.assign", "partner.review"], false, true]);
     expect([orgKind("admin", "internal"), orgKind(CONTRACTOR, "internal"), orgKind(TECHNICIAN, "external"), orgKind(TECHNICIAN, "internal")]).toStrictEqual(["operator", CONTRACTOR, CONTRACTOR, "operator"]);
   });
 

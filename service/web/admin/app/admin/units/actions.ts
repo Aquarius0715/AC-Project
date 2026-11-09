@@ -6,6 +6,7 @@
 import { refresh } from "next/cache";
 import { coreAll, coreOp, CoreError } from "@ac/web/lib/dal";
 import { actionFailure } from "@ac/web/lib/actionFailure";
+import { deleteAccounts } from "@ac/web/lib/forceDelete";
 import type { ApiCustomerRow, ApiImportPreview, ApiOrgRow, ApiUnitImport, Profile, Scope } from "@ac/web/lib/assets";
 import type { OpInput } from "@ac/web/lib/opTypes";
 
@@ -56,11 +57,15 @@ export async function updateCustomer(id: string, version: number, org: { id: str
 }
 
 /** customers.delete and then organizations.delete: a customer registered by mistake is removed as it was made (DEC-103);
-a customer with units, jobs, contracts, invoices or users is refused with the reason. */
-export async function deleteCustomer(id: string, version: number, org: { id: string; version: number }, reason: string) {
+a customer with units, jobs, contracts, invoices or users is refused with the reason. With `force` (the data.forceDelete
+holder) its accounts go too, even those with history: customers.delete first (units, jobs, contracts, invoices and reports
+still refuse it, and then nothing has been removed), then every account of the organization (members.delete), then the
+organization. A failure part-way leaves the rest to delete again. */
+export async function deleteCustomer(id: string, version: number, org: { id: string; version: number }, reason: string, force = false) {
   return run(async () => {
     const why = reason.trim();
-    await coreOp("customers.delete", { id, reason: why }, write(version));
+    await coreOp("customers.delete", { id, force, reason: why }, write(version));
+    if (force) await deleteAccounts(org.id, why);
     await coreOp("organizations.delete", { id: org.id, reason: why }, write(org.version));
     return null;
   });

@@ -16,6 +16,7 @@ import type { ContractorsLive } from "../_lib/load";
 import { JobsTabs } from "./jobs-header";
 import { NewJobModal } from "./jobs-view";
 import { Icon } from "@ac/web/components/Icon";
+import { ForceDeleteField, forceReady, noForce } from "@ac/web/components/DeleteDialog";
 import { Checkbox } from "@ac/web/components/ui/checkbox";
 import { codePoints } from "@ac/web/lib/text";
 import { oneOf } from "@ac/web/lib/oneOf";
@@ -56,7 +57,7 @@ export function ContractorsView({ live }: Readonly<{ live: ContractorsLive }>) {
       </div>
       {modal?.kind === "profile" && <ProfileModal live={live} d={d} organizationId={modal.organizationId} onClose={close} onFail={fail} />}
       {modal?.kind === "deleteRate" && <DeleteRateModal id={modal.id} title={modal.title} onClose={close} onFail={fail} />}
-      {modal?.kind === "delete" && d && <DeleteModal d={d} onClose={close} onFail={fail} />}
+      {modal?.kind === "delete" && d && <DeleteModal d={d} canForce={live.canForce} onClose={close} onFail={fail} />}
       {modal?.kind === "status" && d?.profile && <StatusModal p={d.profile} onClose={close} onFail={fail} />}
       {modal?.kind === "rates" && d && <RatesModal d={d} now={Date.parse(live.now)} onClose={close} onFail={fail} />}
       {modal?.kind === "verify" && d && <VerifyModal d={d} onClose={close} onFail={fail} />}
@@ -155,22 +156,24 @@ function ProfileModal({ live, d, organizationId, onClose, onFail }: ModalProps &
 }
 
 /** contractors.delete and organizations.delete (DEC-103): a reason, and what is removed with the company and what stops it. */
-function DeleteModal({ d, onClose, onFail }: ModalProps & { d: Detail }) {
+function DeleteModal({ d, canForce, onClose, onFail }: ModalProps & { d: Detail; canForce: boolean }) {
   const t = useT();
   const nav = useUrlPatch();
   const [pending, run] = useAction();
   const [reason, setReason] = useState("");
   const [tried, setTried] = useState(false);
+  const [force, setForce] = useState(noForce);
   const confirm = () => {
     setTried(true);
-    if (!reason.trim()) return;
+    if (!reason.trim() || !forceReady(force, d.org.name)) return;
     const profile = d.profile ? { id: d.profile.id, version: d.profile.version } : null;
-    run(() => deleteContractor({ id: d.org.id, version: d.org.version }, profile, reason), t("Contractor deleted"), () => { onClose(t("Contractor deleted")); nav({ contractorId: null }); }, onFail);
+    run(() => deleteContractor({ id: d.org.id, version: d.org.version }, profile, reason, force.on), t("Contractor deleted"), () => { onClose(t("Contractor deleted")); nav({ contractorId: null }); }, onFail);
   };
   return (
-    <Modal open onClose={() => { onClose(); }} title={t("Delete contractor")} footer={<><Btn onClick={() => { onClose(); }}>{t("Cancel")}</Btn><Btn variant="danger" disabled={pending} onClick={confirm}>{t("Delete")}</Btn></>}>
+    <Modal open onClose={() => { onClose(); }} title={t("Delete contractor")} footer={<><Btn onClick={() => { onClose(); }}>{t("Cancel")}</Btn><Btn variant="danger" disabled={pending || !forceReady(force, d.org.name)} onClick={confirm}>{t("Delete")}</Btn></>}>
       <p className="text-[13px]">{t("Delete {name}? Its profile, rate cards and unavailability are removed with it. A company with jobs, offers, certificates, payouts or users cannot be deleted.", { name: d.org.name })}</p>
       <ReasonField value={reason} tried={tried} onChange={setReason} />
+      {canForce && <ForceDeleteField name={d.org.name} what={t("also deletes its accounts, even those with history. Jobs, offers, certificates and payouts still stop it.")} force={force} onChange={setForce} />}
     </Modal>
   );
 }
