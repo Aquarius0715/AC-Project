@@ -24,7 +24,13 @@ func TestCustomerDeleteWaitsForASaveIntoTheCustomer(t *testing.T) {
 	ctx := context.Background()
 	name := "Race Customer " + uuid.NewString()[:8]
 
-	code, resp := write(srv, hq(), "organizations.save", `{"name":"`+name+`","kind":"customer","status":"active"}`, 0)
+	code, resp := write(
+		srv,
+		hq(),
+		"organizations.save",
+		`{"name":"`+name+`","kind":"customer","status":"active"}`,
+		0,
+	)
 	if code != 200 {
 		t.Fatalf("organization: %d %v", code, resp)
 	}
@@ -72,14 +78,14 @@ func TestCustomerDeleteWaitsForASaveIntoTheCustomer(t *testing.T) {
 	done := make(chan saveResult, 1)
 
 	go func() {
-		c, r := write(
+		status, reply := write(
 			srv,
 			hq(),
 			"properties.save",
 			`{"customerOrgId":"`+org+`","kind":"office","name":"Late site","address":null,"accessInstructions":null}`,
 			0,
 		)
-		done <- saveResult{c, r}
+		done <- saveResult{status, reply}
 	}()
 
 	select {
