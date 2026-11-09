@@ -138,7 +138,7 @@ func (Busy) ContractState(
 	rows, err := c.Tx.Query(
 		ctx,
 		`SELECT id, state IN ('scheduled','requested','applied','release_requested'),
-		jsonb_path_exists(recovery_cases, '$[*] ? (@.status != "resolved")') FROM restrictions.restrictions WHERE contract_id
+		jsonb_path_exists(recovery_cases, '$[*] ? (@.state != "resolved")') FROM restrictions.restrictions WHERE contract_id
 		= $1 ORDER BY id`,
 		contract,
 	)
