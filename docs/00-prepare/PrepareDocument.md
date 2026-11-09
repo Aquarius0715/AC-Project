@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.530.0
+version: 0.531.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -300,6 +300,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.531.0: a CSV import commit keeps unit names unique among siblings and an import is undone only while the places it created hold nothing else (IR666). No operation changes. Phase 1A unchanged.
 0.530.0: a new CSV import preview removes the previews that have expired, as the database design says (IR665). No operation changes. Phase 1A unchanged.
 0.529.0: the adjustment HQ enters when it answers a payout question stays within the safe-integer range, like every other amount (IR659). No operation changes. Phase 1A unchanged.
 0.528.0: a customer is deactivated only after its row is locked, so a unit being added at the same moment is seen by the check for units (IR668). No operation changes. Phase 1A unchanged.
