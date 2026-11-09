@@ -102,7 +102,8 @@ services:
       REAL_MQTT_USER: ""
       REAL_MQTT_PASSWORD: ""
       REAL_MQTT_COMMANDS: ""
-    volumes: ["${LOAD_OUT:-./load-out}:/out:ro"]
+    # only the links file: the out folder also holds the accounts' passwords (manifest.json)
+    volumes: ["${LOAD_OUT:-./load-out}/links.json:/out/links.json:ro"]
   iotload:
     image: ac-api:${IMAGE_TAG:-tools}
     build: { context: ./service/api, dockerfile: build/service.Dockerfile, target: tools, args: { SERVICE: gateway } }
