@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
-  actionCode, actionWord, blockedText, capabilityText, connectionText, fieldText, historyRows, observedText, refusal, restrictionText, runActive, runBanner, stateTiles, windowText,
+  actionCode, actionWord, blockedText, capabilityText, connectionText, fieldText, historyRows, observedText, offeredKey, refusal, restrictionText, runActive, runBanner, stateTiles, windowText,
   type ApiCommandRow, type ApiRun,
 } from "@ac/web/lib/techControl";
 import { i18nOf } from "@ac/web/lib/i18n";
 import type { ApiUnitDetail } from "@ac/web/lib/units";
+import { actionOptions, type Caps } from "@ac/web/lib/clientAutomations";
 
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 
@@ -115,5 +116,18 @@ describe("capability, restriction and refusals (IR286)", () => {
     expect(runBanner(run(), MS)?.title).toBe("Berjalan — tamat 10:10 PG GMT+9 (permulaan diakui 10:05 PG GMT+9)");
     expect(stateTiles({ observedState: { power: true, celsius: 24, mode: "cool", fanLevel: "low", observedAt: null }, latestMeasurements: [] }, MS.t).map((x) => x.label)).toStrictEqual(["Kuasa", "Mod", "Titik set", "Kipas", "Bilik"]);
     expect(capabilityText(unit, MS.t)).toBe("Versi keupayaan v3 membenarkan: set_mode (cool/dry/fan), set_temperature 16–30 °C, set_fan (low/mid/high), larian ujian 1–15 min.");
+  });
+});
+
+describe("offeredKey", () => {
+  const caps: Caps = { control: true, temperature: null, modeControl: false, modes: [], fanControl: false, fanLevels: [], ventilation: true, ventilationLevels: ["low", "high"] };
+  it("keeps a test run's default action the unit offers", () => {
+    expect(offeredKey(actionOptions(caps), "power:off")).toBe("power:off");
+  });
+  it("takes the first offered action when the unit has no power control, as the select shows it", () => {
+    // a ventilation-only model: the select shows Ventilation low, so the run must not send power on
+    const options = actionOptions({ ...caps, control: false });
+    expect(offeredKey(options, "power:on")).toBe("vent:low");
+    expect(offeredKey([], "power:on")).toBe("power:on");
   });
 });
