@@ -9359,3 +9359,10 @@ admin.md says unit names are unique among the non-archived units of a space (CON
 
 1. **The lock.** `Models.CurrentVersion` reads the current row `FOR SHARE`, as the parent reads of IR478 and IR667 do: the delete, or the update that retires the old version, waits for the save, or the save waits for it and finds no model (VALIDATION `modelId` `error.unknownModel`) or the new version. Nothing else changes.
 2. **Test.** `TestModelDeleteWaitsForAUnitSavedWithIt` holds a delete of the model row open in a second transaction and sends `units.save` with that model; before the fix the save answered 200 at once with the unit, now it waits for the commit and answers 422 `modelId=error.unknownModel`. No operation, route or screen changes.
+
+## IR673 `telemetry.series` by space waits for the work window of an external technician (review round 70) — 2026-11-09
+
+IR49(b) makes equipment reads (`telemetry.*`, `alerts.*`, `devices.*`, `units.get`) wait for the work window of an external technician: before `scheduledStart` they answer FORBIDDEN `errors.assignment_not_started`. `telemetry.series` with `unitIds` did so through `readableUnits` (the List-scope check plus `unitscope.Gate`). With `spaceId` the units came from `UnitsInSpace`, which reads in the List scope (the viewing window starts when the assignment is created), and the gate was not applied: an external technician with an assignment that had not started read the measurements of the unit by naming the room it stands in.
+
+1. **The gate.** The `spaceId` path of `telemetry.series` passes the units of the space through `unitscope.Gate`, as the `unitIds` path does. Everyone but an external technician passes; the answer for the technician is the same FORBIDDEN `errors.assignment_not_started` as by unit ID.
+2. **Test.** `TestUnitScopeExternalTechnicianAndContractor` also reads the series by the room of the unit: before the fix it answered 200 with the measurement before the work window, now 403 `errors.assignment_not_started`, and 200 inside the window. No operation, route or screen changes.
