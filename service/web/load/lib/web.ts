@@ -54,7 +54,7 @@ function think(): void {
 }
 
 /** Signs in as the user through the app and the identity provider; true when the app's home page came back. */
-export function signIn(user: User, group: WebGroup): boolean {
+function signIn(user: User, group: WebGroup): boolean {
   const base = baseOf(group);
   const email = `${user.username}@load.local`;
   const started = Date.now();
@@ -82,7 +82,7 @@ export function signIn(user: User, group: WebGroup): boolean {
 }
 
 /** Opens the app's pages one after the other, the way a person moves through the menu. */
-export function openPages(user: User, group: WebGroup, seed: number): void {
+function openPages(user: User, group: WebGroup, seed: number): void {
   const base = baseOf(group);
   const pages = [...PAGES[group]];
   const unit = user.unitIds[seed % Math.max(1, user.unitIds.length)];
