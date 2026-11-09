@@ -135,6 +135,16 @@ func TestUnitScopeExternalTechnicianAndContractor(t *testing.T) {
 	if alertListed() {
 		t.Fatal("alerts.list before the work window")
 	}
+	// nor does the unit list count it: the alert count is an alert read (IR49(b), IR705)
+	_, unitPage := post(
+		srv,
+		techB(),
+		"units.list",
+		`{"limit":100,"filters":{"unitIds":["`+unit+`"]}}`,
+	)
+	if count := asNum(t, items(t, unitPage)[0]["activeAlertCount"]); count != 0 {
+		t.Fatalf("activeAlertCount before the work window: %v", count)
+	}
 
 	if code, res := post(
 		srv,
