@@ -4,7 +4,7 @@
 import { Counter, Rate, Trend } from "k6/metrics";
 import { currentPhase } from "./phase.ts";
 
-export type Kind = "read" | "write" | "auth" | "page" | "signin";
+export type Kind = "read" | "write" | "auth" | "page" | "signin" | "command";
 
 const duration: Record<Kind, Trend> = {
   read: new Trend("ac_read_duration", true),
@@ -12,6 +12,7 @@ const duration: Record<Kind, Trend> = {
   auth: new Trend("ac_auth_duration", true),
   page: new Trend("ac_page_duration", true),
   signin: new Trend("ac_signin_duration", true),
+  command: new Trend("ac_command_duration", true),
 };
 const requests = new Counter("ac_requests");
 const errors = new Rate("ac_errors");

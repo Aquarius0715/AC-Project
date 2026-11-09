@@ -47,6 +47,16 @@ func main() {
 	partnerUsers := flag.Int("partner-users", defaults.PartnerUsers, "partner accounts")
 	technicianUsers := flag.Int("technician-users", defaults.TechnicianUsers, "technician accounts")
 	hqUsers := flag.Int("hq-users", defaults.HQUsers, "HQ accounts")
+	probes := flag.Int(
+		"probes",
+		defaults.Probes,
+		"IoT probe devices (they only measure the delay of a reading)",
+	)
+	links := flag.String(
+		"links",
+		"",
+		"where the devices' links for the bridge and the simulator are written (empty: not written)",
+	)
 
 	flag.Parse()
 
@@ -58,20 +68,31 @@ func main() {
 		PartnerUsers:     *partnerUsers,
 		TechnicianUsers:  *technicianUsers,
 		HQUsers:          *hqUsers,
+		Probes:           *probes,
 		Password:         *password,
 		Now:              time.Now().UTC().Truncate(time.Second),
 	}
 
-	err := run(context.Background(), *url, *manifest, *manifestOnly, cfg)
+	err := run(
+		context.Background(),
+		*url,
+		files{manifest: *manifest, links: *links},
+		*manifestOnly,
+		cfg,
+	)
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
-// run guards the database name, applies the data in one transaction and writes the manifest.
+// files are the files a run writes: the account manifest and, when named, the devices' links.
+type files struct{ manifest, links string }
+
+// run guards the database name, applies the data in one transaction and writes the manifest and the links.
 func run(
 	ctx context.Context,
-	url, manifestPath string,
+	url string,
+	out files,
 	manifestOnly bool,
 	cfg loadseed.Config,
 ) error {
@@ -81,7 +102,7 @@ func run(
 	}
 
 	if manifestOnly {
-		return writeManifest(manifestPath, result.Manifest)
+		return write(out, result)
 	}
 
 	err = loadseed.Guard(url)
@@ -116,7 +137,26 @@ func run(
 		return apperr.Wrap(err, "seed.Apply")
 	}
 
-	return writeManifest(manifestPath, result.Manifest)
+	return write(out, result)
+}
+
+// write writes the manifest and, when a path is named, the links.
+func write(out files, result *loadseed.Result) error {
+	err := writeManifest(out.manifest, result.Manifest)
+	if err != nil {
+		return err
+	}
+
+	if out.links == "" {
+		return nil
+	}
+
+	data, err := json.MarshalIndent(result.Links, "", "  ")
+	if err != nil {
+		return apperr.Wrap(err, "json.MarshalIndent")
+	}
+
+	return apperr.Wrap(os.WriteFile(out.links, data, manifestMode), "os.WriteFile")
 }
 
 // writeManifest writes the account manifest. The same configuration always makes the same one, so the manifest the

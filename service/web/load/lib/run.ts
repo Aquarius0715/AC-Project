@@ -74,7 +74,7 @@ export function watched(): Record<string, string[]> {
     out[`ac_errors{kind:${kind}}`] = [];
   }
   for (const c of CLASSES) out[`ac_status{class:${c}}`] = [];
-  for (const kind of ["page", "signin"]) {
+  for (const kind of ["page", "signin", "command"]) {
     out[`ac_requests{kind:${kind}}`] = [];
     out[`ac_errors{kind:${kind}}`] = [];
   }

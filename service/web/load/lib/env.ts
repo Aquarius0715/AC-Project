@@ -20,6 +20,8 @@ export const env = {
   customerUrl: setting("CUSTOMER_URL", "http://customer-web-api:3000"),
   partnerUrl: setting("PARTNER_URL", "http://partner-web-api:3000"),
   technicianUrl: setting("TECHNICIAN_URL", "http://technician-web-api:3000"),
+  // how long the IoT scenarios run, in seconds (deploy/load/run.sh: the same time the telemetry generator runs)
+  iotSeconds: Number(setting("IOT_SECONDS", "60")),
   // for trying a scenario: shorter (TIME_SCALE) or smaller (VU_SCALE); 1 for a real run
   timeScale: Number(setting("TIME_SCALE", "1")),
   vuScale: Number(setting("VU_SCALE", "1")),
