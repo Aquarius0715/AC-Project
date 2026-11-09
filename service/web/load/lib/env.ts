@@ -16,4 +16,11 @@ export const env = {
   manifest: setting("MANIFEST", "/out/manifest.json"),
   // the stress scenario reads only: more virtual users than accounts would share a membership's write limit
   writes: setting("WRITES", "1") !== "0",
+  // the web apps, as k6 reaches them inside the compose network (phase 2)
+  customerUrl: setting("CUSTOMER_URL", "http://customer-web-api:3000"),
+  partnerUrl: setting("PARTNER_URL", "http://partner-web-api:3000"),
+  technicianUrl: setting("TECHNICIAN_URL", "http://technician-web-api:3000"),
+  // for trying a scenario: shorter (TIME_SCALE) or smaller (VU_SCALE); 1 for a real run
+  timeScale: Number(setting("TIME_SCALE", "1")),
+  vuScale: Number(setting("VU_SCALE", "1")),
 };

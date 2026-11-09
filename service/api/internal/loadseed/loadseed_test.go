@@ -69,6 +69,10 @@ func TestBuildLaunchSize(t *testing.T) {
 		)
 	}
 
+	if len(got.Consents) != 210 {
+		t.Errorf("consents = %d, want one for each of the 210 customer accounts", len(got.Consents))
+	}
+
 	if len(got.Organizations) != 610 || len(got.Offers) != 300 {
 		t.Errorf(
 			"organizations %d (want 610), offers %d (want 300)",
