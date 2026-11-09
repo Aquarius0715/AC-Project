@@ -9649,3 +9649,12 @@ In HQ automation policies (FR-A11), Fire (demo) sends `automations.fire` with a 
 1. **Fix.** `evaluationKey(type, rows)` (`shared/lib/automation.ts`) is what an evaluation asks, without its time or event ID. Fire reuses the last event ID and tick only while that is unchanged; any other change, the condition type included, makes a new event.
 2. **Test.** `automation.test.ts` checks three things. The key is the same for the same evaluation. It changes with the policy's condition type for a fact without its own kind. For a fact with its own kind it does not follow the policy's type, and it follows the fact's value. All three failed before the fix (no such function) and pass after.
 3. **Not changed.** The API, Simulate (a read, always a new event) and every operation, route and count.
+
+## IR705 The unit list counts a unit's alerts only while the caller may read them (review round 152, 2026-11-10)
+
+IR49(b) keeps an external technician's equipment reads (`units.get`, `telemetry.*`, `alerts.*`, `devices.*`) closed until the work window starts. The unit is listed in the viewing window before that. `units.list` already left `latestMeasurements` empty then (IR213), but `activeAlertCount` counted the unit's open and acknowledged alerts, which `alerts.list` leaves out and `alerts.get` refuses at that time.
+
+1. **Reproduced.** In `TestUnitScopeExternalTechnicianAndContractor`, the unit is listed before the work window and has a new warning alert, and `alerts.list` leaves the alert out. `units.list` still answered `activeAlertCount` 1.
+2. **Fix.** The unit list counts alerts over the units the caller may read now (`unitscope.EquipmentReadable`), as it already did for the latest measurements. HQ, clients, contractors and internal technicians are unchanged: for them every listed unit is readable.
+3. **Test.** The same test now checks `activeAlertCount` 0 before the work window. It failed before the fix (1) and passes after.
+4. **Not changed.** `observedState` and `effectivePowerState` in the list. They come from the unit's own record, not from a telemetry or alert read, and IR49(b) does not name them. Whether they too should wait for the work window is left to the owner of IR49.
