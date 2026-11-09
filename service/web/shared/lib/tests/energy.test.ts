@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compareRow, dayRanges, periodRange, pickUnits, selectionQuery } from "@ac/web/lib/clientEnergy";
+import { compareRow, dayRanges, periodRange, pickUnits, previousMonth, selectionQuery } from "@ac/web/lib/clientEnergy";
 import { amount, baselineErrors, baselineRows, coveragePct, one, roundAway, saving, summaryView, warning, type ApiEnergySummary, type BaselineDraft } from "@ac/web/lib/energy";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
 import { must } from "./must";
@@ -139,5 +139,23 @@ describe("HQ energy baselines in the display language (IR296)", () => {
 
   it("never shows coverage below full as 100 (one reading missing is not 100.0%)", () => {
     expect([coveragePct(1), coveragePct(0.99996), coveragePct(0.9875), coveragePct(0.996, 0), coveragePct(1, 0)]).toEqual(["100.0", "99.9", "98.8", "99", "100"]);
+  });
+});
+
+describe("the month before now", () => {
+  // the report export lists the months from last month back; "last month" is the Kuala Lumpur month before the one the
+  // reader is in, so from 16:00 UTC on the last day of a month, when Kuala Lumpur is already in the next one, it is
+  // that month (IR679)
+  it("is the month before the Kuala Lumpur month", () => {
+    expect(previousMonth(new Date("2026-11-15T04:00:00Z"))).toBe("2026-10");
+    expect(previousMonth(new Date("2026-05-01T00:00:00Z"))).toBe("2026-04");
+    expect(previousMonth(new Date("2026-01-20T10:00:00Z"))).toBe("2025-12");
+  });
+
+  it("follows Kuala Lumpur at the end of a month, where UTC is still in the old one", () => {
+    expect(previousMonth(new Date("2026-12-31T20:00:00Z"))).toBe("2026-12"); // Kuala Lumpur: 2027-01-01 04:00
+    expect(previousMonth(new Date("2026-11-30T17:00:00Z"))).toBe("2026-11"); // 2026-12-01 01:00
+    expect(previousMonth(new Date("2026-03-31T16:30:00Z"))).toBe("2026-03"); // 2026-04-01 00:30
+    expect(previousMonth(new Date("2026-03-31T15:59:00Z"))).toBe("2026-02"); // 2026-03-31 23:59, still March
   });
 });
