@@ -2,6 +2,7 @@ package integration_test
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -12,6 +13,9 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/scheduler"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
+
+// errTenantBroken is the failure of one tenant's scheduler job.
+var errTenantBroken = errors.New("this tenant's job fails")
 
 //nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestWorkerTickExpiresOffers(t *testing.T) {
@@ -298,5 +302,49 @@ func TestSchedulerInstancesShareTheWork(t *testing.T) {
 	)
 	if schedTickErr != nil { // apply the ticks' events as the consumers would
 		t.Fatal(schedTickErr)
+	}
+}
+
+// TestSchedulerTicksTheOtherTenantsWhenOneFails: a tenant whose transitions fail (a bad row, a job's error) must not
+// keep every tenant after it from expiring its offers and commands; the tick still reports the failure.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
+func TestSchedulerTicksTheOtherTenantsWhenOneFails(t *testing.T) {
+	srv := server(t)
+
+	var (
+		lock    sync.Mutex
+		visited []string
+		first   string
+	)
+
+	reg := ops.NewRegistry()
+	reg.AddJob(ops.DomainBilling, func(_ context.Context, call *ops.Call) (int, error) {
+		lock.Lock()
+		defer lock.Unlock()
+
+		tenant := call.Principal.TenantID.String()
+		visited = append(visited, tenant)
+
+		if first == "" {
+			first = tenant
+
+			return 0, errTenantBroken
+		}
+
+		return 0, nil
+	})
+
+	var tenants int
+
+	ownerScan(t, `SELECT count(*) FROM platform.tenants`, nil, &tenants)
+
+	_, err := scheduler.Tick(context.Background(), srv.DB, clock(), reg)
+	if err == nil {
+		t.Error("the tick did not report the failing tenant")
+	}
+
+	if len(visited) != tenants {
+		t.Errorf("the tick visited %d of %d tenants after the first failed", len(visited), tenants)
 	}
 }

@@ -9586,3 +9586,12 @@ Every operation with a principal ended by answering `SELECT count(*) FROM platfo
 3. **Fix.** `SELECT COALESCE(max(seq), 0) FROM platform.outbox`, in the pipeline and in a measured baseline's `sourceSnapshot.eventCursor`. Baselines saved earlier keep the value they recorded.
 4. **Limits.** Under row level security the index is read backwards to the tenant's latest event, so a tenant with few events among many of another's takes longer; it is never slower than the count was, and today there is one tenant. A tenant whose events have all been removed reads 0. No screen reads this value, so neither case shows.
 5. **The load test.** The data has no outbox history: a run does not measure a service with 7 days of events. This is a gap in `docs/02-design/load-test.md` to keep in mind when reading its results.
+
+## IR698 The scheduler ticks every tenant even when one of them fails (review round 126, 2026-11-10)
+
+The scheduler visits the tenants in ID order, each in its own transaction (backend Go design §7). It returned at the first tenant whose transaction failed. Every tenant after it then stopped expiring its offers, proposals and commands, confirming unrated jobs, freezing histories and running its domain jobs (IR54 schedule automations), at every tick, until the first one was fixed.
+
+1. **Reproduced.** A scheduler job that fails for the first tenant: the tick visited 1 of the test database's 5 tenants.
+2. **Fix.** `tick` goes on to the next tenant and reports the failures together (`errors.Join`, each naming its tenant). The failing tenant's transaction is rolled back as before, and the next tick, a second later, tries it again. The background loop already logs a failure once a minute (IR429).
+3. **Not changed.** The order of the tenants and of the domains' locks (IR356); a tenant that another instance holds is still skipped. Offers expire with the actor `system-demo` (IR48); that was checked and matches the design.
+4. **Test.** `TestSchedulerTicksTheOtherTenantsWhenOneFails`: every tenant is visited and the tick still reports the error.

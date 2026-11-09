@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.560.0 / Created: 2026-09-14 / Updated: 2026-11-07 / Status: Draft for review / Language: English
+Version: 0.561.0 / Created: 2026-09-14 / Updated: 2026-11-07 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -100,6 +100,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.561.0 (2026-11-09): IR698: the scheduler ticks every tenant even when one of them fails; the failures are reported together and the failing tenant is tried again at the next tick.
 0.560.0 (2026-11-09): IR697: Meta.eventCursor is the outbox's highest position, not a count of it: the count fell when old events were removed and read the whole outbox on every request.
 0.559.0 (2026-11-09): IR696: clearing a preferred time's date in Admin's New job no longer takes the screen down: a time that is not complete is a field error, and Add another time starts empty.
 0.558.0 (2026-11-09): IR695: a set-up or invitation e-mail links to the address the invitation came from (the verified token's issuer), so people on the Tailnet can open what is sent from there; admin tokens are cached per address (DEC-102).
