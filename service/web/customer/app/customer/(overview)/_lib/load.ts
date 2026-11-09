@@ -7,10 +7,10 @@
 // user's display language and time zone (coreDisplay, IR260).
 import "server-only";
 import { coreAll, coreDisplay, coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
+import { restrictionFor } from "@ac/web/lib/restrictionLookup";
 import { byCount, i18nOf } from "@ac/web/lib/i18n";
 import { dueNotice, unitPlaces, type ClientContract } from "@ac/web/lib/clientBilling";
 import type { ApiInvoice } from "@ac/web/lib/billing";
-import type { ApiRestriction } from "@ac/web/lib/restrictions";
 import { baselinesFor, dayRanges, periodRange } from "@ac/web/lib/clientEnergy";
 import { ruleCard, triggerOf, type ApiAutomation, type ApiConsent, type ApiOccurrence } from "@ac/web/lib/clientAutomations";
 import { metricCard, type ApiAirSeries } from "@ac/web/lib/air";
@@ -64,13 +64,9 @@ export async function loadOverview(sp: Record<string, string | string[] | undefi
   const due = recover((async () => {
     const [overdue, contracts] = await Promise.all([coreAll<ApiInvoice>("invoices.list", { filters: { overdueOnly: true } }), coreAll<ClientContract>("contracts.list")]);
     const k = contracts.find((c) => (c.activeRestrictionIds ?? []).length > 0 && overdue.some((x) => x.contractId === c.id));
-    let restriction: { r: ApiRestriction; invoiceId: string } | null = null;
-    const invoiceId = k ? overdue.find((x) => x.contractId === k.id)?.id : undefined; // the contract's overdue invoice
-    if (k && invoiceId) {
-      const page = await coreOp<{ items: ApiRestriction[] }>("restrictions.forInvoice", { invoiceId, query: { limit: 10 } });
-      const r = page.items.find((x) => (k.activeRestrictionIds ?? []).includes(x.id));
-      if (r) restriction = { r, invoiceId };
-    }
+    // the contract's overdue invoices, oldest due first: the restriction cites those overdue when it was scheduled (IR715)
+    const found = k ? await restrictionFor(overdue.filter((x) => x.contractId === k.id), (x) => (k.activeRestrictionIds ?? []).includes(x.id)) : null;
+    const restriction = found ? { r: found.r, invoiceId: found.invoice.id } : null;
     return dueNotice(overdue, restriction, i);
   })(), (error: unknown) => { if (error instanceof CoreError && (error.error.code === "FORBIDDEN" || error.error.code === "NOT_FOUND")) { return null; } throw error; });
   const inScope = automations.filter((a) => a.unitIds.some((u) => ids.includes(u))).toSorted((a, b) => Number(b.enabled) - Number(a.enabled) || a.name.localeCompare(b.name));
