@@ -220,8 +220,11 @@ test("the default policy's rules, a customer's switch and a rule copied as a cus
   await threshold.fill("340");
   await expect(main).toContainText("1 rule changed · Refrigerant low pressure");
   await main.getByRole("button", { name: "Save policy" }).click();
-  await expect(main).toContainText(`Policy v${String(before.version + 1)}`);
+  await page.getByText("Default limits saved for every unit").last().waitFor();
+  // IR681: counted once, at the toast, with no retry — the saved version is already on the screen when "saved" shows
+  expect(await main.textContent()).toContain(`Policy v${String(before.version + 1)}`);
   await expect(main).toContainText("No unsaved changes");
+  await page.getByText("Default limits saved for every unit").waitFor({ state: "detached" }); // the next toast is a new one
   await threshold.fill("350");
   await main.getByRole("button", { name: "Save policy" }).click();
   await expect(main).toContainText(`Policy v${String(before.version + 2)}`);

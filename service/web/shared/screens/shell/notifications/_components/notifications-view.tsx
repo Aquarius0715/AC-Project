@@ -11,6 +11,7 @@ import { actionMessage, type ActionFailure } from "@ac/web/lib/actionMessage";
 import { byCount, type T } from "@ac/web/lib/i18n";
 import { markAllRead, markRead } from "../actions";
 import { Button } from "@ac/web/components/ui/button";
+import { useRefreshThen } from "@ac/web/lib/useRefreshThen";
 
 // why a notification was not marked read, in the display language (the write limit says how long to wait, IR380)
 const readFailure = (f: ActionFailure, t: T) => {
@@ -25,6 +26,7 @@ export function NotificationsView({ rows }: Readonly<{ rows?: InboxRow[] }>) {
   const demo = useDemoInbox(role);
   const [tab, setTab] = useState<"all" | "unread">("all");
   const [pending, start] = useTransition();
+  const refreshThen = useRefreshThen(pending);
   const [failed, setFailed] = useState<string | null>(null);
   const toast = useToast();
   const isApi = rows !== undefined;
@@ -35,7 +37,7 @@ export function NotificationsView({ rows }: Readonly<{ rows?: InboxRow[] }>) {
   const open = (n: { id: string; version: number; read: boolean; live: boolean }) => {
     if (isApi) {
       if (n.read) return;
-      start(async () => { const f = await markRead(n.id, n.version); setFailed(f && readFailure(f, t)); }); return; // Server Action; the page re-renders with fresh rows
+      start(async () => { const f = await markRead(n.id, n.version); if (f) setFailed(readFailure(f, t)); else refreshThen(() => { setFailed(null); }); }); return; // Server Action; the page reads its rows again
     }
     if (n.live) jobActions.markRead(n.id); else jobActions.markFixedRead([n.id]);
   };
@@ -51,7 +53,7 @@ export function NotificationsView({ rows }: Readonly<{ rows?: InboxRow[] }>) {
       const r = await markAllRead(unread.map((n) => n.id));
       setFailed(null);
       if (r.failure) { toast(readFailure(r.failure, t), "crit"); return; }
-      toast(r.skipped ? t("{n} marked as read · {skipped} skipped — read meanwhile or no longer available", { n: r.marked, skipped: r.skipped }) : byCount(r.marked, { one: t("1 notification marked as read"), many: t("{n} notifications marked as read", { n: r.marked }) }));
+      refreshThen(() => { toast(r.skipped ? t("{n} marked as read · {skipped} skipped — read meanwhile or no longer available", { n: r.marked, skipped: r.skipped }) : byCount(r.marked, { one: t("1 notification marked as read"), many: t("{n} notifications marked as read", { n: r.marked }) })); });
     });
   };
   return (

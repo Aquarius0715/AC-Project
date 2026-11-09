@@ -11,6 +11,7 @@ import { ConditionFields, WindowEditor } from "./policy-parts";
 import { DefaultRulePreview, DemoTest } from "./policy-checks";
 import { Icon } from "@ac/web/components/Icon";
 import { byCount, textOf } from "@ac/web/lib/i18n";
+import { useRefreshThen } from "@ac/web/lib/useRefreshThen";
 
 const CATEGORY: Record<string, string> = { air_quality: "Air quality", fault: "Fault", maintenance: "Maintenance", connection: "Connection" };
 const SHOWN = 20; // the customers listed before the search-select (DD-A05 item 9, Figma 268:2)
@@ -27,6 +28,7 @@ export function DefaultPolicyEditor({ p, customers, units, canWrite, copyFor, on
   const i18n = useI18n();
   const toast = useToast();
   const [pending, startTransition] = useTransition();
+  const refreshThen = useRefreshThen(pending);
   const [rules, setRules] = useState(p.rules);
   const [of, setOf] = useState(`${p.id}@${String(p.version)}`);
   const [tried, setTried] = useState(false);
@@ -74,8 +76,7 @@ export function DefaultPolicyEditor({ p, customers, units, canWrite, copyFor, on
     startTransition(async () => {
       const r = await saveDefaultRules({ ...p, rules });
       if (!r.ok) { toast(actionMessage(r, t), "crit"); return; }
-      toast(t("Default limits saved for every unit"));
-      setTried(false);
+      refreshThen(() => { toast(t("Default limits saved for every unit")); setTried(false); });
     });
   };
   const confirmSwitch = () => {
@@ -86,7 +87,7 @@ export function DefaultPolicyEditor({ p, customers, units, canWrite, copyFor, on
     startTransition(async () => {
       const r = await switchDefaultRule(p.id, rule.ruleKey, customer.id, on, reason, setting(customer.id)?.version ?? 0);
       if (!r.ok) { toast(actionMessage(r, t), "crit"); return; }
-      done();
+      refreshThen(done);
     });
   };
 

@@ -23,6 +23,7 @@ import { ConditionFields, WindowEditor } from "./policy-parts";
 import { DemoTest, NotificationPreview } from "./policy-checks";
 import { Icon } from "@ac/web/components/Icon";
 import { entryOf } from "@ac/web/lib/lookup";
+import { useRefreshThen } from "@ac/web/lib/useRefreshThen";
 
 /** API mode: the selected policy (`policyId`) or the owner customer of a new one (`new`, copied from the default rule
 `from`) from the URL (DD-A05 items 5, 8 and 9), whether the session may write policies, the display time zone a new
@@ -119,6 +120,7 @@ export function PoliciesTab({ pols, live, sel, select, showOff = true, copyFor, 
   const t = useT();
   const toast = useToast();
   const [pending, startTransition] = useTransition();
+  const refreshThen = useRefreshThen(pending);
   const canWrite = live?.canWrite ?? true;
   const customers = live?.customers ?? demoCustomers;
 
@@ -164,9 +166,11 @@ export function PoliciesTab({ pols, live, sel, select, showOff = true, copyFor, 
     startTransition(async () => {
       const r = await savePolicy(draft);
       if (!r.ok) { toast(actionMessage(r, t), "crit"); return; }
-      toast(t(isNew ? "Policy created — attach it to units on each unit’s page" : "Policy saved"));
-      setTried(false);
-      if (isNew && r.id) select(r.id);
+      refreshThen(() => {
+        toast(t(isNew ? "Policy created — attach it to units on each unit’s page" : "Policy saved"));
+        setTried(false);
+        if (isNew && r.id) select(r.id);
+      });
     });
   };
   const remove = () => {
@@ -179,9 +183,11 @@ export function PoliciesTab({ pols, live, sel, select, showOff = true, copyFor, 
     startTransition(async () => {
       const r = await deletePolicy(draft.id, draft.version);
       if (!r.ok) { toast(actionMessage(r, t), "crit"); return; }
-      toast(t("“{name}” deleted", { name: draft.name }));
-      setDeleting(false);
-      select(null);
+      refreshThen(() => {
+        toast(t("“{name}” deleted", { name: draft.name }));
+        setDeleting(false);
+        select(null);
+      });
     });
   };
   const discard = () => { if (isNew) select(null); else { setDraft(p); setTried(false); } };

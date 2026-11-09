@@ -22,6 +22,7 @@ import { byCount } from "@ac/web/lib/i18n";
 
 import { oneOf } from "@ac/web/lib/oneOf";
 import { nonEmpty } from "@ac/web/lib/lists";
+import { useRefreshThen } from "@ac/web/lib/useRefreshThen";
 
 interface Scope { customerId?: string; unitId?: string; kind?: PlanType }
 interface Live { scope: Scope; rows: ContractRow[]; counts: Record<PlanType | "all", number>; selectedId: string | null; customers: { id: string; name: string }[]; units: UnitOption[] }
@@ -81,6 +82,7 @@ export function ContractsView({ live }: Readonly<{ live?: Live }>) {
   const router = useRouter();
   const pathname = usePathname();
   const [pending, start] = useTransition();
+  const refreshThen = useRefreshThen(pending);
   const nav = (patch: Record<string, string | null>) => {
     const q = new URLSearchParams(location.search);
     for (const [k, v] of Object.entries(patch)) {
@@ -155,9 +157,11 @@ export function ContractsView({ live }: Readonly<{ live?: Live }>) {
         restrictionEligible: isEligible, rulesVersion: isEligible ? d.rulesVersion.trim() : null,
       }, sel?.version);
       if (!r.ok) { toast(actionMessage(r, t), "crit"); return; }
-      toast(creating || !sel ? t("Contract created") : t("Saved as version {v}", { v: r.value.version }));
-      setCreating(false);
-      nav({ contractId: r.value.id });
+      refreshThen(() => {
+        toast(creating || !sel ? t("Contract created") : t("Saved as version {v}", { v: r.value.version }));
+        setCreating(false);
+        nav({ contractId: r.value.id });
+      });
     });
   };
 
