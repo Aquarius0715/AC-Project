@@ -195,6 +195,7 @@ jobs:
         run: |
           if [ "${{ matrix.workspace }}" = e2e ]; then
             npx eslint --max-warnings=0 -c e2e/eslint.config.mjs e2e
+            npx eslint --max-warnings=0 -c load/eslint.config.mjs load   # the k6 scenarios share this job (its name is a required check)
           else
             npm run lint --workspace=${{ matrix.workspace }}
           fi

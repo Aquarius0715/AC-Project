@@ -1,0 +1,109 @@
+# The load test stack (docs/02-design/backend-go-design.md, load tests): compose.yaml with this file on top, run as the
+# compose project ac-load by deploy/load/run.sh. It is made for one run and removed after it: nothing in it is published
+# on the host (the k6 container reaches the gateway and Keycloak inside the compose network), and it has its own
+# PostgreSQL database "ac_load", its own Keycloak with the realm copy deploy/load/realm.py wrote, its own broker with no
+# client, and no web app and no IoT bridge or simulator, so it never meets the shared test environment (ac-test) or the
+# real MQTT broker.
+services:
+  postgres:
+    ports: !reset []
+    environment: { POSTGRES_DB: ac_load }
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U postgres -d ac_load"] }
+  valkey: { ports: !reset [] }
+  localstack: { ports: !reset [] }
+  mosquitto: { ports: !reset [] }
+  mailpit: { ports: !reset [] }
+  keycloak: { ports: !reset [] }
+  gateway: { ports: !reset [] }
+
+  # the Core API takes the load client as its app client; every database login points at ac_load
+  migrate:
+    environment:
+      DATABASE_URL: postgres://postgres:local@postgres:5432/ac_load?sslmode=disable
+      SEED_MOCK_FLEET: "0"            # the mock fleet is for the IoT demo; the load data is the launch size
+      SEED_LIVE_SENSORS: ""           # the live site of real sensor nodes is never part of a load run
+  identity-api:
+    environment:
+      DATABASE_URL: postgres://ac_identity_login:local@postgres:5432/ac_load?sslmode=disable
+      DATABASE_READER_URL: postgres://ac_identity_login:local@postgres:5432/ac_load?sslmode=disable
+      OIDC_APP_CLIENT_ID: ac-load
+  equipment-api:
+    environment:
+      DATABASE_URL: postgres://ac_equipment_login:local@postgres:5432/ac_load?sslmode=disable
+      DATABASE_READER_URL: postgres://ac_equipment_login:local@postgres:5432/ac_load?sslmode=disable
+      OIDC_APP_CLIENT_ID: ac-load
+  maintenance-api:
+    environment:
+      DATABASE_URL: postgres://ac_maintenance_login:local@postgres:5432/ac_load?sslmode=disable
+      DATABASE_READER_URL: postgres://ac_maintenance_login:local@postgres:5432/ac_load?sslmode=disable
+      OIDC_APP_CLIENT_ID: ac-load
+  billing-api:
+    environment:
+      DATABASE_URL: postgres://ac_billing_login:local@postgres:5432/ac_load?sslmode=disable
+      DATABASE_READER_URL: postgres://ac_billing_login:local@postgres:5432/ac_load?sslmode=disable
+      OIDC_APP_CLIENT_ID: ac-load
+  energy-api:
+    environment:
+      DATABASE_URL: postgres://ac_energy_login:local@postgres:5432/ac_load?sslmode=disable
+      DATABASE_READER_URL: postgres://ac_energy_login:local@postgres:5432/ac_load?sslmode=disable
+      OIDC_APP_CLIENT_ID: ac-load
+
+  worker-outbox: { environment: { DATABASE_URL: "postgres://ac_app_login:local@postgres:5432/ac_load?sslmode=disable" } }
+  worker-iot: { environment: { DATABASE_URL: "postgres://ac_app_login:local@postgres:5432/ac_load?sslmode=disable" } }
+  worker-telemetry: { environment: { DATABASE_URL: "postgres://ac_app_login:local@postgres:5432/ac_load?sslmode=disable" } }
+  worker-rollup: { environment: { DATABASE_URL: "postgres://ac_app_login:local@postgres:5432/ac_load?sslmode=disable" } }
+  worker-automation: { environment: { DATABASE_URL: "postgres://ac_app_login:local@postgres:5432/ac_load?sslmode=disable" } }
+  worker-importexport: { environment: { DATABASE_URL: "postgres://ac_app_login:local@postgres:5432/ac_load?sslmode=disable" } }
+  worker-notification: { environment: { DATABASE_URL: "postgres://ac_app_login:local@postgres:5432/ac_load?sslmode=disable" } }
+  worker-scheduler-equipment:
+    environment:
+      DATABASE_URL: postgres://ac_equipment_login:local@postgres:5432/ac_load?sslmode=disable
+      DATABASE_READER_URL: postgres://ac_equipment_login:local@postgres:5432/ac_load?sslmode=disable
+  worker-scheduler-maintenance:
+    environment:
+      DATABASE_URL: postgres://ac_maintenance_login:local@postgres:5432/ac_load?sslmode=disable
+      DATABASE_READER_URL: postgres://ac_maintenance_login:local@postgres:5432/ac_load?sslmode=disable
+  worker-scheduler-billing:
+    environment:
+      DATABASE_URL: postgres://ac_billing_login:local@postgres:5432/ac_load?sslmode=disable
+      DATABASE_READER_URL: postgres://ac_billing_login:local@postgres:5432/ac_load?sslmode=disable
+
+  # one-off: the launch-size data and the account manifest. It refuses any database but ac_load.
+  loadseed:
+    image: ac-api:${IMAGE_TAG:-tools}
+    build: { context: ./service/api, dockerfile: build/service.Dockerfile, target: tools, args: { SERVICE: gateway } }
+    user: "${LOAD_UID:-65532}:${LOAD_GID:-65532}"
+    command: ["/app/loadseed", "-manifest", "/out/manifest.json"]
+    environment:
+      OWNER_DATABASE_URL: postgres://postgres:local@postgres:5432/ac_load?sslmode=disable
+      LOAD_PASSWORD: ${LOAD_PASSWORD:-}
+    volumes: ["${LOAD_OUT:-./load-out}:/out"]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    networks: [data]
+    restart: "no"
+    profiles: [load]
+
+  # k6 (pinned by digest) runs the scenarios of service/web/load inside the network; the results go to the out folder
+  k6:
+    image: grafana/k6:2.3.0@sha256:2dd4756ec6e14e62778916e1eb850108e4b499304c02df56760fa0bdb0fba0b8
+    user: "${LOAD_UID:-12345}:${LOAD_GID:-12345}"
+    command: ["run", "/load/scenarios/smoke.ts"]
+    environment:
+      GATEWAY_URL: http://gateway:8080
+      TOKEN_URL: http://keycloak:8080/realms/ac/protocol/openid-connect/token
+      LOAD_CLIENT_ID: ac-load
+      LOAD_CLIENT_SECRET: ${LOAD_CLIENT_SECRET:-}
+      ADMIN_CLIENT_ID: ac-admin-web
+      ADMIN_CLIENT_SECRET: ${AC_ADMIN_WEB_CLIENT_SECRET:-}
+      MANIFEST: /out/manifest.json
+      WRITES: ${LOAD_WRITES:-1}
+    volumes: ["./service/web/load:/load:ro", "${LOAD_OUT:-./load-out}:/out"]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    networks: [app]
+    restart: "no"
+    profiles: [k6]

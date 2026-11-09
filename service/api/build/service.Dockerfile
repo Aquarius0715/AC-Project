@@ -17,15 +17,17 @@ RUN mkdir -p /out/blobs
 
 # dev: toolchain image with the sources (local tools such as the IoT bridge build here)
 FROM build AS dev
-# the demo IoT commands (compose profile iot): the simulated modules, the bridge to the demo trigger, the fleet history
+# the demo IoT commands (compose profile iot): the simulated modules, the bridge to the demo trigger, the fleet history;
+# loadseed fills the database ac_load of the load test (deploy/load), and refuses any other database
 RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
     mkdir -p /app && CGO_ENABLED=0 go build -trimpath -o /app/devicesim ./cmd/devicesim \
     && CGO_ENABLED=0 go build -trimpath -o /app/iotbridge ./cmd/iotbridge \
-    && CGO_ENABLED=0 go build -trimpath -o /app/mockhistory ./cmd/mockhistory
+    && CGO_ENABLED=0 go build -trimpath -o /app/mockhistory ./cmd/mockhistory \
+    && CGO_ENABLED=0 go build -trimpath -o /app/loadseed ./cmd/loadseed
 
 # tools: the IoT commands on the distroless runtime, as the services run (non-root, no shell or toolchain; IR539)
 FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab AS tools
-COPY --from=dev /app/devicesim /app/iotbridge /app/mockhistory /app/
+COPY --from=dev /app/devicesim /app/iotbridge /app/mockhistory /app/loadseed /app/
 USER 65532:65532
 
 FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab AS runtime

@@ -10,9 +10,9 @@
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
-    "lint": "npm run lint --workspaces --if-present && eslint --max-warnings=0 -c e2e/eslint.config.mjs e2e",
+    "lint": "npm run lint --workspaces --if-present && eslint --max-warnings=0 -c e2e/eslint.config.mjs e2e && eslint --max-warnings=0 -c load/eslint.config.mjs load",
     "test": "npm run test --workspaces --if-present",
-    "typecheck": "npm run typecheck --workspaces --if-present && tsc -p e2e/tsconfig.json",
+    "typecheck": "npm run typecheck --workspaces --if-present && tsc -p e2e/tsconfig.json && tsc -p load/tsconfig.json",
     "e2e": "playwright test -c e2e/playwright.config.ts",
     "knip": "knip --no-progress"
   },
@@ -23,6 +23,7 @@
     "@tailwindcss/postcss": "^4.1.0",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/react": "^16.3.3",
+    "@types/k6": "2.3.1",
     "@types/node": "^26.6.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
