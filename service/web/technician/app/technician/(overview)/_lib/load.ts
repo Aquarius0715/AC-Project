@@ -5,13 +5,15 @@
 // display language; every time is formatted here — today and its timeline in Kuala Lumpur, instants in the user's
 // display time zone (IR281).
 import "server-only";
-import { coreAll, coreDisplay, coreNow, coreOp, orWhenRefused, coreItems } from "@ac/web/lib/dal";
+import { coreAll, coreDisplay, coreNow, coreOp, orWhenRefused } from "@ac/web/lib/dal";
 import { i18nOf } from "@ac/web/lib/i18n";
 import type { ApiAlert } from "@ac/web/lib/alerts";
 import { klDay } from "@ac/web/lib/partnerOverview";
 import { alertRows, dayTimeline, kpis, reportRows, SORTS, sortOf, TABS, tabOf, techRow, type ApiTechCounts, type ApiTechJobRow, type TechJobRow } from "@ac/web/lib/techOverview";
 
 const optional = orWhenRefused;
+// the alerts the overview lists: every one not resolved yet
+const UNRESOLVED: ("open" | "acknowledged")[] = ["open", "acknowledged"];
 
 export async function loadOverview(sp: { tab?: string; sort?: string }) {
   const [now, display] = await Promise.all([coreNow(), coreDisplay()]);
@@ -26,7 +28,9 @@ export async function loadOverview(sp: { tab?: string; sort?: string }) {
     // them and not today's (IR702)
     coreAll<ApiTechJobRow>("jobs.list", { sort: { field: spec.field, direction: spec.direction } }),
     optional(coreAll<{ id: string; displayName: string }>("units.list"), []),
-    optional(coreItems<ApiAlert>("alerts.list", { sort: { field: "severity", direction: "desc" }, limit: 50 }), [] as ApiAlert[]),
+    // each unresolved status on its own: the list sorts the most severe first across the statuses, so one page of every
+    // status lost the open alerts behind resolved ones of a higher severity (IR711)
+    optional(Promise.all(UNRESOLVED.map((status) => coreAll<ApiAlert>("alerts.list", { filters: { status }, sort: { field: "severity", direction: "desc" } }))).then((x) => x.flat()), [] as ApiAlert[]),
   ]);
   const names = new Map(units.map((u) => [u.id, u.displayName]));
   const rows = jobs.map((j) => techRow(j, nowMs, names, i)).filter((r): r is TechJobRow => !!r);

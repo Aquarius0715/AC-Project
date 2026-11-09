@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.572.0
+version: 0.573.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -300,6 +300,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.573.0: IR711: the technician overview reads each unresolved alert status on its own, so open alerts are no longer cut behind resolved ones.
 0.572.0: IR710: the HQ alerts screen reads each alert status on its own, so open alerts are no longer cut behind 100 resolved ones.
 0.571.0: IR709: a technician binds an unbound device only to its planned unit unless they registered it, and device writes answer NOT_FOUND for an unbound device the caller does not read.
 0.570.0: IR707: overdue totals are per currency on the customer overview and HQ's customer standing, never added across currencies.
