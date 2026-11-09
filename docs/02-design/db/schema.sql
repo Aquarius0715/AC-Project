@@ -59,6 +59,7 @@ CREATE TABLE platform.outbox (
 );
 CREATE INDEX outbox_unpublished ON platform.outbox (occurred_at) WHERE published_at IS NULL;
 CREATE INDEX outbox_type_seq ON platform.outbox (event_type, seq);  -- consumers poll their event types in order
+CREATE INDEX outbox_tenant_seq ON platform.outbox (tenant_id, seq);  -- a tenant's position (Meta.eventCursor, IR699)
 
 -- Generic change capture (IR188): AFTER row triggers publish RowChanged:<schema>.<table> {op, row} with the columns
 -- named in the trigger arguments. Consuming services keep reference copies (<schema>.ref_<table>) of exactly those

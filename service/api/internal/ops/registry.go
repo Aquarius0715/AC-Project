@@ -630,6 +630,14 @@ func setAppNow(ctx context.Context, txn pgx.Tx, now time.Time) error {
 	return apperr.Wrap(err, "select set_config")
 }
 
+// tenantCursorSQL is the transaction's tenant's position in the outbox (Meta.eventCursor, D07): the highest sequence
+// of its events, 0 before the first.
+const tenantCursorSQL = `SELECT COALESCE(max(seq), 0) FROM platform.outbox
+	WHERE tenant_id = current_setting('app.tenant_id')::uuid`
+
+// TenantCursor is the query of the transaction's tenant's outbox position, for a result that records it.
+func TenantCursor() string { return tenantCursorSQL }
+
 // metaCorrelationID is the ServiceResult meta field of the correlation ID.
 const metaCorrelationID = "correlationId"
 
@@ -899,10 +907,10 @@ func (r *Registry) execute(
 
 		if txn != nil &&
 			call.Principal != nil { // Meta.eventCursor: the tenant's event position of this snapshot (D07)
-			// the highest position, read from the index, not a count: housekeeping removes old events, and a count would go
-			// back and read the whole outbox on every request
-			return txn.QueryRow(ctx, `SELECT COALESCE(max(seq), 0) FROM platform.outbox`).
-				Scan(&cursor)
+			// the tenant's highest position, from the index, not a count: housekeeping removes old events, and a count
+			// would go back and read the whole outbox on every request. The outbox has no row level security (the relay
+			// reads it across tenants), so the tenant is named here, or the cursor would follow every tenant's events
+			return txn.QueryRow(ctx, tenantCursorSQL).Scan(&cursor)
 		}
 
 		return nil

@@ -446,7 +446,7 @@ func measuredBaseline(
 		SourceSnapshot: sourceSnapshot{Generation: 1, EventCursor: 0, SnapshotAt: call.Now},
 	}
 
-	err = call.Tx.QueryRow(ctx, `SELECT COALESCE(max(seq), 0) FROM platform.outbox`).
+	err = call.Tx.QueryRow(ctx, ops.TenantCursor()).
 		Scan(&measured.SourceSnapshot.EventCursor)
 	if err != nil {
 		return nil, nil, apperr.Wrap(err, "select platform.outbox")
