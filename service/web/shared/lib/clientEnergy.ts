@@ -91,6 +91,12 @@ export function pickUnits(units: { id: string; displayName: string }[], paramete
   const picked = [...new Set(parameter.split(","))].filter((id) => units.some((u) => u.id === id)).slice(0, 4);
   return picked.length > 0 ? picked : [...units].toSorted((a, b) => a.displayName.localeCompare(b.displayName)).slice(0, 1).map((u) => u.id);
 }
+/** The Kuala Lumpur month before the one `now` is in, as "YYYY-MM": the first month of the report export's list (IR679). It comes from the Kuala Lumpur date, not the UTC one, which is still in the old month for eight hours at the end of every month. */
+export function previousMonth(now: Date): string {
+  const [year = 0, month = 1] = klLocal(now.toISOString()).slice(0, 7).split("-").map(Number);
+  const before = month === 1 ? { year: year - 1, month: 12 } : { year, month: month - 1 };
+  return `${String(before.year)}-${String(before.month).padStart(2, "0")}`;
+}
 /** The energy screen's selection as URL parameters (also passed to the offsets page, FR-C13 “Based on Energy & cost”). */
 export function selectionQuery(p: { unitIds: string[]; period: PeriodKind; from?: string; to?: string; baselineId?: string | null }): string {
   const q = new URLSearchParams({ unitIds: p.unitIds.join(","), period: p.period });

@@ -9,8 +9,8 @@ import { connection } from "next/server";
 import { actionMessage } from "@ac/web/lib/actionMessage";
 import { apiMode, coreAll, coreDisplay, coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
 import { i18nOf } from "@ac/web/lib/i18n";
-import { klLocal, summaryView, type ApiBaseline, type ApiEnergySummary } from "@ac/web/lib/energy";
-import { baselineLabel, baselinesFor, compareRow, dayRanges, periodKinds, periodRange, pickUnits, selectionQuery } from "@ac/web/lib/clientEnergy";
+import { summaryView, type ApiBaseline, type ApiEnergySummary } from "@ac/web/lib/energy";
+import { baselineLabel, baselinesFor, compareRow, dayRanges, periodKinds, periodRange, pickUnits, previousMonth, selectionQuery } from "@ac/web/lib/clientEnergy";
 import { EnergyDemo } from "./_components/energy-demo";
 import { EnergyView, type EnergyLive } from "./_components/energy-view";
 import { queryReader } from "@ac/web/lib/searchParams";
@@ -36,7 +36,6 @@ export default async function CustomerEnergyPage({ searchParams }: Readonly<Page
   const options = baselinesFor(baselines, unitIds);
   const baseline = one("baselineId") === "none" ? undefined : options.find((b) => b.id === one("baselineId")) ?? options[0];
   const name = new Map(own.map((u) => [u.id, u.name]));
-  const lastMonth = (() => { const d = new Date(now); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() - 1); return klLocal(d.toISOString()).slice(0, 7); })();
   const live: EnergyLive = {
     units: own,
     baselines: options.map((b) => ({ id: b.id, label: baselineLabel(b) })),
@@ -45,11 +44,11 @@ export default async function CustomerEnergyPage({ searchParams }: Readonly<Page
     daily: [],
     compare: null,
     query: selectionQuery({ unitIds, period: kind, from: one("from"), to: one("to"), baselineId: baseline?.id }),
+    lastMonth: previousMonth(now),
     unitIds,
     period,
     properties,
     prefs,
-    lastMonth,
   };
   if (unitIds.length > 0 && !period.error) {
     try {
