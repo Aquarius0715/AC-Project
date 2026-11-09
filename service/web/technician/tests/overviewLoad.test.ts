@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { describe, expect, it, vi } from "vitest";
 
 // the technician overview reads the user's jobs through the DAL (FR-T01); the jobs list is paged (limit 100, SR14)
@@ -9,7 +8,7 @@ const dal = vi.hoisted(() => ({
 vi.mock("server-only", () => ({}));
 vi.mock("@ac/web/lib/dal", () => dal);
 
-import { loadOverview } from "../../../technician/app/technician/(overview)/_lib/load";
+import { loadOverview } from "../app/technician/(overview)/_lib/load";
 import type { ApiTechJobRow } from "@ac/web/lib/techOverview";
 
 const now = new Date("2026-11-10T02:00:00Z");
