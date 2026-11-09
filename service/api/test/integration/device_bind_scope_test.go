@@ -74,6 +74,17 @@ func TestBindOnlyAReadableUnboundDevice(t *testing.T) {
 		t.Fatalf("the technician reads HQ's unbound device: %d", code)
 	}
 
+	// nor do the writes on a bound device tell a technician that the unbound one exists (CONFLICT notBound)
+	if code, _ := write(
+		srv,
+		techInt(),
+		"devices.check",
+		`{"id":"`+hqDevice+`","jobId":"`+job+`"}`,
+		1,
+	); code != 404 {
+		t.Errorf("devices.check of HQ's unbound device: %d", code)
+	}
+
 	if code := bind(hqDevice); code != 404 {
 		t.Errorf("the technician binds HQ's device planned for another unit: %d", code)
 	}

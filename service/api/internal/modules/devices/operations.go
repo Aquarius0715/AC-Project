@@ -509,6 +509,13 @@ func deviceUse(ctx context.Context, call *ops.Call, device uuid.UUID, state devS
 	return nil
 }
 
+// hiddenUnbound reports whether an unbound device is one the caller does not read: everyone but HQ reads only the
+// unbound devices they registered (deviceScope, devices.get).
+func hiddenUnbound(call *ops.Call, state devState) bool {
+	return state.unit == nil && call.Principal.Role != roleAdmin &&
+		state.creator != call.Principal.MembershipID
+}
+
 // rebindable checks the locked device against a bind to unit: a technician moves a bound device only from a unit of
 // an assignment of theirs as well (the unit it leaves is in scope too, and DD-T11 rejects an unauthorized rebinding,
 // IR366), and binds an unbound one only to its planned unit unless they registered it (IR709); then the expected
@@ -528,8 +535,7 @@ func (m *Module) rebindable(
 	// a device not bound yet goes to the unit HQ planned for it, or anywhere by HQ or the member who registered it: a
 	// technician cannot take another member's planned device to a unit of their own (NOT_FOUND, as the device reads
 	// for them, whatever its version: IR366, IR709)
-	if state.unit == nil && unit != state.target && call.Principal.Role != roleAdmin &&
-		state.creator != call.Principal.MembershipID {
+	if state.unit == nil && unit != state.target && hiddenUnbound(call, state) {
 		return apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
@@ -744,6 +750,13 @@ func (m *Module) lockBoundDevice(
 	}
 
 	if state.unit == nil {
+		if hiddenUnbound(
+			call,
+			state,
+		) { // it reads as not found for the caller: say nothing of it (IR366, IR709)
+			return state, apperr.E(apperr.NotFound, apperr.KeyNotFound)
+		}
+
 		return state, apperr.E(apperr.Conflict, apperr.KeyDeviceNotBound)
 	}
 
