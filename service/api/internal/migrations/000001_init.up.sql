@@ -940,6 +940,8 @@ CREATE TABLE monitoring.measurements (
 ) PARTITION BY RANGE (observed_at);
 CREATE INDEX measurements_unit_metric ON monitoring.measurements (unit_id, metric, observed_at DESC);
 CREATE INDEX measurements_observed_brin ON monitoring.measurements USING brin (observed_at);
+-- the duplicate check of an ingested event (event_id): without it every reading scans the table
+CREATE INDEX measurements_event ON monitoring.measurements (event_id);
 -- Example partitions; production partitions are created ahead by pg_partman (premake 7, retention 35 days).
 CREATE TABLE monitoring.measurements_default PARTITION OF monitoring.measurements DEFAULT;
 

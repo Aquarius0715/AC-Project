@@ -14,7 +14,7 @@ import { useI18n, useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { showTime, zonedInstant, type T } from "@ac/web/lib/i18n";
-import { contractorNames, costLineOf, extendDefault, fromZonedInput, hqRefusal, longSlot, money, jobRequestErrors, offerDefaults, returnReason, slotText, tomorrowIn, zonedInput, type CostLine, type PreferredRow } from "@ac/web/lib/adminJobs";
+import { contractorNames, costLineOf, extendDefault, fromZonedInput, hqRefusal, longSlot, money, jobRequestErrors, nextDay, offerDefaults, returnReason, slotText, tomorrowIn, zonedInput, type CostLine, type PreferredRow } from "@ac/web/lib/adminJobs";
 import { typeLabel } from "@ac/web/lib/partnerJobDetail";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import { assignInternal, cancelJob, classifyFollowUp, createJob, extendAccess, holdJob, offerToContractor, proposeSlot, resolvePartnerSlot, resumeJob, reviewReport, saveCosts, withdrawProposal } from "../actions";
@@ -39,8 +39,6 @@ function preferredTitle(isPlan: boolean, round: number, t: T): string {
 }
 /** A banner or card tone: ok and warn as they are, any other tone as the default. */
 const okOrWarn = (tone: string) => (tone === "ok" || tone === "warn" ? tone : undefined);
-/** The calendar day after `date` (YYYY-MM-DD), whatever the time zone. */
-const nextDay = (date: string) => new Date(Date.parse(`${date}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
 
 /** HQ maintenance jobs (FR-A06, Figma Admin 06-1, 06-11…06-18): the Jobs tab from the Core API (Plans, Contractors and
 SLA are PlansView, ContractorsView and SlaView). Texts in the user's display language; the times of the first render

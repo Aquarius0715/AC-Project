@@ -105,6 +105,7 @@ func tenantPrincipal(tenant uuid.UUID) *ops.Principal {
 		Employment:        "",
 		Timezone:          "",
 		SessionsRevokedAt: nil,
+		IssuerHost:        "",
 	}
 }
 

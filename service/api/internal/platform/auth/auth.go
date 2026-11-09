@@ -9,6 +9,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -31,6 +32,9 @@ type Identity struct {
 	// it is HQ's app, whose sign-in asks for the one-time code every time (DEC-85, IR510).
 	Client   string
 	AdminApp bool
+	// Issuer is the token's verified issuer, empty when the verifier does not say. It names the address the holder
+	// signed in on (IR651, IR695).
+	Issuer string
 }
 
 // Verifier checks a bearer token and returns who holds it.
@@ -47,7 +51,13 @@ var errUnknownToken = errors.New("unknown token")
 // Verify implements Verifier.
 func (s StaticVerifier) Verify(_ context.Context, token string) (Identity, error) {
 	if sub, ok := s[token]; ok {
-		return Identity{Subject: sub, SignedIn: time.Time{}, Client: "", AdminApp: false}, nil
+		return Identity{
+			Subject:  sub,
+			SignedIn: time.Time{},
+			Client:   "",
+			AdminApp: false,
+			Issuer:   "",
+		}, nil
 	}
 
 	return Identity{}, errUnknownToken
@@ -210,6 +220,7 @@ func (a *Authenticator) Load(
 		Employment:        "",
 		Timezone:          "",
 		SessionsRevokedAt: nil,
+		IssuerHost:        "",
 	}
 	now := a.now()
 
@@ -278,7 +289,21 @@ func (a *Authenticator) authenticate(ectx *echo.Context, header string) (*ops.Pr
 		return nil, refusal
 	}
 
-	return principal, nil
+	return onAddress(principal, identity.Issuer), nil
+}
+
+// onAddress is the principal naming the host of the token's issuer. It is a copy: a principal source may share one
+// principal among requests (RemoteSource's cache), and those can have signed in on different addresses.
+func onAddress(principal *ops.Principal, issuer string) *ops.Principal {
+	parsed, err := url.Parse(issuer)
+	if err != nil || parsed.Hostname() == "" {
+		return principal
+	}
+
+	named := *principal
+	named.IssuerHost = parsed.Hostname()
+
+	return &named
 }
 
 // refused answers the DomainError for a principal this token may not act as, nil when it may.

@@ -82,6 +82,7 @@ func FromDTO(principalDTO PrincipalDTO) *ops.Principal {
 		Employment:        principalDTO.Employment,
 		Timezone:          principalDTO.Timezone,
 		SessionsRevokedAt: principalDTO.SessionsRevokedAt,
+		IssuerHost:        "",
 	}
 	for _, perm := range principalDTO.Permissions {
 		principal.Permissions[perm] = true
