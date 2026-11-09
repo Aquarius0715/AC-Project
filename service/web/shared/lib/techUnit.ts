@@ -188,7 +188,7 @@ export function seriesChart(metric: string, unit: string, items: Point[], p: Per
 /** One metric to chart: its readings of the period and how many the period holds. */
 export interface SeriesSpec { metric: string; unit: string; items: Point[]; total: number; complete: boolean }
 /** One line of the chart and what the screen says about its readings. */
-export interface ChartLine { metric: string; name: string; unit: string; points: (number | null)[]; axis: "left" | "right"; empty: boolean; count: string | null; gap: string | null; cut: string | null }
+interface ChartLine { metric: string; name: string; unit: string; points: (number | null)[]; axis: "left" | "right"; empty: boolean; count: string | null; gap: string | null; cut: string | null }
 export interface SeriesCharts { title: string; labels: string[]; times: string[]; lines: ChartLine[] }
 /** The metrics over the period in one chart (IR689): each on the axis of its unit (the first unit left, the second
 right), with the slots' headings for the tooltip. One metric reads as `seriesChart` does, with its title. */
