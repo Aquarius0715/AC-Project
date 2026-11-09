@@ -4,7 +4,8 @@
 // nothing stored) and automations.fire (demo-only, one-time key). Public endpoints: the DAL verifies the session and
 // the Core API authorizes them (automation.policy.write) and checks the policy version.
 import { refresh } from "next/cache";
-import { coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
+import { coreNow, coreOp } from "@ac/web/lib/dal";
+import { actionFailure } from "@ac/web/lib/actionFailure";
 import type { OpInput } from "@ac/web/lib/opTypes";
 
 export type ActionResult<T = null> = { ok: true; value: T } | { ok: false; messageKey: string; code: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null };
@@ -14,7 +15,7 @@ async function run<T>(fn: () => Promise<T>, rerender = true): Promise<ActionResu
   try {
     return { ok: true, value: await fn() };
   } catch (error) {
-    return error instanceof CoreError ? { ok: false, messageKey: error.error.messageKey, code: error.error.code, fieldErrors: error.error.fieldErrors, retryAfterSeconds: error.error.retryAfterSeconds } : { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
+    return actionFailure(error);
   } finally {
     if (rerender) refresh();
   }

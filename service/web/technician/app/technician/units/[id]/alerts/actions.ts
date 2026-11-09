@@ -4,7 +4,8 @@
 // alert version. The DAL verifies the session; the Core API lets a technician on the unit acknowledge with alert.read and
 // resolve with alert.resolve, inside the work window (IR94, IR284), citing candidates of alerts.evidence (IR327).
 import { refresh } from "next/cache";
-import { coreOp, type CoreOptions, CoreError } from "@ac/web/lib/dal";
+import { coreOp, type CoreOptions } from "@ac/web/lib/dal";
+import { actionFailure } from "@ac/web/lib/actionFailure";
 import type { OpCall , OpArgs } from "@ac/web/lib/opTypes";
 
 export type ActionResult = { ok: true } | { ok: false; messageKey: string; code: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null };
@@ -14,7 +15,7 @@ async function run(call: OpCall, version: number): Promise<ActionResult> {
     await coreOp(...([...call, { write: true, expectedVersion: version }] as OpArgs<CoreOptions>));
     return { ok: true };
   } catch (error) {
-    return error instanceof CoreError ? { ok: false, messageKey: error.error.messageKey, code: error.error.code, fieldErrors: error.error.fieldErrors, retryAfterSeconds: error.error.retryAfterSeconds } : { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
+    return actionFailure(error);
   } finally {
     refresh();
   }

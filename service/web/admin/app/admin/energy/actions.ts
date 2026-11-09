@@ -3,7 +3,8 @@
 // Server Action of the HQ energy analysis (FR-A13): baselines.save. A public endpoint: the DAL verifies the session and
 // the Core API authorizes it (energy.write) and checks the version a new baseline version was read at.
 import { refresh } from "next/cache";
-import { coreOp, CoreError } from "@ac/web/lib/dal";
+import { coreOp } from "@ac/web/lib/dal";
+import { actionFailure } from "@ac/web/lib/actionFailure";
 import type { OpInput } from "@ac/web/lib/opTypes";
 
 export type ActionResult<T = null> = { ok: true; value: T } | { ok: false; messageKey: string; code: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null };
@@ -14,7 +15,7 @@ export async function deleteBaseline(id: string, version: number, reason: string
     await coreOp("baselines.delete", { id, reason }, { write: true, expectedVersion: version });
     return { ok: true, value: null };
   } catch (error) {
-    return error instanceof CoreError ? { ok: false, messageKey: error.error.messageKey, code: error.error.code, fieldErrors: error.error.fieldErrors, retryAfterSeconds: error.error.retryAfterSeconds } : { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {}, retryAfterSeconds: null };
+    return actionFailure(error);
   } finally {
     refresh();
   }
@@ -26,7 +27,7 @@ export async function saveBaseline(input: OpInput<"baselines.save">, version?: n
     const b = await coreOp<{ id: string; version: number }>("baselines.save", input, { write: true, expectedVersion: input.id ? version : undefined });
     return { ok: true, value: { id: b.id, version: b.version } };
   } catch (error) {
-    return error instanceof CoreError ? { ok: false, messageKey: error.error.messageKey, code: error.error.code, fieldErrors: error.error.fieldErrors, retryAfterSeconds: error.error.retryAfterSeconds } : { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
+    return actionFailure(error);
   } finally {
     refresh();
   }

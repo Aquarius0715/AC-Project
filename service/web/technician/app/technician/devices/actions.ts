@@ -4,7 +4,8 @@
 // session and the Core API authorizes it (technician:device.maintain on an assigned job of the unit, IR94; alerts with
 // alert.resolve) and checks the version the write version catalog requires.
 import { refresh } from "next/cache";
-import { coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
+import { coreNow, coreOp } from "@ac/web/lib/dal";
+import { actionFailure } from "@ac/web/lib/actionFailure";
 import type { Metric } from "@ac/web/lib/devices";
 import type { OpInput } from "@ac/web/lib/opTypes";
 
@@ -14,7 +15,7 @@ async function run<T>(fn: () => Promise<T>): Promise<ActionResult<T>> {
   try {
     return { ok: true, value: await fn() };
   } catch (error) {
-    return error instanceof CoreError ? { ok: false, messageKey: error.error.messageKey, code: error.error.code, fieldErrors: error.error.fieldErrors, retryAfterSeconds: error.error.retryAfterSeconds } : { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
+    return actionFailure(error);
   } finally {
     refresh();
   }
