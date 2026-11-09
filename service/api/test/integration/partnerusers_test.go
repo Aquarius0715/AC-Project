@@ -28,6 +28,16 @@ import (
 //nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestPartnerUsers(t *testing.T) {
 	srv := server(t)
+	// the list marks the seed technician as booked while an assignment of it is active: tests that revoke the seed
+	// assignment restore it only when no test assignment holds its window, and a later test may revoke that one
+	owner(
+		t,
+		`UPDATE maintenance.assignments a SET status = 'active' WHERE a.id = $1 AND a.status <> 'active' AND NOT EXISTS (
+			SELECT 1 FROM maintenance.assignments b WHERE b.id <> a.id AND b.status = 'active' AND
+			b.technician_membership_id = a.technician_membership_id AND b.scheduled && a.scheduled)`,
+		seed.ID("assignment-contractor-a"),
+	)
+
 	email := "tech-" + uuid.NewString()[:8] + "@example.com"
 	save := func(a *actor, body string, v int) (int, map[string]any) {
 		return write(srv, a, "partnerUsers.save", body, v)
