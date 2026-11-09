@@ -82,16 +82,18 @@ describe("HQ automation policies in Malay (IR303)", () => {
 describe("evaluationKey", () => {
   // a repeated Fire reuses its one-time event ID only for the same evaluation; another body under the same key is
   // refused (D04), so a changed condition type must make a new event (IR704)
-  const rows: FactRow[] = [{ unitId: "u1", value: "true", quality: "valid" }];
+  const occupied: FactRow = { unitId: "u1", value: "true", quality: "valid" };
+  const rows: FactRow[] = [occupied];
   it("is the same for the same evaluation", () => {
-    expect(evaluationKey("occupancy", rows)).toBe(evaluationKey("occupancy", [{ ...rows[0] }]));
+    expect(evaluationKey("occupancy", rows)).toBe(evaluationKey("occupancy", [{ ...occupied }]));
   });
   it("changes with the policy's condition type for a fact without its own kind", () => {
     expect(evaluationKey("peak", rows)).not.toBe(evaluationKey("occupancy", rows));
   });
   it("does not follow the policy's type for a fact with its own kind, and follows its value", () => {
-    const own: FactRow[] = [{ unitId: "u1", kind: "tariff", value: "0.5", quality: "valid" }];
+    const tariff: FactRow = { unitId: "u1", kind: "tariff", value: "0.5", quality: "valid" };
+    const own: FactRow[] = [tariff];
     expect(evaluationKey("peak", own)).toBe(evaluationKey("occupancy", own));
-    expect(evaluationKey("peak", own)).not.toBe(evaluationKey("peak", [{ ...own[0], value: "0.6" }]));
+    expect(evaluationKey("peak", own)).not.toBe(evaluationKey("peak", [{ ...tariff, value: "0.6" }]));
   });
 });
