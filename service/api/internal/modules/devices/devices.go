@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/pradita/ac-project/service/api/internal/modules/maintenance"
 	"github.com/pradita/ac-project/service/api/internal/ops"
@@ -581,6 +582,24 @@ const errMqttNodeFormat = "error.mqttNodeFormat"
 // errDuplicateMqttNode refuses a node_id that another device of the tenant has.
 const errDuplicateMqttNode = "error.duplicateMqttNode"
 
+// dupDevice maps the refusal of the unique indexes devices_serial and devices_mqtt_node, which a device saved at the
+// same moment as the check before the write (serialFree, mqttNodeFree) causes, to the conflict that check answers.
+func dupDevice(err error) error {
+	pgErr, matched := errors.AsType[*pgconn.PgError](err)
+	if !matched || pgErr.Code != "23505" {
+		return err
+	}
+
+	switch pgErr.ConstraintName {
+	case "devices_serial":
+		return apperr.E(apperr.Conflict, apperr.KeyDuplicateSerial)
+	case "devices_mqtt_node":
+		return apperr.E(apperr.Conflict, errDuplicateMqttNode)
+	}
+
+	return err
+}
+
 // normalizeMqttNode trims a node_id and makes the empty one absent; ok is false for a malformed one.
 func normalizeMqttNode(raw *string) (*string, bool) {
 	if raw == nil {
@@ -881,7 +900,7 @@ func insertDevice(
 		input.MqttNode,
 	)
 	if execErr != nil {
-		return apperr.Wrap(execErr, "insert devices.devices")
+		return apperr.Wrap(dupDevice(execErr), "insert devices.devices")
 	}
 
 	for _, mt := range input.SensorTypes {

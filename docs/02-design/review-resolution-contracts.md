@@ -9345,6 +9345,14 @@ admin.md says unit names are unique among the non-archived units of a space (CON
 1. **The order.** `id` now follows the direction. `name` and `dueAt` are unchanged: they follow the direction, ties go by unit ID ascending, and the units without a warranty end stay last either way.
 2. **Test.** `TestSortCoverage` covers all three fields in both directions; before the fix `id` descending came out ascending. No operation, route or screen changes.
 
+## IR671 A serial or node_id taken at the same moment answers the specific conflict (review round 56) — 2026-11-09
+
+`devices.register` and `devices.setMqttNode` check before they write that no other device has the serial (CONFLICT `error.duplicateSerial`, D05) or the MQTT node_id (CONFLICT `error.duplicateMqttNode`). A device saved with the same value after the check and before the write (not committed when the check ran) is refused by the unique index (`devices_serial`, `devices_mqtt_node`) at the write, and the refusal reached the caller as the generic CONFLICT `error.conflict`: the form could not tell that the serial or node is taken. It is the same case as IR669 for the sibling names.
+
+1. **The mapping.** The insert of `devices.register` and the update of `devices.setMqttNode` pass their error through `dupDevice`, which turns a refusal of `devices_serial` into `error.duplicateSerial` and one of `devices_mqtt_node` into `error.duplicateMqttNode`. Nothing else changes.
+2. **Test.** `TestDeviceDuplicateTakenAtTheSameMoment` holds an uncommitted device with the same serial or node and sends the register with that serial, the register with that node and the node setting; each answered `error.conflict` before the fix and the specific key now. No operation, route or screen changes.
+3. **Test isolation.** The new test moved `TestPartnerUsers` behind `TestOfferAcceptAssign` and `TestWithdrawRollsBackWhenTheJobCannotBeUpdated` in its shard, which exposed a dependency: the first revokes the seed assignment of the external technician and restores it only when no test assignment holds the window, the second then revokes that test assignment, and the list no longer marked the technician as booked. `TestPartnerUsers` now restores the seed assignment (guarded the same way) before it asserts.
+
 ## IR672 A unit is saved with a model only while the model row is read with a share lock (review round 59) — 2026-11-09
 
 `capabilities.delete` (DEC-103) locks the model row, then looks for units and campaigns that use it. `units.save` read the model's current capability version with a plain `SELECT` (`Models.CurrentVersion`) and then inserted or updated the unit, so a save that ran at the same moment as the delete read the model before the delete committed and wrote after the delete looked, and a unit remained whose model no longer exists. A new version of the model (`capabilities.save`, which moves the units to it) is the same case: a unit saved at that moment kept the old version.

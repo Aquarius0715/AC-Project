@@ -101,7 +101,7 @@ func (m *Module) setMqttNode(
 		input.MqttNode,
 	)
 	if err != nil {
-		return Device{}, apperr.Wrap(err, "update devices.devices")
+		return Device{}, apperr.Wrap(dupDevice(err), "update devices.devices")
 	}
 
 	version, err := bumpDevice(ctx, call, input.DeviceID)
