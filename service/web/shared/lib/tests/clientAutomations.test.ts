@@ -107,3 +107,13 @@ describe("automation name length", () => {
     expect(draftErrors({ ...d, name: ' '.repeat(3) })).toHaveProperty("name");
   });
 });
+
+// a time that cannot be formatted (not an instant) is shown as it came; an unknown zone falls back to Kuala Lumpur (IR687)
+describe("runText / runClock with a value that does not format", () => {
+  it("shows the text as it came instead of recursing without end", () => {
+    expect([runText("garbage"), runClock("garbage"), runText("garbage", "Asia/Tokyo"), runClock("", "Asia/Tokyo")]).toStrictEqual(["garbage", "garbage", "garbage", ""]);
+  });
+  it("still falls back to Kuala Lumpur for a zone the runtime does not know", () => {
+    expect([runText(TEXT_2026_09_14T10_00_00Z, "No/Such_Zone"), runClock(TEXT_2026_09_14T14_00_00Z, "No/Such_Zone")]).toStrictEqual(["Mon, 14 Sept, 18:00 MYT", "22:00 MYT"]);
+  });
+});

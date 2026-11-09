@@ -124,7 +124,7 @@ export function runText(iso: string, tz = KL, i: I18n = EN): string {
     const zone = zoneName(d, tz, i.display.locale);
     return `${d.toLocaleString(tag, { timeZone: tz, weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })}${wrapped(zone, " ")}`;
   } catch {
-    return runText(iso, KL, i);
+    return tz === KL ? iso : runText(iso, KL, i); // an unknown zone falls back to Kuala Lumpur; what is no instant is shown as it came (IR687)
   }
 }
 /** “22:00 MYT”: only the time of a rule's run, in the rule's own time zone (the end of a schedule run). */
@@ -135,7 +135,7 @@ export function runClock(iso: string, tz = KL, i: I18n = EN): string {
     const zone = zoneName(d, tz, i.display.locale);
     return `${d.toLocaleTimeString(tag, { timeZone: tz, hour: "2-digit", minute: "2-digit", hourCycle: "h23" })}${wrapped(zone, " ")}`;
   } catch {
-    return runClock(iso, KL, i);
+    return tz === KL ? iso : runClock(iso, KL, i);
   }
 }
 const reasonText: Record<string, string> = { consent_revoked: "consent revoked", capability_changed: "capability changed", unit_archived: "unit archived" };
