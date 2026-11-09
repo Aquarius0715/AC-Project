@@ -9457,3 +9457,11 @@ The contractor's offer page (`/partner/jobs/[id]`, FR-P02) declines an offer wit
 1. **`useAction`.** `run(fn, ok, after, failed, { reload: false })`: a change that takes the screen away shows its toast and runs `after` at once and does not ask the router for a new read. The default is unchanged (the new read, then the toast, IR680).
 2. **The screen.** The offer page's decline passes `{ reload: false }`; every other action keeps the new read.
 3. **Test.** `useAction.test.tsx`: with `reload: false` a success shows the toast, runs `after` and makes no router refresh (it failed before: the refresh was asked for). Not run end to end in the development stack (a decline changes the demo data); the not-found after a decline follows from `loadJobDetail` and the comment in `actions.ts`. No operation, route, screen or count changes.
+
+## IR686 The shared shell's Server Actions let the sign-in redirect through too (review round 116) — 2026-11-09
+
+IR683 moved the 24 action files of the four apps that worded a non-Core error as UNAVAILABLE by hand to `actionFailure`, and tightened the guard test (`serverActionFailures.test.ts`). The guard read only each app's own `app` folder. The shell screens the apps re-export live in `shared/screens/shell`, and their three action files were not read: notifications (`markRead`, `markAllRead`) worded every non-Core error as UNAVAILABLE by hand, which swallows the DAL's redirect to sign-in when the session is gone (signed out in another tab), and preferences and the demo panel rethrew every error that was not a refused call, so an unreachable Core API sent the page to its error boundary and lost what the person had typed (the language form, the two-factor code).
+
+1. **The actions.** The three files use `actionFailure`: a refused call keeps its code, key and field errors, a call with no answer is UNAVAILABLE and the screen stays, and Next's own control flow (the redirect) goes on.
+2. **Guard test.** `serverActionFailures.test.ts` also reads the action files of `shared/screens` (38 files now); it failed for these three before the change.
+3. **Not in this change.** No screen, route, operation or count changes.

@@ -8,6 +8,7 @@ import { refresh } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { coreClockFresh, coreOp, CoreError } from "@ac/web/lib/dal";
+import { actionFailure } from "@ac/web/lib/actionFailure";
 import { clearedCookieOptions, dropSession, SESSION_COOKIE } from "@ac/web/lib/session";
 import { advanceTarget, nextSequence, openFault, type ApiDevice, type ApiDeviceEvent } from "@ac/web/lib/demoPanel";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
@@ -19,8 +20,7 @@ const run = async <T,>(fn: () => Promise<T>): Promise<Result<T>> => {
     refresh();
     return { ok: true, value };
   } catch (error) {
-    if (error instanceof CoreError) return { ok: false, code: error.error.code, messageKey: error.error.messageKey, fieldErrors: error.error.fieldErrors, retryAfterSeconds: error.error.retryAfterSeconds };
-    throw error;
+    return actionFailure(error);
   }
 };
 const invalid = (field: string): Result<never> => ({ ok: false, code: "VALIDATION", messageKey: "error.validation", fieldErrors: { [field]: "error.invalid" } });
