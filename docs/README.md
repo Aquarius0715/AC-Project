@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.567.0 / Created: 2026-09-14 / Updated: 2026-11-07 / Status: Draft for review / Language: English
+Version: 0.568.0 / Created: 2026-09-14 / Updated: 2026-11-07 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -100,6 +100,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.568.0 (2026-11-10): IR705: the unit list counts a unit's alerts only while the caller may read them (an external technician before the work window sees none).
 0.567.0 (2026-11-10): IR704: a repeated automation Fire reuses its event only for the same evaluation, so changing the condition type makes a new event.
 0.566.0 (2026-11-10): IR703: revoking access sends the saved membership (scopes and start unchanged), not the form's unsaved edits.
 0.565.0 (2026-11-10): IR702: the technician overview reads every page of the jobs list, so today's work shows past 100 jobs.
