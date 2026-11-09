@@ -6,6 +6,7 @@
 // ended while open). Texts in the user's display language; every time is formatted here (IR280).
 import "server-only";
 import { coreAll, coreDisplay, coreNow, coreOp, CoreError, orWhenRefused, coreItems } from "@ac/web/lib/dal";
+import { unitAlerts } from "@ac/web/lib/unitAlerts";
 import { i18nOf, showSpan, showTime } from "@ac/web/lib/i18n";
 import type { ApiAlert } from "@ac/web/lib/alerts";
 import type { ApiUnitDetail } from "@ac/web/lib/units";
@@ -50,7 +51,7 @@ export async function loadUnit(id: string, jobId?: string) {
     };
   }
   const [alerts, jobs, members] = await Promise.all([
-    optional(coreItems<ApiAlert>("alerts.list", { limit: 20, filters: { unitId: id } }), [] as ApiAlert[]),
+    optional(unitAlerts<ApiAlert>(id, 20), [] as ApiAlert[]), // every unresolved one, then the latest resolved (IR712)
     optional(coreItems<ApiUnitJob>("jobs.list", { limit: 50, filters: { unitId: id } }), [] as ApiUnitJob[]),
     optional(coreAll<ApiMember>("members.list"), [] as ApiMember[]),
   ]);

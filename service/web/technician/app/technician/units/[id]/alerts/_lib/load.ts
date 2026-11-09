@@ -5,7 +5,8 @@
 // Before the work window the page says when it opens (IR76). Texts in the user's display language; every time is
 // formatted here (IR284).
 import "server-only";
-import { coreDisplay, coreNow, coreOp, corePermissions, CoreError, orWhenRefused, coreItems } from "@ac/web/lib/dal";
+import { coreDisplay, coreNow, coreOp, corePermissions, CoreError, orWhenRefused } from "@ac/web/lib/dal";
+import { unitAlerts } from "@ac/web/lib/unitAlerts";
 import { i18nOf, showTime, textOf } from "@ac/web/lib/i18n";
 import type { ApiUnitDetail } from "@ac/web/lib/units";
 import { alertChoices, alertView, selectAlert, type ApiTechAlert } from "@ac/web/lib/techAlerts";
@@ -27,7 +28,7 @@ export async function loadAlerts(unitId: string, sp: { jobId?: string; alertId?:
   const { t } = i;
   const nowMs = now.getTime();
   const unitHref = `/technician/units/${unitId}${sp.jobId ? `?jobId=${sp.jobId}` : ""}`;
-  const alerts = await recover(coreItems<ApiTechAlert>("alerts.list", { limit: 50, filters: { unitId } }), (error: unknown) => {
+  const alerts = await recover(unitAlerts<ApiTechAlert>(unitId, 50), (error: unknown) => { // every unresolved one, then the latest resolved (IR712)
     if (error instanceof CoreError && error.status < 500) return error.error;
     throw error; // error.tsx
   });
