@@ -12,6 +12,7 @@ package scheduler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"time"
@@ -102,8 +103,13 @@ func tick(
 		return Result{}, err
 	}
 
-	var result Result
+	var (
+		result Result
+		failed []error
+	)
 
+	// each tenant in its own transaction, and one that fails does not hold up the others: its failure is reported and
+	// its transaction rolled back, and the next tick tries it again
 	for _, tenant := range tenants {
 		err := txm.Run(ctx, false, ops.TenantPrincipal(tenant), func(txn pgx.Tx) error {
 			_, err := txn.Exec(
@@ -141,11 +147,11 @@ func tick(
 			return nil
 		})
 		if err != nil {
-			return result, apperr.Wrap(err, "db.TxManager.Run")
+			failed = append(failed, fmt.Errorf("tenant %s: %w", tenant, err))
 		}
 	}
 
-	return result, nil
+	return result, apperr.Wrap(errors.Join(failed...), "db.TxManager.Run")
 }
 
 // tenantIDs are the tenants a tick visits, in ID order.
