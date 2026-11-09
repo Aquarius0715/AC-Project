@@ -16,6 +16,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -116,7 +117,7 @@ func run(broker, api, equipment, tenant string) error {
 		append([]iotbridge.Link{}, iotbridge.Links()...),
 		iotbridge.FleetLinks(fleet)...)
 	resolver := iotbridge.NewResolver(append(links, extra...))
-	httpc := &http.Client{Timeout: httpTimeout, Transport: nil, CheckRedirect: nil, Jar: nil}
+	httpc := newHTTPClient()
 	endpoint := api + "/v1/demo/trigger"
 
 	clock := &demoClock{api: api, c: httpc, mu: sync.Mutex{}, off: 0}
@@ -166,6 +167,20 @@ func run(broker, api, equipment, tenant string) error {
 	log.Print("iot-bridge: stopping")
 
 	return nil
+}
+
+// newHTTPClient is the bridge's client of the API. It keeps a connection for each worker: the default keeps two for a
+// host, and the workers would open and close one for nearly every call until the local ports ran out.
+func newHTTPClient() *http.Client {
+	client := &http.Client{Timeout: httpTimeout, Transport: nil, CheckRedirect: nil, Jar: nil}
+
+	if base, ok := http.DefaultTransport.(*http.Transport); ok {
+		transport := base.Clone()
+		transport.MaxIdleConnsPerHost = workers
+		client.Transport = transport
+	}
+
+	return client
 }
 
 // subscribeDemo subscribes to the simulated modules' topics (QoS 1, as the design says). It runs on every connect; a
@@ -556,7 +571,12 @@ func send(
 	if err != nil {
 		return apperr.Wrap(err, "http.Client.Do")
 	}
-	defer func() { _ = resp.Body.Close() }()
+
+	defer func() {
+		// a connection goes back to the client only when its answer was read to the end; a failure here only costs it
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode >= http.StatusMultipleChoices {
 		return &statusError{code: resp.StatusCode}
