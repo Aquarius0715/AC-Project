@@ -53,6 +53,7 @@ compose() { docker compose -p "$PROJECT" --env-file "$settings" -f compose.yaml 
 all_profiles() { compose --profile backend --profile load --profile k6 "$@"; }
 
 sampler=
+# shellcheck disable=SC2329 # run by the EXIT, INT and TERM traps below
 cleanup() {
   status=$?
   [ -z "$sampler" ] || kill "$sampler" 2>/dev/null || true
@@ -99,7 +100,12 @@ echo "== sample connections and CPU while k6 runs"
   echo "time,pg_connections,pg_active,cpu_percent_by_container" >"$LOAD_OUT/postgres.csv"
   while true; do
     conns=$(compose exec -T postgres psql -U postgres -d ac_load -tA -F, -c "select count(*), count(*) filter (where state = 'active') from pg_stat_activity where datname = 'ac_load'" 2>/dev/null || echo ",")
-    cpu=$(docker stats --no-stream --format '{{.Name}}={{.CPUPerc}}' $(docker ps -q --filter "label=com.docker.compose.project=$PROJECT") 2>/dev/null | tr '\n' ' ' || true)
+    ids=$(docker ps -q --filter "label=com.docker.compose.project=$PROJECT")
+    cpu=
+    if [ -n "$ids" ]; then
+      # shellcheck disable=SC2086 # the container IDs are separate words
+      cpu=$(docker stats --no-stream --format '{{.Name}}={{.CPUPerc}}' $ids 2>/dev/null | tr '\n' ' ' || true)
+    fi
     echo "$(date +%s),$conns,$cpu" >>"$LOAD_OUT/postgres.csv"
     sleep 10
   done
