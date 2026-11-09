@@ -10,16 +10,22 @@ import { actionMessage, type ActionFailure } from "@ac/web/lib/actionMessage";
 /** Runs a Server Action in a transition: a toast on success (text or from the value) and the readable failure in the
 display language otherwise (IR269); `after` runs only on success. A change that succeeded makes the page read its data
 again (`router.refresh()`, whatever the action itself asked for), and the transition lasts until the new screen is
-shown: the toast and `after` come then, so "saved" is never on a screen that still shows the old values (IR680). Returns
-[pending, run]. */
+shown: the toast and `after` come then, so "saved" is never on a screen that still shows the old values (IR680). A change
+that takes the screen away (a declined offer: the job leaves the company and its page would be not found) passes
+`{ reload: false }`: the toast and `after` come at once and the page is not read again (IR685). Returns [pending, run]. */
 export function useAction() {
   type Result<T> = { ok: true; value: T } | ({ ok: false } & ActionFailure);
   const t = useT();
   const toast = useToast();
   const [pending, start] = useTransition();
   const refreshThen = useRefreshThen(pending);
-  const run = <T,>(fn: () => Promise<Result<T>>, ok: string | ((v: T) => string), after?: (v: T) => void, failed?: (r: ActionFailure) => void) => { start(async () => {
+  const run = <T,>(fn: () => Promise<Result<T>>, ok: string | ((v: T) => string), after?: (v: T) => void, failed?: (r: ActionFailure) => void, options?: { reload?: boolean }) => { start(async () => {
       const r = await fn();
+      if (r.ok && options?.reload === false) {
+        toast(typeof ok === "string" ? ok : ok(r.value));
+        after?.(r.value);
+        return;
+      }
       if (r.ok) {
         refreshThen(() => { toast(typeof ok === "string" ? ok : ok(r.value)); after?.(r.value); });
         return;

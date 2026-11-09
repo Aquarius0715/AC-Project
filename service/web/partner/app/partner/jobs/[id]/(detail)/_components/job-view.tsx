@@ -131,7 +131,7 @@ function OfferView({ live }: Readonly<{ live: Extract<JobDetailLive, { kind: "of
           <span><span className="block uppercase text-muted-foreground">{t("Open offers")}</span>{t("1 of {n} · answer within {left}", { n: x.offers, left: x.left })}</span>
         </div>} />
       {modal === "decline" && (
-        <Modal open onClose={() => { setModal(null); }} title={t("Decline offer {id}?", { id: short })} footer={<><Btn onClick={() => { setModal(null); }}>{t("Cancel")}</Btn><Btn variant="danger" disabled={pending} onClick={() => { run(() => declineOffer(j.jobId, j.offerId, j.jobVersion, reason.trim()), t("Offer declined"), () => { setModal(null); setDeclined(true); }, (f) => { setModal(null); failed(f); }); }}>{t("Confirm decline")}</Btn></>}>
+        <Modal open onClose={() => { setModal(null); }} title={t("Decline offer {id}?", { id: short })} footer={<><Btn onClick={() => { setModal(null); }}>{t("Cancel")}</Btn><Btn variant="danger" disabled={pending} onClick={() => { run(() => declineOffer(j.jobId, j.offerId, j.jobVersion, reason.trim()), t("Offer declined"), () => { setModal(null); setDeclined(true); }, (f) => { setModal(null); failed(f); }, { reload: false }); }}>{t("Confirm decline")}</Btn></>}>
           <p className="text-[13px]">{t("The job returns to HQ with your reason: “{reason}”. A new offer would get a new offer ID.", { reason: reason.trim() })}</p>
         </Modal>
       )}
