@@ -69,6 +69,7 @@ func principal(t *testing.T, txm *db.TxManager) *ops.Principal {
 		Employment:        "",
 		Timezone:          "",
 		SessionsRevokedAt: nil,
+		IssuerHost:        "",
 	}
 
 	caller.Role = "admin"

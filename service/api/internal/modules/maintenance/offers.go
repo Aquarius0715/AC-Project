@@ -1094,6 +1094,7 @@ func (m Delivery) checkTechnician(
 			Employment:        "",
 			Timezone:          "",
 			SessionsRevokedAt: nil,
+			IssuerHost:        "",
 		},
 		unit,
 		prop,

@@ -184,7 +184,7 @@ func run(cfg config) error {
 		probes:     probes,
 		pool:       pool,
 		client:     nil, // set once connected: the connect handler uses the generator
-		jobs:       make(chan job, publishQueue),
+		jobs:       iotload.NewQueue[job](publishQueue),
 		published:  atomic.Int64{},
 		batches:    atomic.Int64{},
 		failed:     atomic.Int64{},
@@ -331,7 +331,7 @@ type generator struct {
 	probes  []*probe
 	pool    *pgxpool.Pool
 	client  mqtt.Client
-	jobs    chan job
+	jobs    *iotload.Queue[job]
 
 	published, batches, failed, dropped, beats, answered, probesSent, slots atomic.Int64
 
@@ -385,12 +385,10 @@ func (g *generator) answer(byDevice map[string]*sim, msg mqtt.Message) {
 	g.answered.Add(1)
 }
 
-// enqueue hands a message to the publishers; a full queue drops it and counts it, so a slow broker shows as a shortfall
-// and not as a generator that falls behind its own schedule.
+// enqueue hands a message to the publishers; a full or closed queue drops it and counts it, so a slow broker shows as
+// a shortfall and not as a generator that falls behind its own schedule.
 func (g *generator) enqueue(topic string, payload []byte, batch bool) {
-	select {
-	case g.jobs <- job{topic: topic, payload: payload, batch: batch}:
-	default:
+	if !g.jobs.Offer(job{topic: topic, payload: payload, batch: batch}) {
 		g.dropped.Add(1)
 	}
 }
@@ -399,7 +397,7 @@ func (g *generator) enqueue(topic string, payload []byte, batch bool) {
 func (g *generator) publisher(wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	for j := range g.jobs {
+	for j := range g.jobs.Values() {
 		tok := g.client.Publish(j.topic, 1, false, j.payload)
 		if tok.WaitTimeout(publishWait) && tok.Error() == nil {
 			g.published.Add(1)
@@ -454,7 +452,7 @@ func (g *generator) play(ctx context.Context) error {
 	generated := time.Since(started)
 
 	loops.Wait()
-	close(g.jobs)
+	g.jobs.Close()
 	publishers.Wait()
 
 	log.Printf(

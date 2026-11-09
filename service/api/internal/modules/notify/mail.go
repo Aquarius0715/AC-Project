@@ -361,6 +361,7 @@ func DeliverAll(
 				Employment:        "",
 				Timezone:          "",
 				SessionsRevokedAt: nil,
+				IssuerHost:        "",
 			},
 			func(tx pgx.Tx) error {
 				n, err := Deliver(ctx, tx, sender, apps, now, limit)
@@ -433,6 +434,7 @@ func SweepAll(ctx context.Context, txm *db.TxManager, now time.Time) (int64, err
 				Employment:        "",
 				Timezone:          "",
 				SessionsRevokedAt: nil,
+				IssuerHost:        "",
 			},
 			func(tx pgx.Tx) error {
 				n, err := Sweep(ctx, tx, now)

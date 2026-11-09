@@ -705,3 +705,79 @@ func TestAccountsPerOrgPerDay(t *testing.T) {
 		t.Errorf("remove: %d %v", code, resp)
 	}
 }
+
+// TestInvitationNamesTheAddressItCameFrom: the provider is told the address of the sign-in that sent the invitation, so
+// the set-up e-mail's link opens where the sender is (the Tailnet or the lab network); a token of the only address
+// names none, and the provider uses its own.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
+func TestInvitationNamesTheAddressItCameFrom(t *testing.T) {
+	fake := &fakeIDP{
+		mu:         sync.Mutex{},
+		subjects:   nil,
+		err:        nil,
+		created:    nil,
+		updated:    nil,
+		setups:     nil,
+		switched:   nil,
+		removed:    nil,
+		failing:    false,
+		lost:       nil,
+		generation: 0,
+	}
+	srv := serverCfg(
+		t,
+		func(c *apiserver.Config) { c.IdentityProvider = fake; c.Domains = ops.Domains },
+	)
+
+	const tailnet = "100.99.169.116"
+
+	for sender, want := range map[string]string{
+		contrA().token:                 "",
+		contrA().token + "#" + tailnet: tailnet,
+	} {
+		who := &actor{token: sender, membership: contrA().membership}
+		email := "address-" + uuid.NewString()[:8] + "@example.com"
+
+		code, res := write(
+			srv,
+			who,
+			"partnerUsers.save",
+			`{"email":"`+email+`","partnerRole":"contractor","displayName":"Address"}`,
+			0,
+		)
+		if code != 200 {
+			t.Fatalf("%s: %d %v", sender, code, res)
+		}
+
+		err := srv.DrainEvents(context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		fake.mu.Lock()
+		created := fake.created
+		fake.mu.Unlock()
+
+		found := false
+
+		for _, account := range created {
+			if account.Email == email {
+				found = true
+
+				if account.PublicHost != want {
+					t.Errorf(
+						"%s: the provider was told %q, want %q",
+						sender,
+						account.PublicHost,
+						want,
+					)
+				}
+			}
+		}
+
+		if !found {
+			t.Errorf("%s: no account was opened for %s", sender, email)
+		}
+	}
+}

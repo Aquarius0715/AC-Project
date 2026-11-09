@@ -41,6 +41,9 @@ type Principal struct {
 	// SessionsRevokedAt ends every sign-in before it (members.revokeSessions, IR384): a token whose sign-in time is
 	// earlier is refused. Wall clock, as the identity provider's auth_time is; nil when never revoked.
 	SessionsRevokedAt *time.Time
+	// IssuerHost is the host name of the verified token's issuer: the address this request's sign-in was made on (it is
+	// checked against OIDC_ISSUER, so it cannot be made up, IR695). Empty for work without a user's token.
+	IssuerHost string
 }
 
 // TenantPrincipal is the principal of work that acts for no one in tenant, such as a scheduler transaction or a demo
@@ -57,6 +60,7 @@ func TenantPrincipal(tenant uuid.UUID) *Principal {
 		Employment:        "",
 		Timezone:          "",
 		SessionsRevokedAt: nil,
+		IssuerHost:        "",
 	}
 }
 
@@ -134,6 +138,8 @@ type Operation struct {
 	NewInput func() any
 	Result   reflect.Type // the handler's result type, held to the contract's result by TestResultsMatchContract (IR392)
 	Handle   func(ctx context.Context, c *Call, in any) (any, error)
+	// OwnTx is an operation whose handler opens its own transactions (RegisterOwnTx): the pipeline opens none around it.
+	OwnTx bool
 }
 
 // Runner runs fn in one transaction with the RLS context of the principal (implemented by platform/db).
@@ -363,7 +369,22 @@ func Register[I any, O any](
 
 			return handler(ctx, call, input)
 		},
+		OwnTx: false,
 	}
+}
+
+// RegisterOwnTx registers an operation whose handler opens its own transactions, because it does not know its tenant
+// until it has looked (demo.trigger). The pipeline opens none around it: a handler that asked the pool for a connection
+// while its operation's transaction held one would wait for itself once as many calls ran as the pool has connections.
+// call.Tx is nil in it, and what it records goes in its own transactions.
+func RegisterOwnTx[I any, O any](
+	reg *Registry,
+	name string,
+	handler func(context.Context, *Call, *I) (O, error),
+) {
+	Register(reg, name, handler)
+
+	reg.ops[name].OwnTx = true
 }
 
 // Operations returns the registered operations sorted by name.
@@ -838,6 +859,12 @@ func (r *Registry) execute(
 	input any,
 	write bool,
 ) (any, int64, error) {
+	if operation.OwnTx {
+		out, err := operation.Handle(ctx, call, input)
+
+		return out, 0, apperr.Wrap(err, "ops.Operation.Handle")
+	}
+
 	var (
 		out    any
 		cursor int64

@@ -1032,7 +1032,8 @@ type demoSwitch struct {
 func registerDemo(reg *ops.Registry, d *demoOps) {
 	ops.Register(reg, "demo.advanceClock", d.advance)
 	ops.Register(reg, "demo.reset", d.reset)
-	ops.Register(reg, "demo.trigger", d.trigger)
+	// each trigger runs in the transaction of its tenant (inTenant)
+	ops.RegisterOwnTx(reg, "demo.trigger", d.trigger)
 	ops.Register(reg, "demoSession.signIn", demoSessionSignIn)
 	ops.Register(reg, "demoSession.switchMembership", demoSessionSwitch)
 	ops.Register(reg, "demoSession.signOut", demoSessionSignOut)

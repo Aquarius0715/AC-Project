@@ -143,6 +143,7 @@ func (v *OIDCVerifier) Verify(_ context.Context, token string) (Identity, error)
 		SignedIn: authTime(claims),
 		Client:   client,
 		AdminApp: client != "" && client == v.AdminClient,
+		Issuer:   iss,
 	}, nil
 }
 

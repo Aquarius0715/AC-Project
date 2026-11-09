@@ -59,6 +59,7 @@ func TestSessionGet(t *testing.T) {
 		UserID:       uuid.New(),
 		OrgID:        uuid.New(),
 		ScopeVersion: 3, Scopes: nil, Employment: "", Timezone: "", SessionsRevokedAt: nil,
+		IssuerHost: "",
 	}
 	req := httptest.NewRequestWithContext(
 		ops.WithPrincipal(t.Context(), principal),

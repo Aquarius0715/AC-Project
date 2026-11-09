@@ -182,7 +182,7 @@ if [ "$iot" = 1 ]; then
     echo "FAILED: the telemetry half of the IoT run did not meet its checks" >&2
     [ "$rc" -ne 0 ] || rc=97
   fi
-  # the broker drops what a slow subscriber cannot take (the stand-in bridge reads one message at a time): say so, as the missing readings and slow commands it causes look like a fault of the platform
+  # the broker drops what a slow subscriber cannot take: say so, as the missing readings and slow commands it causes would otherwise look like a fault of the API
   broker_dropped=$(all_profiles logs --no-color --since "$iot_started" mosquitto 2>&1 | grep -c "Outgoing messages are being dropped" || true)
   if [ "$broker_dropped" -gt 0 ]; then
     echo "FAILED: the broker dropped messages for the bridge ($broker_dropped times): the bridge could not keep up with the load" >&2

@@ -203,6 +203,7 @@ func TestMembersSaveNewUser(t *testing.T) {
 			Employment:        "",
 			Timezone:          "",
 			SessionsRevokedAt: nil,
+			IssuerHost:        "",
 		},
 		clock(),
 	)

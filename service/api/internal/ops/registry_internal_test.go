@@ -259,6 +259,7 @@ func adminPrincipal() *Principal {
 			Permissions: map[string]bool{"asset.write": true, permAssetRead: true}, ClientRole: "",
 		}, TenantID: uuid.UUID{}, MembershipID: uuid.UUID{}, UserID: uuid.UUID{}, OrgID: uuid.UUID{}, ScopeVersion: 0,
 		Scopes: nil, Employment: "", Timezone: "", SessionsRevokedAt: nil,
+		IssuerHost: "",
 	}
 }
 
@@ -279,6 +280,7 @@ func clientPrincipal() *Principal {
 		Employment:        "",
 		Timezone:          "",
 		SessionsRevokedAt: nil,
+		IssuerHost:        "",
 	}
 }
 
@@ -299,6 +301,7 @@ func technicianPrincipal() *Principal {
 		Employment:        "",
 		Timezone:          "",
 		SessionsRevokedAt: nil,
+		IssuerHost:        "",
 	}
 }
 
@@ -336,6 +339,7 @@ func refusals() []refusal {
 					Permissions: map[string]bool{permAssetRead: true}, ClientRole: "",
 				}, TenantID: uuid.UUID{}, MembershipID: uuid.UUID{}, UserID: uuid.UUID{}, OrgID: uuid.UUID{}, ScopeVersion: 0,
 				Scopes: nil, Employment: "", Timezone: "", SessionsRevokedAt: nil,
+				IssuerHost: "",
 			},
 			403,
 			apperr.Forbidden,
