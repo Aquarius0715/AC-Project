@@ -10,6 +10,7 @@ vi.mock("@ac/web/lib/dal", () => dal);
 
 import { loadOverview } from "../app/technician/(overview)/_lib/load";
 import type { ApiTechJobRow } from "@ac/web/lib/techOverview";
+import type { ApiAlert } from "@ac/web/lib/alerts";
 
 const now = new Date("2026-11-10T02:00:00Z");
 const ended = (n: number): ApiTechJobRow => ({ projection: "history", jobId: `old-${String(n)}`, type: "maintenance", status: "completed", completedAt: "2026-10-01T03:00:00Z" });
@@ -19,6 +20,13 @@ const todayJob: ApiTechJobRow = {
   assignmentAcknowledgement: "accepted",
 };
 const firstPage = Array.from({ length: 100 }, (_, n) => ended(n));
+const alert = (id: string, status: string, severity: ApiAlert["severity"]): ApiAlert => ({
+  id, status, severity, unitId: "unit-1", type: "high_temperature", causeCode: "threshold", evidenceKind: "measurement", evidenceText: "", detectedAt: "2026-11-10T01:00:00Z",
+});
+// the server's alerts, most severe first across the statuses: 50 resolved critical ones ahead of an open warning
+const server = [...Array.from({ length: 50 }, (_, n) => alert(`resolved-${String(n)}`, "resolved", "critical")), alert("open-1", "open", "warning")];
+interface Query { limit?: number; filters?: { status?: string } }
+const matching = (q: Query = {}) => server.filter((a) => !q.filters?.status || a.status === q.filters.status);
 
 describe("technician overview", () => {
   it("keeps today's job that the list returns after its first page (IR702)", async () => {
@@ -33,5 +41,15 @@ describe("technician overview", () => {
     const live = await loadOverview({ tab: "today", sort: "dueAt" });
     expect(live.rows.map((r) => r.id)).toStrictEqual(["job-today"]);
     expect(live.tabs.map((x) => x.count)).toStrictEqual([1, 1]); // the completed ones are not part of the work (IR642)
+  });
+
+  it("keeps an open alert that 50 resolved alerts of a higher severity sort ahead of (IR711)", async () => {
+    dal.coreNow.mockResolvedValue(now);
+    dal.coreDisplay.mockResolvedValue({ locale: "en", timeZone: "Asia/Kuala_Lumpur" });
+    dal.coreOp.mockResolvedValue({ counts: { total: 0, scheduledCount: 0, inProgressCount: 0, overdueCount: 0, assignedCount: 0 } });
+    dal.coreItems.mockImplementation((operation: string, q: Query) => Promise.resolve(operation === "alerts.list" ? matching(q).slice(0, q.limit ?? 25) : []));
+    dal.coreAll.mockImplementation((operation: string, q: Query) => Promise.resolve(operation === "alerts.list" ? matching(q) : []));
+    const live = await loadOverview({});
+    expect(live.alerts.map((a) => a.id)).toStrictEqual(["open-1"]);
   });
 });
