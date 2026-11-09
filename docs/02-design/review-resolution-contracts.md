@@ -9287,3 +9287,10 @@ The user chose to delete accounts that were never used and to keep ending the ot
 
 1. **The rule.** The scopes of a membership are distinct (kind and ID): a repeated scope is VALIDATION `error.duplicate` on `scopes`, as a repeated permission is on `permissions`. An unknown kind keeps its `error.invalid`.
 2. **Tests.** `TestMembersSave` (a scope named twice is refused on its field). No operation, route or screen changes; 224 operations, 245 routes.
+
+## IR663 A write run again after a deadlock records its events and audit entries once (review round 40) — 2026-11-09
+
+`TxManager.Run` runs a transaction again, up to three times, when PostgreSQL ends it with a deadlock (40P01) or a serialization failure (40001). The operation pipeline builds the `Call` of a write before `Run` and the callback appended the events (`Call.Emit`) and audit entries (`Call.Audit`) of the handler to it; nothing emptied them when the callback ran a second time. The attempt that committed therefore wrote the events and audit entries of the attempt that had rolled back as well: the outbox carried every event twice (a notification, a projection or an account event handled twice) and the audit log every entry twice. The retry is rare (two writes that lock the same rows in opposite order), but when it happened the duplicates were silent.
+
+1. **The rule.** The callback of the pipeline empties `Call.Events` and `Call.Audits` at the start of every attempt, so a transaction records what the attempt that commits produced and nothing else.
+2. **Tests.** `TestRetriedWriteRecordsOneAttemptOnly` (a handler that emits and audits, then fails once with a retryable error under a runner that runs the callback again): it recorded two events and two audit entries before the fix. No operation, route or screen changes; 224 operations, 245 routes.
