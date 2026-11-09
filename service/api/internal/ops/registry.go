@@ -844,6 +844,9 @@ func (r *Registry) execute(
 	)
 
 	err := r.DB.Run(ctx, !write, call.Principal, func(txn pgx.Tx) error {
+		// the database runs this callback again after a deadlock or a serialization failure: what an attempt that was
+		// rolled back emitted and audited is not recorded with the one that commits (IR663)
+		call.Events, call.Audits = nil, nil
 		call.Tx = r.txFor(txn)
 		// business time of this transaction for SQL defaults and platform.app_now() (IR157)
 		if txn != nil {
