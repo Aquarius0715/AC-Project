@@ -385,6 +385,11 @@ export function jobRequestErrors(f: { unitId: string; symptom: string; slots: Sl
   const today = new Date(now + 8 * 3_600_000).toISOString().slice(0, 10);
   const keys = new Set<string>();
   for (const [i, x] of f.slots.entries()) {
+    // the form sends "" while a date or time is cleared or incomplete: not a time yet (as preferredError for the customer)
+    if (Number.isNaN(Date.parse(x.startAt)) || Number.isNaN(Date.parse(x.endAt))) {
+      e[`slot${String(i)}`] = t("Enter the date and both times of each preferred time.");
+      continue;
+    }
     const h = (Date.parse(x.endAt) - Date.parse(x.startAt)) / 3_600_000;
     const day = new Date(Date.parse(x.startAt) + 8 * 3_600_000).toISOString().slice(0, 10);
     const slotProblem = slotError(h, !isAfter(day, today), keys.has(x.startAt + x.endAt), t);
@@ -392,6 +397,12 @@ export function jobRequestErrors(f: { unitId: string; symptom: string; slots: Sl
     keys.add(x.startAt + x.endAt);
   }
   return e;
+}
+
+/** The day after a date (YYYY-MM-DD), for the next preferred time; "" when the date is cleared or incomplete. */
+export function nextDay(date: string): string {
+  const at = Date.parse(`${date}T00:00:00Z`);
+  return Number.isNaN(at) ? "" : new Date(at + 86_400_000).toISOString().slice(0, 10);
 }
 
 /** The default new end of an access extension: one day after the current end. */

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ms } from "@ac/web/lib/i18n-ms";
-import { agreedSlots, classifyBy, contractorNames, controls, costLineOf, costTotals, delivery, extendDefault, fromZonedInput, LISTED, money, jobRequestErrors as jobRequestErrors, periodChip, reportCard, returnReason, reviewModeOf, facts, filtersOf, hqRefusal, HQ_REFUSAL_KEYS, hqRow, longSlot, offerDefaults, preferredRows, slotText, sortOf, stageOf, stepper, tomorrowIn, zonedInput, type ApiHqJob, type ApiHqRow, type Names } from "@ac/web/lib/adminJobs";
+import { agreedSlots, classifyBy, contractorNames, controls, costLineOf, costTotals, delivery, extendDefault, fromZonedInput, LISTED, money, jobRequestErrors as jobRequestErrors, periodChip, reportCard, returnReason, reviewModeOf, facts, filtersOf, hqRefusal, HQ_REFUSAL_KEYS, hqRow, longSlot, nextDay, offerDefaults, preferredRows, slotText, sortOf, stageOf, stepper, tomorrowIn, zonedInput, type ApiHqJob, type ApiHqRow, type Names } from "@ac/web/lib/adminJobs";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
 import { must } from "./must";
 import type { ApiWorkReport } from "@ac/web/lib/partnerReview";
@@ -161,6 +161,24 @@ describe("HQ maintenance jobs", () => {
     expect(jobRequestErrors({ ...base, contactWindow: "1234567" }, NOW)).toHaveProperty(CONTACTWINDOW);
     expect(jobRequestErrors({ ...base, contactWindow: "x".repeat(201) }, NOW)).toHaveProperty(CONTACTWINDOW);
     expect(jobRequestErrors({ ...base, contactWindow: "x".repeat(200) }, NOW)).toStrictEqual({});
+  });
+
+  // the form sends "" for a time while its date or time is cleared or incomplete (zonedInstant): that is a field error, not a crash
+  it("reports a preferred time that is not complete instead of throwing", () => {
+    const base = { unitId: "u1", symptom: "Water dripping from the indoor unit" };
+    const complete = slot(TEXT_2026_09_22T02_00_00Z, TEXT_2026_09_22T04_00_00Z);
+    expect(jobRequestErrors({ ...base, slots: [slot("", "")] }, NOW)).toStrictEqual({ slot0: "Enter the date and both times of each preferred time." });
+    expect(jobRequestErrors({ ...base, slots: [slot("", TEXT_2026_09_22T04_00_00Z)] }, NOW)).toStrictEqual({ slot0: "Enter the date and both times of each preferred time." });
+    expect(jobRequestErrors({ ...base, slots: [complete, slot(TEXT_2026_09_23T02_00_00Z, "")] }, NOW)).toStrictEqual({ slot1: "Enter the date and both times of each preferred time." });
+    expect(jobRequestErrors({ ...base, slots: [slot("", "")] }, NOW, MS.t)).toStrictEqual({ slot0: "Masukkan tarikh dan kedua-dua masa bagi setiap masa pilihan." });
+  });
+
+  // "Add another time" takes the day after the last one, which may have been cleared
+  it("gives the next day, and nothing for a date that is not complete", () => {
+    expect(nextDay("2026-09-30")).toBe("2026-10-01");
+    expect(nextDay("2026-12-31")).toBe("2027-01-01");
+    expect(nextDay("")).toBe("");
+    expect(nextDay("not a date")).toBe("");
   });
 
   it("checks a new job and the review mode", () => {
