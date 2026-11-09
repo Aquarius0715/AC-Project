@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/pradita/ac-project/service/api/internal/platform/paging"
 )
 
 func TestCoverageStatus(t *testing.T) {
@@ -86,6 +88,65 @@ func TestWarrantyStage(t *testing.T) {
 	} {
 		if got := warrantyStage(testCase.ends, now); got != testCase.want {
 			t.Errorf("%s: %d, want %d", name, got, testCase.want)
+		}
+	}
+}
+
+// TestSortCoverage: each sort field follows its direction — id and name ascending or descending, dueAt by warranty end
+// with the units without one last either way — and ties go by unit ID.
+func TestSortCoverage(t *testing.T) {
+	t.Parallel()
+
+	const asc, desc = "asc", "desc"
+
+	now := time.Date(2026, 9, 14, 0, 0, 0, 0, time.UTC)
+	soon, later := now.Add(24*time.Hour), now.Add(48*time.Hour)
+	first, second, third, fourth := uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+		uuid.MustParse("00000000-0000-0000-0000-000000000002"),
+		uuid.MustParse("00000000-0000-0000-0000-000000000003"),
+		uuid.MustParse("00000000-0000-0000-0000-000000000004")
+	unit := func(id uuid.UUID, name string, ends *time.Time) UnitCoverage {
+		return UnitCoverage{
+			UnitID:          id,
+			CustomerID:      uuid.Nil,
+			ModelID:         uuid.Nil,
+			WarrantyEndsAt:  ends,
+			ContractIDs:     nil,
+			Status:          "",
+			ClaimableJobIDs: nil,
+			name:            name,
+		}
+	}
+	units := func() []UnitCoverage {
+		return []UnitCoverage{
+			unit(second, "b", &later),
+			unit(fourth, "a", nil),
+			unit(first, "c", &soon),
+			unit(third, "d", &later),
+		}
+	}
+
+	for name, testCase := range map[string]struct {
+		field, direction string
+		want             []uuid.UUID
+	}{
+		"id ascending":    {"id", asc, []uuid.UUID{first, second, third, fourth}},
+		"id descending":   {"id", desc, []uuid.UUID{fourth, third, second, first}},
+		"name ascending":  {keyName, asc, []uuid.UUID{fourth, second, first, third}},
+		"name descending": {keyName, desc, []uuid.UUID{third, first, second, fourth}},
+		"dueAt ascending": {keyDueAt, asc, []uuid.UUID{first, second, third, fourth}},
+		// ties (second and third end together) go by unit ID in both directions; the unit without a warranty stays last
+		"dueAt descending": {keyDueAt, desc, []uuid.UUID{second, third, first, fourth}},
+	} {
+		got := units()
+		sortCoverage(got, &paging.SortSpec{Field: testCase.field, Direction: testCase.direction})
+
+		for i, want := range testCase.want {
+			if got[i].UnitID != want {
+				t.Errorf("%s: position %d is %v, want %v", name, i, got[i].UnitID, want)
+
+				break
+			}
 		}
 	}
 }

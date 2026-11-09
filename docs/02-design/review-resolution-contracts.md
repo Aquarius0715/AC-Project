@@ -9330,3 +9330,10 @@ admin.md says unit names are unique among the non-archived units of a space (CON
 1. **The commit.** The preview checks every row's name against the units there are; between the preview and the commit (up to 30 minutes) a unit with the same name could be saved, and `units.importCommit` inserted its unit without looking again, so two units of one space shared a name. The commit now checks the name after each insert, as `units.save` does: a name taken since the preview is CONFLICT `error.duplicateSiblingName` and the whole commit rolls back.
 2. **The undo.** `units.importUndo` archived the properties and spaces the import created with a plain update. A unit saved into such a property afterwards (or a second import into it) was left active inside an archived property. The undo is now CONFLICT `error.importPlaceInUse` while a created property or space holds a non-archived unit, or a non-archived location, that the import did not create; the created places are locked first, as the archive does (IR478).
 3. **Tests.** `TestUnitsImportCommitKeepsSiblingNamesUnique` and `TestUnitsImportUndoKeepsPlacesThatHoldOtherUnits` both answered 200 before the fix. No operation, route or screen changes; 224 operations, 245 routes.
+
+## IR670 The coverage list sorted by id follows the direction (review round 55) — 2026-11-09
+
+`units.coverage` takes the sort fields `id`, `name` and `dueAt` with a direction (DD-A19). The sort of the list put `id` ascending whatever the direction: the branch that breaks ties by unit ID also served the `id` field, so `sort=id:desc` answered the same order as `id:asc`.
+
+1. **The order.** `id` now follows the direction. `name` and `dueAt` are unchanged: they follow the direction, ties go by unit ID ascending, and the units without a warranty end stay last either way.
+2. **Test.** `TestSortCoverage` covers all three fields in both directions; before the fix `id` descending came out ascending. No operation, route or screen changes.
