@@ -59,6 +59,13 @@ const (
 	nodeRefresh     = 30 * time.Second
 )
 
+// The bridge's workers and the places in each one's queue: 3,000 devices at 9 seconds are about 330 batches a second,
+// and a call to the API takes a few milliseconds, so 32 workers leave a wide margin.
+const (
+	workers     = 32
+	workerQueue = 256
+)
+
 // defaultEquipmentURL is the equipment-api service inside the compose network, which has no TLS.
 const defaultEquipmentURL = "http://equipment-api:8080" //nolint:revive // unsecure-url-scheme: private network
 
@@ -121,11 +128,17 @@ func run(broker, api, equipment, tenant string) error {
 
 	go clock.keepRefreshing(ctx)
 
+	// the messages are worked off by a fixed set of workers, a device always on the same one (its readings, heartbeats and
+	// acknowledgements stay in order), so one slow call does not hold up the rest and the broker's queue for the bridge
+	// does not overflow
+	work := iotbridge.NewDispatcher(workers, workerQueue)
+	defer work.Close() // runs after the disconnect below: no message is handed to it any more
+
 	// the subscriptions are made on every connect: a clean session loses them when the broker restarts
 	opts := mqtt.NewClientOptions().AddBroker(broker).SetClientID("iot-bridge").
 		SetUsername(os.Getenv("MQTT_USER")).SetPassword(os.Getenv("MQTT_PASSWORD")).
 		SetAutoReconnect(true).SetConnectRetry(true).SetKeepAlive(keepAlive).
-		SetOnConnectHandler(func(c mqtt.Client) { subscribeDemo(ctx, c, resolver, clock, httpc, endpoint) }).
+		SetOnConnectHandler(func(c mqtt.Client) { subscribeDemo(ctx, c, work, resolver, clock, httpc, endpoint) }).
 		SetConnectionLostHandler(
 			func(_ mqtt.Client, err error) { log.Printf("broker %s: connection lost: %v", broker, err) })
 
@@ -160,13 +173,21 @@ func run(broker, api, equipment, tenant string) error {
 func subscribeDemo(
 	ctx context.Context,
 	client mqtt.Client,
+	work *iotbridge.Dispatcher,
 	resolver *iotbridge.Resolver,
 	clock *demoClock,
 	httpc *http.Client,
 	endpoint string,
 ) {
 	sub := func(topic string, h mqtt.MessageHandler) {
-		if tok := client.Subscribe(topic, 1, h); tok.Wait() && tok.Error() != nil {
+		// The handler only queues the message on its device's worker and returns, so the library takes the next message
+		// (and acknowledges this one to the broker) at once. A message acknowledged but not yet worked off is lost if the
+		// bridge stops then; a reading is re-sent by the device, and this bridge only stands in for AWS IoT rules.
+		queued := func(conn mqtt.Client, msg mqtt.Message) {
+			work.Submit(deviceKey(msg.Topic()), func() { h(conn, msg) })
+		}
+
+		if tok := client.Subscribe(topic, 1, queued); tok.Wait() && tok.Error() != nil {
 			log.Printf("subscribe %s: %v", topic, tok.Error())
 		}
 	}
@@ -256,6 +277,20 @@ func subscribeDemo(
 			log.Printf("trigger %s: %v", trigger.EventID, sendErr)
 		}
 	})
+}
+
+// deviceKey is the device of a topic t/<tenant>/d/<device>/…, which decides the worker of its messages; a topic of any
+// other shape is its own key.
+func deviceKey(topic string) string {
+	const deviceAt = 3 // t, <tenant>, d, <device>
+
+	parts := strings.Split(topic, "/")
+
+	if len(parts) > deviceAt {
+		return parts[deviceAt]
+	}
+
+	return topic
 }
 
 // liveOptions are the live broker's client options: the nodes' login, a clean session with no will message, and the

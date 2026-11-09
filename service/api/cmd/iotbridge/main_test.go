@@ -245,3 +245,23 @@ func TestEnvAndTokenHelpers(t *testing.T) {
 
 	_ = context.Background()
 }
+
+// TestDeviceKeyIsTheDeviceOfTheTopic: telemetry, heartbeat and acknowledgement topics of one device give the same key,
+// so its messages stay in order on one worker; a topic of another shape is its own key.
+func TestDeviceKeyIsTheDeviceOfTheTopic(t *testing.T) {
+	t.Parallel()
+
+	const device = "dev-9"
+
+	for topic, want := range map[string]string{
+		"t/tenant-1/d/dev-9/telemetry": device,
+		"t/tenant-1/d/dev-9/heartbeat": device,
+		"t/tenant-1/d/dev-9/cmd/ack":   device,
+		"t/tenant-1/d":                 "t/tenant-1/d",
+		"":                             "",
+	} {
+		if got := deviceKey(topic); got != want {
+			t.Errorf("deviceKey(%q) = %q, want %q", topic, got, want)
+		}
+	}
+}
