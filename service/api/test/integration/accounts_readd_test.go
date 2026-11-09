@@ -750,6 +750,16 @@ func TestInvitationNamesTheAddressItCameFrom(t *testing.T) {
 			t.Fatalf("%s: %d %v", sender, code, res)
 		}
 
+		// later tests do not see a contractor admin they did not make (certificate reminders go to every one)
+		membership := asStr(t, data(res)["membershipId"])
+		t.Cleanup(func() {
+			owner(
+				t,
+				`UPDATE identity.memberships SET valid_until = valid_from + interval '1 minute' WHERE id = $1`,
+				membership,
+			)
+		})
+
 		err := srv.DrainEvents(context.Background())
 		if err != nil {
 			t.Fatal(err)
