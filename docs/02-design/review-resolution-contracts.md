@@ -9606,3 +9606,11 @@ IR697 made `Meta.eventCursor` the highest `seq` of `platform.outbox`. The contra
 4. **Running databases.** The index reaches migration 000001 only. A database created before this change needs `CREATE INDEX outbox_tenant_seq ON platform.outbox (tenant_id, seq);` by hand; without it the query is still correct, only slower.
 5. **Not changed.** The cursor's other properties stay as IR697 left them: it only increases while the tenant's latest event is kept, and a tenant whose events have all been removed reads 0. No screen reads this value.
 6. **A test left contractor admins behind.** `TestInvitationNamesTheAddressItCameFrom` (IR695) invites two contractor admins of contractor-a and kept them. When it ran before `TestCertificateReminders` on the same database, the 60-day reminder went to three admins instead of one, so `make test-all` failed in one order of the shards and passed in another. It now ends the two memberships when it finishes, as the other tests do; run together in that order the two tests failed before and pass after.
+
+## IR700 A contract's unresolved recovery case is read from the case's `state` (review round 130, 2026-11-10)
+
+`Contract.hasUnresolvedRecovery` is true while a recovery case of one of the contract's restrictions is not resolved (SR26, IR135 item 1), and `contracts.save` refuses a contract that has one (CONFLICT `errors.contract_restricted`; admin A07 saves only when it is false). The query that derives it asked for `@.status != "resolved"`, but a recovery case keeps its state in `state` (`RestrictionRecoveryCase`, `restrictions/recovery.go`); the other two readers of the cases, `unitRecovering` and the schedule's unit check, use `state`.
+
+1. **Reproduced.** A restriction of the contract, ended (`cancelled`), with a `pending` recovery case: `contracts.list` answered `hasUnresolvedRecovery=false` and `contracts.save` accepted a new version (200), so HQ could revise a contract whose terminal-restriction observation was still unresolved.
+2. **Fix.** The query reads `@.state != "resolved"`. The integration test `TestContractsAndInvoices` now covers a pending case (listed, revision refused with 409) and a resolved one (not listed).
+3. **Not changed.** The rule itself, the error, the web editor (it already disables saving when the value is true) and every operation, route and count.
