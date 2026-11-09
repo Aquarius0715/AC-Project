@@ -6,7 +6,8 @@
 import type { Currency } from "@ac/web/lib/contracts.gen";
 import { EN, intlTag, showDate, showTime, translator, type I18n, type Locale, type T, textOf } from "@ac/web/lib/i18n";
 import { businessDay } from "@ac/web/lib/clientBilling";
-import { amount, klStamp, one } from "@ac/web/lib/energy";
+import { klStamp, one } from "@ac/web/lib/energy";
+import { moneyByCurrency } from "@ac/web/lib/money";
 import { metricLabel, metricUnit, opSymbol, type Operator, type Severity } from "@ac/web/lib/adminAlerts";
 import { csvCell } from "@ac/web/lib/csv";
 import type { IconName } from "@ac/web/components/Icon";
@@ -69,7 +70,7 @@ export function standing(customerId: string, contracts: ApiContractLite[], overd
   const r = (restrictions ?? []).filter((x): x is ApiRestrictionLite & { contractId: string } => !!x.contractId && ids.has(x.contractId) && Object.hasOwn(restrictionRank, x.state)).toSorted((a, b) => (lookup(restrictionRank, a.state) ?? 9) - (lookup(restrictionRank, b.state) ?? 9))[0];
   return {
     plans: [...new Set(current.map((k) => k.planType))], contracts: current.length, contractUnits: new Set(current.flatMap((k) => k.unitIds)).size, overdue: due.length,
-    overdueAmount: due.length > 0 ? amount(due.reduce((n, i) => n + i.amountMinor, 0), due[0]?.currency ?? "MYR") : null,
+    overdueAmount: due.length > 0 ? moneyByCurrency(due) : null, // per currency, never added across them (IR707)
     restriction: r ? { id: r.id, state: r.state, contractId: r.contractId } : unknownRestriction(mine, restrictions),
   };
 }
