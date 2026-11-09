@@ -16,6 +16,7 @@ import {
 } from "@ac/web/lib/restrictions";
 import { RestrictionsDemo } from "./_components/restrictions-demo";
 import { RestrictionsView, type RestrictionsLive } from "./_components/restrictions-view";
+import { stateCounts } from "./_lib/counts";
 import { queryReader } from "@ac/web/lib/searchParams";
 import { orNull } from "@ac/web/lib/promises";
 
@@ -38,9 +39,11 @@ export default async function AdminRestrictionsPage({ searchParams }: Readonly<P
   const status = states.find((s) => s === one("status"));
   const scope = { contractId: isFull ? one("contractId") : undefined, invoiceId: isFull ? one("invoiceId") : undefined, status };
   const filters = { ...(scope.contractId && { contractId: scope.contractId }), ...(scope.invoiceId && { invoiceId: scope.invoiceId }), ...(status && { status }) };
-  const [scoped, units] = await Promise.all([
+  const [scoped, units, countOf] = await Promise.all([
     coreOp<Page<ApiRestriction>>("restrictions.list", { limit: 100, filters }),
     perms.has("asset.read") ? coreAllPage<Unit>("units.list") : Promise.resolve({ items: [] as Unit[] }), // override-only callers see unit IDs
+    // each state's total in the contract / invoice scope, whichever state is picked (IR714)
+    stateCounts({ ...(scope.contractId && { contractId: scope.contractId }), ...(scope.invoiceId && { invoiceId: scope.invoiceId }) }),
   ]);
   const names = new Map(units.items.map((u) => [u.id, u.displayName]));
   const [contracts, customers] = isFull
@@ -53,7 +56,6 @@ export default async function AdminRestrictionsPage({ searchParams }: Readonly<P
     return `${customerName.get(k.customerId) ?? t("customer")} · ${t("{plan} contract v{version}", { plan: k.planType, version: k.version })}`;
   };
   const rows = restrictionRows(scoped.items, contractLabel, i);
-  const countOf = (state: RestrictionState) => rows.filter((r) => r.state === state).length;
   const counts: Record<RestrictionState, number> = { scheduled: countOf("scheduled"), requested: countOf("requested"), applied: countOf("applied"), release_requested: countOf("release_requested"), released: countOf("released"), cancelled: countOf("cancelled") };
   // every restriction (the scope may narrow the list): the cause invoices of the filter and the units under restriction
   const all = Object.keys(filters).length > 0 ? await coreOp<Page<ApiRestriction>>("restrictions.list", { limit: 100 }) : scoped;
