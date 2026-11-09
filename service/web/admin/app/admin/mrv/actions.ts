@@ -3,7 +3,8 @@
 // Server Actions of the MRV demo workspace (FR-A14). Each one is a public endpoint: the DAL verifies the session and the
 // Core API authorizes the call (mrv.read, mrv.write, mrv.review, mrv.factors) and checks the expected version.
 import { refresh } from "next/cache";
-import { coreOp, CoreError } from "@ac/web/lib/dal";
+import { coreOp } from "@ac/web/lib/dal";
+import { actionFailure } from "@ac/web/lib/actionFailure";
 import type { ApiMRVPreview, MRVConditions } from "@ac/web/lib/mrv";
 import type { OpInput } from "@ac/web/lib/opTypes";
 
@@ -13,7 +14,7 @@ async function run<T>(fn: () => Promise<T>, rerender = true): Promise<ActionResu
   try {
     return { ok: true, value: await fn() };
   } catch (error) {
-    return error instanceof CoreError ? { ok: false, messageKey: error.error.messageKey, code: error.error.code, fieldErrors: error.error.fieldErrors, retryAfterSeconds: error.error.retryAfterSeconds } : { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
+    return actionFailure(error);
   } finally {
     if (rerender) refresh();
   }

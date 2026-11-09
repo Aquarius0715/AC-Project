@@ -4,15 +4,12 @@
 // verifies the session and the Core API authorizes it (client:self-customer for renames, client:control.execute for
 // commands) and checks the version.
 import { refresh } from "next/cache";
-import { coreOp, CoreError } from "@ac/web/lib/dal";
+import { coreOp } from "@ac/web/lib/dal";
+import { actionFailure } from "@ac/web/lib/actionFailure";
 import type { ApiCommand, ApiUnitDetail, UnitAction } from "@ac/web/lib/units";
 
 export type ActionResult<T = null> = { ok: true; value: T } | { ok: false; messageKey: string; code: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null };
-const failure = (e: unknown): ActionResult<never> => {
-  return (e instanceof CoreError
-    ? { ok: false, messageKey: e.error.messageKey, code: e.error.code, fieldErrors: e.error.fieldErrors, retryAfterSeconds: e.error.retryAfterSeconds }
-    : { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} });
-};
+const failure = (e: unknown): ActionResult<never> => actionFailure(e);
 
 /** locations.rename: only the name changes (trimmed 1–120, unique among siblings, IR109). */
 export async function renameLocation(kind: "property" | "space" | "unit", id: string, version: number, name: string): Promise<ActionResult> {

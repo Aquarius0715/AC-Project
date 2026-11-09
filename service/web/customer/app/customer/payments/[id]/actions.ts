@@ -4,7 +4,8 @@ const PAYMENTS_SIMULATE = "payments.simulate";
 // Server Actions of the customer invoice page (FR-C11, FR-C12). Each one is a public endpoint: the DAL verifies the
 // session and the Core API authorizes it (client:self) and checks the invoice or payment version.
 import { refresh } from "next/cache";
-import { coreOp, corePrincipal, CoreError } from "@ac/web/lib/dal";
+import { coreOp, corePrincipal } from "@ac/web/lib/dal";
+import { actionFailure } from "@ac/web/lib/actionFailure";
 import { demoReference, type ClientPayment, type PreviewParams } from "@ac/web/lib/clientBilling";
 
 export type ActionResult<T = null> = { ok: true; value: T } | { ok: false; messageKey: string; code: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null };
@@ -13,7 +14,7 @@ async function run<T>(fn: () => Promise<T>): Promise<ActionResult<T>> {
   try {
     return { ok: true, value: await fn() };
   } catch (error) {
-    return error instanceof CoreError ? { ok: false, messageKey: error.error.messageKey, code: error.error.code, fieldErrors: error.error.fieldErrors, retryAfterSeconds: error.error.retryAfterSeconds } : { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
+    return actionFailure(error);
   } finally {
     refresh();
   }

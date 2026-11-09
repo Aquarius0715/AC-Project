@@ -5,13 +5,14 @@
 // membership version. Revoking access is a save with validUntil at the business clock when HQ confirms (IR492); an account made by mistake that never acted is deleted with members.delete (DEC-103). Signing a user
 // out everywhere is members.revokeSessions: every session ends, the access stays (IR384, IR385).
 import { refresh } from "next/cache";
-import { coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
+import { coreNow, coreOp } from "@ac/web/lib/dal";
+import { actionFailure } from "@ac/web/lib/actionFailure";
 import type { OpInput } from "@ac/web/lib/opTypes";
 
 export type ActionResult<T = null> = { ok: true; value: T } | { ok: false; messageKey: string; code: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null };
 
 /** The refusal a Core API error carries, or the unavailable answer for anything else. */
-const failure = (error: unknown): ActionResult<never> => error instanceof CoreError ? { ok: false, messageKey: error.error.messageKey, code: error.error.code, fieldErrors: error.error.fieldErrors, retryAfterSeconds: error.error.retryAfterSeconds } : { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
+const failure = (error: unknown): ActionResult<never> => actionFailure(error);
 
 export async function saveMember(input: OpInput<"members.save">, version?: number): Promise<ActionResult<{ id: string; version: number }>> {
   try {
@@ -37,7 +38,7 @@ export async function deleteMember(id: string, version: number, reason: string):
     await coreOp("members.delete", { id, reason: reason.trim() }, { write: true, expectedVersion: version });
     return { ok: true, value: null };
   } catch (error) {
-    return error instanceof CoreError ? { ok: false, messageKey: error.error.messageKey, code: error.error.code, fieldErrors: error.error.fieldErrors, retryAfterSeconds: error.error.retryAfterSeconds } : { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {}, retryAfterSeconds: null };
+    return actionFailure(error);
   } finally {
     refresh();
   }

@@ -3,7 +3,8 @@
 // Server Actions of the customer air-quality page (FR-C07). Each one is a public endpoint: the DAL verifies the session
 // and the Core API authorizes it (ventilation.log: client:self, the room of the caller's organization).
 import { refresh } from "next/cache";
-import { coreOp, CoreError } from "@ac/web/lib/dal";
+import { coreOp } from "@ac/web/lib/dal";
+import { actionFailure } from "@ac/web/lib/actionFailure";
 import type { ApiVentilationLog, VentMethod } from "@ac/web/lib/air";
 
 export type ActionResult<T = null> = { ok: true; value: T } | { ok: false; messageKey: string; code: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null };
@@ -14,7 +15,7 @@ export async function logVentilation(input: { spaceId: string; unitId: string; m
   try {
     return { ok: true, value: await coreOp<ApiVentilationLog>("ventilation.log", input, { write: true }) };
   } catch (error) {
-    return error instanceof CoreError ? { ok: false, messageKey: error.error.messageKey, code: error.error.code, fieldErrors: error.error.fieldErrors, retryAfterSeconds: error.error.retryAfterSeconds } : { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
+    return actionFailure(error);
   } finally {
     refresh();
   }

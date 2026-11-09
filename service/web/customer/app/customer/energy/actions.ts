@@ -1,15 +1,12 @@
 "use server";
 
 // Server Actions of the customer Energy & cost screen (FR-C16): the demo monthly report and the monthly e-mail copy.
-import { coreOp, CoreError } from "@ac/web/lib/dal";
+import { coreOp } from "@ac/web/lib/dal";
+import { actionFailure } from "@ac/web/lib/actionFailure";
 import type { OpInput } from "@ac/web/lib/opTypes";
 
 export type ActionResult<T = null> = { ok: true; value: T } | { ok: false; messageKey: string; code: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null };
-const failure = (e: unknown): ActionResult<never> => {
-  return (e instanceof CoreError
-    ? { ok: false, messageKey: e.error.messageKey, code: e.error.code, fieldErrors: e.error.fieldErrors, retryAfterSeconds: e.error.retryAfterSeconds }
-    : { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} });
-};
+const failure = (e: unknown): ActionResult<never> => actionFailure(e);
 
 export interface ReportFile { fileName: string; mime: string; size: number; generatedAt: string; isDemo: boolean }
 export interface ReportInput { month: string; propertyIds: string[]; sections: ("energy_cost" | "month_comparison" | "co2_offsets" | "alerts_maintenance")[]; format: "pdf" | "csv" }

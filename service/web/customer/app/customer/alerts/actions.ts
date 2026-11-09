@@ -32,7 +32,7 @@ export async function readAlert(ids: string[]): Promise<ActionFailure | null> {
     await coreOp("notifications.markAllRead", { ids }, { write: true });
     return null;
   } catch (error) {
-    return error instanceof CoreError ? { code: error.error.code, messageKey: error.error.messageKey, fieldErrors: error.error.fieldErrors, retryAfterSeconds: error.error.retryAfterSeconds } : { code: "UNAVAILABLE", messageKey: "error.unavailable", fieldErrors: {} };
+    return actionFailure(error);
   } finally {
     refresh();
   }

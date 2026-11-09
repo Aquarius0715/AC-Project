@@ -4,7 +4,8 @@
 // and the Core API authorizes the call (device.write, audit.read) and checks the expected version where the write
 // version catalog requires one.
 import { refresh } from "next/cache";
-import { coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
+import { coreNow, coreOp } from "@ac/web/lib/dal";
+import { actionFailure } from "@ac/web/lib/actionFailure";
 import type { CampaignDraft, Metric } from "@ac/web/lib/devices";
 import { parseWaves } from "@ac/web/lib/devices";
 import type { OpInput } from "@ac/web/lib/opTypes";
@@ -16,7 +17,7 @@ async function run<T>(fn: () => Promise<T>, rerender = true): Promise<ActionResu
   try {
     return { ok: true, value: await fn() };
   } catch (error) {
-    return error instanceof CoreError ? { ok: false, messageKey: error.error.messageKey, code: error.error.code, fieldErrors: error.error.fieldErrors, retryAfterSeconds: error.error.retryAfterSeconds } : { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
+    return actionFailure(error);
   } finally {
     if (rerender) refresh();
   }
