@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ApiDevice, ApiDeviceDetail, ApiDeviceOperation } from "@ac/web/lib/devices";
 import {
   calibrationText, deviceFieldText, deviceRefusal, deviceTiles, eventRows, failureText, filterOf, followFilter, firmwareCard, HQ_FILTERS, jobFor, newerFirmware, newerVersions, openAlerts, openFaults,
-  operationLabel, operationRows, sensorRows, techDeviceRows, type ApiAlertLite, type ApiDeviceEventFull, type TechJob,
+  blankRegistration, operationLabel, operationRows, sensorRows, techDeviceRows, type ApiAlertLite, type ApiDeviceEventFull, type TechJob,
 } from "@ac/web/lib/techDevices";
 import { i18nOf } from "@ac/web/lib/i18n";
 
@@ -219,5 +219,15 @@ describe("the device screens in Malay with the display time zone (IR287)", () =>
     expect(deviceRefusal({ code: "OFFLINE", messageKey: "error.offline", fieldErrors: {} })).toMatch(/^The device is not reachable, so nothing was started/);
     expect(deviceRefusal({ code: "VALIDATION", messageKey: "error.validation", fieldErrors: { reason: "error.required" } })).toBeNull();
     expect([deviceFieldText("error.duplicate"), deviceFieldText("error.duplicate", MS.t), deviceFieldText("errors.serial_format")]).toStrictEqual(["Already registered", "Sudah didaftarkan", "serial format"]);
+  });
+});
+
+describe("blankRegistration", () => {
+  it("starts at the first unit still without a device and its first job, with no serial or sensors", () => {
+    // the form opens afresh: the unit registered last time is no longer listed after the refresh (IR701)
+    expect(blankRegistration([{ unitId: "u2", jobs: [{ id: "j2" }, { id: "j3" }] }, { unitId: "u3", jobs: [] }])).toStrictEqual({ serial: "", unitId: "u2", sensors: [], jobId: "j2" });
+  });
+  it("is empty when every assigned unit has a device", () => {
+    expect(blankRegistration([])).toStrictEqual({ serial: "", unitId: "", sensors: [], jobId: "" });
   });
 });

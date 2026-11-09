@@ -9,6 +9,7 @@ import type { UnitAction } from "@ac/web/lib/contracts.gen";
 import { FAN_LABEL, MODE_LABEL, type ApiUnitDetail, type CommandAction } from "@ac/web/lib/units";
 import { airNumber } from "@ac/web/lib/air";
 import { lookup } from "@ac/web/lib/lookup";
+import type { ActionGroup } from "@ac/web/lib/clientAutomations";
 
 const en = translator("en");
 
@@ -49,6 +50,14 @@ export function actionCode(a: CommandAction): string {
 export function actionWord(a: UnitAction, t: T = en): string {
   if (a.kind !== "set_power") return actionCode(a);
   return t(a.power ? "Power ON" : "Power OFF");
+}
+
+/** The action key a select of the unit's options starts at: `key` when the unit offers it, otherwise the first offered
+one, which is what the select shows — a ventilation-only model has no power, and its test run must not send power on
+(IR701). With no options at all the key stays. */
+export function offeredKey(options: readonly ActionGroup[], key: string): string {
+  const offered = options.flatMap((g) => g.options.map((o) => o.key));
+  return offered.includes(key) ? key : offered[0] ?? key;
 }
 
 /** One history row: what was sent, its device outcome and the badge. Test-run commands name their run. */
