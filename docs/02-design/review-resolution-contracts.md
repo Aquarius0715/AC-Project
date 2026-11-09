@@ -9676,3 +9676,13 @@ A customer's contracts may be in MYR or in USD (IR135 item 1), so its overdue in
 2. **Fix.** `moneyByCurrency` (`shared/lib/money.ts`) totals the amounts per currency in the order the currencies first appear and joins them ("130.00 MYR + 50.00 USD"). Both screens use it. A single currency reads as before.
 3. **Tests.** `clientBilling.test.ts` (the notice) and `assets.test.ts` (the standing). Failing before, passing after.
 4. **Not changed.** The API, the warranty-claim candidate (the costs of one job) and every operation, route and count.
+
+## IR709 A technician binds an unbound device only to its planned unit unless they registered it (review round 171, 2026-11-10)
+
+`devices.register` reserves a device for a planned unit (`targetUnitId`, IR467), and the device stays unbound until `devices.bind`. Until then HQ and the member who registered it are the only ones who read it (`devices.get` answers NOT_FOUND to anyone else). `devices.bind` locked the device by its ID alone. For a technician it checked the job's unit (the target of the bind) and, for a bound device, the unit it leaves, but nothing about an unbound one. So a technician who could not read HQ's unbound device could bind it to a unit of their own job, taking it from the unit HQ planned it for.
+
+1. **Reproduced.** HQ registers a device planned for one unit. The internal technician, with an active assignment on another unit, gets NOT_FOUND from `devices.get` and 200 from `devices.bind` to their unit.
+2. **The other device writes.** `devices.check`, `devices.calibrate` and `devices.updateFirmware` lock a bound device and answered CONFLICT `deviceNotBound` before any scope check, so the same technician learned that HQ's unbound device exists (reproduced: 409). An unbound device the caller does not read is now NOT_FOUND there too (`hiddenUnbound`, the read rule of `devices.get`).
+3. **Fix.** An unbound device goes to its planned unit, as IR467's "bind it once installed" intends, which a technician assigned there may do. A bind to any other unit is refused unless HQ, or the member who registered the device, makes it. The refusal is NOT_FOUND, as the device reads for the caller, and it comes before the version is compared (IR366).
+4. **Test.** `TestBindOnlyAReadableUnboundDevice`: `devices.check` of HQ's unbound device is NOT_FOUND (409 before), HQ's device planned for another unit is refused (404, 200 before), and the technician's own registered device binds (200). `TestTechnicianRebind` still binds HQ's device to its planned unit.
+5. **Not changed.** HQ's binds, the rebinding of a bound device (IR366), `devices.get`, and every operation, route and count. B-12 (a technician's own registered device and the technician app's bind step) stays open.
