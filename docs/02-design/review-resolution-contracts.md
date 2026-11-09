@@ -9732,3 +9732,16 @@ The Customer inquiries tab of `/admin/billing` (FR-A08, DD-A08) shows the custom
 1. **Reproduced.** The admin app's unit test `restrictionCounts.test.ts` serves 120 released restrictions and one older applied one in a contract's scope. Counting the listed page gives applied 0 and released 100 (the test fails). With the fix the counts are 1 and 120.
 2. **Fix.** `stateCounts` (`admin/app/admin/restrictions/_lib/counts.ts`) reads the `total` of `restrictions.list` per state (limit 1), in the contract / invoice scope of the URL whichever state is picked. The list, the detail and the schedule form are unchanged.
 3. **Not changed.** The unfiltered list still shows the newest 100. A state chip, now counted right, lists that state on the server. Every operation, route and count stays the same.
+
+## IR715 The customer finds the active restriction through every invoice of the contract (review round 199, 2026-11-10)
+
+The customer has no restriction list. Three pages find a contract's active restriction through the invoices it cites (`restrictions.forInvoice`, IR583, IR610):
+- Contracts & payments (FR-C10): the restriction notice;
+- the overview's due notice (DEC-90);
+- the unit page's link to the restriction (IR583).
+
+`invoices.list` answers the latest due first. Contracts & payments and the unit page asked about the first three unpaid invoices only. The overview asked about the contract's latest overdue invoice only. A restriction cites the invoices that were overdue when it was scheduled. So a customer who had not paid the newer invoices either, which is the customer a restriction is for, lost the notice and the link.
+
+1. **Reproduced.** `shared/lib/tests/restrictionLookup.test.ts`: a contract with three newer unpaid invoices, the overdue one the restriction cites, and an older paid one. With the first three unpaid invoices the restriction is not found (the test fails). With the fix it is found on the first request.
+2. **Fix.** `restrictionFor` (`shared/lib/restrictionLookup.ts`) asks about the unpaid invoices oldest due first, then the paid ones latest due first (a restriction being released once they are paid, `release_requested`). It stops at the first restriction the page accepts. The three pages use it; the overview passes the contract's overdue invoices. The `no-await-in-loop` exception of `eslint.base.mjs` names the new file instead of the payments page, which no longer loops.
+3. **Not changed.** What the notices and the link show. Every operation, route and count stays the same.
