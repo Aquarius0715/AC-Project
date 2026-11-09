@@ -180,6 +180,7 @@ At the design capacity (20,000 units, about 120,000 measurements per minute) the
 | Units & locations tree (`units.list`, `spaces.list`) | by customer / property / space | `properties_customer`, `spaces_property`, `units_property` |
 | Unit control (`commands.create`, `commands.get`) | pending command per unit, latest commands | `commands_one_pending_per_unit`, `commands_unit` |
 | 24-hour chart (`telemetry.series`) | unit + metric + time range | `measurements_unit_metric` (hot) or `measurements_15m` (as built: the hot index only, IR335) |
+| Duplicate check of a received reading (`demo.trigger`) | event ID | `measurements_event` (IR694: without it every reading scans the table) |
 | Energy analysis / MRV | unit set + period | `measurements_1h` primary key (as built: `energy.ref_power_samples` by unit and time, IR335) |
 | Alerts inbox (`alerts.list`) | open alerts by customer and severity | `alerts_open` |
 | Jobs lists (HQ / partner / technician) | by status, contractor, assigned technician | `jobs_status`, `jobs_contractor`, `assignments_technician` |

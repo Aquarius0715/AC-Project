@@ -776,6 +776,10 @@ func ExpireCommands(ctx context.Context, txn pgx.Tx, now time.Time) (int, error)
 
 // Acknowledge applies a device acknowledgement (IoT bridge / device simulator): before expiresAt the command becomes
 // acknowledged; later acknowledgements are only recorded (D04 timing). It returns whether the command was acknowledged.
+//
+// A requested command counts as sent: the answer shows it reached the device, and it can overtake the report that it
+// was sent, which then finds nothing to change. Taken for a late answer, it would leave the command sent with nothing
+// more to come, and the unit busy until it expired.
 func Acknowledge(
 	ctx context.Context,
 	txn pgx.Tx,
@@ -784,8 +788,9 @@ func Acknowledge(
 ) (bool, error) {
 	tag, err := txn.Exec(
 		ctx,
-		`UPDATE control.commands SET status = 'acknowledged', acknowledged_at = $2, version = version + 1, updated_at = $2
-		WHERE id = $1 AND status = 'sent' AND $2 < expires_at`,
+		`UPDATE control.commands SET status = 'acknowledged', acknowledged_at = $2, delivery = 'sent',
+		sent_at = COALESCE(sent_at, $2), version = version + 1, updated_at = $2
+		WHERE id = $1 AND status IN ('requested','sent') AND $2 < expires_at`,
 		command,
 		receivedAt,
 	)
