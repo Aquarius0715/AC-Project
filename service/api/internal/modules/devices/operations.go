@@ -511,7 +511,8 @@ func deviceUse(ctx context.Context, call *ops.Call, device uuid.UUID, state devS
 
 // rebindable checks the locked device against a bind to unit: a technician moves a bound device only from a unit of
 // an assignment of theirs as well (the unit it leaves is in scope too, and DD-T11 rejects an unauthorized rebinding,
-// IR366); then the expected version, a device already on the unit and an unresolved tamper.
+// IR366), and binds an unbound one only to its planned unit unless they registered it (IR709); then the expected
+// version, a device already on the unit and an unresolved tamper.
 func (m *Module) rebindable(
 	ctx context.Context,
 	call *ops.Call,
@@ -523,6 +524,13 @@ func (m *Module) rebindable(
 		if err != nil {
 			return apperr.Wrap(err, "devices.TechUnitAccess.TechnicianUnit")
 		}
+	}
+	// a device not bound yet goes to the unit HQ planned for it, or anywhere by HQ or the member who registered it: a
+	// technician cannot take another member's planned device to a unit of their own (NOT_FOUND, as the device reads
+	// for them, whatever its version: IR366, IR709)
+	if state.unit == nil && unit != state.target && call.Principal.Role != roleAdmin &&
+		state.creator != call.Principal.MembershipID {
+		return apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	currentErr := state.current(call)
