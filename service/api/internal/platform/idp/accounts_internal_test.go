@@ -96,7 +96,7 @@ func newAccountsKeycloak(t *testing.T) (*Keycloak, *accountsRealm) {
 		Client:       nil,
 		Now:          nil,
 		mu:           sync.Mutex{},
-		tokens: nil,
+		tokens:       nil,
 	}, realm
 }
 
@@ -110,6 +110,7 @@ func testAccount() Account {
 		Role:        "technician",
 		ClientID:    "ac-web",
 		RedirectURI: "http://localhost:3002/login",
+		PublicHost:  "",
 	}
 }
 

@@ -62,7 +62,7 @@ type Keycloak struct {
 }
 
 // adminToken is a cached token of the service account and when to stop using it. The realm checks a token's issuer
-// against the address of the request, so a token serves only the address it was issued for (IR697).
+// against the address of the request, so a token serves only the address it was issued for (IR695).
 type adminToken struct {
 	value string
 	until time.Time
@@ -120,7 +120,7 @@ type Account struct {
 	// RedirectURI and ClientID are where the password set-up e-mail's link returns: the app the person signs in to
 	RedirectURI string
 	ClientID    string
-	// PublicHost is the host name the set-up e-mail's link is to use: where the invitation came from (IR697). Empty: the
+	// PublicHost is the host name the set-up e-mail's link is to use: where the invitation came from (IR695). Empty: the
 	// provider's own address. It is a verified token's issuer, never what a request says of itself.
 	PublicHost string
 }

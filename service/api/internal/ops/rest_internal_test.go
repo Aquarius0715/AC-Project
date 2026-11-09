@@ -762,6 +762,7 @@ func billingPrincipal() *Principal {
 			}, ClientRole: "",
 		}, TenantID: uuid.UUID{}, MembershipID: uuid.UUID{}, UserID: uuid.UUID{}, OrgID: uuid.UUID{}, ScopeVersion: 0,
 		Scopes: nil, Employment: "", Timezone: "", SessionsRevokedAt: nil,
+		IssuerHost: "",
 	}
 }
 

@@ -309,18 +309,18 @@ func createAccount(
 
 // requestAccount asks the identity-accounts consumer to open the provider account (if missing) or point it at this
 // membership, and send the set-up e-mail.
-func requestAccount(c *ops.Call, user, membership uuid.UUID, role string) {
+func requestAccount(call *ops.Call, user, membership uuid.UUID, role string) {
 	payload := map[string]any{
 		"userId":        user,
 		keyMembershipID: membership,
 		keyRole:         role,
 	}
-	// the set-up e-mail's link opens where the sender is (IR697); without it the provider's own address (a bootstrap)
-	if c.Principal != nil && c.Principal.IssuerHost != "" {
-		payload["publicHost"] = c.Principal.IssuerHost
+	// the set-up e-mail's link opens where the sender is (IR695); without it the provider's own address (a bootstrap)
+	if call.Principal != nil && call.Principal.IssuerHost != "" {
+		payload["publicHost"] = call.Principal.IssuerHost
 	}
 
-	c.Emit(
+	call.Emit(
 		ops.Event{
 			AggregateType: kindMembership,
 			AggregateID:   membership,

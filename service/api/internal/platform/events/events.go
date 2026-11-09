@@ -328,6 +328,7 @@ func (c *Consumer) apply(ctx context.Context, event Event) (bool, error) {
 			Employment:        "",
 			Timezone:          "",
 			SessionsRevokedAt: nil,
+			IssuerHost:        "",
 		},
 		func(txn pgx.Tx) error {
 			tag, err := txn.Exec(

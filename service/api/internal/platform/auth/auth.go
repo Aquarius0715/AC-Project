@@ -33,7 +33,7 @@ type Identity struct {
 	Client   string
 	AdminApp bool
 	// Issuer is the token's verified issuer, empty when the verifier does not say. It names the address the holder
-	// signed in on (IR651, IR697).
+	// signed in on (IR651, IR695).
 	Issuer string
 }
 
@@ -51,7 +51,13 @@ var errUnknownToken = errors.New("unknown token")
 // Verify implements Verifier.
 func (s StaticVerifier) Verify(_ context.Context, token string) (Identity, error) {
 	if sub, ok := s[token]; ok {
-		return Identity{Subject: sub, SignedIn: time.Time{}, Client: "", AdminApp: false, Issuer: ""}, nil
+		return Identity{
+			Subject:  sub,
+			SignedIn: time.Time{},
+			Client:   "",
+			AdminApp: false,
+			Issuer:   "",
+		}, nil
 	}
 
 	return Identity{}, errUnknownToken
@@ -214,6 +220,7 @@ func (a *Authenticator) Load(
 		Employment:        "",
 		Timezone:          "",
 		SessionsRevokedAt: nil,
+		IssuerHost:        "",
 	}
 	now := a.now()
 

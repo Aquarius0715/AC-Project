@@ -131,6 +131,7 @@ func NoteHandlers() map[string]events.Handler {
 					Employment:        "",
 					Timezone:          "",
 					SessionsRevokedAt: nil,
+					IssuerHost:        "",
 				},
 				CorrelationID:   "",
 				Bearer:          "",

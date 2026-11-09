@@ -293,6 +293,7 @@ func (realm *addressRealm) serve(writer http.ResponseWriter, req *http.Request) 
 	case strings.HasSuffix(req.URL.Path, "/token"):
 		realm.tokens.Add(1)
 		realm.calls = append(realm.calls, "token "+host)
+		//nolint:gosec // G705: a fake realm answering this test's own client, not a browser
 		_, _ = writer.Write([]byte(`{"access_token":"token-of-` + host + `","expires_in":300}`))
 	case strings.HasSuffix(req.URL.Path, "/execute-actions-email"):
 		if req.Header.Get("Authorization") != "Bearer token-of-"+host {
@@ -307,6 +308,7 @@ func (realm *addressRealm) serve(writer http.ResponseWriter, req *http.Request) 
 		writer.WriteHeader(http.StatusNoContent)
 	default:
 		realm.calls = append(realm.calls, "admin "+host)
+
 		writer.WriteHeader(http.StatusNoContent)
 	}
 }
@@ -331,8 +333,14 @@ func setupAt(t *testing.T, public, host, redirect string) (string, string) {
 	keycloak.PublicURL = public
 
 	err := keycloak.SendSetup(t.Context(), "subject-1", Account{
-		Email: "a@example.com", DisplayName: "A", TenantID: "t", Membership: "m", Role: "client_user",
-		RedirectURI: redirect, ClientID: "ac-customer", PublicHost: host,
+		Email:       "a@example.com",
+		DisplayName: "A",
+		TenantID:    "t",
+		Membership:  "m",
+		Role:        "client_user",
+		RedirectURI: redirect,
+		ClientID:    "ac-customer",
+		PublicHost:  host,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -398,8 +406,14 @@ func TestAdminTokensAreKeptPerAddress(t *testing.T) {
 		t.Helper()
 
 		err := keycloak.SendSetup(t.Context(), "subject-1", Account{
-			Email: "a@example.com", DisplayName: "A", TenantID: "t", Membership: "m", Role: "client_user",
-			RedirectURI: "http://10.100.1.17:3200/login", ClientID: "ac-customer", PublicHost: host,
+			Email:       "a@example.com",
+			DisplayName: "A",
+			TenantID:    "t",
+			Membership:  "m",
+			Role:        "client_user",
+			RedirectURI: "http://10.100.1.17:3200/login",
+			ClientID:    "ac-customer",
+			PublicHost:  host,
 		})
 		if err != nil {
 			t.Fatal(err)

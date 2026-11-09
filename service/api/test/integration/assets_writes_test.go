@@ -631,6 +631,7 @@ func TestAssetWritesLifecycle(t *testing.T) {
 		Employment:        "",
 		Timezone:          "",
 		SessionsRevokedAt: nil,
+		IssuerHost:        "",
 	}
 
 	err := srv.DB.Run(t.Context(), true, principal, func(txn pgx.Tx) error {

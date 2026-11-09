@@ -766,7 +766,12 @@ func TestInvitationNamesTheAddressItCameFrom(t *testing.T) {
 				found = true
 
 				if account.PublicHost != want {
-					t.Errorf("%s: the provider was told %q, want %q", sender, account.PublicHost, want)
+					t.Errorf(
+						"%s: the provider was told %q, want %q",
+						sender,
+						account.PublicHost,
+						want,
+					)
 				}
 			}
 		}

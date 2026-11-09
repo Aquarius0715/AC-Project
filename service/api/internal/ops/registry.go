@@ -42,7 +42,7 @@ type Principal struct {
 	// earlier is refused. Wall clock, as the identity provider's auth_time is; nil when never revoked.
 	SessionsRevokedAt *time.Time
 	// IssuerHost is the host name of the verified token's issuer: the address this request's sign-in was made on (it is
-	// checked against OIDC_ISSUER, so it cannot be made up, IR697). Empty for work without a user's token.
+	// checked against OIDC_ISSUER, so it cannot be made up, IR695). Empty for work without a user's token.
 	IssuerHost string
 }
 
@@ -60,6 +60,7 @@ func TenantPrincipal(tenant uuid.UUID) *Principal {
 		Employment:        "",
 		Timezone:          "",
 		SessionsRevokedAt: nil,
+		IssuerHost:        "",
 	}
 }
 

@@ -477,10 +477,10 @@ func TestPrincipalNamesTheAddressOfTheSignIn(t *testing.T) {
 	tenant, membership := uuid.NewString(), uuid.NewString()
 
 	for issuer, want := range map[string]string{
-		"http://100.99.169.116:8281/realms/ac": "100.99.169.116",
-		"http://10.100.1.17:8281/realms/ac":    "10.100.1.17",
-		"https://auth.example.com/realms/ac":   "auth.example.com",
-		"":                                     "",
+		tailnetIssuer:                        "100.99.169.116",
+		"http://10.100.1.17:8281/realms/ac":  "10.100.1.17",
+		"https://auth.example.com/realms/ac": "auth.example.com",
+		"":                                   "",
 	} {
 		rec, got := call(t, authenticator, membershipHeaders(issuer, tenant, membership))
 		if issuer == "" { // no bearer token at all
