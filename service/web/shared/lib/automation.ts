@@ -194,6 +194,10 @@ export function evaluationInput(type: AutoCondition["type"], rows: FactRow[], no
     }),
   };
 }
+/** What an evaluation asks, without its time or event ID: a repeated Fire (automations.fire) reuses its one-time event
+ID only while this stays the same. Another body under the same key is refused (D04), and a fact without its own kind
+follows the policy's condition type (IR704). */
+export const evaluationKey = (type: AutoCondition["type"], rows: FactRow[]): string => JSON.stringify(evaluationInput(type, rows, new Date(0), ""));
 /** Why a unit was not acted on (the suppression reasons of automations.simulate / fire), worded for HQ. */
 export function reasonWord(reason: string, t: T = en): string {
   const words: Record<string, string> = {
