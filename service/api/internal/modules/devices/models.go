@@ -17,7 +17,9 @@ import (
 // Models answers model-register questions for other modules (assets.Models).
 type Models struct{}
 
-// CurrentVersion returns the current capability version of modelID, or ok=false when the model does not exist.
+// CurrentVersion returns the current capability version of modelID, or ok=false when the model does not exist. The row
+// is read with a share lock: capabilities.delete and a new version of the model wait for the unit save, or are waited
+// for and seen, so a unit is never saved with a model that is deleted or has moved on at the same moment.
 func (Models) CurrentVersion(
 	ctx context.Context,
 	c *ops.Call,
@@ -25,7 +27,7 @@ func (Models) CurrentVersion(
 ) (int, bool, error) {
 	var version int
 
-	err := c.Tx.QueryRow(ctx, `SELECT version FROM devices.capabilities WHERE id = $1 AND is_current`, modelID).
+	err := c.Tx.QueryRow(ctx, `SELECT version FROM devices.capabilities WHERE id = $1 AND is_current FOR SHARE`, modelID).
 		Scan(&version)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
