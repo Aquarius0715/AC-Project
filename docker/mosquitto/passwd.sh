@@ -13,11 +13,14 @@ set -a
 . "$env_file"
 set +a
 : "${MQTT_DEVICE_SIM_KEY:?set in .env.local}" "${MQTT_IOT_BRIDGE_KEY:?set in .env.local}"
-# the file only changes when a key changes: a stamp (git-ignored) keeps a hash of the keys it was written from
+# the file only changes when a key changes: a stamp (git-ignored) keeps a hash of the keys it was written from and a
+# hash of the file it wrote. The file is tracked in git, and a forced checkout (deploy/test/deploy.sh) puts the
+# committed one back while the stamp stays: a file that is not the one written is written again (IR684).
 stamp="$here/.passwd.keys"
 sha256() { if command -v sha256sum >/dev/null 2>&1; then sha256sum; else shasum -a 256; fi; }
 sum=$(printf '%s\n%s\n' "$MQTT_IOT_BRIDGE_KEY" "$MQTT_DEVICE_SIM_KEY" | sha256 | cut -d' ' -f1)
-if [ -f "$stamp" ] && [ "$(cat "$stamp")" = "$sum" ] && grep -q '^device-sim:' "$here/passwd" 2>/dev/null; then
+file_sum() { sha256 <"$here/passwd" | cut -d' ' -f1; }
+if [ -f "$stamp" ] && [ -f "$here/passwd" ] && [ "$(cat "$stamp")" = "$sum $(file_sum)" ] && grep -q '^device-sim:' "$here/passwd"; then
   echo "broker password file is up to date"
   exit 0
 fi
@@ -29,5 +32,5 @@ docker run --rm --entrypoint sh -e MQTT_DEVICE_SIM_KEY -e MQTT_IOT_BRIDGE_KEY -v
   chmod 644 /work/passwd.new
 '
 mv "$here/passwd.new" "$here/passwd"
-printf '%s\n' "$sum" > "$stamp"
+printf '%s %s\n' "$sum" "$(file_sum)" >"$stamp"
 echo "wrote $here/passwd for: $(cut -d: -f1 "$here/passwd" | tr '\n' ' ')"
