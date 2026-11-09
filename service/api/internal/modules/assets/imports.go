@@ -874,6 +874,13 @@ func (commit *importCommit) unit(ctx context.Context, row storedRow) error {
 		return apperr.Wrap(execErr, "insert assets.units")
 	}
 
+	// the name is checked after the write, as units.save does: a unit saved since the preview with the same name stops the
+	// commit (IR666)
+	nameErr := siblingName(ctx, commit.call, kindUnit, unitID)
+	if nameErr != nil {
+		return nameErr
+	}
+
 	commit.units = append(commit.units, unitID)
 	commit.call.Emit(
 		ops.Event{
@@ -1126,7 +1133,7 @@ func (m *Module) unitsImportUndo(
 		return UnitImport{}, conflict("error.undoWindowClosed")
 	}
 
-	err = m.unitsInUse(ctx, call, unitImport.CreatedUnitIDs)
+	err = m.importInUse(ctx, call, unitImport)
 	if err != nil {
 		return UnitImport{}, err
 	}
@@ -1146,8 +1153,8 @@ func (m *Module) unitsImportUndo(
 		ids   []uuid.UUID
 	}{
 		{"assets.units", unitImport.CreatedUnitIDs},
-		{"assets.spaces", unitImport.CreatedSpaceIDs},
-		{"assets.properties", unitImport.CreatedPropertyIDs},
+		{tableSpaces, unitImport.CreatedSpaceIDs},
+		{tableProperties, unitImport.CreatedPropertyIDs},
 	} {
 		_, err := call.Tx.Exec(
 			ctx,
@@ -1195,6 +1202,55 @@ func (m *Module) unitsImportUndo(
 	)
 
 	return unitImport, nil
+}
+
+// importInUse refuses an undo while what the import created is in use: its units (telemetry or jobs) or its places
+// (units or locations of others in them).
+func (m *Module) importInUse(ctx context.Context, call *ops.Call, unitImport UnitImport) error {
+	err := m.unitsInUse(ctx, call, unitImport.CreatedUnitIDs)
+	if err != nil {
+		return err
+	}
+
+	return placesInUse(ctx, call, unitImport)
+}
+
+// placesInUse refuses an undo while a property or space the import created holds a unit or a location the import did
+// not create: archiving it would leave that unit or location in an archived place, which spaces.archive and
+// properties.archive refuse (CONFLICT error.importPlaceInUse, IR666). The places are locked first, as the archive does,
+// so a unit saved at the same moment waits and is seen.
+func placesInUse(ctx context.Context, call *ops.Call, unitImport UnitImport) error {
+	for _, table := range []struct {
+		name string
+		ids  []uuid.UUID
+	}{{tableProperties, unitImport.CreatedPropertyIDs}, {tableSpaces, unitImport.CreatedSpaceIDs}} {
+		_, err := call.Tx.Exec(
+			ctx,
+			"SELECT 1 FROM "+table.name+" WHERE id = ANY($1) FOR UPDATE",
+			table.ids,
+		)
+		if err != nil {
+			return apperr.Wrap(err, "select (placesInUse)")
+		}
+	}
+
+	var other bool
+
+	err := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.units u WHERE NOT u.archived AND
+			(u.property_id = ANY($1) OR u.space_id = ANY($2)) AND NOT (u.id = ANY($3)))
+		OR EXISTS (SELECT 1 FROM assets.spaces s WHERE NOT s.archived AND
+			(s.property_id = ANY($1) OR s.parent_space_id = ANY($2)) AND NOT (s.id = ANY($2)))`,
+		unitImport.CreatedPropertyIDs, unitImport.CreatedSpaceIDs, unitImport.CreatedUnitIDs).
+		Scan(&other)
+	if err != nil {
+		return apperr.Wrap(err, "select assets.units")
+	}
+
+	if other {
+		return conflict("error.importPlaceInUse")
+	}
+
+	return nil
 }
 
 // unitsInUse refuses an undo while a unit the import created has telemetry or jobs.

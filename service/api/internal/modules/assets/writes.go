@@ -1106,7 +1106,7 @@ func (m *Module) propertiesSave(
 		),
 	)
 	if err != nil {
-		return Property{}, versionedUpdate(ctx, call, "assets.properties", *input.ID, err)
+		return Property{}, versionedUpdate(ctx, call, tableProperties, *input.ID, err)
 	}
 
 	err = locationSaved(
@@ -1301,7 +1301,7 @@ func (m *Module) spacesSave(ctx context.Context, call *ops.Call, input *SpaceSav
 		),
 	)
 	if err != nil {
-		return Space{}, versionedUpdate(ctx, call, "assets.spaces", *input.ID, err)
+		return Space{}, versionedUpdate(ctx, call, tableSpaces, *input.ID, err)
 	}
 
 	err = locationSaved(
@@ -1660,7 +1660,7 @@ func (m *Module) propertiesArchive(
 ) (ArchivedResource, error) {
 	return m.archive(
 		kindProperty,
-		"assets.properties",
+		tableProperties,
 		`SELECT EXISTS (SELECT 1 FROM assets.units WHERE property_id = $1 AND NOT archived) OR EXISTS (SELECT 1 FROM
 			assets.spaces WHERE property_id = $1 AND NOT archived)`,
 	)(
@@ -1703,7 +1703,7 @@ func (m *Module) spacesArchive(
 ) (ArchivedResource, error) {
 	return m.archive(
 		kindSpace,
-		"assets.spaces",
+		tableSpaces,
 		`SELECT EXISTS (SELECT 1 FROM assets.units WHERE space_id = $1 AND NOT archived) OR EXISTS (SELECT 1 FROM
 			assets.spaces WHERE parent_space_id = $1 AND NOT archived)`,
 	)(

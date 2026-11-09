@@ -541,7 +541,7 @@ func (*Module) propertiesList(
 		call,
 		query,
 		filters,
-		"assets.properties",
+		tableProperties,
 		propertyCols,
 		conds,
 		args,
@@ -624,7 +624,7 @@ func (*Module) spacesList(
 		conds = append(conds, "kind = "+add(*filters.Kind))
 	}
 
-	return list(ctx, call, query, filters, "assets.spaces", spaceCols, conds, args, scanSpace)
+	return list(ctx, call, query, filters, tableSpaces, spaceCols, conds, args, scanSpace)
 }
 
 // ---- locations.rename (IR109) ----
@@ -784,7 +784,7 @@ func renameTargetOf(kind string) renameTarget {
 	switch kind {
 	case kindProperty:
 		return renameTarget{
-			"assets.properties",
+			tableProperties,
 			keyName,
 			"customer_org_id",
 			`SELECT 1 FROM assets.properties o, assets.properties t
@@ -793,7 +793,7 @@ func renameTargetOf(kind string) renameTarget {
 		}
 	case kindSpace:
 		return renameTarget{
-			"assets.spaces",
+			tableSpaces,
 			keyName,
 			"(SELECT customer_org_id FROM assets.properties p WHERE p.id = property_id)",
 			`SELECT 1 FROM assets.spaces o, assets.spaces t WHERE t.id = $1 AND o.property_id = t.property_id AND

@@ -101,6 +101,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
 0.532.0 (2026-11-09): a rename refused by the unique index of sibling names answers the sibling-name conflict, as a save does (IR669; no operation changes).
+0.531.0 (2026-11-09): a CSV import commit keeps unit names unique among siblings and an import is undone only while the places it created hold nothing else (IR666; no operation changes).
 0.530.0 (2026-11-09): a new CSV import preview removes the previews that have expired, as the database design says (IR665; no operation changes).
 0.529.0 (2026-11-09): the adjustment HQ enters when it answers a payout question stays within the safe-integer range, like every other amount (IR659; no operation changes).
 0.528.0 (2026-11-09): a customer is deactivated only after its row is locked, so a unit being added at the same moment is seen (IR668; no operation changes).
