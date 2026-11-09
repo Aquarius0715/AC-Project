@@ -9695,3 +9695,11 @@ A customer's contracts may be in MYR or in USD (IR135 item 1), so its overdue in
 2. **Fix.** `scopeAlerts` (`admin/app/admin/alerts/_lib/load.ts`) reads each status with its own filter: the open and acknowledged alerts in full (`coreAll`, following `nextCursor`), the resolved alerts as their first page of 100, most severe first. The view, its tiles, the URL state (IR318) and the permission check (IR581) are unchanged.
 3. **Tests.** The admin app now has a Vitest set-up of its own (`admin/vitest.config.mts`, `npm test`), as the technician app does (IR702), which the CI unit-test job runs with the other workspaces.
 4. **Not changed.** The resolved tile stops at 100 as before. Every operation, route and count stays the same.
+
+## IR711 The technician overview reads each unresolved alert status on its own (review round 186, 2026-11-10)
+
+The technician overview (FR-T01, SCR-T01) lists the open and acknowledged alerts on the technician's assigned units in "Alerts on my units (n)". The loader read one page of `alerts.list` (limit 50) over every status, most severe first, and the view dropped the resolved ones. The list sorts by severity across the statuses, so once the assigned units held 50 resolved alerts of a higher severity, the open alerts behind them were missing from the card and its count. This is the class of IR710 (the HQ alerts screen).
+
+1. **Reproduced.** `technician/tests/overviewLoad.test.ts` serves 50 resolved critical alerts and one open warning, in the list's order. With one page of every status the card is empty (the test fails). With the fix it lists the open warning.
+2. **Fix.** The loader reads the open and the acknowledged alerts each with its own status filter, in full (`coreAll`), most severe first. The card's order (worst, then newest) and its links are unchanged. A role that may not read alerts still gets an empty card (`orWhenRefused`).
+3. **Not changed.** The technician unit pages read their unit's alerts as before. Every operation, route and count stays the same.
