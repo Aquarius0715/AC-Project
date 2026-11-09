@@ -14,6 +14,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/modules/maintenance"
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
+	"github.com/pradita/ac-project/service/api/internal/platform/money"
 	"github.com/pradita/ac-project/service/api/internal/platform/paging"
 )
 
@@ -1062,8 +1063,15 @@ func (in *ResolveInput) Validate() map[string]string {
 		fieldErrs["reply"] = apperr.KeyLength
 	}
 
-	if in.AdjustmentMinor != nil && *in.AdjustmentMinor == 0 {
-		fieldErrs["adjustmentMinor"] = "error.nonZero"
+	if in.AdjustmentMinor != nil {
+		switch {
+		case *in.AdjustmentMinor == 0:
+			fieldErrs["adjustmentMinor"] = "error.nonZero"
+		case !money.InRange(max(*in.AdjustmentMinor, -*in.AdjustmentMinor)):
+			// signed, but its size stays within the safe-integer range (IR647, IR659); -MinInt64 wraps to itself, which
+			// is negative and refused here too
+			fieldErrs["adjustmentMinor"] = apperr.KeyRange
+		}
 	}
 
 	return fieldErrs
