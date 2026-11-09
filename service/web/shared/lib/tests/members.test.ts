@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
 import {
-  allowedFor, allPermissions, isActive, MEMBER_FIELDS, memberDraft, memberErrors, memberFieldId, memberInput, memberRows, orgKind, resourceWord, roleDefaults, roleWord, validity, zonedLocal,
+  allowedFor, allPermissions, isActive, MEMBER_FIELDS, memberDraft, memberErrors, memberFieldId, memberInput, memberRows, orgKind, resourceWord, revokeInput, roleDefaults, roleWord, validity, zonedLocal,
   type ApiMember, type MemberDraft,
 } from "@ac/web/lib/members";
 
@@ -96,5 +96,18 @@ describe("the form's field order", () => {
       ...memberErrors(draft({ userId: "", creatingUser: true, inviteEmail: "nope", inviteName: " " }), { selfUserId: "me" }) };
     expect(Object.keys(all).filter((k) => !(MEMBER_FIELDS as readonly string[]).includes(k))).toStrictEqual([]);
     expect([memberFieldId("newUser.email"), memberFieldId("validFrom")]).toStrictEqual(["member-newUser-email", "member-validFrom"]);
+  });
+});
+
+describe("revokeInput", () => {
+  it("sends the saved membership, not the form's unsaved edits, with the reason (IR703)", () => {
+    // saved with seconds: the revoke keeps the start exactly as stored, and the form's edits play no part
+    const saved = member({ validFrom: "2026-09-01T00:00:30Z", permissions: [ALERT_READ, IDENTITY_READ] });
+    const input = revokeInput(saved, "tenant-a", ASIA_TOKYO, "  left the company ");
+    expect(input).toMatchObject({ id: "m1", userId: "u1", organizationId: "org-p", role: TECHNICIAN, employment: "external",
+      permissions: [ALERT_READ, IDENTITY_READ], scopes: [{ kind: "unit", id: "unit-1" }], validFrom: "2026-09-01T00:00:30Z", reason: "left the company" });
+  });
+  it("keeps an admin's saved scopes as they are (the form shows the tenant for none)", () => {
+    expect(revokeInput(member({ role: "admin", employment: null, scopes: [] }), "tenant-a", ASIA_TOKYO, "x").scopes).toStrictEqual([]);
   });
 });

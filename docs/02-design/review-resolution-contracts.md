@@ -9632,3 +9632,12 @@ The technician overview (FR-T01, DD-T01, SCR-T01) read `jobs.list` as one page o
 2. **Fix.** The loader reads every page (`coreAll`, which follows `nextCursor` with the same sort up to 1,000 items, SR14), as the customer's maintenance list already does. The order is the server's, as before.
 3. **Test.** `technician/tests/overviewLoad.test.ts` (today's job after the first page is in Today; completed ones are not counted, IR642), with the DAL mocked. Failing before, passing after. The technician app gets its own Vitest (`technician/vitest.config.mts`, Node, `npm test` of the workspace): a test of the app's loader cannot live in the shared package, which must not import an app (`import/no-relative-packages`, `import/no-extraneous-dependencies`).
 4. **Not changed.** The API, the sorts and the screen. Partner loaders that read one page of `jobs.list` (team, schedule, payouts) are left to their own review: some show only the latest items on purpose.
+
+## IR703 Revoking access sends the saved membership, not the form's unsaved edits (review round 144, 2026-11-10)
+
+In Access & roles (FR-A03, DD-A03), "Revoke access…" saves the membership with `validUntil` at the business clock (IR492). The revoke was built from the form's draft, with only the permissions and scopes put back to the saved ones. The draft also carries the "Valid from" field, which stays editable, and it holds the times to the minute only.
+
+1. **What went wrong.** Suppose HQ edited "Valid from" and revoked without saving. The revoke then saved that edit as well, under the revoke's audit entry. With a start set later than now, `members.save` refused the revoke (the access would end before it starts). Even without an edit, a start saved with seconds was cut to the minute by the revoke.
+2. **Fix.** `revokeInput(membership, tenantId, zone, reason)` (`shared/lib/members.ts`) builds the revoke from the saved membership. Its scopes stay as saved (for an admin with none saved, the form shows the tenant but the revoke does not add it), and its start stays to the second. The reason is trimmed, and the action sets `validUntil` to now, as before.
+3. **Tests.** `members.test.ts` checks two cases. The revoke carries the saved permissions, scopes and start, to the second, with the trimmed reason. An admin's empty saved scopes stay empty. Both failed before the fix (no such function) and pass after.
+4. **Not changed.** The API, the revoke dialog and Save. A revoke still needs its own reason.
