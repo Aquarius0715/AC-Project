@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -244,4 +246,76 @@ func TestEnvAndTokenHelpers(t *testing.T) {
 	}
 
 	_ = context.Background()
+}
+
+// TestDeviceKeyIsTheDeviceOfTheTopic: telemetry, heartbeat and acknowledgement topics of one device give the same key,
+// so its messages stay in order on one worker; a topic of another shape is its own key.
+func TestDeviceKeyIsTheDeviceOfTheTopic(t *testing.T) {
+	t.Parallel()
+
+	const device = "dev-9"
+
+	for topic, want := range map[string]string{
+		"t/tenant-1/d/dev-9/telemetry": device,
+		"t/tenant-1/d/dev-9/heartbeat": device,
+		"t/tenant-1/d/dev-9/cmd/ack":   device,
+		"t/tenant-1/d":                 "t/tenant-1/d",
+		"":                             "",
+	} {
+		if got := deviceKey(topic); got != want {
+			t.Errorf("deviceKey(%q) = %q, want %q", topic, got, want)
+		}
+	}
+}
+
+// TestSendReusesItsConnections: sending is many calls a second from the workers, and a client that opens a connection
+// for each one runs out of local ports (connect: cannot assign requested address) and loses readings and
+// acknowledgements. So the workers share a few connections, however many calls they make.
+func TestSendReusesItsConnections(t *testing.T) {
+	t.Parallel()
+
+	var opened atomic.Int64
+
+	api := httptest.NewUnstartedServer(
+		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = w.Write([]byte(`{"data":{}}`))
+		}),
+	)
+	api.Config.ConnState = func(_ net.Conn, state http.ConnState) {
+		if state == http.StateNew {
+			opened.Add(1)
+		}
+	}
+	api.Start()
+
+	defer api.Close()
+
+	const (
+		senders = 8
+		each    = 50
+	)
+
+	client := newHTTPClient()
+
+	var (
+		running sync.WaitGroup
+		trigger iotbridge.Trigger
+	)
+
+	for range senders {
+		running.Go(func() {
+			for range each {
+				err := send(t.Context(), client, api.URL, trigger)
+				if err != nil {
+					t.Error(err)
+				}
+			}
+		})
+	}
+
+	running.Wait()
+
+	if got := opened.Load(); got > senders*2 {
+		t.Errorf("%d connections opened for %d calls from %d senders", got, senders*each, senders)
+	}
 }
