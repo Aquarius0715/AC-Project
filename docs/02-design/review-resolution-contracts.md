@@ -9425,3 +9425,11 @@ The customer's Energy & cost screen offers the monthly report export. Its defaul
 
 1. **The month.** `previousMonth(now)` in `lib/clientEnergy.ts` takes the Kuala Lumpur year and month of now and gives the one before it (January gives December of the year before). The page uses it.
 2. **Test.** `energy.test.ts` checks an ordinary day, the first of a month, January, and the instants at the end of a month in UTC (16:00 on the last day and a minute before it). No operation, route or API changes.
+
+## IR682 The notice of a change comes even when the change removes the screen that asked (review round 92) — 2026-11-09
+
+IR680 and IR681 moved the "saved" notice into an effect of the component that made the change, to run when the new read is on the screen. A delete (DEC-103: a contractor company, a device, a customer, a model) removes the row, and with it the modal or button that asked, in the very commit that shows the new read. That component's effects never ran again: no "deleted" notice and no `after` (the URL patch, the close of the dialog) came. The unit test of the hook showed it; the E2E of the deletes in the development stack could not (its Go images pre-date the delete operations, so the stack refuses them before the web part is reached).
+
+1. **`useRefreshThen`.** When the component is removed while a notice is waiting, the notice runs as it goes (the cleanup of an effect with no dependencies). The toast belongs to the page, so it is still shown; a notice that was already run is not run again.
+2. **Test.** `useRefreshThen.test.tsx`: a component that asked and is unmounted before the transition ends runs the notice once (it failed before). No operation, route, screen or count changes.
+3. **A symlink on main.** The IR681 commit carried `service/web/shared/node_modules`, a symlink into the working tree of one machine (a worktree's link to the installed packages): `node_modules/` in `service/.gitignore` matches only a directory, not a link. It is removed from the repository and the rule is `node_modules`.

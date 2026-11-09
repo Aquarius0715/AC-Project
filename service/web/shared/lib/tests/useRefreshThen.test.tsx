@@ -34,4 +34,13 @@ describe("useRefreshThen", () => {
     await act(() => { screen.getByRole("button", { name: "shown" }).click(); return Promise.resolve(); });
     expect(then.mock.calls).toHaveLength(1); // once
   });
+
+  it("runs the notice when the screen that asked is gone with the new read (a deleted row)", async () => {
+    const then = vi.fn();
+    const view = render(<Screen then={then} />);
+    await act(() => { screen.getByRole("button", { name: "change" }).click(); return Promise.resolve(); });
+    expect(then).not.toHaveBeenCalled();
+    view.unmount(); // the new screen has no such row: this component is removed while its transition is still on
+    expect(then.mock.calls).toHaveLength(1);
+  });
 });

@@ -1,5 +1,6 @@
 # Node / Next.js (npm workspace: web-shared, *-web)
-node_modules/
+node_modules
+# (no slash: a symlink to another tree's node_modules, as a worktree uses, is ignored too; one was committed by mistake)
 .next/
 next-env.d.ts
 *.tsbuildinfo
