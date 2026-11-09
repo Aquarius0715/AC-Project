@@ -26,7 +26,8 @@ function actionFiles(directory: string): string[] {
 }
 
 describe("the Server Actions of the apps", () => {
-  const files = APPS.flatMap((app) => actionFiles(path.join(root, app, "app")));
+  // the apps' own screens and the shared ones the apps re-export (shell: notifications, preferences, demo panel; IR686)
+  const files = [...APPS.flatMap((app) => actionFiles(path.join(root, app, "app"))), ...actionFiles(path.join(root, "shared", "screens"))];
 
   it("find the action files", () => {
     expect(files.length).toBeGreaterThan(20);

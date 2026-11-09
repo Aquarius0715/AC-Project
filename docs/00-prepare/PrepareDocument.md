@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.548.0
+version: 0.549.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -300,6 +300,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.549.0: IR686: the shared shell's Server Actions (notifications, preferences, demo panel) word a failed call with actionFailure; the guard test reads them too.
 0.548.0: IR685: declining an offer does not read the page again, so the person sees the confirmation, not a not-found page.
 0.547.0: IR684: the broker password script writes its file again after a forced checkout put the committed one back (test deployments).
 0.546.0: IR683: every Server Action words a failed call with actionFailure, so the sign-in redirect of a gone session is not swallowed.

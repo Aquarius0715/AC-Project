@@ -27,7 +27,7 @@ describe("Mark all as read", () => {
   });
   it("passes a refusal on, with the wait of the write limit", async () => {
     dal.coreOp.mockRejectedValueOnce(new dal.CoreError(domainError({ code: "RATE_LIMITED", messageKey: "error.rateLimited", fieldErrors: {}, retryAfterSeconds: 12 })));
-    expect(await markAllRead(["n1"])).toStrictEqual({ marked: 0, skipped: 0, failure: { code: "RATE_LIMITED", messageKey: "error.rateLimited", fieldErrors: {}, retryAfterSeconds: 12 } });
+    expect(await markAllRead(["n1"])).toStrictEqual({ marked: 0, skipped: 0, failure: { ok: false, code: "RATE_LIMITED", messageKey: "error.rateLimited", fieldErrors: {}, retryAfterSeconds: 12 } }); // actionFailure marks it ok: false (IR686)
   });
   it("marks nothing when the Core API is unreachable", async () => {
     dal.coreOp.mockRejectedValueOnce(new TypeError("fetch failed"));
