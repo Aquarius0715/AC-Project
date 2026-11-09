@@ -160,6 +160,21 @@ func TestUnitScopeExternalTechnicianAndContractor(t *testing.T) {
 		res["messageKey"] != keyAssignmentNotStarted {
 		t.Fatalf("telemetry before the work window: %d %v", code, res)
 	}
+	// the same read by the room the unit stands in is gated alike (IR673)
+	bySpace := `{"from":"` + clock().Add(-time.Hour).
+		Format(time.RFC3339) +
+		`","to":"` + clock().Format(
+		time.RFC3339,
+	) + `","spaceId":"` + seed.ID("room-b-1").String() + `","metric":"temperature","query":{}}`
+	if code, res := post(
+		srv,
+		techB(),
+		"telemetry.series",
+		bySpace,
+	); code != 403 ||
+		res["messageKey"] != keyAssignmentNotStarted {
+		t.Fatalf("telemetry by space before the work window: %d %v", code, res)
+	}
 
 	if code, _ := post(srv, contrA(), "alerts.get", `{"id":"`+alert+`"}`); code != 200 {
 		t.Fatalf("contractor reads the alert of its accepted job: %d", code)
@@ -196,6 +211,10 @@ func TestUnitScopeExternalTechnicianAndContractor(t *testing.T) {
 
 	if code, _ := post(srv, techB(), "telemetry.series", series); code != 200 {
 		t.Fatalf("telemetry inside the work window: %d", code)
+	}
+
+	if code, _ := post(srv, techB(), "telemetry.series", bySpace); code != 200 {
+		t.Fatalf("telemetry by space inside the work window: %d", code)
 	}
 
 	if n := readings(); n == 0 { // the inserted temperature, plus readings other tests left on this unit

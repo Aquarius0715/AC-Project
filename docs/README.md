@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.535.0 / Created: 2026-09-14 / Updated: 2026-11-07 / Status: Draft for review / Language: English
+Version: 0.536.0 / Created: 2026-09-14 / Updated: 2026-11-07 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -100,6 +100,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.536.0 (2026-11-09): telemetry.series by space waits for the work window of an external technician (IR673; no operation changes).
 0.535.0 (2026-11-09): a unit is saved with a model only while the model row is read with a share lock (IR672; no operation changes).
 0.534.0 (2026-11-09): a serial or MQTT node_id that another device takes at the same moment answers the specific duplicate conflict (IR671; no operation changes).
 0.533.0 (2026-11-09): units.coverage sorted by id follows the direction (IR670; no operation changes).
