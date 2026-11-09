@@ -9322,3 +9322,10 @@ database-design.md says the 30-minute import previews (`assets.unit_import_previ
 
 1. **The rule.** `units.importPreview` deletes the previews of its tenant whose `expires_at` is at or before now (business time) in the transaction that stores the new one. A commit with an expired preview is unchanged (CONFLICT, as `units.importCommit` answers it today); the commit still deletes the preview it takes.
 2. **Tests.** `TestUnitsImportPreviewPurgesExpiredPreviews` (an expired and a live preview; only the live one is left after a new preview) failed before the fix. No operation, route or screen changes; 224 operations, 245 routes.
+
+## IR669 A rename refused by the unique index answers the sibling-name conflict (review round 54) — 2026-11-09
+
+`locations.rename` checks before it writes that no sibling has the new name (DD-A02: unique among the non-archived siblings, CONFLICT `error.duplicateSiblingName`). A sibling saved with that name after the check and before the update (not committed when the check ran) is refused by the unique index (`properties_name`, `spaces_name`) at the update, and the refusal reached the caller as the generic CONFLICT `error.conflict`: the form could not show that the name is taken. The saves (`properties.save`, `spaces.save`) already map the index to `error.duplicateSiblingName` (IR208).
+
+1. **The mapping.** The update of `locations.rename` passes its error through the same `dupSibling` mapping as the saves. Nothing else changes (units have no index; their check is unchanged).
+2. **Test.** `TestRenameToANameTakenAtTheSameMomentIsAConflict` holds an uncommitted sibling with the new name and sends the rename: before the fix it answered CONFLICT with `error.conflict`, now `error.duplicateSiblingName`. No operation, route or screen changes.
