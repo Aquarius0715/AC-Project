@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { translator } from "@ac/web/lib/i18n";
 import {
-  actionText, autoDraft, autoErrors, autoInput, conditionText, decisionWord, disabledReasonWord, evaluationInput, policyGroups, reasonWord,
-  type ApiAutoPolicy, type AutoDraft,
+  actionText, autoDraft, autoErrors, autoInput, conditionText, decisionWord, disabledReasonWord, evaluationInput, evaluationKey, policyGroups, reasonWord,
+  type ApiAutoPolicy, type AutoDraft, type FactRow,
 } from "@ac/web/lib/automation";
 
 const PEAK_SAVER = "Peak saver";
@@ -76,5 +76,24 @@ describe("HQ automation policies in Malay (IR303)", () => {
     expect(autoErrors({ ...autoDraft(), name: "", unitIds: [] }, null, t)).toStrictEqual({ name: "1–120 aksara", unitIds: "Pilih sekurang-kurangnya satu unit" });
     expect([reasonWord("restricted", t), decisionWord("selected", t), decisionWord("requested", t), disabledReasonWord("consent_revoked", t)]).toStrictEqual(["disekat oleh sekatan aktif", "dipilih", "diminta", "persetujuan ditarik balik"]);
     expect([reasonWord("superseded"), reasonWord("superseded", t)]).toStrictEqual(["superseded by a schedule starting in the same minute", "digantikan oleh jadual yang bermula pada minit yang sama"]); // IR504
+  });
+});
+
+describe("evaluationKey", () => {
+  // a repeated Fire reuses its one-time event ID only for the same evaluation; another body under the same key is
+  // refused (D04), so a changed condition type must make a new event (IR704)
+  const occupied: FactRow = { unitId: "u1", value: "true", quality: "valid" };
+  const rows: FactRow[] = [occupied];
+  it("is the same for the same evaluation", () => {
+    expect(evaluationKey("occupancy", rows)).toBe(evaluationKey("occupancy", [{ ...occupied }]));
+  });
+  it("changes with the policy's condition type for a fact without its own kind", () => {
+    expect(evaluationKey("peak", rows)).not.toBe(evaluationKey("occupancy", rows));
+  });
+  it("does not follow the policy's type for a fact with its own kind, and follows its value", () => {
+    const tariff: FactRow = { unitId: "u1", kind: "tariff", value: "0.5", quality: "valid" };
+    const own: FactRow[] = [tariff];
+    expect(evaluationKey("peak", own)).toBe(evaluationKey("occupancy", own));
+    expect(evaluationKey("peak", own)).not.toBe(evaluationKey("peak", [{ ...tariff, value: "0.6" }]));
   });
 });
