@@ -9315,3 +9315,10 @@ IR647 left the payout lines out of the amount range check because the server com
 
 1. **The rule.** `adjustmentMinor` is a non-zero whole number whose size is at most 2^53 − 1 (`money.InRange` on its absolute value; the smallest int64, whose absolute value does not exist, is refused too): VALIDATION `error.range` on `adjustmentMinor` otherwise.
 2. **Tests.** `TestAmountsStayInSafeRange` (both signs, the last valid amount accepted) and `TestPayoutAdjustmentMinInt64`. No operation, route or screen changes; 224 operations, 245 routes.
+
+## IR665 A new CSV import preview removes the expired ones (review round 51) — 2026-11-09
+
+database-design.md says the 30-minute import previews (`assets.unit_import_previews`) are "purged after expiry", and the table has an index on `expires_at` for it, but nothing deleted them: a preview left only when its import was committed or its customer deleted, so every file anyone previewed and did not commit stayed in the table (the rows of up to 1,000 lines, resolved IDs included).
+
+1. **The rule.** `units.importPreview` deletes the previews of its tenant whose `expires_at` is at or before now (business time) in the transaction that stores the new one. A commit with an expired preview is unchanged (CONFLICT, as `units.importCommit` answers it today); the commit still deletes the preview it takes.
+2. **Tests.** `TestUnitsImportPreviewPurgesExpiredPreviews` (an expired and a live preview; only the live one is left after a new preview) failed before the fix. No operation, route or screen changes; 224 operations, 245 routes.
