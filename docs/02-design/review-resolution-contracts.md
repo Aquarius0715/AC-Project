@@ -9658,3 +9658,12 @@ IR49(b) keeps an external technician's equipment reads (`units.get`, `telemetry.
 2. **Fix.** The unit list counts alerts over the units the caller may read now (`unitscope.EquipmentReadable`), as it already did for the latest measurements. HQ, clients, contractors and internal technicians are unchanged: for them every listed unit is readable.
 3. **Test.** The same test now checks `activeAlertCount` 0 before the work window. It failed before the fix (1) and passes after.
 4. **Not changed.** `observedState` and `effectivePowerState` in the list. They come from the unit's own record, not from a telemetry or alert read, and IR49(b) does not name them. Whether they too should wait for the work window is left to the owner of IR49.
+
+## IR706 A twice-renewed "other" certificate stays in one row (review round 160, 2026-11-10)
+
+The contractor's certifications tab (FR-P09, DD-P09) shows one row per technician and qualification. A certificate filed under "other" is a group of its own, and its renewals join it (`groupedCerts`, `shared/lib/partnerCertificates.ts`). `certificates.submit` accepts as `renewalOf` any certificate of the same technician and code, a renewal included, and `certificates.list` answers by expiry. The grouping merged a renewal into the group of the certificate it renews one step at a time, in list order. With an original, its renewal and the renewal of that renewal, the first renewal joined the original's group and was gone when the second looked for it. The second renewal then became a row of its own, and the original's row named the first renewal as its latest certificate.
+
+1. **Reproduced.** A unit test with that chain in list order (expiry ascending) gave two rows.
+2. **Fix.** Each "other" certificate is filed under the first certificate of its chain: `renewalOf` is followed back while it names another "other" certificate of the list, each one once (a loop cannot hang). The result no longer depends on the order of the list. A renewal of a certificate outside the list keeps its own row, as before.
+3. **Test.** `partnerCertificates.test.ts`: the chain gives one row, in list order and reversed. Failing before (two rows), passing after.
+4. **Not changed.** The API, the qualification codes, which by design always group by code, and every operation, route and count.

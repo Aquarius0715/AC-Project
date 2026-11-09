@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.568.0
+version: 0.569.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -300,6 +300,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.569.0: IR706: a twice-renewed other certificate stays in one row on the contractor's certifications tab.
 0.568.0: IR705: the unit list counts a unit's alerts only while the caller may read them (an external technician before the work window sees none).
 0.567.0: IR704: a repeated automation Fire reuses its event only for the same evaluation, so changing the condition type makes a new event.
 0.566.0: IR703: revoking access sends the saved membership (scopes and start unchanged), not the form's unsaved edits.
