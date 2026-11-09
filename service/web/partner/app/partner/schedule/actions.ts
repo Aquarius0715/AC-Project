@@ -7,6 +7,7 @@
 // language and time zone for the confirmation (IR275).
 import { refresh } from "next/cache";
 import { coreDisplay, coreOp, CoreError } from "@ac/web/lib/dal";
+import { actionFailure } from "@ac/web/lib/actionFailure";
 import { showSpan } from "@ac/web/lib/i18n";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 
@@ -23,6 +24,6 @@ export async function assignTechnician(jobId: string, jobVersion: number, techni
       if (error.error.code === "CONFLICT") refresh(); // overlap, changed state or another version: show the latest
       return { ok: false, code: error.error.code, messageKey: error.error.messageKey, fieldErrors: error.error.fieldErrors, retryAfterSeconds: error.error.retryAfterSeconds };
     }
-    throw error;
+    return actionFailure(error);
   }
 }

@@ -6,6 +6,7 @@
 // only the preview is made then. A refused note keeps the form; a refused preview reports that the note was saved.
 import { refresh } from "next/cache";
 import { coreDisplay, coreOp, CoreError } from "@ac/web/lib/dal";
+import { actionFailure } from "@ac/web/lib/actionFailure";
 import { showTime } from "@ac/web/lib/i18n";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import type { OpInput } from "@ac/web/lib/opTypes";
@@ -16,7 +17,7 @@ export interface Communication {
 }
 interface Preview { id: string; templateKey: string; channel: string; recipientMembershipId: string; deliveryState: string; occurredAt: string; at: string }
 export type CommunicationFailure = { ok: false; stage: "note" | "preview"; noteSaved: boolean } & ActionFailure;
-const failure = (e: CoreError, stage: CommunicationFailure["stage"], noteSaved: boolean): CommunicationFailure => ({ ok: false, code: e.error.code, messageKey: e.error.messageKey, fieldErrors: e.error.fieldErrors, retryAfterSeconds: e.error.retryAfterSeconds, stage, noteSaved });
+const failure = (e: unknown, stage: CommunicationFailure["stage"], noteSaved: boolean): CommunicationFailure => ({ ...actionFailure(e), stage, noteSaved });
 
 export async function communicate(c: Communication): Promise<CommunicationFailure | { ok: true; value: { noteSaved: boolean; preview: Preview } }> {
   const message = c.message.trim();
@@ -26,8 +27,7 @@ export async function communicate(c: Communication): Promise<CommunicationFailur
       await coreOp("jobs.addNote", { jobId: c.jobId, visibility: c.visibility, message }, { write: true, expectedVersion: c.version ?? undefined });
       isNoteSaved = true;
     } catch (error) {
-      if (!(error instanceof CoreError)) throw error;
-      if (error.error.code === "CONFLICT") refresh(); // another version or a closed job: show the latest
+      if (error instanceof CoreError && error.error.code === "CONFLICT") refresh(); // another version or a closed job: show the latest
       return failure(error, "note", false);
     }
   }
@@ -37,7 +37,6 @@ export async function communicate(c: Communication): Promise<CommunicationFailur
     const at = showTime(p.occurredAt, await coreDisplay()); // in the user's display time zone (IR278)
     return { ok: true, value: { noteSaved: isNoteSaved, preview: { id: p.id, templateKey: p.templateKey, channel: p.channel, recipientMembershipId: p.recipientMembershipId, deliveryState: p.deliveryState, occurredAt: p.occurredAt, at } } };
   } catch (error) {
-    if (!(error instanceof CoreError)) throw error;
     if (isNoteSaved) refresh();
     return failure(error, "preview", isNoteSaved);
   }

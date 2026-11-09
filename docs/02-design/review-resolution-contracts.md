@@ -9380,3 +9380,10 @@ The Server Actions of the technician's job workspace (acknowledge, check-in, pau
 
 1. **The failure.** `actionFailure(error)` words what a Server Action's call threw: a refused call by its code, message key and field errors; Next's own control flow (the redirect to sign-in) is thrown on as before; anything else is `UNAVAILABLE`, which the page shows as a message and keeps its state. The actions of the job workspace use it.
 2. **Test.** `actionFailure.test.ts` covers the refused call, the call without an answer and the redirect. No operation, route or screen layout changes.
+
+## IR676 Every Server Action answers unavailable when the Core API gives no answer (review round 77) — 2026-11-09
+
+IR675 changed the Server Actions of the technician's job workspace so that a Core API that gives no answer (restarting, or unreachable from the web server) reads as the unavailable result instead of an error thrown from the action, which sends the page to its error boundary and loses what the user has typed. Ten more Server Action files of the other apps had the same shape — a branch for a refused call and `throw` for everything else: HQ jobs (cost lines, plans, contractors), customer alerts and maintenance, and the contractor's team, schedule, history (note and preview), job detail, report review and payouts.
+
+1. **The failure.** Their final `throw` is `actionFailure(error)` (IR675): the refusal by its code, Next's own redirect through, anything else `UNAVAILABLE`. The history action builds its stage and note state on that result. No operation, route or screen changes.
+2. **Test.** `serverActionFailures.test.ts` reads every `actions.ts` of the four apps and refuses one that looks at `CoreError` without answering the other errors (through `actionFailure` or as `error.unavailable`); eight of the files failed it before.

@@ -9,6 +9,7 @@
 import { isNone } from "@ac/web/lib/isNone";
 import { refresh } from "next/cache";
 import { coreOp, CoreError } from "@ac/web/lib/dal";
+import { actionFailure } from "@ac/web/lib/actionFailure";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import { certDates, certificateCode } from "@ac/web/lib/partnerCertificates";
 import { formValue } from "@ac/web/lib/formValue";
@@ -18,10 +19,7 @@ import type { OpInput } from "@ac/web/lib/opTypes";
 import { formText } from "@ac/web/lib/formData";
 
 type Result<T> = { ok: true; value: T } | ({ ok: false } & ActionFailure);
-const failure = (e: unknown): { ok: false } & ActionFailure => {
-  if (e instanceof CoreError) return { ok: false, code: e.error.code, messageKey: e.error.messageKey, fieldErrors: e.error.fieldErrors, retryAfterSeconds: e.error.retryAfterSeconds };
-  throw e;
-};
+const failure = (e: unknown): { ok: false } & ActionFailure => actionFailure(e);
 
 export async function setUnavailability(input: OpInput<"members.setUnavailability">): Promise<Result<{ conflicts: number }>> {
   try {
