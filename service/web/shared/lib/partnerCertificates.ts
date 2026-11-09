@@ -58,22 +58,27 @@ interface RowTools {
   state: (endsAt: number) => { status: CertStatus; days: number };
   badgeOf: (status: CertStatus, days: number | null) => CertRow["badge"];
 }
-/** A technician's certificates by qualification (an "other" certificate is its own group; a renewal joins its original). */
+/** A technician's certificates by qualification. An "other" certificate is its own group, and its renewals join it
+however long the chain of renewals is: each one is filed under the first certificate it renews, whatever the order of
+the list (IR706). */
 function groupedCerts(mine: ApiCert[]): Map<string, ApiCert[]> {
+  const byId = new Map(mine.map((c) => [c.id, c]));
+  // the first certificate of an "other" chain: renewalOf followed back while it names one of these, each step once
+  const rootOf = (c: ApiCert): string => {
+    const seen = new Set<string>();
+    let at = c;
+    while (at.renewalOf && !seen.has(at.id)) {
+      seen.add(at.id);
+      const before = byId.get(at.renewalOf);
+      if (before?.code !== "other") break;
+      at = before;
+    }
+    return at.id;
+  };
   const groups = new Map<string, ApiCert[]>();
   for (const c of mine) {
-    const k = c.code === "other" ? `other:${c.id}` : c.code;
+    const k = c.code === "other" ? `other:${rootOf(c)}` : c.code;
     groups.set(k, [...(groups.get(k) ?? []), c]);
-  }
-  // a renewal of an "other" certificate joins its original
-  for (const [k, list] of groups) {
-    const of = list[0]?.renewalOf;
-    const target = of ? groups.get(`other:${of}`) : undefined;
-    if (!(target && k.startsWith("other:"))) {
-      continue;
-    }
-
-    target.push(...list); groups.delete(k);
   }
   return groups;
 }

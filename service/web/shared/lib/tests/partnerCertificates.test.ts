@@ -35,6 +35,7 @@ const certs = [
   cert("c3", { membershipId: "m-b", code: DEMO_OUTDOOR, name: "Refrigerant handling", number: "RH-2022-0310", issuedAt: KL("2022-09-01"), expiresAt: KL("2026-09-01"), status: "expired" }),
 ];
 const renewal = cert("c4", { status: PENDING_VERIFICATION, renewalOf: "c1", number: "EB-2026-0931", issuedAt: KL(TEXT_2026_09_28), expiresAt: KL("2029-09-27"), createdAt: "2026-09-14T03:00:00Z" });
+const height = (id: string, over: Partial<ApiCert>) => cert(id, { membershipId: "m-c", code: "other", name: "Working at height", ...over });
 const job: CertJob = { jobId: "job-p07-full", short: "job-p07", technicianId: "m-a", slot: { startAt: "2026-10-20T01:00:00Z", endAt: "2026-10-20T04:00:00Z" }, text: "20 Oct, 9:00 am – 12:00 pm MYT", unit: "Server room AC", required: [DEMO_ELECTRICAL] };
 
 describe("partner certifications", () => {
@@ -69,6 +70,19 @@ describe("partner certifications", () => {
     expect([uploaded.detail, uploaded.badge.text, uploaded.renewalPending, uploaded.actions]).toStrictEqual(["granted by HQ · the upload waits for HQ", "Valid", true, []]);
     const waiting = certRows([member("m-c", TECH_EXTERNAL_A2, [])], [cert("c8", { membershipId: "m-c", code: DEMO_INDOOR, status: PENDING_VERIFICATION })], [], 60, NOW);
     expect(waiting.map((r) => [r.badge.text, r.actions, r.blocks])).toStrictEqual([["Pending HQ verification", ["view"], []]]);
+  });
+
+  it("keeps a twice-renewed other certificate in one row, whatever the list order (IR706)", () => {
+    // certificates.list answers by expiry: the original, its renewal, then the renewal of that renewal
+    const chain = [
+      height("o1", { status: "expired", expiresAt: KL("2026-09-01") }),
+      height("o2", { renewalOf: "o1", expiresAt: KL("2027-09-01") }),
+      height("o3", { renewalOf: "o2", status: PENDING_VERIFICATION, expiresAt: KL("2028-09-01") }),
+    ];
+    for (const list of [chain, chain.toReversed()]) {
+      const rows = certRows([member("m-c", TECH_EXTERNAL_A2, [])], list, [], 60, NOW).filter((r) => r.name === "Working at height");
+      expect(rows).toHaveLength(1);
+    }
   });
 
   it("names a qualification a booked job needs that the technician does not hold", () => {
