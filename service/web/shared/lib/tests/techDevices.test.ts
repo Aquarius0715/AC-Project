@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ApiDevice, ApiDeviceDetail, ApiDeviceOperation } from "@ac/web/lib/devices";
 import {
   calibrationText, deviceFieldText, deviceRefusal, deviceTiles, eventRows, failureText, filterOf, followFilter, firmwareCard, HQ_FILTERS, jobFor, newerFirmware, newerVersions, openAlerts, openFaults,
-  newRegistration, operationLabel, operationRows, sensorRows, techDeviceRows, type ApiAlertLite, type ApiDeviceEventFull, type TechJob,
+  blankRegistration, operationLabel, operationRows, sensorRows, techDeviceRows, type ApiAlertLite, type ApiDeviceEventFull, type TechJob,
 } from "@ac/web/lib/techDevices";
 import { i18nOf } from "@ac/web/lib/i18n";
 
@@ -222,12 +222,12 @@ describe("the device screens in Malay with the display time zone (IR287)", () =>
   });
 });
 
-describe("newRegistration", () => {
+describe("blankRegistration", () => {
   it("starts at the first unit still without a device and its first job, with no serial or sensors", () => {
     // the form opens afresh: the unit registered last time is no longer listed after the refresh (IR701)
-    expect(newRegistration([{ unitId: "u2", jobs: [{ id: "j2" }, { id: "j3" }] }, { unitId: "u3", jobs: [] }])).toEqual({ serial: "", unitId: "u2", sensors: [], jobId: "j2" });
+    expect(blankRegistration([{ unitId: "u2", jobs: [{ id: "j2" }, { id: "j3" }] }, { unitId: "u3", jobs: [] }])).toStrictEqual({ serial: "", unitId: "u2", sensors: [], jobId: "j2" });
   });
   it("is empty when every assigned unit has a device", () => {
-    expect(newRegistration([])).toEqual({ serial: "", unitId: "", sensors: [], jobId: "" });
+    expect(blankRegistration([])).toStrictEqual({ serial: "", unitId: "", sensors: [], jobId: "" });
   });
 });

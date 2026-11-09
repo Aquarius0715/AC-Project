@@ -44,7 +44,7 @@ export function jobFor(unitId: string | null, jobs: TechJob[]): string | null {
 /** The register form as it opens (FR-T11): the first assigned unit still without a device and its first job, no serial
 and no sensors. It is made afresh each time the form opens: after a registration the refreshed list no longer has the
 unit registered, and an old unit or serial would go out although the select shows another unit (IR701). */
-export function newRegistration(register: readonly { unitId: string; jobs: readonly { id: string }[] }[]): { serial: string; unitId: string; sensors: Metric[]; jobId: string } {
+export function blankRegistration(register: readonly { unitId: string; jobs: readonly { id: string }[] }[]): { serial: string; unitId: string; sensors: Metric[]; jobId: string } {
   const first = register[0];
   return { serial: "", unitId: first?.unitId ?? "", sensors: [], jobId: first?.jobs[0]?.id ?? "" };
 }

@@ -8,7 +8,7 @@ import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import type { ApiDeviceDetail, Metric } from "@ac/web/lib/devices";
-import { connectionDot, deviceFieldText, deviceRefusal, FILTERS, filterOf, firmwareCardLook, firmwareSub, followFilter, operationTone, openAlerts, operationLabel, type EventRow, type Filter, type OperationRow, type TechDeviceRow, metricText, newRegistration } from "@ac/web/lib/techDevices";
+import { connectionDot, deviceFieldText, deviceRefusal, FILTERS, filterOf, firmwareCardLook, firmwareSub, followFilter, operationTone, openAlerts, operationLabel, type EventRow, type Filter, type OperationRow, type TechDeviceRow, metricText, blankRegistration } from "@ac/web/lib/techDevices";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import { acknowledgeAlert, addResponseNote, bindDevice, calibrateSensor, checkDevice, registerDevice, updateFirmware } from "../actions";
 import type { UnitSymbol } from "@ac/web/lib/contracts.gen";
@@ -46,7 +46,7 @@ export function TechDevicesView({ live }: Readonly<{ live: TechDevicesLive }>) {
   const [modal, setModal] = useState<null | "register" | "rebind" | "calibrate" | "firmware" | "note">(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [refused, setRefused] = useState<string | null>(null);
-  const [reg, setReg] = useState(() => newRegistration(live.register));
+  const [reg, setReg] = useState(() => blankRegistration(live.register));
   const [bind, setBind] = useState({ unitId: "", reason: "" });
   const [cal, setCal] = useState({ sensorId: "", reference: "", measured: "" });
   const [fw, setFw] = useState("");
@@ -119,7 +119,7 @@ export function TechDevicesView({ live }: Readonly<{ live: TechDevicesLive }>) {
           </Plain>
         ))}</div>
         <div className="flex flex-wrap items-center gap-2"><div className="w-64"><Search placeholder={t("Search serial, device or unit…")} value={q} onChange={setQ} /></div>
-          {live.canMaintain && <Btn variant="primary" disabled={live.register.length === 0} title={live.register.length > 0 ? undefined : t("Every assigned unit already has a device")} onClick={() => { setReg(newRegistration(live.register)); setErrors({}); setModal("register"); }}><Icon name="add" /> {t("Register device")}</Btn>}</div>
+          {live.canMaintain && <Btn variant="primary" disabled={live.register.length === 0} title={live.register.length > 0 ? undefined : t("Every assigned unit already has a device")} onClick={() => { setReg(blankRegistration(live.register)); setErrors({}); setModal("register"); }}><Icon name="add" /> {t("Register device")}</Btn>}</div>
       </div>
       {refused && <Banner tone="crit">{refused}</Banner>}
       <div className="split-rev">
