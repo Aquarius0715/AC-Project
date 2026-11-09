@@ -9568,3 +9568,11 @@ The test environment answers on two addresses (DEC-102, IR651), and the links of
 5. **Checked on a real Keycloak.** A throwaway stack on two addresses (`localhost` and `127.0.0.1`, `deploy/test/compose.multihost.yaml`), with a real token of each address: an invitation from each gave a link and a return address on that address, and a browser opened the link, set the password, came back to the app and signed in to `/partner` without leaving the address. An admin token of one address answered 401 on the other, which is why they are cached per address.
 6. **Not changed.** BFF, web apps, realm and nginx: the redirect URIs of each `PUBLIC_HOSTS` address are registered already. IR651 item 5 still holds for an e-mail asked for without a user's token. The notification e-mails the workers send still carry the canonical `APP_URL_*` (IR651 item 8).
 7. **Known limit.** Someone who can reach only the lab network, invited from the Tailnet, cannot open that link. They can ask for a password reset on the Keycloak page they can reach, whose link has that address. An invitation already sent keeps its link: send it again.
+
+## IR696 Clearing a preferred time's date in Admin's New job no longer takes the screen down (review round 122, 2026-11-09)
+
+`jobRequestErrors` runs while the New job form renders. A cleared date makes `zonedInstant` answer "", and the rule turned that into a date with `new Date(NaN).toISOString()`, which throws `RangeError`: clearing the date field took the screen down. "Add another time" threw the same way from `nextDay` on a cleared date.
+
+1. **Fix.** A time that is not complete is a field error, in the words the customer form already uses ("Enter the date and both times of each preferred time.", with its Malay and Japanese texts); `nextDay` moved to `shared/lib/adminJobs.ts` and answers "" for such a date, so the new row starts empty.
+2. **Checked for the same shape.** `preferredError` (customer) already refuses an empty time first, and `unavailabilityConflicts` (partner) checks `isDate` first. Times that come from the API are not form input and were not changed.
+3. **Tests.** `adminJobs.test.ts`: an empty start, an empty end, an empty later time, the Malay text, and `nextDay` across a month and a year and on empty and malformed dates. No operation, route or count changes.
