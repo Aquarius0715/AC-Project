@@ -197,7 +197,7 @@ func subscribeDemo(
 	sub := func(topic string, h mqtt.MessageHandler) {
 		// The handler only queues the message on its device's worker and returns, so the library takes the next message
 		// (and acknowledges this one to the broker) at once. A message acknowledged but not yet worked off is lost if the
-		// bridge stops then; a reading is re-sent by the device, and this bridge only stands in for AWS IoT rules.
+		// bridge stops then: the price of the parallel work, accepted because this bridge only stands in for AWS IoT rules.
 		queued := func(conn mqtt.Client, msg mqtt.Message) {
 			work.Submit(deviceKey(msg.Topic()), func() { h(conn, msg) })
 		}
