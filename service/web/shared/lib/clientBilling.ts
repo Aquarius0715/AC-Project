@@ -6,7 +6,7 @@
 import { amount } from "@ac/web/lib/energy";
 import {  businessDay, invoiceStatus, KL, type ApiContract, type ApiInquiry, type ApiInvoice, type ApiPayment, type InvoiceStatus } from "@ac/web/lib/billing";
 import { policyText, stateLabel, type ApiCommand, type ApiRestriction, type RestrictionState } from "@ac/web/lib/restrictions";
-import { money } from "@ac/web/lib/money";
+import { money, moneyByCurrency } from "@ac/web/lib/money";
 import { EN, intlTag, showDate, showTime, translator, type I18n, type Locale, type T, textOf } from "@ac/web/lib/i18n";
 
 const en = translator("en");
@@ -225,7 +225,7 @@ export function dueNotice(overdue: Pick<ApiInvoice, "id" | "number" | "amountMin
   const { t, display } = i;
   const lines: DueLine[] = [overdue.length === 1
     ? { text: t("Invoice {number} is overdue — {amount}", { number: first.number, amount: money(first.amountMinor, first.currency) }), href: `/customer/payments/${first.id}`, link: t("Pay now") }
-    : { text: t("{n} invoices are overdue — {amount} in total", { n: overdue.length, amount: money(overdue.reduce((sum, x) => sum + x.amountMinor, 0), first.currency) }), href: "/customer/payments?status=overdue", link: t("View invoices") }];
+    : { text: t("{n} invoices are overdue — {amount} in total", { n: overdue.length, amount: moneyByCurrency(overdue) }), href: "/customer/payments?status=overdue", link: t("View invoices") }];
   const r = restriction?.r;
   if (r && live.has(r.state)) {
     const n = r.unitIds.length;

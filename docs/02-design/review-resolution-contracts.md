@@ -9667,3 +9667,12 @@ The contractor's certifications tab (FR-P09, DD-P09) shows one row per technicia
 2. **Fix.** Each "other" certificate is filed under the first certificate of its chain: `renewalOf` is followed back while it names another "other" certificate of the list, each one once (a loop cannot hang). The result no longer depends on the order of the list. A renewal of a certificate outside the list keeps its own row, as before.
 3. **Test.** `partnerCertificates.test.ts`: the chain gives one row, in list order and reversed. Failing before (two rows), passing after.
 4. **Not changed.** The API, the qualification codes, which by design always group by code, and every operation, route and count.
+
+## IR707 Overdue totals are per currency, never added across currencies (review round 163, 2026-11-10)
+
+A customer's contracts may be in MYR or in USD (IR135 item 1), so its overdue invoices can be in both. Two screens added the overdue invoices' minor units together and wrote the sum in the first invoice's currency. 120.00 MYR and 50.00 USD then read as "170.00 MYR". The two screens are the customer overview's notice ("{n} invoices are overdue — {amount} in total", `dueNotice`, DEC-90 / IR610) and HQ's customer standing (the "Overdue billing" KPI, `standing` in `shared/lib/assets.ts`). The HQ dashboard and billing screens already list unpaid amounts per currency and never sum them across currencies.
+
+1. **Reproduced.** Unit tests with one MYR and one USD invoice: the notice said "180.00 MYR" (with a second MYR invoice) and the standing said "170.00 MYR".
+2. **Fix.** `moneyByCurrency` (`shared/lib/money.ts`) totals the amounts per currency in the order the currencies first appear and joins them ("130.00 MYR + 50.00 USD"). Both screens use it. A single currency reads as before.
+3. **Tests.** `clientBilling.test.ts` (the notice) and `assets.test.ts` (the standing). Failing before, passing after.
+4. **Not changed.** The API, the warranty-claim candidate (the costs of one job) and every operation, route and count.

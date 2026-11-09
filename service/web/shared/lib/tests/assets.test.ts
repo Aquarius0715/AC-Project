@@ -43,6 +43,9 @@ describe("HQ customers & units", () => {
     expect(standingOf("c-a", [k], [], null, NOW).restriction).toStrictEqual({ id: "r1", state: "active", contractId: "k1" });
     expect(standingMarks("active", standingOf("c-a", [k], [], null, NOW)).map((m) => m.label)).toStrictEqual(["Restriction active"]);
     expect(standingOf("c-a", [k], [], [], NOW).restriction).toBeNull(); // with restriction.read the restrictions list decides
+    // the overdue amount is per currency, never added across currencies (IR707)
+    const overdue = [{ id: "i1", contractId: "k1", amountMinor: 12_000, currency: "MYR" as const }, { id: "i2", contractId: "k1", amountMinor: 5000, currency: "USD" as const }];
+    expect(standingOf("c-a", [k], overdue, [], NOW).overdueAmount).toBe("120.00 MYR + 50.00 USD");
     expect(standingOf("c-a", [{ ...k, activeRestrictionIds: [] }], [], null, NOW).restriction).toBeNull();
     const rows = customerRows([{ id: "c1", version: 1, name: "Demo Customer A", status: "active", organizationId: "org-a", serviceProfile: "rto", createdAt: "2026-04-01T00:00:00Z" }],
       [{ id: "org-a", version: 2, name: "Customer A Sdn Bhd", kind: "customer", status: "active" }], [], [unit({}), unit({ id: "u2", effectivePowerState: "off" })], () => null);

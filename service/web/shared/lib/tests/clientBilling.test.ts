@@ -112,6 +112,10 @@ describe("the overview's notice (DEC-90, IR610)", () => {
       { text: "Cooling is limited to 24 °C or warmer on 1 unit until it is paid", href: "/customer/payments/i1?tab=restriction&restrictionId=r1", link: "View restriction details" },
     ]);
   });
+  it("totals overdue invoices per currency, never across currencies (IR707)", () => {
+    const mixed = [inv("i1", "INV-1", 12_000), { id: "i2", number: "INV-2", amountMinor: 5000, currency: "USD" as const }, inv("i3", "INV-3", 1000)];
+    expect(dueNoticeOf(mixed, null)[0]?.text).toBe("3 invoices are overdue — 130.00 MYR + 50.00 USD in total");
+  });
   it("counts several invoices, words a power-off and a scheduled restriction, and says nothing when all is paid", () => {
     const two = [inv("i1", "INV-1", 12_000), inv("i2", "INV-2", 3050)];
     expect(dueNotice(two, null)).toStrictEqual([{ text: "2 invoices are overdue — 150.50 MYR in total", href: "/customer/payments?status=overdue", link: "View invoices" }]);
