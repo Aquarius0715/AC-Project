@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.527.0 / Created: 2026-09-14 / Updated: 2026-11-07 / Status: Draft for review / Language: English
+Version: 0.528.0 / Created: 2026-09-14 / Updated: 2026-11-07 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -100,6 +100,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.528.0 (2026-11-09): a customer is deactivated only after its row is locked, so a unit being added at the same moment is seen (IR668; no operation changes).
 0.527.0 (2026-11-09): a property or unit is saved into a customer only after a delete of the customer has finished or never starts (IR667; no operation changes).
 0.523.0 (2026-11-09): a write that PostgreSQL runs again after a deadlock records its events and audit entries once, not once per attempt (IR663; no operation changes).
 0.522.0 (2026-11-09): a membership names each scope once, as it names each permission once; a repeated scope no longer slips past the scope-version check (IR661; no operation changes).

@@ -9301,3 +9301,10 @@ The user chose to delete accounts that were never used and to keep ending the ot
 
 1. **The lock.** `customerActive` reads the customer row `FOR SHARE`, as the parent reads of IR478 do: the delete waits for the save, or the save waits for the delete and finds no customer (NOT_FOUND). Nothing else changes: the same checks, the same errors.
 2. **Test.** `TestCustomerDeleteWaitsForASaveIntoTheCustomer` holds a delete of the customer row open in a second transaction and sends `properties.save`; before the fix the save answered 200 at once, now it waits for the commit and answers 404. No operation, route or screen changes.
+
+## IR668 A customer is deactivated only after its row is locked (review round 53) — 2026-11-09
+
+IR667 made `properties.save` and `units.save` read the customer row with a share lock. The deactivation in `customers.save` (status `inactive`, D05) checked for units, contracts and jobs first and updated the customer row last, so a unit save that had read the customer as active before the deactivation, and committed after its check, left an active unit under an inactive customer: the update waited for the share lock but did not look again.
+
+1. **The lock.** `canDeactivate` now locks the customer row (`FOR UPDATE`) before it looks for units: a unit save in flight is waited for and seen (CONFLICT `error.customerActive`), and a unit save that starts later waits for the deactivation and finds the customer inactive (CONFLICT `error.customerInactive`).
+2. **Test.** `TestCustomerDeactivateWaitsForAUnitBeingAdded` holds a unit insert with a share lock on the customer open in a second transaction and sends the deactivation; before the fix it answered 200 and left the unit under the inactive customer, now it waits and answers 409. No operation, route or screen changes.
