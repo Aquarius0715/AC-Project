@@ -33,6 +33,7 @@ import { oneOf } from "@ac/web/lib/oneOf";
 import { filled } from "@ac/web/lib/filled";
 import { entryOf } from "@ac/web/lib/lookup";
 import { isAfter, isBefore } from "@ac/web/lib/order";
+import { useRefreshThen } from "@ac/web/lib/useRefreshThen";
 
 /** A recipient's role in words (IR499). */
 const ROLE_WORD: Record<string, string> = { client: "Client", admin: "Admin", contractor: "Contractor", technician: "Technician" };
@@ -202,6 +203,7 @@ export function BillingView({ live }: Readonly<{ live?: BillingLive }>) {
   const router = useRouter();
   const pathname = usePathname();
   const [pending, start] = useTransition();
+  const refreshThen = useRefreshThen(pending);
   const [conflict, setConflict] = useState(false);
   const nav = (patch: Record<string, string | null>) => {
     const q = new URLSearchParams(location.search);
@@ -215,8 +217,7 @@ export function BillingView({ live }: Readonly<{ live?: BillingLive }>) {
     start(async () => {
       const r = await fn();
       if (r.ok) {
-        toast(typeof ok === "string" ? ok : ok(r.value));
-        after?.(r.value);
+        refreshThen(() => { toast(typeof ok === "string" ? ok : ok(r.value)); after?.(r.value); });
         return;
       }
       toast(actionMessage(r, t), "crit");

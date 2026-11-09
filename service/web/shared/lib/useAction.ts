@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useTransition } from "react";
+import { useRefreshThen } from "@ac/web/lib/useRefreshThen";
 import { useToast } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
 import { signInAgainHref, signedOutReason } from "@ac/web/lib/login";
@@ -16,20 +16,12 @@ export function useAction() {
   type Result<T> = { ok: true; value: T } | ({ ok: false } & ActionFailure);
   const t = useT();
   const toast = useToast();
-  const router = useRouter();
   const [pending, start] = useTransition();
-  const shown = useRef<(() => void) | null>(null); // the toast and `after` of a success, for when its screen is shown
-  useEffect(() => {
-    if (pending || !shown.current) return;
-    const done = shown.current;
-    shown.current = null;
-    done();
-  }, [pending]);
+  const refreshThen = useRefreshThen(pending);
   const run = <T,>(fn: () => Promise<Result<T>>, ok: string | ((v: T) => string), after?: (v: T) => void, failed?: (r: ActionFailure) => void) => { start(async () => {
       const r = await fn();
       if (r.ok) {
-        shown.current = () => { toast(typeof ok === "string" ? ok : ok(r.value)); after?.(r.value); };
-        router.refresh();
+        refreshThen(() => { toast(typeof ok === "string" ? ok : ok(r.value)); after?.(r.value); });
         return;
       }
       if (r.code === "UNAUTHENTICATED") { // the session was refused: sign in again, then back here (IR385)

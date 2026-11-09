@@ -2,7 +2,7 @@
 const SET_TEMPERATURE_FROM_C_TO_C = "Set temperature {from}°C → {to}°C";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Badge, Banner, Btn, Card, Check, ConnBadge, Modal, Page, PowerBadge, Stat, SummaryList, Toggle, cx, useToast, Choice } from "@ac/web/components/ui";
 import { units, unitRowFromApi, type UnitRow } from "@ac/web/lib/client";
@@ -14,6 +14,7 @@ import { useDisplay, useT } from "@ac/web/components/I18n";
 import { createCommand, setUnitAlertPolicies } from "../actions";
 import { RenameModal } from "../../../_components/rename-modal";
 import { Icon } from "@ac/web/components/Icon";
+import { useRefreshThen } from "@ac/web/lib/useRefreshThen";
 
 export interface PolicyOption { id: string; name: string; rule: string }
 
@@ -164,6 +165,8 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
   const display = useDisplay();
   const toast = useToast();
   const router = useRouter();
+  const [policiesPending, startPolicies] = useTransition();
+  const refreshThen = useRefreshThen(policiesPending);
   const d = detail ?? null;
   const isApi = detail !== undefined;
   const roomUnits = { data: roomRows ?? units };
@@ -281,15 +284,16 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
       return;
     }
     const report = (res: Awaited<ReturnType<typeof setUnitAlertPolicies>>) => {
-      if (res.ok) toast(message, tone); else toast(t("Not saved: {reason}", { reason: reason(res.messageKey, res.code) }), "warn");
+      if (res.ok) refreshThen(() => { toast(message, tone); });
+      else toast(t("Not saved: {reason}", { reason: reason(res.messageKey, res.code) }), "warn");
     };
-    void (async () => {
+    startPolicies(async () => {
       try {
         report(await setUnitAlertPolicies(id, ids));
       } catch (error: unknown) {
         fail(error);
       }
-    })();
+    });
   };
   const send = () => {
     setConfirm(false);

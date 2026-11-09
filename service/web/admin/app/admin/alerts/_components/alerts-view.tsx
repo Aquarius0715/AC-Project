@@ -20,6 +20,7 @@ import { demoCustomers, NewPolicyModal, PoliciesTab, seedPolicies, type Policies
 import { ScopeBar } from "../../jobs/_components/jobs-header";
 import { Icon } from "@ac/web/components/Icon";
 import { entryOf } from "@ac/web/lib/lookup";
+import { useRefreshThen } from "@ac/web/lib/useRefreshThen";
 
 const ST: Record<AlertState, string> = { open: "Open", acknowledged: ACKNOWLEDGED, resolved: "Resolved" };
 const LIST: Record<AlertState, string> = { open: "Open alerts", acknowledged: "Acknowledged alerts", resolved: "Resolved alerts" };
@@ -85,6 +86,7 @@ export function AdminAlertsView({ live }: Readonly<{ live?: Live }>) {
   const pathname = usePathname();
   const patch = useUrlPatch();
   const [pending, startTransition] = useTransition();
+  const refreshThen = useRefreshThen(pending);
   const [urlTab, setUrlTab] = useUrlTab<"alerts" | "policies">({ alerts: "alerts", policies: "policies" }, "alerts");
   const tab = live ? live.tab : urlTab;
   // the customer → property → unit scope is shared by both tabs, so switching keeps it (DD-A05 items 5 and 8)
@@ -136,8 +138,7 @@ export function AdminAlertsView({ live }: Readonly<{ live?: Live }>) {
     startTransition(async () => {
       const r = await fn();
       if (r.ok) {
-        toast(ok);
-        after?.();
+        refreshThen(() => { toast(ok); after?.(); });
       } else {
         toast(evidenceRefusal(r.fieldErrors, t) ?? actionMessage(r, t), "crit");
         failed?.();
