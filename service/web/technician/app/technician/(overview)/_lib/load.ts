@@ -14,23 +14,24 @@ import { alertRows, dayTimeline, kpis, reportRows, SORTS, sortOf, TABS, tabOf, t
 const optional = orWhenRefused;
 
 export async function loadOverview(sp: { tab?: string; sort?: string }) {
-  interface Page<T> { items: T[]; total: number }
   const [now, display] = await Promise.all([coreNow(), coreDisplay()]);
   const nowMs = now.getTime();
   const i = i18nOf(display);
   const { t } = i;
   const tab = tabOf(sp.tab), sort = sortOf(sp.sort);
   const spec = SORTS.find((s) => s.id === sort) ?? SORTS[0];
-  const [summary, list, units, alerts] = await Promise.all([
+  const [summary, jobs, units, alerts] = await Promise.all([
     coreOp<{ counts: ApiTechCounts }>("summaries.get", { kind: "technician", filters: {} }),
-    coreOp<Page<ApiTechJobRow>>("jobs.list", { sort: { field: spec.field, direction: spec.direction }, limit: 100 }),
+    // every page: the list keeps the jobs whose window has ended, so a first page sorted by deadline holds the oldest of
+    // them and not today's (IR702)
+    coreAll<ApiTechJobRow>("jobs.list", { sort: { field: spec.field, direction: spec.direction } }),
     optional(coreAll<{ id: string; displayName: string }>("units.list"), []),
     optional(coreItems<ApiAlert>("alerts.list", { sort: { field: "severity", direction: "desc" }, limit: 50 }), [] as ApiAlert[]),
   ]);
   const names = new Map(units.map((u) => [u.id, u.displayName]));
-  const rows = list.items.map((j) => techRow(j, nowMs, names, i)).filter((r): r is TechJobRow => !!r);
+  const rows = jobs.map((j) => techRow(j, nowMs, names, i)).filter((r): r is TechJobRow => !!r);
   const jobOfUnit = new Map<string, string>();
-  for (const j of list.items) if (j.projection === "summary" && !jobOfUnit.has(j.unitId)) jobOfUnit.set(j.unitId, j.id);
+  for (const j of jobs) if (j.projection === "summary" && !jobOfUnit.has(j.unitId)) jobOfUnit.set(j.unitId, j.id);
   const today = rows.filter((r) => r.today);
   const klToday = new Date(nowMs + 8 * 3_600_000).toISOString().slice(0, 10);
   return {

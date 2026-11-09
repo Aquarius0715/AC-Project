@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.564.0
+version: 0.565.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -300,6 +300,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.565.0: IR702: the technician overview reads every page of the jobs list, so today's work shows past 100 jobs.
 0.564.0: IR701: two technician forms send what their selects show (test-run actions the unit offers; the register device form opens afresh).
 0.563.0: IR700: a contract's unresolved recovery case is read from the case's state, so contracts.save refuses it again (IR135 item 1).
 0.562.0: IR699: Meta.eventCursor is the tenant's own outbox position (the outbox has no row level security), with the index outbox_tenant_seq; corrects IR697.
