@@ -22450,12 +22450,6 @@
                         "description": "input field reason",
                         "name": "reason",
                         "in": "query"
-                    },
-                    {
-                        "type": "boolean",
-                        "description": "input field force",
-                        "name": "force",
-                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -24270,12 +24264,6 @@
                         "type": "string",
                         "description": "input field reason",
                         "name": "reason",
-                        "in": "query"
-                    },
-                    {
-                        "type": "boolean",
-                        "description": "input field force",
-                        "name": "force",
                         "in": "query"
                     }
                 ],

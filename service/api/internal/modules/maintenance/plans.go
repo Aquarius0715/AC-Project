@@ -711,7 +711,6 @@ type PlanDeleteInput = ContractorDeleteInput
 //	@Param			X-Expected-Version	header		integer	true	"all: required (target plans, read plans.get)"
 //	@Param			id					path		string	true	"input field id"
 //	@Param			reason				query		string	false	"input field reason"
-//	@Param			force				query		boolean	false	"input field force"
 //	@Success		200					{object}	ops.Envelope{data=DeletedResource}
 //	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 //	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"

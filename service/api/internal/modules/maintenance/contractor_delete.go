@@ -14,12 +14,11 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
 
-// ContractorDeleteInput is contractors.delete input.
+// ContractorDeleteInput is the input of a delete by ID and reason: plans.delete and rateCards.delete.
+// contractors.delete takes ContractorProfileDeleteInput, which adds Force.
 type ContractorDeleteInput struct {
 	ID     uuid.UUID `json:"id"`
 	Reason string    `json:"reason"`
-	// Force (data.forceDelete, IR690): the company's accounts do not stop the delete; the caller deletes them after it
-	Force bool `json:"force,omitempty"`
 }
 
 // Validate implements ops.Validator.
@@ -33,6 +32,24 @@ func (in *ContractorDeleteInput) Validate() map[string]string {
 	if n := utf8.RuneCountInString(in.Reason); n < 1 || n > 1000 {
 		fieldErrs["reason"] = apperr.KeyLength
 	}
+
+	return fieldErrs
+}
+
+// ContractorProfileDeleteInput is contractors.delete input: the profile, the reason and, for a holder of
+// data.forceDelete, that the accounts of the company do not stop the delete (IR690): the caller deletes them
+// afterwards.
+type ContractorProfileDeleteInput struct {
+	ID     uuid.UUID `json:"id"`
+	Reason string    `json:"reason"`
+	Force  bool      `json:"force,omitempty"`
+}
+
+// Validate implements ops.Validator.
+func (in *ContractorProfileDeleteInput) Validate() map[string]string {
+	base := ContractorDeleteInput{ID: in.ID, Reason: in.Reason}
+	fieldErrs := base.Validate()
+	in.Reason = base.Reason
 
 	return fieldErrs
 }
@@ -80,7 +97,7 @@ type DeletedResource struct {
 func (Partners) delete(
 	ctx context.Context,
 	call *ops.Call,
-	input *ContractorDeleteInput,
+	input *ContractorProfileDeleteInput,
 ) (DeletedResource, error) {
 	forbidden := ops.CheckForce(call, input.Force)
 	if forbidden != nil {
@@ -177,7 +194,6 @@ type RateCardDeleteInput = ContractorDeleteInput
 //	@Param			Idempotency-Key	header		string	true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 //	@Param			id				path		string	true	"input field id"
 //	@Param			reason			query		string	false	"input field reason"
-//	@Param			force			query		boolean	false	"input field force"
 //	@Success		200				{object}	ops.Envelope{data=DeletedResource}
 //	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
 //	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
