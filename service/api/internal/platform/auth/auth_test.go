@@ -445,3 +445,58 @@ func checkMiddlewareRecordsSignIn(
 		t.Fatalf("the middleware records the token's sign-in: %v %v", last, authTime)
 	}
 }
+
+// issuerVerifier takes the token for the issuer it names, as a verified token of that address would be.
+type issuerVerifier struct{}
+
+func (issuerVerifier) Verify(_ context.Context, token string) (auth.Identity, error) {
+	return auth.Identity{
+		Subject: "subject-1", SignedIn: time.Time{}, Client: "", AdminApp: false, Issuer: token,
+	}, nil
+}
+
+// sharedSource answers the same principal to every request, as RemoteSource's cache does.
+type sharedSource struct{ principal *ops.Principal }
+
+func (s sharedSource) Principal(
+	context.Context, string, uuid.UUID, uuid.UUID, time.Time,
+) (*ops.Principal, error) {
+	return s.principal, nil
+}
+
+// TestPrincipalNamesTheAddressOfTheSignIn: the request's principal names the host of its token's issuer, port and
+// path left out. A principal source may share one principal among requests of different addresses, so it stays as it
+// was (a request must not see another's address).
+func TestPrincipalNamesTheAddressOfTheSignIn(t *testing.T) {
+	t.Parallel()
+
+	shared := ops.TenantPrincipal(uuid.New())
+	authenticator := &auth.Authenticator{
+		Verifier: issuerVerifier{}, DB: nil, Now: nil, Source: sharedSource{principal: shared},
+	}
+	tenant, membership := uuid.NewString(), uuid.NewString()
+
+	for issuer, want := range map[string]string{
+		"http://100.99.169.116:8281/realms/ac": "100.99.169.116",
+		"http://10.100.1.17:8281/realms/ac":    "10.100.1.17",
+		"https://auth.example.com/realms/ac":   "auth.example.com",
+		"":                                     "",
+	} {
+		rec, got := call(t, authenticator, membershipHeaders(issuer, tenant, membership))
+		if issuer == "" { // no bearer token at all
+			if rec.Code != http.StatusUnauthorized {
+				t.Errorf("no token: %d", rec.Code)
+			}
+
+			continue
+		}
+
+		if rec.Code != http.StatusNoContent || got == nil || got.IssuerHost != want {
+			t.Errorf("%q: %d %+v, want the host %q", issuer, rec.Code, got, want)
+		}
+	}
+
+	if shared.IssuerHost != "" {
+		t.Errorf("the shared principal took the address %q", shared.IssuerHost)
+	}
+}

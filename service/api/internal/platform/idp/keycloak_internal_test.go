@@ -94,8 +94,7 @@ func newTestKeycloak(base, secret string, now func() time.Time, client *http.Cli
 		Now:          now,
 		Client:       client,
 		mu:           sync.Mutex{},
-		token:        "",
-		until:        time.Time{},
+		tokens:       nil,
 	}
 }
 
@@ -272,5 +271,158 @@ func TestKeycloakNamesItsPublicAddress(t *testing.T) {
 				want,
 			)
 		}
+	}
+}
+
+// addressRealm records what each call of a realm named: the path with its forwarded host, and the redirect address of
+// the set-up e-mail. Each token it issues names the host it was asked for, as Keycloak does.
+type addressRealm struct {
+	lock     sync.Mutex
+	calls    []string
+	redirect string
+	tokens   atomic.Int64
+}
+
+func (realm *addressRealm) serve(writer http.ResponseWriter, req *http.Request) {
+	realm.lock.Lock()
+	defer realm.lock.Unlock()
+
+	host := req.Header.Get("X-Forwarded-Host")
+
+	switch {
+	case strings.HasSuffix(req.URL.Path, "/token"):
+		realm.tokens.Add(1)
+		realm.calls = append(realm.calls, "token "+host)
+		_, _ = writer.Write([]byte(`{"access_token":"token-of-` + host + `","expires_in":300}`))
+	case strings.HasSuffix(req.URL.Path, "/execute-actions-email"):
+		if req.Header.Get("Authorization") != "Bearer token-of-"+host {
+			writer.WriteHeader(http.StatusUnauthorized)
+
+			return
+		}
+
+		realm.calls = append(realm.calls, "mail "+host)
+		realm.redirect = req.URL.Query().Get("redirect_uri")
+
+		writer.WriteHeader(http.StatusNoContent)
+	default:
+		realm.calls = append(realm.calls, "admin "+host)
+		writer.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func (realm *addressRealm) seen() (string, string) {
+	realm.lock.Lock()
+	defer realm.lock.Unlock()
+
+	return strings.Join(realm.calls, "|"), realm.redirect
+}
+
+// setupAt sends one set-up e-mail on a fresh realm and answers what the realm saw.
+func setupAt(t *testing.T, public, host, redirect string) (string, string) {
+	t.Helper()
+
+	realm := &addressRealm{lock: sync.Mutex{}, calls: nil, redirect: "", tokens: atomic.Int64{}}
+	srv := httptest.NewServer(http.HandlerFunc(realm.serve))
+
+	defer srv.Close()
+
+	keycloak := newTestKeycloak(srv.URL, testSecret, nil, nil)
+	keycloak.PublicURL = public
+
+	err := keycloak.SendSetup(t.Context(), "subject-1", Account{
+		Email: "a@example.com", DisplayName: "A", TenantID: "t", Membership: "m", Role: "client_user",
+		RedirectURI: redirect, ClientID: "ac-customer", PublicHost: host,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return realm.seen()
+}
+
+// TestSendSetupUsesTheAddressOfTheInvitation: the e-mail's link has the address the invitation came from, in the host
+// and in the return address, on the ports of the deployment; with one address (no PublicURL) nothing changes.
+func TestSendSetupUsesTheAddressOfTheInvitation(t *testing.T) {
+	t.Parallel()
+
+	const (
+		canonical = "http://10.100.1.17:8281"
+		tailnet   = "100.99.169.116"
+		app       = "http://10.100.1.17:3200/login"
+	)
+
+	for name, testCase := range map[string]struct {
+		public, host, redirect, calls, wantRedirect string
+	}{
+		"another address": {
+			canonical, tailnet, app,
+			"token 100.99.169.116:8281|mail 100.99.169.116:8281", "http://100.99.169.116:3200/login",
+		},
+		"no address named": {canonical, "", app, "token 10.100.1.17:8281|mail 10.100.1.17:8281", app},
+		"the canonical address": {
+			canonical, "10.100.1.17", app, "token 10.100.1.17:8281|mail 10.100.1.17:8281", app,
+		},
+		"one-address deployment": {"", tailnet, app, "token |mail ", app},
+		// an app on a host of its own is not one of the provider's addresses (production: a provider of its own)
+		"an app elsewhere": {
+			canonical, tailnet, "https://app.example.com/login",
+			"token 100.99.169.116:8281|mail 100.99.169.116:8281", "https://app.example.com/login",
+		},
+	} {
+		calls, redirect := setupAt(t, testCase.public, testCase.host, testCase.redirect)
+		if calls != testCase.calls {
+			t.Errorf("%s: the realm saw %q, want %q", name, calls, testCase.calls)
+		}
+
+		if redirect != testCase.wantRedirect {
+			t.Errorf("%s: redirect %q, want %q", name, redirect, testCase.wantRedirect)
+		}
+	}
+}
+
+// TestAdminTokensAreKeptPerAddress: Keycloak checks a token's issuer against the address of the request, so a token of
+// one address is not used on another; each address's token is kept, and a refusal drops only its own.
+func TestAdminTokensAreKeptPerAddress(t *testing.T) {
+	t.Parallel()
+
+	realm := &addressRealm{lock: sync.Mutex{}, calls: nil, redirect: "", tokens: atomic.Int64{}}
+	srv := httptest.NewServer(http.HandlerFunc(realm.serve))
+
+	defer srv.Close()
+
+	keycloak := newTestKeycloak(srv.URL, testSecret, nil, nil)
+	keycloak.PublicURL = "http://10.100.1.17:8281"
+
+	send := func(host string) {
+		t.Helper()
+
+		err := keycloak.SendSetup(t.Context(), "subject-1", Account{
+			Email: "a@example.com", DisplayName: "A", TenantID: "t", Membership: "m", Role: "client_user",
+			RedirectURI: "http://10.100.1.17:3200/login", ClientID: "ac-customer", PublicHost: host,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	send("100.99.169.116")
+	send("")
+	send("100.99.169.116")
+	send("")
+
+	if got := realm.tokens.Load(); got != 2 {
+		t.Errorf("%d tokens were issued, want one for each of the 2 addresses", got)
+	}
+
+	// other calls stay on the canonical address, with its token
+	err := keycloak.SetEnabled(t.Context(), "subject-1", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	calls, _ := realm.seen()
+	if !strings.HasSuffix(calls, "admin 10.100.1.17:8281") {
+		t.Errorf("the other call went out as %q", calls)
 	}
 }

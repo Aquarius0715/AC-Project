@@ -94,9 +94,15 @@ func seedFixture(t *testing.T) *seed.Fixture {
 type testTokens auth.StaticVerifier
 
 func (v testTokens) Verify(ctx context.Context, token string) (auth.Identity, error) {
+	// tok#host: a token of a sign-in on that address; tok@seconds: a token of a sign-in at that time
+	token, host, onAddress := strings.Cut(token, "#")
 	tok, authTime, signed := strings.Cut(token, "@")
 
 	verified, err := auth.StaticVerifier(v).Verify(ctx, tok)
+	if onAddress {
+		verified.Issuer = "http://" + host + ":8281/realms/ac"
+	}
+
 	if err != nil || !signed {
 		return verified, apperr.Wrap(err, "auth.StaticVerifier.Verify")
 	}

@@ -295,3 +295,26 @@ func TestNewVerifierFromEnvListsIssuers(t *testing.T) {
 		t.Errorf("issuers %q", v.Issuers)
 	}
 }
+
+// TestOIDCVerifierNamesTheIssuer: the verified issuer is part of the identity: it says which address the holder signed
+// in on, and being checked against the list it cannot be made up.
+func TestOIDCVerifierNamesTheIssuer(t *testing.T) {
+	t.Parallel()
+
+	key := newKey(t)
+	verifier := newTestVerifier(key)
+	tailnet := "http://100.99.169.116:8281/realms/ac"
+	verifier.Issuers = []string{testIssuer, tailnet}
+
+	claims := accessClaims()
+	claims["iss"] = tailnet
+
+	identity, err := verifier.Verify(t.Context(), sign(t, key, claims))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if identity.Issuer != tailnet {
+		t.Errorf("issuer %q, want %q", identity.Issuer, tailnet)
+	}
+}
