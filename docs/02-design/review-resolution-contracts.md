@@ -9294,3 +9294,10 @@ The user chose to delete accounts that were never used and to keep ending the ot
 
 1. **The rule.** The callback of the pipeline empties `Call.Events` and `Call.Audits` at the start of every attempt, so a transaction records what the attempt that commits produced and nothing else.
 2. **Tests.** `TestRetriedWriteRecordsOneAttemptOnly` (a handler that emits and audits, then fails once with a retryable error under a runner that runs the callback again): it recorded two events and two audit entries before the fix. No operation, route or screen changes; 224 operations, 245 routes.
+
+## IR667 A property or unit is saved into a customer only after the customer delete has finished or never starts (review round 52) — 2026-11-09
+
+`customers.delete` (IR654) locks the customer row, looks for units, and deletes the customer's properties, spaces and imports. `properties.save` and `units.save` (new) read the customer's status with a plain `SELECT` (`customerActive`) and then insert. Under READ COMMITTED a save running at the same moment as the delete read the customer before the delete committed and inserted after the delete looked, so a property or unit of a deleted customer remained.
+
+1. **The lock.** `customerActive` reads the customer row `FOR SHARE`, as the parent reads of IR478 do: the delete waits for the save, or the save waits for the delete and finds no customer (NOT_FOUND). Nothing else changes: the same checks, the same errors.
+2. **Test.** `TestCustomerDeleteWaitsForASaveIntoTheCustomer` holds a delete of the customer row open in a second transaction and sends `properties.save`; before the fix the save answered 200 at once, now it waits for the commit and answers 404. No operation, route or screen changes.
