@@ -9641,3 +9641,11 @@ In Access & roles (FR-A03, DD-A03), "Revoke access…" saves the membership with
 2. **Fix.** `revokeInput(membership, tenantId, zone, reason)` (`shared/lib/members.ts`) builds the revoke from the saved membership. Its scopes stay as saved (for an admin with none saved, the form shows the tenant but the revoke does not add it), and its start stays to the second. The reason is trimmed, and the action sets `validUntil` to now, as before.
 3. **Tests.** `members.test.ts` checks two cases. The revoke carries the saved permissions, scopes and start, to the second, with the trimmed reason. An admin's empty saved scopes stay empty. Both failed before the fix (no such function) and pass after.
 4. **Not changed.** The API, the revoke dialog and Save. A revoke still needs its own reason.
+
+## IR704 A repeated automation Fire reuses its event only for the same evaluation (review round 145, 2026-11-10)
+
+In HQ automation policies (FR-A11), Fire (demo) sends `automations.fire` with a one-time event ID, and the screen keeps that ID so that pressing Fire again for the same evaluation returns the stored result instead of firing twice. The screen dropped the ID only when a fact row was edited, added or removed. A fact without its own kind takes the policy's condition type ("When"), and changing "When" left the ID in place. The next Fire then sent another body under the same key, which D04 refuses (CONFLICT), although HQ had asked for a new evaluation.
+
+1. **Fix.** `evaluationKey(type, rows)` (`shared/lib/automation.ts`) is what an evaluation asks, without its time or event ID. Fire reuses the last event ID and tick only while that is unchanged; any other change, the condition type included, makes a new event.
+2. **Test.** `automation.test.ts` checks three things. The key is the same for the same evaluation. It changes with the policy's condition type for a fact without its own kind. For a fact with its own kind it does not follow the policy's type, and it follows the fact's value. All three failed before the fix (no such function) and pass after.
+3. **Not changed.** The API, Simulate (a read, always a new event) and every operation, route and count.
