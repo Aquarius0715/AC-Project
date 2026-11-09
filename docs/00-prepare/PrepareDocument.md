@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.540.0
+version: 0.541.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -300,6 +300,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.541.0: the one-time code input keeps the digits of a code pasted with a space (IR678). No operation changes. Phase 1A unchanged.
 0.540.0: an alert policy is attached to a unit, and a default rule switched at version 0, only under a lock, so a deleted policy is never attached and a first switch is never overwritten (IR677). No operation changes. Phase 1A unchanged.
 0.539.0: every Server Action answers unavailable when the Core API gives no answer, so a typed form stays (IR676). No operation changes. Phase 1A unchanged.
 0.538.0: a Server Action of the technician job workspace answers unavailable when the Core API gives no answer, so unsaved edits stay (IR675). No operation changes. Phase 1A unchanged.

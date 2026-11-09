@@ -376,6 +376,9 @@ export const Plain = ({ className, touch, ...p }: React.ComponentProps<typeof Bu
 };
 /** A one-time code as separate boxes (Figma 10g): one transparent input over the boxes, so typing, pasting and the
 browser's one-time-code autofill all work; the box for the next digit is outlined while the input has focus. */
+/** A one-time code of `length` digits in boxes over one input. The input has no maxlength: a code is copied as "123 456", and the
+browser would cut the pasted text to `length` characters before the digits are picked out (IR678); onChange keeps the digits
+and cuts them to `length`. */
 export function CodeInput({ value, onChange, label, length = 6 }: Readonly<{ value: string; onChange: (v: string) => void; label: string; length?: number }>) {
   const [focused, setFocused] = useState(false);
   const next = Math.min(value.length, length - 1);
@@ -384,7 +387,7 @@ export function CodeInput({ value, onChange, label, length = 6 }: Readonly<{ val
       {Array.from({ length }, (_, i) => (
           <span key={i} aria-hidden className={cx("grid h-10 w-10 place-items-center rounded-lg border bg-surface text-lg font-semibold", focused && i === next ? "border-primary ring-2 ring-primary/20" : "border-line")}>{value.at(i) ?? ""}</span>
         ))}
-      <input aria-label={label} inputMode="numeric" autoComplete="one-time-code" maxLength={length} value={value}
+      <input aria-label={label} inputMode="numeric" autoComplete="one-time-code" value={value}
         onChange={(e) => { onChange(e.target.value.replaceAll(/\D/g, "").slice(0, length)); }} onFocus={() => { setFocused(true); }} onBlur={() => { setFocused(false); }}
         className="absolute inset-0 h-full w-full cursor-text opacity-0" />
     </div>
