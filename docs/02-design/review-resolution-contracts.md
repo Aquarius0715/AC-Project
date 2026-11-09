@@ -9337,3 +9337,10 @@ admin.md says unit names are unique among the non-archived units of a space (CON
 
 1. **The mapping.** The update of `locations.rename` passes its error through the same `dupSibling` mapping as the saves. Nothing else changes (units have no index; their check is unchanged).
 2. **Test.** `TestRenameToANameTakenAtTheSameMomentIsAConflict` holds an uncommitted sibling with the new name and sends the rename: before the fix it answered CONFLICT with `error.conflict`, now `error.duplicateSiblingName`. No operation, route or screen changes.
+
+## IR671 A serial or node_id taken at the same moment answers the specific conflict (review round 56) — 2026-11-09
+
+`devices.register` and `devices.setMqttNode` check before they write that no other device has the serial (CONFLICT `error.duplicateSerial`, D05) or the MQTT node_id (CONFLICT `error.duplicateMqttNode`). A device saved with the same value after the check and before the write (not committed when the check ran) is refused by the unique index (`devices_serial`, `devices_mqtt_node`) at the write, and the refusal reached the caller as the generic CONFLICT `error.conflict`: the form could not tell that the serial or node is taken. It is the same case as IR669 for the sibling names.
+
+1. **The mapping.** The insert of `devices.register` and the update of `devices.setMqttNode` pass their error through `dupDevice`, which turns a refusal of `devices_serial` into `error.duplicateSerial` and one of `devices_mqtt_node` into `error.duplicateMqttNode`. Nothing else changes.
+2. **Test.** `TestDeviceDuplicateTakenAtTheSameMoment` holds an uncommitted device with the same serial or node and sends the register with that serial, the register with that node and the node setting; each answered `error.conflict` before the fix and the specific key now. No operation, route or screen changes.
