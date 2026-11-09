@@ -172,5 +172,11 @@ export function memberInput(d: MemberDraft, id?: string, zone = "Asia/Kuala_Lump
   };
 }
 
+/** members.save of a revoke (FR-A03, IR492): the saved membership as it is, whatever the form holds unsaved, with the
+reason; the action sets validUntil to now. Its scopes and start go unchanged, the start to the second (IR703). */
+export function revokeInput(m: ApiMember, tenantId: string, zone: string, reason: string): OpInput<"members.save"> {
+  return { ...memberInput({ ...memberDraft(m, tenantId, zone), reason }, m.id, zone), scopes: m.scopes, validFrom: m.validFrom };
+}
+
 /** The valid period in the display time zone. */
 export const validity = (m: Pick<ApiMember, "validFrom" | "validUntil">, i: I18n = EN) => `${showTime(m.validFrom, i.display)} → ${m.validUntil ? showTime(m.validUntil, i.display) : i.t("open-ended")}`;
