@@ -9387,3 +9387,11 @@ IR675 changed the Server Actions of the technician's job workspace so that a Cor
 
 1. **The failure.** Their final `throw` is `actionFailure(error)` (IR675): the refusal by its code, Next's own redirect through, anything else `UNAVAILABLE`. The history action builds its stage and note state on that result. No operation, route or screen changes.
 2. **Test.** `serverActionFailures.test.ts` reads every `actions.ts` of the four apps and refuses one that looks at `CoreError` without answering the other errors (through `actionFailure` or as `error.unavailable`); eight of the files failed it before.
+
+## IR677 A unit is given an alert policy, and a default rule is switched, only under a lock (review round 71) — 2026-11-09
+
+Two writes of Monitoring checked a row without a lock and so could both pass with a write that ran at the same moment.
+
+1. **Attaching a policy to a unit.** `units.setAlertPolicies` read the policy rows (`Policies.Owners`) with a plain `SELECT`; `policies.delete` locks the row and then detaches the units from it. An attach that read the policy before the delete committed, and inserted its link after the delete had looked for links, left a unit that carries the ID of a policy that no longer exists. `Owners` now reads the rows `FOR SHARE` (ordered by ID), as the parent reads of IR478, IR667 and IR672 do: the attach waits for the delete and finds no policy (NOT_FOUND), or the delete waits for the attach and detaches it.
+2. **Switching a default rule at version 0.** `policies.setDefaultRule` reads the stored setting `FOR UPDATE`, but with no stored setting there is no row to lock: two first switches of the same rule both saw version 0, and the second `ON CONFLICT DO UPDATE` overwrote the first and answered 200. The update now applies only `WHERE version = expected`, so the second switch finds the first one's row at version 1 and answers CONFLICT `error.versionConflict`. The upsert moved into `storeRuleSetting`.
+3. **Tests.** `TestPolicyDeleteWaitsForAnAttachToAUnit` holds an uncommitted delete of the policy and sends the attach (it answered 200 at once before the fix, now it waits and answers 404); `TestDefaultRuleFirstSwitchesAtTheSameMoment` holds an uncommitted first setting and sends a switch at version 0 (200 before, now 409 `error.versionConflict`). No operation, route or screen changes.
