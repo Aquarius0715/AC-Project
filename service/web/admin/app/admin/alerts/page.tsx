@@ -7,10 +7,11 @@
 import { connection } from "next/server";
 import { apiMode, coreAll, coreDisplay, coreNow, coreOp, corePermissions, CoreError, orWhenForbidden, coreAllPage } from "@ac/web/lib/dal";
 import { i18nOf } from "@ac/web/lib/i18n";
-import { adminAlertRows, policyRows, type AlertState, type ApiAdminAlert, type ApiCustomerName, type ApiMemberName, type ApiPolicy, type ApiUnitName, type Severity } from "@ac/web/lib/adminAlerts";
+import { adminAlertRows, policyRows, type AlertState, type ApiCustomerName, type ApiMemberName, type ApiPolicy, type ApiUnitName, type Severity } from "@ac/web/lib/adminAlerts";
 import { NeedsAccess } from "@ac/web/components/NeedsAccess";
 
 import { AdminAlertsView } from "./_components/alerts-view";
+import { scopeAlerts } from "./_lib/load";
 import { recover } from "@ac/web/lib/promises";
 import { firstOf as one } from "@ac/web/lib/searchParams";
 
@@ -51,7 +52,7 @@ export default async function AdminAlertsPage({ searchParams }: Readonly<PagePro
   };
   const [now, perms, display, alertsRead, unitsRead, customersRead, propertiesRead, policiesRead, members, defaultsRead] = await Promise.all([
     coreNow(), corePermissions(), coreDisplay(),
-    need(coreOp<Page<ApiAdminAlert>>("alerts.list", { limit: 100, filters }), "alert.read"), // every status in the scope: the tiles count them
+    need(scopeAlerts(filters), "alert.read"), // every status in the scope, each read on its own: the tiles count them (IR710)
     need(coreAllPage<ApiUnitName & { propertyId: string; archived?: boolean }>("units.list"), ASSET_READ),
     need(coreAllPage<ApiCustomerName & { status?: "active" | "inactive" }>("customers.list"), ASSET_READ),
     need(coreAll<{ id: string; name: string; customerOrgId: string }>("properties.list"), ASSET_READ),
