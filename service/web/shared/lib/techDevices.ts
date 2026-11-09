@@ -4,7 +4,7 @@
 // the client view; Vitest covers it. Texts in the display language (`i` / `t`, IR287); instants in the user's display
 // time zone (IR44). Event types, evidence sources and versions stay codes, as in Figma.
 import { EN, relativeTime, showClock, showTime, translator, type I18n, type T, textOf } from "@ac/web/lib/i18n";
-import type { ApiCalibration, ApiDevice, ApiDeviceDetail, ApiDeviceOperation, Connection } from "@ac/web/lib/devices";
+import type { ApiCalibration, ApiDevice, ApiDeviceDetail, ApiDeviceOperation, Connection, Metric } from "@ac/web/lib/devices";
 import { metricLabel } from "@ac/web/lib/adminAlerts";
 import { lookup } from "@ac/web/lib/lookup";
 
@@ -39,6 +39,14 @@ const rank: Record<string, number> = { in_progress: 0, assigned: 1, rework_reque
 /** The job a device write on the unit runs under (IR94): in progress first, else assigned or rework; null without one. */
 export function jobFor(unitId: string | null, jobs: TechJob[]): string | null {
   return unitId ? jobs.filter((j) => j.unitId === unitId && Object.hasOwn(rank, j.status)).toSorted((a, b) => (lookup(rank, a.status) ?? 9) - (lookup(rank, b.status) ?? 9))[0]?.id ?? null : null;
+}
+
+/** The register form as it opens (FR-T11): the first assigned unit still without a device and its first job, no serial
+and no sensors. It is made afresh each time the form opens: after a registration the refreshed list no longer has the
+unit registered, and an old unit or serial would go out although the select shows another unit (IR701). */
+export function blankRegistration(register: readonly { unitId: string; jobs: readonly { id: string }[] }[]): { serial: string; unitId: string; sensors: Metric[]; jobId: string } {
+  const first = register[0];
+  return { serial: "", unitId: first?.unitId ?? "", sensors: [], jobId: first?.jobs[0]?.id ?? "" };
 }
 
 const ago = (iso: string | null, now: number, t: T) => {
