@@ -872,7 +872,10 @@ func (r *Registry) execute(
 
 		if txn != nil &&
 			call.Principal != nil { // Meta.eventCursor: the tenant's event position of this snapshot (D07)
-			return txn.QueryRow(ctx, `SELECT count(*) FROM platform.outbox`).Scan(&cursor)
+			// the highest position, read from the index, not a count: housekeeping removes old events, and a count would go
+			// back and read the whole outbox on every request
+			return txn.QueryRow(ctx, `SELECT COALESCE(max(seq), 0) FROM platform.outbox`).
+				Scan(&cursor)
 		}
 
 		return nil

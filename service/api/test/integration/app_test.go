@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/pradita/ac-project/service/api/internal/modules/identity"
@@ -509,5 +510,55 @@ func TestUnitsGet(t *testing.T) {
 	); code != 404 ||
 		res["messageKey"] != apperr.KeyUnknownOperation { // GET /v1/units/ has no route
 		t.Fatalf("missing id: %d %v", code, res)
+	}
+}
+
+// TestEventCursorIsAPosition: Meta.eventCursor is the tenant's position in its events, so it never goes back. Counting
+// the outbox made it fall when housekeeping removed old events, and made every request of the service read all of them.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
+func TestEventCursorIsAPosition(t *testing.T) {
+	srv := server(t)
+
+	cursor := func() float64 {
+		t.Helper()
+
+		_, res := post(srv, hq(), "session.get", `{}`)
+
+		return asNum(t, asObj(t, res["meta"])["eventCursor"])
+	}
+
+	addEvent := func() string {
+		t.Helper()
+
+		event := uuid.NewString()
+		owner(
+			t,
+			`INSERT INTO platform.outbox (id, tenant_id, aggregate_type, aggregate_id, event_type, payload, correlation_id)
+			VALUES ($1, $2, 'test', $1, 'test.position', '{}', 'corr-position')`,
+			event,
+			seed.ID("tenant-a"),
+		)
+		t.Cleanup(func() { owner(t, `DELETE FROM platform.outbox WHERE id = $1`, event) })
+
+		return event
+	}
+
+	older := addEvent()
+	addEvent()
+
+	before := cursor()
+	if before < 2 {
+		t.Fatalf("cursor %v with two events in the outbox", before)
+	}
+
+	owner(
+		t,
+		`DELETE FROM platform.outbox WHERE id = $1`,
+		older,
+	) // housekeeping removes the old events
+
+	if after := cursor(); after < before {
+		t.Errorf("the cursor went back from %v to %v when an event was removed", before, after)
 	}
 }
