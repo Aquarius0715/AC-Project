@@ -16,6 +16,9 @@ import (
 // testIssuer is the local Keycloak realm the test tokens name.
 const testIssuer = "http://localhost:8081/realms/ac"
 
+// tailnetIssuer is the same realm on a second address of the deployment.
+const tailnetIssuer = "http://100.99.169.116:8281/realms/ac"
+
 // newTestVerifier returns a verifier of the customer and HQ apps that trusts key.
 func newTestVerifier(key *rsa.PrivateKey) *auth.OIDCVerifier {
 	return &auth.OIDCVerifier{
@@ -259,13 +262,13 @@ func TestOIDCVerifierSeveralIssuers(t *testing.T) {
 
 	key := newKey(t)
 	verifier := newTestVerifier(key)
-	verifier.Issuers = []string{testIssuer, "http://100.99.169.116:8281/realms/ac"}
+	verifier.Issuers = []string{testIssuer, tailnetIssuer}
 
 	for issuer, want := range map[string]bool{
-		testIssuer:                             true,
-		"http://100.99.169.116:8281/realms/ac": true,
-		"http://evil.example/realms/ac":        false,
-		"":                                     false,
+		testIssuer:                      true,
+		tailnetIssuer:                   true,
+		"http://evil.example/realms/ac": false,
+		"":                              false,
 	} {
 		claims := accessClaims()
 		claims["iss"] = issuer
@@ -293,5 +296,27 @@ func TestNewVerifierFromEnvListsIssuers(t *testing.T) {
 	if len(v.Issuers) != 2 || v.Issuers[0] != "http://a.example/realms/ac" ||
 		v.Issuers[1] != "http://b.example/realms/ac" {
 		t.Errorf("issuers %q", v.Issuers)
+	}
+}
+
+// TestOIDCVerifierNamesTheIssuer: the verified issuer is part of the identity: it says which address the holder signed
+// in on, and being checked against the list it cannot be made up.
+func TestOIDCVerifierNamesTheIssuer(t *testing.T) {
+	t.Parallel()
+
+	key := newKey(t)
+	verifier := newTestVerifier(key)
+	verifier.Issuers = []string{testIssuer, tailnetIssuer}
+
+	claims := accessClaims()
+	claims["iss"] = tailnetIssuer
+
+	identity, err := verifier.Verify(t.Context(), sign(t, key, claims))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if identity.Issuer != tailnetIssuer {
+		t.Errorf("issuer %q, want %q", identity.Issuer, tailnetIssuer)
 	}
 }

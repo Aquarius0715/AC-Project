@@ -719,6 +719,7 @@ func TestPartnerAccountCreated(t *testing.T) {
 			Employment:        "",
 			Timezone:          "",
 			SessionsRevokedAt: nil,
+			IssuerHost:        "",
 		},
 		clock(),
 	)
@@ -810,6 +811,7 @@ func firstSignIn(t *testing.T, srv *apiserver.Server, membership string) {
 			Employment:        "",
 			Timezone:          "",
 			SessionsRevokedAt: nil,
+			IssuerHost:        "",
 		},
 		clock(),
 	)

@@ -8,7 +8,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"time"
 )
 
 // adminCall is one call the fake admin API took.
@@ -97,8 +96,7 @@ func newAccountsKeycloak(t *testing.T) (*Keycloak, *accountsRealm) {
 		Client:       nil,
 		Now:          nil,
 		mu:           sync.Mutex{},
-		token:        "",
-		until:        time.Time{},
+		tokens:       nil,
 	}, realm
 }
 
@@ -112,6 +110,7 @@ func testAccount() Account {
 		Role:        "technician",
 		ClientID:    "ac-web",
 		RedirectURI: "http://localhost:3002/login",
+		PublicHost:  "",
 	}
 }
 

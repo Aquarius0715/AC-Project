@@ -127,6 +127,7 @@ func sweepIdempotencyKeys(ctx context.Context, runner ops.Runner, now time.Time)
 				Employment:        "",
 				Timezone:          "",
 				SessionsRevokedAt: nil,
+				IssuerHost:        "",
 			},
 			func(tx pgx.Tx) error {
 				tag, err := tx.Exec(

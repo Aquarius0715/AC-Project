@@ -41,6 +41,9 @@ type Principal struct {
 	// SessionsRevokedAt ends every sign-in before it (members.revokeSessions, IR384): a token whose sign-in time is
 	// earlier is refused. Wall clock, as the identity provider's auth_time is; nil when never revoked.
 	SessionsRevokedAt *time.Time
+	// IssuerHost is the host name of the verified token's issuer: the address this request's sign-in was made on (it is
+	// checked against OIDC_ISSUER, so it cannot be made up, IR695). Empty for work without a user's token.
+	IssuerHost string
 }
 
 // TenantPrincipal is the principal of work that acts for no one in tenant, such as a scheduler transaction or a demo
@@ -57,6 +60,7 @@ func TenantPrincipal(tenant uuid.UUID) *Principal {
 		Employment:        "",
 		Timezone:          "",
 		SessionsRevokedAt: nil,
+		IssuerHost:        "",
 	}
 }
 
