@@ -9402,3 +9402,11 @@ The two-factor code of the settings screen is typed into `CodeInput`: six boxes 
 
 1. **The input.** `CodeInput` has no `maxlength`. `onChange` already keeps only the digits and cuts them to the length of the code (`12ab34567890` gives `123456`), so the attribute only did harm on a paste.
 2. **Test.** `codeInput.test.tsx`: a code pasted as `123 456` or `654-321` gives six digits, a longer text is cut to the length and loses what is not a digit, and the input has no `maxlength` (it failed before). No operation, route or screen layout changes.
+
+## IR680 After a change that succeeded the screen is read again, and "saved" shows when the new screen does (round 89) — 2026-11-09
+
+The user reported that after pressing a button the setting or the change did not show on the screen. It was reproduced with the language of Preferences: the toast "Preferences saved" came first, and the shell (menu, buttons) kept the old language for a second or more — in four of four runs the old language was still there at the moment of the toast — and only a reload or the wait showed the saved one. `useAction` showed its toast the moment the Server Action answered, while the screen was read again only after that, by the `refresh()` the action itself asked for; and the screens that call a Server Action without `useAction` depend on that same `refresh()`.
+
+1. **`useAction`.** A change that succeeded now makes the page read its data again (`router.refresh()`, whatever the action asked for) inside the transition, so the transition lasts until the new screen is shown; the toast and the `after` of the call come then. A refused change is unchanged (the toast at once, no new read). The 75 uses of `useAction` follow.
+2. **Test.** `useAction.test.tsx` checks that a success asks the router for one new read and a refusal asks for none. The E2E `preferences.e2e.ts` counts the shell's buttons at the moment of the toast, with no retry: it failed on the earlier build (`[0, 1]`, still English) and passes now (`[1, 0]`).
+3. **Not in this change.** The screens that call a Server Action with their own `useTransition` and toast, without `useAction` (alert and default policies, billing contracts, notifications, the technician's alert evidence and a few more), keep relying on the action's `refresh()`; IR681 moves them to `useAction`. No operation, route or API changes.

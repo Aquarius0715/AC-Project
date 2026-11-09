@@ -13,6 +13,19 @@ test.afterEach(async ({ page }) => {
   zoneBefore = null;
 });
 
+// IR680: the "saved" toast comes when the screen shows the saved value. The toast used to come first and the shell kept
+// the old language for a second or more, which read as "the button did nothing".
+test("the screen shows the saved language when the toast does, without a reload", async ({ page }) => {
+  const before = await displayZone(page);
+  zoneBefore = before;
+  await page.goto("/settings/preferences");
+  await page.getByRole("button", { name: "Bahasa Melayu" }).click();
+  await page.getByRole("button", { name: /Save preferences/ }).click();
+  await page.getByText(/Keutamaan disimpan|Preferences saved/).last().waitFor();
+  // counted once, at the toast, with no retry: a screen that changes a moment later fails here
+  expect([await page.getByRole("button", { name: "Log keluar" }).count(), await page.getByRole("button", { name: "Sign out" }).count()]).toStrictEqual([1, 0]);
+});
+
 test("language and time zone are saved and read back", async ({ page }) => {
   const before = await displayZone(page);
   const target = before === "Asia/Tokyo" ? "Asia/Singapore" : "Asia/Tokyo";
