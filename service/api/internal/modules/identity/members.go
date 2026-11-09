@@ -596,10 +596,19 @@ func (in *MemberInput) validateScopes(fieldErrs map[string]string) {
 		authz.RoleAdmin: {"tenant"}, authz.RoleClient: {scopeOrganization}, authz.RoleContractor: {scopeOrganization},
 		authz.RoleTechnician: {"unit", "property", scopeOrganization},
 	}[in.Role]
-	for _, sc := range in.Scopes {
-		if !slices.Contains(kinds, sc.Kind) {
+	seen := map[ScopeRef]bool{}
+
+	for _, scopeRef := range in.Scopes {
+		if !slices.Contains(kinds, scopeRef.Kind) {
 			fieldErrs["scopes"] = apperr.KeyInvalid
 		}
+
+		// a scope named twice is stored once, so the update would lose one without moving the scope version (IR661)
+		if seen[scopeRef] && fieldErrs["scopes"] == "" {
+			fieldErrs["scopes"] = apperr.KeyDuplicate
+		}
+
+		seen[scopeRef] = true
 	}
 
 	if in.Role == authz.RoleAdmin && len(in.Scopes) > 1 {

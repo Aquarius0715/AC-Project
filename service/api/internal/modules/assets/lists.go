@@ -423,8 +423,19 @@ func (*Module) addCustomer(
 	return customer, nil
 }
 
-// canDeactivate refuses to deactivate a customer that has units, or active contracts or jobs (D05).
+// canDeactivate refuses to deactivate a customer that has units, or active contracts or jobs (D05). The customer row is
+// locked first: a unit save reads it with a share lock (customerActive), so one of the two waits and then sees the
+// other, and no active unit is left under an inactive customer.
 func (m *Module) canDeactivate(ctx context.Context, call *ops.Call, org uuid.UUID) error {
+	_, lockErr := call.Tx.Exec(
+		ctx,
+		`SELECT 1 FROM assets.customers WHERE organization_id = $1 FOR UPDATE`,
+		org,
+	)
+	if lockErr != nil {
+		return apperr.Wrap(lockErr, "select assets.customers")
+	}
+
 	var units bool
 
 	err := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.units WHERE customer_org_id = $1 AND NOT

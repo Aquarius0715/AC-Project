@@ -9281,6 +9281,48 @@ The user chose to delete accounts that were never used and to keep ending the ot
 1. **The rule.** `clientUsers.resendInvite` is CONFLICT `errors.access_expired` when the user's membership has an end at or before now, as the partner one is; the resend gap (IR423) is checked after it.
 2. **Tests.** `TestClientUserResendRefusedAfterTheAccessEnded` answered 200 before the fix. No operation, route or screen changes; 224 operations, 245 routes.
 
+## IR661 A membership names each scope once (review round 32) — 2026-11-09
+
+`members.save` refused a permission named twice (`error.invalid`) but took a scope named twice and stored it once (`ON CONFLICT DO NOTHING`). The check that moves the membership's `scopeVersion` when an update changes its scopes compares the lengths and then asks whether every sent scope was there before, so an update that replaced the scopes [A, B] by [A, A] kept the same length, found every sent scope in the old list, and left the version where it was: B was gone and the sessions and cursors scoped to [A, B] stayed valid.
+
+1. **The rule.** The scopes of a membership are distinct (kind and ID): a repeated scope is VALIDATION `error.duplicate` on `scopes`, as a repeated permission is on `permissions`. An unknown kind keeps its `error.invalid`.
+2. **Tests.** `TestMembersSave` (a scope named twice is refused on its field). No operation, route or screen changes; 224 operations, 245 routes.
+
+## IR663 A write run again after a deadlock records its events and audit entries once (review round 40) — 2026-11-09
+
+`TxManager.Run` runs a transaction again, up to three times, when PostgreSQL ends it with a deadlock (40P01) or a serialization failure (40001). The operation pipeline builds the `Call` of a write before `Run` and the callback appended the events (`Call.Emit`) and audit entries (`Call.Audit`) of the handler to it; nothing emptied them when the callback ran a second time. The attempt that committed therefore wrote the events and audit entries of the attempt that had rolled back as well: the outbox carried every event twice (a notification, a projection or an account event handled twice) and the audit log every entry twice. The retry is rare (two writes that lock the same rows in opposite order), but when it happened the duplicates were silent.
+
+1. **The rule.** The callback of the pipeline empties `Call.Events` and `Call.Audits` at the start of every attempt, so a transaction records what the attempt that commits produced and nothing else.
+2. **Tests.** `TestRetriedWriteRecordsOneAttemptOnly` (a handler that emits and audits, then fails once with a retryable error under a runner that runs the callback again): it recorded two events and two audit entries before the fix. No operation, route or screen changes; 224 operations, 245 routes.
+
+## IR667 A property or unit is saved into a customer only after the customer delete has finished or never starts (review round 52) — 2026-11-09
+
+`customers.delete` (IR654) locks the customer row, looks for units, and deletes the customer's properties, spaces and imports. `properties.save` and `units.save` (new) read the customer's status with a plain `SELECT` (`customerActive`) and then insert. Under READ COMMITTED a save running at the same moment as the delete read the customer before the delete committed and inserted after the delete looked, so a property or unit of a deleted customer remained.
+
+1. **The lock.** `customerActive` reads the customer row `FOR SHARE`, as the parent reads of IR478 do: the delete waits for the save, or the save waits for the delete and finds no customer (NOT_FOUND). Nothing else changes: the same checks, the same errors.
+2. **Test.** `TestCustomerDeleteWaitsForASaveIntoTheCustomer` holds a delete of the customer row open in a second transaction and sends `properties.save`; before the fix the save answered 200 at once, now it waits for the commit and answers 404. No operation, route or screen changes.
+
+## IR668 A customer is deactivated only after its row is locked (review round 53) — 2026-11-09
+
+IR667 made `properties.save` and `units.save` read the customer row with a share lock. The deactivation in `customers.save` (status `inactive`, D05) checked for units, contracts and jobs first and updated the customer row last, so a unit save that had read the customer as active before the deactivation, and committed after its check, left an active unit under an inactive customer: the update waited for the share lock but did not look again.
+
+1. **The lock.** `canDeactivate` now locks the customer row (`FOR UPDATE`) before it looks for units: a unit save in flight is waited for and seen (CONFLICT `error.customerActive`), and a unit save that starts later waits for the deactivation and finds the customer inactive (CONFLICT `error.customerInactive`).
+2. **Test.** `TestCustomerDeactivateWaitsForAUnitBeingAdded` holds a unit insert with a share lock on the customer open in a second transaction and sends the deactivation; before the fix it answered 200 and left the unit under the inactive customer, now it waits and answers 409. No operation, route or screen changes.
+
+## IR659 A payout adjustment stays within the safe-integer range (review round 24) — 2026-11-09
+
+IR647 left the payout lines out of the amount range check because the server computes them. One kind is not computed: the adjustment line of an answered question carries the `adjustmentMinor` that HQ typed in `payouts.resolveQuery` (signed, non-zero). It was only refused when zero, so HQ could enter 9,000,000,000,000,000,000 or its negative: the next generated draft added it to the statement's gross or deductions, and a few of them wrap a 64-bit sum around.
+
+1. **The rule.** `adjustmentMinor` is a non-zero whole number whose size is at most 2^53 − 1 (`money.InRange` on its absolute value; the smallest int64, whose absolute value does not exist, is refused too): VALIDATION `error.range` on `adjustmentMinor` otherwise.
+2. **Tests.** `TestAmountsStayInSafeRange` (both signs, the last valid amount accepted) and `TestPayoutAdjustmentMinInt64`. No operation, route or screen changes; 224 operations, 245 routes.
+
+## IR665 A new CSV import preview removes the expired ones (review round 51) — 2026-11-09
+
+database-design.md says the 30-minute import previews (`assets.unit_import_previews`) are "purged after expiry", and the table has an index on `expires_at` for it, but nothing deleted them: a preview left only when its import was committed or its customer deleted, so every file anyone previewed and did not commit stayed in the table (the rows of up to 1,000 lines, resolved IDs included).
+
+1. **The rule.** `units.importPreview` deletes the previews of its tenant whose `expires_at` is at or before now (business time) in the transaction that stores the new one. A commit with an expired preview is unchanged (CONFLICT, as `units.importCommit` answers it today); the commit still deletes the preview it takes.
+2. **Tests.** `TestUnitsImportPreviewPurgesExpiredPreviews` (an expired and a live preview; only the live one is left after a new preview) failed before the fix. No operation, route or screen changes; 224 operations, 245 routes.
+
 ## IR666 A CSV import keeps sibling names unique and is undone only while its places hold nothing else (review round 51) — 2026-11-09
 
 admin.md says unit names are unique among the non-archived units of a space (CONFLICT `error.duplicateSiblingName`) and that a property or space that still holds non-archived units or child spaces cannot be archived (CONFLICT `error.notEmpty`). Two parts of the CSV import (IR109, FR-A18) did not hold to this.

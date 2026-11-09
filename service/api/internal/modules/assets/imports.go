@@ -245,7 +245,18 @@ func (m *Module) unitsImportPreview(
 	}
 	// the preview is not business data: stored outside the operation's read-only transaction
 	runErr := m.Store.Run(ctx, false, call.Principal, func(tx pgx.Tx) error {
+		// the previews of this tenant that expired go first: nothing else removes them (database-design.md "purged
+		// after expiry", IR665), and the expiry index makes this a short scan
 		_, err := tx.Exec(
+			ctx,
+			`DELETE FROM assets.unit_import_previews WHERE expires_at <= $1`,
+			call.Now,
+		)
+		if err != nil {
+			return apperr.Wrap(err, "delete assets.unit_import_previews")
+		}
+
+		_, err = tx.Exec(
 			ctx,
 			`INSERT INTO assets.unit_import_previews (id, tenant_id, customer_id, membership_id, file_name, rows, expires_at)
 			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6)`,
