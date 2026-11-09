@@ -1,0 +1,18 @@
+diff --git a/service/api/internal/modules/assets/writes.go b/service/api/internal/modules/assets/writes.go
+index 681b53c4..ab854648 100644
+--- a/service/api/internal/modules/assets/writes.go
++++ b/service/api/internal/modules/assets/writes.go
+@@ -998,10 +998,12 @@ func (*Module) UnitVersion(ctx context.Context, c *ops.Call, unit uuid.UUID) (in
+ 	return v, apperr.Wrap(err, "select assets.units")
+ }
+ 
++// customerActive requires an active customer, read with a share lock: customers.delete waits for the save, or is waited
++// for and seen, so a property or unit is never added to a customer that is being deleted.
+ func (*Module) customerActive(ctx context.Context, c *ops.Call, org uuid.UUID) error {
+ 	var status string
+ 
+-	err := c.Tx.QueryRow(ctx, `SELECT status FROM assets.customers WHERE organization_id = $1`, org).
++	err := c.Tx.QueryRow(ctx, `SELECT status FROM assets.customers WHERE organization_id = $1 FOR SHARE`, org).
+ 		Scan(&status)
+ 	if errors.Is(err, pgx.ErrNoRows) {
+ 		return notFound()
