@@ -11,7 +11,13 @@ services:
     healthcheck: { test: ["CMD-SHELL", "pg_isready -U postgres -d ac_load"] }
   valkey: { ports: !reset [] }
   localstack: { ports: !reset [] }
-  mosquitto: { ports: !reset [] }
+  # the broker of the IoT scenarios takes the password file the run writes in its out folder (docker/mosquitto/passwd stays as
+  # it is: the development stack's broker uses it)
+  mosquitto:
+    ports: !reset []
+    volumes:
+      - ./docker/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - "${LOAD_OUT:-./load-out}/mosquitto-passwd:/mosquitto/config/passwd:ro"
   mailpit: { ports: !reset [] }
   keycloak: { ports: !reset [] }
   gateway: { ports: !reset [] }
@@ -83,12 +89,44 @@ services:
     environment: { OIDC_APP_CLIENT_ID: ac-load, OIDC_APP_CLIENT_SECRET: "${LOAD_CLIENT_SECRET:-}" }
     healthcheck: { test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/login').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"], interval: 5s, timeout: 5s, retries: 30 }
 
+  # the IoT scenarios (phase 3): the bridge that stands in for AWS IoT rules, told about the load devices by the links file
+  # loadseed wrote, and the generator that plays those devices. The real broker is not named anywhere here: REAL_MQTT_* stay
+  # empty, and the bridge connects to this project's own broker only.
+  iot-bridge:
+    user: "${LOAD_UID:-65532}:${LOAD_GID:-65532}"
+    environment:
+      MQTT_USER: iot-bridge
+      MQTT_PASSWORD: ${MQTT_IOT_BRIDGE_KEY:-}
+      IOT_LINKS_FILE: /out/links.json
+      REAL_MQTT_URL: ""
+      REAL_MQTT_USER: ""
+      REAL_MQTT_PASSWORD: ""
+      REAL_MQTT_COMMANDS: ""
+    volumes: ["${LOAD_OUT:-./load-out}:/out:ro"]
+  iotload:
+    image: ac-api:${IMAGE_TAG:-tools}
+    build: { context: ./service/api, dockerfile: build/service.Dockerfile, target: tools, args: { SERVICE: gateway } }
+    user: "${LOAD_UID:-65532}:${LOAD_GID:-65532}"
+    command: ["/app/iotload", "--links", "/out/links.json", "--out", "/out/iotload.json"]
+    environment:
+      MQTT_URL: tcp://mosquitto:1883
+      MQTT_USER: device-sim
+      MQTT_PASSWORD: ${MQTT_DEVICE_SIM_KEY:-}
+      OWNER_DATABASE_URL: postgres://postgres:local@postgres:5432/ac_load?sslmode=disable
+    volumes: ["${LOAD_OUT:-./load-out}:/out"]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    networks: [data]
+    restart: "no"
+    profiles: [iot]
+
   # one-off: the launch-size data and the account manifest. It refuses any database but ac_load.
   loadseed:
     image: ac-api:${IMAGE_TAG:-tools}
     build: { context: ./service/api, dockerfile: build/service.Dockerfile, target: tools, args: { SERVICE: gateway } }
     user: "${LOAD_UID:-65532}:${LOAD_GID:-65532}"
-    command: ["/app/loadseed", "-manifest", "/out/manifest.json"]
+    command: ["/app/loadseed", "-manifest", "/out/manifest.json", "-links", "/out/links.json"]
     environment:
       OWNER_DATABASE_URL: postgres://postgres:local@postgres:5432/ac_load?sslmode=disable
       LOAD_PASSWORD: ${LOAD_PASSWORD:-}
@@ -119,6 +157,7 @@ services:
       TECHNICIAN_URL: http://technician-web-api:3000
       TIME_SCALE: ${LOAD_TIME_SCALE:-1}
       VU_SCALE: ${LOAD_VU_SCALE:-1}
+      IOT_SECONDS: ${LOAD_IOT_SECONDS:-60}
     volumes: ["./service/web/load:/load:ro", "${LOAD_OUT:-./load-out}:/out"]
     read_only: true
     tmpfs: [/tmp]

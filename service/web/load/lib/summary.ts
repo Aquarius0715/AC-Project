@@ -28,13 +28,14 @@ function inWindow(data: unknown, metric: string, key: string): string {
   return (metricValue(data, metric, "max") ?? 0) === 0 ? "-" : show(metricValue(data, metric, key), 1);
 }
 
-const KINDS = ["read", "write", "auth", "page", "signin"] as const;
+const KINDS = ["read", "write", "auth", "page", "signin", "command"] as const;
 const TRENDS = {
   read: "ac_read_duration",
   write: "ac_write_duration",
   auth: "ac_auth_duration",
   page: "ac_page_duration",
   signin: "ac_signin_duration",
+  command: "ac_command_duration",
 } as const;
 export const CLASSES = ["2xx", "3xx", "4xx", "5xx", "network"] as const;
 export const WRITE_NAMES = ["jobs.create", "preferences.update"] as const;
