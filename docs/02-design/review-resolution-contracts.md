@@ -9465,3 +9465,10 @@ IR683 moved the 24 action files of the four apps that worded a non-Core error as
 1. **The actions.** The three files use `actionFailure`: a refused call keeps its code, key and field errors, a call with no answer is UNAVAILABLE and the screen stays, and Next's own control flow (the redirect) goes on.
 2. **Guard test.** `serverActionFailures.test.ts` also reads the action files of `shared/screens` (38 files now); it failed for these three before the change.
 3. **Not in this change.** No screen, route, operation or count changes.
+
+## IR687 A time that cannot be formatted does not overflow the stack (review round 117) — 2026-11-09
+
+`runText` and `runClock` (`lib/clientAutomations.ts`) word a rule's run time in the rule's own time zone, and fall back to Kuala Lumpur for a zone the runtime does not know. The fall-back called the function again with the Kuala Lumpur zone whenever anything failed, not only a bad zone. A value that is no instant (an empty or malformed string from a preview answer) fails in Kuala Lumpur too, so the function called itself without end and the page ended in "Maximum call stack size exceeded" (the error boundary), instead of showing the text. It was reproduced in the unit test: `runText("garbage")` and `runClock("garbage")` threw.
+
+1. **The fall-back.** It retries in Kuala Lumpur only when the zone was another one; in Kuala Lumpur a value that does not format is shown as it came. An unknown zone still reads in Kuala Lumpur time.
+2. **Test.** `clientAutomations.test.ts`: a value that does not format comes back as it was (for both functions, in Kuala Lumpur and another zone; it failed before), and an unknown zone still falls back. No screen, route, operation or count changes; the values of the API are instants, so this only guards a malformed answer.
