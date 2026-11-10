@@ -211,6 +211,7 @@ const (
 	statusRunning          = "running"
 	statusScheduled        = "scheduled"
 	statusSent             = "sent"
+	stateSucceeded         = "succeeded"
 	statusUnpaid           = "unpaid"
 	statusWithdrawn        = "withdrawn"
 )

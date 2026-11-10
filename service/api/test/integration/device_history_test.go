@@ -185,6 +185,37 @@ func TestDeviceHistory(t *testing.T) {
 	if code, m := note(techInt(), "tech note", 2); code != 200 {
 		t.Fatalf("assigned technician note: %d %v", code, m)
 	}
+	// writes.getResult rechecks the device as the caller (IR724, round 140): the note while the technician may read
+	// the device, only that it succeeded once the assignment and the unit scope are gone
+	result := func() map[string]any {
+		return storedResult(t, srv, techInt(), "devices.addResponseNote", "id", eventID)
+	}
+	if r := result(); r["state"] != stateSucceeded ||
+		len(asArr(t, asObj(t, r["result"])["responseNotes"])) != 2 {
+		t.Fatalf("assigned: %v", r)
+	}
+
+	owner(
+		t,
+		`DELETE FROM maintenance.assignments WHERE technician_membership_id = $1 AND job_id IN (SELECT id FROM
+			maintenance.jobs WHERE unit_id = $2)`,
+		seed.ID("tech-internal-a"),
+		unit,
+	)
+	owner(
+		t,
+		`DELETE FROM identity.membership_scopes WHERE membership_id = $1 AND kind = 'unit' AND ref_id = $2`,
+		seed.ID("tech-internal-a"),
+		unit,
+	)
+
+	if code, _ := post(srv, techInt(), "devices.get", `{"id":"`+dev+`"}`); code != 404 {
+		t.Fatalf("the technician without assignment reads the device: %d", code)
+	}
+
+	if r := result(); r["state"] != stateSucceeded || r["result"] != nil {
+		t.Fatalf("unassigned: %v, want succeeded without the result", r)
+	}
 }
 
 // A unit holds one device at a time (error.unitHasDevice), and only a bound device is calibrated
