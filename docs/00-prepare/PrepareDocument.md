@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.580.0
+version: 0.581.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -300,6 +300,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.581.0: IR719: the sign-in callback times out the token exchange after 10 s and reads a non-JSON or missing answer as its token error, not the error page.
 0.580.0: IR718: every screen that runs a Server Action itself (ten files) keeps the screen when the call gets no answer, as useAction does (IR717).
 0.579.0: IR717: a Server Action that cannot be reached (offline browser, restarting app server) shows the unavailable toast and keeps the screen instead of the error boundary.
 0.578.0: IR716: the app shell takes API mode from the layout, so a technician never gets the demo QR match and a non-owner client no Users link while the session is unread.
