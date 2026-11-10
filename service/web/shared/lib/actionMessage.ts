@@ -51,6 +51,9 @@ const keyText: Record<string, string> = {
   "error.deviceInCampaign": "This device is in a firmware campaign that has not ended — wait for it or abort the campaign",
   "error.campaignActive": "This campaign has not ended — abort it first",
   "error.customerHasUnits": "This customer still has units — delete them first",
+  // a property or unit save, an import preview or commit (IR751): the customer is inactive; an import's checked preview is gone
+  "error.customerInactive": "This customer is inactive — activate it first",
+  "error.previewExpired": "The checked file has expired or changed — check it again, then import",
   "error.customerInUse": "This customer has jobs, contracts, invoices, reports or users, so it cannot be deleted",
   "error.contractorInUse": "This contractor has jobs, offers, certificates, payouts or users, so it cannot be deleted",
   "error.orgHasProfile": "This organization still has a customer or contractor profile — delete that first",

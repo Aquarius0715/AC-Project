@@ -5749,6 +5749,8 @@ export const ja: Record<string, string> = {
   "Contractor deleted": "契約会社を削除しました",
   "Delete {name}? Its profile, rate cards and unavailability are removed with it. A company with jobs, offers, certificates, payouts or users cannot be deleted.": "{name} を削除しますか？ プロフィール、レートカード、稼働不可の登録も一緒に削除されます。案件・オファー・証明書・支払い・ユーザーがある会社は削除できません。",
   "This customer still has units — delete them first": "このお客様にはまだユニットがあります。先に削除してください",
+  "This customer is inactive — activate it first": "このお客様は無効です。先に有効にしてください",
+  "The checked file has expired or changed — check it again, then import": "確認したファイルの期限が切れたか、内容が変わりました。もう一度確認してから取り込んでください",
   "This customer has jobs, contracts, invoices, reports or users, so it cannot be deleted": "このお客様には案件・契約・請求・レポート・ユーザーがあるため削除できません",
   "This contractor has jobs, offers, certificates, payouts or users, so it cannot be deleted": "この契約会社には案件・オファー・証明書・支払い・ユーザーがあるため削除できません",
   "This organization still has a customer or contractor profile — delete that first": "この組織にはまだお客様または契約会社のプロフィールがあります。先に削除してください",
