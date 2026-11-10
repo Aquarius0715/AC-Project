@@ -9757,3 +9757,11 @@ Both took the mode from `useBffSession()`. That hook is null until `/bff/session
 1. **Reproduced.** `shared/lib/tests/appShellMode.test.tsx` renders the shell in API mode (`live` given) with `/bff/session` unreadable. Before the fix, Scan QR opens the demo dialog ("[ camera preview ]") and a client gets the Users link (both cases fail).
 2. **Fix.** API mode is `live` being given, or a session that says `api`. The role layouts pass `live` only in API mode (IR241), so it is known on the first render; the shared pages (notifications, preferences, demo) pass it only with a session, and there the session still tells. The real QR scan and the owner check use it. In API mode the owner check reads the session's client role, which is false until the session answers. The demo keeps its dialog and persona.
 3. **Not changed.** The QR scan itself, the Users page and its server-side owner check. Every operation, route and count stays the same.
+
+## IR717 A Server Action that cannot be reached keeps the screen (review round 220, 2026-11-10)
+
+`useAction` (`shared/lib/useAction.ts`) runs the screens' Server Actions in a transition. A failure answered by the action, a refusal or an unavailable Core API (IR683), becomes a toast in the display language, and the screen keeps what the user typed. A call that gets no answer at all was not handled: the browser is offline, or the app server restarts. The promise of the action rejects, the rejection leaves the transition, and React shows the route's error boundary. So the form the user had filled in was lost.
+
+1. **Reproduced.** `shared/lib/tests/useAction.test.tsx` runs an action whose call rejects (`TypeError: Failed to fetch`). The error is thrown out of the transition (the test fails).
+2. **Fix.** `reached` turns such a rejection into the failure `actionFailure` gives a Core API that does not answer: `UNAVAILABLE`, `error.unavailable`. The screen then shows "The service is unavailable — try again shortly" and runs the caller's `failed`. Next's own control flow still goes on: a redirect or not found is rethrown by `unstable_rethrow`, as on the server.
+3. **Not changed.** Successes (the re-read of IR680, `reload: false` of IR685), refusals and the sign-in redirect of an ended session (IR385). Every operation, route and count stays the same.
