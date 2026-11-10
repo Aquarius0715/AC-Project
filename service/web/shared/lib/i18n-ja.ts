@@ -139,6 +139,8 @@ export const ja: Record<string, string> = {
   "Mid": "中",
   "High": "強",
   "Not sent: {reason}": "送信できませんでした: {reason}",
+  "{unit}: sent — its answer could not be read. Refresh to see the AC's state before sending again.": "{unit}: 送信しましたが、応答を読み取れませんでした。もう一度送る前に、更新してエアコンの状態を確認してください。",
+  "Sent — its answer could not be read. Refresh to see the AC's state.": "送信しましたが、応答を読み取れませんでした。更新してエアコンの状態を確認してください。",
   "Not sent": "送信できませんでした",
   "another command is still waiting for this AC": "このエアコンに別のコマンドがまだ待機中です",
   "this AC changed — reload and try again": "このエアコンが変更されました。再読み込みしてもう一度お試しください",

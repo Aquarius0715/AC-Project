@@ -19,3 +19,19 @@ export async function waitForCommand(first: ApiCommand, onUpdate: (c: ApiCommand
   }
   return c;
 }
+
+/** A created command followed until the device answers: `answered` with its last state, or not answered when a poll
+got no answer (the browser offline, the app server restarting). The command was sent then and the device may still
+carry it out, so a screen says so, never "not sent" (IR728); `command` is the last state seen. */
+export interface Followed { answered: boolean; command: ApiCommand }
+
+/** waitForCommand that answers a failed poll as a command sent but not answered, with the last state seen. */
+export async function followCommand(first: ApiCommand, onUpdate: (c: ApiCommand) => void): Promise<Followed> {
+  let last = first;
+  try {
+    const command = await waitForCommand(first, (c) => { last = c; onUpdate(c); });
+    return { answered: true, command };
+  } catch {
+    return { answered: false, command: last };
+  }
+}

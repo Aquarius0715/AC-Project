@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { waitForCommand } from "@ac/web/lib/unitCommands";
+import { followCommand, waitForCommand } from "@ac/web/lib/unitCommands";
 import type { ApiCommand } from "@ac/web/lib/units";
 
 const ACKNOWLEDGED = "acknowledged";
@@ -58,5 +58,23 @@ describe("following a command until the device answers (D04, Unit Control)", () 
       expect(waiting).rejects.toThrow("UNAVAILABLE"),
       vi.advanceTimersByTimeAsync(2000),
     ]);
+  });
+});
+
+// a command the screen created was sent: a poll that gets no answer afterwards does not make it "not sent" (IR728)
+describe("followCommand", () => {
+  it("answers the last state the device reported", async () => {
+    callOp.mockResolvedValueOnce(deviceCommand(ACKNOWLEDGED));
+    const following = followCommand(deviceCommand("sent"), vi.fn());
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(await following).toStrictEqual({ answered: true, command: deviceCommand(ACKNOWLEDGED) });
+  });
+
+  it("answers the command as sent but unread when a poll gets no answer", async () => {
+    callOp.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    const seen: string[] = [];
+    const following = followCommand(deviceCommand("sent"), (c) => { seen.push(c.status); });
+    await vi.advanceTimersByTimeAsync(2000);
+    expect([await following, seen]).toStrictEqual([{ answered: false, command: deviceCommand("sent") }, ["sent"]]);
   });
 });
