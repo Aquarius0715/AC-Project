@@ -30,6 +30,10 @@ describe("inbox rows and alert rows", () => {
     const r = inboxRow(note({}), "client");
     expect([r.t, r.d, r.href, r.read]).toStrictEqual(["Job update — job-1", "Requested", "/customer/maintenance?jobId=job-1", false]);
     expect(inboxRow(note({ channel: "email" }), "client").d).toBe("Requested · email");
+    // a failed device operation (IR753) reads "Failed", worded in the display language
+    const failedOp = note({ type: "device_operation", templateKey: "device_operation", target: { kind: "device", id: "d1" }, params: { ...note({}).params, targetName: "AC-DEMO-0002", status: "failed" } });
+    expect(inboxRow(failedOp, "admin").d).toBe("Failed");
+    expect(inboxRow(failedOp, "admin", { locale: "ms", timeZone: "UTC" }).d).toBe("Gagal");
     expect(inboxRow(note({ channel: "email" }), "client", { locale: "ms", timeZone: "UTC" }).d).toBe("Diminta · e-mel"); // the channel in words too (IR488)
     expect(inboxRow(note({ type: "fault", templateKey: "alert", sourceAlertId: "a1", target: { kind: "unit", id: "u1" }, params: { ...note({}).params, targetName: BEDROOM_AC, status: "open" } }), "client"))
       .toMatchObject({ t: "Alert on Bedroom AC", href: "/customer/alerts" });

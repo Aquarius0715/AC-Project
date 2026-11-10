@@ -660,15 +660,33 @@ func (d *demoOps) operationResult(ctx context.Context, call *ops.Call, input *Tr
 		call.Now,
 		`SELECT EXISTS (SELECT 1 FROM devices.device_operations WHERE id = $1)`,
 		*input.OperationID,
-		func(txn pgx.Tx, _ uuid.UUID) error {
-			return devices.FinishOperation(
+		func(txn pgx.Tx, tenant uuid.UUID) error {
+			succeeded := input.Result == "succeeded"
+
+			err := devices.FinishOperation(
 				ctx,
 				txn,
 				*input.OperationID,
-				input.Result == "succeeded",
+				succeeded,
 				input.OccurredAt,
 				call.Now,
 			)
+			if err != nil || succeeded {
+				return apperr.Wrap(err, "devices.FinishOperation")
+			}
+			// the device reported the failure: the operation's creator and HQ hear of it (IR95, IR753)
+			return devices.NotifyOperationFailed(ctx, &ops.Call{
+				Tx:              txn,
+				Now:             call.Now,
+				CorrelationID:   uuid.NewString(),
+				Queries:         d.reg,
+				Principal:       ops.SystemPrincipal(tenant, seed.ID("system-demo")),
+				Bearer:          "",
+				ExpectedVersion: nil,
+				Candidates:      nil,
+				Events:          nil,
+				Audits:          nil,
+			}, *input.OperationID)
 		},
 	)
 }

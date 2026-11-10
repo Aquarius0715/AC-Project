@@ -79,7 +79,7 @@ const statusWords: Record<string, string> = {
   open: "Unresolved", requested: "Requested", time_proposed: "Time proposed", offered: "Offered", accepted: "Accepted", declined: "Declined", assigned: "Assigned",
   in_progress: "In progress", submitted: "Submitted", returned: "Returned for rework", rework_requested: "Rework requested", completed: "Completed", cancelled: "Cancelled",
   on_hold: "On hold", scheduled: "Scheduled", applied: "Applied", release_requested: "Release requested", released: "Released", received: "Received", answered: "Answered",
-  confirmed: "Payment confirmed",
+  confirmed: "Payment confirmed", failed: "Failed", // a device operation that failed (IR753)
 };
 /** Why an assignment was released (the access-release notice, IR439). */
 const reasonWords: Record<string, string> = {

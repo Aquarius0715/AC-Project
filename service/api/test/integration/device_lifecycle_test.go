@@ -164,6 +164,10 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 	if d, un := conn(); d != connectionError || un != connectionError {
 		t.Fatalf("check TIMEOUT → error: %s / %s", d, un)
 	}
+	// a failed operation tells the member who started it and HQ's device writers (IR95 device_operation.failed, IR753)
+	if n := countNotes(t, dev, "hq-operator", "device_operation"); n != 1 {
+		t.Errorf("notices of the timed-out check to its creator: %d", n)
+	}
 	// a failed check result (the device answers) → error; a check is accepted in any connection state
 	failed := start("check")
 
@@ -171,6 +175,10 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 
 	if code, _ := result(failed, "failed", base.Add(2*time.Second)); code != 200 {
 		t.Fatal("check failure result")
+	}
+
+	if n := countNotes(t, dev, "hq-operator", "device_operation"); n != 2 {
+		t.Errorf("notices after the device reported the failure: %d", n)
 	}
 
 	if st, code := opState(failed); st != statusFailed || code != codeUnavailable {
