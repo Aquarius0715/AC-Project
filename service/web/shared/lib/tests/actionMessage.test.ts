@@ -32,6 +32,17 @@ describe("actionMessage (one toast line per failed Server Action)", () => {
     expect(actionMessage(inactive, translator("ms"))).not.toContain("CONFLICT");
     expect(actionMessage(expired, translator("ja"))).not.toContain("CONFLICT");
   });
+  it("says why a refusal without a field happened, in every display language (IR756)", () => {
+    const keys = ["error.customerActive", "error.notEmpty", "error.unitActive", "error.unitInUse", "error.alreadyUndone", "error.undoWindowClosed", "error.importPlaceInUse", "error.importUnitInUse", "error.alreadyBound", "error.unitHasDevice", "error.unitBusy", "error.duplicateModel", "error.retryOnlyFailedOrSkipped", "error.idempotencyKeyReused", "error.requestInProgress"];
+    for (const messageKey of keys) {
+      for (const language of ["en", "ms", "ja"] as const) {
+        const line = actionMessage(failure({ code: "CONFLICT", messageKey }), translator(language));
+        expect(line, `${messageKey} (${language})`).not.toContain("CONFLICT");
+      }
+    }
+    expect(actionMessage(failure({ code: "CONFLICT", messageKey: "error.unitInUse" }))).toBe("This unit has history (jobs, contracts, invoices, telemetry or devices), so it cannot be deleted — archive it instead");
+    expect(actionMessage(failure({ code: "CONFLICT", messageKey: "error.undoWindowClosed" }), translator("ja"))).toBe("この取り込みを取り消せる 24 時間の期限が過ぎました");
+  });
   it("explains version conflicts, domain errors and bare codes", () => {
     expect(actionMessage(failure({ code: "CONFLICT", messageKey: "error.versionConflict" }))).toMatch(/changed this in the meantime/);
     expect(actionMessage(failure({ code: "CONFLICT", messageKey: "errors.operation_not_running" }))).toBe("Operation not running");

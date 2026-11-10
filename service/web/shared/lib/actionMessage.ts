@@ -54,6 +54,25 @@ const keyText: Record<string, string> = {
   // a property or unit save, an import preview or commit (IR751): the customer is inactive; an import's checked preview is gone
   "error.customerInactive": "This customer is inactive — activate it first",
   "error.previewExpired": "The checked file has expired or changed — check it again, then import",
+  // archiving or deactivating what is still in use, deleting a unit with history (D05, DD-A02)
+  "error.customerActive": "This customer still has units, open jobs or current contracts — archive or end them before deactivating",
+  "error.notEmpty": "This place still has units or spaces in it — move or archive them first",
+  "error.unitActive": "This unit is still in use — a current contract, an open job, a bound device, a restriction, or a command or check still running — end or remove them before archiving",
+  "error.unitInUse": "This unit has history (jobs, contracts, invoices, telemetry or devices), so it cannot be deleted — archive it instead",
+  // undoing a unit import (IR111): once, within 24 h, while nothing else uses what it created
+  "error.alreadyUndone": "This import has already been undone",
+  "error.undoWindowClosed": "The 24-hour undo period for this import has ended",
+  "error.importPlaceInUse": "Other units or spaces were added to the imported places — the import can no longer be undone",
+  "error.importUnitInUse": "An imported unit now has telemetry, jobs or other history — the import can no longer be undone",
+  // binding and operating devices, device models, firmware campaign retries
+  "error.alreadyBound": "This device is already bound to this unit",
+  "error.unitHasDevice": "This unit already has a device — unbind it first",
+  "error.unitBusy": "Another operation is running on this unit — try again when it has finished",
+  "error.duplicateModel": "A capability for this manufacturer and model exists already",
+  "error.retryOnlyFailedOrSkipped": "Only a failed or skipped device can be retried",
+  // the Idempotency-Key of a write (D04): another body under the same key, or the first send still running
+  "error.idempotencyKeyReused": "This request was already sent with different contents — reload the page and try again",
+  "error.requestInProgress": "The same request is still being processed — try again in a moment",
   "error.customerInUse": "This customer has jobs, contracts, invoices, reports or users, so it cannot be deleted",
   "error.contractorInUse": "This contractor has jobs, offers, certificates, payouts or users, so it cannot be deleted",
   "error.orgHasProfile": "This organization still has a customer or contractor profile — delete that first",
