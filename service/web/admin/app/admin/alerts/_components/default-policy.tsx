@@ -12,6 +12,7 @@ import { DefaultRulePreview, DemoTest } from "./policy-checks";
 import { Icon } from "@ac/web/components/Icon";
 import { byCount, textOf } from "@ac/web/lib/i18n";
 import { useRefreshThen } from "@ac/web/lib/useRefreshThen";
+import { reached } from "@ac/web/lib/unreachable";
 
 const CATEGORY: Record<string, string> = { air_quality: "Air quality", fault: "Fault", maintenance: "Maintenance", connection: "Connection" };
 const SHOWN = 20; // the customers listed before the search-select (DD-A05 item 9, Figma 268:2)
@@ -74,7 +75,7 @@ export function DefaultPolicyEditor({ p, customers, units, canWrite, copyFor, on
     if (broken.length > 0) { toast(t("Fix the validation errors first"), "crit"); return; }
     if (demo) { toast(t("Default limits saved for every unit")); return; }
     startTransition(async () => {
-      const r = await saveDefaultRules({ ...p, rules });
+      const r = await reached(() => saveDefaultRules({ ...p, rules })); // no answer reads as unavailable (IR718)
       if (!r.ok) { toast(actionMessage(r, t), "crit"); return; }
       refreshThen(() => { toast(t("Default limits saved for every unit")); setTried(false); });
     });
@@ -85,7 +86,7 @@ export function DefaultPolicyEditor({ p, customers, units, canWrite, copyFor, on
     const done = () => { toast(t(on ? "{rule} switched on for {name}" : "{rule} switched off for {name}", { rule: rule.name, name: customer.name })); setSwitching(null); setReason(""); };
     if (demo) { done(); return; }
     startTransition(async () => {
-      const r = await switchDefaultRule(p.id, rule.ruleKey, customer.id, on, reason, setting(customer.id)?.version ?? 0);
+      const r = await reached(() => switchDefaultRule(p.id, rule.ruleKey, customer.id, on, reason, setting(customer.id)?.version ?? 0));
       if (!r.ok) { toast(actionMessage(r, t), "crit"); return; }
       refreshThen(done);
     });

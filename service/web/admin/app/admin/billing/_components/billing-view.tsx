@@ -34,6 +34,7 @@ import { filled } from "@ac/web/lib/filled";
 import { entryOf } from "@ac/web/lib/lookup";
 import { isAfter, isBefore } from "@ac/web/lib/order";
 import { useRefreshThen } from "@ac/web/lib/useRefreshThen";
+import { reached } from "@ac/web/lib/unreachable";
 
 /** A recipient's role in words (IR499). */
 const ROLE_WORD: Record<string, string> = { client: "Client", admin: "Admin", contractor: "Contractor", technician: "Technician" };
@@ -215,7 +216,7 @@ export function BillingView({ live }: Readonly<{ live?: BillingLive }>) {
   };
   const act = <Value,>(fn: () => Promise<ActionResult<Value>>, ok: string | ((v: Value) => string), after?: (v: Value) => void) => {
     start(async () => {
-      const r = await fn();
+      const r = await reached(fn); // no answer reads as unavailable (IR718)
       if (r.ok) {
         refreshThen(() => { toast(typeof ok === "string" ? ok : ok(r.value)); after?.(r.value); });
         return;

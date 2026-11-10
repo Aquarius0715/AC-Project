@@ -18,6 +18,7 @@ import { sendCommand } from "../actions";
 import { RenameModal, type Renaming } from "../../_components/rename-modal";
 import { oneOf } from "@ac/web/lib/oneOf";
 import { Icon, type IconName } from "@ac/web/components/Icon";
+import { unreachableFailure } from "@ac/web/lib/unreachable";
 
 export interface PropertiesLive {
   tree: TreeProperty[]; selection: Selection | null; owner: boolean;
@@ -211,14 +212,19 @@ function GroupPanel({ live, space }: Readonly<{ live: PropertiesLive; space: str
     // command over the member's write limit waits the advised seconds and is sent again (IR375, IR380)
     const wait = (id: string) => (s: number) => { setTrack((x) => ({ ...x, [id]: { status: "Waiting", note: t("Write limit reached — sending again in {s} s", { s }) } })); };
     await Promise.all(rows.map(async (r) => {
-      for (const a of r.actions) {
-        const created = await sendPaced(() => sendCommand(r.id, a), wait(r.id));
-        if (!created.ok) { setTrack((x) => ({ ...x, [r.id]: { status: "Failed", note: actionMessage(created, t) } })); return; }
-        setTrack((x) => ({ ...x, [r.id]: { status: "Sending", note: "" } }));
-        const c: ApiCommand = await waitForCommand(created.value, () => { /* the row already says Sending */ });
-        if (c.status !== "acknowledged") { setTrack((x) => ({ ...x, [r.id]: { status: "Failed", note: historyRow(c, t, i.display).text } })); return; }
+      try {
+        for (const a of r.actions) {
+          const created = await sendPaced(() => sendCommand(r.id, a), wait(r.id));
+          if (!created.ok) { setTrack((x) => ({ ...x, [r.id]: { status: "Failed", note: actionMessage(created, t) } })); return; }
+          setTrack((x) => ({ ...x, [r.id]: { status: "Sending", note: "" } }));
+          const c: ApiCommand = await waitForCommand(created.value, () => { /* the row already says Sending */ });
+          if (c.status !== "acknowledged") { setTrack((x) => ({ ...x, [r.id]: { status: "Failed", note: historyRow(c, t, i.display).text } })); return; }
+        }
+        setTrack((x) => ({ ...x, [r.id]: { status: "Confirmed", note: r.change } }));
+      } catch {
+        // the action or the poll got no answer: this AC failed, the others go on and the button comes back (IR718)
+        setTrack((x) => ({ ...x, [r.id]: { status: "Failed", note: actionMessage(unreachableFailure(), t) } }));
       }
-      setTrack((x) => ({ ...x, [r.id]: { status: "Confirmed", note: r.change } }));
     }));
     setSending(false);
     toast(t("Group change finished — results are shown per AC"));
