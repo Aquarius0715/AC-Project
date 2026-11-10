@@ -1,7 +1,8 @@
 # A pull request of this repository merges into main by itself once every required check has passed: this workflow turns
 # on GitHub's auto-merge when the pull request is opened. Which checks are required, and that the branch is up to date with
 # main, is the branch protection of main (the 14 jobs of ci.yml); GitHub waits for them and merges, or keeps waiting.
-# A pull request from a fork never gets it.
+# A pull request from a fork never gets it, nor one of Dependabot (IR727): a dependency update merges only when someone
+# merges it, after reading what it changes (an update can need code changes, or not be an update at all).
 name: Auto-merge
 
 on:
@@ -15,7 +16,9 @@ permissions:
 jobs:
   enable:
     name: Turn on auto-merge
-    if: github.event.pull_request.head.repo.full_name == github.repository && !github.event.pull_request.draft
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository && !github.event.pull_request.draft &&
+      github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: [self-hosted, ac-test]
     container: { image: "python:3.13-bookworm" }
     steps:

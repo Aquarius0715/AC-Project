@@ -12,7 +12,10 @@ services:
   gateway: { ports: !reset [] }
   webhook: { ports: !reset [] }
   jaeger: { ports: !reset [] }
-  mailpit: { restart: unless-stopped }
+  # the inbox holds the set-up and reset links of every account: on the server only, read through an SSH tunnel (IR720)
+  # the server's loopback (IR720): ac-test's environment file sets MAILPIT_PORT=8225 (setup.sh), and the E2E stack,
+  # whose settings do not, keeps compose.yaml's 8025, which its specs open (IR729)
+  mailpit: { ports: !override ["127.0.0.1:${MAILPIT_PORT:-8025}:8025"], restart: unless-stopped }
   stripe-mock: { restart: unless-stopped }
   weather-mock: { restart: unless-stopped }
   keycloak:
