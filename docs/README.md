@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.618.0 / Created: 2026-09-14 / Updated: 2026-11-11 / Status: Draft for review / Language: English
+Version: 0.619.0 / Created: 2026-09-14 / Updated: 2026-11-11 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -100,6 +100,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.619.0 (2026-11-11): IR762: IR428's housekeeping text no longer lists the invitation e-mails of a table that IR479 dropped.
 0.618.0 (2026-11-11): IR761: the hourly sweep removes idempotency keys by the database time they are written with, so moving the demo clock forward no longer ends a key early and lets a retry run its write twice.
 0.617.0 (2026-11-11): IR760: the hourly housekeeping also removes the account and session events that the identity consumer applied before IR511 split them off, instead of keeping them in the outbox for ever.
 0.616.0 (2026-11-11): IR759: 24 operations that take no expected version (preferences.update, invoices.create, commands.create and others) no longer say "expectedVersion required for updates" in the catalog and the API description.
