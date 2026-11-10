@@ -299,8 +299,8 @@ func withSensors(ctx context.Context, call *ops.Call, devices []Device) error {
 //	@Description	admin:device.read | admin:audit.read
 //	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
 //	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-//	@Description	Design: DD-A04, DD-T02, DD-T11, DD-A16, DD-A20, DD-T12 · Query: filters unitId,status · sort \
-//	@Description	id,createdAt,updatedAt (default id asc)
+//	@Description	Design: DD-A04, DD-T02, DD-T11, DD-A16, DD-A20, DD-T12 · Query: filters unitId,status,search,modelId \
+//	@Description	· sort id,createdAt,updatedAt (default id asc)
 //	@Tags			devices
 //	@Accept			json
 //	@Produce		json
@@ -309,6 +309,8 @@ func withSensors(ctx context.Context, call *ops.Call, devices []Device) error {
 //	@Param			sort	query		string	false	"field:direction — fields id,createdAt,updatedAt; default id asc"
 //	@Param			unitId	query		string	false	"filter → unitId"
 //	@Param			status	query		string	false	"filter → connection"
+//	@Param			search	query		string	false	"filter → part of serial (IR723)"
+//	@Param			modelId	query		string	false	"filter → model of the bound unit (IR723)"
 //	@Success		200		{object}	ops.Envelope{data=DevicePage}
 //	@Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
 //	@Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
@@ -382,8 +384,10 @@ func (m *Module) list(
 
 // deviceFilter is the devices.list filters of the query catalog.
 type deviceFilter struct {
-	UnitID *uuid.UUID `json:"unitId,omitempty"`
-	Status *string    `json:"status,omitempty"`
+	UnitID  *uuid.UUID `json:"unitId,omitempty"`
+	Status  *string    `json:"status,omitempty"`
+	Search  *string    `json:"search,omitempty"`  // part of the serial, case-insensitive (IR723)
+	ModelID *uuid.UUID `json:"modelId,omitempty"` // the model of the device's bound unit (IR723)
 }
 
 // decodeFilters reads the query's filters into filter, a struct of the catalogued keys: another key is VALIDATION.
@@ -426,6 +430,19 @@ func deviceConditions(call *ops.Call, filter deviceFilter) (string, []any, error
 
 		args = append(args, *filter.Status)
 		conds = append(conds, fmt.Sprintf("d.connection = $%d", len(args)))
+	}
+	// HQ finds a device and a model's devices on the server, past any one page (IR723)
+	if filter.Search != nil && strings.TrimSpace(*filter.Search) != "" {
+		args = append(args, paging.Contains(*filter.Search))
+		conds = append(conds, fmt.Sprintf("d.serial ILIKE $%d", len(args)))
+	}
+
+	if filter.ModelID != nil {
+		args = append(args, *filter.ModelID)
+		conds = append(
+			conds,
+			fmt.Sprintf("EXISTS (SELECT 1 FROM assets.units mu WHERE mu.id = d.unit_id AND mu.model_id = $%d)", len(args)),
+		)
 	}
 
 	return strings.Join(conds, " AND "), args, nil
