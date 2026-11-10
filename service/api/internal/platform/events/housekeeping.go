@@ -24,7 +24,8 @@ type Swept struct{ Outbox, Processed, Failures, IdempotencyKeys int64 }
 // Housekeep deletes what the platform tables keep no longer (IR428), at now (business time, the clock the rows were
 // written with):
 //   - outbox events older than OutboxRetention that every consumer subscribing to their type has applied (or
-//     dead-lettered): an event a consumer still needs stays, however old;
+//     dead-lettered), a split consumer counting what the one it was split from applied: an event a consumer still
+//     needs stays, however old;
 //   - processed-event records and failure records of events that are no longer in the outbox, the former once they
 //     are older than ProcessedRetention, so an event is never delivered twice;
 //   - idempotency keys past their expiry, tenant by tenant (the table has row-level security).
@@ -36,21 +37,25 @@ func Housekeep(
 ) (Swept, error) {
 	var swept Swept
 
-	var names, types []string // one row per (consumer, subscribed type)
+	// one row per (consumer, subscribed type), with the consumer it was split from: what that one applied before the
+	// split counts as applied (IR511, IR760)
+	var names, types, splits []string
 
 	for _, c := range consumers {
 		for t := range c.Handlers {
-			names, types = append(names, c.Name), append(types, t)
+			names = append(names, c.Name)
+			types = append(types, t)
+			splits = append(splits, c.SplitFrom)
 		}
 	}
 
 	err := runner.Run(ctx, false, nil, func(txn pgx.Tx) error {
 		tag, err := txn.Exec(ctx, `DELETE FROM platform.outbox o WHERE o.occurred_at < $1
-			AND NOT EXISTS (SELECT 1 FROM unnest($2::text[], $3::text[]) AS sub(consumer, event_type)
+			AND NOT EXISTS (SELECT 1 FROM unnest($2::text[], $3::text[], $4::text[]) AS sub(consumer, event_type, split)
 				WHERE sub.event_type = o.event_type
-				  AND NOT EXISTS (SELECT 1 FROM platform.processed_events p WHERE p.consumer = sub.consumer AND p.event_id =
-				  o.id))`,
-			now.Add(-OutboxRetention), names, types)
+				  AND NOT EXISTS (SELECT 1 FROM platform.processed_events p WHERE p.event_id = o.id
+				    AND (p.consumer = sub.consumer OR (sub.split <> '' AND p.consumer = sub.split))))`,
+			now.Add(-OutboxRetention), names, types, splits)
 		if err != nil {
 			return apperr.Wrap(err, "delete platform.outbox")
 		}

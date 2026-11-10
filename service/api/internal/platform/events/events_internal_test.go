@@ -455,6 +455,71 @@ func TestHousekeep(t *testing.T) {
 	execAs(t, runner, nil, `DELETE FROM platform.outbox WHERE id = $1`, rows.needed)
 }
 
+// An event the consumer it was split from applied (IR511) counts as applied by the split consumer: it leaves the outbox
+// after its retention instead of staying for ever (IR428, IR760).
+//
+//nolint:paralleltest // shares the test database with the other DB tests
+func TestHousekeepCountsTheEventsOfASplitConsumer(t *testing.T) {
+	runner := testDB(t)
+	tenant := firstTenant(t, runner)
+	typ := "Split" + uuid.NewString()[:8]
+	before, split := "test-"+uuid.NewString(), "test-"+uuid.NewString()
+	event := uuid.New()
+
+	execAs(
+		t,
+		runner,
+		nil,
+		`INSERT INTO platform.outbox (id, tenant_id, aggregate_type, aggregate_id, event_type, payload, correlation_id,
+			occurred_at)
+		VALUES ($1, $2, 'test', $1, $3, '{}', 'corr', $4)`,
+		event,
+		tenant,
+		typ,
+		housekeepDay(10),
+	)
+	execAs(
+		t,
+		runner,
+		nil,
+		`INSERT INTO platform.processed_events (consumer, event_id, processed_at) VALUES ($1, $2, $3)`,
+		before,
+		event,
+		housekeepDay(10),
+	)
+
+	t.Cleanup(func() {
+		execAs(t, runner, nil, `DELETE FROM platform.processed_events WHERE event_id = $1`, event)
+		execAs(t, runner, nil, `DELETE FROM platform.outbox WHERE id = $1`, event)
+	})
+
+	noop := func(context.Context, pgx.Tx, Event) error { return nil }
+	consumers := []*Consumer{{
+		Name:      split,
+		Handlers:  map[string]Handler{typ: noop},
+		DB:        nil,
+		Batch:     0,
+		Logf:      nil,
+		Now:       nil,
+		SplitFrom: before,
+	}}
+
+	_, err := Housekeep(context.Background(), runner, housekeepDay(20), consumers)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if left := countAs(
+		t,
+		runner,
+		nil,
+		`SELECT count(*) FROM platform.outbox WHERE id = $1`,
+		event,
+	); left != 0 {
+		t.Errorf("an event applied before the split stays in the outbox: %d", left)
+	}
+}
+
 // housekeepDay is day d of January 2000, the clock of TestHousekeep.
 func housekeepDay(d int) time.Time { return time.Date(2000, 1, d, 0, 0, 0, 0, time.UTC) }
 
