@@ -1,6 +1,7 @@
 package integration_test
 
 import (
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -533,6 +534,19 @@ func TestWorkReports(t *testing.T) {
 	); code != 200 || data(res)["status"] != statusCompleted ||
 		data(res)["completedAt"] == nil {
 		t.Fatalf("accept: %d %v", code, res)
+	}
+	// IR740 (B-22): each review's event names its decision, the return of v5 and the acceptance of v7
+	var decisions []string
+	ownerScan(
+		t,
+		`SELECT coalesce(array_agg(action || ':' || report_version ORDER BY occurred_at, report_version), '{}')
+		FROM maintenance.job_events WHERE job_id = $1 AND action LIKE 'job.review%'`,
+		[]any{job},
+		&decisions,
+	)
+
+	if !slices.Equal(decisions, []string{"job.review_returned:5", "job.review_accepted:7"}) {
+		t.Errorf("review events: %v", decisions)
 	}
 	// DEC-73 / IR234: completion releases the assignment — the technician is free again, the detail still names who did
 	// the work, the technician keeps the job as a history snapshot at once (no worker tick), writes end, and the

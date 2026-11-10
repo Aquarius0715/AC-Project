@@ -151,7 +151,7 @@ export function timeline(status: string, events: ApiJobEvent[], hasTechnician: b
   const steps: [string, string[], string][] = [
     ["Requested", ["job.created"], ORIGIN_TEXT.get(origin ?? "") ?? "by the client or the plan"], ["Offered", ["job.offered"], "HQ offered your company"], ["Accepted", ["offer.accepted"], "you"],
     ["Assigned", ["job.assigned"], "from Schedule"], ["In progress", ["job.checked_in", "job.started"], "technician checks in on site"],
-    ["Submitted", ["job.submitted"], "report sent for your review"], ["Completed", ["job.reviewed"], "after the quality review"],
+    ["Submitted", ["job.submitted"], "report sent for your review"], ["Completed", ["job.review_accepted", "job.reviewed"], "after the quality review"],
   ];
   return steps.map(([label, actions, sub], k) => {
     const whenAt = at(actions);

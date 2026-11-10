@@ -1706,7 +1706,13 @@ func (m Reports) reviewJob(ctx context.Context, call *ops.Call, input *ReviewInp
 		}
 	}
 
-	reportEventErr := m.reportEvent(ctx, call, input.JobID, "job.reviewed", reportID, latest)
+	// the decision is the action (IR740, B-22): `job.reviewed`, written before, named both
+	action := "job.review_accepted"
+	if input.Decision == decisionReturn {
+		action = "job.review_returned"
+	}
+
+	reportEventErr := m.reportEvent(ctx, call, input.JobID, action, reportID, latest)
 	if reportEventErr != nil {
 		return Job{}, reportEventErr
 	}

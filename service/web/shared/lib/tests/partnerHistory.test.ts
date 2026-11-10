@@ -78,6 +78,9 @@ describe("partner job history", () => {
     expect(eventItem(must(events[1]), users)).toEqual({ id: "e2", title: "Note added", detail: "“Missing filter photo” · internal · by contractor-a", at: "20 Sept 2026, 2:05 pm MYT", badge: "internal" });
     expect(eventItem(must(events[3]), users)).toMatchObject({ badge: "customer", detail: "“Arriving at 09:00” · customer" }); // someone outside the company is not named
     expect(eventItem(auditEvent("m", OFFER_ACCEPTED, TEXT_2026_09_20T00_00_00Z, null, "u-me"), users).detail).toBe("by you");
+    // IR740 (B-22): the review's event names its decision, so a return no longer reads as a green "Report reviewed"
+    expect(eventItem(auditEvent("ra", "job.review_accepted", TEXT_2026_09_20T00_00_00Z), users)).toMatchObject({ title: "Report accepted", tone: "ok" });
+    expect(eventItem(auditEvent("rr", "job.review_returned", TEXT_2026_09_20T00_00_00Z), users)).toMatchObject({ title: "Returned for rework", tone: "warn" });
     expect([channelText("inApp"), channelText("email"), channelText("whatsapp")]).toEqual(["in-app", "email", "WhatsApp"]);
     expect(eventItem(auditEvent("r", "job.rework_started", TEXT_2026_09_20T00_00_00Z, null, null), users)).toMatchObject({ detail: "by system", tone: "warn", badge: "customer" });
   });

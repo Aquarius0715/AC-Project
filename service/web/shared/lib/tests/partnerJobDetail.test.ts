@@ -84,6 +84,11 @@ describe("partner job detail", () => {
     ]);
     expect(timeline("completed", events, true).every((s) => s.state === "done")).toBe(true);
     expect(timeline("rework_requested", events, true).find((s) => s.state === "current")?.label).toBe("In progress");
+    // IR740: a return is not the completion; the acceptance (or a row written before IR740) is
+    const completedAt = (evs: typeof events) => timeline("completed", evs, true).find((s) => s.label === "Completed")?.at;
+    expect(completedAt([...events, event("job.review_returned", "2026-09-20T00:00:00Z")])).toBeNull();
+    expect(completedAt([...events, event("job.review_returned", "2026-09-20T00:00:00Z"), event("job.review_accepted", "2026-09-21T00:00:00Z")])).toBe("2026-09-21T00:00:00Z");
+    expect(completedAt([...events, event("job.reviewed", "2026-09-19T00:00:00Z")])).toBe("2026-09-19T00:00:00Z");
     expect(eventRows(events).map((r) => r.text)).toStrictEqual(["Job accepted", "Offer received from HQ", "Job created"]);
     expect(timeline("accepted", events, false, "periodic_plan", MS_TOKYO).slice(0, 3).map((s) => [s.label, s.sub, s.atText])).toStrictEqual([
       ["Diminta", "pelan berkala", "13 Sep 2026, 10:00 PG GMT+9"], ["Ditawarkan", "HQ menawarkan kepada syarikat anda", "13 Sep 2026, 7:20 PTG GMT+9"], ["Diterima", "anda", "14 Sep 2026, 11:02 PG GMT+9"],
