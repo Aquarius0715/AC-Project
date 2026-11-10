@@ -9856,3 +9856,20 @@ The shared test environment answers on the lab LAN and the Tailnet (DEC-102, IR6
 3. **Tests.** `TestMailLinksAtTheSignInAddress` (notify): the Tailnet host moves the link; the canonical host, an unlisted host and none keep it; a single-address environment never moves it. `TestRecordSignInHost` (auth): a sign-in records its issuer's host and a later call without one keeps it. It fails on the code before this change.
 4. **Data.** The column is added in migration 000001 and `schema.sql` (version 1 is still edited in place). The dev database got it by hand (`ALTER TABLE identity.users ADD COLUMN IF NOT EXISTS sign_in_host text`). The shared test environment builds its data again from the seed at its next deployment, as for any change of the migrations (`deploy.sh`).
 5. **Not changed.** The set-up and invitation e-mails (IR695), the e-mail texts and every operation, route and count.
+
+## IR722 A technician binds the device they registered to its planned unit (B-12, decided 2026-11-10)
+
+FR-T11's flow is "register serial → bind unit → check connection" (AT-T11-N). Since IR467, `devices.register` only reserves the planned unit (`targetUnitId`, D05), and the device stays unbound until `devices.bind`. The admin screens took that step (IR467). The technician app kept saying the opposite:
+- "Bind to unit", "binds it in one step" and "Device registered and bound".
+- For an unbound device the loader found no job: it looked one up by `unitId`, which is null. So every device action was disabled, and there was no Bind….
+
+A technician who registered a device on site could not finish the set-up. The user took B-12's recommendation: mirror IR467 in the technician app.
+
+1. **Reproduced.** `technician/tests/devicesLoad.test.ts`: a device registered for a planned unit on which the technician has an assigned job. The loader answered no job (`null`, the test fails). With the fix it is that unit's job.
+2. **Fix.**
+   - The loader takes the device's unit, or its planned unit while it is not bound. That unit's job is the job the device is bound under; IR709 lets a technician bind an unbound device to its planned unit.
+   - The view has a binding card of its own (`BindingCard`). A device not bound yet reads "Not bound yet", says what to do next, and offers Bind… with the planned unit and "Installed on site" prefilled. A bound device offers Rebind….
+   - Check connection, Calibrate and Update firmware wait for the binding; the API refuses them on an unbound device.
+   - The register form reads "Planned unit", "Registering reserves the device for this unit; Bind connects it once it is installed." and "Register", and its toast is "Device registered — bind it to the unit once it is installed". These are the admin app's texts and keys (en / ms / ja). The four texts the technician app no longer shows were removed from the ms and ja dictionaries.
+3. **Not changed.** The API (IR467, IR709), the admin screens and every operation, route and count.
+4. **Open.** Figma Technician 03 still draws one step, and the E2E path register → bind → check is not written yet.
