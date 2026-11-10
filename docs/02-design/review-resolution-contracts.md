@@ -9846,3 +9846,30 @@ The user asked that Dependabot's pull requests no longer merge by themselves.
 3. **#159.** It was closed with `@dependabot ignore this version`. Dependabot stored that as "> 0.164.0" for the whole collector (`@dependabot show … ignore conditions`), which would also hide every later version. `@dependabot unignore` did nothing on the closed PR or on another one. The branch was restored at its last commit and the PR reopened, and Dependabot answered "I will stop ignoring the otel/opentelemetry-collector-contrib dependency". `.github/dependabot.yml` now ignores only `0.164.0-386`, so #159 is retired without a dependency-wide ignore.
 4. **Checks.** shellcheck and actionlint as in CI: 0. `bash -n` and `sh -n`: ok. `passwd.sh` with dummy keys in a worktree wrote both accounts with compose.yaml's image (rc=0); the tracked file was restored. `docker/mosquitto/passwd.test.sh` (IR684) copies only passwd.sh into its temporary tree, so it now writes a compose.yaml there too. Its `docker` shim also records the image it was given, and the test requires compose.yaml's.
 5. **Docs.** container-design.md §6: auto-merge, its Dependabot exception and the image reference.
+
+## IR721 A notification e-mail links to the address its recipient last signed in on (B-16, decided 2026-11-10)
+
+The shared test environment answers on the lab LAN and the Tailnet (DEC-102, IR651). IR695 made the set-up and invitation e-mails link to the address the invitation came from. The notification e-mails of the worker kept `APP_URL_*`, the canonical LAN address (IR651 item 8), which cannot be reached from the Tailnet. The user took B-16's recommendation: link each e-mail to the address its recipient last signed in on.
+
+1. **Recorded.** `identity.users.sign_in_host` (new, nullable) holds the host name of the issuer of the user's latest sign-in. `RecordSignIn` writes it with the sign-in (IR268). The host is the verified issuer's (`Principal.IssuerHost`, IR695), so a sender cannot choose it. A call without one, an internal call, keeps the recorded host.
+2. **Used.** The notification worker reads `PUBLIC_HOSTS` (compose passes it to `worker-notification`). `dueMails` reads the recipient's `sign_in_host`. `Apps.on` moves the role's app to that host, with its port and scheme kept, only when the host is listed. A host that is not listed, or none, keeps the canonical address. An environment with one address (dev, CI, E2E, production) has no listed host, and its links stay as they are.
+3. **Tests.** `TestMailLinksAtTheSignInAddress` (notify): the Tailnet host moves the link; the canonical host, an unlisted host and none keep it; a single-address environment never moves it. `TestRecordSignInHost` (auth): a sign-in records its issuer's host and a later call without one keeps it. It fails on the code before this change.
+4. **Data.** The column is added in migration 000001 and `schema.sql` (version 1 is still edited in place). The dev database got it by hand (`ALTER TABLE identity.users ADD COLUMN IF NOT EXISTS sign_in_host text`). The shared test environment builds its data again from the seed at its next deployment, as for any change of the migrations (`deploy.sh`).
+5. **Not changed.** The set-up and invitation e-mails (IR695), the e-mail texts and every operation, route and count.
+
+## IR722 A technician binds the device they registered to its planned unit (B-12, decided 2026-11-10)
+
+FR-T11's flow is "register serial → bind unit → check connection" (AT-T11-N). Since IR467, `devices.register` only reserves the planned unit (`targetUnitId`, D05), and the device stays unbound until `devices.bind`. The admin screens took that step (IR467). The technician app kept saying the opposite:
+- "Bind to unit", "binds it in one step" and "Device registered and bound".
+- For an unbound device the loader found no job: it looked one up by `unitId`, which is null. So every device action was disabled, and there was no Bind….
+
+A technician who registered a device on site could not finish the set-up. The user took B-12's recommendation: mirror IR467 in the technician app.
+
+1. **Reproduced.** `technician/tests/devicesLoad.test.ts`: a device registered for a planned unit on which the technician has an assigned job. The loader answered no job (`null`, the test fails). With the fix it is that unit's job.
+2. **Fix.**
+   - The loader takes the device's unit, or its planned unit while it is not bound. That unit's job is the job the device is bound under; IR709 lets a technician bind an unbound device to its planned unit.
+   - The view has a binding card of its own (`BindingCard`). A device not bound yet reads "Not bound yet", says what to do next, and offers Bind… with the planned unit and "Installed on site" prefilled. A bound device offers Rebind….
+   - Check connection, Calibrate and Update firmware wait for the binding; the API refuses them on an unbound device.
+   - The register form reads "Planned unit", "Registering reserves the device for this unit; Bind connects it once it is installed." and "Register", and its toast is "Device registered — bind it to the unit once it is installed". These are the admin app's texts and keys (en / ms / ja). The four texts the technician app no longer shows were removed from the ms and ja dictionaries.
+3. **Not changed.** The API (IR467, IR709), the admin screens and every operation, route and count.
+4. **Open.** Figma Technician 03 still draws one step, and the E2E path register → bind → check is not written yet.

@@ -46,8 +46,10 @@ export async function loadDevices(options: { selected?: string; unitId?: string;
   if (!row) return live;
   const { id } = row;
   const d = await coreOp<ApiDeviceDetail & { activeOperation: (ApiDeviceOperation & { startedAt?: string | null; expiresAt?: string }) | null }>("devices.get", { id });
-  const unit = d.unitId ? await quiet(coreOp<Unit>("units.get", { id: d.unitId })) : null;
-  const jobId = (options.jobId && myJobs.some((j) => j.id === options.jobId && j.unitId === d.unitId) ? options.jobId : null) ?? jobFor(d.unitId, myJobs);
+  // a device not bound yet belongs to its planned unit: its job binds it there (D05, IR467, IR722)
+  const home = d.unitId ?? d.targetUnitId ?? null;
+  const unit = home ? await quiet(coreOp<Unit>("units.get", { id: home })) : null;
+  const jobId = (options.jobId && myJobs.some((j) => j.id === options.jobId && j.unitId === home) ? options.jobId : null) ?? jobFor(home, myJobs);
   const candidates = unit?.capabilities.firmwareCandidates ?? [];
   const isMaintain = live.canMaintain && !!jobId;
   const [ops, cals, evs] = await Promise.all([
