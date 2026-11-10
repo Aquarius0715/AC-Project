@@ -109,7 +109,7 @@ jobs:
             -v "$HOME/.cache/ac-e2e-npm:/tmp/home/.npm" \
             -e E2E_CUSTOMER_URL=http://localhost:3300 -e E2E_PARTNER_URL=http://localhost:3301 \
             -e E2E_TECHNICIAN_URL=http://localhost:3302 -e E2E_ADMIN_URL=http://localhost:3303 \
-            -v "$GITHUB_WORKSPACE:/work" -w /work/service/web mcr.microsoft.com/playwright:v1.64.1-noble \
+            -v "$GITHUB_WORKSPACE:/work" -w /work/service/web mcr.microsoft.com/playwright:v1.65.0-noble \
             bash -c 'npm ci && npm run e2e -- --reporter=github,list --max-failures=10'
       - name: stack logs on failure
         if: failure()
