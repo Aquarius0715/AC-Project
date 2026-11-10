@@ -381,7 +381,7 @@ export function webConfig(tsconfigRootDir) {
       // These loops run one await after the other because each step depends on the one before or may end the loop: a cursor
       // (pagination of the Core API and of the telemetry series, the response stream), a poll that waits between reads (a
       // command's result, the demo clock), writes paced by the API's rate limit (a bulk send, one unit's commands), and a search
-      // that stops at the first match (the restriction behind a contract's first invoices). Running them at once would send
+      // that stops at the first match (the restriction behind a contract's invoices, IR715). Running them at once would send
       // requests the first answer makes needless. Everywhere else the rule stays on.
       files: [
         "**/lib/dal.ts",
@@ -389,7 +389,7 @@ export function webConfig(tsconfigRootDir) {
         "**/lib/unitCommands.ts",
         "**/lib/writeLimit.ts",
         "**/screens/shell/demo/actions.ts",
-        "**/customer/payments/page.tsx",
+        "**/lib/restrictionLookup.ts",
         "**/customer/properties/_components/properties-view.tsx",
         "**/customer/units/*/_components/unit-view.tsx",
         "**/customer/units/*/page.tsx",

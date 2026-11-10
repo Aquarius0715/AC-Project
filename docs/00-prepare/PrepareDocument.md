@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.576.0
+version: 0.577.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -300,6 +300,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.577.0: IR715: the customer finds a contract's active restriction through every invoice, unpaid oldest due first, so the notice and the unit link no longer disappear behind newer unpaid invoices.
 0.576.0: IR714: the HQ restrictions screen counts every state of its scope from the list totals.
 0.575.0: IR713: HQ billing reads every inquiry waiting for a reply, so an older received inquiry is no longer cut behind newer answered ones.
 0.574.0: IR712: the technician unit and alert pages and the contractor unit view read every unresolved alert of the unit, and the latest resolved ones.

@@ -4,10 +4,10 @@
 // invoices). URL keys: contractId, status. Read-only; payments start on the invoice page. Texts in the user's display
 // language; due dates and contract periods are Kuala Lumpur business days (IR267). The Phase 1A demo keeps the fixtures.
 import { connection } from "next/server";
-import { apiMode, coreAll, coreDisplay, coreNow, coreOp } from "@ac/web/lib/dal";
+import { apiMode, coreAll, coreDisplay, coreNow } from "@ac/web/lib/dal";
+import { restrictionFor } from "@ac/web/lib/restrictionLookup";
 import { i18nOf } from "@ac/web/lib/i18n";
 import type { ApiInvoice } from "@ac/web/lib/billing";
-import type { ApiRestriction } from "@ac/web/lib/restrictions";
 import {
   clientInvoiceRows, contractCards, KL, restrictionNotice, statusFilters, statusQuery, unitPlaces, type ClientContract, type RestrictionNotice,
 } from "@ac/web/lib/clientBilling";
@@ -40,15 +40,8 @@ export default async function CustomerPaymentsPage({ searchParams }: Readonly<Pa
   // the active restriction of the contract, found through one of its invoices (the customer has no restriction list)
   let notice: (RestrictionNotice & { invoiceId: string }) | null = null;
   if (sel && sel.restrictionIds.length > 0) {
-    const unpaidFirst = [...all].toSorted((a, b) => (a.status === "paid" ? 1 : 0) - (b.status === "paid" ? 1 : 0)).slice(0, 3);
-    for (const i of unpaidFirst) {
-      const page = await coreOp<{ items: ApiRestriction[] }>("restrictions.forInvoice", { invoiceId: i.id, query: { limit: 10 } });
-      const r = page.items.find((x) => sel.restrictionIds.includes(x.id));
-      if (r) {
-        notice = { ...restrictionNotice(r, (id) => place.get(id), i18n.t), invoiceId: i.id };
-        break;
-      }
-    }
+    const found = await restrictionFor(all, (x) => sel.restrictionIds.includes(x.id)); // every invoice, causes first (IR715)
+    if (found) notice = { ...restrictionNotice(found.r, (id) => place.get(id), i18n.t), invoiceId: found.invoice.id };
   }
   return <PaymentsView live={{ cards, status, notice, selected: sel?.id ?? null, invoices: clientInvoiceRows(shown, now, i18n), total: all.length, otherZone: display.timeZone !== KL }} />;
 }
