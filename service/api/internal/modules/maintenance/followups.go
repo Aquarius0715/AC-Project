@@ -1075,7 +1075,7 @@ func ConfirmUnrated(ctx context.Context, tx pgx.Tx, now time.Time) (int, error) 
 		now,
 	)
 
-	return int(tag.RowsAffected()), err
+	return int(tag.RowsAffected()), apperr.Wrap(err, "update maintenance.jobs")
 }
 
 // RegisterFollowUps binds the IR127 operations.

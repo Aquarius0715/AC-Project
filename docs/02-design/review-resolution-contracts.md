@@ -10116,3 +10116,12 @@ Found in review round 297 (`shared/lib/demoPanel.ts`).
 2. **Now.** That reason is "Try again" (already in the Malay and Japanese dictionaries). The unused "Not done — try again" entries are removed from both.
 3. **Not changed.** The device picker still shows the raw connection code and an English "Unit" when a unit has no name; the panel is the demo's own control screen.
 4. **Tests.** `demoPanel.test.ts`: the fallback is "Try again", and no reason starts with "Not done" (failed before). `i18n.test.ts` keeps the dictionaries free of unused entries.
+
+## IR745 The unrated-job confirmation wraps its database error — 2026-11-11
+
+Found in review rounds 394–396 (`maintenance/followups.go`).
+
+1. **Before.** `ConfirmUnrated` (the maintenance scheduler's auto-confirmation, BR-C17) returned the error of its `UPDATE maintenance.jobs` as pgx gave it, without the place it happened, which the lint constitution (CLAUDE.md §2) asks for. wrapcheck is enabled but does not report this shape (`return int(tag.RowsAffected()), err` from a pgx.Tx method), also when run alone.
+2. **Now.** The error is `apperr.Wrap(err, "update maintenance.jobs")`. Behaviour is unchanged.
+3. **The rest of the code.** An AST scan of `internal/` for a `return …, err` of an error that came straight from a pgx receiver (tx, txn, rows, conn, pool, ….Tx) found this one place only.
+4. **Tests.** None new: wrapping changes no observable result, and forcing that UPDATE to fail needs a fault the suites do not inject. The scheduler's tests still pass.

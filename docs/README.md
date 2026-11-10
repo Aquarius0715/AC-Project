@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.601.0 / Created: 2026-09-14 / Updated: 2026-11-10 / Status: Draft for review / Language: English
+Version: 0.602.0 / Created: 2026-09-14 / Updated: 2026-11-10 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -100,6 +100,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.602.0 (2026-11-11): IR745: the auto-confirmation of unrated jobs wraps its database error with where it happened (lint constitution §2); found by an AST scan that wrapcheck missed.
 0.601.0 (2026-11-11): IR743: a refused demo operation reads "Not done: Try again", not "Not done: Not done — try again".
 0.600.0 (2026-11-11): IR742: a location rule needs its owner's consent also when another member of the customer edits it (SR02).
 0.599.0 (2026-11-10): IR741: a chart with several lines scales its axes to the size of its values (a power of 0.4–1.2 kW gets 0.2–1.4, not −1–3) and never below zero for values that are all zero or more.
