@@ -49,7 +49,10 @@ describe("customer overview", () => {
     expect(periodNote("today", { from: TEXT_2026_09_13T16_00_00Z, to: TEXT_2026_09_14T01_12_00Z })).toBe("Today = 00:00–09:12 · Asia/Kuala_Lumpur");
     // the periods are Kuala Lumpur days, so the note stays in Kuala Lumpur time in either language
     expect(periodNote("7d", { from: "2026-09-07T16:00:00Z", to: TEXT_2026_09_14T01_12_00Z }, MS_TOKYO)).toBe("7 hari lepas = 8 Sep 00:00 – 14 Sep 09:12 · Asia/Kuala_Lumpur");
-    expect(previousRange({ from: TEXT_2026_09_13T16_00_00Z, to: TEXT_2026_09_14T01_12_00Z })).toStrictEqual({ from: "2026-09-13T06:48:00.000Z", to: TEXT_2026_09_13T16_00_00Z });
+    // today is compared with yesterday at this time, the same hours a day earlier (IR726): 00:00–09:12 yesterday, not
+    // the 9 h 12 min before midnight; 7 and 30 days with the days just before them
+    expect(previousRange("today", { from: TEXT_2026_09_13T16_00_00Z, to: TEXT_2026_09_14T01_12_00Z })).toStrictEqual({ from: "2026-09-12T16:00:00.000Z", to: "2026-09-13T01:12:00.000Z" });
+    expect(previousRange("7d", { from: "2026-09-07T16:00:00Z", to: TEXT_2026_09_14T01_12_00Z })).toStrictEqual({ from: "2026-09-01T06:48:00.000Z", to: "2026-09-07T16:00:00Z" });
   });
 
   it("shows the measured room temperature, humidity and power — never the AC setting", () => {
