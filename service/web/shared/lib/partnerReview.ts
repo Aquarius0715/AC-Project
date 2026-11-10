@@ -49,13 +49,14 @@ export const resultText: Record<NonNullable<ApiInspectionItem["result"]>, { labe
 export interface ReworkItem { label: string; checked: boolean }
 /** The items that need rework, as HQ's and the contractor's return dialogs offer them (Figma Admin 06-1, Contractor 398:2
 “Items that need rework”; IR232, IR609): the inspection items that need attention, were not inspected or have no
-result — ticked — then each reading to re-measure, and more photos, ticked when the report has none. */
+result — ticked — then each reading to re-measure, and more photos, ticked when the report has none. A reading
+measured twice (before and after, same metric and part) is one item: the dialogs key and tick the items by label (IR737). */
 export function reworkItems(items: Pick<InspectionRow, "label" | "result" | "reason">[], readings: [string, string][], photos: number, t: T = en): ReworkItem[] {
   const word = (r: ApiInspectionItem["result"]) => t(r ? entryOf(resultText, r).label : "No result").toLowerCase();
   return [
     ...items.filter((x) => x.result === null || x.result === "attention" || x.result === "not_inspected")
       .map((x) => ({ label: `${x.label} — ${word(x.result)}${wrapped(x.reason, " (", ")")}`, checked: true })),
-    ...readings.map(([label]) => ({ label: t("{reading} — re-measure", { reading: label }), checked: false })),
+    ...[...new Set(readings.map(([label]) => label))].map((label) => ({ label: t("{reading} — re-measure", { reading: label }), checked: false })),
     { label: t("Photos — add more evidence"), checked: photos === 0 },
   ];
 }
