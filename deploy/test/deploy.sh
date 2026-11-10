@@ -5,12 +5,13 @@
 # checkout, so the build and deploy logs show on the Actions tab.
 #
 # A deployment builds the tag's images one at a time, with the tag as the image tag (the images of the last KEEP
-# deployed tags stay), and starts the compose project ac-test: compose.yaml with deploy/test/compose.test.yaml and
-# deploy/test/compose.live.yaml on top and the server's environment file ~/ac-test/env (deploy/test/setup.sh writes
-# it). The data are the fixture's accounts and the real devices at customer-a, on the real clock (DEC-96). They stay
-# from one deployment to the next, except when the migrations or compose.live.yaml changed: version 1 is edited in
-# place before the first release and never applied again to a database that has it, so the data is then built again
-# from the seed. A deployment that fails brings back the tag before it.
+# deployed tags stay; untagged images go and the build cache is trimmed to CACHE_LIMIT), and starts the compose
+# project ac-test: compose.yaml with deploy/test/compose.test.yaml and deploy/test/compose.live.yaml on top and the
+# server's environment file ~/ac-test/env (deploy/test/setup.sh writes it). The data are the fixture's accounts and
+# the real devices at customer-a, on the real clock (DEC-96). They stay from one deployment to the next, except when
+# the migrations or compose.live.yaml changed: version 1 is edited in place before the first release and never applied
+# again to a database that has it, so the data is then built again from the seed. A deployment that fails brings back
+# the tag before it.
 #
 #   deploy.sh deploy TAG   deploys the tag (the workflow; by hand, from a checkout that has the tag)
 #   deploy.sh boot         after a reboot: the stack again, then the API services once Keycloak answers, as they load
@@ -29,6 +30,9 @@ STATE=$ROOT/state
 REPO=${AC_TEST_REPO:-$(cat "$STATE/repo" 2>/dev/null || echo "$ROOT/repo")}
 PROJECT=ac-test
 KEEP=3
+# the build cache BuildKit may keep after a deployment (IR725): unbounded, it filled the lab server's disk with the
+# nightly E2E builds; 20 GB keeps the layers of the next builds warm
+CACHE_LIMIT=20GB
 API_SERVICES=(gateway identity-api equipment-api maintenance-api billing-api energy-api)
 MIGRATIONS=service/api/internal/migrations
 LIVE=deploy/test/compose.live.yaml # this environment's data (DEC-96); a tag before it has none
@@ -179,7 +183,10 @@ deploy() {
   STEP=
 }
 
-# keeps the images of the last KEEP deployed tags, for a quick way back
+# keeps the images of the last KEEP deployed tags, for a quick way back; then removes the untagged images (the
+# replaced builds) and trims the build cache to CACHE_LIMIT (IR725). The host's untagged images that no container uses
+# and the build cache go; tagged images, of this project or another, and every volume stay. A clean-up that fails
+# does not fail the deployment
 prune() {
   local keep image
   printf '%s\n' "$1" >>"$STATE/history"
@@ -189,6 +196,8 @@ prune() {
     ac-*:test*) grep -qxF "${image##*:}" <<<"$keep" || docker image rm "$image" >/dev/null 2>&1 || true ;;
     esac
   done
+  docker image prune -f >/dev/null 2>&1 || true
+  docker builder prune -f --max-used-space "$CACHE_LIMIT" >/dev/null 2>&1 || true
 }
 
 # what the data of the tag $1 are built from: the migrations, and this environment's data settings

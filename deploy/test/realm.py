@@ -1,7 +1,8 @@
 """Writes the shared test environment's Keycloak realm (DEC-93): docker/keycloak/realm-ac.json, the local realm, with
 the test URLs the apps return to after sign-in and this environment's own client secrets in place of the local ones.
-The demo users and their passwords stay as they are. Keycloak imports the file only while the realm does not exist,
-on the environment's first start.
+The demo users take DEMO_USER_PASSWORD of the environment file when it names one (IR720), else they keep the local
+passwords. Keycloak imports the file only while the realm does not exist, on the environment's first start;
+docker/keycloak/configure.sh sets the same password on a realm that exists.
 
 usage: python3 deploy/test/realm.py REALM_IN REALM_OUT SETTINGS  (the URLs and secrets from the environment file)
 """
@@ -65,6 +66,12 @@ def main() -> None:
         client["webOrigins"] = urls
     for client_id, name in SECRETS.items():
         clients[client_id]["secret"] = setting(name)
+    demo_password = settings.get("DEMO_USER_PASSWORD", "")
+    if demo_password:  # the demo users' passwords are in the repository: this environment has its own (IR720)
+        for user in realm["users"]:
+            for credential in user.get("credentials", []):
+                if credential.get("type") == "password":
+                    credential["value"] = demo_password
     fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o644)  # Keycloak reads it as another user
     with os.fdopen(fd, "w", encoding="utf-8") as f:
         json.dump(realm, f, ensure_ascii=False, indent=2)

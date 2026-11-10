@@ -69,6 +69,8 @@ IDP_ADMIN_CLIENT_SECRET=$(secret)
 SESSION_SECRET=$(secret)
 INTERNAL_API_TOKEN=$(secret)
 VALKEY_PASSWORD=$(secret)
+# the demo users' password in this environment (IR720): the repository's are public to anyone who reads it
+DEMO_USER_PASSWORD=$(secret)
 MQTT_DEVICE_SIM_KEY=$(openssl rand -hex 24)
 MQTT_IOT_BRIDGE_KEY=$(openssl rand -hex 24)
 # the real sensor nodes' broker on this server (DEC-86); 1 lets the app switch the real air conditioner (DEC-89)
