@@ -1,6 +1,6 @@
 {
   "version": "0.210.0",
-  "spec_baseline_id": "1bc740881c7788e2a1ca93aaafe1045842b08fc367c67afc9f03a94a6c3793cb",
+  "spec_baseline_id": "ed03f7a7fe4f7173a9fecd45e3cec7cbe02130f43ade3324db24aa5e439ccd29",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
@@ -102,7 +102,7 @@
     },
     {
       "path": "02-design/api/swagger.json",
-      "sha256": "dfdc45d7e27e69fc0b44b6fa692b3e9378128fd055b9dfe450f3988810f8cc4a"
+      "sha256": "a7a93a64c458c54fbedf190edb8312931e0be7024d51ca02576ce6bbd7c4151f"
     },
     {
       "path": "02-design/backend-architecture.md",
