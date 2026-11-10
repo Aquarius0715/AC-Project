@@ -417,3 +417,91 @@ func (l *liveControl) space(ctx context.Context, node string) {
 	case <-timer.C:
 	}
 }
+
+// answerChecks answers the connection checks of the live nodes' devices every commandPoll until the context ends
+// (devices.mqttChecks, IR736): a check runs for at most a minute, and real nodes answer none. A read that fails is
+// logged once a minute while it keeps failing.
+func answerChecks(
+	ctx context.Context,
+	heard *iotbridge.LiveHeard,
+	clock *demoClock,
+	httpc *http.Client,
+	endpoint string,
+	api liveAPI,
+) {
+	ticker := time.NewTicker(commandPoll)
+	defer ticker.Stop()
+
+	rep := &logging.Repeats{Logf: log.Printf, Every: 0, Now: nil}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case now := <-ticker.C:
+			checks, err := fetchChecks(ctx, httpc, api)
+			if err != nil {
+				rep.Failed(fmt.Sprintf("live connection checks: %v", err))
+
+				continue
+			}
+
+			rep.OK("live connection checks")
+
+			when := now.Add(clock.offset() - clockMargin)
+
+			for _, check := range checks {
+				answerCheck(
+					ctx,
+					httpc,
+					endpoint,
+					check,
+					heard.GapOf([]string{check.Node}, now),
+					when,
+				)
+			}
+		}
+	}
+}
+
+// answerCheck sends the answer to one check and logs it.
+func answerCheck(
+	ctx context.Context,
+	httpc *http.Client,
+	endpoint string,
+	check iotbridge.LiveCheck,
+	gap time.Duration,
+	when time.Time,
+) {
+	trigger := iotbridge.LiveCheckTrigger(check, gap, when)
+
+	err := send(ctx, httpc, endpoint, trigger)
+	if err != nil && !recorded(err) {
+		log.Printf("live check %s of node %s: %v", check.OperationID, check.Node, err)
+
+		return
+	}
+
+	log.Printf(
+		"live check %s of node %s: %s (unheard for %s)",
+		check.OperationID,
+		check.Node,
+		trigger.Result,
+		gap.Round(time.Second),
+	)
+}
+
+// fetchChecks reads the running connection checks of the live nodes' devices (devices.mqttChecks, IR736).
+func fetchChecks(
+	ctx context.Context,
+	client *http.Client,
+	api liveAPI,
+) ([]iotbridge.LiveCheck, error) {
+	var data struct {
+		Checks []iotbridge.LiveCheck `json:"checks"`
+	}
+
+	err := liveQuery(ctx, client, api, "mqttChecks", `{}`, &data)
+
+	return data.Checks, err
+}

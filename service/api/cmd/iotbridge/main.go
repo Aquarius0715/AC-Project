@@ -367,6 +367,7 @@ func startLive(
 
 	go keepNodes(ctx, httpc, api, nodes)
 	go reportGap(ctx, handler.heard, clock, httpc, endpoint, api, nodes)
+	go answerChecks(ctx, handler.heard, clock, httpc, endpoint, api)
 
 	client := mqtt.NewClient(
 		liveOptions(
@@ -425,20 +426,23 @@ func keepNodes(
 	}
 }
 
-// fetchNodes reads the bound devices that have a node_id (devices.mqttNodes, IR635).
-func fetchNodes(
+// liveQuery calls an internal query of the equipment service (devices.<name>) with the internal service token and
+// the tenant, and decodes its answer's data into out.
+func liveQuery[T any](
 	ctx context.Context,
 	client *http.Client,
 	api liveAPI,
-) ([]iotbridge.NodeDevice, error) {
+	name, input string,
+	out *T,
+) error {
 	req, err := http.NewRequestWithContext(
 		ctx,
 		http.MethodPost,
-		api.equipment+"/internal/v1/system/queries/devices.mqttNodes",
-		strings.NewReader(`{}`),
+		api.equipment+"/internal/v1/system/queries/devices."+name,
+		strings.NewReader(input),
 	)
 	if err != nil {
-		return nil, apperr.Wrap(err, "http.NewRequest")
+		return apperr.Wrap(err, "http.NewRequest")
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -447,26 +451,36 @@ func fetchNodes(
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, apperr.Wrap(err, "http.Client.Do")
+		return apperr.Wrap(err, "http.Client.Do")
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, &statusError{code: resp.StatusCode}
+		return &statusError{code: resp.StatusCode}
 	}
 
 	var body struct {
-		Data struct {
-			Nodes []iotbridge.NodeDevice `json:"nodes"`
-		} `json:"data"`
+		Data *T `json:"data"`
 	}
 
-	decodeErr := json.NewDecoder(resp.Body).Decode(&body)
-	if decodeErr != nil {
-		return nil, apperr.Wrap(decodeErr, "json.Decoder.Decode")
+	body.Data = out
+
+	return apperr.Wrap(json.NewDecoder(resp.Body).Decode(&body), "json.Decoder.Decode")
+}
+
+// fetchNodes reads the bound devices that have a node_id (devices.mqttNodes, IR635).
+func fetchNodes(
+	ctx context.Context,
+	client *http.Client,
+	api liveAPI,
+) ([]iotbridge.NodeDevice, error) {
+	var data struct {
+		Nodes []iotbridge.NodeDevice `json:"nodes"`
 	}
 
-	return body.Data.Nodes, nil
+	err := liveQuery(ctx, client, api, "mqttNodes", `{}`, &data)
+
+	return data.Nodes, err
 }
 
 // brokerHost is a broker URL's host for the logs, never the credentials the URL may carry.
@@ -829,38 +843,14 @@ func fetchConnectionFault(
 ) (iotbridge.ConnectionFault, error) {
 	var out iotbridge.ConnectionFault
 
-	req, err := http.NewRequestWithContext(
+	err := liveQuery(
 		ctx,
-		http.MethodPost,
-		api.equipment+"/internal/v1/system/queries/devices.connectionFault",
-		strings.NewReader(`{"deviceId":"`+device.String()+`"}`),
+		client,
+		api,
+		"connectionFault",
+		`{"deviceId":"`+device.String()+`"}`,
+		&out,
 	)
-	if err != nil {
-		return out, apperr.Wrap(err, "http.NewRequest")
-	}
 
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set(ops.InternalTokenHeader, api.token)
-	req.Header.Set("X-Tenant-Id", api.tenant)
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return out, apperr.Wrap(err, "http.Client.Do")
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return out, &statusError{code: resp.StatusCode}
-	}
-
-	var body struct {
-		Data iotbridge.ConnectionFault `json:"data"`
-	}
-
-	decodeErr := json.NewDecoder(resp.Body).Decode(&body)
-	if decodeErr != nil {
-		return out, apperr.Wrap(decodeErr, "json.Decoder.Decode")
-	}
-
-	return body.Data, nil
+	return out, err
 }

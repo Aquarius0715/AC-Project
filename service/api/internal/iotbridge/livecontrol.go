@@ -165,7 +165,7 @@ func liveTrigger(eventType string, event uuid.UUID, when time.Time) Trigger {
 		BindingID:   nil,
 		Sequence:    nil,
 		Kind:        "",
-		Recovery:    nil,
+		Recovery:    nil, OperationID: nil, Result: "",
 	}
 }
 

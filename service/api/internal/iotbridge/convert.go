@@ -122,6 +122,9 @@ type Trigger struct {
 	Sequence  *int64     `json:"sequence,omitempty"`
 	Kind      string     `json:"kind,omitempty"`
 	Recovery  *Recovery  `json:"recovery,omitempty"`
+	// operation: the result of a running check or firmware operation (IR67), succeeded or failed
+	OperationID *uuid.UUID `json:"operationId,omitempty"`
+	Result      string     `json:"result,omitempty"`
 }
 
 // Recovery is the DeviceRecovery a restored device event carries: the axis, the value it returns to and the fault it
@@ -232,6 +235,7 @@ func (r *Resolver) Triggers(batch devicesim.Batch, received time.Time) ([]Trigge
 				EventID:    event, // no sequence: the API numbers the reading after the latest (IR77)
 				Sequence:   nil,
 			}, CommandID: nil, DeviceID: nil, State: nil, Event: nil, BindingID: nil, Sequence: nil, Kind: "", Recovery: nil,
+			OperationID: nil, Result: "",
 		})
 	}
 
@@ -269,7 +273,7 @@ func CommandTrigger(ack devicesim.Ack, received time.Time) (Trigger, bool, error
 			BindingID:   nil,
 			Sequence:    nil,
 			Kind:        "",
-			Recovery:    nil,
+			Recovery:    nil, OperationID: nil, Result: "",
 		}, false, nil
 	}
 
@@ -289,7 +293,7 @@ func CommandTrigger(ack devicesim.Ack, received time.Time) (Trigger, bool, error
 		BindingID:   nil,
 		Sequence:    nil,
 		Kind:        "",
-		Recovery:    nil,
+		Recovery:    nil, OperationID: nil, Result: "",
 	}, true, nil
 }
 

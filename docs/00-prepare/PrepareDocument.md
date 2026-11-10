@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.593.0
+version: 0.594.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -301,6 +301,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.594.0: IR736: the IoT bridge answers the connection checks of the real nodes' devices from when it last heard them; a check of a node heard within 3 minutes succeeds. Phase 1A unchanged.
 0.593.0: IR735: the live air conditioner follows the real firmware 0.4.0 (DEC-104): power, setpoint, mode and fan from the app, the node's own answers and settings, the last will, PM2.5 and readings kept while offline; device firmware requirements 0.5.0. Phase 1A unchanged.
 0.592.0: IR734: the first GitHub alerts: twoFactor's otpauth label built without a partial replace (CodeQL), minimatch 11.0.5 for the development tools (Dependabot).
 0.591.0: IR726, IR728, IR730, IR731, IR733 (release 2026-11-10): today compared with yesterday at this time; a command without a read answer is sent; the three E2E failures on main; Keycloak 26.8.2 with the kc-admin-api scope; documentation addresses and the deployment's settings from the Environment test.

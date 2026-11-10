@@ -73,10 +73,60 @@ type MqttNodes struct {
 	Nodes []MqttNode `json:"nodes"`
 }
 
+// QueryMqttChecks lists the running connection checks of the bound devices that have an MQTT node_id. Real nodes
+// answer no check, so a check of theirs would time out and leave the device in error; the IoT gateway (cmd/iotbridge)
+// reads them with the internal service token every 2 seconds and answers each from when it last heard the node
+// (IR736).
+const QueryMqttChecks = "devices.mqttChecks"
+
+// MqttChecksInput is QueryMqttChecks input (the tenant comes from the request header).
+type MqttChecksInput struct{}
+
+// Validate implements ops.Validator.
+func (*MqttChecksInput) Validate() map[string]string { return nil }
+
+// MqttCheck is one running check of a node's device.
+type MqttCheck struct {
+	OperationID uuid.UUID `json:"operationId"`
+	DeviceID    uuid.UUID `json:"deviceId"`
+	Node        string    `json:"node"`
+}
+
+// MqttChecks is QueryMqttChecks answer, oldest check first.
+type MqttChecks struct {
+	Checks []MqttCheck `json:"checks"`
+}
+
 // RegisterQueries binds the Devices internal queries.
 func RegisterQueries(r *ops.Registry) {
 	ops.RegisterQuery(r, ops.DomainEquipment, QueryConnectionFault, connectionFault)
 	ops.RegisterQuery(r, ops.DomainEquipment, QueryMqttNodes, mqttNodes)
+	ops.RegisterQuery(r, ops.DomainEquipment, QueryMqttChecks, mqttChecks)
+}
+
+func mqttChecks(ctx context.Context, call *ops.Call, _ *MqttChecksInput) (MqttChecks, error) {
+	rows, err := call.Tx.Query(
+		ctx,
+		`SELECT o.id, d.id, d.mqtt_node FROM devices.device_operations o JOIN devices.devices d ON d.id = o.device_id
+		WHERE o.kind = $1 AND o.status = $2 AND d.mqtt_node IS NOT NULL AND d.binding_id IS NOT NULL
+		ORDER BY o.created_at, o.id`,
+		kindCheck,
+		statusRunning,
+	)
+	if err != nil {
+		return MqttChecks{}, apperr.Wrap(err, "select devices.device_operations")
+	}
+
+	checks, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (MqttCheck, error) {
+		var check MqttCheck
+
+		return check, row.Scan(&check.OperationID, &check.DeviceID, &check.Node)
+	})
+	if err != nil {
+		return MqttChecks{}, apperr.Wrap(err, "select devices.device_operations")
+	}
+
+	return MqttChecks{Checks: checks}, nil
 }
 
 func mqttNodes(ctx context.Context, call *ops.Call, _ *MqttNodesInput) (MqttNodes, error) {

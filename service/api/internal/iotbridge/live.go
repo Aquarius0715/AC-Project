@@ -195,6 +195,7 @@ func liveReadings(dev NodeDevice, msg map[string]any, slot, when time.Time) []Tr
 				Quality:    qualityValid,
 				EventID:    event, Sequence: nil,
 			}, CommandID: nil, DeviceID: nil, State: nil, Event: nil, BindingID: nil, Sequence: nil, Kind: "", Recovery: nil,
+			OperationID: nil, Result: "",
 		})
 	}
 
@@ -225,7 +226,7 @@ func liveHeartbeat(dev uuid.UUID, slot time.Time) Trigger {
 		BindingID:   nil,
 		Sequence:    nil,
 		Kind:        "",
-		Recovery:    nil,
+		Recovery:    nil, OperationID: nil, Result: "",
 	}
 }
 
@@ -245,7 +246,7 @@ func liveEvaluation(key string, when time.Time, units []uuid.UUID, facts []Fact)
 			Facts:      facts,
 			Phase:      "condition",
 		}, CommandID: nil, Measurement: nil, DeviceID: nil, State: nil, BindingID: nil, Sequence: nil, Kind: "",
-		Recovery: nil,
+		Recovery: nil, OperationID: nil, Result: "",
 	}
 }
 
@@ -318,7 +319,7 @@ func LiveConnectionTrigger(
 			BindingID:   nil,
 			Sequence:    nil,
 			Kind:        "",
-			Recovery:    nil,
+			Recovery:    nil, OperationID: nil, Result: "",
 		}, false
 	}
 
@@ -337,7 +338,7 @@ func LiveConnectionTrigger(
 		State:       nil,
 		Event:       nil,
 		Kind:        "",
-		Recovery:    nil,
+		Recovery:    nil, OperationID: nil, Result: "",
 	}
 	switch {
 	case fault.FaultID == nil && gap >= LiveOfflineAfter:
@@ -371,7 +372,7 @@ func LiveConnectionTrigger(
 			BindingID:   nil,
 			Sequence:    nil,
 			Kind:        "",
-			Recovery:    nil,
+			Recovery:    nil, OperationID: nil, Result: "",
 		}, false
 	}
 
@@ -581,4 +582,44 @@ func (m *LiveMinutes) Release(node string, slot time.Time) {
 	defer m.mu.Unlock()
 
 	delete(m.claimed[node], slot)
+}
+
+// LiveCheck is a running connection check of a live node's device, as devices.mqttChecks answers it.
+type LiveCheck struct {
+	OperationID uuid.UUID `json:"operationId"`
+	DeviceID    uuid.UUID `json:"deviceId"`
+	Node        string    `json:"node"`
+}
+
+// LiveCheckTrigger answers a connection check of a live node's device at `when` (IR736): real nodes answer none, so a
+// check would time out and leave the device in error while the node is heard. The bridge answers from the node's
+// heartbeat gap: succeeded while the node counts as online (unheard for less than LiveOfflineAfter), which sets the
+// device online; failed otherwise, which sets it in error until the minute's report takes it offline
+// (LiveConnectionTrigger) and the node's return brings it back. The event ID comes from the operation, so a repeat is
+// one event.
+func LiveCheckTrigger(check LiveCheck, gap time.Duration, when time.Time) Trigger {
+	operation := check.OperationID
+	result := "failed"
+
+	if gap < LiveOfflineAfter {
+		result = "succeeded"
+	}
+
+	return Trigger{
+		ScenarioID:  Scenario,
+		EventID:     uuid.NewSHA1(seed.Namespace(), []byte("live/check/"+operation.String())),
+		OccurredAt:  when.UTC(),
+		EventType:   "operation",
+		CommandID:   nil,
+		Measurement: nil,
+		DeviceID:    nil,
+		State:       nil,
+		Event:       nil,
+		BindingID:   nil,
+		Sequence:    nil,
+		Kind:        "",
+		Recovery:    nil,
+		OperationID: &operation,
+		Result:      result,
+	}
 }

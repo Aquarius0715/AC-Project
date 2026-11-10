@@ -68,7 +68,7 @@ func SentTrigger(w Waiting, when time.Time) Trigger {
 		BindingID:   nil,
 		Sequence:    nil,
 		Kind:        "",
-		Recovery:    nil,
+		Recovery:    nil, OperationID: nil, Result: "",
 	}
 }
 
@@ -110,6 +110,6 @@ func StateTrigger(heartbeat devicesim.Heartbeat, when time.Time) (Trigger, error
 		BindingID:   nil,
 		Sequence:    nil,
 		Kind:        "",
-		Recovery:    nil,
+		Recovery:    nil, OperationID: nil, Result: "",
 	}, nil
 }

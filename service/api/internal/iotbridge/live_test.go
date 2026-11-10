@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"regexp"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -948,5 +949,84 @@ func TestLiveMinutes(t *testing.T) {
 
 	if !minutes.Claim(node1, minute.Add(49*time.Hour)) || !minutes.Claim(node1, minute) {
 		t.Error("a minute two days before the claimed one is still remembered")
+	}
+}
+
+// TestLiveCheckTrigger: a live node's check succeeds while the node counts as online (unheard for less than
+// LiveOfflineAfter) and fails after; the answer names the operation, one event per operation, in the body the demo
+// trigger takes (operationId, result).
+func TestLiveCheckTrigger(t *testing.T) {
+	t.Parallel()
+
+	check := iotbridge.LiveCheck{
+		OperationID: seed.ID("op-live-check"),
+		DeviceID:    seed.ID("device-live-ac"),
+		Node:        node1,
+	}
+
+	for gap, want := range map[time.Duration]string{
+		0:                                        resultSucceeded,
+		iotbridge.LiveOfflineAfter - time.Second: resultSucceeded,
+		iotbridge.LiveOfflineAfter:               "failed",
+		time.Hour:                                "failed",
+	} {
+		trigger := iotbridge.LiveCheckTrigger(check, gap, liveAt())
+		if trigger.EventType != "operation" || trigger.OperationID == nil ||
+			*trigger.OperationID != check.OperationID ||
+			trigger.Result != want ||
+			!trigger.OccurredAt.Equal(liveAt()) {
+			t.Errorf("gap %s: %+v, want %s", gap, trigger, want)
+		}
+	}
+
+	first := iotbridge.LiveCheckTrigger(check, 0, liveAt())
+	if again := iotbridge.LiveCheckTrigger(
+		check,
+		time.Hour,
+		liveAt().Add(time.Second),
+	); again.EventID != first.EventID {
+		t.Error("two answers to one check are two events")
+	}
+
+	other := check
+	other.OperationID = seed.ID("op-live-check-2")
+
+	if iotbridge.LiveCheckTrigger(other, 0, liveAt()).EventID == first.EventID {
+		t.Error("two checks share an event")
+	}
+
+	raw, err := json.Marshal(first)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var body map[string]any
+
+	err = json.Unmarshal(raw, &body)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if body["operationId"] != check.OperationID.String() || body["result"] != resultSucceeded ||
+		body["eventType"] != "operation" {
+		t.Errorf("body %s", raw)
+	}
+
+	reading, err := json.Marshal(iotbridge.SentTrigger(iotbridge.Waiting{
+		ID: seed.ID(
+			"cmd-live",
+		),
+		DeviceID:  uuid.UUID{},
+		UnitID:    uuid.UUID{},
+		Action:    nil,
+		ExpiresAt: time.Time{},
+	}, liveAt()))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if strings.Contains(string(reading), "operationId") ||
+		strings.Contains(string(reading), `"result"`) {
+		t.Errorf("another trigger carries the operation fields: %s", reading)
 	}
 }
