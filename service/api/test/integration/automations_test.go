@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/uuid"
+
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
@@ -354,6 +356,60 @@ func TestAutomationEvents(t *testing.T) {
 		0,
 	); code != 200 {
 		t.Fatalf("location rule: %d %v", code, res)
+	}
+}
+
+// TestAutomationLocationNeedsOwnersConsent (SR02, IR742): a location condition needs the consent of the rule's owner,
+// who the rule acts for, not of the member who saves it. A member of the customer who consented cannot turn another
+// member's rule into a location rule while that owner has not consented; the owner's own rule still saves.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
+func TestAutomationLocationNeedsOwnersConsent(t *testing.T) {
+	srv := server(t)
+	u := newUnit(t, srv, "Owner consent AC")
+	body := func(id, cond string) string {
+		return `{` + id + `"name":"When home","unitIds":["` + u + `"],"timezone":"Asia/Kuala_Lumpur","enabled":true,` +
+			`"priority":10,"kind":"event","condition":` + cond + `,"action":{"kind":"set_temperature","celsius":24}}`
+	}
+
+	owner(
+		t,
+		`UPDATE identity.consents SET granted = true, granted_at = $2 WHERE membership_id = $1`,
+		seed.ID("customer-b"),
+		clock(),
+	)
+	t.Cleanup(func() {
+		owner(
+			t,
+			`UPDATE identity.consents SET granted = false WHERE membership_id = $1`,
+			seed.ID("customer-b"),
+		)
+	})
+
+	code, resp := write(
+		srv,
+		customerB(),
+		"automations.save",
+		body("", `{"type":"occupancy","occupied":true}`),
+		0,
+	)
+	if code != 200 {
+		t.Fatalf("occupancy rule: %d %v", code, resp)
+	}
+
+	id, version := asStr(t, data(resp)["id"]), ver(t, resp)
+	// the rule is another member's, who never consented to location automation
+	owner(
+		t,
+		`UPDATE control.automations SET owner_membership_id = $2 WHERE id = $1`,
+		id,
+		uuid.New(),
+	)
+
+	code, resp = write(srv, customerB(), "automations.save",
+		body(`"id":"`+id+`",`, `{"type":"location","event":"arrival"}`), version)
+	if code != 422 || fields(resp) != "condition=errors.consent_required" {
+		t.Errorf("another member's rule turned into a location rule: %d %s", code, fields(resp))
 	}
 }
 
