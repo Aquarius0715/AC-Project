@@ -14,6 +14,7 @@ import type { AlertsLive } from "../_lib/load";
 import { PoliciesLive } from "./policies-live";
 import { Icon } from "@ac/web/components/Icon";
 import { useRefreshThen } from "@ac/web/lib/useRefreshThen";
+import { orUnreachable } from "@ac/web/lib/unreachable";
 
 /** The customer alert inbox (FR-C08, DD-C08, Figma Client 06a/06b/06g) and the Alert policies tab (FR-C15, 06e/06f) from
 the Core API: filters in the URL, read state from the membership's notifications (opening an alert marks them read; the
@@ -38,7 +39,8 @@ export function AlertsLiveView({ live }: Readonly<{ live: AlertsLive }>) {
   const info = live.rows.filter((a) => a.group === "info");
   const show = (a: InboxAlert) => {
     setOpen(a);
-    if (a.unread.length > 0) start(async () => { const f = await readAlert(a.unread.map((n) => n.id)); if (f) setFailed(t("Not marked as read: {reason}", { reason: actionMessage(f, t) })); else refreshThen(() => { setFailed(null); }); });
+    // a read that gets no answer reads as unavailable (IR718)
+    if (a.unread.length > 0) start(async () => { const f = await orUnreachable(() => readAlert(a.unread.map((n) => n.id)), (failure) => failure); if (f) setFailed(t("Not marked as read: {reason}", { reason: actionMessage(f, t) })); else refreshThen(() => { setFailed(null); }); });
   };
   // a function, not a component: a component declared here would be a new type on every render and remount its rows
   const renderItem = (a: InboxAlert) => (

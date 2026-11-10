@@ -10,6 +10,7 @@ import { metricLabel, metricUnit, recipientRole, testOutcome, type ApiRecipient,
 import { testPolicy } from "../actions";
 import { Icon, type IconName } from "@ac/web/components/Icon";
 import { textOf } from "@ac/web/lib/i18n";
+import { reached } from "@ac/web/lib/unreachable";
 
 interface Unit { id: string; name: string }
 const TONE = { ok: "text-ok", warn: "text-warn", crit: "text-crit", muted: "text-muted-foreground" } as const;
@@ -118,7 +119,7 @@ export function DemoTest({ saved, dirty, unit, demo }: Readonly<{ saved: Tested;
     if (value.trim() === "" || !Number.isFinite(v)) { setResult({ tone: "crit", text: t("Enter a reading first.") }); return; }
     if (demo) { setResult(testOutcome(demoDecision(saved, unit.id, v), saved, v, unit.name, t)); return; }
     startTransition(async () => {
-      const r = await testPolicy(saved.id, unit.id, saved.metric, v);
+      const r = await reached(() => testPolicy(saved.id, unit.id, saved.metric, v)); // no answer reads as unavailable (IR718)
       if (!r.ok) { toast(actionMessage(r, t), "crit"); return; }
       setResult(testOutcome(r.decision, saved, v, unit.name, t));
     });

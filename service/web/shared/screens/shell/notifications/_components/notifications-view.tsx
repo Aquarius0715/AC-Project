@@ -12,6 +12,7 @@ import { byCount, type T } from "@ac/web/lib/i18n";
 import { markAllRead, markRead } from "../actions";
 import { Button } from "@ac/web/components/ui/button";
 import { useRefreshThen } from "@ac/web/lib/useRefreshThen";
+import { orUnreachable } from "@ac/web/lib/unreachable";
 
 // why a notification was not marked read, in the display language (the write limit says how long to wait, IR380)
 const readFailure = (f: ActionFailure, t: T) => {
@@ -37,7 +38,7 @@ export function NotificationsView({ rows }: Readonly<{ rows?: InboxRow[] }>) {
   const open = (n: { id: string; version: number; read: boolean; live: boolean }) => {
     if (isApi) {
       if (n.read) return;
-      start(async () => { const f = await markRead(n.id, n.version); if (f) setFailed(readFailure(f, t)); else refreshThen(() => { setFailed(null); }); }); return; // Server Action; the page reads its rows again
+      start(async () => { const f = await orUnreachable(() => markRead(n.id, n.version), (failure) => failure); if (f) setFailed(readFailure(f, t)); else refreshThen(() => { setFailed(null); }); }); return; // Server Action; the page reads its rows again
     }
     if (n.live) jobActions.markRead(n.id); else jobActions.markFixedRead([n.id]);
   };
@@ -50,7 +51,7 @@ export function NotificationsView({ rows }: Readonly<{ rows?: InboxRow[] }>) {
       toast(t(unread.length === 1 ? "1 notification marked as read" : "{n} notifications marked as read", { n: unread.length })); return;
     }
     start(async () => {
-      const r = await markAllRead(unread.map((n) => n.id));
+      const r = await orUnreachable(() => markAllRead(unread.map((n) => n.id)), (failure) => ({ marked: 0, skipped: 0, failure })); // no answer reads as unavailable (IR718)
       setFailed(null);
       if (r.failure) { toast(readFailure(r.failure, t), "crit"); return; }
       refreshThen(() => { toast(r.skipped ? t("{n} marked as read · {skipped} skipped — read meanwhile or no longer available", { n: r.marked, skipped: r.skipped }) : byCount(r.marked, { one: t("1 notification marked as read"), many: t("{n} notifications marked as read", { n: r.marked }) })); });

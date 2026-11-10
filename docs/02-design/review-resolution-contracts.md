@@ -9765,3 +9765,18 @@ Both took the mode from `useBffSession()`. That hook is null until `/bff/session
 1. **Reproduced.** `shared/lib/tests/useAction.test.tsx` runs an action whose call rejects (`TypeError: Failed to fetch`). The error is thrown out of the transition (the test fails).
 2. **Fix.** `reached` turns such a rejection into the failure `actionFailure` gives a Core API that does not answer: `UNAVAILABLE`, `error.unavailable`. The screen then shows "The service is unavailable — try again shortly" and runs the caller's `failed`. Next's own control flow still goes on: a redirect or not found is rethrown by `unstable_rethrow`, as on the server.
 3. **Not changed.** Successes (the re-read of IR680, `reload: false` of IR685), refusals and the sign-in redirect of an ended session (IR385). Every operation, route and count stays the same.
+
+## IR718 Every screen that runs a Server Action itself keeps the screen when the call gets no answer (review round 221 / 228, 2026-11-10)
+
+IR717 made `useAction` read a Server Action call that gets no answer (the browser offline, the app server restarting) as unavailable. Ten files run their Server Actions themselves, in their own transitions or handlers, and awaited them without a catch:
+- admin: `alerts-view.tsx`, `default-policy.tsx` (2 calls), `policies-tab.tsx` (2), `policy-checks.tsx`, `billing-view.tsx`, `billing/contracts/contracts-view.tsx`;
+- customer: `alerts-live.tsx`, `properties-view.tsx` (the group send);
+- the shared inbox `notifications-view.tsx` (2);
+- technician: `units/[id]/alerts/alert-evidence.tsx`.
+
+In a transition the rejection reached the route's error boundary and the typed form was lost. In the group send the rows stayed "Sending" and the button stayed disabled.
+
+1. **Reproduced.** `shared/lib/tests/unreachableActions.test.tsx` runs the inbox with `markRead` and `markAllRead` rejecting (`TypeError: Failed to fetch`). On the unfixed view both cases fail: the error is thrown out of the transition. With the fix they show "Not marked as read: The service is unavailable — try again shortly" and keep the inbox.
+2. **Fix.** `shared/lib/unreachable.ts` holds the rule of IR717 for every caller. `reached` serves an `{ ok }`-shaped action: its answer, or the unavailable failure. `orUnreachable` serves any other shape (a failure or null, counts with a failure): the caller maps the failure to its own shape. Next's own control flow (redirect, not found) is rethrown by `unstable_rethrow`. `useAction` uses `reached`, and each of the ten files wraps its call. Each row of the group send now catches: that AC reads "Failed" with the unavailable text, the others go on, and the button comes back. The customer unit page already caught its own (unchanged).
+3. **Tests.** The inbox cases above, `reached` / `orUnreachable` themselves, and the IR717 case of `useAction`. The group send has no component test: the customer app has no component test set-up yet. Its catch is the one the unit page uses.
+4. **Not changed.** What each screen shows on an answer, success or refusal. Every operation, route and count stays the same.

@@ -24,6 +24,7 @@ import { DemoTest, NotificationPreview } from "./policy-checks";
 import { Icon } from "@ac/web/components/Icon";
 import { entryOf } from "@ac/web/lib/lookup";
 import { useRefreshThen } from "@ac/web/lib/useRefreshThen";
+import { reached } from "@ac/web/lib/unreachable";
 
 /** API mode: the selected policy (`policyId`) or the owner customer of a new one (`new`, copied from the default rule
 `from`) from the URL (DD-A05 items 5, 8 and 9), whether the session may write policies, the display time zone a new
@@ -164,7 +165,7 @@ export function PoliciesTab({ pols, live, sel, select, showOff = true, copyFor, 
     if (!draft || problems) { toast(t("Fix the validation errors first"), "crit"); return; }
     if (!live) { toast(t("Policy saved")); return; }
     startTransition(async () => {
-      const r = await savePolicy(draft);
+      const r = await reached(() => savePolicy(draft)); // no answer reads as unavailable (IR718)
       if (!r.ok) { toast(actionMessage(r, t), "crit"); return; }
       refreshThen(() => {
         toast(t(isNew ? "Policy created — attach it to units on each unit’s page" : "Policy saved"));
@@ -181,7 +182,7 @@ export function PoliciesTab({ pols, live, sel, select, showOff = true, copyFor, 
       return;
     }
     startTransition(async () => {
-      const r = await deletePolicy(draft.id, draft.version);
+      const r = await reached(() => deletePolicy(draft.id, draft.version));
       if (!r.ok) { toast(actionMessage(r, t), "crit"); return; }
       refreshThen(() => {
         toast(t("“{name}” deleted", { name: draft.name }));

@@ -23,6 +23,7 @@ import { byCount } from "@ac/web/lib/i18n";
 import { oneOf } from "@ac/web/lib/oneOf";
 import { nonEmpty } from "@ac/web/lib/lists";
 import { useRefreshThen } from "@ac/web/lib/useRefreshThen";
+import { reached } from "@ac/web/lib/unreachable";
 
 interface Scope { customerId?: string; unitId?: string; kind?: PlanType }
 interface Live { scope: Scope; rows: ContractRow[]; counts: Record<PlanType | "all", number>; selectedId: string | null; customers: { id: string; name: string }[]; units: UnitOption[] }
@@ -151,11 +152,11 @@ export function ContractsView({ live }: Readonly<{ live?: Live }>) {
       return;
     }
     start(async () => {
-      const r = await saveContract({
+      const r = await reached(() => saveContract({ // no answer reads as unavailable (IR718)
         ...(sel && !creating && { id: sel.id }), customerId: d.customerId, unitIds: d.unitIds, planType: d.planType,
         startAt: dayInstant(d.start, sel?.startAt), endAt: dayInstant(d.end, sel?.endAt), priceMinor: priceMinor(d.price), currency: d.currency,
         restrictionEligible: isEligible, rulesVersion: isEligible ? d.rulesVersion.trim() : null,
-      }, sel?.version);
+      }, sel?.version));
       if (!r.ok) { toast(actionMessage(r, t), "crit"); return; }
       refreshThen(() => {
         toast(creating || !sel ? t("Contract created") : t("Saved as version {v}", { v: r.value.version }));
