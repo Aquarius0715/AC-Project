@@ -1,12 +1,12 @@
 {
   "version": "0.210.0",
-  "spec_baseline_id": "1810f489fc6d84653a8aa196dcac4008522f7938fb50dbaf9436365554a8afee",
+  "spec_baseline_id": "ed03f7a7fe4f7173a9fecd45e3cec7cbe02130f43ade3324db24aa5e439ccd29",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
     {
       "path": "00-prepare/PrepareDocument.md",
-      "sha256": "672705fb9ebcbd83c82b2e97784bb69778134c35da1d58ba17150350263ebe30"
+      "sha256": "a81d8dd8bc48fc4f68b94781e60a49be807d4fe1fb0ccb25916b25c993f0fcc7"
     },
     {
       "path": "00-prepare/company-requirement-map.csv",
@@ -102,7 +102,7 @@
     },
     {
       "path": "02-design/api/swagger.json",
-      "sha256": "b7359a46093da14aacdfa50d80d5e538c1c6d767e2d861db689ff1f62f606c6a"
+      "sha256": "a7a93a64c458c54fbedf190edb8312931e0be7024d51ca02576ce6bbd7c4151f"
     },
     {
       "path": "02-design/backend-architecture.md",
@@ -166,15 +166,15 @@
     },
     {
       "path": "02-design/query-catalog.csv",
-      "sha256": "102ffdc9a0517d78967921595b047452a6442c45d0693b701ef5079414d8042a"
+      "sha256": "9aaac174311d1a0128b0e31f34c0445ac7f002cfc21b85c5e11bb102db49d532"
     },
     {
       "path": "02-design/review-resolution-contracts.md",
-      "sha256": "4ee8466d6077c69c1ad1ae6246dbc5b7334fefe21515ab9d76573d10b720f11d"
+      "sha256": "a9f3ae5a39a4c64687b8b0454075ae0a58d831db1fb6b49465bea0c67a522bfe"
     },
     {
       "path": "02-design/service-contracts.ts",
-      "sha256": "b5e1fec8fceff071975ba3edf0c30063315438f3761f60f8cf70e39bbc65a11f"
+      "sha256": "a2e6cfbf2d090cb657a63d5f1afb13fbf4fa06b216b8360eca7ab25a34f432ab"
     },
     {
       "path": "02-design/strict-review-contracts.md",
@@ -298,7 +298,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "670959d6b45b07977450a1fb888d71cc5f1e7006192c5743d74def3b9e525666"
+      "sha256": "41a00397352ec5b089aaf48efde6bc3836010191ae826f787ce5d0c67eda0499"
     },
     {
       "path": "tools/check_review_regressions.py",
