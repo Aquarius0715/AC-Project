@@ -155,6 +155,8 @@ export const ms: Record<string, string> = {
 
   // the customer's unit screen
   "Not sent: {reason}": "Tidak dihantar: {reason}",
+  "{unit}: sent — its answer could not be read. Refresh to see the AC's state before sending again.": "{unit}: dihantar — jawapannya tidak dapat dibaca. Muat semula untuk melihat keadaan AC sebelum menghantar lagi.",
+  "Sent — its answer could not be read. Refresh to see the AC's state.": "Dihantar — jawapannya tidak dapat dibaca. Muat semula untuk melihat keadaan AC.",
   "Not sent": "Tidak dihantar",
   "another command is still waiting for this AC": "arahan lain masih menunggu untuk AC ini",
   "this AC changed — reload and try again": "AC ini telah berubah — muat semula dan cuba lagi",
