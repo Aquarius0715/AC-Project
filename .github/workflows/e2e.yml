@@ -109,7 +109,7 @@ jobs:
             -v "$HOME/.cache/ac-e2e-npm:/tmp/home/.npm" \
             -e E2E_CUSTOMER_URL=http://localhost:3300 -e E2E_PARTNER_URL=http://localhost:3301 \
             -e E2E_TECHNICIAN_URL=http://localhost:3302 -e E2E_ADMIN_URL=http://localhost:3303 \
-            -v "$GITHUB_WORKSPACE:/work" -w /work/service/web mcr.microsoft.com/playwright:v1.64.1-noble \
+            -v "$GITHUB_WORKSPACE:/work" -w /work/service/web mcr.microsoft.com/playwright:v1.65.0-noble \
             bash -c 'npm ci && npm run e2e -- --reporter=github,list --max-failures=10'
       - name: stack logs on failure
         if: failure()
@@ -126,3 +126,10 @@ jobs:
       - name: remove the stack
         if: always()
         run: docker compose -p ac-e2e --env-file "$SETTINGS" -f compose.yaml -f deploy/test/compose.test.yaml --profile full --profile iot down --volumes --remove-orphans
+      - name: remove the replaced images and trim the build cache
+        if: always()
+        # the replaced :e2e builds (untagged) and the build cache over 20 GB, as deploy.sh does after a deployment
+        # (IR725): the nightly builds filled the server's disk. Tagged images and volumes, of any project, stay
+        run: |
+          docker image prune -f >/dev/null || true
+          docker builder prune -f --max-used-space 20GB >/dev/null || true

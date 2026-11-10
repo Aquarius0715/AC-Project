@@ -69,6 +69,8 @@ func NewVerifierFromEnv(ctx context.Context) (*OIDCVerifier, error) {
 		NoErrorReturnFirstHTTPReq: nil,
 		RefreshErrorHandlerFunc:   nil,
 		ValidationSkipAll:         false,
+		Given:                     nil,
+		PrioritizeHTTP:            false,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("jwks: %w", err)
