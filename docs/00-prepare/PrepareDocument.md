@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.582.0
+version: 0.583.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -300,6 +300,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.583.0: IR725: the lab server's disk stays bounded: CI's PostgreSQL data in tmpfs, untagged images removed and the build cache capped at 20 GB after a deployment, the E2E and the load test.
 0.582.0: IR720 (B-15): the shared test environment publishes Mailpit on the server's loopback only and gives the demo users its own DEMO_USER_PASSWORD.
 0.581.0: IR719: the sign-in callback times out the token exchange after 10 s and reads a non-JSON or missing answer as its token error, not the error page.
 0.580.0: IR718: every screen that runs a Server Action itself (ten files) keeps the screen when the call gets no answer, as useAction does (IR717).
