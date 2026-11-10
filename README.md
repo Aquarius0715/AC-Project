@@ -35,8 +35,9 @@ sensor nodes' devices when the stack takes them in (DEC-92).
 
 Real sensor nodes (optional, development only): with `REAL_MQTT_URL` and its login in `.env.local`, `migrate` adds a
 live site to Demo Customer B and the IoT bridge records the nodes' readings there once a minute; `REAL_MQTT_COMMANDS=1`
-also lets the app switch the real air conditioner on and off. `customer-b` keeps its access past the demo data's end
-of access (DEC-86, DEC-89, DEC-92; what the nodes must send: backend architecture §9).
+also lets the app set the real air conditioner (power, setpoint, mode and fan). `customer-b` keeps its access past the
+demo data's end of access (DEC-86, DEC-89, DEC-92, DEC-104; what the nodes must send: backend architecture §9 and the
+[device firmware requirements](docs/02-design/device-firmware.md)).
 
 Shared test environment (DEC-93, DEC-94): pushing a tag such as `test1.0.0r2` on a commit of `main` runs the workflow
 "Test deployment" on the lab server, the real nodes' broker's machine, which is the repository's self-hosted runner. Once

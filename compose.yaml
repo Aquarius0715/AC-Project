@@ -375,7 +375,7 @@ services:
       INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-local-internal-token-change-me}   # the same dev value as the Core API services (backend-env)
       # real sensor nodes (DEC-86): with REAL_MQTT_URL and its login in .env.local the bridge also subscribes to their
       # broker and records their readings on the live site; empty keeps it off. REAL_MQTT_COMMANDS=1 lets it send the
-      # live units' power on/off to the topic of their device's node, its only publish there (DEC-89, IR635)
+      # live units' commands to the topic of their device's node, its only publish there (DEC-89, IR635, DEC-104)
       REAL_MQTT_URL: ${REAL_MQTT_URL:-}
       REAL_MQTT_TOPIC: ${REAL_MQTT_TOPIC:-smarthome/ac/#}
       REAL_MQTT_USER: ${REAL_MQTT_USER:-}

@@ -43,7 +43,7 @@ func TestCommandMessageFromTheStoredAction(t *testing.T) {
 	}
 
 	trigger := iotbridge.SentTrigger(waiting, waiting.ExpiresAt)
-	if trigger.EventType != "command_sent" || trigger.CommandID == nil ||
+	if trigger.EventType != eventCommandSent || trigger.CommandID == nil ||
 		*trigger.CommandID != waiting.ID ||
 		trigger.Measurement != nil {
 		t.Errorf("sent trigger %+v", trigger)

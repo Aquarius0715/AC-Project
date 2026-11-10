@@ -154,7 +154,7 @@ func TestSendReportsRefusals(t *testing.T) {
 
 	trigger := iotbridge.Trigger{
 		EventID:     uuid.New(),
-		EventType:   "telemetry",
+		EventType:   eventTelemetry,
 		ScenarioID:  "",
 		OccurredAt:  time.Time{},
 		CommandID:   nil,

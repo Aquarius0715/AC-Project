@@ -2,6 +2,8 @@ package integration_test
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -12,12 +14,12 @@ import (
 )
 
 // TestLiveSiteSeeds: the live site (DEC-86, DEC-89, DEC-91, DEC-92) adds, on a property of the fixture's Demo Customer
-// B with one room, the air conditioner on a model that offers the remote power only and node_2's sensor unit on one
-// with no control, each with an online module that has its sensors and an active binding; a unit mirrors its module.
-// The customer's client, customer-b, keeps the access without the fixture's end date, and the site adds no person. A
-// second run adds nothing, clears an end date set since, leaves a connection that changed since alone, and brings in
-// a unit the site gained since the first, online. It runs in a transaction that is rolled back, so the shared test
-// database keeps only the fixture.
+// B with one room, the air conditioner on a model that offers the settings the nodes' firmware takes (power,
+// setpoint, mode and fan) and node_2's sensor unit on one with no control, each with an online module that has its
+// sensors and an active binding; a unit mirrors its module. The customer's client, customer-b, keeps the access
+// without the fixture's end date, and the site adds no person. A second run adds nothing, clears an end date set
+// since, leaves a connection that changed since alone, and brings in a unit the site gained since the first, online.
+// It runs in a transaction that is rolled back, so the shared test database keeps only the fixture.
 //
 //nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestLiveSiteSeeds(t *testing.T) {
@@ -104,32 +106,43 @@ func TestLiveSiteSeeds(t *testing.T) {
 
 	for _, module := range site.Modules() {
 		var (
-			control, modeControl, fanControl, noTemperature bool
-			manufacturer, model                             string
+			control, modeControl, fanControl bool
+			manufacturer, model, settings    string
 		)
 
-		scanErr := txn.QueryRow(ctx, `SELECT control, mode_control, fan_control, temperature IS NULL, manufacturer, model
+		scanErr := txn.QueryRow(ctx, `SELECT control, mode_control, fan_control, manufacturer, model,
+			concat_ws(' ', temperature->>'min', temperature->>'max', temperature->>'step', array_to_string(modes, ','),
+				array_to_string(fan_levels, ','))
 			FROM devices.capabilities WHERE id = $1 AND is_current`,
 			seed.ID(module.Capability),
 		).
-			Scan(&control, &modeControl, &fanControl, &noTemperature, &manufacturer, &model)
+			Scan(&control, &modeControl, &fanControl, &manufacturer, &model, &settings)
 		if scanErr != nil {
 			t.Fatalf("model of %s: %v", module.UnitName, scanErr)
 		}
 
-		if control != module.Control || modeControl || fanControl || !noTemperature ||
+		wantSettings := " " // no temperature, no modes, no fan levels
+		if s := module.Settings; s != nil {
+			wantSettings = fmt.Sprintf("%g %g %g %s %s", s.TempMin, s.TempMax, s.TempStep,
+				strings.Join(s.Modes, ","), strings.Join(s.FanLevels, ","))
+		}
+
+		if control != module.Control || modeControl != (module.Settings != nil) ||
+			fanControl != (module.Settings != nil) ||
+			settings != wantSettings ||
 			manufacturer != module.Manufacturer ||
 			model != module.Model {
 			t.Errorf(
-				"the model of %s, %s %s, offers control %t, mode %t, fan %t, no temperature %t; want control %t only",
+				"the model of %s, %s %s, offers control %t, mode %t, fan %t, settings %q; want control %t, settings %q",
 				module.UnitName,
 				manufacturer,
 				model,
 				control,
 				modeControl,
 				fanControl,
-				noTemperature,
+				settings,
 				module.Control,
+				wantSettings,
 			)
 		}
 

@@ -1,12 +1,12 @@
 {
   "version": "0.210.0",
-  "spec_baseline_id": "6280e9bdce2256c62bbf2c24f7ca5e769c378518dbca9d5715d3e986104c0e3f",
+  "spec_baseline_id": "1d7832d22f71d4282c253b5237339c5707fcdbc15d99a67fe12b6a0f1ee88a49",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
     {
       "path": "00-prepare/PrepareDocument.md",
-      "sha256": "42a2e784191cc4aa6b11d92c8d551cd2e407323d865137233cc83214b1f8396e"
+      "sha256": "42efa2487a7492f6d292d33fdcd877fdde33ecdc9178bb8a61e946e9d6de78fb"
     },
     {
       "path": "00-prepare/company-requirement-map.csv",
@@ -106,7 +106,7 @@
     },
     {
       "path": "02-design/backend-architecture.md",
-      "sha256": "33bb6a2e40a4b2c1cfdb4478ab671de7bbf2c9138c9e5836dbc51ae5343ea3cc"
+      "sha256": "3c046cddf4178d5853140936d095a7af45086f259264ad4eed3dadfeb211efaa"
     },
     {
       "path": "02-design/backend-go-design.md",
@@ -122,7 +122,7 @@
     },
     {
       "path": "02-design/container-design.md",
-      "sha256": "a3092ddfd877d85cd0f0acee2516f32ba184e54d39ab08a8b173e760d5aa393f"
+      "sha256": "ea2dbea6a108e18f1c88bc6ce9145d4da059617df2605f1c0384bcd302e0bd5f"
     },
     {
       "path": "02-design/contractor.md",
@@ -138,11 +138,11 @@
     },
     {
       "path": "02-design/device-firmware.ja.md",
-      "sha256": "f3340cab1979fa2a5d474eb85fe956a40410ce29580cdb30482745e6b31e6052"
+      "sha256": "6b95ccd62d9d3fba533ab88e53c65cc2b1027d768655af918feafb12b3288050"
     },
     {
       "path": "02-design/device-firmware.md",
-      "sha256": "4d0c54ece426f3756bc772cf69075132cf98cba040fc2880105d7910161de92f"
+      "sha256": "17239391ab6bdef793cc94db01eaeebb357fb1610a08936845f4fdab49a5a1ba"
     },
     {
       "path": "02-design/implementation-contracts.md",
@@ -170,7 +170,7 @@
     },
     {
       "path": "02-design/review-resolution-contracts.md",
-      "sha256": "348f55129af8dbaab0be50a9c93ecbda91b60fd1cc47d2b110228c64060537c5"
+      "sha256": "c3d004b6c3ba881eb6d9cf20d24308d5250c700e024ab5f4928626bd3b460ad1"
     },
     {
       "path": "02-design/service-contracts.ts",
@@ -298,7 +298,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "014499aaedfac09c527d9fbc07a0f1fd8eec44067f2eef626ae8460af7598851"
+      "sha256": "57cdd22d9c68a7fe31e6aedcd29443ece45b78687e3d73d6ef124964c280e275"
     },
     {
       "path": "tools/check_review_regressions.py",

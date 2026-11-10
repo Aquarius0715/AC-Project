@@ -169,14 +169,14 @@ func TestCommandTriggerMapsTheAcknowledgement(t *testing.T) {
 	}
 
 	trigger, ok, err := iotbridge.CommandTrigger(ack("applied"), receivedAt())
-	if err != nil || !ok || trigger.EventType != "command_ack" || trigger.CommandID == nil ||
+	if err != nil || !ok || trigger.EventType != eventCommandAck || trigger.CommandID == nil ||
 		trigger.CommandID.String() != cmd ||
 		trigger.Measurement != nil {
 		t.Fatalf("applied: %+v ok=%v err=%v", trigger, ok, err)
 	}
 
 	trigger, ok, _ = iotbridge.CommandTrigger(ack("unsupported"), receivedAt())
-	if !ok || trigger.EventType != "command_fail" {
+	if !ok || trigger.EventType != eventCommandFail {
 		t.Errorf("unsupported: %+v ok=%v", trigger, ok)
 	}
 
