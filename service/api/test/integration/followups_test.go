@@ -770,3 +770,50 @@ func TestExtendAccessRefreezesHistory(t *testing.T) {
 		t.Errorf("frozen again at the new end: %v", at)
 	}
 }
+
+// A problem reported on a unit archived after the visit opens no new job on it: an archived unit takes no new
+// business operation (IR39), as jobs.create and plans.generateNext refuse (IR746).
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
+func TestReportProblemOnArchivedUnit(t *testing.T) {
+	srv := server(t)
+	unit := newUnit(t, srv, "Archived after visit")
+
+	code, m := write(srv, customerB(), "jobs.create", jobBody(unit, nil), 0)
+	if code != 200 {
+		t.Fatalf("create: %d %v", code, m)
+	}
+
+	job := asStr(t, data(m)["id"])
+	owner(
+		t,
+		`UPDATE maintenance.jobs SET status = 'completed', completed_at = $2 WHERE id = $1`,
+		job,
+		clock().Add(-time.Hour),
+	)
+	owner(t, `UPDATE assets.units SET archived = true WHERE id = $1`, unit)
+
+	code, res := write(
+		srv,
+		customerB(),
+		"jobs.reportProblem",
+		`{"jobId":"`+job+`","reasonCode":"same_problem","details":"Still dripping water after the visit",`+
+			`"photos":[],"preferredSlot":null}`,
+		1,
+	)
+	if code != 409 || res["messageKey"] != apperr.KeyUnitArchived {
+		t.Errorf("problem on an archived unit: %d %v", code, res)
+	}
+
+	var follow int
+	ownerScan(
+		t,
+		`SELECT count(*) FROM maintenance.jobs WHERE follow_up_of_job_id = $1`,
+		[]any{job},
+		&follow,
+	)
+
+	if follow != 0 {
+		t.Errorf("follow-up jobs on the archived unit: %d", follow)
+	}
+}
