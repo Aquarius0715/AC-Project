@@ -9,6 +9,7 @@ import (
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
+	"github.com/pradita/ac-project/service/api/internal/platform/events"
 )
 
 // CustomerDeleteInput is customers.delete input: the customer, the reason and, for a holder of data.forceDelete, that
@@ -130,7 +131,7 @@ func (*Module) customersDelete(
 		ops.Event{
 			AggregateType: kindCustomer,
 			AggregateID:   input.ID,
-			Type:          "CustomerDeleted",
+			Type:          events.CustomerDeleted,
 			Payload:       nil,
 		},
 	)

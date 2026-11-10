@@ -20,7 +20,29 @@ func EventHandlers() map[string]events.Handler {
 		events.FilterCleaningCleared:  filterCleaningCleared,
 		events.ReconciliationRequired: reconciliationRequired,
 		events.ReconciliationResolved: reconciliationResolved,
+		events.CustomerDeleted:        customerDeleted,
 	}
+}
+
+// customerDeleted deletes the settings of a deleted customer (IR739, DEC-103): the alert policies made for it and its
+// switches of the default policy's rules. The customer had no unit, so no unit names one of its policies.
+func customerDeleted(ctx context.Context, txn pgx.Tx, event events.Event) error {
+	_, err := txn.Exec(
+		ctx,
+		`DELETE FROM monitoring.default_rule_settings WHERE customer_id = $1`,
+		event.AggregateID,
+	)
+	if err != nil {
+		return apperr.Wrap(err, "delete monitoring.default_rule_settings")
+	}
+
+	_, err = txn.Exec(
+		ctx,
+		`DELETE FROM monitoring.alert_policies WHERE kind = 'alert' AND customer_id = $1`,
+		event.AggregateID,
+	)
+
+	return apperr.Wrap(err, "delete monitoring.alert_policies")
 }
 
 // filterCleaningDue opens the unit's filter cleaning reminder Alert (IR239), with a DeliveryFailure when no one

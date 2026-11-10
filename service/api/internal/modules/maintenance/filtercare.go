@@ -906,3 +906,19 @@ func RegisterFilterCare(r *ops.Registry, m FilterCare) {
 	ops.Register(r, "filterCare.markCleaned", m.markCleaned)
 	ops.Register(r, "filterCare.saveSettings", m.saveSettings)
 }
+
+// CustomerHandlers apply CustomerDeleted (consumer maintenance, IR739, DEC-103): a deleted customer's filter care
+// settings go with it.
+func CustomerHandlers() map[string]events.Handler {
+	return map[string]events.Handler{
+		events.CustomerDeleted: func(ctx context.Context, txn pgx.Tx, event events.Event) error {
+			_, err := txn.Exec(
+				ctx,
+				`DELETE FROM maintenance.filter_care_settings WHERE customer_id = $1`,
+				event.AggregateID,
+			)
+
+			return apperr.Wrap(err, "delete maintenance.filter_care_settings")
+		},
+	}
+}

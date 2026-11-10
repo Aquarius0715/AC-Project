@@ -55,6 +55,13 @@ const (
 
 	FilterCleaningDue     = "FilterCleaningDue"     // open the maintenance Alert of the unit's cleaning cycle
 	FilterCleaningCleared = "FilterCleaningCleared" // resolve it: a later cleaning ended the cycle
+
+	// equipment (assets) → equipment (monitoring) and maintenance (IR739).
+
+	// CustomerDeleted: a customer was deleted (customers.delete, DEC-103), the event's AggregateID; its settings go with
+	// it: the alert policies made for it and its default rule switches (monitoring), its filter care settings
+	// (maintenance).
+	CustomerDeleted = "CustomerDeleted"
 )
 
 // FilterReminder is the payload of FilterCleaningDue / FilterCleaningCleared; maintenance assigns the Alert ID so the
