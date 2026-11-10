@@ -93,7 +93,11 @@ func consumers(
 	set.add(
 		ops.DomainMaintenance,
 		"maintenance",
-		merge(events.Handlers(maintenance.Replicas()...), maintenance.NoteHandlers()),
+		merge(
+			events.Handlers(maintenance.Replicas()...),
+			maintenance.NoteHandlers(),
+			maintenance.CustomerHandlers(),
+		),
 	) // IR192
 	set.add(
 		ops.DomainEnergy,

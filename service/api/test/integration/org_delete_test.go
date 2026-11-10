@@ -148,6 +148,106 @@ func TestCustomersAndOrganizationsDelete(t *testing.T) {
 	}
 }
 
+// A deleted customer takes its settings with it (IR739, B-21): the alert policy HQ made for it, its default rule switch
+// and its filter care settings are gone once the CustomerDeleted event is applied; another customer's stay.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
+func TestCustomerDeleteRemovesItsSettings(t *testing.T) {
+	srv := server(t)
+	name := "Del Settings " + uuid.NewString()[:8]
+
+	code, resp := write(
+		srv,
+		hq(),
+		"organizations.save",
+		`{"name":"`+name+`","kind":"customer","status":"active"}`,
+		0,
+	)
+	if code != 200 {
+		t.Fatalf("organization: %d %v", code, resp)
+	}
+
+	org := asStr(t, data(resp)["id"])
+
+	code, resp = write(
+		srv,
+		hq(),
+		"customers.save",
+		`{"name":"`+name+`","organizationId":"`+org+`","serviceProfile":"general","status":"active"}`,
+		0,
+	)
+	if code != 200 {
+		t.Fatalf("customer: %d %v", code, resp)
+	}
+
+	cust, version := asStr(t, data(resp)["id"]), ver(t, resp)
+	hqRecipient := `["` + seed.ID("hq-operator").String() + `"]`
+
+	for _, customer := range []string{cust, seed.ID("cust-b").String()} {
+		code, resp = write(srv, hq(), "policies.save", alertPolicyBody(map[string]string{
+			fieldCustomerID:             `"` + customer + `"`,
+			fieldRecipientMembershipIDs: hqRecipient,
+		}), 0)
+		if code != 200 {
+			t.Fatalf("alert policy of %s: %d %v", customer, code, resp)
+		}
+
+		if customer != cust {
+			kept := asStr(t, data(resp)["id"])
+			t.Cleanup(
+				func() { owner(t, `DELETE FROM monitoring.alert_policies WHERE id = $1`, kept) },
+			)
+		}
+	}
+
+	code, resp = write(
+		srv,
+		hq(),
+		opPoliciesSetDefaultRule,
+		`{"policyId":"`+defaultPolicyID(
+			t,
+		)+`","ruleKey":"dust_pm25","customerId":"`+cust+`","enabled":false}`,
+		versionZero,
+	)
+	if code != 200 {
+		t.Fatalf("default rule: %d %v", code, resp)
+	}
+
+	owner(
+		t,
+		`INSERT INTO maintenance.filter_care_settings (tenant_id, customer_id) VALUES ($1, $2)`,
+		seed.ID("tenant-a"),
+		cust,
+	)
+
+	code, resp = write(srv, hq(), "customers.delete", `{"id":"`+cust+`",`+testReason+`}`, version)
+	if code != 200 {
+		t.Fatalf("customer delete: %d %v", code, resp)
+	}
+
+	drainEvents(t)
+
+	count := func(table, customer string) int {
+		var n int
+
+		ownerScan(t, `SELECT count(*) FROM `+table+` WHERE customer_id = $1`, []any{customer}, &n)
+
+		return n
+	}
+
+	for _, table := range []string{
+		"monitoring.alert_policies", "monitoring.default_rule_settings", "maintenance.filter_care_settings",
+	} {
+		if n := count(table, cust); n != 0 {
+			t.Errorf("%s keeps %d rows of the deleted customer", table, n)
+		}
+	}
+
+	if count("monitoring.alert_policies", seed.ID("cust-b").String()) == 0 {
+		t.Error("another customer's alert policy went with the deleted one")
+	}
+}
+
 // A contractor company registered by mistake is deleted as it was made (the profile, then its organization); one
 // with jobs, offers or accounts is refused with the reason (DEC-103). HQ only.
 //
