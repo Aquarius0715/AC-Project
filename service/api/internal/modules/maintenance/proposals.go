@@ -1078,6 +1078,11 @@ func (m Proposals) requestRescheduleJob(
 		}
 	}
 
+	withdrawErr := withdrawOpenProposals(ctx, call, input.JobID)
+	if withdrawErr != nil {
+		return Job{}, withdrawErr
+	}
+
 	raw, marshalErr := json.Marshal(input.PreferredSlots)
 	if marshalErr != nil {
 		return Job{}, apperr.Wrap(marshalErr, "json.Marshal")
@@ -1104,6 +1109,31 @@ func (m Proposals) requestRescheduleJob(
 		"RescheduleRequested",
 		deref(input.Comment),
 	)
+}
+
+// withdrawOpenProposals ends the proposals a reschedule leaves open, as a cancellation does (IR444, IR445, IR749): the
+// client's pending proposal and the contractor's time change pending at HQ or sent to the client. The new preferred
+// times start a new round, which HQ answers with a new offer or proposal.
+func withdrawOpenProposals(ctx context.Context, call *ops.Call, job uuid.UUID) error {
+	_, err := call.Tx.Exec(
+		ctx,
+		`UPDATE maintenance.slot_proposals SET status = 'withdrawn', decided_at = $2 WHERE job_id = $1 AND status =
+			'pending'`,
+		job,
+		call.Now,
+	)
+	if err != nil {
+		return apperr.Wrap(err, "update maintenance.slot_proposals")
+	}
+
+	_, err = call.Tx.Exec(
+		ctx,
+		`UPDATE maintenance.partner_slot_proposals SET status = 'withdrawn' WHERE status IN ('pending','sent_to_client')
+		AND offer_id IN (SELECT id FROM maintenance.offers WHERE job_id = $1)`,
+		job,
+	)
+
+	return apperr.Wrap(err, "update maintenance.partner_slot_proposals")
 }
 
 // ---- partner proposals ----
