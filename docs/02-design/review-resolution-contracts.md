@@ -10052,3 +10052,11 @@ Found on the shared test environment after IR735's deployment: both live units s
 3. **Bridge code.** `Trigger` carries `operationId` and `result`. The three internal queries the bridge reads (`devices.mqttNodes`, `devices.connectionFault`, `devices.mqttChecks`) go through one helper (`liveQuery`).
 4. **The test environment now.** The two devices were set back online by hand SQL (`live-connection-online.sql`, given to the user). From this release a check of a live device answers itself, so Admin's or the technician's Check connection also brings a device out of `error`.
 5. **Tests.** `TestLiveCheckTrigger` (the 3-minute line, one event per operation, the body), `TestLiveChecks` (the read with the token and tenant, succeeded and failed answers), `TestMqttChecksForTheGateway` (only running checks of node devices are listed; the answer brings a device in error back online; the internal token is required).
+
+## IR737 One re-measure item per reading in the return dialogs — 2026-11-10
+
+Found in review round 270 (`shared/lib/partnerReview.ts`, never reviewed by name).
+
+1. **Cause.** The "Items that need rework" list of the return dialogs (HQ's Admin > Jobs and the contractor's quality review, IR232, IR609) offers one "re-measure" item per reading of the report. A technician may record the same metric on the same part twice (before and after cleaning: the readings table takes any rows, and `jobs.saveDraft` does not refuse them), so two items had the same label. Both dialogs key the checkboxes and keep the ticked items by label: React saw two children with one key, ticking one ticked both, and the reason listed the line twice.
+2. **Fix.** `reworkItems` offers one re-measure item per distinct reading label. The label already names the metric and the part, so the technician reads the same instruction.
+3. **Tests.** `partnerReview.test.ts`: two readings of the refrigerant pressure of the refrigerant pipe give one re-measure item, and the labels are unique.

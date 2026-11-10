@@ -59,6 +59,13 @@ describe("inspection rows", () => {
     expect(returnReason(["Indoor unit — filter condition — attention (Dusty)"], " Clean it again. ")).toBe("Rework: Indoor unit — filter condition — attention (Dusty). Clean it again.");
     expect(reworkItems(inspectionRows([item({ componentKey: "filter", result: "attention", reason: "Dusty" })], MS_TOKYO.t), [], 1, MS_TOKYO.t)[0]?.label).toBe("Unit dalaman — keadaan penapis — perhatian (Dusty)");
   });
+  it("offers one re-measure item per reading label, as the dialogs key and tick the items by label (IR737)", () => {
+    const before = { id: "m1", componentKey: "refrigerant_pipe", metric: "refrigerant_pressure", value: 4.2, unit: "bar", quality: "valid", observedAt: "2026-09-14T01:00:00Z" };
+    const readings = readingRows([before, { ...before, id: "m2", value: 4.6 }]); // before and after, same metric and part
+    const labels = reworkItems([], readings, 1).map((x) => x.label);
+    expect(labels).toStrictEqual(["Refrigerant pressure (refrigerant) — re-measure", "Photos — add more evidence"]);
+    expect(new Set(labels).size).toBe(labels.length);
+  });
   it("names the photos linked to a finding (IR352)", () => {
     const r = report({ items: [item({ result: "attention", reason: "Dusty", evidenceIds: ["a1", "fedcba9876543210"] })] });
     expect(inspectionRows(r.items, undefined, r.attachmentRefs)[0]?.photos).toStrictEqual(["p1.png", "fedcba98"]); // a photo the report no longer lists keeps its ID
