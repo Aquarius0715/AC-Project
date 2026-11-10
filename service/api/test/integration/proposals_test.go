@@ -1830,7 +1830,7 @@ func TestCancelWithdrawsOpenProposals(t *testing.T) {
 		)
 	}
 
-	if decision != "decline" || reason != "job_cancelled" {
+	if decision != decisionDecline || reason != "job_cancelled" {
 		t.Errorf(
 			"after the cancel the offer is %q (%q), want a decline as job_cancelled",
 			decision,
@@ -2171,4 +2171,237 @@ func firstCandidate(t *testing.T, offer any) any {
 	}
 
 	return asObj(t, slots[0])["startAt"]
+}
+
+// TestAcceptedContractorHoldEndsAssignment (IR750): an internal job whose technician cannot make it, re-timed by HQ
+// with a proposal held for a contractor — the client's acceptance offers the job to that contractor and ends the
+// internal assignment, as a reassignment does. Before, the assignment stayed active beside the new offer, so the
+// technician kept the visit, its unit access and the booking.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
+func TestAcceptedContractorHoldEndsAssignment(t *testing.T) {
+	srv := server(t)
+	stamp := func(h int) string { return clock().Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	// isolate from active assignments other tests left in the preferred time
+	owner(
+		t,
+		`UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = $1 AND status = 'active' AND
+			scheduled && tstzrange($2, $3)`,
+		seed.ID(membershipTechInternalA),
+		clock().Add(73*time.Hour),
+		clock().Add(74*time.Hour),
+	)
+
+	_, resp := write(
+		srv,
+		customerA(),
+		"jobs.create",
+		jobBody(seed.ID("unit-non-rto").String(), nil),
+		0,
+	)
+	job := asStr(t, data(resp)["id"])
+	version := func() int {
+		t.Helper()
+
+		_, res := post(srv, hq(), "jobs.get", `{"jobId":"`+job+`"}`)
+
+		return int(asNum(t, data(res)["version"]))
+	}
+
+	if code, res := write(
+		srv,
+		hq(),
+		"jobs.assign",
+		`{"jobId":"`+job+`","technicianMembershipId":"`+seed.ID(membershipTechInternalA).String()+
+			`","startAt":"`+stamp(73)+`","endAt":"`+stamp(74)+`"}`,
+		version(),
+	); code != 200 {
+		t.Fatalf("assign: %d %v", code, res)
+	}
+
+	if code, res := write(
+		srv,
+		techInt(),
+		"jobs.acknowledgeAssignment",
+		`{"jobId":"`+job+`","decision":"cant_make","reason":"another call"}`,
+		version(),
+	); code != 200 {
+		t.Fatalf("cant_make: %d %v", code, res)
+	}
+
+	hold := `{"kind":"contractor","contractorOrgId":"` + seed.ID("org-contractor-a").String() + `"}`
+	if code, res := write(
+		srv,
+		hq(),
+		"jobs.proposeSlot",
+		`{"jobId":"`+job+`","slot":`+slotJSON(98, 2)+`,"hold":`+hold+
+			`,"message":"A partner can come then","replyBy":"`+stamp(48)+`"}`,
+		version(),
+	); code != 200 {
+		t.Fatalf("propose: %d %v", code, res)
+	}
+
+	var proposal string
+	ownerScan(
+		t,
+		`SELECT id::text FROM maintenance.slot_proposals WHERE job_id = $1 AND status = 'pending'`,
+		[]any{job},
+		&proposal,
+	)
+
+	if code, res := write(
+		srv,
+		customerA(),
+		"jobs.respondProposal",
+		`{"jobId":"`+job+`","proposalId":"`+proposal+`","decision":"accept"}`,
+		version(),
+	); code != 200 || data(res)["status"] != "offered" {
+		t.Fatalf("accept: %d %v", code, res)
+	}
+
+	var active int
+	ownerScan(
+		t,
+		`SELECT count(*) FROM maintenance.assignments WHERE job_id = $1 AND status = 'active'`,
+		[]any{job},
+		&active,
+	)
+
+	if active != 0 {
+		t.Errorf("active assignments after the job went to the contractor: %d", active)
+	}
+
+	_, detail := post(srv, hq(), "jobs.get", `{"jobId":"`+job+`"}`)
+	if data(detail)["assignmentId"] != nil || data(detail)["scheduledSlot"] != nil {
+		t.Errorf(
+			"the job still names the old assignment or time: %v %v",
+			data(detail)["assignmentId"],
+			data(detail)["scheduledSlot"],
+		)
+	}
+}
+
+// TestAcceptedContractorHoldEndsOtherOffer (IR750): an outsourced job offered to contractor-a, whose time change made
+// HQ propose a time held for contractor-b instead — the client's acceptance offers the job to contractor-b and ends
+// contractor-a's open offer and its time change, so contractor-a can no longer accept the job.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
+func TestAcceptedContractorHoldEndsOtherOffer(t *testing.T) {
+	srv := server(t)
+	stamp := func(h int) string { return clock().Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	// tech-external-a free for the contractor's time change, as openProposals frees it
+	owner(
+		t,
+		`UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = $1 AND status = 'active' AND
+			lower(scheduled) > $2`,
+		seed.ID("tech-external-a"),
+		clock().Add(2*time.Hour),
+	)
+
+	_, resp := write(
+		srv,
+		customerA(),
+		"jobs.create",
+		jobBody(seed.ID("unit-non-rto").String(), nil),
+		0,
+	)
+	job := asStr(t, data(resp)["id"])
+	version := func() int {
+		t.Helper()
+
+		_, res := post(srv, hq(), "jobs.get", `{"jobId":"`+job+`"}`)
+
+		return int(asNum(t, data(res)["version"]))
+	}
+
+	if code, res := write(
+		srv,
+		hq(),
+		"jobs.offer",
+		`{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").String()+
+			`","offerExpiresAt":"`+stamp(12)+`","accessValidFrom":"`+stamp(0)+`","accessValidUntil":"`+stamp(200)+
+			`","termsVersion":"t"}`,
+		version(),
+	); code != 200 {
+		t.Fatalf("offer to contractor-a: %d %v", code, res)
+	}
+
+	var offerA string
+	ownerScan(
+		t,
+		`SELECT id::text FROM maintenance.offers WHERE job_id = $1 AND decision IS NULL`,
+		[]any{job},
+		&offerA,
+	)
+
+	if code, res := write(
+		srv,
+		contrA(),
+		"jobs.proposePartnerSlot",
+		`{"jobId":"`+job+`","offerId":"`+offerA+`","slot":`+slotJSON(146, 2)+
+			`,"technicianMembershipId":"`+seed.ID("tech-external-a").String()+`","reason":"team busy"}`,
+		version(),
+	); code != 200 {
+		t.Fatalf("contractor-a's time change: %d %v", code, res)
+	}
+
+	hold := `{"kind":"contractor","contractorOrgId":"` + seed.ID("org-contractor-b").String() + `"}`
+	if code, res := write(
+		srv,
+		hq(),
+		"jobs.proposeSlot",
+		`{"jobId":"`+job+`","slot":`+slotJSON(98, 2)+`,"hold":`+hold+
+			`,"message":"Another partner can come then","replyBy":"`+stamp(48)+`"}`,
+		version(),
+	); code != 200 {
+		t.Fatalf("propose contractor-b: %d %v", code, res)
+	}
+
+	var proposal string
+	ownerScan(
+		t,
+		`SELECT id::text FROM maintenance.slot_proposals WHERE job_id = $1 AND status = 'pending'`,
+		[]any{job},
+		&proposal,
+	)
+
+	if code, res := write(
+		srv,
+		customerA(),
+		"jobs.respondProposal",
+		`{"jobId":"`+job+`","proposalId":"`+proposal+`","decision":"accept"}`,
+		version(),
+	); code != 200 {
+		t.Fatalf("accept: %d %v", code, res)
+	}
+
+	var decision, reason, change string
+	ownerScan(
+		t,
+		`SELECT COALESCE(o.decision, ''), COALESCE(o.decline_reason, ''), (SELECT status FROM
+			maintenance.partner_slot_proposals WHERE offer_id = o.id) FROM maintenance.offers o WHERE o.id = $1`,
+		[]any{offerA},
+		&decision,
+		&reason,
+		&change,
+	)
+
+	if decision != decisionDecline || reason != "rescheduled" || change != statusWithdrawn {
+		t.Errorf(
+			"contractor-a's offer after the acceptance: %q (%q), time change %s",
+			decision,
+			reason,
+			change,
+		)
+	}
+
+	if code, _ := write(
+		srv,
+		contrA(),
+		"jobs.accept",
+		`{"jobId":"`+job+`","offerId":"`+offerA+`","termsVersion":"t"}`,
+		version(),
+	); code == 200 {
+		t.Error("contractor-a accepted a job handed to contractor-b")
+	}
 }

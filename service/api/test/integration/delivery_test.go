@@ -458,7 +458,7 @@ func TestOfferAcceptAssign(t *testing.T) {
 		`{"jobId":"`+job+`","offerId":"`+offer+`","reason":"no capacity"}`,
 		2,
 	); code != 200 ||
-		data(res)["decision"] != "decline" {
+		data(res)["decision"] != decisionDecline {
 		t.Fatalf("decline: %d %v", code, res)
 	}
 
