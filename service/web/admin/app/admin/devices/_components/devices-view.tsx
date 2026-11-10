@@ -12,6 +12,8 @@ import { ModelsTab } from "./models-tab";
 export interface DevicesLive {
   tab: "models" | "devices" | "firmware"; now: string; canAudit: boolean; canWrite: boolean;
   models: ModelRow[]; devices: DeviceRow[]; units: { id: string; label: string; modelId: string }[];
+  /** how many devices the registry holds, and on the devices tab the page of it (server search, cursor, IR723) */
+  deviceTotal: number; page?: { q: string; next: string | null; cursor: string | null };
   /** the devices tab's list (Figma Admin 246:2): sorted by serial, with the state of each */
   rows?: TechDeviceRow[];
   device?: {
@@ -30,8 +32,8 @@ export function DevicesView({ live }: Readonly<{ live: DevicesLive }>) {
   const nav = useUrlPatch();
   return (
     <Page>
-      <Tabs value={live.tab} onChange={(v) => { nav({ tab: v === "models" ? null : v, deviceId: null, campaignId: null }); }} tabs={[
-        { id: "models", label: t("Models"), count: live.models.length }, { id: "devices", label: t("IoT devices"), count: live.devices.length },
+      <Tabs value={live.tab} onChange={(v) => { nav({ tab: v === "models" ? null : v, deviceId: null, campaignId: null, q: null, cursor: null }); }} tabs={[
+        { id: "models", label: t("Models"), count: live.models.length }, { id: "devices", label: t("IoT devices"), count: live.deviceTotal },
         { id: "firmware", label: t("Firmware campaigns"), count: live.campaigns?.length },
       ]} />
       {live.tab === "models" ? <ModelsTab live={live} /> : null}{live.tab !== "models" && live.tab === "devices" && <DeviceTab live={live} />}{live.tab !== "models" && live.tab !== "devices" && <FirmwareTab live={live} />}

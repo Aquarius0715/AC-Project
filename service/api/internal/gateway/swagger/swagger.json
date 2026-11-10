@@ -6670,7 +6670,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | admin:device.read | admin:audit.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A04, DD-T02, DD-T11, DD-A16, DD-A20, DD-T12 · Query: filters unitId,status · sort id,createdAt,updatedAt (default id asc)",
+                "description": "Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | admin:device.read | admin:audit.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A04, DD-T02, DD-T11, DD-A16, DD-A20, DD-T12 · Query: filters unitId,status,search,modelId · sort id,createdAt,updatedAt,serial (default id asc)",
                 "consumes": [
                     "application/json"
                 ],
@@ -6697,7 +6697,7 @@
                     },
                     {
                         "type": "string",
-                        "description": "field:direction — fields id,createdAt,updatedAt; default id asc",
+                        "description": "field:direction — fields id,createdAt,updatedAt,serial; default id asc",
                         "name": "sort",
                         "in": "query"
                     },
@@ -6711,6 +6711,18 @@
                         "type": "string",
                         "description": "filter → connection",
                         "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "filter → part of the serial or the MQTT node ID or the bound unit's name (IR723)",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "filter → model of the bound unit (IR723)",
+                        "name": "modelId",
                         "in": "query"
                     }
                 ],
