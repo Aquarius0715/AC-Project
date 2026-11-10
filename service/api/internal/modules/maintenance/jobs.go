@@ -2521,7 +2521,7 @@ func (m Jobs) cancelJob(ctx context.Context, call *ops.Call, input *CancelInput)
 			'job_cancelled',
 		version = version + 1, updated_at = platform.app_now() WHERE job_id = $1 AND decision IS NULL`,
 		input.JobID,
-		call.Principal.MembershipID,
+		call.Principal.UserID, // Offer.decidedBy is the deciding user (IR747)
 		call.Now,
 	)
 	if execErr != nil {

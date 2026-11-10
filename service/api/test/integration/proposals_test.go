@@ -1720,7 +1720,7 @@ func TestDeclineWithdrawsClientProposal(t *testing.T) {
 
 // TestCancelWithdrawsOpenProposals (IR444, IR445): HQ cancelling a job ends the proposals still open on it: the
 // company's time change waiting for HQ and HQ's proposal waiting for the client, so neither is answered on a cancelled
-// job. The offer ends too (declined as job_cancelled).
+// job. The offer ends too (declined as job_cancelled, by HQ's user, IR747).
 //
 //nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestCancelWithdrawsOpenProposals(t *testing.T) {
@@ -1738,19 +1738,28 @@ func TestCancelWithdrawsOpenProposals(t *testing.T) {
 		t.Fatalf("cancel: %d %v", code, res)
 	}
 
-	var clientStatus, partnerStatus, decision, reason string
+	var (
+		clientStatus, partnerStatus, decision, reason string
+		decidedBy                                     uuid.UUID
+	)
 	ownerScan(
 		t,
 		`SELECT (SELECT status FROM maintenance.slot_proposals WHERE id = $1),
 			(SELECT status FROM maintenance.partner_slot_proposals WHERE id = $2),
 			(SELECT decision FROM maintenance.offers WHERE id = $3),
-			(SELECT decline_reason FROM maintenance.offers WHERE id = $3)`,
+			(SELECT decline_reason FROM maintenance.offers WHERE id = $3),
+			(SELECT decided_by FROM maintenance.offers WHERE id = $3)`,
 		[]any{proposal, partner, offer},
 		&clientStatus,
 		&partnerStatus,
 		&decision,
 		&reason,
+		&decidedBy,
 	)
+	// Offer.decidedBy is the deciding user, as on an accept, a decline or a reschedule (IR747)
+	if decidedBy != seed.ID("user-hq-operator") {
+		t.Errorf("the cancelled offer is decided by %s, want HQ's user", decidedBy)
+	}
 
 	if clientStatus != statusWithdrawn || partnerStatus != statusWithdrawn {
 		t.Errorf(
