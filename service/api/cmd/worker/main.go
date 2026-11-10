@@ -15,6 +15,7 @@ import (
 	"os/signal"
 	"slices"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -169,6 +170,7 @@ func runMail(ctx context.Context) error {
 			"http://localhost:3002",
 		),
 		Admin: envOr("APP_URL_ADMIN", "http://localhost:3003"),
+		Hosts: publicHosts(os.Getenv("PUBLIC_HOSTS")),
 	}
 
 	log.Printf("notification worker: sending e-mails through %s", strconv.Quote(addr))
@@ -279,4 +281,17 @@ func runHousekeeping(ctx context.Context) error {
 		case <-ticker.C:
 		}
 	}
+}
+
+// publicHosts are the host names of PUBLIC_HOSTS (comma separated, IR651): the addresses an e-mail may link to (IR721).
+func publicHosts(list string) []string {
+	var out []string
+
+	for host := range strings.SplitSeq(list, ",") {
+		if host = strings.ToLower(strings.TrimSpace(host)); host != "" {
+			out = append(out, host)
+		}
+	}
+
+	return out
 }

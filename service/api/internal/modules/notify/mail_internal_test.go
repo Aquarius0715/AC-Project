@@ -19,12 +19,14 @@ func TestMailTexts(t *testing.T) {
 		Partner:    "http://p",
 		Technician: "http://t",
 		Admin:      "http://a",
+		Hosts:      nil,
 	}
 
 	subject, body := notificationMail(
 		noticeAlert,
 		map[string]any{"targetName": "Bedroom AC", keyStatus: "open"},
 		authz.RoleClient,
+		"",
 		apps,
 	)
 	if subject != "Alert: Bedroom AC" || !strings.Contains(body, "Status: open") ||
@@ -36,6 +38,7 @@ func TestMailTexts(t *testing.T) {
 		noticeAlert,
 		map[string]any{"targetName": "Bed\r\nroom AC"},
 		authz.RoleClient,
+		"",
 		apps,
 	); got != "Alert: Bed room AC" { // a name with a line break
 		t.Errorf("subject on one line: %q", got)
@@ -45,6 +48,7 @@ func TestMailTexts(t *testing.T) {
 		"unknown",
 		nil,
 		authz.RoleAdmin,
+		"",
 		apps,
 	); got != "Notification: unknown" {
 		t.Errorf("unknown template: %q", got)
@@ -59,6 +63,7 @@ func TestMailTexts(t *testing.T) {
 			noticeAlert,
 			nil,
 			role,
+			"",
 			apps,
 		); !strings.Contains(
 			body,
@@ -66,6 +71,62 @@ func TestMailTexts(t *testing.T) {
 		) {
 			t.Errorf("%s links to %q", role, body)
 		}
+	}
+}
+
+// TestMailLinksAtTheSignInAddress: an environment on several addresses links each e-mail to the address its recipient
+// last signed in on, when that address is listed (IR721, B-16); any other, or none, keeps the canonical one.
+func TestMailLinksAtTheSignInAddress(t *testing.T) {
+	t.Parallel()
+
+	apps := Apps{
+		Customer:   "http://10.100.1.17:3200",
+		Partner:    "http://10.100.1.17:3201",
+		Technician: "http://10.100.1.17:3202",
+		Admin:      "http://10.100.1.17:3203",
+		Hosts:      []string{"10.100.1.17", "100.99.169.116"},
+	}
+
+	const canonical = "http://10.100.1.17:3200/notifications"
+
+	for host, want := range map[string]string{
+		"100.99.169.116": "http://100.99.169.116:3200/notifications",
+		"10.100.1.17":    canonical,
+		"evil.example":   canonical,
+		"":               canonical,
+	} {
+		if _, body := notificationMail(
+			noticeAlert,
+			nil,
+			authz.RoleClient,
+			host,
+			apps,
+		); !strings.Contains(
+			body,
+			want,
+		) {
+			t.Errorf("signed in on %q: %q", host, body)
+		}
+	}
+
+	single := Apps{
+		Customer:   "http://localhost:3000",
+		Partner:    "",
+		Technician: "",
+		Admin:      "",
+		Hosts:      nil,
+	}
+	if _, body := notificationMail(
+		noticeAlert,
+		nil,
+		authz.RoleClient,
+		"100.99.169.116",
+		single,
+	); !strings.Contains(
+		body,
+		"http://localhost:3000/notifications",
+	) { // one address (dev, CI, E2E): no listed host, nothing moves
+		t.Errorf("single address: %q", body)
 	}
 }
 
