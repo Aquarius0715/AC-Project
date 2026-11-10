@@ -670,9 +670,8 @@ func (in *ImportCommitInput) Validate() map[string]string {
 //	@Summary		units.importCommit (write)
 //	@ID				units.importCommit
 //	@Description	Authorization: admin:asset.write
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
-//	@Description	IR111 preview must be unexpired and unchanged; imports ready and warning rows only, as one change \
-//	@Description	set
+//	@Description	Validation: D01; input constraints in the corresponding DD; IR111 preview must be unexpired and \
+//	@Description	unchanged; imports ready and warning rows only, as one change set
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-A18
 //	@Tags			units

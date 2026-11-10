@@ -155,7 +155,7 @@ func (m Billing) notifyMembers(
 //	@Summary		inquiries.create (write)
 //	@ID				inquiries.create
 //	@Description	Authorization: client:self
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+//	@Description	Validation: D01; input constraints in the corresponding DD
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-C12
 //	@Tags			inquiries

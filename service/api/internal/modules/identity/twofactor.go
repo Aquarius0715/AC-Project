@@ -100,8 +100,8 @@ func (in *CodeInput) Validate() map[string]string {
 //	@Summary		twoFactor.enable (write)
 //	@ID				twoFactor.enable
 //	@Description	Authorization: authenticated:own-session
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
-//	@Description	IR112 demo: any 6 digits; shows 8 recovery codes once
+//	@Description	Validation: D01; input constraints in the corresponding DD; IR112 demo: any 6 digits; shows 8 \
+//	@Description	recovery codes once
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DDC-07
 //	@Tags			twoFactor
@@ -188,8 +188,7 @@ func enableTwoFactor(ctx context.Context, call *ops.Call, _ *CodeInput) (TwoFact
 //	@Summary		twoFactor.disable (write)
 //	@ID				twoFactor.disable
 //	@Description	Authorization: authenticated:own-session
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
-//	@Description	IR112 requires a current 6-digit code
+//	@Description	Validation: D01; input constraints in the corresponding DD; IR112 requires a current 6-digit code
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DDC-07
 //	@Tags			twoFactor

@@ -168,7 +168,7 @@ func (in *ResetInput) Validate() map[string]string {
 //	@Summary		demo.reset (write)
 //	@ID				demo.reset
 //	@Description	Authorization: public:demo-panel-only
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+//	@Description	Validation: D01; input constraints in the corresponding DD
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DDC-07
 //	@Tags			demo
@@ -1063,7 +1063,7 @@ func registerDemo(reg *ops.Registry, d *demoOps) {
 //	@Summary		demoSession.signIn (write)
 //	@ID				demoSession.signIn
 //	@Description	Authorization: public:demo-only
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+//	@Description	Validation: D01; input constraints in the corresponding DD
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DDC-07
 //	@Tags			demoSession
@@ -1091,7 +1091,7 @@ func demoSessionSignIn(ctx context.Context, c *ops.Call, in *demoSignIn) (struct
 //	@Summary		demoSession.switchMembership (write)
 //	@ID				demoSession.switchMembership
 //	@Description	Authorization: authenticated:demo-account-switch; D09
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+//	@Description	Validation: D01; input constraints in the corresponding DD
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DDC-07
 //	@Tags			demoSession
@@ -1119,7 +1119,7 @@ func demoSessionSwitch(ctx context.Context, c *ops.Call, in *demoSwitch) (struct
 //	@Summary		demoSession.signOut (write)
 //	@ID				demoSession.signOut
 //	@Description	Authorization: authenticated:own-session
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+//	@Description	Validation: D01; input constraints in the corresponding DD
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DDC-07
 //	@Tags			demoSession

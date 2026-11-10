@@ -1371,7 +1371,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: client:control.execute:self | admin:automation.policy.write | admin:alert.policy.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR215 records skips whose own trigger held (reason in automation_runs)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A11, DD-A12, DD-C04, DD-C05, DD-A05",
+                "description": "Authorization: client:control.execute:self | admin:automation.policy.write | admin:alert.policy.write\nValidation: D01; input constraints in the corresponding DD; IR215 records skips whose own trigger held (reason in automation_runs)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A11, DD-A12, DD-C04, DD-C05, DD-A05",
                 "consumes": [
                     "application/json"
                 ],
@@ -3003,7 +3003,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: contractor:partner.assign:own-company\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 PDF/JPEG/PNG up to 10 MB; issuedAt \u003c expiresAt\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-P09",
+                "description": "Authorization: contractor:partner.assign:own-company\nValidation: D01; input constraints in the corresponding DD; IR111 PDF/JPEG/PNG up to 10 MB; issuedAt \u003c expiresAt\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-P09",
                 "consumes": [
                     "application/json"
                 ],
@@ -4158,7 +4158,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: client:control.execute | technician:control.diagnose:job-required | admin:control.execute\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR46 restriction action table; IR47 derived connection/powerSignal OFFLINE; IR74 client omits reason; IR94 technician write table (assignment and work window, jobId required when typed); IR109 group control sends one command per selected unit (owner only); a command asked for here is always source ui (the voice channel was withdrawn, IR648)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-C03, DD-T10, DD-A11 through automations.fire, DD-C04, DD-C05, DD-A02, DD-C14 · Input versions: expectedUnitVersion=UnitDetail.version",
+                "description": "Authorization: client:control.execute | technician:control.diagnose:job-required | admin:control.execute\nValidation: D01; input constraints in the corresponding DD; IR46 restriction action table; IR47 derived connection/powerSignal OFFLINE; IR74 client omits reason; IR94 technician write table (assignment and work window, jobId required when typed); IR109 group control sends one command per selected unit (owner only); a command asked for here is always source ui (the voice channel was withdrawn, IR648)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-C03, DD-T10, DD-A11 through automations.fire, DD-C04, DD-C05, DD-A02, DD-C14 · Input versions: expectedUnitVersion=UnitDetail.version",
                 "consumes": [
                     "application/json"
                 ],
@@ -5998,7 +5998,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: public:demo-only\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DDC-07",
+                "description": "Authorization: public:demo-only\nValidation: D01; input constraints in the corresponding DD\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DDC-07",
                 "consumes": [
                     "application/json"
                 ],
@@ -6091,7 +6091,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: authenticated:own-session\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DDC-07",
+                "description": "Authorization: authenticated:own-session\nValidation: D01; input constraints in the corresponding DD\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DDC-07",
                 "consumes": [
                     "application/json"
                 ],
@@ -6263,7 +6263,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: authenticated:demo-account-switch; D09\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DDC-07",
+                "description": "Authorization: authenticated:demo-account-switch; D09\nValidation: D01; input constraints in the corresponding DD\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DDC-07",
                 "consumes": [
                     "application/json"
                 ],
@@ -6465,7 +6465,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: public:demo-panel-only\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DDC-07",
+                "description": "Authorization: public:demo-panel-only\nValidation: D01; input constraints in the corresponding DD\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DDC-07",
                 "consumes": [
                     "application/json"
                 ],
@@ -8455,7 +8455,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: technician:control.diagnose:assigned-valid-job\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR94 technician write table (assignment and work window, jobId required when typed)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-T10 · Input versions: expectedUnitVersion=UnitDetail.version;expectedJobVersion=JobDetail.version",
+                "description": "Authorization: technician:control.diagnose:assigned-valid-job\nValidation: D01; input constraints in the corresponding DD; IR94 technician write table (assignment and work window, jobId required when typed)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-T10 · Input versions: expectedUnitVersion=UnitDetail.version;expectedJobVersion=JobDetail.version",
                 "consumes": [
                     "application/json"
                 ],
@@ -9597,7 +9597,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: client:self-customer:owner\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR110 thresholdHours 50–2000 or null (model default); fallbackDays 7–180\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-C18",
+                "description": "Authorization: client:self-customer:owner\nValidation: D01; input constraints in the corresponding DD; IR110 thresholdHours 50–2000 or null (model default); fallbackDays 7–180\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-C18",
                 "consumes": [
                     "application/json"
                 ],
@@ -9704,7 +9704,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: client:self\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-C18",
+                "description": "Authorization: client:self\nValidation: D01; input constraints in the corresponding DD\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-C18",
                 "consumes": [
                     "application/json"
                 ],
@@ -9937,7 +9937,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: admin:device.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 signed target version from Capability.firmwareCandidates; startAt at least 24 h ahead; waves ascending ending at 100; autoPause 1–50 %\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A20",
+                "description": "Authorization: admin:device.write\nValidation: D01; input constraints in the corresponding DD; IR111 signed target version from Capability.firmwareCandidates; startAt at least 24 h ahead; waves ascending ending at 100; autoPause 1–50 %\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A20",
                 "consumes": [
                     "application/json"
                 ],
@@ -10886,7 +10886,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: client:self\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-C12",
+                "description": "Authorization: client:self\nValidation: D01; input constraints in the corresponding DD\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-C12",
                 "consumes": [
                     "application/json"
                 ],
@@ -11263,7 +11263,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: admin:billing.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR90 dueAt must be after now; no period overlapping an invoice of the contract (CONFLICT errors.invoice_period_exists; IR469)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A08 · Input versions: contractVersion=Contract.version",
+                "description": "Authorization: admin:billing.write\nValidation: D01; input constraints in the corresponding DD; IR90 dueAt must be after now; no period overlapping an invoice of the contract (CONFLICT errors.invoice_period_exists; IR469)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A08 · Input versions: contractVersion=Contract.version",
                 "consumes": [
                     "application/json"
                 ],
@@ -17134,7 +17134,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: contractor:partner.assign:own-company | admin:job.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 from\u003c=to, at most 31 days; conflicting assignments are reported, not changed\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-P06",
+                "description": "Authorization: contractor:partner.assign:own-company | admin:job.write\nValidation: D01; input constraints in the corresponding DD; IR111 from\u003c=to, at most 31 days; conflicting assignments are reported, not changed\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-P06",
                 "consumes": [
                     "application/json"
                 ],
@@ -21277,7 +21277,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: admin:billing.payment\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 period YYYY-MM already ended; approved or paid statements are untouched\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A23",
+                "description": "Authorization: admin:billing.payment\nValidation: D01; input constraints in the corresponding DD; IR111 period YYYY-MM already ended; approved or paid statements are untouched\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A23",
                 "consumes": [
                     "application/json"
                 ],
@@ -23450,7 +23450,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: authenticated:own-session\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR112 monthlyReportEmail only for client sessions\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DDC-07",
+                "description": "Authorization: authenticated:own-session\nValidation: D01; input constraints in the corresponding DD; IR112 monthlyReportEmail only for client sessions\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DDC-07",
                 "consumes": [
                     "application/json"
                 ],
@@ -24138,7 +24138,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: admin:job.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 effectiveFrom in the future; creates a new version\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A21",
+                "description": "Authorization: admin:job.write\nValidation: D01; input constraints in the corresponding DD; IR111 effectiveFrom in the future; creates a new version\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A21",
                 "consumes": [
                     "application/json"
                 ],
@@ -24245,7 +24245,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: admin:job.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR655 only a rate card that has not started (CONFLICT error.rateCardStarted)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A21",
+                "description": "Authorization: admin:job.write\nValidation: D01; input constraints in the corresponding DD; IR655 only a rate card that has not started (CONFLICT error.rateCardStarted)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A21",
                 "consumes": [
                     "application/json"
                 ],
@@ -24481,7 +24481,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: admin:restriction.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A09 · Input versions: expectedContractVersion=Contract.version",
+                "description": "Authorization: admin:restriction.write\nValidation: D01; input constraints in the corresponding DD\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A09 · Input versions: expectedContractVersion=Contract.version",
                 "consumes": [
                     "application/json"
                 ],
@@ -25816,7 +25816,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: admin:job.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 percentages 0–100; responseHours 1–168; applies to jobs created after effectiveFrom\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A22",
+                "description": "Authorization: admin:job.write\nValidation: D01; input constraints in the corresponding DD; IR111 percentages 0–100; responseHours 1–168; applies to jobs created after effectiveFrom\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A22",
                 "consumes": [
                     "application/json"
                 ],
@@ -26927,7 +26927,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: authenticated:own-session\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR112 requires a current 6-digit code\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DDC-07",
+                "description": "Authorization: authenticated:own-session\nValidation: D01; input constraints in the corresponding DD; IR112 requires a current 6-digit code\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DDC-07",
                 "consumes": [
                     "application/json"
                 ],
@@ -27034,7 +27034,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: authenticated:own-session\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR112 demo: any 6 digits; shows 8 recovery codes once\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DDC-07",
+                "description": "Authorization: authenticated:own-session\nValidation: D01; input constraints in the corresponding DD; IR112 demo: any 6 digits; shows 8 recovery codes once\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DDC-07",
                 "consumes": [
                     "application/json"
                 ],
@@ -27556,7 +27556,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: admin:asset.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 preview must be unexpired and unchanged; imports ready and warning rows only, as one change set\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A18",
+                "description": "Authorization: admin:asset.write\nValidation: D01; input constraints in the corresponding DD; IR111 preview must be unexpired and unchanged; imports ready and warning rows only, as one change set\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A18",
                 "consumes": [
                     "application/json"
                 ],
@@ -28694,7 +28694,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: client:self\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR110 manual record only; never creates a Command; duration 1–240 minutes; IR213 co2AtLog: latest CO₂ reading when valid at logging time, never an older one\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-C07",
+                "description": "Authorization: client:self\nValidation: D01; input constraints in the corresponding DD; IR110 manual record only; never creates a Command; duration 1–240 minutes; IR213 co2AtLog: latest CO₂ reading when valid at logging time, never an older one\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-C07",
                 "consumes": [
                     "application/json"
                 ],

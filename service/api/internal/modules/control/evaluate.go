@@ -1337,8 +1337,8 @@ func (m Automations) simulate(
 //	@ID				automations.fire
 //	@Description	Authorization: client:control.execute:self | admin:automation.policy.write | \
 //	@Description	admin:alert.policy.write
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
-//	@Description	IR215 records skips whose own trigger held (reason in automation_runs)
+//	@Description	Validation: D01; input constraints in the corresponding DD; IR215 records skips whose own trigger \
+//	@Description	held (reason in automation_runs)
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-A11, DD-A12, DD-C04, DD-C05, DD-A05
 //	@Tags			automations

@@ -1028,9 +1028,9 @@ func (m Telemetry) summary(
 //	@Summary		ventilation.log (write)
 //	@ID				ventilation.log
 //	@Description	Authorization: client:self
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
-//	@Description	IR110 manual record only; never creates a Command; duration 1–240 minutes; IR213 co2AtLog: latest \
-//	@Description	CO₂ reading when valid at logging time, never an older one
+//	@Description	Validation: D01; input constraints in the corresponding DD; IR110 manual record only; never creates \
+//	@Description	a Command; duration 1–240 minutes; IR213 co2AtLog: latest CO₂ reading when valid at logging time, \
+//	@Description	never an older one
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-C07
 //	@Tags			ventilation
