@@ -9830,3 +9830,19 @@ IR720 moved the shared test environment's Mailpit to the server's loopback with 
    - without `MAILPIT_PORT`: 127.0.0.1:8025;
    - with `MAILPIT_PORT=8225`: 127.0.0.1:8225.
    The E2E is run again on this change.
+
+## IR727 Dependabot's pull requests are merged by hand; the broker image comes from compose.yaml — 2026-11-10
+
+`auto-merge.yml` turned on GitHub's auto-merge for every pull request of the repository, Dependabot's included. A dependency update then reached `main` as soon as the 14 required checks passed. On 2026-11-10 the nine open Dependabot pull requests showed why that is not enough:
+- #159 was not an update at all: `0.164.0-386` is the collector's image for 32-bit Linux only.
+- #157 adds two fields to `keyfunc.Override`, which oidc.go lists in full.
+- #161 raises Playwright beyond the E2E container's browsers.
+- #162 is a major jsdom with focus changes.
+
+The user asked that Dependabot's pull requests no longer merge by themselves.
+
+1. **Auto-merge.** The job does not run for a pull request opened by `dependabot[bot]`: someone merges it after reading the change. Every other pull request of the repository keeps auto-merge (2026-11-08). The nine open ones had been set to draft by the user, so none had auto-merge on. They went to `main` together through a release branch (#165).
+2. **The broker image.** `docker/mosquitto/passwd.sh` and `deploy/load/run.sh` ran `eclipse-mosquitto:2` by a digest of their own (`38c0da…`), older than compose.yaml's. Dependabot updates only compose.yaml. Both now read the pinned reference from compose.yaml's `image:` line, and stop when it is missing.
+3. **#159.** It was closed with `@dependabot ignore this version`. Dependabot stored that as "> 0.164.0" for the whole collector (`@dependabot show … ignore conditions`), which would also hide every later version. `@dependabot unignore` did nothing on the closed PR or on another one. The branch was restored at its last commit and the PR reopened, and Dependabot answered "I will stop ignoring the otel/opentelemetry-collector-contrib dependency". `.github/dependabot.yml` now ignores only `0.164.0-386`, so #159 is retired without a dependency-wide ignore.
+4. **Checks.** shellcheck and actionlint as in CI: 0. `bash -n` and `sh -n`: ok. `passwd.sh` with dummy keys in a worktree wrote both accounts with compose.yaml's image (rc=0); the tracked file was restored.
+5. **Docs.** container-design.md §6: auto-merge, its Dependabot exception and the image reference.
