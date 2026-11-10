@@ -2,12 +2,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { toast } from "sonner";
+import type { unstable_rethrow as rethrow } from "next/navigation";
 import { ToastProvider } from "@ac/web/components/ui";
 import { useAction } from "@ac/web/lib/useAction";
 
 // the router of the page the action runs on: a change that succeeded asks it to read the screen again (IR680)
 const refresh = vi.hoisted(() => vi.fn());
-vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
+// the real unstable_rethrow, so Next's own control flow would still go on (IR717)
+vi.mock("next/navigation", async (actual) => {
+  const real = await actual<{ unstable_rethrow: typeof rethrow }>();
+  return { unstable_rethrow: real.unstable_rethrow, useRouter: () => ({ refresh }) };
+});
 
 type Result = { ok: true; value: string } | { ok: false; code: string; messageKey: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null };
 
@@ -80,5 +85,18 @@ describe("useAction", () => {
   it("sends an expired session to sign-in too", async () => {
     await press({ ok: false, code: "UNAUTHENTICATED", messageKey: "error.membershipInvalid", fieldErrors: {} });
     expect(assign.mock.calls).toStrictEqual([["/login?error=expired&returnTo=%2Fadmin%2Funits%3FcustomerId%3Dc-1%26tab%3Dusers"]]);
+  });
+
+  it("keeps the screen when the Server Action itself cannot be reached, with the unavailable toast and failed (IR717)", async () => {
+    const failed = vi.fn();
+    function Offline() {
+      const [, run] = useAction();
+      return <button type="button" onClick={() => { run(() => Promise.reject(new TypeError("Failed to fetch")), "Saved", undefined, failed); }}>go</button>;
+    }
+    render(<ToastProvider><Offline /></ToastProvider>);
+    await act(() => { screen.getByRole("button", { name: "go" }).click(); return Promise.resolve(); });
+    const alert = await screen.findByRole("alert");
+    expect([alert.textContent, failed.mock.calls.map((c: unknown[]) => c[0]), screen.queryByRole("button", { name: "go" }) !== null])
+      .toStrictEqual(["The service is unavailable — try again shortly", [{ ok: false, code: "UNAVAILABLE", messageKey: "error.unavailable", fieldErrors: {} }], true]);
   });
 });
