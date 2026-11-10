@@ -9818,3 +9818,15 @@ On 2026-11-10 the lab server's disk (461 GB) was full. The three self-hosted run
    - A regular `docker volume prune`: Supabase, Grafana and Mosquitto run on the same server, and it could remove their anonymous volumes. With (2) the volumes are no longer made.
    - `docker system prune -a`: it would remove the stopped projects' images on the server too.
 6. **Checks.** actionlint, shellcheck and ruff as in CI; `bash -n deploy/test/deploy.sh`. On the server, the number of unused volumes (`docker volume ls -qf dangling=true | wc -l`) stays the same across this PR's CI. The deployment's clean-up shows at the next deployment the user asks for; the E2E's at the next nightly run.
+
+## IR729 The E2E stack's Mailpit keeps 8025 — 2026-11-10
+
+IR720 moved the shared test environment's Mailpit to the server's loopback with `127.0.0.1:${MAILPIT_PORT:-8225}:8025` in `deploy/test/compose.test.yaml`. The E2E stack (`ac-e2e`, e2e.yml) uses the same file, but its settings do not set `MAILPIT_PORT`, so it took 8225 too. That is the port of ac-test's Mailpit on the same server. The E2E run of 2026-11-10 (42759430296, on deps-2026-11-10) stopped while starting the stack: `Bind for 0.0.0.0:8225 failed: port is already allocated`. The nightly run would have stopped the same way.
+
+1. **Port.** The default is compose.yaml's 8025 again: `127.0.0.1:${MAILPIT_PORT:-8025}:8025`.
+   - ac-test's environment file sets `MAILPIT_PORT=8225` (deploy/test/setup.sh), so it keeps 8225 on the loopback.
+   - The E2E stack keeps 8025, which container-design.md §6 names and its specs open.
+2. **Checked.** `docker compose -f compose.yaml -f deploy/test/compose.test.yaml config mailpit`:
+   - without `MAILPIT_PORT`: 127.0.0.1:8025;
+   - with `MAILPIT_PORT=8225`: 127.0.0.1:8225.
+   The E2E is run again on this change.
