@@ -147,8 +147,11 @@ export function questionRows(s: ApiPayoutStatement, rows: LineRow[], t: T = en) 
 }
 
 const STATEMENT_STATUS = new Map([["paid", "Paid"], ["approved", "Approved"]]);
-/** A one-page PDF (Courier, PDF 1.4) of the statement: header, lines and totals in the user's language. ASCII only —
-other characters print as “-” — the result is a byte string the browser wraps in a Blob. */
+/** The text lines an A4 page holds: from y 800 down to the 40 pt bottom margin at 12 pt a line. */
+const PAGE_LINES = 64;
+/** The PDF (Courier, PDF 1.4) of the statement: header, lines and totals in the user's language, continued on further
+pages after PAGE_LINES text lines so a long statement keeps every line and its totals (IR738). ASCII only — other
+characters print as “-” — the result is a byte string the browser wraps in a Blob. */
 const col = (x: string, w: number) => (x.length > w ? x.slice(0, w - 1) + "…" : x).padEnd(w);
 const esc = (x: string) => x.replaceAll(/[^\u{20}-\u{7E}]/gu, "-").replaceAll(/[\\()]/g, (c) => "\\" + c);
 function statementPdf(s: ApiPayoutStatement, rows: LineRow[], company: string, t: T, locale: Locale): string {
@@ -160,11 +163,19 @@ function statementPdf(s: ApiPayoutStatement, rows: LineRow[], company: string, t
     `${t("Net payable").padEnd(57)} ${money(s.netMinor, s.currency).padStart(12)}`, "",
     t("Rates come from the contractor's rate card with HQ. Only review-accepted jobs are paid."), t("Demo document - not a tax invoice."),
   ];
-  const stream = `BT /F1 9 Tf 40 800 Td 12 TL ${text.map((l) => `(${esc(l)}) Tj T*`).join(" ")} ET`;
+  const pages = Array.from({ length: Math.ceil(text.length / PAGE_LINES) }, (_, p) => text.slice(p * PAGE_LINES, (p + 1) * PAGE_LINES));
+  // objects 1–3 are the catalog, the page tree and the font; each page is then a page object and its content
+  const pageRef = (p: number) => `${String(4 + 2 * p)} 0 R`;
   const objects = [
-    "<< /Type /Catalog /Pages 2 0 R >>", "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
-    "<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>", `<< /Length ${String(stream.length)} >>\nstream\n${stream}\nendstream`,
+    "<< /Type /Catalog /Pages 2 0 R >>", `<< /Type /Pages /Kids [${pages.map((_, p) => pageRef(p)).join(" ")}] /Count ${String(pages.length)} >>`,
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>",
+    ...pages.flatMap((lines, p) => {
+      const stream = `BT /F1 9 Tf 40 800 Td 12 TL ${lines.map((l) => `(${esc(l)}) Tj T*`).join(" ")} ET`;
+      return [
+        `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents ${String(5 + 2 * p)} 0 R >>`,
+        `<< /Length ${String(stream.length)} >>\nstream\n${stream}\nendstream`,
+      ];
+    }),
   ];
   let out = "%PDF-1.4\n";
   const offsets: number[] = [];
