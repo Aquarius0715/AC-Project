@@ -9788,3 +9788,61 @@ In a transition the rejection reached the route's error boundary and the typed f
 1. **Reproduced.** `shared/lib/tests/callbackToken.test.ts` runs the callback with a matching state and a token endpoint that answers an HTML page, or rejects with a timeout. Both throw before the fix: `SyntaxError: Unexpected token '<'` and `TimeoutError`.
 2. **Fix.** `exchange` posts the code with a 10-second timeout (`AbortSignal.timeout`). It returns the parsed token response, or null on a refusal, on a body that is not a token response, on an error or on no answer in time. Null sends the sign-in to `/login?error=token`, as a refusal did before.
 3. **Not changed.** The PKCE and state checks, the role and membership checks, the revoked sign-in (IR384 / IR385), the session (IR382) and the address handling (IR651). Every operation, route and count stays the same.
+
+## IR720 The shared test environment keeps Mailpit on the server and its own demo passwords (B-15, decided 2026-11-10)
+
+The shared test environment (DEC-93 / DEC-96) holds the real air conditioner at customer-a, with `REAL_MQTT_COMMANDS=1`. Two things let anyone who reaches the server on the lab network or the Tailnet take over an account there:
+- Mailpit was published on all addresses, and its inbox holds every set-up and password-reset link.
+- The ten demo users kept the passwords of `docker/keycloak/realm-ac.json`, which are in the repository. Only HQ needs a one-time code, so customer-a's password alone switched the real AC.
+
+The user took B-15's recommendation.
+
+1. **Mailpit.** `deploy/test/compose.test.yaml` publishes it on `127.0.0.1:${MAILPIT_PORT:-8225}` (`!override`), whatever `PUBLISH_ADDR` is. It is read through an SSH tunnel: `ssh -L 8225:127.0.0.1:8225 <server>`. The dev stack keeps its loopback default.
+2. **Demo passwords.** The environment file names `DEMO_USER_PASSWORD`, which `setup.sh` writes for a new environment. `realm.py` puts it on every demo user's password credential when it writes a new realm. `configure.sh` (the `keycloak-config` one-shot of every start) sets it with `kcadm.sh set-password` on the ten users of `realm-ac.json` in a realm that exists. The password is passed in `KC_CLI_PASSWORD`, not on the command line. An empty value (dev, CI, E2E) changes nothing.
+3. **Tests.** `deploy/test/test_realm.py` (in CI's Python and shell job): with `DEMO_USER_PASSWORD` every password credential is that value (failed before), and without it the local passwords stay. `docker compose config` of the test files shows Mailpit on 127.0.0.1 (0.0.0.0 before).
+4. **For the running environment.** Mailpit moves to the loopback at the next deployment. The demo passwords change only once `DEMO_USER_PASSWORD=<a secret>` is added to `~/ac-test/env` by hand: `setup.sh` keeps an existing file. The value is then the team's password for the demo users there.
+5. **Not changed.** The apps, Keycloak's ports, the users the team invited (only the ten demo users are set) and every operation.
+
+## IR725 The lab server's disk stays bounded: CI's PostgreSQL in tmpfs, the build cache capped — 2026-11-10
+
+On 2026-11-10 the lab server's disk (461 GB) was full. The three self-hosted runners went offline: they could not write their logs and restarted every five seconds. Of the 433 Docker volumes, 410 were unused (about 90 GB), and the build cache held about 47 GB. The disk was cleaned by hand (118 GB freed). Left alone, it would fill again at the same pace, so the causes are removed.
+
+1. **Causes.**
+   - `ci.yml`'s `go-test` and `go-test-cluster` start `postgres:18` as a service container. The image declares `VOLUME /var/lib/postgresql`, so every job created an anonymous volume holding its test databases (about 200 MB). The runner removes the containers after a job but not their volumes. The job containers' images (golang, node, python) declare no volume.
+   - A job cannot remove its own volume at the end: the job containers have no Docker socket (IR632), and the service container still runs when the last step does.
+   - `deploy.sh` and `e2e.yml` build with BuildKit, and nothing trimmed its cache. `deploy.sh`'s `prune` removed only the old `ac-*:test*` images, so each nightly rebuild of `ac-*:e2e` left the one before as an untagged image (16 GB of them at the time).
+2. **CI's PostgreSQL in memory.** Both Go jobs mount a tmpfs on the service's data directory (`--tmpfs /var/lib/postgresql:rw,size=2g`). On the path of a `VOLUME`, Docker creates no anonymous volume. The test databases are thrown away after the job anyway; 2 GB only caps a runaway. Checked locally: a `postgres:18` container with the tmpfs answers `pg_isready`, creates a database and leaves the volume count unchanged (57 before and after); without the tmpfs it leaves one more volume.
+3. **After a deployment.** `deploy.sh`'s `prune` also removes the untagged images (`docker image prune -f`) and trims the build cache to `CACHE_LIMIT=20GB` (`docker builder prune -f --max-used-space`; `--keep-storage` is deprecated since Docker 28, the server runs 29). A clean-up that fails does not fail the deployment, like the image removal before it.
+4. **After the E2E.** A last step of `e2e.yml`, after `remove the stack`, always run and on the server itself, does the same with the same 20 GB. It is a step of its own, so it runs even when `down` fails. The load test (`load.yml`, run by hand) rebuilds its `:load` images each time and ends with the same step (found in round 251).
+5. **Not done.**
+   - A regular `docker volume prune`: Supabase, Grafana and Mosquitto run on the same server, and it could remove their anonymous volumes. With (2) the volumes are no longer made.
+   - `docker system prune -a`: it would remove the stopped projects' images on the server too.
+6. **Checks.** actionlint, shellcheck and ruff as in CI; `bash -n deploy/test/deploy.sh`. On the server, the number of unused volumes (`docker volume ls -qf dangling=true | wc -l`) stays the same across this PR's CI. The deployment's clean-up shows at the next deployment the user asks for; the E2E's at the next nightly run.
+
+## IR729 The E2E stack's Mailpit keeps 8025 — 2026-11-10
+
+IR720 moved the shared test environment's Mailpit to the server's loopback with `127.0.0.1:${MAILPIT_PORT:-8225}:8025` in `deploy/test/compose.test.yaml`. The E2E stack (`ac-e2e`, e2e.yml) uses the same file, but its settings do not set `MAILPIT_PORT`, so it took 8225 too. That is the port of ac-test's Mailpit on the same server. The E2E run of 2026-11-10 (42759430296, on deps-2026-11-10) stopped while starting the stack: `Bind for 0.0.0.0:8225 failed: port is already allocated`. The nightly run would have stopped the same way.
+
+1. **Port.** The default is compose.yaml's 8025 again: `127.0.0.1:${MAILPIT_PORT:-8025}:8025`.
+   - ac-test's environment file sets `MAILPIT_PORT=8225` (deploy/test/setup.sh), so it keeps 8225 on the loopback.
+   - The E2E stack keeps 8025, which container-design.md §6 names and its specs open.
+2. **Checked.** `docker compose -f compose.yaml -f deploy/test/compose.test.yaml config mailpit`:
+   - without `MAILPIT_PORT`: 127.0.0.1:8025;
+   - with `MAILPIT_PORT=8225`: 127.0.0.1:8225.
+   The E2E is run again on this change.
+
+## IR727 Dependabot's pull requests are merged by hand; the broker image comes from compose.yaml — 2026-11-10
+
+`auto-merge.yml` turned on GitHub's auto-merge for every pull request of the repository, Dependabot's included. A dependency update then reached `main` as soon as the 14 required checks passed. On 2026-11-10 the nine open Dependabot pull requests showed why that is not enough:
+- #159 was not an update at all: `0.164.0-386` is the collector's image for 32-bit Linux only.
+- #157 adds two fields to `keyfunc.Override`, which oidc.go lists in full.
+- #161 raises Playwright beyond the E2E container's browsers.
+- #162 is a major jsdom with focus changes.
+
+The user asked that Dependabot's pull requests no longer merge by themselves.
+
+1. **Auto-merge.** The job does not run for a pull request opened by `dependabot[bot]`: someone merges it after reading the change. Every other pull request of the repository keeps auto-merge (2026-11-08). The nine open ones had been set to draft by the user, so none had auto-merge on. They went to `main` together through a release branch (#165).
+2. **The broker image.** `docker/mosquitto/passwd.sh` and `deploy/load/run.sh` ran `eclipse-mosquitto:2` by a digest of their own (`38c0da…`), older than compose.yaml's. Dependabot updates only compose.yaml. Both now read the pinned reference from compose.yaml's `image:` line, and stop when it is missing.
+3. **#159.** It was closed with `@dependabot ignore this version`. Dependabot stored that as "> 0.164.0" for the whole collector (`@dependabot show … ignore conditions`), which would also hide every later version. `@dependabot unignore` did nothing on the closed PR or on another one. The branch was restored at its last commit and the PR reopened, and Dependabot answered "I will stop ignoring the otel/opentelemetry-collector-contrib dependency". `.github/dependabot.yml` now ignores only `0.164.0-386`, so #159 is retired without a dependency-wide ignore.
+4. **Checks.** shellcheck and actionlint as in CI: 0. `bash -n` and `sh -n`: ok. `passwd.sh` with dummy keys in a worktree wrote both accounts with compose.yaml's image (rc=0); the tracked file was restored. `docker/mosquitto/passwd.test.sh` (IR684) copies only passwd.sh into its temporary tree, so it now writes a compose.yaml there too. Its `docker` shim also records the image it was given, and the test requires compose.yaml's.
+5. **Docs.** container-design.md §6: auto-merge, its Dependabot exception and the image reference.

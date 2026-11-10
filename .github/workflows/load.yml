@@ -60,3 +60,10 @@ jobs:
         run: |
           left=$(docker ps -a --filter "label=com.docker.compose.project=ac-load" -q; docker volume ls -q --filter "label=com.docker.compose.project=ac-load"; docker network ls -q --filter "label=com.docker.compose.project=ac-load")
           if [ -n "$left" ]; then docker compose -p ac-load down --volumes --remove-orphans || true; echo "::error title=ac-load was not removed::$left"; exit 1; fi
+      - name: remove the replaced images and trim the build cache
+        if: always()
+        # the replaced :load builds (untagged) and the build cache over 20 GB, as deploy.sh and e2e.yml do (IR725).
+        # Tagged images and volumes, of any project, stay
+        run: |
+          docker image prune -f >/dev/null || true
+          docker builder prune -f --max-used-space 20GB >/dev/null || true
