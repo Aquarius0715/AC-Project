@@ -5,11 +5,11 @@
 import { connection } from "next/server";
 import { notFound } from "next/navigation";
 import { apiMode, coreAll, coreDisplay, coreNow, coreOp, corePrincipal, CoreError } from "@ac/web/lib/dal";
+import { restrictionFor } from "@ac/web/lib/restrictionLookup";
 import { i18nOf, textOf } from "@ac/web/lib/i18n";
 import { conditionText, defaultRuleRows, type ApiAlertPolicy, type ApiDefaultPolicy } from "@ac/web/lib/customerPolicies";
 import { unitRowFromApi, type ApiUnit } from "@ac/web/lib/client";
 import type { ApiCommand, ApiUnitDetail } from "@ac/web/lib/units";
-import type { ApiRestriction } from "@ac/web/lib/restrictions";
 import { UnitView, type PolicyOption } from "./_components/unit-view";
 import { orNull } from "@ac/web/lib/promises";
 
@@ -24,13 +24,9 @@ async function restrictionHref(unitId: string): Promise<string | null> {
   const contracts = await coreAll<{ id: string; activeRestrictionIds?: string[] }>("contracts.list", { filters: { unitId } });
   for (const k of contracts) {
     if (!k.activeRestrictionIds?.length) continue;
-    const invoices = await coreAll<{ id: string; status: string }>("invoices.list", { filters: { contractId: k.id } });
-    const unpaidFirst = [...invoices].toSorted((a, b) => Number(a.status === "paid") - Number(b.status === "paid")).slice(0, 3);
-    for (const i of unpaidFirst) {
-      const page = await coreOp<{ items: ApiRestriction[] }>("restrictions.forInvoice", { invoiceId: i.id, query: { limit: 10 } });
-      const r = page.items.find((x) => (k.activeRestrictionIds ?? []).includes(x.id) && x.unitIds.includes(unitId));
-      if (r) return `/customer/payments/${i.id}?tab=restriction&restrictionId=${r.id}`;
-    }
+    const invoices = await coreAll<{ id: string; status: string; dueAt: string }>("invoices.list", { filters: { contractId: k.id } });
+    const found = await restrictionFor(invoices, (x) => (k.activeRestrictionIds ?? []).includes(x.id) && x.unitIds.includes(unitId)); // causes first (IR715)
+    if (found) return `/customer/payments/${found.invoice.id}?tab=restriction&restrictionId=${found.r.id}`;
   }
   return null;
 }
