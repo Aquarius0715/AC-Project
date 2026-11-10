@@ -876,7 +876,7 @@ func operationRequested(call *ops.Call, device, operationID uuid.UUID, kind stri
 			AggregateType: entityDevice,
 			AggregateID:   device,
 			Type:          "DeviceOperationRequested",
-			Payload:       map[string]any{fieldOperationID: operationID, "kind": kind},
+			Payload:       map[string]any{fieldOperationID: operationID, fieldKind: kind},
 		},
 	)
 	call.Audit(ops.AuditEntry{

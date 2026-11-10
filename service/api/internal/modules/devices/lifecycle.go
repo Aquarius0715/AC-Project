@@ -4,11 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/pradita/ac-project/service/api/internal/modules/identity"
+	"github.com/pradita/ac-project/service/api/internal/modules/notify"
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
@@ -134,6 +137,11 @@ func expireOperations(ctx context.Context, call *ops.Call) (int, error) {
 		}
 
 		operationFailed(call, operation, "TIMEOUT")
+
+		err := NotifyOperationFailed(ctx, call, operation.id)
+		if err != nil {
+			return 0, err
+		}
 	}
 
 	return len(expired), nil
@@ -204,7 +212,7 @@ func (l Lifecycle) startDue(ctx context.Context, call *ops.Call, operation pendi
 
 		operationFailed(call, operation, failure)
 
-		return nil
+		return NotifyOperationFailed(ctx, call, operation.id)
 	}
 
 	_, execErr := call.Tx.Exec(
@@ -802,4 +810,65 @@ func applySignal(ctx context.Context, txn pgx.Tx, signal Signal, axis string, no
 	}
 
 	return apperr.Wrap(err, "update devices.devices")
+}
+
+// NotifyOperationFailed sends IR95's device_operation.failed notice of a failed operation (IR753): one notification
+// to the member who started it and to each HQ device.write holder, targeting the device. An operation a firmware
+// campaign started is reported by the campaign (its results and auto-pause), not one notice per device.
+func NotifyOperationFailed(ctx context.Context, call *ops.Call, operationID uuid.UUID) error {
+	var (
+		device      uuid.UUID
+		actor       *uuid.UUID
+		campaign    *uuid.UUID
+		kind        string
+		failureCode *string
+	)
+
+	err := call.Tx.QueryRow(ctx, `SELECT device_id, actor_membership_id, campaign_id, kind, failure_code FROM
+		devices.device_operations WHERE id = $1`, operationID).
+		Scan(&device, &actor, &campaign, &kind, &failureCode)
+	if err != nil {
+		return apperr.Wrap(err, "select devices.device_operations")
+	}
+
+	if campaign != nil {
+		return nil
+	}
+
+	hq, err := identity.Members(ctx, call, identity.MembersInput{
+		Role:           roleAdmin,
+		Permission:     "device.write",
+		IDs:            nil,
+		OrganizationID: nil,
+		ClientRole:     "",
+	})
+	if err != nil {
+		return apperr.Wrap(err, "identity.Members")
+	}
+
+	recipients := hq
+	if actor != nil && !slices.Contains(recipients, *actor) {
+		recipients = append(recipients, *actor)
+	}
+
+	for _, recipient := range recipients {
+		_, err := (notify.Store{}).Create(ctx, call, notify.New{
+			RecipientMembershipID: recipient,
+			Type:                  noticeDeviceOp,
+			TemplateKey:           noticeDeviceOp,
+			TargetKind:            entityDevice,
+			TargetID:              device,
+			Severity:              "warning",
+			Params: map[string]any{
+				fieldKind:     kind,
+				fieldStatus:   statusFailed,
+				"failureCode": failureCode,
+			}, Channel: "", SourceAlertID: nil,
+		})
+		if err != nil {
+			return apperr.Wrap(err, "notify.Store.Create")
+		}
+	}
+
+	return nil
 }

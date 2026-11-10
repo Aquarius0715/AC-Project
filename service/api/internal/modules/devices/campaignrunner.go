@@ -317,8 +317,8 @@ func (m *Module) notifyUnitCustomer(
 	for _, recipient := range recipients {
 		_, err := (notify.Store{}).Create(ctx, call, notify.New{
 			RecipientMembershipID: recipient,
-			Type:                  "device_operation",
-			TemplateKey:           "device_operation",
+			Type:                  noticeDeviceOp,
+			TemplateKey:           noticeDeviceOp,
 			TargetKind:            "unit",
 			TargetID:              unitID,
 			Severity:              "normal",
@@ -760,7 +760,7 @@ func installRequested(call *ops.Call, campaignID, device, operationID uuid.UUID)
 			Type:          "DeviceOperationRequested",
 			Payload: map[string]any{
 				fieldOperationID: operationID,
-				"kind":           kindFirmware,
+				fieldKind:        kindFirmware,
 				"campaignId":     campaignID,
 			},
 		},

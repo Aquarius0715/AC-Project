@@ -84,6 +84,8 @@ const devCols = `d.id, d.tenant_id, d.version, d.created_at, d.updated_at, d.bin
 // and the roles the device scope tells apart.
 const (
 	entityDevice     = "device"
+	noticeDeviceOp   = "device_operation" // the notification type and template of device operations (IR95)
+	fieldKind        = "kind"
 	entityCapability = "capability"
 
 	connOnline     = "online"
