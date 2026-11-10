@@ -204,7 +204,7 @@ Each `ci.yml` job runs in a container of its own (`golang:1.26-trixie`, `node:26
 - The Go suites reach their PostgreSQL service at `localhost:5432` through `socat`, where the tests look.
 - A container works as root, so each job hands its workspace back to the runner's user at the end, or the next checkout could not clean it.
 
-Actions are pinned by commit SHA, and `.github/dependabot.yml` proposes their updates weekly. Before a push, `sh scripts/check.sh` runs the checks of `ci.yml` locally.
+Actions are pinned by commit SHA, and `.github/dependabot.yml` proposes their updates weekly. A pull request merges into `main` by itself once the 14 required checks of `ci.yml` pass (`auto-merge.yml`). Dependabot's are the exception: someone merges them after reading what they change (IR727). Scripts that run an image of `compose.yaml` by hand (`docker/mosquitto/passwd.sh`, `deploy/load/run.sh`) read its pinned reference from `compose.yaml`, so they follow Dependabot's updates. Before a push, `sh scripts/check.sh` runs the checks of `ci.yml` locally.
 
 **Shared test environment (as built, DEC-93, DEC-94, DEC-96, IR629, IR631, IR633).** A tag `test<major>.<minor>.<patch>r<n>` (for example `test1.0.0r2`) deploys the whole stack to the lab server, the machine of the real sensor nodes' broker, where others open the apps from the lab network. The tag's commit must be on `main` and its CI must have passed. The build and deploy logs show on the Actions tab.
 - **A runner on the server.** The repository is private (DEC-94), and the server is registered as its self-hosted runner, label `ac-test`. The runner reaches GitHub from the inside, so the lab network needs no way in, and only the collaborators' code reaches it.
