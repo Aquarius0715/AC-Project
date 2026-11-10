@@ -14,6 +14,10 @@ updates:
       # (E2E of the 4 → 2026.9.1 proposal): the stack stays on the free 4.x line
       - dependency-name: localstack/localstack
         update-types: ["version-update:semver-major"]
+      # 0.164.0-386 is the collector's image for 32-bit Linux only (linux/386), not a newer version of the multi-arch
+      # 0.164.0: proposed as an update in #159 (IR727)
+      - dependency-name: otel/opentelemetry-collector-contrib
+        versions: ["0.164.0-386"]
   - package-ecosystem: docker
     directories: [/service/api/build, /service/web]
     schedule: { interval: weekly }

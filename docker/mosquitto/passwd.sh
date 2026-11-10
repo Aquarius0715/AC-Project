@@ -24,7 +24,10 @@ if [ -f "$stamp" ] && [ -f "$here/passwd" ] && [ "$(cat "$stamp")" = "$sum $(fil
   echo "broker password file is up to date"
   exit 0
 fi
-docker run --rm --entrypoint sh -e MQTT_DEVICE_SIM_KEY -e MQTT_IOT_BRIDGE_KEY -v "$here:/work" eclipse-mosquitto:2@sha256:38c0da4f2ef84284d47b3b3eeea1cb3bdeabe81ee10caf0cd5c5ff61ee3ea408 -c '
+# the broker image of compose.yaml, the one Dependabot keeps up to date, so this copy never lags behind it (IR727)
+image=$(sed -n 's/^ *image: *\(eclipse-mosquitto:[^ ]*\).*/\1/p' "$here/../../compose.yaml")
+[ -n "$image" ] || { echo "no eclipse-mosquitto image in compose.yaml" >&2; exit 1; }
+docker run --rm --entrypoint sh -e MQTT_DEVICE_SIM_KEY -e MQTT_IOT_BRIDGE_KEY -v "$here:/work" "$image" -c '
   set -eu
   rm -f /work/passwd.new
   mosquitto_passwd -c -b /work/passwd.new iot-bridge "$MQTT_IOT_BRIDGE_KEY"

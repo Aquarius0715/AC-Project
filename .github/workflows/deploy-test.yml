@@ -12,6 +12,7 @@ name: Test deployment
 on:
   push:
     tags: ["test[0-9]+.[0-9]+.[0-9]+r[0-9]+"]
+  # zizmor: ignore[dangerous-triggers] the job runs only for CI on a push to main (event push, conclusion success) and checks out main and the tags, never a pull request's code (IR732)
   workflow_run:
     workflows: [CI]
     types: [completed]
@@ -28,13 +29,16 @@ concurrency:
 jobs:
   deploy:
     name: Deploy to the lab server
-    # a tag push, or a CI run that passed on a push to main
-    if: github.event_name == 'push' || (github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success')
+    # a tag push, or a CI run that passed on a push to main; only in this repository, never a fork's (IR732)
+    if: >-
+      github.repository == 'Aquarius0715/AC-Project' &&
+      (github.event_name == 'push' || (github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success'))
     runs-on: [self-hosted, ac-test]
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false # no later step pushes or fetches with the job's token
           fetch-depth: 0 # main, the tags, and the deployed tag: a failure brings it back, and the migrations are compared
       - name: the tag to deploy
         id: pick

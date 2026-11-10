@@ -9788,3 +9788,114 @@ In a transition the rejection reached the route's error boundary and the typed f
 1. **Reproduced.** `shared/lib/tests/callbackToken.test.ts` runs the callback with a matching state and a token endpoint that answers an HTML page, or rejects with a timeout. Both throw before the fix: `SyntaxError: Unexpected token '<'` and `TimeoutError`.
 2. **Fix.** `exchange` posts the code with a 10-second timeout (`AbortSignal.timeout`). It returns the parsed token response, or null on a refusal, on a body that is not a token response, on an error or on no answer in time. Null sends the sign-in to `/login?error=token`, as a refusal did before.
 3. **Not changed.** The PKCE and state checks, the role and membership checks, the revoked sign-in (IR384 / IR385), the session (IR382) and the address handling (IR651). Every operation, route and count stays the same.
+
+## IR720 The shared test environment keeps Mailpit on the server and its own demo passwords (B-15, decided 2026-11-10)
+
+The shared test environment (DEC-93 / DEC-96) holds the real air conditioner at customer-a, with `REAL_MQTT_COMMANDS=1`. Two things let anyone who reaches the server on the lab network or the Tailnet take over an account there:
+- Mailpit was published on all addresses, and its inbox holds every set-up and password-reset link.
+- The ten demo users kept the passwords of `docker/keycloak/realm-ac.json`, which are in the repository. Only HQ needs a one-time code, so customer-a's password alone switched the real AC.
+
+The user took B-15's recommendation.
+
+1. **Mailpit.** `deploy/test/compose.test.yaml` publishes it on `127.0.0.1:${MAILPIT_PORT:-8225}` (`!override`), whatever `PUBLISH_ADDR` is. It is read through an SSH tunnel: `ssh -L 8225:127.0.0.1:8225 <server>`. The dev stack keeps its loopback default.
+2. **Demo passwords.** The environment file names `DEMO_USER_PASSWORD`, which `setup.sh` writes for a new environment. `realm.py` puts it on every demo user's password credential when it writes a new realm. `configure.sh` (the `keycloak-config` one-shot of every start) sets it with `kcadm.sh set-password` on the ten users of `realm-ac.json` in a realm that exists. The password is passed in `KC_CLI_PASSWORD`, not on the command line. An empty value (dev, CI, E2E) changes nothing.
+3. **Tests.** `deploy/test/test_realm.py` (in CI's Python and shell job): with `DEMO_USER_PASSWORD` every password credential is that value (failed before), and without it the local passwords stay. `docker compose config` of the test files shows Mailpit on 127.0.0.1 (0.0.0.0 before).
+4. **For the running environment.** Mailpit moves to the loopback at the next deployment. The demo passwords change only once `DEMO_USER_PASSWORD=<a secret>` is added to `~/ac-test/env` by hand: `setup.sh` keeps an existing file. The value is then the team's password for the demo users there.
+5. **Not changed.** The apps, Keycloak's ports, the users the team invited (only the ten demo users are set) and every operation.
+
+## IR725 The lab server's disk stays bounded: CI's PostgreSQL in tmpfs, the build cache capped — 2026-11-10
+
+On 2026-11-10 the lab server's disk (461 GB) was full. The three self-hosted runners went offline: they could not write their logs and restarted every five seconds. Of the 433 Docker volumes, 410 were unused (about 90 GB), and the build cache held about 47 GB. The disk was cleaned by hand (118 GB freed). Left alone, it would fill again at the same pace, so the causes are removed.
+
+1. **Causes.**
+   - `ci.yml`'s `go-test` and `go-test-cluster` start `postgres:18` as a service container. The image declares `VOLUME /var/lib/postgresql`, so every job created an anonymous volume holding its test databases (about 200 MB). The runner removes the containers after a job but not their volumes. The job containers' images (golang, node, python) declare no volume.
+   - A job cannot remove its own volume at the end: the job containers have no Docker socket (IR632), and the service container still runs when the last step does.
+   - `deploy.sh` and `e2e.yml` build with BuildKit, and nothing trimmed its cache. `deploy.sh`'s `prune` removed only the old `ac-*:test*` images, so each nightly rebuild of `ac-*:e2e` left the one before as an untagged image (16 GB of them at the time).
+2. **CI's PostgreSQL in memory.** Both Go jobs mount a tmpfs on the service's data directory (`--tmpfs /var/lib/postgresql:rw,size=2g`). On the path of a `VOLUME`, Docker creates no anonymous volume. The test databases are thrown away after the job anyway; 2 GB only caps a runaway. Checked locally: a `postgres:18` container with the tmpfs answers `pg_isready`, creates a database and leaves the volume count unchanged (57 before and after); without the tmpfs it leaves one more volume.
+3. **After a deployment.** `deploy.sh`'s `prune` also removes the untagged images (`docker image prune -f`) and trims the build cache to `CACHE_LIMIT=20GB` (`docker builder prune -f --max-used-space`; `--keep-storage` is deprecated since Docker 28, the server runs 29). A clean-up that fails does not fail the deployment, like the image removal before it.
+4. **After the E2E.** A last step of `e2e.yml`, after `remove the stack`, always run and on the server itself, does the same with the same 20 GB. It is a step of its own, so it runs even when `down` fails. The load test (`load.yml`, run by hand) rebuilds its `:load` images each time and ends with the same step (found in round 251).
+5. **Not done.**
+   - A regular `docker volume prune`: Supabase, Grafana and Mosquitto run on the same server, and it could remove their anonymous volumes. With (2) the volumes are no longer made.
+   - `docker system prune -a`: it would remove the stopped projects' images on the server too.
+6. **Checks.** actionlint, shellcheck and ruff as in CI; `bash -n deploy/test/deploy.sh`. On the server, the number of unused volumes (`docker volume ls -qf dangling=true | wc -l`) stays the same across this PR's CI. The deployment's clean-up shows at the next deployment the user asks for; the E2E's at the next nightly run.
+
+## IR729 The E2E stack's Mailpit keeps 8025 — 2026-11-10
+
+IR720 moved the shared test environment's Mailpit to the server's loopback with `127.0.0.1:${MAILPIT_PORT:-8225}:8025` in `deploy/test/compose.test.yaml`. The E2E stack (`ac-e2e`, e2e.yml) uses the same file, but its settings do not set `MAILPIT_PORT`, so it took 8225 too. That is the port of ac-test's Mailpit on the same server. The E2E run of 2026-11-10 (42759430296, on deps-2026-11-10) stopped while starting the stack: `Bind for 0.0.0.0:8225 failed: port is already allocated`. The nightly run would have stopped the same way.
+
+1. **Port.** The default is compose.yaml's 8025 again: `127.0.0.1:${MAILPIT_PORT:-8025}:8025`.
+   - ac-test's environment file sets `MAILPIT_PORT=8225` (deploy/test/setup.sh), so it keeps 8225 on the loopback.
+   - The E2E stack keeps 8025, which container-design.md §6 names and its specs open.
+2. **Checked.** `docker compose -f compose.yaml -f deploy/test/compose.test.yaml config mailpit`:
+   - without `MAILPIT_PORT`: 127.0.0.1:8025;
+   - with `MAILPIT_PORT=8225`: 127.0.0.1:8225.
+   The E2E is run again on this change.
+
+## IR727 Dependabot's pull requests are merged by hand; the broker image comes from compose.yaml — 2026-11-10
+
+`auto-merge.yml` turned on GitHub's auto-merge for every pull request of the repository, Dependabot's included. A dependency update then reached `main` as soon as the 14 required checks passed. On 2026-11-10 the nine open Dependabot pull requests showed why that is not enough:
+- #159 was not an update at all: `0.164.0-386` is the collector's image for 32-bit Linux only.
+- #157 adds two fields to `keyfunc.Override`, which oidc.go lists in full.
+- #161 raises Playwright beyond the E2E container's browsers.
+- #162 is a major jsdom with focus changes.
+
+The user asked that Dependabot's pull requests no longer merge by themselves.
+
+1. **Auto-merge.** The job does not run for a pull request opened by `dependabot[bot]`: someone merges it after reading the change. Every other pull request of the repository keeps auto-merge (2026-11-08). The nine open ones had been set to draft by the user, so none had auto-merge on. They went to `main` together through a release branch (#165).
+2. **The broker image.** `docker/mosquitto/passwd.sh` and `deploy/load/run.sh` ran `eclipse-mosquitto:2` by a digest of their own (`38c0da…`), older than compose.yaml's. Dependabot updates only compose.yaml. Both now read the pinned reference from compose.yaml's `image:` line, and stop when it is missing.
+3. **#159.** It was closed with `@dependabot ignore this version`. Dependabot stored that as "> 0.164.0" for the whole collector (`@dependabot show … ignore conditions`), which would also hide every later version. `@dependabot unignore` did nothing on the closed PR or on another one. The branch was restored at its last commit and the PR reopened, and Dependabot answered "I will stop ignoring the otel/opentelemetry-collector-contrib dependency". `.github/dependabot.yml` now ignores only `0.164.0-386`, so #159 is retired without a dependency-wide ignore.
+4. **Checks.** shellcheck and actionlint as in CI: 0. `bash -n` and `sh -n`: ok. `passwd.sh` with dummy keys in a worktree wrote both accounts with compose.yaml's image (rc=0); the tracked file was restored. `docker/mosquitto/passwd.test.sh` (IR684) copies only passwd.sh into its temporary tree, so it now writes a compose.yaml there too. Its `docker` shim also records the image it was given, and the test requires compose.yaml's.
+5. **Docs.** container-design.md §6: auto-merge, its Dependabot exception and the image reference.
+
+## IR721 A notification e-mail links to the address its recipient last signed in on (B-16, decided 2026-11-10)
+
+The shared test environment answers on the lab LAN and the Tailnet (DEC-102, IR651). IR695 made the set-up and invitation e-mails link to the address the invitation came from. The notification e-mails of the worker kept `APP_URL_*`, the canonical LAN address (IR651 item 8), which cannot be reached from the Tailnet. The user took B-16's recommendation: link each e-mail to the address its recipient last signed in on.
+
+1. **Recorded.** `identity.users.sign_in_host` (new, nullable) holds the host name of the issuer of the user's latest sign-in. `RecordSignIn` writes it with the sign-in (IR268). The host is the verified issuer's (`Principal.IssuerHost`, IR695), so a sender cannot choose it. A call without one, an internal call, keeps the recorded host.
+2. **Used.** The notification worker reads `PUBLIC_HOSTS` (compose passes it to `worker-notification`). `dueMails` reads the recipient's `sign_in_host`. `Apps.on` moves the role's app to that host, with its port and scheme kept, only when the host is listed. A host that is not listed, or none, keeps the canonical address. An environment with one address (dev, CI, E2E, production) has no listed host, and its links stay as they are.
+3. **Tests.** `TestMailLinksAtTheSignInAddress` (notify): the Tailnet host moves the link; the canonical host, an unlisted host and none keep it; a single-address environment never moves it. `TestRecordSignInHost` (auth): a sign-in records its issuer's host and a later call without one keeps it. It fails on the code before this change.
+4. **Data.** The column is added in migration 000001 and `schema.sql` (version 1 is still edited in place). The dev database got it by hand (`ALTER TABLE identity.users ADD COLUMN IF NOT EXISTS sign_in_host text`). The shared test environment builds its data again from the seed at its next deployment, as for any change of the migrations (`deploy.sh`).
+5. **Not changed.** The set-up and invitation e-mails (IR695), the e-mail texts and every operation, route and count.
+
+## IR722 A technician binds the device they registered to its planned unit (B-12, decided 2026-11-10)
+
+FR-T11's flow is "register serial → bind unit → check connection" (AT-T11-N). Since IR467, `devices.register` only reserves the planned unit (`targetUnitId`, D05), and the device stays unbound until `devices.bind`. The admin screens took that step (IR467). The technician app kept saying the opposite:
+- "Bind to unit", "binds it in one step" and "Device registered and bound".
+- For an unbound device the loader found no job: it looked one up by `unitId`, which is null. So every device action was disabled, and there was no Bind….
+
+A technician who registered a device on site could not finish the set-up. The user took B-12's recommendation: mirror IR467 in the technician app.
+
+1. **Reproduced.** `technician/tests/devicesLoad.test.ts`: a device registered for a planned unit on which the technician has an assigned job. The loader answered no job (`null`, the test fails). With the fix it is that unit's job.
+2. **Fix.**
+   - The loader takes the device's unit, or its planned unit while it is not bound. That unit's job is the job the device is bound under; IR709 lets a technician bind an unbound device to its planned unit.
+   - The view has a binding card of its own (`BindingCard`). A device not bound yet reads "Not bound yet", says what to do next, and offers Bind… with the planned unit and "Installed on site" prefilled. A bound device offers Rebind….
+   - Check connection, Calibrate and Update firmware wait for the binding; the API refuses them on an unbound device.
+   - The register form reads "Planned unit", "Registering reserves the device for this unit; Bind connects it once it is installed." and "Register", and its toast is "Device registered — bind it to the unit once it is installed". These are the admin app's texts and keys (en / ms / ja). The four texts the technician app no longer shows were removed from the ms and ja dictionaries.
+3. **Not changed.** The API (IR467, IR709), the admin screens and every operation, route and count.
+4. **Open.** Figma Technician 03 still draws one step, and the E2E path register → bind → check is not written yet.
+
+## IR732 The repository can be public: nobody outside can run, change or start anything — 2026-11-10
+
+The user decided to make the repository public, so that its CI runs on GitHub-hosted runners without a limit. Everything may be seen: the history, the pull requests, the logs and the internal addresses. The condition is that nobody outside can run, change or start anything, nor reach a secret. Before, every workflow ran on the lab server's self-hosted runners, `ci.yml` and `auto-merge.yml` for every pull request too, so a fork's pull request would have run its own code on the lab server.
+
+1. **ci.yml on hosted runners.**
+   - Every job runs on `ubuntu-latest`, in the same containers as before.
+   - The lanes' `needs` are gone; the job names, which are the required checks, stay.
+   - The named volumes are replaced by `actions/cache` (v6.1.0, by SHA), keyed by `go.sum`, `package-lock.json` and `ci.yml`.
+   - The steps that handed the workspace back to the runner's user are gone; a hosted runner is fresh every time.
+2. **Auto-merge.** It runs on `ubuntu-latest` for the owner's own pull requests only (`user.login == github.repository_owner`), not a fork's, another account's or Dependabot's (IR727). Its write permissions are the job's, not the workflow's. The trigger stays `pull_request`, never `pull_request_target`.
+3. **The lab server's workflows.** e2e.yml, load.yml and deploy-test.yml run their jobs only in this repository and never for a pull request: `github.repository == 'Aquarius0715/AC-Project'` and, for e2e and load, `github.event_name != 'pull_request'`. Their triggers cannot be started from outside:
+   - schedule and dispatch, which need write access;
+   - a test tag;
+   - `workflow_run` of CI on a push to `main`, whose checkout is main and the tags, never a pull request's code.
+4. **Credentials and permissions.** Every checkout sets `persist-credentials: false`; no step pushes or fetches with the job's token. deploy.sh's tag fetch is optional and the checkout has the tags. Every workflow's permissions are `contents: read`, plus `actions: read` for deploy-test and the auto-merge job's own.
+5. **zizmor** (1.31.1) lints the workflows' security in other-lint, beside actionlint, at 0 findings. Two exceptions name their rule and reason:
+   - deploy-test's `workflow_run` (dangerous-triggers): it acts only on a push to `main`;
+   - the docs job's `typescript@6.0.3` (adhoc-packages): the lock's exact version.
+6. **CODEOWNERS and SECURITY.md.** `* @Aquarius0715` and `/.github/ @Aquarius0715`; vulnerabilities are reported privately (private vulnerability reporting).
+7. **Repository settings** (2026-11-10, after the repository was made public).
+   - Set through the API: fork pull requests need approval for every external contributor (it was first-time contributors only), and only GitHub's own actions are allowed, pinned by SHA.
+   - Already set: read-only workflow permissions without creating or approving pull requests; main's protection with the 14 required checks and no force push; secret scanning and push protection.
+   - Left to the user: the tag ruleset (`test*`, the owner only); the Environment `test` limited to `main` and `test*`; Dependabot alerts and private vulnerability reporting; Wiki and Projects off.
+   - No required review: the owner alone could not approve the owner's own pull requests, and auto-merge does not use a bypass (the user's choice (a)).
+8. **Order.** Merged after the repository became public, so the hosted runners' minutes are free; it went ahead of the queued changes.

@@ -31,10 +31,13 @@ concurrency:
 jobs:
   load:
     name: k6 (compose project ac-load)
+    # the lab server runs only this repository's own runs, never a fork's or a pull request's (IR732)
+    if: github.repository == 'Aquarius0715/AC-Project' && github.event_name != 'pull_request'
     runs-on: [self-hosted, ac-test]
     timeout-minutes: 210   # the 2-hour soak, and the images and the stack before it
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false } # no later step pushes or fetches with the job's token
       - name: build, start, fill, run k6, remove
         env:
           SCENARIO: ${{ inputs.scenario }}
@@ -60,3 +63,10 @@ jobs:
         run: |
           left=$(docker ps -a --filter "label=com.docker.compose.project=ac-load" -q; docker volume ls -q --filter "label=com.docker.compose.project=ac-load"; docker network ls -q --filter "label=com.docker.compose.project=ac-load")
           if [ -n "$left" ]; then docker compose -p ac-load down --volumes --remove-orphans || true; echo "::error title=ac-load was not removed::$left"; exit 1; fi
+      - name: remove the replaced images and trim the build cache
+        if: always()
+        # the replaced :load builds (untagged) and the build cache over 20 GB, as deploy.sh and e2e.yml do (IR725).
+        # Tagged images and volumes, of any project, stay
+        run: |
+          docker image prune -f >/dev/null || true
+          docker builder prune -f --max-used-space 20GB >/dev/null || true

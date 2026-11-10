@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.581.0
+version: 0.588.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -300,6 +300,13 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.588.0: IR732: the repository can be public: CI on GitHub-hosted runners, the lab server's workflows only for this repository's own runs, credentials not persisted, zizmor, CODEOWNERS, SECURITY.md.
+0.587.0: IR722: the technician app's bind step: a device registered on site is reserved for its planned unit and bound with Bind… (B-12).
+0.586.0: IR721: notification e-mails link to the address the recipient last signed in on (identity.users.sign_in_host, PUBLIC_HOSTS).
+0.585.0: IR727: Dependabot's pull requests are merged by hand (auto-merge skips them); the broker image of passwd.sh and the load test comes from compose.yaml; dependabot.yml ignores only the collector's 0.164.0-386.
+0.584.0: IR729: the E2E stack's Mailpit keeps 8025 (IR720's default of 8225 collided with the shared test environment's Mailpit on the lab server).
+0.583.0: IR725: the lab server's disk stays bounded: CI's PostgreSQL data in tmpfs, untagged images removed and the build cache capped at 20 GB after a deployment, the E2E and the load test.
+0.582.0: IR720 (B-15): the shared test environment publishes Mailpit on the server's loopback only and gives the demo users its own DEMO_USER_PASSWORD.
 0.581.0: IR719: the sign-in callback times out the token exchange after 10 s and reads a non-JSON or missing answer as its token error, not the error page.
 0.580.0: IR718: every screen that runs a Server Action itself (ten files) keeps the screen when the call gets no answer, as useAction does (IR717).
 0.579.0: IR717: a Server Action that cannot be reached (offline browser, restarting app server) shows the unavailable toast and keeps the screen instead of the error boundary.
