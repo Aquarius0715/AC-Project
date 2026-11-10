@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Badge, Btn, Card, Check, ConnBadge, cx, EmptyState, Field, Input, ListRow, Modal, Search, Select, Textarea, Plain, ScrollX } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
@@ -23,7 +23,7 @@ export function DeviceTab({ live }: Readonly<{ live: DevicesLive }>) {
   const nav = useUrlPatch();
   const [pending, run] = useAction();
   const [filter, setFilter] = useState<Filter>("all");
-  const [q, setQ] = useState("");
+  const [q, setQ] = useServerSearch(live.page?.q);
   const [modal, setModal] = useState<null | "register" | "bind" | "unbind" | "delete" | "calibrate" | "firmware" | "node">(null);
   const [tried, setTried] = useState(false);
   const [reg, setReg] = useState({ serial: "", unitId: "", sensors: [] as Metric[], node: "" });
@@ -35,7 +35,7 @@ export function DeviceTab({ live }: Readonly<{ live: DevicesLive }>) {
   const [fw, setFw] = useState("");
   const rows = live.rows ?? [];
   const counts = HQ_FILTERS.map(({ id: f, label }) => ({ f, label: t(label), n: rows.filter(filterOf(f)).length }));
-  const shown = rows.filter(filterOf(filter)).filter((x) => !q || `${x.serial} ${x.mqttNode ?? ""} ${x.id} ${x.unit}`.toLowerCase().includes(q.toLowerCase()));
+  const shown = rows.filter(filterOf(filter));
   const dv = live.device;
   const close = () => { setModal(null); setTried(false); };
   const isBusy = !!dv?.detail.activeOperation;
@@ -103,6 +103,7 @@ export function DeviceTab({ live }: Readonly<{ live: DevicesLive }>) {
               </ListRow>
             ))}</div>
           )}
+                  {live.page && <RegistryPaging shown={rows.length} total={live.deviceTotal} page={live.page} />}
         </Card>
         {dv ? (
           <Card>
@@ -240,4 +241,33 @@ export function DeviceTab({ live }: Readonly<{ live: DevicesLive }>) {
       </Modal>
     </div>
   );
+}
+
+/** The registry's paging (IR723): how many of the matching devices this page shows, the first page and the next. */
+function RegistryPaging({ shown, total, page }: Readonly<{ shown: number; total: number; page: NonNullable<DevicesLive["page"]> }>) {
+  const t = useT();
+  const nav = useUrlPatch();
+  const { cursor, next } = page;
+  return (
+    <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[11px] text-muted-foreground">
+      <span>{t("{n} of {total}", { n: shown, total })}</span>
+      <span className="flex items-center gap-3">
+        {cursor && <Plain className="font-semibold text-primary" onClick={() => { nav({ cursor: null, deviceId: null }); }}><Icon name="chevronLeft" /> {t("First page")}</Plain>}
+        {next && <Plain className="font-semibold text-primary" onClick={() => { nav({ cursor: next, deviceId: null }); }}>{t("Next")} <Icon name="chevronRight" /></Plain>}
+      </span>
+    </div>
+  );
+}
+
+/** The registry's search box: it runs on the server (serial, MQTT node ID or unit name), so the URL takes the text once
+typing pauses, from the first page and without a selection (IR723). */
+function useServerSearch(searched = ""): [string, (v: string) => void] {
+  const nav = useUrlPatch();
+  const [q, setQ] = useState(searched);
+  useEffect(() => {
+    const isChanged = q.trim() !== searched;
+    const timer = isChanged ? setTimeout(() => { nav({ q: q.trim() || null, cursor: null, deviceId: null }); }, 400) : undefined;
+    return () => { clearTimeout(timer); };
+  }, [q, searched, nav]);
+  return [q, setQ];
 }

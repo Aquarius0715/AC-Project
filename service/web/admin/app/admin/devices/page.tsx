@@ -18,6 +18,7 @@ import type { ApiUnitDetail } from "@ac/web/lib/units";
 import { withAccess } from "@ac/web/lib/withAccess";
 import { DevicesDemo } from "./_components/devices-demo";
 import { DevicesView, type DevicesLive } from "./_components/devices-view";
+import { registryPage } from "./_lib/registry";
 import { queryReader } from "@ac/web/lib/searchParams";
 
 // members the session may not read (no identity.read)
@@ -38,16 +39,22 @@ async function AdminDevicesPageContent({ searchParams }: Readonly<PageProps<"/ad
   const one = queryReader(sp);
   const asked = one("tab");
   const tab = asked === "devices" || asked === "firmware" ? asked : "models";
-  const [now, perms, display, caps, units, devices] = await Promise.all([
+  // the devices tab pages the registry on the server; the models and firmware tabs count every device of each model and
+  // version and offer them to a campaign, so they read them all (IR723)
+  const [now, perms, display, caps, units, registry, all] = await Promise.all([
     coreNow(), corePermissions(), coreDisplay(),
     coreAllPage<ApiCapability>("capabilities.list"),
     coreAllPage<ApiUnitLite>("units.list"),
-    coreOp<Page<ApiDevice>>("devices.list", { limit: 100 }),
+    tab === "devices" ? registryPage(one("q")?.trim() ?? "", one("cursor") ?? null, one("deviceId") ?? null) : null,
+    tab === "devices" ? Promise.resolve([] as ApiDevice[]) : coreAll<ApiDevice>("devices.list", {}, 10_000),
   ]);
+  const devices = { items: registry?.items ?? all };
   const i = i18nOf(display);
   const rows = deviceRows(devices.items, units.items, i.t);
   const live: DevicesLive = {
     tab, now: now.toISOString(), canAudit: perms.has("audit.read"), canWrite: perms.has("device.write"),
+    deviceTotal: registry?.total ?? all.length,
+    ...(registry && { page: { q: one("q")?.trim() ?? "", next: registry.next, cursor: one("cursor") ?? null } }),
     models: modelRows(caps.items, units.items, devices.items, i), devices: rows,
     units: units.items.filter((u) => !u.archived).map((u) => ({ id: u.id, label: u.displayName, modelId: u.modelId })),
   };
