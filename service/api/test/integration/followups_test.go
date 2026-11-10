@@ -218,6 +218,39 @@ func TestRateAndReportProblem(t *testing.T) {
 	); code != 404 {
 		t.Errorf("another customer opens the photo: %d", code)
 	}
+	// a contractor who reads the job only as an offer (accepted, its access window not yet open) does not get the photo:
+	// only the detail projection lists it (IR755)
+	owner(
+		t,
+		`INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, candidate_slots, offered_at,
+			offer_expires_at, access_valid_from, access_valid_until, decision, decided_at)
+		VALUES ($1,$2,$3,'t',`+oneSlotSQL(
+			"$5",
+			"$6",
+		)+`,$4,$5,$5,$6,'accept',$4)`,
+		seed.ID("tenant-a"),
+		follow,
+		seed.ID("org-contractor-a"),
+		clock(),
+		clock().Add(time.Hour),
+		clock().Add(2*time.Hour),
+	)
+
+	if code, g := post(srv, contrA(), "jobs.get", `{"jobId":"`+follow+`"}`); code != 200 ||
+		data(g)["projection"] != "offer" {
+		t.Errorf("the contractor reads the offer: %d %v", code, g)
+	}
+
+	if code, _ := post(
+		srv,
+		contrA(),
+		"jobs.getAttachment",
+		`{"jobId":"`+follow+`","attachmentId":"`+pid+`"}`,
+	); code != 404 {
+		t.Errorf("a contractor with only an offer opens the photo: %d", code)
+	}
+
+	owner(t, `DELETE FROM maintenance.offers WHERE job_id = $1`, follow)
 
 	if code, m := prob(
 		`"reasonCode":"other","details":"Another issue with the louver","photos":[],"preferredSlot":null`,

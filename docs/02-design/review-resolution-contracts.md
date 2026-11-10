@@ -10200,3 +10200,11 @@ Found in review round 608 (`web/shared/lib/actionMessage.ts`).
 1. **Before.** `units.importCommit` answers CONFLICT `error.customerInactive` when the customer is inactive (and, since IR751, when a deactivation or delete finished while the commit waited) and CONFLICT `error.previewExpired` when the checked preview is gone; property and unit saves and the import preview answer `error.customerInactive` too. Neither key had words in the shared action message, and CONFLICT has no code text, so the admin screen showed "CONFLICT: Customer inactive" / "CONFLICT: Preview expired" — English in every display language (IR481).
 2. **Now.** Both keys have their sentence ("This customer is inactive — activate it first", "The checked file has expired or changed — check it again, then import"), translated in Malay and Japanese.
 3. **Tests.** `actionMessage.test.ts` (failed before with the CONFLICT lines); `i18n.test.ts` keeps both dictionaries complete.
+
+## IR755 A job's problem photos open only with the job's detail — 2026-11-11
+
+Found in review round 615 (`maintenance/jobs.go`, `jobs.getAttachment`).
+
+1. **Before.** `jobs.getAttachment` (IR437) let through whoever `jobs.get` answered. For a contractor or a technician `jobs.get` falls back from the detail to the offer projection (an open offer, or an accepted one before its access window) and then to the frozen history (IR124 item 5), and neither lists the problem photos. So a contractor whose access window had ended, a technician whose viewing window had ended, or a contractor holding only an offer opened the customer's photos with an attachment ID.
+2. **Now.** The photo opens only for a caller who reads the job in its detail projection — the projection that lists `problemPhotos` (client of the job's customer, HQ job.read, the delivering contractor and the assigned technician inside their windows); otherwise NOT_FOUND. The catalog's validation text says so; the authorization predicates are unchanged.
+3. **Tests.** `TestRateAndReportProblem`: a contractor with an accepted offer whose access window has not opened reads the offer projection, and the photo answers 404 (200 before).

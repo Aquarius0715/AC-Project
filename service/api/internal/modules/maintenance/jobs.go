@@ -1192,14 +1192,14 @@ func (in *JobAttachmentInput) Validate() map[string]string {
 	return nil
 }
 
-// getAttachment answers a problem photo of a job to whoever may read the job (jobs.get decides, IR437).
+// getAttachment answers a problem photo of a job to whoever may read the job in its detail projection (IR437, IR755).
 //
 //	@Summary		jobs.getAttachment (read)
 //	@ID				jobs.getAttachment
 //	@Description	Authorization: client:self | contractor:offer-projection-or-delegated-history | \
 //	@Description	technician:assigned-history | admin:job.read
 //	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; a problem photo of \
-//	@Description	a follow-up job (IR437) for whoever may read the job
+//	@Description	a follow-up job (IR437) for whoever reads the job in its detail projection (IR755)
 //	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
 //	@Description	Design: DD-A06, DD-C17, DD-P02, DD-T04
 //	@Tags			jobs
@@ -1223,9 +1223,11 @@ func (m Jobs) getAttachment(
 	call *ops.Call,
 	input *JobAttachmentInput,
 ) (BlobOut, error) {
-	_, getErr := m.get(ctx, call, &JobIDInput{JobID: input.JobID})
-	if getErr != nil {
-		return BlobOut{}, getErr
+	// only the detail projection lists the photos: a contractor's offer or history projection, or a technician's
+	// history, ends their sight of them with the access window (IR755)
+	_, detailErr := m.detail(ctx, call, input.JobID)
+	if detailErr != nil {
+		return BlobOut{}, detailErr
 	}
 
 	var (
