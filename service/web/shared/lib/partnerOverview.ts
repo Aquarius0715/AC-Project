@@ -281,7 +281,7 @@ export const jobEventTitle: Record<string, string> = {
   "job.created": "Job created", "job.offered": "Offer received from HQ", "offer.accepted": "Job accepted", "offer.declined": "Offer declined", offer_expired: "Offer expired",
   "offer.access_extended": "Access window extended", "job.assigned": "Technician assigned", "job.assignment_released": "Technician’s access ended — to be reassigned", "job.qualification_released": "Technician’s qualification ended — to be reassigned", "assignment.accepted": "Technician confirmed the slot", "assignment.cant_make": "Technician can’t make the slot",
   "job.checked_in": "Checked in on site", "job.started": "Work started", "job.paused": "Work paused", "job.resumed_work": "Work resumed", "job.submitted": "Report submitted",
-  "partner.review": "Partner review", "job.reviewed": "Report reviewed", "job.rework_started": "Rework started", "job.costs_saved": "Costs saved", "job.held": "Job on hold",
+  "partner.review": "Partner review", "job.reviewed": "Report reviewed", "job.review_accepted": "Report accepted", "job.review_returned": "Returned for rework", "job.rework_started": "Rework started", "job.costs_saved": "Costs saved", "job.held": "Job on hold",
   "job.resumed": "Job resumed", "job.cancelled": "Job cancelled", "job.reschedule_requested": "Reschedule requested", "proposal.sent": "Time proposed", "proposal.accepted": "Proposal accepted",
   "proposal.declined": "Proposal declined", "proposal.withdrawn": "Proposal withdrawn", "note.added": "Note added", "job.rated": "Customer rating", "job.problem_reported": "Problem reported",
   "job.follow_up_classified": "Follow-up classified", "job.warranty_claim_filed": "Warranty claim filed",

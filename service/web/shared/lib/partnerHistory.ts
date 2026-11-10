@@ -50,7 +50,7 @@ function delegationText(until: string, now: number, { t, display }: I18n): strin
 /** An event's tone: a review or completion is ok, a setback warns, anything else is plain. */
 function eventTone(action: string): "ok" | "warn" | undefined {
   if (/reviewed|accepted|completed/.test(action)) return "ok";
-  return /rework|cant_make|held|cancel|problem/.test(action) ? "warn" : undefined;
+  return /rework|returned|cant_make|held|cancel|problem/.test(action) ? "warn" : undefined;
 }
 const STATUS_LABEL: Record<string, string> = {
   accepted: "Accepted", assigned: "Assigned", in_progress: "In progress", on_hold: "On hold", rework_requested: "Rework requested", submitted: "Submitted", completed: "Completed", cancelled: "Cancelled",
