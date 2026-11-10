@@ -6715,13 +6715,13 @@
                     },
                     {
                         "type": "string",
-                        "description": "filter → part of the serial",
+                        "description": "filter → part of the serial or the MQTT node ID or the bound unit's name (IR723)",
                         "name": "search",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "description": "filter",
+                        "description": "filter → model of the bound unit (IR723)",
                         "name": "modelId",
                         "in": "query"
                     }

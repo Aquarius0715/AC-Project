@@ -309,8 +309,8 @@ func withSensors(ctx context.Context, call *ops.Call, devices []Device) error {
 //	@Param			sort	query		string	false	"field:direction — fields id,createdAt,updatedAt,serial; default id asc"
 //	@Param			unitId	query		string	false	"filter → unitId"
 //	@Param			status	query		string	false	"filter → connection"
-//	@Param			search	query		string	false	"filter → part of the serial"
-//	@Param			modelId	query		string	false	"filter"
+//	@Param			search	query		string	false	"filter → part of the serial or the MQTT node ID or the bound unit's name (IR723)"
+//	@Param			modelId	query		string	false	"filter → model of the bound unit (IR723)"
 //	@Success		200		{object}	ops.Envelope{data=DevicePage}
 //	@Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
 //	@Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
