@@ -12,10 +12,11 @@ test("hovering the chart names the value, its unit and the time; two metrics sha
   const box = await chart.boundingBox();
   expect(box).not.toBeNull();
   if (!box) return;
-  // the readings of the week are hourly averages: some point under the pointer carries a value (a gap shows nothing)
+  // the readings of the week are hourly averages and a gap shows nothing. The E2E stack's room may hold only the
+  // current hour's reading, at the right end, so the pointer starts there and moves left (IR730)
   let tooltip = "";
-  for (let k = 1; k <= 12 && !tooltip.includes("µg/m³"); k++) {
-    await page.mouse.move(box.x + (box.width * k) / 13, box.y + box.height / 2);
+  for (let k = 0; k <= 12 && !tooltip.includes("µg/m³"); k++) {
+    await page.mouse.move(box.x + box.width * (1 - k / 13) - 4, box.y + box.height / 2);
     tooltip = (await page.locator(".recharts-tooltip-wrapper").first().textContent()) ?? "";
   }
   expect(tooltip).toContain("PM2.5");
