@@ -115,9 +115,12 @@ python3 deploy/load/realm.py docker/keycloak/realm-ac.json "$LOAD_OUT/realm-load
 
 echo "== accounts of the broker (a password file of this run, not docker/mosquitto/passwd of the development stack)"
 broker_key() { sed -n "s/^$1=//p" "$settings"; }
+# the broker image of compose.yaml, the one Dependabot keeps up to date, so this copy never lags behind it (IR727)
+broker_image=$(sed -n 's/^ *image: *\(eclipse-mosquitto:[^ ]*\).*/\1/p' compose.yaml)
+[ -n "$broker_image" ] || { echo "no eclipse-mosquitto image in compose.yaml" >&2; exit 1; }
 MQTT_IOT_BRIDGE_KEY=$(broker_key MQTT_IOT_BRIDGE_KEY) MQTT_DEVICE_SIM_KEY=$(broker_key MQTT_DEVICE_SIM_KEY) \
   docker run --rm --user "$LOAD_UID:$LOAD_GID" --entrypoint sh -e MQTT_IOT_BRIDGE_KEY -e MQTT_DEVICE_SIM_KEY -v "$LOAD_OUT:/work" \
-  eclipse-mosquitto:2@sha256:38c0da4f2ef84284d47b3b3eeea1cb3bdeabe81ee10caf0cd5c5ff61ee3ea408 -c '
+  "$broker_image" -c '
     set -eu
     rm -f /work/mosquitto-passwd
     mosquitto_passwd -c -b /work/mosquitto-passwd iot-bridge "$MQTT_IOT_BRIDGE_KEY"
