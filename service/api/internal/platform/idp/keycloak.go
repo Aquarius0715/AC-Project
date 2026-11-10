@@ -50,7 +50,7 @@ type Keycloak struct {
 	ClientID     string // a confidential client whose service account holds realm-management manage-users
 	ClientSecret string
 	// PublicURL is the address people reach the identity provider by (IDP_PUBLIC_URL, IR651), e.g.
-	// http://10.100.1.17:8281. When the provider takes its host name from the request (several addresses for one
+	// http://192.0.2.10:8281. When the provider takes its host name from the request (several addresses for one
 	// deployment), the links in its e-mails come from the request's forwarded host: every request of this client names
 	// it, so a set-up link points at an address people can open, not at the internal one.
 	PublicURL string

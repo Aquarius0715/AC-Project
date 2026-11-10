@@ -9177,13 +9177,13 @@ IR216 says that a client sees the commands of its organization's unit with the r
 
 The test environment's apps and Keycloak had one fixed address (`CUSTOMER_WEB_URL`, `KEYCLOAK_URL` in the server's environment file): the lab network's. From the Tailnet the Sign in button led to that address, which a Tailnet device cannot reach. The user wanted both addresses to work. A Tailscale subnet route (the lab address reachable from the Tailnet) needs the Tailnet's administrator, who was not at hand, so the code takes both.
 
-1. **The setting.** `PUBLIC_HOSTS` in the environment file lists every host name or IP the stack answers on, the canonical one first (for example `10.100.1.17,100.99.169.116`). Empty or missing: nothing changes. The deployment adds `deploy/test/compose.multihost.yaml` when it is set.
+1. **The setting.** `PUBLIC_HOSTS` in the environment file lists every host name or IP the stack answers on, the canonical one first (for example `192.0.2.10,100.64.0.10`). Empty or missing: nothing changes. The deployment adds `deploy/test/compose.multihost.yaml` when it is set.
 2. **The apps (BFF).** A request that came by a listed host gets that host in the sign-in redirect to Keycloak, in the callback address, in the sign-out redirect, in the Content-Security-Policy's `form-action` and in the links to the other apps (`oidcConfigFor`, `addressFor`, `shared/lib/publicOrigin.ts`). Any other Host header, which anyone can send, gets the canonical address, so no link, redirect or policy carries a host the deployment did not name. Cookies belong to the host, so a sign-in that starts on one address must end on it; it does.
 3. **Keycloak.** It builds its issuer, its pages and its links from the host of the request (`KC_HOSTNAME` unset, `KC_HOSTNAME_STRICT=false`, `KC_PROXY_HEADERS=xforwarded`). A header anyone can send must not choose that host (a password-reset e-mail would link to whatever the sender said), so Keycloak's own port is no longer published: nginx (`keycloak-edge`) is, answers 421 for a host that is not listed, replaces the forwarded headers with the host it checked, and passes the request on. The services reach Keycloak by `keycloak:8080` as before.
 4. **The tokens.** The tokens of a sign-in name the address it started on (their `iss`), so the APIs accept the issuer of each listed address: `OIDC_ISSUER` takes a comma-separated list (`OIDCVerifier.Issuers`; `deploy.sh` builds it from `KEYCLOAK_URL` and `PUBLIC_HOSTS`). A refresh or a logout by the apps calls Keycloak by its internal address and names the token's own address in `X-Forwarded-Host` (`issuerHeaders`), because Keycloak refuses a refresh token whose issuer is not the realm address the request names; without this a sign-out left the single sign-on running.
 5. **E-mails.** `identity-api` (set-up and invitation e-mails) names `IDP_PUBLIC_URL` (the canonical `KEYCLOAK_URL`) on its calls, so the link points at an address people can open and not at `keycloak:8080`. A password-reset e-mail asked for on the Keycloak page links to the address the person was on. The links the workers write (`APP_URL_*`) are the canonical address.
 6. **The realm.** `deploy/test/realm.py` writes the redirect URIs and web origins of each listed address for a new realm, and `docker/keycloak/configure.sh` (the `keycloak-config` service) sets them in a realm that exists.
-7. **Setting it up.** On the server, add the line `PUBLIC_HOSTS=10.100.1.17,100.99.169.116` (the addresses of the server) to `~/ac-test/env` and deploy a tag. The ports 3200–3203, 8281 and 8225 must be reachable on both addresses (they are published on all addresses, `PUBLISH_ADDR=0.0.0.0`). Open the apps by either address; a bookmark of either works.
+7. **Setting it up.** On the server, add the line `PUBLIC_HOSTS=192.0.2.10,100.64.0.10` (the addresses of the server) to `~/ac-test/env` and deploy a tag. The ports 3200–3203, 8281 and 8225 must be reachable on both addresses (they are published on all addresses, `PUBLISH_ADDR=0.0.0.0`). Open the apps by either address; a bookmark of either works.
 8. **Not changed.** The mail of a technician's invitation and the notifications the workers send carry the canonical address. The dev stack, CI and E2E keep one address (`PUBLIC_HOSTS` empty).
 9. **Tests.** Vitest: the host helper, the login route and the callback on a listed and on an unlisted host, `issuerHeaders`. Go: the verifier with several issuers, the Keycloak client's forwarded headers. By hand on the local stack with `localhost` and `127.0.0.1` as the two addresses: both sign in and stay on their address, a refresh after the access token's short life and a sign-out work on the second one, the invitation e-mail's link opens, the edge answers 421 for another host and ignores a forged `X-Forwarded-Host`.
 
@@ -9559,7 +9559,7 @@ IR693 ended with `iot-design` failing and read that as a limit of the stand-in b
 
 ## IR695 The links of the set-up and invitation e-mails open at the address the invitation came from (user request, 2026-11-09)
 
-The test environment answers on two addresses (DEC-102, IR651), and the links of the e-mails `identity-api` asks Keycloak to send were always its canonical one (IR651 item 5). A person on the Tailnet cannot reach the lab network's address (checked: from the Tailnet `10.100.1.17` does not answer on 8281, 3200 or 3203, and `100.99.169.116` does), so they could not open the link and could not register.
+The test environment answers on two addresses (DEC-102, IR651), and the links of the e-mails `identity-api` asks Keycloak to send were always its canonical one (IR651 item 5). A person on the Tailnet cannot reach the lab network's address (checked: from the Tailnet `192.0.2.10` does not answer on 8281, 3200 or 3203, and `100.64.0.10` does), so they could not open the link and could not register.
 
 1. **The address.** No new header: the verified access token's `iss` names the address the sender signed in on (IR651 item 4) and is checked against `OIDC_ISSUER`, so a request cannot make it up. `auth.Identity.Issuer` carries it, and the request's `ops.Principal.IssuerHost` its host name. The principal is copied to take it, because `RemoteSource` shares one principal among requests that can be on different addresses.
 2. **The event.** `requestAccount` puts `publicHost` in `AccountRequested` when the principal names one; `identity-accounts` hands it on as `idp.Account.PublicHost`. An event without it (the bootstrap's) uses the provider's own address.
@@ -9935,3 +9935,75 @@ The user decided to make the repository public, so that its CI runs on GitHub-ho
    - `TestWriteResultRechecksTheJob`: a technician's jobs.acknowledgeAssignment, then the assignment revoked.
    - `TestDeviceHistory`: the round 140 case, a technician's response note, then the assignment and the unit scope removed.
    Both answer the stored result before and `succeeded` without it after. Without the recheck, both failed with the stored body. Both suites pass (`make test-all`).
+
+## IR726 The customer overview compares today with yesterday at this time — 2026-11-10
+
+The overview's energy card (FR-C01, DD-C01, IR240 item 3) compares the period with "the previous period of the same length", worded "vs yesterday at this time" for today. `previousRange` took the span that ends where today starts. At 09:12 it compared today 00:00–09:12 with yesterday 14:48–24:00, not with yesterday 00:00–09:12. AC use follows the time of day, so the card's "n % vs yesterday at this time" was off by the difference between the night and the afternoon. For example, a morning of normal use read as a large drop against the afternoon before.
+
+1. **Today.** The same hours a day earlier: [from − 24 h, to − 24 h). That period is also of the same length. Kuala Lumpur has no daylight saving time, so a day is 24 hours.
+2. **7 and 30 days.** Unchanged: the days just before the period ("the 7 days before", "the 30 days before").
+3. **Code.** `previousRange(kind, period)` in `shared/lib/customerOverview.ts`; the overview loader passes the period kind. No other screen compares with a previous period.
+4. **Test.** `customerOverview.test.ts` held the old range: 09:12 compared with yesterday 14:48–24:00. It now expects yesterday 00:00–09:12 for today and the days before for 7 days. It failed before the change.
+
+## IR728 A command whose answer could not be read is "sent", never "not sent" — 2026-11-10
+
+After a customer sends a command, the web follows it: it reads `commands.get` through the BFF every 2 s until the device answers (`waitForCommand`, D04). When one of those reads got no answer (the browser offline, the app server restarting), the failure reached the screens' error paths:
+- **Unit control** (`/customer/units/[id]`) toasted "Not sent" (or "Not sent: …" for a refused read), while the history already listed the command.
+- **Group control** (`/customer/properties`, FR-C14) marked the AC "Failed" and offered it to "Retry failed ACs".
+The command had been created and sent then, and the device may still carry it out. The customer was told the opposite and invited to send it again.
+
+1. **followCommand** (`shared/lib/unitCommands.ts`). waitForCommand that answers a failed read as `{ answered: false, command }` with the last state seen, instead of throwing.
+2. **Unit control.** A command not answered toasts "{unit}: sent — its answer could not be read. Refresh to see the AC's state before sending again." and stops the remaining settings. A command refused at creation still reads "Not sent: …".
+3. **Group control.** Such an AC shows the new state **Unknown** (warn) with "Sent — its answer could not be read. Refresh to see the AC's state.". It is not counted as failed, so "Retry failed ACs" leaves it out. A Server Action that got no answer is still Failed (IR718).
+4. **Texts.** Both sentences are in ms and ja.
+5. **Tests.** `unitCommands.test.ts`: followCommand with an answer, and with a read that fails. They failed before (followCommand did not exist). Web lint, typecheck and test: 0 errors (760 + 2 + 3).
+6. **Figma.** The group control's per-AC badges (Client 02 group change) gain "Unknown". To be drawn with the next Figma pass.
+
+## IR730 The three E2E failures on main — 2026-11-10
+
+An E2E run on `main` (42767558736) failed three tests. They also failed on the Dependabot batch (#165), so the updates did not cause them.
+
+1. **customer/air-chart.e2e.ts** (added with IR689) expected the PM2.5 tooltip "PM2.5 … µg/m³ … hh:mm". It read an empty tooltip.
+   - The E2E stack's Bedroom has only the current hour's reading in the last 7 days, the one point at the chart's right end; the rest is a gap. The test hovered between 1/13 and 12/13 of the chart's width and never reached that point. On the development stack, which has days of readings, it passed.
+   - Fix: the pointer starts at the right end and moves left, so the latest reading is found first.
+2. **admin phone width in Malay** (smoke.e2e.ts): `/admin/units?customerId=…&unitId=…` scrolled sideways, by 46 px on the runner and 77 px with the wide test font on a Mac.
+   - The customer's actions sit in a row that does not wrap. In Malay at 360 px, the three of them (Edit customer, Delete customer…, New unit) are wider than the screen. "Delete customer…" came with DEC-103.
+   - Fix: the row wraps (`flex-wrap justify-end`). Measured on the served page with those classes: no sideways scroll.
+3. **customer smoke crawl** (smoke.e2e.ts "every linked page of the app renders") ran past its 240 s limit on the runner.
+   - Each of the 40 pages takes about 3.7 s on a Mac, 150 s in all: about 1.7 s of server render, then about 2 s while Next.js prefetches the page's links (one `?_rsc=` render per link) until the network is idle.
+   - Fix: the limit is 480 s. The prefetching itself is proposal B-20.
+
+## IR731 Keycloak 26.8.2: identity-api's service account carries the admin API scope — 2026-11-10
+
+Keycloak 26.8.2 (#160, in the Dependabot batch of 2026-11-10) is a security release (CVE-2026-19688). Its admin REST API checks the audience of an access token: a service account is admitted only when its client has the built-in client scope `kc-admin-api`, which adds the admin API (`<issuer host>/admin/realms/ac`) to the token's audience. identity-api's client `ac-identity-admin` did not have it.
+- With 26.8.2 every account call answered 401 (`create user answered 401`, `enable answered 401`), so HQ, a contractor or a customer owner could not add a person.
+- Seven E2E tests failed. Keycloak's own log says `Failed to verify identity token: Expected audience not available in the token`.
+- The batch (#165) left #160 out and kept 26.8.1.
+
+1. **Realm.** `docker/keycloak/realm-ac.json` gives `ac-identity-admin` the default client scopes `web-origins, acr, profile, roles, basic, email, kc-admin-api`: the defaults it had, plus the new one. Keycloak 26.8.1 has no `kc-admin-api` and leaves it out on import, so the file serves both versions.
+2. **Existing realms.** Keycloak imports the file only while the realm does not exist. `docker/keycloak/configure.sh` (every start, IR646) therefore adds `kc-admin-api` to the client's default scopes when the realm has that scope. That is the dev database, the shared test environment and any realm imported before. A Keycloak without the scope needs nothing.
+3. **Image.** `compose.yaml`'s Keycloak and keycloak-config are on 26.8.2 (`723b1d6e…`, #160's digest).
+4. **Checked locally** with compose.yaml's Keycloak settings: the realm file, the ac-identity-admin client credentials, `keycloak:8080` from another container, as identity-api calls it. The call is POST /admin/realms/ac/users.
+
+   | Keycloak | Realm | Without the scope | With the change |
+   |---|---|---|---|
+   | 26.8.1 | new file | 201 | 201 |
+   | 26.8.2 | old file | 401 | 201 (after configure.sh) |
+   | 26.8.2 | new file | — | 201 |
+
+   On 26.8.2 the token's audience is `["http://localhost:8081/admin/realms/ac", "realm-management"]`, with the same `manage-users` role.
+
+## IR733 The internal values out of the repository: documentation addresses, the deployment's settings in an Environment secret — 2026-11-10
+
+With the repository public (IR732), the code and documents keep no address of the lab network or the Tailnet, and the test deployment can take its settings from GitHub rather than only from the server.
+
+1. **Addresses.** The lab server's address `10.100.1.17` is `192.0.2.10` (TEST-NET-1, for documentation) and its Tailnet address `100.99.169.116` is `100.64.0.10` (the shared address space the Tailnet uses). This applies in the tests (auth, oidc, keycloak, accounts_readd), a comment of keycloak.go, setup.sh's example and two documents. The real values stay in the server's environment file.
+2. **The deployment's settings.** deploy-test.yml's job uses the Environment `test`.
+   - Its secret `AC_TEST_ENV_FILE`, the whole environment file, is written to the runner's temporary directory (umask 077), passed to deploy.sh as `AC_TEST_ENV`, and removed after the job, whatever happened.
+   - Without the secret, the job uses the server's `~/ac-test/env` as before, so a deployment works before and after the secret is set.
+   - The step that masks the file's passwords, secrets, tokens and keys reads the same file.
+   - `deploy.sh`'s `SETTINGS` is `${AC_TEST_ENV:-$ROOT/env}`; the boot unit and a deployment by hand keep the server's file.
+3. **For the user.**
+   - On the server, `gh secret set AC_TEST_ENV_FILE --env test < ~/ac-test/env` sets the secret without printing it.
+   - In the repository settings, the Environment `test` takes deployments from `main` and the tags `test*` only. A required reviewer is optional: it would hold every automatic deployment until approved.
+

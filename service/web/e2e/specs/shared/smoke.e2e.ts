@@ -73,7 +73,9 @@ test.afterEach(async ({ page }) => {
 });
 
 test("every linked page of the app renders", async ({ page, app }) => {
-  test.setTimeout(240_000);
+  // 40 pages, each waited for until the network is idle: about 1.7 s of server render, then about 2 s while the app
+  // prefetches the page's links. 150 s on a Mac for the customer app, past 240 s on the lab runners (IR730)
+  test.setTimeout(480_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => { errors.push(`${page.url()}: ${e.message}`); });
   const refused: string[] = []; // Chromium logs each CSP violation as a console error

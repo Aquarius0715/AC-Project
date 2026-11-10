@@ -4,9 +4,10 @@
 # - pushing the tag deploys at once when CI passed on the commit already;
 # - while that CI still runs, the run ends, and the CI's own completion deploys the newest test tag on its commit.
 # CI runs on the same runner, so a deployment never holds it waiting. The job runs deploy/test/deploy.sh from the
-# checkout with the server's environment file (~/ac-test/env, which never leaves the server), whose secrets are masked
-# in the log. One deployment runs at a time; a newer one waiting replaces an older one that waits. The repository is
-# private, so only its collaborators' code reaches the runner.
+# checkout with the environment file of the Environment test's secret AC_TEST_ENV_FILE, written to the runner's temporary
+# directory for the job and removed after it (IR733); without that secret, with the server's ~/ac-test/env as before.
+# Its passwords, secrets, tokens and keys are masked in the log. One deployment runs at a time; a newer one waiting
+# replaces an older one that waits.
 name: Test deployment
 
 on:
@@ -34,6 +35,7 @@ jobs:
       github.repository == 'Aquarius0715/AC-Project' &&
       (github.event_name == 'push' || (github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success'))
     runs-on: [self-hosted, ac-test]
+    environment: test # its secrets, for main and the test tags only (repository settings, IR733)
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -74,8 +76,24 @@ jobs:
             exit 0
           fi
           echo "tag=$tag" >>"$GITHUB_OUTPUT"
-      - name: keep the server's secrets out of the log
+      - name: the environment file
+        id: settings
         if: steps.pick.outputs.tag != ''
+        env:
+          ENV_FILE: ${{ secrets.AC_TEST_ENV_FILE }}
+        run: |
+          if [ -n "$ENV_FILE" ]; then
+            umask 077
+            file=$RUNNER_TEMP/ac-test.env
+            printf '%s\n' "$ENV_FILE" >"$file"
+          else
+            file=$HOME/ac-test/env # the server's own, until the secret is set
+          fi
+          echo "file=$file" >>"$GITHUB_OUTPUT"
+      - name: keep the environment's secrets out of the log
+        if: steps.pick.outputs.tag != ''
+        env:
+          SETTINGS_FILE: ${{ steps.settings.outputs.file }}
         run: |
           # the values of the environment file's passwords, secrets, tokens and keys are masked from here on
           while IFS= read -r line; do
@@ -86,10 +104,14 @@ jobs:
               if [ -n "$value" ]; then echo "::add-mask::$value"; fi
               ;;
             esac
-          done <"$HOME/ac-test/env"
+          done <"$SETTINGS_FILE"
       - name: deploy ${{ steps.pick.outputs.tag }}
         if: steps.pick.outputs.tag != ''
         env:
           AC_TEST_REPO: ${{ github.workspace }}
+          AC_TEST_ENV: ${{ steps.settings.outputs.file }}
           TAG: ${{ steps.pick.outputs.tag }}
         run: bash deploy/test/deploy.sh deploy "$TAG"
+      - name: remove the written environment file
+        if: always()
+        run: rm -f "$RUNNER_TEMP/ac-test.env"

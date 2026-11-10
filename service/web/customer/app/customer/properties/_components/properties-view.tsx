@@ -9,7 +9,7 @@ import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { selectionId, type Connection, type PowerState, type Selection, type TreeProperty, type TreeSpace } from "@ac/web/lib/assets";
 import { changeText, groupPlan, type GroupChange, type PlanRow, type RoomUnit } from "@ac/web/lib/clientProperties";
 import { historyRow, type ApiCommand, type ApiUnitDetail } from "@ac/web/lib/units";
-import { waitForCommand } from "@ac/web/lib/unitCommands";
+import { followCommand } from "@ac/web/lib/unitCommands";
 import { sendPaced } from "@ac/web/lib/writeLimit";
 import { actionMessage } from "@ac/web/lib/actionMessage";
 import { useI18n, useT } from "@ac/web/components/I18n";
@@ -37,7 +37,7 @@ const kind = (t: T, k: string) => t(kindLabel[k] ?? k);
 /** Units & locations (FR-C02) in API mode: the structure is read only (HQ manages it) except renaming; a room lists its
 air conditioners, and owners can send one change to several of them (Group control, FR-C14). */
 // a command's state and a group test's result as a badge colour (primary for the others)
-const TRY_TONE = new Map<string, "ok" | "crit" | "warn">([["Confirmed", "ok"], ["Failed", "crit"], ["Waiting", "warn"]]);
+const TRY_TONE = new Map<string, "ok" | "crit" | "warn">([["Confirmed", "ok"], ["Failed", "crit"], ["Waiting", "warn"], ["Unknown", "warn"]]);
 const RESULT_TONE = new Map<string, "unknown" | "warn" | "muted">([["Skipped", "unknown"], ["Clamped", "warn"], ["No change", "muted"]]);
 export function PropertiesView({ live }: Readonly<{ live: PropertiesLive }>) {
   const t = useT();
@@ -188,7 +188,8 @@ function Panel({ live, sel, rename, go }: Readonly<{ live: PropertiesLive; sel: 
 
 // ---- group control (FR-C14) ----
 
-interface Track { status: "Sending" | "Waiting" | "Confirmed" | "Failed"; note: string }
+/** Unknown: the command was sent but its answer could not be read, so it is neither failed nor retried (IR728). */
+interface Track { status: "Sending" | "Waiting" | "Confirmed" | "Failed" | "Unknown"; note: string }
 function GroupPanel({ live, space }: Readonly<{ live: PropertiesLive; space: string }>) {
   const i = useI18n();
   const { t } = i;
@@ -217,12 +218,14 @@ function GroupPanel({ live, space }: Readonly<{ live: PropertiesLive; space: str
           const created = await sendPaced(() => sendCommand(r.id, a), wait(r.id));
           if (!created.ok) { setTrack((x) => ({ ...x, [r.id]: { status: "Failed", note: actionMessage(created, t) } })); return; }
           setTrack((x) => ({ ...x, [r.id]: { status: "Sending", note: "" } }));
-          const c: ApiCommand = await waitForCommand(created.value, () => { /* the row already says Sending */ });
+          const followed = await followCommand(created.value, () => { /* the row already says Sending */ });
+          if (!followed.answered) { setTrack((x) => ({ ...x, [r.id]: { status: "Unknown", note: t("Sent — its answer could not be read. Refresh to see the AC's state.") } })); return; }
+          const c: ApiCommand = followed.command;
           if (c.status !== "acknowledged") { setTrack((x) => ({ ...x, [r.id]: { status: "Failed", note: historyRow(c, t, i.display).text } })); return; }
         }
         setTrack((x) => ({ ...x, [r.id]: { status: "Confirmed", note: r.change } }));
       } catch {
-        // the action or the poll got no answer: this AC failed, the others go on and the button comes back (IR718)
+        // the action got no answer: this AC failed, the others go on and the button comes back (IR718)
         setTrack((x) => ({ ...x, [r.id]: { status: "Failed", note: actionMessage(unreachableFailure(), t) } }));
       }
     }));
@@ -244,7 +247,7 @@ function GroupPanel({ live, space }: Readonly<{ live: PropertiesLive; space: str
               <div className="flex items-center justify-between"><b className="text-[13px]">{u.name}</b><Icon name={sel.includes(u.id) ? "checked" : "unchecked"} className="text-sm" /></div>
               <div className="text-[11px] text-muted-foreground">{u.online && (u.temp === "—" && u.watts === "—" ? t("no recent reading") : `${u.temp} · ${u.watts}`)}{!u.online && u.seen && t("last seen {when}", { when: u.seen })}{!u.online && !u.seen && t("no connection yet")}</div>
               <div className="mt-1 flex flex-wrap gap-1"><PowerBadge s={u.power} /><ConnBadge s={u.conn} />{tr && <Badge tone={TRY_TONE.get(tr.status) ?? "primary"}>{t(tr.status)}</Badge>}</div>
-              {(tr?.status === "Failed" || tr?.status === "Waiting") && <div className={cx("mt-1 text-[11px]", tr.status === "Failed" ? "text-crit" : "text-warn")}>{tr.note}</div>}
+              {(tr?.status === "Failed" || tr?.status === "Waiting" || tr?.status === "Unknown") && <div className={cx("mt-1 text-[11px]", tr.status === "Failed" ? "text-crit" : "text-warn")}>{tr.note}</div>}
             </Plain>
           );
         })}

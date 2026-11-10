@@ -8,7 +8,7 @@ import { Badge, Banner, Btn, Card, Check, ConnBadge, Modal, Page, PowerBadge, St
 import { units, unitRowFromApi, type UnitRow } from "@ac/web/lib/client";
 import { OpError } from "@ac/web/lib/ops";
 import { controlLayout, FAN_LABEL, historyRow, latest, MODE_LABEL, type ApiCommand, type ApiUnitDetail, type UnitAction } from "@ac/web/lib/units";
-import { waitForCommand } from "@ac/web/lib/unitCommands";
+import { followCommand } from "@ac/web/lib/unitCommands";
 import { byCount, showRecent, showTime, textOf } from "@ac/web/lib/i18n";
 import { useDisplay, useT } from "@ac/web/components/I18n";
 import { createCommand, setUnitAlertPolicies } from "../actions";
@@ -255,7 +255,13 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
       toast(t("Not sent: {reason}", { reason: reason(created.messageKey, created.code) }), "warn");
       return false;
     }
-    const c = await waitForCommand(created.value, track); // polls commands.get through the BFF
+    const followed = await followCommand(created.value, track); // polls commands.get through the BFF
+    if (!followed.answered) {
+      // the command was sent; only its answer could not be read, so it is never "not sent" (IR728)
+      toast(t("{unit}: sent — its answer could not be read. Refresh to see the AC's state before sending again.", { unit: unit.name }), "warn");
+      return false;
+    }
+    const c = followed.command;
     toast(`${unit.name}: ${historyRow(c, t, display).text}`, c.status === "acknowledged" ? undefined : "warn");
     return c.status === "acknowledged";
   };

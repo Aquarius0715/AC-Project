@@ -192,7 +192,8 @@ function CustomerScreen({ live, c }: Readonly<{ live: UnitsLive; c: CustomerLive
         <Plain touch type="button" className="font-semibold text-primary" onClick={() => { nav({ customerId: null, tab: null, locationId: null, propertyId: null, unitId: null, powerState: null, connections: null, search: null }); }}><Icon name="chevronLeft" /> {t("Customers")}</Plain>
         <span className="text-muted-foreground">/ {r.name}{c.unit ? ` / ${c.unit.u.displayName}` : ""}</span>
         {r.marks.map((x) => <Badge key={x.label} tone={x.tone} icon={x.icon}>{x.label}</Badge>)}
-        <div className="ml-auto flex gap-2">
+        {/* the actions wrap at phone width: three in Malay are wider than 360 px (IR730) */}
+        <div className="ml-auto flex flex-wrap justify-end gap-2">
           {canWrite && <Btn size="sm" onClick={() => { setM({ kind: "customer" }); }}>{t("Edit customer")}</Btn>}
           {canWrite && <Btn size="sm" variant="danger" onClick={() => { setM({ kind: "deleteCustomer" }); }}>{t("Delete customer…")}</Btn>}
           {canWrite && r.status === "active" && c.tree.length > 0 && <Btn size="sm" variant="primary" onClick={addUnitHere}><Icon name="add" /> {t("New unit")}</Btn>}

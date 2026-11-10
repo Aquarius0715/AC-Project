@@ -25,7 +25,7 @@
 set -euo pipefail
 
 ROOT=${AC_TEST_ROOT:-$HOME/ac-test}
-SETTINGS=$ROOT/env
+SETTINGS=${AC_TEST_ENV:-$ROOT/env} # the workflow passes the Environment test's file (IR733); the boot unit and by hand: the server's
 STATE=$ROOT/state
 REPO=${AC_TEST_REPO:-$(cat "$STATE/repo" 2>/dev/null || echo "$ROOT/repo")}
 PROJECT=ac-test

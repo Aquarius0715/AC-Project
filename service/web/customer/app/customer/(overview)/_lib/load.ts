@@ -40,7 +40,7 @@ export async function loadOverview(sp: Record<string, string | string[] | undefi
   const ids = sel.scope.map((u) => u.id);
   const place = unitPlaces(units, properties, spaces);
   const period = periodRange(kind, now);
-  const prev = previousRange(period);
+  const prev = previousRange(kind, period);
   const week = dayRanges(periodRange("7d", now).from, period.to, display.locale).slice(-7);
   const propertyFilter = sel.propertyId ? { propertyId: sel.propertyId } : {};
   const filters = sel.unitId ? { unitId: sel.unitId } : propertyFilter;

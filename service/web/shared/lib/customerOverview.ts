@@ -46,10 +46,13 @@ export function periodNote(kind: OverviewPeriod, p: { from: string; to: string }
   return kind === "today" ? i.t("Today = {from}–{to} · {zone}", { from: hm(p.from), to: hm(p.to), zone: KL })
     : i.t("{period} = {from} – {to} · {zone}", { period: i.t(entryOf(periodLabel, kind)), from: `${md(p.from, i)} ${hm(p.from)}`, to: `${md(p.to, i)} ${hm(p.to)}`, zone: KL });
 }
-/** The period of the same length that ends where this one starts. */
-export function previousRange(p: { from: string; to: string }): { from: string; to: string } {
-  const span = Date.parse(p.to) - Date.parse(p.from);
-  return { from: new Date(Date.parse(p.from) - span).toISOString(), to: p.from };
+const DAY_MS = 86_400_000;
+/** The period the energy card compares with, of the same length: today with yesterday at this time (the same hours a
+day earlier — AC use follows the time of day, IR726), 7 and 30 days with the days just before them. */
+export function previousRange(kind: OverviewPeriod, p: { from: string; to: string }): { from: string; to: string } {
+  const from = Date.parse(p.from), to = Date.parse(p.to);
+  const shift = kind === "today" ? DAY_MS : to - from;
+  return { from: new Date(from - shift).toISOString(), to: kind === "today" ? new Date(to - DAY_MS).toISOString() : p.from };
 }
 
 const latestOf = (u: OverviewUnit, metric: string) => u.latestMeasurements.find((m) => m.metric === metric);

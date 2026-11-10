@@ -17,7 +17,7 @@ import (
 const testIssuer = "http://localhost:8081/realms/ac"
 
 // tailnetIssuer is the same realm on a second address of the deployment.
-const tailnetIssuer = "http://100.99.169.116:8281/realms/ac"
+const tailnetIssuer = "http://100.64.0.10:8281/realms/ac"
 
 // newTestVerifier returns a verifier of the customer and HQ apps that trusts key.
 func newTestVerifier(key *rsa.PrivateKey) *auth.OIDCVerifier {

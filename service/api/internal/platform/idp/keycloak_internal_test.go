@@ -219,7 +219,7 @@ func TestKeycloakTokenAnswers(t *testing.T) {
 func TestKeycloakNamesItsPublicAddress(t *testing.T) {
 	t.Parallel()
 
-	for public, want := range map[string]string{"http://10.100.1.17:8281": "10.100.1.17:8281 http", "": " "} {
+	for public, want := range map[string]string{"http://192.0.2.10:8281": "192.0.2.10:8281 http", "": " "} {
 		var (
 			lock sync.Mutex
 			seen []string
@@ -355,9 +355,9 @@ func TestSendSetupUsesTheAddressOfTheInvitation(t *testing.T) {
 	t.Parallel()
 
 	const (
-		canonical = "http://10.100.1.17:8281"
-		tailnet   = "100.99.169.116"
-		app       = "http://10.100.1.17:3200/login"
+		canonical = "http://192.0.2.10:8281"
+		tailnet   = "100.64.0.10"
+		app       = "http://192.0.2.10:3200/login"
 	)
 
 	for name, testCase := range map[string]struct {
@@ -365,17 +365,17 @@ func TestSendSetupUsesTheAddressOfTheInvitation(t *testing.T) {
 	}{
 		"another address": {
 			canonical, tailnet, app,
-			"token 100.99.169.116:8281|mail 100.99.169.116:8281", "http://100.99.169.116:3200/login",
+			"token 100.64.0.10:8281|mail 100.64.0.10:8281", "http://100.64.0.10:3200/login",
 		},
-		"no address named": {canonical, "", app, "token 10.100.1.17:8281|mail 10.100.1.17:8281", app},
+		"no address named": {canonical, "", app, "token 192.0.2.10:8281|mail 192.0.2.10:8281", app},
 		"the canonical address": {
-			canonical, "10.100.1.17", app, "token 10.100.1.17:8281|mail 10.100.1.17:8281", app,
+			canonical, "192.0.2.10", app, "token 192.0.2.10:8281|mail 192.0.2.10:8281", app,
 		},
 		"one-address deployment": {"", tailnet, app, "token |mail ", app},
 		// an app on a host of its own is not one of the provider's addresses (production: a provider of its own)
 		"an app elsewhere": {
 			canonical, tailnet, "https://app.example.com/login",
-			"token 100.99.169.116:8281|mail 100.99.169.116:8281", "https://app.example.com/login",
+			"token 100.64.0.10:8281|mail 100.64.0.10:8281", "https://app.example.com/login",
 		},
 	} {
 		calls, redirect := setupAt(t, testCase.public, testCase.host, testCase.redirect)
@@ -400,7 +400,7 @@ func TestAdminTokensAreKeptPerAddress(t *testing.T) {
 	defer srv.Close()
 
 	keycloak := newTestKeycloak(srv.URL, testSecret, nil, nil)
-	keycloak.PublicURL = "http://10.100.1.17:8281"
+	keycloak.PublicURL = "http://192.0.2.10:8281"
 
 	send := func(host string) {
 		t.Helper()
@@ -411,7 +411,7 @@ func TestAdminTokensAreKeptPerAddress(t *testing.T) {
 			TenantID:    "t",
 			Membership:  "m",
 			Role:        "client_user",
-			RedirectURI: "http://10.100.1.17:3200/login",
+			RedirectURI: "http://192.0.2.10:3200/login",
 			ClientID:    "ac-customer",
 			PublicHost:  host,
 		})
@@ -420,9 +420,9 @@ func TestAdminTokensAreKeptPerAddress(t *testing.T) {
 		}
 	}
 
-	send("100.99.169.116")
+	send("100.64.0.10")
 	send("")
-	send("100.99.169.116")
+	send("100.64.0.10")
 	send("")
 
 	if got := realm.tokens.Load(); got != 2 {
@@ -436,7 +436,7 @@ func TestAdminTokensAreKeptPerAddress(t *testing.T) {
 	}
 
 	calls, _ := realm.seen()
-	if !strings.HasSuffix(calls, "admin 10.100.1.17:8281") {
+	if !strings.HasSuffix(calls, "admin 192.0.2.10:8281") {
 		t.Errorf("the other call went out as %q", calls)
 	}
 }
