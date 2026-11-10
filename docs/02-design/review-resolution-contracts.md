@@ -9912,3 +9912,26 @@ The user decided to make the repository public, so that its CI runs on GitHub-ho
    - The models and firmware tabs read every device (`coreAll`, at most 10,000), so the per-model and per-version counts and a campaign's choices are complete. Counting those on the server would need a new summary; at 3,000 devices this is 30 reads of 100 on those two tabs only.
 3. **Tests.** `TestDeviceListSearchAndModel` (integration): search by part of the serial, literal wildcards, the unit's name, the devices of a model, and the serial order. It failed before: `search` was not allowed, then the `serial` sort was invalid. `admin/tests/deviceRegistry.test.ts`: the page request by serial with the search, the URL device read on its own, and a stale cursor.
 4. **Not changed.** The state chips (online, offline, tamper, no sensors) count the devices of the page. The technician app's device list, and every other operation, route and count.
+
+## IR724 writes.getResult rechecks the write's target as the caller (B-13, decided 2026-11-10)
+
+`writes.getResult` (DDC-03) checked only that the key was the caller membership's own, for that operation and not expired (24 h), and returned the stored result as it was. Its authorization is `authenticated:original-user-and-current-target-scope`, and strict review SR14 asks to recheck the current delegation, assignment, qualification and resource ownership before returning it (SR03/IR19 for restrictions). For up to 24 hours, a technician whose assignment ended, a client member whose unit scope was narrowed or a contractor whose delegation ended read again what a write answered then (round 140: a device event's notes). The user took B-13's option 1.
+
+1. **The recheck.** A table in `modules/writes` names, for each write whose target is held to the caller's scope, the read of that target and its ID field in the stored result:
+   - jobs.* writes, plans.generateNext, attachments.add, jobs.saveDraft and reports.signOff: `jobs.get` (id or jobId);
+   - devices.* writes: `devices.get` (id or deviceId);
+   - alerts.acknowledge and alerts.resolve: `alerts.get`; commands.create: `commands.get`; diagnosticRuns.create: `diagnosticRuns.get`;
+   - units.save, units.setAlertPolicies and filterCare.markCleaned: `units.get`;
+   - the restriction writes: `restrictions.get`.
+   Before a succeeded result is returned, that read runs as the caller: its predicates, then its handler's scope checks on the current rows. It runs in the service that owns the read, over the internal query `reads.check.<domain>` (IR190: the caller's principal and token), in the caller's transaction when the process serves that domain. `TestTargetsReadTheirTarget` holds the table to the generated contracts: each write's result has the field, and each read's input takes it.
+2. **Refused.** A read refused as NOT_FOUND or FORBIDDEN answers `succeeded` with the operation and `resourceIds`, without `result`. The write happened, so the client does not send it again (D04), but what it answered then is not shown. Any other error of the read is the error of `writes.getResult`.
+3. **Unchanged.** The other writes keep returning their stored result:
+   - the caller's own records (preferences, consents, notifications, sessions, two-factor);
+   - the receipts the original user keeps (jobs.accept and jobs.decline, IR01);
+   - deletions;
+   - settings without a unit, job or device scope.
+   Replaying a write with the same key and body still returns its stored response; proposal B-17.
+4. **Tests.**
+   - `TestWriteResultRechecksTheJob`: a technician's jobs.acknowledgeAssignment, then the assignment revoked.
+   - `TestDeviceHistory`: the round 140 case, a technician's response note, then the assignment and the unit scope removed.
+   Both answer the stored result before and `succeeded` without it after. Without the recheck, both failed with the stored body. Both suites pass (`make test-all`).
