@@ -9899,3 +9899,16 @@ The user decided to make the repository public, so that its CI runs on GitHub-ho
    - Left to the user: the tag ruleset (`test*`, the owner only); the Environment `test` limited to `main` and `test*`; Dependabot alerts and private vulnerability reporting; Wiki and Projects off.
    - No required review: the owner alone could not approve the owner's own pull requests, and auto-merge does not use a bypass (the user's choice (a)).
 8. **Order.** Merged after the repository became public, so the hosted runners' minutes are free; it went ahead of the queued changes.
+
+## IR723 HQ's device registry pages on the server (B-14, decided 2026-11-10)
+
+`/admin/devices` (FR-A04) read `devices.list` as one page of 100, sorted by id, and built everything from it: the list and its search (client-side), the selected device (a `deviceId` past the 100 fell back to the first), the model counts, the "current on N devices" label and a campaign's device choices. At the launch size of backend architecture §13 (3,000 devices), HQ could not reach 2,900 of them, and the counts were wrong. The user took B-14's recommendation: server-side paging and search.
+
+1. **API.** `devices.list` takes `search`: part of the serial, the MQTT node ID or the bound unit's name, case-insensitive, with its wildcards literal (`paging.Contains`). It also takes `modelId`, the model of the device's bound unit, and `serial` as a sort field. `search` and `modelId` were already in `Query.filters`; `Query.sort` gains `'serial'` in `service-contracts.ts`. The query catalog row, the generated catalog and contracts, and the Swagger annotations follow.
+2. **Screen.**
+   - The devices tab reads one page of 100 by serial with the search on the server (`registryPage`, `admin/app/admin/devices/_lib/registry.ts`). The search box writes the URL key `q` once typing pauses (400 ms), and the page goes on with `cursor` ("{n} of {total}", First page, Next).
+   - A URL device not on the page is read with `devices.get` and shown first. A cursor that no longer holds reads the first page.
+   - The tab's count is the registry's total.
+   - The models and firmware tabs read every device (`coreAll`, at most 10,000), so the per-model and per-version counts and a campaign's choices are complete. Counting those on the server would need a new summary; at 3,000 devices this is 30 reads of 100 on those two tabs only.
+3. **Tests.** `TestDeviceListSearchAndModel` (integration): search by part of the serial, literal wildcards, the unit's name, the devices of a model, and the serial order. It failed before: `search` was not allowed, then the `serial` sort was invalid. `admin/tests/deviceRegistry.test.ts`: the page request by serial with the search, the URL device read on its own, and a stale cursor.
+4. **Not changed.** The state chips (online, offline, tamper, no sensors) count the devices of the page. The technician app's device list, and every other operation, route and count.
