@@ -73,6 +73,18 @@ const keyText: Record<string, string> = {
   // the Idempotency-Key of a write (D04): another body under the same key, or the first send still running
   "error.idempotencyKeyReused": "This request was already sent with different contents — reload the page and try again",
   "error.requestInProgress": "The same request is still being processed — try again in a moment",
+  // the shared keys of many refusals (IR758): a state that no longer allows it, a clash with another record or a change
+  // at the same moment (a unique or exclusion violation), a request that ran out of time, a device that is not online
+  "error.invalidState": "This is no longer possible in its current state — reload the page to see the latest state",
+  "error.conflict": "This clashes with another record, or with a change made at the same moment — reload the page and try again",
+  "error.timeout": "The request took too long — check whether the change was saved, then try again",
+  "error.offline": "The device is offline — try again when it is back online",
+  // device and organization refusals named by a shared key (IR758); some screens word them with more detail
+  "error.deviceNotBound": "This device is not bound to a unit — bind it first",
+  "error.duplicateSerial": "Another device already has this serial number",
+  "error.tamperUnresolved": "This device has an unresolved tamper alert — resolve it first",
+  "error.duplicateName": "This name is already used",
+  "error.unitArchived": "This unit is archived",
   "error.customerInUse": "This customer has jobs, contracts, invoices, reports or users, so it cannot be deleted",
   "error.contractorInUse": "This contractor has jobs, offers, certificates, payouts or users, so it cannot be deleted",
   "error.orgHasProfile": "This organization still has a customer or contractor profile — delete that first",

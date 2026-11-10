@@ -10224,3 +10224,16 @@ Found in review round 630 (`identity/clientusers.go`, `identity/partnerusers.go`
 1. **Before.** `clientUsers.resendInvite` and `partnerUsers.resendInvite` read the account (status `invited`) without a lock and checked the membership's end with a plain read; only the 5-minute pacing (IR423) then locked the account row. A disable of the account (it locks the row) or HQ ending the access (`members.save` locks the membership) at the same moment was not seen: the re-send waited for the account lock, or did not wait at all, and then queued the set-up e-mail — which reopens the sign-in IR461 and IR664 keep closed.
 2. **Now.** The account is loaded `FOR UPDATE` and the membership is read `FOR SHARE` together with its end (one helper for both apps, answering the user to e-mail), before the pacing. A change half done makes the re-send wait and then answer CONFLICT `errors.invite_not_pending` or `errors.access_expired`. The lock order is account, then membership, as in the user saves, so they do not deadlock.
 3. **Tests.** `TestResendInviteWaitsForAChangeOfTheAccount`: a disable half done, and an access end half done; both answered 200 (a queued e-mail) before, and now wait and answer 409 with their key.
+
+## IR758 The shared refusal keys say why, whatever their code — 2026-11-11
+
+Found in review round 635 (`web/shared/lib/actionMessage.ts`, after IR756).
+
+1. **Before.** IR754 and IR756 gave words to the keys the Core API writes out as text; the keys it takes from shared constants were not in that search. Of those, nine had no words in the shared action message, and CONFLICT, TIMEOUT and OFFLINE have no code text, so a screen without its own wording showed the code and the humanized key in English in every display language — "CONFLICT: Invalid state", "TIMEOUT: Timeout". The nine keys are:
+   - `error.invalidState` — 43 refusals: an action that the record's current state no longer allows.
+   - `error.conflict` — every unique or exclusion violation of the database.
+   - `error.timeout` — the HTTP and statement timeouts.
+   - `error.offline` — a device operation on a device that is not online, IR94.
+   - `error.deviceNotBound`, `error.duplicateSerial`, `error.tamperUnresolved`, `error.duplicateName` and `error.unitArchived`.
+2. **Now.** Each has its sentence in English, Malay and Japanese, for example "This is no longer possible in its current state — reload the page to see the latest state". Screens that word a key with more detail (the jobs, alerts and requests screens, the import file check) keep their own words; the shared sentence is the fallback.
+3. **Tests.** `actionMessage.test.ts`: none of the nine gives a line that contains its code in en, ms or ja (failed before with "CONFLICT: Invalid state"), and two lines are exact; the shared Vitest suite passes.
