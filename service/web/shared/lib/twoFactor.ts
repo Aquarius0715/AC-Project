@@ -6,7 +6,8 @@ const ISSUER = "AC Project";
 
 /** otpauth://totp/AC%20Project:<account>?secret=<key>&issuer=AC%20Project&algorithm=SHA1&digits=6&period=30 */
 export function otpauthUri(setupKey: string, account: string): string {
-  const label = encodeURIComponent(`${ISSUER}:${account}`).replace("%3A", ":");
+  // the label is "issuer:account" with only the separator a colon; a colon of the account stays encoded (Key URI format)
+  const label = `${encodeURIComponent(ISSUER)}:${encodeURIComponent(account)}`;
   return `otpauth://totp/${label}?secret=${setupKey.replaceAll(/\s/g, "").toUpperCase()}&issuer=${encodeURIComponent(ISSUER)}&algorithm=SHA1&digits=6&period=30`;
 }
 
