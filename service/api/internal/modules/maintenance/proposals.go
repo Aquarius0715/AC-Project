@@ -799,6 +799,11 @@ func offerFromProposal(
 		return apperr.Wrap(marshalErr, "json.Marshal")
 	}
 
+	releaseErr := releaseForOffer(ctx, call, job, contractor)
+	if releaseErr != nil {
+		return releaseErr
+	}
+
 	_, execErr := call.Tx.Exec(
 		ctx,
 		`INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, candidate_slots, offered_at,
@@ -819,12 +824,66 @@ func offerFromProposal(
 
 	_, err := call.Tx.Exec(
 		ctx,
-		`UPDATE maintenance.jobs SET status = 'offered', contractor_org_id = $2 WHERE id = $1`,
+		`UPDATE maintenance.jobs SET status = 'offered', contractor_org_id = $2, assignment_id = NULL, scheduled_slot = NULL
+			WHERE id = $1`,
 		job,
 		contractor,
 	)
 
 	return apperr.Wrap(err, "update maintenance.jobs")
+}
+
+// releaseForOffer ends what the job held before the accepted proposal hands it to another contractor (IR750): the
+// active assignment — an internal technician's, or the previous contractor's technician's who could not make it —,
+// another contractor's open offer (declined as rescheduled, which the offer acceptance KPI leaves out, IR452) with its
+// time changes, and another contractor's accepted access, as a reassignment and a reschedule end them.
+func releaseForOffer(ctx context.Context, call *ops.Call, job, contractor uuid.UUID) error {
+	_, err := call.Tx.Exec(
+		ctx,
+		`UPDATE maintenance.partner_slot_proposals SET status = 'withdrawn' WHERE status IN ('pending','sent_to_client')
+		AND offer_id IN (SELECT id FROM maintenance.offers WHERE job_id = $1 AND contractor_org_id <> $2)`,
+		job,
+		contractor,
+	)
+	if err != nil {
+		return apperr.Wrap(err, "update maintenance.partner_slot_proposals")
+	}
+
+	_, err = call.Tx.Exec(
+		ctx,
+		`UPDATE maintenance.offers SET decision = 'decline', decided_by = $3, decided_at = $4, decline_reason = 'rescheduled',
+			version = version + 1, updated_at = platform.app_now()
+		WHERE job_id = $1 AND contractor_org_id <> $2 AND decision IS NULL AND expired_at IS NULL`,
+		job,
+		contractor,
+		call.Principal.UserID,
+		call.Now,
+	)
+	if err != nil {
+		return apperr.Wrap(err, "update maintenance.offers")
+	}
+
+	_, err = call.Tx.Exec(
+		ctx,
+		`UPDATE maintenance.assignments SET status = 'revoked', reason = 'reassigned', version = version + 1, updated_at =
+			platform.app_now() WHERE job_id = $1 AND status = 'active'`,
+		job,
+	)
+	if err != nil {
+		return apperr.Wrap(err, "update maintenance.assignments")
+	}
+
+	_, err = call.Tx.Exec(
+		ctx,
+		`UPDATE maintenance.offers SET access_valid_until = GREATEST(access_valid_from, $2), version = version + 1, updated_at
+			= platform.app_now()
+		WHERE job_id = $1 AND decision = 'accept' AND contractor_org_id <> $3 AND access_valid_until > $2`,
+		job,
+		call.Now,
+		contractor,
+	)
+
+	return apperr.Wrap(err, "update maintenance.offers")
 }
 
 // moveOffer moves the contractor's open offer to the proposal's slot: its access window follows the visit (IR454), a

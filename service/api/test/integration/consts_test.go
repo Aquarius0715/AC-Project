@@ -214,6 +214,7 @@ const (
 	stateSucceeded         = "succeeded"
 	statusUnpaid           = "unpaid"
 	statusWithdrawn        = "withdrawn"
+	decisionDecline        = "decline" // Offer.decision of a declined offer
 )
 
 // Evaluation decisions, their reasons and the outcomes of runs.
