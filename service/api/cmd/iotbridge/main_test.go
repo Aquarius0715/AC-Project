@@ -26,7 +26,7 @@ func TestFetchWaitingReadsTheRequestedCommands(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/internal/v1/system/queries/control.requestedCommands" ||
-			r.Header.Get(ops.InternalTokenHeader) != "tok" ||
+			r.Header.Get(ops.InternalTokenHeader) != testToken ||
 			r.Header.Get("X-Tenant-Id") != "t1" {
 			writer.WriteHeader(http.StatusUnauthorized)
 
@@ -39,7 +39,7 @@ func TestFetchWaitingReadsTheRequestedCommands(t *testing.T) {
 					"data": []map[string]any{
 						{
 							"id":        commandID,
-							"deviceId":  uuid.New(),
+							keyDeviceID: uuid.New(),
 							"unitId":    uuid.New(),
 							"action":    map[string]any{"kind": "set_temperature", "celsius": 26},
 							"expiresAt": time.Now().Add(time.Minute),
@@ -51,7 +51,7 @@ func TestFetchWaitingReadsTheRequestedCommands(t *testing.T) {
 
 	client := &http.Client{Timeout: 5 * time.Second, Transport: nil, CheckRedirect: nil, Jar: nil}
 
-	got, err := fetchWaiting(t.Context(), client, srv.URL, "tok", "t1")
+	got, err := fetchWaiting(t.Context(), client, srv.URL, testToken, "t1")
 	if err != nil || len(got) != 1 || got[0].ID != commandID {
 		t.Fatalf("waiting: %v %v", got, err)
 	}
@@ -68,12 +68,12 @@ func TestFetchWaitingReadsTheRequestedCommands(t *testing.T) {
 	)
 	defer bad.Close()
 
-	_, fetchWaitingErr = fetchWaiting(t.Context(), client, bad.URL, "tok", "t1")
+	_, fetchWaitingErr = fetchWaiting(t.Context(), client, bad.URL, testToken, "t1")
 	if fetchWaitingErr == nil {
 		t.Error("a bad answer is not an error")
 	}
 
-	_, fetchWaitingErr = fetchWaiting(t.Context(), client, "http://127.0.0.1:1", "tok", "t1")
+	_, fetchWaitingErr = fetchWaiting(t.Context(), client, "http://127.0.0.1:1", testToken, "t1")
 	if fetchWaitingErr == nil {
 		t.Error("a dead API is not an error")
 	}
@@ -165,7 +165,7 @@ func TestSendReportsRefusals(t *testing.T) {
 		BindingID:   nil,
 		Sequence:    nil,
 		Kind:        "",
-		Recovery:    nil,
+		Recovery:    nil, OperationID: nil, Result: "",
 	}
 
 	err := send(t.Context(), client, srv.URL, trigger)
@@ -194,7 +194,7 @@ func TestSendReportsRefusals(t *testing.T) {
 			BindingID:   nil,
 			Sequence:    nil,
 			Kind:        "",
-			Recovery:    nil,
+			Recovery:    nil, OperationID: nil, Result: "",
 		},
 	)
 	if err == nil {
@@ -239,9 +239,9 @@ func TestEnvAndTokenHelpers(t *testing.T) {
 		t.Error("envOr")
 	}
 
-	t.Setenv("INTERNAL_API_TOKEN", "tok")
+	t.Setenv("INTERNAL_API_TOKEN", testToken)
 
-	if internalToken() != "tok" {
+	if internalToken() != testToken {
 		t.Error("internalToken")
 	}
 

@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/pradita/ac-project/service/api/internal/iotbridge"
+	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
@@ -488,4 +489,78 @@ const (
 	eventCommandSent = "command_sent"
 	eventTelemetry   = "telemetry"
 	eventState       = "state"
+	testToken        = "tok"
+	keyDeviceID      = "deviceId"
 )
+
+// TestLiveChecks: the running checks are read with the internal token and the tenant, and each is answered on the demo
+// trigger: succeeded for a node heard just now, failed for one unheard for longer than LiveOfflineAfter; a refused read
+// is an error.
+func TestLiveChecks(t *testing.T) {
+	t.Parallel()
+
+	live := newLiveFixture(t)
+	heard, silent := uuid.New(), uuid.New()
+
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/internal/v1/system/queries/devices.mqttChecks" ||
+			r.Header.Get(
+				ops.InternalTokenHeader,
+			) != testToken || r.Header.Get("X-Tenant-Id") != "t1" {
+			w.WriteHeader(http.StatusUnauthorized)
+
+			return
+		}
+
+		_ = json.NewEncoder(w).
+			Encode(map[string]any{"data": map[string]any{"checks": []map[string]any{
+				{"operationId": heard, keyDeviceID: live.air.DeviceID, "node": node1Name},
+				{"operationId": silent, keyDeviceID: live.sensors.DeviceID, "node": node2Name},
+			}}})
+	}))
+	t.Cleanup(api.Close)
+
+	checks, err := fetchChecks(
+		t.Context(),
+		live.handler.httpc,
+		liveAPI{equipment: api.URL, token: testToken, tenant: "t1"},
+	)
+	if err != nil || len(checks) != 2 || checks[0].OperationID != heard ||
+		checks[1].Node != node2Name {
+		t.Fatalf("checks %+v, %v", checks, err)
+	}
+
+	_, err = fetchChecks(
+		t.Context(),
+		live.handler.httpc,
+		liveAPI{equipment: api.URL, token: "wrong", tenant: "t1"},
+	)
+	if err == nil {
+		t.Error("a refused read is not an error")
+	}
+
+	now := time.Now()
+	live.handler.heard.Heard(node1Name, now)
+	live.handler.heard.Gone(node2Name, now)
+
+	for _, check := range checks {
+		answerCheck(
+			t.Context(),
+			live.handler.httpc,
+			live.srv.URL,
+			check,
+			live.handler.heard.GapOf([]string{check.Node}, now),
+			now,
+		)
+	}
+
+	live.api.mu.Lock()
+	defer live.api.mu.Unlock()
+
+	if len(live.api.got) != 2 || live.api.got[0].Result != "succeeded" ||
+		*live.api.got[0].OperationID != heard ||
+		live.api.got[1].Result != "failed" ||
+		*live.api.got[1].OperationID != silent {
+		t.Errorf("answers %+v", live.api.got)
+	}
+}

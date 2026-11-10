@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -232,6 +233,132 @@ func TestMqttNodesForTheGateway(t *testing.T) {
 		if asObj(t, n)["node"] == node {
 			t.Error("an unbound device is listed")
 		}
+	}
+
+	if code, _ := ask(""); code != 401 {
+		t.Errorf("without the internal token: %d", code)
+	}
+}
+
+// TestMqttChecksForTheGateway: the IoT gateway reads the running connection checks of the devices that have a node_id
+// (devices.mqttChecks, IR736), and its answer (demo.trigger operation succeeded) brings a device a timed-out check left
+// in error back online. A queued check, a check of a device without a node_id and a finished check are not listed;
+// without the internal token the read is refused.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
+func TestMqttChecksForTheGateway(t *testing.T) {
+	srv := serverWith(t, true)
+	cluster := newCluster(t)
+	unit, other := boundUnit(t, srv, "error"), boundUnit(t, srv, "online")
+	node := "Check_" + uuid.NewString()[:8]
+
+	var device, otherDevice string
+	ownerScan(t, `SELECT id::text FROM devices.devices WHERE unit_id = $1`, []any{unit}, &device)
+	ownerScan(
+		t,
+		`SELECT id::text FROM devices.devices WHERE unit_id = $1`,
+		[]any{other},
+		&otherDevice,
+	)
+	owner(t, `UPDATE devices.devices SET mqtt_node = $2 WHERE id = $1`, device, node)
+
+	running, queued, noNode := uuid.NewString(), uuid.NewString(), uuid.NewString()
+	for _, operation := range []struct{ id, device, unit, status string }{
+		{running, device, unit, "running"}, {queued, device, unit, "queued"}, {noNode, otherDevice, other, "running"},
+	} {
+		owner(
+			t,
+			`INSERT INTO devices.device_operations (id, tenant_id, device_id, unit_id, kind, status, expires_at)
+			VALUES ($1,$2,$3,$4,'check',$5, now() + interval '1 day')`,
+			operation.id,
+			seed.ID("tenant-a"),
+			operation.device,
+			operation.unit,
+			operation.status,
+		)
+	}
+
+	ask := func(token string) (int, []map[string]any) {
+		req, _ := http.NewRequestWithContext(
+			t.Context(),
+			http.MethodPost,
+			cluster.urls[ops.DomainEquipment]+"/internal/v1/system/queries/devices.mqttChecks",
+			strings.NewReader(`{}`),
+		)
+		req.Header.Set("Content-Type", "application/json")
+
+		if token != "" {
+			req.Header.Set(ops.InternalTokenHeader, token)
+		}
+
+		req.Header.Set("X-Tenant-Id", seed.ID("tenant-a").String())
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = resp.Body.Close() }()
+
+		var body struct {
+			Data struct {
+				Checks []map[string]any `json:"checks"`
+			} `json:"data"`
+		}
+
+		_ = json.NewDecoder(resp.Body).Decode(&body)
+
+		return resp.StatusCode, body.Data.Checks
+	}
+
+	mine := func(checks []map[string]any) []map[string]any {
+		var out []map[string]any
+
+		for _, check := range checks {
+			if check["deviceId"] == device || check["deviceId"] == otherDevice {
+				out = append(out, check)
+			}
+		}
+
+		return out
+	}
+
+	code, checks := ask("test-internal")
+	if got := mine(checks); code != 200 || len(got) != 1 || got[0]["operationId"] != running ||
+		got[0]["node"] != node {
+		t.Fatalf("mqttChecks: %d %v", code, got)
+	}
+
+	var appNow time.Time
+	ownerScan(t, `SELECT platform.app_now()`, nil, &appNow)
+
+	if code, resp := write(
+		srv,
+		customerB(),
+		"demo.trigger",
+		`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+appNow.Add(-time.Second).
+			Format(time.RFC3339Nano)+
+			`","eventType":"operation","operationId":"`+running+`","result":"succeeded"}`,
+		0,
+	); code != 200 {
+		t.Fatalf("the gateway's answer: %d %v", code, resp)
+	}
+
+	var devConn, unitConn string
+	ownerScan(
+		t,
+		`SELECT d.connection, u.connection FROM devices.devices d JOIN assets.units u ON u.id = d.unit_id
+		WHERE d.id = $1`,
+		[]any{device},
+		&devConn,
+		&unitConn,
+	)
+
+	if devConn != "online" || unitConn != "online" {
+		t.Errorf("after the answered check the device is %s, its unit %s", devConn, unitConn)
+	}
+
+	if _, checks := ask("test-internal"); len(mine(checks)) != 0 {
+		t.Errorf("a finished check is still listed: %v", mine(checks))
 	}
 
 	if code, _ := ask(""); code != 401 {

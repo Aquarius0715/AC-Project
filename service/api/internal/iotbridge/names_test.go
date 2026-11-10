@@ -13,6 +13,7 @@ const (
 	node2             = "node_2"
 	node9             = "node_9"
 	qualityValid      = "valid"
+	resultSucceeded   = "succeeded"
 	sensorHumidity    = "humidity"
 	sensorPower       = "power"
 	sensorTemperature = "temperature"
