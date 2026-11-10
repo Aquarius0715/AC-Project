@@ -10060,3 +10060,11 @@ Found in review round 270 (`shared/lib/partnerReview.ts`, never reviewed by name
 1. **Cause.** The "Items that need rework" list of the return dialogs (HQ's Admin > Jobs and the contractor's quality review, IR232, IR609) offers one "re-measure" item per reading of the report. A technician may record the same metric on the same part twice (before and after cleaning: the readings table takes any rows, and `jobs.saveDraft` does not refuse them), so two items had the same label. Both dialogs key the checkboxes and keep the ticked items by label: React saw two children with one key, ticking one ticked both, and the reason listed the line twice.
 2. **Fix.** `reworkItems` offers one re-measure item per distinct reading label. The label already names the metric and the part, so the technician reads the same instruction.
 3. **Tests.** `partnerReview.test.ts`: two readings of the refrigerant pressure of the refrigerant pipe give one re-measure item, and the labels are unique.
+
+## IR738 The payout statement PDF continues on further pages — 2026-11-10
+
+Found in review round 271 (`shared/lib/partnerPayouts.ts`, never reviewed by name). It replaces the "one-page" PDF of FR-P10's earlier entries (the payouts screen, IR279).
+
+1. **Cause.** The statement PDF (Contractor > Payouts, Download PDF) was one A4 page: Courier 9 pt from y 800 at 12 pt a line, so about 66 lines show. Five header lines and seven lines of totals and notes leave about 54 statement lines. A statement has one line per review-accepted job of the month, and a contractor at the launch size (§13) has more; the rest of the lines and the totals ran off the page.
+2. **Fix.** The text goes onto pages of 64 lines (down to the 40 pt bottom margin). Each page is a page object with its own content stream; the catalog, the page tree and the Courier font are shared. A short statement is still one page. The text rules stay: ASCII only, `\`, `(` and `)` escaped, a Japanese user's PDF in English (IR639).
+3. **Tests.** `partnerPayouts.test.ts`: 120 statement lines give 3 pages of at most 64 lines, 132 text lines in all, the totals on the last page, each stream's /Length and every xref offset right. Read back with pdfinfo and mutool: 3 pages, and 1 for a short statement.

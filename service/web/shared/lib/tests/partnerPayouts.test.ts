@@ -96,6 +96,22 @@ describe("payoutPdf", () => {
     const stream = must(must(/stream\n([\s\S]*?)\nendstream/.exec(pdf))[1]);
     expect(stream).toHaveLength(length);
   });
+  it("continues a long statement on further pages, so every line and the totals stay on a page (IR738)", () => {
+    const lines = Array.from({ length: 120 }, (_, k) => line({ id: `l${String(k)}`, jobId: `job-${String(k).padStart(8, "0")}` }));
+    const s = statement({ lines });
+    const pdf = payoutPdf(s, lineRows(s, new Map(), []), "Demo Contractor A");
+    const streams = pdf.matchAll(/stream\n([\s\S]*?)\nendstream/g).map((m) => must(m[1])).toArray();
+    expect(streams).toHaveLength(3); // 132 text lines, 64 to a page
+    expect(pdf).toContain("/Count 3");
+    for (const st of streams) expect((st.match(/\) Tj/g) ?? []).length).toBeLessThanOrEqual(64);
+    expect(streams.join("").match(/\) Tj/g) ?? []).toHaveLength(132); // 120 statement lines + the 12 of the header, rules, totals and notes
+    expect(must(streams.at(-1))).toContain("(Net payable");
+    for (const m of pdf.matchAll(/\/Length (\d+) >>\nstream\n([\s\S]*?)\nendstream/g)) expect(must(m[2])).toHaveLength(Number(m[1]));
+    const xref = Number(must(/startxref\n(\d+)/.exec(pdf))[1]);
+    expect(pdf.slice(xref, xref + 4)).toBe("xref");
+    const offsets = pdf.matchAll(/(\d{10}) 00000 n/g).map((m) => Number(m[1])).toArray();
+    for (const [i, o] of offsets.entries()) expect(pdf.slice(o, o + `${String(i + 1)} 0 obj`.length)).toBe(`${String(i + 1)} 0 obj`);
+  });
 });
 
 describe("payouts in Malay (IR279)", () => {
