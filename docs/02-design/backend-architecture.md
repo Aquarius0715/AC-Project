@@ -206,7 +206,7 @@ Modelling rules:
   - billing (restrictions) → equipment: `UnitRestrictionApplied`, `UnitRestrictionCleared`, `RecoveryCasesChanged`, `ReconciliationRequired`, `ReconciliationResolved`, `RestrictionCommandRequested`, `RestrictionCommandsCancelled`;
   - equipment → billing (restrictions): `UnitRestrictionObserved`, `CommandAcknowledged`, `CommandsEnded`;
   - any domain → identity: `NotificationRequested` (the notification store) and `AuditRecorded`; maintenance → identity: `QualificationGranted`; billing → maintenance: `JobNoteRequested`;
-  - maintenance → equipment: `OfferAccessChanged`, `AssignmentAccessChanged` (row triggers), `FilterCleaningDue`, `FilterCleaningCleared`; identity → equipment: `ConsentRevoked`;
+  - maintenance → equipment: `OfferAccessChanged`, `AssignmentAccessChanged` (row triggers), `FilterCleaningDue`, `FilterCleaningCleared`; identity → equipment: `ConsentRevoked`; equipment (assets) → equipment (monitoring) and maintenance: `CustomerDeleted` (IR739: the deleted customer's alert policies, default rule switches and filter care settings);
   - identity's own `identity-accounts` consumer: `AccountRequested`, `AccountEnabled`, `SessionsRevoked`.
 
   The other event types in the outbox (for example `JobAssigned` or `InvoiceCreated`) record what happened for the planned SNS consumers; nothing consumes them yet. The flows of the table that have no such event, such as TelemetryReceived, CommandSettled and AlertOpened, have no event as built: the IoT bridge posts the readings, the acknowledgements and the facts to evaluate to the API over HTTP (`demo.trigger`), which stores them and evaluates the alert policies itself (IR529).
