@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.613.0
+version: 0.614.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -301,6 +301,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.614.0: IR757: a set-up e-mail is sent again only under the account's and the membership's locks. Phase 1A unchanged.
 0.613.0: IR756: the other refusals without a field have their words. Phase 1A unchanged.
 0.612.0: IR755: a job's problem photos open only with the job's detail. Phase 1A unchanged.
 0.611.0: IR754: the import refusals have their words. Phase 1A unchanged.

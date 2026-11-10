@@ -885,7 +885,8 @@ func clientUsersResend(
 		return InvitePreview{}, err
 	}
 
-	clientUser, err := loadClientUser(ctx, call, input.ID, false)
+	// locked: a disable or delete of the account at the same moment waits or is seen (IR757)
+	clientUser, err := loadClientUser(ctx, call, input.ID, true)
 	if err != nil {
 		return InvitePreview{}, err
 	}
@@ -895,30 +896,14 @@ func clientUsersResend(
 	}
 
 	// no set-up e-mail once the access has ended: it would open the sign-in account HQ turned off (IR461, IR508, IR664)
-	var ended bool
-
-	endedErr := call.Tx.QueryRow(ctx, `SELECT valid_until IS NOT NULL AND valid_until <= $2 FROM identity.memberships WHERE
-		id = $1`, *clientUser.MembershipID, call.Now).
-		Scan(&ended)
-	if endedErr != nil {
-		return InvitePreview{}, apperr.Wrap(endedErr, "select identity.memberships")
-	}
-
-	if ended {
-		return InvitePreview{}, apperr.E(apperr.Conflict, "errors.access_expired")
+	user, err := resendTarget(ctx, call, *clientUser.MembershipID)
+	if err != nil {
+		return InvitePreview{}, err
 	}
 
 	inviteResendWaitErr := inviteResendWait(ctx, call, "client_users", clientUser.ID)
 	if inviteResendWaitErr != nil {
 		return InvitePreview{}, inviteResendWaitErr
-	}
-
-	var user uuid.UUID // the set-up e-mail again (IR461)
-
-	scanErr := call.Tx.QueryRow(ctx, `SELECT user_id FROM identity.memberships WHERE id = $1`, *clientUser.MembershipID).
-		Scan(&user)
-	if scanErr != nil {
-		return InvitePreview{}, apperr.Wrap(scanErr, "select identity.memberships")
 	}
 
 	requestAccount(call, user, *clientUser.MembershipID, authz.RoleClient)
