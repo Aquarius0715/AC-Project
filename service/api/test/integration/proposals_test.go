@@ -1718,6 +1718,67 @@ func TestDeclineWithdrawsClientProposal(t *testing.T) {
 	}
 }
 
+// TestRescheduleWithdrawsOpenProposals (IR749): the client's reschedule of a plan visit declines the open offer, as a
+// cancellation does, so it ends the proposals still open on the job too: the contractor's time change and the client
+// proposal HQ sent on from it. Before, they stayed pending and the old proposal could still be accepted.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
+func TestRescheduleWithdrawsOpenProposals(t *testing.T) {
+	srv := server(t)
+	opened := openProposals(t, srv)
+	job, partner, proposal := opened.job, opened.partner, opened.proposal
+	// the visit is a plan visit, which the client may reschedule (IR113)
+	owner(t, `UPDATE maintenance.jobs SET origin = 'periodic_plan' WHERE id = $1`, job)
+	// and its offered time is more than 48 hours ahead (the reschedule limit)
+	owner(
+		t,
+		`UPDATE maintenance.offers SET candidate_slots = jsonb_build_array(jsonb_build_object('startAt', $2::text, 'endAt',
+			$3::text)) WHERE id = $1`,
+		opened.offer,
+		clock().Add(100*time.Hour).Format(time.RFC3339),
+		clock().Add(102*time.Hour).Format(time.RFC3339),
+	)
+
+	three := `[` + slotJSON(170, 2) + `,` + slotJSON(194, 2) + `,` + slotJSON(218, 2) + `]`
+	if code, res := write(
+		srv,
+		customerA(),
+		"jobs.requestReschedule",
+		`{"jobId":"`+job+`","preferredSlots":`+three+`}`,
+		4,
+	); code != 200 {
+		t.Fatalf("reschedule: %d %v", code, res)
+	}
+
+	var clientStatus, partnerStatus string
+	ownerScan(
+		t,
+		`SELECT (SELECT status FROM maintenance.slot_proposals WHERE id = $1), (SELECT status FROM
+			maintenance.partner_slot_proposals WHERE id = $2)`,
+		[]any{proposal, partner},
+		&clientStatus,
+		&partnerStatus,
+	)
+
+	if clientStatus != statusWithdrawn || partnerStatus != statusWithdrawn {
+		t.Errorf(
+			"after the reschedule: client proposal %s, time change %s",
+			clientStatus,
+			partnerStatus,
+		)
+	}
+
+	if code, _ := write(
+		srv,
+		customerA(),
+		"jobs.respondProposal",
+		`{"jobId":"`+job+`","proposalId":"`+proposal+`","decision":"accept"}`,
+		5,
+	); code != 409 {
+		t.Errorf("the client accepted a proposal from before the reschedule: %d", code)
+	}
+}
+
 // TestCancelWithdrawsOpenProposals (IR444, IR445): HQ cancelling a job ends the proposals still open on it: the
 // company's time change waiting for HQ and HQ's proposal waiting for the client, so neither is answered on a cancelled
 // job. The offer ends too (declined as job_cancelled, by HQ's user, IR747).
@@ -1827,17 +1888,37 @@ func TestAcceptRechecksHold(t *testing.T) {
 		[]any{job},
 		&proposal,
 	)
+	// contractor-a suspended; other tests of the shard may have left its profile (TestSLAScorecard,
+	// TestOfferAcceptanceIgnoresCancelledJobs), so an existing one is suspended and restored, a new one removed
+	var existed bool
+	ownerScan(
+		t,
+		`SELECT EXISTS (SELECT 1 FROM maintenance.contractors WHERE organization_id = $1)`,
+		[]any{seed.ID("org-contractor-a")},
+		&existed,
+	)
 	owner(
 		t,
 		`INSERT INTO maintenance.contractors (tenant_id, organization_id, name, status, registration_no, contact_email,
 			delegation, suspended_reason)
-		VALUES ($1, $2, 'Demo Contractor A', 'suspended', 'SSM-TEST', 'ops@contractor-a.example', tstzrange($3, $4), 'test')`,
+		VALUES ($1, $2, 'Demo Contractor A', 'suspended', 'SSM-TEST', 'ops@contractor-a.example', tstzrange($3, $4), 'test')
+		ON CONFLICT (organization_id) DO UPDATE SET status = 'suspended', suspended_reason = 'test'`,
 		seed.ID("tenant-a"),
 		seed.ID("org-contractor-a"),
 		clock().Add(-time.Hour),
 		clock().Add(24*365*time.Hour),
 	)
 	t.Cleanup(func() {
+		if existed {
+			owner(
+				t,
+				`UPDATE maintenance.contractors SET status = 'active', suspended_reason = NULL WHERE organization_id = $1`,
+				seed.ID("org-contractor-a"),
+			)
+
+			return
+		}
+
 		owner(
 			t,
 			`DELETE FROM maintenance.contractors WHERE organization_id = $1`,
