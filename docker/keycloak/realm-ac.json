@@ -211,6 +211,7 @@
       "name": "identity-api: ends a user's sessions when HQ signs them out everywhere (IR386); no sign-in flow",
       "publicClient": false,
       "secret": "local-identity-admin-08e3e9c976792a4915e39541",
+      "defaultClientScopes": ["web-origins", "acr", "profile", "roles", "basic", "email", "kc-admin-api"],
       "serviceAccountsEnabled": true,
       "standardFlowEnabled": false,
       "implicitFlowEnabled": false,

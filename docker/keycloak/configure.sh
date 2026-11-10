@@ -49,6 +49,15 @@ if [ -n "${PUBLIC_HOSTS:-}" ]; then
   "$KC" update "clients/$webid" -r ac -s "redirectUris=[$web]" -s "webOrigins=[$(origins "$web")]"
   "$KC" update "clients/$id" -r ac -s "redirectUris=[$admin]" -s "webOrigins=[$(origins "$admin")]"
 fi
+# Keycloak 26.8.2 admits a service account to the admin API only with the built-in client scope kc-admin-api, which
+# puts the admin audience in its token (CVE-2026-19688, IR731); identity-api's account gets it. A realm imported before
+# has the scope but not on the client; a Keycloak before 26.8.2 has no such scope and needs none
+scope=$("$KC" get client-scopes -r ac --fields id,name --format csv --noquotes | sed -n 's/^\([^,]*\),kc-admin-api$/\1/p')
+if [ -n "$scope" ]; then
+  admin_id=$("$KC" get clients -r ac -q clientId=ac-identity-admin --fields id --format csv --noquotes)
+  "$KC" update "clients/$admin_id/default-client-scopes/$scope" -r ac
+  echo "realm ac: identity-api's service account has the admin API scope"
+fi
 # the demo users' passwords are in the repository: an environment that names its own (the shared test environment's
 # DEMO_USER_PASSWORD, IR720) sets it on every start; empty (dev, CI, E2E) leaves them as imported
 if [ -n "${DEMO_USER_PASSWORD:-}" ]; then
