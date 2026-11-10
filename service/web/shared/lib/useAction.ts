@@ -1,11 +1,24 @@
 "use client";
 
 import { useTransition } from "react";
+import { unstable_rethrow } from "next/navigation";
 import { useRefreshThen } from "@ac/web/lib/useRefreshThen";
 import { useToast } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
 import { signInAgainHref, signedOutReason } from "@ac/web/lib/login";
 import { actionMessage, type ActionFailure } from "@ac/web/lib/actionMessage";
+
+/** The Server Action's answer, or unavailable when the call itself got none (the browser offline, the app server away):
+the page stays with what the user typed, as for a Core API that does not answer (IR683, IR717). Next's own control flow
+(a redirect, not found) goes on. */
+async function reached<T>(fn: () => Promise<{ ok: true; value: T } | ({ ok: false } & ActionFailure)>): Promise<{ ok: true; value: T } | ({ ok: false } & ActionFailure)> {
+  try {
+    return await fn();
+  } catch (error) {
+    unstable_rethrow(error);
+    return { ok: false, code: "UNAVAILABLE", messageKey: "error.unavailable", fieldErrors: {} };
+  }
+}
 
 /** Runs a Server Action in a transition: a toast on success (text or from the value) and the readable failure in the
 display language otherwise (IR269); `after` runs only on success. A change that succeeded makes the page read its data
@@ -20,7 +33,7 @@ export function useAction() {
   const [pending, start] = useTransition();
   const refreshThen = useRefreshThen(pending);
   const run = <T,>(fn: () => Promise<Result<T>>, ok: string | ((v: T) => string), after?: (v: T) => void, failed?: (r: ActionFailure) => void, options?: { reload?: boolean }) => { start(async () => {
-      const r = await fn();
+      const r = await reached(fn);
       if (r.ok && options?.reload === false) {
         toast(typeof ok === "string" ? ok : ok(r.value));
         after?.(r.value);
