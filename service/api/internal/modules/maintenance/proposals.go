@@ -49,7 +49,7 @@ func replyByOK(now, replyBy, slotStart time.Time) bool {
 		!replyBy.After(slotStart)
 }
 
-func (m Proposals) pending(ctx context.Context, c *ops.Call, job uuid.UUID) (bool, error) {
+func (Proposals) pending(ctx context.Context, c *ops.Call, job uuid.UUID) (bool, error) {
 	var found bool
 
 	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.slot_proposals WHERE job_id = $1 AND status =
@@ -243,6 +243,15 @@ func (m Proposals) proposeSlotJob(
 		}
 
 		allowed = count > 0
+
+		if !allowed && job.status == statusAccepted {
+			over, overErr := candidatesOver(ctx, call, input.JobID)
+			if overErr != nil {
+				return Job{}, overErr
+			}
+
+			allowed = over // the contractor can no longer assign any time it was offered (IR642)
+		}
 	case statusAssigned:
 		var ack string // no active assignment: not allowed
 
@@ -254,7 +263,9 @@ func (m Proposals) proposeSlotJob(
 			return Job{}, apperr.Wrap(err, "select maintenance.assignments")
 		}
 
-		allowed = ack == ackCantMake
+		// the technician cannot make it, or the booked time is over and nobody started (IR642)
+		allowed = ack == ackCantMake ||
+			(job.scheduled != nil && !job.scheduled.EndAt.After(call.Now))
 	}
 
 	if !allowed {
@@ -306,7 +317,7 @@ func (m Proposals) proposeSlotJob(
 	return m.finish(ctx, call, input.JobID, "proposal.sent", "jobs.proposeSlot", "SlotProposed", "")
 }
 
-func (m Proposals) insertProposal(
+func (Proposals) insertProposal(
 	ctx context.Context,
 	call *ops.Call,
 	job uuid.UUID,
@@ -781,17 +792,23 @@ func offerFromProposal(
 		return apperr.Wrap(scanErr, "select maintenance.offers")
 	}
 
+	candidate, marshalErr := json.Marshal(
+		[]Slot{slot},
+	) // the client accepted this one time (IR636 item 4)
+	if marshalErr != nil {
+		return apperr.Wrap(marshalErr, "json.Marshal")
+	}
+
 	_, execErr := call.Tx.Exec(
 		ctx,
-		`INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, visit_slot, offered_at,
+		`INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, candidate_slots, offered_at,
 			offer_expires_at,
-		access_valid_from, access_valid_until) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, tstzrange($4, $5),
-		$6, $7, $6, $8)`,
+		access_valid_from, access_valid_until) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4,
+		$5, $6, $5, $7)`,
 		job,
 		contractor,
 		terms,
-		slot.StartAt,
-		slot.EndAt,
+		candidate,
 		call.Now,
 		expires,
 		slot.EndAt.Add(accessAfterVisit),
@@ -821,16 +838,22 @@ func moveOffer(
 	slot Slot,
 ) error {
 	// the access window follows the moved visit (IR454): it still has to cover it, as jobs.offer requires, and reaches
-	// slot end + 24 h like an offer the acceptance creates; it is never shortened
+	// slot end + 24 h like an offer the acceptance creates; it is never shortened. The client accepted this one time, so
+	// it becomes the offer's only candidate (IR636 item 4).
+	candidate, marshalErr := json.Marshal([]Slot{slot})
+	if marshalErr != nil {
+		return apperr.Wrap(marshalErr, "json.Marshal")
+	}
+
 	_, execErr := call.Tx.Exec(
 		ctx,
-		`UPDATE maintenance.offers SET visit_slot = tstzrange($2, $3), access_valid_from = LEAST(access_valid_from, $2),
-		access_valid_until = GREATEST(access_valid_until, $4), version = version + 1, updated_at = platform.app_now() WHERE id
+		`UPDATE maintenance.offers SET candidate_slots = $4, access_valid_from = LEAST(access_valid_from, $2),
+		access_valid_until = GREATEST(access_valid_until, $3), version = version + 1, updated_at = platform.app_now() WHERE id
 		= $1`,
 		offer,
 		slot.StartAt,
-		slot.EndAt,
 		slot.EndAt.Add(accessAfterVisit),
+		candidate,
 	)
 	if execErr != nil {
 		return apperr.Wrap(execErr, "update maintenance.offers")
@@ -878,6 +901,21 @@ func moveOffer(
 	}
 
 	return nil
+}
+
+// candidatesOver reports whether every candidate time of the job's accepted offer has ended (IR642): the contractor can
+// assign none of them, so HQ may propose another time like it does after a technician cannot make it.
+func candidatesOver(ctx context.Context, call *ops.Call, jobID uuid.UUID) (bool, error) {
+	var over bool
+
+	err := call.Tx.QueryRow(ctx, `SELECT COALESCE(bool_and((c->>'endAt')::timestamptz <= $2), false)
+		FROM jsonb_array_elements((SELECT candidate_slots FROM maintenance.offers WHERE job_id = $1 AND decision = 'accept'
+			ORDER BY decided_at DESC LIMIT 1)) c`, jobID, call.Now).Scan(&over)
+	if err != nil {
+		return false, apperr.Wrap(err, "select maintenance.offers")
+	}
+
+	return over, nil
 }
 
 // ---- jobs.requestReschedule ----
@@ -946,6 +984,35 @@ func (m Proposals) requestReschedule(
 	return written(m.requestRescheduleJob(ctx, c, in))
 }
 
+// visitStart is when the job's visit begins, for the 48 hour rule of a reschedule: its scheduled slot or, until a
+// technician is assigned, the earliest candidate time of its offer (IR636 item 5); nil when it has neither.
+func (Proposals) visitStart(
+	ctx context.Context,
+	call *ops.Call,
+	jobID uuid.UUID,
+	job jobRow,
+) (*time.Time, error) {
+	if job.scheduled != nil {
+		return &job.scheduled.StartAt, nil
+	}
+
+	var start time.Time
+
+	err := call.Tx.QueryRow(ctx, `SELECT (SELECT min((c->>'startAt')::timestamptz) FROM
+		jsonb_array_elements(candidate_slots) c) FROM maintenance.offers WHERE job_id = $1 AND expired_at IS NULL
+		AND (decision IS NULL OR decision = 'accept') ORDER BY offered_at DESC LIMIT 1`, jobID).
+		Scan(&start)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil //nolint:nilnil // no offer yet: there is no visit start, which is not an error
+	}
+
+	if err != nil {
+		return nil, apperr.Wrap(err, "select maintenance.offers")
+	}
+
+	return &start, nil
+}
+
 // requestRescheduleJob is requestReschedule answering the job with its detail extras.
 func (m Proposals) requestRescheduleJob(
 	ctx context.Context,
@@ -982,20 +1049,9 @@ func (m Proposals) requestRescheduleJob(
 		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
-	var start *time.Time
-	if job.scheduled != nil {
-		start = &job.scheduled.StartAt
-	} else {
-		var visitStart time.Time
-
-		err := call.Tx.QueryRow(ctx, `SELECT lower(visit_slot) FROM maintenance.offers WHERE job_id = $1 AND expired_at IS
-			NULL
-			AND (decision IS NULL OR decision = 'accept')
-			ORDER BY offered_at DESC LIMIT 1`, input.JobID).
-			Scan(&visitStart)
-		if err == nil {
-			start = &visitStart
-		}
+	start, startErr := m.visitStart(ctx, call, input.JobID, job)
+	if startErr != nil {
+		return Job{}, startErr
 	}
 
 	if start != nil && start.Sub(call.Now) < 48*time.Hour {
@@ -1119,12 +1175,15 @@ func (m Proposals) proposePartnerJob(
 	call *ops.Call,
 	input *PartnerProposeInput,
 ) (Job, error) {
-	var expires time.Time
+	var (
+		expires    time.Time
+		candidates []Slot
+	)
 
-	err := call.Tx.QueryRow(ctx, `SELECT offer_expires_at FROM maintenance.offers WHERE id = $1 AND job_id = $2 AND
-		contractor_org_id = $3 AND decision IS NULL AND expired_at IS NULL FOR UPDATE`,
+	err := call.Tx.QueryRow(ctx, `SELECT offer_expires_at, candidate_slots FROM maintenance.offers WHERE id = $1 AND
+		job_id = $2 AND contractor_org_id = $3 AND decision IS NULL AND expired_at IS NULL FOR UPDATE`,
 		input.OfferID, input.JobID, call.Principal.OrgID).
-		Scan(&expires)
+		Scan(&expires, &candidates)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Job{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
@@ -1158,6 +1217,11 @@ func (m Proposals) proposePartnerJob(
 
 	if !PreferredSlotsOK(call.Now, []Slot{input.Slot}) {
 		return Job{}, apperr.Fields(map[string]string{fieldSlot: apperr.KeySlotRules})
+	}
+
+	// a candidate time needs no proposal: the contractor assigns a technician for it directly (IR636 item 6)
+	if slotIn(candidates, input.Slot) {
+		return Job{}, apperr.Fields(map[string]string{fieldSlot: "errors.slot_is_preferred"})
 	}
 
 	checkTechnicianErr := m.Delivery.checkTechnician(
@@ -1210,7 +1274,7 @@ func (m Proposals) proposePartnerJob(
 	)
 }
 
-func (m Proposals) partnerProposal(
+func (Proposals) partnerProposal(
 	ctx context.Context,
 	call *ops.Call,
 	input *ProposalRef,

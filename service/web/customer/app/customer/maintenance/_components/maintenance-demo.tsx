@@ -1,26 +1,38 @@
 "use client";
+const TIME_PROPOSED = "time_proposed";
+const TEXT_14_00_16_00 = "14:00–16:00";
+const TEXT_09_00_11_00 = "09:00–11:00";
+const CONTRACTOR = "contractor";
 
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, Choice, DataTable, Field, Input, ListRow, Modal, Page, PageHead, Select, SummaryList, Tabs, Textarea, Timeline, UtilBar, cx, useToast, Plain } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Choice, DataTable, Field, Input, ListRow, Modal, Page, PageHead, Select, SummaryList, Tabs, Textarea, Timeline, UtilizationBar, cx, useToast, Plain } from "@ac/web/components/ui";
 import { JobStatusBadge, OriginBadge, PreferredSlotsInput, SlotLine, preferredError } from "@ac/web/components/JobBits";
-import { Job, JobStatus, Slot, fitFor, fmt, jobActions, longDate, useJobs } from "@ac/web/lib/jobs";
+import { type Job, type JobStatus, type Slot, fitFor, fmt, jobActions, longDate, useJobs } from "@ac/web/lib/jobs";
 import { units } from "@ac/web/lib/client";
 import { Icon, type IconName } from "@ac/web/components/Icon";
 import { Checkbox } from "@ac/web/components/ui/checkbox";
 import { symptomLength } from "@ac/web/lib/customerMaintenance";
+import { oneOf } from "@ac/web/lib/oneOf";
+import { orDash } from "@ac/web/lib/text";
+import { entryOf } from "@ac/web/lib/lookup";
 
 type StatusTab = "all" | "reply" | "requested" | "scheduled" | "progress" | "completed" | "cancelled";
-const tabOf = (s: JobStatus): StatusTab =>
-  s === "time_proposed" ? "reply" : s === "requested" ? "requested" : s === "offered" || s === "accepted" || s === "assigned" ? "scheduled" : s === "completed" ? "completed" : s === "cancelled" ? "cancelled" : "progress";
-const ORDER: JobStatus[] = ["time_proposed", "requested", "in_progress", "rework_requested", "submitted", "offered", "accepted", "assigned", "on_hold", "completed", "cancelled"];
-const blank = (): Slot[] => [{ date: "2026-09-28", win: "14:00–16:00" }, { date: "2026-09-29", win: "10:00–12:00" }, { date: "2026-09-30", win: "09:00–11:00" }];
+// the status tab of a job; the statuses of work under way count as in progress
+const TAB_OF = new Map<JobStatus, StatusTab>([
+  [TIME_PROPOSED, "reply"], ["requested", "requested"], ["offered", "scheduled"], ["accepted", "scheduled"], ["assigned", "scheduled"], ["completed", "completed"], ["cancelled", "cancelled"],
+]);
+const tabOf = (s: JobStatus): StatusTab => TAB_OF.get(s) ?? "progress";
+const ORDER: JobStatus[] = [TIME_PROPOSED, "requested", "in_progress", "rework_requested", "submitted", "offered", "accepted", "assigned", "on_hold", "completed", "cancelled"];
+const blank = (): Slot[] => [{ date: "2026-09-28", win: TEXT_14_00_16_00 }, { date: "2026-09-29", win: "10:00–12:00" }, { date: "2026-09-30", win: TEXT_09_00_11_00 }];
 
 function scheduleLine(j: Job) {
-  if (j.status === "time_proposed" && j.proposal) return { icon: "swap" as IconName, text: `${j.proposal.by === "contractor" ? "Service partner asks for" : "HQ proposed"} ${fmt(j.proposal.slot)} — reply by ${j.proposal.replyBy}`, warn: true };
+  if (j.status === TIME_PROPOSED && j.proposal) return { icon: "swap" as IconName, text: `${j.proposal.by === CONTRACTOR ? "Service partner asks for" : "HQ proposed"} ${fmt(j.proposal.slot)} — reply by ${j.proposal.replyBy}`, warn: true };
   if (j.status === "requested") return { icon: "time" as IconName, text: `Preferred ${fmt(j.preferred[0])}${j.preferred.length > 1 ? ` · +${String(j.preferred.length - 1)} more` : ""} (not confirmed yet)` };
   if (j.status === "completed") return { icon: "success" as IconName, text: `Completed ${fmt(j.scheduled)} · report available` };
   if (j.status === "cancelled") return { icon: "cancelled" as IconName, text: "Cancelled" };
-  return { icon: "time" as IconName, text: `${j.origin === "plan" ? "Scheduled" : "Confirmed"} ${fmt(j.scheduled)}${j.technician && j.techAck?.status === "accepted" ? ` · ${j.technician}` : (j.status === "offered" ? " · booking the technician" : "")}` };
+  const booking = j.status === "offered" ? " · booking the technician" : "";
+  const who = j.technician && j.techAck?.status === "accepted" ? ` · ${j.technician}` : booking;
+  return { icon: "time" as IconName, text: `${j.origin === "plan" ? "Scheduled" : "Confirmed"} ${fmt(j.scheduled)}${who}` };
 }
 
 /** The Phase 1A demo of /customer/maintenance (fixture store); API mode renders MaintenanceView. */
@@ -33,7 +45,7 @@ export function MaintenanceDemo({ jobId, initialTab }: Readonly<{ jobId?: string
   const [origin, setOrigin] = useState<"all" | "request" | "plan">("all");
   const [selId, setSelId] = useState<string | null>(sp.jobId ?? null);
   const [modal, setModal] = useState<null | "new" | "decline" | "other" | "rate" | "problem" | "cancel" | "note">(null);
-  const jobs = [...all].sort((a, b) => ORDER.indexOf(a.status) - ORDER.indexOf(b.status));
+  const jobs = [...all].toSorted((a, b) => ORDER.indexOf(a.status) - ORDER.indexOf(b.status));
   const shown = jobs.filter((j) => (tab === "all" || tabOf(j.status) === tab) && (origin === "all" || j.origin === origin));
   const count = (t: StatusTab) => jobs.filter((j) => t === "all" || tabOf(j.status) === t).length;
   const sel = all.find((j) => j.id === selId) ?? null;
@@ -44,12 +56,12 @@ export function MaintenanceDemo({ jobId, initialTab }: Readonly<{ jobId?: string
       <Tabs value={page} onChange={setPage} tabs={[{ id: "requests", label: "My requests" }, { id: "filters", label: "Filter care" }]} />
       {page === "filters" ? <FilterCare onRequest={() => { setPage("requests"); setModal("new"); }} /> : (
         <>
-          {replyCount > 0 && <Banner tone="warn" icon="swap" action={<Btn size="sm" variant="primary" onClick={() => { setTab("reply"); setSelId(jobs.find((j) => j.status === "time_proposed")?.id ?? null); }}>Review</Btn>}>A new visit time needs your reply ({replyCount}). Nothing is booked until you accept.</Banner>}
+          {replyCount > 0 && <Banner tone="warn" icon="swap" action={<Btn size="sm" variant="primary" onClick={() => { setTab("reply"); setSelId(jobs.find((j) => j.status === TIME_PROPOSED)?.id ?? null); }}>Review</Btn>}>A new visit time needs your reply ({replyCount}). Nothing is booked until you accept.</Banner>}
           {(() => { const done = all.find((j) => j.status === "completed" && j.id === "job-c02"); return done && !rated.has(done.id) ? <Banner tone="ok" icon="check" action={<span className="flex gap-2"><Btn size="sm" onClick={() => { setSelId(done.id); setModal("problem"); }}>Report a problem</Btn><Btn size="sm" variant="primary" onClick={() => { setSelId(done.id); setModal("rate"); }}>Confirm & rate</Btn></span>}><b>Work finished — job-c02 · Living room AC · Sep 8.</b> Is everything working? Your confirmation closes the job.</Banner> : null; })()}
           <PageHead title="My requests" sub={`${String(jobs.length)} requests · sorted by status (business order)`} action={<Btn variant="primary" onClick={() => { setModal("new"); }}><Icon name="add" /> New maintenance request</Btn>} />
           <div className="flex flex-wrap items-center justify-between gap-2">
             <Tabs value={tab} onChange={setTab} tabs={([["all", "All"], ["reply", "Needs your reply"], ["requested", "Requested"], ["scheduled", "Scheduled"], ["progress", "In progress"], ["completed", "Completed"], ["cancelled", "Cancelled"]] as [StatusTab, string][]).filter(([t]) => t !== "reply" || replyCount > 0).map(([id, label]) => ({ id, label, count: count(id) }))} />
-            <Select aria-label="Origin" value={origin} onChange={(e) => { setOrigin(e.target.value as typeof origin); }} className="w-auto"><option value="all">Origin: All</option><option value="request">Origin: Client request</option><option value="plan">Origin: Periodic plan</option></Select>
+            <Select aria-label="Origin" value={origin} onChange={(e) => { setOrigin(oneOf(["all", "request", "plan"] as const, e.target.value, origin)); }} className="w-auto"><option value="all">Origin: All</option><option value="request">Origin: Client request</option><option value="plan">Origin: Periodic plan</option></Select>
           </div>
           <div className={cx("grid gap-4", sel ? "grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]" : "grid-cols-1")}>
             <div className="flex min-w-0 flex-col gap-2">
@@ -92,28 +104,29 @@ function Detail({ j, onClose, open }: Readonly<{ j: Job; onClose: () => void; op
     <Card title={j.id} sub={`${j.unit} — ${j.origin === "plan" ? "periodic inspection" : j.symptom.slice(0, 40)}`} action={<div className="flex items-center gap-2"><JobStatusBadge s={j.status} client /><Btn size="sm" variant="ghost" aria-label="Close" onClick={onClose}><Icon name="close" /></Btn></div>} className="self-start">
       <SummaryList items={[
         ["Unit", `${j.unit} · ${j.loc}`],
-        ["Origin · type", j.origin === "plan" ? `Periodic plan · ${j.planId} · visit ${j.planVisit}` : `Client request · ${j.type}`],
+        ["Origin · type", j.origin === "plan" ? `Periodic plan · ${orDash(j.planId)} · visit ${orDash(j.planVisit)}` : `Client request · ${j.type}`],
         ...(j.followUpOf ? [["Follow-up of", <span key="f" className="flex flex-wrap items-center gap-2">{j.followUpOf}<FollowUpBadge j={j} /></span>] as [string, React.ReactNode]] : []),
         ...(j.origin === "request" ? [["Request", `“${j.symptom}”`] as [string, string]] : []),
-        ...(j.scheduled && j.status !== "time_proposed" ? [[j.origin === "plan" ? "Scheduled" : "Confirmed time", `${longDate(j.scheduled)}${j.origin === "plan" ? " · set by HQ from your plan" : ""}`] as [string, string]] : []),
-        ...(j.technician && j.techAck?.status === "accepted" ? [["Technician", `${j.technician}${j.delivery === "contractor" ? ` (${j.contractor})` : " · HQ"}`] as [string, string]] : []),
+        ...(j.scheduled && j.status !== TIME_PROPOSED ? [[j.origin === "plan" ? "Scheduled" : "Confirmed time", `${longDate(j.scheduled)}${j.origin === "plan" ? " · set by HQ from your plan" : ""}`] as [string, string]] : []),
+        ...(j.technician && j.techAck?.status === "accepted" ? [["Technician", `${j.technician}${j.delivery === CONTRACTOR ? ` (${orDash(j.contractor)})` : " · HQ"}`] as [string, string]] : []),
       ]} />
       {j.origin === "request" && j.preferred.length > 0 && j.status !== "completed" && j.status !== "cancelled" && (
         <div className="mt-3 flex flex-col gap-1.5">
           <b className="text-[13px]">Your preferred times{j.round > 1 ? ` (round ${String(j.round)})` : ""}</b>
           {j.preferred.map((s, i) => {
-            const chosen = j.scheduled && s.date === j.scheduled.date && s.win === j.scheduled.win;
-            const isNone = j.status === "time_proposed" && fitFor(s).fits === "none";
-            return <SlotLine key={i} i={i} slot={s} struck={isNone} note={chosen ? "booked" : (isNone ? "Not available — no qualified technician free" : undefined)} />;
+            const chosen = s.date === j.scheduled?.date && s.win === j.scheduled.win;
+            const isNone = j.status === TIME_PROPOSED && fitFor(s).fits === "none";
+            const unavailable = isNone ? "Not available — no qualified technician free" : undefined;
+            return <SlotLine key={i} i={i} slot={s} struck={isNone} note={chosen ? "booked" : unavailable} />;
           })}
         </div>
       )}
       {j.declined && j.status === "requested" && <div className="mt-3"><Banner tone="warn">You declined the proposed time ({j.declined.reason}). HQ is looking at your new times.</Banner></div>}
-      {j.status === "time_proposed" && p && (
+      {j.status === TIME_PROPOSED && p && (
         <div className="mt-3 rounded-xl border border-[#f5c473] bg-[#fff8ec] p-4">
-          <div className="flex flex-wrap items-center justify-between gap-2"><b className="text-[14px]">{p.by === "contractor" ? "Your service partner asks for another time (via HQ)" : "HQ proposes a new time"}</b><Badge tone="warn">Reply by {p.replyBy}</Badge></div>
+          <div className="flex flex-wrap items-center justify-between gap-2"><b className="text-[14px]">{p.by === CONTRACTOR ? "Your service partner asks for another time (via HQ)" : "HQ proposes a new time"}</b><Badge tone="warn">Reply by {p.replyBy}</Badge></div>
           <div className="my-2 text-xl font-bold">{longDate(p.slot)}</div>
-          <SummaryList items={[["Who comes", p.by === "contractor" || p.who.startsWith("contractor") ? `Partner technician from ${p.who.split(" ", 1)[0]} (name shown once assigned)` : "HQ technician (name shown once confirmed)"], ["Message", `“${p.message}”`]]} />
+          <SummaryList items={[["Who comes", p.by === CONTRACTOR || p.who.startsWith(CONTRACTOR) ? `Partner technician from ${p.who.split(" ", 1)[0] ?? p.who} (name shown once assigned)` : "HQ technician (name shown once confirmed)"], ["Message", `“${p.message}”`]]} />
           <div className="mt-3 flex flex-wrap items-center justify-end gap-2"><span className="mr-auto text-[11px] text-warn">Accepting books this time. Declining keeps your request open.</span><Btn variant="danger" onClick={() => { open("decline"); }}>Decline…</Btn><Btn variant="primary" onClick={() => { jobActions.accept(j.id); toast("Time accepted — booking the technician"); }}><Icon name="check" />Accept this time</Btn></div>
         </div>
       )}
@@ -141,7 +154,7 @@ function Detail({ j, onClose, open }: Readonly<{ j: Job; onClose: () => void; op
       <p className="mt-4 text-[13px] font-bold">History</p>
       <Timeline items={j.history.slice(-5).map((h) => ({ time: h.at, title: h.text }))} />
       <div className="mt-3 flex flex-wrap justify-between gap-2">
-        {(j.status === "requested" || j.status === "time_proposed") && j.origin === "request" ? <Btn size="sm" variant="danger" onClick={() => { open("cancel"); }}>Cancel request</Btn> : <span />}
+        {(j.status === "requested" || j.status === TIME_PROPOSED) && j.origin === "request" ? <Btn size="sm" variant="danger" onClick={() => { open("cancel"); }}>Cancel request</Btn> : <span />}
         {j.status !== "completed" && j.status !== "cancelled" && <Btn size="sm" onClick={() => { open("note"); }}><Icon name="add" /> Add note</Btn>}
       </div>
       <p className="mt-2 text-[11px] text-muted-foreground">Cancel is possible until a time is booked. Any time outside your preferred times is booked only after you accept it. Notes can’t change the time or technician.</p>
@@ -155,12 +168,13 @@ function NewRequest({ open, onClose, onDone }: Readonly<{ open: boolean; onClose
   const [sym, setSym] = useState("");
   const [slots, setSlots] = useState<Slot[]>(blank());
   const [tried, setTried] = useState(false);
-  const symErr = tried && (symptomLength(sym) < 10 || symptomLength(sym) > 2000) ? "Symptoms must be 10–2000 characters" : undefined;
-  const slotErr = tried ? preferredError(slots) : undefined;
+  const symError = tried && (symptomLength(sym) < 10 || symptomLength(sym) > 2000) ? "Symptoms must be 10–2000 characters" : undefined;
+  const slotError = tried ? preferredError(slots) : undefined;
   const submit = () => {
     setTried(true);
     if (sym.trim().length < 10 || sym.length > 2000 || preferredError(slots)) return;
-    const u = units.find((x) => x.id === unitId)!;
+    const u = units.find((x) => x.id === unitId);
+    if (!u) return;
     const id = jobActions.create({ unitId, type, unit: u.name, loc: u.loc, symptom: sym.trim(), preferred: slots });
     setTried(false); setSym(""); setSlots(blank()); onDone(id);
   };
@@ -168,8 +182,8 @@ function NewRequest({ open, onClose, onDone }: Readonly<{ open: boolean; onClose
     <Modal open={open} onClose={onClose} title="New maintenance request" footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={submit}>Submit request</Btn></>}>
       <Field label="Unit"><Select value={unitId} onChange={(e) => { setUnitId(e.target.value); }}>{units.map((u) => <option key={u.id} value={u.id}>{u.name} · {u.loc}</option>)}</Select></Field>
       <Field label="Type"><Choice value={type} onChange={setType} options={[{ id: "Reactive", label: "Reactive" }, { id: "Preventive", label: "Preventive" }]} /></Field>
-      <Field label="Symptoms (10–2000 characters)" error={symErr} hint={`${String(symptomLength(sym))} / 2000`}><Textarea value={sym} onChange={(e) => { setSym(e.target.value); }} placeholder="Cold air is weak and there is water dripping from the indoor unit." /></Field>
-      <PreferredSlotsInput value={slots} onChange={setSlots} error={slotErr} />
+      <Field label="Symptoms (10–2000 characters)" error={symError} hint={`${String(symptomLength(sym))} / 2000`}><Textarea value={sym} onChange={(e) => { setSym(e.target.value); }} placeholder="Cold air is weak and there is water dripping from the indoor unit." /></Field>
+      <PreferredSlotsInput value={slots} onChange={setSlots} error={slotError} />
       <Banner>Nothing is booked yet — you will see “Scheduled” once a time is confirmed. Any time outside your 3 options needs your approval.</Banner>
     </Modal>
   );
@@ -179,31 +193,31 @@ function DeclineModal({ open, j, onClose, onDone }: Readonly<{ open: boolean; j:
   const [reason, setReason] = useState<"not_home" | "too_late" | "other">("not_home");
   const [comment, setComment] = useState("");
   const [give, setGive] = useState(true);
-  const [slots, setSlots] = useState<Slot[]>([{ date: "2026-10-02", win: "14:00–16:00" }, { date: "2026-10-05", win: "10:00–12:00" }, { date: "2026-10-06", win: "14:00–16:00" }]);
+  const [slots, setSlots] = useState<Slot[]>([{ date: "2026-10-02", win: TEXT_14_00_16_00 }, { date: "2026-10-05", win: "10:00–12:00" }, { date: "2026-10-06", win: TEXT_14_00_16_00 }]);
   const [tried, setTried] = useState(false);
-  const err = tried && give ? preferredError(slots) : undefined;
-  const label = { not_home: "I’m not at home then", too_late: "Too late for me", other: "Other" }[reason];
+  const errorText = tried && give ? preferredError(slots) : undefined;
+  const label = entryOf({ not_home: "I’m not at home then", too_late: "Too late for me", other: "Other" }, reason);
   return (
-    <Modal open={open} onClose={onClose} title="Decline the proposed time" footer={<><Btn onClick={onClose}>Back</Btn><Btn variant="primary" onClick={() => { setTried(true); if (give && preferredError(slots)) return; jobActions.decline(j.id, label, comment.trim(), give ? slots : []); onDone(); }}>{give ? "Decline & send new times" : "Decline"}</Btn></>}>
+    <Modal open={open} onClose={onClose} title="Decline the proposed time" footer={<><Btn onClick={onClose}>Back</Btn><Btn variant="primary" onClick={() => { setTried(true); if (give && preferredError(slots)) { return; } jobActions.decline(j.id, label, comment.trim(), give ? slots : []); onDone(); }}>{give ? "Decline & send new times" : "Decline"}</Btn></>}>
       <p className="text-xs text-muted-foreground">{j.id} · {j.unit} · proposed {j.proposal ? longDate(j.proposal.slot) : ""}</p>
       <Field label="Reason"><Choice value={reason} onChange={setReason} options={[{ id: "not_home", label: "I’m not at home then" }, { id: "too_late", label: "Too late for me" }, { id: "other", label: "Other" }]} /></Field>
       <Field label="Comment to HQ (optional)"><Input value={comment} onChange={(e) => { setComment(e.target.value); }} placeholder="Away on Oct 1. Any weekday afternoon next week works." /></Field>
       <label className="flex items-center gap-2 text-[13px]"><Checkbox className="h-4 w-4 accent-[#005bea]" checked={give} onCheckedChange={(v) => { setGive(v); }} />Give 3 new preferred times (recommended)</label>
-      {give && <PreferredSlotsInput value={slots} onChange={setSlots} error={err} label="New preferred times" hint="Declining never cancels the request — use “Cancel request” for that." />}
+      {give && <PreferredSlotsInput value={slots} onChange={setSlots} error={errorText} label="New preferred times" hint="Declining never cancels the request — use “Cancel request” for that." />}
       <Banner>HQ looks again and either books one of your times or sends another proposal.</Banner>
     </Modal>
   );
 }
 
 function OtherTimeModal({ open, j, onClose, onDone }: Readonly<{ open: boolean; j: Job; onClose: () => void; onDone: () => void }>) {
-  const [slots, setSlots] = useState<Slot[]>([{ date: "2026-12-09", win: "09:00–11:00" }, { date: "2026-12-10", win: "14:00–16:00" }, { date: "2026-12-11", win: "09:00–11:00" }]);
+  const [slots, setSlots] = useState<Slot[]>([{ date: "2026-12-09", win: TEXT_09_00_11_00 }, { date: "2026-12-10", win: TEXT_14_00_16_00 }, { date: "2026-12-11", win: TEXT_09_00_11_00 }]);
   const [comment, setComment] = useState("");
   const [tried, setTried] = useState(false);
-  const err = tried ? preferredError(slots) : undefined;
+  const errorText = tried ? preferredError(slots) : undefined;
   return (
-    <Modal open={open} onClose={onClose} title="Request another time" footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (preferredError(slots)) return; jobActions.requestOther(j.id, slots, comment.trim()); onDone(); }}>Send to HQ</Btn></>}>
+    <Modal open={open} onClose={onClose} title="Request another time" footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (preferredError(slots)) { return; } jobActions.requestOther(j.id, slots, comment.trim()); onDone(); }}>Send to HQ</Btn></>}>
       <p className="text-xs text-muted-foreground">{j.id} · periodic visit {fmt(j.scheduled)} · up to 48 h before the visit</p>
-      <PreferredSlotsInput value={slots} onChange={setSlots} error={err} />
+      <PreferredSlotsInput value={slots} onChange={setSlots} error={errorText} />
       <Field label="Comment (optional)"><Input value={comment} onChange={(e) => { setComment(e.target.value); }} /></Field>
     </Modal>
   );
@@ -230,33 +244,35 @@ function ProblemModal({ open, j, onClose, onDone }: Readonly<{ open: boolean; j:
   const [d, setD] = useState("");
   const [visit, setVisit] = useState("2026-09-25");
   const [tried, setTried] = useState(false);
-  const [err, setErr] = useState<string | undefined>();
+  const [errorText, setErrorText] = useState<string | undefined>();
   return (
-    <Modal open={open} onClose={onClose} title={`Report a problem — ${j.id}`} footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (d.trim().length < 10 || d.length > 2000) return; const r = jobActions.reportProblem(j.id, PROBLEM[reason], d.trim(), visit); if ("error" in r) { setErr(r.error); return; } setD(""); setTried(false); onDone(r.id!); }}>Send report</Btn></>}>
+    <Modal open={open} onClose={onClose} title={`Report a problem — ${j.id}`} footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (d.trim().length < 10 || d.length > 2000) { return; } const r = jobActions.reportProblem(j.id, entryOf(PROBLEM, reason), d.trim(), visit); if ("error" in r) { setErrorText(r.error); return; } setD(""); setTried(false); onDone(r.id); }}>Send report</Btn></>}>
       <Field label="What happened?"><Choice value={reason} onChange={setReason} options={[{ id: "same", label: "Same problem again" }, { id: "new", label: "New damage" }, { id: "incomplete", label: "Work not completed" }, { id: "other", label: "Other" }]} /></Field>
       <Field label="Details (10–2000 characters)" error={tried && (d.trim().length < 10 || d.length > 2000) ? "Describe the problem (10–2000 characters)" : undefined}><Textarea value={d} onChange={(e) => { setD(e.target.value); }} /></Field>
       <Field label="Preferred visit (optional)"><Input type="date" value={visit} onChange={(e) => { setVisit(e.target.value); }} /></Field>
-      {err && <Banner tone="crit">{err}</Banner>}
+      {errorText && <Banner tone="crit">{errorText}</Banner>}
       <Banner>Creates a follow-up request linked to {j.id} (“Under HQ review”). HQ decides within 1 business day: rework (free) or a new request.</Banner>
     </Modal>
   );
 }
 
-function FollowUpBadge({ j }: { j: Job }) {
-  return j.followUpClass === "rework" ? <Badge tone="ok">Rework (free)</Badge> : (j.followUpClass === "new_request" ? <Badge tone="primary">New request</Badge> : <Badge tone="warn">Under HQ review</Badge>);
+function FollowUpBadge({ j }: Readonly<{ j: Job }>) {
+  if (j.followUpClass === "rework") return <Badge tone="ok">Rework (free)</Badge>;
+  if (j.followUpClass === "new_request") return <Badge tone="primary">New request</Badge>;
+  return <Badge tone="warn">Under HQ review</Badge>;
 }
 
 function NoteModal({ open, j, onClose, onDone }: Readonly<{ open: boolean; j: Job; onClose: () => void; onDone: () => void }>) {
   const [t, setT] = useState("");
   const [tried, setTried] = useState(false);
-  const [err, setErr] = useState<string | undefined>();
+  const [errorText, setErrorText] = useState<string | undefined>();
   const isBad = !t.trim() || t.length > 2000;
   return (
-    <Modal open={open} onClose={onClose} title={`Add a note for ${j.id}`} footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (isBad) return; const e = jobActions.addNote(j.id, t); if (e) { setErr(e); return; } setT(""); setTried(false); onDone(); }}>Send note</Btn></>}>
-      <Field label="Note to the HQ coordinator (1–2000 characters)" error={tried && isBad ? "Write 1–2000 characters" : undefined} hint={`${String(t.length)} / 2000 · Visible to: HQ coordinator${j.delivery === "contractor" ? ` · ${j.contractor}` : ""}${j.technician ? ` · assigned technician (${j.technician})` : ""}`}>
+    <Modal open={open} onClose={onClose} title={`Add a note for ${j.id}`} footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (isBad) { return; } const e = jobActions.addNote(j.id, t); if (e) { setErrorText(e); return; } setT(""); setTried(false); onDone(); }}>Send note</Btn></>}>
+      <Field label="Note to the HQ coordinator (1–2000 characters)" error={tried && isBad ? "Write 1–2000 characters" : undefined} hint={`${String(t.length)} / 2000 · Visible to: HQ coordinator${j.delivery === CONTRACTOR ? ` · ${orDash(j.contractor)}` : ""}${j.technician ? ` · assigned technician (${j.technician})` : ""}`}>
         <Textarea value={t} onChange={(e) => { setT(e.target.value); }} placeholder="Please call 30 minutes before arriving — the gate code changed to 4821." />
       </Field>
-      {err && <Banner tone="crit">{err}</Banner>}
+      {errorText && <Banner tone="crit">{errorText}</Banner>}
       <Banner>A note can’t change the visit time or the technician. To move the visit, write it here — HQ sends you a new time to accept. Notes are kept in the job history.</Banner>
     </Modal>
   );
@@ -266,7 +282,7 @@ function CancelModal({ open, j, onClose, onDone }: Readonly<{ open: boolean; j: 
   const [r, setR] = useState("");
   const [tried, setTried] = useState(false);
   return (
-    <Modal open={open} onClose={onClose} title={`Cancel ${j.id}?`} footer={<><Btn onClick={onClose}>Keep request</Btn><Btn variant="danger" onClick={() => { setTried(true); if (!r.trim()) return; jobActions.cancel(j.id, r.trim()); onDone(); }}>Cancel request</Btn></>}>
+    <Modal open={open} onClose={onClose} title={`Cancel ${j.id}?`} footer={<><Btn onClick={onClose}>Keep request</Btn><Btn variant="danger" onClick={() => { setTried(true); if (!r.trim()) { return; } jobActions.cancel(j.id, r.trim()); onDone(); }}>Cancel request</Btn></>}>
       <Field label="Reason (required)" error={tried && !r.trim() ? "A reason is required" : undefined}><Input value={r} onChange={(e) => { setR(e.target.value); }} placeholder="Resolved itself" /></Field>
     </Modal>
   );
@@ -278,6 +294,11 @@ const filters = [
   { unit: "Lobby AC", loc: "Office A · last cleaned Aug 12", h: 120, st: "OK" as const },
   { unit: "Living room AC", loc: "Home A › 1F · cleaned by technician Sep 8 (job-c02)", h: 41, st: "OK" as const },
 ];
+/** A filter's tone by its cleaning status. */
+function filterTone(st: string): "crit" | "warn" | "ok" {
+  if (st === "Overdue") return "crit";
+  return st === "Due soon" ? "warn" : "ok";
+}
 function FilterCare({ onRequest }: Readonly<{ onRequest: () => void }>) {
   const toast = useToast();
   const [rows, setRows] = useState(filters);
@@ -287,9 +308,9 @@ function FilterCare({ onRequest }: Readonly<{ onRequest: () => void }>) {
         <DataTable rowKey={(r) => r.unit} rows={rows} cols={[
           { key: "u", label: "AC", render: (r) => <div><b>{r.unit}</b><div className="text-[11px] text-muted-foreground">{r.loc}</div></div> },
           { key: "h", label: "Run time", render: (r) => `${String(r.h)} h since cleaning` },
-          { key: "p", label: "Progress", render: (r) => <div className="w-28"><UtilBar pct={Math.min(100, (r.h / 250) * 100)} tone={r.st === "Overdue" ? "crit" : (r.st === "Due soon" ? "warn" : "ok")} /></div>, hideBelow: "sm" },
-          { key: "s", label: "Status", render: (r) => <Badge tone={r.st === "Overdue" ? "crit" : (r.st === "Due soon" ? "warn" : "ok")}>{r.st}</Badge> },
-          { key: "a", label: "", render: (r) => r.st === "Overdue" ? <Btn size="sm" variant="primary" onClick={onRequest}>Request cleaning</Btn> : <Btn size="sm" onClick={() => { setRows((s) => s.map((x) => (x.unit === r.unit ? { ...x, h: 0, st: "OK", loc: x.loc.split(" · ", 1)[0] + " · cleaned by you just now" } : x))); toast("Marked cleaned — counter reset"); }}>Mark cleaned</Btn> },
+          { key: "p", label: "Progress", render: (r) => <div className="w-28"><UtilizationBar pct={Math.min(100, (r.h / 250) * 100)} tone={filterTone(r.st)} /></div>, hideBelow: "sm" },
+          { key: "s", label: "Status", render: (r) => <Badge tone={filterTone(r.st)}>{r.st}</Badge> },
+          { key: "a", label: "", render: (r) => r.st === "Overdue" ? <Btn size="sm" variant="primary" onClick={onRequest}>Request cleaning</Btn> : <Btn size="sm" onClick={() => { setRows((s) => s.map((x) => (x.unit === r.unit ? { ...x, h: 0, st: "OK", loc: `${x.loc.split(" · ", 1)[0] ?? x.loc} · cleaned by you just now` } : x))); toast("Marked cleaned — counter reset"); }}>Mark cleaned</Btn> },
         ]} />
         <p className="mt-2 text-[11px] text-muted-foreground">Run time counts hours the AC was running. Unknown connection → “Unknown”.</p>
       </Card>

@@ -11,17 +11,17 @@ export function ControlDemo({ id }: Readonly<{ id: string }>) {
   const isRestricted = id === "unit-limited";
   const [reason, setReason] = useState("Confirming mode change resolves reported airflow complaint.");
   const [mode, setMode] = useState("cool");
-  const [temp, setTemp] = useState("24");
+  const [setpoint, setSetpoint] = useState("24");
   const [dur, setDur] = useState("5");
   const [trReason, setTrReason] = useState("Verify cooling recovers after coil clean.");
   const [confirm, setConfirm] = useState<null | "cmd" | "test">(null);
   const [errs, setErrs] = useState<string[]>([]);
-  const [hist, setHist] = useState([["09:41", "test run start (Power ON, 5 min)", "cmd-0418 · acknowledged 09:41:03 · ends 09:46"], ["09:40", "set_mode = cool", "cmd-0417 · acknowledged 09:40:02 · mode confirmed by device"], ["09:32", "set_temperature = 15 °C", "cmd-0416 · rejected — below model minimum 16 °C (VALIDATION)"], ["09:30", "read state", "cmd-0415 · acknowledged 09:30:01"]]);
+  const [hist, setHist] = useState<[string, string, string][]>([["09:41", "test run start (Power ON, 5 min)", "cmd-0418 · acknowledged 09:41:03 · ends 09:46"], ["09:40", "set_mode = cool", "cmd-0417 · acknowledged 09:40:02 · mode confirmed by device"], ["09:32", "set_temperature = 15 °C", "cmd-0416 · rejected — below model minimum 16 °C (VALIDATION)"], ["09:30", "read state", "cmd-0415 · acknowledged 09:30:01"]]);
   const [run, setRun] = useState<"running" | "ended" | null>("running");
   const check = (kind: "cmd" | "test") => {
     const e: string[] = [];
-    if (kind === "cmd") { if (!reason.trim()) e.push("Reason is required."); if (+temp < (isRestricted ? 24 : 16) || +temp > 30) e.push(isRestricted ? `FORBIDDEN — ${temp} °C is below the restriction minimum 24 °C.` : "VALIDATION — temperature must be 16–30 °C."); }
-    else { if (+dur < 1 || +dur > 15) e.push("VALIDATION — test run is 1–15 minutes only."); if (!trReason.trim()) e.push("Reason is required."); }
+    if (kind === "cmd") { if (!reason.trim()) { e.push("Reason is required."); } if (Number(setpoint) < (isRestricted ? 24 : 16) || Number(setpoint) > 30) e.push(isRestricted ? `FORBIDDEN — ${setpoint} °C is below the restriction minimum 24 °C.` : "VALIDATION — temperature must be 16–30 °C."); }
+    else { if (Number(dur) < 1 || Number(dur) > 15) { e.push("VALIDATION — test run is 1–15 minutes only."); } if (!trReason.trim()) e.push("Reason is required."); }
     setErrs(e); if (e.length === 0) setConfirm(kind);
   };
   const send = () => {
@@ -38,7 +38,7 @@ export function ControlDemo({ id }: Readonly<{ id: string }>) {
       <div className="split">
         <div className="flex min-w-0 flex-col gap-4">
           <Card title="Normal diagnostic action">
-            <div className="grid-fluid" style={{ ["--min"as string]: "180px" }}><Field label="Job"><Input readOnly value="job-contractor-a" /></Field><Field label="Action"><Select value={mode} onChange={(e) => { setMode(e.target.value); }}><option value="cool">set_mode = cool</option><option value="dry">set_mode = dry</option><option value="fan">set_mode = fan</option></Select></Field><Field label="Set temp (°C)"><Input type="number" value={temp} onChange={(e) => { setTemp(e.target.value); }} /></Field></div>
+            <div className="grid-fluid" style={{ ["--min"as string]: "180px" }}><Field label="Job"><Input readOnly value="job-contractor-a" /></Field><Field label="Action"><Select value={mode} onChange={(e) => { setMode(e.target.value); }}><option value="cool">set_mode = cool</option><option value="dry">set_mode = dry</option><option value="fan">set_mode = fan</option></Select></Field><Field label="Set temp (°C)"><Input type="number" value={setpoint} onChange={(e) => { setSetpoint(e.target.value); }} /></Field></div>
             <div className="mt-3"><Field label="Reason (required)"><Textarea value={reason} onChange={(e) => { setReason(e.target.value); }} /></Field></div>
             <div className="mt-3 flex justify-end"><Btn variant="primary" onClick={() => { check("cmd"); }}>Review & send</Btn></div>
           </Card>

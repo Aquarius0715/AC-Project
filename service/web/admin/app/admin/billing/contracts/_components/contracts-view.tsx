@@ -1,4 +1,11 @@
 "use client";
+const CUSTOMER_A = "customer-a";
+const CUSTOMER_B = "customer-b";
+const UNIT_NON_RTO = "unit-non-rto";
+const CONTRACT_RTO_A = "contract-rto-a";
+const UNIT_OFFLINE_RTO = "unit-offline-rto";
+const UNIT_LIMITED = "unit-limited";
+const UNIT_OTHER_CUSTOMER = "unit-other-customer";
 
 import Link from "next/link";
 import { useState, useTransition } from "react";
@@ -11,27 +18,33 @@ import { amount, money } from "@ac/web/lib/money";
 import { dayInstant, draftErrors, planLabel, planWord, priceMinor, type ContractDraft, type ContractRow, type PlanType, type UnitOption } from "@ac/web/lib/contracts";
 import { saveContract } from "../actions";
 import { Icon } from "@ac/web/components/Icon";
+import { byCount } from "@ac/web/lib/i18n";
+
+import { oneOf } from "@ac/web/lib/oneOf";
+import { nonEmpty } from "@ac/web/lib/lists";
+import { useRefreshThen } from "@ac/web/lib/useRefreshThen";
+import { reached } from "@ac/web/lib/unreachable";
 
 interface Scope { customerId?: string; unitId?: string; kind?: PlanType }
 interface Live { scope: Scope; rows: ContractRow[]; counts: Record<PlanType | "all", number>; selectedId: string | null; customers: { id: string; name: string }[]; units: UnitOption[] }
 
-const demoCustomers = [{ id: "customer-a", name: "customer-a" }, { id: "customer-b", name: "customer-b" }];
-const demoRow = (id: string, cust: string, planType: PlanType, unitIds: string[], priceMinor: number, start: string, end: string, eligible: boolean, restrictionIds: string[]): ContractRow => {
+const demoCustomers = [{ id: CUSTOMER_A, name: CUSTOMER_A }, { id: CUSTOMER_B, name: CUSTOMER_B }];
+const demoRow = (id: string, cust: string, planType: PlanType, unitIds: string[], price: number, start: string, end: string, eligible: boolean, restrictionIds: string[]): ContractRow => {
   return {
     id,
     planType,
     cust,
     unitIds,
-    priceMinor,
     start,
     end,
     restrictionIds,
+    priceMinor: price,
     version: 1,
     plan: planLabel[planType],
     customerId: cust,
     units: `${String(unitIds.length)} unit${unitIds.length === 1 ? "" : "s"}`,
     currency: "MYR",
-    price: money(priceMinor, "MYR"),
+    price: money(price, "MYR"),
     startAt: `${start}T00:00:00+08:00`,
     endAt: `${end}T00:00:00+08:00`,
     period: `${start} → ${end}`,
@@ -40,17 +53,17 @@ const demoRow = (id: string, cust: string, planType: PlanType, unitIds: string[]
     recovery: false,
   };
 };
-const seedRows = [
-  demoRow("contract-general-a", "customer-a", "general", ["unit-non-rto"], 5000, "2026-01-01", "2027-01-01", false, []),
-  demoRow("contract-rto-a", "customer-a", "rto", ["unit-online-rto", "unit-offline-rto", "unit-limited"], 12_000, "2026-01-01", "2027-01-01", true, ["restriction-limited-a"]),
-  demoRow("contract-rto-b", "customer-b", "rto", ["unit-other-customer"], 8500, "2026-03-01", "2027-03-01", true, []),
-];
+const seedRows = nonEmpty([
+  demoRow("contract-general-a", CUSTOMER_A, "general", [UNIT_NON_RTO], 5000, "2026-01-01", "2027-01-01", false, []),
+  demoRow(CONTRACT_RTO_A, CUSTOMER_A, "rto", ["unit-online-rto", UNIT_OFFLINE_RTO, UNIT_LIMITED], 12_000, "2026-01-01", "2027-01-01", true, ["restriction-limited-a"]),
+  demoRow("contract-rto-b", CUSTOMER_B, "rto", [UNIT_OTHER_CUSTOMER], 8500, "2026-03-01", "2027-03-01", true, []),
+]);
 const seedUnits: UnitOption[] = [
-  { id: "unit-online-rto", customerId: "customer-a", label: "Bedroom AC · unit-online-rto", where: "Home A › 1F › Bedroom", otherContracts: ["contract-rto-a"] },
-  { id: "unit-offline-rto", customerId: "customer-a", label: "unit-offline-rto", where: "Home A › 2F › Study", otherContracts: ["contract-rto-a"] },
-  { id: "unit-limited", customerId: "customer-a", label: "unit-limited", where: "Home A › 1F › Living room", otherContracts: ["contract-rto-a"] },
-  { id: "unit-non-rto", customerId: "customer-a", label: "unit-non-rto", where: "Home B", otherContracts: ["contract-general-a"] },
-  { id: "unit-other-customer", customerId: "customer-b", label: "unit-other-customer", where: "Home B", otherContracts: ["contract-rto-b"] },
+  { id: "unit-online-rto", customerId: CUSTOMER_A, label: "Bedroom AC · unit-online-rto", where: "Home A › 1F › Bedroom", otherContracts: [CONTRACT_RTO_A] },
+  { id: UNIT_OFFLINE_RTO, customerId: CUSTOMER_A, label: UNIT_OFFLINE_RTO, where: "Home A › 2F › Study", otherContracts: [CONTRACT_RTO_A] },
+  { id: UNIT_LIMITED, customerId: CUSTOMER_A, label: UNIT_LIMITED, where: "Home A › 1F › Living room", otherContracts: [CONTRACT_RTO_A] },
+  { id: UNIT_NON_RTO, customerId: CUSTOMER_A, label: UNIT_NON_RTO, where: "Home B", otherContracts: ["contract-general-a"] },
+  { id: UNIT_OTHER_CUSTOMER, customerId: CUSTOMER_B, label: UNIT_OTHER_CUSTOMER, where: "Home B", otherContracts: ["contract-rto-b"] },
 ];
 const plans: PlanType[] = ["rto", "general", "energy", "environment"];
 const draftOf = (r: ContractRow): ContractDraft => {
@@ -70,6 +83,7 @@ export function ContractsView({ live }: Readonly<{ live?: Live }>) {
   const router = useRouter();
   const pathname = usePathname();
   const [pending, start] = useTransition();
+  const refreshThen = useRefreshThen(pending);
   const nav = (patch: Record<string, string | null>) => {
     const q = new URLSearchParams(location.search);
     for (const [k, v] of Object.entries(patch)) {
@@ -78,9 +92,9 @@ export function ContractsView({ live }: Readonly<{ live?: Live }>) {
     }
     router.replace(q.size > 0 ? `${pathname}?${q}` : pathname, { scroll: false });
   };
-  const [demoRows, setDemoRows] = useState(seedRows);
+  const [demoRows, setDemoRows] = useState<ContractRow[]>(seedRows);
   const [demoKind, setDemoKind] = useState<"all" | PlanType>("all");
-  const [demoSel, setDemoSel] = useState(seedRows[1].id);
+  const [demoSel, setDemoSel] = useState(seedRows[1]?.id ?? seedRows[0].id);
   const rows = live ? live.rows : demoRows.filter((r) => demoKind === "all" || r.planType === demoKind);
   const kind: "all" | PlanType = live ? live.scope.kind ?? "all" : demoKind;
   const customers = live ? live.customers : demoCustomers;
@@ -89,17 +103,19 @@ export function ContractsView({ live }: Readonly<{ live?: Live }>) {
   const sel = creating ? null : rows.find((r) => r.id === (live ? live.selectedId : demoSel)) ?? rows[0] ?? null;
 
   // the form restarts from each selected contract version (adjust state during render, not in an effect)
-  const key = creating ? "new" : (sel ? `${sel.id}:${String(sel.version)}` : "none");
+  const selKey = sel ? `${sel.id}:${String(sel.version)}` : "none";
+  const key = creating ? "new" : selKey;
   const [source, setSource] = useState(key);
   const [d, setD] = useState<ContractDraft>(sel ? draftOf(sel) : blankDraft());
   const [tried, setTried] = useState(false);
   if (source !== key) {
     setSource(key);
-    setD(creating ? blankDraft(live?.scope.customerId) : (sel ? draftOf(sel) : blankDraft()));
+    const blank = creating ? blankDraft(live?.scope.customerId) : blankDraft(); // no contract is selected while creating
+    setD(sel ? draftOf(sel) : blank);
     setTried(false);
   }
   const errors = draftErrors(d, t);
-  const isBlocked = !creating && sel ? sel.restrictionIds.length > 0 || sel.recovery : false;
+  const isBlocked = !creating && !!sel && (sel.restrictionIds.length > 0 || sel.recovery);
   const customerUnits = units.filter((u) => u.customerId === d.customerId);
   const scopeUnits = live?.scope.customerId ? units.filter((u) => u.customerId === live.scope.customerId) : units;
   const set = (patch: Partial<ContractDraft>) => { setD((x) => {
@@ -136,18 +152,32 @@ export function ContractsView({ live }: Readonly<{ live?: Live }>) {
       return;
     }
     start(async () => {
-      const r = await saveContract({
+      const r = await reached(() => saveContract({ // no answer reads as unavailable (IR718)
         ...(sel && !creating && { id: sel.id }), customerId: d.customerId, unitIds: d.unitIds, planType: d.planType,
         startAt: dayInstant(d.start, sel?.startAt), endAt: dayInstant(d.end, sel?.endAt), priceMinor: priceMinor(d.price), currency: d.currency,
         restrictionEligible: isEligible, rulesVersion: isEligible ? d.rulesVersion.trim() : null,
-      }, sel?.version);
+      }, sel?.version));
       if (!r.ok) { toast(actionMessage(r, t), "crit"); return; }
-      toast(creating || !sel ? t("Contract created") : t("Saved as version {v}", { v: r.value.version }));
-      setCreating(false);
-      nav({ contractId: r.value.id });
+      refreshThen(() => {
+        toast(creating || !sel ? t("Contract created") : t("Saved as version {v}", { v: r.value.version }));
+        setCreating(false);
+        nav({ contractId: r.value.id });
+      });
     });
   };
 
+  const demoCount = (k: PlanType | "all") => (k === "all" ? demoRows.length : demoRows.filter((r) => r.planType === k).length);
+  const cardTitle = (): string => {
+    if (creating || !sel) return t("New contract");
+    return live ? t("Contract {id}", { id: sel.id.slice(0, 8) }) : sel.id;
+  };
+  // the version being edited and the contract's active restrictions
+  const cardSub = (): string => {
+    if (creating || !sel) return t("Saving creates version 1");
+    const n = sel.restrictionIds.length;
+    const held = n > 0 ? ` · ${byCount(n, { one: t("1 active restriction"), many: t("{n} active restrictions", { n }) })}` : "";
+    return `${sel.cust} · ${t("Version {v} · Editing → v{next}", { v: sel.version, next: sel.version + 1 })}${held}`;
+  };
   return (
     <Page>
       {live && (
@@ -158,36 +188,38 @@ export function ContractsView({ live }: Readonly<{ live?: Live }>) {
           <span className="ml-auto pb-2 text-xs text-muted-foreground">{t(live.counts.all === 1 ? "1 contract in scope" : "{n} contracts in scope", { n: live.counts.all })}</span>
         </div>
       )}
-      <Tabs value={kind} onChange={(k) => { if (live) nav({ kind: k === "all" ? null : k, contractId: null }); else setDemoKind(k); }} tabs={(["all", ...plans] as const).map((k) => ({ id: k, label: k === "all" ? t("All") : planWord(k, t), count: live ? live.counts[k] : (k === "all" ? demoRows.length : demoRows.filter((r) => r.planType === k).length) }))} />
+      <Tabs value={kind} onChange={(k) => { if (live) nav({ kind: k === "all" ? null : k, contractId: null }); else setDemoKind(k); }} tabs={(["all", ...plans] as const).map((k) => ({ id: k, label: k === "all" ? t("All") : planWord(k, t), count: live ? live.counts[k] : demoCount(k) }))} />
       <div className="split-rev">
         <Card title={t("Contracts")} sub={t("sorted by ID")} action={<Btn size="sm" variant="primary" onClick={() => { setCreating(true); }}><Icon name="add" /> {t("New contract")}</Btn>} className="self-start">
           {rows.length === 0 ? <EmptyState title={t("No contracts")}>{t("No contract matches this scope.")}</EmptyState> : <div className="flex flex-col gap-2">{rows.map((c) => <ListRow key={c.id} selected={sel?.id === c.id} onClick={() => { select(c.id); }}><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="truncate text-[13px]">{live ? c.id.slice(0, 8) : c.id}</b><b className="text-[13px]">{c.price}</b></div><div className="flex items-center gap-1.5 text-[11px] text-muted-foreground"><Badge tone={c.planType === "rto" ? "primary" : "muted"}>{planWord(c.planType, t)}</Badge>{c.cust} · {c.units}</div><div className="text-[11px] text-muted-foreground">{c.period}</div><div className="mt-1">{c.restrictionEligible ? <Badge tone="ok">{t("Eligible · {rules}", { rules: c.rulesVersion ?? "—" })}{c.restrictionIds.length > 0 ? ` · ${t("restriction active")}` : ""}</Badge> : <Badge tone="muted">{t("Not restriction eligible")}</Badge>}</div></div></ListRow>)}</div>}
           <p className="mt-3 text-[11px] text-muted-foreground">{t("Units without a contract can still be monitored and maintained.")}</p>
         </Card>
         {creating || sel ? (
-          <Card title={creating || !sel ? t("New contract") : (live ? t("Contract {id}", { id: sel.id.slice(0, 8) }) : sel.id)} sub={creating || !sel ? t("Saving creates version 1") : `${sel.cust} · ${t("Version {v} · Editing → v{next}", { v: sel.version, next: sel.version + 1 })}${sel.restrictionIds.length > 0 ? ` · ${t(sel.restrictionIds.length === 1 ? "1 active restriction" : "{n} active restrictions", { n: sel.restrictionIds.length })}` : ""}`} action={<Badge tone="primary">{planWord(d.planType, t)}</Badge>}>
+          <Card title={cardTitle()} sub={cardSub()} action={<Badge tone="primary">{planWord(d.planType, t)}</Badge>}>
             <div className="flex flex-col gap-5">
               <section>
                 <h3 className="mb-1 text-[13px] font-bold">{t("Customer & units")}</h3>
                 <p className="mb-2 text-xs text-muted-foreground">{t("Only this customer’s active units can be included. A unit on another contract is labelled, not hidden.")}</p>
                 <div className="mb-3 max-w-sm"><Field label={t("Customer")} error={tried ? errors.customerId : undefined} hint={t(creating ? "The units below must belong to this customer" : "Fixed after creation — the units below must belong to this customer")}><Select value={d.customerId} disabled={!creating || isBlocked} onChange={(e) => { set({ customerId: e.target.value, unitIds: [] }); }}><option value="">{t("Select…")}</option>{customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field></div>
-                {d.customerId ? (customerUnits.length === 0 ? <p className="text-xs text-muted-foreground">{t("This customer has no active units.")}</p> : (
+                {d.customerId && customerUnits.length === 0 ? <p className="text-xs text-muted-foreground">{t("This customer has no active units.")}</p> : null}
+                {d.customerId && customerUnits.length > 0 ? (
                   <div className="flex flex-col gap-1.5">{customerUnits.map((u) => {
                     const others = u.otherContracts.filter((k) => k !== sel?.id || creating);
                     return <Check key={u.id} checked={d.unitIds.includes(u.id)} disabled={isBlocked} onChange={(on) => { set({ unitIds: on ? [...d.unitIds, u.id] : d.unitIds.filter((x) => x !== u.id) }); }} label={<span>{u.label} <span className="text-xs text-muted-foreground">{u.where}{others.length > 0 ? ` · ${t("also on {list}", { list: others.map((k) => (live ? k.slice(0, 8) : k)).join(", ") })}` : ""}</span></span>} />;
                   })}</div>
-                )) : <p className="text-xs text-muted-foreground">{t("Choose a customer first.")}</p>}
+                ) : null}
+                {d.customerId ? null : <p className="text-xs text-muted-foreground">{t("Choose a customer first.")}</p>}
                 {tried && errors.unitIds && <p className="mt-1 text-xs text-crit">{errors.unitIds}</p>}
               </section>
               <section>
                 <h3 className="mb-2 text-[13px] font-bold">{t("Plan")}</h3>
-                <div className="max-w-sm"><Field label={t("Plan type")}><Select value={d.planType} disabled={isBlocked} onChange={(e) => { set({ planType: e.target.value as PlanType }); }}>{plans.map((p) => <option key={p} value={p}>{p === "rto" ? t("RTO — Rent to Own") : (p === "general" ? t("General — maintenance") : planWord(p, t))}</option>)}</Select></Field></div>
+                <div className="max-w-sm"><Field label={t("Plan type")}><Select value={d.planType} disabled={isBlocked} onChange={(e) => { set({ planType: oneOf(plans, e.target.value, d.planType) }); }}>{plans.map((p) => <option key={p} value={p}>{p === "rto" ? t("RTO — Rent to Own") : null}{p !== "rto" && p === "general" && t("General — maintenance")}{p !== "rto" && p !== "general" && planWord(p, t)}</option>)}</Select></Field></div>
               </section>
               <section className="grid-fluid" style={{ ["--min" as string]: "150px" }}>
                 <Field label={t("Start")} error={tried ? errors.start : undefined} hint={t("Dates are Kuala Lumpur days ({zone}).", { zone: KL })}><Input type="date" value={d.start} disabled={isBlocked} onChange={(e) => { set({ start: e.target.value }); }} /></Field>
                 <Field label={t("End")} error={tried ? errors.end : undefined} hint={t("Must be after the start")}><Input type="date" value={d.end} disabled={isBlocked} onChange={(e) => { set({ end: e.target.value }); }} /></Field>
                 <Field label={t("Price")} error={tried ? errors.price : undefined} hint="≥ 0"><Input type="number" min="0" step="0.01" value={d.price} disabled={isBlocked} onChange={(e) => { set({ price: e.target.value }); }} /></Field>
-                <Field label={t("Currency")}><Select value={d.currency} disabled={isBlocked} onChange={(e) => { set({ currency: e.target.value as "MYR" | "USD" }); }}><option>MYR</option><option>USD</option></Select></Field>
+                <Field label={t("Currency")}><Select value={d.currency} disabled={isBlocked} onChange={(e) => { set({ currency: oneOf(["MYR", "USD"] as const, e.target.value, d.currency) }); }}><option>MYR</option><option>USD</option></Select></Field>
               </section>
               <section>
                 <h3 className="mb-1 text-[13px] font-bold">{t("Restriction eligibility")}</h3>
@@ -195,7 +227,7 @@ export function ContractsView({ live }: Readonly<{ live?: Live }>) {
                 <Check label={<span>{t("Allow cooling restrictions for unpaid invoices")}<span className="block text-[11px] text-muted-foreground">{t("Advance notice → restriction → release after payment (Restrictions screen)")}</span></span>} checked={d.restrictionEligible} disabled={isBlocked || d.planType !== "rto"} onChange={(on) => { set({ restrictionEligible: on }); }} />
                 <div className="mt-2 max-w-xs"><Field label={t("Rules version · required when eligible")} hint={t("Demo rules — not approved production rules")} error={tried ? errors.rulesVersion : undefined}><Input value={d.rulesVersion} maxLength={64} disabled={isBlocked || !d.restrictionEligible} onChange={(e) => { set({ rulesVersion: e.target.value }); }} /></Field></div>
               </section>
-              {isBlocked && sel && <Banner tone="warn" action={sel.restrictionIds[0] && <Link className="text-xs font-semibold text-primary" href={live ? `/admin/restrictions?restrictionId=${sel.restrictionIds[0]}` : "/admin/restrictions"}>{t("Open restriction")} <Icon name="arrowRight" /></Link>}>{t("Save is disabled: {reason}. Cancel the notice or release the restriction first — contract changes never cancel or release restrictions.", { reason: sel.restrictionIds.length > 0 ? t(sel.restrictionIds.length === 1 ? "1 active restriction on this contract" : "{n} active restrictions on this contract", { n: sel.restrictionIds.length }) : t("an unresolved recovery case exists") })}</Banner>}
+              {isBlocked && <Banner tone="warn" action={sel.restrictionIds[0] && <Link className="text-xs font-semibold text-primary" href={live ? `/admin/restrictions?restrictionId=${sel.restrictionIds[0]}` : "/admin/restrictions"}>{t("Open restriction")} <Icon name="arrowRight" /></Link>}>{t("Save is disabled: {reason}. Cancel the notice or release the restriction first — contract changes never cancel or release restrictions.", { reason: byCount(sel.restrictionIds.length, { none: t("an unresolved recovery case exists"), one: t("1 active restriction on this contract"), many: t("{n} active restrictions on this contract", { n: sel.restrictionIds.length }) }) })}</Banner>}
               <section className="rounded-xl bg-surface2 p-3 text-xs"><b className="text-[13px]">{t("What saving does")}</b><ul className="mt-1 list-disc pl-5">{creating || !sel ? <><li>{t("Creates version 1 of a new contract for this customer")}</li><li>{t("New invoices can be issued against it")}</li></> : <><li>{t("Creates version {next} — version {v} stays in history", { next: sel.version + 1, v: sel.version })}</li><li>{t("Invoices already issued keep version {v} and their original amounts", { v: sel.version })}</li><li>{t("New invoices will use version {next} ({amount})", { next: sel.version + 1, amount: `${/^\d+(\.\d{1,2})?$/.test(d.price.trim()) ? amount(priceMinor(d.price)) : "—"} ${d.currency}` })}</li></>}</ul></section>
               <div className="flex justify-end gap-2">{creating && <Btn onClick={() => { setCreating(false); }}>{t("Cancel")}</Btn>}{isBlocked && <Badge tone="muted">{t("Read-only while a restriction is active")}</Badge>}<Btn variant="primary" disabled={pending || isBlocked} onClick={save}>{creating || !sel ? t("Create contract") : t("Save as version {n}", { n: sel.version + 1 })}</Btn></div>
             </div>

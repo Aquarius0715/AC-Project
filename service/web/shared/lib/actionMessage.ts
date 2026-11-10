@@ -2,7 +2,8 @@
 // the Core API turned into one toast line. Pure code shared by every client view that calls Server Actions. The line
 // is in the display language (`t`, IR269); a field name and a domain message key are humanized English, because the
 // API sends keys, not texts.
-import { translator, type T } from "@ac/web/lib/i18n";
+import { translator, type T, textOf } from "@ac/web/lib/i18n";
+import { lookup } from "@ac/web/lib/lookup";
 
 export interface ActionFailure { code: string; messageKey: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null }
 
@@ -14,6 +15,7 @@ const fieldText: Record<string, string> = {
   "error.past": "{field} must not be in the past",
   "error.future": "{field} must not be in the future",
   "error.duplicate": "{field} is already used",
+  "error.mqttNodeFormat": "The MQTT node ID needs 1–64 letters, digits, hyphens or underscores",
   "error.count": "{field} has the wrong number of entries",
   "error.invalidFile": "{field} is not an accepted file — check its type and size", // the bytes, the type or the size (IR308)
   // the person does not get this notice on that channel, e.g. WhatsApp without a phone number on the account (IR578)
@@ -27,6 +29,8 @@ const fieldText: Record<string, string> = {
 };
 // the refusals of the user management and assignment (IR416, IR417, IR420, IR421, IR433) say what to do
 const keyText: Record<string, string> = {
+  // a node ID belongs to one device (IR635)
+  "error.duplicateMqttNode": "Another device already has this MQTT node ID",
   "errors.own_account": "You can’t change or remove your own account",
   "errors.last_owner": "The last active owner can’t be demoted, disabled or removed",
   "errors.last_contractor": "Your company keeps one active contractor — this one can’t be disabled or removed",
@@ -41,6 +45,31 @@ const keyText: Record<string, string> = {
   "errors.invoice_has_payment": "This invoice already has a payment in progress or recorded — finish or fail that one first",
   // an invoice of the contract already covers part of the period (IR469)
   "errors.invoice_period_exists": "This contract already has an invoice for part of this period — choose a period after it",
+  // deleting or unbinding a device, deleting a model (DEC-103): what keeps it, and what to do first
+  "error.deviceBound": "This device is bound to a unit — unbind it first",
+  "error.deviceBusy": "This device has an operation under way — wait until it ends",
+  "error.deviceInCampaign": "This device is in a firmware campaign that has not ended — wait for it or abort the campaign",
+  "error.campaignActive": "This campaign has not ended — abort it first",
+  "error.customerHasUnits": "This customer still has units — delete them first",
+  "error.customerInUse": "This customer has jobs, contracts, invoices, reports or users, so it cannot be deleted",
+  "error.contractorInUse": "This contractor has jobs, offers, certificates, payouts or users, so it cannot be deleted",
+  "error.orgHasProfile": "This organization still has a customer or contractor profile — delete that first",
+  "error.orgHasUsers": "This organization still has users — remove them first",
+  "error.orgOperator": "The operator organization cannot be deleted",
+  "error.planHasJobs": "This plan has made a job, so it cannot be deleted",
+  "error.rateCardStarted": "This rate card has started, so it cannot be deleted",
+  "error.baselineCited": "An MRV report cites this baseline, so it cannot be deleted",
+  "error.factorCited": "An MRV report cites this factor, so it cannot be deleted",
+  "error.factorDefault": "This is the default factor of the energy summary, so it cannot be deleted",
+  "error.reportReviewed": "This report was reviewed, so it cannot be deleted",
+  "error.memberUsed": "This account has acted or has an assignment or certificate, so it cannot be deleted — revoke the access instead",
+  "error.memberHasOthers": "This person has another account — delete or end that first",
+  "error.memberSelf": "You cannot delete the account you are signed in with",
+  // a forced delete without the Data deletion permission (data.forceDelete)
+  "errors.force_delete_not_allowed": "You are not allowed to force a delete — ask HQ for the Data deletion permission",
+  "error.notBound": "This device is not bound to a unit",
+  "error.modelInUse": "Units still use this model — change their model first",
+  "error.modelInCampaign": "A firmware campaign names this model, so it cannot be deleted",
   "errors.technician_booked": "This technician still has an assigned job — reassign it first",
   "errors.technician_access_ends": "This technician's access ends before the visit — choose another technician or ask HQ to extend it",
   "errors.invite_pending": "This user hasn’t signed in yet — remove them, or wait until they have",
@@ -67,7 +96,10 @@ export const fieldName = (field: string) => humanize(field.split(".").pop() ?? f
 each worded as the toast words it: the text under the field to fix (IR586). */
 export function fieldErrorTexts<K extends string>(r: ActionFailure, fields: Record<string, K>, t: T = translator("en")): Partial<Record<K, string>> {
   const out: Partial<Record<K, string>> = {};
-  for (const [field, key] of Object.entries(r.fieldErrors)) if (fields[field]) out[fields[field]] = actionMessage({ ...r, fieldErrors: { [field]: key } }, t);
+  for (const [field, key] of Object.entries(r.fieldErrors)) {
+    const form = lookup(fields, field);
+    if (form) Object.assign(out, { [form]: actionMessage({ ...r, fieldErrors: { [field]: key } }, t) });
+  }
   return out;
 }
 
@@ -75,7 +107,8 @@ export function actionMessage(r: ActionFailure, t: T = translator("en")): string
   const [field, key] = Object.entries(r.fieldErrors)[0] ?? [];
   if (field && key) {
     const name = fieldName(field);
-    return fieldText[key] ? t(fieldText[key], { field: name }) : t("{field} — {problem}", { field: name, problem: humanize(key).toLowerCase() });
+    const text = lookup(fieldText, key);
+    return text ? t(text, { field: name }) : t("{field} — {problem}", { field: name, problem: humanize(key).toLowerCase() });
   }
   if (r.messageKey === "error.versionConflict") return t("Someone changed this in the meantime — the screen now shows the latest version");
   // the write limit per member (IR375): how long to wait, as the implementation contracts ask for RATE_LIMITED
@@ -90,7 +123,8 @@ export function actionMessage(r: ActionFailure, t: T = translator("en")): string
     }
     return r.retryAfterSeconds ? t("Too many changes in a short time — try again in {s} s", { s: r.retryAfterSeconds }) : t("Too many changes in a short time — try again shortly");
   }
-  if (keyText[r.messageKey]) return t(keyText[r.messageKey]);
+  const known = keyText[r.messageKey];
+  if (known) return t(known);
   if (r.messageKey.startsWith("errors.")) return humanize(r.messageKey);
-  return codeText[r.code] ? t(codeText[r.code]) : `${r.code}: ${humanize(r.messageKey)}`;
+  return textOf(codeText, r.code, t) ?? `${r.code}: ${humanize(r.messageKey)}`;
 }

@@ -1,13 +1,15 @@
 "use client";
 
+import { hasContent } from "@ac/web/lib/hasContent";
 import Link from "next/link";
 import { Select, cx } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
+import { setParams } from "@ac/web/lib/searchParams";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 
 interface Scope { customerId?: string; propertyId?: string; unitId?: string }
 const keep = (q: Scope, extra: Record<string, string> = {}) => {
-  const sp = new URLSearchParams({ ...Object.fromEntries(Object.entries(q).filter(([, v]) => v) as [string, string][]), ...extra });
+  const sp = new URLSearchParams([...setParams(q), ...Object.entries(extra)]);
   return sp.size > 0 ? `/admin/jobs?${sp}` : "/admin/jobs";
 };
 
@@ -21,7 +23,7 @@ export function JobsTabs({ tab, counts, q, action }: Readonly<{ tab: string; cou
       <div role="tablist" className="flex flex-wrap gap-4">
         {tabs.map((x) => <Link key={x.id} role="tab" aria-selected={tab === x.id} href={keep(q, x.id === "jobs" ? {} : { tab: x.id })} className={cx("-mb-px border-b-2 px-1 pb-2 text-[13px] font-semibold", tab === x.id ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-ink")}>{t(x.label)}{x.count !== undefined && <span className="ml-1.5 rounded bg-surface2 px-1.5 text-[11px]">{x.count}</span>}</Link>)}
       </div>
-      {action && <div className="mb-1.5">{action}</div>}
+      {hasContent(action) && <div className="mb-1.5">{action}</div>}
     </div>
   );
 }

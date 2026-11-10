@@ -8,12 +8,13 @@ import { apiMode, CoreError } from "@ac/web/lib/dal";
 import { DevicesView } from "@ac/web/components/TechDevices";
 import { loadDevices } from "../_lib/load";
 import { TechDevicesView } from "../_components/devices-view";
+import { recover } from "@ac/web/lib/promises";
 
 export default async function TechnicianDeviceEventsPage({ params }: Readonly<PageProps<"/technician/devices/[id]">>) {
   const { id } = await params;
   await connection();
   if (!apiMode()) return <DevicesView initial={id} />;
-  const live = await loadDevices({ selected: id, events: true }).catch((error) => {
+  const live = await recover(loadDevices({ selected: id, events: true }), (error: unknown) => {
     if (error instanceof CoreError && (error.error.code === "NOT_FOUND" || error.error.code === "FORBIDDEN")) notFound();
     throw error;
   });

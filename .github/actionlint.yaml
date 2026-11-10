@@ -1,0 +1,3 @@
+# actionlint (docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint): the lab server's self-hosted runner label (DEC-94)
+self-hosted-runner:
+  labels: [ac-test]

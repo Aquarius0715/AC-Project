@@ -1,19 +1,24 @@
 "use client";
+const TECH_A = "tech-external-a";
+const Q_REFRIGERANT = "Split-unit refrigerant handling";
+const Q_ELECTRICAL = "Electrical basics";
+const Q_GENERAL = "General maintenance";
 
 import { useState } from "react";
 import Link from "next/link";
-import { Badge, Banner, Btn, Card, Check, DataTable, EmptyState, Field, Input, Modal, Page, Search, Select, Stat, Tabs, UtilBar, useToast } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Check, DataTable, EmptyState, Field, Input, Modal, Page, Search, Select, Stat, Tabs, UtilizationBar, useToast, type Tone } from "@ac/web/components/ui";
 import { useUrlTab } from "@ac/web/lib/useUrlTab";
 import { Icon } from "@ac/web/components/Icon";
 
 // DATA_SOURCE=API: technicians of the company (members.list, IR172 displayName), a week of members.capacity and
 // members.setUnavailability. Qualification grants come from the memberships (contractors get no permissions/scopes, IR42).
+const CERT_TONE = new Map<string, Tone>([["Valid", "ok"], ["Expired", "muted"]]); // anything else is expiring
 const techs = [
-  { id: "tech-external-a", quals: ["Split-unit refrigerant handling", "Electrical basics"], sub: "Refrigerant handling · Electrical basics · active since 2025-04", asg: "09:00–13:00 assigned", free: "13:00–17:00 free", used: 10, tot: 40, week: ["2 / 8 h", "4 / 8 h", "0 / 8 h", "4 / 8 h", "0 / 8 h", "—", "—"], active: true },
-  { id: "tech-external-a2", quals: ["General maintenance"], sub: "General maintenance · active since 2026-02", asg: "13:00–17:00 assigned (job-p12)", free: "09:00–13:00 free", used: 8, tot: 40, week: ["0 / 8 h", "4 / 8 h", "4 / 8 h", "0 / 8 h", "0 / 8 h", "—", "—"], active: true },
+  { id: TECH_A, quals: [Q_REFRIGERANT, Q_ELECTRICAL], sub: "Refrigerant handling · Electrical basics · active since 2025-04", asg: "09:00–13:00 assigned", free: "13:00–17:00 free", used: 10, tot: 40, week: ["2 / 8 h", "4 / 8 h", "0 / 8 h", "4 / 8 h", "0 / 8 h", "—", "—"], active: true },
+  { id: "tech-external-a2", quals: [Q_GENERAL], sub: "General maintenance · active since 2026-02", asg: "13:00–17:00 assigned (job-p12)", free: "09:00–13:00 free", used: 8, tot: 40, week: ["0 / 8 h", "4 / 8 h", "4 / 8 h", "0 / 8 h", "0 / 8 h", "—", "—"], active: true },
   { id: "tech-external-old", quals: [], sub: "Expired membership", asg: "—", free: "—", used: 0, tot: 0, week: [], active: false },
 ];
-const quals: [string, string][] = [["Split-unit refrigerant handling", "tech-external-a · valid to 2027-03-31"], ["Electrical basics", "tech-external-a · expires 2026-10-15"], ["General maintenance", "tech-external-a2 · valid to 2027-01-31"], ["Gas leak detection", "not held"]];
+const quals: [string, string][] = [[Q_REFRIGERANT, "tech-external-a · valid to 2027-03-31"], [Q_ELECTRICAL, "tech-external-a · expires 2026-10-15"], [Q_GENERAL, "tech-external-a2 · valid to 2027-01-31"], ["Gas leak detection", "not held"]];
 
 /** Phase 1A demo team screen (fixture technicians). */
 export function MockTeam() {
@@ -34,14 +39,14 @@ export function MockTeam() {
           {list.length === 0 && <EmptyState title="No match">No technician matches this qualification.</EmptyState>}
           {list.map((t) => {
             const pct = t.tot ? Math.round((t.used / t.tot) * 100) : null;
-            return <Card key={t.id} title={t.id} sub={t.sub} action={<div className="text-right"><div className="text-xl font-bold">{pct === null ? "—" : pct + "%"}</div><div className="text-[11px] text-muted-foreground">utilization</div></div>}>
-              <div className="mb-2 flex justify-between text-xs"><span>Week of 09-14</span><b>{t.used} h / {t.tot} h</b></div><UtilBar pct={pct} />
+            return <Card key={t.id} title={t.id} sub={t.sub} action={<div className="text-right"><div className="text-xl font-bold">{pct === null ? "—" : `${String(pct)}%`}</div><div className="text-[11px] text-muted-foreground">utilization</div></div>}>
+              <div className="mb-2 flex justify-between text-xs"><span>Week of 09-14</span><b>{t.used} h / {t.tot} h</b></div><UtilizationBar pct={pct} />
               <div className="mt-2 grid-fluid text-xs" style={{ ["--min"as string]: "180px" }}><span>{t.asg}</span><span className="text-ok">{t.free}</span></div>
             </Card>;
           })}
           <p className="text-[11px] text-muted-foreground">Utilization = assigned hours ÷ configured available hours (4 h / 8 h = 50%). Undefined available hours show “—”, not 0%. Accounts are managed in Users.</p>
           <Card title="Week of 09-14 — assigned / available hours" action={<Link className="text-xs font-semibold text-primary" href="/partner/schedule">Open schedule <Icon name="arrowRight" /></Link>}>
-            <div className="scroll-x"><table className="w-full min-w-[560px] text-xs"><thead><tr className="text-left text-muted-foreground"><th /><th>Mon 14</th><th>Tue 15</th><th>Wed 16</th><th>Thu 17</th><th>Fri 18</th><th>Sat 19</th><th>Sun 20</th></tr></thead><tbody>{techs.filter((t) => t.week.length).map((t) => <tr key={t.id} className="border-t border-line"><td className="py-2 font-bold">{t.id}</td>{t.week.map((w, i) => <td key={i}>{w}</td>)}</tr>)}</tbody></table></div>
+            <div className="scroll-x"><table className="w-full min-w-[560px] text-xs"><thead><tr className="text-left text-muted-foreground"><td /><th>Mon 14</th><th>Tue 15</th><th>Wed 16</th><th>Thu 17</th><th>Fri 18</th><th>Sat 19</th><th>Sun 20</th></tr></thead><tbody>{techs.filter((t) => t.week.length).map((t) => <tr key={t.id} className="border-t border-line"><td className="py-2 font-bold">{t.id}</td>{t.week.map((w, i) => <td key={i}>{w}</td>)}</tr>)}</tbody></table></div>
             <p className="mt-2 text-[11px] text-muted-foreground">Sat/Sun have no configured available hours, so utilization shows “—”.</p>
           </Card>
         </div>
@@ -59,7 +64,7 @@ export function MockTeam() {
         <Banner tone="warn">Conflicts with 1 confirmed assignment (job-c07 · 10-01 10:00–12:00). Reassign it or ask HQ to propose a new time to the client — the client must approve any time change.</Banner>
       </Modal>
       <Modal open={modal === "upload"} onClose={() => { setModal(null); }} title="Upload renewal — Electrical basics" footer={<><Btn onClick={() => { setModal(null); }}>Cancel</Btn><Btn variant="primary" onClick={() => { setModal(null); toast("Renewal uploaded — pending HQ verification"); }}>Upload</Btn></>}>
-        <Field label="Technician"><Input disabled value="tech-external-a" /></Field>
+        <Field label="Technician"><Input disabled value={TECH_A} /></Field>
         <div className="grid-fluid" style={{ ["--min" as string]: "160px" }}><Field label="Certificate no."><Input defaultValue="EB-2026-0442" /></Field><Field label="Valid until"><Input type="date" defaultValue="2028-10-15" /></Field></div>
         <div className="rounded-xl border border-dashed border-line p-4 text-center text-xs text-muted-foreground"><Icon name="upload" /> Drop a PDF / image (≤ 5 MiB)</div>
         <p className="text-[11px] text-muted-foreground">A pending renewal does not extend eligibility until HQ verifies it.</p>
@@ -70,9 +75,9 @@ export function MockTeam() {
 
 function Certs({ onUpload }: Readonly<{ onUpload: () => void }>) {
   const rows = [
-    { t: "tech-external-a", c: "Split-unit refrigerant handling", until: "2027-03-31", st: "Valid" },
-    { t: "tech-external-a", c: "Electrical basics", until: "2026-10-15", st: "Expiring · 14 d" },
-    { t: "tech-external-a2", c: "General maintenance", until: "2027-01-31", st: "Valid" },
+    { t: TECH_A, c: Q_REFRIGERANT, until: "2027-03-31", st: "Valid" },
+    { t: TECH_A, c: Q_ELECTRICAL, until: "2026-10-15", st: "Expiring · 14 d" },
+    { t: "tech-external-a2", c: Q_GENERAL, until: "2027-01-31", st: "Valid" },
     { t: "tech-external-b", c: "Refrigerant handling", until: "2026-09-01", st: "Expired" },
   ];
   return (
@@ -81,7 +86,7 @@ function Certs({ onUpload }: Readonly<{ onUpload: () => void }>) {
       <Card title="Certificates — contractor-a">
         <DataTable rowKey={(r) => r.t + r.c} rows={rows} cols={[
           { key: "t", label: "Technician", render: (r) => <b>{r.t}</b> }, { key: "c", label: "Certificate", render: (r) => r.c }, { key: "u", label: "Valid until", render: (r) => r.until },
-          { key: "s", label: "Status", render: (r) => <Badge tone={r.st === "Valid" ? "ok" : (r.st === "Expired" ? "muted" : "warn")}>{r.st}</Badge> },
+          { key: "s", label: "Status", render: (r) => <Badge tone={CERT_TONE.get(r.st) ?? "warn"}>{r.st}</Badge> },
           { key: "a", label: "", render: (r) => (r.st.startsWith("Expiring") ? <Btn size="sm" variant="primary" onClick={onUpload}>Upload renewal</Btn> : null) },
         ]} />
         <p className="mt-2 text-[11px] text-muted-foreground">Only valid, HQ-verified certificates make a technician eligible for offers that require them.</p>

@@ -5,6 +5,8 @@
 // the record it changes.
 import { refresh } from "next/cache";
 import { coreAll, coreOp, CoreError } from "@ac/web/lib/dal";
+import { actionFailure } from "@ac/web/lib/actionFailure";
+import { deleteAccounts } from "@ac/web/lib/forceDelete";
 import type { ApiCustomerRow, ApiImportPreview, ApiOrgRow, ApiUnitImport, Profile, Scope } from "@ac/web/lib/assets";
 import type { OpInput } from "@ac/web/lib/opTypes";
 
@@ -14,7 +16,7 @@ async function run<T>(fn: () => Promise<T>): Promise<ActionResult<T>> {
   try {
     return { ok: true, value: await fn() };
   } catch (error) {
-    return error instanceof CoreError ? { ok: false, messageKey: error.error.messageKey, code: error.error.code, fieldErrors: error.error.fieldErrors ?? {}, retryAfterSeconds: error.error.retryAfterSeconds } : { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
+    return actionFailure(error);
   } finally {
     refresh();
   }
@@ -32,8 +34,10 @@ export async function createCustomer(input: CustomerInput) {
       org = await coreOp<ApiOrgRow>("organizations.save", { name: billingName, kind: "customer", status: "active" }, write());
     } catch (error) {
       if (!(error instanceof CoreError && error.error.messageKey === "error.duplicateName")) throw error;
-      const same = (await coreAll<ApiOrgRow>("organizations.list", { filters: { kind: "customer" } })).find((o) => o.name.trim().toLowerCase() === billingName.toLowerCase());
-      const taken = same && (await Promise.all((["active", "inactive"] as const).map((status) => coreAll<ApiCustomerRow>("customers.list", { filters: { organizationId: same.id, status } })))).flat().length > 0;
+      const customers = await coreAll<ApiOrgRow>("organizations.list", { filters: { kind: "customer" } });
+      const same = customers.find((o) => o.name.trim().toLowerCase() === billingName.toLowerCase());
+      const lists = same ? await Promise.all((["active", "inactive"] as const).map((status) => coreAll<ApiCustomerRow>("customers.list", { filters: { organizationId: same.id, status } }))) : [];
+      const taken = lists.flat().length > 0;
       if (!same || taken) throw error;
       org = same;
     }
@@ -52,17 +56,32 @@ export async function updateCustomer(id: string, version: number, org: { id: str
   });
 }
 
+/** customers.delete and then organizations.delete: a customer registered by mistake is removed as it was made (DEC-103);
+a customer with units, jobs, contracts, invoices or users is refused with the reason. With `force` (the data.forceDelete
+holder) its accounts go too, even those with history: customers.delete first (units, jobs, contracts, invoices and reports
+still refuse it, and then nothing has been removed), then every account of the organization (members.delete), then the
+organization. A failure part-way leaves the rest to delete again. */
+export async function deleteCustomer(id: string, version: number, org: { id: string; version: number }, reason: string, force = false) {
+  return run(async () => {
+    const why = reason.trim();
+    await coreOp("customers.delete", { id, force, reason: why }, write(version));
+    if (force) await deleteAccounts(org.id, why);
+    await coreOp("organizations.delete", { id: org.id, reason: why }, write(org.version));
+    return null;
+  });
+}
+
 export interface PropertyInput { id?: string; customerOrgId: string; kind: "home" | "office"; name: string; address: string | null; accessInstructions: string | null }
 export async function saveProperty(input: PropertyInput, version?: number) {
-  return run(() => coreOp<{ id: string }>("properties.save", input, write(version)).then((p) => p.id));
+  return run(async () => { const p = await coreOp<{ id: string }>("properties.save", input, write(version)); return p.id; });
 }
 export interface SpaceInput { id?: string; propertyId: string; parentSpaceId: string | null; kind: "area" | "floor" | "room" | "space"; name: string }
 export async function saveSpace(input: SpaceInput, version?: number) {
-  return run(() => coreOp<{ id: string }>("spaces.save", input, write(version)).then((s) => s.id));
+  return run(async () => { const s = await coreOp<{ id: string }>("spaces.save", input, write(version)); return s.id; });
 }
 /** properties.archive / spaces.archive (CONFLICT while it still holds units or child spaces). */
 export async function archiveLocation(kind: "property" | "space", id: string, version: number, reason: string) {
-  return run(() => coreOp(kind === "property" ? "properties.archive" : "spaces.archive", { id, reason }, write(version)).then(() => null));
+  return run(async () => { await coreOp(kind === "property" ? "properties.archive" : "spaces.archive", { id, reason }, write(version)); return null; });
 }
 
 export interface UnitInput {
@@ -70,47 +89,47 @@ export interface UnitInput {
   serviceScope: Scope[]; warrantyEndsAt?: string | null; changeReason?: string;
 }
 export async function saveUnit(input: UnitInput, version?: number) {
-  return run(() => coreOp<{ id: string }>("units.save", input, write(version)).then((u) => u.id));
+  return run(async () => { const u = await coreOp<{ id: string }>("units.save", input, write(version)); return u.id; });
 }
 /** units.archive takes the unit out of use and keeps its ID and history (D05: CONFLICT while it is still in use). */
 export async function archiveUnit(id: string, version: number, reason: string) {
-  return run(() => coreOp("units.archive", { id, reason }, write(version)).then(() => null));
+  return run(async () => { await coreOp("units.archive", { id, reason }, write(version)); return null; });
 }
 /** units.delete removes a unit registered by mistake (CONFLICT once it had contracts, jobs or IoT). */
 export async function deleteUnit(id: string, version: number, reason: string) {
-  return run(() => coreOp("units.delete", { id, reason }, write(version)).then(() => null));
+  return run(async () => { await coreOp("units.delete", { id, reason }, write(version)); return null; });
 }
 export async function setUnitPolicies(unitId: string, version: number, alertPolicyIds: string[]) {
-  return run(() => coreOp("units.setAlertPolicies", { unitId, alertPolicyIds }, write(version)).then(() => null));
+  return run(async () => { await coreOp("units.setAlertPolicies", { unitId, alertPolicyIds }, write(version)); return null; });
 }
 /** policies.setDefaultRule for this customer (version 0 creates the setting). */
 export async function setDefaultRule(policyId: string, ruleKey: string, customerId: string, enabled: boolean, version: number) {
-  return run(() => coreOp("policies.setDefaultRule", { policyId, ruleKey, customerId, enabled }, write(version)).then(() => null));
+  return run(async () => { await coreOp("policies.setDefaultRule", { policyId, ruleKey, customerId, enabled }, write(version)); return null; });
 }
 
 // ---- client users (FR-A17): adding (the account at once, IR461), role / sign-in changes with a reason, removal, set-up
 // e-mail again and reset previews ----
 export async function inviteClientUser(customerId: string, email: string, clientRole: "owner" | "member", displayName: string) {
-  return run(() => coreOp<{ id: string }>("clientUsers.save", { customerId, clientRole, email: email.trim(), displayName: displayName.trim() }, write()).then((u) => u.id));
+  return run(async () => { const u = await coreOp<{ id: string }>("clientUsers.save", { customerId, clientRole, email: email.trim(), displayName: displayName.trim() }, write()); return u.id; });
 }
 export async function updateClientUser(id: string, version: number, input: { customerId: string; email: string; clientRole: "owner" | "member"; status?: "active" | "disabled"; reason: string }) {
-  return run(() => coreOp("clientUsers.save", { id, ...input, reason: input.reason.trim() }, write(version)).then(() => null));
+  return run(async () => { await coreOp("clientUsers.save", { id, ...input, reason: input.reason.trim() }, write(version)); return null; });
 }
 export async function removeClientUser(id: string, version: number, reason: string) {
-  return run(() => coreOp("clientUsers.remove", { id, reason: reason.trim() }, write(version)).then(() => null));
+  return run(async () => { await coreOp("clientUsers.remove", { id, reason: reason.trim() }, write(version)); return null; });
 }
 /** members.revokeSessions for the client user's membership: every session of the user ends at once; the access stays
 (Figma Admin 02-15 → 03-8, IR384, IR385). */
 export async function signOutEverywhere(membershipId: string, reason: string) {
-  return run(() => coreOp("members.revokeSessions", { membershipId, reason: reason.trim() }, write()).then(() => null));
+  return run(async () => { await coreOp("members.revokeSessions", { membershipId, reason: reason.trim() }, write()); return null; });
 }
 /** clientUsers.resendInvite sends the set-up e-mail again, through the identity provider (IR461). */
 export async function resendInvite(id: string) {
-  return run(() => coreOp("clientUsers.resendInvite", { id }, { write: true }).then(() => null));
+  return run(async () => { await coreOp("clientUsers.resendInvite", { id }, { write: true }); return null; });
 }
 /** auth.previewPasswordReset answers the same generic preview for every address (IR145). */
 export async function previewPasswordReset(email: string) {
-  return run(() => coreOp("auth.previewPasswordReset", { demoEmail: email }).then(() => null));
+  return run(async () => { await coreOp("auth.previewPasswordReset", { demoEmail: email }); return null; });
 }
 
 // ---- CSV import (FR-A18): preview (writes nothing), import once, undo within 24 h ----
@@ -126,6 +145,6 @@ export async function importUndo(importId: string, version: number, reason: stri
 
 // ---- warranty (FR-A19) ----
 export async function recordWarrantyClaim(jobId: string, version: number, partLabel: string, amountMinor: number, currency: OpInput<"jobs.recordWarrantyClaim">["currency"], reason: string) {
-  return run(() => coreOp("jobs.recordWarrantyClaim", { jobId, amountMinor, currency, partLabel: partLabel.trim(), reason: reason.trim() }, write(version)).then(() => null));
+  return run(async () => { await coreOp("jobs.recordWarrantyClaim", { jobId, amountMinor, currency, partLabel: partLabel.trim(), reason: reason.trim() }, write(version)); return null; });
 }
 

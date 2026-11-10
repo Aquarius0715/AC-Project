@@ -16,10 +16,13 @@ import (
 // testIssuer is the local Keycloak realm the test tokens name.
 const testIssuer = "http://localhost:8081/realms/ac"
 
+// tailnetIssuer is the same realm on a second address of the deployment.
+const tailnetIssuer = "http://100.99.169.116:8281/realms/ac"
+
 // newTestVerifier returns a verifier of the customer and HQ apps that trusts key.
 func newTestVerifier(key *rsa.PrivateKey) *auth.OIDCVerifier {
 	return &auth.OIDCVerifier{
-		Issuer: testIssuer, Audiences: []string{appClient, adminClient},
+		Issuers: []string{testIssuer}, Audiences: []string{appClient, adminClient},
 		Keyfunc: func(*jwt.Token) (any, error) { return &key.PublicKey, nil }, AdminClient: "",
 	}
 }
@@ -249,5 +252,71 @@ func TestNewVerifierFromEnv(t *testing.T) {
 	) // keyfunc starts with an unreachable JWKS and refreshes in the background
 	if err == nil && v == nil {
 		t.Fatal("verifier")
+	}
+}
+
+// TestOIDCVerifierSeveralIssuers: when the identity provider answers on several addresses, the tokens of a sign-in
+// name the address it started on, so the verifier takes each listed issuer and no other (IR651).
+func TestOIDCVerifierSeveralIssuers(t *testing.T) {
+	t.Parallel()
+
+	key := newKey(t)
+	verifier := newTestVerifier(key)
+	verifier.Issuers = []string{testIssuer, tailnetIssuer}
+
+	for issuer, want := range map[string]bool{
+		testIssuer:                      true,
+		tailnetIssuer:                   true,
+		"http://evil.example/realms/ac": false,
+		"":                              false,
+	} {
+		claims := accessClaims()
+		claims["iss"] = issuer
+
+		_, err := verifier.Verify(t.Context(), sign(t, key, claims))
+		if (err == nil) != want {
+			t.Errorf("issuer %q: accepted %v, want %v (%v)", issuer, err == nil, want, err)
+		}
+	}
+}
+
+// TestNewVerifierFromEnvListsIssuers: OIDC_ISSUER may name several issuers, comma separated, with blanks around them.
+func TestNewVerifierFromEnvListsIssuers(t *testing.T) {
+	t.Setenv("OIDC_ISSUER", " http://a.example/realms/ac , http://b.example/realms/ac ,")
+	t.Setenv("OIDC_JWKS_URL", "http://127.0.0.1:1/certs")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	v, err := auth.NewVerifierFromEnv(ctx)
+	if err != nil {
+		t.Skip(err)
+	}
+
+	if len(v.Issuers) != 2 || v.Issuers[0] != "http://a.example/realms/ac" ||
+		v.Issuers[1] != "http://b.example/realms/ac" {
+		t.Errorf("issuers %q", v.Issuers)
+	}
+}
+
+// TestOIDCVerifierNamesTheIssuer: the verified issuer is part of the identity: it says which address the holder signed
+// in on, and being checked against the list it cannot be made up.
+func TestOIDCVerifierNamesTheIssuer(t *testing.T) {
+	t.Parallel()
+
+	key := newKey(t)
+	verifier := newTestVerifier(key)
+	verifier.Issuers = []string{testIssuer, tailnetIssuer}
+
+	claims := accessClaims()
+	claims["iss"] = tailnetIssuer
+
+	identity, err := verifier.Verify(t.Context(), sign(t, key, claims))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if identity.Issuer != tailnetIssuer {
+		t.Errorf("issuer %q, want %q", identity.Issuer, tailnetIssuer)
 	}
 }

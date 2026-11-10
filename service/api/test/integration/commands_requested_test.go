@@ -110,3 +110,69 @@ func TestRequestedCommandsForTheGateway(t *testing.T) {
 		t.Fatalf("a sent command is still waiting: %v", rows)
 	}
 }
+
+// TestAcknowledgementAheadOfTheSentReport: a device can answer before the report that its command was sent reaches the
+// API, because the two travel separately. The answer in time acknowledges the command; counted as late, it left the
+// command "sent" with nothing more to come, and the unit refused every command as busy until the command expired.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
+func TestAcknowledgementAheadOfTheSentReport(t *testing.T) {
+	srv := serverWith(t, true)
+	command := uuid.NewString()
+	owner(
+		t,
+		`INSERT INTO control.commands (id, tenant_id, unit_id, device_id, actor_membership_id, source, action, status,
+			delivery, requested_at, expires_at, correlation_id, created_at, updated_at)
+		VALUES ($1,$2,$3,$4,$5,'ui',$6,'requested','not_sent',$7,$8,'corr-ahead',$7,$7)`,
+		command,
+		seed.ID("tenant-a"),
+		seed.ID("unit-offline-rto"),
+		seed.ID("device-offline-rto"),
+		seed.ID("hq-operator"),
+		`{"kind":"set_temperature","celsius":26}`,
+		clock(),
+		clock().Add(5*time.Minute),
+	)
+	keepObserved(t, command)
+	t.Cleanup(func() { owner(t, `DELETE FROM control.commands WHERE id = $1`, command) })
+
+	trigger := func(kind string, ago time.Duration) {
+		t.Helper()
+
+		code, res := write(
+			srv,
+			hq(),
+			"demo.trigger",
+			`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+
+				clock().Add(-ago).
+					Format(time.RFC3339)+
+				`","eventType":"`+kind+`","commandId":"`+command+`"}`,
+			0,
+		)
+		if code != http.StatusOK {
+			t.Fatalf("%s: %d %v", kind, code, res)
+		}
+	}
+
+	trigger("command_ack", 2*time.Second)
+	trigger("command_sent", time.Second) // the report that lost the race changes nothing
+
+	var (
+		status, delivery string
+		sent, late       bool
+	)
+
+	ownerScan(
+		t,
+		`SELECT status, delivery, sent_at IS NOT NULL, late_ack_at IS NOT NULL FROM control.commands WHERE id = $1`,
+		[]any{command},
+		&status,
+		&delivery,
+		&sent,
+		&late,
+	)
+
+	if status != statusAcknowledged || delivery != "sent" || !sent || late {
+		t.Errorf("status %s, delivery %s, sent time %v, late %v", status, delivery, sent, late)
+	}
+}

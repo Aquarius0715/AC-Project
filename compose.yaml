@@ -17,7 +17,7 @@
 name: ac-project
 
 x-worker: &worker             # cmd/worker (independent service, IR166/IR174)
-  image: ac-worker:dev
+  image: ac-worker:${IMAGE_TAG:-dev}
   build:
     context: ./service/api
     dockerfile: build/worker.Dockerfile
@@ -25,6 +25,12 @@ x-worker: &worker             # cmd/worker (independent service, IR166/IR174)
   environment:
     DATABASE_URL: postgres://ac_app_login:local@postgres:5432/ac?sslmode=disable
     DEMO_OPS: "1"                                       # scenario clock shared with the API (platform.demo_clock, IR168)
+    DEMO_CLOCK_START: ${DEMO_CLOCK_START:-}             # empty: from fixture.clock; now: the real clock (deploy/test, DEC-96)
+    # the apps that links in e-mails open (the defaults are this machine; deploy/test names the shared test URLs)
+    APP_URL_CUSTOMER: ${CUSTOMER_WEB_URL:-http://localhost:3000}
+    APP_URL_PARTNER: ${PARTNER_WEB_URL:-http://localhost:3001}
+    APP_URL_TECHNICIAN: ${TECHNICIAN_WEB_URL:-http://localhost:3002}
+    APP_URL_ADMIN: ${ADMIN_WEB_URL:-http://localhost:3003}
   read_only: true
   cap_drop: [ALL]               # IR373
   security_opt: [no-new-privileges:true]
@@ -40,23 +46,28 @@ x-backend: &backend          # Core API business-domain services (service/api/cm
   environment: &backend-env
     APP_ENV: local
     DEMO_OPS: "1"                                       # demo.advanceClock / demo.trigger (IR154); never set in production
+    DEMO_CLOCK_START: ${DEMO_CLOCK_START:-}             # empty: from fixture.clock; now: the real clock (deploy/test, DEC-96)
     DATABASE_URL: postgres://ac_app_login:local@postgres:5432/ac?sslmode=disable
     DATABASE_READER_URL: postgres://ac_app_login:local@postgres:5432/ac?sslmode=disable
     AWS_REGION: ap-southeast-5
     AWS_ENDPOINT_URL: http://localstack:4566
     AWS_ACCESS_KEY_ID: test
     AWS_SECRET_ACCESS_KEY: test
-    OIDC_ISSUER: http://localhost:8081/realms/ac          # must equal the iss claim seen by browsers
+    OIDC_ISSUER: ${API_OIDC_ISSUER:-${KEYCLOAK_URL:-http://localhost:8081}/realms/ac}   # must equal the iss claim of the tokens the BFF gets (the browser's address, or keycloak:8080 when the provider has several, IR651)
     OIDC_JWKS_URL: http://keycloak:8080/realms/ac/protocol/openid-connect/certs
     OIDC_ADMIN_CLIENT_ID: ac-admin-web
     OIDC_APP_CLIENT_ID: ac-web
+    APP_URL_CUSTOMER: ${CUSTOMER_WEB_URL:-http://localhost:3000}
+    APP_URL_PARTNER: ${PARTNER_WEB_URL:-http://localhost:3001}
+    APP_URL_TECHNICIAN: ${TECHNICIAN_WEB_URL:-http://localhost:3002}
+    APP_URL_ADMIN: ${ADMIN_WEB_URL:-http://localhost:3003}
     MQTT_URL: tcp://mosquitto:1883
     STRIPE_API_BASE: http://stripe-mock:12111
     WEATHER_API_BASE: http://weather-mock:8080          # WireMock GET /v1/current
     OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
     RATE_LIMIT_URL: redis://:${VALKEY_PASSWORD:-local-valkey-only}@valkey:6379                   # write limit per membership, 60 per minute (IR375)
     ACCOUNTS_PER_ORG_PER_DAY: "500"                     # accounts added per organization in 24 h (IR464; 30 in production): local E2E runs add many
-    INTERNAL_API_TOKEN: local-internal-token-change-me   # service-to-service calls (identity principal, IR181)
+    INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-local-internal-token-change-me}   # service-to-service calls (identity principal, IR181)
     IDENTITY_INTERNAL_URL: http://identity-api:8080      # ignored by identity-api itself
     # internal queries between the services (IR190, IR193); a service never calls itself
     IDENTITY_API_URL: http://identity-api:8080
@@ -79,10 +90,11 @@ x-backend: &backend          # Core API business-domain services (service/api/cm
 x-web: &web                   # one Next.js app per entry point (service/web/<name>, service/web/Dockerfile, IR178)
   environment: &web-env
     DATA_SOURCE: mock            # Phase 1A demo: screens keep their fixture data
-    CUSTOMER_WEB_URL: http://localhost:3000
-    PARTNER_WEB_URL: http://localhost:3001
-    TECHNICIAN_WEB_URL: http://localhost:3002
-    ADMIN_WEB_URL: http://localhost:3003
+    CUSTOMER_WEB_URL: ${CUSTOMER_WEB_URL:-http://localhost:3000}
+    PARTNER_WEB_URL: ${PARTNER_WEB_URL:-http://localhost:3001}
+    TECHNICIAN_WEB_URL: ${TECHNICIAN_WEB_URL:-http://localhost:3002}
+    ADMIN_WEB_URL: ${ADMIN_WEB_URL:-http://localhost:3003}
+    PUBLIC_HOSTS: ${PUBLIC_HOSTS:-}   # more addresses the apps and Keycloak answer on besides the URLs above (IR651); empty: those only
   read_only: true
   cap_drop: [ALL]               # distroless, non-root, a port above 1024: no Linux capability needed (IR373)
   security_opt: [no-new-privileges:true]
@@ -92,8 +104,8 @@ x-web-api-env: &web-api-env
   <<: *web-env
   DATA_SOURCE: api
   CORE_API_URL: http://gateway:8080
-  SESSION_SECRET: local-dev-session-secret-change-me
-  OIDC_ISSUER: http://localhost:8081/realms/ac
+  SESSION_SECRET: ${SESSION_SECRET:-local-dev-session-secret-change-me}
+  OIDC_ISSUER: ${KEYCLOAK_URL:-http://localhost:8081}/realms/ac
   OIDC_INTERNAL_ISSUER: http://keycloak:8080/realms/ac
   SESSION_STORE_URL: redis://:${VALKEY_PASSWORD:-local-valkey-only}@valkey:6379
 
@@ -101,99 +113,99 @@ services:
   # ------------------------------------------------------------------ web apps (Next.js, one per entry point)
   customer-web:           # demo (mock data) — client entry point
     <<: *web
-    image: ac-customer-web:dev
+    image: ac-customer-web:${IMAGE_TAG:-dev}
     build: { context: ./service/web, args: { APP: customer } }
-    ports: ["127.0.0.1:3000:3000"]
+    ports: ["${PUBLISH_ADDR:-127.0.0.1}:${CUSTOMER_WEB_PORT:-3000}:3000"]
     tmpfs: [/tmp, /app/customer/.next/cache]
     profiles: [demo]
 
   customer-web-api:       # production-like: Server Components / Server Actions call the Core API through the DAL
     <<: *web
-    image: ac-customer-web:dev
+    image: ac-customer-web:${IMAGE_TAG:-dev}
     build: { context: ./service/web, args: { APP: customer } }
-    ports: ["127.0.0.1:3000:3000"]
+    ports: ["${PUBLISH_ADDR:-127.0.0.1}:${CUSTOMER_WEB_PORT:-3000}:3000"]
     tmpfs: [/tmp, /app/customer/.next/cache]
     environment:
       <<: *web-api-env
-      APP_URL: http://localhost:3000
+      APP_URL: ${CUSTOMER_WEB_URL:-http://localhost:3000}
       OIDC_APP_CLIENT_ID: ac-web
-      OIDC_APP_CLIENT_SECRET: local-ac-web-secret
+      OIDC_APP_CLIENT_SECRET: ${AC_WEB_CLIENT_SECRET:-local-ac-web-secret}
     networks: [edge, app]
     profiles: [full]
     depends_on: { gateway: { condition: service_started }, keycloak: { condition: service_healthy }, valkey: { condition: service_started } }
 
   partner-web:           # demo (mock data) — contractor entry point
     <<: *web
-    image: ac-partner-web:dev
+    image: ac-partner-web:${IMAGE_TAG:-dev}
     build: { context: ./service/web, args: { APP: partner } }
-    ports: ["127.0.0.1:3001:3000"]
+    ports: ["${PUBLISH_ADDR:-127.0.0.1}:${PARTNER_WEB_PORT:-3001}:3000"]
     tmpfs: [/tmp, /app/partner/.next/cache]
     profiles: [demo]
 
   partner-web-api:       # production-like: Server Components / Server Actions call the Core API through the DAL
     <<: *web
-    image: ac-partner-web:dev
+    image: ac-partner-web:${IMAGE_TAG:-dev}
     build: { context: ./service/web, args: { APP: partner } }
-    ports: ["127.0.0.1:3001:3000"]
+    ports: ["${PUBLISH_ADDR:-127.0.0.1}:${PARTNER_WEB_PORT:-3001}:3000"]
     tmpfs: [/tmp, /app/partner/.next/cache]
     environment:
       <<: *web-api-env
-      APP_URL: http://localhost:3001
+      APP_URL: ${PARTNER_WEB_URL:-http://localhost:3001}
       OIDC_APP_CLIENT_ID: ac-web
-      OIDC_APP_CLIENT_SECRET: local-ac-web-secret
+      OIDC_APP_CLIENT_SECRET: ${AC_WEB_CLIENT_SECRET:-local-ac-web-secret}
     networks: [edge, app]
     profiles: [full]
     depends_on: { gateway: { condition: service_started }, keycloak: { condition: service_healthy }, valkey: { condition: service_started } }
 
   technician-web:           # demo (mock data) — technician entry point
     <<: *web
-    image: ac-technician-web:dev
+    image: ac-technician-web:${IMAGE_TAG:-dev}
     build: { context: ./service/web, args: { APP: technician } }
-    ports: ["127.0.0.1:3002:3000"]
+    ports: ["${PUBLISH_ADDR:-127.0.0.1}:${TECHNICIAN_WEB_PORT:-3002}:3000"]
     tmpfs: [/tmp, /app/technician/.next/cache]
     profiles: [demo]
 
   technician-web-api:       # production-like: Server Components / Server Actions call the Core API through the DAL
     <<: *web
-    image: ac-technician-web:dev
+    image: ac-technician-web:${IMAGE_TAG:-dev}
     build: { context: ./service/web, args: { APP: technician } }
-    ports: ["127.0.0.1:3002:3000"]
+    ports: ["${PUBLISH_ADDR:-127.0.0.1}:${TECHNICIAN_WEB_PORT:-3002}:3000"]
     tmpfs: [/tmp, /app/technician/.next/cache]
     environment:
       <<: *web-api-env
-      APP_URL: http://localhost:3002
+      APP_URL: ${TECHNICIAN_WEB_URL:-http://localhost:3002}
       OIDC_APP_CLIENT_ID: ac-web
-      OIDC_APP_CLIENT_SECRET: local-ac-web-secret
+      OIDC_APP_CLIENT_SECRET: ${AC_WEB_CLIENT_SECRET:-local-ac-web-secret}
     networks: [edge, app]
     profiles: [full]
     depends_on: { gateway: { condition: service_started }, keycloak: { condition: service_healthy }, valkey: { condition: service_started } }
 
   admin-web:           # demo (mock data) — admin entry point
     <<: *web
-    image: ac-admin-web:dev
+    image: ac-admin-web:${IMAGE_TAG:-dev}
     build: { context: ./service/web, args: { APP: admin } }
-    ports: ["127.0.0.1:3003:3000"]
+    ports: ["${PUBLISH_ADDR:-127.0.0.1}:${ADMIN_WEB_PORT:-3003}:3000"]
     tmpfs: [/tmp, /app/admin/.next/cache]
     profiles: [demo]
 
   admin-web-api:       # production-like: Server Components / Server Actions call the Core API through the DAL
     <<: *web
-    image: ac-admin-web:dev
+    image: ac-admin-web:${IMAGE_TAG:-dev}
     build: { context: ./service/web, args: { APP: admin } }
-    ports: ["127.0.0.1:3003:3000"]
+    ports: ["${PUBLISH_ADDR:-127.0.0.1}:${ADMIN_WEB_PORT:-3003}:3000"]
     tmpfs: [/tmp, /app/admin/.next/cache]
     environment:
       <<: *web-api-env
-      APP_URL: http://localhost:3003
+      APP_URL: ${ADMIN_WEB_URL:-http://localhost:3003}
       OIDC_APP_CLIENT_ID: ac-admin-web
-      OIDC_APP_CLIENT_SECRET: local-ac-admin-secret
+      OIDC_APP_CLIENT_SECRET: ${AC_ADMIN_WEB_CLIENT_SECRET:-local-ac-admin-secret}
     networks: [edge, app]
     profiles: [full]
     depends_on: { gateway: { condition: service_started }, keycloak: { condition: service_healthy }, valkey: { condition: service_started } }
 
   # ------------------------------------------------------------------ backend (Go + Echo)
   migrate:             # one-off: embedded migrations (cmd/migrate), local login role, demo fixture once
-    image: ac-migrate:dev
+    image: ac-migrate:${IMAGE_TAG:-dev}
     build:
       context: ./service/api
       dockerfile: build/migrate.Dockerfile
@@ -208,6 +220,7 @@ services:
       SEED_FIXTURE: /fixture/fixture-contract.json     # local only: skipped when identity.users has rows
       SEED_MOCK_FLEET: "1"                             # local only: one air conditioner and IoT module per state pattern (internal/devicesim/fleet.json)
       SEED_LIVE_SENSORS: ${REAL_MQTT_URL:+1}           # local only: the live site of real sensor nodes when .env.local names their broker (DEC-86)
+      DEMO_CLOCK_START: ${DEMO_CLOCK_START:-}           # now: the live site as of now, on the real clock (deploy/test, DEC-96)
     volumes: [./docs/04-agentic-sdlc/fixture-contract.json:/fixture/fixture-contract.json:ro]
     read_only: true
     cap_drop: [ALL]             # IR373
@@ -216,7 +229,7 @@ services:
     profiles: [schema, backend, full]
 
   gateway:             # Core API entry for the web apps: forwards each operation's REST route (/v1/…) to the owning service (IR180, IR222)
-    image: ac-gateway:dev
+    image: ac-gateway:${IMAGE_TAG:-dev}
     build: { context: ./service/api, dockerfile: build/service.Dockerfile, target: runtime, args: { SERVICE: gateway } }
     environment:
       IDENTITY_API_URL: http://identity-api:8080
@@ -236,7 +249,7 @@ services:
 
   identity-api:        # identity, notifications, audit (internal; reached through the gateway)
     <<: *backend
-    image: ac-identity-api:dev
+    image: ac-identity-api:${IMAGE_TAG:-dev}
     build: { context: ./service/api, dockerfile: build/service.Dockerfile, target: runtime, args: { SERVICE: identity-api } }
     environment:         # least-privilege login of the domain (IR194)
       <<: *backend-env
@@ -246,12 +259,13 @@ services:
       IDP_TOKEN_URL: http://keycloak:8080/realms/ac/protocol/openid-connect/token
       IDP_ADMIN_URL: http://keycloak:8080/admin/realms/ac
       IDP_ADMIN_CLIENT_ID: ac-identity-admin
-      IDP_ADMIN_CLIENT_SECRET: local-identity-admin-08e3e9c976792a4915e39541   # local only; production calls Cognito with identity-api's task role, no secret
+      IDP_ADMIN_CLIENT_SECRET: ${IDP_ADMIN_CLIENT_SECRET:-local-identity-admin-08e3e9c976792a4915e39541}   # local only; production calls Cognito with identity-api's task role, no secret
+      IDP_PUBLIC_URL: ${IDP_PUBLIC_URL:-}   # the address the links of the provider's e-mails use when it has several (IR651)
     healthcheck: { test: ["CMD", "/app/server", "healthcheck"], interval: 10s, timeout: 3s, retries: 5 }
 
   equipment-api:        # units, devices, control, monitoring, read models (internal; reached through the gateway)
     <<: *backend
-    image: ac-equipment-api:dev
+    image: ac-equipment-api:${IMAGE_TAG:-dev}
     build: { context: ./service/api, dockerfile: build/service.Dockerfile, target: runtime, args: { SERVICE: equipment-api } }
     environment:         # least-privilege login of the domain (IR194)
       <<: *backend-env
@@ -261,7 +275,7 @@ services:
 
   maintenance-api:        # jobs, offers, assignments, partners (internal; reached through the gateway)
     <<: *backend
-    image: ac-maintenance-api:dev
+    image: ac-maintenance-api:${IMAGE_TAG:-dev}
     build: { context: ./service/api, dockerfile: build/service.Dockerfile, target: runtime, args: { SERVICE: maintenance-api } }
     environment:         # least-privilege login of the domain (IR194)
       <<: *backend-env
@@ -273,7 +287,7 @@ services:
 
   billing-api:        # billing, payments, restrictions (internal; reached through the gateway)
     <<: *backend
-    image: ac-billing-api:dev
+    image: ac-billing-api:${IMAGE_TAG:-dev}
     build: { context: ./service/api, dockerfile: build/service.Dockerfile, target: runtime, args: { SERVICE: billing-api } }
     environment:         # least-privilege login of the domain (IR194)
       <<: *backend-env
@@ -283,7 +297,7 @@ services:
 
   energy-api:        # energy, MRV, offsets (internal; reached through the gateway)
     <<: *backend
-    image: ac-energy-api:dev
+    image: ac-energy-api:${IMAGE_TAG:-dev}
     build: { context: ./service/api, dockerfile: build/service.Dockerfile, target: runtime, args: { SERVICE: energy-api } }
     environment:         # least-privilege login of the domain (IR194)
       <<: *backend-env
@@ -293,7 +307,7 @@ services:
 
   webhook:             # planned service (Stripe / SES / WhatsApp receiver); no command yet
     <<: *backend
-    image: ac-webhook:dev
+    image: ac-webhook:${IMAGE_TAG:-dev}
     build: { context: ./service/api, dockerfile: build/service.Dockerfile, target: runtime, args: { SERVICE: webhook } }
     ports: ["127.0.0.1:8082:8080"]   # this machine only: not reachable from other devices on the network (IR373)
     networks: [edge, app, data]
@@ -331,8 +345,14 @@ services:
     environment:
       DATABASE_URL: postgres://ac_app_login:local@postgres:5432/ac?sslmode=disable
       DEMO_OPS: "1"
+      DEMO_CLOCK_START: ${DEMO_CLOCK_START:-}
       MAIL_SMTP_ADDR: mailpit:1025
       MAIL_FROM: AC Project <no-reply@ac-project.local>
+      APP_URL_CUSTOMER: ${CUSTOMER_WEB_URL:-http://localhost:3000}
+      APP_URL_PARTNER: ${PARTNER_WEB_URL:-http://localhost:3001}
+      APP_URL_TECHNICIAN: ${TECHNICIAN_WEB_URL:-http://localhost:3002}
+      APP_URL_ADMIN: ${ADMIN_WEB_URL:-http://localhost:3003}
+      PUBLIC_HOSTS: ${PUBLIC_HOSTS:-}   # an e-mail links to the listed address its recipient last signed in on (IR721)
     depends_on:
       migrate: { condition: service_completed_successfully }
       mailpit: { condition: service_started }
@@ -342,7 +362,7 @@ services:
   # bridge carries the telemetry and the acknowledgements to the demo trigger of the Core API (gateway). Each logs in with
   # its own API key from .env.local (docker/mosquitto/passwd.sh writes the broker's password file from those keys).
   iot-bridge:          # local stand-in for AWS IoT rules: MQTT topics -> the Core API's demo trigger
-    image: ac-api:tools
+    image: ac-api:${IMAGE_TAG:-tools}
     build: { context: ./service/api, dockerfile: build/service.Dockerfile, target: tools, args: { SERVICE: gateway } }
     read_only: true               # distroless, non-root, no capability needed (IR539)
     cap_drop: [ALL]
@@ -352,22 +372,21 @@ services:
       MQTT_USER: iot-bridge
       MQTT_PASSWORD: ${MQTT_IOT_BRIDGE_KEY:?set MQTT_IOT_BRIDGE_KEY in .env.local}
       EQUIPMENT_API_URL: http://equipment-api:8080     # the control domain's internal queries (requested commands)
-      INTERNAL_API_TOKEN: local-internal-token-change-me   # the same dev value as the Core API services (backend-env)
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-local-internal-token-change-me}   # the same dev value as the Core API services (backend-env)
       # real sensor nodes (DEC-86): with REAL_MQTT_URL and its login in .env.local the bridge also subscribes to their
       # broker and records their readings on the live site; empty keeps it off. REAL_MQTT_COMMANDS=1 lets it send the
-      # live unit's power on/off to the command node's topic, its only publish there (DEC-89)
+      # live units' power on/off to the topic of their device's node, its only publish there (DEC-89, IR635)
       REAL_MQTT_URL: ${REAL_MQTT_URL:-}
       REAL_MQTT_TOPIC: ${REAL_MQTT_TOPIC:-smarthome/ac/#}
       REAL_MQTT_USER: ${REAL_MQTT_USER:-}
       REAL_MQTT_PASSWORD: ${REAL_MQTT_PASSWORD:-}
       REAL_MQTT_COMMANDS: ${REAL_MQTT_COMMANDS:-}
-      REAL_MQTT_COMMAND_NODE: ${REAL_MQTT_COMMAND_NODE:-node_1}
     networks: [data, app]
     depends_on: { mosquitto: { condition: service_started }, gateway: { condition: service_healthy }, equipment-api: { condition: service_healthy } }
     profiles: [iot]
 
   device-sim:          # simulated IoT modules (telemetry each minute, heartbeats, command acks) for the demo fixture devices
-    image: ac-api:tools
+    image: ac-api:${IMAGE_TAG:-tools}
     build: { context: ./service/api, dockerfile: build/service.Dockerfile, target: tools, args: { SERVICE: gateway } }
     read_only: true               # distroless, non-root, no capability needed (IR539)
     cap_drop: [ALL]
@@ -381,7 +400,7 @@ services:
     profiles: [iot]
 
   mock-history:        # one-off: 30 days of past readings for the mock fleet, up to the scenario clock (charts)
-    image: ac-api:tools
+    image: ac-api:${IMAGE_TAG:-tools}
     build: { context: ./service/api, dockerfile: build/service.Dockerfile, target: tools, args: { SERVICE: gateway } }
     read_only: true               # distroless, non-root, no capability needed (IR539)
     cap_drop: [ALL]
@@ -397,7 +416,7 @@ services:
 
   # ------------------------------------------------------------------ local stand-ins for AWS services
   postgres:            # Aurora PostgreSQL 18
-    image: postgres:18@sha256:edb0c08dc33befd0262ab3b5cf1c4f3f8cfd8b09e88c05b45adee29d6761ddb6   # pinned by digest (IR373)
+    image: postgres:18@sha256:e3d24f6906d0760bf4da0dae872415391ededefad23fd471c47dc53b0ddf3c42   # pinned by digest (IR373)
     environment:
       POSTGRES_DB: ac
       POSTGRES_PASSWORD: local
@@ -411,7 +430,7 @@ services:
     profiles: [infra, schema, backend, full]
 
   valkey:              # ElastiCache (sessions, idempotency fast path, rate limits)
-    image: valkey/valkey:9@sha256:418652cfb58ef879d4978c33553735d7147016032d5aefaa14c828e611eb9dfd   # pinned by digest (IR373)
+    image: valkey/valkey:9@sha256:3add1a336a920ea54770a001ab6feb3da5fceea96a40373a3a2cd469b815f0b7   # pinned by digest (IR373)
     user: "999:999"                # the image's valkey user, not root (security loop, IR414)
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
@@ -432,7 +451,7 @@ services:
     profiles: [infra, backend, full]
 
   mosquitto:           # AWS IoT Core stand-in (MQTT 3.1.1/5); mutual TLS is verified in staging against IoT Core
-    image: eclipse-mosquitto:2@sha256:860aeb5d63ce509508f6dcfb2bc8a1c1dd2bc60555b562b45ce90e52d8dabb0f   # pinned by digest (IR373)
+    image: eclipse-mosquitto:2@sha256:75d6662dee52c947dc9dd9c29f1d8d7ffef78ddaf38001caa09755681e8bbc98   # pinned by digest (IR373)
     user: "1883:1883"              # the image's mosquitto user, not root (security loop, IR414)
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
@@ -443,26 +462,28 @@ services:
 
   mailpit:             # Amazon SES stand-in for development: catches every e-mail (SMTP 1025) and shows it at
                        # http://localhost:8025; nothing leaves the machine (IR418)
-    image: axllent/mailpit:v1.32.0@sha256:0790692be935ea4420d085694f7985b1f692ca6a8771ab0e0bd8ba75ac180498   # pinned (IR373)
+    image: axllent/mailpit:v1.33.0@sha256:9b3a463be15354c0f0eba91697d80e3e0d8a5623ef0e627cacc836bc17fd5231   # pinned (IR373)
     user: "1000:1000"              # not root (security loop, IR414)
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
     environment:
       MP_MAX_MESSAGES: "2000"
-    ports: ["127.0.0.1:8025:8025"]   # the web inbox, this machine only (IR373)
+    ports: ["${PUBLISH_ADDR:-127.0.0.1}:${MAILPIT_PORT:-8025}:8025"]   # the web inbox, this machine only (IR373)
     networks: [app]
     profiles: [infra, backend, full]
 
   keycloak:            # Amazon Cognito stand-in (OIDC, TOTP); realm "ac" with clients ac-web and ac-admin-web
-    image: quay.io/keycloak/keycloak:26.8@sha256:a78d6b79572168cb25886b80a8b5b8d4ed4390743e3eecb810538683e209dd6b   # pinned by digest (IR373)
+    image: quay.io/keycloak/keycloak:26.8@sha256:3f3c5f8e03c614774b4bd9173b88391fefa4153bfc010d8012d59ad825377332   # pinned by digest (IR373)
     command: ["start-dev", "--import-realm", "--http-port=8080"]
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
-      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
-      KC_HOSTNAME: http://localhost:8081       # fixed issuer for tokens, whoever calls
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      KC_HOSTNAME: ${KEYCLOAK_URL:-http://localhost:8081}       # fixed issuer for tokens, whoever calls
       KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"  # containers may still reach it as keycloak:8080
-    ports: ["127.0.0.1:8081:8080"]   # this machine only: not reachable from other devices on the network (IR373)
-    volumes: [./docker/keycloak/realm-ac.json:/opt/keycloak/data/import/realm-ac.json:ro]
+    ports: ["${PUBLISH_ADDR:-127.0.0.1}:${KEYCLOAK_PORT:-8081}:8080"]   # this machine only: not reachable from other devices on the network (IR373)
+    volumes:
+      - "${KEYCLOAK_REALM_FILE:-./docker/keycloak/realm-ac.json}:/opt/keycloak/data/import/realm-ac.json:ro"
+      - "./docker/keycloak/themes:/opt/keycloak/themes:ro"   # the AC Project sign-in pages and mails (IR646)
     healthcheck:   # healthy once realm ac answers its discovery document (the image has bash, not curl)
       test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /realms/ac/.well-known/openid-configuration HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && head -1 <&3 | grep -q ' 200 '"]
       interval: 5s
@@ -470,6 +491,25 @@ services:
       retries: 60
       start_period: 20s
     networks: [edge, app]
+    profiles: [infra, backend, full]
+
+  keycloak-config:     # once per start: brings a realm that already exists to realm-ac.json's sign-in settings (IR646)
+    image: quay.io/keycloak/keycloak:26.8@sha256:3f3c5f8e03c614774b4bd9173b88391fefa4153bfc010d8012d59ad825377332
+    entrypoint: ["sh", "/configure.sh"]
+    environment:
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      PUBLIC_HOSTS: ${PUBLIC_HOSTS:-}   # the realm's redirect URIs for each address of each app (IR651)
+      DEMO_USER_PASSWORD: ${DEMO_USER_PASSWORD:-}   # the demo users' password of an environment that names one (IR720)
+      CUSTOMER_WEB_URL: ${CUSTOMER_WEB_URL:-http://localhost:3000}
+      PARTNER_WEB_URL: ${PARTNER_WEB_URL:-http://localhost:3001}
+      TECHNICIAN_WEB_URL: ${TECHNICIAN_WEB_URL:-http://localhost:3002}
+      ADMIN_WEB_URL: ${ADMIN_WEB_URL:-http://localhost:3003}
+    volumes: ["./docker/keycloak/configure.sh:/configure.sh:ro"]
+    depends_on: { keycloak: { condition: service_healthy } }
+    restart: "no"
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    networks: [app]
     profiles: [infra, backend, full]
 
   stripe-mock:         # offline Stripe API for tests; use the Stripe CLI (profile stripe) for real test-mode webhooks
@@ -481,7 +521,7 @@ services:
     profiles: [infra, backend, full]
 
   stripe-cli:
-    image: stripe/stripe-cli:v1.55.1@sha256:abb51eab2607fc16375ce79da40edfc3ae92f2a7ac100e44889ba1b291b41c83   # pinned (IR373)
+    image: stripe/stripe-cli:v1.55.8@sha256:c8e5a48108fb4c1e83583912c85810e9ac3bc8db91070da3f915ac369ceecf31   # pinned (IR373)
     command: ["listen", "--forward-to", "webhook:8080/stripe", "--api-key", "${STRIPE_TEST_SECRET_KEY:-}"]
     networks: [edge]
     profiles: [stripe]
@@ -496,7 +536,7 @@ services:
     profiles: [infra, backend, full]
 
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.163.2-386@sha256:bd0aac7fc525d8016b7bba1e35287b1f3a43c1e2d52e2426e2496d8d45668784
+    image: otel/opentelemetry-collector-contrib:0.164.0@sha256:340c9ca6a36617084c6661bdc4f0fe92b7cda5a805d61673ec8db375fddc522b
     volumes: [./docker/otel/collector.yaml:/etc/otelcol-contrib/config.yaml:ro]
     networks: [app]
     profiles: [obs]

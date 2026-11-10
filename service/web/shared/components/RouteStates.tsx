@@ -6,7 +6,9 @@
 import { useEffect } from "react";
 import { Btn, Card, Page } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
+import { z } from "@ac/web/lib/zod";
 import { signInAgainHref } from "@ac/web/lib/login";
+import { orNull } from "@ac/web/lib/promises";
 
 export function RouteLoading({ what }: Readonly<{ what: string }>) {
   const t = useT();
@@ -17,13 +19,21 @@ export function RouteLoading({ what }: Readonly<{ what: string }>) {
   );
 }
 
+const sessionAnswer = z.object({ dataSource: z.string().optional(), signedIn: z.boolean().optional() });
+async function readSession(): Promise<unknown> {
+  const res = await fetch("/bff/session", { cache: "no-store" });
+  return res.json();
+}
+
 export function RouteError({ what, error, retry }: Readonly<{ what: string; error: Error & { digest?: string }; retry: () => void }>) {
   const t = useT();
   // a page that failed because the session was refused (IR385): the DAL dropped it, so sign in again and come back
   useEffect(() => {
-    fetch("/bff/session", { cache: "no-store" }).then((r) => r.json()).then((s: { dataSource?: string; signedIn?: boolean }) => {
-      if (s.dataSource === "api" && !s.signedIn) location.assign(signInAgainHref("expired", location.pathname + location.search));
-    }).catch(() => {});
+    void (async () => {
+      // no session answer: the error page stays as it is
+      const answer = sessionAnswer.safeParse(await orNull(readSession()));
+      if (answer.success && answer.data.dataSource === "api" && !answer.data.signedIn) location.assign(signInAgainHref("expired", location.pathname + location.search));
+    })();
   }, []);
   return (
     <Page className="max-w-3xl">

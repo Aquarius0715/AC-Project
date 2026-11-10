@@ -85,7 +85,7 @@ type Command struct {
 	ExpiresAt         time.Time       `json:"expiresAt"`
 	FailureCode       *string         `json:"failureCode"`
 	CorrelationID     string          `json:"correlationId"`
-	Source            string          `json:"source"` // ui | voice | automation | restriction | diagnostic | group (IR216)
+	Source            string          `json:"source"` // ui | automation | restriction | diagnostic | group (IR216)
 }
 
 const commandCols = `id, tenant_id, version, created_at, updated_at, unit_id, actor_membership_id, action, ` +
@@ -167,9 +167,7 @@ type CreateInput struct {
 	JobID               *uuid.UUID      `json:"jobId,omitempty"`
 	Reason              *string         `json:"reason,omitempty"`
 	ExpectedUnitVersion int             `json:"expectedUnitVersion"`
-	// the channel the user chose; ui when omitted (IR306)
-	Source string `enums:"ui,voice" json:"source,omitempty"`
-	action UnitAction
+	action              UnitAction
 }
 
 // Validate implements ops.Validator.
@@ -187,12 +185,6 @@ func (in *CreateInput) Validate() map[string]string {
 	in.action = a
 	if in.ExpectedUnitVersion < 1 {
 		fieldErrs["expectedUnitVersion"] = apperr.KeyRequired
-	}
-
-	if in.Source == "" {
-		in.Source = "ui"
-	} else if in.Source != "ui" && in.Source != sourceVoice {
-		fieldErrs[keySource] = apperr.KeyInvalid
 	}
 
 	if in.Reason != nil {
@@ -223,8 +215,8 @@ func inScope(p *ops.Principal, unit, property, org uuid.UUID) bool {
 //	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
 //	@Description	IR46 restriction action table; IR47 derived connection/powerSignal OFFLINE; IR74 client omits \
 //	@Description	reason; IR94 technician write table (assignment and work window, jobId required when typed); IR109 \
-//	@Description	group control sends one command per selected unit (owner only); IR306 source ui (default) or voice, \
-//	@Description	voice only from a client (the assistant of the Client app)
+//	@Description	group control sends one command per selected unit (owner only); a command asked for here is always \
+//	@Description	source ui (the voice channel was withdrawn, IR648)
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-C03, DD-T10, DD-A11 through automations.fire, DD-C04, DD-C05, DD-A02, DD-C14 · Input \
 //	@Description	versions: expectedUnitVersion=UnitDetail.version
@@ -286,7 +278,7 @@ func (m Commands) create(ctx context.Context, call *ops.Call, input *CreateInput
 			`INSERT INTO control.commands (tenant_id, unit_id, device_id, actor_membership_id, source, action, job_id, reason,
 				status, delivery,
 		requested_at, sent_at, expires_at, correlation_id, created_at, updated_at)
-		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $10, $4, $5, $6, 'requested', 'not_sent', $7, NULL, $8,
+		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, 'ui', $4, $5, $6, 'requested', 'not_sent', $7, NULL, $8,
 		$9, $7, $7) RETURNING `+commandCols,
 			input.UnitID,
 			dev,
@@ -297,7 +289,6 @@ func (m Commands) create(ctx context.Context, call *ops.Call, input *CreateInput
 			call.Now,
 			call.Now.Add(CommandTTL),
 			call.CorrelationID,
-			input.Source,
 		),
 	)
 	if err != nil {
@@ -332,8 +323,8 @@ func (m Commands) create(ctx context.Context, call *ops.Call, input *CreateInput
 }
 
 // checkRequester checks who asks for a command: a client, for a unit of its own organization and without a reason; a
-// technician, never by voice, on a job of theirs that covers the unit and with a reason; HQ, never by voice (the
-// assistant is offered only in the Client app, IR115) and with a reason. A unit out of reach is NOT_FOUND.
+// technician on a job of theirs that covers the unit and with a reason; HQ with a reason. A unit out of reach is
+// NOT_FOUND.
 func (m Commands) checkRequester(
 	ctx context.Context,
 	call *ops.Call,
@@ -353,10 +344,6 @@ func (m Commands) checkRequester(
 			return apperr.Fields(map[string]string{keyReason: apperr.KeyNotAllowed})
 		}
 	case authz.RoleTechnician:
-		if input.Source == sourceVoice {
-			return apperr.Fields(map[string]string{keySource: apperr.KeyNotAllowed})
-		}
-
 		if !found {
 			return notFound
 		}
@@ -376,10 +363,6 @@ func (m Commands) checkRequester(
 	default:
 		if !found {
 			return notFound
-		}
-
-		if input.Source == sourceVoice { // the assistant is offered only in the Client app (IR115)
-			return apperr.Fields(map[string]string{keySource: apperr.KeyNotAllowed})
 		}
 
 		if input.Reason == nil {
@@ -500,7 +483,18 @@ func (m Commands) get(ctx context.Context, call *ops.Call, in *GetInput) (Comman
 		}
 	}
 
+	hideForeignReason(call, &command)
+
 	return command, nil
+}
+
+// hideForeignReason withholds from a client the reason of a command that someone else sent: a technician's or HQ's
+// reason is not the customer's (IR216). commands.list and commands.get both apply it.
+func hideForeignReason(call *ops.Call, command *Command) {
+	if call.Principal.Role == authz.RoleClient &&
+		command.ActorMembershipID != call.Principal.MembershipID {
+		command.Reason = nil
+	}
 }
 
 // ListInput is commands.list input (IR216).
@@ -623,10 +617,7 @@ func (m Commands) list(
 			return paging.Page[Command]{}, err
 		}
 
-		if call.Principal.Role == authz.RoleClient &&
-			command.ActorMembershipID != call.Principal.MembershipID {
-			command.Reason = nil // another actor's reason (a technician's or HQ's) is not the customer's
-		}
+		hideForeignReason(call, &command)
 
 		items = append(items, command)
 	}
@@ -684,7 +675,7 @@ func (m Commands) checkReader(ctx context.Context, call *ops.Call, input *ListIn
 	return nil
 }
 
-// AuditResult appends the final result of a command that a person asked for (commands.create: source ui or voice) under
+// AuditResult appends the final result of a command that a person asked for (commands.create: source ui) under
 // the request's correlation ID, after its pending entry: success when the device acknowledged it, failed when the
 // device refused it or its window passed, the failure code as the reason (IR90, IR604). actor is the system part that
 // saw it. Commands of a restriction, a diagnosis or an automation are recorded under their own operations.
@@ -707,7 +698,7 @@ func AuditResult(
 		return apperr.Wrap(err, "select control.commands")
 	}
 
-	if (source != "ui" && source != sourceVoice) || corr == nil || *corr == "" {
+	if source != sourceUI || corr == nil || *corr == "" {
 		return nil
 	}
 
@@ -785,6 +776,10 @@ func ExpireCommands(ctx context.Context, txn pgx.Tx, now time.Time) (int, error)
 
 // Acknowledge applies a device acknowledgement (IoT bridge / device simulator): before expiresAt the command becomes
 // acknowledged; later acknowledgements are only recorded (D04 timing). It returns whether the command was acknowledged.
+//
+// A requested command counts as sent: the answer shows it reached the device, and it can overtake the report that it
+// was sent, which then finds nothing to change. Taken for a late answer, it would leave the command sent with nothing
+// more to come, and the unit busy until it expired.
 func Acknowledge(
 	ctx context.Context,
 	txn pgx.Tx,
@@ -793,8 +788,9 @@ func Acknowledge(
 ) (bool, error) {
 	tag, err := txn.Exec(
 		ctx,
-		`UPDATE control.commands SET status = 'acknowledged', acknowledged_at = $2, version = version + 1, updated_at = $2
-		WHERE id = $1 AND status = 'sent' AND $2 < expires_at`,
+		`UPDATE control.commands SET status = 'acknowledged', acknowledged_at = $2, delivery = 'sent',
+		sent_at = COALESCE(sent_at, $2), version = version + 1, updated_at = $2
+		WHERE id = $1 AND status IN ('requested','sent') AND $2 < expires_at`,
 		command,
 		receivedAt,
 	)

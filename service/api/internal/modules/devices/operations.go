@@ -5,6 +5,7 @@ import (
 	"errors"
 	"math"
 	"slices"
+	"strings"
 	"time"
 	"unicode/utf8"
 
@@ -246,9 +247,279 @@ func (m *Module) bindDetail(
 	return m.detail(ctx, call, "d.id = $1", []any{input.DeviceID})
 }
 
+// ---- unbind / delete (DEC-103) ----
+
+// UnbindInput is devices.unbind input.
+type UnbindInput struct {
+	DeviceID uuid.UUID `json:"deviceId"`
+	Reason   string    `json:"reason"`
+}
+
+// DeleteDeviceInput is devices.delete input.
+type DeleteDeviceInput struct {
+	DeviceID uuid.UUID `json:"deviceId"`
+	Reason   string    `json:"reason"`
+}
+
+// DeletedResource is DeletedResource of service-contracts.ts.
+type DeletedResource struct {
+	ID      uuid.UUID `json:"id"`
+	Deleted bool      `json:"deleted"`
+}
+
+// reasonErrors checks the reason of a write: 1–1000 characters after trimming.
+func reasonErrors(reason *string, fieldErrs map[string]string) {
+	*reason = strings.TrimSpace(*reason)
+	if n := utf8.RuneCountInString(*reason); n < 1 || n > 1000 {
+		fieldErrs["reason"] = apperr.KeyLength
+	}
+}
+
+// Validate implements ops.Validator.
+func (in *UnbindInput) Validate() map[string]string {
+	fieldErrs := map[string]string{}
+	if in.DeviceID == uuid.Nil {
+		fieldErrs["deviceId"] = apperr.KeyRequired
+	}
+
+	reasonErrors(&in.Reason, fieldErrs)
+
+	return fieldErrs
+}
+
+// Validate implements ops.Validator.
+func (in *DeleteDeviceInput) Validate() map[string]string {
+	fieldErrs := map[string]string{}
+	if in.DeviceID == uuid.Nil {
+		fieldErrs["deviceId"] = apperr.KeyRequired
+	}
+
+	reasonErrors(&in.Reason, fieldErrs)
+
+	return fieldErrs
+}
+
+// unbind takes a bound device off its unit (DEC-103): HQ only, a unit with work under way is busy as for a bind, the
+// binding row keeps its history and the sensors get new IDs, as when a device moves. The device stays registered, free
+// to bind again or to delete.
+//
+//	@Summary		devices.unbind (write)
+//	@ID				devices.unbind
+//	@Description	Authorization: admin:device.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR652 ends the device's binding (its history stays); CONFLICT error.notBound when it is not bound; a \
+//	@Description	unit with work under way is busy
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A04
+//	@Tags			devices
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer		true	"all: required (target device, read devices.get)"
+//	@Param			deviceId			path		string		true	"input field deviceId"
+//	@Param			request				body		UnbindInput	true	"input; the path parameters come from the route"
+//	@Success		200					{object}	ops.Envelope{data=Device}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/devices/{deviceId}/unbind [post]
+func (m *Module) unbind(ctx context.Context, call *ops.Call, input *UnbindInput) (Device, error) {
+	state, err := lockDevice(ctx, call, input.DeviceID)
+	if err != nil {
+		return Device{}, err
+	}
+
+	currentErr := state.current(call)
+	if currentErr != nil {
+		return Device{}, currentErr
+	}
+
+	if state.unit == nil {
+		return Device{}, apperr.E(apperr.Conflict, "error.notBound")
+	}
+
+	exclusiveErr := m.exclusive(ctx, call, *state.unit)
+	if exclusiveErr != nil {
+		return Device{}, exclusiveErr
+	}
+
+	releaseErr := releaseBinding(ctx, call, input.DeviceID, input.Reason)
+	if releaseErr != nil {
+		return Device{}, releaseErr
+	}
+
+	var version int
+
+	scanErr := call.Tx.QueryRow(ctx, `UPDATE devices.devices SET unit_id = NULL, binding_id = NULL, version = version + 1,
+		updated_at = platform.app_now() WHERE id = $1 RETURNING version`, input.DeviceID).
+		Scan(&version)
+	if scanErr != nil {
+		return Device{}, apperr.Wrap(scanErr, "update devices.devices")
+	}
+
+	call.Emit(
+		ops.Event{
+			AggregateType: entityDevice,
+			AggregateID:   input.DeviceID,
+			Type:          "DeviceUnbound",
+			Payload:       map[string]any{fieldPreviousUnitID: *state.unit},
+		},
+	)
+	call.Audit(
+		ops.AuditEntry{
+			Action:          "devices.unbind",
+			TargetKind:      entityDevice,
+			TargetID:        input.DeviceID.String(),
+			PreviousVersion: call.ExpectedVersion,
+			NextVersion:     &version,
+			Reason:          input.Reason, Result: "", Before: nil, After: nil,
+		},
+	)
+
+	detail, err := m.detail(ctx, call, "d.id = $1", []any{input.DeviceID})
+
+	return detail.Device, err
+}
+
+// deleteDevice deletes a registered device that is in no use (DEC-103): not bound to a unit, no operation under way and
+// in no unfinished firmware campaign; otherwise CONFLICT with the reason. The device's own records go with it: its
+// sensors, bindings, operations, events and notes, calibrations and its rows in firmware campaigns. What other
+// modules keep (commands, readings, alerts) holds the ID only.
+//
+//	@Summary		devices.delete (write)
+//	@ID				devices.delete
+//	@Description	Authorization: admin:device.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR652 only a device that is not bound, has no operation under way and is in no unfinished firmware \
+//	@Description	campaign (CONFLICT error.deviceBound / error.deviceBusy / error.deviceInCampaign); deletes the \
+//	@Description	device with its own sensors, bindings, operations, events, calibrations and campaign rows
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A04
+//	@Tags			devices
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string	true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer	true	"all: required (target device, read devices.get)"
+//	@Param			deviceId			path		string	true	"input field deviceId"
+//	@Param			reason				query		string	false	"input field reason"
+//	@Success		200					{object}	ops.Envelope{data=DeletedResource}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/devices/{deviceId} [delete]
+func (*Module) deleteDevice(
+	ctx context.Context,
+	call *ops.Call,
+	input *DeleteDeviceInput,
+) (DeletedResource, error) {
+	state, err := lockDevice(ctx, call, input.DeviceID)
+	if err != nil {
+		return DeletedResource{}, err
+	}
+
+	currentErr := state.current(call)
+	if currentErr != nil {
+		return DeletedResource{}, currentErr
+	}
+
+	useErr := deviceUse(ctx, call, input.DeviceID, state)
+	if useErr != nil {
+		return DeletedResource{}, useErr
+	}
+
+	for _, stmt := range []string{
+		`DELETE FROM devices.firmware_campaign_devices WHERE device_id = $1`,
+		`DELETE FROM devices.calibration_records WHERE device_id = $1`,
+		`DELETE FROM devices.device_event_notes WHERE event_id IN
+			(SELECT id FROM devices.device_events WHERE device_id = $1)`,
+		`DELETE FROM devices.device_events WHERE device_id = $1`,
+		`DELETE FROM devices.device_operations WHERE device_id = $1`,
+		`DELETE FROM devices.sensors WHERE device_id = $1`,
+		`DELETE FROM devices.device_bindings WHERE device_id = $1`,
+		`DELETE FROM devices.devices WHERE id = $1`,
+	} {
+		_, execErr := call.Tx.Exec(ctx, stmt, input.DeviceID)
+		if execErr != nil {
+			return DeletedResource{}, apperr.Wrap(execErr, "delete devices.devices")
+		}
+	}
+
+	call.Emit(
+		ops.Event{
+			AggregateType: entityDevice,
+			AggregateID:   input.DeviceID,
+			Type:          "DeviceDeleted",
+			Payload:       nil,
+		},
+	)
+	call.Audit(
+		ops.AuditEntry{
+			Action:          "devices.delete",
+			TargetKind:      entityDevice,
+			TargetID:        input.DeviceID.String(),
+			PreviousVersion: call.ExpectedVersion,
+			Reason:          input.Reason, NextVersion: nil, Result: "", Before: nil, After: nil,
+		},
+	)
+
+	return DeletedResource{ID: input.DeviceID, Deleted: true}, nil
+}
+
+// deviceUse refuses a device that is bound, has a queued or running operation, or is in a firmware campaign that has
+// not ended, with the reason in that order.
+func deviceUse(ctx context.Context, call *ops.Call, device uuid.UUID, state devState) error {
+	if state.unit != nil {
+		return apperr.E(apperr.Conflict, "error.deviceBound")
+	}
+
+	var busy, inCampaign bool
+
+	err := call.Tx.QueryRow(
+		ctx,
+		`SELECT EXISTS (SELECT 1 FROM devices.device_operations WHERE device_id = $1 AND status IN ('queued','running') AND
+			expires_at > $2),
+		EXISTS (SELECT 1 FROM devices.firmware_campaign_devices cd JOIN devices.firmware_campaigns c ON c.id = cd.campaign_id
+			WHERE cd.device_id = $1 AND c.state IN ('scheduled','running','paused') AND cd.result IN ('pending','installing'))`,
+		device,
+		call.Now,
+	).Scan(&busy, &inCampaign)
+	if err != nil {
+		return apperr.Wrap(err, "select devices.device_operations")
+	}
+
+	switch {
+	case busy:
+		return apperr.E(apperr.Conflict, "error.deviceBusy")
+	case inCampaign:
+		return apperr.E(apperr.Conflict, "error.deviceInCampaign")
+	}
+
+	return nil
+}
+
+// hiddenUnbound reports whether an unbound device is one the caller does not read: everyone but HQ reads only the
+// unbound devices they registered (deviceScope, devices.get).
+func hiddenUnbound(call *ops.Call, state devState) bool {
+	return state.unit == nil && call.Principal.Role != roleAdmin &&
+		state.creator != call.Principal.MembershipID
+}
+
 // rebindable checks the locked device against a bind to unit: a technician moves a bound device only from a unit of
 // an assignment of theirs as well (the unit it leaves is in scope too, and DD-T11 rejects an unauthorized rebinding,
-// IR366); then the expected version, a device already on the unit and an unresolved tamper.
+// IR366), and binds an unbound one only to its planned unit unless they registered it (IR709); then the expected
+// version, a device already on the unit and an unresolved tamper.
 func (m *Module) rebindable(
 	ctx context.Context,
 	call *ops.Call,
@@ -260,6 +531,12 @@ func (m *Module) rebindable(
 		if err != nil {
 			return apperr.Wrap(err, "devices.TechUnitAccess.TechnicianUnit")
 		}
+	}
+	// a device not bound yet goes to the unit HQ planned for it, or anywhere by HQ or the member who registered it: a
+	// technician cannot take another member's planned device to a unit of their own (NOT_FOUND, as the device reads
+	// for them, whatever its version: IR366, IR709)
+	if state.unit == nil && unit != state.target && hiddenUnbound(call, state) {
+		return apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	currentErr := state.current(call)
@@ -473,6 +750,13 @@ func (m *Module) lockBoundDevice(
 	}
 
 	if state.unit == nil {
+		if hiddenUnbound(
+			call,
+			state,
+		) { // it reads as not found for the caller: say nothing of it (IR366, IR709)
+			return state, apperr.E(apperr.NotFound, apperr.KeyNotFound)
+		}
+
 		return state, apperr.E(apperr.Conflict, apperr.KeyDeviceNotBound)
 	}
 
@@ -965,7 +1249,7 @@ func scanCal(row pgx.Row) (CalibrationRecord, error) {
 const calFrom = ` FROM devices.calibration_records r LEFT JOIN devices.device_bindings b ON b.device_id = r.device_id
 	AND b.bound_at <= r.created_at AND (b.unbound_at IS NULL OR b.unbound_at > r.created_at)`
 
-func (m *Module) calibration(
+func (*Module) calibration(
 	ctx context.Context,
 	c *ops.Call,
 	id uuid.UUID,

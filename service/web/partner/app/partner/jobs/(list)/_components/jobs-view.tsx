@@ -18,7 +18,7 @@ export function JobsView({ live }: Readonly<{ live: JobsLive }>) {
   const t = useT();
   const patch = useUrlPatch();
   const reset = { cursor: null, page: null };
-  const all = live.tabs[0].count;
+  const all = live.tabs[0]?.count ?? 0;
   return (
     <Page>
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -27,7 +27,7 @@ export function JobsView({ live }: Readonly<{ live: JobsLive }>) {
           <Select aria-label={t("Sort")} className="w-auto" value={live.sort} onChange={(e) => { patch({ sort: e.target.value === "status:asc" ? null : e.target.value, ...reset }); }}>
             {live.sorts.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
           </Select>
-          <Select aria-label={t("Period")} className="w-auto" value={live.period.value} onChange={(e) => { const [from, to] = e.target.value.split("|", 2); patch({ from, to, ...reset }); }}>
+          <Select aria-label={t("Period")} className="w-auto" value={live.period.value} onChange={(e) => { const [from = "", to = ""] = e.target.value.split("|", 2); patch({ from, to, ...reset }); }}>
             {live.period.custom && <option value={live.period.value}>{t("Period: {period}", { period: live.period.label })}</option>}
             {live.periods.map((p) => <option key={p.value} value={p.value}>{t("Period: {period}", { period: p.label })}</option>)}
           </Select>

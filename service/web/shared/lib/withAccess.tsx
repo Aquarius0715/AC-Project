@@ -11,6 +11,6 @@ export async function withAccess(what: string, permissions: string[], render: ()
   } catch (error) {
     if (!(error instanceof CoreError && error.error.code === "FORBIDDEN")) throw error;
     const held = await corePermissions();
-    return <NeedsAccess what={what} permission={permissions.find((p) => !held.has(p)) ?? permissions[0]} />;
+    return <NeedsAccess what={what} permission={permissions.find((p) => !held.has(p)) ?? permissions[0] ?? ""} />;
   }
 }

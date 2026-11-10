@@ -6,8 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"mime"
+	"net"
 	"net/mail"
 	"net/smtp"
+	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -36,7 +39,10 @@ type SMTP struct {
 }
 
 // Send implements Sender.
-func (s SMTP) Send(_ context.Context, recipient, subject, body string) (string, error) {
+func (s SMTP) Send(
+	_ context.Context,
+	recipient, subject, body string,
+) (string, error) { //nolint:unparam // Send implements Sender, whose caller reads the message ID
 	if strings.ContainsAny(recipient, "\r\n") ||
 		strings.ContainsAny(subject, "\r\n") { // no header injection
 		return "", errHeaderLineBreak
@@ -71,8 +77,37 @@ func (s SMTP) Send(_ context.Context, recipient, subject, body string) (string, 
 	)
 }
 
-// Apps are the sign-in addresses of the web apps that e-mails link to.
-type Apps struct{ Customer, Partner, Technician, Admin string }
+// Apps are the sign-in addresses of the web apps that e-mails link to, and the host names the deployment also answers
+// on (PUBLIC_HOSTS, IR651): an e-mail links to the address its recipient last signed in on when that one is listed
+// (IR721).
+type Apps struct {
+	Customer, Partner, Technician, Admin string
+	Hosts                                []string
+}
+
+// on is the app of the role at host, its port and scheme kept, when host is one of Hosts; the canonical address
+// otherwise (no listed host, a host that is not listed, or none recorded).
+func (a Apps) on(role, host string) string {
+	app := a.of(role)
+
+	host = strings.ToLower(host)
+	if host == "" || !slices.Contains(a.Hosts, host) {
+		return app
+	}
+
+	parsed, err := url.Parse(app)
+	if err != nil || parsed.Host == "" {
+		return app
+	}
+
+	if port := parsed.Port(); port != "" {
+		parsed.Host = net.JoinHostPort(host, port)
+	} else {
+		parsed.Host = host
+	}
+
+	return strings.TrimRight(parsed.String(), "/")
+}
 
 // of is the app of a membership role: a client's customer app, a contractor's partner app, a technician's app, HQ's.
 func (a Apps) of(role string) string {
@@ -117,7 +152,7 @@ const footer = "\n\n— AC Project (demo). This message was sent by the demo sta
 func notificationMail(
 	templateKey string,
 	params map[string]any,
-	role string,
+	role, host string,
 	apps Apps,
 ) (string, string) {
 	name, _ := params["targetName"].(string)
@@ -141,7 +176,7 @@ func notificationMail(
 		}
 	}
 
-	fmt.Fprintf(&builder, "\n\nOpen the app: %s/notifications", apps.of(role))
+	fmt.Fprintf(&builder, "\n\nOpen the app: %s/notifications", apps.on(role, host))
 	builder.WriteString(footer)
 
 	return subject, builder.String()
@@ -197,6 +232,7 @@ func Deliver(
 type pendingMail struct {
 	id            uuid.UUID
 	to, key, role string
+	host          string // the host the recipient last signed in on (IR721); empty when none was recorded
 	params        []byte
 	attempts      int
 	ended         bool
@@ -208,7 +244,7 @@ func dueMails(ctx context.Context, txn pgx.Tx, now time.Time, limit int) ([]pend
 	rows, err := txn.Query(
 		ctx,
 		`SELECT n.id, u.email::text, n.template_key, m.role, n.params, COALESCE(d.attempts, 0), m.valid_until IS NOT NULL AND
-			m.valid_until <= $3
+			m.valid_until <= $3, COALESCE(u.sign_in_host, '')
 		FROM notify.notifications n JOIN identity.memberships m ON m.id = n.recipient_membership_id JOIN identity.users u ON
 		u.id = m.user_id
 		LEFT JOIN notify.deliveries d ON d.notification_id = n.id AND d.channel = 'email'
@@ -241,6 +277,7 @@ func dueMails(ctx context.Context, txn pgx.Tx, now time.Time, limit int) ([]pend
 			&email.params,
 			&email.attempts,
 			&email.ended,
+			&email.host,
 		)
 		if err != nil {
 			return nil, apperr.Wrap(err, "select notify.notifications")
@@ -273,7 +310,7 @@ func deliverOne(
 	case json.Unmarshal(email.params, &params) != nil:
 		state, reason = "suppressed", new("parameters do not decode")
 	default:
-		subject, body := notificationMail(email.key, params, email.role, apps)
+		subject, body := notificationMail(email.key, params, email.role, email.host, apps)
 
 		var err error
 
@@ -358,6 +395,7 @@ func DeliverAll(
 				Employment:        "",
 				Timezone:          "",
 				SessionsRevokedAt: nil,
+				IssuerHost:        "",
 			},
 			func(tx pgx.Tx) error {
 				n, err := Deliver(ctx, tx, sender, apps, now, limit)
@@ -430,6 +468,7 @@ func SweepAll(ctx context.Context, txm *db.TxManager, now time.Time) (int64, err
 				Employment:        "",
 				Timezone:          "",
 				SessionsRevokedAt: nil,
+				IssuerHost:        "",
 			},
 			func(tx pgx.Tx) error {
 				n, err := Sweep(ctx, tx, now)

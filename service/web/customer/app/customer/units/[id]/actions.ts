@@ -3,14 +3,11 @@
 // Server Actions of the customer unit screen (FR-C03, FR-C15). Each one is a public endpoint: the DAL verifies the
 // session and the Core API authorizes the call (client:control.execute, own customer policies).
 import { refresh } from "next/cache";
-import { coreOp, CoreError } from "@ac/web/lib/dal";
+import { coreOp } from "@ac/web/lib/dal";
+import { actionFailure } from "@ac/web/lib/actionFailure";
 import type { ApiCommand, ApiUnitDetail, UnitAction } from "@ac/web/lib/units";
 
 export type ActionResult<T> = { ok: true; value: T } | { ok: false; messageKey: string; code: string };
-
-function failed(e: unknown): { ok: false; messageKey: string; code: string } {
-  return e instanceof CoreError ? { ok: false, messageKey: e.error.messageKey, code: e.error.code } : { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE" };
-}
 
 /** commands.create with the current unit version; the client then polls commands.get until the device answers. */
 export async function createCommand(unitId: string, action: UnitAction): Promise<ActionResult<ApiCommand>> {
@@ -19,7 +16,7 @@ export async function createCommand(unitId: string, action: UnitAction): Promise
     const command = await coreOp<ApiCommand>("commands.create", { unitId, action, expectedUnitVersion: unit.version }, { write: true });
     return { ok: true, value: command };
   } catch (error) {
-    return failed(error);
+    return actionFailure(error);
   }
 }
 
@@ -30,7 +27,7 @@ export async function setUnitAlertPolicies(unitId: string, alertPolicyIds: strin
     await coreOp("units.setAlertPolicies", { unitId, alertPolicyIds }, { write: true, expectedVersion: unit.version });
     return { ok: true, value: null };
   } catch (error) {
-    return failed(error);
+    return actionFailure(error);
   } finally {
     refresh();
   }

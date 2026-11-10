@@ -2,10 +2,11 @@
 // nonce, which Next.js puts on its scripts, and nosniff, a referrer policy, no framing and no powerful browser features (IR383). Static assets carry the
 // static headers too. Runs in each app's project, signed in as its user; nothing is changed.
 import { test, expect } from "../../fixtures/test";
+import { must } from "../../fixtures/must";
 
 test("pages carry the CSP with a fresh nonce and the static security headers", async ({ page, app }) => {
   const res = await page.goto(app.home);
-  const h = res!.headers();
+  const h = must(res).headers();
   const csp = h["content-security-policy"] ?? "";
   const nonce = (/'nonce-([^']+)'/.exec(csp))?.[1] ?? "";
   expect(nonce, "a nonce in the CSP").not.toBe("");
@@ -13,7 +14,7 @@ test("pages carry the CSP with a fresh nonce and the static security headers", a
   expect(csp).not.toContain("unsafe-eval"); // a production build
   expect([h["x-content-type-options"], h["referrer-policy"], h["x-frame-options"]]).toEqual(["nosniff", "strict-origin-when-cross-origin", "DENY"]);
   expect(h["permissions-policy"]).toBe("camera=(), microphone=(), geolocation=(), payment=(), usb=(), display-capture=()"); // IR383
-  const html = await res!.text();
+  const html = await must(res).text();
   expect(html, "the framework's scripts carry the nonce").toContain(`nonce="${nonce}"`);
   expect(html.match(/<script(?![^>]*nonce=)[^>]*>/g) ?? [], "scripts without the nonce").toEqual([]);
   const again = await page.request.get(app.home);
@@ -21,7 +22,8 @@ test("pages carry the CSP with a fresh nonce and the static security headers", a
   const stylesheet = page.locator("link[rel=stylesheet]").first();
   await expect(stylesheet, "the app's stylesheet").toHaveAttribute("href", /./);
   const css = await stylesheet.getAttribute("href");
-  expect((await page.request.get(css!)).headers()["x-content-type-options"]).toBe("nosniff");
+  const served = await page.request.get(must(css));
+  expect(served.headers()["x-content-type-options"]).toBe("nosniff");
 });
 
 // IR358: the BFF's POST routes serve the app's own pages only (CSRF): another site's read, write or sign-out is refused.
@@ -32,9 +34,11 @@ test("the BFF takes requests from the app's own pages only", async ({ page, app 
   expect(read.status()).toBe(200);
   const evil = { origin: "https://evil.example" };
   const cross = await page.request.post("/bff/ops/notifications.list", { data: { limit: 1 }, headers: evil });
-  expect([cross.status(), (await cross.json()).messageKey]).toEqual([403, "errors.cross_site_request"]);
+  const crossBody: unknown = await cross.json();
+  expect([cross.status(), crossBody]).toMatchObject([403, { messageKey: "errors.cross_site_request" }]);
   const write = await page.request.post("/bff/ops/jobs.cancel", { data: { jobId: "00000000-0000-4000-8000-000000000000", cancelReason: "x" }, headers: evil });
-  expect([write.status(), (await write.json()).messageKey]).toEqual([403, "errors.cross_site_request"]);
+  const writeBody: unknown = await write.json();
+  expect([write.status(), writeBody]).toMatchObject([403, { messageKey: "errors.cross_site_request" }]);
   const signOut = await page.request.post("/bff/auth/logout", { headers: { origin: "https://evil.example" }, maxRedirects: 0 });
   expect(signOut.status()).toBe(403);
   await page.goto(app.home);

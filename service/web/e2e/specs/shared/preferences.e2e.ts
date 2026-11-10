@@ -2,7 +2,7 @@
 // (Malay puts the shell and the screen in Malay), a client's location consent and monthly report e-mail too, and
 // two-step verification turns on (setup QR, six code boxes, recovery codes once) and off. Every change is put back.
 import { test, expect } from "../../fixtures/test";
-import { displayZone, ENGLISH, savePreferences as save, setDisplay } from "../../fixtures/display";
+import { displayZone, ENGLISH, JAPANESE, savePreferences as save, setDisplay } from "../../fixtures/display";
 import { expectAccessible } from "../../fixtures/a11y";
 
 // English and the earlier zone come back at the end of the language test, or here when it fails (also on a timeout)
@@ -11,6 +11,19 @@ let zoneBefore: string | null = null;
 test.afterEach(async ({ page }) => {
   if (zoneBefore) await setDisplay(page, ENGLISH, zoneBefore);
   zoneBefore = null;
+});
+
+// IR680: the "saved" toast comes when the screen shows the saved value. The toast used to come first and the shell kept
+// the old language for a second or more, which read as "the button did nothing".
+test("the screen shows the saved language when the toast does, without a reload", async ({ page }) => {
+  const before = await displayZone(page);
+  zoneBefore = before;
+  await page.goto("/settings/preferences");
+  await page.getByRole("button", { name: "Bahasa Melayu" }).click();
+  await page.getByRole("button", { name: /Save preferences/ }).click();
+  await page.getByText(/Keutamaan disimpan|Preferences saved/).last().waitFor();
+  // counted once, at the toast, with no retry: a screen that changes a moment later fails here
+  expect([await page.getByRole("button", { name: "Log keluar" }).count(), await page.getByRole("button", { name: "Sign out" }).count()]).toStrictEqual([1, 0]);
 });
 
 test("language and time zone are saved and read back", async ({ page }) => {
@@ -35,6 +48,26 @@ test("language and time zone are saved and read back", async ({ page }) => {
   zoneBefore = null;
   await page.reload();
   await expect(page.locator("main select").first()).toHaveValue(before);
+  await expect(page.getByRole("button", { name: ENGLISH })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
+});
+
+test("Japanese is saved and read back, with the shell, the screen and the times in Japanese (IR639)", async ({ page }) => {
+  const before = await displayZone(page);
+  zoneBefore = before;
+  await page.getByRole("button", { name: JAPANESE }).click();
+  await save(page);
+  await page.reload();
+  await expect(page.getByRole("button", { name: JAPANESE })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("html")).toHaveAttribute("lang", "ja"); // the page declares the language it speaks
+  await expect(page.getByRole("button", { name: "ログアウト" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "設定", exact: true })).toBeVisible();
+  await expect(page.getByText("表示言語", { exact: true })).toBeVisible();
+  await page.goto("/notifications");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("通知");
+  await setDisplay(page, ENGLISH, before);
+  zoneBefore = null;
+  await page.reload();
   await expect(page.getByRole("button", { name: ENGLISH })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
 });

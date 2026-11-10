@@ -5,19 +5,23 @@
 // membership, revoked at the end. Skipped on a stack without Mailpit.
 import type { Browser, Page } from "@playwright/test";
 import { test, expect, FAILED_PAGE } from "../../fixtures/test";
-import { APPS, type App } from "../../fixtures/apps";
-import { totpBase32 } from "../../fixtures/auth";
+import { APPS } from "../../fixtures/apps";
+import { startSignIn, totpBase32 } from "../../fixtures/auth";
 import { mailpitUp, setupLink } from "../../fixtures/mailpit";
+import { must } from "../../fixtures/must";
+import { pickDateTime } from "../../fixtures/time";
 
-const app = (id: App["id"]) => APPS.find((a) => a.id === id)!;
-const open = async (browser: Browser, a: App, signedIn = true): Promise<Page> =>
-  (await browser.newContext({ baseURL: a.url, viewport: { width: 1920, height: 1080 }, ...(signedIn ? { storageState: a.state } : { storageState: { cookies: [], origins: [] } }) })).newPage();
+const adminApp = must(APPS.find((a) => a.id === "admin"));
+const open = async (browser: Browser, signedIn = true): Promise<Page> => {
+  const context = await browser.newContext({ baseURL: adminApp.url, viewport: { width: 1920, height: 1080 }, ...(signedIn ? { storageState: adminApp.state } : { storageState: { cookies: [], origins: [] } }) });
+  return context.newPage();
+};
 
 test("a new HQ administrator sets a password and a one-time-code device, then signs in with both", async ({ browser }) => {
   test.setTimeout(240_000);
   test.skip(!(await mailpitUp()), "needs the local Mailpit inbox");
   const email = `e2e-admin-${String(Date.now())}@example.com`;
-  const admin = await open(browser, app("admin"));
+  const admin = await open(browser);
   const main = admin.getByRole("main");
 
   await test.step("HQ adds the person as Admin", async () => {
@@ -29,7 +33,7 @@ test("a new HQ administrator sets a password and a one-time-code device, then si
     await main.getByRole("textbox", { name: /^Email/ }).fill(email);
     await main.getByRole("button", { name: "Admin", exact: true }).last().click(); // the role, after the role filter
     await main.getByRole("combobox", { name: /^Organization/ }).selectOption({ label: "Demo HQ" });
-    await main.getByLabel("Valid from").fill("2026-09-01T09:00"); // before the seed's demo clock
+    await pickDateTime(main.getByRole("group", { name: "Valid from" }), "2026-09-01T09:00"); // before the seed's demo clock
     await main.getByRole("textbox", { name: /^Change reason/ }).fill("E2E: a second administrator");
     await main.getByRole("button", { name: "Create membership" }).click();
     await expect(admin.getByText("Membership created").first()).toBeVisible();
@@ -38,7 +42,7 @@ test("a new HQ administrator sets a password and a one-time-code device, then si
 
   const password = `E2e-${crypto.randomUUID()}`;
   let key = "";
-  const me = await open(browser, app("admin"), false);
+  const me = await open(browser, false);
 
   await test.step("the set-up e-mail sets the password and a one-time-code device", async () => {
     await me.goto(await setupLink(email));
@@ -60,7 +64,8 @@ test("a new HQ administrator sets a password and a one-time-code device, then si
         await me.locator("#password-new").press("Enter");
       } else if (page === "device") { // the key in text instead of the QR code
         await me.getByRole("link", { name: /Unable to scan/ }).click();
-        key = (await me.locator("#kc-totp-secret-key").innerText()).trim();
+        const secret = await me.locator("#kc-totp-secret-key").innerText();
+        key = secret.trim();
         expect(key).toMatch(/^[A-Z2-7 ]{16,}$/);
         await me.locator("#totp").fill(totpBase32(key));
         await me.locator("#userLabel").fill("E2E phone");
@@ -73,10 +78,9 @@ test("a new HQ administrator sets a password and a one-time-code device, then si
   });
 
   await test.step("the admin app asks for the password and a code", async () => {
-    const hq = app("admin");
+    const hq = adminApp;
     await me.goto(`${hq.url}/login`);
-    await me.getByRole("link", { name: /^Continue as / }).click();
-    await me.locator("#username").fill(email);
+    await startSignIn(me, email);
     await me.locator("#password").fill(password);
     await me.locator("#kc-login").click();
     await expect(me.locator("#otp")).toBeVisible(); // two steps

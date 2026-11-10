@@ -5,11 +5,12 @@
 import { test, expect } from "../../fixtures/test";
 import { APPS } from "../../fixtures/apps";
 import { signIn } from "../../fixtures/auth";
+import { must } from "../../fixtures/must";
 
 test.describe.configure({ timeout: 180_000 });
 
 test("the report autosaves once, 20 s after the last edit", async ({ browser }) => {
-  const app = APPS.find((a) => a.id === "technician")!;
+  const app = must(APPS.find((a) => a.id === "technician"));
   const ctx = await browser.newContext({ baseURL: app.url, storageState: { cookies: [], origins: [] }, viewport: { width: 1920, height: 1080 } });
   const page = await ctx.newPage();
   try {
@@ -39,7 +40,7 @@ test("the report autosaves once, 20 s after the last edit", async ({ browser }) 
     const edited = Date.now();
     await result.selectOption({ label: "Normal" });
     await page.waitForResponse((r) => r.request().method() === "POST" && new URL(r.url()).pathname.startsWith("/technician/jobs/") && r.request().postData() !== null, { timeout: 60_000 });
-    const firstSave = saves[0];
+    const firstSave = must(saves[0], "the first save");
     expect(firstSave - edited).toBeGreaterThanOrEqual(18_000);
     await page.waitForTimeout(3000);
     expect(saves).toHaveLength(1);

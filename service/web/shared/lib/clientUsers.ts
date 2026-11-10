@@ -1,4 +1,5 @@
 "use client";
+const KEY = "ac-client-users-v1";
 
 /**
 Shared client-user mock store (FR-A17 / FR-C19 / IR114). The customer owner (Client app,
@@ -7,12 +8,18 @@ Demo only: adding users and set-up e-mail resends are previews; state lives in t
 restores the seed, FR-X05).
 */
 import { useSyncExternalStore } from "react";
-import { readDemo, writeDemo } from "@ac/web/lib/demoStore";
+import { z } from "@ac/web/lib/zod";
+import { readDemoAs, writeDemo } from "@ac/web/lib/demoStore";
+import { isEmail } from "@ac/web/lib/text";
 
 export type ClientRole = "owner" | "member";
 export interface ClientUser { id: string; name: string | null; email: string; role: ClientRole; status: "invited" | "active" | "disabled"; lastSignIn: string | null; invitedBy?: string; invitedAt?: string }
 
-const KEY = "ac-client-users-v1";
+const clientUser = z.object({
+  id: z.string(), name: z.string().nullable(), email: z.string(), role: z.enum(["owner", "member"]), status: z.enum(["invited", "active", "disabled"]),
+  lastSignIn: z.string().nullable(), invitedBy: z.string().optional(), invitedAt: z.string().optional(),
+}) satisfies z.ZodType<ClientUser>;
+
 export const CLIENT_USERS_SEED: ClientUser[] = [
   { id: "cu-tan-wei", name: "Tan Wei", email: "tan.wei@example.com", role: "owner", status: "active", lastSignIn: "2026-09-30 08:12" },
   { id: "cu-mei-tan", name: "Mei Tan", email: "mei.tan@example.com", role: "member", status: "active", lastSignIn: "2026-09-27 21:40" },
@@ -25,7 +32,7 @@ let state: ClientUser[] | null = null;
 const listeners = new Set<() => void>();
 const load = () => {
   if (state) return state;
-  state = readDemo<ClientUser[]>(KEY) ?? CLIENT_USERS_SEED;
+  state = readDemoAs(KEY, z.array(clientUser)) ?? CLIENT_USERS_SEED;
   return state;
 };
 const save = (next: ClientUser[]) => {
@@ -39,10 +46,10 @@ export const useClientUsers = () => useSyncExternalStore(subscribe, load, () => 
 export const emailError = (email: string, users: ClientUser[]) => {
   const e = email.trim();
   if (!e) return "Enter an e-mail address";
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return "Enter a valid e-mail address";
+  if (!isEmail(e)) return "Enter a valid e-mail address";
   const dup = users.find((u) => u.email.toLowerCase() === e.toLowerCase());
   if (dup) return `This person is already a user of customer-a (${dup.name ?? dup.email} · ${dup.role === "owner" ? "Owner" : "Member"}). E-mails are matched without case.`;
-  return;
+  return null;
 };
 
 export const clientUserActions = {
@@ -50,32 +57,32 @@ export const clientUserActions = {
   /** clientUsers.save without id: the account exists at once (IR461), listed as not signed in yet. */
   invite(email: string, role: ClientRole, by: string, name = "") {
     const users = load();
-    const err = emailError(email, users);
-    if (err) return err;
+    const error = emailError(email, users);
+    if (error) return error;
     save([...users, { id: `cu-${String(Date.now())}`, name: name.trim() || null, email: email.trim(), status: "invited", lastSignIn: null, invitedBy: by, invitedAt: "2026-10-06", role }]);
-    return;
+    return null;
   },
   /** clientUsers.resendInvite — invited users only, preview only. */
-  resend: (id: string) => load().find((u) => u.id === id)?.status === "invited" ? undefined : "Only invited users can be re-invited",
+  resend: (id: string) => load().find((u) => u.id === id)?.status === "invited" ? null : "Only invited users can be re-invited",
   /** HQ only (DD-A17): the last active owner cannot be demoted, disabled or removed. */
   setRole(id: string, role: ClientRole) {
     const users = load();
     if (role === "member" && users.filter((u) => u.role === "owner" && u.status === "active" && u.id !== id).length === 0) return "CONFLICT — the last active owner cannot be demoted";
     save(users.map((u) => (u.id === id ? { ...u, role } : u)));
-    return;
+    return null;
   },
   setStatus(id: string, status: "active" | "disabled") {
     const users = load();
     const u = users.find((x) => x.id === id);
     if (status === "disabled" && u?.role === "owner" && users.filter((x) => x.role === "owner" && x.status === "active" && x.id !== id).length === 0) return "CONFLICT — the last active owner cannot be disabled";
     save(users.map((x) => (x.id === id ? { ...x, status } : x)));
-    return;
+    return null;
   },
   remove(id: string) {
     const users = load();
     const u = users.find((x) => x.id === id);
     if (u?.role === "owner" && users.filter((x) => x.role === "owner" && x.status === "active" && x.id !== id).length === 0) return "CONFLICT — the last active owner cannot be removed";
     save(users.filter((x) => x.id !== id));
-    return;
+    return null;
   },
 };

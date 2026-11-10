@@ -25,6 +25,7 @@ func assembled(t *testing.T) *server.Server {
 			Addr:              "",
 			Clock:             nil,
 			DemoOps:           false,
+			DemoShared:        false,
 			DemoStart:         time.Time{},
 			Logger:            nil,
 			Domains:           nil,
@@ -93,7 +94,7 @@ func TestRESTRoutesResolve(t *testing.T) {
 		}
 	}
 
-	if routes != 233 {
-		t.Fatalf("%d routes, want 233", routes)
+	if routes != 246 {
+		t.Fatalf("%d routes, want 246", routes)
 	}
 }

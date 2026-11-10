@@ -26,7 +26,7 @@ export function contentSecurityPolicy(nonce: string, o: { dev: boolean; https: b
 }
 
 /** A fresh nonce: a random UUID in base64, as in the Next.js guide. */
-export const newNonce = (): string => Buffer.from(crypto.randomUUID()).toString("base64");
+export const makeNonce = (): string => Buffer.from(crypto.randomUUID()).toString("base64");
 
 /** The origin of an absolute URL, or null. */
 export function originOf(url: string): string | null {

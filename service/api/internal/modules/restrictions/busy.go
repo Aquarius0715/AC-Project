@@ -43,6 +43,20 @@ func RegisterQueries(r *ops.Registry) {
 	ops.RegisterQuery(r, ops.DomainBilling, QueryUnitPolicy, unitPolicy)
 	ops.RegisterQuery(r, ops.DomainBilling, QueryUnitRestriction, unitRestriction)
 	ops.RegisterQuery(r, ops.DomainBilling, QueryUnitRecovering, unitRecovering)
+	ops.RegisterQuery(r, ops.DomainBilling, ops.QueryOrgRecordsRestrictions, orgRecords)
+}
+
+// orgRecords reports any restriction of the customer: a record that stays, so the customer is not deleted (DEC-103).
+func orgRecords(ctx context.Context, c *ops.Call, input *ops.OrgRecordsInput) (bool, error) {
+	var held bool
+
+	err := c.Tx.QueryRow(
+		ctx,
+		`SELECT EXISTS (SELECT 1 FROM restrictions.restrictions WHERE customer_id = $1)`,
+		input.CustomerID,
+	).Scan(&held)
+
+	return held, apperr.Wrap(err, "select restrictions.restrictions")
 }
 
 // UnitRestriction returns the newest restriction that currently restricts the unit (unit detail, IR46).
@@ -124,7 +138,7 @@ func (Busy) ContractState(
 	rows, err := c.Tx.Query(
 		ctx,
 		`SELECT id, state IN ('scheduled','requested','applied','release_requested'),
-		jsonb_path_exists(recovery_cases, '$[*] ? (@.status != "resolved")') FROM restrictions.restrictions WHERE contract_id
+		jsonb_path_exists(recovery_cases, '$[*] ? (@.state != "resolved")') FROM restrictions.restrictions WHERE contract_id
 		= $1 ORDER BY id`,
 		contract,
 	)

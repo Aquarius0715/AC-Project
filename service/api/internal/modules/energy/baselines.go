@@ -446,7 +446,7 @@ func measuredBaseline(
 		SourceSnapshot: sourceSnapshot{Generation: 1, EventCursor: 0, SnapshotAt: call.Now},
 	}
 
-	err = call.Tx.QueryRow(ctx, `SELECT count(*) FROM platform.outbox`).
+	err = call.Tx.QueryRow(ctx, ops.TenantCursor()).
 		Scan(&measured.SourceSnapshot.EventCursor)
 	if err != nil {
 		return nil, nil, apperr.Wrap(err, "select platform.outbox")
@@ -579,6 +579,8 @@ func Register(reg *ops.Registry) {
 	ops.Register(reg, "factors.save", saveFactor)
 	ops.Register(reg, "baselines.list", listBaselines)
 	ops.Register(reg, "baselines.save", saveBaseline)
+	ops.Register(reg, "baselines.delete", deleteBaseline)
+	ops.Register(reg, "factors.delete", deleteFactor)
 	ops.Register(reg, "energy.summary", summary)
 	ops.Register(reg, "energy.exportReport", exportReport)
 }

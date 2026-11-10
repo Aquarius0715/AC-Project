@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Badge, Banner, Card, EmptyState, Kpi, LinkBtn, Page, Select, SeverityBadge, TextLink, cx, Plain, ScrollX } from "@ac/web/components/ui";
+import { Badge, Banner, Card, EmptyState, Kpi, LinkButton, Page, Select, SeverityBadge, TextLink, cx, Plain, ScrollX } from "@ac/web/components/ui";
 import { OriginBadge } from "@ac/web/components/JobBits";
 import { useT } from "@ac/web/components/I18n";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
@@ -13,19 +13,20 @@ language; the times come formatted from the loader — today's timeline in Kuala
 export function OverviewView({ live }: Readonly<{ live: OverviewLive }>) {
   const t = useT();
   const patch = useUrlPatch();
-  const all = live.tabs.find((x) => x.id === "all")!.count;
+  const all = live.tabs.find((x) => x.id === "all")?.count ?? 0;
+  const first = live.pending[0]; // the next assignment to accept
   return (
     <Page>
       <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}>
         {live.kpis.map((k) => <Kpi key={k.label} label={k.label} value={k.value} sub={k.sub} tone={k.tone} />)}
       </div>
-      {live.pending.length === 1 && (
-        <Banner tone="warn" icon="mail" action={<LinkBtn size="sm" variant="primary" href={`/technician/jobs/${live.pending[0].id}`}>{t("Review & accept")}</LinkBtn>}>
-          <b>{t("New assignment to accept — {job}", { job: `${live.pending[0].short} · ${live.pending[0].title} · ${live.pending[0].slotText}` })}</b>. {t("The visit time was agreed with the client; accept it or say you can’t make it.")}
+      {first && live.pending.length === 1 && (
+        <Banner tone="warn" icon="mail" action={<LinkButton size="sm" variant="primary" href={`/technician/jobs/${first.id}`}>{t("Review & accept")}</LinkButton>}>
+          <b>{t("New assignment to accept — {job}", { job: `${first.short} · ${first.title} · ${first.slotText}` })}</b>. {t("The visit time was agreed with the client; accept it or say you can’t make it.")}
         </Banner>
       )}
-      {live.pending.length > 1 && (
-        <Banner tone="warn" icon="mail" action={<LinkBtn size="sm" variant="primary" href={`/technician/jobs/${live.pending[0].id}`}>{t("Review the first")}</LinkBtn>}>
+      {first && live.pending.length > 1 && (
+        <Banner tone="warn" icon="mail" action={<LinkButton size="sm" variant="primary" href={`/technician/jobs/${first.id}`}>{t("Review the first")}</LinkButton>}>
           <b>{t("{n} new assignments to accept", { n: live.pending.length })}</b> — {live.pending.map((j, k) => <span key={j.id}>{k ? ", " : ""}<Link className="font-semibold underline" href={`/technician/jobs/${j.id}`}>{j.short} · {j.slotText}</Link></span>)}. {t("The visit times were agreed with the client.")}
         </Banner>
       )}

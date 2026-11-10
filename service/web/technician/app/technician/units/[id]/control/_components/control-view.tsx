@@ -8,12 +8,13 @@ import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { focusField } from "@ac/web/lib/focusField";
 import { actionOf } from "@ac/web/lib/clientAutomations";
-import { actionCode, actionWord, fieldText, refusal } from "@ac/web/lib/techControl";
+import { actionCode, actionWord, fieldText, offeredKey, refusal } from "@ac/web/lib/techControl";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import { sendDiagnostic, startTestRun } from "../actions";
 import type { ControlLive } from "../_lib/load";
 import { Icon } from "@ac/web/components/Icon";
 
+const RESULT_LOOK = new Map([["ok", "bg-ok-soft text-ok"], ["crit", "bg-crit-soft text-crit"]]);
 /** Diagnostic control (FR-T10, Figma Technician 02-18…02-28) in API mode: one diagnostic command or one test run at a
 time for the assigned job, each confirmed first; device acknowledgements and the run's end are shown only when the
 device reports them. Texts in the user's display language; the times come formatted from the loader (IR286). */
@@ -25,8 +26,8 @@ export function ControlView({ live }: Readonly<{ live: ControlLive }>) {
   const first = options[0]?.options[0]?.key ?? "power:on";
   const [action, setAction] = useState(options.find((g) => g.options[0]?.key.startsWith("mode:"))?.options[0]?.key ?? first);
   const [reason, setReason] = useState("");
-  const [start, setStart] = useState("power:on");
-  const [end, setEnd] = useState("power:off");
+  const [start, setStart] = useState(offeredKey(options, "power:on"));
+  const [end, setEnd] = useState(offeredKey(options, "power:off"));
   const [minutes, setMinutes] = useState("5");
   const [trReason, setTrReason] = useState("");
   const [confirm, setConfirm] = useState<null | "cmd" | "run">(null);
@@ -34,9 +35,8 @@ export function ControlView({ live }: Readonly<{ live: ControlLive }>) {
   const [refused, setRefused] = useState<string | null>(null);
   const ids = { reason: useId(), durationMinutes: useId(), trReason: useId() };
   useEffect(() => { // device acknowledgements and run states arrive on the server: refresh while something is open
-    if (!live.active) return;
-    const timer = setInterval(() => { router.refresh(); }, 4000);
-    return () => { clearInterval(timer); };
+    const timer = live.active ? setInterval(() => { router.refresh(); }, 4000) : null;
+    return () => { if (timer) clearInterval(timer); };
   }, [live.active, router]);
   const back = <div className="flex flex-wrap items-center gap-2 text-[13px]"><Link href={live.unitHref} className="font-semibold text-primary" aria-label={t("Back")}><Icon name="chevronLeft" /></Link><h1 className="text-base font-bold">{t("Diagnostic control")}</h1><span className="text-muted-foreground">· {live.unit.name}</span></div>;
   if (!live.canDiagnose) return <Page>{back}<EmptyState title={t("No diagnostic permission")}>{t("Diagnostic control needs control.diagnose on an assigned job. Ask HQ if you should have it.")}</EmptyState></Page>;
@@ -54,7 +54,7 @@ export function ControlView({ live }: Readonly<{ live: ControlLive }>) {
     if (kind === "cmd" && (reason.trim().length === 0 || reason.trim().length > 1000)) e.reason = t("Reason is required (1–1000 characters)");
     if (kind === "run") {
       const n = Number(minutes);
-      if (!Number.isInteger(n) || n < 1 || n > 15) e.durationMinutes = t("A test run lasts 1–15 minutes");
+      if (!Number.isSafeInteger(n) || n < 1 || n > 15) e.durationMinutes = t("A test run lasts 1–15 minutes");
       if (trReason.trim().length === 0 || trReason.trim().length > 1000) e.trReason = t("Reason is required (1–1000 characters)");
     }
     setErrors(e);
@@ -92,6 +92,10 @@ export function ControlView({ live }: Readonly<{ live: ControlLive }>) {
     run(() => sendDiagnostic({ unitId: live.unit.id, jobId: job.id, action: r.endAction, reason: t("End of test run sent again: {reason}", { reason: r.reason }).slice(0, 1000), expectedUnitVersion: live.unit.version }),
       (c) => t("{id} sent — waiting for the device", { id: c.id.slice(0, 8) }), () => { setErrors({}); setRefused(null); }, failed);
   };
+  const runLabel = () => {
+    if (live.run && live.active) return t("Start test run (running)");
+    return t(live.run?.state === "completed" ? "Start new test run" : "Start test run");
+  };
   return (
     <Page>
       {back}
@@ -108,7 +112,7 @@ export function ControlView({ live }: Readonly<{ live: ControlLive }>) {
             </div>
             <div className="mt-3"><Field label={t("Reason (required)")} error={errors.reason}><Textarea id={ids.reason} value={reason} maxLength={1000} placeholder={t("Why this command is needed for the diagnosis")} onChange={(e) => { setReason(e.target.value); }} /></Field></div>
             <div className="mt-3 flex justify-end"><Btn variant="primary" disabled={pending || isBusy || options.length === 0} onClick={() => { review("cmd"); }}>{t("Review & send")}</Btn></div>
-            {latest && <p className={`mt-3 rounded-xl px-3 py-2 text-xs font-semibold ${latest.badge.tone === "ok" ? "bg-ok-soft text-ok" : (latest.badge.tone === "crit" ? "bg-crit-soft text-crit" : "bg-surface2 text-muted-foreground")}`}>{latest.title} — {latest.sub}</p>}
+            {latest && <p className={`mt-3 rounded-xl px-3 py-2 text-xs font-semibold ${RESULT_LOOK.get(latest.badge.tone) ?? "bg-surface2 text-muted-foreground"}`}>{latest.title} — {latest.sub}</p>}
           </Card>
           <Card title={t("Current unit state")} action={<span className="text-xs text-muted-foreground">{live.unit.observed}</span>}>
             <div className="grid-fluid" style={{ ["--min" as string]: "120px" }}>
@@ -136,7 +140,7 @@ export function ControlView({ live }: Readonly<{ live: ControlLive }>) {
             {live.banner && <div className="mt-3"><Banner tone={live.banner.tone}><b>{live.banner.title}</b><div className="text-xs">{live.banner.text}</div></Banner></div>}
             {live.run?.state === "end_failed" && <div className="mt-2"><Btn className="w-full" variant="danger" disabled={pending || live.active || !job.inWindow} onClick={retryEnd}>{t("Retry end command")}</Btn>{!job.inWindow && <p className="mt-1 text-[11px] text-muted-foreground">{t("Retry not available — no authorization")}</p>}</div>}
             {live.run?.state === "end_blocked" && <p className="mt-2 text-[11px] text-muted-foreground">{t("Retry not available — no authorization")}</p>}
-            <div className="mt-3"><Btn className="w-full" disabled={pending || isBusy || options.length === 0} onClick={() => { review("run"); }}>{t(live.run && live.active ? "Start test run (running)" : (live.run?.state === "completed" ? "Start new test run" : "Start test run"))}</Btn></div>
+            <div className="mt-3"><Btn className="w-full" disabled={pending || isBusy || options.length === 0} onClick={() => { review("run"); }}>{runLabel()}</Btn></div>
             <p className="mt-2 text-[11px] text-muted-foreground">{t("1–15 minutes only. Reason required. Cannot start during firmware updates or an unfinished command.")}</p>
           </Card>
           <Card title={t("Authorization")}>

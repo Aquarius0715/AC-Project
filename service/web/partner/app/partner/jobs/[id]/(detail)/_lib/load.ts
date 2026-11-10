@@ -6,25 +6,20 @@
 // server (IR272): instants in the user's display time zone, the capacity days as Kuala Lumpur dates; the view only
 // translates fixed texts.
 import "server-only";
-import { coreAll, coreDisplay, coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
+import { coreAll, coreDisplay, coreNow, coreOp, CoreError, orWhenRefused, coreItems } from "@ac/web/lib/dal";
 import { i18nOf, showClock, showSpan, showTime, zonedParts } from "@ac/web/lib/i18n";
 import type { ApiAlert } from "@ac/web/lib/alerts";
 import type { ApiUnitDetail } from "@ac/web/lib/units";
 import { delegationLeft, detailBanner, eventRows, fits, ordinal, qualified, requiredFor, timeline, type ApiPartnerJobDetail } from "@ac/web/lib/partnerJobDetail";
-import { until, type ApiCapacity, type ApiJobEvent, type ApiMember } from "@ac/web/lib/partnerOverview";
+import { firstSlot, until, type ApiCapacity, type ApiJobEvent, type ApiMember } from "@ac/web/lib/partnerOverview";
+import { recover } from "@ac/web/lib/promises";
 
-const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => {
-  return p.catch((error) => {
-    if (error instanceof CoreError && error.error.code !== "UNAVAILABLE" && error.error.code !== "TIMEOUT") return fallback;
-    throw error;
-  });
-};
+const optional = orWhenRefused;
 const klDate = (iso: string) => new Date(Date.parse(iso) + 8 * 3_600_000).toISOString().slice(0, 10);
 const plusDays = (date: string, n: number) => new Date(Date.parse(`${date}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 
 export async function loadJobDetail(jobId: string) {
-  interface Page<T> { items: T[] }
-  const job = await coreOp<ApiPartnerJobDetail>("jobs.get", { jobId }).catch((error) => {
+  const job = await recover(coreOp<ApiPartnerJobDetail>("jobs.get", { jobId }), (error: unknown) => {
     if (error instanceof CoreError && (error.error.code === "NOT_FOUND" || error.error.code === "FORBIDDEN")) return null; // another company's job reads as absent (D01)
     throw error;
   });
@@ -43,27 +38,28 @@ export async function loadJobDetail(jobId: string) {
     };
   }
   const members = await optional(coreAll<ApiMember>("members.list"), []);
-  const capacityOf = (date: string) => optional(coreOp<Page<ApiCapacity>>("members.capacity", { date, query: { limit: 100 } }).then((r) => r.items), []);
-  const events = optional(coreOp<Page<ApiJobEvent>>("jobs.events", { jobId, query: { limit: 100 } }).then((r) => r.items), []);
+  const capacityOf = (date: string) => optional(coreItems<ApiCapacity>("members.capacity", { date, query: { limit: 100 } }), []);
+  const events = optional(coreItems<ApiJobEvent>("jobs.events", { jobId, query: { limit: 100 } }), []);
   const names = Object.fromEntries(members.map((m) => [m.id, m.displayName]));
   if (job.projection === "offer") {
-    const first = klDate(job.visitSlot.startAt);
+    const visit = firstSlot(job.candidateSlots) ?? job.requestedSlot; // the earliest candidate time sets the capacity week (IR636)
+    const first = klDate(visit.startAt);
     const dates = [0, 1, 2, 3, 4].map((n) => plusDays(first, n));
-    const [days, ev] = await Promise.all([Promise.all(dates.map(capacityOf)), events]);
-    const technicians = members.filter((m) => m.role === "technician" && qualified(m, job.requiredQualifications, job.visitSlot.startAt)).map((m) => ({ id: m.id, name: m.displayName }));
+    const [days, event] = await Promise.all([Promise.all(dates.map((item) => capacityOf(item))), events]);
+    const technicians = members.filter((m) => m.role === "technician" && qualified(m, job.requiredQualifications, visit.startAt)).map((m) => ({ id: m.id, name: m.displayName }));
     const p = job.partnerSlotProposal;
-    const offers = Math.max(1, ev.filter((e) => e.action === "job.offered").length);
-    const start = zonedParts(job.visitSlot.startAt, display.timeZone);
+    const offers = Math.max(1, event.filter((e) => e.action === "job.offered").length);
+    const start = zonedParts(visit.startAt, display.timeZone);
     return {
       kind: "offer" as const,
-      events: ev,
-      fits: fits(members, job.requiredQualifications, job.visitSlot, dates.map((date, k) => ({ date, capacity: days[k] })), "offer", undefined, i),
+      events: event,
+      fits: fits(members, job.requiredQualifications, visit, dates.map((date, k) => ({ date, capacity: days.at(k) ?? [] })), "offer", undefined, i),
       text: {
-        expires: showTime(job.offerExpiresAt, display), visit: showSpan(job.visitSlot.startAt, job.visitSlot.endAt, display),
+        expires: showTime(job.offerExpiresAt, display), visit: job.candidateSlots.map((s) => showSpan(s.startAt, s.endAt, display)).join(" / "), first: showSpan(visit.startAt, visit.endAt, display), count: job.candidateSlots.length,
         access: showSpan(job.accessValidFrom, job.accessValidUntil, display), accessFrom: showTime(job.accessValidFrom, display), offered: showTime(job.offeredAt, display),
-        left: until(job.offerExpiresAt, ms, t), proposal: p ? showSpan(p.slot.startAt, p.slot.endAt, display) : null, offers, nth: ordinal(offers, display.locale),
+        left: until(job.offerExpiresAt, ms, t), proposal: p ? showSpan(p.slot.startAt, p.slot.endAt, display) : null, nth: ordinal(offers, display.locale),
         // Propose another time: typed in the display time zone (NFR-08), the day after the fixed visit by default
-        propose: { zone: display.timeZone, date: zonedParts(new Date(Date.parse(job.visitSlot.startAt) + 86_400_000).toISOString(), display.timeZone).date, from: start.time, to: zonedParts(job.visitSlot.endAt, display.timeZone).time },
+        propose: { zone: display.timeZone, date: zonedParts(new Date(Date.parse(visit.startAt) + 86_400_000).toISOString(), display.timeZone).date, from: start.time, to: zonedParts(visit.endAt, display.timeZone).time }, offers,
       },
       now,
       job,
@@ -71,25 +67,25 @@ export async function loadJobDetail(jobId: string) {
       technicians,
     };
   }
-  const visit = job.assignment ? { startAt: job.assignment.scheduledStart, endAt: job.assignment.scheduledEnd } : job.offer?.visitSlot ?? job.requestedSlot;
+  const visit = job.assignment ? { startAt: job.assignment.scheduledStart, endAt: job.assignment.scheduledEnd } : job.scheduledSlot ?? firstSlot(job.offer?.candidateSlots ?? []) ?? job.requestedSlot;
   const dates = [0, 1, 2, 3, 4].map((n) => plusDays(klDate(visit.startAt), n));
-  const [unit, ev, alerts, days] = await Promise.all([
+  const [unit, event, alerts, days] = await Promise.all([
     optional(coreOp<ApiUnitDetail>("units.get", { id: job.unitId }), null),
     events,
     Promise.all(job.alertIds.map((id) => optional(coreOp<ApiAlert>("alerts.get", { id }), null))),
-    Promise.all(dates.map(capacityOf)),
+    Promise.all(dates.map((item) => capacityOf(item))),
   ]);
   const required = requiredFor(unit?.serviceScope ?? []);
   const linked = alerts.filter((a): a is ApiAlert => !!a);
   const tech = job.assignment ? names[job.assignment.technicianMembershipId] ?? t("Technician") : null;
   return {
     kind: "detail" as const,
-    events: ev,
+    events: event,
     alerts: linked,
-    fits: fits(members, required, visit, dates.map((date, k) => ({ date, capacity: days[k] })), "detail", job.assignment?.technicianMembershipId, i),
+    fits: fits(members, required, visit, dates.map((date, k) => ({ date, capacity: days.at(k) ?? [] })), "detail", job.assignment?.technicianMembershipId, i),
     text: {
-      tech, banner: detailBanner(job, tech, ms, i), steps: timeline(job.status, ev, !!job.assignment, job.origin, i),
-      visit: job.offer ? showSpan(job.offer.visitSlot.startAt, job.offer.visitSlot.endAt, display) : showSpan(job.requestedSlot.startAt, job.requestedSlot.endAt, display),
+      tech, banner: detailBanner(job, tech, ms, i), steps: timeline(job.status, event, !!job.assignment, job.origin, i),
+      visit: job.assignment || job.scheduledSlot || !job.offer ? showSpan(visit.startAt, visit.endAt, display) : job.offer.candidateSlots.map((s) => showSpan(s.startAt, s.endAt, display)).join(" / "),
       access: job.offer ? showSpan(job.offer.accessValidFrom, job.offer.accessValidUntil, display) : null,
       scheduled: job.assignment ? showSpan(job.assignment.scheduledStart, job.assignment.scheduledEnd, display) : null,
       seen: unit?.lastSeenAt ? showClock(unit.lastSeenAt, display) : null,

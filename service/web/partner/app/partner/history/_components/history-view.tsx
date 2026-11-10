@@ -8,10 +8,12 @@ import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { CHANNELS, channelText, communicationRefusal, ROLES, TEMPLATES, type TimelineItem } from "@ac/web/lib/partnerHistory";
-import { communicate, type Communication, type CommunicationFailure } from "../actions";
+import { communicate } from "../actions";
+import { oneOf } from "@ac/web/lib/oneOf";
 import type { HistoryLive } from "../_lib/load";
-import { Icon } from "@ac/web/components/Icon";
+import { Icon, type IconName } from "@ac/web/components/Icon";
 
+const EVENT_ICON = new Map<string, IconName>([["warn", "alert"], ["ok", "check"]]);
 const dot: Record<string, string> = { ok: "bg-ok/15 text-ok", warn: "bg-warn/15 text-warn", none: "bg-primary/10 text-primary" };
 
 /** The contractor's job history (FR-P07, FR-P08, Figma Contractor 05-1…05-6) from the Core API. Texts in the user's
@@ -27,7 +29,12 @@ const hrefOf = (live: HistoryLive, jobId?: string) => { const q = [jobId ? `jobI
 function List({ live }: Readonly<{ live: HistoryLive }>) {
   const t = useT();
   const patch = useUrlPatch();
-  const all = live.tabs.find((x) => x.id === "all")!.count;
+  const all = live.tabs.find((x) => x.id === "all")?.count ?? 0;
+  // no rows: older jobs outside the 90 days, or none at all
+  const emptyState = () => {
+    if (live.outside > 0) return <EmptyState title={t("No jobs in the last 90 days")} action={<Btn size="sm" onClick={() => { patch({ period: "all" }); }}>{t("Show all time")}</Btn>}>{t(live.outside === 1 ? "1 job of your company is older than 90 days — it shows under all time." : "{n} jobs of your company are older than 90 days — they show under all time.", { n: live.outside })}</EmptyState>;
+    return <EmptyState title={t(all ? "No jobs in this view" : "No jobs yet")}>{t("Jobs appear here once your company accepts an offer.")}</EmptyState>;
+  };
   return (
     <Page>
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -40,12 +47,10 @@ function List({ live }: Readonly<{ live: HistoryLive }>) {
         </div>
       </div>
       <Card title={t("Your jobs — {company} only · choose a job to open its history", { company: live.company })}>
-        {live.rows.length === 0 ? (live.outside > 0
-          ? <EmptyState title={t("No jobs in the last 90 days")} action={<Btn size="sm" onClick={() => { patch({ period: "all" }); }}>{t("Show all time")}</Btn>}>{t(live.outside === 1 ? "1 job of your company is older than 90 days — it shows under all time." : "{n} jobs of your company are older than 90 days — they show under all time.", { n: live.outside })}</EmptyState>
-          : <EmptyState title={t(all ? "No jobs in this view" : "No jobs yet")}>{t("Jobs appear here once your company accepts an offer.")}</EmptyState>) : (
+        {live.rows.length === 0 ? emptyState() : (
           <ScrollX>
             <table className="w-full min-w-[880px] text-[13px]">
-              <thead><tr className="text-left text-[11px] uppercase tracking-wide text-muted-foreground"><th className="py-2 font-semibold">{t("Job")}</th><th className="py-2 font-semibold">{t("Technician")}</th><th className="py-2 font-semibold">{t("Last event")}</th><th className="py-2 font-semibold">{t("Status")}</th><th /></tr></thead>
+              <thead><tr className="text-left text-[11px] uppercase tracking-wide text-muted-foreground"><th className="py-2 font-semibold">{t("Job")}</th><th className="py-2 font-semibold">{t("Technician")}</th><th className="py-2 font-semibold">{t("Last event")}</th><th className="py-2 font-semibold">{t("Status")}</th><td /></tr></thead>
               <tbody>
                 {live.rows.map((r) => (
                   <tr key={r.id} className="border-t border-line align-top hover:bg-surface2/60">
@@ -66,10 +71,10 @@ function List({ live }: Readonly<{ live: HistoryLive }>) {
   );
 }
 
-type Detail = NonNullable<HistoryLive["detail"]>;
+type DetailRows = NonNullable<HistoryLive["detail"]>;
 interface SessionPreview { id: string; title: string; sub: string }
 
-function Detail({ live, detail }: Readonly<{ live: HistoryLive; detail: Detail }>) {
+function Detail({ live, detail }: Readonly<{ live: HistoryLive; detail: DetailRows }>) {
   const t = useT();
   const patch = useUrlPatch();
   const [view, setView] = useState<"all" | "customer" | "internal">("all");
@@ -90,17 +95,15 @@ function Detail({ live, detail }: Readonly<{ live: HistoryLive; detail: Detail }
             {([["unit", t("Unit"), r.unit ?? r.title], ["tech", t("Technician"), r.tech.name], ["status", t("Status"), r.badge.text], ["delegation", t("Delegation"), r.delegation]] as const).map(([k, label, v]) => <div key={k}><div className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{label}</div><b className={cx(k === "status" && r.badge.tone === "ok" && "text-ok", k === "status" && r.badge.tone === "crit" && "text-crit")}>{v}</b></div>)}
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
-            {([["all", t("All events"), detail.items.length], ["customer", t("Customer-visible"), count("customer")], ["internal", t("Internal"), count("internal")]] as const).map(([id, label, n]) => {
-              return (
+            {([["all", t("All events"), detail.items.length], ["customer", t("Customer-visible"), count("customer")], ["internal", t("Internal"), count("internal")]] as const).map(([id, label, n]) => (
                 <Plain key={id} type="button" aria-pressed={view === id} onClick={() => { setView(id); }} className={cx("rounded-full border px-3 py-1 text-xs font-semibold", view === id ? "border-primary bg-primary-soft text-primary" : "border-line bg-surface")}>{label} ({n})</Plain>
-              );
-            })}
+              ))}
           </div>
           <ol className="mt-3 flex flex-col">
             {items.length === 0 && <li className="py-3 text-[13px] text-muted-foreground">{t("No events in this view.")}</li>}
             {items.map((e) => (
               <li key={e.id} className="flex items-start gap-3 border-t border-line py-2.5 first:border-0">
-                <span aria-hidden className={cx("grid h-7 w-7 shrink-0 place-items-center rounded-lg text-xs", dot[e.tone ?? "none"])}><Icon name={e.tone === "warn" ? "alert" : (e.tone === "ok" ? "check" : "dot")} /></span>
+                <span aria-hidden className={cx("grid h-7 w-7 shrink-0 place-items-center rounded-lg text-xs", dot[e.tone ?? "none"])}><Icon name={EVENT_ICON.get(e.tone ?? "") ?? "dot"} /></span>
                 <span className="min-w-0 flex-1"><b className="block text-[13px]">{e.title}</b><span className="block text-[11px] text-muted-foreground">{[e.detail, e.at].filter(Boolean).join(" · ")}</span></span>
                 <Badge tone={e.badge === "customer" ? "primary" : "muted"}>{t(e.badge)}</Badge>
               </li>
@@ -126,11 +129,11 @@ function Crumb({ live, text }: Readonly<{ live: HistoryLive; text: string }>) {
   return <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground"><Link href={hrefOf(live)} className="font-semibold text-primary"><Icon name="arrowLeft" /> {t("Job history")}</Link> › <b className="text-ink">{text}</b></div>;
 }
 
-function Compose({ detail, onPreview }: Readonly<{ detail: Extract<Detail, { missing: false }>; onPreview: (p: SessionPreview) => void }>) {
+function Compose({ detail, onPreview }: Readonly<{ detail: Extract<DetailRows, { missing: false }>; onPreview: (p: SessionPreview) => void }>) {
   const t = useT();
   const r = detail.row, mode = detail.mode;
   const [pending, run] = useAction();
-  const [template, setTemplate] = useState<string>(TEMPLATES[0].id);
+  const [template, setTemplate] = useState<(typeof TEMPLATES)[number]["id"]>(TEMPLATES[0].id);
   const [visibility, setVisibility] = useState<"internal" | "customer">("internal");
   const [role, setRole] = useState<string>(ROLES.find((x) => detail.recipients.some((p) => p.role === x.id))?.id ?? ROLES[0].id);
   const ofRole = detail.recipients.filter((p) => p.role === role);
@@ -142,20 +145,21 @@ function Compose({ detail, onPreview }: Readonly<{ detail: Extract<Detail, { mis
   const [result, setResult] = useState<{ tone: "ok" | "crit" | "warn"; text: string } | null>(null);
   const channels = CHANNELS.filter((c) => !chosen || chosen.allowedChannels.includes(c.id));
   const isTooLong = message.trim().length > 2000;
+  const lengthError = isTooLong ? t("At most 2000 characters") : undefined;
   const isClosed = mode.kind === "closed";
   const send = () => {
     setTried(true);
     if (!message.trim() || isTooLong || !chosen) return;
-    const ch = channels.some((c) => c.id === channel) ? channel : "inApp";
-    run(() => communicate({ jobId: r.id, version: r.version, saveNote: mode.kind === "note", templateKey: template as Communication["templateKey"], channel: ch as Communication["channel"], recipientMembershipId: chosen.id, message, visibility }),
+    const ch = channels.find((c) => c.id === channel)?.id ?? "inApp";
+    run(() => communicate({ jobId: r.id, version: r.version, saveNote: mode.kind === "note", templateKey: template, channel: ch, recipientMembershipId: chosen.id, message, visibility }),
       t(mode.kind === "note" ? "Note saved + preview created" : "Preview created"),
       (v) => {
         const label = ROLES.find((x) => x.id === role)?.label ?? role;
         onPreview({ id: v.preview.id, title: `${template} → ${label} (${chosen.displayLabel})`, sub: [ch, t(v.preview.deliveryState), v.noteSaved ? t("note {visibility}", { visibility: t(visibility) }) : "", v.preview.at].filter(Boolean).join(" · ") });
+        const savedText = t(visibility === "internal" ? "Saved the note (internal) and created the {channel} preview for {name}. Nothing was sent; internal notes stay hidden from the customer." : "Saved the note (customer-visible) and created the {channel} preview for {name}. Nothing was sent.", { channel: channelText(ch, t), name: chosen.displayLabel });
         setResult({
           tone: "ok",
-          text: v.noteSaved ? t(visibility === "internal" ? "Saved the note (internal) and created the {channel} preview for {name}. Nothing was sent; internal notes stay hidden from the customer." : "Saved the note (customer-visible) and created the {channel} preview for {name}. Nothing was sent.", { channel: channelText(ch, t), name: chosen.displayLabel })
-            : t("Created the {channel} preview for {name}. Nothing was sent.", { channel: channelText(ch, t), name: chosen.displayLabel }),
+          text: v.noteSaved ? savedText : t("Created the {channel} preview for {name}. Nothing was sent.", { channel: channelText(ch, t), name: chosen.displayLabel }),
         });
         if (!v.noteSaved) {
           return;
@@ -164,8 +168,8 @@ function Compose({ detail, onPreview }: Readonly<{ detail: Extract<Detail, { mis
         setMessage(""); setTried(false);
       },
       (f) => {
-        const c = f as CommunicationFailure;
-        setResult({ tone: c.noteSaved ? "warn" : "crit", text: t(c.noteSaved ? "The note was saved, but the preview failed: {reason}" : "Not saved: {reason} Your message is kept.", { reason: communicationRefusal(f, t) }) });
+        const noteSaved = "noteSaved" in f && f.noteSaved === true; // a communication failure says whether the note was kept
+        setResult({ tone: noteSaved ? "warn" : "crit", text: t(noteSaved ? "The note was saved, but the preview failed: {reason}" : "Not saved: {reason} Your message is kept.", { reason: communicationRefusal(f, t) }) });
       });
   };
   return (
@@ -173,7 +177,7 @@ function Compose({ detail, onPreview }: Readonly<{ detail: Extract<Detail, { mis
       <div className="flex flex-col gap-3">
         {mode.text && <Banner tone={isClosed ? undefined : "warn"}>{mode.text}</Banner>}
         {result && <Banner tone={result.tone}>{result.text}</Banner>}
-        <Field label={t("Template")}><Select value={template} disabled={isClosed} onChange={(e) => { setTemplate(e.target.value); }}>{TEMPLATES.map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}</Select></Field>
+        <Field label={t("Template")}><Select value={template} disabled={isClosed} onChange={(e) => { setTemplate(oneOf(TEMPLATES.map((x) => x.id), e.target.value, template)); }}>{TEMPLATES.map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}</Select></Field>
         {mode.kind === "note" && <Field label={t("Visibility")}><Choice value={visibility} onChange={setVisibility} options={[{ id: "internal", label: t("Internal (default)") }, { id: "customer", label: t("Customer-visible") }]} /></Field>}
         <Field label={t("Recipient role")} hint={chosen ? `${t(ROLES.find((x) => x.id === role)?.sub ?? "")} · ${chosen.displayLabel}` : t("Nobody of this role is part of the job.")}>
           <Select value={role} disabled={isClosed} onChange={(e) => { setRole(e.target.value); setRecipient(detail.recipients.find((p) => p.role === e.target.value)?.id ?? ""); }}>
@@ -182,7 +186,7 @@ function Compose({ detail, onPreview }: Readonly<{ detail: Extract<Detail, { mis
         </Field>
         {ofRole.length > 1 && <Field label={t("Recipient")}><Select value={chosen?.id ?? ""} onChange={(e) => { setRecipient(e.target.value); }}>{ofRole.map((p) => <option key={p.id} value={p.id}>{p.displayLabel}</option>)}</Select></Field>}
         <Field label={t("Channel")}><Select value={channels.some((c) => c.id === channel) ? channel : "inApp"} disabled={isClosed} onChange={(e) => { setChannel(e.target.value); }}>{channels.map((c) => <option key={c.id} value={c.id}>{t("{channel} · preview only", { channel: c.id })}</option>)}</Select></Field>
-        <Field label={t("Message (1–2000 chars)")} error={tried && !message.trim() ? t("A message is required — nothing was saved") : (isTooLong ? t("At most 2000 characters") : undefined)}>
+        <Field label={t("Message (1–2000 chars)")} error={tried && !message.trim() ? t("A message is required — nothing was saved") : lengthError}>
           <Textarea value={message} disabled={isClosed} onChange={(e) => { setMessage(e.target.value); }} placeholder={t("Schedule moved to 2026-09-22 09:00–11:00 due to technician availability.")} />
         </Field>
         <div className="flex flex-wrap justify-end gap-2"><Btn disabled={pending || isClosed} onClick={() => { setMessage(""); setTried(false); setResult(null); }}>{t("Clear")}</Btn><Btn variant="primary" disabled={pending || isClosed || !chosen} onClick={send} className="h-auto min-h-8 max-w-full whitespace-normal text-left">{mode.add && <Icon name="add" />}{mode.button}</Btn></div>

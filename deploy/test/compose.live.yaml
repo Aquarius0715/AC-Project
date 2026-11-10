@@ -1,0 +1,16 @@
+# The shared test environment's data (DEC-96): the fixture's accounts only, and the real devices at customer-a, with no
+# mock fleet. deploy/test/deploy.sh adds this file on top of compose.yaml and deploy/test/compose.test.yaml, and runs the
+# scenario on the real clock (DEMO_CLOCK_START=now, which compose.yaml hands to every service with the clock and to
+# migrate). E2E and the local stack keep the demo. A change here builds the data again from the seed at the next
+# deployment, as a change of the migrations does.
+services:
+  migrate:
+    environment:
+      SEED_ACCOUNTS_ONLY: "1"        # the tenants, organizations and accounts with their permissions, without an end of access
+      SEED_MOCK_FLEET: "0"           # none of the mock fleet's units
+      SEED_LIVE_CLIENT: customer-a   # the live site (the real air conditioner and node_2's sensors) at Demo Customer A
+  # the mock fleet's simulator and its 30 days of history: in a profile the deployment never starts
+  device-sim:
+    profiles: !override [mock-fleet]
+  mock-history:
+    profiles: !override [mock-fleet]

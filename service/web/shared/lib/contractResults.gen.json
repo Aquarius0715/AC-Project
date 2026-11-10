@@ -333,6 +333,13 @@
   ],
   "items": null
  },
+ "baselines.delete": {
+  "fields": [
+   "deleted",
+   "id"
+  ],
+  "items": null
+ },
  "baselines.list": {
   "fields": [
    "items",
@@ -373,6 +380,13 @@
    "unitIds",
    "updatedAt",
    "version"
+  ],
+  "items": null
+ },
+ "capabilities.delete": {
+  "fields": [
+   "deleted",
+   "id"
   ],
   "items": null
  },
@@ -718,6 +732,13 @@
   ],
   "items": null
  },
+ "contractors.delete": {
+  "fields": [
+   "deleted",
+   "id"
+  ],
+  "items": null
+ },
  "contractors.list": {
   "fields": [
    "items",
@@ -832,6 +853,13 @@
    "unitIds",
    "updatedAt",
    "version"
+  ],
+  "items": null
+ },
+ "customers.delete": {
+  "fields": [
+   "deleted",
+   "id"
   ],
   "items": null
  },
@@ -984,6 +1012,7 @@
    "firmwareVersion",
    "id",
    "lastSeenAt",
+   "mqttNode",
    "powerSignal",
    "sensors",
    "serial",
@@ -1066,6 +1095,13 @@
   ],
   "items": null
  },
+ "devices.delete": {
+  "fields": [
+   "deleted",
+   "id"
+  ],
+  "items": null
+ },
  "devices.events": {
   "fields": [
    "items",
@@ -1104,6 +1140,7 @@
    "firmwareVersion",
    "id",
    "lastSeenAt",
+   "mqttNode",
    "powerSignal",
    "sensors",
    "serial",
@@ -1131,6 +1168,7 @@
    "firmwareVersion",
    "id",
    "lastSeenAt",
+   "mqttNode",
    "powerSignal",
    "sensors",
    "serial",
@@ -1177,6 +1215,51 @@
    "firmwareVersion",
    "id",
    "lastSeenAt",
+   "mqttNode",
+   "powerSignal",
+   "sensors",
+   "serial",
+   "tamper",
+   "targetUnitId",
+   "tenantId",
+   "unitId",
+   "updatedAt",
+   "version"
+  ],
+  "items": null
+ },
+ "devices.setMqttNode": {
+  "fields": [
+   "bindingId",
+   "connection",
+   "createdAt",
+   "createdByMembershipId",
+   "firmwareVersion",
+   "id",
+   "lastSeenAt",
+   "mqttNode",
+   "powerSignal",
+   "sensors",
+   "serial",
+   "tamper",
+   "targetUnitId",
+   "tenantId",
+   "unitId",
+   "updatedAt",
+   "version"
+  ],
+  "items": null
+ },
+ "devices.unbind": {
+  "fields": [
+   "bindingId",
+   "connection",
+   "createdAt",
+   "createdByMembershipId",
+   "firmwareVersion",
+   "id",
+   "lastSeenAt",
+   "mqttNode",
    "powerSignal",
    "sensors",
    "serial",
@@ -1312,6 +1395,13 @@
   ],
   "items": null
  },
+ "factors.delete": {
+  "fields": [
+   "deleted",
+   "id"
+  ],
+  "items": null
+ },
  "factors.list": {
   "fields": [
    "items",
@@ -1429,6 +1519,13 @@
    "version",
    "waves",
    "window"
+  ],
+  "items": null
+ },
+ "firmwareCampaigns.delete": {
+  "fields": [
+   "deleted",
+   "id"
   ],
   "items": null
  },
@@ -1961,6 +2058,7 @@
    "asOf",
    "assignment",
    "assignmentId",
+   "candidateSlots",
    "completedAt",
    "contactWindow",
    "contractorOrgId",
@@ -2007,7 +2105,6 @@
    "unitId",
    "updatedAt",
    "version",
-   "visitSlot",
    "warrantyClaims"
   ],
   "items": null
@@ -2073,6 +2170,7 @@
    "asOf",
    "assignmentAcknowledgement",
    "assignmentId",
+   "candidateSlots",
    "completedAt",
    "contractorOrgId",
    "createdAt",
@@ -2104,8 +2202,7 @@
    "termsVersion",
    "type",
    "unitId",
-   "version",
-   "visitSlot"
+   "version"
   ]
  },
  "jobs.offer": {
@@ -2899,6 +2996,13 @@
   ],
   "items": null
  },
+ "members.delete": {
+  "fields": [
+   "deleted",
+   "id"
+  ],
+  "items": null
+ },
  "members.eligible": {
   "fields": [
    "items",
@@ -3025,6 +3129,13 @@
    "updatedAt",
    "version"
   ]
+ },
+ "mrv.deleteDraft": {
+  "fields": [
+   "deleted",
+   "id"
+  ],
+  "items": null
  },
  "mrv.get": {
   "fields": [
@@ -3299,6 +3410,13 @@
    "tenantId",
    "updatedAt",
    "version"
+  ],
+  "items": null
+ },
+ "organizations.delete": {
+  "fields": [
+   "deleted",
+   "id"
   ],
   "items": null
  },
@@ -3632,6 +3750,13 @@
   ],
   "items": null
  },
+ "plans.delete": {
+  "fields": [
+   "deleted",
+   "id"
+  ],
+  "items": null
+ },
  "plans.generateNext": {
   "fields": [
    "alertIds",
@@ -3919,6 +4044,13 @@
    "tenantId",
    "updatedAt",
    "version"
+  ],
+  "items": null
+ },
+ "rateCards.delete": {
+  "fields": [
+   "deleted",
+   "id"
   ],
   "items": null
  },
@@ -4762,19 +4894,6 @@
    "unitId",
    "updatedAt",
    "version"
-  ],
-  "items": null
- },
- "voice.resolveIntent": {
-  "fields": [
-   "before",
-   "candidates",
-   "celsius",
-   "expectedVersion",
-   "kind",
-   "measurement",
-   "messageKey",
-   "unitId"
   ],
   "items": null
  },

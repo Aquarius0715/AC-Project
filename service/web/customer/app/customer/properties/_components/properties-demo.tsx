@@ -1,20 +1,23 @@
 "use client";
+const UNASSIGNED = "unassigned";
 
 import Link from "next/link";
 import { useState } from "react";
 import { Btn, Card, Field, Input, Modal, Page, PowerBadge, SummaryList, Badge, cx, useToast, Plain } from "@ac/web/components/ui";
-import { GroupControl, GUnit } from "@ac/web/components/Features";
-import { Icon } from "@ac/web/components/Icon";
+import { GroupControl, type GUnit } from "@ac/web/components/Features";
+import { Icon, type IconName } from "@ac/web/components/Icon";
+import type { NonEmpty } from "@ac/web/lib/lists";
+import { lookup } from "@ac/web/lib/lookup";
 
 interface Node { id: string; name: string; type: string; units?: number; children?: Node[]; unassigned?: boolean }
-const tree: Node[] = [
+const tree: NonEmpty<Node> = [
   { id: "home-a", name: "Home A", type: "Home", children: [
     { id: "1f", name: "1F", type: "Floor", children: [
       { id: "bedroom", name: "Bedroom", type: "Room", units: 2 },
       { id: "living", name: "Living room", type: "Room", units: 1 },
       { id: "kitchen", name: "Kitchen", type: "Room", units: 1 } ] },
     { id: "2f", name: "2F", type: "Floor", children: [{ id: "study", name: "Study", type: "Room", units: 1 }] },
-    { id: "unassigned", name: "Unassigned units", type: "", units: 1, unassigned: true },
+    { id: UNASSIGNED, name: "Unassigned units", type: "", units: 1, unassigned: true },
   ] },
   { id: "office-a", name: "Office A", type: "Office", children: [
     { id: "open", name: "Open office", type: "Area", children: [{ id: "ws", name: "Workstations", type: "Space", units: 8 }] },
@@ -26,18 +29,34 @@ const roomUnits: Record<string, { id: string; name: string; temp: number; w: num
   living: [{ id: "unit-non-rto", name: "Living room AC", temp: 26.5, w: 510, state: "running" }],
   kitchen: [{ id: "unit-kitchen-a", name: "Kitchen AC", temp: 27.2, w: 545, state: "running" }],
 };
+// the workstations' third AC is stopped and the sixth unreachable; the others run
+const WS_STATE = new Map<number, GUnit["state"]>([[2, "stopped"], [5, "unknown"]]);
 const groupUnits: Record<string, GUnit[]> = {
-  ws: Array.from({ length: 8 }, (_, i) => ({ id: `ws-ac-0${String(i + 1)}`, name: `WS-AC 0${String(i + 1)}`, temp: i === 2 || i === 7 ? null : 24 + (i % 3) * 0.5, w: i === 2 || i === 7 ? null : 580 + i * 10, state: (i === 5 ? "unknown" : (i === 2 ? "stopped" : "running")) as GUnit["state"], online: i !== 5 })),
+  ws: Array.from({ length: 8 }, (_, i) => ({ id: `ws-ac-0${String(i + 1)}`, name: `WS-AC 0${String(i + 1)}`, temp: i === 2 || i === 7 ? null : 24 + (i % 3) * 0.5, w: i === 2 || i === 7 ? null : 580 + i * 10, state: WS_STATE.get(i) ?? "running", online: i !== 5 })),
   bedroom: [{ id: "unit-online-rto", name: "Bedroom AC", temp: 28, w: 680, state: "running", online: true }, { id: "unit-bedroom-2", name: "Bedroom AC #2", temp: 27, w: 0, state: "stopped", online: true }],
   meeting: [{ id: "unit-meeting", name: "Meeting room AC", temp: 25, w: 600, state: "running", online: true, min: 24 }, { id: "unit-meeting-2", name: "Meeting AC 2", temp: 25.5, w: 590, state: "running", online: true }],
 };
 
+/** A tree row's icon: open with its children, unknown for the unassigned units, closed otherwise. */
+function treeIcon(n: Node): IconName {
+  if (n.children) return "chevronDown";
+  return n.unassigned ? "unknown" : "chevronRight";
+}
+/** The selected space's path: a group space, the home, the unassigned units or a room of the home. */
+function spaceTitle(sel: string, isRoom: boolean): string {
+  if (sel === "ws") return "Office A › Open office › Workstations";
+  if (sel === "meeting") return "Office A › 3F › Meeting room";
+  if (sel === "home-a") return "Home A";
+  if (!isRoom) return sel === UNASSIGNED ? "Unassigned units (1)" : "Home A";
+  return `Home A › 1F › ${sel.charAt(0).toUpperCase()}${sel.slice(1)}`;
+}
+const GROUP_SPACE = new Map([["ws", "Workstations"], ["meeting", "Meeting room"]]);
 function TreeRow({ n, depth, sel, onSel, onRename }: Readonly<{ n: Node; depth: number; sel: string; onSel: (id: string) => void; onRename: (n: Node) => void }>) {
   return (
     <>
       <div className={cx("flex items-center gap-2 rounded-lg px-2 py-1.5", sel === n.id ? "bg-primary-soft" : "hover:bg-surface2")} style={{ paddingLeft: 8 + depth * 16 }}>
         <Plain onClick={() => { onSel(n.id); }} className="flex min-w-0 flex-1 items-center gap-2 text-left">
-          <Icon name={n.children ? "chevronDown" : (n.unassigned ? "unknown" : "chevronRight")} className="text-muted-foreground" />
+          <Icon name={treeIcon(n)} className="text-muted-foreground" />
           <span className="truncate font-semibold">{n.name}</span>
           {n.type && <span className="rounded bg-surface2 px-1.5 text-[10px] text-muted-foreground">{n.type}</span>}
           {n.units !== undefined && <span className="text-[11px] text-muted-foreground">· {n.units} unit{n.units > 1 ? "s" : ""}</span>}
@@ -55,12 +74,12 @@ export function PropertiesDemo() {
   const [sel, setSel] = useState("home-a");
   const [renaming, setRenaming] = useState<Node | null>(null);
   const [name, setName] = useState("");
-  const [err, setErr] = useState<string>();
+  const [errorText, setErrorText] = useState<string>();
   const [mode, setMode] = useState<"single" | "group">("single");
-  const startRename = (n: Node) => { setRenaming(n); setName(n.name); setErr(undefined); };
+  const startRename = (n: Node) => { setRenaming(n); setName(n.name); setErrorText(undefined); };
   const save = () => {
-    if (!name.trim()) { setErr("Name is required (1–120 characters)"); return; }
-    if (name.trim().toLowerCase() === "office a" && renaming?.id !== "office-a") { setErr("A location with this name already exists"); return; }
+    if (!name.trim()) { setErrorText("Name is required (1–120 characters)"); return; }
+    if (name.trim().toLowerCase() === "office a" && renaming?.id !== "office-a") { setErrorText("A location with this name already exists"); return; }
     toast(`Renamed to “${name}”`); setRenaming(null);
   };
   const us = roomUnits[sel];
@@ -71,7 +90,7 @@ export function PropertiesDemo() {
           <div className="flex flex-col text-[13px]">{tree.map((n) => <TreeRow key={n.id} n={n} depth={0} sel={sel} onSel={(id) => { setSel(id); setMode("single"); }} onRename={startRename} />)}</div>
           <p className="mt-3 text-[11px] text-muted-foreground">Read-only — HQ sets up properties, floors, rooms and units. You can rename any location with its edit button or Rename; nothing else here changes the structure.</p>
         </Card>
-        <Card title={sel === "ws" ? "Office A › Open office › Workstations" : sel === "meeting" ? "Office A › 3F › Meeting room" : sel === "home-a" || !us ? (sel === "unassigned" ? "Unassigned units (1)" : "Home A") : "Home A › 1F › " + sel[0].toUpperCase() + sel.slice(1)} sub={sel === "home-a" ? "Home A · Home" : undefined} action={sel !== "unassigned" && <Btn size="sm" onClick={() => { startRename(tree[0]); }}><Icon name="edit" />Rename</Btn>}>
+        <Card title={spaceTitle(sel, Object.hasOwn(roomUnits, sel))} sub={sel === "home-a" ? "Home A · Home" : undefined} action={sel !== UNASSIGNED && <Btn size="sm" onClick={() => { startRename(tree[0]); }}><Icon name="edit" />Rename</Btn>}>
           {sel === "home-a" && (
             <>
               <SummaryList cols={2} items={[["Type", "Home"], ["Floors", "2 (1F, 2F)"], ["Rooms", "4"], ["Air conditioners", "5 in rooms · 1 unassigned"], ["Last edited", "Sep 12 · version 3"]]} />
@@ -81,19 +100,17 @@ export function PropertiesDemo() {
           {groupUnits[sel] && (
             <div className="mb-3 flex flex-wrap items-center gap-2"><span className="text-xs text-muted-foreground">{groupUnits[sel].length} ACs ·</span>{(["single", "group"] as const).map((m) => <Plain key={m} aria-pressed={mode === m} onClick={() => { setMode(m); }} className={cx("rounded-control border px-3 py-1 text-xs font-semibold", mode === m ? "border-primary bg-primary-soft text-primary" : "border-line")}>{mode === m && <Icon name="check" />}{m === "single" ? "Single AC" : "Group control"}</Plain>)}</div>
           )}
-          {groupUnits[sel] && mode === "group" && <GroupControl space={sel === "ws" ? "Workstations" : (sel === "meeting" ? "Meeting room" : "Bedroom")} units={groupUnits[sel]} />}
-          {sel === "ws" && mode === "single" && <div className="flex flex-col gap-2">{groupUnits.ws.map((u) => <Link key={u.id} href="/customer/units/unit-online-rto" className="flex items-center justify-between rounded-xl border border-line p-3 hover:bg-surface2/60"><b className="flex items-center gap-1.5"><Icon name="units" className="text-primary" />{u.name}</b><span className="flex items-center gap-3 text-xs"><PowerBadge s={u.state} />{u.temp ?? "—"} °C <Icon name="chevronRight" /></span></Link>)}</div>}
+          {groupUnits[sel] && mode === "group" && <GroupControl space={GROUP_SPACE.get(sel) ?? "Bedroom"} units={groupUnits[sel]} />}
+          {sel === "ws" && mode === "single" && <div className="flex flex-col gap-2">{(groupUnits.ws ?? []).map((u) => <Link key={u.id} href="/customer/units/unit-online-rto" className="flex items-center justify-between rounded-xl border border-line p-3 hover:bg-surface2/60"><b className="flex items-center gap-1.5"><Icon name="units" className="text-primary" />{u.name}</b><span className="flex items-center gap-3 text-xs"><PowerBadge s={u.state} />{u.temp ?? "—"} °C <Icon name="chevronRight" /></span></Link>)}</div>}
           {us && mode === "single" && (
             <div className="flex flex-col gap-2">
-              {us.map((u) => {
-                return (
+              {us.map((u) => (
                   <Link key={u.id} href={`/customer/units/${u.id}`} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line p-3 hover:bg-surface2/60"><span className="flex items-center gap-2 font-bold"><Icon name="units" className="text-primary" />{u.name}</span><span className="flex items-center gap-3 text-xs"><PowerBadge s={u.state} /><span>{u.temp} °C</span><span>{u.w} W</span><span className="text-muted-foreground"><Icon name="chevronRight" /></span></span></Link>
-                );
-              })}
+                ))}
             </div>
           )}
-          {sel !== "home-a" && !us && !groupUnits[sel] && sel !== "unassigned" && <p className="text-[13px] text-muted-foreground">{sel === "study" ? "Study AC is offline (unknown)." : "Select a room with air conditioners to see them here."}</p>}
-          {(sel === "home-a" || sel === "unassigned") && (
+          {sel !== "home-a" && !us && !lookup(groupUnits, sel) && sel !== UNASSIGNED && <p className="text-[13px] text-muted-foreground">{sel === "study" ? "Study AC is offline (unknown)." : "Select a room with air conditioners to see them here."}</p>}
+          {(sel === "home-a" || sel === UNASSIGNED) && (
             <div className="mt-2">
               <div className="mb-2 text-[13px] font-bold">? Unassigned units (1) <span className="text-xs font-normal text-muted-foreground">Not in any room</span></div>
               <Link href="/customer/units/unit-guest" className="flex items-center justify-between rounded-xl border border-line p-3 hover:bg-surface2/60"><span><b className="inline-flex items-center gap-1.5"><Icon name="units" className="text-primary" />Guest AC</b><span className="block text-[11px] text-muted-foreground">Home A · no room assigned</span></span><span className="text-xs">25.5 °C · 0 W <Icon name="chevronRight" /></span></Link>
@@ -103,7 +120,7 @@ export function PropertiesDemo() {
         </Card>
       </div>
       <Modal open={!!renaming} onClose={() => { setRenaming(null); }} title={`Rename ${renaming?.name ?? "location"}`} footer={<><Btn onClick={() => { setRenaming(null); }}>Cancel</Btn><Btn variant="primary" onClick={save}>Save</Btn></>}>
-        <Field label="Name" error={err} hint="Try “Office A” to see the duplicate-name validation."><Input value={name} onChange={(e) => { setName(e.target.value); }} autoFocus /></Field>
+        <Field label="Name" error={errorText} hint="Try “Office A” to see the duplicate-name validation."><Input value={name} onChange={(e) => { setName(e.target.value); }} /></Field>
       </Modal>
     </Page>
   );

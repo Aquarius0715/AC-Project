@@ -1,10 +1,14 @@
 "use client";
 
+import { hasContent } from "@ac/web/lib/hasContent";
 import { Badge, Input, Select, cx } from "./ui";
 import { Icon, type IconName } from "@ac/web/components/Icon";
 import type { JobStatus, Origin, Slot } from "@ac/web/lib/jobs";
-import { statusLabel } from "@ac/web/lib/jobs";
+import { jobStatuses, statusLabel } from "@ac/web/lib/jobs";
+import { oneOf } from "@ac/web/lib/oneOf";
 import { useT } from "./I18n";
+import { isAfter } from "@ac/web/lib/order";
+import { entryOf } from "@ac/web/lib/lookup";
 
 /** Where a job came from — shown on every role (IR113), in the display language. */
 export function OriginBadge({ origin }: { origin: Origin }) {
@@ -23,21 +27,24 @@ const statusIcon: Record<JobStatus, IconName> = { requested: "requested", time_p
 // A client sees one word for a booked visit: offered, accepted and assigned all read "Scheduled", like the tab they
 // are listed under and the request dialog's "you will see “Scheduled” once a time is confirmed" (IR574).
 const SCHEDULED = new Set<JobStatus>(["offered", "accepted", "assigned"]);
-export function JobStatusBadge({ s, client }: { s: JobStatus; client?: boolean }) {
+/** A job status as the API sent it: one this app does not know is shown as it came, in a muted badge. */
+export function JobStatusBadge({ s, client }: Readonly<{ s: string; client?: boolean }>) {
   const t = useT();
-  return client && SCHEDULED.has(s) ? <Badge tone="primary" icon="assigned">{t("Scheduled")}</Badge> : <Badge tone={statusTone[s]} icon={statusIcon[s]}>{t(statusLabel[s])}</Badge>;
+  const known = oneOf(jobStatuses, s, undefined);
+  if (known === undefined) return <Badge tone="muted">{s}</Badge>;
+  return client && SCHEDULED.has(known) ? <Badge tone="primary" icon="assigned">{t("Scheduled")}</Badge> : <Badge tone={entryOf(statusTone, known)} icon={entryOf(statusIcon, known)}>{t(entryOf(statusLabel, known))}</Badge>;
 }
 
-export const RANKS = ["1st", "2nd", "3rd"];
+const RANKS = ["1st", "2nd", "3rd"];
 export function Rank({ i }: Readonly<{ i: number }>) {
   const t = useT();
-  return <span className="inline-grid w-10 shrink-0 place-items-center rounded-lg bg-primary-soft py-0.5 text-xs font-semibold text-primary">{t(RANKS[i])}</span>;
+  return <span className="inline-grid w-10 shrink-0 place-items-center rounded-lg bg-primary-soft py-0.5 text-xs font-semibold text-primary">{t(RANKS.at(i) ?? String(i + 1))}</span>;
 }
 
 export const WINDOWS = ["09:00–11:00", "10:00–12:00", "13:00–15:00", "14:00–16:00", "16:00–18:00"];
 
 /** Three preferred times (1st = most preferred). Used by the request, decline and reschedule dialogs. */
-export function PreferredSlotsInput({ value, onChange, error, label = "Preferred times — give 3 options (1st = most preferred)", hint }: Readonly<{ value: Slot[]; onChange: (v: Slot[]) => void; error?: string; label?: string; hint?: string }>) {
+export function PreferredSlotsInput({ value, onChange, error, label = "Preferred times — give 3 options (1st = most preferred)", hint = "3 different times, at least 1 day ahead. HQ books one of them. If none can be met, HQ proposes another time — you accept or decline it." }: Readonly<{ value: Slot[]; onChange: (v: Slot[]) => void; error?: string; label?: string; hint?: string }>) {
   const set = (i: number, p: Partial<Slot>) => { onChange(value.map((s, k) => (k === i ? { ...s, ...p } : s))); };
   return (
     <fieldset className="flex flex-col gap-2">
@@ -45,11 +52,11 @@ export function PreferredSlotsInput({ value, onChange, error, label = "Preferred
       {value.map((s, i) => (
         <div key={i} className="flex items-center gap-2">
           <Rank i={i} />
-          <Input type="date" aria-label={`${RANKS[i]} preferred date`} value={s.date} onChange={(e) => { set(i, { date: e.target.value }); }} className="min-w-0 flex-1" />
-          <Select aria-label={`${RANKS[i]} preferred window`} value={s.win} onChange={(e) => { set(i, { win: e.target.value }); }} className="min-w-0 flex-1">{WINDOWS.map((w) => <option key={w}>{w}</option>)}</Select>
+          <Input type="date" aria-label={`${RANKS.at(i) ?? ""} preferred date`} value={s.date} onChange={(e) => { set(i, { date: e.target.value }); }} className="min-w-0 flex-1" />
+          <Select aria-label={`${RANKS.at(i) ?? ""} preferred window`} value={s.win} onChange={(e) => { set(i, { win: e.target.value }); }} className="min-w-0 flex-1">{WINDOWS.map((w) => <option key={w}>{w}</option>)}</Select>
         </div>
       ))}
-      {error ? <span className="flex items-center gap-1 text-xs font-medium text-crit"><Icon name="error" />{error}</span> : <span className="text-[11px] text-muted-foreground">{hint ?? "3 different times, at least 1 day ahead. HQ books one of them. If none can be met, HQ proposes another time — you accept or decline it."}</span>}
+      {error ? <span className="flex items-center gap-1 text-xs font-medium text-crit"><Icon name="error" />{error}</span> : <span className="text-[11px] text-muted-foreground">{hint}</span>}
     </fieldset>
   );
 }
@@ -57,7 +64,7 @@ export function PreferredSlotsInput({ value, onChange, error, label = "Preferred
 /** Validation shared by all preferred-time inputs (IR113): 3 slots, distinct, after the demo “today”. */
 export function preferredError(v: Slot[], today = "2026-09-22"): string | undefined {
   if (v.length !== 3 || v.some((s) => !s.date)) return "Enter 3 preferred times";
-  if (v.some((s) => s.date <= today)) return "Each time must be at least 1 day ahead";
+  if (v.some((s) => !isAfter(s.date, today))) return "Each time must be at least 1 day ahead";
   if (new Set(v.map((s) => s.date + s.win)).size !== 3) return "The 3 times must be different";
   return undefined;
 }
@@ -67,7 +74,7 @@ export function SlotLine({ i, slot, struck, note }: Readonly<{ i: number; slot: 
     <div className="flex flex-wrap items-center gap-2 text-[13px]">
       <Rank i={i} />
       <span className={cx("font-semibold", struck && "text-muted-foreground line-through")}>{slot.date.slice(5)} · {slot.win}</span>
-      {note && <span className="text-xs text-muted-foreground">{note}</span>}
+      {hasContent(note) && <span className="text-xs text-muted-foreground">{note}</span>}
     </div>
   );
 }

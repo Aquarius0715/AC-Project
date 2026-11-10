@@ -58,15 +58,15 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ operation:
   const call = coreRequest(operation, input);
   if (!call) return domainError(404, "NOT_FOUND", "error.unknownOperation");
   const session = await readSession();
-  const headers: Record<string, string> = call.body === undefined ? {} : { "Content-Type": "application/json" };
+  const headers = new Headers(call.body === undefined ? {} : { "Content-Type": "application/json" });
   if (session) {
-    headers.Authorization = `Bearer ${session.accessToken}`;
-    headers["X-Tenant-Id"] = session.tenantId;
-    headers["X-Membership-Id"] = session.membershipId;
+    headers.set("Authorization", `Bearer ${session.accessToken}`);
+    headers.set("X-Tenant-Id", session.tenantId);
+    headers.set("X-Membership-Id", session.membershipId);
   }
   for (const h of ["Idempotency-Key", "X-Expected-Version"]) {
     const v = req.headers.get(h);
-    if (v) headers[h] = v;
+    if (v) headers.set(h, v);
   }
   const base = process.env.CORE_API_URL ?? "http://localhost:8080";
   try {

@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { setSearchParam, useSearchParam } from "@ac/web/lib/urlState";
+import { setSearchParameter, useSearchParameter } from "@ac/web/lib/urlState";
 import { ImportCsvModal, WarrantyTab } from "@ac/web/components/Features";
-import { ClientRole, ClientUser, clientUserActions, emailError, useClientUsers } from "@ac/web/lib/clientUsers";
+import { type ClientRole, type ClientUser, clientUserActions, emailError, useClientUsers } from "@ac/web/lib/clientUsers";
 import { nameError } from "@ac/web/lib/partnerUsers";
 import { Badge, Banner, Btn, Card, DataTable, Field, Input, Kpi, ListRow, Modal, Page, PowerBadge, ConnBadge, Search, Select, SummaryList, Tabs, useToast, ActionMenu, Plain } from "@ac/web/components/ui";
+import { oneOf } from "@ac/web/lib/oneOf";
 import { Icon } from "@ac/web/components/Icon";
 
 interface Cust { id: string; name: string; status: "active" | "inactive"; props: number; units: number; op: string; alerts: number | string; contract: string }
@@ -22,21 +23,21 @@ const unitRows = [
 ];
 
 /** The Phase 1A demo of /admin/units (fixtures; DATA_SOURCE≠API). */
+const setTop = (t: "customers" | "warranty") => { setSearchParameter("tab", t === "warranty" ? "warranty" : "overview"); };
+const setTab = (t: "units" | "users" | "policies") => { setSearchParameter("tab", t === "units" ? "overview" : t); };
+const setCust = (c: Cust | null) => {
+  setSearchParameter("customerId", c ? c.id : null);
+  setSearchParameter("tab", "overview");
+};
 export function UnitsDemo() {
   const toast = useToast();
   const [q, setQ] = useState("");
   // URL state is the source of truth (SCR-A02: customerId + tab=overview|users|policies|warranty, Figma 02-15 / 02-16 / 02-19)
-  const urlTab = useSearchParam("tab");
-  const urlCustomer = useSearchParam("customerId");
+  const urlTab = useSearchParameter("tab");
+  const urlCustomer = useSearchParameter("customerId");
   const cust = customers.find((x) => x.id === urlCustomer) ?? null;
   const top: "customers" | "warranty" = !cust && urlTab === "warranty" ? "warranty" : "customers";
   const tab: "units" | "users" | "policies" = urlTab === "users" || urlTab === "policies" ? urlTab : "units";
-  const setTop = (t: "customers" | "warranty") => { setSearchParam("tab", t === "warranty" ? "warranty" : "overview"); };
-  const setTab = (t: "units" | "users" | "policies") => { setSearchParam("tab", t === "units" ? "overview" : t); };
-  const setCust = (c: Cust | null) => {
-    setSearchParam("customerId", c ? c.id : null);
-    setSearchParam("tab", "overview");
-  };
   const [imp, setImp] = useState(false);
   const [status, setStatus] = useState<"active" | "all">("active");
   const [loc, setLoc] = useState("home-a");
@@ -47,7 +48,7 @@ export function UnitsDemo() {
   const [tried, setTried] = useState(false);
   const rows = customers.filter((c) => (status === "all" || c.status === "active") && (!q || (c.id + c.name).toLowerCase().includes(q.toLowerCase())));
   const close = () => { setModal(null); setTried(false); setName(""); setReason(""); };
-  const nameErr = tried && !name.trim() ? "Name is required (1–120 characters)" : undefined;
+  const nameProblem = tried && !name.trim() ? "Name is required (1–120 characters)" : undefined;
 
   if (!cust) {
     return (
@@ -57,12 +58,12 @@ export function UnitsDemo() {
         {top === "warranty" ? <WarrantyTab /> : <>
         <div className="grid-fluid" style={{ ["--min"as string]: "180px" }}><Kpi label="Customers" value={2} sub="+1 inactive (not counted)" /><Kpi label="Properties" value={2} sub="Home A · Home B" /><Kpi label="Units" value={5} sub="Running 2 · Stopped 2 · unknown 1" /><Kpi label="Needs attention" value={1} tone="warn" sub="overdue billing / open alert" /></div>
         <Card title="Customers" sub="Select a customer to manage its properties, spaces, and units" action={<Btn size="sm" variant="primary" onClick={() => { setModal("customer"); }}><Icon name="add" /> New customer</Btn>}>
-          <div className="mb-3 flex flex-wrap items-center gap-3"><div className="min-w-[220px] flex-1 sm:max-w-sm"><Search placeholder="Search customer name, ID, or property…" value={q} onChange={setQ} /></div><Select aria-label="Status" className="w-auto" value={status} onChange={(e) => { setStatus(e.target.value as "all"); }}><option value="active">Status: Active</option><option value="all">Status: All</option></Select></div>
+          <div className="mb-3 flex flex-wrap items-center gap-3"><div className="min-w-[220px] flex-1 sm:max-w-sm"><Search placeholder="Search customer name, ID, or property…" value={q} onChange={setQ} /></div><Select aria-label="Status" className="w-auto" value={status} onChange={(e) => { setStatus(oneOf(["active", "all"] as const, e.target.value, status)); }}><option value="active">Status: Active</option><option value="all">Status: All</option></Select></div>
           <DataTable rows={rows} rowKey={(r) => r.id} onRowClick={(c) => { setCust(c); }} cols={[{ key: "c", label: "Customer", render: (c) => <><b>{c.id}</b><div className="text-xs text-muted-foreground">{c.name}</div></> }, { key: "s", label: "Status", render: (c) => <Badge tone={c.status === "active" ? "ok" : "unknown"}>{c.status}</Badge> }, { key: "p", label: "Properties", render: (c) => c.props, hideBelow: "sm" }, { key: "u", label: "Units", render: (c) => c.units }, { key: "o", label: "Operation", render: (c) => c.op, hideBelow: "md" }, { key: "a", label: "Alerts", render: (c) => c.alerts, hideBelow: "md" }, { key: "k", label: "Contract", render: (c) => c.contract, hideBelow: "md" }, { key: "x", label: "", render: () => <span className="text-muted-foreground"><Icon name="chevronRight" /></span> }]} />
           <p className="mt-2 text-[11px] text-muted-foreground">{rows.length} of 3 · sorted by name · Inactive customers appear only with Status: All (IR40). Archived properties/spaces/units never appear in lists, summaries, or KPI denominators (IR39).</p>
         </Card>
         </>}
-        <Modal open={modal === "customer"} onClose={close} title="New customer" footer={<><Btn onClick={close}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!name.trim()) return; toast(`Customer “${name}” created`); close(); }}>Create</Btn></>}><Field label="Customer name" error={nameErr}><Input value={name} onChange={(e) => { setName(e.target.value); }} /></Field></Modal>
+        <Modal open={modal === "customer"} onClose={close} title="New customer" footer={<><Btn onClick={close}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!name.trim()) { return; } toast(`Customer “${name}” created`); close(); }}>Create</Btn></>}><Field label="Customer name" error={nameProblem}><Input value={name} onChange={(e) => { setName(e.target.value); }} /></Field></Modal>
       </Page>
     );
   }
@@ -92,16 +93,19 @@ export function UnitsDemo() {
       {tab === "users" && <ClientUsersTab />}
       {tab === "policies" && <Card title="Customer › Alert policies" sub="customer-a policies only">{[["Bedroom too hot", "2 units"], ["Stuffy office", "2 units"], ["Night humidity", "0 units · Off"]].map(([a, b]) => <div key={a} className="flex justify-between border-t border-line py-2 text-[13px] first:border-0"><b>{a}</b><span className="text-muted-foreground">{b}</span></div>)}</Card>}
 
-      <Modal open={modal === "location" || modal === "rename"} onClose={close} title={modal === "rename" ? "Rename location" : "Add location"} footer={<><Btn onClick={close}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!name.trim()) return; toast("Location saved"); close(); }}>Save</Btn></>}><Field label="Name" error={nameErr}><Input value={name} onChange={(e) => { setName(e.target.value); }} /></Field></Modal>
+      <Modal open={modal === "location" || modal === "rename"} onClose={close} title={modal === "rename" ? "Rename location" : "Add location"} footer={<><Btn onClick={close}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!name.trim()) { return; } toast("Location saved"); close(); }}>Save</Btn></>}><Field label="Name" error={nameProblem}><Input value={name} onChange={(e) => { setName(e.target.value); }} /></Field></Modal>
       <Modal open={modal === "delete"} onClose={close} title="Delete location" footer={<Btn onClick={close}>Close</Btn>}><Banner tone="crit">CONFLICT — this location still has units. Move or delete them first.</Banner></Modal>
       <Modal open={modal === "deleteUnit"} onClose={close} title="Delete unit" footer={<Btn onClick={close}>Close</Btn>}><Banner tone="crit">CONFLICT — unit is in use (contract scope / open jobs). It cannot be deleted.</Banner></Modal>
-      <Modal open={modal === "unit"} onClose={close} title="New unit in Bedroom" footer={<><Btn onClick={close}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!name.trim()) return; toast("Unit created"); close(); }}>Create</Btn></>}><Field label="Unit name" error={nameErr}><Input value={name} onChange={(e) => { setName(e.target.value); }} /></Field><Field label="Model"><Select><option>ventilation-demo v3</option><option>cap-split-std v1</option></Select></Field></Modal>
-      <Modal open={modal === "move"} onClose={close} title="Change location" footer={<><Btn onClick={close}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!reason.trim()) return; toast("Location changed"); close(); }}>Save</Btn></>}><Field label="New location"><Select><option>Home A › 1F › Kitchen</option><option>Home A › 2F › Study</option></Select></Field><Field label="Reason" error={tried && !reason.trim() ? "A reason is required" : undefined}><Input value={reason} onChange={(e) => { setReason(e.target.value); }} /></Field></Modal>
+      <Modal open={modal === "unit"} onClose={close} title="New unit in Bedroom" footer={<><Btn onClick={close}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!name.trim()) { return; } toast("Unit created"); close(); }}>Create</Btn></>}><Field label="Unit name" error={nameProblem}><Input value={name} onChange={(e) => { setName(e.target.value); }} /></Field><Field label="Model"><Select><option>ventilation-demo v3</option><option>cap-split-std v1</option></Select></Field></Modal>
+      <Modal open={modal === "move"} onClose={close} title="Change location" footer={<><Btn onClick={close}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!reason.trim()) { return; } toast("Location changed"); close(); }}>Save</Btn></>}><Field label="New location"><Select><option>Home A › 1F › Kitchen</option><option>Home A › 2F › Study</option></Select></Field><Field label="Reason" error={tried && !reason.trim() ? "A reason is required" : undefined}><Input value={reason} onChange={(e) => { setReason(e.target.value); }} /></Field></Modal>
       <Modal open={modal === "attach"} onClose={close} title="Attach policies to Bedroom AC" footer={<><Btn onClick={close}>Cancel</Btn><Btn variant="primary" onClick={() => { toast("Policy attached"); close(); }}>Attach</Btn></>}><Field label="customer-a policies only"><Select><option>Bedroom too hot</option><option>Stuffy office</option><option>Night humidity</option></Select></Field></Modal>
     </Page>
   );
 }
 
+// a client user's status badge; any other status is disabled
+const USER_TONE = new Map<string, "ok" | "warn">([["active", "ok"], ["invited", "warn"]]);
+const USER_STATUS = new Map([["active", "Active"], ["invited", "Not signed in yet"]]);
 /** FR-A17 — HQ manages every client user; owners also manage them from the customer app (FR-C19, IR417). Adding a user
 creates their account at once (IR461); the demo sends nothing. */
 function ClientUsersTab() {
@@ -112,31 +116,34 @@ function ClientUsersTab() {
   const [name, setName] = useState("");
   const [role, setRole] = useState<ClientRole>("member");
   const [tried, setTried] = useState(false);
-  const err = tried ? emailError(email, users) : undefined;
-  const nameErr = tried ? nameError(name) : undefined;
+  const errorText = tried ? emailError(email, users) : undefined;
+  const nameProblem = tried ? nameError(name) : undefined;
   const close = () => { setOpen(false); setTried(false); setEmail(""); setName(""); setRole("member"); };
-  const run = (e: string | undefined, ok: string) => { toast(e ?? ok, e ? "warn" : undefined); };
+  const run = (e: string | null, ok: string) => { toast(e ?? ok, e ? "warn" : undefined); };
   const act = (u: ClientUser, a: string) => {
-    if (a === "resend") run(clientUserActions.resend(u.id), `Set-up e-mail re-sent to ${u.email} — nothing is sent in the demo`);
-    if (a === "role") run(clientUserActions.setRole(u.id, u.role === "owner" ? "member" : "owner"), `Role changed to ${u.role === "owner" ? "Member" : "Owner"}`);
-    if (a === "reset") toast("Password reset preview created (generic message)");
-    if (a === "disable") run(clientUserActions.setStatus(u.id, u.status === "disabled" ? "active" : "disabled"), u.status === "disabled" ? "Sign-in enabled" : "Sign-in disabled");
-    if (a === "remove") run(clientUserActions.remove(u.id), `${u.email} removed from customer-a`);
+    switch (a) {
+      case "resend": { run(clientUserActions.resend(u.id), `Set-up e-mail re-sent to ${u.email} — nothing is sent in the demo`); break; }
+      case "role": { run(clientUserActions.setRole(u.id, u.role === "owner" ? "member" : "owner"), `Role changed to ${u.role === "owner" ? "Member" : "Owner"}`); break; }
+      case "reset": { toast("Password reset preview created (generic message)"); break; }
+      case "disable": { run(clientUserActions.setStatus(u.id, u.status === "disabled" ? "active" : "disabled"), u.status === "disabled" ? "Sign-in enabled" : "Sign-in disabled"); break; }
+      case "remove": { run(clientUserActions.remove(u.id), `${u.email} removed from customer-a`); break; }
+      default: // a menu item this demo does not act on
+    }
   };
   return (
     <Card title="Client users of customer-a" sub="People who sign in to the customer app. They only ever see customer-a’s properties and units." action={<Btn size="sm" variant="primary" onClick={() => { setOpen(true); }}><Icon name="add" /> Add user</Btn>}>
       <DataTable rows={users} rowKey={(u) => u.id} cols={[
         { key: "u", label: "User", render: (u) => <><b>{u.name ?? u.email}</b><div className="text-xs text-muted-foreground">{u.name ? u.email : `invited ${u.invitedAt ?? ""} by ${u.invitedBy ?? "—"}`}</div></> },
         { key: "r", label: "Role", render: (u) => <Badge tone={u.role === "owner" ? "primary" : "muted"}>{u.role === "owner" ? "Owner" : "Member"}</Badge> },
-        { key: "s", label: "Status", render: (u) => <Badge tone={u.status === "active" ? "ok" : (u.status === "invited" ? "warn" : "muted")}>{u.status === "active" ? "Active" : (u.status === "invited" ? "Not signed in yet" : "Disabled")}</Badge> },
+        { key: "s", label: "Status", render: (u) => <Badge tone={USER_TONE.get(u.status) ?? "muted"}>{USER_STATUS.get(u.status) ?? "Disabled"}</Badge> },
         { key: "l", label: "Last sign-in", render: (u) => u.lastSignIn ?? "—", hideBelow: "md" },
         { key: "a", label: "", render: (u) => <ActionMenu label="Actions" onChoose={(v) => { act(u, v); }}><option value="role">Change role (Owner / Member)</option>{u.status === "invited" && <option value="resend">Resend set-up e-mail</option>}<option value="reset">Reset password</option><option value="disable">{u.status === "disabled" ? "Enable sign-in" : "Disable sign-in"}</option><option value="remove">Remove from customer</option></ActionMenu> },
       ]} />
       <p className="mt-2 text-[11px] text-muted-foreground">Client users have no permission editor — the customer’s owners also manage them from the customer app (Users: add, roles, access, remove). Contractors manage their own staff in the partner app; HQ sets permissions and access periods in Access &amp; roles. The last active owner cannot be demoted, disabled or removed.</p>
-      <Modal open={open} onClose={close} title="Add client user" footer={<><Btn onClick={close}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (nameError(name)) return; const e = clientUserActions.invite(email, role, "hq-operator", name); if (e) return; toast(`${name.trim()} added — nothing is sent in the demo`); close(); }}>Add user</Btn></>}>
-        <Field label="Name" error={nameErr}><Input value={name} maxLength={120} onChange={(e) => { setName(e.target.value); }} /></Field>
-        <Field label="Email" hint="One account per person; the set-up e-mail goes to this address" error={err}><Input type="email" value={email} onChange={(e) => { setEmail(e.target.value); }} /></Field>
-        <Field label="Role"><Select value={role} onChange={(e) => { setRole(e.target.value as ClientRole); }}><option value="member">Member</option><option value="owner">Owner</option></Select></Field>
+      <Modal open={open} onClose={close} title="Add client user" footer={<><Btn onClick={close}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (nameError(name)) { return; } const e = clientUserActions.invite(email, role, "hq-operator", name); if (e) { return; } toast(`${name.trim()} added — nothing is sent in the demo`); close(); }}>Add user</Btn></>}>
+        <Field label="Name" error={nameProblem}><Input value={name} maxLength={120} onChange={(e) => { setName(e.target.value); }} /></Field>
+        <Field label="Email" hint="One account per person; the set-up e-mail goes to this address" error={errorText}><Input type="email" value={email} onChange={(e) => { setEmail(e.target.value); }} /></Field>
+        <Field label="Role"><Select value={role} onChange={(e) => { setRole(oneOf(["member", "owner"] as const, e.target.value, role)); }}><option value="member">Member</option><option value="owner">Owner</option></Select></Field>
       </Modal>
     </Card>
   );

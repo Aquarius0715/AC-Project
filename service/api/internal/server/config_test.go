@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pradita/ac-project/service/api/internal/platform/democlock"
 	"github.com/pradita/ac-project/service/api/internal/platform/idp"
 	"github.com/pradita/ac-project/service/api/internal/platform/ratelimit"
 	"github.com/pradita/ac-project/service/api/internal/server"
@@ -54,6 +55,41 @@ func TestConfigFromEnvDefaults(t *testing.T) {
 		len(cfg.ServiceURLs) != 0 ||
 		cfg.IdentityProvider != nil {
 		t.Fatalf("defaults: %+v %v", cfg, err)
+	}
+}
+
+// TestDemoClockFromEnv: in the demo the scenario clock is the shared one, from fixture.clock unless DEMO_CLOCK_START
+// names another start or now, the real clock (the zero start, DEC-96); outside the demo there is none.
+func TestDemoClockFromEnv(t *testing.T) {
+	clearEnv(t)
+
+	cfg, err := server.ConfigFromEnv(nil, nil)
+	if err != nil || cfg.DemoShared || !cfg.DemoStart.IsZero() {
+		t.Fatalf("outside the demo: shared %t from %v, %v", cfg.DemoShared, cfg.DemoStart, err)
+	}
+
+	t.Setenv("DEMO_OPS", "1")
+
+	for value, want := range map[string]string{"": democlock.DefaultStart, democlock.RealTime: ""} {
+		t.Setenv("DEMO_CLOCK_START", value)
+
+		cfg, err := server.ConfigFromEnv(nil, nil)
+
+		got := ""
+		if !cfg.DemoStart.IsZero() {
+			got = cfg.DemoStart.Format(time.RFC3339)
+		}
+
+		if err != nil || !cfg.DemoShared || got != want {
+			t.Errorf(
+				"DEMO_CLOCK_START=%q: shared %t from %q, %v; want %q",
+				value,
+				cfg.DemoShared,
+				got,
+				err,
+				want,
+			)
+		}
 	}
 }
 

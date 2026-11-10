@@ -10,6 +10,9 @@ import { saveDefaultRules, switchDefaultRule } from "../actions";
 import { ConditionFields, WindowEditor } from "./policy-parts";
 import { DefaultRulePreview, DemoTest } from "./policy-checks";
 import { Icon } from "@ac/web/components/Icon";
+import { byCount, textOf } from "@ac/web/lib/i18n";
+import { useRefreshThen } from "@ac/web/lib/useRefreshThen";
+import { reached } from "@ac/web/lib/unreachable";
 
 const CATEGORY: Record<string, string> = { air_quality: "Air quality", fault: "Fault", maintenance: "Maintenance", connection: "Connection" };
 const SHOWN = 20; // the customers listed before the search-select (DD-A05 item 9, Figma 268:2)
@@ -26,6 +29,7 @@ export function DefaultPolicyEditor({ p, customers, units, canWrite, copyFor, on
   const i18n = useI18n();
   const toast = useToast();
   const [pending, startTransition] = useTransition();
+  const refreshThen = useRefreshThen(pending);
   const [rules, setRules] = useState(p.rules);
   const [of, setOf] = useState(`${p.id}@${String(p.version)}`);
   const [tried, setTried] = useState(false);
@@ -35,20 +39,26 @@ export function DefaultPolicyEditor({ p, customers, units, canWrite, copyFor, on
     setTried(false);
   }
   const [key, setKey] = useState(p.rules[0]?.ruleKey ?? "");
-  const idx = Math.max(0, rules.findIndex((r) => r.ruleKey === key));
-  const rule = rules[idx];
+  const index = Math.max(0, rules.findIndex((r) => r.ruleKey === key));
+  const rule = rules[index];
   const [more, setMore] = useState<string[]>([]); // customers past the first 20 picked in the search-select
   const [switching, setSwitching] = useState<{ customer: { id: string; name: string }; on: boolean } | null>(null);
   const [reason, setReason] = useState("");
   if (!rule) return <Card title={t("Default policy")}><p className="text-[13px] text-muted-foreground">{t("The default policy has no rules.")}</p></Card>;
 
-  const edit = (patch: Partial<DefaultRule>) => { setRules((rs) => rs.map((r, i) => (i === idx ? { ...r, ...patch } : r))); };
+  const edit = (patch: Partial<DefaultRule>) => { setRules((rs) => rs.map((r, i) => (i === index ? { ...r, ...patch } : r))); };
   const errorsOf = (r: DefaultRule) => conditionErrors(r, t);
   const errors = errorsOf(rule);
   const broken = rules.filter((r) => Object.keys(errorsOf(r)).length);
   const changed = ruleChanges({ ...p, rules }, p);
-  const status = tried && broken.length > 0 ? t(broken.length === 1 ? "1 rule to fix · nothing saved: {names}" : "{n} rules to fix · nothing saved: {names}", { n: broken.length, names: broken.map((r) => r.name).join(", ") })
-    : (changed.length > 0 ? `${t(changed.length === 1 ? "1 rule changed" : "{n} rules changed", { n: changed.length })} · ${changed.join(", ")}` : t("No unsaved changes"));
+  // the save line: the rules to fix after a refused save, else the unsaved changes
+  const statusText = () => {
+    const names = broken.map((r) => r.name).join(", ");
+    if (tried && broken.length > 0) return byCount(broken.length, { one: t("1 rule to fix · nothing saved: {names}", { names }), many: t("{n} rules to fix · nothing saved: {names}", { n: broken.length, names }) });
+    if (changed.length === 0) return t("No unsaved changes");
+    return `${byCount(changed.length, { one: t("1 rule changed"), many: t("{n} rules changed", { n: changed.length }) })} · ${changed.join(", ")}`;
+  };
+  const status = statusText();
   const sorted = [...customers].toSorted((a, b) => a.name.localeCompare(b.name));
   const listed = [...sorted.slice(0, SHOWN), ...sorted.slice(SHOWN).filter((c) => more.includes(c.id))];
   const setting = (customerId: string) => p.settings.find((s) => s.ruleKey === rule.ruleKey && s.customerId === customerId);
@@ -65,10 +75,9 @@ export function DefaultPolicyEditor({ p, customers, units, canWrite, copyFor, on
     if (broken.length > 0) { toast(t("Fix the validation errors first"), "crit"); return; }
     if (demo) { toast(t("Default limits saved for every unit")); return; }
     startTransition(async () => {
-      const r = await saveDefaultRules({ ...p, rules });
+      const r = await reached(() => saveDefaultRules({ ...p, rules })); // no answer reads as unavailable (IR718)
       if (!r.ok) { toast(actionMessage(r, t), "crit"); return; }
-      toast(t("Default limits saved for every unit"));
-      setTried(false);
+      refreshThen(() => { toast(t("Default limits saved for every unit")); setTried(false); });
     });
   };
   const confirmSwitch = () => {
@@ -77,19 +86,24 @@ export function DefaultPolicyEditor({ p, customers, units, canWrite, copyFor, on
     const done = () => { toast(t(on ? "{rule} switched on for {name}" : "{rule} switched off for {name}", { rule: rule.name, name: customer.name })); setSwitching(null); setReason(""); };
     if (demo) { done(); return; }
     startTransition(async () => {
-      const r = await switchDefaultRule(p.id, rule.ruleKey, customer.id, on, reason, setting(customer.id)?.version ?? 0);
+      const r = await reached(() => switchDefaultRule(p.id, rule.ruleKey, customer.id, on, reason, setting(customer.id)?.version ?? 0));
       if (!r.ok) { toast(actionMessage(r, t), "crit"); return; }
-      done();
+      refreshThen(done);
     });
   };
 
+  // why the demo test cannot run: no test unit, the rule off everywhere in scope, or a metric without synthetic readings
+  const untestable = () => {
+    if (!copyable(rule)) return t("A synthetic reading cannot be entered for this rule's metric.");
+    return t(inScope.length > 0 ? "The rule is off for every customer in scope, so it cannot be tested here." : "There is no unit to test the rule on.");
+  };
   return (
     <Card title={<span className="inline-flex flex-wrap items-center gap-2">{t("Default policy")} › {rule.name}<Badge tone="muted">{t("Policy v{n}", { n: p.version })}</Badge></span>}
-      sub={`${p.id} · ${t("HQ template")} · ${t("rule {n} of {total}", { n: idx + 1, total: rules.length })}`} action={<Badge tone="ok">{t("Enabled (template)")}</Badge>}>
+      sub={`${p.id} · ${t("HQ template")} · ${t("rule {n} of {total}", { n: index + 1, total: rules.length })}`} action={<Badge tone="ok">{t("Enabled (template)")}</Badge>}>
       <div className="flex flex-col gap-5">
         <Banner tone="warn" action={canWrite && copyable(rule) ? <Btn size="sm" onClick={() => { onCopy(rule.ruleKey); }}>{copyFor ? t("Copy as a {customer} policy", { customer: copyFor.name }) : t("Copy as a customer policy")}<Icon name="arrowRight" /></Btn> : undefined}>
           <span><b>{t("Default policy rule — runs on every unit of every customer")}</b><span className="block text-xs">{t("Saving changes affects all units. Customers and HQ can add their own policies on top; this rule cannot be detached from a unit.")}</span>
-            {!copyable(rule) && <span className="block text-xs">{t("{metric} is not a metric a customer policy can watch, so this rule cannot be copied.", { metric: metricLabel[rule.metric] ? t(metricLabel[rule.metric]) : rule.metric })}</span>}</span>
+            {!copyable(rule) && <span className="block text-xs">{t("{metric} is not a metric a customer policy can watch, so this rule cannot be copied.", { metric: textOf(metricLabel, rule.metric, t) ?? rule.metric })}</span>}</span>
         </Banner>
         {!canWrite && <Banner>{t("You can read the default policy. Changing it needs alert.policy.write.")}</Banner>}
         <section aria-label={t("Rules")}><h3 className="mb-2 text-[13px] font-bold">{t("Rules ({n})", { n: rules.length })}</h3>
@@ -137,8 +151,7 @@ export function DefaultPolicyEditor({ p, customers, units, canWrite, copyFor, on
           <DemoTest key={rule.ruleKey} saved={{ id: p.id, version: p.version, metric: savedRule.metric, operator: savedRule.operator, threshold: savedRule.threshold, on: true }}
             dirty={changed.includes(rule.name)} unit={{ id: testUnit.id, name: testUnit.name }} demo={demo} />
         ) : (
-          <section><h3 className="mb-1 text-[13px] font-bold">{t("Test with demo data")}</h3><p className="text-xs text-muted-foreground">{t(copyable(rule) ? (inScope.length > 0 ? "The rule is off for every customer in scope, so it cannot be tested here." : "There is no unit to test the rule on.")
-            : "A synthetic reading cannot be entered for this rule's metric.")}</p></section>
+          <section><h3 className="mb-1 text-[13px] font-bold">{t("Test with demo data")}</h3><p className="text-xs text-muted-foreground">{untestable()}</p></section>
         )}
         <section><h3 className="mb-1 text-[13px] font-bold">{t("Owner & units")}</h3>
           <div className="text-xs font-semibold">{t("Owner")}</div><div className="mt-1"><Badge tone="primary">{t("HQ default (all customers)")}</Badge></div>

@@ -8,8 +8,9 @@
 // the selected plan and jobs.list (the unit's periodic jobs) for the status of each generated occurrence.
 import "server-only";
 import { evidenceText } from "@ac/web/lib/evidence";
-import { coreAll, coreDisplay, coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
-import { i18nOf, showTime } from "@ac/web/lib/i18n";
+import { coreAll, coreDisplay, coreNow, coreOp, CoreError, corePermissions, orWhenRefused, coreItems } from "@ac/web/lib/dal";
+import { DATA_FORCE_DELETE } from "@ac/web/lib/members";
+import { i18nOf, showTime, textOf } from "@ac/web/lib/i18n";
 import { alertTitle } from "@ac/web/lib/alerts";
 import { jobEventTitle, type ApiJobEvent } from "@ac/web/lib/partnerOverview";
 import type { ApiWorkReport } from "@ac/web/lib/partnerReview";
@@ -17,16 +18,14 @@ import { agreedSlots, classifyBy, controls, costTotals, delivery, facts, filters
 import { nextOccurrence, planDate, planRows, type ApiPlan } from "@ac/web/lib/adminPlans";
 import { breachRows, PERIODS, periodOf, slaRows, slaTiles, targetsByPlan, type ApiScorecard } from "@ac/web/lib/adminSla";
 import { contractorRows, kpiTiles, pendingCertificates, profileFacts, rateCardView, technicianRows, type ApiCertificate, type ApiProfile, type ApiRateCard, type ApiTechnician } from "@ac/web/lib/adminContractors";
+import { recover } from "@ac/web/lib/promises";
+
+const TECHNICIAN = "technician";
 
 interface Page<T> { items: T[]; total: number }
-interface Org { id: string; name: string; kind: string; status: string }
-interface Member { id: string; userId: string; displayName: string; role: string; employment: string | null; organizationId: string; validUntil: string | null; qualifications: ApiTechnician["qualifications"] }
-const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => {
-  return p.catch((error) => {
-    if (error instanceof CoreError && error.error.code !== "UNAVAILABLE" && error.error.code !== "TIMEOUT") return fallback;
-    throw error;
-  });
-};
+interface Org { id: string; version: number; name: string; kind: string; status: string }
+interface Member { id: string; userId: string; displayName: string; role: string; employment: string | null; organizationId: string; validUntil: string | null; qualifications?: ApiTechnician["qualifications"] }
+const optional = orWhenRefused;
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
 type SP = Record<string, string | string[] | undefined>;
@@ -42,7 +41,7 @@ async function shared(sp: SP) {
     optional(coreAll<Member>("members.list"), []),
   ]);
   const hq = orgs.find((o) => o.kind === "operator") ?? null;
-  const contractors = orgs.filter((o) => o.kind === "contractor").sort((a, b) => a.name.localeCompare(b.name)); // by name in every list and select (IR572)
+  const contractors = orgs.filter((o) => o.kind === "contractor").toSorted((a, b) => a.name.localeCompare(b.name)); // by name in every list and select (IR572)
   const names: Names = {
     units: new Map(units.map((u) => [u.id, u.displayName])), customers: new Map(orgs.filter((o) => o.kind === "customer").map((o) => [o.id, o.name])),
     people: new Map(members.map((m) => [m.id, m.displayName])), orgs: new Map(orgs.map((o) => [o.id, o.name])),
@@ -64,7 +63,7 @@ async function shared(sp: SP) {
         properties: properties.filter((p) => !custOrg || p.customerOrgId === custOrg).map((p) => ({ id: p.id, name: p.name })),
         units: units.filter((u) => (!custOrg || u.customerOrgId === custOrg) && (!sq.propertyId || u.propertyId === sq.propertyId)).map((u) => ({ id: u.id, name: u.displayName })),
       },
-      units: units.map((u) => ({ id: u.id, name: u.displayName, customer: names.customers.get(u.customerOrgId) ?? i.t("customer") })).sort((a, b) => a.customer.localeCompare(b.customer) || a.name.localeCompare(b.name)),
+      units: units.map((u) => ({ id: u.id, name: u.displayName, customer: names.customers.get(u.customerOrgId) ?? i.t("customer") })).toSorted((a, b) => a.customer.localeCompare(b.customer) || a.name.localeCompare(b.name)),
     },
   };
 }
@@ -76,79 +75,82 @@ export async function loadJobs(sp: SP) {
   const q: Query = { customerId: one(sp.customerId), propertyId: one(sp.propertyId), unitId: one(sp.unitId), origin: one(sp.origin), delivery: one(sp.delivery), assignee: one(sp.assignee), overdue: one(sp.overdue), type: one(sp.type), stage: stageOf(one(sp.stage)) ?? undefined, from: one(sp.from), to: one(sp.to) };
   const period = periodOfQuery(q);
   const sort = sortOf(one(sp.sort));
-  const spec = SORTS.find((s) => s.id === sort)!;
+  const spec = SORTS.find((s) => s.id === sort) ?? SORTS[0];
   const [counts, list, profiles] = await Promise.all([
-    Promise.all(STAGES.map((s) => coreOp<Page<unknown>>("jobs.list", { filters: { ...scope, ...period, ...s.filter }, limit: 1 }).then((r) => r.total))),
+    Promise.all(STAGES.map(async (s) => { const r = await coreOp<Page<unknown>>("jobs.list", { filters: { ...scope, ...period, ...s.filter }, limit: 1 }); return r.total; })),
     coreOp<Page<ApiHqRow>>("jobs.list", { filters: filtersOf(q, hq?.id ?? null), sort: { field: spec.field, direction: spec.direction }, limit: 100 }),
     optional(coreAll<{ organizationId: string; status: string }>("contractors.list"), []), // offers suspended per profile (DD-A21)
   ]);
   const rows = list.items.map((j) => hqRow(j, nowMs, names, unitOrg, i));
   // ?new=<unitId>[&alertId=] opens New job for that unit, its symptom taken from the alert (DD-A05 item 11, IR318)
-  const newUnit = one(sp.new), fromAlert = one(sp.alertId);
-  const alert = newUnit && fromAlert ? await optional(coreOp<{ id: string; type: string; causeCode: string; evidenceText: string }>("alerts.get", { id: fromAlert }), null) : null;
-  const newJob = newUnit ? { unitId: newUnit, symptom: alert ? t("Alert {id}: {title} — {evidence}", { id: alert.id.slice(0, 8), title: alertTitle(alert, t), evidence: evidenceText(alert.evidenceText, t) }).slice(0, 2000) : "" } : null;
+  const requestedUnit = one(sp.new), fromAlert = one(sp.alertId);
+  const alert = requestedUnit && fromAlert ? await optional(coreOp<{ id: string; type: string; causeCode: string; evidenceText: string }>("alerts.get", { id: fromAlert }), null) : null;
+  const jobRequest = requestedUnit ? { unitId: requestedUnit, symptom: alert ? t("Alert {id}: {title} — {evidence}", { id: alert.id.slice(0, 8), title: alertTitle(alert, t), evidence: evidenceText(alert.evidenceText, t) }).slice(0, 2000) : "" } : null;
   // the job the new-job dialog just created: ?jobId=<id>&created=book|requested (its detail opens step 2, or says it was saved as requested)
   const createdKind = one(sp.created);
   const created = createdKind === "book" || createdKind === "requested" ? { id: one(sp.jobId) ?? "", book: createdKind === "book" } : null;
   const base = {
-    ...head, q, newJob, created, period, periodChip: period ? periodChip(period, i) : null, sort, sorts: SORTS.map((x) => ({ id: x.id, text: t(x.text) })), total: list.total,
-    stages: STAGES.map((x, k) => ({ id: x.id, label: t(x.label), count: counts[k] })),
+    ...head, q, requestDraft: jobRequest, created, period, periodChip: period ? periodChip(period, i) : null, sort, sorts: SORTS.map((x) => ({ id: x.id, text: t(x.text) })), total: list.total,
+    stages: STAGES.map((x, k) => ({ id: x.id, label: t(x.label), count: counts.at(k) ?? 0 })),
     deliveries: [{ id: "internal", name: t("Internal") }, ...contractors.map((c) => ({ id: c.id, name: c.name }))],
-    assignees: members.filter((m) => m.role === "technician").map((m) => ({ id: m.id, name: m.displayName })),
+    assignees: members.filter((m) => m.role === TECHNICIAN).map((m) => ({ id: m.id, name: m.displayName })),
     contractors: contractors.map((c) => ({ id: c.id, name: c.name, status: profiles.find((p) => p.organizationId === c.id)?.status === "suspended" ? "suspended" : c.status })),
-    internalTechs: members.filter((m) => m.role === "technician" && m.employment === "internal").map((m) => ({ id: m.id, name: m.displayName })),
+    internalTechs: members.filter((m) => m.role === TECHNICIAN && m.employment === "internal").map((m) => ({ id: m.id, name: m.displayName })),
     rows,
   };
   const pick = one(sp.jobId) ?? rows[0]?.id;
   if (!pick) return { ...base, detail: null };
-  const job = await coreOp<ApiHqJob>("jobs.get", { jobId: pick }).catch((error) => {
+  const job = await recover(coreOp<ApiHqJob>("jobs.get", { jobId: pick }), (error: unknown) => {
     if (error instanceof CoreError && error.error.code === "NOT_FOUND") return null;
     throw error;
   });
   if (!job) return { ...base, detail: null, missing: pick };
-  const ref = job.reportRefs?.[job.reportRefs.length - 1];
+  const ref = job.reportRefs.at(-1);
   const [events, unit, eligible, report] = await Promise.all([
-    optional(coreOp<Page<ApiJobEvent>>("jobs.events", { jobId: job.id, query: { limit: 100 } }).then((r) => r.items), [] as ApiJobEvent[]),
+    optional(coreItems<ApiJobEvent>("jobs.events", { jobId: job.id, query: { limit: 100 } }), [] as ApiJobEvent[]),
     optional(coreOp<{ displayName: string; location: { pathLabels: string[] } }>("units.get", { id: job.unitId }), null),
     job.status === "requested" && job.slotProposal?.status !== "pending"
       ? Promise.all(agreedSlots(job).map((s) => {
         return Date.parse(s.startAt) <= nowMs ? Promise.resolve([] as { id: string; displayName: string }[])
-          : optional(coreOp<Page<{ id: string; displayName: string }>>("members.eligible", { jobId: job.id, startAt: s.startAt, endAt: s.endAt, query: { limit: 20 } }).then((r) => r.items), [] as { id: string; displayName: string }[]);
+          : optional(coreItems<{ id: string; displayName: string }>("members.eligible", { jobId: job.id, startAt: s.startAt, endAt: s.endAt, query: { limit: 20 } }), [] as { id: string; displayName: string }[]);
       }))
       : Promise.resolve([] as { id: string; displayName: string }[][]),
     ref ? optional(coreOp<ApiWorkReport>("reports.get", { jobId: job.id, reportId: ref.reportId, reportVersion: ref.reportVersion }), null) : Promise.resolve(null),
   ]);
   const byUser = new Map(members.map((m) => [m.userId, m.displayName]));
   const sp2 = job.slotProposal, pp = job.partnerSlotProposal;
-  const photos = report ? (await Promise.all(report.attachmentRefs.filter((a) => a.status === "ready" && a.size <= 2_000_000).slice(0, 4).map(async (a) => {
+  // who holds HQ's proposed time: an HQ technician or a contractor
+  const holdName = (hold: NonNullable<typeof sp2>["hold"]) => (hold.kind === "internal" ? names.people.get(hold.membershipId) ?? t("HQ technician") : names.orgs.get(hold.contractorOrgId) ?? t("contractor"));
+  const loaded = report ? await Promise.all(report.attachmentRefs.filter((a) => a.status === "ready" && a.size <= 2_000_000).slice(0, 4).map(async (a) => {
     const b = await optional(coreOp<{ mime: string; bytes: string }>("attachments.getContent", { jobId: job.id, reportId: report.id, reportVersion: report.version, attachmentId: a.id }), null);
     return b ? { id: a.id, name: a.name, url: `data:${b.mime};base64,${b.bytes}` } : null;
-  }))).filter((p): p is { id: string; name: string; url: string } => !!p) : [];
+  })) : [];
+  const photos = loaded.filter((p): p is { id: string; name: string; url: string } => !!p);
   const costs = job.costs ?? [];
   return {
     ...base,
     detail: {
-      job, title: names.units.get(job.unitId) ?? unit?.displayName ?? t("Unit"), customer: names.customers.get(unitOrg.get(job.unitId) ?? "") ?? t("customer"), location: unit?.location.pathLabels.join(" › ") ?? "",
+      title: names.units.get(job.unitId) ?? unit?.displayName ?? t("Unit"), customer: names.customers.get(unitOrg.get(job.unitId) ?? "") ?? t("customer"), location: unit?.location.pathLabels.join(" › ") ?? "",
       steps: stepper(job.status, !job.contractorOrgId, t), facts: facts(job, names, i), delivery: delivery(job, names, nowMs, i), controls: controls(job.status, t),
       preferred: preferredRows(job, eligible, nowMs, i),
-      history: [...events].sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt)).slice(0, 12).map((e) => {
+      history: [...events].toSorted((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt)).slice(0, 12).map((e) => {
         return {
-          id: e.id, at: showTime(e.occurredAt, i.display), text: `${jobEventTitle[e.action] ? t(jobEventTitle[e.action]) : e.action.replaceAll(/[._]/g, " ")}${e.actorUserId ? ` · ${byUser.get(e.actorUserId) ?? t("client")}` : ""}`,
+          id: e.id, at: showTime(e.occurredAt, i.display), text: `${textOf(jobEventTitle, e.action, t) ?? e.action.replaceAll(/[._]/g, " ")}${e.actorUserId ? ` · ${byUser.get(e.actorUserId) ?? t("client")}` : ""}`,
         };
       }),
-      partnerTech: pp ? names.people.get(pp.technicianMembershipId) ?? t("technician") : null,
-      holdWho: sp2 ? (sp2.hold.kind === "internal" ? names.people.get(sp2.hold.membershipId) ?? t("HQ technician") : names.orgs.get(sp2.hold.contractorOrgId) ?? t("contractor")) : null,
+      partnerTech: pp ? names.people.get(pp.technicianMembershipId) ?? t(TECHNICIAN) : null,
+      holdWho: sp2 ? holdName(sp2.hold) : null,
       // the times the detail shows on its first render, formatted here in the display time zone (IR290)
       texts: {
         // the plan occurrence is an instant: its date in the display zone, as on the Plans tab (IR291)
         occurrence: job.occurrenceAt ? planDate(job.occurrenceAt, i.display) : null, classifyBy: classifyBy(job.createdAt, i),
         declinedAt: sp2?.decidedAt ? showTime(sp2.decidedAt, i.display) : null, replyBy: sp2 ? showTime(sp2.replyBy, i.display) : null, proposed: sp2 ? longSlot(sp2.slot, i) : null,
-        agreed: job.offer ? slotText(job.offer.visitSlot, i) : null, partnerSlot: pp ? longSlot(pp.slot, i) : null, partnerSent: pp ? showTime(pp.sentAt, i.display) : null,
+        agreed: job.offer ? job.offer.candidateSlots.map((s) => slotText(s, i)).join(" / ") : null, partnerSlot: pp ? longSlot(pp.slot, i) : null, partnerSent: pp ? showTime(pp.sentAt, i.display) : null,
         accessUntil: job.offer ? showTime(job.offer.accessValidUntil, i.display) : null,
       },
       report: report ? { ...reportCard(job, report, byUser, i), photos } : null, draft: !!job.draftReportRef,
-      costs, totals: costTotals(costs),
-      extend: job.offer?.decision === "accept" && !["completed", "cancelled"].includes(job.status) ? { until: job.offer.accessValidUntil } : null,
+      totals: costTotals(costs),
+      extend: job.offer?.decision === "accept" && !["completed", "cancelled"].includes(job.status) ? { until: job.offer.accessValidUntil } : null, job, costs,
     },
   };
 }
@@ -168,7 +170,7 @@ export async function loadPlans(sp: SP) {
   const base = { ...head, q, rows, plansTotal: plans.length };
   const pick = one(sp.planId) ?? rows[0]?.id;
   if (!pick) return { ...base, detail: null };
-  const plan = await coreOp<ApiPlan>("plans.get", { id: pick }).catch((error) => {
+  const plan = await recover(coreOp<ApiPlan>("plans.get", { id: pick }), (error: unknown) => {
     if (error instanceof CoreError && error.error.code === "NOT_FOUND") return null;
     throw error;
   });
@@ -182,8 +184,8 @@ export async function loadPlans(sp: SP) {
     ...base,
     detail: {
       plan, unit: names.units.get(plan.unitId) ?? unit?.displayName ?? t("Unit"), customer: customerOfUnit.get(plan.unitId) ?? t("customer"), location: unit?.location.pathLabels.join(" › ") ?? "",
-      occurrences: [...plan.generatedOccurrences].sort((a, b) => Date.parse(b.occurrenceAt) - Date.parse(a.occurrenceAt)).map((o) => ({ ...o, date: planDate(o.occurrenceAt, i.display), status: status.get(o.jobId) ?? null })),
-      texts: { next: planDate(plan.nextDueAt, i.display), then: planDate(nextOccurrence(plan.nextDueAt, plan.recurrence.intervalMonths, plan.anchorDay), i.display) },
+      occurrences: [...plan.generatedOccurrences].toSorted((a, b) => Date.parse(b.occurrenceAt) - Date.parse(a.occurrenceAt)).map((o) => ({ ...o, date: planDate(o.occurrenceAt, i.display), status: status.get(o.jobId) ?? null })),
+      texts: { next: planDate(plan.nextDueAt, i.display), after: planDate(nextOccurrence(plan.nextDueAt, plan.recurrence.intervalMonths, plan.anchorDay), i.display) },
     },
   };
 }
@@ -194,14 +196,14 @@ export type PlansLive = Awaited<ReturnType<typeof loadPlans>>;
 90-day KPIs, the delegation and the rate card in effect) and for contractorId its rate cards (rateCards.list, newest
 first), technicians (members.list) and uploaded certificates (certificates.list). */
 export async function loadContractors(sp: SP) {
-  const { now, i, members, contractors: orgs, names, head } = await shared(sp);
+  const [{ now, i, members, contractors: orgs, names, head }, perms] = await Promise.all([shared(sp), corePermissions()]);
   const { t } = i;
   const nowMs = now.getTime();
   const profiles = await optional(coreAll<ApiProfile>("contractors.list"), [] as ApiProfile[]);
-  const technicians: ApiTechnician[] = members.filter((m) => m.role === "technician" && orgs.some((o) => o.id === m.organizationId))
+  const technicians: ApiTechnician[] = members.filter((m) => m.role === TECHNICIAN && orgs.some((o) => o.id === m.organizationId))
     .map((m) => ({ id: m.id, displayName: m.displayName, organizationId: m.organizationId, role: m.role, validUntil: m.validUntil ?? null, qualifications: m.qualifications ?? [] }));
   const rows = contractorRows(orgs.map((o) => ({ id: o.id, name: o.name })), profiles, technicians, t);
-  const base = { ...head, q: {}, rows, withoutProfile: orgs.filter((o) => profiles.every((p) => p.organizationId !== o.id)).map((o) => ({ id: o.id, name: o.name })) };
+  const base = { ...head, canForce: perms.has(DATA_FORCE_DELETE), q: {}, rows, withoutProfile: orgs.filter((o) => profiles.every((p) => p.organizationId !== o.id)).map((o) => ({ id: o.id, name: o.name })) };
   const pick = one(sp.contractorId) ?? rows[0]?.id;
   if (!pick) return { ...base, detail: null };
   const org = orgs.find((o) => o.id === pick);
@@ -212,17 +214,17 @@ export async function loadContractors(sp: SP) {
     optional(coreAll<ApiCertificate>("certificates.list", { filters: { organizationId: pick } }), [] as ApiCertificate[]),
   ]);
   // without a profile there is no rateCardId: the card in effect is the latest that has started
-  const inEffect = profile?.rateCardId ?? [...cards].filter((c) => Date.parse(c.effectiveFrom) <= nowMs).sort((a, b) => Date.parse(b.effectiveFrom) - Date.parse(a.effectiveFrom))[0]?.id ?? null;
-  const mine = technicians.filter((t) => t.organizationId === pick);
+  const inEffect = profile?.rateCardId ?? [...cards].filter((c) => Date.parse(c.effectiveFrom) <= nowMs).toSorted((a, b) => Date.parse(b.effectiveFrom) - Date.parse(a.effectiveFrom))[0]?.id ?? null;
+  const mine = technicians.filter((technician) => technician.organizationId === pick);
   return {
     ...base,
     detail: {
-      org: { id: org.id, name: org.name },
+      org: { id: org.id, name: org.name, version: org.version },
       kpis: profile ? kpiTiles(profile.kpis, t) : null,
       facts: profile ? profileFacts(profile, nowMs, i) : null,
       rates: rateCardView(cards, inEffect, nowMs, i),
       techs: technicianRows(mine, certs, nowMs, i),
-      pending: pendingCertificates(certs).map((c) => ({ id: c.id, version: c.version, technician: names.people.get(c.membershipId) ?? t("technician"), name: c.name, code: c.code, number: c.number, issuedAt: c.issuedAt, expiresAt: c.expiresAt, fileName: c.fileName, renewal: !!c.renewalOf })),
+      pending: pendingCertificates(certs).map((c) => ({ id: c.id, version: c.version, technician: names.people.get(c.membershipId) ?? t(TECHNICIAN), name: c.name, code: c.code, number: c.number, issuedAt: c.issuedAt, expiresAt: c.expiresAt, fileName: c.fileName, renewal: !!c.renewalOf })),
       profile,
     },
   };

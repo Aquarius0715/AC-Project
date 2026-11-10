@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """Mutation checks for the document validator; never edits the source documents."""
+from concurrent.futures import ThreadPoolExecutor
 import json
+import os
 from pathlib import Path
+import queue
 import shutil
 import subprocess
 import sys
@@ -31,7 +34,7 @@ CASES = [
     ('absent_report_accepted', [(TYPE, "{hasReport:false;acceptance:'not_accepted'}", "{hasReport:false;acceptance:'accepted'}")], 'Absent report cannot be accepted'),
     ('address_missing_null', [(TYPE, 'siteAddress:string|null', 'siteAddress:string')], 'Offer must use nullable installation address'),
     ('disabled_reason_missing', [(TYPE, "disabledReason:'capability_changed'|'unit_archived'|'consent_revoked'|null", 'disabledReason:string|null')], 'Rule disable reason absent'),
-    ('stale_operation_count', [('02-design/common.md','212 local service operations','211 local service operations')], 'Common operation count drift'),
+    ('stale_operation_count', [('02-design/common.md','225 local service operations','224 local service operations')], 'Common operation count drift'),
 
     ('unsafe_job_receipt', [(TYPE, 'export type JobDecisionReceipt = {jobId:ID;',
                             'export type JobDecisionReceipt = {unitId:ID;jobId:ID;')],
@@ -87,8 +90,6 @@ CASES = [
      'Superseded wording remains (IR81)'),
     ('environment_policy_variant_returns', [('02-design/admin.md', 'automation.policy.write permission; target units', 'Has permission to manage environmental policies; target units')],
      'Superseded wording remains (IR81)'),
-    ('room_display_name_returns', [('02-design/deterministic-contracts.md', 'Room matching/candidates follow IR65 (exact Space.name)', 'room matches the display name exactly')],
-     'Superseded wording remains (IR81)'),
     ('customer_organization_count_returns', [('02-design/admin.md', 'IR40 (Customers where both Customer and Organization are active).', 'The number of customer organizations that are active.')],
      'Superseded wording remains (IR81)'),
     ('negative_saving_old_label_returns', [('01-requirements/client.md', 'savingPercentage=-20, “Increase 20.0%” (IR80)', 'Increase20%')],
@@ -111,8 +112,6 @@ CASES = [
      'Seed devices must list explicit sensors'),
     ('public_screen_states_regress', [('03-uiux/screen-catalog.csv', 'navigation,none,none,success,', 'navigation,none,none,initial;loading;success;empty;error;offline;permission-denied;not-found;stale,')],
      'Public screen states differ'),
-    ('voice_panel_fetches', [('03-uiux/component-contracts.csv', 'none; VoiceContainer calls voice.resolveIntent', 'voice.resolveIntent; VoiceContainer calls voice.resolveIntent')],
-     'VoicePanel must be presentation only'),
     ('calibration_invalidation_missing', [('02-design/review-resolution-contracts.md', '| device_operation | devices.operations, devices.calibrations, devices.get, units.get |', '| device_operation | devices.operations, devices.get, units.get |')],
      '0.19 behavioral guard missing'),
     ('acceptance_patch_key_missing', [('04-agentic-sdlc/fixture-contract.json', '"AT-P06-B": {', '"AT-P06-X": {')],
@@ -194,29 +193,44 @@ def validate(root):
                             capture_output=True, text=True)
     return result.returncode, json.loads(result.stdout)
 
-results = []
+# The cases run in parallel, each worker on a copy of its own (a case changes files of its copy and restores them):
+# AC_DOC_WORKERS workers, or one per CPU up to 8.
+WORKERS = max(1, int(os.environ.get('AC_DOC_WORKERS', '0')) or min(8, os.cpu_count() or 1))
+
+def run_case(copies, case):
+    name, mutations, expected = case
+    copied = copies.get()
+    originals = {}
+    try:
+        for relative, old, new in mutations:
+            path = copied/relative
+            originals.setdefault(path, path.read_bytes())
+            content = path.read_text()
+            if old not in content:
+                raise AssertionError('Mutation target missing: '+name)
+            path.write_text(content.replace(old, new))
+        code, report = validate(copied)
+        passed = code != 0 and any(expected in error for error in report['errors'])
+        return {'case':name, 'detected':passed, 'expected_diagnostic':expected}
+    finally:
+        for path, data in originals.items():
+            path.write_bytes(data)
+        copies.put(copied)
+
 with tempfile.TemporaryDirectory(prefix='ac-document-regression-') as directory:
-    copied = Path(directory)/'docs'
-    shutil.copytree(ROOT, copied, ignore=shutil.ignore_patterns('05-document-review', '__pycache__'))
-    code, report = validate(copied)
+    first = Path(directory)/'docs-0'
+    shutil.copytree(ROOT, first, ignore=shutil.ignore_patterns('05-document-review', '__pycache__'))
+    code, report = validate(first)
     if code or report['errors']:
         raise SystemExit('Unmodified copied specification must pass first: '+str(report['errors']))
-    for name, mutations, expected in CASES:
-        originals = {}
-        try:
-            for relative, old, new in mutations:
-                path = copied/relative
-                originals.setdefault(path, path.read_bytes())
-                content = path.read_text()
-                if old not in content:
-                    raise AssertionError('Mutation target missing: '+name)
-                path.write_text(content.replace(old, new))
-            code, report = validate(copied)
-            passed = code != 0 and any(expected in error for error in report['errors'])
-            results.append({'case':name, 'detected':passed, 'expected_diagnostic':expected})
-        finally:
-            for path, data in originals.items():
-                path.write_bytes(data)
+    copies = queue.Queue()
+    copies.put(first)
+    for i in range(1, WORKERS):
+        copy = Path(directory)/f'docs-{i}'
+        shutil.copytree(first, copy)
+        copies.put(copy)
+    with ThreadPoolExecutor(WORKERS) as pool:
+        results = list(pool.map(lambda case: run_case(copies, case), CASES))  # in the order of CASES
 print(json.dumps({'scope':'document-validator-mutations-only', 'application_tests':'not_run',
                   'results':results, 'passed':all(r['detected'] for r in results)}, indent=2))
 sys.exit(0 if all(r['detected'] for r in results) else 1)

@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.496.0 / Created: 2026-09-14 / Updated: 2026-11-04 / Status: Draft for review / Language: English
+Version: 0.588.0 / Created: 2026-09-14 / Updated: 2026-11-07 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -20,7 +20,7 @@ Document authors and final decision makers for the 1A specification: **Masaki Ki
 | 8 | [Reference design analysis](00-prepare/reference-design-analysis.md) / [Frontend input/output contracts](02-design/implementation-contracts.md) / [Operation catalog](02-design/operation-catalog.csv) | Visual values from the source and detailed input/output definitions |
 | 9 | [Verification plan](04-agentic-sdlc/verification.md) / [Traceability matrix](00-prepare/traceability.csv) | Check the links from requirements to design and tests |
 | 10 | [Backend architecture](02-design/backend-architecture.md) / [Network architecture](02-design/network-architecture.md) | Production target (PROPOSED; AWS, Stripe and HQ company-network access per DEC-68 / IR117): BFF, Core API modules, data, IoT, integrations, zones and traffic flows; not Phase 1A acceptance inputs (IR116) |
-| 11 | [Backend Go design](02-design/backend-go-design.md) / [Database design](02-design/database-design.md) / [db/schema.sql](02-design/db/schema.sql) / [Operation persistence map](02-design/operation-persistence-map.csv) | Production target implementation (PROPOSED): Go + Echo service layout, request pipeline, workers, tests; PostgreSQL schemas, constraints, RLS, partitions, migrations (IR118) |
+| 11 | [Backend Go design](02-design/backend-go-design.md) / [Database design](02-design/database-design.md) / [db/schema.sql](02-design/db/schema.sql) / [Operation persistence map](02-design/operation-persistence-map.csv) / [Load test](02-design/load-test.md) | Production target implementation (PROPOSED): Go + Echo service layout, request pipeline, workers, tests; PostgreSQL schemas, constraints, RLS, partitions, migrations (IR118) |
 | 12 | [Container design](02-design/container-design.md) / `compose.yaml` | Everything runs in Docker: images, Dockerfile standards, Compose profiles with local stand-ins for AWS services, ECS Fargate runtime (IR119) |
 | 13 | [Service contracts](02-design/service-contracts.ts) / [Deterministic contracts](02-design/deterministic-contracts.md) / [Strict review contracts](02-design/strict-review-contracts.md) / [Review resolution contracts](02-design/review-resolution-contracts.md) (the IR log) / [Write version catalog](02-design/write-version-catalog.csv) / [Query catalog](02-design/query-catalog.csv) / [API description](02-design/api/swagger.json) / [Demo fixture](04-agentic-sdlc/fixture-contract.json) | The binding contracts behind the documents above: types, the D / SR / IR rules (the newest IR applies, IR72), the expected version of each write, the filters and sorts of each list, the REST API generated from the handlers, and the fixture the tests and the local stack load |
 
@@ -100,6 +100,92 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.588.0 (2026-11-10): IR732: public repository: hosted CI, lab-server workflows guarded, zizmor.
+0.587.0 (2026-11-10): IR722: technician registers, then binds (planned unit, Bind…).
+0.586.0 (2026-11-10): IR721: e-mail links follow the recipient's last sign-in address (B-16).
+0.585.0 (2026-11-10): IR727: no auto-merge for Dependabot; scripts read the broker image from compose.yaml.
+0.584.0 (2026-11-10): IR729: E2E Mailpit back on 8025; ac-test keeps 8225 from its environment file.
+0.583.0 (2026-11-10): IR725: CI PostgreSQL in tmpfs; image and build-cache clean-up after deploy, E2E and load runs.
+0.582.0 (2026-11-10): IR720: the shared test environment keeps Mailpit on the server and its own demo passwords (B-15).
+0.581.0 (2026-11-10): IR719: the sign-in callback reads a token exchange without a usable answer as its token error.
+0.580.0 (2026-11-10): IR718: every screen that runs a Server Action itself keeps the screen when the call gets no answer.
+0.579.0 (2026-11-10): IR717: a Server Action that cannot be reached keeps the screen (unavailable toast).
+0.578.0 (2026-11-10): IR716: the app shell takes API mode from the layout, not from the session read in the browser.
+0.577.0 (2026-11-10): IR715: the customer finds the active restriction through every invoice of the contract (causes first).
+0.576.0 (2026-11-10): IR714: the HQ restrictions screen counts every state of its scope (list totals per state).
+0.575.0 (2026-11-10): IR713: HQ billing reads every inquiry waiting for a reply (no longer cut behind answered ones).
+0.574.0 (2026-11-10): IR712: the unit pages read every unresolved alert of the unit (no longer cut behind resolved ones).
+0.573.0 (2026-11-10): IR711: the technician overview reads each unresolved alert status on its own (open alerts no longer cut behind resolved ones).
+0.572.0 (2026-11-10): IR710: the HQ alerts screen reads each alert status on its own (open alerts no longer cut behind resolved ones).
+0.571.0 (2026-11-10): IR709: a technician binds an unbound device only to its planned unit unless they registered it, and device writes answer NOT_FOUND for an unbound device the caller does not read.
+0.570.0 (2026-11-10): IR707: overdue totals are per currency on the customer overview and HQ's customer standing, never added across currencies.
+0.569.0 (2026-11-10): IR706: a twice-renewed other certificate stays in one row on the contractor's certifications tab.
+0.568.0 (2026-11-10): IR705: the unit list counts a unit's alerts only while the caller may read them (an external technician before the work window sees none).
+0.567.0 (2026-11-10): IR704: a repeated automation Fire reuses its event only for the same evaluation, so changing the condition type makes a new event.
+0.566.0 (2026-11-10): IR703: revoking access sends the saved membership (scopes and start unchanged), not the form's unsaved edits.
+0.565.0 (2026-11-10): IR702: the technician overview reads every page of the jobs list, so today's work shows past 100 jobs.
+0.564.0 (2026-11-10): IR701: two technician forms send what their selects show (test-run actions the unit offers; the register device form opens afresh).
+0.563.0 (2026-11-10): IR700: a contract's unresolved recovery case is read from the case's state, so contracts.save refuses it again (IR135 item 1).
+0.562.0 (2026-11-10): IR699: Meta.eventCursor is the tenant's own outbox position (the outbox has no row level security), with the index outbox_tenant_seq; corrects IR697.
+0.561.0 (2026-11-09): IR698: the scheduler ticks every tenant even when one of them fails; the failures are reported together and the failing tenant is tried again at the next tick.
+0.560.0 (2026-11-09): IR697: Meta.eventCursor is the outbox's highest position, not a count of it: the count fell when old events were removed and read the whole outbox on every request.
+0.559.0 (2026-11-09): IR696: clearing a preferred time's date in Admin's New job no longer takes the screen down: a time that is not complete is a field error, and Add another time starts empty.
+0.558.0 (2026-11-09): IR695: a set-up or invitation e-mail links to the address the invitation came from (the verified token's issuer), so people on the Tailnet can open what is sent from there; admin tokens are cached per address (DEC-102).
+0.557.0 (2026-11-09): IR694: the IoT path at the design rate: demo.trigger no longer waits for its own connections, an acknowledgement that overtakes the sent report counts, the bridge works in parallel per device and reuses its connections, an index for the duplicate check; iot-design passes for 10 minutes on a developer's Mac (the rate of messages, not of rows).
+0.556.0 (2026-11-09): IR693: load test of the IoT path: 3,000 devices on the stack's own broker and bridge, the iot-smoke, iot and iot-design scenarios (telemetry freshness, command round trip), the generator cmd/iotload; the broker's drops are reported.
+0.555.0 (2026-11-09): IR692: load test of the web layer (sign-in, BFF, server-rendered pages): web-smoke, web, spike and soak scenarios, the web apps in the ac-load stack; the customer accounts get the location consent.
+0.554.0 (2026-11-09): IR691: load test of the Core API at the launch size (cmd/loadseed, deploy/load, service/web/load k6 smoke/load/stress, load.yml) and the test sufficiency measured; results are lab measurements, §13 stays PROPOSED.
+0.553.0 (2026-11-09): IR690: data.forceDelete — force delete of a customer or contractor company with its accounts; units, jobs, contracts, invoices and reports still stop it.
+0.552.0 (2026-11-09): IR689: LineChart tooltip with the name, unit and time of each value; air quality and unit monitoring take several metrics (metric=a,b), two units at most on two axes.
+0.551.0 (2026-11-09): IR688: policyErrors checks the cooldown and the escalation as whole minutes 1–1440, as the Core API's integers.
+0.550.0 (2026-11-09): IR687: runText and runClock fall back to Kuala Lumpur only for another zone; what is no instant is shown as it came.
+0.549.0 (2026-11-09): IR686: notifications, preferences and the demo panel use actionFailure, so the sign-in redirect is not swallowed and an unreachable Core API keeps the page.
+0.548.0 (2026-11-09): IR685: useAction takes { reload: false } for a change that removes the screen; the partner offer decline uses it.
+0.547.0 (2026-11-09): IR684: passwd.sh's stamp keeps the hash of the file it wrote; a shell test runs in check.sh and CI.
+0.546.0 (2026-11-09): IR683: the 24 Server Action files that worded UNAVAILABLE by hand use actionFailure; the guard test requires it.
+0.545.0 (2026-11-09): IR682: useRefreshThen runs the waiting notice when its component is removed by the new read, so a delete still shows its notice.
+0.544.0 (2026-11-09): the report export's last month is the Kuala Lumpur month (IR679; no operation changes).
+0.543.0 (2026-11-09): the screens with their own transition read the page again and show saved with the new screen (IR681; no operation changes).
+0.542.0 (2026-11-09): after a change that succeeded the screen is read again, and the saved notice shows with the new screen (IR680; no operation changes).
+0.541.0 (2026-11-09): the one-time code input keeps the digits of a code pasted with a space (IR678; no operation changes).
+0.540.0 (2026-11-09): a unit is given an alert policy, and a default rule is switched, only under a lock (IR677; no operation changes).
+0.539.0 (2026-11-09): every Server Action answers unavailable when the Core API gives no answer (IR676; no operation changes).
+0.538.0 (2026-11-09): a technician job workspace action answers unavailable when the Core API gives no answer (IR675; no operation changes).
+0.537.0 (2026-11-09): the unit QR scan dialog answers a failed scan when a call gets no answer (IR674; no operation changes).
+0.536.0 (2026-11-09): telemetry.series by space waits for the work window of an external technician (IR673; no operation changes).
+0.535.0 (2026-11-09): a unit is saved with a model only while the model row is read with a share lock (IR672; no operation changes).
+0.534.0 (2026-11-09): a serial or MQTT node_id that another device takes at the same moment answers the specific duplicate conflict (IR671; no operation changes).
+0.533.0 (2026-11-09): units.coverage sorted by id follows the direction (IR670; no operation changes).
+0.532.0 (2026-11-09): a rename refused by the unique index of sibling names answers the sibling-name conflict, as a save does (IR669; no operation changes).
+0.531.0 (2026-11-09): a CSV import commit keeps unit names unique among siblings and an import is undone only while the places it created hold nothing else (IR666; no operation changes).
+0.530.0 (2026-11-09): a new CSV import preview removes the previews that have expired, as the database design says (IR665; no operation changes).
+0.529.0 (2026-11-09): the adjustment HQ enters when it answers a payout question stays within the safe-integer range, like every other amount (IR659; no operation changes).
+0.528.0 (2026-11-09): a customer is deactivated only after its row is locked, so a unit being added at the same moment is seen (IR668; no operation changes).
+0.527.0 (2026-11-09): a property or unit is saved into a customer only after a delete of the customer has finished or never starts (IR667; no operation changes).
+0.523.0 (2026-11-09): a write that PostgreSQL runs again after a deadlock records its events and audit entries once, not once per attempt (IR663; no operation changes).
+0.522.0 (2026-11-09): a membership names each scope once, as it names each permission once; a repeated scope no longer slips past the scope-version check (IR661; no operation changes).
+0.521.0 (2026-11-09): a customer's owner cannot send a user the set-up e-mail again once the access has ended, as a contractor cannot (IR664; no operation changes).
+0.517.0 (2026-11-09): saving a customer's user without changing its status keeps the end HQ gave the membership instead of clearing it (IR662; no operation changes).
+0.516.0 (2026-11-09): an emission factor too small for the six-decimal column is refused on its field instead of failing the database check (IR660; no operation changes).
+0.515.0 (2026-11-09): a device that rejects the start or the end Command of a diagnostic test run ends the run as `start_failed` / `end_failed` with the device's code, so the unit is free again (IR658; no operation changes).
+0.514.0 (2026-11-09): HQ deletes an account made by mistake that never acted, has no assignment or certificate and is its person's only account (`members.delete`): the person and the provider account go with it; any other account is ended by revoking the access (225 operations, 246 routes; DEC-103 phase 3, IR657).
+0.513.0 (2026-11-09): HQ deletes a baseline and an emission factor that no MRV report cites (`baselines.delete`, `factors.delete`) and an MRV report no review touched (`mrv.deleteDraft`); the default factor and reviewed reports stay (224 operations, 245 routes; DEC-103 phase 5, IR656).
+0.512.0 (2026-11-08): HQ deletes a maintenance plan that has made no job (`plans.delete`) and a rate card that has not started (`rateCards.delete`); a plan with jobs and a rate card in effect stay (221 operations, 242 routes; DEC-103 phase 4, IR655).
+0.511.0 (2026-11-08): HQ deletes a customer or a contractor company that has no record anywhere: the profile (`customers.delete`, `contractors.delete`) and then its organization (`organizations.delete`); one with units, jobs, contracts, invoices, reports, certificates, payouts or users is refused with the reason (219 operations, 240 routes; DEC-103 phase 2, IR654).
+0.510.0 (2026-11-08): HQ deletes a firmware campaign that has ended (aborted or completed) with its device results (`firmwareCampaigns.delete`: 216 operations, 237 routes); one that has not is refused with the reason (DEC-103 phase 1b, IR653).
+0.509.0 (2026-11-08): HQ deletes a device or a model that is in no use, and takes a device off its unit (`devices.unbind`, `devices.delete`, `capabilities.delete`: 215 operations, 236 routes); a thing in use is refused with the reason (DEC-103, IR652).
+0.508.0 (2026-11-08): The shared test environment answers on several addresses listed in `PUBLIC_HOSTS`: the sign-in goes to Keycloak on the address it started on and returns to it (DEC-102, IR651).
+0.507.0 (2026-11-08): The AI assistant is removed: the Client header button and panel, `voice.resolveIntent` (212 operations, 233 routes), the microphone consent and the `voice` source of a command; FR-X02 is withdrawn and BIZ-03 is out of scope (DEC-101, IR648).
+0.506.0 (2026-11-08): The sign-in pages are product pages: the e-mail address, then the identity provider's own AC Project pages for the password, the one-time code and a reset, in the language chosen on the page; the demo-account button is gone (DEC-100, IR646).
+0.505.0 (2026-11-08): Japanese is a third display language beside English and Malay: every translated text, the voice assistant's grammar and the date and time formats (DEC-99, IR639).
+0.504.0 (2026-11-07): The visit time is settled when the contractor assigns a technician: an offer carries every time the client agreed, and the client is told the confirmed time (DEC-98, IR636).
+0.503.0 (2026-11-07): A device is registered with its ESP32's MQTT node ID in Admin, and the IoT bridge takes readings and sends commands by the IDs in the database, so a new node needs no release (DEC-97, IR635).
+0.502.0 (2026-11-04): The shared test environment shows the fixture's accounts and the real devices only: customer-a's two real units, on the real clock, without the mock fleet (DEC-96, IR633).
+0.501.0 (2026-11-04): CI and E2E run on the lab server's runner too, so the private repository's Actions minutes stay unused (DEC-95, IR632).
+0.500.0 (2026-11-04): Test deployments run on the lab server's runner, with their build and deploy logs on the Actions tab (DEC-94, IR631).
+0.499.0 (2026-11-04): A test deployment's progress shows on GitHub, step by step (DEC-93, IR630).
+0.498.0 (2026-11-04): A tag such as test1.0.0r0 deploys the stack to the lab server, where others open it (DEC-93, IR629).
+0.497.0 (2026-11-04): The default clients split demo and real: customer-a has the demo data and the mock fleet, customer-b the real devices, all from the seed (DEC-92, IR628).
 0.496.0 (2026-11-04): node_2's room readings have a unit of their own, "Live · node_2 sensors", beside the live Daikin air conditioner (DEC-91, IR627).
 0.495.0 (2026-11-03): Every screen speaks in words — no error codes, spec IDs, status codes or code names (IR626).
 0.494.0 (2026-11-03): Parts and refrigerant name the field to fix, and pausing keeps the technician where they were (IR625).

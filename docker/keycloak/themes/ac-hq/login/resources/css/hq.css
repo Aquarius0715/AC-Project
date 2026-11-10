@@ -1,0 +1,4 @@
+/* HQ Admin: a darker accent so the HQ page is not mistaken for a customer's */
+:root {
+    --keycloak-card-top-color: #0b1f44;
+}

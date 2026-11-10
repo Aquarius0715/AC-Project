@@ -51,17 +51,21 @@ const (
 )
 
 // Main runs one domain service (IR180): it serves only the operations of domains, with /healthz and /readyz and the
-// container healthcheck subcommand (container design §3).
-func Main(service string, domains ...string) {
+// container healthcheck subcommand (container design §3). It returns the process's exit code, for main to pass to
+// os.Exit.
+func Main(service string, domains ...string) int {
 	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
-		os.Exit(health.Check(envOr("ADDR", ":8080")))
+		return health.Check(envOr("ADDR", ":8080"))
 	}
 
 	err := run(service, domains)
 	if err != nil {
 		slog.Error("startup", "err", err)
-		os.Exit(1)
+
+		return 1
 	}
+
+	return 0
 }
 
 // run serves until SIGINT or SIGTERM; Main exits on its error once its deferred clean-up has run.
@@ -124,9 +128,9 @@ func run(service string, domains []string) error {
 const writeLimitDefault = 60
 
 // withWriteLimit sets the write limit per membership (IR375) and the record of denied writes (IR603) on the shared
-// counter store at url.
-func withWriteLimit(cfg *Config, url string) error {
-	store, err := ratelimit.NewValkey(url)
+// counter store at address.
+func withWriteLimit(cfg *Config, address string) error {
+	store, err := ratelimit.NewValkey(address)
 	if err != nil {
 		return fmt.Errorf("RATE_LIMIT_URL: %w", err)
 	}
@@ -180,11 +184,20 @@ func identityProvider(values []string) (*idp.Keycloak, error) {
 		}
 	}
 
+	// IDP_PUBLIC_URL is optional: the address people open the identity provider by, when it answers on several (IR651)
+	public := os.Getenv("IDP_PUBLIC_URL")
+	if public != "" {
+		u, err := url.Parse(public)
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+			return nil, fmt.Errorf("IDP_PUBLIC_URL: %w", errNotHTTPURL)
+		}
+	}
+
 	return &idp.Keycloak{
 		TokenURL:     values[0],
 		AdminURL:     strings.TrimRight(values[1], "/"),
 		ClientID:     values[2],
-		ClientSecret: values[3], Client: nil, Now: nil,
+		ClientSecret: values[3], PublicURL: public, Client: nil, Now: nil,
 	}, nil
 }
 
@@ -254,6 +267,7 @@ func ConfigFromEnv(logger *slog.Logger, domains []string) (Config, error) {
 		InternalToken:     os.Getenv("INTERNAL_API_TOKEN"),
 		ServiceURLs:       serviceURLsFromEnv(),
 		Clock:             nil,
+		DemoShared:        false,
 		DemoStart:         time.Time{},
 		PrincipalTTL:      0,
 		DemoClock:         nil,
@@ -271,8 +285,8 @@ func ConfigFromEnv(logger *slog.Logger, domains []string) (Config, error) {
 	}
 	// the write limit per membership (IR375): RATE_LIMIT_URL is the shared counter store, WRITE_LIMIT_PER_MINUTE the
 	// limit (60 by default, network architecture §6); without a store there is no limit
-	if url := os.Getenv("RATE_LIMIT_URL"); url != "" {
-		err := withWriteLimit(&cfg, url)
+	if address := os.Getenv("RATE_LIMIT_URL"); address != "" {
+		err := withWriteLimit(&cfg, address)
 		if err != nil {
 			return cfg, err
 		}
@@ -292,13 +306,15 @@ func ConfigFromEnv(logger *slog.Logger, domains []string) (Config, error) {
 		cfg.IdentityProvider = provider
 	}
 
-	if cfg.DemoOps { // fixture.clock unless DEMO_CLOCK_START overrides it (IR36); shared with the workers (IR168)
+	// fixture.clock unless DEMO_CLOCK_START overrides it (IR36), or the real clock (now, DEC-96); shared with the
+	// workers (IR168)
+	if cfg.DemoOps {
 		start, err := democlock.StartFromEnv(os.Getenv)
 		if err != nil {
 			return cfg, fmt.Errorf("DEMO_CLOCK_START: %w", err)
 		}
 
-		cfg.DemoStart = start
+		cfg.DemoShared, cfg.DemoStart = true, start
 	}
 
 	return cfg, nil

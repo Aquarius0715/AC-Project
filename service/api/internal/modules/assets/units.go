@@ -133,6 +133,7 @@ func Register(reg *ops.Registry, module *Module) {
 	ops.Register(reg, "units.archive", module.unitsArchive)
 	ops.Register(reg, "customers.list", module.customersList)
 	ops.Register(reg, "customers.save", module.customersSave)
+	ops.Register(reg, "customers.delete", module.customersDelete)
 	ops.Register(reg, "properties.list", module.propertiesList)
 	ops.Register(reg, "spaces.list", module.spacesList)
 	ops.Register(reg, "locations.rename", module.locationsRename)
@@ -302,18 +303,22 @@ func (m *Module) enrich(ctx context.Context, call *ops.Call, units []Unit) error
 		return apperr.Wrap(err, "assets.Monitoring.PowerMeasured")
 	}
 
-	counts, err := m.Mon.ActiveAlertCounts(ctx, call, ids)
-	if err != nil {
-		return apperr.Wrap(err, "assets.Monitoring.ActiveAlertCounts")
-	}
-
 	readable, err := unitscope.EquipmentReadable(
 		ctx,
 		call,
 		ids,
-	) // telemetry is an equipment read (IR49(b)): nothing before the work window
+	) // telemetry and alerts are equipment reads (IR49(b)): nothing before the work window
 	if err != nil {
 		return apperr.Wrap(err, "unitscope.EquipmentReadable")
+	}
+
+	counts, err := m.Mon.ActiveAlertCounts(
+		ctx,
+		call,
+		readable,
+	) // the count is an alert read too (IR705)
+	if err != nil {
+		return apperr.Wrap(err, "assets.Monitoring.ActiveAlertCounts")
 	}
 
 	latest, err := m.Mon.LatestMeasurements(ctx, call, readable)

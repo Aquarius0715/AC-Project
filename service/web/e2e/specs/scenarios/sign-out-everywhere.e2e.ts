@@ -4,9 +4,10 @@
 // leaves one audit entry and a revocation time on customer-b's membership.
 import { test, expect } from "../../fixtures/test";
 import { APPS, type App } from "../../fixtures/apps";
-import { enterPassword, signIn } from "../../fixtures/auth";
+import { emailOf, enterPassword, settles, signIn, startSignIn } from "../../fixtures/auth";
+import { must } from "../../fixtures/must";
 
-const app = (id: App["id"]) => APPS.find((a) => a.id === id)!;
+const app = (id: App["id"]) => must(APPS.find((a) => a.id === id));
 
 test("HQ signs a client user out everywhere, and the password signs them in again", async ({ browser }) => {
   test.setTimeout(180_000);
@@ -46,7 +47,7 @@ test("HQ signs a client user out everywhere, and the password signs them in agai
       // the first page drops the refused session and its error state sends the browser to sign-in; a page that showed
       // no error leaves it to the next one, which finds no session
       await user.goto("/customer");
-      if (!(await user.waitForURL(/\/login/, { timeout: 10_000 }).then(() => true, () => false))) await user.goto("/customer");
+      if (!(await settles(user.waitForURL(/\/login/, { timeout: 10_000 }), true, false))) await user.goto("/customer");
       await expect(user).toHaveURL(/\/login/);
     });
 
@@ -56,7 +57,7 @@ test("HQ signs a client user out everywhere, and the password signs them in agai
       await user.waitForTimeout(Math.max(0, revokedAt + 1100 - Date.now()));
       const refusedSso: string[] = []; // the BFF's prompt=login hop after a refused single sign-on answer (IR385)
       user.on("request", (r) => { if (/\/bff\/auth\/login\?(.*&)?reauth=1/.test(r.url())) refusedSso.push(r.url()); });
-      await user.getByRole("link", { name: /^Continue as / }).click();
+      await startSignIn(user, emailOf("customer-b"));
       await expect(user.locator("#password")).toBeVisible();
       expect(refusedSso, "the provider's single sign-on session was ended (IR386)").toEqual([]);
       await enterPassword(user, "customer-b");

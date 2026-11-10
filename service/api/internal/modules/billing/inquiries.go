@@ -311,7 +311,7 @@ func recordCreate(call *ops.Call, inquiryID uuid.UUID, subjectType string) {
 	)
 }
 
-func (m Billing) loadInquiry(
+func (Billing) loadInquiry(
 	ctx context.Context,
 	call *ops.Call,
 	inquiryID uuid.UUID,
@@ -362,7 +362,7 @@ func (m Billing) loadInquiry(
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/inquiries [get]
-func (m Billing) listInquiries(
+func (Billing) listInquiries(
 	ctx context.Context,
 	call *ops.Call,
 	query *paging.Query,

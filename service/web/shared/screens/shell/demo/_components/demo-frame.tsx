@@ -1,5 +1,6 @@
 import { Card, DemoBadge, cx, Plain } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
+import { CLOCK_JUMPS, jumpLabel } from "@ac/web/lib/demoPanel";
 import { Icon, type IconName } from "@ac/web/components/Icon";
 
 const jump = "rounded-control bg-primary-soft px-3 py-2 text-[13px] font-semibold text-ink hover:bg-primary-soft/70 disabled:cursor-not-allowed disabled:opacity-50";
@@ -24,15 +25,14 @@ export function DemoFrame({ clock, scenario, reset, triggers, above }: Readonly<
   );
 }
 
-export function ClockFace({ time, onMinute, onHour, disabled }: Readonly<{ time: string; onMinute: () => void; onHour: () => void; disabled?: boolean }>) {
+export function ClockFace({ time, onJump, disabled }: Readonly<{ time: string; onJump: (minutes: number) => void; disabled?: boolean }>) {
   const t = useT();
   return (
     <>
       <div className="font-mono text-xl font-bold tracking-tight">{time}</div>
       <p className="mt-1 text-[11px] text-muted-foreground">{t("Real-time speed · advancing jumps do not consume session lifetime")}</p>
       <div className="mt-3 grid grid-cols-2 gap-2">
-        <Plain touch type="button" className={jump} disabled={disabled} onClick={onMinute}>{t("+1 min")}</Plain>
-        <Plain touch type="button" className={jump} disabled={disabled} onClick={onHour}>{t("+1 hour")}</Plain>
+        {CLOCK_JUMPS.map((minutes) => <Plain key={minutes} touch type="button" className={jump} disabled={disabled} onClick={() => { onJump(minutes); }}>{jumpLabel(minutes, t)}</Plain>)}
       </div>
     </>
   );
@@ -41,7 +41,7 @@ export function ClockFace({ time, onMinute, onHour, disabled }: Readonly<{ time:
 /** One trigger tile: icon, name and what it does; a tile that cannot run here says why. */
 export function TriggerTile({ icon, title, sub, onClick, disabled, tone }: Readonly<{ icon: IconName; title: string; sub: string; onClick?: () => void; disabled?: boolean; tone?: "ok" }>) {
   return (
-    <Plain type="button" onClick={onClick} disabled={disabled || !onClick} className={cx("flex min-w-0 flex-col items-start gap-0.5 rounded-xl border border-line bg-surface px-3 py-2.5 text-left hover:bg-surface2 disabled:cursor-not-allowed disabled:opacity-60", tone === "ok" && "border-[#86efac]")}>
+    <Plain type="button" onClick={onClick} disabled={disabled === true || !onClick} className={cx("flex min-w-0 flex-col items-start gap-0.5 rounded-xl border border-line bg-surface px-3 py-2.5 text-left hover:bg-surface2 disabled:cursor-not-allowed disabled:opacity-60", tone === "ok" && "border-[#86efac]")}>
       <span className="flex items-center gap-2 text-[13px] font-semibold"><Icon name={icon} className={cx("text-crit", tone === "ok" && "text-ok")} />{title}</span>
       <span className="text-[11px] text-muted-foreground">{sub}</span>
     </Plain>

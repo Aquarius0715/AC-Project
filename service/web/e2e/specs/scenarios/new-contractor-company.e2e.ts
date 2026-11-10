@@ -6,11 +6,16 @@
 import type { Browser, Page } from "@playwright/test";
 import { test, expect, FAILED_PAGE } from "../../fixtures/test";
 import { APPS, type App } from "../../fixtures/apps";
+import { startSignIn } from "../../fixtures/auth";
 import { mailpitUp, setupLink } from "../../fixtures/mailpit";
+import { must } from "../../fixtures/must";
+import { pickDateTime } from "../../fixtures/time";
 
-const app = (id: App["id"]) => APPS.find((a) => a.id === id)!;
-const open = async (browser: Browser, a: App, signedIn = true): Promise<Page> =>
-  (await browser.newContext({ baseURL: a.url, viewport: { width: 1920, height: 1080 }, ...(signedIn ? { storageState: a.state } : { storageState: { cookies: [], origins: [] } }) })).newPage();
+const app = (id: App["id"]) => must(APPS.find((a) => a.id === id));
+const open = async (browser: Browser, a: App, signedIn = true): Promise<Page> => {
+  const context = await browser.newContext({ baseURL: a.url, viewport: { width: 1920, height: 1080 }, ...(signedIn ? { storageState: a.state } : { storageState: { cookies: [], origins: [] } }) });
+  return context.newPage();
+};
 
 test("HQ adds a contractor company and its first contractor, who signs in to the partner app", async ({ browser }) => {
   test.setTimeout(240_000);
@@ -43,7 +48,7 @@ test("HQ adds a contractor company and its first contractor, who signs in to the
     await main.getByRole("textbox", { name: /^Email/ }).fill(email);
     await main.getByRole("button", { name: "Contractor", exact: true }).last().click(); // the role, after the role filter
     await main.getByRole("combobox", { name: /^Organization/ }).selectOption({ label: company });
-    await main.getByLabel("Valid from").fill("2026-09-01T09:00"); // before the seed's demo clock
+    await pickDateTime(main.getByRole("group", { name: "Valid from" }), "2026-09-01T09:00"); // before the seed's demo clock
     await main.getByRole("textbox", { name: /^Change reason/ }).fill("E2E: the new company's first contractor");
     await main.getByRole("button", { name: "Create membership" }).click();
     await expect(admin.getByText("Membership created").first()).toBeVisible();
@@ -64,8 +69,7 @@ test("HQ adds a contractor company and its first contractor, who signs in to the
     await expect(me.getByText(/Your account has been updated/)).toBeVisible();
     const partner = app("partner");
     await me.goto(`${partner.url}/login`);
-    await me.getByRole("link", { name: /^Continue as / }).click();
-    await me.locator("#username").fill(email);
+    await startSignIn(me, email);
     await me.locator("#password").fill(password);
     await me.locator("#kc-login").click();
     await me.waitForURL((u) => u.origin === new URL(partner.url).origin && (u.pathname === partner.home || u.pathname.startsWith(partner.home + "/")));

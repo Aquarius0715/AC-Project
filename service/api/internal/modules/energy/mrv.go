@@ -332,7 +332,9 @@ func LoadReport(
 		return report, err
 	}
 
-	return report, reviews(ctx, call, &report)
+	err = reviews(ctx, call, &report)
+
+	return report, err
 }
 
 // GetInput is mrv.get input.
@@ -760,7 +762,7 @@ func saveDraft(ctx context.Context, call *ops.Call, input *SaveInput) (Report, e
 	call.Audit(
 		ops.AuditEntry{
 			Action:          "mrv.saveDraft",
-			TargetKind:      "mrv_report",
+			TargetKind:      kindMRVReport,
 			TargetID:        reportID.String(),
 			PreviousVersion: call.ExpectedVersion,
 			NextVersion:     &version, Reason: "", Result: "", Before: nil, After: nil,
@@ -888,7 +890,7 @@ func recordReview(ctx context.Context, call *ops.Call, input *ReviewInput) (Repo
 	call.Audit(
 		ops.AuditEntry{
 			Action:          "mrv.recordReview",
-			TargetKind:      "mrv_report",
+			TargetKind:      kindMRVReport,
 			TargetID:        report.ID.String(),
 			PreviousVersion: &latest,
 			NextVersion:     &next,
@@ -906,5 +908,6 @@ func RegisterMRV(reg *ops.Registry) {
 	ops.Register(reg, "mrv.list", listReports)
 	ops.Register(reg, "mrv.versions", versions)
 	ops.Register(reg, "mrv.saveDraft", saveDraft)
+	ops.Register(reg, "mrv.deleteDraft", deleteDraft)
 	ops.Register(reg, "mrv.recordReview", recordReview)
 }

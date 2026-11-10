@@ -9,6 +9,7 @@ import (
 
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/seed"
+	apiserver "github.com/pradita/ac-project/service/api/internal/server"
 )
 
 const (
@@ -300,7 +301,7 @@ func TestSlotProposals(t *testing.T) {
 		hq(),
 		"jobs.get",
 		`{"jobId":"`+job2+`"}`,
-	); asObj(t, asObj(t, data(res)["offer"])["visitSlot"])["startAt"] != stamp(
+	); firstCandidate(t, data(res)["offer"]) != stamp(
 		98,
 	) ||
 		asObj(t, data(res)["offer"])["offerExpiresAt"] != stamp(24) {
@@ -420,11 +421,7 @@ func TestPartnerProposalsAndReschedule(t *testing.T) {
 		"jobs.offer",
 		`{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").
 			String()+
-			`","visitSlot":`+slotJSON(
-			49,
-			2,
-		)+
-			`,"offerExpiresAt":"`+stamp(
+			`","offerExpiresAt":"`+stamp(
 			12,
 		)+`","accessValidFrom":"`+stamp(
 			0,
@@ -610,7 +607,7 @@ func TestPartnerProposalsAndReschedule(t *testing.T) {
 		hq(),
 		"jobs.get",
 		`{"jobId":"`+job+`"}`,
-	); asObj(t, asObj(t, data(m)["offer"])["visitSlot"])["startAt"] != stamp(
+	); firstCandidate(t, data(m)["offer"]) != stamp(
 		101,
 	) {
 		t.Fatal("offer visit slot moved")
@@ -635,11 +632,7 @@ func TestPartnerProposalsAndReschedule(t *testing.T) {
 		"jobs.offer",
 		`{"jobId":"`+job2+`","contractorOrgId":"`+seed.ID("org-contractor-a").
 			String()+
-			`","visitSlot":`+slotJSON(
-			49,
-			2,
-		)+
-			`,"offerExpiresAt":"`+stamp(
+			`","offerExpiresAt":"`+stamp(
 			12,
 		)+`","accessValidFrom":"`+stamp(
 			0,
@@ -905,11 +898,7 @@ func TestRescheduleAfterContractorAssignment(t *testing.T) {
 		"jobs.offer",
 		`{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").
 			String()+
-			`","visitSlot":`+slotJSON(
-			49,
-			2,
-		)+
-			`,"offerExpiresAt":"`+stamp(
+			`","offerExpiresAt":"`+stamp(
 			12,
 		)+`","accessValidFrom":"`+stamp(
 			0,
@@ -1030,7 +1019,7 @@ func TestRescheduleAfterContractorAssignment(t *testing.T) {
 		hq(),
 		"jobs.get",
 		`{"jobId":"`+job+`"}`,
-	); asObj(t, asObj(t, data(res)["offer"])["visitSlot"])["startAt"] != stamp(
+	); firstCandidate(t, data(res)["offer"]) != stamp(
 		97,
 	) {
 		t.Errorf("the accepted offer's visit: %v", data(res)["offer"])
@@ -1074,11 +1063,7 @@ func TestPartnerProposalRefusals(t *testing.T) {
 		"jobs.offer",
 		`{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").
 			String()+
-			`","visitSlot":`+slotJSON(
-			49,
-			2,
-		)+
-			`,"offerExpiresAt":"`+stamp(
+			`","offerExpiresAt":"`+stamp(
 			12,
 		)+`","accessValidFrom":"`+stamp(
 			0,
@@ -1222,9 +1207,12 @@ func TestRescheduleOfferedPeriodicVisit(t *testing.T) {
 	)
 	owner(
 		t,
-		`INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, visit_slot, offered_at,
+		`INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, candidate_slots, offered_at,
 			offer_expires_at, access_valid_from, access_valid_until)
-		VALUES ($1,$2,$3,'t',tstzrange($4,$5),$6,$7,$6,$8)`,
+		VALUES ($1,$2,$3,'t',`+oneSlotSQL(
+			"$4",
+			"$5",
+		)+`,$6,$7,$6,$8)`,
 		seed.ID("tenant-a"),
 		job,
 		seed.ID("org-contractor-a"),
@@ -1254,7 +1242,10 @@ func TestRescheduleOfferedPeriodicVisit(t *testing.T) {
 
 	owner(
 		t,
-		`UPDATE maintenance.offers SET visit_slot = tstzrange($2, $3) WHERE job_id = $1`,
+		`UPDATE maintenance.offers SET candidate_slots = `+oneSlotSQL(
+			"$2",
+			"$3",
+		)+` WHERE job_id = $1`,
 		job,
 		clock().Add(100*time.Hour),
 		clock().Add(102*time.Hour),
@@ -1297,11 +1288,7 @@ func TestPartnerProposalEndsWithClientProposal(t *testing.T) {
 			"jobs.offer",
 			`{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").
 				String()+
-				`","visitSlot":`+slotJSON(
-				49,
-				2,
-			)+
-				`,"offerExpiresAt":"`+stamp(
+				`","offerExpiresAt":"`+stamp(
 				12,
 			)+`","accessValidFrom":"`+stamp(
 				0,
@@ -1455,11 +1442,7 @@ func TestPartnerProposalEndsWithOffer(t *testing.T) {
 			"jobs.offer",
 			`{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").
 				String()+
-				`","visitSlot":`+slotJSON(
-				49,
-				2,
-			)+
-				`,"offerExpiresAt":"`+stamp(
+				`","offerExpiresAt":"`+stamp(
 				12,
 			)+`","accessValidFrom":"`+stamp(
 				0,
@@ -1585,12 +1568,15 @@ func TestPartnerProposalEndsWithOffer(t *testing.T) {
 	ended(job, partner)
 }
 
-// TestDeclineWithdrawsClientProposal (IR445): a contractor that declines its offer while HQ has sent its time change to
-// the client ends that client proposal too, so the client's acceptance cannot offer the job again to that company.
-//
-//nolint:paralleltest // the integration tests share one server and the seeded test database
-func TestDeclineWithdrawsClientProposal(t *testing.T) {
-	srv := server(t)
+// openedProposals names what openProposals leaves.
+type openedProposals struct{ job, offer, partner, proposal string }
+
+// openProposals leaves a job offered to contractor-a with the company's time change waiting at HQ and HQ's proposal of
+// it waiting for the client (IR444, IR445). It returns the job, the offer, the time change and the client proposal; the
+// job's version is 4 afterwards.
+func openProposals(t *testing.T, srv *apiserver.Server) openedProposals {
+	t.Helper()
+
 	owner(
 		t,
 		`UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = $1 AND status = 'active' AND
@@ -1609,17 +1595,16 @@ func TestDeclineWithdrawsClientProposal(t *testing.T) {
 	)
 
 	job := asStr(t, data(resp)["id"])
+
+	var offer, partner, proposal string
+
 	if code, res := write(
 		srv,
 		hq(),
 		"jobs.offer",
 		`{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").
 			String()+
-			`","visitSlot":`+slotJSON(
-			49,
-			2,
-		)+
-			`,"offerExpiresAt":"`+stamp(
+			`","offerExpiresAt":"`+stamp(
 			12,
 		)+`","accessValidFrom":"`+stamp(
 			0,
@@ -1631,7 +1616,6 @@ func TestDeclineWithdrawsClientProposal(t *testing.T) {
 		t.Fatalf("offer: %d %v", code, res)
 	}
 
-	var offer, partner, proposal string
 	ownerScan(
 		t,
 		`SELECT id::text FROM maintenance.offers WHERE job_id = $1 AND decision IS NULL`,
@@ -1676,6 +1660,18 @@ func TestDeclineWithdrawsClientProposal(t *testing.T) {
 		&proposal,
 	)
 
+	return openedProposals{job: job, offer: offer, partner: partner, proposal: proposal}
+}
+
+// TestDeclineWithdrawsClientProposal (IR445): a contractor that declines its offer while HQ has sent its time change to
+// the client ends that client proposal too, so the client's acceptance cannot offer the job again to that company.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
+func TestDeclineWithdrawsClientProposal(t *testing.T) {
+	srv := server(t)
+	opened := openProposals(t, srv)
+	job, offer, partner, proposal := opened.job, opened.offer, opened.partner, opened.proposal
+
 	if code, res := write(
 		srv,
 		contrA(),
@@ -1719,6 +1715,67 @@ func TestDeclineWithdrawsClientProposal(t *testing.T) {
 
 	if offers != 1 {
 		t.Errorf("offers after the decline: %d", offers)
+	}
+}
+
+// TestCancelWithdrawsOpenProposals (IR444, IR445): HQ cancelling a job ends the proposals still open on it: the
+// company's time change waiting for HQ and HQ's proposal waiting for the client, so neither is answered on a cancelled
+// job. The offer ends too (declined as job_cancelled).
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
+func TestCancelWithdrawsOpenProposals(t *testing.T) {
+	srv := server(t)
+	opened := openProposals(t, srv)
+	job, offer, partner, proposal := opened.job, opened.offer, opened.partner, opened.proposal
+
+	if code, res := write(
+		srv,
+		hq(),
+		"jobs.cancel",
+		`{"jobId":"`+job+`","cancelReason":"the customer withdrew"}`,
+		4,
+	); code != 200 {
+		t.Fatalf("cancel: %d %v", code, res)
+	}
+
+	var clientStatus, partnerStatus, decision, reason string
+	ownerScan(
+		t,
+		`SELECT (SELECT status FROM maintenance.slot_proposals WHERE id = $1),
+			(SELECT status FROM maintenance.partner_slot_proposals WHERE id = $2),
+			(SELECT decision FROM maintenance.offers WHERE id = $3),
+			(SELECT decline_reason FROM maintenance.offers WHERE id = $3)`,
+		[]any{proposal, partner, offer},
+		&clientStatus,
+		&partnerStatus,
+		&decision,
+		&reason,
+	)
+
+	if clientStatus != statusWithdrawn || partnerStatus != statusWithdrawn {
+		t.Errorf(
+			"after the cancel: client proposal %s, time change %s",
+			clientStatus,
+			partnerStatus,
+		)
+	}
+
+	if decision != "decline" || reason != "job_cancelled" {
+		t.Errorf(
+			"after the cancel the offer is %q (%q), want a decline as job_cancelled",
+			decision,
+			reason,
+		)
+	}
+
+	if code, _ := write(
+		srv,
+		customerA(),
+		"jobs.respondProposal",
+		`{"jobId":"`+job+`","proposalId":"`+proposal+`","decision":"accept"}`,
+		5,
+	); code != 409 {
+		t.Errorf("the client accepted a proposal on a cancelled job: %d", code)
 	}
 }
 
@@ -1838,16 +1895,12 @@ func TestAcceptedProposalExtendsAccess(t *testing.T) {
 		"jobs.offer",
 		`{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").
 			String()+
-			`","visitSlot":`+slotJSON(
-			49,
-			2,
-		)+
-			`,"offerExpiresAt":"`+stamp(
+			`","offerExpiresAt":"`+stamp(
 			12,
 		)+`","accessValidFrom":"`+stamp(
 			0,
 		)+`","accessValidUntil":"`+stamp(
-			60,
+			100,
 		)+`","termsVersion":"t"}`,
 		1,
 	); code != 200 {
@@ -2016,4 +2069,16 @@ func TestProposalReplyByBeforeSlot(t *testing.T) {
 	if offers != 0 {
 		t.Errorf("offers after the refused acceptance: %d", offers)
 	}
+}
+
+// firstCandidate is the start of the first candidate time of an Offer (IR636).
+func firstCandidate(t *testing.T, offer any) any {
+	t.Helper()
+
+	slots, ok := asObj(t, offer)["candidateSlots"].([]any)
+	if !ok || len(slots) == 0 {
+		t.Fatalf("offer without candidateSlots: %v", offer)
+	}
+
+	return asObj(t, slots[0])["startAt"]
 }

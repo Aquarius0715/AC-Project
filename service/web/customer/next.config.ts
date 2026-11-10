@@ -12,8 +12,7 @@ const nextConfig: NextConfig = {
   outputFileTracingRoot: path.join(__dirname, ".."),
   turbopack: { root: path.join(__dirname, "..") },
   // the security headers of network architecture §6 on every response (IR354); the page CSP comes from proxy.ts
-  async headers() {
-    return [{ source: "/:path*", headers: [
+  headers: () => Promise.resolve([{ source: "/:path*", headers: [
       { key: "X-Content-Type-Options", value: "nosniff" },
       { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
       { key: "X-Frame-Options", value: "DENY" },
@@ -23,8 +22,7 @@ const nextConfig: NextConfig = {
     ] }, {
       // the BFF answers carry the session and Core API data: never stored by the browser, as the gateway's (IR407, IR434)
       source: "/bff/:path*", headers: [{ key: "Cache-Control", value: "no-store" }],
-    }];
-  },
+    }]),
   // Report a problem sends up to 5 photos to a Server Action as files; the Core API takes 8 MiB for jobs.reportProblem
   experimental: { serverActions: { bodySizeLimit: "8mb" } },
 };

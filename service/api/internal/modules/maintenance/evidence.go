@@ -92,7 +92,7 @@ func (in *ListAttachmentsInput) Validate() map[string]string {
 //	@Failure		504		{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/attachments [get]
-func (m Files) list(
+func (Files) list(
 	ctx context.Context,
 	call *ops.Call,
 	input *ListAttachmentsInput,

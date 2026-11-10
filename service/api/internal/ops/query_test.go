@@ -205,6 +205,7 @@ func TestHTTPQueries(t *testing.T) {
 		Employment:        "",
 		Timezone:          "",
 		SessionsRevokedAt: nil,
+		IssuerHost:        "",
 	}
 	user := &ops.Call{
 		Principal:       principal,

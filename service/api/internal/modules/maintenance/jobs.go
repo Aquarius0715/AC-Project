@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"regexp"
 	"slices"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/google/uuid"
@@ -281,11 +281,14 @@ const (
 	fieldFrom           = "from"
 	fieldHold           = "hold"
 	fieldItems          = "items"
+	fieldEndAt          = "endAt"
 	fieldJobID          = "jobId"
 	fieldName           = "name"
 	fieldNextAction     = "nextAction"
+	fieldWorkText       = "workText"
 	fieldOrganizationID = "organizationId"
 	fieldReason         = "reason"
+	fieldRefrigerant    = "refrigerant"
 	fieldReportVersion  = "reportVersion"
 	fieldSlot           = "slot"
 	fieldStatus         = "status"
@@ -357,24 +360,38 @@ func jobTypes() map[string]bool {
 // maxContactWindowLength is the longest contact window, in characters after trimming.
 const maxContactWindowLength = 200
 
-var contactDigits = regexp.MustCompile(`\d{7,}`)
+// minPhoneDigits is the length of a run of digits that reads as a phone number.
+const minPhoneDigits = 7
 
-// ContactWindowOK applies IR64: no '@' and no run of seven digits once spaces, hyphens, parentheses and '+' are
-// removed.
+// contactSeparators are what a phone number is written with between its digits besides spaces: the ASCII characters and
+// the full-width ones a Japanese input method produces.
+const contactSeparators = "-()+\t－（）＋"
+
+// ContactWindowOK applies IR64 and IR640: no '@' and no run of seven digits, once spaces, hyphens, parentheses and '+'
+// are set aside. Digits are the digits of every script and the symbols include their full-width forms, so a number
+// typed with a Japanese input method (０９０－１２３４－５６７８, ＠) is refused like the ASCII one.
 func ContactWindowOK(contactWindow string) bool {
-	if strings.Contains(contactWindow, "@") {
+	if strings.ContainsAny(contactWindow, "@＠") {
 		return false
 	}
 
-	stripped := strings.Map(func(r rune) rune {
-		if r == ' ' || r == '-' || r == '(' || r == ')' || r == '+' || r == '\t' {
-			return -1
+	digits := 0
+
+	for _, char := range contactWindow {
+		switch {
+		case unicode.IsDigit(char):
+			digits++
+			if digits >= minPhoneDigits {
+				return false
+			}
+		case unicode.IsSpace(char) || strings.ContainsRune(contactSeparators, char):
+			// a separator between digits does not end the run
+		default:
+			digits = 0
 		}
+	}
 
-		return r
-	}, contactWindow)
-
-	return !contactDigits.MatchString(stripped)
+	return true
 }
 
 // Validate implements ops.Validator (shape only; slot timing needs the clock).
@@ -612,7 +629,7 @@ func insertRequest(
 	return jobID, apperr.Wrap(err, "insert maintenance.jobs")
 }
 
-func (m Jobs) event(
+func (Jobs) event(
 	ctx context.Context,
 	call *ops.Call,
 	job uuid.UUID,
@@ -717,7 +734,9 @@ func (m Jobs) load(
 		return job, err
 	}
 
-	return job, m.project(ctx, call, &job)
+	err = m.project(ctx, call, &job)
+
+	return job, err
 }
 
 // detailExtras reads what JobDetail adds to the job's row: the slot proposal, the assignment, the contractor's time
@@ -855,7 +874,7 @@ type OfferView struct {
 	JobID            uuid.UUID  `json:"jobId"`
 	ContractorOrgID  uuid.UUID  `json:"contractorOrgId"`
 	TermsVersion     string     `json:"termsVersion"`
-	VisitSlot        Slot       `json:"visitSlot"`
+	CandidateSlots   []Slot     `json:"candidateSlots"` // the client's agreed times; the contractor picks one (IR636)
 	OfferedAt        time.Time  `json:"offeredAt"`
 	OfferExpiresAt   time.Time  `json:"offerExpiresAt"`
 	AccessValidFrom  time.Time  `json:"accessValidFrom"`
@@ -867,7 +886,7 @@ type OfferView struct {
 }
 
 // project applies the IR42 role projections (and IR127 item 7: the current Offer) to a JobDetail.
-func (m Jobs) project(ctx context.Context, call *ops.Call, job *Job) error {
+func (Jobs) project(ctx context.Context, call *ops.Call, job *Job) error {
 	role := call.Principal.Role
 	if role == roleAdmin || role == roleContractor {
 		err := currentOffer(ctx, call, job)
@@ -895,7 +914,7 @@ func (m Jobs) project(ctx context.Context, call *ops.Call, job *Job) error {
 func currentOffer(ctx context.Context, call *ops.Call, job *Job) error {
 	role := call.Principal.Role
 	stmt := `SELECT id, tenant_id, version, created_at, updated_at, job_id, contractor_org_id, terms_version,
-			lower(visit_slot), upper(visit_slot), offered_at,
+			candidate_slots, offered_at,
 			offer_expires_at, access_valid_from, access_valid_until, decision, decided_by, decided_at, decline_reason
 			FROM maintenance.offers WHERE job_id = $1 AND ((decision IS NULL AND expired_at IS NULL) OR decision = 'accept')`
 	args := []any{job.ID}
@@ -911,7 +930,7 @@ func currentOffer(ctx context.Context, call *ops.Call, job *Job) error {
 	err := call.Tx.QueryRow(ctx, stmt+" ORDER BY offered_at DESC LIMIT 1", args...).
 		Scan(&offerView.ID, &offerView.TenantID, &offerView.Version, &offerView.CreatedAt, &offerView.UpdatedAt,
 			&offerView.JobID,
-			&offerView.ContractorOrgID, &offerView.TermsVersion, &offerView.VisitSlot.StartAt, &offerView.VisitSlot.EndAt,
+			&offerView.ContractorOrgID, &offerView.TermsVersion, &offerView.CandidateSlots,
 			&offerView.OfferedAt, &offerView.OfferExpiresAt,
 			&offerView.AccessValidFrom, &offerView.AccessValidUntil,
 			&offerView.Decision, &offerView.DecidedBy, &offerView.DecidedAt, &offerView.DeclineReason)
@@ -1015,7 +1034,7 @@ func technicianName(ctx context.Context, call *ops.Call, assignment *Assignment)
 
 // pendingOrLastProposal is the job's pending slot proposal, or else its latest one; found is false for a job without
 // one.
-func (m Jobs) pendingOrLastProposal(
+func (Jobs) pendingOrLastProposal(
 	ctx context.Context,
 	c *ops.Call,
 	job uuid.UUID,
@@ -1061,7 +1080,7 @@ func (m Jobs) shownAssignment(
 }
 
 // assignmentWhere is the job's Assignment that meets cond; found is false when none does.
-func (m Jobs) assignmentWhere(
+func (Jobs) assignmentWhere(
 	ctx context.Context,
 	call *ops.Call,
 	job uuid.UUID,
@@ -2224,7 +2243,7 @@ func eventsWhere(
 }
 
 // eventRows loads JobEvents (with their notes) matching where.
-func (m Jobs) eventRows(
+func (Jobs) eventRows(
 	ctx context.Context,
 	call *ops.Call,
 	where string,
@@ -2322,7 +2341,7 @@ func scanEvent(rows pgx.Rows) (Event, error) {
 // ---- state changes ----
 
 // lockJob loads a job in scope for update and checks the expected version.
-func (m Jobs) lockJob(ctx context.Context, call *ops.Call, id uuid.UUID) (string, error) {
+func (Jobs) lockJob(ctx context.Context, call *ops.Call, id uuid.UUID) (string, error) {
 	args := []any{id}
 
 	var (

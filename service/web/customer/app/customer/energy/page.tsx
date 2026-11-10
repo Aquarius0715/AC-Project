@@ -9,10 +9,12 @@ import { connection } from "next/server";
 import { actionMessage } from "@ac/web/lib/actionMessage";
 import { apiMode, coreAll, coreDisplay, coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
 import { i18nOf } from "@ac/web/lib/i18n";
-import { klLocal, summaryView, type ApiBaseline, type ApiEnergySummary } from "@ac/web/lib/energy";
-import { baselineLabel, baselinesFor, compareRow, dayRanges, periodKinds, periodRange, pickUnits, selectionQuery } from "@ac/web/lib/clientEnergy";
+import { summaryView, type ApiBaseline, type ApiEnergySummary } from "@ac/web/lib/energy";
+import { baselineLabel, baselinesFor, compareRow, dayRanges, periodKinds, periodRange, pickUnits, previousMonth, selectionQuery } from "@ac/web/lib/clientEnergy";
 import { EnergyDemo } from "./_components/energy-demo";
 import { EnergyView, type EnergyLive } from "./_components/energy-view";
+import { queryReader } from "@ac/web/lib/searchParams";
+import { orNull } from "@ac/web/lib/promises";
 
 
 export default async function CustomerEnergyPage({ searchParams }: Readonly<PageProps<"/customer/energy">>) {
@@ -21,20 +23,19 @@ export default async function CustomerEnergyPage({ searchParams }: Readonly<Page
   await connection();
   if (!apiMode()) return <EnergyDemo />;
   const sp = await searchParams;
-  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k] as string) : undefined);
+  const one = queryReader(sp);
   const [now, units, baselines, properties, prefs, display] = await Promise.all([
     coreNow(), coreAll<Unit>("units.list"), coreAll<ApiBaseline>("baselines.list"), coreAll<{ id: string; name: string }>("properties.list"),
-    coreOp<Preferences>("preferences.get", {}).catch(() => null), coreDisplay(),
+    orNull(coreOp<Preferences>("preferences.get", {})), coreDisplay(),
   ]);
   const i = i18nOf(display);
-  const own = units.map((u) => ({ id: u.id, name: u.displayName })).sort((a, b) => a.name.localeCompare(b.name));
+  const own = units.map((u) => ({ id: u.id, name: u.displayName })).toSorted((a, b) => a.name.localeCompare(b.name));
   const unitIds = pickUnits(units, one("unitIds"));
   const kind = periodKinds.find((k) => k === one("period")) ?? "7d";
   const period = periodRange(kind, now, { from: one("from"), to: one("to") }, i);
   const options = baselinesFor(baselines, unitIds);
   const baseline = one("baselineId") === "none" ? undefined : options.find((b) => b.id === one("baselineId")) ?? options[0];
   const name = new Map(own.map((u) => [u.id, u.name]));
-  const lastMonth = (() => { const d = new Date(now); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() - 1); return klLocal(d.toISOString()).slice(0, 7); })();
   const live: EnergyLive = {
     units: own,
     baselines: options.map((b) => ({ id: b.id, label: baselineLabel(b) })),
@@ -43,11 +44,11 @@ export default async function CustomerEnergyPage({ searchParams }: Readonly<Page
     daily: [],
     compare: null,
     query: selectionQuery({ unitIds, period: kind, from: one("from"), to: one("to"), baselineId: baseline?.id }),
+    lastMonth: previousMonth(now),
     unitIds,
     period,
     properties,
     prefs,
-    lastMonth,
   };
   if (unitIds.length > 0 && !period.error) {
     try {
@@ -59,18 +60,19 @@ export default async function CustomerEnergyPage({ searchParams }: Readonly<Page
       const base = total.totals.savedKWh === null ? null : total.baselineSnapshot?.baselineKWh ?? null;
       live.summary = summaryView(total, i);
       live.raw = { kWh: total.totals.kWh, baseline: base, tariff: total.tariffVersion, factor: total.factorSnapshot ? i.t("{region} {year} · {factor} kgCO₂e/kWh (demo factor)", { region: total.factorSnapshot.region, year: total.factorSnapshot.year, factor: total.factorSnapshot.kgCO2ePerKWh }) : null, coverage: total.coverage };
-      live.daily = days.map((d, i) => ({ label: d.label, actual: perDay[i].totals.kWh, baseline: base === null ? null : (base * (Date.parse(d.to) - Date.parse(d.from))) / 60_000 / minutes }));
+      live.daily = days.map((d, index) => ({ label: d.label, actual: perDay.at(index)?.totals.kWh ?? null, baseline: base === null ? null : (base * (Date.parse(d.to) - Date.parse(d.from))) / 60_000 / minutes }));
       if (unitIds.length > 1) {
         const rows = await Promise.all(unitIds.map(async (u) => {
           const b = baselinesFor(baselines, [u])[0];
           const [s, byDay] = await Promise.all([sum([u], period.from, period.to, b?.id), days.length <= 7 ? Promise.all(days.map((d) => sum([u], d.from, d.to))) : Promise.resolve(null)]);
           return { row: compareRow(u, name.get(u) ?? u.slice(0, 8), s, i.t), byDay: byDay?.map((x) => x.totals.kWh ?? 0) ?? null };
         }));
-        live.compare = { rows: rows.map((r) => r.row), series: rows.every((r) => r.byDay) ? rows.map((r) => r.byDay!) : null };
+        const byDays = rows.map((r) => r.byDay); // the daily series only when every unit has one
+        live.compare = { rows: rows.map((r) => r.row), series: byDays.every((d): d is number[] => d !== null) ? byDays : null };
       }
     } catch (error) {
       if (!(error instanceof CoreError) || error.error.code !== "VALIDATION") throw error; // an unusable period or unit set shows on the page
-      live.error = actionMessage({ code: error.error.code, messageKey: error.error.messageKey, fieldErrors: error.error.fieldErrors ?? {}, retryAfterSeconds: error.error.retryAfterSeconds }, i.t);
+      live.error = actionMessage({ code: error.error.code, messageKey: error.error.messageKey, fieldErrors: error.error.fieldErrors, retryAfterSeconds: error.error.retryAfterSeconds }, i.t);
     }
   }
   return <EnergyView live={live} />;

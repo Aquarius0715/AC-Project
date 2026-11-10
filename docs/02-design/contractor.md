@@ -101,7 +101,7 @@ Scope: FR-P02 / Main display pattern: **UI-DETAIL**. Service boundary: `jobs.get
 | reason | string/required for decline | 1–1000 characters | Decline reason |
 | expectedVersion | integer/required | Displayed job version | Conflict detection |
 | termsVersion | Read-only/required on submission | Delegation terms version | Basis for confirmation |
-| visitSlot / origin | Read-only | Fixed agreed visit time and Origin badge (IR113); no candidate date ranges | What is offered |
+| candidateSlots / origin | Read-only | The times the client agreed (one time after a proposal the client accepted) and the Origin badge (IR113, IR636); the contractor settles one when it assigns a technician; no candidate date ranges | What is offered |
 | partner proposal | slot + own qualified technician + reason 1–1000 | Open own offer only; one pending at a time (IR113) | Propose another time |
 
 **Steps**

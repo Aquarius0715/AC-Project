@@ -59,6 +59,7 @@ CREATE TABLE platform.outbox (
 );
 CREATE INDEX outbox_unpublished ON platform.outbox (occurred_at) WHERE published_at IS NULL;
 CREATE INDEX outbox_type_seq ON platform.outbox (event_type, seq);  -- consumers poll their event types in order
+CREATE INDEX outbox_tenant_seq ON platform.outbox (tenant_id, seq);  -- a tenant's position (Meta.eventCursor, IR699)
 
 -- Generic change capture (IR188): AFTER row triggers publish RowChanged:<schema>.<table> {op, row} with the columns
 -- named in the trigger arguments. Consuming services keep reference copies (<schema>.ref_<table>) of exactly those
@@ -151,7 +152,7 @@ CREATE TABLE platform.demo_clock (             -- demo environment only (DEMO_OP
 -- ---------------------------------------------------------------------------------------------
 -- identity
 -- ---------------------------------------------------------------------------------------------
-CREATE TABLE identity.permissions (           -- reference data: the 38 Permission values (IR107)
+CREATE TABLE identity.permissions (           -- reference data: the 39 Permission values (IR107, IR690)
   code        text PRIMARY KEY,
   resource    text NOT NULL,
   kind        text NOT NULL CHECK (kind IN ('read','write','action'))
@@ -166,6 +167,7 @@ CREATE TABLE identity.users (
   status        text NOT NULL DEFAULT 'active' CHECK (status IN ('invited','active','disabled','anonymised')),
   last_sign_in_at timestamptz,             -- business time of the latest sign-in (IR268)
   sign_in_auth_time timestamptz,           -- the identity provider's auth_time of that sign-in (IR268)
+  sign_in_host  text,                      -- the host name of the issuer of that sign-in; e-mails link there (IR721)
   sign_in_membership_id uuid,              -- the membership the sign-in account's claims name; null = not provisioned (IR462)
   created_at    timestamptz NOT NULL DEFAULT platform.app_now(),
   updated_at    timestamptz NOT NULL DEFAULT platform.app_now(),
@@ -243,7 +245,7 @@ CREATE INDEX qualification_grants_membership ON identity.qualification_grants (m
 
 CREATE TABLE identity.preferences (
   user_id               uuid PRIMARY KEY REFERENCES identity.users(id),
-  locale                text NOT NULL DEFAULT 'en' CHECK (locale IN ('en','ms')),
+  locale                text NOT NULL DEFAULT 'en' CHECK (locale IN ('en','ms','ja')),
   timezone              text NOT NULL DEFAULT 'Asia/Kuala_Lumpur',
   currency              char(3) NOT NULL DEFAULT 'MYR' CHECK (currency = 'MYR'),
   monthly_report_email  boolean NOT NULL DEFAULT false,
@@ -503,6 +505,7 @@ CREATE TABLE devices.devices (
   tenant_id                 uuid NOT NULL,
   serial                    text NOT NULL,
   iot_thing_name            text UNIQUE,         -- AWS IoT Core thing
+  mqtt_node                 text CHECK (mqtt_node ~ '^[A-Za-z0-9_-]{1,64}$'),   -- node_id of the ESP32 node: the <node> of smarthome/ac/<node>/... (IR635)
   certificate_arn           text,
   binding_id                uuid,
   unit_id                   uuid,                -- current binding (denormalised)
@@ -519,6 +522,7 @@ CREATE TABLE devices.devices (
   UNIQUE (tenant_id, id)
 );
 CREATE UNIQUE INDEX devices_serial ON devices.devices (tenant_id, upper(btrim(serial)));   -- duplicate serial CONFLICT (AT-T11-E)
+CREATE UNIQUE INDEX devices_mqtt_node ON devices.devices (tenant_id, mqtt_node) WHERE mqtt_node IS NOT NULL;   -- one device per node
 CREATE INDEX devices_unit ON devices.devices (tenant_id, unit_id);
 
 CREATE TABLE devices.sensors (
@@ -662,7 +666,7 @@ CREATE TABLE control.commands (
   unit_id             uuid NOT NULL,
   device_id           uuid,
   actor_membership_id uuid NOT NULL,             -- system-restriction / automation memberships for system paths
-  source              text NOT NULL CHECK (source IN ('ui','voice','automation','restriction','diagnostic','group')),
+  source              text NOT NULL CHECK (source IN ('ui','automation','restriction','diagnostic','group')),
   action              jsonb NOT NULL,            -- UnitAction | RestrictionAction
   diagnostic_run_id   uuid,
   job_id              uuid,
@@ -938,6 +942,8 @@ CREATE TABLE monitoring.measurements (
 ) PARTITION BY RANGE (observed_at);
 CREATE INDEX measurements_unit_metric ON monitoring.measurements (unit_id, metric, observed_at DESC);
 CREATE INDEX measurements_observed_brin ON monitoring.measurements USING brin (observed_at);
+-- the duplicate check of an ingested event (event_id): without it every reading scans the table
+CREATE INDEX measurements_event ON monitoring.measurements (event_id);
 -- Example partitions; production partitions are created ahead by pg_partman (premake 7, retention 35 days).
 CREATE TABLE monitoring.measurements_default PARTITION OF monitoring.measurements DEFAULT;
 
@@ -1064,7 +1070,7 @@ CREATE TABLE maintenance.offers (
   job_id             uuid NOT NULL,
   contractor_org_id  uuid NOT NULL,
   terms_version      text NOT NULL,
-  visit_slot         tstzrange NOT NULL,
+  candidate_slots    jsonb NOT NULL CHECK (jsonb_typeof(candidate_slots) = 'array' AND jsonb_array_length(candidate_slots) >= 1), -- Slot[]: the client's agreed times; the contractor picks one when it assigns a technician (IR636)
   offered_at         timestamptz NOT NULL,
   offer_expires_at   timestamptz NOT NULL,
   access_valid_from  timestamptz NOT NULL,
@@ -1767,7 +1773,7 @@ CREATE TABLE notify.deliveries (
 CREATE TABLE notify.templates (
   key        text NOT NULL,
   channel    text NOT NULL CHECK (channel IN ('inApp','email','whatsapp')),
-  locale     text NOT NULL CHECK (locale IN ('en','ms')),
+  locale     text NOT NULL CHECK (locale IN ('en','ms','ja')),
   version    int NOT NULL,
   subject    text,
   body       text NOT NULL,
@@ -1979,7 +1985,7 @@ BEGIN
 END $$;
 -- Later migrations: ALTER DEFAULT PRIVILEGES in each schema grants the same rights on new tables.
 
--- Reference data: the 38 permissions (IR107)
+-- Reference data: the 39 permissions (IR107, IR690)
 INSERT INTO identity.permissions (code, resource, kind) VALUES
  ('dashboard.read','dashboard','read'),
  ('asset.read','asset','read'),('asset.write','asset','write'),
@@ -1997,4 +2003,5 @@ INSERT INTO identity.permissions (code, resource, kind) VALUES
  ('mrv.read','mrv','read'),('mrv.write','mrv','write'),('mrv.review','mrv','action'),('mrv.factors','mrv','action'),
  ('offset.read','offset','read'),('offset.write','offset','write'),
  ('audit.read','audit','read'),
- ('partner.accept','partner','action'),('partner.assign','partner','action'),('partner.review','partner','action');
+ ('partner.accept','partner','action'),('partner.assign','partner','action'),('partner.review','partner','action'),
+ ('data.forceDelete','data','action');

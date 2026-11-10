@@ -7,12 +7,13 @@
 import { connection } from "next/server";
 import { notFound } from "next/navigation";
 import { EmptyState, Page as Screen } from "@ac/web/components/ui";
-import { coreAll, apiMode, coreDisplay, coreNow, coreOp, corePermissions, CoreError } from "@ac/web/lib/dal";
+import { apiMode, coreDisplay, coreNow, coreOp, corePermissions, CoreError, coreAllPage } from "@ac/web/lib/dal";
 import { auditItem, type ApiAudit } from "@ac/web/lib/audit";
 import { i18nOf } from "@ac/web/lib/i18n";
 import { activePeriod, intentText, unitRows, type ApiRestriction } from "@ac/web/lib/restrictions";
 import { ExceptionDemo } from "./_components/exception-demo";
 import { ExceptionView } from "./_components/exception-view";
+import { recover } from "@ac/web/lib/promises";
 
 
 export default async function AdminRestrictionPage({ params }: Readonly<PageProps<"/admin/restrictions/[id]">>) {
@@ -27,11 +28,11 @@ export default async function AdminRestrictionPage({ params }: Readonly<PageProp
     return <Screen><EmptyState title={t("No access")}>{t("Restrictions need restriction.read, restriction.write or restriction.override.")}</EmptyState></Screen>;
   }
   const [r, units] = await Promise.all([
-    coreOp<ApiRestriction>("restrictions.get", { id }).catch((error) => {
+    recover(coreOp<ApiRestriction>("restrictions.get", { id }), (error: unknown) => {
       if (error instanceof CoreError && error.error.code === "NOT_FOUND") notFound();
       throw error;
     }),
-    perms.has("asset.read") ? coreAll<{ id: string; displayName: string }>("units.list").then((items) => ({ items, total: items.length })) : Promise.resolve({ items: [] as { id: string; displayName: string }[] }),
+    perms.has("asset.read") ? coreAllPage<{ id: string; displayName: string }>("units.list") : Promise.resolve({ items: [] as { id: string; displayName: string }[] }),
   ]);
   const canAudit = perms.has("audit.read");
   const from = new Date(now.getTime() - 365 * 24 * 3600 * 1000).toISOString();

@@ -596,10 +596,19 @@ func (in *MemberInput) validateScopes(fieldErrs map[string]string) {
 		authz.RoleAdmin: {"tenant"}, authz.RoleClient: {scopeOrganization}, authz.RoleContractor: {scopeOrganization},
 		authz.RoleTechnician: {"unit", "property", scopeOrganization},
 	}[in.Role]
-	for _, sc := range in.Scopes {
-		if !slices.Contains(kinds, sc.Kind) {
+	seen := map[ScopeRef]bool{}
+
+	for _, scopeRef := range in.Scopes {
+		if !slices.Contains(kinds, scopeRef.Kind) {
 			fieldErrs["scopes"] = apperr.KeyInvalid
 		}
+
+		// a scope named twice is stored once, so the update would lose one without moving the scope version (IR661)
+		if seen[scopeRef] && fieldErrs["scopes"] == "" {
+			fieldErrs["scopes"] = apperr.KeyDuplicate
+		}
+
+		seen[scopeRef] = true
 	}
 
 	if in.Role == authz.RoleAdmin && len(in.Scopes) > 1 {
@@ -850,14 +859,14 @@ func checkScopes(ctx context.Context, call *ops.Call, input *MemberInput) error 
 	return nil
 }
 
-// checkSelfPromotion refuses a user granting themselves identity.write or restriction.override they did not hold
-// already (DD-A03).
+// checkSelfPromotion refuses a user granting themselves identity.write, restriction.override or data.forceDelete they
+// did not hold already (DD-A03).
 func checkSelfPromotion(ctx context.Context, call *ops.Call, input *MemberInput) error {
 	if input.UserID != call.Principal.UserID {
 		return nil
 	}
 
-	for _, permission := range []string{"identity.write", "restriction.override"} {
+	for _, permission := range []string{"identity.write", "restriction.override", "data.forceDelete"} {
 		if !slices.Contains(input.Permissions, permission) {
 			continue
 		}
@@ -1491,5 +1500,6 @@ func membersRevokeSessions(
 func RegisterMembers(r *ops.Registry) {
 	ops.Register(r, "members.list", membersList)
 	ops.Register(r, "members.save", membersSave)
+	ops.Register(r, "members.delete", membersDelete)
 	ops.Register(r, "members.revokeSessions", membersRevokeSessions)
 }

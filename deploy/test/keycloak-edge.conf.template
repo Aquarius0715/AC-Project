@@ -1,0 +1,32 @@
+# In front of Keycloak when it answers on several addresses (deploy/test/compose.multihost.yaml, IR651).
+# $host_ok comes from conf.d/00-hosts.conf (the PUBLIC_HOSTS list). Keycloak is told the host and port that were checked.
+map $http_host $forwarded_port {
+  ~:(?<fwdport>\d+)$ $fwdport;
+  default 80;
+}
+
+server {
+  listen 80;
+  server_name _;
+
+  # Keycloak's cookies and tokens make large headers
+  large_client_header_buffers 4 32k;
+  proxy_buffer_size 32k;
+  proxy_buffers 8 32k;
+  proxy_busy_buffers_size 64k;
+
+  location / {
+    if ($host_ok = 0) {
+      return 421;
+    }
+    proxy_pass http://keycloak:8080;
+    proxy_http_version 1.1;
+    proxy_set_header Host $http_host;
+    # what the sender put in these headers is dropped: they are set here, from the checked host
+    proxy_set_header X-Forwarded-Host $http_host;
+    proxy_set_header X-Forwarded-Port $forwarded_port;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_set_header Forwarded "";
+  }
+}

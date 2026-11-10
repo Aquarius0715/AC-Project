@@ -3,7 +3,8 @@
 // Server Actions of technician diagnostic control (FR-T10). Each one is a public endpoint: the DAL verifies the session
 // and the Core API authorizes it (technician:control.diagnose on an assigned job inside its work window, IR94).
 import { refresh } from "next/cache";
-import { coreOp, CoreError } from "@ac/web/lib/dal";
+import { coreOp } from "@ac/web/lib/dal";
+import { actionFailure } from "@ac/web/lib/actionFailure";
 import type { UnitAction } from "@ac/web/lib/contracts.gen";
 import type { ApiCommandRow, ApiRun } from "@ac/web/lib/techControl";
 
@@ -13,7 +14,7 @@ async function run<T>(fn: () => Promise<T>): Promise<ActionResult<T>> {
   try {
     return { ok: true, value: await fn() };
   } catch (error) {
-    return error instanceof CoreError ? { ok: false, messageKey: error.error.messageKey, code: error.error.code, fieldErrors: error.error.fieldErrors ?? {}, retryAfterSeconds: error.error.retryAfterSeconds } : { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
+    return actionFailure(error);
   } finally {
     refresh();
   }

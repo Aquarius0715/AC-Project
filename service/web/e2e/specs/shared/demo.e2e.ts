@@ -3,6 +3,7 @@
 // session. The clock is moved only with E2E_ADVANCE_CLOCK=1, because the demo clock never goes back.
 import { test, expect } from "../../fixtures/test";
 import { signIn } from "../../fixtures/auth";
+import { must } from "../../fixtures/must";
 
 test("the panel is labelled demo and shows the Core API clock", async ({ page }) => {
   await page.goto("/demo");
@@ -10,6 +11,12 @@ test("the panel is labelled demo and shows the Core API clock", async ({ page })
   await expect(page.getByRole("main")).toContainText(/\d{4}-\d\d-\d\d \d\d:\d\d UTC/);
   await expect(page.getByRole("button", { name: "Reset demo data" })).toBeDisabled();
   await expect(page.getByRole("button", { name: /Delay transport/ })).toBeDisabled();
+});
+
+// IR641: a minute, then 1, 2, 4, 8, 12 and 24 hours (nothing is pressed: the demo clock never goes back)
+test("the clock has a button for each jump", async ({ page }) => {
+  await page.goto("/demo");
+  for (const name of ["+1 min", "+1 hour", "+2 hours", "+4 hours", "+8 hours", "+12 hours", "+24 hours"]) await expect(page.getByRole("button", { name, exact: true })).toBeEnabled();
 });
 
 test("the clock moves forward by a minute", async ({ page }) => {
@@ -31,7 +38,7 @@ test("a device loses its connection and gets it back", async ({ page }) => {
   const online = options.findIndex((o) => o.endsWith(' · online') && !o.startsWith("Mock · "));
   test.skip(online === -1, "no online device to take offline");
   await select.selectOption({ index: online });
-  const unit = options[online].split(" · ", 1)[0];
+  const unit = must(options.at(online)).split(" · ", 1)[0] ?? "";
   await page.getByRole("button", { name: /Device offline/ }).click();
   await expect(page.getByText(`${unit}: connection lost`)).toBeVisible();
   await expect(select.locator("option:checked")).toHaveText(/ · offline · fault open$/);
@@ -42,17 +49,13 @@ test("a device loses its connection and gets it back", async ({ page }) => {
 
 test("Expire session asks to sign in again", async ({ browser, app }) => {
   // a sign-in of its own: expiring deletes the stored session (IR382), which the project's other tests share
-  const context = await browser.newContext({ baseURL: app.url, storageState: { cookies: [], origins: [] } });
-  try {
-    const page = await context.newPage();
-    await signIn(page, app);
-    await page.goto("/demo");
-    await page.getByRole("button", { name: /Expire session/ }).click();
-    await expect(page).toHaveURL(/\/login\?error=expired$/);
-    await expect(page.locator('[role="alert"]:not(#__next-route-announcer__)')).toContainText("Your session ended"); // the banner, not Next.js's route announcer
-    await page.goto(app.home);
-    await expect(page).toHaveURL(/\/login\?returnTo=/);
-  } finally {
-    await context.close();
-  }
+  await using context = await browser.newContext({ baseURL: app.url, storageState: { cookies: [], origins: [] } });
+  const page = await context.newPage();
+  await signIn(page, app);
+  await page.goto("/demo");
+  await page.getByRole("button", { name: /Expire session/ }).click();
+  await expect(page).toHaveURL(/\/login\?error=expired$/);
+  await expect(page.locator('[role="alert"]:not(#__next-route-announcer__)')).toContainText("Your session ended"); // the banner, not Next.js's route announcer
+  await page.goto(app.home);
+  await expect(page).toHaveURL(/\/login\?returnTo=/);
 });

@@ -415,7 +415,7 @@ Return AdminSummary.energySummary to dashboard.read holders. Targets are nonarch
 
 ## IR64 Contact-window input and visibility — REV18-020
 
-contactWindow is 0–200 code points after trim. If it contains '@', or if removing whitespace, hyphens, parentheses, and '+' leaves at least seven consecutive digits, return VALIDATION (fieldErrors.contactWindow, messageKey=errors.contact_details_forbidden). Return JobDetail.contactWindow only to the client (own job), HQ job.write, the assigned technician within the viewing window (IR49), and the accepted contractor within the access window. Other projections use null. Do not include it in JobOfferSummary, JobHistorySnapshot, or notification params. Complete detection in free text is not guaranteed (DDC-09). Input guidance and handling of time notation follow IR90 (REV19-017).
+contactWindow is 0–200 code points after trim. If it contains '@', or if removing whitespace, hyphens, parentheses, and '+' leaves at least seven consecutive digits, return VALIDATION (fieldErrors.contactWindow, messageKey=errors.contact_details_forbidden). The digits are the digits of any script and the separators, '+' and '@' include their full-width forms (０９０－１２３４－５６７８, ＋, ＠), so a number typed with a Japanese input method is refused like the ASCII one (IR640). Return JobDetail.contactWindow only to the client (own job), HQ job.write, the assigned technician within the viewing window (IR49), and the accepted contractor within the access window. Other projections use null. Do not include it in JobOfferSummary, JobHistorySnapshot, or notification params. Complete detection in free text is not guaranteed (DDC-09). Input guidance and handling of time notation follow IR90 (REV19-017).
 
 ## IR65 Voice target matching and syntax — REV18-021
 
@@ -964,6 +964,8 @@ Desktop screens are 1920×1080 responsive layouts (sidebar + main; columns befor
 ## IR113 Maintenance scheduling: preferred times, time proposals, partner acknowledgement, and job origin — 2026-10-02
 
 User request 2026-10-02 (Figma Client 07d/07k–07n, Admin 06-11–06-16, Contractor 02-22–02-24, Technician 02-33/02-34 and the “Maintenance scheduling — cross-role flow” board). The client chooses the visit time; nobody else may book a time the client did not choose or accept.
+
+*IR636 (2026-11-07) revises what an Offer holds: it carries every agreed time (`candidateSlots`) instead of one `visitSlot`, and the contractor settles the time when it assigns a technician. Where items 3, 5, 6, 7, 9 and 10 below say `visitSlot`, read the candidate times of IR636.*
 
 1. **Origin.** `MaintenanceJob.origin` is `periodic_plan` when `planId≠null` and `client_request` otherwise (including jobs HQ enters on a client's behalf with `jobs.create`). Every job list and detail of every role shows the origin badge (Client request / Periodic plan); `jobs.list` accepts `filters.origin`.
 2. **Preferred times.** A client `jobs.create` sends the 1st preferred time as `requestedStart/requestedEnd` and exactly 2 `alternativeSlots` (2nd, 3rd). The three slots must be distinct, in the future and start on a later calendar day than now (Asia/Kuala_Lumpur), each 1–4 hours long; otherwise VALIDATION (`fieldErrors.alternativeSlots`). HQ on a client's behalf may send 0–2 alternatives. The Repository stores `preferredSlots=[requestedSlot, ...alternativeSlots]`, `preferenceRound=1`; `requestedSlot` and the IR38 `dueAt` default are unchanged. Plan-generated jobs have `preferredSlots=[]`.
@@ -4201,7 +4203,7 @@ No UI kit, icon set, or form, schema, query or translation library is added. Rea
 
 IR313 typed every call's input. The results were still typed by hand in the web, and nothing compared them with the contract. A new check does, and it found faults in the contract and in the web.
 
-1. **The check.** `shared/lib/__tests__/results.test.ts` (Vitest) runs on every coreOp / coreAll / callOp / useOp call with a literal operation. The result type the caller names, or TypeScript infers, must accept `OperationContracts[op].result`; for coreAll, an item of its page. The rules:
+1. **The check.** `shared/lib/tests/results.test.ts` (Vitest) runs on every coreOp / coreAll / callOp / useOp call with a literal operation. The result type the caller names, or TypeScript infers, must accept `OperationContracts[op].result`; for coreAll, an item of its page. The rules:
    - Every field the web reads is in the contract, with a type the web accepts. A field the contract allows to be null must allow null in the web too.
    - Below the top of a result, every variant the contract allows must fit, for example the kinds of a command's action.
    - At the top, and for the items of a page, the request or the role picks the variant. The screen names the projection or kind it reads, and each variant it names must fit. This applies to a union with a field that tells every variant apart. A union without such a field needs one variant that fits (payments.simulate, where the event decides).
@@ -6283,7 +6285,7 @@ The web's last character icons are Lucide icons, a test keeps characters from co
    - **"→ {version} installed"** in the technician's device history reads "{version} installed".
    - The web's `Icon` map gains `more` (Ellipsis), as the Figma set has.
 2. **Spacing.** Two icons that touched their text now have a gap: the location consent heading, and the Single AC / Group control buttons.
-3. **The guard, `shared/lib/__tests__/icons.test.ts`.**
+3. **The guard, `shared/lib/tests/icons.test.ts`.**
    - It parses every source file of the four apps and the shared package with the TypeScript parser. It reads string literals, template text and JSX text, but not comments. The Malay dictionary is included.
    - It refuses symbol and pictograph characters, an arrow, ‹ or › at the start or end of a text, and "+ " before a label.
    - An arrow between words, and a separator with spaces on both sides on the same line, are typography and pass.
@@ -8831,3 +8833,1069 @@ The user asked to take node_2's data in. node_2 now reports the room too: on 202
 6. **Development stack.** The migrate and bridge images were rebuilt, and migrate ran again ("Live · Daikin AC, Live · node_2 sensors"). The new unit came in online with its two sensors and binding, and change capture copied it to the billing, energy and notify domains.
    - After the bridge restarted, node_2's readings landed on the sensor unit every minute (28.9 °C, 60.2 %). The air conditioner kept node_1's temperature and humidity and node_2's power.
    - The data was read only, and no command was sent.
+
+## IR628 customer-a sees the demo data, customer-b the real devices (DEC-92) — 2026-11-04
+
+The user wants a test deployment that other people can open and that shows the same state from the seed alone. The default client users split it: customer-a with the demo data only, customer-b with the real devices' data. The other default users stay as they are. Asked about the details, the user took the three recommendations: the mock fleet moves to customer-a, the live site's own customer leaves the seed but stays in the development database, and customer-b has no end of access.
+
+1. **Live site on Demo Customer B (`seed.LiveSite`, `ApplyLive`).** The property "Live sensors" with its room, the air conditioner and node_2's sensor unit is now Demo Customer B's. The seed no longer makes a customer, an owner, an account request or a set-up e-mail of its own: "Live Sensor Customer" (DEC-87, IR525) is gone from the seed, and the fixture's customer-b is the client who sees the site. The fixture must be loaded first.
+2. **customer-b keeps its access.** The fixture's memberships end on 2026-10-01 on the scenario clock, about 17 days after a fresh seed.
+   - While the live site is seeded, `ApplyLive` clears customer-b's end date and raises the membership's version. An end date set later is cleared at the next start.
+   - A revoked access stays revoked.
+   - customer-a and the other users keep the fixture's dates.
+3. **Mock fleet on Demo Customer A (`devicesim/fleet.json`).** The 20 simulated air conditioners, one per state pattern, moved from customer B to customer A.
+   - customer-a sees every state in the demo. customer-b sees only the real devices and the fixture's Home B.
+   - The IoT demo signs in as customer-a (`docker/iot-demo.sh`, `iot-demo.e2e.ts`).
+4. **Docs.** The README and the container design say who sees what. DEC-87 is superseded.
+5. **Tests.**
+   - `TestLiveSiteSeeds`: the site's customer is the fixture's Demo Customer B. customer-b's fixture end date is cleared, and one set later is cleared at the next start. The site adds no one to the customer's user list.
+   - `TestLiveSiteRefusesATakenAddress` went with the owner.
+   - The integration tests do not load the mock fleet, which keeps its own test.
+6. **Development stack.** One transaction moved the existing records with their history:
+   - the mock fleet's property, 20 units, 18 bindings, 14 open alerts and 14 filter reminders to Demo Customer A;
+   - the live site's property, 2 units, 2 bindings and 2 resolved alerts to Demo Customer B.
+
+   Readings and commands follow their units. Change capture updated the energy and notify copies. migrate then ran with the new seed ("live sensor site of Demo Customer B ready"), which cleared customer-b's end date, and the bridge restarted. "Live Sensor Customer" stays with its two owners and no units.
+   - Signed in, customer-b's overview lists Bedroom AC B, Live · Daikin AC (29.8 °C, 57.1 %, 8 W) and Live · node_2 sensors (29.6 °C, 59.1 %). customer-a's lists its four units and the 19 active mock units.
+   - The customer, HQ and scenario E2E passed on this stack with Node 26: customer 43 passed, admin and scenarios 63 passed, the skips by design. One customer run on Node 23 failed only for want of `Uint8Array.toHex`.
+   - No command was sent.
+
+## IR629 A test tag deploys the stack to the lab server (DEC-93) — 2026-11-04
+
+The user wants continuous deployment: pushing a tag like `test1.0.0r0` deploys the stack to the server of the real nodes' broker, where others open it. The server, as the user checked it, runs Ubuntu 26.04 (x86_64, 24 cores, 18 GiB of memory free) with Docker 29.9 and Compose v5.6. It is on the lab network, it reaches github.com and ghcr.io, and it runs other projects too: Grafana on 3000, Supabase on 5432 and the broker in Docker on 1883. The repository is public. The user runs the one-time set-up, takes HTTP on the server's address and ports, allows the real air conditioner's commands, and wants the data built again only when the schema changed.
+
+1. **The server pulls (`deploy/test/deploy.sh`).** A systemd timer runs the script every minute. It fetches the tags and takes the newest `test<major>.<minor>.<patch>r<n>`, then deploys it if two checks pass:
+   - the tag's commit is on `main`;
+   - the CI workflow passed on that commit (GitHub's public API, no token).
+
+   GitHub-hosted runners cannot reach the server. A self-hosted runner on a public repository would run the code of pull requests from forks on the machine that also switches the real air conditioner.
+2. **The server builds the images.** GitHub's container registry keeps a new package private, so the server would need a token, or each of the 13 images would have to be made public by hand. The server builds the images one at a time, tagged with the git tag (`IMAGE_TAG`), and keeps those of the last three deployed tags.
+3. **compose.yaml takes the deployment's values.** The default of each variable is this machine's value, so the local stack renders the same as before. The only addition is `APP_URL_*`, at the Go defaults, for the e-mail links:
+   - the apps' and Keycloak's URLs (`*_WEB_URL`, `KEYCLOAK_URL`);
+   - the published address and ports (`PUBLISH_ADDR`, `*_PORT`);
+   - the image tag, the realm file, and the secrets that were local values (Keycloak admin password, client secrets, session secret, internal token).
+4. **`deploy/test/compose.test.yaml`.**
+   - Only the apps (3200–3203), Keycloak (8281) and Mailpit (8225) are published, on all addresses.
+   - The stores, brokers and APIs stay inside the compose networks.
+   - The long-running services restart with the server.
+   - Keycloak keeps its data in a volume, so a recreated container keeps the accounts set up since the import.
+5. **The environment file (`deploy/test/setup.sh`).**
+   - It asks for the address and the real broker's login, then writes `~/ac-test/env` for its user only, with random secrets.
+   - `deploy/test/realm.py` writes the realm from `realm-ac.json` with the test URLs and those client secrets. The demo users keep their passwords.
+   - `docker/mosquitto/passwd.sh` reads another settings file through `ENV_FILE`.
+   - The settings file is never sourced by the shell, because the broker password may hold any character.
+6. **Plain HTTP works.**
+   - The session cookies are not `Secure` on HTTP (`session.ts`).
+   - The browser code that called `crypto.randomUUID` calls the new `randomId`. A page outside a secure context lacks `crypto.randomUUID`, and without the change the operation relay's writes and HQ's automation simulation failed there. `randomId` uses `getRandomValues` outside a secure context (`randomId.test.ts`).
+   - Two HQ specs made their relay's idempotency keys in the page; they now make them in Node, so the suite runs against such a page too.
+7. **Data, failures and reboots.**
+   - The data stays between deployments. When the migrations changed since the deployed tag, it is built again from the seed (version 1 is edited in place before the first release); `deploy.sh reset` does it by hand.
+   - A failed deployment brings back the tag before it, and a tag is tried three times.
+   - After a reboot, the first check starts the stack and restarts the API services once Keycloak answers (IR419).
+8. **Checked on this Mac as a trial.** The script deployed a local tag under the project `ac-test`, at the Mac's LAN address (10.100.1.2), without the real broker, beside the development stack.
+   - Keycloak and the four apps answered there. On those HTTP addresses the smoke crawl passed for the customer app and HQ (6), and the HQ automation and alert-policy specs, the technician's QR scan and the customer assistant passed.
+   - `deploy.sh reset` rebuilt the data and Keycloak's volume from the seed (scenario clock back to 14 Sept), and the four apps signed in again (12 passed).
+   - The CI check read `success` for a commit of main and `pending` for an unknown one.
+   - The trial was then removed (containers, volumes, the 13 images). The development stack ran on, untouched.
+
+## IR630 A test deployment shows its progress on GitHub (DEC-93) — 2026-11-04
+
+The first test deployment, `test1.0.0r0`, could be followed only in the server's journal. The user asked to see it on GitHub, and accepted a token on the server for that (recommended).
+
+1. **Deployments of the environment `test` (`deploy/test/github.py`).** Each tag becomes one GitHub deployment, and each step adds a status:
+   - queued while its CI runs;
+   - in progress at each step: checking out, the realm and broker logins, each image as n/13, starting the stack, waiting for the apps and Keycloak, the mock fleet's history;
+   - success, or failure naming the step that failed and the tag brought back;
+   - error when the tag is not on main or its CI failed.
+
+   A reset reports on the deployed tag's deployment.
+2. **The token.** `GITHUB_DEPLOY_TOKEN` in `~/ac-test/env` is a fine-grained token of this repository with only the Deployments permission (read and write). If it leaks, it can only write deployment statuses.
+   - Running `setup.sh` again asks for it when the file lacks it.
+   - Python reads it from the file, so it never appears on a command line that other users of the server could see.
+   - Without it nothing is sent.
+   - Nothing sent names the server, because the repository is public.
+3. **Reports never stop a deployment.** A report that fails is logged, and the deployment goes on.
+4. **A tag deploys with its own scripts.** When a tag changes `deploy/test`, the check checks the tag out and runs that tag's `deploy.sh`. A script change thus takes effect in the deployment that brings it.
+5. **Checked with stubs.** The real script ran in a sandbox, with Docker and GitHub's API replaced by stubs that record each call:
+   - with CI pending, one queued status was sent, and not repeated a minute later;
+   - with CI passed on a tag that changes the scripts, the script re-ran from the tag, sent the step statuses in order, then success, and recorded the tag as deployed;
+   - a failing build sent a failure naming "building the images (1/2)" and the way back, then started the tag before;
+   - the token went in the Authorization header only.
+
+## IR631 The test deployment runs on the lab server's runner, with its logs on Actions (DEC-94) — 2026-11-04
+
+The user wanted the build and deploy logs on GitHub Actions. IR630 showed only the steps, and only under Deployments. That needs the deployment to run as an Actions job on the server. A self-hosted runner on a public repository would run fork pull requests' code there, so the user chose to make the repository private and register the server as its runner.
+
+1. **The workflow (`.github/workflows/deploy-test.yml`).** It runs on a push of a tag `test<major>.<minor>.<patch>r<n>`, on the runner with the label `ac-test`. Its steps:
+   - It checks the tag out with the history.
+   - It refuses a commit that is not on `main`.
+   - It waits for the CI workflow of the commit: `deploy/test/ci_gate.py` uses the job's token with `actions: read`. It prints each change of the run's progress, fails when CI fails, and waits 60 minutes at most.
+   - It masks the values of the environment file's passwords, secrets, tokens and keys in the log.
+   - It runs `deploy/test/deploy.sh deploy TAG` from the checkout.
+
+   One deployment runs at a time, and a newer tag waiting replaces an older one that waits.
+2. **`deploy.sh` for the runner.**
+   - Each step is a group of its own in the log, and the image builds print their full output.
+   - A failure is an error annotation that names the step and the tag brought back.
+   - A deployment that works records its tree, and copies the script to `~/ac-test/deploy.sh` for the boot unit.
+   - The pull of the tags, the public-API CI check and the GitHub reports of IR629 and IR630 are removed, with `deploy/test/github.py`. The runner's token and the Actions run replace them, and the server keeps no GitHub token.
+3. **`setup.sh`.** It keeps the environment file and removes the first version's timer. It installs the unit `ac-test-boot`, which runs `deploy.sh boot` after a reboot: the stack starts again, and the API services restart once Keycloak answers (IR419). It ends with the runner's registration steps.
+4. **Checked with stubs.** The real scripts ran in a sandbox, with Docker and the API replaced by stubs:
+   - a first deployment, and one with the same migrations (data kept);
+   - one with changed migrations (data rebuilt once);
+   - a failing build, with its error annotation, the tag before brought back and the deployed tag unchanged;
+   - the boot step, and the status;
+   - the CI gate: a pass after two reads, a failure, the timeout, and the token sent only as a header.
+
+## IR632 CI and E2E run on the lab server's runner too (DEC-95) — 2026-11-04
+
+A private repository has 2,000 free Actions minutes a month on GitHub's runners, and CI with E2E used about an hour a push. The user asked to run them on the lab server's runner as well.
+
+1. **CI (`ci.yml`).** All seven jobs run on the runner (`[self-hosted, ac-test]`), each in a container of its own: `golang:1.26-bookworm` for the Go jobs, `node:26-bookworm` for the web jobs and `python:3.12-bookworm` for the docs.
+   - **Isolation.** The dependencies' code (npm install scripts, test tools) runs in the container. It does not run on the server, and it does not reach `~/ac-test/env`. The runner does not pass the Docker socket into a job container (its source mounts only the work, temp, tool and action directories).
+   - **Caches.** Docker volumes keep the Go module and build caches (`ac-ci-go`, `ac-ci-cache`) and the npm cache (`ac-ci-npm`) between runs.
+   - **PostgreSQL.** The Go suites' PostgreSQL service has no published port, because the server's own PostgreSQL has 5432. `socat` serves it at `localhost:5432` in the job container, where the tests look, so the tests keep their URLs.
+   - **Ownership.** A container works as root. Each job hands its workspace back to the runner's user at the end, or the next checkout could not clean it.
+2. **E2E (`e2e.yml`).** It runs on the runner's Docker, beside the server's services and the test environment.
+   - **The stack.** It is the compose project `ac-e2e` (`IMAGE_TAG=e2e`), built one image at a time. Its apps listen on `127.0.0.1:3300–3303`. Its stores and brokers are not published (`deploy/test/compose.test.yaml`). Keycloak 8081 and Mailpit 8025 keep their ports, because the specs open them.
+   - **The realm.** `deploy/test/realm.py` writes the realm with these URLs and random client secrets.
+   - **Playwright.** It runs in `mcr.microsoft.com/playwright:v1.64.1-noble` as the runner's user, on the host network, with its npm cache kept in `~/.cache/ac-e2e-npm`.
+   - **Teardown.** The stack is removed at the end. One run at a time.
+   - **When.** It takes 20 to 25 minutes on the only runner, so it runs every night on `main` at 02:00 in the lab (WIB, 19:00 UTC) and by hand on any branch, no longer on each push and pull request. The user asked whether to drop E2E, and chose this, the recommendation, over running it by hand only or deleting it. GitHub mails a failed night, and the specs still run locally (`npm run e2e`).
+3. **The deployment no longer waits for CI on the runner.** A deployment job that waited for CI would hold the only runner that CI needs. `ci_gate.py` with 0 minutes reads once, and exits 3 while CI still runs.
+   - When the tag is pushed, it deploys at once if CI passed on the commit already; otherwise the run ends with a notice.
+   - When CI completes on a push to main, `deploy-test.yml` also runs (`workflow_run`). It deploys the newest test tag on that commit unless that tag is deployed already.
+4. **Checked.**
+   - The four workflows parse, and their shell steps parse.
+   - The container images exist: `golang:1.26-bookworm`, `node:26-bookworm`, `python:3.12-bookworm`, `postgres:18` and `mcr.microsoft.com/playwright:v1.64.1-noble`.
+   - The CI gate's read-once mode answered 0, 3, 3 and 1 for a passed, a running, a not-started and a failed CI.
+
+   The workflows themselves first run once the runner is registered.
+5. **Fixed after the merge.** GitHub refused `e2e.yml` on every push ("context runner is not allowed here"), because the job's `env` named `${{ runner.temp }}`, and only steps see the runner context. The first step now hands the settings path to the later steps through `GITHUB_ENV`. `.github/actionlint.yaml` names the runner label, so `docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint` checks the four workflows with no finding. On the server the runner took its first CI jobs in their containers: Vitest and ESLint passed.
+6. **Go jobs on Debian 13.** Go lint failed on the server at "generated files are current". `make swagger` runs `scripts/swag_annotate.py`, which uses an f-string that Python 3.12 accepts and 3.11 refuses (line 379). `golang:1.26-bookworm` has Python 3.11. The Go jobs now run in `golang:1.26-trixie` (Python 3.13, psql 17, socat). The step passed there on main's commit.
+7. **Three runners.** One runner took the seven CI jobs one after another, 12 to 15 minutes a push. GitHub's runners would take about 7, but CI there costs about 24 of the free plan's 2,000 minutes a month a run (its $12 a month at $0.006 a Linux minute); self-hosted runners cost nothing. The user chose two more runners on the server.
+   - `deploy/test/add-runners.sh` installs them as `~/actions-runner-2` and `-3`, each with the label `ac-test` and a service of its own, from one registration token.
+   - The token is read without echo and reaches `config.sh` through `ACTIONS_RUNNER_INPUT_TOKEN`, which the runner reads and clears, never on a command line.
+   - Each runner takes one job at a time in its own work directory. The cache volumes are shared, and Go's and npm's caches are safe to use concurrently.
+8. **bash in the job containers.** The two Go suites failed at `go test` with "set: Illegal option -o pipefail": a job container's steps run in `sh` by default. `ci.yml` sets `defaults.run.shell: bash`. On the runner, the web jobs and the document validators passed in their containers, as did the suites' set-up (the PostgreSQL service through socat, the test databases).
+9. **git in the job containers.** On main's first run, Go lint failed at the generated-files check. Its `git diff` printed only its usage (exit 129): the runner's user owns the workspace and the container works as root, so git took it for no repository. The job now marks the workspace a `safe.directory` first. This was reproduced in `golang:1.26-trixie` with the workspace owned by uid 1000: exit 129 without the setting, 0 with it. The other six jobs passed on the three runners, in parallel; the Go suites took three minutes.
+
+## IR633 The shared test environment: the accounts and the real devices only (DEC-96) — 2026-11-04
+
+The test environment showed the demo: customer-a's demo data and the mock fleet's units, on the fixture's clock of September 2026, beside the real devices at customer-b. The user asked to leave the mock data out and to connect the real devices to customer-a only, two units. The user chose to remove everything of the demo but the accounts, to run on the real clock, and to keep the local stack and E2E as they are.
+
+1. **The accounts only.** With `SEED_ACCOUNTS_ONLY=1`, migrate loads the fixture's accounts (`seed.ApplyAccounts`): the tenants and organizations, the ten default users with their memberships, permissions, qualifications and organization or tenant scopes, the customers with their user lists, the consents and the default alert policy.
+   - **No end of access.** The fixture's dates are the scenario's: its access ended on 2026-10-01. An external technician's access must end (FR-A03), so it ends on 2099-12-31, and the qualifications hold as long.
+   - **None of the demo.** No places, models, devices, readings, allergen observations, emission factor, baselines, contracts, invoices, restrictions, commands, alerts, notifications, jobs, offers, assignments, rate cards or filter cleanings. The technicians' scopes name the demo's units, and the demo setting switches customer-a's offline rule off, so neither is loaded: the real units get the offline alert.
+2. **The live site at customer-a.** `SEED_LIVE_CLIENT=customer-a` puts the live site, the Daikin air conditioner and node_2's sensor unit, at the customer of that client of the fixture (`seed.LiveSiteAt`). Empty keeps customer-b (DEC-92). The site's own records keep their IDs, so a database has it at one customer. The IoT bridge's log no longer names the customer, which the database decides.
+3. **The real clock.** `DEMO_CLOCK_START=now` (`democlock.RealTime`) starts the shared scenario clock at offset 0.
+   - `compose.yaml` hands the value to every service with the clock and to migrate, which then adds the live site as of now. Its default, empty, keeps fixture.clock.
+   - A zero start now means the real clock, so `Config.DemoShared` tells the shared clock of a stack's services (`ConfigFromEnv`) from one local to the process (tests).
+   - The demo controls stay (`DEMO_OPS=1`): their Advance clock moves the shared clock ahead of the real time for every service.
+4. **The deployment.** `deploy/test/compose.live.yaml` holds the seed settings, and it moves the device simulator and the mock history to the profile `mock-fleet`, which the deployment never starts. `deploy.sh`:
+   - adds the file when the tag has it, and sets `DEMO_CLOCK_START=now`;
+   - removes the containers of the services it leaves out, because compose keeps a container whose service left the active profiles, even with `--remove-orphans`;
+   - no longer loads the mock fleet's history;
+   - builds the data again from the seed when the migrations or `compose.live.yaml` changed (`state/data`, which replaces `state/schema`).
+
+   The first deployment with this change therefore builds the data from the seed. That includes Keycloak's data, so the HQ users set up their one-time codes again.
+5. **Unchanged.** The local stack and E2E keep the demo, because `compose.yaml`'s defaults are unchanged: customer-a's demo data and the mock fleet, customer-b's live site, the fixture clock.
+6. **Checked.**
+   - Go tests: the accounts-only seed with the live site at customer-a, on an empty database with the schema; `LiveSiteAt` for no client, customer-a, a contractor and an unknown name; the real-time start stored at offset 0; `ConfigFromEnv`'s clock outside the demo, by default and with `now`.
+   - migrate on an empty database with the test settings, run twice. The first run logged `seeded the 10 accounts only` and `live sensor site of "Demo Customer A" ready ("Live · Daikin AC, Live · node_2 sensors")`; the names are quoted, because `SEED_LIVE_CLIENT` chose them. The second logged `fixture already loaded` and kept the site. identity-api, started there with `DEMO_CLOCK_START=now`, stored the offset 0. The database had two units, both Demo Customer A's, eight open memberships and two that end in 2099, and no job or contract. An unknown client stops migrate: `live site: "nobody" is not a client of a fixture customer`.
+   - `make test-all` (both suites, 32 packages), golangci-lint with 0 issues, `sh scripts/check.sh` (exit 0) and shellcheck of `deploy.sh` and `setup.sh`.
+   - `docker compose config` with the three files. migrate gets the four settings, and the 15 services with the clock get `now`. The simulator and the mock history are left out, and the IoT bridge runs. Without `compose.live.yaml`, as for a tag before it, the demo settings stay.
+
+## IR634 CI in three runner lanes, with the slow suites in parallel — 2026-11-04
+
+The user found the CI before a deployment slow, asked to order the jobs for the three runners so that a run is as short as it can be, and then to run in parallel whatever CI and E2E can.
+
+1. **A test that met the integration suite.** On main after PR #51, `TestApplyFixture` failed while the same commit had passed on its PR. It counted every row of `ac_test` not created at the seed time, and `go test ./...` runs the integration suite at the same time, which commits users, memberships, units and modules to `ac_test` at the current time. The test now seeds an empty database of its own, `ac_seed_fixture_test`, as `TestApplyAccounts` does (PR #52).
+2. **Three lanes.** The runners took the seven jobs in no fixed order: when the document validators, the longest job, started last, a run took up to 11 minutes. The jobs now run in three lanes, longest first. A job waits for the one before it in its lane with `needs`, and still runs when that one failed (`!cancelled()`), so every check reports. The job names are unchanged, so the deployment's `workflow_run` and the required checks keep working (PR #53).
+3. **The document regressions in parallel.** `check_review_regressions.py` ran its 102 mutation cases one after the other, each a full validator run: 346 s on the runner. The cases now run on `AC_DOC_WORKERS` workers, one per CPU up to 8, each on a copy of its own; a case changes files of its copy and restores them. The results keep the order of the cases. Locally: 3 min 2 s before, 29 s after, with the same output byte for byte.
+4. **The integration suite in shards.** Every integration test builds its own server on `AC_TEST_DB`, so tests on different databases never meet. `service/api/scripts/test-shards.sh` compiles the suite once and runs it in `SHARDS` processes (3 by default), the tests dealt to them in turn, each on a fresh database of its own (`ac_test_s1`…, or `ac_test_cluster_s1`… for the split services). `RESET=only` builds the databases one after the other and stops, because their migrations update the cluster-wide login roles; `RESET=0` keeps them. `make test-run`, `make test-cluster-run` and `make test-all` use it, and so do both Go jobs of CI; the Go tests job runs the packages beside the shards.
+   - One test depended on the order: `TestSearchIsLiteral` took its search term from the first row of each list, and in a shard that row was a contractor named "B" left by another test. It now takes the first row with a value of at least three characters.
+   - Locally the suite took 2 min 25 s in one process and about 1 min in three shards (1 min 15 s for the split services); `make test-all` 3 min 15 s before, 1 min 40 s after. Two more sharded runs passed.
+5. **The lanes after the change.** go-test-cluster → web-test → go-lint | docs → web-lint | go-test → web-typecheck: each about three minutes.
+6. **The E2E's images.** E2E built its 12 images one at a time, 207 s: the four Next.js apps about 160 s, the eight Go images about 50 s. The Go images now build together in one call; the Next.js apps stay one at a time, because four of those builds at once need several GB beside the server's other projects.
+7. **Left as they are.** The cost does not change: the runners are self-hosted, and GitHub does not bill their minutes; the lab server does the same work in less time. The E2E's Playwright specs keep one worker: they share the demo users and restore what they change, so two at once would see each other's changes. The deployment keeps building its images one at a time, for the same reason and because it serves the shared environment.
+
+## IR635 Devices are registered with their MQTT node ID; the IoT bridge reads them from the database (DEC-97) — 2026-11-07
+
+The user registered a new device in Admin with the serial set to the MQTT ID and found that nothing came in: the bridge's table of nodes was in the code (`iotbridge.LiveNodes`, the seed's live site), so a node needed a code change. The user asked to keep it in the database and register it from Admin. They answered two questions: one device per AC (one node per device), and the commands' node is set per device too.
+
+1. **The node ID is a field of the device.** `devices.devices.mqtt_node` (null, 1–64 of `A-Z a-z 0-9 _ -`, unique per tenant where set). It is not the serial: the serial is upper-cased and has no underscore (DD-T11), while the topic is matched exactly.
+2. **Operations (212 → 213 operations, 233 → 234 routes).** `devices.register` takes an optional `mqttNode` (trimmed, empty is none); the new `devices.setMqttNode` (admin:device.write, version required) sets, changes or clears it, with an audit row and a `DeviceMqttNodeChanged` event. The malformed value is a VALIDATION on `mqttNode` (`error.mqttNodeFormat`), a taken one a CONFLICT (`error.duplicateMqttNode`). `Device` has `mqttNode`.
+3. **The internal query `devices.mqttNodes`** (equipment domain, internal token and tenant, like `devices.connectionFault`) answers the bound devices that have a node ID: node, device, unit, whether the unit's model takes commands, and the device's sensors.
+4. **The bridge (`cmd/iotbridge`, `internal/iotbridge`).** It reads that query at start and every 30 seconds (`NodeRegistry`; a failed read keeps the last one). A message of a registered node becomes readings on that device's sensors: the field for each sensor's metric is a fixed table (`temp`, `humidity`, `power` with the voltage gate, as in device-firmware.md §5.2), so a device records what its model lists. A node nobody registered is heard but not recorded, and the log says so once. The gap, the connection and the heartbeat follow each device's own node. A command goes to the node of its unit's device when the model takes commands, and only with `REAL_MQTT_COMMANDS=1`; `REAL_MQTT_COMMAND_NODE` is gone.
+5. **Admin.** Register device has an optional MQTT node ID; the device detail shows it with Edit… (set, change, clear). The technician app registers without one.
+6. **The development seed (`seed.LiveSite`)** follows one device per node: "Live · Daikin AC" is device LIVE-AC-NODE-1 on node_1 (temperature, humidity, the power command), and node_2's device LIVE-NODE-2 on "Live · node_2 sensors" now also has the supply power (the energy boundary `ac_input_electricity`). The AC's own page no longer shows the power. An installation seeded before needs a reset; the test environment is rebuilt from the seed with the migration.
+
+## IR636 The contractor settles the visit time when it assigns a technician (DEC-98) — 2026-11-07
+
+User request 2026-11-07: a maintenance job goes customer → HQ → contractor, and HQ narrowed the client's preferred times to one at `jobs.offer`. It should not: the contractor is the one who knows whether it can send someone, so the time is narrowed when the technician is assigned. HQ's own technicians are unchanged: HQ settles the time with `jobs.assign`.
+
+1. **An Offer holds the agreed times.** `Offer.visitSlot` and `JobOfferSummary.visitSlot` become `candidateSlots: Slot[]` (1 or more). `jobs.offer` no longer takes `visitSlot`: the server stores the job's agreed times that have not ended — the current `preferredSlots` in the order the client ranked them, then the slots of accepted SlotProposals, or, when there are none, the plan occurrence (IR113 item 3). If none is left the call is VALIDATION `candidateSlots=error.past`; HQ proposes another time (IR113 item 4).
+2. **Offer rules.** `offerExpiresAt ≤ accessValidUntil` (`error.afterAccess`, clock-free) and not after the last candidate starts (`error.afterVisit`, IR457); the access window covers every candidate (`accessValidFrom ≤` the earliest start and the latest end `≤ accessValidUntil`, `error.accessMustCoverVisit`). The rules that need the candidates are checked after the job is read, so they are VALIDATION like the others.
+3. **The contractor's assignment.** From `accepted`, `jobs.assign` by the contractor takes a slot equal to one of the offer's `candidateSlots` that has not ended (otherwise VALIDATION `errors.slot_not_agreed`; an ended one `endAt=error.past`, IR456). From `assigned` the contractor keeps the booked time while it has not ended (IR642) or moves to another candidate that has not ended — for example when the technician cannot make it (IR113 item 8) — and the new Assignment is `acknowledgement=pending` with `scheduledSlot` following it. HQ's assignments (from `requested`, a reassignment at the same slot) and the extension rules of IR49 are unchanged.
+4. **One candidate left.** When the client accepts a proposal that creates an Offer (IR113 item 5) or moves one (a contractor's time change, IR113 item 7), the Offer's candidates become that one time, and the access window follows as in IR454.
+5. **Reschedule.** For `jobs.requestReschedule` (IR113 item 6), until a technician is assigned the 48 hours count from the offer's earliest candidate.
+6. **Time change.** `jobs.proposePartnerSlot` with a time that is one of the offer's candidates is VALIDATION `slot=errors.slot_is_preferred`: the contractor assigns for it directly.
+7. **Notifications (IR95).** `jobs.assign` still sends `schedule_change` to the client, the technician and HQ, including a reassignment to another candidate; `jobs.offer` sends `job_update` ("HQ booked a service partner") and the time is not confirmed until a technician is assigned.
+8. **Screens.** Admin: the booking modal's "Offer to contractor" lists the times (read-only) with the default windows from the last of them (`offerDefaults`); "Assign internally" keeps one time. The Offer card reads "Times offered". Contractor: the offer shows "Times offered" (the list line is "{earliest} · +N more to choose from"); the schedule form lists the open times as a radio group (URL `slot`, the index among the open times) with the technicians for the chosen time, and a job whose booked time passed can be reassigned to an open candidate. Client: while a partner is booked and no technician assigned, the time reads "being arranged — one of your preferred times"; it is confirmed when the contractor assigns. Figma Admin 06-11, Contractor 02-22–02-24 and the cross-role flow board still show the fixed visit time and follow this item.
+9. **Data.** `maintenance.offers.visit_slot tstzrange` is replaced by `candidate_slots jsonb NOT NULL` (an array of Slot, at least 1) in schema.sql and migration 000001; demoSeed offers carry `candidateSlots`. A running database is patched by hand (`ALTER TABLE maintenance.offers ADD COLUMN candidate_slots …`, backfilled from `visit_slot`, then `DROP COLUMN visit_slot`).
+
+## IR638 Times are chosen, not typed — 2026-11-08
+
+The user found it a chore to type a time as digits, a colon and digits, and asked for a choice instead. They then chose to change every time field, the date-and-time ones too, to an hour select and a minute select, the minutes a quarter of an hour apart.
+
+1. **What was typed.** Three fields of the customer automations form (Start, End and Your usual time) were text boxes that took `HH:mm`; 13 fields were native `time` inputs and 36 native `datetime-local` inputs, which show a 12-hour clock in some browsers and can only be typed in on a desktop.
+2. **The pickers.** `TimeSelect` takes and gives the `HH:mm` string, `DateTimeSelect` the `YYYY-MM-DDTHH:mm` string of the native inputs, so the forms' state, their validators, the time-zone conversions (`zonedInput`, `fromZonedInput`, `zonedInstant`) and the Server Actions are unchanged. The hour list is 00 to 23, the minute list 00, 15, 30 and 45. They are native selects, so a phone shows its own picker.
+3. **Values off the quarter hours.** A stored or default value such as 07:10 is shown as it is, as one more minute in the list; the picker never rounds a value. An optional time starts its hour list with an empty choice, and the minute is chosen once there is an hour. In `DateTimeSelect` the time is chosen once there is a date, and a chosen date starts at 00:00 unless the form names another time. The `min` of a date-and-time field limits the day only; the form's validator still checks the time of day.
+4. **Forms and focus.** `Field` treats a picker as a labelled group, and an error marks each of its controls invalid, as for a single control (IR573). The first control takes the field's id, so a failed save still takes focus to it. The error of an empty automation time reads "Choose a time" instead of the format "HH:mm".
+5. **The HQ dashboard's custom period.** It wrote the URL when a native field lost focus. The two pickers write it at each choice, as the dashboard's other selects do; the page shows the choice at once and reads the dashboard when the URL changes.
+6. **Not changed.** Date-only fields stay native date inputs, with the browser's calendar. The contact-window text of a maintenance request is free text and keeps its `HH:mm` hint.
+7. **Tests.** Vitest covers the string handling (`timeParts`) and the pickers in a `Field`; the Playwright specs that filled a date-and-time field use `pickDateTime` (the date typed, the hour and minute chosen).
+
+## IR639 Japanese is a third display language (DEC-99) — 2026-11-08
+
+The user asked for Japanese to be selectable beside English and Malay, with every text translated and the voice assistant understanding Japanese.
+
+1. **The language.** `Locale` is `en|ms|ja` in `service-contracts.ts`, in the Go validators of `preferences.update` and `voice.resolveIntent`, and in the `CHECK`s of `identity.preferences.locale` and `notify.templates.locale`. Preferences, the Assistant's language select and the browser demo offer "日本語" under its own name. Anything else is still VALIDATION.
+2. **The texts.** `shared/lib/i18n-ja.ts` holds a Japanese text for each of the 5,754 English keys of `i18n-ms.ts`, in the same order, with the same `{placeholders}`. The key check of IR44 now runs on both dictionaries: every literal the code translates has a text in each, no entry is unused, no key repeats, every placeholder is kept, and no Japanese text stays English except names and formats that read the same (CO2, WhatsApp, MRV, RTO, templates of placeholders). The text is a draft until Business / UI / UX review it, like the Malay one.
+3. **Dates and times.** Japanese uses `ja-JP` formats ("2026/09/14 9:00 MYT"). Japanese takes the zone abbreviation from the English data, because `ja-JP` names Kuala Lumpur and Singapore "GMT+8"; English and Malay keep the abbreviations of their own data (the Malay one says SGT for Singapore, as before). One helper (`zoneName`) serves the times and the automation run times. Ordinals read "第1" (`partnerJobDetail.ordinal`).
+4. **Voice.** `voice.resolveIntent` accepts `温度 <room>`, `<room>を<integer>度に設定` and `ヘルプ` for `ja`, matched like the other grammars (the room by its exact Space name). An English phrase in Japanese, or the reverse, is unsupported.
+5. **A fixed bug.** The customer's report export saved the language as `en` or `ms` only, so a Japanese user who turned the monthly e-mail on would have been put back to English; it now keeps any language.
+6. **The payout PDF.** The statement PDF has a Courier font and ASCII only (everything else printed as "-"), so a Japanese user's PDF is written in English; the screen is Japanese.
+7. **Tests.** Vitest runs the dictionary checks per language and covers the Japanese date, the ordinal, the assistant's examples against the grammar, the PDF and the locale list; the Go integration tests save `ja` and resolve the three phrases; Playwright saves Japanese in Preferences, reads the shell back in Japanese and puts English back.
+
+## IR640 The contact window refuses full-width phone numbers and addresses — 2026-11-08
+
+Review round 3 of the maintenance module. `ContactWindowOK` (IR64) counted ASCII digits and looked for the ASCII `@` only, so a Japanese input method's `０９０１２３４５６７８`, `０９０－１２３４－５６７８`, `（０３）１２３４　５６７８`, `＋６０…` or `me＠example.com` was accepted, and so were Arabic-Indic digits; the request form's check (`contactError`) had the same gap. Both now read digits of any script (`unicode.IsDigit`, `\p{Nd}`) and the full-width separators (`－`, `（`, `）`, `＋`, the ideographic space) and `＠`; the Go test and the Vitest case use the same samples, plus times such as `平日 9:00〜18:00` that stay accepted.
+
+## IR641 The Demo clock moves by 1, 2, 4, 8, 12 and 24 hours as well — 2026-11-08
+
+The user asked for more jumps than a minute and an hour, to reach a deadline (an offer's expiry, an invoice's due date, a day's schedule) without pressing +1 hour many times.
+
+1. **The buttons.** Demo controls (FR-X05, DDC-07) show `+1 min`, `+1 hour`, `+2 hours`, `+4 hours`, `+8 hours`, `+12 hours` and `+24 hours`, in the Core API mode and in the browser demo; one list (`CLOCK_JUMPS`) drives the buttons, the target (`advanceTarget`) and the toasts.
+2. **The API is unchanged.** `demo.advanceClock` takes the target time and refuses only a time in the past (`errors.clock_backwards`, IR36); a jump of a day runs the deadlines once at the target time, like a jump of an hour.
+3. **A caution.** The clock never goes back and the running API cannot be reset (`make resetdb` rebuilds it offline), so a few presses of +24 hours move the dev stack past its seed's dates (bookings, qualifications).
+4. **Tests.** Vitest covers the jump list, the target of a day and the texts in English, Malay and Japanese; a component test presses the buttons; Playwright checks that the seven buttons are there (it does not press them, as the dev clock cannot be put back).
+5. **Not done here.** Figma Client 10e still shows two buttons.
+
+## IR642 A job whose booked time passed unworked is rescheduled by HQ's proposal — 2026-11-08
+
+Found in the review (B-1) and in the user's report: a job still `assigned` after its booked time had no way back. `jobs.assign` accepted a reassignment at the same, already ended time (IR456 refused only a first assignment), so the new technician could never open it; `jobs.proposeSlot` allowed an assigned job only after "can't make it", so an accepted assignment nobody started, and an accepted job whose offered times had all passed with nobody assigned, could not be rescheduled; the screens showed no way either.
+
+1. **Reassignment.** From `assigned`, `jobs.assign` keeps the booked time only while its end is after now; otherwise VALIDATION `endAt=error.past`, as for a first assignment. Moving to another candidate that has not ended (IR636) and the extension of a started job (D06) are unchanged.
+2. **HQ proposes another time.** `jobs.proposeSlot` is allowed for an `assigned` job when the technician cannot make it **or** the booked time has ended, and for an `accepted` job when the contractor's time change is pending **or** every candidate time of the accepted offer has ended (`INVALID_STATE` otherwise). The client's acceptance works as before: the assignment is revoked and the contractor's job returns to `accepted` with the proposed time as the offer's only candidate and its access window extended (IR454, IR636 item 4); an internal job gets the new assignment.
+3. **HQ's screen.** The delivery card of such a job shows why (the booked time passed and nobody started, or every time offered has passed) and **Propose another time…** (also on the "can't make it" banner); the jobs list keeps its `window ended` text and overdue filter.
+4. **The contractor's list** says "Ask HQ for a new time" for an unstarted job whose time ended, and keeps "Extend or reassign" for a started one.
+5. **The technician** keeps the viewing window of IR49 and IR124 (the unit and job detail close with it). The overview lists the job as "Work window ended — ask your contractor or HQ to extend or reassign" from its history snapshot, when the snapshot still reads assigned or in progress and the job was not completed.
+6. **Not done here.** A notification to HQ and the contractor when a booked time ends unworked (a scheduler job, notification type and templates) is a separate change; Figma is not updated.
+7. **Tests.** `TestOverdueAssignedJobIsRescheduled` (the past time is refused, HQ proposes, the client accepts, the contractor assigns the new time), `TestAcceptedJobWithNoTimeLeftIsRescheduled`; Vitest for HQ's `proposable`, the technician's ended row and the contractor's hint.
+
+## IR643 A second rate card for the same start time is refused on the field — 2026-11-08
+
+Review round 6 of the maintenance module. A contractor has one rate card per start time (`UNIQUE (contractor_org_id, effective_from)`), but `rateCards.save` did not check it: a second card for the same `effectiveFrom` hit the constraint and came back as an empty `409 CONFLICT`, which HQ's screen could only show as an unexplained conflict.
+
+1. `rateCards.save` is VALIDATION `effectiveFrom=error.duplicate` when the company already has a card starting at that time; HQ's screen reads "a rate card already starts then".
+2. The company's row in `maintenance.contractors` is locked for the save (`FOR UPDATE`), so two saves for it run one after the other: the next version number (`max(version) + 1`) and the check above see the first, instead of two concurrent saves taking the same version.
+3. Test: `TestContractorRegister` (a second card at the start time of version 2); Vitest for the refusal text in the three languages' dictionaries.
+
+
+## IR644 A report's work text and follow-up note are counted after trimming (review round 9) — 2026-11-08
+
+Submitting a report counted the work text and the follow-up note as typed, so a work text of ten spaces, or a follow-up note of spaces, passed the API although the technician's form refuses both (it counts the trimmed text). A report could therefore be submitted with nothing written.
+
+1. **The rule.** On submit, `workText` is 10–4000 Unicode code points after trimming, and a follow-up's `note` must have at least one character after trimming. This is the same trimming D12 applies to the reason fields; the stored text is not changed.
+2. **Not changed.** Saving a draft still accepts an unfinished text (the draft only caps the length); the technician's form already trims, so no web change.
+3. **Tests.** `TestSubmitErrors` covers a blank work text, a padded short one and a blank follow-up note.
+
+
+## IR645 A refrigerant record's cylinder ID is trimmed (review round 10) — 2026-11-08
+
+A report draft accepted a refrigerant record whose cylinder ID was only spaces (it counted the ID as typed), although the technician's form refuses it. The cylinder ID is what traces the refrigerant, so a record without one is worthless to the inspector.
+
+1. **The rule.** The cylinder ID is trimmed when a draft is saved, and it must have 1–`maxCodeLength` code points after trimming (`refrigerant=error.invalid` otherwise), as the part name already is.
+2. **Tests.** `TestDraftRefrigerantCylinder` covers a named, a padded, a blank, an empty and a tab-and-newline cylinder.
+
+
+## IR646 The sign-in pages are product pages (DEC-100) — 2026-11-08
+
+Every app's sign-in page was built for the demo: a fixed account, a “Continue as customer-a” button, “not real authentication” notices and English only; the password was typed on Keycloak's plain pages; and the reset page sent nothing. The user asked for a product sign-in for each service. They chose to brand the identity provider's pages (the password never passes through the apps), to remove the demo button, one theme for Client, Partner and Technician plus one for HQ Admin, and a language choice with a real reset.
+
+1. **The app's page.** Server-rendered (IR251). It shows the service name (`loginTitle`: Client, Partner, Technician, Admin) and its line, an `Email address` field and Continue. Continue is a plain GET form to `/bff/auth/login` with `login_hint` (the address), `returnTo` (kept inside the app's area, IR251) and `ui_locales`; it works without JavaScript. Other services are listed as links, and `?error=` still says why a sign-in came back. `nav.ts` no longer has a demo user or description per role.
+2. **The BFF.** `login_hint` is passed on only when it is an address of at most 320 characters (`loginHint`), and `ui_locales` only when it is `en`, `ms` or `ja` (`uiLocale`); anything else is left out, so neither can carry another value to the identity provider. State, PKCE and `reauth=1` (IR385) are unchanged.
+3. **The language before sign-in.** The language buttons post to a Server Action that keeps one of the three languages in the `ac_sign_in_locale` cookie (checked with `isLocale`; httpOnly, `SameSite=Lax`, a year). `coreDisplay()` reads it when there is no session, so `<html lang>` and the page speak it (IR489); with a session the saved preference still wins. English when none is kept.
+4. **The identity provider's pages.** Keycloak themes in `docker/keycloak/themes`: `ac` (parent `keycloak.v2`, so the element ids the E2E suite uses stay) with the AC Project logo, colour and texts in English, Bahasa Melayu and 日本語, and `ac-hq` (HQ Admin's title and accent), used by the `ac-admin-web` client. Keycloak ships no Malay, so `messages_ms` covers the sign-in path (sign-in, one-time code, reset, new password, two-step set-up, errors) and the reset and invitation e-mails (`ac` email theme); any other text falls back to English. The realm turns on the three languages, `resetPasswordAllowed` and the themes; the e-mail sender name is “AC Project”.
+5. **A password reset.** There is no reset page in the apps: the identity provider's sign-in page has Forgot password?, which sends the e-mail (to Mailpit in development) and sets the new password. `/forgot-password` leads to `/login` when an identity service is connected; the browser demo keeps its preview.
+6. **Existing realms.** Keycloak imports the realm file only when the realm does not exist, so `docker/keycloak/configure.sh` (the one-shot `keycloak-config` service of the compose stack, safe to run again) brings a realm that exists — the development stack, the shared test environment — to the same settings with `kcadm.sh`. In production Cognito's managed login takes the same branding, languages and recovery by e-mail.
+7. **The browser demo build** (no identity service, `DATA_SOURCE=mock`) keeps a Continue to the role home with a line saying so; it is the only place a demo account remains.
+8. **Not done.** The Figma Login frames of the four roles (the Figma tool was not available), and a Malay and Japanese review by Business / UI / UX (DEC-99's rule).
+9. **Tests.** Vitest: `login.ts` (`loginHint`, `uiLocale`), the BFF route (hint, language, PKCE, `reauth`), the language action, `coreDisplay` before sign-in, the dictionaries (both languages), the controls baseline. E2E: every spec signs in through the e-mail step; `sign-in.e2e.ts` chooses 日本語 and finds the identity provider's page in it with the address filled in, and sends a reset e-mail to Mailpit.
+
+
+## IR647 An amount in minor units stays within the safe-integer range (review round 13) — 2026-11-08
+
+The contract for money (implementation-contracts.md, Money) says an `amountMinor` is a nonnegative integer within JavaScript's safe-integer range. The API checked only the lower end, so HQ or a contractor could store 9,000,000,000,000,000,000 sen: the web shows such an amount rounded, and a sum of a few of them (an invoice total, a payout) wraps around in 64 bits.
+
+1. **The rule.** `money.InRange` (`platform/money`): 0 ≤ amount ≤ 2^53 − 1 (9,007,199,254,740,991). The refusal is the field's existing one: `amountMinor` / `priceMinor` / `costLines` / `lines` with `error.range` or `error.invalid`.
+2. **Where.** The inputs a person types an amount into: `contracts.save` (`priceMinor`), `invoices.create` (`amountMinor`), `jobs.saveCost` (cost lines), `jobs.recordWarrantyClaim` and the rate card's lines. Payment amounts are compared with the invoice's, and payout lines are computed by the server, so they need no input check.
+3. **Tests.** `TestAmountsStayInSafeRange` in `billing` and `maintenance` (over the range refused, the last valid amount accepted) and `money.TestInRange`.
+
+
+## IR648 The AI assistant is removed (DEC-101) — 2026-11-08
+
+The user no longer wants the AI assistant of the Client app (FR-X02: voice and text status checks, a confirmed temperature change and help, Figma Client 09a–09g). It is taken out of the code, the API, the database, the specification and Figma. The user decided two things: past data is deleted (a command with the source `voice` becomes `ui`, and the history label “· by voice” goes), and FR-X02 stays as a number recorded as withdrawn, with BIZ-03 out of scope. The older sections about it (IR09, IR44, IR65, IR115, IR153, IR258, IR306, IR537 and the review records) describe what was built then and stay as written.
+
+1. **Operations (213 → 212, 234 → 233 routes).** `voice.resolveIntent` and the `voice` module are gone, with the catalogs' rows, `ResolvedIntent` and its tests (`voice_test.go`, the IDOR and contract-result lines). The count checks (`validate_documents.py`, the Go tests of the generator, the registry, the gateway and the REST routes, `rest.test.ts`) say 212 and 233. The generated files (`catalog_gen.go`, `routes.gen.ts`, `contracts.gen.ts`, `contractInputs.gen.json`, `contractResults.gen.json`, swagger) are produced again.
+2. **`commands.create` has no `source` input.** A command a person asks for is always `ui` (`AuditResult` records only those, as before). The `source` of a stored command is `ui | automation | restriction | diagnostic | group`: the CHECK of `control.commands.source` (`schema.sql`, migration 000001) no longer has `'voice'`. A request that still sends `source` is a malformed input.
+3. **Existing databases.** A running database is brought to the same schema by hand (the project's rule for schema.sql edits): `UPDATE control.commands SET source = 'ui' WHERE source = 'voice'`, then the CHECK constraint is replaced without `'voice'`. The development database and `ac-test` are shared and are changed only after the user says so.
+4. **Web.** The header button and `AssistantPanel`, `lib/assistant.ts`, its Server Action, the microphone switch of Preferences (both the API and the browser demo views), the `assistant` and `mic` icons and the history label “· by voice” are gone; the Malay texts that nothing shows any more (71) are removed. Preferences keeps the location consent, now worded “Location, for location automations” / “withdrawal turns off location automations”. `Permissions-Policy` still denies the microphone, which nothing uses.
+5. **Specification.** FR-X02 is recorded as withdrawn (requirements, origins, traceability, company map, DEC-08); AT-X02-N/E/B, UC-C08/C09, `VoicePanel` / `VoiceContainer`, the D09 voice grammar, the Speech service rows, the persistence map row and the `FR-X02` ids of the screens are removed. The validators no longer expect them (`WITHDRAWN_CASES` for the acceptance patch AT-X02-B, the VoiceContainer checks, the `voice_panel_fetches` regression case).
+6. **Not done.** Figma: Client 09a–09g and their flow arrows, the header's Assistant button in the shell components, UC-C08/C09 on the Use Cases page, the User Flows page, the op and route counts of the System Architecture board (212 / 233) and the Preferences rows 10d/10g — the Figma tool was not available.
+7. **Tests.** `TestCommands` (a `source` input is malformed; the command is stored as `ui`), `units.test.ts` (no “by voice” label), `rest.test.ts` (212 / 233), the dictionary test (no entry that nothing shows), `icons.test.ts` (no unused icon), and the document validators.
+
+## IR649 The file of a replaced or cleared sign-off leaves the report (review round 15) — 2026-11-08
+
+A sign-off binds one signature (or an absence reason with a site photo) to the draft; its file is stored as an attachment of the report. Signing again, adding a photo (`attachments.add`) or saving the draft (`jobs.saveDraft`) replaces or clears the sign-off, but the earlier file stayed among the report's attachments. The technician's app shows every attachment but the current sign-off's as a photo, so an old signature appeared as a photo; and every one of them counted toward the 10 attachments of `attachments.add` (DD-T09), so after a few signatures a 10th photo, or any photo, was refused with `errors.too_many_attachments`. Signing again with nothing else changed stored one more file each time.
+
+1. **The rule.** The files of a draft's sign-off are deleted (rows of `maintenance.attachments`; the objects in the store stay, as for every upload that is not used) when the sign-off is replaced (`reports.signOff`) or cleared (`attachments.add`, `jobs.saveDraft`). In `attachments.add` this happens before the count, so the limit counts photos and the sign-off still to come.
+2. **Not changed.** A frozen version keeps its sign-off and its file (a returned or accepted report is read as it was signed); only the draft's are deleted. The limit stays 10 attachments of a report, and the current sign-off's file counts toward it.
+3. **Test.** `TestSignOffFilesFollowTheSignOff`: a second sign-off leaves one file, a photo added leaves the photo only, and saving the draft leaves the photo only (the second and the last two checks failed before the change).
+
+## IR650 `commands.get` withholds another actor's reason from a client, as `commands.list` does (review round 19) — 2026-11-08
+
+IR216 says that a client sees the commands of its organization's unit with the reason of a command someone else sent (a technician or HQ) withheld, and `commands.list` did so. `commands.get` did not: a client that knew a command's ID (the list shows every ID) read the internal reason a technician or HQ had written, for example “airflow check”.
+
+1. **The rule.** `commands.get` and `commands.list` apply the same function (`hideForeignReason`): for a client, the `reason` is null unless the client itself sent the command. HQ and a technician see the reason as before.
+2. **Test.** `TestCommandHistory`: a client's `commands.get` of a technician's command has no reason (it showed it before), and the technician's own `commands.get` still does.
+3. **Noted, not changed.** The documented authorization of `commands.get` for a technician is "assigned", while the code lets a technician with the unit in scope read any command of that unit; `commands.list` requires a held job. Proposal B-4 in the review proposals asks whether to apply the job rule to `get` too.
+
+## IR651 The shared test environment answers on several addresses (DEC-102) — 2026-11-08
+
+The test environment's apps and Keycloak had one fixed address (`CUSTOMER_WEB_URL`, `KEYCLOAK_URL` in the server's environment file): the lab network's. From the Tailnet the Sign in button led to that address, which a Tailnet device cannot reach. The user wanted both addresses to work. A Tailscale subnet route (the lab address reachable from the Tailnet) needs the Tailnet's administrator, who was not at hand, so the code takes both.
+
+1. **The setting.** `PUBLIC_HOSTS` in the environment file lists every host name or IP the stack answers on, the canonical one first (for example `10.100.1.17,100.99.169.116`). Empty or missing: nothing changes. The deployment adds `deploy/test/compose.multihost.yaml` when it is set.
+2. **The apps (BFF).** A request that came by a listed host gets that host in the sign-in redirect to Keycloak, in the callback address, in the sign-out redirect, in the Content-Security-Policy's `form-action` and in the links to the other apps (`oidcConfigFor`, `addressFor`, `shared/lib/publicOrigin.ts`). Any other Host header, which anyone can send, gets the canonical address, so no link, redirect or policy carries a host the deployment did not name. Cookies belong to the host, so a sign-in that starts on one address must end on it; it does.
+3. **Keycloak.** It builds its issuer, its pages and its links from the host of the request (`KC_HOSTNAME` unset, `KC_HOSTNAME_STRICT=false`, `KC_PROXY_HEADERS=xforwarded`). A header anyone can send must not choose that host (a password-reset e-mail would link to whatever the sender said), so Keycloak's own port is no longer published: nginx (`keycloak-edge`) is, answers 421 for a host that is not listed, replaces the forwarded headers with the host it checked, and passes the request on. The services reach Keycloak by `keycloak:8080` as before.
+4. **The tokens.** The tokens of a sign-in name the address it started on (their `iss`), so the APIs accept the issuer of each listed address: `OIDC_ISSUER` takes a comma-separated list (`OIDCVerifier.Issuers`; `deploy.sh` builds it from `KEYCLOAK_URL` and `PUBLIC_HOSTS`). A refresh or a logout by the apps calls Keycloak by its internal address and names the token's own address in `X-Forwarded-Host` (`issuerHeaders`), because Keycloak refuses a refresh token whose issuer is not the realm address the request names; without this a sign-out left the single sign-on running.
+5. **E-mails.** `identity-api` (set-up and invitation e-mails) names `IDP_PUBLIC_URL` (the canonical `KEYCLOAK_URL`) on its calls, so the link points at an address people can open and not at `keycloak:8080`. A password-reset e-mail asked for on the Keycloak page links to the address the person was on. The links the workers write (`APP_URL_*`) are the canonical address.
+6. **The realm.** `deploy/test/realm.py` writes the redirect URIs and web origins of each listed address for a new realm, and `docker/keycloak/configure.sh` (the `keycloak-config` service) sets them in a realm that exists.
+7. **Setting it up.** On the server, add the line `PUBLIC_HOSTS=10.100.1.17,100.99.169.116` (the addresses of the server) to `~/ac-test/env` and deploy a tag. The ports 3200–3203, 8281 and 8225 must be reachable on both addresses (they are published on all addresses, `PUBLISH_ADDR=0.0.0.0`). Open the apps by either address; a bookmark of either works.
+8. **Not changed.** The mail of a technician's invitation and the notifications the workers send carry the canonical address. The dev stack, CI and E2E keep one address (`PUBLIC_HOSTS` empty).
+9. **Tests.** Vitest: the host helper, the login route and the callback on a listed and on an unlisted host, `issuerHeaders`. Go: the verifier with several issuers, the Keycloak client's forwarded headers. By hand on the local stack with `localhost` and `127.0.0.1` as the two addresses: both sign in and stay on their address, a refresh after the access token's short life and a sign-out work on the second one, the invitation e-mail's link opens, the edge answers 421 for another host and ignores a forged `X-Forwarded-Host`.
+
+## IR652 HQ deletes devices and models that are in no use (DEC-103, phase 1) — 2026-11-08
+
+The user could not delete what HQ registers (devices first of all) and asked for every create, read, update and delete to work, mainly from the Admin screens. They chose: all master data (not the records that stand for what happened), a thing in use is refused with the reason, and one pull request per area. This is the first area, the devices.
+
+1. **`devices.unbind {deviceId, reason}`** (`admin:device.write`). A bound device leaves its unit; it stays registered. CONFLICT `error.notBound` for a device that is not bound, and a unit with work under way is busy, as for a bind. The binding row keeps its history and the sensors get new IDs, as when a device moves. Answers the `Device`. Event `DeviceUnbound`, audit `devices.unbind`.
+2. **`devices.delete {deviceId, reason}`** (`admin:device.write`). A device that is not bound (`error.deviceBound`), has no queued or running operation (`error.deviceBusy`) and is in no unfinished firmware campaign (scheduled, running or paused, with its row pending or installing: `error.deviceInCampaign`). It is deleted with its own records: sensors, bindings, operations, events and their notes, calibrations and its rows in firmware campaigns (a finished campaign's list loses that row). What other modules keep (commands, readings, alerts) holds the ID only and stays. Answers `DeletedResource`. Event `DeviceDeleted`, audit `devices.delete`.
+3. **`capabilities.delete {id, reason}`** (`admin:device.write`). A model no unit uses (`error.modelInUse`) and no firmware campaign, finished or not, names (`error.modelInCampaign`: the campaign's history names it); every version goes. Deleting finished campaigns comes with phase 1b.
+4. **The expected version** is the device's (`devices.get`) or the model's current version (`capabilities.list`); a stale one is CONFLICT; the reason is 1–1000 characters after trimming.
+5. **The screens.** Admin > Devices & models: the bound device offers Unbind… (beside Rebind…), the device detail has a Delete device row (Delete… is off while the device is bound or busy, with the reason shown), and a model has Delete model…. Each opens a dialog with a required reason; a refusal reads as the toast text of its key (`actionMessage`). English, Malay and Japanese.
+6. **Counts.** 212 → 215 operations, 233 → 236 routes (the generated files, the validators, the Go and web tests).
+7. **Not in this phase.** Firmware campaigns (`firmwareCampaigns.delete`), customers and contractor companies, HQ accounts, maintenance plans and rate cards, MRV baselines and factors; Figma (the tool was not available).
+8. **Tests.** `TestDevicesUnbindAndDelete` and `TestCapabilitiesDelete` (the refusals, the roles, the versions, the records left behind), the E2E of the device row, and the dictionary and contract tests.
+
+## IR653 HQ deletes a firmware campaign that has ended (DEC-103, phase 1b) — 2026-11-08
+
+The second part of the device area: the model delete of IR652 is refused while any firmware campaign names the model, finished or not, so the finished campaigns must be deletable.
+
+1. **`firmwareCampaigns.delete {id, reason}`** (`admin:device.write`, `DELETE /v1/firmware-campaigns/{id}`, DD-A20). Only a campaign whose state is `aborted` or `completed`; a `scheduled`, `running` or `paused` one is CONFLICT `error.campaignActive` (abort it first). The campaign and its device rows (`firmware_campaign_devices`) are deleted. The devices stay registered and the install operations stay in their history. Answers `DeletedResource`. Event `FirmwareCampaignDeleted`, audit `firmwareCampaigns.delete`.
+2. **The expected version** is the campaign's (`firmwareCampaigns.get`); a stale one is CONFLICT; the reason is 1–1000 characters after trimming; an unknown ID is NOT_FOUND.
+3. **The screen.** Admin > Devices & models > Firmware: a campaign that has ended offers Delete campaign… (reason required); after the delete the selection clears. English, Malay and Japanese.
+4. **Counts.** 215 → 216 operations, 236 → 237 routes.
+5. **Tests.** `TestFirmwareCampaignsDelete` (scheduled refused, roles, reason, versions, rows gone, device kept) and the dictionary and contract tests.
+
+## IR654 HQ deletes a customer or a contractor company registered by mistake (DEC-103, phase 2) — 2026-11-08
+
+A customer and a contractor company are made in two steps (the organization, then its profile: IR208, IR465). They are deleted the same way, in the opposite order, and only while nothing refers to them.
+
+1. **`customers.delete {id, reason}`** (`admin:asset.write`, `DELETE /v1/customers/{id}`, DD-A02). The customer is refused with CONFLICT `error.customerHasUnits` while any unit (archived ones too) belongs to it, and `error.customerInUse` while another domain holds a record of it: a job or cleaning reminder (maintenance), a contract, invoice or inquiry (billing), a restriction, an MRV report, offset quote or record (energy), a membership, a contractor-company user or a customer user (identity). Otherwise its properties, spaces and unit imports are deleted with it. The customer's alert policies and filter-care settings in other domains keep the customer ID only. Event `CustomerDeleted`, audit `customers.delete`.
+2. **`contractors.delete {id, reason}`** (`admin:job.write`, `DELETE /v1/contractors/{id}`, DD-A21). CONFLICT `error.contractorInUse` while any domain holds a record of the company: a job, offer, history snapshot or certificate (maintenance), a payout statement (billing), an account (identity). Otherwise its rate cards and unavailability are deleted with the profile. Event `ContractorDeleted`, audit `contractors.delete`.
+3. **`organizations.delete {id, reason}`** (`admin:asset.write`, `DELETE /v1/organizations/{id}`, DD-A02, DD-A21). The organization of a customer or a contractor company, after its profile is gone: CONFLICT `error.orgHasProfile` while a customer or contractor profile names it, `error.orgHasUsers` while a membership or a company user belongs to it, `error.orgOperator` for the HQ operator organization, which is never deleted. Event `OrganizationDeleted`, audit `organizations.delete`.
+4. **The checks across domains** are internal queries, one per domain, each on the domain's own tables (`maintenance.orgRecords`, `billing.orgRecords`, `restrictions.orgRecords`, `energy.orgRecords`, `identity.orgUsers`; the profile checks `assets.orgHasCustomer`, `maintenance.orgHasContractor`); `ops.OrgHasRecords` asks them all, so no domain reads another's tables (IR194).
+5. **The versions** are the customer's (`customers.list`), the company profile's (`contractors.list`) and the organization's (`organizations.list`); a stale one is CONFLICT; the reason is 1–1000 characters after trimming.
+6. **The screens.** Admin > Customers (Edit customer…): Delete customer… runs `customers.delete` and then `organizations.delete` with one reason, and returns to the list. Admin > Jobs > Contractors: Delete contractor… runs `contractors.delete` (when there is a profile) and then `organizations.delete`. A refusal shows the text of its key. English, Malay and Japanese.
+7. **Counts.** 216 → 219 operations, 237 → 240 routes.
+8. **Tests.** `TestCustomersAndOrganizationsDelete`, `TestContractorsDelete` (the refusals with their keys, the roles, the versions, the order), the E2E of a contractor company added by mistake, and the dictionary and contract tests. Not run against a rebuilt stack in this round: the E2E waits for the nightly run.
+
+## IR655 HQ deletes a maintenance plan and a rate card that nothing depends on (DEC-103, phase 4) — 2026-11-08
+
+1. **`plans.delete {id, reason}`** (`admin:job.write`, `DELETE /v1/plans/{id}`, DD-A06). A plan that has made no job; a plan with any job (finished or not) stays with its history: CONFLICT `error.planHasJobs`. The expected version is the plan's (`plans.get`). Event `PlanDeleted`, audit `plans.delete`. How to stop a running plan that has jobs is not part of this phase (it stays a proposal).
+2. **`rateCards.delete {id, reason}`** (`admin:job.write`, `DELETE /v1/rate-cards/{id}`, DD-A21). A rate card whose start is still ahead; one in effect, or one that was, prices payouts and stays: CONFLICT `error.rateCardStarted`. As in `rateCards.save`, rate cards take no expected version (a version sent is VALIDATION). The next card's version number is the highest left plus one. Event `RateCardDeleted`, audit `rateCards.delete`.
+3. **The reason** is 1–1000 characters after trimming; an unknown ID is NOT_FOUND.
+4. **The screens.** Admin > Jobs > Plans: Delete plan… on a plan with no generated occurrence. Admin > Jobs > Contractors: Delete rate card… beside each scheduled card. English, Malay and Japanese.
+5. **Counts.** 219 → 221 operations, 240 → 242 routes.
+6. **Tests.** `TestPlansDelete`, `TestRateCardsDelete` and the dictionary and contract tests. No E2E in this round.
+
+## IR656 HQ deletes a baseline, an emission factor and an MRV draft that nothing depends on (DEC-103, phase 5) — 2026-11-09
+
+1. **`baselines.delete {id, reason}`** (`admin:energy.write`, `DELETE /v1/baselines/{id}`, DD-A13). Every version of a baseline that no MRV report cites (a report's conditions name `baselineId`): CONFLICT `error.baselineCited` otherwise. The expected version is the current one (`baselines.list`). Event `BaselineDeleted`, audit `baselines.delete`.
+2. **`factors.delete {id, reason}`** (`admin:mrv.factors`, `DELETE /v1/factors/{id}`, DD-A14). Every version of a factor that no MRV report cites (`error.factorCited`) and that is not the default factor `energy.summary` uses (`error.factorDefault`). Event `EmissionFactorDeleted`, audit `factors.delete`.
+3. **`mrv.deleteDraft {id, reason}`** (`admin:mrv.write`, `DELETE /v1/mrv/{id}`, DD-A14). Every version of a report none of whose versions was reviewed (all `draft`, no review row): CONFLICT `error.reportReviewed` otherwise. The expected version is the latest version (`mrv.get`). Event `MRVReportDeleted`, audit `mrv.deleteDraft`. A reviewed report is a record and stays.
+4. **The reason** is 1–1000 characters after trimming; an unknown ID is NOT_FOUND; a stale version is CONFLICT.
+5. **The screens.** Admin > Energy > Baselines: Delete baseline…. Admin > MRV: Delete report… (on the latest version of an unreviewed report) and, in the factors tab, Delete factor…. All three use one dialog with a required reason. English, Malay and Japanese.
+6. **Counts.** 221 → 224 operations, 242 → 245 routes.
+7. **Tests.** `TestMRVDeletes` (cited and uncited, the default factor, a reviewed report, roles, versions) and the dictionary and contract tests. No E2E in this round.
+
+## IR657 HQ deletes an account made by mistake (DEC-103, phase 3) — 2026-11-09
+
+The user chose to delete accounts that were never used and to keep ending the others by revoking the access (a save with `validUntil`, IR492).
+
+1. **`members.delete {id, reason}`** (`admin:identity.write`, `DELETE /v1/members/{id}`, DD-A03). The expected version is the membership's (`members.list`). CONFLICT: `error.memberSelf` for the caller's own account; `error.memberHasOthers` while the person has another membership; `error.memberUsed` when an audit entry names the membership as the actor (every audited write, in any domain, leaves one, which covers the actor columns of the other tables) or when maintenance holds an assignment, a certificate (held or verified) or a filter cleaning marked by it (internal query `maintenance.membershipRecords`).
+2. **What goes.** The membership with its permissions, scopes and qualification grants, its location consent, its entry in a customer's or a contractor company's user list, and its person: preferences, two-step setting and the user row. Notifications addressed to the account in another domain keep the ID and are never shown. The audit entries about the account stay (the log is append-only).
+3. **The provider account.** When the person has a provider subject, the event `AccountDeleted` makes the `identity-accounts` consumer delete the user at the provider (`Provider.DeleteAccount`; Keycloak `DELETE /users/{id}`, an unknown user is already gone). Like the other account events it is best effort: a provider that does not answer is logged; the account has no membership, so it cannot sign in.
+4. **The reason** is 1–1000 characters after trimming; an unknown ID is NOT_FOUND; a stale version is CONFLICT.
+5. **The screen.** Admin > Settings > Access & roles: Delete account… beside Revoke access…, with the shared dialog (a required reason). English, Malay and Japanese.
+6. **Counts.** 224 → 225 operations, 245 → 246 routes.
+7. **Tests.** `TestMembersDelete` (roles, reason, version, a person with two accounts, an account that acted, the caller's own, the clean account and its person gone), `TestMembersDeleteRemovesTheProviderAccount`, the Keycloak client test, and the dictionary and contract tests. Not built: Cognito's `DeleteAccount` (the Cognito adapter is still planned, IR386).
+
+## IR658 A device that rejects a test run's start or end Command ends the run (review round 22) — 2026-11-09
+
+1. **The gap.** The DiagnosticRun table of implementation-contracts.md says that a start failure moves `awaiting_start` to `start_failed` and that a failure or expiry of the end Command moves `end_requested` to `end_failed`. Only the expiry (IR139 item 2) did. When the device rejected the Command (`command_fail`, status `failed`, code `DEVICE_REJECTED`), the run stayed `awaiting_start` or `end_requested` for good: the unit counted as busy for every other Command and run (D05) and the technician never saw the failure.
+2. **The rule.** A rejected start Command makes the run `start_failed` and a rejected end Command `end_failed`, both with `failureCode` = the device's code (`DEVICE_REJECTED`), in the transaction that fails the Command (`control.RunCommandFailed`). The end timer is not started and nothing is resent (the table's rule); the unit is free again.
+3. **Tests.** `TestDiagnosticRunDeviceRejection` (a rejected start, then a second run on the same unit, then a rejected end). No operation, route or screen changes; 224 operations, 245 routes.
+
+## IR660 An emission factor too small for its column is refused on its field (review round 29) — 2026-11-09
+
+`factors.save` accepted any kgCO2ePerKWh above 0 and up to 10. The column is `numeric(10,6)` with a check that the value is positive, so a value such as 0.0000004, which rounds to 0.000000 when it is stored, passed the validation and then failed the database's check: a 422 with no field named, the one case of this operation that VALIDATION did not explain.
+
+1. **The rule.** kgCO2ePerKWh is at least 0.0000005 (half of the column's step, the smallest value that is stored as 0.000001) and at most 10; below it VALIDATION `error.range` on `kgCO2ePerKWh`. Values with more than six decimals are still stored rounded to six, as before; the response shows the stored value.
+2. **Tests.** `TestFactors` (0.0000004 refused on its field) and `TestFactorRangeFollowsTheColumn` (the edges). No operation, route or screen changes; 224 operations, 245 routes.
+
+## IR662 A save of a customer's user keeps the end HQ gave the membership (review round 33) — 2026-11-09
+
+`clientUsers.save` keeps the user's membership in step with the list (IR461). For any status other than `disabled` it wrote `valid_until = NULL`, so a customer owner (or HQ) who changed only the role, or saved the user with the same status, removed an end that HQ had given the membership in `members.save` (a leaving date, an access that was meant to stop): the access became open-ended.
+
+1. **The rule.** The membership's end is rewritten only by a change to or from `disabled`: disabling ends it now (at least a second after its start); enabling again clears it. A save that leaves the status as it was changes the client role and the scope version and keeps the end.
+2. **Tests.** `TestClientUserSaveKeepsTheEndHQSet` failed before the fix (the end came back empty); `TestClientUserMembershipSync` still covers disable and enable. No operation, route or screen changes; 224 operations, 245 routes.
+
+## IR664 A customer's owner cannot send the set-up e-mail again after the access has ended (review round 42) — 2026-11-09
+
+`partnerUsers.resendInvite` refuses once the user's access has ended (`errors.access_expired`, IR461). `clientUsers.resendInvite` checked only that the user was still invited. When HQ ends the access of an invited customer user (`members.save`, IR508) the membership ends and the sign-in account is turned off; the user's list row stays `invited`. A resend then queued `AccountRequested`, whose consumer updates the provider account and sets it enabled again, so the customer's owner could open the sign-in account HQ had turned off (the API still refused the ended membership, but the provider account was on and a set-up e-mail went out).
+
+1. **The rule.** `clientUsers.resendInvite` is CONFLICT `errors.access_expired` when the user's membership has an end at or before now, as the partner one is; the resend gap (IR423) is checked after it.
+2. **Tests.** `TestClientUserResendRefusedAfterTheAccessEnded` answered 200 before the fix. No operation, route or screen changes; 224 operations, 245 routes.
+
+## IR661 A membership names each scope once (review round 32) — 2026-11-09
+
+`members.save` refused a permission named twice (`error.invalid`) but took a scope named twice and stored it once (`ON CONFLICT DO NOTHING`). The check that moves the membership's `scopeVersion` when an update changes its scopes compares the lengths and then asks whether every sent scope was there before, so an update that replaced the scopes [A, B] by [A, A] kept the same length, found every sent scope in the old list, and left the version where it was: B was gone and the sessions and cursors scoped to [A, B] stayed valid.
+
+1. **The rule.** The scopes of a membership are distinct (kind and ID): a repeated scope is VALIDATION `error.duplicate` on `scopes`, as a repeated permission is on `permissions`. An unknown kind keeps its `error.invalid`.
+2. **Tests.** `TestMembersSave` (a scope named twice is refused on its field). No operation, route or screen changes; 224 operations, 245 routes.
+
+## IR663 A write run again after a deadlock records its events and audit entries once (review round 40) — 2026-11-09
+
+`TxManager.Run` runs a transaction again, up to three times, when PostgreSQL ends it with a deadlock (40P01) or a serialization failure (40001). The operation pipeline builds the `Call` of a write before `Run` and the callback appended the events (`Call.Emit`) and audit entries (`Call.Audit`) of the handler to it; nothing emptied them when the callback ran a second time. The attempt that committed therefore wrote the events and audit entries of the attempt that had rolled back as well: the outbox carried every event twice (a notification, a projection or an account event handled twice) and the audit log every entry twice. The retry is rare (two writes that lock the same rows in opposite order), but when it happened the duplicates were silent.
+
+1. **The rule.** The callback of the pipeline empties `Call.Events` and `Call.Audits` at the start of every attempt, so a transaction records what the attempt that commits produced and nothing else.
+2. **Tests.** `TestRetriedWriteRecordsOneAttemptOnly` (a handler that emits and audits, then fails once with a retryable error under a runner that runs the callback again): it recorded two events and two audit entries before the fix. No operation, route or screen changes; 224 operations, 245 routes.
+
+## IR667 A property or unit is saved into a customer only after the customer delete has finished or never starts (review round 52) — 2026-11-09
+
+`customers.delete` (IR654) locks the customer row, looks for units, and deletes the customer's properties, spaces and imports. `properties.save` and `units.save` (new) read the customer's status with a plain `SELECT` (`customerActive`) and then insert. Under READ COMMITTED a save running at the same moment as the delete read the customer before the delete committed and inserted after the delete looked, so a property or unit of a deleted customer remained.
+
+1. **The lock.** `customerActive` reads the customer row `FOR SHARE`, as the parent reads of IR478 do: the delete waits for the save, or the save waits for the delete and finds no customer (NOT_FOUND). Nothing else changes: the same checks, the same errors.
+2. **Test.** `TestCustomerDeleteWaitsForASaveIntoTheCustomer` holds a delete of the customer row open in a second transaction and sends `properties.save`; before the fix the save answered 200 at once, now it waits for the commit and answers 404. No operation, route or screen changes.
+
+## IR668 A customer is deactivated only after its row is locked (review round 53) — 2026-11-09
+
+IR667 made `properties.save` and `units.save` read the customer row with a share lock. The deactivation in `customers.save` (status `inactive`, D05) checked for units, contracts and jobs first and updated the customer row last, so a unit save that had read the customer as active before the deactivation, and committed after its check, left an active unit under an inactive customer: the update waited for the share lock but did not look again.
+
+1. **The lock.** `canDeactivate` now locks the customer row (`FOR UPDATE`) before it looks for units: a unit save in flight is waited for and seen (CONFLICT `error.customerActive`), and a unit save that starts later waits for the deactivation and finds the customer inactive (CONFLICT `error.customerInactive`).
+2. **Test.** `TestCustomerDeactivateWaitsForAUnitBeingAdded` holds a unit insert with a share lock on the customer open in a second transaction and sends the deactivation; before the fix it answered 200 and left the unit under the inactive customer, now it waits and answers 409. No operation, route or screen changes.
+
+## IR659 A payout adjustment stays within the safe-integer range (review round 24) — 2026-11-09
+
+IR647 left the payout lines out of the amount range check because the server computes them. One kind is not computed: the adjustment line of an answered question carries the `adjustmentMinor` that HQ typed in `payouts.resolveQuery` (signed, non-zero). It was only refused when zero, so HQ could enter 9,000,000,000,000,000,000 or its negative: the next generated draft added it to the statement's gross or deductions, and a few of them wrap a 64-bit sum around.
+
+1. **The rule.** `adjustmentMinor` is a non-zero whole number whose size is at most 2^53 − 1 (`money.InRange` on its absolute value; the smallest int64, whose absolute value does not exist, is refused too): VALIDATION `error.range` on `adjustmentMinor` otherwise.
+2. **Tests.** `TestAmountsStayInSafeRange` (both signs, the last valid amount accepted) and `TestPayoutAdjustmentMinInt64`. No operation, route or screen changes; 224 operations, 245 routes.
+
+## IR665 A new CSV import preview removes the expired ones (review round 51) — 2026-11-09
+
+database-design.md says the 30-minute import previews (`assets.unit_import_previews`) are "purged after expiry", and the table has an index on `expires_at` for it, but nothing deleted them: a preview left only when its import was committed or its customer deleted, so every file anyone previewed and did not commit stayed in the table (the rows of up to 1,000 lines, resolved IDs included).
+
+1. **The rule.** `units.importPreview` deletes the previews of its tenant whose `expires_at` is at or before now (business time) in the transaction that stores the new one. A commit with an expired preview is unchanged (CONFLICT, as `units.importCommit` answers it today); the commit still deletes the preview it takes.
+2. **Tests.** `TestUnitsImportPreviewPurgesExpiredPreviews` (an expired and a live preview; only the live one is left after a new preview) failed before the fix. No operation, route or screen changes; 224 operations, 245 routes.
+
+## IR666 A CSV import keeps sibling names unique and is undone only while its places hold nothing else (review round 51) — 2026-11-09
+
+admin.md says unit names are unique among the non-archived units of a space (CONFLICT `error.duplicateSiblingName`) and that a property or space that still holds non-archived units or child spaces cannot be archived (CONFLICT `error.notEmpty`). Two parts of the CSV import (IR109, FR-A18) did not hold to this.
+
+1. **The commit.** The preview checks every row's name against the units there are; between the preview and the commit (up to 30 minutes) a unit with the same name could be saved, and `units.importCommit` inserted its unit without looking again, so two units of one space shared a name. The commit now checks the name after each insert, as `units.save` does: a name taken since the preview is CONFLICT `error.duplicateSiblingName` and the whole commit rolls back.
+2. **The undo.** `units.importUndo` archived the properties and spaces the import created with a plain update. A unit saved into such a property afterwards (or a second import into it) was left active inside an archived property. The undo is now CONFLICT `error.importPlaceInUse` while a created property or space holds a non-archived unit, or a non-archived location, that the import did not create; the created places are locked first, as the archive does (IR478).
+3. **Tests.** `TestUnitsImportCommitKeepsSiblingNamesUnique` and `TestUnitsImportUndoKeepsPlacesThatHoldOtherUnits` both answered 200 before the fix. No operation, route or screen changes; 224 operations, 245 routes.
+
+## IR669 A rename refused by the unique index answers the sibling-name conflict (review round 54) — 2026-11-09
+
+`locations.rename` checks before it writes that no sibling has the new name (DD-A02: unique among the non-archived siblings, CONFLICT `error.duplicateSiblingName`). A sibling saved with that name after the check and before the update (not committed when the check ran) is refused by the unique index (`properties_name`, `spaces_name`) at the update, and the refusal reached the caller as the generic CONFLICT `error.conflict`: the form could not show that the name is taken. The saves (`properties.save`, `spaces.save`) already map the index to `error.duplicateSiblingName` (IR208).
+
+1. **The mapping.** The update of `locations.rename` passes its error through the same `dupSibling` mapping as the saves. Nothing else changes (units have no index; their check is unchanged).
+2. **Test.** `TestRenameToANameTakenAtTheSameMomentIsAConflict` holds an uncommitted sibling with the new name and sends the rename: before the fix it answered CONFLICT with `error.conflict`, now `error.duplicateSiblingName`. No operation, route or screen changes.
+
+## IR670 The coverage list sorted by id follows the direction (review round 55) — 2026-11-09
+
+`units.coverage` takes the sort fields `id`, `name` and `dueAt` with a direction (DD-A19). The sort of the list put `id` ascending whatever the direction: the branch that breaks ties by unit ID also served the `id` field, so `sort=id:desc` answered the same order as `id:asc`.
+
+1. **The order.** `id` now follows the direction. `name` and `dueAt` are unchanged: they follow the direction, ties go by unit ID ascending, and the units without a warranty end stay last either way.
+2. **Test.** `TestSortCoverage` covers all three fields in both directions; before the fix `id` descending came out ascending. No operation, route or screen changes.
+
+## IR671 A serial or node_id taken at the same moment answers the specific conflict (review round 56) — 2026-11-09
+
+`devices.register` and `devices.setMqttNode` check before they write that no other device has the serial (CONFLICT `error.duplicateSerial`, D05) or the MQTT node_id (CONFLICT `error.duplicateMqttNode`). A device saved with the same value after the check and before the write (not committed when the check ran) is refused by the unique index (`devices_serial`, `devices_mqtt_node`) at the write, and the refusal reached the caller as the generic CONFLICT `error.conflict`: the form could not tell that the serial or node is taken. It is the same case as IR669 for the sibling names.
+
+1. **The mapping.** The insert of `devices.register` and the update of `devices.setMqttNode` pass their error through `dupDevice`, which turns a refusal of `devices_serial` into `error.duplicateSerial` and one of `devices_mqtt_node` into `error.duplicateMqttNode`. Nothing else changes.
+2. **Test.** `TestDeviceDuplicateTakenAtTheSameMoment` holds an uncommitted device with the same serial or node and sends the register with that serial, the register with that node and the node setting; each answered `error.conflict` before the fix and the specific key now. No operation, route or screen changes.
+3. **Test isolation.** The new test moved `TestPartnerUsers` behind `TestOfferAcceptAssign` and `TestWithdrawRollsBackWhenTheJobCannotBeUpdated` in its shard, which exposed a dependency: the first revokes the seed assignment of the external technician and restores it only when no test assignment holds the window, the second then revokes that test assignment, and the list no longer marked the technician as booked. `TestPartnerUsers` now restores the seed assignment (guarded the same way) before it asserts.
+
+## IR672 A unit is saved with a model only while the model row is read with a share lock (review round 59) — 2026-11-09
+
+`capabilities.delete` (DEC-103) locks the model row, then looks for units and campaigns that use it. `units.save` read the model's current capability version with a plain `SELECT` (`Models.CurrentVersion`) and then inserted or updated the unit, so a save that ran at the same moment as the delete read the model before the delete committed and wrote after the delete looked, and a unit remained whose model no longer exists. A new version of the model (`capabilities.save`, which moves the units to it) is the same case: a unit saved at that moment kept the old version.
+
+1. **The lock.** `Models.CurrentVersion` reads the current row `FOR SHARE`, as the parent reads of IR478 and IR667 do: the delete, or the update that retires the old version, waits for the save, or the save waits for it and finds no model (VALIDATION `modelId` `error.unknownModel`) or the new version. Nothing else changes.
+2. **Test.** `TestModelDeleteWaitsForAUnitSavedWithIt` holds a delete of the model row open in a second transaction and sends `units.save` with that model; before the fix the save answered 200 at once with the unit, now it waits for the commit and answers 422 `modelId=error.unknownModel`. No operation, route or screen changes.
+
+## IR673 `telemetry.series` by space waits for the work window of an external technician (review round 70) — 2026-11-09
+
+IR49(b) makes equipment reads (`telemetry.*`, `alerts.*`, `devices.*`, `units.get`) wait for the work window of an external technician: before `scheduledStart` they answer FORBIDDEN `errors.assignment_not_started`. `telemetry.series` with `unitIds` did so through `readableUnits` (the List-scope check plus `unitscope.Gate`). With `spaceId` the units came from `UnitsInSpace`, which reads in the List scope (the viewing window starts when the assignment is created), and the gate was not applied: an external technician with an assignment that had not started read the measurements of the unit by naming the room it stands in.
+
+1. **The gate.** The `spaceId` path of `telemetry.series` passes the units of the space through `unitscope.Gate`, as the `unitIds` path does. Everyone but an external technician passes; the answer for the technician is the same FORBIDDEN `errors.assignment_not_started` as by unit ID.
+2. **Test.** `TestUnitScopeExternalTechnicianAndContractor` also reads the series by the room of the unit: before the fix it answered 200 with the measurement before the work window, now 403 `errors.assignment_not_started`, and 200 inside the window. No operation, route or screen changes.
+
+## IR674 The unit QR scan answers a failed scan when the call has no answer (review round 72) — 2026-11-09
+
+The technician's “Scan unit QR” dialog (FR-T13, DD-T13) calls `units.resolveQr` and then `units.get` and `jobs.get` through the BFF. A refused call arrives as an error with its code and the dialog words it (`Page unavailable`, `Not a label`, `Scan failed`). A call that gets no answer at all — the phone loses the network on site, the request is cut — throws a plain network error instead. The dialog threw it again from its handler: the state stayed on `Reading the label…`, the Scan button stayed disabled, and only closing the dialog helped. Other forms word the same failure as `Not sent`.
+
+1. **The refusal.** `qrRefusalOf(error)` words whatever a scan threw: a refused call by its code as before, anything else as `Scan failed` / “The label could not be checked — try again.”, so the dialog is ready for another scan.
+2. **Test.** `techQr.test.ts` reads a network error as the failed scan and a NOT_FOUND refusal as before. No operation, route or screen layout changes.
+
+## IR675 A Server Action of the technician's job workspace answers unavailable when the Core API gives no answer (review round 76) — 2026-11-09
+
+The Server Actions of the technician's job workspace (acknowledge, check-in, pause, draft save, photo upload, sign-off, submit, resume rework) turned a refused Core API call into a result with its code and message, and threw every other error again. A call that gets no answer — the Core API is restarting or unreachable from the web server — is such an error: the page that called the action fell to its error boundary and was built again, and the checklist the technician had typed but not saved was gone, although the draft save is designed to leave the page as it is so that unsaved edits survive. The actions of the other apps return the unavailable result for it. The thrown error was only needed for the redirect to sign-in that the Data Access Layer raises when the session cookie is missing.
+
+1. **The failure.** `actionFailure(error)` words what a Server Action's call threw: a refused call by its code, message key and field errors; Next's own control flow (the redirect to sign-in) is thrown on as before; anything else is `UNAVAILABLE`, which the page shows as a message and keeps its state. The actions of the job workspace use it.
+2. **Test.** `actionFailure.test.ts` covers the refused call, the call without an answer and the redirect. No operation, route or screen layout changes.
+
+## IR676 Every Server Action answers unavailable when the Core API gives no answer (review round 77) — 2026-11-09
+
+IR675 changed the Server Actions of the technician's job workspace so that a Core API that gives no answer (restarting, or unreachable from the web server) reads as the unavailable result instead of an error thrown from the action, which sends the page to its error boundary and loses what the user has typed. Ten more Server Action files of the other apps had the same shape — a branch for a refused call and `throw` for everything else: HQ jobs (cost lines, plans, contractors), customer alerts and maintenance, and the contractor's team, schedule, history (note and preview), job detail, report review and payouts.
+
+1. **The failure.** Their final `throw` is `actionFailure(error)` (IR675): the refusal by its code, Next's own redirect through, anything else `UNAVAILABLE`. The history action builds its stage and note state on that result. No operation, route or screen changes.
+2. **Test.** `serverActionFailures.test.ts` reads every `actions.ts` of the four apps and refuses one that looks at `CoreError` without answering the other errors (through `actionFailure` or as `error.unavailable`); eight of the files failed it before.
+
+## IR677 A unit is given an alert policy, and a default rule is switched, only under a lock (review round 71) — 2026-11-09
+
+Two writes of Monitoring checked a row without a lock and so could both pass with a write that ran at the same moment.
+
+1. **Attaching a policy to a unit.** `units.setAlertPolicies` read the policy rows (`Policies.Owners`) with a plain `SELECT`; `policies.delete` locks the row and then detaches the units from it. An attach that read the policy before the delete committed, and inserted its link after the delete had looked for links, left a unit that carries the ID of a policy that no longer exists. `Owners` now reads the rows `FOR SHARE` (ordered by ID), as the parent reads of IR478, IR667 and IR672 do: the attach waits for the delete and finds no policy (NOT_FOUND), or the delete waits for the attach and detaches it.
+2. **Switching a default rule at version 0.** `policies.setDefaultRule` reads the stored setting `FOR UPDATE`, but with no stored setting there is no row to lock: two first switches of the same rule both saw version 0, and the second `ON CONFLICT DO UPDATE` overwrote the first and answered 200. The update now applies only `WHERE version = expected`, so the second switch finds the first one's row at version 1 and answers CONFLICT `error.versionConflict`. The upsert moved into `storeRuleSetting`.
+3. **Tests.** `TestPolicyDeleteWaitsForAnAttachToAUnit` holds an uncommitted delete of the policy and sends the attach (it answered 200 at once before the fix, now it waits and answers 404); `TestDefaultRuleFirstSwitchesAtTheSameMoment` holds an uncommitted first setting and sends a switch at version 0 (200 before, now 409 `error.versionConflict`). No operation, route or screen changes.
+
+## IR678 The one-time code input keeps the digits of a code pasted with a space (review round 82) — 2026-11-09
+
+The two-factor code of the settings screen is typed into `CodeInput`: six boxes drawn over one input. The input carried `maxlength="6"`. An authenticator app or a message shows a code as `123 456`, and a user copies it with its space: the browser cut the pasted text to six characters (`123 45`) before the component picked the digits out, so five digits were left and the last one was lost, with nothing on the screen to say so.
+
+1. **The input.** `CodeInput` has no `maxlength`. `onChange` already keeps only the digits and cuts them to the length of the code (`12ab34567890` gives `123456`), so the attribute only did harm on a paste.
+2. **Test.** `codeInput.test.tsx`: a code pasted as `123 456` or `654-321` gives six digits, a longer text is cut to the length and loses what is not a digit, and the input has no `maxlength` (it failed before). No operation, route or screen layout changes.
+
+## IR680 After a change that succeeded the screen is read again, and "saved" shows when the new screen does (round 89) — 2026-11-09
+
+The user reported that after pressing a button the setting or the change did not show on the screen. It was reproduced with the language of Preferences: the toast "Preferences saved" came first, and the shell (menu, buttons) kept the old language for a second or more — in four of four runs the old language was still there at the moment of the toast — and only a reload or the wait showed the saved one. `useAction` showed its toast the moment the Server Action answered, while the screen was read again only after that, by the `refresh()` the action itself asked for; and the screens that call a Server Action without `useAction` depend on that same `refresh()`.
+
+1. **`useAction`.** A change that succeeded now makes the page read its data again (`router.refresh()`, whatever the action asked for) inside the transition, so the transition lasts until the new screen is shown; the toast and the `after` of the call come then. A refused change is unchanged (the toast at once, no new read). The 75 uses of `useAction` follow.
+2. **Test.** `useAction.test.tsx` checks that a success asks the router for one new read and a refusal asks for none. The E2E `preferences.e2e.ts` counts the shell's buttons at the moment of the toast, with no retry: it failed on the earlier build (`[0, 1]`, still English) and passes now (`[1, 0]`).
+3. **Not in this change.** The screens that call a Server Action with their own `useTransition` and toast, without `useAction` (alert and default policies, billing contracts, notifications, the technician's alert evidence and a few more), keep relying on the action's `refresh()`; IR681 moves them to `useAction`. No operation, route or API changes.
+
+## IR681 The screens that call a Server Action with their own transition read the page again and show "saved" with the new screen (round 89) — 2026-11-09
+
+IR680 made `useAction` read the page again after a change that succeeded and show its toast only when the new screen is shown. Twelve other places call a Server Action with a transition or an `await` of their own and showed their notice or closed their dialog the moment the action answered, relying on the action's own `refresh()`, so the same lag was there: on the HQ default policy, the screen still showed the old policy version at the moment of "Default limits saved for every unit" (v11 at the toast, v12 a second later, on the running stack).
+
+1. **`useRefreshThen(pending)`.** The part of `useAction` that asks the router for a new read and runs the notice when the transition is over is a hook of its own; `useAction` uses it too. A screen with its own `useTransition` calls the function it returns on success, with what it did at once after the action (the toast, closing a dialog, selecting the saved record).
+2. **The screens.** HQ alerts (acknowledge, resolve and the others), alert policies (save, delete), the default policy (limits, a customer's switch), billing (invoice and payout actions), contracts (save, then the URL), the customer's alert read marks, the notification inbox (read, read all), the technician's alert evidence (acknowledge, resolve; its busy flag is now a transition) and the customer's unit page (attach alert policies). The demo test of an alert policy stores nothing and the screens that already call `router.refresh()` after a command's acknowledgement are unchanged.
+3. **Test.** `useRefreshThen.test.tsx` (one new read, the notice only when the transition is over, once). The E2E of the default policy counts the version on the screen at the moment of the toast with no retry: it fails on the earlier build and passes on this one. No operation, route or API changes.
+
+## IR679 The report export's "last month" is the Kuala Lumpur month (review round 87) — 2026-11-09
+
+The customer's Energy & cost screen offers the monthly report export. Its default month and the first of the twelve months in its list are "last month", which the page worked out as the UTC month before now and wrote in Kuala Lumpur time. For the eight hours at the end of every month in which Kuala Lumpur is already in the next month (from 16:00 UTC), that named the month before last: at 2026-12-31T20:00Z (Kuala Lumpur: 2027-01-01) it said 2026-11 instead of 2026-12; likewise 2026-11-30T17:00Z gave 2026-10 and 2026-03-31T16:30Z gave 2026-02.
+
+1. **The month.** `previousMonth(now)` in `lib/clientEnergy.ts` takes the Kuala Lumpur year and month of now and gives the one before it (January gives December of the year before). The page uses it.
+2. **Test.** `energy.test.ts` checks an ordinary day, the first of a month, January, and the instants at the end of a month in UTC (16:00 on the last day and a minute before it). No operation, route or API changes.
+
+## IR682 The notice of a change comes even when the change removes the screen that asked (review round 92) — 2026-11-09
+
+IR680 and IR681 moved the "saved" notice into an effect of the component that made the change, to run when the new read is on the screen. A delete (DEC-103: a contractor company, a device, a customer, a model) removes the row, and with it the modal or button that asked, in the very commit that shows the new read. That component's effects never ran again: no "deleted" notice and no `after` (the URL patch, the close of the dialog) came. The unit test of the hook showed it; the E2E of the deletes in the development stack could not (its Go images pre-date the delete operations, so the stack refuses them before the web part is reached).
+
+1. **`useRefreshThen`.** When the component is removed while a notice is waiting, the notice runs as it goes (the cleanup of an effect with no dependencies). The toast belongs to the page, so it is still shown; a notice that was already run is not run again.
+2. **Test.** `useRefreshThen.test.tsx`: a component that asked and is unmounted before the transition ends runs the notice once (it failed before). No operation, route, screen or count changes.
+3. **A symlink on main.** The IR681 commit carried `service/web/shared/node_modules`, a symlink into the working tree of one machine (a worktree's link to the installed packages): `node_modules/` in `service/.gitignore` matches only a directory, not a link. It is removed from the repository and the rule is `node_modules`.
+
+## IR683 Every Server Action lets the sign-in redirect of the session through (review round 95) — 2026-11-09
+
+IR675 made `actionFailure` the one way a Server Action words an error that is not a refused Core API call: a call that got no answer is UNAVAILABLE, and Next's own control flow is not an error and goes on (`unstable_rethrow`). IR676 moved ten action files to it. Twenty-four files still carried their own copy of the first half — `error instanceof CoreError ? {…} : {…UNAVAILABLE…}` — and the guard test accepted that as "answers an error that is not a refused call". The copy swallows the second half: the DAL redirects to `/login` when the session cookie is gone (the user signed out in another tab, "Sign out everywhere", IR384) by throwing, and an action that words every non-Core error as UNAVAILABLE turns that redirect into a toast "service unavailable" on a page whose session is over.
+
+1. **The actions.** The customer (payments, air quality, energy, offsets, unit, alerts, properties, users, automations), partner (users), technician (unit alerts, control, devices) and admin (access, automation, energy, MRV, restrictions, units, alerts, offsets, billing, contracts, devices) action files word the failure with `actionFailure`. Their results are the same as before for a refused call and for an unreachable Core API.
+2. **Guard test.** `serverActionFailures.test.ts` no longer accepts a hand-written `error.unavailable`: a file that looks at `CoreError` must use `actionFailure` (or `unstable_rethrow` itself). It failed for the 23 files that had no rethrow and passes now.
+3. **Not in this change.** No screen, route, operation or count changes.
+
+## IR684 The broker password script writes its file again when a forced checkout put the committed one back (review round 109) — 2026-11-09
+
+`docker/mosquitto/passwd` is tracked in git (the compose mount needs a file there), and `docker/mosquitto/passwd.sh` rewrites it from the API keys of the environment. To avoid running Docker every time it kept a stamp (`.passwd.keys`, git-ignored) with the hash of the keys, and answered "up to date" when the stamp matched and the file had a `device-sim` line. `deploy/test/deploy.sh` checks each tag out with `git checkout --force --detach`, which puts the committed file back (the one of the developer's own keys) but leaves the ignored stamp. From the second deployment of the shared test environment on, `prepare` found the stamp matching the keys, kept the committed file, and the broker started with logins that did not belong to the environment's `MQTT_IOT_BRIDGE_KEY` / `MQTT_DEVICE_SIM_KEY`: the bridge and the simulator could not connect. It was reproduced in a scratch repository (write the file, force-checkout, run again: "up to date" and the committed file).
+
+1. **The stamp.** It now keeps the hash of the keys and the hash of the file written (`<keys> <file>`); "up to date" needs both to match, so a file that is not the one written is written again. An old stamp (the keys only) does not match, and the file is written once more.
+2. **Test.** `docker/mosquitto/passwd.test.sh` runs the script with a shim `docker` that writes the file the generator would: the first run writes it, an unchanged run does not call the generator, the committed file coming back is written again (it failed before), a changed key is written. It runs in `scripts/check.sh` and in the CI job "Python, shell, workflows and Dockerfiles" (which already runs shellcheck on every shell script). No other file, route, operation or count changes.
+3. **Not verified on the lab server.** The test environment's own checkout was not read; the reproduction is the script's logic with the same git command `deploy.sh` uses.
+
+## IR685 Declining an offer does not read the page again (review round 111) — 2026-11-09
+
+The contractor's offer page (`/partner/jobs/[id]`, FR-P02) declines an offer with `jobs.decline`: the job goes back to HQ and leaves the company, so the job's page is not found for it afterwards (`loadJobDetail` answers absent, the page calls `notFound()`). The Server Action therefore does not refresh (`reload = false` in `actions.ts`), and the screen shows its own "declined" confirmation from local state. IR680 made `useAction` read the page again after every change that succeeded, whatever the action asked for, so after a decline the page was read again and the person saw "not found" instead of the confirmation.
+
+1. **`useAction`.** `run(fn, ok, after, failed, { reload: false })`: a change that takes the screen away shows its toast and runs `after` at once and does not ask the router for a new read. The default is unchanged (the new read, then the toast, IR680).
+2. **The screen.** The offer page's decline passes `{ reload: false }`; every other action keeps the new read.
+3. **Test.** `useAction.test.tsx`: with `reload: false` a success shows the toast, runs `after` and makes no router refresh (it failed before: the refresh was asked for). Not run end to end in the development stack (a decline changes the demo data); the not-found after a decline follows from `loadJobDetail` and the comment in `actions.ts`. No operation, route, screen or count changes.
+
+## IR686 The shared shell's Server Actions let the sign-in redirect through too (review round 116) — 2026-11-09
+
+IR683 moved the 24 action files of the four apps that worded a non-Core error as UNAVAILABLE by hand to `actionFailure`, and tightened the guard test (`serverActionFailures.test.ts`). The guard read only each app's own `app` folder. The shell screens the apps re-export live in `shared/screens/shell`, and their three action files were not read: notifications (`markRead`, `markAllRead`) worded every non-Core error as UNAVAILABLE by hand, which swallows the DAL's redirect to sign-in when the session is gone (signed out in another tab), and preferences and the demo panel rethrew every error that was not a refused call, so an unreachable Core API sent the page to its error boundary and lost what the person had typed (the language form, the two-factor code).
+
+1. **The actions.** The three files use `actionFailure`: a refused call keeps its code, key and field errors, a call with no answer is UNAVAILABLE and the screen stays, and Next's own control flow (the redirect) goes on.
+2. **Guard test.** `serverActionFailures.test.ts` also reads the action files of `shared/screens` (38 files now); it failed for these three before the change.
+3. **Not in this change.** No screen, route, operation or count changes.
+
+## IR687 A time that cannot be formatted does not overflow the stack (review round 117) — 2026-11-09
+
+`runText` and `runClock` (`lib/clientAutomations.ts`) word a rule's run time in the rule's own time zone, and fall back to Kuala Lumpur for a zone the runtime does not know. The fall-back called the function again with the Kuala Lumpur zone whenever anything failed, not only a bad zone. A value that is no instant (an empty or malformed string from a preview answer) fails in Kuala Lumpur too, so the function called itself without end and the page ended in "Maximum call stack size exceeded" (the error boundary), instead of showing the text. It was reproduced in the unit test: `runText("garbage")` and `runClock("garbage")` threw.
+
+1. **The fall-back.** It retries in Kuala Lumpur only when the zone was another one; in Kuala Lumpur a value that does not format is shown as it came. An unknown zone still reads in Kuala Lumpur time.
+2. **Test.** `clientAutomations.test.ts`: a value that does not format comes back as it was (for both functions, in Kuala Lumpur and another zone; it failed before), and an unknown zone still falls back. No screen, route, operation or count changes; the values of the API are instants, so this only guards a malformed answer.
+
+## IR688 The HQ alert policy form refuses a cooldown or an escalation that is not a whole number of minutes (review round 121) — 2026-11-09
+
+The policy form (`policyErrors`, FR-A05) checked the priority and the duration to be whole numbers, but the cooldown and the escalation only to lie between 1 and 1440. The Core API takes both as integers (`cooldownMinutes`, `escalateAfterMinutes`): a `1.5` passed the form and then failed to decode on the server, so the person saw a refusal that named no field instead of the field's own message.
+
+1. **The check.** `minutesError`: a value that is not a whole number reads "A whole number 1–1440" at the field; a whole number outside 1–1440 keeps "1–1440". The new text is in the Malay and Japanese dictionaries.
+2. **Test.** `adminAlerts.test.ts`: `1.5` and `59.9` are refused at the two fields (it failed before). No operation, route, screen or count changes.
+
+## IR689 The time-series chart says what a value is and when it was measured, and shows several metrics in one chart (user request, 2026-11-09)
+
+The user reported that the tooltip of the time-series charts showed only "Value": nothing said which metric it was, in what unit, or at what time. They also asked for several values in one chart, "like metrics".
+
+1. **The tooltip.** `LineChart` (`shared/components/ui.tsx`) names every value with its metric and unit ("Temperature 23.8 °C"), and heads the tooltip with the span the point stands for in the display time zone ("Tue, 15 Sept, 10:01 pm – Wed, 16 Sept, 12:01 am MYT"; `times`). The values use the screen's own rounding (`format`: temperature and humidity one decimal, ppm and µg/m³ whole, IR44). The small charts of the customer overview (CO2), the technician's other-metric cards and the policy form's illustration name their value too ("Illustration (not readings)" for the curve that is not real readings).
+2. **Several lines in one chart.** `LineChart` takes `series`: each line has its name, unit, values, an optional guide value and the axis it is read on. The first unit is read on the left axis and a second unit on the right axis, each with its own scale and gridlines (`lib/chartScale.ts`: `unitAxes`, `toggleSeries`, and the scale helpers `axisRange` / `axisTicks` that moved there from `lib/air.ts`); a third unit does not fit, so at most two units (and so, on the air screen, two metrics) are in one chart. A guide (1000 ppm ventilation, 35 µg/m³ cleaning) is drawn on the axis of its line. The legend names each line with its unit and its side. A gap is shaded only where every line has none. The one-line form (`points`, `name`, `unit`, `threshold`, `min`/`max`/`ticks`) is unchanged for the other screens.
+3. **The customer's air quality** (`/customer/air-quality`). The URL's `metric` takes a list (`metric=co2,pm25`; one name is the old link, so the old links keep working). The metric tabs are toggle chips (at least one stays on; a chip that would be a third unit is off with a hint), a metric card also puts its metric in the chart or takes it out, each selected metric reads its own `telemetry.series`, the table view shows one table per metric, and the point under the pointer shows the slot's time.
+4. **The technician's unit monitoring** (`/technician/units/[id]`, Monitoring). The same: `metric=temperature,humidity`, chips of the metrics the unit measures, one line per metric on its axis, the slot's span in the tooltip, the other-metric cards' "Chart →" adds the metric. Each line says its own count, gap and "earlier readings are not loaded" (IR598).
+5. **Tests.** `charts.test.tsx` (lines, axes, legend, tooltip with the time, name, value and unit — driven through Recharts' keyboard layer), `air.test.ts` (the URL's metrics, toggling, axes, headings in the display zone), `techUnit.test.ts` (`metricsOf`, `seriesCharts`), `customerOverview.test.ts` (`bucketTimes`); the E2E `customer/air-chart.e2e.ts` (hover shows time, name and unit; two metrics make two lines and two axes; a third unit is off) and `technician/unit-chart.e2e.ts` (the same on the technician's unit monitoring, for a technician with a unit inside the work window; skipped on a seed without one). The strings are in the Malay and Japanese dictionaries.
+6. **Figma.** The screens' states change (metric chips, the tooltip, the two-axis chart): Figma Client 05a (air quality) and Technician 02-11…02-13 (unit monitoring) are to be updated with this change; the wireframes were not touched by this implementation.
+7. **Not in this change.** No operation, route or count changes; no new data is read except one `telemetry.series` per selected metric (at most two).
+
+## IR690 A holder of `data.forceDelete` can delete a customer or a contractor company together with its accounts, even those with history (user request, 2026-11-09)
+
+HQ could not delete `customer-b`: `error.customerInUse` ("This customer has jobs, contracts, invoices, reports or users…") stayed because the accounts of the customer, including ones that ended or had acted, were still there. "Remove from customer" only ends an account (`valid_until`), and `members.delete` (DEC-103) refuses an account that appears as the actor of any audit entry, or that marked a filter cleaning (`error.memberUsed`). A customer whose users ever did something therefore could never be deleted.
+
+1. **Permission `data.forceDelete`** (39th `Permission`, group "Data deletion" in Access & roles). It is granted one by one: no role default has it, and the seed gives it to `hq-operator` only (`fixture-contract.json`). Like `identity.write` and `restriction.override` it cannot be given to oneself (`checkSelfPromotion`). Schema: a row in `identity.permissions` (migration `000001`, `schema.sql`); the permission count of the docs is 39.
+2. **Input `force?: boolean`** on `customers.delete`, `contractors.delete` and `members.delete` (catalog, `service-contracts.ts`, generated routes / contracts / Swagger). `force: true` without the permission is FORBIDDEN `errors.force_delete_not_allowed` (`ops.CheckForce`), also when nothing would be refused. The audit reason of a forced delete starts with `[forced] ` (`ops.ForcedReason`), so who forced it is in the audit log.
+3. **What force changes.** `customers.delete` / `contractors.delete` ask the other domains for records with `SkipAccounts`: the identity domain is not asked, so accounts do not stop the delete. Units (`error.customerHasUnits`), jobs, contracts, invoices, reports and every other record still refuse it, so nothing is removed if one of them remains. `members.delete` with force no longer refuses an account for its audit history or for filter cleanings (`membershipRecords` with `IgnoreCleanings`); it still refuses the caller's own account (`memberSelf`), a person with another account (`memberHasOthers`) and an account with an assignment or a certificate (`memberUsed`: a technician's records are not broken). The audit rows stay (append-only); the IDs in old records stay as IDs.
+4. **Admin screens.** The delete dialogs of a customer (`/admin/units`), a contractor company (Jobs › Contractors) and an account (Access & roles) show "Force delete" to the holder only. Choosing it asks to type the record's name before Delete can be pressed (`ForceDeleteField`). `deleteCustomer` with force runs `customers.delete` force first (a refusal there leaves everything as it was), then `members.delete` force for every membership of the organization (`members.list` with `organizationId`, including ended ones; `lib/forceDelete.ts`, one at a time), then `organizations.delete`; a failure part-way leaves the rest to be deleted again. `deleteContractor` does the same.
+5. **Tests.** Go integration `force_delete_test.go` (a plain delete is refused, a force without the permission is 403, the seeded customer with units is still refused, a customer with an account that acted is deleted with its accounts and the audit rows say `[forced]`, own account / second account stay refused, a contractor with an account); `authz_test.go` (39 permissions); Vitest `members.test.ts` (matrix, self-block), `deleteDialog.test.tsx` (the option only for the holder, the name must match, the reason is still needed), `forceDelete.test.ts` (order, versions, stop at the first refusal); E2E `admin/force-delete.e2e.ts` (the dialog offers force to `hq-operator`; a customer made by the spec is deleted). The strings are in the Malay and Japanese dictionaries.
+6. **Dev and test databases.** The permission row is in migration `000001` only; a running database gets `INSERT INTO identity.permissions …` and the grant to `hq-operator` by hand (see the schema-change note); the next reset has both.
+7. **Figma.** The delete dialogs (Admin customer, contractor, account) and the permission editor (a "Data deletion" row) are to be updated; the wireframes were not touched by this implementation.
+8. **Not changed.** DEC-103's rules for a delete without force; units, jobs, contracts, invoices and reports are never force-deleted; a force delete of a unit is not offered.
+
+## IR691 Load test of the Core API (smoke, load, stress) and the test sufficiency measured (user request, 2026-11-09)
+
+Backend Go design §9 had listed a k6 load test as "planned" and there was none: no k6 script, no Go benchmark, and the §13 targets had never been measured. This round adds the first phase and records how well the other levels were covered on `9901b01f`.
+
+1. **Test sufficiency, measured on `9901b01f`.** Go statements covered by the integration and package tests together: 88.6% of 20,866 (`make cover`; 88.4% of 17,336 on 11-01); by the package tests alone (`test/` left out): 17.2% (maintenance 6.5%, devices 3.2%, identity 3.3%, energy 2.7%, restrictions 1.7%; platform 81.2%, ops 81.6%), so the domain logic is checked through the integration suite. Web `shared` (Vitest, v8): lines 83.4% of 6,226 (`lib` 94.3%, `bff` 80.9%, `components` 34.5%, `screens` 5.9%); the four apps have no unit test. The nightly end-to-end failure "no page scrolls sideways at phone width" still reproduces on this commit: `/admin/units?customerId=…&unitId=…` overflows by 77 px with the wide font (46 px in the nightly run). It is reported, not fixed here. Not in this change: the end-to-end fix, integration tests of the Server Actions and the BFF, `-race` in CI, web coverage in CI.
+2. **Data.** `cmd/loadseed` (`internal/loadseed`) builds a fixture of the launch size on top of the demo seed and applies it with `internal/seed`: 600 customers, 3,000 units, 600 contracts, 1,800 invoices, 1,200 jobs (300 offered to 10 contractor companies) and 300 accounts (customer 70%, partner 15%, technician 10%, HQ 5%: an assumption). It refuses every database name but `ac_load`, before it connects and by `current_database()` after (`TestGuardRefusesEveryDatabaseButAcLoad`). `-manifest-only` writes the account manifest without a database.
+3. **Stack.** `deploy/load/compose.load.yaml` makes the compose project `ac-load`: its own database `ac_load`, Keycloak, Valkey and broker, no web app and no IoT bridge, nothing published on the host. `deploy/load/realm.py` copies the realm (`docker/keycloak/realm-ac.json` is not changed) and adds the client `ac-load` with the password grant, the 300 users, and the password grant on `ac-admin-web` in the copy for HQ's accounts. `deploy/load/run.sh` builds, starts, checks that no port is published and no real broker is named, fills, samples Postgres connections and CPU, runs k6 and removes the project; its exit status is k6's (99 on a breached threshold).
+4. **Scenarios.** `service/web/load` (TypeScript for k6 2.3.0, pinned by digest; linted and type-checked with the web workspace, in the `e2e` lint job of CI): `smoke`, `load`, `stress` with the §13 thresholds. The latency trends count successful answers only, and 429s, 5xx and the status classes are reported, so refusals cannot make the percentiles look good (checked: with maintenance-api stopped the run showed 29% errors, error answers at a median of 6 ms, and exited 99).
+5. **Workflow.** `.github/workflows/load.yml`: manual only, scenario chosen at dispatch, concurrency group `e2e-lab-server` (shared with E2E), artifacts kept 30 days, and a check that nothing of `ac-load` is left.
+6. **Found while building it.** Valkey is not a dependency of any service, so a stack started by naming the gateway has no write-limit store; the Core API then lets each write through without the limit after about 1.8 seconds (it fails open and logs `write limit not checked`). The script starts it, and fails the run if that log line appears. Whether the Core API should wait 1.8 seconds per write when its limit store is down is a design question for the user; it is not changed here.
+7. **Results.** `smoke` on a developer's Mac: 0 errors in 139 answers, read p95 43 ms, write p95 11 ms (a check of the script and the stack, not a measurement). `load` and `stress` have not been run on the lab server; §13 stays PROPOSED. The numbers will be measurements on the lab server, not a guarantee for production. Details in [load test](load-test.md).
+8. **Not in this change.** Phase 2 (the web layer, the sign-in spike, the 2-hour soak) and phase 3 (the IoT path). No operation, route or count changes.
+
+## IR692 Load test of the web layer: sign-in, BFF and server-rendered pages, the sign-in spike and the soak (user request, 2026-11-09)
+
+Phase 2 of the load test (IR691 built the Core API scenarios). The customer, partner and technician apps are measured with the sign-in a person goes through, not with a token handed to a script.
+
+1. **Stack.** `deploy/load/compose.load.yaml` adds the three `*-web-api` services to the throwaway project `ac-load` for the web scenarios (nothing published; a health check on `/login`). The apps sign in with the load client `ac-load` (`OIDC_APP_CLIENT_ID`), the same client the Core API takes as its app client, so their tokens are accepted. `deploy/load/realm.py` gives `ac-load` the authorization code flow with PKCE and the apps' in-network addresses, still only in the realm copy. `deploy/load/run.sh` builds the three apps one at a time for a web scenario, starts them, and samples memory as well as CPU and Postgres connections.
+2. **Scenarios** (`service/web/load`): `web-smoke` (3 users, 1 minute, no error), `web` (285 users, 15 minutes), `spike` (60 at work, 225 sign in at minute 3), `soak` (285 users, 2 hours, windows of 15 minutes). A virtual user is one browser (`noCookiesReset`): it signs in once through the app's sign-in step, the identity provider's form and the callback, and then opens the app's pages (HTML only; scripts and styles are static files). HQ has no web scenario: its sign-in needs a one-time code. The report adds a row per window (page p50 and p95, sign-in p95, errors), so the time to recover after a spike and a drift over the soak can be read. `TIME_SCALE` and `VU_SCALE` shorten a run for trying the script; the report then says it is not a measurement.
+3. **Thresholds.** Section 13 names no target for the web layer, so only the error rate is held (below 1%; the spike 5%; `web-smoke` none). Page and sign-in times are recorded to decide a target from. A page that falls back to the sign-in page, or a sign-in whose home page does not come back, is an error.
+4. **Data.** The customer overview reads the location consent, which the demo seed gives its customers and the first load data did not: `loadseed` now gives each of the 210 customer accounts one (`location_automation`, not granted), and the overview no longer answers 404.
+5. **Checked.** `web-smoke`: 0 errors in 63 pages and 3 sign-ins, exit 0. With the partner app stopped the run showed 86% sign-in errors and k6 exited 99. `spike` and `soak` ran shortened (the windows printed; a sign-in rush of 68 users took the page p95 from 281 ms before it to 748 ms during it and 26 ms after). `load.yml` offers the four scenarios; its timeout is 210 minutes for the soak. These are runs on a developer's Mac: nothing was run on the lab server.
+6. **Found while building it.** k6 clears the cookies at the start of each iteration unless `noCookiesReset` is set; without it every second visit of a virtual user had no session and looked like an application failure. Nothing in the apps was wrong.
+7. **Not in this change.** The IoT path (phase 3); the admin app; writes through the web (Server Actions cannot be called without a browser); static files and a CDN. No operation, route or count changes.
+
+## IR693 Load test of the IoT path: telemetry at the launch rate and the design capacity, and the command round trip (user request, 2026-11-09)
+
+Phase 3 of the load test (IR691 the Core API, IR692 the web layer). The path from a device through the broker and the bridge to the Core API is measured on the throwaway project `ac-load`, never on the shared `ac-test` environment or the real MQTT broker.
+
+1. **Devices.** `loadseed` also registers one device for each of the 3,000 units (a temperature and a power sensor each; the demo seed's few devices stay) and writes a links file (`-links`, `links.json`) that names each device, its unit and its sensors; the last 60 units are probes. The bridge reads the file named by `IOT_LINKS_FILE` (`iotbridge.LoadLinks`; a missing device or unit and a duplicate are refused) and adds the devices to the ones it knows.
+2. **Generator.** `cmd/iotload` (`internal/iotload` for the pure statistics) plays the devices on the stack's broker with the simulator's own payloads (`internal/devicesim`): a telemetry batch from each device every interval spread evenly over it, a heartbeat every minute, and an acknowledgement for each command at once. It refuses every database but `ac_load`, as `loadseed` does. Beside the devices, 60 probes send one batch a minute and the generator polls `monitoring.measurements` for each reading until it is stored: the time from publishing to storing is the freshness of the whole path. A sensor keeps one reading per minute slot, so the expected count is of sensor-minutes and not of batches. At the end it waits up to a minute for the backlog and writes `iotload.json`.
+3. **Scenarios.** `iot-smoke` (90 s, no error allowed), `iot` (10 min, 3,000 devices a minute, 50 batches a second) and `iot-design` (10 min, a batch from each device every 9 seconds, about 333 a second, the design capacity of backend architecture §13). In each, 20 virtual users send setpoint commands (`commands.create` with the unit's version) and poll until the command is `acknowledged`: threshold round trip p95 < 5 s and errors < 1% (the PROPOSED values of §13); a command not acknowledged in 20 s is an error. `deploy/load/iot_check.py` judges the telemetry side: freshness p95 within 10 s, no probe lost, the generator kept 95% of its pace, nothing dropped or refused, 99% of the readings stored. `run.sh` also fails (status 97) when the broker logs `Outgoing messages are being dropped`.
+4. **Stack and workflow.** The `iot` profile adds the bridge and the generator to the stack (nothing published on the host); the Dockerfile builds `iotload`; `load.yml` offers the three scenarios and keeps `iotload.json` and `iotload.log` as artifacts.
+5. **Results** (a developer's Mac, shortened to `TIME_SCALE` 0.2 where noted; lab-server numbers are not available): `iot-smoke` passed (562 commands, p95 2.0 s; probes stored p95 27 ms, none lost; 100% stored). `iot` passed (789 commands, p95 2.0 s, no error; 13,860 of 13,860 readings stored; probes p95 23 ms). `iot-design` **failed through the stand-in bridge**: the generator kept its pace and the broker took every batch, but the broker logged that it dropped messages for the bridge, 93.9% of the readings were stored and 93.5% of the commands were not acknowledged in 20 s. The bridge's MQTT client runs its handlers one at a time (the library default); IoT Core's rules run in parallel, so this is read as a limit of the stand-in and not of the production path (the cause was read from the code and the broker log; no change that removes it was made or tried). Why the 140 probes were all stored in the same run is not explained.
+6. **Not changed.** The bridge's handling (it stays sequential; making it concurrent changes the order in which a device's readings and states are applied and is a decision for the owner of the bridge), the shared environment, the real broker and every operation, route and count. The results are measurements of a laptop, not of the lab server and not a guarantee for production; §13 stays PROPOSED.
+
+## IR694 The IoT path at the design rate: triggers no longer wait for their own connections, commands survive an overtaking acknowledgement, the bridge works in parallel (user request, 2026-11-09)
+
+IR693 ended with `iot-design` failing and read that as a limit of the stand-in bridge, "not a finding about production". That reading was wrong in part. At the user's request the bridge was made parallel, which uncovered the defects below, each reproduced before it was fixed.
+
+1. **`demo.trigger` waited for its own connections.** The pipeline ran every write in one transaction, and the trigger's handler asked the same pool for further connections for its tenant's transaction. As many triggers at once as the pool has connections (pgx's default, `max(4, CPU count)`) all held one and waited for another until their callers gave up, and every other request of the service waited behind them: reads took about 10 s. A test with a pool of 2 and 8 triggers at once answered 504 for all 8 after its 5-second limit. The handler uses only its own transactions, so the pipeline now opens none around it (`ops.RegisterOwnTx`); what commits together is unchanged. The answer's `meta.eventCursor` is now 0 for a signed-in caller as well (it already was for the bridge, which has no user, and no screen reads it for this operation).
+2. **An acknowledgement in time could be lost.** `control.Acknowledge` changed only `sent` commands. An answer that overtook the report `command_sent`, which travels separately, was recorded as late; the report then moved the command to `sent` with nothing more to come, and the unit refused every command as `errors.unit_busy` until it expired. This is not particular to the load test: a real device can overtake the report too. A requested command acknowledged before its expiry now becomes `acknowledged` (delivery `sent`, `sentAt` the time of the answer), and the later report changes nothing.
+3. **The bridge opened a connection for nearly every call.** `send` closed each answer unread, and the default HTTP transport keeps two connections for a host. At the design rate the local ports ran out (`connect: cannot assign requested address`) and the readings, acknowledgements and state reports of those moments were lost. 400 calls opened 400 connections in a test; `send` now reads the answer and the client keeps a connection for each worker.
+4. **The bridge worked one message at a time.** It now hands each message to one of 32 workers chosen by device (`iotbridge.Dispatcher`): the messages of one device stay in order, and those of different devices run side by side; a message that arrives after the bridge has begun to stop is dropped. The broker's message is acknowledged when it is queued, so a message queued but not yet worked off is lost if the bridge stops: accepted, as it only stands in for AWS IoT rules.
+5. **The duplicate check of a reading scanned the table.** `alreadyStored` looks a reading up by `event_id`, which had no index: a parallel sequential scan of the partition for every reading (1.18 million rows on a development database). New index `measurements_event`. Its effect alone was not measured after item 1 was fixed.
+6. **The generator could crash at the end of a run.** A command answered after generation had ended was sent on a closed channel (`panic: send on closed channel`), and no report was written. The jobs now go through `iotload.Queue`, which refuses a value once closed. This fix was pushed to the pull request of IR693 after it had merged, so it is delivered here.
+7. **Results.** On a developer's Mac, `iot-design` for the full 10 minutes passes every check: 3,851 commands with no error, round trip p95 2.0 s; reads p95 5.5 ms, writes p95 7.1 ms; 202,518 batches of 202,534 asked; 65,300 of 65,300 readings stored; probes p95 28 ms, none of 620 lost; nothing dropped by the broker. The same scenario before these changes: 93.5% of the commands failed and 93.9% of the readings were stored; with the parallel bridge alone, 0.1% were stored.
+8. **What this does not show.** The run has the design's rate of messages (about 330 batches a second) but not its rate of rows: 3,000 devices reporting every 9 seconds store about 105 readings a second, because a sensor keeps one reading a minute and later batches of a minute are recognised as repeats. 20,000 devices a minute would store about 667 a second, six times as many. It is also a laptop and not the lab server; `demo.trigger` is the demo environment's way in and not the production IoT path; the devices are ideal. Backend architecture §13 stays PROPOSED.
+9. **A flaw in the measurement, left as it is.** A probe looks its reading up by the module's sequence number, while the API numbers a reading after the latest it holds. After one lost reading the two differ, so every later reading of that probe counts as lost too. It overstates the loss in a failing run and does not touch a run with none lost.
+10. **Dev and test databases.** The index is in migration `000001` only; a running database gets `CREATE INDEX measurements_event ON monitoring.measurements (event_id)` by hand. Without it the service still works, more slowly.
+11. **Not changed.** The real MQTT broker and the live unit were not written to, and `ac-test` was not touched. `units.importPreview` has the same shape as item 1 (read from the code, not reproduced) and is proposed for a decision (review-proposals B-11).
+
+## IR695 The links of the set-up and invitation e-mails open at the address the invitation came from (user request, 2026-11-09)
+
+The test environment answers on two addresses (DEC-102, IR651), and the links of the e-mails `identity-api` asks Keycloak to send were always its canonical one (IR651 item 5). A person on the Tailnet cannot reach the lab network's address (checked: from the Tailnet `10.100.1.17` does not answer on 8281, 3200 or 3203, and `100.99.169.116` does), so they could not open the link and could not register.
+
+1. **The address.** No new header: the verified access token's `iss` names the address the sender signed in on (IR651 item 4) and is checked against `OIDC_ISSUER`, so a request cannot make it up. `auth.Identity.Issuer` carries it, and the request's `ops.Principal.IssuerHost` its host name. The principal is copied to take it, because `RemoteSource` shares one principal among requests that can be on different addresses.
+2. **The event.** `requestAccount` puts `publicHost` in `AccountRequested` when the principal names one; `identity-accounts` hands it on as `idp.Account.PublicHost`. An event without it (the bootstrap's) uses the provider's own address.
+3. **The provider.** `Keycloak.SendSetup` sends only `execute-actions-email` on that address, on the port and scheme of `IDP_PUBLIC_URL`; every other admin call stays on the canonical one. The return address changes to the same app on that host. It changes only when its host is the canonical address's, so an app on a host of its own (production: `app.example.com` beside the provider) keeps its address. With no `IDP_PUBLIC_URL` nothing changes, as in the development stack, CI and E2E.
+4. **Admin tokens per address.** Keycloak checks a token's issuer against the address of the request, so the service account's tokens are cached per address, and a 401 drops only that address's token. The addresses are the verified issuers, so the cache cannot grow without limit.
+5. **Checked on a real Keycloak.** A throwaway stack on two addresses (`localhost` and `127.0.0.1`, `deploy/test/compose.multihost.yaml`), with a real token of each address: an invitation from each gave a link and a return address on that address, and a browser opened the link, set the password, came back to the app and signed in to `/partner` without leaving the address. An admin token of one address answered 401 on the other, which is why they are cached per address.
+6. **Not changed.** BFF, web apps, realm and nginx: the redirect URIs of each `PUBLIC_HOSTS` address are registered already. IR651 item 5 still holds for an e-mail asked for without a user's token. The notification e-mails the workers send still carry the canonical `APP_URL_*` (IR651 item 8).
+7. **Known limit.** Someone who can reach only the lab network, invited from the Tailnet, cannot open that link. They can ask for a password reset on the Keycloak page they can reach, whose link has that address. An invitation already sent keeps its link: send it again.
+
+## IR696 Clearing a preferred time's date in Admin's New job no longer takes the screen down (review round 122, 2026-11-09)
+
+`jobRequestErrors` runs while the New job form renders. A cleared date makes `zonedInstant` answer "", and the rule turned that into a date with `new Date(NaN).toISOString()`, which throws `RangeError`: clearing the date field took the screen down. "Add another time" threw the same way from `nextDay` on a cleared date.
+
+1. **Fix.** A time that is not complete is a field error, in the words the customer form already uses ("Enter the date and both times of each preferred time.", with its Malay and Japanese texts); `nextDay` moved to `shared/lib/adminJobs.ts` and answers "" for such a date, so the new row starts empty.
+2. **Checked for the same shape.** `preferredError` (customer) already refuses an empty time first, and `unavailabilityConflicts` (partner) checks `isDate` first. Times that come from the API are not form input and were not changed.
+3. **Tests.** `adminJobs.test.ts`: an empty start, an empty end, an empty later time, the Malay text, and `nextDay` across a month and a year and on empty and malformed dates. No operation, route or count changes.
+
+## IR697 `Meta.eventCursor` is the outbox position, not a count of the outbox (review round 125, 2026-11-09)
+
+Every operation with a principal ended by answering `SELECT count(*) FROM platform.outbox` as `Meta.eventCursor`, which the contract calls the tenant's outbox position and says only increases (deterministic contracts §events).
+
+1. **Wrong value.** Housekeeping removes events older than 7 days, so the count fell. A test with two events shows it: removing the older one took the cursor from 55 to 54.
+2. **Cost on every request.** The count reads the whole of the tenant's outbox, on every read and write. On a development database of 45,010 events it took 5.7 ms; `max(seq)` took 0.04 ms. The outbox keeps power samples for 7 days, one a minute per device, so 3,000 devices hold about 30 million rows. That would be about 4 seconds on every request by extrapolation, not measured, against the read target of 300 ms in backend architecture §13. The load test does not show it, because a run's outbox is small: a short run with no history cannot.
+3. **Fix.** `SELECT COALESCE(max(seq), 0) FROM platform.outbox`, in the pipeline and in a measured baseline's `sourceSnapshot.eventCursor`. Baselines saved earlier keep the value they recorded.
+4. **Limits.** Under row level security the index is read backwards to the tenant's latest event, so a tenant with few events among many of another's takes longer; it is never slower than the count was, and today there is one tenant. A tenant whose events have all been removed reads 0. No screen reads this value, so neither case shows.
+5. **The load test.** The data has no outbox history: a run does not measure a service with 7 days of events. This is a gap in `docs/02-design/load-test.md` to keep in mind when reading its results.
+
+## IR698 The scheduler ticks every tenant even when one of them fails (review round 126, 2026-11-10)
+
+The scheduler visits the tenants in ID order, each in its own transaction (backend Go design §7). It returned at the first tenant whose transaction failed. Every tenant after it then stopped expiring its offers, proposals and commands, confirming unrated jobs, freezing histories and running its domain jobs (IR54 schedule automations), at every tick, until the first one was fixed.
+
+1. **Reproduced.** A scheduler job that fails for the first tenant: the tick visited 1 of the test database's 5 tenants.
+2. **Fix.** `tick` goes on to the next tenant and reports the failures together (`errors.Join`, each naming its tenant). The failing tenant's transaction is rolled back as before, and the next tick, a second later, tries it again. The background loop already logs a failure once a minute (IR429).
+3. **Not changed.** The order of the tenants and of the domains' locks (IR356); a tenant that another instance holds is still skipped. Offers expire with the actor `system-demo` (IR48); that was checked and matches the design.
+4. **Test.** `TestSchedulerTicksTheOtherTenantsWhenOneFails`: every tenant is visited and the tick still reports the error.
+
+## IR699 `Meta.eventCursor` is the tenant's own outbox position (review round 129, 2026-11-10)
+
+IR697 made `Meta.eventCursor` the highest `seq` of `platform.outbox`. The contract calls it the tenant's position (deterministic contracts §events), and IR697 assumed row level security keeps the query to the tenant. It does not: `platform.outbox` has no row level security by design, because the relay and the scheduler read it across tenants (`schema.sql`, the comment above the outbox grants). The cursor therefore followed every tenant's events.
+
+1. **Reproduced.** A test inserts an event for another tenant: the HQ principal's cursor moved from 53 to 58 although none of its own events changed. A tenant could watch another tenant's activity through this value.
+2. **Fix.** The query names the transaction's tenant, `WHERE tenant_id = current_setting('app.tenant_id')::uuid`, in the pipeline and in a measured baseline's `sourceSnapshot.eventCursor` (`ops.TenantCursor`). The index `outbox_tenant_seq (tenant_id, seq)` answers it directly. Baselines saved earlier keep the value they recorded.
+3. **Corrects IR697.** Its item 2 ("reads the whole of the tenant's outbox") and item 4 ("under row level security the index is read backwards to the tenant's latest event") described row level security the outbox does not have. Measured on the development database (47,427 events, nearly all of one tenant): the tenant with almost no events is answered from `outbox_tenant_seq` in 0.007 ms, and the tenant with almost all of them from the `seq` index read backwards in 0.04 ms, the planner's choice.
+4. **Running databases.** The index reaches migration 000001 only. A database created before this change needs `CREATE INDEX outbox_tenant_seq ON platform.outbox (tenant_id, seq);` by hand; without it the query is still correct, only slower.
+5. **Not changed.** The cursor's other properties stay as IR697 left them: it only increases while the tenant's latest event is kept, and a tenant whose events have all been removed reads 0. No screen reads this value.
+6. **A test left contractor admins behind.** `TestInvitationNamesTheAddressItCameFrom` (IR695) invites two contractor admins of contractor-a and kept them. When it ran before `TestCertificateReminders` on the same database, the 60-day reminder went to three admins instead of one, so `make test-all` failed in one order of the shards and passed in another. It now ends the two memberships when it finishes, as the other tests do; run together in that order the two tests failed before and pass after.
+
+## IR700 A contract's unresolved recovery case is read from the case's `state` (review round 130, 2026-11-10)
+
+`Contract.hasUnresolvedRecovery` is true while a recovery case of one of the contract's restrictions is not resolved (SR26, IR135 item 1), and `contracts.save` refuses a contract that has one (CONFLICT `errors.contract_restricted`; admin A07 saves only when it is false). The query that derives it asked for `@.status != "resolved"`, but a recovery case keeps its state in `state` (`RestrictionRecoveryCase`, `restrictions/recovery.go`); the other two readers of the cases, `unitRecovering` and the schedule's unit check, use `state`.
+
+1. **Reproduced.** A restriction of the contract, ended (`cancelled`), with a `pending` recovery case: `contracts.list` answered `hasUnresolvedRecovery=false` and `contracts.save` accepted a new version (200), so HQ could revise a contract whose terminal-restriction observation was still unresolved.
+2. **Fix.** The query reads `@.state != "resolved"`. The integration test `TestContractsAndInvoices` now covers a pending case (listed, revision refused with 409) and a resolved one (not listed).
+3. **Not changed.** The rule itself, the error, the web editor (it already disables saving when the value is true) and every operation, route and count.
+
+## IR701 Two technician forms send what their selects show (review round 133, 2026-11-10)
+
+Two technician forms kept a value behind a select that the select no longer showed. A select whose value is not one of its options shows its first option, so the form sent something other than what the technician saw.
+
+1. **Test run actions (diagnostic control, FR-T10, Figma Technician 02-18…02-28).** The start and end selects offer the unit's actions (`actionOptions` of its capabilities) but began at `power:on` and `power:off` whatever the unit offered. A capability may have ventilation without control (DD-A04 allows it; then there is no power, temperature, mode or fan). For such a unit the selects showed ventilation while the confirmation read "Power ON for 5 min, then Power OFF" and the request carried those actions, which the server refuses (the action is not supported). `offeredKey(options, key)` (`shared/lib/techControl.ts`) keeps the default when the unit offers it and otherwise takes the first offered action. A unit with power control is unchanged.
+2. **Register device (FR-T11).** The form's state was made once, when the screen first rendered, from the units still without a device. It was not made again when the form reopened. After a registration the refreshed list no longer has that unit, but the form still held it and the serial typed before: reopened, the select showed another unit while "Register & bind" sent the old unit and serial. The old serial is refused as a duplicate; with a new serial the device would be registered for the unit registered before, which the select no longer shows. A screen that first rendered with no free unit kept an empty unit, so the form said "Choose a unit" while the select showed one. `blankRegistration(register)` (`shared/lib/techDevices.ts`) makes the form afresh each time it opens, as the other device forms already do.
+3. **Tests.** `techControl.test.ts` (power kept for a unit with control, ventilation low for a ventilation-only unit, the key kept with no options) and `techDevices.test.ts` (the first free unit and its first job with no serial or sensors; empty with no free unit). Failing before (no such functions), passing after.
+4. **Not changed.** The server, which checks every action's capability, the assignment and the serial (whether `devices.register` should refuse a unit that already has a device is left to its own review). The normal diagnostic action already starts at an offered action. The customer automation editor marks an action the AC does not offer and refuses to save. Every operation, route and count is unchanged.
+
+## IR702 The technician overview reads every page of the jobs list (review round 135, 2026-11-10)
+
+The technician overview (FR-T01, DD-T01, SCR-T01) read `jobs.list` as one page of 100 and built Today, All assigned, the tab counts, the timeline, the pending acknowledgements, the alerts' job links and the report rows from it. The list keeps every job the technician was assigned to, the ended ones as the history projection (IR124, IR642). Once a technician had more than 100, the page held only the first 100 in the chosen order: sorted by deadline (oldest first), those were old jobs, and today's work was missing from every part of the screen.
+
+1. **Reproduced.** A loader test with a first page of 100 ended jobs and today's job on the next page: Today was empty.
+2. **Fix.** The loader reads every page (`coreAll`, which follows `nextCursor` with the same sort up to 1,000 items, SR14), as the customer's maintenance list already does. The order is the server's, as before.
+3. **Test.** `technician/tests/overviewLoad.test.ts` (today's job after the first page is in Today; completed ones are not counted, IR642), with the DAL mocked. Failing before, passing after. The technician app gets its own Vitest (`technician/vitest.config.mts`, Node, `npm test` of the workspace): a test of the app's loader cannot live in the shared package, which must not import an app (`import/no-relative-packages`, `import/no-extraneous-dependencies`).
+4. **Not changed.** The API, the sorts and the screen. Partner loaders that read one page of `jobs.list` (team, schedule, payouts) are left to their own review: some show only the latest items on purpose.
+
+## IR703 Revoking access sends the saved membership, not the form's unsaved edits (review round 144, 2026-11-10)
+
+In Access & roles (FR-A03, DD-A03), "Revoke access…" saves the membership with `validUntil` at the business clock (IR492). The revoke was built from the form's draft, with only the permissions and scopes put back to the saved ones. The draft also carries the "Valid from" field, which stays editable, and it holds the times to the minute only.
+
+1. **What went wrong.** Suppose HQ edited "Valid from" and revoked without saving. The revoke then saved that edit as well, under the revoke's audit entry. With a start set later than now, `members.save` refused the revoke (the access would end before it starts). Even without an edit, a start saved with seconds was cut to the minute by the revoke.
+2. **Fix.** `revokeInput(membership, tenantId, zone, reason)` (`shared/lib/members.ts`) builds the revoke from the saved membership. Its scopes stay as saved (for an admin with none saved, the form shows the tenant but the revoke does not add it), and its start stays to the second. The reason is trimmed, and the action sets `validUntil` to now, as before.
+3. **Tests.** `members.test.ts` checks two cases. The revoke carries the saved permissions, scopes and start, to the second, with the trimmed reason. An admin's empty saved scopes stay empty. Both failed before the fix (no such function) and pass after.
+4. **Not changed.** The API, the revoke dialog and Save. A revoke still needs its own reason.
+
+## IR704 A repeated automation Fire reuses its event only for the same evaluation (review round 145, 2026-11-10)
+
+In HQ automation policies (FR-A11), Fire (demo) sends `automations.fire` with a one-time event ID, and the screen keeps that ID so that pressing Fire again for the same evaluation returns the stored result instead of firing twice. The screen dropped the ID only when a fact row was edited, added or removed. A fact without its own kind takes the policy's condition type ("When"), and changing "When" left the ID in place. The next Fire then sent another body under the same key, which D04 refuses (CONFLICT), although HQ had asked for a new evaluation.
+
+1. **Fix.** `evaluationKey(type, rows)` (`shared/lib/automation.ts`) is what an evaluation asks, without its time or event ID. Fire reuses the last event ID and tick only while that is unchanged; any other change, the condition type included, makes a new event.
+2. **Test.** `automation.test.ts` checks three things. The key is the same for the same evaluation. It changes with the policy's condition type for a fact without its own kind. For a fact with its own kind it does not follow the policy's type, and it follows the fact's value. All three failed before the fix (no such function) and pass after.
+3. **Not changed.** The API, Simulate (a read, always a new event) and every operation, route and count.
+
+## IR705 The unit list counts a unit's alerts only while the caller may read them (review round 152, 2026-11-10)
+
+IR49(b) keeps an external technician's equipment reads (`units.get`, `telemetry.*`, `alerts.*`, `devices.*`) closed until the work window starts. The unit is listed in the viewing window before that. `units.list` already left `latestMeasurements` empty then (IR213), but `activeAlertCount` counted the unit's open and acknowledged alerts, which `alerts.list` leaves out and `alerts.get` refuses at that time.
+
+1. **Reproduced.** In `TestUnitScopeExternalTechnicianAndContractor`, the unit is listed before the work window and has a new warning alert, and `alerts.list` leaves the alert out. `units.list` still answered `activeAlertCount` 1.
+2. **Fix.** The unit list counts alerts over the units the caller may read now (`unitscope.EquipmentReadable`), as it already did for the latest measurements. HQ, clients, contractors and internal technicians are unchanged: for them every listed unit is readable.
+3. **Test.** The same test now checks `activeAlertCount` 0 before the work window. It failed before the fix (1) and passes after.
+4. **Not changed.** `observedState` and `effectivePowerState` in the list. They come from the unit's own record, not from a telemetry or alert read, and IR49(b) does not name them. Whether they too should wait for the work window is left to the owner of IR49.
+
+## IR706 A twice-renewed "other" certificate stays in one row (review round 160, 2026-11-10)
+
+The contractor's certifications tab (FR-P09, DD-P09) shows one row per technician and qualification. A certificate filed under "other" is a group of its own, and its renewals join it (`groupedCerts`, `shared/lib/partnerCertificates.ts`). `certificates.submit` accepts as `renewalOf` any certificate of the same technician and code, a renewal included, and `certificates.list` answers by expiry. The grouping merged a renewal into the group of the certificate it renews one step at a time, in list order. With an original, its renewal and the renewal of that renewal, the first renewal joined the original's group and was gone when the second looked for it. The second renewal then became a row of its own, and the original's row named the first renewal as its latest certificate.
+
+1. **Reproduced.** A unit test with that chain in list order (expiry ascending) gave two rows.
+2. **Fix.** Each "other" certificate is filed under the first certificate of its chain: `renewalOf` is followed back while it names another "other" certificate of the list, each one once (a loop cannot hang). The result no longer depends on the order of the list. A renewal of a certificate outside the list keeps its own row, as before.
+3. **Test.** `partnerCertificates.test.ts`: the chain gives one row, in list order and reversed. Failing before (two rows), passing after.
+4. **Not changed.** The API, the qualification codes, which by design always group by code, and every operation, route and count.
+
+## IR707 Overdue totals are per currency, never added across currencies (review round 163, 2026-11-10)
+
+A customer's contracts may be in MYR or in USD (IR135 item 1), so its overdue invoices can be in both. Two screens added the overdue invoices' minor units together and wrote the sum in the first invoice's currency. 120.00 MYR and 50.00 USD then read as "170.00 MYR". The two screens are the customer overview's notice ("{n} invoices are overdue — {amount} in total", `dueNotice`, DEC-90 / IR610) and HQ's customer standing (the "Overdue billing" KPI, `standing` in `shared/lib/assets.ts`). The HQ dashboard and billing screens already list unpaid amounts per currency and never sum them across currencies.
+
+1. **Reproduced.** Unit tests with one MYR and one USD invoice: the notice said "180.00 MYR" (with a second MYR invoice) and the standing said "170.00 MYR".
+2. **Fix.** `moneyByCurrency` (`shared/lib/money.ts`) totals the amounts per currency in the order the currencies first appear and joins them ("130.00 MYR + 50.00 USD"). Both screens use it. A single currency reads as before.
+3. **Tests.** `clientBilling.test.ts` (the notice) and `assets.test.ts` (the standing). Failing before, passing after.
+4. **Not changed.** The API, the warranty-claim candidate (the costs of one job) and every operation, route and count.
+
+## IR709 A technician binds an unbound device only to its planned unit unless they registered it (review round 171, 2026-11-10)
+
+`devices.register` reserves a device for a planned unit (`targetUnitId`, IR467), and the device stays unbound until `devices.bind`. Until then HQ and the member who registered it are the only ones who read it (`devices.get` answers NOT_FOUND to anyone else). `devices.bind` locked the device by its ID alone. For a technician it checked the job's unit (the target of the bind) and, for a bound device, the unit it leaves, but nothing about an unbound one. So a technician who could not read HQ's unbound device could bind it to a unit of their own job, taking it from the unit HQ planned it for.
+
+1. **Reproduced.** HQ registers a device planned for one unit. The internal technician, with an active assignment on another unit, gets NOT_FOUND from `devices.get` and 200 from `devices.bind` to their unit.
+2. **The other device writes.** `devices.check`, `devices.calibrate` and `devices.updateFirmware` lock a bound device and answered CONFLICT `deviceNotBound` before any scope check, so the same technician learned that HQ's unbound device exists (reproduced: 409). An unbound device the caller does not read is now NOT_FOUND there too (`hiddenUnbound`, the read rule of `devices.get`).
+3. **Fix.** An unbound device goes to its planned unit, as IR467's "bind it once installed" intends, which a technician assigned there may do. A bind to any other unit is refused unless HQ, or the member who registered the device, makes it. The refusal is NOT_FOUND, as the device reads for the caller, and it comes before the version is compared (IR366).
+4. **Test.** `TestBindOnlyAReadableUnboundDevice`: `devices.check` of HQ's unbound device is NOT_FOUND (409 before), HQ's device planned for another unit is refused (404, 200 before), and the technician's own registered device binds (200). `TestTechnicianRebind` still binds HQ's device to its planned unit.
+5. **Not changed.** HQ's binds, the rebinding of a bound device (IR366), `devices.get`, and every operation, route and count. B-12 (a technician's own registered device and the technician app's bind step) stays open.
+
+## IR710 The HQ alerts screen reads each alert status on its own (review round 185, 2026-11-10)
+
+`/admin/alerts` (FR-A05, SCR-A05) shows the open, acknowledged and resolved alerts of its scope as three status tiles, and lists the alerts of the selected status (open by default). The page read one page of `alerts.list` (limit 100) over every status, and the view picked the status from it. The list sorts the most severe first, then by ID, across the statuses. So once a scope held more than 100 alerts, the open alerts of a lower severity sorted behind the resolved alerts of a higher one were missing from the list and from the Open tile. Resolved alerts only accumulate, so this happens in time to HQ's unscoped view.
+
+1. **Reproduced.** The admin app's unit test `alertsLoad.test.ts` serves 100 resolved critical alerts and one open warning, in the list's order. With one page of every status, the open warning is missing (the test fails). With the fix it is listed, and the resolved tile still counts the first 100.
+2. **Fix.** `scopeAlerts` (`admin/app/admin/alerts/_lib/load.ts`) reads each status with its own filter: the open and acknowledged alerts in full (`coreAll`, following `nextCursor`), the resolved alerts as their first page of 100, most severe first. The view, its tiles, the URL state (IR318) and the permission check (IR581) are unchanged.
+3. **Tests.** The admin app now has a Vitest set-up of its own (`admin/vitest.config.mts`, `npm test`), as the technician app does (IR702), which the CI unit-test job runs with the other workspaces.
+4. **Not changed.** The resolved tile stops at 100 as before. Every operation, route and count stays the same.
+
+## IR711 The technician overview reads each unresolved alert status on its own (review round 186, 2026-11-10)
+
+The technician overview (FR-T01, SCR-T01) lists the open and acknowledged alerts on the technician's assigned units in "Alerts on my units (n)". The loader read one page of `alerts.list` (limit 50) over every status, most severe first, and the view dropped the resolved ones. The list sorts by severity across the statuses, so once the assigned units held 50 resolved alerts of a higher severity, the open alerts behind them were missing from the card and its count. This is the class of IR710 (the HQ alerts screen).
+
+1. **Reproduced.** `technician/tests/overviewLoad.test.ts` serves 50 resolved critical alerts and one open warning, in the list's order. With one page of every status the card is empty (the test fails). With the fix it lists the open warning.
+2. **Fix.** The loader reads the open and the acknowledged alerts each with its own status filter, in full (`coreAll`), most severe first. The card's order (worst, then newest) and its links are unchanged. A role that may not read alerts still gets an empty card (`orWhenRefused`).
+3. **Not changed.** The technician unit pages read their unit's alerts as before. Every operation, route and count stays the same.
+
+## IR712 The unit pages read every unresolved alert of the unit (review round 187, 2026-11-10)
+
+Three unit pages list a unit's unresolved alerts first:
+- the technician's unit page (FR-T05): the open alerts card and the events of the period;
+- its alert evidence page (FR-T07): the alert picker, which opens the worst unresolved alert;
+- the contractor's unit view (FR-P04): the evidence list.
+
+Each read one page of `alerts.list` for the unit over every status: 50 alerts on the technician pages, 20 on the contractor's. The list sorts the most severe first, then by ID, across the statuses. So once a unit held that many resolved alerts of a higher severity, its open and acknowledged alerts were missing from these pages. A unit's resolved alerts only accumulate. This is the class of IR710 and IR711.
+
+1. **Reproduced.** `shared/lib/tests/unitAlerts.test.ts` serves 50 resolved critical alerts, one open warning and one acknowledged alert for a unit, in the list's order. With one page of every status, the two unresolved alerts are missing (the test fails). With the fix both are read.
+2. **Fix.** `unitAlerts` (`shared/lib/unitAlerts.ts`) reads the unit's open and acknowledged alerts each in full (`coreAll`), and its latest resolved alerts up to the page's former limit (50 or 20), newest change first (`updatedAt` desc, so the events of the period and the evidence list show the recent ones). The three loaders use it. A refusal still answers as before: the technician's alert page shows its unavailable states, and the other two show no alerts.
+3. **Not changed.** What the pages show and how they order it. Every operation, route and count stays the same.
+
+## IR713 HQ billing reads every inquiry waiting for a reply (review round 193, 2026-11-10)
+
+The Customer inquiries tab of `/admin/billing` (FR-A08, DD-A08) shows the customers' questions as All, Received and Answered, with a count on each, and puts the received ones first. The page read one page of `inquiries.list` (limit 100), which sorts the newest first across the states. So once more than 100 newer inquiries had been answered, an older one still waiting for a reply was missing from the Received tab and its count, and HQ could not answer it. Inquiries only accumulate. This is the class of IR710 to IR712.
+
+1. **Reproduced.** The admin app's unit test `inquiriesLoad.test.ts` serves 100 answered inquiries and one older received inquiry, in the list's order. With one page the received inquiry is missing (the test fails). With the fix it is listed, and the Answered tab still shows the newest 100.
+2. **Fix.** `billingInquiries` (`admin/app/admin/billing/_lib/inquiries.ts`) reads the received inquiries in full (`coreAll` with `status: received`) and the newest 100 answered ones (`status: answered`). The view, its order and the reply flow are unchanged.
+3. **Not changed.** The customer's payment page already reads every inquiry of its invoice and restriction (`coreAll`). Every operation, route and count stays the same.
+
+## IR714 The HQ restrictions screen counts every state of its scope (review round 194, 2026-11-10)
+
+`/admin/restrictions` (FR-A09, SCR-A09) shows a chip with a count for each state: scheduled, requested, applied, release requested, released and cancelled. A chip picks that state as the `status` filter of the list. The counts were taken from the listed rows: one page of `restrictions.list` (limit 100, newest first). So with a state picked, every other chip showed 0. Without one, the counts stopped at the newest 100 restrictions, and an older restriction still applied did not count. Released and cancelled restrictions only accumulate.
+
+1. **Reproduced.** The admin app's unit test `restrictionCounts.test.ts` serves 120 released restrictions and one older applied one in a contract's scope. Counting the listed page gives applied 0 and released 100 (the test fails). With the fix the counts are 1 and 120.
+2. **Fix.** `stateCounts` (`admin/app/admin/restrictions/_lib/counts.ts`) reads the `total` of `restrictions.list` per state (limit 1), in the contract / invoice scope of the URL whichever state is picked. The list, the detail and the schedule form are unchanged.
+3. **Not changed.** The unfiltered list still shows the newest 100. A state chip, now counted right, lists that state on the server. Every operation, route and count stays the same.
+
+## IR715 The customer finds the active restriction through every invoice of the contract (review round 199, 2026-11-10)
+
+The customer has no restriction list. Three pages find a contract's active restriction through the invoices it cites (`restrictions.forInvoice`, IR583, IR610):
+- Contracts & payments (FR-C10): the restriction notice;
+- the overview's due notice (DEC-90);
+- the unit page's link to the restriction (IR583).
+
+`invoices.list` answers the latest due first. Contracts & payments and the unit page asked about the first three unpaid invoices only. The overview asked about the contract's latest overdue invoice only. A restriction cites the invoices that were overdue when it was scheduled. So a customer who had not paid the newer invoices either, which is the customer a restriction is for, lost the notice and the link.
+
+1. **Reproduced.** `shared/lib/tests/restrictionLookup.test.ts`: a contract with three newer unpaid invoices, the overdue one the restriction cites, and an older paid one. With the first three unpaid invoices the restriction is not found (the test fails). With the fix it is found on the first request.
+2. **Fix.** `restrictionFor` (`shared/lib/restrictionLookup.ts`) asks about the unpaid invoices oldest due first, then the paid ones latest due first (a restriction being released once they are paid, `release_requested`). It stops at the first restriction the page accepts. The three pages use it; the overview passes the contract's overdue invoices. The `no-await-in-loop` exception of `eslint.base.mjs` names the new file instead of the payments page, which no longer loops.
+3. **Not changed.** What the notices and the link show. Every operation, route and count stays the same.
+
+## IR716 The app shell takes API mode from the layout, not from the session read in the browser (review round 212, 2026-11-10)
+
+The app shell (`shared/components/AppShell.tsx`) has two choices that depend on the mode:
+- the technician's Scan QR opens the real scan (`units.resolveQr`, FR-T13) in API mode, and the Phase 1A demo dialog otherwise. The demo dialog shows a fixture match: "Matched", Bedroom AC, `job-contractor-a`.
+- a client sees the Users page (FR-C19) only as an owner. In API mode that is the session's client role; otherwise it is the demo persona, an owner.
+
+Both took the mode from `useBffSession()`. That hook is null until `/bff/session` answers, and it is the mock session when the answer cannot be read. So in API mode a technician who pressed Scan QR before the session answered, or after a failed read, saw the demo's invented match. In the same cases a client who is not an owner was offered the Users link (the page itself is refused by the Core API).
+
+1. **Reproduced.** `shared/lib/tests/appShellMode.test.tsx` renders the shell in API mode (`live` given) with `/bff/session` unreadable. Before the fix, Scan QR opens the demo dialog ("[ camera preview ]") and a client gets the Users link (both cases fail).
+2. **Fix.** API mode is `live` being given, or a session that says `api`. The role layouts pass `live` only in API mode (IR241), so it is known on the first render; the shared pages (notifications, preferences, demo) pass it only with a session, and there the session still tells. The real QR scan and the owner check use it. In API mode the owner check reads the session's client role, which is false until the session answers. The demo keeps its dialog and persona.
+3. **Not changed.** The QR scan itself, the Users page and its server-side owner check. Every operation, route and count stays the same.
+
+## IR717 A Server Action that cannot be reached keeps the screen (review round 220, 2026-11-10)
+
+`useAction` (`shared/lib/useAction.ts`) runs the screens' Server Actions in a transition. A failure answered by the action, a refusal or an unavailable Core API (IR683), becomes a toast in the display language, and the screen keeps what the user typed. A call that gets no answer at all was not handled: the browser is offline, or the app server restarts. The promise of the action rejects, the rejection leaves the transition, and React shows the route's error boundary. So the form the user had filled in was lost.
+
+1. **Reproduced.** `shared/lib/tests/useAction.test.tsx` runs an action whose call rejects (`TypeError: Failed to fetch`). The error is thrown out of the transition (the test fails).
+2. **Fix.** `reached` turns such a rejection into the failure `actionFailure` gives a Core API that does not answer: `UNAVAILABLE`, `error.unavailable`. The screen then shows "The service is unavailable — try again shortly" and runs the caller's `failed`. Next's own control flow still goes on: a redirect or not found is rethrown by `unstable_rethrow`, as on the server.
+3. **Not changed.** Successes (the re-read of IR680, `reload: false` of IR685), refusals and the sign-in redirect of an ended session (IR385). Every operation, route and count stays the same.
+
+## IR718 Every screen that runs a Server Action itself keeps the screen when the call gets no answer (review round 221 / 228, 2026-11-10)
+
+IR717 made `useAction` read a Server Action call that gets no answer (the browser offline, the app server restarting) as unavailable. Ten files run their Server Actions themselves, in their own transitions or handlers, and awaited them without a catch:
+- admin: `alerts-view.tsx`, `default-policy.tsx` (2 calls), `policies-tab.tsx` (2), `policy-checks.tsx`, `billing-view.tsx`, `billing/contracts/contracts-view.tsx`;
+- customer: `alerts-live.tsx`, `properties-view.tsx` (the group send);
+- the shared inbox `notifications-view.tsx` (2);
+- technician: `units/[id]/alerts/alert-evidence.tsx`.
+
+In a transition the rejection reached the route's error boundary and the typed form was lost. In the group send the rows stayed "Sending" and the button stayed disabled.
+
+1. **Reproduced.** `shared/lib/tests/unreachableActions.test.tsx` runs the inbox with `markRead` and `markAllRead` rejecting (`TypeError: Failed to fetch`). On the unfixed view both cases fail: the error is thrown out of the transition. With the fix they show "Not marked as read: The service is unavailable — try again shortly" and keep the inbox.
+2. **Fix.** `shared/lib/unreachable.ts` holds the rule of IR717 for every caller. `reached` serves an `{ ok }`-shaped action: its answer, or the unavailable failure. `orUnreachable` serves any other shape (a failure or null, counts with a failure): the caller maps the failure to its own shape. Next's own control flow (redirect, not found) is rethrown by `unstable_rethrow`. `useAction` uses `reached`, and each of the ten files wraps its call. Each row of the group send now catches: that AC reads "Failed" with the unavailable text, the others go on, and the button comes back. The customer unit page already caught its own (unchanged).
+3. **Tests.** The inbox cases above, `reached` / `orUnreachable` themselves, and the IR717 case of `useAction`. The group send has no component test: the customer app has no component test set-up yet. Its catch is the one the unit page uses.
+4. **Not changed.** What each screen shows on an answer, success or refusal. Every operation, route and count stays the same.
+
+## IR719 The sign-in callback reads a token exchange without a usable answer as its token error (review round 234 / 235, 2026-11-10)
+
+`/bff/auth/callback` exchanges the authorization code for tokens at the identity provider's token endpoint, server to server. It sent a refusal (`!ok`) and a body that is not a token response to `/login?error=token`. But it had no timeout. And a body that is not JSON (a proxy's error page with status 200), or a fetch that failed, threw out of the route handler. So the sign-in ended on the error page, or waited as long as the platform's own timeout when the provider accepted the connection and never answered. The Core API check of the same route already has a 3-second timeout.
+
+1. **Reproduced.** `shared/lib/tests/callbackToken.test.ts` runs the callback with a matching state and a token endpoint that answers an HTML page, or rejects with a timeout. Both throw before the fix: `SyntaxError: Unexpected token '<'` and `TimeoutError`.
+2. **Fix.** `exchange` posts the code with a 10-second timeout (`AbortSignal.timeout`). It returns the parsed token response, or null on a refusal, on a body that is not a token response, on an error or on no answer in time. Null sends the sign-in to `/login?error=token`, as a refusal did before.
+3. **Not changed.** The PKCE and state checks, the role and membership checks, the revoked sign-in (IR384 / IR385), the session (IR382) and the address handling (IR651). Every operation, route and count stays the same.
+
+## IR720 The shared test environment keeps Mailpit on the server and its own demo passwords (B-15, decided 2026-11-10)
+
+The shared test environment (DEC-93 / DEC-96) holds the real air conditioner at customer-a, with `REAL_MQTT_COMMANDS=1`. Two things let anyone who reaches the server on the lab network or the Tailnet take over an account there:
+- Mailpit was published on all addresses, and its inbox holds every set-up and password-reset link.
+- The ten demo users kept the passwords of `docker/keycloak/realm-ac.json`, which are in the repository. Only HQ needs a one-time code, so customer-a's password alone switched the real AC.
+
+The user took B-15's recommendation.
+
+1. **Mailpit.** `deploy/test/compose.test.yaml` publishes it on `127.0.0.1:${MAILPIT_PORT:-8225}` (`!override`), whatever `PUBLISH_ADDR` is. It is read through an SSH tunnel: `ssh -L 8225:127.0.0.1:8225 <server>`. The dev stack keeps its loopback default.
+2. **Demo passwords.** The environment file names `DEMO_USER_PASSWORD`, which `setup.sh` writes for a new environment. `realm.py` puts it on every demo user's password credential when it writes a new realm. `configure.sh` (the `keycloak-config` one-shot of every start) sets it with `kcadm.sh set-password` on the ten users of `realm-ac.json` in a realm that exists. The password is passed in `KC_CLI_PASSWORD`, not on the command line. An empty value (dev, CI, E2E) changes nothing.
+3. **Tests.** `deploy/test/test_realm.py` (in CI's Python and shell job): with `DEMO_USER_PASSWORD` every password credential is that value (failed before), and without it the local passwords stay. `docker compose config` of the test files shows Mailpit on 127.0.0.1 (0.0.0.0 before).
+4. **For the running environment.** Mailpit moves to the loopback at the next deployment. The demo passwords change only once `DEMO_USER_PASSWORD=<a secret>` is added to `~/ac-test/env` by hand: `setup.sh` keeps an existing file. The value is then the team's password for the demo users there.
+5. **Not changed.** The apps, Keycloak's ports, the users the team invited (only the ten demo users are set) and every operation.
+
+## IR725 The lab server's disk stays bounded: CI's PostgreSQL in tmpfs, the build cache capped — 2026-11-10
+
+On 2026-11-10 the lab server's disk (461 GB) was full. The three self-hosted runners went offline: they could not write their logs and restarted every five seconds. Of the 433 Docker volumes, 410 were unused (about 90 GB), and the build cache held about 47 GB. The disk was cleaned by hand (118 GB freed). Left alone, it would fill again at the same pace, so the causes are removed.
+
+1. **Causes.**
+   - `ci.yml`'s `go-test` and `go-test-cluster` start `postgres:18` as a service container. The image declares `VOLUME /var/lib/postgresql`, so every job created an anonymous volume holding its test databases (about 200 MB). The runner removes the containers after a job but not their volumes. The job containers' images (golang, node, python) declare no volume.
+   - A job cannot remove its own volume at the end: the job containers have no Docker socket (IR632), and the service container still runs when the last step does.
+   - `deploy.sh` and `e2e.yml` build with BuildKit, and nothing trimmed its cache. `deploy.sh`'s `prune` removed only the old `ac-*:test*` images, so each nightly rebuild of `ac-*:e2e` left the one before as an untagged image (16 GB of them at the time).
+2. **CI's PostgreSQL in memory.** Both Go jobs mount a tmpfs on the service's data directory (`--tmpfs /var/lib/postgresql:rw,size=2g`). On the path of a `VOLUME`, Docker creates no anonymous volume. The test databases are thrown away after the job anyway; 2 GB only caps a runaway. Checked locally: a `postgres:18` container with the tmpfs answers `pg_isready`, creates a database and leaves the volume count unchanged (57 before and after); without the tmpfs it leaves one more volume.
+3. **After a deployment.** `deploy.sh`'s `prune` also removes the untagged images (`docker image prune -f`) and trims the build cache to `CACHE_LIMIT=20GB` (`docker builder prune -f --max-used-space`; `--keep-storage` is deprecated since Docker 28, the server runs 29). A clean-up that fails does not fail the deployment, like the image removal before it.
+4. **After the E2E.** A last step of `e2e.yml`, after `remove the stack`, always run and on the server itself, does the same with the same 20 GB. It is a step of its own, so it runs even when `down` fails. The load test (`load.yml`, run by hand) rebuilds its `:load` images each time and ends with the same step (found in round 251).
+5. **Not done.**
+   - A regular `docker volume prune`: Supabase, Grafana and Mosquitto run on the same server, and it could remove their anonymous volumes. With (2) the volumes are no longer made.
+   - `docker system prune -a`: it would remove the stopped projects' images on the server too.
+6. **Checks.** actionlint, shellcheck and ruff as in CI; `bash -n deploy/test/deploy.sh`. On the server, the number of unused volumes (`docker volume ls -qf dangling=true | wc -l`) stays the same across this PR's CI. The deployment's clean-up shows at the next deployment the user asks for; the E2E's at the next nightly run.
+
+## IR729 The E2E stack's Mailpit keeps 8025 — 2026-11-10
+
+IR720 moved the shared test environment's Mailpit to the server's loopback with `127.0.0.1:${MAILPIT_PORT:-8225}:8025` in `deploy/test/compose.test.yaml`. The E2E stack (`ac-e2e`, e2e.yml) uses the same file, but its settings do not set `MAILPIT_PORT`, so it took 8225 too. That is the port of ac-test's Mailpit on the same server. The E2E run of 2026-11-10 (42759430296, on deps-2026-11-10) stopped while starting the stack: `Bind for 0.0.0.0:8225 failed: port is already allocated`. The nightly run would have stopped the same way.
+
+1. **Port.** The default is compose.yaml's 8025 again: `127.0.0.1:${MAILPIT_PORT:-8025}:8025`.
+   - ac-test's environment file sets `MAILPIT_PORT=8225` (deploy/test/setup.sh), so it keeps 8225 on the loopback.
+   - The E2E stack keeps 8025, which container-design.md §6 names and its specs open.
+2. **Checked.** `docker compose -f compose.yaml -f deploy/test/compose.test.yaml config mailpit`:
+   - without `MAILPIT_PORT`: 127.0.0.1:8025;
+   - with `MAILPIT_PORT=8225`: 127.0.0.1:8225.
+   The E2E is run again on this change.
+
+## IR727 Dependabot's pull requests are merged by hand; the broker image comes from compose.yaml — 2026-11-10
+
+`auto-merge.yml` turned on GitHub's auto-merge for every pull request of the repository, Dependabot's included. A dependency update then reached `main` as soon as the 14 required checks passed. On 2026-11-10 the nine open Dependabot pull requests showed why that is not enough:
+- #159 was not an update at all: `0.164.0-386` is the collector's image for 32-bit Linux only.
+- #157 adds two fields to `keyfunc.Override`, which oidc.go lists in full.
+- #161 raises Playwright beyond the E2E container's browsers.
+- #162 is a major jsdom with focus changes.
+
+The user asked that Dependabot's pull requests no longer merge by themselves.
+
+1. **Auto-merge.** The job does not run for a pull request opened by `dependabot[bot]`: someone merges it after reading the change. Every other pull request of the repository keeps auto-merge (2026-11-08). The nine open ones had been set to draft by the user, so none had auto-merge on. They went to `main` together through a release branch (#165).
+2. **The broker image.** `docker/mosquitto/passwd.sh` and `deploy/load/run.sh` ran `eclipse-mosquitto:2` by a digest of their own (`38c0da…`), older than compose.yaml's. Dependabot updates only compose.yaml. Both now read the pinned reference from compose.yaml's `image:` line, and stop when it is missing.
+3. **#159.** It was closed with `@dependabot ignore this version`. Dependabot stored that as "> 0.164.0" for the whole collector (`@dependabot show … ignore conditions`), which would also hide every later version. `@dependabot unignore` did nothing on the closed PR or on another one. The branch was restored at its last commit and the PR reopened, and Dependabot answered "I will stop ignoring the otel/opentelemetry-collector-contrib dependency". `.github/dependabot.yml` now ignores only `0.164.0-386`, so #159 is retired without a dependency-wide ignore.
+4. **Checks.** shellcheck and actionlint as in CI: 0. `bash -n` and `sh -n`: ok. `passwd.sh` with dummy keys in a worktree wrote both accounts with compose.yaml's image (rc=0); the tracked file was restored. `docker/mosquitto/passwd.test.sh` (IR684) copies only passwd.sh into its temporary tree, so it now writes a compose.yaml there too. Its `docker` shim also records the image it was given, and the test requires compose.yaml's.
+5. **Docs.** container-design.md §6: auto-merge, its Dependabot exception and the image reference.
+
+## IR721 A notification e-mail links to the address its recipient last signed in on (B-16, decided 2026-11-10)
+
+The shared test environment answers on the lab LAN and the Tailnet (DEC-102, IR651). IR695 made the set-up and invitation e-mails link to the address the invitation came from. The notification e-mails of the worker kept `APP_URL_*`, the canonical LAN address (IR651 item 8), which cannot be reached from the Tailnet. The user took B-16's recommendation: link each e-mail to the address its recipient last signed in on.
+
+1. **Recorded.** `identity.users.sign_in_host` (new, nullable) holds the host name of the issuer of the user's latest sign-in. `RecordSignIn` writes it with the sign-in (IR268). The host is the verified issuer's (`Principal.IssuerHost`, IR695), so a sender cannot choose it. A call without one, an internal call, keeps the recorded host.
+2. **Used.** The notification worker reads `PUBLIC_HOSTS` (compose passes it to `worker-notification`). `dueMails` reads the recipient's `sign_in_host`. `Apps.on` moves the role's app to that host, with its port and scheme kept, only when the host is listed. A host that is not listed, or none, keeps the canonical address. An environment with one address (dev, CI, E2E, production) has no listed host, and its links stay as they are.
+3. **Tests.** `TestMailLinksAtTheSignInAddress` (notify): the Tailnet host moves the link; the canonical host, an unlisted host and none keep it; a single-address environment never moves it. `TestRecordSignInHost` (auth): a sign-in records its issuer's host and a later call without one keeps it. It fails on the code before this change.
+4. **Data.** The column is added in migration 000001 and `schema.sql` (version 1 is still edited in place). The dev database got it by hand (`ALTER TABLE identity.users ADD COLUMN IF NOT EXISTS sign_in_host text`). The shared test environment builds its data again from the seed at its next deployment, as for any change of the migrations (`deploy.sh`).
+5. **Not changed.** The set-up and invitation e-mails (IR695), the e-mail texts and every operation, route and count.
+
+## IR722 A technician binds the device they registered to its planned unit (B-12, decided 2026-11-10)
+
+FR-T11's flow is "register serial → bind unit → check connection" (AT-T11-N). Since IR467, `devices.register` only reserves the planned unit (`targetUnitId`, D05), and the device stays unbound until `devices.bind`. The admin screens took that step (IR467). The technician app kept saying the opposite:
+- "Bind to unit", "binds it in one step" and "Device registered and bound".
+- For an unbound device the loader found no job: it looked one up by `unitId`, which is null. So every device action was disabled, and there was no Bind….
+
+A technician who registered a device on site could not finish the set-up. The user took B-12's recommendation: mirror IR467 in the technician app.
+
+1. **Reproduced.** `technician/tests/devicesLoad.test.ts`: a device registered for a planned unit on which the technician has an assigned job. The loader answered no job (`null`, the test fails). With the fix it is that unit's job.
+2. **Fix.**
+   - The loader takes the device's unit, or its planned unit while it is not bound. That unit's job is the job the device is bound under; IR709 lets a technician bind an unbound device to its planned unit.
+   - The view has a binding card of its own (`BindingCard`). A device not bound yet reads "Not bound yet", says what to do next, and offers Bind… with the planned unit and "Installed on site" prefilled. A bound device offers Rebind….
+   - Check connection, Calibrate and Update firmware wait for the binding; the API refuses them on an unbound device.
+   - The register form reads "Planned unit", "Registering reserves the device for this unit; Bind connects it once it is installed." and "Register", and its toast is "Device registered — bind it to the unit once it is installed". These are the admin app's texts and keys (en / ms / ja). The four texts the technician app no longer shows were removed from the ms and ja dictionaries.
+3. **Not changed.** The API (IR467, IR709), the admin screens and every operation, route and count.
+4. **Open.** Figma Technician 03 still draws one step, and the E2E path register → bind → check is not written yet.
+
+## IR732 The repository can be public: nobody outside can run, change or start anything — 2026-11-10
+
+The user decided to make the repository public, so that its CI runs on GitHub-hosted runners without a limit. Everything may be seen: the history, the pull requests, the logs and the internal addresses. The condition is that nobody outside can run, change or start anything, nor reach a secret. Before, every workflow ran on the lab server's self-hosted runners, `ci.yml` and `auto-merge.yml` for every pull request too, so a fork's pull request would have run its own code on the lab server.
+
+1. **ci.yml on hosted runners.**
+   - Every job runs on `ubuntu-latest`, in the same containers as before.
+   - The lanes' `needs` are gone; the job names, which are the required checks, stay.
+   - The named volumes are replaced by `actions/cache` (v6.1.0, by SHA), keyed by `go.sum`, `package-lock.json` and `ci.yml`.
+   - The steps that handed the workspace back to the runner's user are gone; a hosted runner is fresh every time.
+2. **Auto-merge.** It runs on `ubuntu-latest` for the owner's own pull requests only (`user.login == github.repository_owner`), not a fork's, another account's or Dependabot's (IR727). Its write permissions are the job's, not the workflow's. The trigger stays `pull_request`, never `pull_request_target`.
+3. **The lab server's workflows.** e2e.yml, load.yml and deploy-test.yml run their jobs only in this repository and never for a pull request: `github.repository == 'Aquarius0715/AC-Project'` and, for e2e and load, `github.event_name != 'pull_request'`. Their triggers cannot be started from outside:
+   - schedule and dispatch, which need write access;
+   - a test tag;
+   - `workflow_run` of CI on a push to `main`, whose checkout is main and the tags, never a pull request's code.
+4. **Credentials and permissions.** Every checkout sets `persist-credentials: false`; no step pushes or fetches with the job's token. deploy.sh's tag fetch is optional and the checkout has the tags. Every workflow's permissions are `contents: read`, plus `actions: read` for deploy-test and the auto-merge job's own.
+5. **zizmor** (1.31.1) lints the workflows' security in other-lint, beside actionlint, at 0 findings. Two exceptions name their rule and reason:
+   - deploy-test's `workflow_run` (dangerous-triggers): it acts only on a push to `main`;
+   - the docs job's `typescript@6.0.3` (adhoc-packages): the lock's exact version.
+6. **CODEOWNERS and SECURITY.md.** `* @Aquarius0715` and `/.github/ @Aquarius0715`; vulnerabilities are reported privately (private vulnerability reporting).
+7. **Repository settings** (2026-11-10, after the repository was made public).
+   - Set through the API: fork pull requests need approval for every external contributor (it was first-time contributors only), and only GitHub's own actions are allowed, pinned by SHA.
+   - Already set: read-only workflow permissions without creating or approving pull requests; main's protection with the 14 required checks and no force push; secret scanning and push protection.
+   - Left to the user: the tag ruleset (`test*`, the owner only); the Environment `test` limited to `main` and `test*`; Dependabot alerts and private vulnerability reporting; Wiki and Projects off.
+   - No required review: the owner alone could not approve the owner's own pull requests, and auto-merge does not use a bypass (the user's choice (a)).
+8. **Order.** Merged after the repository became public, so the hosted runners' minutes are free; it went ahead of the queued changes.

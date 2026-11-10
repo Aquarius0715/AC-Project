@@ -1,44 +1,52 @@
 "use client";
+const TIME_PROPOSED = "time_proposed";
+const IN_PROGRESS = "in_progress";
+const CONTRACTORS = "contractors";
+const CONTRACTOR = "contractor";
+const TEXT_10_00_12_00 = "10:00–12:00";
 
 import { useState } from "react";
 import { Badge, Banner, Btn, Card, Choice, DataTable, Field, Input, Kpi, ListRow, Modal, Page, Select, SummaryList, Tabs, Textarea, Timeline, cx, useToast, Plain } from "@ac/web/components/ui";
 import { JobStatusBadge, OriginBadge, PreferredSlotsInput, Rank, preferredError } from "@ac/web/components/JobBits";
-import { Job, JobStatus, Slot, fitFor, fmt, jobActions, longDate, statusLabel, useJobs } from "@ac/web/lib/jobs";
+import { type Job, type JobStatus, type Slot, fitFor, fmt, jobActions, longDate, statusLabel, useJobs } from "@ac/web/lib/jobs";
 import { Icon } from "@ac/web/components/Icon";
+import { oneOf } from "@ac/web/lib/oneOf";
+import { nonEmpty } from "@ac/web/lib/lists";
 
-const PIPE: JobStatus[] = ["requested", "time_proposed", "offered", "accepted", "assigned", "in_progress", "submitted", "rework_requested", "completed", "on_hold"];
-const ORDER: JobStatus[] = ["requested", "time_proposed", "offered", "accepted", "assigned", "in_progress", "on_hold", "submitted", "rework_requested", "completed", "cancelled"];
-const plans = [
+const PIPE: JobStatus[] = ["requested", TIME_PROPOSED, "offered", "accepted", "assigned", IN_PROGRESS, "submitted", "rework_requested", "completed", "on_hold"];
+const ORDER: JobStatus[] = ["requested", TIME_PROPOSED, "offered", "accepted", "assigned", IN_PROGRESS, "on_hold", "submitted", "rework_requested", "completed", "cancelled"];
+const plans = nonEmpty([
   { id: "plan-living-a", name: "Living room AC — periodic inspection & filter cleaning", rule: "Every 3 months · day 8 · customer-a · next visit 2026-12-08", unit: "Living room AC", delivery: "Internal · tech-internal-b" },
   { id: "plan-lobby-b", name: "Lobby AC — quarterly inspection", rule: "Every 3 months · day 1 · customer-b · next 2026-11-01", unit: "Lobby AC", delivery: "Offer to contractor-a" },
-];
-type Tab = "jobs" | "plans" | "contractors" | "sla";
+]);
 
 /** The Phase 1A demo of the maintenance coordinator (fixture jobs, plans, contractors and SLA). */
 export function JobsDemo({ jobId, tab: initial }: Readonly<{ jobId?: string; tab?: string }>) {
+  type Tab = "jobs" | "plans" | "contractors" | "sla";
   const sp = { jobId, tab: initial };
   const jobs = useJobs();
-  const [tab, setTab] = useState<Tab>((["plans", "contractors", "sla"].includes(sp.tab ?? "") ? sp.tab : "jobs") as Tab);
+  const [tab, setTab] = useState<Tab>(oneOf(["plans", CONTRACTORS, "sla"] as const, sp.tab ?? "", "jobs"));
   const [selId, setSelId] = useState(sp.jobId ?? "job-c07");
   const [origin, setOrigin] = useState<"all" | "request" | "plan">("all");
   const [delivery, setDelivery] = useState<"all" | "internal" | "contractor">("all");
   const [stage, setStage] = useState<JobStatus | null>(null);
-  const [modal, setModal] = useState<null | { kind: "book"; slot: Slot } | { kind: "propose" } | { kind: "new" } | { kind: "reason"; what: "rework" | "hold" | "reassign" } | { kind: "classify" }>(null);
-  const list = [...jobs].filter((j) => j.status !== "cancelled").sort((a, b) => ORDER.indexOf(a.status) - ORDER.indexOf(b.status))
+  type JobDialog = { kind: "book"; slot: Slot } | { kind: "propose" } | { kind: "new" } | { kind: "reason"; what: "rework" | "hold" | "reassign" } | { kind: "classify" };
+  const [modal, setModal] = useState<JobDialog | null>(null);
+  const list = [...jobs].filter((j) => j.status !== "cancelled").toSorted((a, b) => ORDER.indexOf(a.status) - ORDER.indexOf(b.status))
     .filter((j) => (origin === "all" || j.origin === origin) && (delivery === "all" || j.delivery === delivery) && (!stage || j.status === stage));
   const sel = jobs.find((j) => j.id === selId) ?? list[0];
   return (
     <Page className="max-w-[1440px]">
-      <Tabs value={tab} onChange={setTab} tabs={[{ id: "jobs", label: "Jobs", count: jobs.filter((j) => j.status !== "cancelled").length }, { id: "plans", label: "Plans", count: 2 }, { id: "contractors", label: "Contractors", count: 3 }, { id: "sla", label: "SLA by customer" }]} />
+      <Tabs value={tab} onChange={setTab} tabs={[{ id: "jobs", label: "Jobs", count: jobs.filter((j) => j.status !== "cancelled").length }, { id: "plans", label: "Plans", count: 2 }, { id: CONTRACTORS, label: "Contractors", count: 3 }, { id: "sla", label: "SLA by customer" }]} />
       {tab === "jobs" && (
         <>
           <div className="scroll-x"><div className="grid min-w-[880px] grid-cols-10 overflow-hidden rounded-2xl border border-line bg-surface">
-            {PIPE.map((s) => <Plain key={s} onClick={() => { setStage(stage === s ? null : s); }} className={cx("border-r border-line px-3 py-2 text-left last:border-r-0 hover:bg-surface2", stage === s && "bg-primary-soft")}><div className="text-[11px] text-muted-foreground">{statusLabel[s]}</div><div className={cx("text-lg font-bold", s === "time_proposed" && jobs.some((j) => j.status === s) && "text-warn")}>{jobs.filter((j) => j.status === s).length}</div></Plain>)}
+            {PIPE.map((s) => <Plain key={s} onClick={() => { setStage(stage === s ? null : s); }} className={cx("border-r border-line px-3 py-2 text-left last:border-r-0 hover:bg-surface2", stage === s && "bg-primary-soft")}><div className="text-[11px] text-muted-foreground">{statusLabel[s]}</div><div className={cx("text-lg font-bold", s === TIME_PROPOSED && jobs.some((j) => j.status === s) && "text-warn")}>{jobs.filter((j) => j.status === s).length}</div></Plain>)}
           </div></div>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap gap-2">
-              <Select className="w-auto" aria-label="Origin" value={origin} onChange={(e) => { setOrigin(e.target.value as typeof origin); }}><option value="all">Origin: All</option><option value="request">Origin: Client request</option><option value="plan">Origin: Periodic plan</option></Select>
-              <Select className="w-auto" aria-label="Delivery" value={delivery} onChange={(e) => { setDelivery(e.target.value as typeof delivery); }}><option value="all">Delivery: All</option><option value="internal">Delivery: Internal</option><option value="contractor">Delivery: Contractor</option></Select>
+              <Select className="w-auto" aria-label="Origin" value={origin} onChange={(e) => { setOrigin(oneOf(["all", "request", "plan"] as const, e.target.value, origin)); }}><option value="all">Origin: All</option><option value="request">Origin: Client request</option><option value="plan">Origin: Periodic plan</option></Select>
+              <Select className="w-auto" aria-label="Delivery" value={delivery} onChange={(e) => { setDelivery(oneOf(["all", "internal", CONTRACTOR] as const, e.target.value, delivery)); }}><option value="all">Delivery: All</option><option value="internal">Delivery: Internal</option><option value="contractor">Delivery: Contractor</option></Select>
               {stage && <Btn size="sm" variant="ghost" onClick={() => { setStage(null); }}><Icon name="close" />{statusLabel[stage]}</Btn>}
             </div>
             <Btn variant="primary" onClick={() => { setModal({ kind: "new" }); }}><Icon name="add" /> New job</Btn>
@@ -60,7 +68,7 @@ export function JobsDemo({ jobId, tab: initial }: Readonly<{ jobId?: string; tab
         </>
       )}
       {tab === "plans" && <PlansDemo />}
-      {tab === "contractors" && <Contractors />}
+      {tab === CONTRACTORS && <Contractors />}
       {tab === "sla" && <Sla />}
       {modal?.kind === "book" && sel && <BookModal j={sel} slot={modal.slot} onClose={() => { setModal(null); }} />}
       {modal?.kind === "propose" && sel && <ProposeModal j={sel} onClose={() => { setModal(null); }} />}
@@ -72,7 +80,7 @@ export function JobsDemo({ jobId, tab: initial }: Readonly<{ jobId?: string; tab
 }
 
 /** The demo's Plans tab (fixture plans). */
-export function PlansDemo() {
+function PlansDemo() {
   const toast = useToast();
   const [plan, setPlan] = useState(plans[0]);
   return (
@@ -86,31 +94,41 @@ export function PlansDemo() {
   );
 }
 
+// the technician's answer on a row, and in the detail with its time; no answer yet is awaiting acceptance
+const ACK_WORD = new Map([["accepted", "accepted"], ["cant_make", "can’t make it"]]);
+function techAnswer(j: Job): string {
+  if (j.techAck?.status === "accepted") return `accepted ${j.techAck.at ?? ""}`;
+  return j.techAck?.status === "cant_make" ? "can’t make this time" : "awaiting acceptance";
+}
+// the reason dialog's title and done message; reassigning names the job
+const REASON_TEXT = new Map([["rework", { title: "Return for rework", done: "Returned for rework" }], ["hold", { title: "Put on hold", done: "Job put on hold" }]]);
 function rowLine(j: Job) {
-  if (j.followUpClass === "pending") return `Follow-up of ${j.followUpOf} · classify by 09-23 11:05`;
+  if (j.followUpClass === "pending") return `Follow-up of ${j.followUpOf ?? "—"} · classify by 09-23 11:05`;
   switch (j.status) {
     case "requested": { return j.declined ? `Client declined · round ${String(j.round)} · ${String(j.preferred.length)} new times` : `${String(j.preferred.length)} preferred times · book one or propose`;
     }
-    case "time_proposed": { return `Proposed ${fmt(j.proposal?.slot)} · reply by ${j.proposal?.replyBy}`;
+    case TIME_PROPOSED: { return `Proposed ${fmt(j.proposal?.slot)} · reply by ${j.proposal?.replyBy ?? "—"}`;
     }
-    case "offered": { return j.partnerProposal?.status === "pending" ? `${j.contractor} proposes ${fmt(j.partnerProposal.slot)} · needs client OK` : `Offer to ${j.contractor} · ${fmt(j.scheduled)}`;
+    case "offered": { return j.partnerProposal?.status === "pending" ? `${j.contractor ?? "—"} proposes ${fmt(j.partnerProposal.slot)} · needs client OK` : `Offer to ${j.contractor ?? "—"} · ${fmt(j.scheduled)}`;
     }
-    case "accepted": { return `${j.contractor} accepted · assign technician`;
+    case "accepted": { return `${j.contractor ?? "—"} accepted · assign technician`;
     }
-    case "assigned": { return `${j.delivery === "contractor" ? j.contractor + " · " : "Internal · "}${j.technician} · ${j.techAck?.status === "accepted" ? "accepted" : (j.techAck?.status === "cant_make" ? "can’t make it" : "awaiting acceptance")}`;
+    case "assigned": { const via = j.delivery === CONTRACTOR ? `${j.contractor ?? "—"} · ` : "Internal · ";
+      return `${via}${j.technician ?? "—"} · ${ACK_WORD.get(j.techAck?.status ?? "") ?? "awaiting acceptance"}`;
     }
-    default: { return `${j.delivery === "contractor" ? j.contractor : "Internal"} · ${j.technician ?? "—"} · ${fmt(j.scheduled)}`;
+    default: { return `${(j.delivery === CONTRACTOR ? j.contractor : "Internal") ?? "—"} · ${j.technician ?? "—"} · ${fmt(j.scheduled)}`;
     }
   }
 }
 
 function JobDetail({ j, open }: Readonly<{ j: Job; open: (m: { kind: "book"; slot: Slot } | { kind: "propose" } | { kind: "reason"; what: "rework" | "hold" | "reassign" } | { kind: "classify" }) => void }>) {
   const toast = useToast();
-  const fits = j.preferred.map(fitFor);
+  const agreedBy = j.origin === "plan" ? "from plan" : "client-approved";
+  const fits = j.preferred.map((item) => fitFor(item));
   const isAnyFit = fits.some((f) => f.fits !== "none");
   return (
     <div className="flex min-w-0 flex-col gap-4">
-      <Card title={<span className="flex flex-wrap items-center gap-2">{j.id} · {j.unit} <JobStatusBadge s={j.status} /><OriginBadge origin={j.origin} /></span>} sub={`${j.type} · ${j.customer} · ${j.loc}${j.planId ? ` · ${j.planId} (${j.planVisit})` : ""}`} action={<div className="flex gap-2"><Btn size="sm" onClick={() => { open({ kind: "reason", what: "hold" }); }}>Hold…</Btn><Btn size="sm" variant="danger" onClick={() => { jobActions.cancel(j.id, "cancelled by HQ"); toast("Job cancelled", "warn"); }}>Cancel…</Btn></div>}>
+      <Card title={<span className="flex flex-wrap items-center gap-2">{j.id} · {j.unit} <JobStatusBadge s={j.status} /><OriginBadge origin={j.origin} /></span>} sub={`${j.type} · ${j.customer} · ${j.loc}${j.planId ? ` · ${j.planId} (${j.planVisit ?? "—"})` : ""}`} action={<div className="flex gap-2"><Btn size="sm" onClick={() => { open({ kind: "reason", what: "hold" }); }}>Hold…</Btn><Btn size="sm" variant="danger" onClick={() => { jobActions.cancel(j.id, "cancelled by HQ"); toast("Job cancelled", "warn"); }}>Cancel…</Btn></div>}>
         <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}>
           {[["Symptom", j.symptom], ["Needs", j.type === "Periodic" ? "General maintenance" : "Refrigerant handling · 2 h"], ["Scheduled", j.scheduled ? longDate(j.scheduled) : "not booked"], ["Contact", "9:00–18:00 · call before arriving"]].map(([k, v]) => <div key={k} className="rounded-xl bg-surface2 p-3"><div className="text-[11px] text-muted-foreground">{k}</div><div className="text-[13px] font-semibold">{v}</div></div>)}
         </div>
@@ -139,7 +157,7 @@ function JobDetail({ j, open }: Readonly<{ j: Job; open: (m: { kind: "book"; slo
         <>
           {j.declined && <Banner tone="crit" icon="error"><b>Client declined the proposed time · {j.declined.at}</b><br />Reason: {j.declined.reason}{j.declined.comment ? ` — “${j.declined.comment}”` : ""}. Held capacity was released.</Banner>}
           <Card title={`Client’s preferred times${j.round > 1 ? ` (round ${String(j.round)})` : ""} — book one of these`} sub="Availability: qualification + overlap + travel">
-            <DataTable rowKey={(r) => r.i + ""} rows={j.preferred.map((s, i) => ({ s, i, f: fits[i] }))} cols={[
+            <DataTable rowKey={(r) => String(r.i)} rows={j.preferred.map((s, i) => ({ s, i, f: fits[i] })).filter((r): r is typeof r & { f: NonNullable<typeof r.f> } => r.f !== undefined)} cols={[
               { key: "r", label: "Rank", render: (r) => <Rank i={r.i} /> },
               { key: "t", label: "Time", render: (r) => <b>{longDate(r.s)}</b> },
               { key: "h", label: "HQ technicians", render: (r) => <span className="text-xs text-muted-foreground">{r.f.hq}</span>, hideBelow: "md" },
@@ -156,37 +174,37 @@ function JobDetail({ j, open }: Readonly<{ j: Job; open: (m: { kind: "book"; slo
         </>
       )}
 
-      {j.status === "time_proposed" && j.proposal && (
-        <Card tone="warn" title={j.proposal.by === "contractor" ? "Partner’s time sent to the client — waiting" : "Proposal sent — waiting for the client"} action={<Badge tone="warn">Reply by {j.proposal.replyBy}</Badge>}>
+      {j.status === TIME_PROPOSED && j.proposal && (
+        <Card tone="warn" title={j.proposal.by === CONTRACTOR ? "Partner’s time sent to the client — waiting" : "Proposal sent — waiting for the client"} action={<Badge tone="warn">Reply by {j.proposal.replyBy}</Badge>}>
           <SummaryList items={[["Proposed time", longDate(j.proposal.slot)], ["Held capacity", `${j.proposal.who} — booked automatically when the client accepts`], ["Message", `“${j.proposal.message}”`], ["Client", "Notified in the Client app · reminder 24 h before the deadline"]]} />
           <div className="mt-3 flex flex-wrap justify-end gap-2"><Btn variant="danger" onClick={() => { jobActions.withdraw(j.id); toast("Proposal withdrawn", "warn"); }}>Withdraw proposal</Btn><Btn onClick={() => { open({ kind: "propose" }); }}>Edit proposal…</Btn><Btn onClick={() => { toast("Reminder sent to the client"); }}>Remind client</Btn></div>
           <p className="mt-2 text-[11px] text-muted-foreground">Accept → booked with the held partner (no extra HQ step). Decline → back to Requested with the client’s reason and new times. No reply → stays Requested and a “Call the client” task is created.</p>
         </Card>
       )}
 
-      {(j.status === "offered" || j.status === "accepted" || j.status === "assigned" || j.status === "in_progress") && (
-        <Card title={j.delivery === "contractor" ? "Delivery · offer to contractor" : "Delivery · internal"}>
+      {(j.status === "offered" || j.status === "accepted" || j.status === "assigned" || j.status === IN_PROGRESS) && (
+        <Card title={j.delivery === CONTRACTOR ? "Delivery · offer to contractor" : "Delivery · internal"}>
           <SummaryList items={[
-            ["Agreed time", j.scheduled ? `${longDate(j.scheduled)} (${j.origin === "plan" ? "from plan" : "client-approved"})` : "—"],
-            ...(j.delivery === "contractor" ? [["Contractor", `${j.contractor} · ${j.status === "offered" ? "offer open · expires 09-25 12:00" : "accepted"}`] as [string, string]] : []),
-            ["Technician", j.technician ? `${j.technician} · ${j.techAck?.status === "accepted" ? `accepted ${j.techAck.at ?? ""}` : (j.techAck?.status === "cant_make" ? "can’t make this time" : "awaiting acceptance")}` : "not assigned yet"],
+            ["Agreed time", j.scheduled ? `${longDate(j.scheduled)} (${agreedBy})` : "—"],
+            ...(j.delivery === CONTRACTOR ? [["Contractor", `${j.contractor ?? "—"} · ${j.status === "offered" ? "offer open · expires 09-25 12:00" : "accepted"}`] as [string, string]] : []),
+            ["Technician", j.technician ? `${j.technician} · ${techAnswer(j)}` : "not assigned yet"],
           ]} />
           {j.techAck?.status === "cant_make" && <div className="mt-3"><Banner tone="warn" action={<span className="flex gap-2">{j.delivery === "internal" && <Btn size="sm" onClick={() => { open({ kind: "reason", what: "reassign" }); }}>Reassign…</Btn>}<Btn size="sm" variant="primary" onClick={() => { open({ kind: "propose" }); }}>Propose another time…</Btn></span>}>{j.technician}: “{j.techAck.reason}”{j.techAck.alt ? ` · could do ${j.techAck.alt}` : ""}. Any new time needs the client’s approval.</Banner></div>}
         </Card>
       )}
 
       {j.status === "offered" && j.partnerProposal?.status === "pending" && (
-        <Card tone="warn" title={<span className="inline-flex items-center gap-1.5"><Icon name="swap" />{`${j.contractor} proposes a different time`}</span>} action={<Badge tone="warn">Needs client approval</Badge>}>
-          <SummaryList items={[["Agreed with client", <s key="s" className="text-muted-foreground">{fmt(j.scheduled)}</s>], ["Proposed by contractor", <b key="b">{longDate(j.partnerProposal.slot)} · {j.partnerProposal.tech}</b>], ["Reason", `“${j.partnerProposal.reason}” — ${j.contractor}, ${j.partnerProposal.sentAt}`]]} />
+        <Card tone="warn" title={<span className="inline-flex items-center gap-1.5"><Icon name="swap" />{`${j.contractor ?? "—"} proposes a different time`}</span>} action={<Badge tone="warn">Needs client approval</Badge>}>
+          <SummaryList items={[["Agreed with client", <s key="s" className="text-muted-foreground">{fmt(j.scheduled)}</s>], ["Proposed by contractor", <b key="b">{longDate(j.partnerProposal.slot)} · {j.partnerProposal.tech}</b>], ["Reason", `“${j.partnerProposal.reason}” — ${j.contractor ?? "—"}, ${j.partnerProposal.sentAt}`]]} />
           <div className="mt-3 flex flex-wrap justify-end gap-2"><Btn onClick={() => { toast("Use “+ New job › Offer” to choose another contractor (demo)"); }}>Offer to another contractor…</Btn><Btn onClick={() => { jobActions.keepTime(j.id); toast("Agreed time kept"); }}>Keep {fmt(j.scheduled)} · ask again</Btn><Btn variant="primary" onClick={() => { jobActions.forwardPartner(j.id, "09-25 12:00"); toast("Sent to the client for approval"); }}>Send to client for approval</Btn></div>
           <p className="mt-2 text-[11px] text-muted-foreground">An agreed time never changes without the client’s OK. The offer stays reserved for {j.contractor} while the client decides.</p>
         </Card>
       )}
 
       {j.status === "submitted" && (
-        <Card title="Work report · version 1" sub={`Submitted by ${j.technician}`}>
+        <Card title="Work report · version 1" sub={`Submitted by ${j.technician ?? "—"}`}>
           <SummaryList items={[["Filter cleaned", "Normal"], ["Drain line", "Normal"], ["Refrigerant pressure", "Normal · 412 kPa"], ["Airflow", "Needs attention · reduced on Low"]]} />
-          {j.delivery === "contractor" ? <p className="mt-2 text-xs text-muted-foreground">Outsourced job — the contractor reviews first; HQ reviews only on escalation.</p> : <>
+          {j.delivery === CONTRACTOR ? <p className="mt-2 text-xs text-muted-foreground">Outsourced job — the contractor reviews first; HQ reviews only on escalation.</p> : <>
             <p className="mt-2 text-xs text-ok">You did not contribute to this report, so you can review it (self-approval is rejected).</p>
             <div className="mt-3 flex flex-wrap gap-2"><Btn variant="primary" onClick={() => { toast("Report accepted — job completed"); }}>Accept report</Btn><Btn onClick={() => { open({ kind: "reason", what: "rework" }); }}>Return for rework…</Btn></div>
           </>}
@@ -205,12 +223,12 @@ function JobDetail({ j, open }: Readonly<{ j: Job; open: (m: { kind: "book"; slo
 function BookModal({ j, slot, onClose }: Readonly<{ j: Job; slot: Slot; onClose: () => void }>) {
   const toast = useToast();
   const f = fitFor(slot);
-  const [d, setD] = useState<"internal" | "contractor">(f.fits === "both" || f.fits === "internal" ? "internal" : "contractor");
+  const [d, setD] = useState<"internal" | "contractor">(f.fits === "both" || f.fits === "internal" ? "internal" : CONTRACTOR);
   return (
     <Modal open onClose={onClose} title={`Book ${j.id}`} footer={<><Btn onClick={onClose}><Icon name="arrowLeft" /> Back</Btn><Btn variant="primary" onClick={() => { jobActions.book(j.id, slot, d, d === "internal" ? "tech-internal-a" : "contractor-a"); toast(d === "internal" ? "Assigned — technician notified" : "Offer sent to contractor-a"); onClose(); }}>{d === "internal" ? "Assign" : "Send offer"}</Btn></>}>
       <p className="text-xs text-muted-foreground">{j.type} · {j.unit} · {j.customer} · {j.origin === "plan" ? "Periodic plan" : "Client request"}</p>
       <Field label="Visit time · from the client" hint="Cannot be edited here. Need another time? Close and use “Propose another time…” — the client must accept it."><div className="rounded-control border border-line bg-surface2 px-3 py-2 text-[13px] font-semibold"><Icon name="locked" /> {longDate(slot)}</div></Field>
-      <Field label="Who does the work" hint={f.fits === "contractor" ? "No qualified HQ technician is free at this time — offer to a contractor." : undefined}><Choice value={d} onChange={setD} options={[...(f.fits === "contractor" ? [] : [{ id: "internal" as const, label: "Assign internally" }]), { id: "contractor" as const, label: "Offer to contractor" }]} /></Field>
+      <Field label="Who does the work" hint={f.fits === CONTRACTOR ? "No qualified HQ technician is free at this time — offer to a contractor." : undefined}><Choice value={d} onChange={setD} options={[...(f.fits === CONTRACTOR ? [] : [{ id: "internal" as const, label: "Assign internally" }]), { id: "contractor" as const, label: "Offer to contractor" }]} /></Field>
       {d === "internal" ? (
         <Field label="Technician" hint="Only members with valid qualifications for the whole slot are listed"><Select><option>tech-internal-a · Available</option></Select></Field>
       ) : (
@@ -228,24 +246,24 @@ function BookModal({ j, slot, onClose }: Readonly<{ j: Job; slot: Slot; onClose:
 function ProposeModal({ j, onClose }: Readonly<{ j: Job; onClose: () => void }>) {
   const toast = useToast();
   const [date, setDate] = useState("2026-10-01");
-  const [win, setWin] = useState("10:00–12:00");
+  const [win, setWin] = useState(TEXT_10_00_12_00);
   const [who, setWho] = useState("contractor-a · tech-external-a");
-  const [msg, setMsg] = useState("All qualified technicians are booked Sep 28–30. The earliest free slot is Thursday morning. Sorry for the wait.");
+  const [messageText, setMessageText] = useState("All qualified technicians are booked Sep 28–30. The earliest free slot is Thursday morning. Sorry for the wait.");
   const [tried, setTried] = useState(false);
   const isPre = j.preferred.some((s) => s.date === date && s.win === win);
   return (
-    <Modal open onClose={onClose} title="Propose another time to the client" footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!msg.trim() || isPre) return; jobActions.propose(j.id, { date, win }, who, msg.trim(), "09-24 18:00"); toast("Proposal sent — waiting for the client"); onClose(); }}>Send proposal</Btn></>}>
+    <Modal open onClose={onClose} title="Propose another time to the client" footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!messageText.trim() || isPre) { return; } jobActions.propose(j.id, { date, win }, who, messageText.trim(), "09-24 18:00"); toast("Proposal sent — waiting for the client"); onClose(); }}>Send proposal</Btn></>}>
       <p className="text-xs text-muted-foreground">{j.id} · {j.customer} · {j.unit}</p>
       <div className="rounded-xl border-2 border-primary bg-primary-soft/50 p-3">
         <div className="mb-2 flex items-center justify-between"><b className="text-[13px] text-primary">Option A</b><Badge tone="ok">Fits · capacity held</Badge></div>
         <div className="grid-fluid" style={{ ["--min" as string]: "160px" }}>
           <Field label="Date"><Input type="date" value={date} onChange={(e) => { setDate(e.target.value); }} /></Field>
-          <Field label="Window"><Select value={win} onChange={(e) => { setWin(e.target.value); }}>{["09:00–11:00", "10:00–12:00", "14:00–16:00"].map((w) => <option key={w}>{w}</option>)}</Select></Field>
+          <Field label="Window"><Select value={win} onChange={(e) => { setWin(e.target.value); }}>{["09:00–11:00", TEXT_10_00_12_00, "14:00–16:00"].map((w) => <option key={w}>{w}</option>)}</Select></Field>
         </div>
         <Field label="Who does it" className="mt-2"><Select value={who} onChange={(e) => { setWho(e.target.value); }}><option>contractor-a · tech-external-a</option><option>tech-internal-a</option></Select></Field>
         {isPre && <p className="mt-1 flex items-center gap-1 text-xs text-crit"><Icon name="error" />This is one of the client’s own times — book it directly instead.</p>}
       </div>
-      <Field label="Message to the client · required" error={tried && !msg.trim() ? "A message is required" : undefined}><Textarea value={msg} onChange={(e) => { setMsg(e.target.value); }} /></Field>
+      <Field label="Message to the client · required" error={tried && !messageText.trim() ? "A message is required" : undefined}><Textarea value={messageText} onChange={(e) => { setMessageText(e.target.value); }} /></Field>
       <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}><Field label="Reply by"><Select><option>09-24 18:00 (48 h)</option><option>09-23 18:00 (24 h)</option></Select></Field><Field label="If no reply"><Select><option>Keep “Requested” and call the client</option></Select></Field></div>
       <Banner>The client sees “Time proposed” with Accept / Decline. Accept → booked automatically with the held partner. Decline → the client sends new times. Held capacity is released on decline or timeout.</Banner>
     </Modal>
@@ -255,14 +273,14 @@ function ProposeModal({ j, onClose }: Readonly<{ j: Job; onClose: () => void }>)
 function NewJobModal({ onClose, onDone }: Readonly<{ onClose: () => void; onDone: (id: string) => void }>) {
   const toast = useToast();
   const [sym, setSym] = useState("");
-  const [slots, setSlots] = useState<Slot[]>([{ date: "2026-10-05", win: "10:00–12:00" }, { date: "2026-10-06", win: "14:00–16:00" }, { date: "2026-10-07", win: "09:00–11:00" }]);
+  const [slots, setSlots] = useState<Slot[]>([{ date: "2026-10-05", win: TEXT_10_00_12_00 }, { date: "2026-10-06", win: "14:00–16:00" }, { date: "2026-10-07", win: "09:00–11:00" }]);
   const [tried, setTried] = useState(false);
-  const err = tried ? preferredError(slots) : undefined;
+  const errorText = tried ? preferredError(slots) : undefined;
   return (
-    <Modal open onClose={onClose} title="New maintenance job" footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (sym.trim().length < 10 || preferredError(slots)) return; const id = jobActions.create({ unitId: "unit-online-rto", unit: "Bedroom AC", loc: "Home A › 1F › Bedroom", type: "Reactive", symptom: sym.trim(), preferred: slots }); toast(`${id} created as Requested`); onDone(id); }}>Create as requested</Btn></>}>
+    <Modal open onClose={onClose} title="New maintenance job" footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (sym.trim().length < 10 || preferredError(slots)) { return; } const id = jobActions.create({ unitId: "unit-online-rto", unit: "Bedroom AC", loc: "Home A › 1F › Bedroom", type: "Reactive", symptom: sym.trim(), preferred: slots }); toast(`${id} created as Requested`); onDone(id); }}>Create as requested</Btn></>}>
       <Field label="Customer · unit"><Select><option>customer-a · Bedroom AC (unit-online-rto)</option></Select></Field>
       <Field label="Symptom / scope (10+ characters)" error={tried && sym.trim().length < 10 ? "Enter at least 10 characters" : undefined}><Textarea value={sym} onChange={(e) => { setSym(e.target.value); }} placeholder="Customer called: unit leaks water at night." /></Field>
-      <PreferredSlotsInput value={slots} onChange={setSlots} error={err} label="Customer’s preferred times (asked on the phone)" hint="Same rule as client requests: book one of these, or propose another time for the customer to accept." />
+      <PreferredSlotsInput value={slots} onChange={setSlots} error={errorText} label="Customer’s preferred times (asked on the phone)" hint="Same rule as client requests: book one of these, or propose another time for the customer to accept." />
       <p className="text-[11px] text-muted-foreground">Periodic visits are created from Plans, not here.</p>
     </Modal>
   );
@@ -275,10 +293,10 @@ function ClassifyModal({ j, onClose }: Readonly<{ j: Job; onClose: () => void }>
   const [tried, setTried] = useState(false);
   const isBad = !r.trim() || r.length > 1000;
   return (
-    <Modal open onClose={onClose} title="Classify follow-up request" footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (isBad) return; const e = jobActions.classifyFollowUp(j.id, cls, r); if (e) { toast(e, "warn"); return; } toast(cls === "rework" ? "Classified as rework (free) — book the client’s preferred visit" : "Classified as a new request — book it like any client request"); onClose(); }}>Classify</Btn></>}>
+    <Modal open onClose={onClose} title="Classify follow-up request" footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (isBad) { return; } const e = jobActions.classifyFollowUp(j.id, cls, r); if (e) { toast(e, "warn"); return; } toast(cls === "rework" ? "Classified as rework (free) — book the client’s preferred visit" : "Classified as a new request — book it like any client request"); onClose(); }}>Classify</Btn></>}>
       <p className="text-xs text-muted-foreground">{j.id} · {j.customer} · {j.unit} — follow-up of {j.followUpOf}</p>
       <Field label="Classification · required"><Choice value={cls} onChange={setCls} options={[{ id: "rework", label: "Rework (free)" }, { id: "new_request", label: "New request" }]} /></Field>
-      <Field label="Reason · required (1–1000 characters)" error={tried && isBad ? "A reason is required (1–1000 characters)" : undefined}><Textarea value={r} onChange={(e) => { setR(e.target.value); }} placeholder={`Drain pan still overflowing — same leak as ${j.followUpOf}.`} /></Field>
+      <Field label="Reason · required (1–1000 characters)" error={tried && isBad ? "A reason is required (1–1000 characters)" : undefined}><Textarea value={r} onChange={(e) => { setR(e.target.value); }} placeholder={`Drain pan still overflowing — same leak as ${j.followUpOf ?? "—"}.`} /></Field>
       <Banner>Set once — cannot be changed later. The job stays “Requested” and is booked like any client request; the client sees “Rework (free)” or “New request” instead of “Under HQ review”.</Banner>
     </Modal>
   );
@@ -288,24 +306,26 @@ function ReasonModal({ what, j, onClose }: Readonly<{ what: "rework" | "hold" | 
   const toast = useToast();
   const [r, setR] = useState("");
   const [tried, setTried] = useState(false);
-  const title = what === "rework" ? "Return for rework" : (what === "hold" ? "Put on hold" : `Reassign ${j.id}`);
+  const known = REASON_TEXT.get(what);
+  const title = known?.title ?? `Reassign ${j.id}`;
+  const done = known?.done ?? "Reassigned — tech-internal-b must accept";
   return (
-    <Modal open onClose={onClose} title={title} footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!r.trim()) return; if (what === "reassign") jobActions.book(j.id, j.scheduled!, "internal", "tech-internal-b"); toast(what === "rework" ? "Returned for rework" : (what === "hold" ? "Job put on hold" : "Reassigned — tech-internal-b must accept"), "warn"); onClose(); }}>Confirm</Btn></>}>
+    <Modal open onClose={onClose} title={title} footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!r.trim()) { return; } if (what === "reassign" && j.scheduled) { jobActions.book(j.id, j.scheduled, "internal", "tech-internal-b"); } toast(done, "warn"); onClose(); }}>Confirm</Btn></>}>
       {what === "reassign" && <Field label="New technician (same agreed time)"><Select><option>tech-internal-b · Available</option></Select></Field>}
       <Field label="Reason (required)" error={tried && !r.trim() ? "A reason is required" : undefined}><Textarea value={r} onChange={(e) => { setR(e.target.value); }} /></Field>
     </Modal>
   );
 }
 
-const contractors = [
+const contractors = nonEmpty([
   { id: "contractor-a", area: "KL, Selangor · 2 technicians", st: "Active" },
   { id: "contractor-b", area: "Penang · 3 technicians", st: "Active" },
   { id: "contractor-c", area: "Johor · offers suspended 09-20", st: "Suspended" },
-];
-export function Contractors() {
+]);
+function Contractors() {
   const toast = useToast();
   const [sel, setSel] = useState(contractors[0]);
-  const [list, setList] = useState(contractors);
+  const [list, setList] = useState<(typeof contractors)[number][]>(contractors);
   return (
     <div className="split-rev">
       <Card title="Contractors" action={<Btn size="sm" onClick={() => { toast("Add contractor (demo)"); }}><Icon name="add" /> Add contractor</Btn>} className="self-start">
@@ -333,7 +353,7 @@ export function Contractors() {
   );
 }
 
-export function Sla() {
+function Sla() {
   return (
     <div className="flex flex-col gap-4">
       <div className="grid-fluid" style={{ ["--min" as string]: "170px" }}>

@@ -1,4 +1,5 @@
 "use client";
+const MY_REQUESTS = "My requests";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -8,7 +9,6 @@ import { JobStatusBadge, OriginBadge } from "@ac/web/components/JobBits";
 import { useAction } from "@ac/web/lib/useAction";
 import { showTime, zonedInstant, zonedParts } from "@ac/web/lib/i18n";
 import { useDisplay, useT } from "@ac/web/components/I18n";
-import type { JobStatus } from "@ac/web/lib/jobs";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import { clientJobRefusal, contactError, followUpText, PROBLEMS, preferredError, RATING_TAGS, STATUS_TABS, symptomLength, type StatusTab } from "@ac/web/lib/customerMaintenance";
 import { filterRefusal } from "@ac/web/lib/customerFilterCare";
@@ -17,6 +17,8 @@ import type { MaintenanceLive } from "../_lib/load";
 import { FilterCareTab, type CleaningPrefill } from "./filter-care";
 import { Icon } from "@ac/web/components/Icon";
 import { Checkbox } from "@ac/web/components/ui/checkbox";
+import { oneOf } from "@ac/web/lib/oneOf";
+import { TimeSelect } from "@ac/web/components/TimeSelect";
 
 type Detail = NonNullable<MaintenanceLive["detail"]>;
 interface Slot { startAt: string; endAt: string }
@@ -35,13 +37,13 @@ export function MaintenanceView({ live }: Readonly<{ live: MaintenanceLive }>) {
   const [going, startGo] = useTransition();
   const [target, setTarget] = useState<"requests" | "filters">(live.page);
   const page = going ? target : live.page;
-  const [prefill, setPrefill] = useState<CleaningPrefill | null>(live.newFor ? { unitId: live.newFor, symptom: "", type: "reactive" } : null);
+  const [prefill, setPrefill] = useState<CleaningPrefill | null>(live.requestUnitId ? { unitId: live.requestUnitId, symptom: "", type: "reactive" } : null);
   const [tab, setTab] = useState<StatusTab>("all");
   const [origin, setOrigin] = useState<"all" | "request" | "plan">("all");
-  const [modal, setModal] = useState<ModalKind>(live.newFor ? "new" : null);
+  const [modal, setModal] = useState<ModalKind>(live.requestUnitId ? "new" : null);
   const [result, setResult] = useState<{ tone: "ok" | "warn" | "crit"; text: string } | null>(null);
   const d = live.detail;
-  const count = (t: StatusTab) => live.rows.filter((r) => t === "all" || r.tab === t).length;
+  const count = (statusTab: StatusTab) => live.rows.filter((r) => statusTab === "all" || r.tab === statusTab).length;
   const shown = live.rows.filter((r) => (tab === "all" || r.tab === tab) && (origin === "all" || r.origin === origin));
   const replies = count("reply");
   const close = (text?: string, tone: "ok" | "warn" = "ok") => { setModal(null); if (text) setResult({ tone, text }); };
@@ -52,44 +54,49 @@ export function MaintenanceView({ live }: Readonly<{ live: MaintenanceLive }>) {
     setResult(null);
     startGo(() => { router.replace(v === "filters" ? "/customer/maintenance?tab=filter-care" : "/customer/maintenance", { scroll: false }); });
   };
+  // the shown tab's body: filter care once loaded, or the requests with the selected one beside them
+  const filtersBody = () => (live.filters && !going ? (
+      <FilterCareTab f={live.filters} owner={live.owner} onRequest={(p) => { setPrefill(p); setModal("new"); }}
+        onDone={(text) => { setResult({ tone: "ok", text }); }} onFail={(f) => { setResult({ tone: f.code === "FORBIDDEN" ? "warn" : "crit", text: filterRefusal(f, t) }); }} />
+  ) : <Card title={t("Filters by AC")}><p className="text-[13px] text-muted-foreground">{t("Loading filter care…")}</p></Card>);
+  const requestsBody = () => {
+    const { rateBanner } = live;
+    if (going) return <Card title={t(MY_REQUESTS)}><p className="text-[13px] text-muted-foreground">{t("Loading your requests…")}</p></Card>;
+    return (
+      <>
+        {replies > 0 && <Banner tone="warn" icon="swap" action={<Btn size="sm" variant="primary" onClick={() => { setTab("reply"); const r = live.rows.find((x) => x.tab === "reply"); if (r) open(r.id); }}>{t("Review")}</Btn>}>{t("A new visit time needs your reply ({n}). Nothing is booked until you accept.", { n: replies })}</Banner>}
+        {rateBanner && <Banner tone="ok" icon="check" action={<Btn size="sm" variant="primary" onClick={() => { open(rateBanner.jobId); }}>{t("Confirm & rate")}</Btn>}><b>{rateBanner.text}</b> {t("Is everything working? Your confirmation closes the job.")}</Banner>}
+        <PageHead title={t(MY_REQUESTS)} sub={t(live.rows.length === 1 ? "{n} request · sorted by status (business order)" : "{n} requests · sorted by status (business order)", { n: live.rows.length })} action={<Btn variant="primary" onClick={() => { setModal("new"); }}><Icon name="add" /> {t("New maintenance request")}</Btn>} />
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <Tabs value={tab} onChange={setTab} tabs={STATUS_TABS.filter(([s]) => s !== "reply" || replies > 0).map(([id, label]) => ({ id, label: t(label), count: count(id) }))} />
+          <Select aria-label={t("Origin")} value={origin} onChange={(e) => { setOrigin(oneOf(["all", "request", "plan"] as const, e.target.value, origin)); }} className="w-auto"><option value="all">{t("Origin: All")}</option><option value="request">{t("Origin: Client request")}</option><option value="plan">{t("Origin: Periodic plan")}</option></Select>
+        </div>
+        <div className={cx("grid gap-4", d ? "grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]" : "grid-cols-1")}>
+          <div className="flex min-w-0 flex-col gap-2">
+            {shown.map((r) => (
+              <ListRow key={r.id} selected={d?.job.id === r.id} href={`/customer/maintenance?jobId=${r.id}`}>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2"><span className="text-xs font-semibold text-muted-foreground">{r.short}</span><b>{r.unit}</b><OriginBadge origin={r.origin} /></div>
+                  <div className="text-xs text-muted-foreground">{r.place ? `${r.place} · ` : ""}{r.type}</div>
+                  <div className={cx("flex items-center gap-1.5 text-xs", r.warn && "font-semibold text-warn")}><Icon name={r.icon} className="shrink-0" />{r.line}</div>
+                </div>
+                <JobStatusBadge s={r.status} client /><span className="text-muted-foreground"><Icon name="chevronRight" /></span>
+              </ListRow>
+            ))}
+            {shown.length === 0 && <p className="rounded-xl border border-line bg-surface p-4 text-center text-xs text-muted-foreground">{t(live.rows.length > 0 ? "No requests in this filter." : "No requests yet — “+ New maintenance request” asks HQ for a visit.")}</p>}
+            <p className="text-[11px] text-muted-foreground">{t("“Scheduled” = a time is confirmed: one of your 3 preferred times, or a new time you accepted. Periodic plan visits are scheduled from your maintenance plan.")}</p>
+          </div>
+          {d ? <JobDetail key={`${d.job.id}:${String(d.job.version)}`} d={d} open={setModal} onDone={close} onFail={fail} /> : null}
+          {!d && "missing" in live ? <Card title={t("Request")}><p className="text-[13px] text-muted-foreground">{t("That request no longer exists in your account.")}</p></Card> : null}
+        </div>
+      </>
+    );
+  };
   return (
     <Page>
-      <Tabs value={page} onChange={go} tabs={[{ id: "requests", label: t("My requests") }, { id: "filters", label: t("Filter care") }]} />
+      <Tabs value={page} onChange={go} tabs={[{ id: "requests", label: t(MY_REQUESTS) }, { id: "filters", label: t("Filter care") }]} />
       {result && <Banner tone={result.tone}>{result.text}</Banner>}
-      {page === "filters" ? (
-        live.filters && !going ? (
-          <FilterCareTab f={live.filters} owner={live.owner} onRequest={(p) => { setPrefill(p); setModal("new"); }}
-            onDone={(text) => { setResult({ tone: "ok", text }); }} onFail={(f) => { setResult({ tone: f.code === "FORBIDDEN" ? "warn" : "crit", text: filterRefusal(f, t) }); }} />
-        ) : <Card title={t("Filters by AC")}><p className="text-[13px] text-muted-foreground">{t("Loading filter care…")}</p></Card>
-      ) : (going ? <Card title={t("My requests")}><p className="text-[13px] text-muted-foreground">{t("Loading your requests…")}</p></Card> : (
-        <>
-          {replies > 0 && <Banner tone="warn" icon="swap" action={<Btn size="sm" variant="primary" onClick={() => { setTab("reply"); const r = live.rows.find((x) => x.tab === "reply"); if (r) open(r.id); }}>{t("Review")}</Btn>}>{t("A new visit time needs your reply ({n}). Nothing is booked until you accept.", { n: replies })}</Banner>}
-          {live.rateBanner && <Banner tone="ok" icon="check" action={<Btn size="sm" variant="primary" onClick={() => { open(live.rateBanner!.jobId); }}>{t("Confirm & rate")}</Btn>}><b>{live.rateBanner.text}</b> {t("Is everything working? Your confirmation closes the job.")}</Banner>}
-          <PageHead title={t("My requests")} sub={t(live.rows.length === 1 ? "{n} request · sorted by status (business order)" : "{n} requests · sorted by status (business order)", { n: live.rows.length })} action={<Btn variant="primary" onClick={() => { setModal("new"); }}><Icon name="add" /> {t("New maintenance request")}</Btn>} />
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <Tabs value={tab} onChange={setTab} tabs={STATUS_TABS.filter(([s]) => s !== "reply" || replies > 0).map(([id, label]) => ({ id, label: t(label), count: count(id) }))} />
-            <Select aria-label={t("Origin")} value={origin} onChange={(e) => { setOrigin(e.target.value as typeof origin); }} className="w-auto"><option value="all">{t("Origin: All")}</option><option value="request">{t("Origin: Client request")}</option><option value="plan">{t("Origin: Periodic plan")}</option></Select>
-          </div>
-          <div className={cx("grid gap-4", d ? "grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]" : "grid-cols-1")}>
-            <div className="flex min-w-0 flex-col gap-2">
-              {shown.map((r) => (
-                <ListRow key={r.id} selected={d?.job.id === r.id} href={`/customer/maintenance?jobId=${r.id}`}>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2"><span className="text-xs font-semibold text-muted-foreground">{r.short}</span><b>{r.unit}</b><OriginBadge origin={r.origin} /></div>
-                    <div className="text-xs text-muted-foreground">{r.place ? `${r.place} · ` : ""}{r.type}</div>
-                    <div className={cx("flex items-center gap-1.5 text-xs", r.warn && "font-semibold text-warn")}><Icon name={r.icon} className="shrink-0" />{r.line}</div>
-                  </div>
-                  <JobStatusBadge s={r.status as JobStatus} client /><span className="text-muted-foreground"><Icon name="chevronRight" /></span>
-                </ListRow>
-              ))}
-              {shown.length === 0 && <p className="rounded-xl border border-line bg-surface p-4 text-center text-xs text-muted-foreground">{t(live.rows.length > 0 ? "No requests in this filter." : "No requests yet — “+ New maintenance request” asks HQ for a visit.")}</p>}
-              <p className="text-[11px] text-muted-foreground">{t("“Scheduled” = a time is confirmed: one of your 3 preferred times, or a new time you accepted. Periodic plan visits are scheduled from your maintenance plan.")}</p>
-            </div>
-            {d ? <JobDetail key={`${d.job.id}:${String(d.job.version)}`} d={d} open={setModal} onDone={close} onFail={fail} />
-              : ("missing" in live ? <Card title={t("Request")}><p className="text-[13px] text-muted-foreground">{t("That request no longer exists in your account.")}</p></Card> : null)}
-          </div>
-        </>
-      ))}
+      {page === "filters" ? filtersBody() : requestsBody()}
       {modal === "new" && <NewRequest live={live} prefill={prefill} onClose={(text, tone) => { setPrefill(null); close(text, tone); }} onFail={(f) => { setPrefill(null); fail(f); }} />}
       {d && modal === "decline" && <DeclineModal d={d} now={Date.parse(live.now)} onClose={close} onFail={fail} />}
       {d && modal === "other" && <OtherTimeModal d={d} now={Date.parse(live.now)} onClose={close} onFail={fail} />}
@@ -103,11 +110,29 @@ export function MaintenanceView({ live }: Readonly<{ live: MaintenanceLive }>) {
 
 type Done = (text?: string, tone?: "ok" | "warn") => void;
 
+/** The submitted report of a completed job: what needs attention, the checks that are fine, parts, readings, work text, photos. */
+function CompletedReport({ report }: Readonly<{ report: NonNullable<Detail["report"]> }>) {
+  const t = useT();
+  return (
+    <>
+        <ul className="divide-y divide-line">{report.items.filter((i) => i.tone !== "ok").map((i) => <li key={i.id} className="flex items-center justify-between gap-2 py-1 text-[13px]"><span>{i.label}{i.reason && <span className="text-xs text-muted-foreground"> · {i.reason}</span>}</span><Badge tone={i.tone}>{i.result}</Badge></li>)}</ul>
+        <p className="mt-1 text-xs text-muted-foreground">{t("{n} checks OK", { n: report.items.filter((i) => i.tone === "ok").length })}{report.parts.length > 0 ? t(" · parts: {parts}", { parts: report.parts.join(", ") }) : t(" · no parts replaced")}</p>
+        {report.readings.length > 0 && <div className="mt-2"><SummaryList items={report.readings} /></div>}
+        {report.workText && <p className="mt-2 text-xs">{report.workText}</p>}
+        {report.photos.length > 0 && <div className="mt-2 flex flex-wrap gap-2">{report.photos.map((p) => (
+          // eslint-disable-next-line @next/next/no-img-element -- data URL read through the DAL (attachments.getContent)
+          <img key={p.id} src={p.url} alt={p.name} className="h-20 w-28 rounded-lg bg-surface2 object-cover" />
+        ))}</div>}
+    </>
+  );
+}
+
 function JobDetail({ d, open, onDone, onFail }: Readonly<{ d: Detail; open: (m: ModalKind) => void; onDone: Done; onFail: (f: ActionFailure) => void }>) {
+  const { proposal } = d;
   const t = useT();
   const j = d.job;
   const [pending, run] = useAction();
-  const status = (j.slotProposal?.status === "pending" ? "time_proposed" : j.status) as JobStatus;
+  const status = j.slotProposal?.status === "pending" ? "time_proposed" : j.status;
   const isClosed = j.status === "completed" || j.status === "cancelled";
   return (
     <Card title={j.id.slice(0, 8)} sub={`${d.unit.name} — ${j.origin === "periodic_plan" ? t("periodic inspection") : j.symptom.slice(0, 48)}`} className="self-start"
@@ -128,7 +153,7 @@ function JobDetail({ d, open, onDone, onFail }: Readonly<{ d: Detail; open: (m: 
           <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
             <span className="mr-auto text-[11px] text-warn">{t("Accepting books this time. Declining keeps your request open.")}</span>
             <Btn variant="danger" disabled={pending} onClick={() => { open("decline"); }}>{t("Decline…")}</Btn>
-            <Btn variant="primary" disabled={pending} onClick={() => { run(() => respondProposal(j.id, j.version, d.proposal!.id, { decision: "accept" }), t("Time accepted"), () => { onDone(t("Time accepted — {when} is booked; the technician confirms it next.", { when: d.proposal!.when })); }, onFail); }}><Icon name="check" />{t("Accept this time")}</Btn>
+            <Btn variant="primary" disabled={pending} onClick={() => { if (!proposal) { return; } run(() => respondProposal(j.id, j.version, proposal.id, { decision: "accept" }), t("Time accepted"), () => { onDone(t("Time accepted — {when} is booked; the technician confirms it next.", { when: proposal.when })); }, onFail); }}><Icon name="check" />{t("Accept this time")}</Btn>
           </div>
         </div>
       )}
@@ -142,18 +167,7 @@ function JobDetail({ d, open, onDone, onFail }: Readonly<{ d: Detail; open: (m: 
       {j.status === "completed" && (
         <>
           <p className="mt-3 text-[13px] font-bold">{t("Completed report")} {d.report ? <span className="text-xs font-normal text-muted-foreground">v{d.report.version}{d.report.accepted ? t(" · accepted {when}", { when: d.report.accepted }) : ""}</span> : <span className="text-xs font-normal text-muted-foreground">{t("visible once HQ accepts it")}</span>}</p>
-          {d.report && (
-            <>
-              <ul className="divide-y divide-line">{d.report.items.filter((i) => i.tone !== "ok").map((i) => <li key={i.id} className="flex items-center justify-between gap-2 py-1 text-[13px]"><span>{i.label}{i.reason && <span className="text-xs text-muted-foreground"> · {i.reason}</span>}</span><Badge tone={i.tone as "ok"}>{i.result}</Badge></li>)}</ul>
-              <p className="mt-1 text-xs text-muted-foreground">{t("{n} checks OK", { n: d.report.items.filter((i) => i.tone === "ok").length })}{d.report.parts.length > 0 ? t(" · parts: {parts}", { parts: d.report.parts.join(", ") }) : t(" · no parts replaced")}</p>
-              {d.report.readings.length > 0 && <div className="mt-2"><SummaryList items={d.report.readings} /></div>}
-              {d.report.workText && <p className="mt-2 text-xs">{d.report.workText}</p>}
-              {d.report.photos.length > 0 && <div className="mt-2 flex flex-wrap gap-2">{d.report.photos.map((p) => (
-                // eslint-disable-next-line @next/next/no-img-element -- data URL read through the DAL (attachments.getContent)
-                <img key={p.id} src={p.url} alt={p.name} className="h-20 w-28 rounded-lg bg-surface2 object-cover" />
-              ))}</div>}
-            </>
-          )}
+          {d.report && <CompletedReport report={d.report} />}
           {d.feedback.kind === "rate" && <div className="mt-3 flex flex-wrap items-center justify-end gap-2"><span className="mr-auto text-[11px] text-muted-foreground">{d.feedback.text}</span><Btn onClick={() => { open("problem"); }}>{t("Report a problem")}</Btn><Btn variant="primary" onClick={() => { open("rate"); }}>{t("Confirm & rate")}</Btn></div>}
           {(d.feedback.kind === "edit" || d.feedback.kind === "rated") && <div className="mt-3 flex flex-wrap items-center justify-end gap-2"><span className="mr-auto text-[13px]">{t("Rated")} <span role="img" aria-label={t("{n} of 5 stars", { n: d.feedback.stars ?? 0 })} className="inline-flex align-[-0.125em] text-warn">{Array.from({ length: d.feedback.stars ?? 0 }, (_, k) => <Icon key={k} name="star" filled />)}</span>{d.feedback.text}</span>{d.feedback.kind === "edit" && <Btn size="sm" onClick={() => { open("rate"); }}>{t("Edit rating")}</Btn>}{d.feedback.report && <Btn size="sm" onClick={() => { open("problem"); }}>{t("Report a problem")}</Btn>}</div>}
         </>
@@ -187,10 +201,10 @@ function TimesInput({ rows, onChange, error, label, firstId }: Readonly<{ rows: 
       <span id={titleId} className="text-[13px] font-semibold">{label ?? t("Your 3 preferred times")} <span className="font-normal text-muted-foreground">{t("· each 1–4 h, from tomorrow, all different · times in {zone}", { zone: timeZone })}</span></span>
       {rows.map((r, i) => (
         <div key={i} className="flex flex-wrap items-end gap-2">
-          <span className="mb-2 w-8 text-xs font-semibold text-primary">{t(["1st", "2nd", "3rd"][i])}</span>
+          <span className="mb-2 w-8 text-xs font-semibold text-primary">{t(["1st", "2nd", "3rd"][i] ?? "")}</span>
           <Field label={t("Date {n}", { n: i + 1 })}><Input id={i === 0 ? firstId : undefined} type="date" value={r.date} onChange={(e) => { set(i, "date", e.target.value); }} /></Field>
-          <Field label={t("From {n}", { n: i + 1 })}><Input type="time" value={r.from} onChange={(e) => { set(i, "from", e.target.value); }} /></Field>
-          <Field label={t("To {n}", { n: i + 1 })}><Input type="time" value={r.to} onChange={(e) => { set(i, "to", e.target.value); }} /></Field>
+          <Field label={t("From {n}", { n: i + 1 })}><TimeSelect value={r.from} onChange={(v) => { set(i, "from", v); }} /></Field>
+          <Field label={t("To {n}", { n: i + 1 })}><TimeSelect value={r.to} onChange={(v) => { set(i, "to", v); }} /></Field>
         </div>
       ))}
       {error && <p id={errorId} className="flex items-center gap-1 text-xs text-crit"><Icon name="error" />{error}</p>}
@@ -212,14 +226,22 @@ function NewRequest({ live, prefill, onClose, onFail }: ModalProps & { live: Mai
   const [contact, setContact] = useState("");
   const [tried, setTried] = useState(false);
   const slots = rows.map((r) => toSlot(r, timeZone));
-  const symErr = symptomLength(sym) < 10 || symptomLength(sym) > 2000 ? t("Symptoms must be 10–2000 characters") : null;
-  const slotErr = preferredError(slots, now, 3, t);
-  const cErr = contactError(contact, t);
+  const symError = symptomLength(sym) < 10 || symptomLength(sym) > 2000 ? t("Symptoms must be 10–2000 characters") : null;
+  const slotError = preferredError(slots, now, 3, t);
+  const cError = contactError(contact, t);
   const ids = { unit: useId(), sym: useId(), times: useId(), contact: useId() };
+  // the first field to fix, top to bottom, or null when the form is valid
+  const firstBad = () => {
+    if (!unitId) return ids.unit;
+    if (symError) return ids.sym;
+    if (slotError) return ids.times;
+    if (cError) return ids.contact;
+    return null;
+  };
   const submit = () => {
     setTried(true);
     // a failed submit takes focus to the first field to fix, top to bottom (IR573)
-    const bad = unitId ? symErr ? ids.sym : slotErr ? ids.times : cErr ? ids.contact : null : ids.unit;
+    const bad = firstBad();
     if (bad) {
       requestAnimationFrame(() => document.getElementById(bad)?.focus());
       return;
@@ -230,15 +252,16 @@ function NewRequest({ live, prefill, onClose, onFail }: ModalProps & { live: Mai
     <Modal open wide onClose={() => { onClose(); }} title={t("New maintenance request")} footer={<><Btn onClick={() => { onClose(); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={submit}>{t("Submit request")}</Btn></>}>
       <Field label={t("Unit")}><Select id={ids.unit} value={unitId} onChange={(e) => { setUnitId(e.target.value); }}>{live.units.map((u) => <option key={u.id} value={u.id}>{u.name}{u.place ? ` · ${u.place}` : ""}</option>)}</Select></Field>
       <Field label={t("Type")}><Choice value={type} onChange={setType} options={[{ id: "reactive", label: t("Repair") }, { id: "preventive", label: t("Preventive") }]} /></Field>
-      <Field label={t("Symptoms (10–2000 characters)")} error={tried ? symErr ?? undefined : undefined} hint={`${String(symptomLength(sym))} / 2000`}><Textarea id={ids.sym} value={sym} onChange={(e) => { setSym(e.target.value); }} placeholder={t("Cold air is weak and there is water dripping from the indoor unit.")} /></Field>
-      <TimesInput rows={rows} onChange={setRows} error={tried ? slotErr : null} firstId={ids.times} />
-      <Field label={t("Contact window (optional)")} hint={t("Use HH:mm for times (example: Weekdays 09:00-18:00) — no phone numbers or e-mail addresses")} error={tried ? cErr ?? undefined : undefined}><Input id={ids.contact} value={contact} maxLength={200} onChange={(e) => { setContact(e.target.value); }} /></Field>
+      <Field label={t("Symptoms (10–2000 characters)")} error={tried ? symError ?? undefined : undefined} hint={`${String(symptomLength(sym))} / 2000`}><Textarea id={ids.sym} value={sym} onChange={(e) => { setSym(e.target.value); }} placeholder={t("Cold air is weak and there is water dripping from the indoor unit.")} /></Field>
+      <TimesInput rows={rows} onChange={setRows} error={tried ? slotError : null} firstId={ids.times} />
+      <Field label={t("Contact window (optional)")} hint={t("Use HH:mm for times (example: Weekdays 09:00-18:00) — no phone numbers or e-mail addresses")} error={tried ? cError ?? undefined : undefined}><Input id={ids.contact} value={contact} maxLength={200} onChange={(e) => { setContact(e.target.value); }} /></Field>
       <Banner>{t("Nothing is booked yet — you will see “Scheduled” once a time is confirmed. Any time outside your 3 options needs your approval.")}</Banner>
     </Modal>
   );
 }
 
 function DeclineModal({ d, now, onClose, onFail }: ModalProps & { d: Detail; now: number }) {
+  const { proposal } = d;
   const t = useT();
   const { timeZone } = useDisplay();
   const j = d.job;
@@ -249,11 +272,11 @@ function DeclineModal({ d, now, onClose, onFail }: ModalProps & { d: Detail; now
   const [rows, setRows] = useState<Row[]>(threeRows(now, timeZone, 3));
   const [tried, setTried] = useState(false);
   const slots = rows.map((r) => toSlot(r, timeZone));
-  const err = give ? preferredError(slots, now, 3, t) : null;
+  const errorText = give ? preferredError(slots, now, 3, t) : null;
   const send = () => {
     setTried(true);
-    if (err || comment.length > 1000) return;
-    run(() => respondProposal(j.id, j.version, d.proposal!.id, { decision: "decline", declineReason: reason, slots: give ? slots : [], comment }), t("Declined"), () => { onClose(t(give ? "Declined — HQ looks at your 3 new times." : "Declined — HQ will look again."), "warn"); }, onFail);
+    if (!proposal || errorText || comment.length > 1000) return;
+    run(() => respondProposal(j.id, j.version, proposal.id, { decision: "decline", declineReason: reason, slots: give ? slots : [], comment }), t("Declined"), () => { onClose(t(give ? "Declined — HQ looks at your 3 new times." : "Declined — HQ will look again."), "warn"); }, onFail);
   };
   return (
     <Modal open wide onClose={() => { onClose(); }} title={t("Decline the proposed time")} footer={<><Btn onClick={() => { onClose(); }}>{t("Back")}</Btn><Btn variant="primary" disabled={pending} onClick={send}>{t(give ? "Decline & send new times" : "Decline")}</Btn></>}>
@@ -261,7 +284,7 @@ function DeclineModal({ d, now, onClose, onFail }: ModalProps & { d: Detail; now
       <Field label={t("Reason")}><Choice value={reason} onChange={setReason} options={[{ id: "not_home", label: t("I’m not at home then") }, { id: "too_late", label: t("Too late for me") }, { id: "other", label: t("Other") }]} /></Field>
       <Field label={t("Comment to HQ (optional, up to 1000)")}><Input value={comment} maxLength={1000} onChange={(e) => { setComment(e.target.value); }} placeholder={t("Away that day. Any weekday afternoon next week works.")} /></Field>
       <label className="flex items-center gap-2 text-[13px]"><Checkbox className="h-4 w-4 accent-[#005bea]" checked={give} onCheckedChange={(v) => { setGive(v); }} />{t("Give 3 new preferred times (recommended)")}</label>
-      {give && <TimesInput rows={rows} onChange={setRows} error={tried ? err : null} label={t("New preferred times")} />}
+      {give && <TimesInput rows={rows} onChange={setRows} error={tried ? errorText : null} label={t("New preferred times")} />}
       <Banner>{t("HQ looks again and either books one of your times or sends another proposal. Declining never cancels the request.")}</Banner>
     </Modal>
   );
@@ -276,11 +299,11 @@ function OtherTimeModal({ d, now, onClose, onFail }: ModalProps & { d: Detail; n
   const [comment, setComment] = useState("");
   const [tried, setTried] = useState(false);
   const slots = rows.map((r) => toSlot(r, display.timeZone));
-  const err = preferredError(slots, now, 3, t);
+  const errorText = preferredError(slots, now, 3, t);
   return (
-    <Modal open wide onClose={() => { onClose(); }} title={t("Request another time")} footer={<><Btn onClick={() => { onClose(); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (err) return; run(() => requestReschedule(j.id, j.version, slots, comment), t("Sent to HQ"), () => { onClose(t("Asked HQ for another time — the visit goes back to booking with your 3 times.")); }, onFail); }}>{t("Send to HQ")}</Btn></>}>
+    <Modal open wide onClose={() => { onClose(); }} title={t("Request another time")} footer={<><Btn onClick={() => { onClose(); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (errorText) { return; } run(() => requestReschedule(j.id, j.version, slots, comment), t("Sent to HQ"), () => { onClose(t("Asked HQ for another time — the visit goes back to booking with your 3 times.")); }, onFail); }}>{t("Send to HQ")}</Btn></>}>
       <p className="text-xs text-muted-foreground">{t("{job} · periodic visit {when} · up to 48 h before the visit", { job: j.id.slice(0, 8), when: j.scheduledSlot ? showTime(j.scheduledSlot.startAt, display) : "" })}</p>
-      <TimesInput rows={rows} onChange={setRows} error={tried ? err : null} />
+      <TimesInput rows={rows} onChange={setRows} error={tried ? errorText : null} />
       <Field label={t("Comment (optional, up to 1000)")}><Input value={comment} maxLength={1000} onChange={(e) => { setComment(e.target.value); }} /></Field>
     </Modal>
   );
@@ -290,13 +313,14 @@ function RateModal({ d, onClose, onFail }: ModalProps & { d: Detail }) {
   const t = useT();
   const j = d.job;
   const [pending, run] = useAction();
-  const [stars, setStars] = useState(j.rating?.stars ?? 0);
+  const STARS = [1, 2, 3, 4, 5] as const;
+  const [stars, setStars] = useState<(typeof STARS)[number] | 0>(STARS.find((s) => s === j.rating?.stars) ?? 0);
   const [tags, setTags] = useState<string[]>(j.rating?.tags ?? []);
   const [comment, setComment] = useState(j.rating?.comment ?? "");
   const [tried, setTried] = useState(false);
   return (
-    <Modal open onClose={() => { onClose(); }} title={t(j.rating ? "Edit rating {job}" : "Confirm & rate {job}", { job: j.id.slice(0, 8) })} footer={<><Btn onClick={() => { onClose(); }}>{t("Not now")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (!stars) return; run(() => rateJob(j.id, j.version, stars as 1 | 2 | 3 | 4 | 5, tags, comment), t("Thanks — rating saved"), () => { onClose(t(j.rating ? "Thanks — rating updated ({stars} of 5 stars)." : "Thanks — job confirmed and rated ({stars} of 5 stars).", { stars })); }, onFail); }}>{t(j.rating ? "Save rating" : "Confirm & submit")}</Btn></>}>
-      <Field label={t("How was the service? (required)")} error={tried && !stars ? t("Choose 1–5 stars") : undefined}><div className="flex gap-1 text-2xl">{[1, 2, 3, 4, 5].map((n) => <Plain key={n} type="button" aria-label={t("{n} stars", { n })} aria-pressed={n === stars} onClick={() => { setStars(n); }} className={n <= stars ? "text-[#f59e0b]" : "text-line"}><Icon name="star" filled /></Plain>)}</div></Field>
+    <Modal open onClose={() => { onClose(); }} title={t(j.rating ? "Edit rating {job}" : "Confirm & rate {job}", { job: j.id.slice(0, 8) })} footer={<><Btn onClick={() => { onClose(); }}>{t("Not now")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (!stars) { return; } run(() => rateJob(j.id, j.version, stars, tags, comment), t("Thanks — rating saved"), () => { onClose(t(j.rating ? "Thanks — rating updated ({stars} of 5 stars)." : "Thanks — job confirmed and rated ({stars} of 5 stars).", { stars })); }, onFail); }}>{t(j.rating ? "Save rating" : "Confirm & submit")}</Btn></>}>
+      <Field label={t("How was the service? (required)")} error={tried && !stars ? t("Choose 1–5 stars") : undefined}><div className="flex gap-1 text-2xl">{STARS.map((n) => <Plain key={n} type="button" aria-label={t("{n} stars", { n })} aria-pressed={n === stars} onClick={() => { setStars(n); }} className={n <= stars ? "text-[#f59e0b]" : "text-line"}><Icon name="star" filled /></Plain>)}</div></Field>
       {/* the tags are stored in English (the API's values); only their labels follow the language */}
       <Field label={t("What went well? (optional)")}><div className="flex flex-wrap gap-1.5">{RATING_TAGS.map((tag) => <Plain key={tag} type="button" aria-pressed={tags.includes(tag)} onClick={() => { setTags((s) => (s.includes(tag) ? s.filter((x) => x !== tag) : [...s, tag])); }} className={cx("rounded-full border px-3 py-1 text-xs font-semibold", tags.includes(tag) ? "border-primary bg-primary-soft text-primary" : "border-line")}>{t(tag)}</Plain>)}</div></Field>
       {stars > 0 && stars <= 2 && <Banner tone="warn">{t("What went wrong? You can also “Report a problem” — HQ then looks at it as a follow-up.")}</Banner>}
@@ -318,12 +342,18 @@ function ProblemModal({ d, now, onClose, onFail }: ModalProps & { d: Detail; now
   const [visit, setVisit] = useState<Row | null>(null);
   const [tried, setTried] = useState(false);
   const total = files.reduce((a, f) => a + f.size, 0);
-  const fileErr = files.length > 5 ? t("Up to 5 photos.") : files.some((f) => !["image/jpeg", "image/png"].includes(f.type) || f.size > 5 * 1024 * 1024) ? t("Photos must be JPEG or PNG up to 5 MiB each.") : total > 5.5 * 1024 * 1024 ? t("The photos together may be 5.5 MB at most.") : null;
-  const detErr = details.trim().length < 10 || details.length > 2000 ? t("Describe the problem (10–2000 characters)") : null;
-  const visitErr = visit ? preferredError([toSlot(visit, timeZone)], now, 1, t) : null;
+  const photoError = (): string | null => {
+    if (files.length > 5) return t("Up to 5 photos.");
+    if (files.some((f) => !["image/jpeg", "image/png"].includes(f.type) || f.size > 5 * 1024 * 1024)) return t("Photos must be JPEG or PNG up to 5 MiB each.");
+    if (total > 5.5 * 1024 * 1024) return t("The photos together may be 5.5 MB at most.");
+    return null;
+  };
+  const fileError = photoError();
+  const detailError = details.trim().length < 10 || details.length > 2000 ? t("Describe the problem (10–2000 characters)") : null;
+  const visitError = visit ? preferredError([toSlot(visit, timeZone)], now, 1, t) : null;
   const send = () => {
     setTried(true);
-    if (detErr || fileErr || visitErr) return;
+    if (detailError || fileError || visitError) return;
     const form = new FormData();
     form.set("jobId", j.id); form.set("version", String(j.version)); form.set("reasonCode", reason); form.set("details", details);
     for (const f of files) form.append("photos", f);
@@ -333,10 +363,10 @@ function ProblemModal({ d, now, onClose, onFail }: ModalProps & { d: Detail; now
   return (
     <Modal open wide onClose={() => { onClose(); }} title={t("Report a problem — {job}", { job: j.id.slice(0, 8) })} footer={<><Btn onClick={() => { onClose(); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={send}>{t("Send report")}</Btn></>}>
       <Field label={t("What happened?")}><Choice value={reason} onChange={setReason} options={PROBLEMS.map((p) => ({ ...p, label: t(p.label) }))} /></Field>
-      <Field label={t("Details (10–2000 characters)")} error={tried ? detErr ?? undefined : undefined}><Textarea value={details} maxLength={2000} onChange={(e) => { setDetails(e.target.value); }} /></Field>
-      <Field label={t("Photos (optional, up to 5 JPEG/PNG)")} error={fileErr ?? undefined}><Input type="file" accept="image/jpeg,image/png" multiple onChange={(e) => { setFiles(Array.from(e.target.files ?? [])); }} className="text-[13px]" /></Field>
-      <label className="flex items-center gap-2 text-[13px]"><Checkbox className="h-4 w-4 accent-[#005bea]" checked={!!visit} onCheckedChange={(v) => { setVisit(v ? threeRows(now, timeZone)[0] : null); }} />{t("Suggest a visit time")}</label>
-      {visit && <TimesInput rows={[visit]} onChange={(r) => { setVisit(r[0]); }} error={tried ? visitErr : null} label={t("Preferred visit")} />}
+      <Field label={t("Details (10–2000 characters)")} error={tried ? detailError ?? undefined : undefined}><Textarea value={details} maxLength={2000} onChange={(e) => { setDetails(e.target.value); }} /></Field>
+      <Field label={t("Photos (optional, up to 5 JPEG/PNG)")} error={fileError ?? undefined}><Input type="file" accept="image/jpeg,image/png" multiple onChange={(e) => { setFiles([...e.target.files ?? []]); }} className="text-[13px]" /></Field>
+      <label className="flex items-center gap-2 text-[13px]"><Checkbox className="h-4 w-4 accent-[#005bea]" checked={!!visit} onCheckedChange={(v) => { setVisit(v ? threeRows(now, timeZone)[0] ?? null : null); }} />{t("Suggest a visit time")}</label>
+      {visit && <TimesInput rows={[visit]} onChange={(r) => { setVisit(r[0] ?? null); }} error={tried ? visitError : null} label={t("Preferred visit")} />}
       <Banner>{t("Creates a follow-up request linked to {job} (“Under HQ review”). HQ decides within 1 business day: rework (free) or a new request.", { job: j.id.slice(0, 8) })}</Banner>
     </Modal>
   );
@@ -350,7 +380,7 @@ function NoteModal({ d, onClose, onFail }: ModalProps & { d: Detail }) {
   const [tried, setTried] = useState(false);
   const isBad = !text.trim() || text.length > 2000;
   return (
-    <Modal open onClose={() => { onClose(); }} title={t("Add a note for {job}", { job: j.id.slice(0, 8) })} footer={<><Btn onClick={() => { onClose(); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (isBad) return; run(() => addNote(j.id, j.version, text), t("Note sent"), () => { onClose(t("Note sent — HQ, the service partner and the technician can read it.")); }, onFail); }}>{t("Send note")}</Btn></>}>
+    <Modal open onClose={() => { onClose(); }} title={t("Add a note for {job}", { job: j.id.slice(0, 8) })} footer={<><Btn onClick={() => { onClose(); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (isBad) { return; } run(() => addNote(j.id, j.version, text), t("Note sent"), () => { onClose(t("Note sent — HQ, the service partner and the technician can read it.")); }, onFail); }}>{t("Send note")}</Btn></>}>
       <Field label={t("Note to the HQ coordinator (1–2000 characters)")} error={tried && isBad ? t("Write 1–2000 characters") : undefined} hint={`${String(text.length)} / 2000`}><Textarea value={text} maxLength={2000} onChange={(e) => { setText(e.target.value); }} placeholder={t("Please call 30 minutes before arriving — the gate code changed to 4821.")} /></Field>
       <Banner>{t("A note can’t change the visit time or the technician. To move the visit, write it here — HQ sends you a new time to accept. Notes are kept in the job history.")}</Banner>
     </Modal>
@@ -364,7 +394,7 @@ function CancelModal({ d, onClose, onFail }: ModalProps & { d: Detail }) {
   const [r, setR] = useState("");
   const [tried, setTried] = useState(false);
   return (
-    <Modal open onClose={() => { onClose(); }} title={t("Cancel {job}?", { job: j.id.slice(0, 8) })} footer={<><Btn onClick={() => { onClose(); }}>{t("Keep request")}</Btn><Btn variant="danger" disabled={pending} onClick={() => { setTried(true); if (!r.trim()) return; run(() => cancelRequest(j.id, j.version, r), t("Request cancelled"), () => { onClose(t("Request cancelled."), "warn"); }, onFail); }}>{t("Cancel request")}</Btn></>}>
+    <Modal open onClose={() => { onClose(); }} title={t("Cancel {job}?", { job: j.id.slice(0, 8) })} footer={<><Btn onClick={() => { onClose(); }}>{t("Keep request")}</Btn><Btn variant="danger" disabled={pending} onClick={() => { setTried(true); if (!r.trim()) { return; } run(() => cancelRequest(j.id, j.version, r), t("Request cancelled"), () => { onClose(t("Request cancelled."), "warn"); }, onFail); }}>{t("Cancel request")}</Btn></>}>
       <Field label={t("Reason (required, up to 1000)")} error={tried && !r.trim() ? t("A reason is required") : undefined}><Input value={r} maxLength={1000} onChange={(e) => { setR(e.target.value); }} placeholder={t("Resolved itself")} /></Field>
     </Modal>
   );

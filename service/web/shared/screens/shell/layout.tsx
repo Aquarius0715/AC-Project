@@ -11,5 +11,5 @@ import { loadShell } from "@ac/web/lib/shell";
 export default async function L({ children }: Readonly<{ children: React.ReactNode }>) {
   await connection();
   const s = apiMode() ? await getSession() : null;
-  return <AppShell role={s?.role ?? (apiMode() ? APP_ROLE : undefined)} live={s ? await loadShell(s.role) : undefined}>{children}</AppShell>;
+  return <AppShell appRole={s?.role ?? (apiMode() ? APP_ROLE : undefined)} live={s ? await loadShell(s.role) : undefined}>{children}</AppShell>;
 }

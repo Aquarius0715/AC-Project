@@ -175,7 +175,7 @@ func (m Billing) markPaid(ctx context.Context, call *ops.Call, invoice uuid.UUID
 	return apperr.Wrap(err, "billing.Releases.OnInvoicePaid")
 }
 
-func (m Billing) paymentResult(
+func (Billing) paymentResult(
 	ctx context.Context,
 	call *ops.Call,
 	paymentID uuid.UUID,

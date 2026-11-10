@@ -4,7 +4,8 @@
 // nothing stored) and automations.fire (demo-only, one-time key). Public endpoints: the DAL verifies the session and
 // the Core API authorizes them (automation.policy.write) and checks the policy version.
 import { refresh } from "next/cache";
-import { coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
+import { coreNow, coreOp } from "@ac/web/lib/dal";
+import { actionFailure } from "@ac/web/lib/actionFailure";
 import type { OpInput } from "@ac/web/lib/opTypes";
 
 export type ActionResult<T = null> = { ok: true; value: T } | { ok: false; messageKey: string; code: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null };
@@ -14,20 +15,21 @@ async function run<T>(fn: () => Promise<T>, rerender = true): Promise<ActionResu
   try {
     return { ok: true, value: await fn() };
   } catch (error) {
-    return error instanceof CoreError ? { ok: false, messageKey: error.error.messageKey, code: error.error.code, fieldErrors: error.error.fieldErrors ?? {}, retryAfterSeconds: error.error.retryAfterSeconds } : { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
+    return actionFailure(error);
   } finally {
     if (rerender) refresh();
   }
 }
 
 export async function saveAutoPolicy(input: OpInput<"policies.save">, version?: number) {
-  return run(() => coreOp<{ id: string; version: number }>("policies.save", input, { write: true, expectedVersion: input.id ? version : undefined }).then((p) => ({ id: p.id, version: p.version })));
+  return run(async () => { const p = await coreOp<{ id: string; version: number }>("policies.save", input, { write: true, expectedVersion: input.id ? version : undefined }); return ({ id: p.id, version: p.version }); });
 }
 type Evaluation = OpInput<"automations.simulate">;
 /** The current minute of the Core API clock: an evaluation is for the current tick (IR21), so the time the page loaded
 would be refused once a minute had passed (IR491). */
 async function tick(): Promise<string> {
-  return new Date(Math.floor((await coreNow()).getTime() / 60_000) * 60_000).toISOString();
+  const now = await coreNow();
+  return new Date(Math.floor(now.getTime() / 60_000) * 60_000).toISOString();
 }
 const atTick = (input: Evaluation, at: string): Evaluation => ({ ...input, occurredAt: at, facts: input.facts.map((f) => ({ ...f, observedAt: at })) });
 

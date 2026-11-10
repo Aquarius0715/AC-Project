@@ -15,6 +15,7 @@ const (
 	fieldContactWindow = "contactWindow"
 	fieldSymptom       = "symptom"
 	refusedSlotRules   = "alternativeSlots=" + apperr.KeySlotRules
+	refusedContact     = "contactWindow=errors.contact_details_forbidden"
 )
 
 // slotJSON returns a Slot starting h hours after the fixture clock lasting d hours.
@@ -206,6 +207,16 @@ func TestJobsCreate(t *testing.T) {
 			map[string]string{fieldContactWindow: `"+60 (12) 345-6789"`},
 			422,
 		},
+		"contact phone full-width": { // typed with a Japanese input method (IR640)
+			customerA(),
+			map[string]string{fieldContactWindow: `"０９０－１２３４－５６７８"`},
+			422,
+		},
+		"contact email full-width": {
+			customerA(),
+			map[string]string{fieldContactWindow: `"me＠example.com"`},
+			422,
+		},
 		"contact 201": {
 			customerA(),
 			map[string]string{fieldContactWindow: `"` + strings.Repeat("w", 201) + `"`},
@@ -221,20 +232,22 @@ func TestJobsCreate(t *testing.T) {
 		roleTechnician:         {techB(), nil, 403},
 	}
 	refused := map[string]string{ // the field each VALIDATION case is refused for
-		caseBadType:              "type=error.invalid",
-		"client dueAt":           "dueAt=error.notAllowed",
-		"client one alternative": "alternativeSlots=error.count",
-		"contact 201":            "contactWindow=error.length",
-		"contact email":          "contactWindow=errors.contact_details_forbidden",
-		"contact phone":          "contactWindow=errors.contact_details_forbidden",
-		"duplicate slots":        refusedSlotRules,
-		"hq dueAt before end":    "dueAt=error.beforeRequestedEnd",
-		"hq three alternatives":  "alternativeSlots=error.count",
-		"missing alternatives":   "alternativeSlots=error.required",
-		"slot 5 hours":           refusedSlotRules,
-		"symptom 2001":           "symptom=error.length",
-		"symptom 9":              "symptom=error.length",
-		"today (KL)":             refusedSlotRules,
+		caseBadType:                "type=error.invalid",
+		"client dueAt":             "dueAt=error.notAllowed",
+		"client one alternative":   "alternativeSlots=error.count",
+		"contact 201":              "contactWindow=error.length",
+		"contact email":            refusedContact,
+		"contact phone":            refusedContact,
+		"contact phone full-width": refusedContact,
+		"contact email full-width": refusedContact,
+		"duplicate slots":          refusedSlotRules,
+		"hq dueAt before end":      "dueAt=error.beforeRequestedEnd",
+		"hq three alternatives":    "alternativeSlots=error.count",
+		"missing alternatives":     "alternativeSlots=error.required",
+		"slot 5 hours":             refusedSlotRules,
+		"symptom 2001":             "symptom=error.length",
+		"symptom 9":                "symptom=error.length",
+		"today (KL)":               refusedSlotRules,
 	}
 
 	for name, tc := range bad {
@@ -685,9 +698,12 @@ func TestJobsReadAndTransitions(t *testing.T) {
 	owner(t, `UPDATE maintenance.jobs SET status = 'offered' WHERE id = $1`, job3)
 	owner(
 		t,
-		`INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, visit_slot, offered_at,
+		`INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, candidate_slots, offered_at,
 			offer_expires_at, access_valid_from, access_valid_until)
-		VALUES ($1,$2,$3,'t1',tstzrange($4,$5),$4,$5,$4,$5)`,
+		VALUES ($1,$2,$3,'t1',`+oneSlotSQL(
+			"$4",
+			"$5",
+		)+`,$4,$5,$4,$5)`,
 		seed.ID("tenant-a"),
 		job3,
 		seed.ID("org-contractor-a"),

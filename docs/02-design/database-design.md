@@ -11,7 +11,7 @@ scope: production-target-implementation
 
 ## 1. Purpose and scope
 
-This document designs the production relational database for the Go backend ([backend Go design](backend-go-design.md), [backend architecture](backend-architecture.md)). The executable schema is [db/schema.sql](db/schema.sql) (99 tables including default partitions as of 2026-10-08, 38 permission rows). It was applied to PostgreSQL 16 on 2026-10-07 and checked for tenant isolation (RLS), the append-only audit trigger, and the no-overlap assignment constraint. Status `PROPOSED` (IR118, DEC-69).
+This document designs the production relational database for the Go backend ([backend Go design](backend-go-design.md), [backend architecture](backend-architecture.md)). The executable schema is [db/schema.sql](db/schema.sql) (99 tables including default partitions as of 2026-10-08, 39 permission rows). It was applied to PostgreSQL 16 on 2026-10-07 and checked for tenant isolation (RLS), the append-only audit trigger, and the no-overlap assignment constraint. Status `PROPOSED` (IR118, DEC-69).
 
 The source of truth for fields and states is [service-contracts.ts](service-contracts.ts); this document says how each type is stored. Phase 1A still uses the in-browser mock and does not use this schema.
 
@@ -20,7 +20,7 @@ The source of truth for fields and states is [service-contracts.ts](service-cont
 | Schema | Owning module | Main tables |
 |---|---|---|
 | platform | shared infrastructure | tenants, outbox, idempotency_keys, scheduled_items, processed_events, event_failures (IR427), stream_checkpoints, demo_clock (demo environment only, IR168) |
-| identity | Identity & access | users, organizations, memberships, membership_permissions, membership_scopes, qualification_grants, permissions (38), preferences, two_factor, consents, client_users (the customer owners' user lists, IR417), partner_users (the contractors' user lists, IR416) |
+| identity | Identity & access | users, organizations, memberships, membership_permissions, membership_scopes, qualification_grants, permissions (39), preferences, two_factor, consents, client_users (the customer owners' user lists, IR417), partner_users (the contractors' user lists, IR416) |
 | assets | Assets | customers, properties, spaces, units, unit_alert_policies, unit_imports, unit_import_previews (30-minute CSV validation results written outside the read transaction of `units.importPreview`, purged after expiry), warranty_reminders (the BR-A19 reminders sent, IR340), unit_offer_access and unit_assignment_access (projections of accepted Offers and of Assignments with an `active` flag for the unit scope and the diagnostic-run scope, fed by change-capture events, IR186, IR187) |
 | devices | Devices | capabilities (versioned), devices, sensors, device_bindings, device_operations, device_events, device_event_notes, calibration_records, firmware_campaigns, firmware_campaign_devices |
 | control | Control | commands, diagnostic_runs, automations, automation_units, automation_policies, automation_policy_units, automation_runs, evaluation_events, schedule_watermarks |
@@ -180,6 +180,7 @@ At the design capacity (20,000 units, about 120,000 measurements per minute) the
 | Units & locations tree (`units.list`, `spaces.list`) | by customer / property / space | `properties_customer`, `spaces_property`, `units_property` |
 | Unit control (`commands.create`, `commands.get`) | pending command per unit, latest commands | `commands_one_pending_per_unit`, `commands_unit` |
 | 24-hour chart (`telemetry.series`) | unit + metric + time range | `measurements_unit_metric` (hot) or `measurements_15m` (as built: the hot index only, IR335) |
+| Duplicate check of a received reading (`demo.trigger`) | event ID | `measurements_event` (IR694: without it every reading scans the table) |
 | Energy analysis / MRV | unit set + period | `measurements_1h` primary key (as built: `energy.ref_power_samples` by unit and time, IR335) |
 | Alerts inbox (`alerts.list`) | open alerts by customer and severity | `alerts_open` |
 | Jobs lists (HQ / partner / technician) | by status, contractor, assigned technician | `jobs_status`, `jobs_contractor`, `assignments_technician` |

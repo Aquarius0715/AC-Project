@@ -16,6 +16,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/modules/notify"
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
+	"github.com/pradita/ac-project/service/api/internal/platform/money"
 	"github.com/pradita/ac-project/service/api/internal/platform/paging"
 )
 
@@ -254,7 +255,9 @@ func (m Billing) loadContract(
 		return contract, err
 	}
 
-	return contract, m.decorate(ctx, call, &contract)
+	err = m.decorate(ctx, call, &contract)
+
+	return contract, err
 }
 
 // listContracts serves contracts.list.
@@ -456,7 +459,7 @@ func (in *ContractInput) Validate() map[string]string {
 		fieldErrs["endAt"] = apperr.KeyRange
 	}
 
-	if in.PriceMinor < 0 {
+	if !money.InRange(in.PriceMinor) {
 		fieldErrs["priceMinor"] = apperr.KeyRange
 	}
 
@@ -819,7 +822,7 @@ type InvoiceInput struct {
 // Validate implements ops.Validator.
 func (in *InvoiceInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
-	if in.AmountMinor < 1 {
+	if in.AmountMinor < 1 || in.AmountMinor > money.MaxMinor {
 		fieldErrs["amountMinor"] = apperr.KeyRange
 	}
 
@@ -993,7 +996,7 @@ func nextInvoiceSeq(ctx context.Context, call *ops.Call) (int, error) {
 	return seq, nil
 }
 
-func (m Billing) loadInvoice(
+func (Billing) loadInvoice(
 	ctx context.Context,
 	call *ops.Call,
 	invoiceID uuid.UUID,

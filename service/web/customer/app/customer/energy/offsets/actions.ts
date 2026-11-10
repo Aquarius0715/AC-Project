@@ -3,15 +3,12 @@
 // Server Actions of the customer carbon offsets page (FR-C13). Each one is a public endpoint: the DAL verifies the
 // session and the Core API authorizes it (client:self; offsets.simulate only event=request or retry).
 import { refresh } from "next/cache";
-import { coreOp, CoreError } from "@ac/web/lib/dal";
+import { coreOp } from "@ac/web/lib/dal";
+import { actionFailure } from "@ac/web/lib/actionFailure";
 import type { ApiOffsetRecord, ApiQuote } from "@ac/web/lib/offsets";
 
 export type ActionResult<T = null> = { ok: true; value: T } | { ok: false; messageKey: string; code: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null };
-const failure = (e: unknown): ActionResult<never> => {
-  return (e instanceof CoreError
-    ? { ok: false, messageKey: e.error.messageKey, code: e.error.code, fieldErrors: e.error.fieldErrors ?? {}, retryAfterSeconds: e.error.retryAfterSeconds }
-    : { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} });
-};
+const failure = (e: unknown): ActionResult<never> => actionFailure(e);
 
 /** offsets.preview: a demo quote for the energy selection (no offset record is created). */
 export async function getQuote(input: { purpose: string; amountKg: number; period: { from: string; to: string }; unitIds: string[] }): Promise<ActionResult<ApiQuote & { estimatedAmountMinor: number | null; currency: string | null }>> {

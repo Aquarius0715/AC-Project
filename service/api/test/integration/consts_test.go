@@ -130,7 +130,6 @@ const (
 	fieldUserID                  = "userId"
 	fieldValidFrom               = "validFrom"
 	fieldValidUntil              = "validUntil"
-	fieldVisitSlot               = "visitSlot"
 	fieldWeekdays                = "weekdays"
 )
 
@@ -176,6 +175,7 @@ const (
 	keyAssignmentEnded      = "errors.assignment_ended"
 	keyAssignmentNotStarted = "errors.assignment_not_started"
 	keyOwnAccount           = "errors.own_account"
+	keyAccessExpired        = "errors.access_expired"
 	keyUnitBusy             = "errors.unit_busy"
 )
 
@@ -310,11 +310,15 @@ const (
 
 // API error codes and the failure codes of device operations.
 const (
-	codeConflict    = "CONFLICT"
-	codeOffline     = "OFFLINE"
-	codeTimeout     = "TIMEOUT"
-	codeUnavailable = "UNAVAILABLE"
+	codeConflict       = "CONFLICT"
+	codeDeviceRejected = "DEVICE_REJECTED"
+	codeOffline        = "OFFLINE"
+	codeTimeout        = "TIMEOUT"
+	codeUnavailable    = "UNAVAILABLE"
 )
+
+// States of a diagnostic test run.
+const stateEndFailed = "end_failed"
 
 // Units and their readings: connection, power, metrics, measurement quality and alert severity.
 const (
@@ -353,3 +357,8 @@ const (
 	projectionOffer   = "offer"
 	projectionSummary = "summary"
 )
+
+// oneSlotSQL is the SQL of an offer's candidate_slots holding one time, from two timestamp expressions (IR636).
+func oneSlotSQL(start, end string) string {
+	return "jsonb_build_array(jsonb_build_object('startAt'," + start + "::timestamptz,'endAt'," + end + "::timestamptz))"
+}

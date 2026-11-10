@@ -1,11 +1,12 @@
 "use client";
+const MY_PROPERTIES = "My properties";
 
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Badge, Banner, Btn, Card, Choice, ConnBadge, cx, DataTable, EmptyState, Field, Modal, Page, PowerBadge, SummaryList, useToast, Plain } from "@ac/web/components/ui";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
-import type { Connection, PowerState, Selection, TreeProperty, TreeSpace } from "@ac/web/lib/assets";
+import { selectionId, type Connection, type PowerState, type Selection, type TreeProperty, type TreeSpace } from "@ac/web/lib/assets";
 import { changeText, groupPlan, type GroupChange, type PlanRow, type RoomUnit } from "@ac/web/lib/clientProperties";
 import { historyRow, type ApiCommand, type ApiUnitDetail } from "@ac/web/lib/units";
 import { waitForCommand } from "@ac/web/lib/unitCommands";
@@ -15,7 +16,9 @@ import { useI18n, useT } from "@ac/web/components/I18n";
 import type { T } from "@ac/web/lib/i18n";
 import { sendCommand } from "../actions";
 import { RenameModal, type Renaming } from "../../_components/rename-modal";
+import { oneOf } from "@ac/web/lib/oneOf";
 import { Icon, type IconName } from "@ac/web/components/Icon";
+import { unreachableFailure } from "@ac/web/lib/unreachable";
 
 export interface PropertiesLive {
   tree: TreeProperty[]; selection: Selection | null; owner: boolean;
@@ -27,31 +30,34 @@ export interface PropertiesLive {
 const kindLabel: Record<string, string> = { home: "Home", office: "Office", floor: "Floor", area: "Area", room: "Room", space: "Space" };
 const powerLabel: Record<PowerState, string> = { on: "Running", off: "Stopped", unknown: "Unknown" };
 // “2 units”, “1 AC” in the display language
-const units_ = (t: T, n: number) => t(n === 1 ? "{n} unit" : "{n} units", { n });
-const acs_ = (t: T, n: number) => t(n === 1 ? "{n} AC" : "{n} ACs", { n });
+const unitsText = (t: T, n: number) => t(n === 1 ? "{n} unit" : "{n} units", { n });
+const acsText = (t: T, n: number) => t(n === 1 ? "{n} AC" : "{n} ACs", { n });
 const kind = (t: T, k: string) => t(kindLabel[k] ?? k);
 
 /** Units & locations (FR-C02) in API mode: the structure is read only (HQ manages it) except renaming; a room lists its
 air conditioners, and owners can send one change to several of them (Group control, FR-C14). */
+// a command's state and a group test's result as a badge colour (primary for the others)
+const TRY_TONE = new Map<string, "ok" | "crit" | "warn">([["Confirmed", "ok"], ["Failed", "crit"], ["Waiting", "warn"]]);
+const RESULT_TONE = new Map<string, "unknown" | "warn" | "muted">([["Skipped", "unknown"], ["Clamped", "warn"], ["No change", "muted"]]);
 export function PropertiesView({ live }: Readonly<{ live: PropertiesLive }>) {
   const t = useT();
   const nav = useUrlPatch();
   const [renaming, setRenaming] = useState<Renaming | null>(null);
-  const sel = live.selection;
-  const selId = sel ? sel.kind === "property" ? sel.property.id : sel.kind === "space" ? sel.space.id : `unassigned:${sel.property.id}` : "";
-  const go = (patch: Record<string, string | null>) => { nav({ propertyId: null, spaceId: null, unassignedOnly: null, mode: null, unitIds: null, powerState: null, connections: null, ...patch }); };
   if (live.tree.length === 0) return <Page><EmptyState title={t("No properties yet")}>{t("HQ registers your homes and offices with their rooms and air conditioners; they appear here once set up.")}</EmptyState></Page>;
+  const sel = live.selection;
+  const selId = selectionId(sel);
+  const go = (patch: Record<string, string | null>) => { nav({ propertyId: null, spaceId: null, unassignedOnly: null, mode: null, unitIds: null, powerState: null, connections: null, ...patch }); };
   return (
     <Page>
       <div className="split-rev">
-        <Card title={t("My properties")} action={<Badge tone="muted">{live.tree.length}</Badge>} className="self-start">
+        <Card title={t(MY_PROPERTIES)} action={<Badge tone="muted">{live.tree.length}</Badge>} className="self-start">
           <div className="flex flex-col text-[13px]">
             {live.tree.map((p) => (
               <div key={p.id}>
                 <Row depth={0} selected={!live.filter && selId === p.id} onClick={() => { go({ propertyId: p.id }); }} icon="home" name={p.name} tag={kind(t, p.kind)}
                   onRename={() => { setRenaming({ kind: "property", id: p.id, version: p.version, name: p.name, where: t("{name} · {kind} (property)", { name: p.name, kind: kind(t, p.kind) }) }); }} />
                 {p.spaces.map((s) => <SpaceRow key={s.id} s={s} p={p} depth={1} selId={live.filter ? "" : selId} go={go} rename={setRenaming} />)}
-                {p.unassigned > 0 && <Row depth={1} selected={!live.filter && selId === `unassigned:${p.id}`} onClick={() => { go({ propertyId: p.id, unassignedOnly: "true" }); }} icon="unknown" name={t("Unassigned units")} meta={t("· {units} · placed by HQ", { units: units_(t, p.unassigned) })} />}
+                {p.unassigned > 0 && <Row depth={1} selected={!live.filter && selId === `unassigned:${p.id}`} onClick={() => { go({ propertyId: p.id, unassignedOnly: "true" }); }} icon="unknown" name={t("Unassigned units")} meta={t("· {units} · placed by HQ", { units: unitsText(t, p.unassigned) })} />}
               </div>
             ))}
           </div>
@@ -88,7 +94,7 @@ function SpaceRow({ s, p, depth, selId, go, rename }: Readonly<{ s: TreeSpace; p
   return (
     <>
       <Row depth={depth} selected={selId === s.id} onClick={() => { go({ spaceId: s.id }); }} icon={s.children.length > 0 ? "chevronDown" : "chevronRight"} name={s.name} tag={kind(t, s.kind)}
-        meta={s.direct ? `· ${units_(t, s.direct)}` : undefined} onRename={() => { rename({ kind: "space", id: s.id, version: s.version, name: s.name, where: t("{name} · {kind} in {property}", { name: s.name, kind: kind(t, s.kind), property: p.name }) }); }} />
+        meta={s.direct ? `· ${unitsText(t, s.direct)}` : undefined} onRename={() => { rename({ kind: "space", id: s.id, version: s.version, name: s.name, where: t("{name} · {kind} in {property}", { name: s.name, kind: kind(t, s.kind), property: p.name }) }); }} />
       {s.children.map((c) => <SpaceRow key={c.id} s={c} p={p} depth={depth + 1} selId={selId} go={go} rename={rename} />)}
     </>
   );
@@ -111,7 +117,8 @@ function UnitRows({ units }: Readonly<{ units: (RoomUnit & { place: string })[] 
 const connLabel: Record<string, string> = { online: "Online", offline: "Offline", unknown: "Unknown", connecting: "Connecting", error: "Error" };
 function FilteredUnits({ live, clear }: Readonly<{ live: PropertiesLive; clear: () => void }>) {
   const t = useT();
-  const f = live.filter!;
+  const f = live.filter;
+  if (!f) return null;
   const label = [f.powerState && t("Power: {state}", { state: t(powerLabel[f.powerState]) }), f.connections.length > 0 && t("Connection: {states}", { states: f.connections.map((c) => t(connLabel[c] ?? c)).join(", ") })].filter(Boolean).join(" · ");
   return (
     <Card title={t("Air conditioners · {filter}", { filter: label })} sub={t("{n} of {total}", { n: live.units.length, total: f.total })} action={<Btn size="sm" onClick={clear}>{t("Clear filter")}</Btn>}>
@@ -124,10 +131,11 @@ function Panel({ live, sel, rename, go }: Readonly<{ live: PropertiesLive; sel: 
   const t = useT();
   const p = sel.property;
   if (sel.kind === "property") {
-    const s = live.summary!;
+    const s = live.summary;
+    if (!s) return null;
     return (
       <>
-        <div className="text-[13px] text-muted-foreground">{t("My properties")} › <b className="text-ink">{p.name}</b></div>
+        <div className="text-[13px] text-muted-foreground">{t(MY_PROPERTIES)} › <b className="text-ink">{p.name}</b></div>
         <Card title={<span className="flex items-center gap-2">{p.name}<Badge tone="muted" icon="home">{kind(t, p.kind)}</Badge></span>}
           action={<Btn size="sm" onClick={() => { rename({ kind: "property", id: p.id, version: p.version, name: p.name, where: t("{name} · {kind} (property)", { name: p.name, kind: kind(t, p.kind) }) }); }}><Icon name="edit" />{t("Rename")}</Btn>}>
           <SummaryList cols={2} items={[[t("Type"), kind(t, s.kind)], [t("Floors"), s.floors.length > 0 ? `${String(s.floors.length)} (${s.floors.join(", ")})` : t("none")], [t("Rooms"), s.rooms], [t("Air conditioners"), t("{inRooms} in rooms · {unassigned} unassigned", { inRooms: s.inRooms, unassigned: s.unassigned })], [t("Last edited"), s.edited]]} />
@@ -156,23 +164,23 @@ function Panel({ live, sel, rename, go }: Readonly<{ live: PropertiesLive; sel: 
   const mode = canGroup ? live.mode : "single";
   return (
     <>
-      <div className="text-[13px] text-muted-foreground">{t("My properties")} › {sel.path.split(" › ").map((x, i, a) => <span key={i}>{i === a.length - 1 ? <b className="text-ink">{x}</b> : `${x} › `}</span>)}</div>
+      <div className="text-[13px] text-muted-foreground">{t(MY_PROPERTIES)} › {sel.path.split(" › ").map((x, i, a) => <span key={i}>{i === a.length - 1 ? <b className="text-ink">{x}</b> : `${x} › `}</span>)}</div>
       <Card title={<span className="flex items-center gap-2">{s.name}<Badge tone="muted">{kind(t, s.kind)}</Badge></span>}
         action={<Btn size="sm" onClick={() => { rename({ kind: "space", id: s.id, version: s.version, name: s.name, where: t("{name} · {kind} in {property}", { name: s.name, kind: kind(t, s.kind), property: p.name }) }); }}><Icon name="edit" />{t("Rename")}</Btn>}>
         {canGroup && (
           <div className="mb-3 flex flex-wrap items-center gap-2">
-            <span className="text-xs text-muted-foreground">{t("{acs} in {space} ·", { acs: acs_(t, direct.length), space: s.name })}</span>
+            <span className="text-xs text-muted-foreground">{t("{acs} in {space} ·", { acs: acsText(t, direct.length), space: s.name })}</span>
             {(["single", "group"] as const).map((m) => {
               return <Plain key={m} type="button" aria-pressed={mode === m} onClick={() => { go({ spaceId: s.id, mode: m === "group" ? "group" : null }); }}
                 className={cx("inline-flex items-center gap-1 rounded-control border px-3 py-1 text-xs font-semibold", mode === m ? "border-primary bg-primary-soft text-primary" : "border-line")}>{mode === m && <Icon name="check" />}{t(m === "single" ? "Single AC" : "Group control")}</Plain>;
             })}
           </div>
         )}
-        {mode === "group" ? <GroupPanel key={s.id} live={{ ...live, units: direct, details: live.details.filter((d) => d.spaceId === s.id) }} space={s.name} /> : (live.units.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No air conditioner in this {kind}.", { kind: kind(t, s.kind).toLowerCase() })}</p> : <>
+        {mode === "group" ? <GroupPanel key={s.id} live={{ ...live, units: direct, details: live.details.filter((d) => d.spaceId === s.id) }} space={s.name} /> : null}{mode !== "group" && live.units.length === 0 && <p className="text-[13px] text-muted-foreground">{t("No air conditioner in this {kind}.", { kind: kind(t, s.kind).toLowerCase() })}</p>}{mode !== "group" && live.units.length > 0 && <>
           <div className="mb-2 flex items-center justify-between text-[13px]"><b>{t("Air conditioners in this {kind} ({n})", { kind: kind(t, s.kind).toLowerCase(), n: live.units.length })}</b></div>
           <UnitRows units={live.units} />
           <div className="mt-3"><Banner>{t(live.owner ? "Each AC has its own control screen; Group control sends one setting to several ACs in a space. Unit membership is managed in HQ’s unit register." : "Each AC has its own control screen. Unit membership is managed in HQ’s unit register.")}</Banner></div>
-        </>)}
+        </>}
       </Card>
     </>
   );
@@ -192,26 +200,31 @@ function GroupPanel({ live, space }: Readonly<{ live: PropertiesLive; space: str
   const [review, setReview] = useState<PlanRow[] | null>(null);
   const [track, setTrack] = useState<Record<string, Track>>({});
   const [sending, setSending] = useState(false);
-  const caps = live.details.filter((d) => sel.includes(d.id)).map((d) => d.capabilities.temperature).filter((t): t is NonNullable<typeof t> => !!t);
-  const lo = caps.length > 0 ? Math.min(...caps.map((t) => t.min)) : 16;
-  const hi = caps.length > 0 ? Math.max(...caps.map((t) => t.max)) : 30;
+  const caps = live.details.filter((d) => sel.includes(d.id)).map((d) => d.capabilities.temperature).filter((cap): cap is NonNullable<typeof cap> => !!cap);
+  const lo = caps.length > 0 ? Math.min(...caps.map((cap) => cap.min)) : 16;
+  const hi = caps.length > 0 ? Math.max(...caps.map((cap) => cap.max)) : 30;
   const toggle = (id: string) => { setSel((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id])); };
   const send = async (rows: PlanRow[]) => {
     setSending(true);
     setReview(null);
-    setTrack((t) => ({ ...t, ...Object.fromEntries(rows.map((r) => [r.id, { status: "Sending" as const, note: "" }])) }));
+    setTrack((prev) => ({ ...prev, ...Object.fromEntries(rows.map((r) => [r.id, { status: "Sending" as const, note: "" }])) }));
     // each AC on its own (no rollback across ACs); its settings one after the other, stopping at the first failure. A
     // command over the member's write limit waits the advised seconds and is sent again (IR375, IR380)
     const wait = (id: string) => (s: number) => { setTrack((x) => ({ ...x, [id]: { status: "Waiting", note: t("Write limit reached — sending again in {s} s", { s }) } })); };
     await Promise.all(rows.map(async (r) => {
-      for (const a of r.actions) {
-        const created = await sendPaced(() => sendCommand(r.id, a), wait(r.id));
-        if (!created.ok) { setTrack((x) => ({ ...x, [r.id]: { status: "Failed", note: actionMessage(created, t) } })); return; }
-        setTrack((x) => ({ ...x, [r.id]: { status: "Sending", note: "" } }));
-        const c: ApiCommand = await waitForCommand(created.value, () => {});
-        if (c.status !== "acknowledged") { setTrack((x) => ({ ...x, [r.id]: { status: "Failed", note: historyRow(c, t, i.display).text } })); return; }
+      try {
+        for (const a of r.actions) {
+          const created = await sendPaced(() => sendCommand(r.id, a), wait(r.id));
+          if (!created.ok) { setTrack((x) => ({ ...x, [r.id]: { status: "Failed", note: actionMessage(created, t) } })); return; }
+          setTrack((x) => ({ ...x, [r.id]: { status: "Sending", note: "" } }));
+          const c: ApiCommand = await waitForCommand(created.value, () => { /* the row already says Sending */ });
+          if (c.status !== "acknowledged") { setTrack((x) => ({ ...x, [r.id]: { status: "Failed", note: historyRow(c, t, i.display).text } })); return; }
+        }
+        setTrack((x) => ({ ...x, [r.id]: { status: "Confirmed", note: r.change } }));
+      } catch {
+        // the action or the poll got no answer: this AC failed, the others go on and the button comes back (IR718)
+        setTrack((x) => ({ ...x, [r.id]: { status: "Failed", note: actionMessage(unreachableFailure(), t) } }));
       }
-      setTrack((x) => ({ ...x, [r.id]: { status: "Confirmed", note: r.change } }));
     }));
     setSending(false);
     toast(t("Group change finished — results are shown per AC"));
@@ -229,8 +242,8 @@ function GroupPanel({ live, space }: Readonly<{ live: PropertiesLive; space: str
             <Plain key={u.id} type="button" disabled={sending} onClick={() => { toggle(u.id); }} aria-pressed={sel.includes(u.id)}
               className={cx("rounded-xl border p-3 text-left disabled:opacity-60", sel.includes(u.id) ? "border-2 border-primary bg-primary-soft/50" : "border-line bg-surface")}>
               <div className="flex items-center justify-between"><b className="text-[13px]">{u.name}</b><Icon name={sel.includes(u.id) ? "checked" : "unchecked"} className="text-sm" /></div>
-              <div className="text-[11px] text-muted-foreground">{u.online ? (u.temp === "—" && u.watts === "—" ? t("no recent reading") : `${u.temp} · ${u.watts}`) : (u.seen ? t("last seen {when}", { when: u.seen }) : t("no connection yet"))}</div>
-              <div className="mt-1 flex flex-wrap gap-1"><PowerBadge s={u.power} /><ConnBadge s={u.conn} />{tr && <Badge tone={tr.status === "Confirmed" ? "ok" : tr.status === "Failed" ? "crit" : tr.status === "Waiting" ? "warn" : "primary"}>{t(tr.status)}</Badge>}</div>
+              <div className="text-[11px] text-muted-foreground">{u.online && (u.temp === "—" && u.watts === "—" ? t("no recent reading") : `${u.temp} · ${u.watts}`)}{!u.online && u.seen && t("last seen {when}", { when: u.seen })}{!u.online && !u.seen && t("no connection yet")}</div>
+              <div className="mt-1 flex flex-wrap gap-1"><PowerBadge s={u.power} /><ConnBadge s={u.conn} />{tr && <Badge tone={TRY_TONE.get(tr.status) ?? "primary"}>{t(tr.status)}</Badge>}</div>
               {(tr?.status === "Failed" || tr?.status === "Waiting") && <div className={cx("mt-1 text-[11px]", tr.status === "Failed" ? "text-crit" : "text-warn")}>{tr.note}</div>}
             </Plain>
           );
@@ -242,7 +255,7 @@ function GroupPanel({ live, space }: Readonly<{ live: PropertiesLive; space: str
           {ch.power && <>
             <Field label={t("Set temperature")}><div className="flex items-center gap-2"><Btn size="sm" onClick={() => { setCh({ ...ch, celsius: Math.max(lo, ch.celsius - 1) }); }} aria-label={t("Lower the temperature")}><Icon name="remove" /></Btn><b className="w-14 text-center">{ch.celsius} °C</b><Btn size="sm" onClick={() => { setCh({ ...ch, celsius: Math.min(hi, ch.celsius + 1) }); }} aria-label={t("Raise the temperature")}><Icon name="add" /></Btn></div></Field>
             <Field label={t("Mode")}><Choice value={ch.mode} onChange={(v: GroupChange["mode"]) => { setCh({ ...ch, mode: v }); }} options={[{ id: "cool", label: t("Cool") }, { id: "dry", label: t("Dry") }, { id: "fan", label: t("Fan") }]} /></Field>
-            <Field label={t("Fan")}><Choice value={ch.fan ?? "keep"} onChange={(v: string) => { setCh({ ...ch, fan: v === "keep" ? null : (v as GroupChange["fan"]) }); }} options={[{ id: "keep", label: t("Keep") }, { id: "low", label: t("Low") }, { id: "mid", label: t("Mid") }, { id: "high", label: t("High") }]} /></Field>
+            <Field label={t("Fan")}><Choice value={ch.fan ?? "keep"} onChange={(v: string) => { setCh({ ...ch, fan: oneOf(["low", "mid", "high"] as const, v, null) }); }} options={[{ id: "keep", label: t("Keep") }, { id: "low", label: t("Low") }, { id: "mid", label: t("Mid") }, { id: "high", label: t("High") }]} /></Field>
           </>}
           <Btn variant="primary" disabled={sel.length === 0 || sending} onClick={() => { setReview(plan(sel)); }}>{t("Review & send")}</Btn>
         </div>
@@ -253,12 +266,12 @@ function GroupPanel({ live, space }: Readonly<{ live: PropertiesLive; space: str
       </Card>
       {review && (
         <Modal open wide onClose={() => { setReview(null); }} title={t(review.length === 1 ? "Send to {n} selected AC in {space}?" : "Send to {n} selected ACs in {space}?", { n: review.length, space })}
-          footer={<><Btn onClick={() => { setReview(null); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={review.every((r) => r.actions.length === 0)} onClick={() => send(review.filter((r) => r.actions.length))}>{t(review.filter((r) => r.actions.length).length === 1 ? "Send to {n} AC" : "Send to {n} ACs", { n: review.filter((r) => r.actions.length).length })}</Btn></>}>
+          footer={<><Btn onClick={() => { setReview(null); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={review.every((r) => r.actions.length === 0)} onClick={() => { void send(review.filter((r) => r.actions.length)); }}>{t(review.filter((r) => r.actions.length).length === 1 ? "Send to {n} AC" : "Send to {n} ACs", { n: review.filter((r) => r.actions.length).length })}</Btn></>}>
           <p className="mb-2 text-[13px] font-semibold">{changeText(ch, t)}</p>
           <DataTable rowKey={(r) => r.id} rows={review} cols={[
             { key: "n", label: "AC", render: (r) => <b>{r.name}</b> },
             { key: "c", label: t("Change"), render: (r) => <>{r.change}{r.note && <div className="text-[11px] text-warn">{r.note}</div>}</> },
-            { key: "r", label: t("Result"), render: (r) => <Badge tone={r.result === "Skipped" ? "unknown" : r.result === "Clamped" ? "warn" : r.result === "No change" ? "muted" : "primary"}>{t(r.result)}</Badge> },
+            { key: "r", label: t("Result"), render: (r) => <Badge tone={RESULT_TONE.get(r.result) ?? "primary"}>{t(r.result)}</Badge> },
           ]} />
           <div className="mt-2"><Banner>{t("After sending, each card shows Sending → Confirmed / Failed. Failed ACs can be retried one by one; there is no rollback across ACs.")}</Banner></div>
         </Modal>

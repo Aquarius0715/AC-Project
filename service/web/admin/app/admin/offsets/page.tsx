@@ -5,13 +5,16 @@
 // simulated purchase / retirement / failure / retry are Server Actions (actions.ts). Texts in the display language; the
 // attempt and event times are formatted here, in the display time zone (IR282, IR298). The Phase 1A demo keeps fixtures.
 import { connection } from "next/server";
-import { coreAll, apiMode, coreDisplay, coreNow, coreOp, corePermissions } from "@ac/web/lib/dal";
+import { apiMode, coreDisplay, coreNow, coreOp, corePermissions, coreAllPage } from "@ac/web/lib/dal";
 import type { ApiCustomer } from "@ac/web/lib/billing";
 import { i18nOf } from "@ac/web/lib/i18n";
 import { recordRows, type ApiOffsetRecord } from "@ac/web/lib/offsets";
 import { withAccess } from "@ac/web/lib/withAccess";
 import { OffsetsDemo } from "./_components/offsets-demo";
 import { OffsetsView } from "./_components/offsets-view";
+import { keysOf } from "@ac/web/lib/keysOf";
+import { queryReader } from "@ac/web/lib/searchParams";
+import { entryOf } from "@ac/web/lib/lookup";
 
 const STATES = ["demo_requested", "demo_purchased", "demo_retired", "failed"] as const;
 const CREATED = { "7d": 7, "30d": 30, "90d": 90, all: null } as const;
@@ -27,19 +30,19 @@ async function AdminOffsetsPageContent({ searchParams }: Readonly<PageProps<"/ad
   await connection();
   if (!apiMode()) return <OffsetsDemo />;
   const sp = await searchParams;
-  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k] as string) : undefined);
+  const one = queryReader(sp);
   const tab = one("tab") === "market" ? "market" : "records";
   const customerId = one("customerId");
   const status = STATES.find((x) => x === one("status"));
-  const created = (Object.keys(CREATED) as (keyof typeof CREATED)[]).find((k) => k === one("created")) ?? "30d";
+  const created = keysOf(CREATED).find((k) => k === one("created")) ?? "30d";
   const now = await coreNow();
-  const days = CREATED[created];
+  const days = entryOf(CREATED, created);
   const filters = { ...(customerId && { customerId }), ...(status && { status }), ...(days !== null && { from: new Date(now.getTime() - days * 86_400_000).toISOString() }) };
   const [perms, display, records, customers, units] = await Promise.all([
     corePermissions(), coreDisplay(),
     coreOp<Page<ApiOffsetRecord>>("offsets.list", { limit: 100, filters }),
-    coreAll<ApiCustomer>("customers.list").then((items) => ({ items, total: items.length })),
-    coreAll<Unit>("units.list").then((items) => ({ items, total: items.length })),
+    coreAllPage<ApiCustomer>("customers.list"),
+    coreAllPage<Unit>("units.list"),
   ]);
   const customerOfOrg = new Map(customers.items.map((c) => [c.organizationId, c.id]));
   const names = customers.items.map((c) => ({ id: c.id, name: c.name }));

@@ -9,9 +9,10 @@
 // the first render are formatted here in the user's language and display time zone (IR293).
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
+import { DATA_FORCE_DELETE } from "@ac/web/lib/members";
 import { apiMode, coreAll, coreDisplay, coreNow, coreOp, corePermissions, CoreError } from "@ac/web/lib/dal";
 import { klStamp } from "@ac/web/lib/energy";
-import { i18nOf, relativeTime, showDate, type I18n } from "@ac/web/lib/i18n";
+import { i18nOf, relativeTime, showDate, type I18n, textOf } from "@ac/web/lib/i18n";
 import { businessDay } from "@ac/web/lib/clientBilling";
 import { statusWord, typeLabel } from "@ac/web/lib/partnerJobDetail";
 import { metricLabel } from "@ac/web/lib/adminAlerts";
@@ -24,6 +25,14 @@ import {
 } from "@ac/web/lib/assets";
 import { UnitsDemo } from "./_components/units-demo";
 import { UnitsView, type CustomerLive, type UnitLive, type UnitsLive } from "./_components/units-view";
+import { queryReader } from "@ac/web/lib/searchParams";
+
+import { orNull, recover } from "@ac/web/lib/promises";
+
+const RESTRICTION_READ = "restriction.read";
+const DEVICE_READ = "device.read";
+const CUSTOMERID = "customerId";
+const DEFAULT_ALERT = "default_alert";
 
 interface Audit { occurredAt: string; actorId: string; reason: string | null }
 interface JobForClaim { projection: "detail"; id: string; version: number; type: string; unitId: string; completedAt: string | null; costs: { kind: "estimate" | "actual"; amountMinor: number; currency: Currency }[]; reportRefs: { reportId: string; reportVersion: number }[] }
@@ -38,14 +47,14 @@ export default async function AdminUnitsPage({ searchParams }: Readonly<PageProp
   await connection();
   if (!apiMode()) return <UnitsDemo />;
   const sp = await searchParams;
-  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k] as string) : undefined);
+  const one = queryReader(sp);
   const [now, perms, display] = await Promise.all([coreNow(), corePermissions(), coreDisplay()]);
   const i = i18nOf(display);
   const { t } = i;
   const has = (...p: string[]) => p.some((x) => perms.has(x));
   if (!has("asset.read")) return <UnitsView live={null} />;
-  const canContracts = has("contract.read", "billing.read", "restriction.read");
-  const canInvoices = has("billing.read", "restriction.read");
+  const canContracts = has("contract.read", "billing.read", RESTRICTION_READ);
+  const canInvoices = has("billing.read", RESTRICTION_READ);
   const [active, inactive, orgs, properties, units, contracts, overdue, restrictions, members] = await Promise.all([
     coreAll<ApiCustomerRow>("customers.list", { filters: { status: "active" } }),
     coreAll<ApiCustomerRow>("customers.list", { filters: { status: "inactive" } }),
@@ -54,7 +63,7 @@ export default async function AdminUnitsPage({ searchParams }: Readonly<PageProp
     coreAll<ApiUnitRow>("units.list"),
     canContracts ? coreAll<ApiContractLite>("contracts.list") : Promise.resolve(null),
     canInvoices ? coreAll<ApiInvoiceLite>("invoices.list", { filters: { overdueOnly: true } }) : Promise.resolve(null),
-    has("restriction.read") ? coreAll<ApiRestrictionLite>("restrictions.list") : Promise.resolve(null),
+    has(RESTRICTION_READ) ? coreAll<ApiRestrictionLite>("restrictions.list") : Promise.resolve(null),
     has("identity.read") ? coreAll<Member>("members.list") : Promise.resolve([] as Member[]),
   ]);
   const standingOf = (c: ApiCustomerRow) => (contracts && overdue ? standing(c.id, contracts, overdue, restrictions, now) : null);
@@ -63,20 +72,21 @@ export default async function AdminUnitsPage({ searchParams }: Readonly<PageProp
     now: now.toISOString(),
     todayKL: klStamp(now.toISOString()).slice(0, 10),
     canWrite: has("asset.write"),
+    canForce: has(DATA_FORCE_DELETE),
     standingKnown: !!(contracts && overdue),
     kpis: registerKpis(rows, units, t),
     search: one("search") ?? "",
-    missing: !!one("customerId") && rows.every((r) => r.id !== one("customerId")),
+    missing: !!one(CUSTOMERID) && rows.every((r) => r.id !== one(CUSTOMERID)),
     top: one("tab") === "warranty" ? "warranty" : "customers",
     activeCustomers: rows.filter((r) => r.status === "active").map((r) => ({ id: r.id, name: r.name })),
     coverageAttention: null,
     rows,
   };
   // a unit link without its customer (the audit's related records, IR320) goes to the unit under its customer
-  const unitOrg = !one("customerId") && one("unitId") ? units.find((u) => u.id === one("unitId"))?.customerOrgId : undefined;
+  const unitOrg = !one(CUSTOMERID) && one("unitId") ? units.find((u) => u.id === one("unitId"))?.customerOrgId : undefined;
   const owner = unitOrg ? rows.find((r) => r.orgId === unitOrg) : undefined;
-  if (owner) redirect(`/admin/units?customerId=${owner.id}&unitId=${one("unitId")}`);
-  const cust = rows.find((r) => r.id === one("customerId"));
+  if (owner) redirect(`/admin/units?customerId=${owner.id}&unitId=${one("unitId") ?? ""}`);
+  const cust = rows.find((r) => r.id === one(CUSTOMERID));
   if (!cust) {
     const coverage = has("asset.read", "contract.read") ? await coreAll<ApiCoverage>("units.coverage") : null;
     live.coverageAttention = coverage ? coverage.filter((c) => c.status === "expiring" || c.status === "no_coverage").length : null;
@@ -90,15 +100,15 @@ export default async function AdminUnitsPage({ searchParams }: Readonly<PageProp
   const unitId = one("unitId");
   const [spaces, caps, policies, openAlerts, detail] = await Promise.all([
     Promise.all(props.map((p) => coreAll<ApiSpaceRow>("spaces.list", { filters: { propertyId: p.id } }))).then((x) => x.flat()),
-    has("dashboard.read", "device.read") ? coreAll<ApiCapability>("capabilities.list") : Promise.resolve([] as ApiCapability[]),
+    has("dashboard.read", DEVICE_READ) ? coreAll<ApiCapability>("capabilities.list") : Promise.resolve([] as ApiCapability[]),
     canPolicies ? coreAll<ApiCustomerPolicy>("policies.list", { filters: { customerId: cust.id } }) : Promise.resolve(null),
     has("alert.read", "alert.policy.read")
       ? Promise.all((["open", "acknowledged"] as const).map((status) => coreAll<Alert>("alerts.list", { filters: { customerId: cust.id, status } }))).then((x) => x.flat())
       : Promise.resolve(null),
-    unitId ? coreOp<ApiUnitDetail>("units.get", { id: unitId }).catch((error) => (error instanceof CoreError && error.status === 404 ? null : Promise.reject(error))) : Promise.resolve(null),
+    unitId ? recover(coreOp<ApiUnitDetail>("units.get", { id: unitId }), (error: unknown) => { if (error instanceof CoreError && error.status === 404) { return null; } throw error; }) : Promise.resolve(null),
   ]);
   const clientUsers = await coreAll<ApiClientUser>("clientUsers.list", { filters: { customerId: cust.id } });
-  const d = detail && detail.customerOrgId === cust.orgId ? detail : null;
+  const d = detail?.customerOrgId === cust.orgId ? detail : null;
   const models = new Map(caps.map((k) => [k.id, k.model]));
   const memberName = new Map(members.map((m) => [m.id, m.displayName]));
   const tree = locationTree(props, spaces, orgUnits, cust.orgId);
@@ -113,13 +123,14 @@ export default async function AdminUnitsPage({ searchParams }: Readonly<PageProp
       limit: 1, filters: { targetKind: sel.kind, targetId: sel.kind === "property" ? sel.property.id : sel.space.id, from: new Date(now.getTime() - 365 * day).toISOString(), to: new Date(now.getTime() + day).toISOString() },
     }).then((p) => p.items[0] ?? null)
     : null;
+  const askedTab = one("tab");
   const customer: CustomerLive = {
     row: cust,
-    tab: one("tab") === "policies" ? "policies" : (one("tab") === "users" ? "users" : "overview"),
+    tab: askedTab === "policies" || askedTab === "users" ? askedTab : "overview",
     selection: sel,
     places: placeOptions(tree, spaces, t),
     users: clientUserRows(clientUsers, (m) => memberName.get(m) ?? t("{name} owner", { name: cust.name }), undefined, i),
-    models: caps.map((k) => ({ id: k.id, label: `${k.manufacturer} ${k.model}` })).sort((a, b) => a.label.localeCompare(b.label)),
+    models: caps.map((k) => ({ id: k.id, label: `${k.manufacturer} ${k.model}` })).toSorted((a, b) => a.label.localeCompare(b.label)),
     perProperty: tree.map((p) => `${p.name} ${String(p.units)}`).join(" · ") || t("no properties yet"),
     alertsSub: openAlerts ? ([["{n} critical", sev("critical")], ["{n} warning", sev("warning")], ["{n} info", sev("normal")]] as const).filter(([, n]) => n > 0).map(([l, n]) => t(l, { n })).join(" · ") || t("none open") : null,
     filter: { powerState, connections: conns, search: one("search") ?? "" },
@@ -127,7 +138,7 @@ export default async function AdminUnitsPage({ searchParams }: Readonly<PageProp
     units: unitRows(filterUnits(at, { powerState, connections: conns, search: "" }), spaces, models, t),
     lastEdit: lastEdit ? `${showDate(lastEdit.occurredAt, i.display)} · ${memberName.get(lastEdit.actorId) ?? t("HQ")}` : null,
     policies: policies ? policyLines(policies, orgUnits.map((u) => u.id), (m) => memberName.get(m) ?? cust.name, i) : null,
-    rules: (() => { const d = policies?.find((p) => p.kind === "default_alert"); return d ? { policyId: d.id, items: defaultRules(d, i) } : null; })(),
+    rules: (() => { const defaultPolicy = policies?.find((p) => p.kind === DEFAULT_ALERT); return defaultPolicy ? { policyId: defaultPolicy.id, items: defaultRules(defaultPolicy, i) } : null; })(),
     canRules: has("alert.policy.write"),
     canAttach: has("asset.write", "alert.policy.write") && canPolicies,
     tree,
@@ -151,7 +162,7 @@ async function unitLive(d: ApiUnitDetail, x: Ctx): Promise<UnitLive> {
   interface Job { projection: "summary"; id: string; type: string; status: string }
   const [jobs, devices, archived] = await Promise.all([
     x.has("job.read") && !d.archived ? coreAll<Job>("jobs.list", { filters: { unitId: d.id } }) : Promise.resolve(null),
-    x.has("device.read") ? coreAll<Device>("devices.list", { filters: { unitId: d.id } }) : Promise.resolve(null),
+    x.has(DEVICE_READ) ? coreAll<Device>("devices.list", { filters: { unitId: d.id } }) : Promise.resolve(null),
     d.archived && x.has("audit.read")
       ? coreOp<{ items: Audit[] }>("audit.list", { limit: 1, filters: { targetKind: "unit", targetId: d.id, action: "units.archive", from: new Date(x.now.getTime() - 365 * day).toISOString(), to: new Date(x.now.getTime() + day).toISOString() } }).then((p) => p.items[0] ?? null)
       : Promise.resolve(null),
@@ -163,27 +174,32 @@ async function unitLive(d: ApiUnitDetail, x: Ctx): Promise<UnitLive> {
     ...(x.contracts ?? []).filter((k) => k.unitIds.includes(d.id) && nowMs < Date.parse(k.endAt)).map((k) => ({ label: t("Unexpired contract ({plan}, until {date})", { plan: k.planType.toUpperCase(), date: businessDay(k.endAt, display.locale) }), href: `/admin/billing/contracts?contractId=${k.id}` })),
     ...(jobs ?? []).filter((j) => !done.has(j.status)).map((j) => ({ label: t("Active job ({type}, {status})", { type: typeLabel(j.type, t), status: statusWord(j.status, t) }), href: `/admin/jobs?jobId=${j.id}` })),
     ...(device ? [{ label: t("Active device binding ({serial})", { serial: device.serial }), href: `/admin/devices?tab=devices&deviceId=${device.id}` }] : []),
-    ...(x.restrictions ?? []).filter((r) => r.unitIds.includes(d.id) && r.state in restrictionState).map((r) => ({ label: t("Active restriction ({state})", { state: t(restrictionState[r.state]) }), href: `/admin/restrictions?restrictionId=${r.id}` })),
+    ...(x.restrictions ?? []).filter((r) => r.unitIds.includes(d.id) && Object.hasOwn(restrictionState, r.state)).map((r) => ({ label: t("Active restriction ({state})", { state: (textOf(restrictionState, r.state, t) ?? r.state) }), href: `/admin/restrictions?restrictionId=${r.id}` })),
     ...(d.pendingCommandIds.length > 0 ? [{ label: t(d.pendingCommandIds.length === 1 ? "1 pending command" : "{n} pending commands", { n: d.pendingCommandIds.length }), href: null }] : []),
   ];
   const byId = new Map((x.policies ?? []).map((p) => [p.id, p]));
-  const def = x.policies?.find((p) => p.kind === "default_alert");
+  const defaults = x.policies?.find((p) => p.kind === DEFAULT_ALERT);
   const attached = [
-    ...(def ? [{ id: def.id, kind: "default_alert" as const, name: def.name, type: t("Default"), condition: t((def.rules?.length ?? 0) === 1 ? "1 rule · ventilation and fault causes" : "{n} rules · ventilation and fault causes", { n: def.rules?.length ?? 0 }), madeBy: t("Always attached"), on: t((def.rules?.length ?? 0) === 1 ? "{on} of 1 rule on" : "{on} of {n} rules on", { on: defaultRules(def, x.i).filter((r) => r.enabled).length, n: def.rules?.length ?? 0 }) }] : []),
+    ...(defaults ? [{ id: defaults.id, kind: "default_alert" as const, name: defaults.name, type: t("Default"), condition: t((defaults.rules?.length ?? 0) === 1 ? "1 rule · ventilation and fault causes" : "{n} rules · ventilation and fault causes", { n: defaults.rules?.length ?? 0 }), madeBy: t("Always attached"), on: t((defaults.rules?.length ?? 0) === 1 ? "{on} of 1 rule on" : "{on} of {n} rules on", { on: defaultRules(defaults, x.i).filter((r) => r.enabled).length, n: defaults.rules?.length ?? 0 }) }] : []),
     ...d.alertPolicyIds.map((id) => {
       const p = byId.get(id);
       const metric = p?.metric ?? "";
-      return { id, kind: "alert" as const, name: p?.name ?? id.slice(0, 8), type: metricLabel[metric] ? t(metricLabel[metric]) : metric, condition: p ? conditionText(p, x.i) : t("policy outside this view"), madeBy: p ? t("Made by {name}", { name: x.memberName.get(p.ownerMembershipId) ?? x.customerName }) : "", on: p && !p.enabled ? t("Off") : "" };
+      return { id, kind: "alert" as const, name: p?.name ?? id.slice(0, 8), type: textOf(metricLabel, metric, t) ?? metric, condition: p ? conditionText(p, x.i) : t("policy outside this view"), madeBy: p ? t("Made by {name}", { name: x.memberName.get(p.ownerMembershipId) ?? x.customerName }) : "", on: p && !p.enabled ? t("Off") : "" };
     }),
   ];
+  // when and why the unit was taken out of use, and by whom
+  const archivedText = () => {
+    if (!archived) return t("Taken out of use");
+    return [t("Taken out of use {date}", { date: showDate(archived.occurredAt, display) }), ...(archived.reason ? [t("reason: {reason}", { reason: archived.reason })] : []), x.memberName.get(archived.actorId) ?? t("HQ")].join(" · ");
+  };
   return {
     u: d,
     path: d.location.pathLabels.join(" › "),
     model: `${modelLabel(d, x.models)} · split`,
     device: device ? { id: device.id, serial: device.serial, connection: device.connection } : null,
     deviceKnown: devices !== null,
-    blockers: x.has("job.read", "device.read") || x.contracts ? blockers : null,
-    archivedNote: d.archived ? (archived ? [t("Taken out of use {date}", { date: showDate(archived.occurredAt, display) }), ...(archived.reason ? [t("reason: {reason}", { reason: archived.reason })] : []), x.memberName.get(archived.actorId) ?? t("HQ")].join(" · ") : t("Taken out of use")) : null,
+    blockers: x.has("job.read", DEVICE_READ) || x.contracts ? blockers : null,
+    archivedNote: d.archived ? archivedText() : null,
     seen: d.lastSeenAt ? relativeTime(d.lastSeenAt, nowMs, x.i) : null,
     attached,
   };
@@ -193,26 +209,27 @@ async function unitLive(d: ApiUnitDetail, x: Ctx): Promise<UnitLive> {
 replaced parts can still be claimed from the manufacturer (job.read for the parts, job.write to file the claim). */
 async function warrantyLive(coverage: ApiCoverage[], x: { has: (...p: string[]) => boolean; units: ApiUnitRow[]; properties: ApiPropertyRow[]; rows: { id: string; name: string }[]; contracts: ApiContractLite[] | null; i: I18n }) {
   const { t, display } = x.i;
-  const caps = x.has("dashboard.read", "device.read") ? await coreAll<ApiCapability>("capabilities.list") : [];
+  const caps = x.has("dashboard.read", DEVICE_READ) ? await coreAll<ApiCapability>("capabilities.list") : [];
   const unit = new Map(x.units.map((u) => [u.id, u]));
-  const prop = new Map(x.properties.map((p) => [p.id, p.name]));
+  const propertyRow = new Map(x.properties.map((p) => [p.id, p.name]));
   const customer = new Map(x.rows.map((r) => [r.id, r.name]));
   const model = new Map(caps.map((k) => [k.id, `${k.manufacturer} ${k.model}`]));
   const contract = new Map((x.contracts ?? []).map((k) => [k.id, t("{plan} until {date}", { plan: k.planType.toUpperCase(), date: businessDay(k.endAt, display.locale) })]));
   const rows = coverageRows(coverage, {
-    unit: (id) => { const u = unit.get(id); return u && { name: u.displayName, place: prop.get(u.propertyId) ?? "" }; },
+    unit: (id) => { const u = unit.get(id); return u && { name: u.displayName, place: propertyRow.get(u.propertyId) ?? "" }; },
     customer: (id) => customer.get(id) ?? id.slice(0, 8), model: (id) => model.get(id) ?? id.slice(0, 8), contract: (id) => contract.get(id) ?? t("contract {id}", { id: id.slice(0, 8) }),
   }, await coreNow(), x.i);
   let claims: ClaimCandidate[] | null = null;
   if (x.has("job.read")) {
     const ids = [...new Set(coverage.flatMap((c) => c.claimableJobIds))];
-    claims = (await Promise.all(ids.map(async (jobId) => {
-      const j = await coreOp<JobForClaim>("jobs.get", { jobId }).catch(() => null);
+    const candidates = await Promise.all(ids.map(async (jobId) => {
+      const j = await orNull(coreOp<JobForClaim>("jobs.get", { jobId }));
       if (!j) return null;
       const ref = j.reportRefs.at(-1);
-      const r = ref ? await coreOp<Report>("reports.get", { jobId, reportId: ref.reportId, reportVersion: ref.reportVersion }).catch(() => null) : null;
+      const r = ref ? await orNull(coreOp<Report>("reports.get", { jobId, reportId: ref.reportId, reportVersion: ref.reportVersion })) : null;
       return claimCandidate(j, r?.parts ?? [], unit.get(j.unitId)?.displayName ?? j.unitId.slice(0, 8), x.i);
-    }))).filter((c): c is ClaimCandidate => !!c);
+    }));
+    claims = candidates.filter((c): c is ClaimCandidate => !!c);
   }
   return { rows, claims, kpis: coverageKpis(rows, t), customers: x.rows, canClaim: x.has("job.write") };
 }

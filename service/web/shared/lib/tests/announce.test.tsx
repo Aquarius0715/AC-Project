@@ -1,0 +1,34 @@
+// @vitest-environment jsdom
+import { afterEach, describe, expect, it } from "vitest";
+import { act, cleanup, render, screen } from "@testing-library/react";
+import { toast } from "sonner";
+import { Banner, ToastProvider, useToast } from "@ac/web/components/ui";
+
+// Sonner keeps its toasts in one store for the page and replays the ones still open to a new Toaster: clear it after each
+// case (DEC-75, IR403)
+afterEach(() => { cleanup(); toast.dismiss(); });
+
+function Pusher() {
+  const notify = useToast();
+  return <><button type="button" onClick={() => { notify("Saved"); }}>ok</button><button type="button" onClick={() => { notify("Not saved: CONFLICT", "crit"); }}>crit</button></>;
+}
+
+// IR362: critical errors are announced at once (UX-06), other results politely
+describe("announcements", () => {
+  it("makes an error banner an alert and other banners a status", () => {
+    render(<><Banner tone="crit">Not submitted</Banner><Banner tone="warn">Window ends soon</Banner><Banner>Saved</Banner></>);
+    expect(screen.getByRole("alert").textContent).toContain("Not submitted");
+    expect(screen.getAllByRole("status").map((x) => x.textContent)).toStrictEqual(["Window ends soon", "Saved"]);
+    // each banner's icon is a Lucide drawing, hidden from assistive technology (DEC-74)
+    expect([...screen.getByRole("alert").querySelectorAll("svg"), ...screen.getAllByRole("status").flatMap((x) => [...x.querySelectorAll("svg")])].map((x) => [x.getAttribute("aria-hidden"), x.classList.contains("lucide")])).toStrictEqual([["true", true], ["true", true], ["true", true]]);
+  });
+  it("puts an error toast in the alert region and other toasts in the status region", async () => {
+    render(<ToastProvider><Pusher /></ToastProvider>);
+    act(() => { screen.getByRole("button", { name: "ok" }).click(); screen.getByRole("button", { name: "crit" }).click(); });
+    // Sonner adds a toast on the next timer tick
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toBe("Not saved: CONFLICT");
+    const status = await screen.findByRole("status");
+    expect(status.textContent).toBe("Saved");
+  });
+});

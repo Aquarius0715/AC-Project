@@ -3,8 +3,9 @@
 // stored in UTC), the next-occurrence box with Generate job, the generated occurrences and the refusals. Pure code shared
 // by the server loader and the client view; Vitest covers it. Texts in the display language (`i` / `t`, IR291); a
 // plan's dates are its instants in the user's display time zone, the zone its next date is typed in (D16, NFR-08).
-import { EN, showDate, translator, type Display, type I18n, type T } from "@ac/web/lib/i18n";
+import { EN, showDate, translator, type Display, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import { actionMessage } from "@ac/web/lib/actionMessage";
+import { lookup } from "@ac/web/lib/lookup";
 
 const en = translator("en");
 
@@ -16,7 +17,7 @@ export interface ApiPlan {
 /** “Every 3 months” / “Every month”. */
 export const everyText = (n: number, t: T = en) => (n === 1 ? t("Every month") : t("Every {n} months", { n }));
 /** The plan's cadence in the title: monthly, quarterly, half-yearly, yearly or every N months. */
-export const cadence = (n: number, t: T = en) => t(({ 1: "monthly", 3: "quarterly", 6: "half-yearly", 12: "yearly" } as Record<number, string>)[n] ?? "every {n} months", { n });
+export const cadence = (n: number, t: T = en) => t(lookup({ 1: "monthly", 3: "quarterly", 6: "half-yearly", 12: "yearly" }, String(n)) ?? "every {n} months", { n });
 /** The date of a plan instant in the display zone: “8 Dec 2026”. */
 export const planDate = (iso: string, d?: Display) => showDate(iso, d);
 
@@ -24,7 +25,7 @@ export interface PlanRow { id: string; short: string; unitId: string; unit: stri
 /** One plan of the list (Figma “Living room AC · customer-a / Every 3 months · day 8 · Next 2026-12-08”), next due first. */
 export function planRows(plans: ApiPlan[], units: Map<string, string>, customerOfUnit: Map<string, string>, i: I18n = EN): PlanRow[] {
   const { t, display } = i;
-  return [...plans].sort((a, b) => Date.parse(a.nextDueAt) - Date.parse(b.nextDueAt) || a.id.localeCompare(b.id)).map((p) => {
+  return [...plans].toSorted((a, b) => Date.parse(a.nextDueAt) - Date.parse(b.nextDueAt) || a.id.localeCompare(b.id)).map((p) => {
     return {
       id: p.id, short: p.id.slice(0, 8), unitId: p.unitId, unit: units.get(p.unitId) ?? t("Unit"), customer: customerOfUnit.get(p.unitId) ?? t("customer"),
       line: `${everyText(p.recurrence.intervalMonths, t)} · ${t("day {n}", { n: p.anchorDay })}`, next: t("Next {date}", { date: planDate(p.nextDueAt, display) }),
@@ -42,15 +43,15 @@ export function nextOccurrence(iso: string, months: number, anchorDay: number): 
   return new Date(first + (Math.min(anchorDay, last) - 1) * 86_400_000).toISOString();
 }
 /** The anchor day a save stores: the UTC day of a changed next date, otherwise the plan's (IR130 item 1). */
-export const anchorOf = (p: Pick<ApiPlan, "anchorDay" | "nextDueAt"> | null, nextDueAt: string) => (p && p.nextDueAt === nextDueAt ? p.anchorDay : new Date(nextDueAt).getUTCDate());
+export const anchorOf = (p: Pick<ApiPlan, "anchorDay" | "nextDueAt"> | null, nextDueAt: string) => (p?.nextDueAt === nextDueAt ? p.anchorDay : new Date(nextDueAt).getUTCDate());
 
 /** The plan form checks: every 1–12 months, the next date in the future (the unit only when creating). */
 export function planErrors(f: { unitId: string; every: number; nextDueAt: string | null }, now: number, t: T = en): Record<string, string> {
   const e: Record<string, string> = {};
   if (!f.unitId) e.unitId = t("Choose the unit.");
-  if (!Number.isInteger(f.every) || f.every < 1 || f.every > 12) e.every = t("Every 1–12 months.");
-  if (!f.nextDueAt || Number.isNaN(Date.parse(f.nextDueAt))) e.nextDueAt = t("Enter the next date and time.");
-  else if (Date.parse(f.nextDueAt) <= now) e.nextDueAt = t("The next date must be in the future.");
+  if (!Number.isSafeInteger(f.every) || f.every < 1 || f.every > 12) e.every = t("Every 1–12 months.");
+  const due = f.nextDueAt ? Date.parse(f.nextDueAt) : NaN;
+  if (Number.isNaN(due) || due <= now) e.nextDueAt = t(Number.isNaN(due) ? "Enter the next date and time." : "The next date must be in the future.");
   return e;
 }
 
@@ -59,9 +60,10 @@ date as text: the page passes the one the server formatted, so the first render 
 export function nextBox(p: ApiPlan, now: number, dirty: boolean, generated: { occurrenceAt: string; jobId: string } | null, i: I18n = EN, next = planDate(p.nextDueAt, i.display)): { title: string; text: string; generate: boolean; why: string | null } {
   const { t } = i;
   const isPast = Date.parse(p.nextDueAt) <= now;
-  const text = generated ? t("{date} was just generated as {job}. Next due advanced to {next}.", { date: planDate(generated.occurrenceAt, i.display), job: generated.jobId.slice(0, 8), next })
-    : (t(isPast ? "The next date has passed — move it forward and save the plan first (no automatic catch-up)." : "Not generated yet. Generating creates one periodic job (requested) for this date — generating the same date again is rejected."));
-  const why = isPast ? t("The next date has passed.") : (dirty ? t("Save the plan first.") : null);
+  const pending = t(isPast ? "The next date has passed — move it forward and save the plan first (no automatic catch-up)." : "Not generated yet. Generating creates one periodic job (requested) for this date — generating the same date again is rejected.");
+  const text = generated ? t("{date} was just generated as {job}. Next due advanced to {next}.", { date: planDate(generated.occurrenceAt, i.display), job: generated.jobId.slice(0, 8), next }) : pending;
+  const unsaved = dirty ? t("Save the plan first.") : null;
+  const why = isPast ? t("The next date has passed.") : unsaved;
   return { title: t("Next occurrence · {date}", { date: next }), generate: !why, text, why };
 }
 
@@ -86,10 +88,11 @@ export function planRefusal(f: { code: string; messageKey: string; fieldErrors: 
     "error.unitArchived": "the unit is archived", "error.unitFixed": "a plan’s unit cannot change",
     "error.past": "must be in the future", "error.invalid": "not a valid value (monthly, every 1–12 months)", "error.required": "required",
   };
-  const word = (k: string) => (keys[k] ? t(keys[k]) : k);
-  const fields = Object.entries(f.fieldErrors ?? {}).map(([k, v]) => `${k}: ${word(v)}`);
+  const word = (k: string) => (textOf(keys, k, t) ?? k);
+  const fields = Object.entries(f.fieldErrors).map(([k, v]) => `${k}: ${word(v)}`);
   if (fields.length > 0) return fields.join(" · ");
-  if (keys[f.messageKey]) return f.code === "CONFLICT" ? t("Not saved: {reason}.", { reason: word(f.messageKey) }) : `${word(f.messageKey)}.`;
+  const known = textOf(keys, f.messageKey, t);
+  if (known) return f.code === "CONFLICT" ? t("Not saved: {reason}.", { reason: known }) : `${known}.`;
   if (f.code === "NOT_FOUND") return t("The plan or its unit no longer exists in your scope.");
   return actionMessage({ ...f, fieldErrors: {} }, t); // the write limit's wait and other codes (IR380)
 }

@@ -1,26 +1,32 @@
 "use client";
+const ADD_CONTRACTOR = "Add contractor";
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Badge, Banner, Btn, Card, EmptyState, Field, Input, Kpi, ListRow, Modal, Page, Select, SummaryList, Textarea, ScrollX } from "@ac/web/components/ui";
 import { useI18n, useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
+import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { businessDay, KL } from "@ac/web/lib/clientBilling";
 import { klDate, klStart } from "@ac/web/lib/partnerTeam";
-import { areasOf, contractorRefusal, nextMonthStart, profileErrors, rateCardErrors, WORK_TYPES, type WorkType } from "@ac/web/lib/adminContractors";
+import { areasOf, contractorRefusal, nextMonthStart, profileErrors, rateCardErrors, WORK_TYPES } from "@ac/web/lib/adminContractors";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
-import { createContractorOrganization, saveContractor, saveRateCard, setOfferStatus, verifyCertificate } from "../actions";
+import { createContractorOrganization, deleteContractor, deleteRateCard, saveContractor, saveRateCard, setOfferStatus, verifyCertificate } from "../actions";
 import type { ContractorsLive } from "../_lib/load";
 import { JobsTabs } from "./jobs-header";
 import { NewJobModal } from "./jobs-view";
 import { Icon } from "@ac/web/components/Icon";
+import { ForceDeleteField, forceReady, noForce } from "@ac/web/components/DeleteDialog";
 import { Checkbox } from "@ac/web/components/ui/checkbox";
+import { codePoints } from "@ac/web/lib/text";
+import { oneOf } from "@ac/web/lib/oneOf";
+import { byCount } from "@ac/web/lib/i18n";
 
 type Detail = NonNullable<ContractorsLive["detail"]>;
 /** The organization choice of a company still to create (IR465). */
 const NEW_COMPANY = "new";
 
-type ModalState = null | { kind: "profile"; organizationId: string | null } | { kind: "status" } | { kind: "rates" } | { kind: "verify" } | { kind: "job" };
+type ModalState = null | { kind: "profile"; organizationId: string | null } | { kind: "status" } | { kind: "rates" } | { kind: "verify" } | { kind: "job" } | { kind: "delete" } | { kind: "deleteRate"; id: string; title: string };
 
 /** HQ contractor register (FR-A21, DD-A21, Figma Admin 06-9) from the Core API. Texts in the display language; the
 register's dates are Kuala Lumpur days, typed and shown so, and said so in another display time zone (IR291). */
@@ -36,7 +42,7 @@ export function ContractorsView({ live }: Readonly<{ live: ContractorsLive }>) {
       <JobsTabs tab="contractors" counts={live.counts} q={{}} action={<Btn variant="primary" size="sm" onClick={() => { setModal({ kind: "job" }); }}><Icon name="add" /> {t("New job")}</Btn>} />
       {result && <Banner tone={result.tone}>{result.text}</Banner>}
       <div className="split-rev">
-        <Card title={t("Contractors")} className="self-start" action={<Btn size="sm" onClick={() => { setModal({ kind: "profile", organizationId: live.withoutProfile[0]?.id ?? null }); }}><Icon name="add" /> {t("Add contractor")}</Btn>}>
+        <Card title={t("Contractors")} className="self-start" action={<Btn size="sm" onClick={() => { setModal({ kind: "profile", organizationId: live.withoutProfile[0]?.id ?? null }); }}><Icon name="add" /> {t(ADD_CONTRACTOR)}</Btn>}>
           {live.rows.length === 0 ? <EmptyState title={t("No contractor organizations")}>{t("Add contractor creates the first company with its profile; its staff are added afterwards.")}</EmptyState> : (
             <div className="flex flex-col gap-1.5">{live.rows.map((r) => (
               <ListRow key={r.id} selected={d?.org.id === r.id} href={`/admin/jobs?tab=contractors&contractorId=${r.id}`}>
@@ -50,7 +56,9 @@ export function ContractorsView({ live }: Readonly<{ live: ContractorsLive }>) {
         {d ? <ContractorDetail key={`${d.org.id}:${String(d.profile?.version ?? 0)}`} d={d} open={setModal} /> : <Card title={t("Contractor")}><p className="text-[13px] text-muted-foreground">{t("missing" in live ? "That contractor no longer exists." : "Pick a contractor.")}</p></Card>}
       </div>
       {modal?.kind === "profile" && <ProfileModal live={live} d={d} organizationId={modal.organizationId} onClose={close} onFail={fail} />}
-      {modal?.kind === "status" && d?.profile && <StatusModal d={d} onClose={close} onFail={fail} />}
+      {modal?.kind === "deleteRate" && <DeleteRateModal id={modal.id} title={modal.title} onClose={close} onFail={fail} />}
+      {modal?.kind === "delete" && d && <DeleteModal d={d} canForce={live.canForce} onClose={close} onFail={fail} />}
+      {modal?.kind === "status" && d?.profile && <StatusModal p={d.profile} onClose={close} onFail={fail} />}
       {modal?.kind === "rates" && d && <RatesModal d={d} now={Date.parse(live.now)} onClose={close} onFail={fail} />}
       {modal?.kind === "verify" && d && <VerifyModal d={d} onClose={close} onFail={fail} />}
       {modal?.kind === "job" && <NewJobModal live={{ now: live.now, units: live.units, q: {} }} onClose={() => { setModal(null); }} />}
@@ -67,8 +75,8 @@ function ContractorDetail({ d, open }: Readonly<{ d: Detail; open: (m: ModalStat
       {d.kpis && <div className="grid-fluid" style={{ ["--min" as string]: "170px" }}>{d.kpis.map((k) => <Kpi key={k.label} label={k.label} value={k.value} icon={k.icon} sub={k.sub} tone={k.tone} />)}</div>}
       <div className="split">
         <Card title={d.org.name} sub={p ? undefined : t("No contractor profile yet — offers still work; add one to record its registration, areas and insurance")}
-          action={p ? <span className="flex gap-2"><Btn size="sm" onClick={() => { open({ kind: "profile", organizationId: p.organizationId }); }}>{t("Edit")}</Btn><Btn size="sm" variant={p.status === "active" ? "danger" : "primary"} onClick={() => { open({ kind: "status" }); }}>{t(p.status === "active" ? "Suspend offers" : "Resume offers")}</Btn></span>
-            : <Btn size="sm" variant="primary" onClick={() => { open({ kind: "profile", organizationId: d.org.id }); }}><Icon name="add" /> {t("Add profile")}</Btn>}>
+          action={p ? <span className="flex gap-2"><Btn size="sm" onClick={() => { open({ kind: "profile", organizationId: p.organizationId }); }}>{t("Edit")}</Btn><Btn size="sm" variant={p.status === "active" ? "danger" : "primary"} onClick={() => { open({ kind: "status" }); }}>{t(p.status === "active" ? "Suspend offers" : "Resume offers")}</Btn><Btn size="sm" variant="danger" onClick={() => { open({ kind: "delete" }); }}>{t("Delete contractor…")}</Btn></span>
+            : <span className="flex gap-2"><Btn size="sm" variant="primary" onClick={() => { open({ kind: "profile", organizationId: d.org.id }); }}><Icon name="add" /> {t("Add profile")}</Btn><Btn size="sm" variant="danger" onClick={() => { open({ kind: "delete" }); }}>{t("Delete contractor…")}</Btn></span>}>
           {p?.status === "suspended" && <div className="mb-3"><Banner tone="crit">{p.suspendedReason ? t("Offers suspended — “{reason}”. New offers to {name} are refused; open offers and jobs continue.", { reason: p.suspendedReason, name: p.name }) : t("Offers suspended. New offers to {name} are refused; open offers and jobs continue.", { name: p.name })}</Banner></div>}
           {d.facts && <SummaryList items={d.facts} />}
           <p className="mt-3 text-[13px] font-bold">{r.current ? r.current.title : t("No rate card in effect")}</p>
@@ -78,14 +86,14 @@ function ContractorDetail({ d, open }: Readonly<{ d: Detail; open: (m: ModalStat
               <tbody>{r.current.lines.map((l) => <tr key={l.workType} className="border-t border-line"><td className="px-2 py-1.5 font-semibold">{l.label}{l.note && <span className="block text-[11px] font-normal text-muted-foreground">{l.note}</span>}</td><td className="px-2 text-right">{l.amount}</td></tr>)}</tbody>
             </table></ScrollX>
           )}
-          {r.scheduled.map((s) => <p key={s.id} className="mt-2 text-xs text-muted-foreground">{t("Next: {title} — {lines}", { title: s.title, lines: s.lines.map((l) => `${l.label} ${l.amount}`).join(" · ") })}</p>)}
+          {r.scheduled.map((s) => <p key={s.id} className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">{t("Next: {title} — {lines}", { title: s.title, lines: s.lines.map((l) => `${l.label} ${l.amount}`).join(" · ") })}<Btn size="sm" variant="danger" onClick={() => { open({ kind: "deleteRate", id: s.id, title: s.title }); }}>{t("Delete rate card…")}</Btn></p>)}
           <div className="mt-3"><Btn size="sm" onClick={() => { open({ kind: "rates" }); }}>{t("Edit rate card")}</Btn></div>
         </Card>
         <Card title={t("Technicians & certificates")}>
           {d.techs.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No technician memberships in this organization.")}</p> : (
             <ul className="divide-y divide-line">{d.techs.map((x) => <li key={x.id} className="flex items-center justify-between gap-2 py-2"><span className="min-w-0"><b className="block text-[13px]">{x.name}</b><span className="text-[11px] text-muted-foreground">{x.sub}</span></span><Badge tone={x.badge.tone}>{x.badge.label}</Badge></li>)}</ul>
           )}
-          <div className="mt-3"><Banner>{d.pending.length > 0 ? t(d.pending.length === 1 ? "1 renewal upload is waiting for verification." : "{n} renewal uploads are waiting for verification.", { n: d.pending.length }) : t("No renewal uploads are waiting for verification.")} {t("Certificates uploaded by the contractor need HQ verification before they count.")}</Banner></div>
+          <div className="mt-3"><Banner>{byCount(d.pending.length, { none: t("No renewal uploads are waiting for verification."), one: t("1 renewal upload is waiting for verification."), many: t("{n} renewal uploads are waiting for verification.", { n: d.pending.length }) })} {t("Certificates uploaded by the contractor need HQ verification before they count.")}</Banner></div>
           <div className="mt-3"><Btn size="sm" variant={d.pending.length > 0 ? "primary" : "secondary"} disabled={d.pending.length === 0} onClick={() => { open({ kind: "verify" }); }}>{t("Verify uploads ({n})", { n: d.pending.length })}</Btn></div>
           <p className="mt-2 text-[11px] text-muted-foreground">{t("KPIs: last 90 days. Customer rating comes from the Client “Confirm & rate” step after completion; SLA targets per plan are in the SLA tab.")}{i.display.timeZone !== KL && ` ${t("The days are Kuala Lumpur days.")}`}</p>
         </Card>
@@ -100,7 +108,7 @@ function ProfileModal({ live, d, organizationId, onClose, onFail }: ModalProps &
   const t = useT();
   const router = useRouter();
   const [pending, run] = useAction();
-  const existing = d?.profile && d.profile.organizationId === organizationId ? d.profile : null;
+  const existing = organizationId !== null && d?.profile?.organizationId === organizationId ? d.profile : null;
   // a company without a profile, or a new one created first (IR465); once created it stays chosen, so trying again
   // after a refused profile adds the profile only
   const [org, setOrg] = useState(organizationId ?? live.withoutProfile[0]?.id ?? NEW_COMPANY);
@@ -110,7 +118,7 @@ function ProfileModal({ live, d, organizationId, onClose, onFail }: ModalProps &
   const [tried, setTried] = useState(false);
   const errors = profileErrors(f, t);
   const choices = existing ? [{ id: existing.organizationId, name: existing.name }] : [...live.withoutProfile, ...(created ? [created] : [])];
-  const companyLength = [...company.trim()].length;
+  const companyLength = codePoints(company.trim());
   const companyError = org === NEW_COMPANY && (companyLength < 1 || companyLength > 120) ? t("A company name of 1–120 characters") : undefined;
   const save = () => {
     setTried(true);
@@ -133,7 +141,7 @@ function ProfileModal({ live, d, organizationId, onClose, onFail }: ModalProps &
     (r) => { if (isMade) router.refresh(); else onFail(r); }); // the new company exists: fix the profile and save again
   };
   return (
-    <Modal open onClose={() => { onClose(); }} title={existing ? t("Edit {name}", { name: existing.name }) : t("Add contractor")} footer={<><Btn onClick={() => { onClose(); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={save}>{t(existing ? "Save" : "Add contractor")}</Btn></>}>
+    <Modal open onClose={() => { onClose(); }} title={existing ? t("Edit {name}", { name: existing.name }) : t(ADD_CONTRACTOR)} footer={<><Btn onClick={() => { onClose(); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={save}>{t(existing ? "Save" : ADD_CONTRACTOR)}</Btn></>}>
       <Field label={t("Contractor organization")} hint={t(existing ? "A profile’s organization cannot change." : "A company without a profile, or a new company.")}><Select value={org} disabled={!!existing} onChange={(e) => { setOrg(e.target.value); }}>{choices.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}{!existing && <option value={NEW_COMPANY}>{t("New company…")}</option>}</Select></Field>
       {org === NEW_COMPANY && <Field label={t("Company name · required")} hint={t("The contractor company is created with this name, then its profile")} error={tried ? companyError : undefined}><Input value={company} maxLength={120} onChange={(e) => { setCompany(e.target.value); }} placeholder="Lim Aircon Services Sdn Bhd" /></Field>}
       <Field label={t("Registration number · required")} error={tried ? errors.registrationNo : undefined}><Input value={f.registrationNo} maxLength={64} onChange={(e) => { setF({ ...f, registrationNo: e.target.value }); }} placeholder="SSM 202301012345" /></Field>
@@ -147,9 +155,56 @@ function ProfileModal({ live, d, organizationId, onClose, onFail }: ModalProps &
   );
 }
 
-function StatusModal({ d, onClose, onFail }: ModalProps & { d: Detail }) {
+/** contractors.delete and organizations.delete (DEC-103): a reason, and what is removed with the company and what stops it. */
+function DeleteModal({ d, canForce, onClose, onFail }: ModalProps & { d: Detail; canForce: boolean }) {
   const t = useT();
-  const p = d.profile!;
+  const nav = useUrlPatch();
+  const [pending, run] = useAction();
+  const [reason, setReason] = useState("");
+  const [tried, setTried] = useState(false);
+  const [force, setForce] = useState(noForce);
+  const confirm = () => {
+    setTried(true);
+    if (!reason.trim() || !forceReady(force, d.org.name)) return;
+    const profile = d.profile ? { id: d.profile.id, version: d.profile.version } : null;
+    run(() => deleteContractor({ id: d.org.id, version: d.org.version }, profile, reason, force.on), t("Contractor deleted"), () => { onClose(t("Contractor deleted")); nav({ contractorId: null }); }, onFail);
+  };
+  return (
+    <Modal open onClose={() => { onClose(); }} title={t("Delete contractor")} footer={<><Btn onClick={() => { onClose(); }}>{t("Cancel")}</Btn><Btn variant="danger" disabled={pending || !forceReady(force, d.org.name)} onClick={confirm}>{t("Delete")}</Btn></>}>
+      <p className="text-[13px]">{t("Delete {name}? Its profile, rate cards and unavailability are removed with it. A company with jobs, offers, certificates, payouts or users cannot be deleted.", { name: d.org.name })}</p>
+      <ReasonField value={reason} tried={tried} onChange={setReason} />
+      {canForce && <ForceDeleteField name={d.org.name} what={t("also deletes its accounts, even those with history. Jobs, offers, certificates and payouts still stop it.")} force={force} onChange={setForce} />}
+    </Modal>
+  );
+}
+
+/** The required reason (1–1000) of a write that names why; the hint says what it is for. */
+function ReasonField({ value, tried, onChange, placeholder }: Readonly<{ value: string; tried: boolean; onChange: (v: string) => void; placeholder?: string }>) {
+  const t = useT();
+  return <Field label={t("Reason · required (1–1000)")} error={tried && !value.trim() ? t("A reason is required") : undefined}><Textarea value={value} maxLength={1000} onChange={(e) => { onChange(e.target.value); }} placeholder={placeholder} /></Field>;
+}
+
+/** rateCards.delete (DEC-103): a rate card that has not started, with a reason. */
+function DeleteRateModal({ id, title, onClose, onFail }: ModalProps & { id: string; title: string }) {
+  const t = useT();
+  const [pending, run] = useAction();
+  const [reason, setReason] = useState("");
+  const [tried, setTried] = useState(false);
+  const confirm = () => {
+    setTried(true);
+    if (!reason.trim()) return;
+    run(() => deleteRateCard(id, reason), t("Rate card deleted"), () => { onClose(t("Rate card deleted")); }, onFail);
+  };
+  return (
+    <Modal open onClose={() => { onClose(); }} title={t("Delete rate card")} footer={<><Btn onClick={() => { onClose(); }}>{t("Cancel")}</Btn><Btn variant="danger" disabled={pending} onClick={confirm}>{t("Delete")}</Btn></>}>
+      <p className="text-[13px]">{t("Delete {name}? A rate card that has started cannot be deleted.", { name: title })}</p>
+      <ReasonField value={reason} tried={tried} onChange={setReason} />
+    </Modal>
+  );
+}
+
+function StatusModal({ p, onClose, onFail }: ModalProps & { p: NonNullable<Detail["profile"]> }) {
+  const t = useT();
   const [pending, run] = useAction();
   const [reason, setReason] = useState("");
   const [tried, setTried] = useState(false);
@@ -162,7 +217,7 @@ function StatusModal({ d, onClose, onFail }: ModalProps & { d: Detail }) {
   };
   return (
     <Modal open onClose={() => { onClose(); }} title={t(isSuspend ? "Suspend offers to {name}" : "Resume offers to {name}", { name: p.name })} footer={<><Btn onClick={() => { onClose(); }}>{t("Cancel")}</Btn><Btn variant={isSuspend ? "danger" : "primary"} disabled={pending} onClick={confirm}>{t(isSuspend ? "Suspend offers" : "Resume offers")}</Btn></>}>
-      <Field label={t("Reason · required (1–1000)")} error={tried && !reason.trim() ? t("A reason is required") : undefined}><Textarea value={reason} maxLength={1000} onChange={(e) => { setReason(e.target.value); }} placeholder={t(isSuspend ? "Insurance certificate expired; offers paused until renewal." : "Insurance renewed.")} /></Field>
+      <ReasonField value={reason} tried={tried} onChange={setReason} placeholder={t(isSuspend ? "Insurance certificate expired; offers paused until renewal." : "Insurance renewed.")} />
       <Banner tone={isSuspend ? "warn" : undefined}>{t(isSuspend ? "New offers to this contractor are refused. Open offers, accepted jobs and their assignments are unchanged." : "HQ can offer jobs to this contractor again.")}</Banner>
     </Modal>
   );
@@ -177,7 +232,7 @@ function RatesModal({ d, now, onClose, onFail }: ModalProps & { d: Detail; now: 
   const [lines, setLines] = useState(() => {
     return WORK_TYPES.map((w) => {
       const l = base?.lines.find((x) => x.workType === w.id);
-      return { workType: w.id as WorkType, on: !!l || !base, amount: l ? l.amount.replace("− ", "") : "", note: l?.note ?? "" };
+      return { workType: w.id, on: !!l || !base, amount: l ? l.amount.replace("− ", "") : "", note: l?.note ?? "" };
     });
   });
   const [tried, setTried] = useState(false);
@@ -186,21 +241,21 @@ function RatesModal({ d, now, onClose, onFail }: ModalProps & { d: Detail; now: 
   const errors = rateCardErrors({ effectiveFrom, lines: chosen }, now, t);
   const save = () => {
     setTried(true);
-    if (Object.keys(errors).length > 0) return;
-    run(() => saveRateCard({ contractorOrgId: d.org.id, effectiveFrom: effectiveFrom!, lines: chosen.map((l) => ({ workType: l.workType, amountMinor: Math.round(Number(l.amount) * 100), note: l.note.trim() || null })), currency }),
-      t("Rate card saved"), () => { onClose(t("Rate card v{v} saved — effective from {date}.", { v: d.rates.nextVersion, date: businessDay(effectiveFrom!, i.display.locale) })); }, onFail);
+    if (!effectiveFrom || Object.keys(errors).length > 0) return;
+    run(() => saveRateCard({ contractorOrgId: d.org.id, lines: chosen.map((l) => ({ workType: l.workType, amountMinor: Math.round(Number(l.amount) * 100), note: l.note.trim() || null })), effectiveFrom, currency }),
+      t("Rate card saved"), () => { onClose(t("Rate card v{v} saved — effective from {date}.", { v: d.rates.nextVersion, date: businessDay(effectiveFrom, i.display.locale) })); }, onFail);
   };
   return (
     <Modal open wide onClose={() => { onClose(); }} title={t("New rate card for {name} · v{v}", { name: d.org.name, v: d.rates.nextVersion })} footer={<><Btn onClick={() => { onClose(); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={save}>{t("Save rate card")}</Btn></>}>
       <p className="text-xs text-muted-foreground">{base ? `${t("Starts from {card}.", { card: base.since })} ` : ""}{t("A rate card never changes once saved — each edit is a new version from a future date.")}</p>
       <div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>
         <Field label={t("Effective from · required")} hint={t("A Kuala Lumpur day, from 00:00")} error={tried ? errors.effectiveFrom : undefined}><Input type="date" value={from} onChange={(e) => { setFrom(e.target.value); }} /></Field>
-        <Field label={t("Currency")}><Select value={currency} onChange={(e) => { setCurrency(e.target.value as "MYR" | "USD"); }}><option value="MYR">MYR</option><option value="USD">USD</option></Select></Field>
+        <Field label={t("Currency")}><Select value={currency} onChange={(e) => { setCurrency(oneOf(["MYR", "USD"] as const, e.target.value, currency)); }}><option value="MYR">MYR</option><option value="USD">USD</option></Select></Field>
       </div>
       <div className="flex flex-col gap-2">
         {lines.map((l, n) => (
           <div key={l.workType} className="flex flex-wrap items-end gap-2">
-            <label className="mb-2 flex w-60 items-center gap-2 text-[13px] font-semibold"><Checkbox checked={l.on} onCheckedChange={(v) => { setLines(lines.map((x, k) => (k === n ? { ...x, on: v } : x))); }} />{t(WORK_TYPES[n].label)}</label>
+            <label className="mb-2 flex w-60 items-center gap-2 text-[13px] font-semibold"><Checkbox checked={l.on} onCheckedChange={(v) => { setLines(lines.map((x, k) => (k === n ? { ...x, on: v } : x))); }} />{t(WORK_TYPES[n]?.label ?? "")}</label>
             <Field label={t("Amount {n}", { n: n + 1 })}><Input inputMode="decimal" disabled={!l.on} value={l.amount} onChange={(e) => { setLines(lines.map((x, k) => (k === n ? { ...x, amount: e.target.value } : x))); }} placeholder="0.00" /></Field>
             <Field label={t("Note {n}", { n: n + 1 })}><Input disabled={!l.on} value={l.note} maxLength={200} onChange={(e) => { setLines(lines.map((x, k) => (k === n ? { ...x, note: e.target.value } : x))); }} /></Field>
           </div>

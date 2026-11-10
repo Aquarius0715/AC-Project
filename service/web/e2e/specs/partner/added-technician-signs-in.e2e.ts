@@ -6,7 +6,9 @@
 // Skipped on a stack without Mailpit.
 import { test, expect, FAILED_PAGE } from "../../fixtures/test";
 import { APPS } from "../../fixtures/apps";
+import { startSignIn } from "../../fixtures/auth";
 import { mailpitUp, setupLink } from "../../fixtures/mailpit";
+import { must } from "../../fixtures/must";
 
 test("a technician the contractor adds sets a password from the e-mail and signs in as themselves", async ({ page, app, browser }) => {
   test.skip(app.id !== "partner", "partner only");
@@ -35,10 +37,9 @@ test("a technician the contractor adds sets a password from the e-mail and signs
   await me.locator("#password-confirm").fill(password);
   await me.locator("#password-new").press("Enter");
   await expect(me.getByText(/Your account has been updated/)).toBeVisible();
-  const tech = APPS.find((a) => a.id === "technician")!;
+  const tech = must(APPS.find((a) => a.id === "technician"));
   await me.goto(`${tech.url}/login`);
-  await me.getByRole("link", { name: /^Continue as / }).click();
-  await me.locator("#username").fill(email);
+  await startSignIn(me, email);
   await me.locator("#password").fill(password);
   await me.locator("#kc-login").click();
   await me.waitForURL((u) => u.origin === new URL(tech.url).origin && (u.pathname === tech.home || u.pathname.startsWith(tech.home + "/")));
@@ -63,7 +64,7 @@ test("a technician the contractor adds sets a password from the e-mail and signs
   const refused = me.getByText(/disabled/i).first();
   await expect(async () => {
     await me.goto(`${tech.url}/login`);
-    await me.getByRole("link", { name: /^Continue as / }).click();
+    await startSignIn(me, email);
     const form = me.locator("#password");
     await expect(form.or(refused).first()).toBeVisible({ timeout: 10_000 });
     if (await form.isVisible()) {

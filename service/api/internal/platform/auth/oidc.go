@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -36,7 +37,9 @@ const (
 // (one of the app clients), expiry, the token type and the signature against the JWKS (container design §4:
 // OIDC_ISSUER, OIDC_JWKS_URL, OIDC_APP_CLIENT_ID, OIDC_ADMIN_CLIENT_ID).
 type OIDCVerifier struct {
-	Issuer      string
+	// Issuers are the issuers a token may name. One for a provider with one address; several when it answers on more
+	// than one (IR651): the tokens of a sign-in carry the address the sign-in started on.
+	Issuers     []string
 	Audiences   []string
 	AdminClient string // HQ's app client (OIDC_ADMIN_CLIENT_ID): its tokens alone carry HQ's memberships (IR510)
 	Keyfunc     jwt.Keyfunc
@@ -44,15 +47,15 @@ type OIDCVerifier struct {
 
 // NewVerifierFromEnv builds the OIDC verifier from the environment.
 func NewVerifierFromEnv(ctx context.Context) (*OIDCVerifier, error) {
-	iss := os.Getenv("OIDC_ISSUER")
+	issuers := issuerList(os.Getenv("OIDC_ISSUER"))
 	jwks := os.Getenv("OIDC_JWKS_URL")
 
-	if iss == "" {
+	if len(issuers) == 0 {
 		return nil, errNoIssuer
 	}
 
 	if jwks == "" {
-		jwks = strings.TrimRight(iss, "/") + "/protocol/openid-connect/certs"
+		jwks = strings.TrimRight(issuers[0], "/") + "/protocol/openid-connect/certs"
 	}
 	// keys of a token with an unknown key ID are fetched again at most every 10 s (the library default is 5 min):
 	// a service that started before the identity provider, or one whose provider was recreated with new keys,
@@ -66,6 +69,8 @@ func NewVerifierFromEnv(ctx context.Context) (*OIDCVerifier, error) {
 		NoErrorReturnFirstHTTPReq: nil,
 		RefreshErrorHandlerFunc:   nil,
 		ValidationSkipAll:         false,
+		Given:                     nil,
+		PrioritizeHTTP:            false,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("jwks: %w", err)
@@ -74,11 +79,24 @@ func NewVerifierFromEnv(ctx context.Context) (*OIDCVerifier, error) {
 	admin := os.Getenv("OIDC_ADMIN_CLIENT_ID")
 
 	return &OIDCVerifier{
-		Issuer:      iss,
+		Issuers:     issuers,
 		Audiences:   []string{os.Getenv("OIDC_APP_CLIENT_ID"), admin},
 		AdminClient: admin,
 		Keyfunc:     keys.Keyfunc,
 	}, nil
+}
+
+// issuerList splits OIDC_ISSUER into its issuers: comma separated, without blanks or empty entries.
+func issuerList(value string) []string {
+	var issuers []string
+
+	for part := range strings.SplitSeq(value, ",") {
+		if trimmed := strings.TrimSpace(part); trimmed != "" {
+			issuers = append(issuers, trimmed)
+		}
+	}
+
+	return issuers
 }
 
 // Verify implements Verifier and returns the `sub` claim with the `auth_time` claim, which Cognito and Keycloak put
@@ -87,9 +105,6 @@ func (v *OIDCVerifier) Verify(_ context.Context, token string) (Identity, error)
 	parsed, err := jwt.Parse(
 		token,
 		v.Keyfunc,
-		jwt.WithIssuer(
-			v.Issuer,
-		),
 		jwt.WithExpirationRequired(),
 		jwt.WithValidMethods([]string{"RS256"}),
 	)
@@ -100,6 +115,11 @@ func (v *OIDCVerifier) Verify(_ context.Context, token string) (Identity, error)
 	claims, isMap := parsed.Claims.(jwt.MapClaims)
 	if !isMap {
 		return Identity{}, errClaimsFormat
+	}
+
+	iss, issErr := claims.GetIssuer()
+	if issErr != nil || !slices.Contains(v.Issuers, iss) {
+		return Identity{}, apperr.Wrap(jwt.ErrTokenInvalidIssuer, "jwt.Parse")
 	}
 
 	if !audienceOK(claims, v.Audiences) {
@@ -125,6 +145,7 @@ func (v *OIDCVerifier) Verify(_ context.Context, token string) (Identity, error)
 		SignedIn: authTime(claims),
 		Client:   client,
 		AdminApp: client != "" && client == v.AdminClient,
+		Issuer:   iss,
 	}, nil
 }
 

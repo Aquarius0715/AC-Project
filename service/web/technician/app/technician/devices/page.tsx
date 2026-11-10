@@ -8,11 +8,12 @@ import { apiMode } from "@ac/web/lib/dal";
 import { DevicesView } from "@ac/web/components/TechDevices";
 import { loadDevices } from "./_lib/load";
 import { TechDevicesView } from "./_components/devices-view";
+import { queryReader } from "@ac/web/lib/searchParams";
 
 export default async function TechnicianDevicesPage({ searchParams }: Readonly<PageProps<"/technician/devices">>) {
   await connection();
   if (!apiMode()) return <DevicesView />;
   const sp = await searchParams;
-  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k] as string) : undefined);
+  const one = queryReader(sp);
   return <TechDevicesView live={await loadDevices({ selected: one("deviceId"), unitId: one("unitId"), jobId: one("jobId"), events: false })} />;
 }

@@ -4,9 +4,15 @@
 // days written in the user's language; inquiries are instants in the display time zone.
 import type { Currency } from "@ac/web/lib/contracts.gen";
 import { EN, intlTag, showDate, showTime, translator, zonedInstant, zonedParts, type I18n, type Locale, type T } from "@ac/web/lib/i18n";
+import { money } from "@ac/web/lib/money";
+import { isAfter } from "@ac/web/lib/order";
+import { withoutYear } from "@ac/web/lib/text";
+import { entryOf, lookup } from "@ac/web/lib/lookup";
+
+const PROCESSING = "processing";
 
 const en = translator("en");
-export interface Range { from: string; to: string }
+interface Range { from: string; to: string }
 export interface ApiInvoice { id: string; version: number; number: string; amountMinor: number; currency: Currency; contractId: string; contractVersion: number; period: Range; dueAt: string; status: "unpaid" | "processing" | "paid"; paymentMethod: string | null; paymentStatus: string | null; paidAt: string | null }
 export interface ApiPayment { id: string; version: number; amountMinor: number; currency: Currency; invoiceId: string; method: string | null; status: "initiated" | "processing" | "confirmed" | "failed"; paymentReference: string | null; confirmedAt: string | null; confirmationReason: string | null }
 export type ApiInvoiceDetail = ApiInvoice & { paymentRefs: ApiPayment[]; restrictionIds: string[] };
@@ -28,7 +34,7 @@ export interface ContractOption { id: string; version: number; label: string; pr
 export const KL = "Asia/Kuala_Lumpur";
 /** A contract or invoice date — a Kuala Lumpur business day — in the user's language: “10 Sept 2026”. */
 export const businessDay = (iso: string, locale: Locale = "en") => showDate(iso, { locale, timeZone: KL });
-const plain = (s: string) => s.replaceAll(/[\u00A0\u2009\u202F]/g, " ");
+const plain = (s: string) => s.replaceAll(/[\u{A0}\u{2009}\u{202F}]/gu, " ");
 /** The billing month of an invoice period in the user's language: “September 2026”. */
 export const billingMonth = (iso: string, locale: Locale = "en") => plain(new Date(iso).toLocaleDateString(intlTag(locale), { timeZone: KL, month: "long", year: "numeric" }));
 /** A YYYY-MM payout period in the user's language: “Sept 2026”. */
@@ -37,7 +43,7 @@ const periodName = (p: string, locale: Locale) =>
 
 const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
 const nextMonth = (ym: string) => {
-  const [y, m] = ym.split("-").map(Number);
+  const [y = 0, m = 1] = ym.split("-").map(Number);
   return m === 12 ? `${String(y + 1)}-01` : `${String(y)}-${String(m + 1).padStart(2, "0")}`;
 };
 /** The billing months of the URL (`from` / `to`, YYYY-MM, Kuala Lumpur months, IR299, IR321) as invoices.list filters
@@ -45,7 +51,7 @@ on the period start: [the first day of `from`, the first day of the month after 
 and a reversed range drops both. */
 export function billingMonths(fromM?: string, toM?: string): { from?: string; to?: string; filters: { from?: string; to?: string } } {
   const from = fromM && MONTH.test(fromM) ? fromM : undefined, to = toM && MONTH.test(toM) ? toM : undefined;
-  if (from && to && from > to) return { filters: {} };
+  if (from && to && isAfter(from, to)) return { filters: {} };
   return {
     ...(from && { from }), ...(to && { to }),
     filters: { ...(from && { from: zonedInstant(`${from}-01`, "00:00", KL) }), ...(to && { to: zonedInstant(`${nextMonth(to)}-01`, "00:00", KL) }) },
@@ -54,22 +60,30 @@ export function billingMonths(fromM?: string, toM?: string): { from?: string; to
 /** The billing months in the user's language: “Aug – Sept 2026”, “from Aug 2026”, “until Sept 2026”; null without any. */
 export function monthsText(from: string | undefined, to: string | undefined, i: I18n = EN): string | null {
   const name = (m: string) => periodName(m, i.display.locale);
-  if (from && to) return from === to ? name(from) : i.t("{from} – {to}", { from: from.slice(0, 4) === to.slice(0, 4) ? name(from).replace(/\s*\d{4}$/, "") : name(from), to: name(to) });
+  if (from && to) return from === to ? name(from) : i.t("{from} – {to}", { from: from.slice(0, 4) === to.slice(0, 4) ? withoutYear(name(from)) : name(from), to: name(to) });
   if (from) return i.t("from {month}", { month: name(from) });
   if (to) return i.t("until {month}", { month: name(to) });
   return null;
 }
 export { money } from "@ac/web/lib/money";
-import { money } from "@ac/web/lib/money";
-const methodName = (m: string | null, t: T) => (m === "demo_credit_card" ? t("Credit card") : (m === "demo_debit_card" ? t("Debit card") : m));
+
+/** An amount with its sign: + for an addition, a minus sign for a deduction. */
+const signedMoney = (minor: number, currency: string) => `${minor > 0 ? "+" : "−"}${money(Math.abs(minor), currency)}`;
+const methodName = (m: string | null, t: T) => {
+  if (m === "demo_credit_card") return t("Credit card");
+  if (m === "demo_debit_card") return t("Debit card");
+  return m;
+};
 /** A payment's status as the screen words it; another code stays as it is. */
-export const paymentWord = (s: string, t: T = en) =>
-  ({ initiated: t("initiated"), processing: t("processing"), confirmed: t("confirmed"), failed: t("failed") })[s] ?? s;
+export const paymentWord = (s: string, t: T = en) => {
+  const words = new Map(Object.entries({ initiated: t("initiated"), processing: t(PROCESSING), confirmed: t("confirmed"), failed: t("failed") }));
+  return words.get(s) ?? s; // a value the API adds before this table does
+};
 
 /** Invoice state for HQ: unpaid past its due date is overdue (IR04). */
 export function invoiceStatus(i: Pick<ApiInvoice, "status" | "dueAt">, now: Date): InvoiceStatus {
   if (i.status === "paid") return "Paid";
-  if (i.status === "processing") return "Processing";
+  if (i.status === PROCESSING) return "Processing";
   return Date.parse(i.dueAt) < now.getTime() ? "Overdue" : "Unpaid";
 }
 
@@ -111,7 +125,7 @@ export function totals(rows: InvoiceRow[], statuses: InvoiceStatus[]): string {
 }
 
 export function invoiceDetail(d: ApiInvoiceDetail, t: T = en): InvoiceDetail {
-  const processing = d.paymentRefs.find((p) => p.status === "processing");
+  const processing = d.paymentRefs.find((p) => p.status === PROCESSING);
   return {
     id: d.id, version: d.version, processingPaymentId: processing?.id ?? null, processingPaymentVersion: processing?.version ?? null,
     payments: d.paymentRefs.map((p) => {
@@ -122,7 +136,7 @@ export function invoiceDetail(d: ApiInvoiceDetail, t: T = en): InvoiceDetail {
     }),
     restrictionIds: d.restrictionIds,
     // payments.recordManual: refused while a payment is started, processing or confirmed; a failed one does not stop it (IR447)
-    manualAllowed: d.paymentRefs.every((p) => !(p.status === "initiated" || p.status === "processing" || p.status === "confirmed")),
+    manualAllowed: d.paymentRefs.every((p) => !(p.status === "initiated" || p.status === PROCESSING || p.status === "confirmed")),
   };
 }
 
@@ -130,7 +144,7 @@ export function invoiceDetail(d: ApiInvoiceDetail, t: T = en): InvoiceDetail {
 export function inquiryRows(inquiries: ApiInquiry[], customers: ApiCustomer[], i: I18n = EN): InquiryRow[] {
   const { t } = i;
   const customer = new Map(customers.map((c) => [c.id, c.name]));
-  return [...inquiries].sort((a, b) => (a.state === b.state ? b.createdAt.localeCompare(a.createdAt) : (a.state === "received" ? -1 : 1))).map((q) => {
+  return [...inquiries].toSorted((a, b) => Number(b.state === "received") - Number(a.state === "received") || b.createdAt.localeCompare(a.createdAt)).map((q) => {
     return {
       id: q.id, version: q.version, cust: customer.get(q.customerId) ?? t("customer"), kind: t(q.subjectType === "payment" ? "Payment" : "Cooling restriction"), at: showTime(q.createdAt, i.display),
       text: `“${q.message}”`, state: q.state, reply: q.reply, invoiceId: q.invoiceId, restrictionId: q.restrictionId,
@@ -157,7 +171,10 @@ export interface StatementRow {
   statusText: string; queryCount: number; openQueries: number;
 }
 /** A statement's status, a line's kind, a question's topic and state as the screen words them. */
-export const statementWord = (s: StatementRow["status"], t: T = en) => ({ Draft: t("Draft"), Approved: t("Approved"), Paid: t("Paid") })[s] ?? s;
+export const statementWord = (s: StatementRow["status"], t: T = en) => {
+  const words: Partial<Record<StatementRow["status"], string>> = { Draft: t("Draft"), Approved: t("Approved"), Paid: t("Paid") };
+  return lookup(words, s) ?? s; // a value the API adds before this table does
+};
 export type StatementDetail = StatementRow & {
   gross: string; deductions: string; payDate: string; payable: boolean; approvedBy: string | null; paidAt: string | null;
   lines: { id: string; job: string; work: string; kind: string; amount: string; note: string }[];
@@ -168,18 +185,23 @@ const statusLabel = { draft: "Draft", approved: "Approved", paid: "Paid" } as co
 export function statementRows(statements: ApiStatement[], orgs: ApiOrganization[], i: I18n = EN): StatementRow[] {
   const org = new Map(orgs.map((o) => [o.id, o.name]));
   const day = (iso: string) => businessDay(iso, i.display.locale);
-  return [...statements].sort((a, b) => b.period.localeCompare(a.period) || a.contractorOrgId.localeCompare(b.contractorOrgId)).map((s) => {
+  const statusText = (s: ApiStatement) => {
+    if (s.status === "approved") return i.t("Approved · pays {date}", { date: day(s.payDate) });
+    if (s.status !== "paid") return i.t("Draft");
+    return s.paidAt ? i.t("Paid {date}", { date: day(s.paidAt) }) : i.t("Paid");
+  };
+  return [...statements].toSorted((a, b) => b.period.localeCompare(a.period) || a.contractorOrgId.localeCompare(b.contractorOrgId)).map((s) => {
     return {
-      id: s.id, version: s.version, contractor: org.get(s.contractorOrgId) ?? i.t("contractor"), period: periodName(s.period, i.display.locale), status: statusLabel[s.status],
+      id: s.id, version: s.version, contractor: org.get(s.contractorOrgId) ?? i.t("contractor"), period: periodName(s.period, i.display.locale), status: entryOf(statusLabel, s.status),
       jobs: new Set(s.lines.map((l) => l.jobId)).size, net: money(s.netMinor, s.currency),
-      statusText: s.status === "approved" ? i.t("Approved · pays {date}", { date: day(s.payDate) }) : s.status === "paid" ? (s.paidAt ? i.t("Paid {date}", { date: day(s.paidAt) }) : i.t("Paid")) : i.t("Draft"),
+      statusText: statusText(s),
       queryCount: s.queries.length, openQueries: s.queries.filter((q) => q.state === "open").length,
     };
   });
 }
 /** The last month that has ended in Kuala Lumpur (YYYY-MM): payout drafts are generated for ended months only. */
 export function lastClosedMonth(now: Date): string {
-  const [y, m] = zonedParts(now.toISOString(), KL).date.slice(0, 7).split("-").map(Number);
+  const [y = 0, m = 1] = zonedParts(now.toISOString(), KL).date.slice(0, 7).split("-").map(Number);
   return m === 1 ? `${String(y - 1)}-12` : `${String(y)}-${String(m - 1).padStart(2, "0")}`;
 }
 
@@ -188,6 +210,7 @@ date is a Kuala Lumpur business day. `names` are the members' names, for who app
 export function statementDetail(s: ApiStatement, orgs: ApiOrganization[], now: Date, i: I18n = EN, names = new Map<string, string>()): StatementDetail {
   const { t } = i;
   const [row] = statementRows([s], orgs, i);
+  if (!row) throw new Error("a statement has its row");
   const line = new Map(s.lines.map((l) => [l.id, l]));
   const work: Record<string, string> = { periodic_inspection: t("Periodic inspection"), repair_base: t("Repair"), emergency: t("Emergency call-out"), rework_deduction: t("Rework deduction") };
   const kind: Record<string, string> = { charge: t("charge"), deduction: t("deduction"), adjustment: t("adjustment") };
@@ -196,11 +219,11 @@ export function statementDetail(s: ApiStatement, orgs: ApiOrganization[], now: D
   return {
     ...row, gross: money(s.grossMinor, s.currency), deductions: money(s.deductionsMinor, s.currency), payDate: businessDay(s.payDate, i.display.locale), payable: Date.parse(s.payDate) <= now.getTime(),
     approvedBy: s.approvedByMembershipId ? names.get(s.approvedByMembershipId) ?? s.approvedByMembershipId.slice(0, 8) : null, paidAt: s.paidAt ? businessDay(s.paidAt, i.display.locale) : null,
-    lines: s.lines.map((l) => ({ id: l.id, job: l.jobId, work: work[l.workType] ?? l.workType, kind: kind[l.kind] ?? l.kind, amount: l.kind === "deduction" ? `−${money(l.amountMinor, s.currency)}` : money(l.amountMinor, s.currency), note: l.note ?? "" })), // a minus sign, as on the adjustments
+    lines: s.lines.map((l) => ({ id: l.id, job: l.jobId, work: lookup(work, l.workType) ?? l.workType, kind: lookup(kind, l.kind) ?? l.kind, amount: l.kind === "deduction" ? `−${money(l.amountMinor, s.currency)}` : money(l.amountMinor, s.currency), note: l.note ?? "" })), // a minus sign, as on the adjustments
     queries: s.queries.map((q) => {
       return {
-        id: q.id, line: line.get(q.lineId)?.jobId ?? q.lineId, topic: topic[q.topic] ?? q.topic, message: q.message, state: state[q.state] ?? q.state, open: q.state === "open", reply: q.reply,
-        adjustment: q.adjustmentMinor === null ? null : `${q.adjustmentMinor > 0 ? "+" : "−"}${money(Math.abs(q.adjustmentMinor), s.currency)}`,
+        id: q.id, line: line.get(q.lineId)?.jobId ?? q.lineId, topic: lookup(topic, q.topic) ?? q.topic, message: q.message, state: lookup(state, q.state) ?? q.state, open: q.state === "open", reply: q.reply,
+        adjustment: q.adjustmentMinor === null ? null : signedMoney(q.adjustmentMinor, s.currency),
       };
     }),
   };

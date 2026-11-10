@@ -292,7 +292,8 @@
         "mrv.factors",
         "offset.read",
         "offset.write",
-        "audit.read"
+        "audit.read",
+        "data.forceDelete"
       ],
       "tenantId": "tenant-a",
       "validFrom": "2026-09-01T00:00:00.000Z",
@@ -1682,10 +1683,12 @@
         "decidedBy": "user-contractor-a",
         "decidedAt": "2026-09-13T01:00:00.000Z",
         "declineReason": null,
-        "visitSlot": {
-          "startAt": "2026-09-14T00:00:00.000Z",
-          "endAt": "2026-09-20T00:00:00.000Z"
-        }
+        "candidateSlots": [
+          {
+            "startAt": "2026-09-14T00:00:00.000Z",
+            "endAt": "2026-09-20T00:00:00.000Z"
+          }
+        ]
       }
     ],
     "assignments": [
@@ -3853,39 +3856,6 @@
           "inputRef": "finalEvaluation"
         }
       ]
-    },
-    "AT-X02-B": {
-      "clock": "2026-09-14T01:00:00.000Z",
-      "simulator": false,
-      "patches": [
-        {
-          "entity": "spaces",
-          "id": "room-1b",
-          "set": {
-            "propertyId": "property-home-a",
-            "parentSpaceId": "floor-1",
-            "kind": "room",
-            "name": "Bedroom",
-            "archived": false
-          }
-        },
-        {
-          "entity": "units",
-          "id": "unit-non-rto",
-          "set": {
-            "spaceId": "room-1b",
-            "displayName": "Bedroom AC"
-          }
-        }
-      ],
-      "expected": {
-        "actor": "customer-a",
-        "candidates": [
-          "unit-non-rto",
-          "unit-online-rto"
-        ],
-        "samePathLabel": true
-      }
     },
     "AT-X06-B.1": {
       "clock": "2026-09-14T01:00:00.000Z",

@@ -4,16 +4,20 @@
 // the server loader and the client view; Vitest covers it. Texts in the display language (`i` / `t`, IR291): a breach
 // is phrased from its kind and its response minutes, and the targets' start times are instants in the display time
 // zone, as typed (NFR-08).
-import { EN, showDate, showTime, translator, zonedParts, type I18n, type T } from "@ac/web/lib/i18n";
+import { isNone } from "@ac/web/lib/isNone";
+import { EN, showDate, showTime, translator, zonedParts, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import { actionMessage } from "@ac/web/lib/actionMessage";
 import { planLabel } from "@ac/web/lib/contracts";
 import { csvQuoted } from "@ac/web/lib/csv";
+import { keysOf } from "@ac/web/lib/keysOf";
 import type { IconName } from "@ac/web/components/Icon";
+
+const FIRST_TIME_FIX = "First-time fix";
 
 const en = translator("en");
 
 type PlanType = "rto" | "general" | "energy" | "environment";
-export interface ApiSlaMetrics { responseWithinTarget: number | null; arrivalInWindow: number | null; firstTimeFix: number | null; averageRating: number | null; ratingCount: number; openOverdue: number }
+interface ApiSlaMetrics { responseWithinTarget: number | null; arrivalInWindow: number | null; firstTimeFix: number | null; averageRating: number | null; ratingCount: number; openOverdue: number }
 export interface ApiTargetView { planType: PlanType; responseHours: number; arrivalInWindowPercent: number; firstTimeFixPercent: number; version: number; effectiveFrom: string | null; state: "in_effect" | "default" | "scheduled" }
 export interface ApiBreach { jobId: string; customerId: string; kind: "response" | "arrival" | "first_time_fix" | "overdue"; detail: string; tookMinutes?: number | null; limitMinutes?: number | null }
 export interface ApiScorecard {
@@ -34,25 +38,28 @@ const pct = (v: number | null) => (v === null ? "—" : `${String(Math.round(v))
 const plans = (targets: ApiTargetView[], used: PlanType[]) => targets.filter((x) => x.state !== "scheduled" && used.includes(x.planType));
 /** “target 95 %” for one plan type, “targets 85–95 % by plan” when the customers' plans differ. */
 function targetText(values: number[], t: T): string {
-  const u = [...new Set(values)].sort((a, b) => a - b);
-  return u.length === 0 ? t("no target") : (u.length === 1 ? t("target {n} %", { n: u[0] }) : t("targets {from}–{to} % by plan", { from: u[0], to: u[u.length - 1] }));
+  const u = [...new Set(values)].toSorted((a, b) => a - b);
+  if (u.length === 0) return t("no target");
+  return u.length === 1 ? t("target {n} %", { n: u[0] ?? 0 }) : t("targets {from}–{to} % by plan", { from: u[0] ?? 0, to: u.at(-1) ?? 0 });
 }
+/** How far below its target a value is: more than 10 points is critical. */
+const severity = (gap: number) => (gap > 10 ? "crit" : "warn");
 /** The plan type's name in the user's language. */
-const planName = (plan: string, t: T) => (planLabel[plan as PlanType] ? t(planLabel[plan as PlanType]) : plan);
+const planName = (plan: string, t: T) => (textOf(planLabel, plan, t) ?? plan);
 
 /** The KPI tiles (Figma 06-10) with the targets of the plan types of the customers in the scorecard; no data is “—”. */
 export function slaTiles(sc: ApiScorecard, t: T = en): { label: string; value: string; icon?: IconName; sub: string; tone?: "warn" | "crit" }[] {
   const used = [...new Set(sc.customers.map((c) => c.planType))];
   const ts = plans(sc.targets, used.length > 0 ? used : ["general"]);
-  const hours = [...new Set(ts.map((x) => x.responseHours))].sort((a, b) => a - b);
+  const hours = [...new Set(ts.map((x) => x.responseHours))].toSorted((a, b) => a - b);
   const m = sc.totals;
-  const below = (v: number | null, target: number) => (v !== null && v < target ? (target - v > 10 ? "crit" : "warn") : undefined);
+  const below = (v: number | null, target: number) => (v !== null && v < target ? severity(target - v) : undefined);
   const arrival = Math.min(...ts.map((x) => x.arrivalInWindowPercent));
   const ftf = Math.min(...ts.map((x) => x.firstTimeFixPercent));
   return [
-    { label: hours.length === 1 ? t("Response ≤ {n} h", { n: hours[0] }) : t("Response within target"), value: pct(m.responseWithinTarget), sub: hours.length === 1 ? t("target 100 % of jobs") : t("≤ {hours} h by plan · target 100 %", { hours: hours.join(" / ") }), tone: below(m.responseWithinTarget, 100) },
+    { label: hours.length === 1 ? t("Response ≤ {n} h", { n: hours[0] ?? 0 }) : t("Response within target"), value: pct(m.responseWithinTarget), sub: hours.length === 1 ? t("target 100 % of jobs") : t("≤ {hours} h by plan · target 100 %", { hours: hours.join(" / ") }), tone: below(m.responseWithinTarget, 100) },
     { label: t("Arrival in window"), value: pct(m.arrivalInWindow), sub: targetText(ts.map((x) => x.arrivalInWindowPercent), t), tone: below(m.arrivalInWindow, arrival) },
-    { label: t("First-time fix"), value: pct(m.firstTimeFix), sub: targetText(ts.map((x) => x.firstTimeFixPercent), t), tone: below(m.firstTimeFix, ftf) },
+    { label: t(FIRST_TIME_FIX), value: pct(m.firstTimeFix), sub: targetText(ts.map((x) => x.firstTimeFixPercent), t), tone: below(m.firstTimeFix, ftf) },
     { label: t("Avg. customer rating"), value: m.averageRating === null ? "—" : m.averageRating.toFixed(1), icon: m.averageRating === null ? undefined : "star", sub: t(m.ratingCount === 1 ? "1 rating" : "{n} ratings", { n: m.ratingCount }) },
     { label: t("Open & overdue"), value: String(m.openOverdue), sub: t(sc.breaches.length === 1 ? "1 breach in the period" : "{n} breaches in the period", { n: sc.breaches.length }), tone: m.openOverdue > 0 ? "crit" : undefined },
   ];
@@ -81,22 +88,24 @@ export function slaRows(sc: ApiScorecard, customers: { id: string; name: string;
 const duration = (min: number, t: T) => (min % 60 === 0 ? t("{n} h", { n: Math.floor(min / 60) }) : t("{h} h {m} min", { h: Math.floor(min / 60), m: min % 60 }));
 /** A breach in words from its kind and response minutes (IR291); the API's English detail when it has neither. */
 export function breachText(b: ApiBreach, t: T = en): string {
-  if (b.kind === "response" && b.limitMinutes != null) {
-    return b.tookMinutes == null ? t("no response within {limit}", { limit: duration(b.limitMinutes, t) }) : t("response {took} vs {limit}", { took: duration(b.tookMinutes, t), limit: duration(b.limitMinutes, t) });
+  if (b.kind === "response" && !isNone(b.limitMinutes)) {
+    return isNone(b.tookMinutes) ? t("no response within {limit}", { limit: duration(b.limitMinutes, t) }) : t("response {took} vs {limit}", { took: duration(b.tookMinutes, t), limit: duration(b.limitMinutes, t) });
   }
   const fixed: Record<string, string> = { arrival: "arrival outside the scheduled window", first_time_fix: "not fixed the first time", overdue: "open past its due time" };
-  return fixed[b.kind] ? t(fixed[b.kind]) : b.detail;
+  return textOf(fixed, b.kind, t) ?? b.detail;
 }
-const KIND: Record<string, string> = { response: "Response", arrival: "Arrival", first_time_fix: "First-time fix", overdue: "Overdue" };
+const KIND: Record<string, string> = { response: "Response", arrival: "Arrival", first_time_fix: FIRST_TIME_FIX, overdue: "Overdue" };
+const breachTone = (kind: string): Tone => (kind === "overdue" ? "crit" : "warn");
 /** The recent breaches (newest first, at most 50) with the customer and Open job →. */
 export const breachRows = (sc: ApiScorecard, names: Map<string, string>, t: T = en) =>
-  sc.breaches.map((b, i) => ({ key: `${b.jobId}:${b.kind}:${String(i)}`, jobId: b.jobId, short: b.jobId.slice(0, 8), text: `${names.get(b.customerId) ?? t("customer")} · ${breachText(b, t)}`, kind: KIND[b.kind] ? t(KIND[b.kind]) : b.kind, tone: (b.kind === "overdue" ? "crit" : "warn") as Tone }));
+  sc.breaches.map((b, i) => ({ key: `${b.jobId}:${b.kind}:${String(i)}`, jobId: b.jobId, short: b.jobId.slice(0, 8), text: `${names.get(b.customerId) ?? t("customer")} · ${breachText(b, t)}`, kind: textOf(KIND, b.kind, t) ?? b.kind, tone: breachTone(b.kind) }));
 
 /** The targets per plan type for the edit dialog: the one in effect (or the default) and a scheduled one, if any. */
 export function targetsByPlan(targets: ApiTargetView[], i: I18n = EN) {
   const { t, display } = i;
-  return (Object.keys(planLabel) as PlanType[]).map((plan) => {
-    const now = targets.find((x) => x.planType === plan && x.state !== "scheduled")!;
+  // a plan type without a target in force is not shown
+  const current = keysOf(planLabel).map((plan) => ({ plan, now: targets.find((x) => x.planType === plan && x.state !== "scheduled") }));
+  return current.filter((x): x is { plan: PlanType; now: ApiTargetView } => x.now !== undefined).map(({ plan, now }) => {
     const next = targets.filter((x) => x.planType === plan && x.state === "scheduled");
     const since = now.state === "default" ? t("default") : t("v{v} since {date}", { v: now.version, date: showDate(now.effectiveFrom, display) });
     return {
@@ -116,7 +125,7 @@ export function targetErrors(f: { responseHours: string; arrival: string; ftf: s
   if (!/^\d+$/.test(f.responseHours.trim()) || h < 1 || h > 168) e.responseHours = t("1–168 whole hours.");
   for (const [k, v] of [["arrival", f.arrival], ["ftf", f.ftf]] as const) {
     const n = Number(v);
-    if (!/^\d+(\.\d)?$/.test(v.trim()) || n < 0 || n > 100) e[k] = t("0–100 %.");
+    if (!/^\d+(\.\d)?$/.test(v.trim()) || n < 0 || n > 100) Object.assign(e, { [k]: t("0–100 %.") });
   }
   if (!f.effectiveFrom || Date.parse(f.effectiveFrom) < now - 60_000) e.effectiveFrom = t("Now or later.");
   return e;
@@ -127,16 +136,17 @@ period's ends are dates in the display time zone. */
 export function slaCsv(rows: SlaRow[], period: { from: string; to: string }, i: I18n = EN): string {
   const { t, display } = i;
   const day = (iso: string) => zonedParts(iso, display.timeZone).date;
-  const head = ["Customer", "Plan", "Jobs", "Response", "Arrival", "First-time fix", "Rating", "Overdue", "Status", "Period from", "Period to"].map((h) => t(h));
-  return [head, ...rows.map((r) => [r.name, r.plan, r.jobs, r.response, r.arrival, r.ftf, r.rating, r.overdue, r.status.label, day(period.from), day(period.to)])].map((l) => l.map(csvQuoted).join(",")).join("\n") + "\n";
+  const head = ["Customer", "Plan", "Jobs", "Response", "Arrival", FIRST_TIME_FIX, "Rating", "Overdue", "Status", "Period from", "Period to"].map((h) => t(h));
+  return [head, ...rows.map((r) => [r.name, r.plan, r.jobs, r.response, r.arrival, r.ftf, r.rating, r.overdue, r.status.label, day(period.from), day(period.to)])].map((l) => l.map((item) => csvQuoted(item)).join(",")).join("\n") + "\n";
 }
 
 /** Readable refusals of sla.saveTargets. */
 export function slaRefusal(f: { code: string; messageKey: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null }, t: T = en): string {
   const keys: Record<string, string> = { "errors.targets_exist": "targets for this plan already start at that time", "error.past": "must be now or later", "error.range": "out of range", "error.invalid": "not a valid value", "error.required": "required" };
-  const word = (k: string) => (keys[k] ? t(keys[k]) : k);
-  const fields = Object.entries(f.fieldErrors ?? {}).map(([k, v]) => `${k}: ${word(v)}`);
+  const word = (k: string) => (textOf(keys, k, t) ?? k);
+  const fields = Object.entries(f.fieldErrors).map(([k, v]) => `${k}: ${word(v)}`);
   if (fields.length > 0) return fields.join(" · ");
-  if (keys[f.messageKey]) return f.code === "CONFLICT" ? t("Not saved: {reason}.", { reason: word(f.messageKey) }) : `${word(f.messageKey)}.`;
+  const known = textOf(keys, f.messageKey, t);
+  if (known) return f.code === "CONFLICT" ? t("Not saved: {reason}.", { reason: known }) : `${known}.`;
   return actionMessage({ ...f, fieldErrors: {} }, t); // the write limit's wait and other codes (IR380)
 }

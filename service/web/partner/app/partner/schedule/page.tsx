@@ -6,12 +6,12 @@ import { apiMode } from "@ac/web/lib/dal";
 import { ScheduleDemo } from "./_components/schedule-demo";
 import { ScheduleView } from "./_components/schedule-view";
 import { loadSchedule } from "./_lib/load";
+import { firstOf as one } from "@ac/web/lib/searchParams";
 
 export default async function PartnerSchedulePage({ searchParams }: Readonly<PageProps<"/partner/schedule">>) {
   await connection();
   const sp = await searchParams;
-  const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
   if (!apiMode()) return <ScheduleDemo jobId={one(sp.jobId)} />;
-  const live = await loadSchedule({ jobId: one(sp.jobId), sort: one(sp.sort) });
+  const live = await loadSchedule({ jobId: one(sp.jobId), sort: one(sp.sort), slot: one(sp.slot) });
   return <ScheduleView live={live} />;
 }

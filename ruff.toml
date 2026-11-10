@@ -1,0 +1,15 @@
+# Python of the repository (docs/tools, service/api/scripts, deploy/test): pyflakes (F), the import, syntax and runtime error
+# checks of pycodestyle (E4, E7, E9) and nothing about layout. The tool scripts keep their compact style (an `if` and its
+# statement on one line, several statements joined by `;`), so E701 and E702 are off; they are layout, not a defect.
+target-version = "py312"
+
+[lint]
+select = ["F", "E4", "E7", "E9"]
+ignore = ["E701", "E702"]
+
+[lint.per-file-ignores]
+# The text of the two document tools is part of the specification baseline (a change to it reads as baseline drift, which only a
+# reviewed change of the specification may regenerate), so their findings stay as they are: the imports of the section that uses
+# them (E402) and a lambda assigned to a name (E731) in the validator; a double import and the name O in the map generator
+"docs/tools/validate_documents.py" = ["E402", "E731"]
+"docs/tools/gen_operation_persistence_map.py" = ["E401", "E741"]

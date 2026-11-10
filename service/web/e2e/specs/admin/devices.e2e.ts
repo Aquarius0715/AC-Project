@@ -9,11 +9,17 @@ test("the device list filters by state and the detail shows the device as Figma 
   await page.goto("/admin/devices?tab=devices");
   const main = page.getByRole("main");
   const list = main.getByRole("heading", { name: "Devices", exact: true }).locator('xpath=ancestor::*[self::section or @data-slot="card"][1]');
-  const serials = async () => (await list.getByRole("button").allInnerTexts()).map((x) => x.split("\n", 1)[0].trim());
+  const serials = async () => {
+    const texts = await list.getByRole("button").allInnerTexts();
+    return texts.map((x) => (x.split("\n", 1)[0] ?? "").trim());
+  };
   await expect(list.getByRole("button").first()).toBeVisible();
-  const seed = async () => (await serials()).filter((x) => x.startsWith("AC-DEMO-"));
+  const seed = async () => {
+    const all = await serials();
+    return all.filter((x) => x.startsWith("AC-DEMO-"));
+  };
   const all = await serials();
-  expect(all).toEqual([...all].sort()); // sorted by serial
+  expect(all).toEqual([...all].toSorted((a, b) => a.localeCompare(b))); // sorted by serial
   await main.getByRole("button", { name: /^Offline\s*\d+$/ }).click();
   expect(await seed()).toEqual(["AC-DEMO-0003"]);
   await main.getByRole("button", { name: /^No sensors\s*\d+$/ }).click();
@@ -80,7 +86,8 @@ test("a registered device is not bound yet, and Bind starts from its planned uni
   await dialog.getByRole("textbox", { name: /^Serial/ }).fill(`AC-E2E-${String(Date.now())}`);
   const planned = dialog.getByRole("combobox", { name: /^Planned unit/ });
   await planned.selectOption({ index: 1 });
-  const unit = (await planned.locator("option:checked").innerText()).trim();
+  const unitText = await planned.locator("option:checked").innerText();
+  const unit = unitText.trim();
   await dialog.getByRole("button", { name: "Register", exact: true }).click();
   await expect(page.getByText("Device registered — bind it to the unit once it is installed").first()).toBeVisible();
   await page.waitForURL(/deviceId=/);
@@ -89,4 +96,64 @@ test("a registered device is not bound yet, and Bind starts from its planned uni
   await expect(dialog.getByRole("heading", { name: "Bind device" })).toBeVisible();
   await expect(dialog.getByRole("combobox", { name: /^Unit/ }).locator("option:checked")).toHaveText(unit);
   await dialog.getByRole("button", { name: "Cancel" }).click();
+});
+
+test("a device is registered with its MQTT node ID, which Edit… changes and clears (IR635)", async ({ page }) => {
+  await page.goto("/admin/devices?tab=devices");
+  const main = page.getByRole("main");
+  const stamp = String(Date.now());
+  const node = `e2e_${stamp}`;
+  await main.getByRole("button", { name: "Register device" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("textbox", { name: /^Serial/ }).fill(`AC-E2E-${stamp}`);
+  await dialog.getByRole("combobox", { name: /^Planned unit/ }).selectOption({ index: 1 });
+  const nodeBox = dialog.getByRole("textbox", { name: /^MQTT node ID/ });
+  await nodeBox.fill("bad node");
+  await dialog.getByRole("button", { name: "Register", exact: true }).click();
+  await expect(dialog).toContainText("Use 1–64 letters, digits, hyphens or underscores");
+  await nodeBox.fill(node);
+  await dialog.getByRole("button", { name: "Register", exact: true }).click();
+  await page.waitForURL(/deviceId=/);
+  await expect(main.getByText(node, { exact: true })).toBeVisible();
+  const renamed = `${node}_b`;
+  await main.getByRole("button", { name: "Edit…" }).click();
+  await dialog.getByRole("textbox", { name: "Node ID" }).fill(renamed);
+  await dialog.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByText("MQTT node ID saved").first()).toBeVisible();
+  await expect(main.getByText(renamed, { exact: true })).toBeVisible();
+  await main.getByRole("button", { name: "Edit…" }).click();
+  await dialog.getByRole("textbox", { name: "Node ID" }).fill("");
+  await dialog.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByText("MQTT node ID cleared").first()).toBeVisible();
+  await expect(main.getByText("Not set", { exact: true })).toBeVisible();
+});
+
+// A registered device that is in no use is deleted from its detail, with a reason (DEC-103, IR652); a bound one is not
+// offered for deletion until it is unbound.
+test("a device registered by mistake is deleted, and a bound device must be unbound first", async ({ page }) => {
+  await page.goto("/admin/devices?tab=devices");
+  const main = page.getByRole("main");
+  const dialog = page.getByRole("dialog");
+  const serial = `AC-E2E-${String(Date.now())}`;
+  await main.getByRole("button", { name: "Register device" }).click();
+  await dialog.getByRole("textbox", { name: /^Serial/ }).fill(serial);
+  await dialog.getByRole("combobox", { name: /^Planned unit/ }).selectOption({ index: 1 });
+  await dialog.getByRole("button", { name: "Register", exact: true }).click();
+  await page.waitForURL(/deviceId=/);
+  await expect(main.getByRole("heading", { name: serial })).toBeVisible();
+
+  await main.getByRole("button", { name: "Delete…", exact: true }).click();
+  await dialog.getByRole("button", { name: "Delete", exact: true }).click();
+  await expect(dialog.getByText("A reason is required")).toBeVisible(); // nothing is deleted without one
+  await dialog.getByRole("textbox", { name: "Reason" }).fill("E2E: registered by mistake");
+  await dialog.getByRole("button", { name: "Delete", exact: true }).click();
+  await expect(page.getByText("Device deleted").first()).toBeVisible();
+  await expect(main.getByRole("button", { name: new RegExp(serial) })).toHaveCount(0);
+
+  // a bound device: Unbind… is offered, Delete… is not
+  await main.getByRole("button", { name: /AC-DEMO-0001/ }).click();
+  await page.waitForURL(/deviceId=/);
+  await expect(main.getByRole("button", { name: "Unbind…" })).toBeVisible();
+  await expect(main.getByRole("button", { name: "Delete…", exact: true })).toBeDisabled();
+  await expect(main).toContainText("A bound device cannot be deleted: unbind it first.");
 });

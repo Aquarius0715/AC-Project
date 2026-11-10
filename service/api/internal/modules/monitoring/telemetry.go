@@ -909,23 +909,24 @@ func (m Telemetry) seriesUnits(
 	call *ops.Call,
 	input *SeriesInput,
 ) ([]uuid.UUID, error) {
-	units := input.UnitIDs
-	if input.SpaceID != nil {
-		var err error
+	if input.SpaceID == nil {
+		return input.UnitIDs, m.readableUnits(ctx, call, input.UnitIDs)
+	}
 
-		units, err = m.Units.UnitsInSpace(ctx, call, *input.SpaceID)
-		if err != nil {
-			return nil, apperr.Wrap(err, "monitoring.TelemetryUnits.UnitsInSpace")
-		}
+	units, err := m.Units.UnitsInSpace(ctx, call, *input.SpaceID)
+	if err != nil {
+		return nil, apperr.Wrap(err, "monitoring.TelemetryUnits.UnitsInSpace")
+	}
 
-		if len(units) == 0 {
-			return nil, apperr.E(apperr.NotFound, apperr.KeyNotFound)
-		}
-	} else {
-		err := m.readableUnits(ctx, call, units)
-		if err != nil {
-			return nil, err
-		}
+	if len(units) == 0 {
+		return nil, apperr.E(apperr.NotFound, apperr.KeyNotFound)
+	}
+
+	// the units come from the List scope, so the work window of an external technician is still to be checked
+	// (IR49(b), IR673)
+	err = unitscope.Gate(ctx, call, units)
+	if err != nil {
+		return nil, apperr.Wrap(err, "unitscope.Gate")
 	}
 
 	return units, nil
@@ -1359,28 +1360,4 @@ func (m Telemetry) ventWhere(
 	}
 
 	return strings.Join(conds, " AND "), nil
-}
-
-// LatestMeasurement returns the most recent measurement of a unit for a metric (highest observedAt, then sequence),
-// and whether the unit has one (voice temperature reads, IR65).
-func LatestMeasurement(
-	ctx context.Context,
-	c *ops.Call,
-	unit uuid.UUID,
-	metric string,
-) (Measurement, bool, error) {
-	measurement, err := scanMeasurement(
-		c.Tx.QueryRow(
-			ctx,
-			`SELECT `+measurementCols+` FROM monitoring.measurements m WHERE m.unit_id = $1 AND m.metric = $2
-		ORDER BY m.observed_at DESC, m.sequence DESC LIMIT 1`,
-			unit,
-			metric,
-		),
-	)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return measurement, false, nil
-	}
-
-	return measurement, err == nil, err
 }

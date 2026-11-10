@@ -32,7 +32,7 @@ func TestPrincipalFromIdentityService(t *testing.T) {
 			idSrv.URL+auth.PrincipalPath+"?subject="+subject+"&tenant="+seed.ID("tenant-a").
 				String()+
 				"&membership="+membership,
-			nil,
+			http.NoBody,
 		)
 		req.Header.Set("Authorization", "Bearer "+token)
 

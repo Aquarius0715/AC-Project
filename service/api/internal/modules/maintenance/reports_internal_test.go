@@ -2,6 +2,7 @@ package maintenance
 
 import (
 	"maps"
+	"strings"
 	"testing"
 	"time"
 
@@ -179,10 +180,24 @@ func TestSubmitErrors(t *testing.T) {
 			func(r *Report) { r.Items[1].ComponentKey = componentFilter },
 			map[string]string{fieldItems: "errors.components_mismatch"},
 		},
-		"short work text": {func(r *Report) { r.WorkText = "Done." }, map[string]string{"workText": apperr.KeyLength}},
-		"no next action":  {func(r *Report) { r.NextAction = nil }, map[string]string{fieldNextAction: apperr.KeyRequired}},
+		"short work text": {func(r *Report) { r.WorkText = "Done." }, map[string]string{fieldWorkText: apperr.KeyLength}},
+		"blank work text": {
+			func(r *Report) { r.WorkText = strings.Repeat(" ", 12) },
+			map[string]string{fieldWorkText: apperr.KeyLength},
+		},
+		"padded short work text": {
+			func(r *Report) { r.WorkText = "  Done.     " },
+			map[string]string{fieldWorkText: apperr.KeyLength},
+		},
+		"no next action": {func(r *Report) { r.NextAction = nil }, map[string]string{fieldNextAction: apperr.KeyRequired}},
 		"follow-up no note": {
 			func(r *Report) { r.NextAction = &NextAction{Kind: nextActionFollowUp, Date: inHours(48), Note: nil} },
+			map[string]string{fieldNextAction: apperr.KeyInvalid},
+		},
+		"follow-up blank note": {
+			func(r *Report) {
+				r.NextAction = &NextAction{Kind: nextActionFollowUp, Date: inHours(48), Note: new("   ")}
+			},
 			map[string]string{fieldNextAction: apperr.KeyInvalid},
 		},
 		"follow-up past": {
@@ -212,6 +227,48 @@ func TestSubmitErrors(t *testing.T) {
 		testCase.change(&r)
 
 		if fe := submitErrors(&r, submitComponents(), submitNow()); !maps.Equal(fe, testCase.want) {
+			t.Errorf("%s: %v want %v", name, fe, testCase.want)
+		}
+	}
+}
+
+// TestDraftRefrigerantCylinder checks that the cylinder of a refrigerant record is counted after trimming, as the
+// technician's form does: a cylinder of spaces names no cylinder.
+func TestDraftRefrigerantCylinder(t *testing.T) {
+	t.Parallel()
+
+	for name, testCase := range map[string]struct {
+		cylinder string
+		want     map[string]string
+	}{
+		"named":   {"C-1", map[string]string{}},
+		"padded":  {"  C-1  ", map[string]string{}},
+		"blank":   {"   ", map[string]string{fieldRefrigerant: apperr.KeyInvalid}},
+		"empty":   {"", map[string]string{fieldRefrigerant: apperr.KeyInvalid}},
+		"newline": {"\n\t", map[string]string{fieldRefrigerant: apperr.KeyInvalid}},
+	} {
+		draft := DraftInput{
+			JobID:        uuid.New(),
+			Items:        []ItemInput{},
+			Measurements: []MeasurementInput{},
+			Parts:        []Part{},
+			Refrigerant: []Refrigerant{
+				{
+					Refrigerant:     "R32",
+					CylinderID:      testCase.cylinder,
+					RecoveredKg:     0,
+					ChargedKg:       0.3,
+					LeakCheck:       "pass",
+					LeakCheckMethod: nil,
+				},
+			},
+			AttachmentIDs: []uuid.UUID{},
+			WorkText:      "",
+			NextAction:    nil,
+			ReportID:      nil,
+		}
+
+		if fe := draft.Validate(); !maps.Equal(fe, testCase.want) {
 			t.Errorf("%s: %v want %v", name, fe, testCase.want)
 		}
 	}

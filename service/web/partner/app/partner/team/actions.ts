@@ -6,18 +6,20 @@
 // the row's version, which removes the days from a chosen day on (IR612); certificates.submit for a
 // renewal or a new certificate, its file read from the form data and sent base64 (IR129, IR277); and
 // certificates.requestTraining with the certificate version as the expected version (write-version catalog).
+import { isNone } from "@ac/web/lib/isNone";
 import { refresh } from "next/cache";
 import { coreOp, CoreError } from "@ac/web/lib/dal";
+import { actionFailure } from "@ac/web/lib/actionFailure";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
-import { certDates } from "@ac/web/lib/partnerCertificates";
+import { certDates, certificateCode } from "@ac/web/lib/partnerCertificates";
+import { formValue } from "@ac/web/lib/formValue";
+import { documentMime } from "@ac/web/lib/uploads";
 import { uploadName, uploadType } from "@ac/web/lib/files";
 import type { OpInput } from "@ac/web/lib/opTypes";
+import { formText } from "@ac/web/lib/formData";
 
 type Result<T> = { ok: true; value: T } | ({ ok: false } & ActionFailure);
-const failure = (e: unknown): { ok: false } & ActionFailure => {
-  if (e instanceof CoreError) return { ok: false, code: e.error.code, messageKey: e.error.messageKey, fieldErrors: e.error.fieldErrors, retryAfterSeconds: e.error.retryAfterSeconds };
-  throw e;
-};
+const failure = (e: unknown): { ok: false } & ActionFailure => actionFailure(e);
 
 export async function setUnavailability(input: OpInput<"members.setUnavailability">): Promise<Result<{ conflicts: number }>> {
   try {
@@ -35,7 +37,7 @@ export async function clearUnavailability(id: string, version: number, from: str
   try {
     const r = await coreOp<{ remaining: unknown }>("members.clearUnavailability", { id, from }, { write: true, expectedVersion: version });
     refresh();
-    return { ok: true, value: { kept: r.remaining != null } };
+    return { ok: true, value: { kept: !isNone(r.remaining) } };
   } catch (error) {
     if (error instanceof CoreError && (error.error.code === "CONFLICT" || error.error.code === "NOT_FOUND")) refresh();
     return failure(error);
@@ -46,13 +48,13 @@ export async function clearUnavailability(id: string, version: number, from: str
 renewal, renewalOf. The certificate starts pending HQ verification. */
 export async function submitCertificate(form: FormData): Promise<Result<{ id: string }>> {
   const file = form.get("file");
-  const text = (k: string) => String(form.get(k) ?? "").trim();
+  const text = (k: string) => formText(form, k).trim();
   try {
     const bytes = file instanceof File ? Buffer.from(await file.arrayBuffer()) : Buffer.alloc(0);
     const renewalOf = text("renewalOf");
     const c = await coreOp<{ id: string }>("certificates.submit", {
-      membershipId: text("membershipId"), code: text("code") as OpInput<"certificates.submit">["code"], name: text("name"), number: text("number"), ...certDates({ issued: text("issued"), expires: text("expires") }),
-      file: { name: file instanceof File ? uploadName(file.name) : "", mime: (file instanceof File ? uploadType(bytes, file.type) : "") as OpInput<"certificates.submit">["file"]["mime"], size: bytes.length, bytes: bytes.toString("base64") },
+      membershipId: text("membershipId"), code: formValue(certificateCode, text("code"), "code"), name: text("name"), number: text("number"), ...certDates({ issued: text("issued"), expires: text("expires") }),
+      file: { name: file instanceof File ? uploadName(file.name) : "", mime: formValue(documentMime, file instanceof File ? uploadType(bytes, file.type) : "", "file"), size: bytes.length, bytes: bytes.toString("base64") },
       ...(renewalOf && { renewalOf }),
     }, { write: true });
     refresh();

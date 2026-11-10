@@ -558,7 +558,7 @@ func (m Alerts) where(
 //	@Failure		504	{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/alerts/{id} [get]
-func (m Alerts) get(ctx context.Context, call *ops.Call, in *GetInput) (Alert, error) {
+func (Alerts) get(ctx context.Context, call *ops.Call, in *GetInput) (Alert, error) {
 	args := []any{in.ID}
 
 	alert, err := scanAlert(

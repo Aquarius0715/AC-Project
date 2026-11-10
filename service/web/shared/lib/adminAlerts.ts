@@ -2,11 +2,19 @@
 // members.list projected for the admin alerts screen. Pure code shared by the Server Component and the client view;
 // Vitest covers it. Texts in the display language (`i` / `t`, IR292); times IR44 in the user's display time zone, with
 // "today / yesterday" for the days next to now. Cause codes and evidence texts stay as the Core API records them.
-import { EN, relativeTime, showDate, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
+import { EN, relativeTime, showDate, showTime, translator, type I18n, type T, textOf, byCount } from "@ac/web/lib/i18n";
 import { evidenceText, resolutionText } from "@ac/web/lib/evidence";
 import { alertTitle } from "@ac/web/lib/alerts";
 import type { OpInput } from "@ac/web/lib/opTypes";
 import type { Metric as ContractMetric } from "@ac/web/lib/contracts.gen";
+import { oneOfOrThrow } from "@ac/web/lib/oneOf";
+import { byNumber, byText } from "@ac/web/lib/order";
+import { filled } from "@ac/web/lib/filled";
+import { wrapped } from "@ac/web/lib/text";
+import { entryOf, lookup } from "@ac/web/lib/lookup";
+
+const TEMPERATURE = "temperature";
+const DEFAULT_ALERT = "default_alert";
 
 const en = translator("en");
 
@@ -74,20 +82,20 @@ export const metricLabel: Record<string, string> = {
 export const metricUnit: Record<string, string> = { temperature: "°C", humidity: "%", co2: "ppm", pm25: "µg/m³", power: "kW", vibration: "mm/s", refrigerant_pressure: "kPa", compressor_cycles: "cycles/h", airflow_drop: "%", heartbeat_gap: "min" };
 export const opSymbol: Record<Operator, string> = { gt: ">", gte: "≥", lt: "<", lte: "≤" };
 /** The metrics an HQ alert policy may watch (IR66 item 3, the Core API's hqMetrics); default rules have their own. */
-export const HQ_METRICS = ["temperature", "humidity", "co2", "pm25", "refrigerant_pressure", "vibration", "power"] as const;
+export const HQ_METRICS = [TEMPERATURE, "humidity", "co2", "pm25", "refrigerant_pressure", "vibration", "power"] as const;
 const sevRank: Record<Severity, number> = { critical: 0, warning: 1, normal: 2 };
 const stRank: Record<AlertState, number> = { open: 0, acknowledged: 1, resolved: 2 };
 const stLabel: Record<AlertState, string> = { open: "Open", acknowledged: "Acknowledged", resolved: "Resolved" };
 const evidenceKind: Record<string, string> = { inferred: "inferred", inspection: "inspection record", demo_observation: "demo observation" };
 const roleWord: Record<string, string> = { client: "client", admin: "HQ", contractor: "contractor", technician: "technician" };
 /** A member's role in the display language (client / HQ). */
-export const recipientRole = (role: string, t: T = en) => (roleWord[role] ? t(roleWord[role]) : role);
+export const recipientRole = (role: string, t: T = en) => (textOf(roleWord, role, t) ?? role);
 
 /** Recovery must lie on the safe side of the threshold for the operator (≥ / >: below, ≤ / <: above). */
 export function recoveryError(op: Operator, threshold: number, recovery: number, t: T = en): string | undefined {
   const isAbove = op === "gt" || op === "gte";
   if (isAbove ? recovery < threshold : recovery > threshold) return undefined;
-  return t(isAbove ? "Recovery {recovery} must be below the {threshold} threshold (direction for {op})" : "Recovery {recovery} must be above the {threshold} threshold (direction for {op})", { recovery, threshold, op: opSymbol[op] });
+  return t(isAbove ? "Recovery {recovery} must be below the {threshold} threshold (direction for {op})" : "Recovery {recovery} must be above the {threshold} threshold (direction for {op})", { recovery, threshold, op: entryOf(opSymbol, op) });
 }
 
 /** The alerts, unresolved first, then by severity and newest; each with its unit, customer and policy, its evidence and
@@ -100,7 +108,7 @@ export function adminAlertRows(alerts: ApiAdminAlert[], units: ApiUnitName[], cu
   const custIdByOrg = new Map(customers.map((c) => [c.organizationId, c.id]));
   const policy = new Map(policies.map((p) => [p.id, p.name]));
   return [...alerts]
-    .sort((a, b) => stRank[a.status] - stRank[b.status] || sevRank[a.severity] - sevRank[b.severity] || b.detectedAt.localeCompare(a.detectedAt))
+    .toSorted((a, b) => stRank[a.status] - stRank[b.status] || sevRank[a.severity] - sevRank[b.severity] || b.detectedAt.localeCompare(a.detectedAt))
     .map((a) => {
       const u = unit.get(a.unitId);
       const customer = (u && custByOrg.get(u.customerOrgId)) ?? t("unknown customer");
@@ -115,10 +123,10 @@ export function adminAlertRows(alerts: ApiAdminAlert[], units: ApiUnitName[], cu
         meta: `${customer} · ${u?.displayName ?? a.unitId} · ${pol}`, state: a.status, st: t(stLabel[a.status]),
         unitId: a.unitId, customerId: (u && custIdByOrg.get(u.customerOrgId)) ?? null, policyless: !a.policyId, inferred: a.evidenceKind === "inferred",
         unit: `${u?.displayName ?? t("Unit")} · ${a.unitId}`, context: customer,
-        evidence: `${evidenceKind[a.evidenceKind] ? t(evidenceKind[a.evidenceKind]) : a.evidenceKind} — “${evidenceText(a.evidenceText, t)}”`,
+        evidence: `${textOf(evidenceKind, a.evidenceKind, t) ?? a.evidenceKind} — “${evidenceText(a.evidenceText, t)}”`,
         cause: a.causeCode === "unknown" ? t("not determined") : t("{cause} (suspected)", { cause: a.causeCode }),
         observed: showTime(a.observedAt, display), detected: showTime(a.detectedAt, display),
-        evidenceRecords: a.evidenceIds.length > 0 ? t(a.evidenceIds.length === 1 ? "1 attached" : "{n} attached", { n: a.evidenceIds.length }) : t("none attached"), timeline,
+        evidenceRecords: byCount(a.evidenceIds.length, { none: t("none attached"), one: t("1 attached"), many: t("{n} attached", { n: a.evidenceIds.length }) }), timeline,
       };
     });
 }
@@ -129,19 +137,20 @@ export function policyRows(policies: ApiPolicy[], customers: ApiCustomerName[], 
   const member = new Map(members.map((m) => [m.id, m]));
   const unitName = new Map(units.map((u) => [u.id, u.displayName]));
   return policies
-    .filter((p): p is ApiPolicy & { kind: "alert" | "default_alert" } => p.kind === "alert" || p.kind === "default_alert")
-    .sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name) : (a.kind === "default_alert" ? -1 : 1)))
+    .filter((p): p is ApiPolicy & { kind: "alert" | "default_alert" } => p.kind === "alert" || p.kind === DEFAULT_ALERT)
+    // the default policy first, then by name
+    .toSorted((a, b) => Number(b.kind === DEFAULT_ALERT) - Number(a.kind === DEFAULT_ALERT) || a.name.localeCompare(b.name))
     .map((p) => {
       const customerName = p.customerId ? cust.get(p.customerId) ?? t("customer") : "";
       const op = p.operator ?? "gte";
       const metric = p.metric ?? "";
       const rules = p.rules?.length ?? 0;
-      const sub = p.kind === "default_alert"
-        ? t(rules === 1 ? "1 rule · ventilation (CO₂, PM2.5) + fault causes" : "{n} rules · ventilation (CO₂, PM2.5) + fault causes", { n: rules })
-        : `${metricLabel[metric] ? t(metricLabel[metric]) : metric} ${opSymbol[op]} ${p.threshold} ${metricUnit[metric] ?? ""} ${t("for {n} s", { n: p.durationSeconds ?? 0 })}`;
+      const sub = p.kind === DEFAULT_ALERT
+        ? byCount(rules, { one: t("1 rule · ventilation (CO₂, PM2.5) + fault causes"), many: t("{n} rules · ventilation (CO₂, PM2.5) + fault causes", { n: rules }) })
+        : `${textOf(metricLabel, metric, t) ?? metric} ${entryOf(opSymbol, op)} ${String(p.threshold ?? "—")} ${lookup(metricUnit, metric) ?? ""} ${t("for {n} s", { n: p.durationSeconds ?? 0 })}`;
       const recipients = (p.recipientMembershipIds ?? []).map((id) => {
         const m = member.get(id);
-        return { id, label: m?.displayName || id, role: m ? recipientRole(m.role, t) : "" };
+        return { id, label: filled(m?.displayName) ?? id, role: m ? recipientRole(m.role, t) : "" };
       });
       const owner = p.ownerMembershipId ? member.get(p.ownerMembershipId) : undefined;
       return {
@@ -149,13 +158,13 @@ export function policyRows(policies: ApiPolicy[], customers: ApiCustomerName[], 
         version: p.version,
         kind: p.kind,
         name: p.name,
-        group: p.kind === "default_alert" ? t("DEFAULT · ON EVERY UNIT") : customerName.toUpperCase(),
+        group: p.kind === DEFAULT_ALERT ? t("DEFAULT · ON EVERY UNIT") : customerName.toUpperCase(),
         on: p.enabled,
-        units: p.kind === "default_alert" ? t("every unit") : t(p.unitIds.length === 1 ? "1 unit" : "{n} units", { n: p.unitIds.length }),
+        units: p.kind === DEFAULT_ALERT ? t("every unit") : byCount(p.unitIds.length, { one: t("1 unit"), many: t("{n} units", { n: p.unitIds.length }) }),
         customerId: p.customerId ?? null,
         priority: p.priority,
         timezone: p.timezone,
-        metric: p.metric ?? "temperature",
+        metric: p.metric ?? TEMPERATURE,
         operator: op,
         threshold: p.threshold ?? 0,
         recovery: p.recoveryThreshold ?? 0,
@@ -194,13 +203,13 @@ export function settingText(s: RuleSettingRow | undefined, i: I18n = EN): string
   const { t } = i;
   if (!s) return t("On");
   const who = s.by ? `${t("by {name}", { name: s.by })}, ` : "";
-  return `${t(s.enabled ? "On" : "Off")} · ${who}${showDate(s.at, i.display)}${s.reason ? ` (${s.reason})` : ""}`;
+  return `${t(s.enabled ? "On" : "Off")} · ${who}${showDate(s.at, i.display)}${wrapped(s.reason, " (", ")")}`;
 }
 
 /** A new, unsaved alert policy of a customer as DD-A05 starts one (IR345): the display time zone (Preferences), off and
 priority 50; the condition of the Figma example (temperature ≥ 30 °C for 60 s, recovery 28), in-app only, nobody
 notified yet. The owner is fixed once it is saved. */
-export function newPolicyDraft(customer: { id: string; name: string }, timezone: string, from?: DefaultRule): AdminPolicy {
+export function blankPolicyDraft(customer: { id: string; name: string }, timezone: string, from?: DefaultRule): AdminPolicy {
   const draft: AdminPolicy = {
     id: "",
     version: 0,
@@ -213,7 +222,7 @@ export function newPolicyDraft(customer: { id: string; name: string }, timezone:
     customerId: customer.id,
     customerName: customer.name,
     priority: 50,
-    metric: "temperature",
+    metric: TEMPERATURE,
     operator: "gte",
     threshold: 30,
     recovery: 28,
@@ -239,17 +248,23 @@ export function newPolicyDraft(customer: { id: string; name: string }, timezone:
 
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
 
+/** Whole minutes 1–1440 (the Core API's integers, IR688): a fraction would not decode there. */
+function minutesError(minutes: number, t: T): string | undefined {
+  if (!Number.isSafeInteger(minutes)) return t("A whole number 1–1440");
+  return minutes >= 1 && minutes <= 1440 ? undefined : t("1–1440");
+}
+
 /** The policy form checks (IR66, IR120 item 3): name 1–120, priority 0–100, duration 1–86400 s, 1–20 recipients,
 cooldown and escalation 1–1440 min, the recovery on the safe side of the threshold, and an “Only if …” window with
 at least one day and two different HH:mm times. */
 export function policyErrors(p: Pick<AdminPolicy, "name" | "priority" | "duration" | "cooldown" | "escalate" | "operator" | "threshold" | "recovery" | "recipients" | "activeWindow">, t: T = en): Record<string, string> {
   const e: Record<string, string> = conditionErrors(p, t);
   if (!p.name.trim() || p.name.length > 120) e.name = t("1–120 characters");
-  if (!(Number.isInteger(p.priority) && p.priority >= 0 && p.priority <= 100)) e.priority = t("A whole number 0–100");
-  if (!(p.cooldown >= 1 && p.cooldown <= 1440)) e.cooldown = t("1–1440");
-  if (!(p.escalate >= 1 && p.escalate <= 1440)) e.escalate = t("1–1440");
-  if (p.recipients.length === 0) e.recipients = t("Add at least one recipient");
-  else if (p.recipients.length > 20) e.recipients = t("At most 20 recipients");
+  if (!(Number.isSafeInteger(p.priority) && p.priority >= 0 && p.priority <= 100)) e.priority = t("A whole number 0–100");
+  const cooldown = minutesError(p.cooldown, t), escalate = minutesError(p.escalate, t);
+  if (cooldown) e.cooldown = cooldown;
+  if (escalate) e.escalate = escalate;
+  if (p.recipients.length === 0 || p.recipients.length > 20) e.recipients = t(p.recipients.length === 0 ? "Add at least one recipient" : "At most 20 recipients");
   return e;
 }
 
@@ -257,7 +272,7 @@ export function policyErrors(p: Pick<AdminPolicy, "name" | "priority" | "duratio
 the safe side of the threshold, and an “Only if …” window with a day and two different HH:mm times. */
 export function conditionErrors(p: Pick<DefaultRule, "duration" | "operator" | "threshold" | "recovery" | "activeWindow">, t: T = en): Record<string, string> {
   const e: Record<string, string> = {};
-  if (!(Number.isInteger(p.duration) && p.duration >= 1 && p.duration <= 86_400)) e.duration = t("Duration must be 1–86400 s");
+  if (!(Number.isSafeInteger(p.duration) && p.duration >= 1 && p.duration <= 86_400)) e.duration = t("Duration must be 1–86400 s");
   const rec = recoveryError(p.operator, p.threshold, p.recovery, t);
   if (rec) e.recovery = rec;
   const w = p.activeWindow;
@@ -265,11 +280,13 @@ export function conditionErrors(p: Pick<DefaultRule, "duration" | "operator" | "
   return e;
 }
 
-const ruleShape = (r: DefaultRule) => [r.operator, r.threshold, r.recovery, r.duration, r.severity, r.activeWindow && [[...r.activeWindow.weekdays].sort(), r.activeWindow.startLocal, r.activeWindow.endLocal]];
+const ruleShape = (r: DefaultRule) => [r.operator, r.threshold, r.recovery, r.duration, r.severity, r.activeWindow && [[...r.activeWindow.weekdays].toSorted(byNumber), r.activeWindow.startLocal, r.activeWindow.endLocal]];
 /** The default rules a draft changes against the saved policy, by name. */
 export const ruleChanges = (draft: AdminPolicy, saved: AdminPolicy): string[] =>
   draft.rules.filter((r) => { const o = saved.rules.find((x) => x.ruleKey === r.ruleKey); return !o || JSON.stringify(ruleShape(r)) !== JSON.stringify(ruleShape(o)); }).map((r) => r.name);
 
+const ruleCategories = ["air_quality", "fault", "maintenance", "connection"] as const;
+const contractMetrics = [TEMPERATURE, "humidity", "co2", "pm25", "power", "vibration", "refrigerant_pressure", "compressor_cycles", "airflow_drop", "heartbeat_gap"] as const satisfies readonly ContractMetric[];
 /** policies.save input for the default policy's limits (DefaultPolicyInput, IR120 item 2): all six rules in their order
 with their fixed key, name, category and metric; saving changes them for every unit. */
 export function defaultRulesInput(p: AdminPolicy): OpInput<"policies.save"> {
@@ -277,7 +294,7 @@ export function defaultRulesInput(p: AdminPolicy): OpInput<"policies.save"> {
     id: p.id, kind: "default_alert" as const,
     rules: p.rules.map((r) => {
       return {
-        ruleKey: r.ruleKey, name: r.name, category: r.category as "air_quality" | "fault" | "maintenance" | "connection", metric: r.metric as ContractMetric,
+        ruleKey: r.ruleKey, name: r.name, category: oneOfOrThrow(ruleCategories, r.category, "rule category"), metric: oneOfOrThrow(contractMetrics, r.metric, "metric"),
         operator: r.operator, threshold: r.threshold, recoveryThreshold: r.recovery, durationSeconds: r.duration, activeWindow: r.activeWindow ?? null, severity: r.severity,
       };
     }),
@@ -286,8 +303,8 @@ export function defaultRulesInput(p: AdminPolicy): OpInput<"policies.save"> {
 
 const CHANGES: [string, (p: AdminPolicy) => unknown][] = [
   ["Name", (p) => p.name], ["Enabled", (p) => p.on], ["Priority", (p) => p.priority], ["Timezone", (p) => p.timezone],
-  ["Condition", (p) => [p.metric, p.operator, p.threshold, p.recovery, p.duration]], ["Active hours", (p) => p.activeWindow && [[...p.activeWindow.weekdays].sort(), p.activeWindow.startLocal, p.activeWindow.endLocal]], ["Severity", (p) => p.severity],
-  ["Recipients", (p) => p.recipients.map((r) => r.id)], ["Channels", (p) => [...p.channels].sort()], ["Cooldown", (p) => p.cooldown], ["Escalation", (p) => p.escalate],
+  ["Condition", (p) => [p.metric, p.operator, p.threshold, p.recovery, p.duration]], ["Active hours", (p) => p.activeWindow && [[...p.activeWindow.weekdays].toSorted(byNumber), p.activeWindow.startLocal, p.activeWindow.endLocal]], ["Severity", (p) => p.severity],
+  ["Recipients", (p) => p.recipients.map((r) => r.id)], ["Channels", (p) => [...p.channels].toSorted(byText)], ["Cooldown", (p) => p.cooldown], ["Escalation", (p) => p.escalate],
 ];
 /** What the draft changes against the saved policy, as the editor's footer names it. */
 export function policyChanges(draft: AdminPolicy, saved: AdminPolicy, t: T = en): string[] {
@@ -297,10 +314,11 @@ export function policyChanges(draft: AdminPolicy, saved: AdminPolicy, t: T = en)
 /** policies.save input for an alert policy (AlertPolicyInput of service-contracts.ts): without an id it creates one
 for its customer, with an id it updates that policy (expectedVersion). */
 export function alertPolicyInput(p: AdminPolicy): OpInput<"policies.save"> {
+  if (!p.customerId) throw new Error("an alert policy belongs to a customer");
   return {
     // an alert policy always belongs to a customer (the Default policy is saved as default_alert)
-    ...(p.id && { id: p.id }), kind: "alert" as const, name: p.name, timezone: p.timezone, enabled: p.on, priority: p.priority, customerId: p.customerId!,
-    metric: p.metric as ContractMetric, operator: p.operator, threshold: p.threshold, recoveryThreshold: p.recovery, durationSeconds: p.duration,
+    ...(p.id && { id: p.id }), kind: "alert" as const, name: p.name, timezone: p.timezone, enabled: p.on, priority: p.priority, customerId: p.customerId,
+    metric: oneOfOrThrow(contractMetrics, p.metric, "metric"), operator: p.operator, threshold: p.threshold, recoveryThreshold: p.recovery, durationSeconds: p.duration,
     activeWindow: p.activeWindow ?? null, severity: p.severity, recipientMembershipIds: p.recipients.map((r) => r.id), channels: p.channels,
     escalateAfterMinutes: p.escalate, cooldownMinutes: p.cooldown,
   };
@@ -308,12 +326,19 @@ export function alertPolicyInput(p: AdminPolicy): OpInput<"policies.save"> {
 
 /** NotificationDecision of service-contracts.ts: one policy's outcome for one unit in automations.simulate. */
 export interface NotificationDecision { unitId: string; policyId: string; decision: "selected" | "suppressed" | "failed"; reason: "not_due" | "quality" | "disabled" | "owner_forbidden" | "cooldown" | "no_recipient" | null }
-const holds = (op: Operator, v: number, threshold: number) => (op === "gt" ? v > threshold : op === "gte" ? v >= threshold : op === "lt" ? v < threshold : v <= threshold);
+function holds(op: Operator, v: number, threshold: number): boolean {
+  switch (op) {
+    case "gt": { return v > threshold; }
+    case "gte": { return v >= threshold; }
+    case "lt": { return v < threshold; }
+    case "lte": { return v <= threshold; }
+  }
+}
 /** What “Test with demo data” found for a synthetic reading (DD-A05 item 7, IR348), in words and a tone; null means the
 policy did not run on the unit (no longer attached). */
 export function testOutcome(d: NotificationDecision | null, p: Pick<AdminPolicy, "metric" | "operator" | "threshold">, value: number, unitName: string, t: T = en): { tone: "ok" | "warn" | "crit" | "muted"; text: string } {
-  const unit = metricUnit[p.metric] ?? "";
-  const v = { value, unit, op: opSymbol[p.operator], threshold: p.threshold, name: unitName };
+  const unit = lookup(metricUnit, p.metric) ?? "";
+  const v = { value, unit, op: entryOf(opSymbol, p.operator), threshold: p.threshold, name: unitName };
   if (!d) return { tone: "warn", text: t("The policy did not run on {name} — it is no longer attached to it.", v) };
   if (d.decision === "selected") return { tone: "ok", text: t("{value} {unit} on {name} raises an alert and notifies the recipients — simulated, nothing is stored.", v) };
   if (d.decision === "failed") return { tone: "crit", text: t("An alert, but nobody is notified: no recipient may read {name}.", v) };

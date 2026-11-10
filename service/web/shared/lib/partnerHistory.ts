@@ -3,22 +3,26 @@
 // and the communication form — save a note and render a notification preview for a recipient of the job (nothing is
 // sent, deliveryState stays preview). Pure code shared by the server loader and the client view; Vitest covers it.
 // Texts in the display language (`t` / `i`, IR278); every instant is formatted for the user's display time zone.
-import { EN, relativeTime, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
+import { EN, relativeTime, showTime, translator, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import { jobEventTitle, type ApiEventSummary, type ApiJobEvent, type ApiMember, type ApiPartnerJob } from "@ac/web/lib/partnerOverview";
+import { oneOf } from "@ac/web/lib/oneOf";
 import { statusWord, typeLabel } from "@ac/web/lib/partnerJobDetail";
+import { lookup } from "@ac/web/lib/lookup";
+
+const IN_PROGRESS = "in_progress";
 
 const en = translator("en");
 
 /** The states a job has after the company accepted it; offers appear here only after acceptance. */
-export const HISTORY_STATUSES = ["accepted", "assigned", "in_progress", "on_hold", "rework_requested", "submitted", "completed", "cancelled"] as const;
+export const HISTORY_STATUSES = ["accepted", "assigned", IN_PROGRESS, "on_hold", "rework_requested", "submitted", "completed", "cancelled"] as const;
 export const TABS = [
   { id: "all", label: "All" }, { id: "active", label: "Active" }, { id: "review", label: "Review" }, { id: "completed", label: "Completed" }, { id: "ended", label: "Delegation ended" },
 ] as const;
 export type HistoryTab = (typeof TABS)[number]["id"];
-export const tabOf = (v?: string): HistoryTab => (TABS.some((t) => t.id === v) ? (v as HistoryTab) : "all");
+export const tabOf = (v = ""): HistoryTab => oneOf(TABS.map((t) => t.id), v, "all");
 export const SORTS = [{ id: "latest", text: "Latest event first" }, { id: "status", text: "Status, earliest stage first" }] as const;
 export type HistorySort = (typeof SORTS)[number]["id"];
-export const sortOf = (v?: string): HistorySort => (SORTS.some((s) => s.id === v) ? (v as HistorySort) : "latest");
+export const sortOf = (v = ""): HistorySort => oneOf(SORTS.map((s) => s.id), v, "latest");
 export const PERIODS = [{ id: "90d", label: "last 90 days" }, { id: "all", label: "all time" }] as const;
 export type HistoryPeriod = (typeof PERIODS)[number]["id"];
 export const periodOf = (v?: string): HistoryPeriod => (v === "all" ? "all" : "90d");
@@ -29,20 +33,31 @@ type Tone = "ok" | "warn" | "crit" | "primary" | "muted";
 API's clientHiddenActions (maintenance/jobs.go) lists them; partnerHistory.test.ts keeps the two in step. */
 export const CLIENT_HIDDEN_ACTIONS = ["job.costs_saved", "job.warranty_claim_filed", "partner_proposal.sent", "partner_proposal.withdrawn", "partner_proposal.kept"];
 /** The customer reads every event except internal notes and the hidden actions (jobs.events for clients, IR42, IR442). */
-export const customerVisible = (e: ApiJobEvent & { note?: ApiEvent["note"] }) => !(e.note && e.note.visibility === "internal") && !CLIENT_HIDDEN_ACTIONS.includes(e.action);
+export const customerVisible = (e: ApiJobEvent & { note?: ApiEvent["note"] }) => e.note?.visibility !== "internal" && !CLIENT_HIDDEN_ACTIONS.includes(e.action);
 /** The counts of a list of events as jobs.list gives them for a summary (IR506); a history's own decision events are
 counted this way. */
 export function eventSummary(events: (ApiJobEvent & { note?: ApiEvent["note"] })[]): ApiEventSummary {
-  const latest = [...events].sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt) || b.id.localeCompare(a.id))[0];
-  return { count: events.length, customerVisible: events.filter(customerVisible).length, notes: events.filter((e) => e.note).length, latest: latest ? { action: latest.action, occurredAt: latest.occurredAt } : null };
+  const latest = [...events].toSorted((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt) || b.id.localeCompare(a.id))[0];
+  return { count: events.length, customerVisible: events.filter((item) => customerVisible(item)).length, notes: events.filter((e) => e.note).length, latest: latest ? { action: latest.action, occurredAt: latest.occurredAt } : null };
 }
-const ACTIVE = new Set(["accepted", "assigned", "in_progress", "on_hold", "rework_requested"]);
+const ACTIVE = new Set(["accepted", "assigned", IN_PROGRESS, "on_hold", "rework_requested"]);
+const DONE_TAB = new Map<string, "review" | "completed">([["submitted", "review"], ["completed", "completed"]]);
+/** The delegation's end: ended at a past time, or until a later one. */
+function delegationText(until: string, now: number, { t, display }: I18n): string {
+  const time = showTime(until, display);
+  return t(Date.parse(until) <= now ? "ended {time}" : "until {time}", { time });
+}
+/** An event's tone: a review or completion is ok, a setback warns, anything else is plain. */
+function eventTone(action: string): "ok" | "warn" | undefined {
+  if (/reviewed|accepted|completed/.test(action)) return "ok";
+  return /rework|cant_make|held|cancel|problem/.test(action) ? "warn" : undefined;
+}
 const STATUS_LABEL: Record<string, string> = {
   accepted: "Accepted", assigned: "Assigned", in_progress: "In progress", on_hold: "On hold", rework_requested: "Rework requested", submitted: "Submitted", completed: "Completed", cancelled: "Cancelled",
 };
-const statusLabel = (s: string, t: T) => (STATUS_LABEL[s] ? t(STATUS_LABEL[s]) : s.replaceAll('_', " "));
+const statusLabel = (s: string, t: T) => (textOf(STATUS_LABEL, s, t) ?? s.replaceAll('_', " "));
 const STATUS_TONE: Record<string, Tone> = { accepted: "primary", assigned: "primary", in_progress: "primary", on_hold: "warn", rework_requested: "warn", submitted: "primary", completed: "ok", cancelled: "muted" };
-const eventTitle = (action: string, t: T) => (jobEventTitle[action] ? t(jobEventTitle[action]) : action.replaceAll(/[._]/g, " "));
+const eventTitle = (action: string, t: T) => (textOf(jobEventTitle, action, t) ?? action.replaceAll(/[._]/g, " "));
 const ACKS: Record<string, string> = { accepted: "accepted the slot", cant_make: "can’t make it", pending: "awaiting acceptance" };
 
 export interface HistoryRow {
@@ -62,16 +77,16 @@ export function historyRow(j: ApiPartnerJob, now: number, units: Map<string, str
       id: j.jobId, short: j.jobId.slice(0, 8), title: typeLabel(j.type, t), origin: null, version: null, ended: true, status: j.status, tab: "ended", unit: null,
       // when the delegation ended: the period counts a history without completion by it (IR614)
       sub: t(s.count === 1 ? "1 own decision event · delegation ended {time} (read-only snapshot)" : "{n} own decision events · delegation ended {time} (read-only snapshot)", { n: s.count, time: showTime(j.asOf, display) }),
-      delegation: t("ended — history only"), tech: { name: "—", sub: t("not shown after the delegation") }, last, lastAt: last ? Date.parse(last.at) : 0,
-      badge: { text: statusLabel(j.status, t), tone: STATUS_TONE[j.status] ?? "muted" }, overdue: false,
+      delegation: t("ended — history only"), tech: { name: "—", sub: t("not shown after the delegation") }, lastAt: last ? Date.parse(last.at) : 0,
+      badge: { text: statusLabel(j.status, t), tone: lookup(STATUS_TONE, j.status) ?? "muted" }, overdue: false, last,
     };
   }
   const tech = j.technicianMembershipId ? names.get(j.technicianMembershipId) ?? t("technician") : null;
   const ack = ACKS[j.assignmentAcknowledgement ?? ""];
-  const isOverdue = (j.status === "assigned" || j.status === "in_progress") && !!j.scheduledSlot && Date.parse(j.scheduledSlot.endAt) <= now;
+  const isOverdue = (j.status === "assigned" || j.status === IN_PROGRESS) && !!j.scheduledSlot && Date.parse(j.scheduledSlot.endAt) <= now;
   const until = j.accessValidUntil ?? null;
-  const delegation = until ? t(Date.parse(until) <= now ? "ended {time}" : "until {time}", { time: showTime(until, display) }) : "—";
-  const tab = ACTIVE.has(j.status) ? "active" : j.status === "submitted" ? "review" : j.status === "completed" ? "completed" : null;
+  const delegation = until ? delegationText(until, now, i) : "—";
+  const tab = ACTIVE.has(j.status) ? "active" : (DONE_TAB.get(j.status) ?? null);
   return {
     id: j.id,
     short: j.id.slice(0, 8),
@@ -82,10 +97,10 @@ export function historyRow(j: ApiPartnerJob, now: number, units: Map<string, str
     status: j.status,
     unit: units.get(j.unitId) ?? null,
     sub: [t(s.count === 1 ? "1 event" : "{n} events", { n: s.count }), t("{n} customer-visible", { n: s.customerVisible }), t(s.notes === 1 ? "1 note" : "{n} notes", { n: s.notes }), t("delegation {state}", { state: delegation })].join(" · "),
-    tech: tech ? { name: tech, sub: t(ack ? ack : "assigned") } : { name: t("Unassigned"), sub: j.status === "accepted" ? t("assign in Schedule") : "—", tone: j.status === "accepted" ? "crit" : undefined },
+    tech: tech ? { name: tech, sub: t(ack ?? "assigned") } : { name: t("Unassigned"), sub: j.status === "accepted" ? t("assign in Schedule") : "—", tone: j.status === "accepted" ? "crit" : undefined },
     lastAt: last ? Date.parse(last.at) : 0,
     overdue: isOverdue,
-    badge: isOverdue ? { text: t("Overdue"), tone: "crit" } : { text: statusLabel(j.status, t), tone: STATUS_TONE[j.status] ?? "muted" },
+    badge: isOverdue ? { text: t("Overdue"), tone: "crit" } : { text: statusLabel(j.status, t), tone: lookup(STATUS_TONE, j.status) ?? "muted" },
     tab,
     delegation,
     last,
@@ -96,9 +111,12 @@ export function historyRow(j: ApiPartnerJob, now: number, units: Map<string, str
 export function visibleRows(rows: HistoryRow[], tab: HistoryTab, sort: HistorySort): HistoryRow[] {
   const order = [...HISTORY_STATUSES] as string[];
   const shown = rows.filter((r) => tab === "all" || r.tab === tab);
-  return shown.sort((a, b) => (sort === "status" ? order.indexOf(a.status) - order.indexOf(b.status) : 0) || b.lastAt - a.lastAt || a.id.localeCompare(b.id));
+  return shown.toSorted((a, b) => (sort === "status" ? order.indexOf(a.status) - order.indexOf(b.status) : 0) || b.lastAt - a.lastAt || a.id.localeCompare(b.id));
 }
-export const tabCounts = (rows: HistoryRow[]) => Object.fromEntries(TABS.map((t) => [t.id, t.id === "all" ? rows.length : rows.filter((r) => r.tab === t.id).length])) as Record<HistoryTab, number>;
+export const tabCounts = (rows: HistoryRow[]): Record<HistoryTab, number> => {
+  const countOf = (tab: HistoryRow["tab"]) => rows.filter((r) => r.tab === tab).length;
+  return { all: rows.length, active: countOf("active"), review: countOf("review"), completed: countOf("completed"), ended: countOf("ended") };
+};
 
 export interface TimelineItem { id: string; title: string; detail: string; at: string; badge: "customer" | "internal"; tone?: "ok" | "warn" }
 /** One timeline row: the event's title, its note (in quotes, with the visibility) and who acted — “you”, a member of the
@@ -107,13 +125,13 @@ export function eventItem(e: ApiEvent, byUser: Map<string, string>, i: I18n = EN
   const { t, display } = i;
   const actor = e.actorUserId ? byUser.get(e.actorUserId) ?? null : t("system");
   const detail = [e.note ? `“${e.note.message}” · ${t(e.note.visibility)}` : "", actor ? t("by {name}", { name: actor }) : ""].filter(Boolean).join(" · ");
-  const tone = /reviewed|accepted|completed/.test(e.action) ? "ok" : (/rework|cant_make|held|cancel|problem/.test(e.action) ? "warn" : undefined);
+  const tone = eventTone(e.action);
   return { id: e.id, title: eventTitle(e.action, t), at: showTime(e.occurredAt, display), badge: customerVisible(e) ? "customer" : "internal", detail, tone };
 }
 /** Who acted, by user: the company's members by name and the signed-in user as “you”. */
 export const byUser = (members: ApiMember[], me?: string, t: T = en) => new Map([...members.map((m) => [m.userId, m.displayName] as const), ...(me ? [[me, t("you")] as const] : [])]);
 /** The channel of a preview in a sentence (“in-app”, “email”, “WhatsApp”). */
-export const channelText = (c: string, t: T = en) => ({ inApp: t("in-app"), email: t("email"), whatsapp: "WhatsApp" })[c] ?? c;
+export const channelText = (c: string, t: T = en) => lookup({ inApp: t("in-app"), email: t("email"), whatsapp: "WhatsApp" }, c) ?? c;
 
 /** The templates and recipient roles of a job communication (DD-P07; roles map hq→admin, assigned technician→technician,
 customer contact→client, IR90). Template, role and channel codes are shown as they are (Figma 05-x). */
@@ -142,7 +160,7 @@ export function communicationRefusal(f: { code: string; messageKey: string; fiel
   }
   if (f.code === "NOT_FOUND") return t("The job is no longer readable by your company.");
   if (f.code === "VALIDATION") {
-    return Object.entries(f.fieldErrors).map(([k, v]) => `${FIELDS[k] ? t(FIELDS[k]) : k}: ${FIELD_TEXT[v] ? t(FIELD_TEXT[v]) : v}`).join(" · ") || t("Check the input.");
+    return Object.entries(f.fieldErrors).map(([k, v]) => `${textOf(FIELDS, k, t) ?? k}: ${textOf(FIELD_TEXT, v, t) ?? v}`).join(" · ") || t("Check the input.");
   }
   return t("{code} — {key} (your text is kept; retry)", { code: f.code, key: f.messageKey });
 }

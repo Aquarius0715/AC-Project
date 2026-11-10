@@ -4,6 +4,10 @@
 import { translator, type T } from "@ac/web/lib/i18n";
 import type { OpInput } from "@ac/web/lib/opTypes";
 import type { Fact } from "@ac/web/lib/contracts.gen";
+import { codePoints } from "@ac/web/lib/text";
+import { entryOf, lookup } from "@ac/web/lib/lookup";
+
+const SET_TEMPERATURE = "set_temperature";
 
 const en = translator("en");
 
@@ -14,6 +18,11 @@ export type AutoCondition =
 export type UnitAction =
   | { kind: "set_power"; power: boolean } | { kind: "set_temperature"; celsius: number } | { kind: "set_mode"; mode: "cool" | "dry" | "fan" }
   | { kind: "set_fan"; fanLevel: "low" | "mid" | "high" } | { kind: "ventilate"; level: "low" | "mid" | "high" };
+/** What a form control can choose, in the order the screen lists it. */
+export const actionKinds = ["set_power", SET_TEMPERATURE, "set_mode", "set_fan", "ventilate"] as const satisfies readonly UnitAction["kind"][];
+export const acModes = ["cool", "dry", "fan"] as const;
+export const fanLevels = ["low", "mid", "high"] as const;
+export const factQualities = ["valid", "missing", "stale", "suspect"] as const;
 /** Policy (kind automation) of service-contracts.ts. */
 export interface ApiAutoPolicy {
   id: string; version: number; kind: "automation"; name: string; unitIds: string[]; ownerMembershipId: string; timezone: string; enabled: boolean; priority: number;
@@ -22,28 +31,36 @@ export interface ApiAutoPolicy {
 
 const cmp: Record<Compare, string> = { gt: ">", gte: "≥", lt: "<", lte: "≤" };
 /** The subject of a measured condition, as the sentence starts. */
-export const subjectText = (type: "tariff" | "solar" | "battery", t: T = en) =>
-  type === "tariff" ? t("When the electricity tariff is") : (t(type === "solar" ? "When solar output is" : "When battery output is"));
+const SUBJECT = new Map([["tariff", "When the electricity tariff is"], ["solar", "When solar output is"], ["battery", "When battery output is"]]);
+export const subjectText = (type: "tariff" | "solar" | "battery", t: T = en) => t(SUBJECT.get(type) ?? type);
 export function conditionText(c: AutoCondition, t: T = en): string {
   switch (c.type) {
     case "occupancy": { return t(c.occupied ? "When the room is occupied" : "When the room is not occupied");
     }
     case "peak": { return t(c.active ? "When a peak period is active" : "When no peak period is active");
     }
-    case "tariff": { return `${subjectText("tariff", t)} ${cmp[c.operator]} ${String(c.value)} MYR/kWh`;
+    case "tariff": { return `${subjectText("tariff", t)} ${entryOf(cmp, c.operator)} ${String(c.value)} MYR/kWh`;
     }
-    default: { return `${subjectText(c.type, t)} ${cmp[c.operator]} ${String(c.value)} kW`;
+    default: { return `${subjectText(c.type, t)} ${entryOf(cmp, c.operator)} ${String(c.value)} kW`;
     }
   }
 }
 /** A mode or a fan / ventilation level, worded. */
-export const modeWord = (m: "cool" | "dry" | "fan", t: T = en) => ({ cool: t("cool"), dry: t("dry"), fan: t("fan") })[m] ?? m;
-export const levelWord = (l: "low" | "mid" | "high", t: T = en) => ({ low: t("low"), mid: t("mid"), high: t("high") })[l] ?? l;
+type Mode = "cool" | "dry" | "fan";
+type Level = "low" | "mid" | "high";
+const modeWord = (m: Mode, t: T = en) => {
+  const words = new Map(Object.entries({ cool: t("cool"), dry: t("dry"), fan: t("fan") }));
+  return words.get(m) ?? m; // a value the API adds before this table does
+};
+const levelWord = (l: Level, t: T = en) => {
+  const words = new Map(Object.entries({ low: t("low"), mid: t("mid"), high: t("high") }));
+  return words.get(l) ?? l; // a value the API adds before this table does
+};
 export function actionText(a: UnitAction, t: T = en): string {
   switch (a.kind) {
     case "set_power": { return t(a.power ? "turn the AC on" : "turn the AC off");
     }
-    case "set_temperature": { return t("set the temperature to {value} °C", { value: a.celsius });
+    case SET_TEMPERATURE: { return t("set the temperature to {value} °C", { value: a.celsius });
     }
     case "set_mode": { return t("switch to {mode} mode", { mode: modeWord(a.mode, t) });
     }
@@ -59,9 +76,10 @@ const ACROSS = "\0across"; // the group key of policies spanning customers (sort
 /** The list grouped by the customer of the target units; policies spanning customers go under “Across customers”. */
 export function policyGroups(ps: ApiAutoPolicy[], customerOfUnit: Map<string, string>, t: T = en): PolicyGroup[] {
   const groups = new Map<string, PolicyGroup>();
-  for (const p of [...ps].sort((a, b) => b.priority - a.priority || a.id.localeCompare(b.id))) {
+  const byPriority = [...ps].toSorted((a, b) => b.priority - a.priority || a.id.localeCompare(b.id));
+  for (const p of byPriority) {
     const customers = new Set(p.unitIds.map((u) => customerOfUnit.get(u) ?? t("unknown customer")));
-    const key = customers.size === 1 ? [...customers][0] : ACROSS;
+    const key = (customers.size === 1 ? [...customers][0] : undefined) ?? ACROSS;
     const g = groups.get(key) ?? { label: key === ACROSS ? t("Across customers") : key, rows: [] };
     g.rows.push({
       id: p.id, version: p.version, name: p.name, sentence: `${conditionText(p.condition, t)} → ${actionText(p.action, t)}`, priority: p.priority, enabled: p.enabled,
@@ -69,12 +87,15 @@ export function policyGroups(ps: ApiAutoPolicy[], customerOfUnit: Map<string, st
     });
     groups.set(key, g);
   }
-  return [...groups].sort(([a], [b]) => (a === ACROSS ? -1 : (b === ACROSS ? 1 : a.localeCompare(b)))).map(([, g]) => g);
+  // the policies across customers first, then by customer
+  return [...groups].toSorted(([a], [b]) => Number(b === ACROSS) - Number(a === ACROSS) || a.localeCompare(b)).map(([, g]) => g);
 }
 
 /** Why a policy was turned off automatically, worded; another code stays as it is. */
-export const disabledReasonWord = (r: string, t: T = en) =>
-  ({ consent_revoked: t("consent revoked"), capability_changed: t("capability changed"), unit_archived: t("unit archived") })[r] ?? r;
+export const disabledReasonWord = (r: string, t: T = en) => {
+  const words = new Map(Object.entries({ consent_revoked: t("consent revoked"), capability_changed: t("capability changed"), unit_archived: t("unit archived") }));
+  return words.get(r) ?? r; // a value the API adds before this table does
+};
 
 /** The editor form (DD-A11 fields, IR07 shared inputs). */
 export interface AutoDraft {
@@ -82,48 +103,82 @@ export interface AutoDraft {
   type: AutoCondition["type"]; flag: boolean; operator: Compare; value: string;
   actionKind: UnitAction["kind"]; power: boolean; celsius: string; mode: "cool" | "dry" | "fan"; level: "low" | "mid" | "high";
 }
+/** The on/off flag of an occupancy or peak condition (false for the measured ones). */
+function conditionFlag(c: AutoCondition | undefined): boolean {
+  return c?.type === "occupancy" ? c.occupied : c?.type === "peak" && c.active;
+}
+/** The fan or ventilation level of an action ("low" for the others). */
+function actionLevel(a: UnitAction | undefined): AutoDraft["level"] {
+  if (a?.kind === "set_fan") return a.fanLevel;
+  return a?.kind === "ventilate" ? a.level : "low";
+}
 export function autoDraft(p?: ApiAutoPolicy, timezone = "Asia/Kuala_Lumpur"): AutoDraft {
   const c = p?.condition;
   const a = p?.action;
   return {
     name: p?.name ?? "", priority: String(p?.priority ?? 50), timezone: p?.timezone ?? timezone, enabled: p?.enabled ?? false, unitIds: p?.unitIds ?? [],
-    type: c?.type ?? "tariff", flag: c?.type === "occupancy" ? c.occupied : (c?.type === "peak" ? c.active : false),
+    type: c?.type ?? "tariff", flag: conditionFlag(c),
     operator: c && "operator" in c ? c.operator : "gt", value: c && "value" in c ? String(c.value) : "0.6",
-    actionKind: a?.kind ?? "set_temperature", power: a?.kind === "set_power" ? a.power : false, celsius: a?.kind === "set_temperature" ? String(a.celsius) : "26",
-    mode: a?.kind === "set_mode" ? a.mode : "cool", level: a?.kind === "set_fan" ? a.fanLevel : (a?.kind === "ventilate" ? a.level : "low"),
+    actionKind: a?.kind ?? SET_TEMPERATURE, power: a?.kind === "set_power" && a.power, celsius: a?.kind === SET_TEMPERATURE ? String(a.celsius) : "26",
+    mode: a?.kind === "set_mode" ? a.mode : "cool", level: actionLevel(a),
   };
 }
-export function autoErrors(d: AutoDraft, tempRange: { min: number; max: number } | null, t: T = en): Record<string, string> {
+export function autoErrors(d: AutoDraft, temperatureRange: { min: number; max: number } | null, t: T = en): Record<string, string> {
   const e: Record<string, string> = {};
-  if ([...d.name.trim()].length === 0 || [...d.name.trim()].length > 120) e.name = t("1–120 characters");
+  if (codePoints(d.name.trim()) === 0 || codePoints(d.name.trim()) > 120) e.name = t("1–120 characters");
   const pr = Number(d.priority);
-  if (!(Number.isInteger(pr) && pr >= 0 && pr <= 100)) e.priority = t("An integer 0–100");
+  if (!(Number.isSafeInteger(pr) && pr >= 0 && pr <= 100)) e.priority = t("An integer 0–100");
   if (!d.timezone.trim()) e.timezone = t("Required");
   if (d.unitIds.length === 0) e.unitIds = t("Choose at least one unit");
-  if ((d.type === "tariff" || d.type === "solar" || d.type === "battery") && (d.value.trim() === "" || !(Number(d.value) >= 0))) e.value = t("A value ≥ 0");
-  if (d.actionKind === "set_temperature") {
+  if ((d.type === "tariff" || d.type === "solar" || d.type === "battery") && (d.value.trim() === "" || Number.isNaN(Number(d.value)) || Number(d.value) < 0)) e.value = t("A value ≥ 0");
+  if (d.actionKind === SET_TEMPERATURE) {
     const c = Number(d.celsius);
-    if (!Number.isFinite(c)) e.celsius = t("A temperature");
-    else if (tempRange && (c < tempRange.min || c > tempRange.max)) e.celsius = t("Within {min}–{max} °C on every target unit", { min: tempRange.min, max: tempRange.max });
+    const celsiusProblem = celsiusError(c, temperatureRange, t);
+    if (celsiusProblem) e.celsius = celsiusProblem;
   }
   return e;
 }
+/** What is wrong with the temperature, or undefined: not a number, or outside the range every target unit allows. */
+function celsiusError(c: number, range: { min: number; max: number } | null | undefined, t: T): string | undefined {
+  if (!Number.isFinite(c)) return t("A temperature");
+  return range && (c < range.min || c > range.max) ? t("Within {min}–{max} °C on every target unit", { min: range.min, max: range.max }) : undefined;
+}
+function draftCondition(d: AutoDraft): AutoCondition {
+  switch (d.type) {
+    case "occupancy": { return { type: "occupancy", occupied: d.flag }; }
+    case "peak": { return { type: "peak", active: d.flag }; }
+    case "tariff": { return { type: "tariff", operator: d.operator, value: Number(d.value), unit: "MYR_per_kWh" }; }
+    default: { return { type: d.type, operator: d.operator, value: Number(d.value), unit: "kW" }; }
+  }
+}
+function draftAction(d: AutoDraft): UnitAction {
+  switch (d.actionKind) {
+    case "set_power": { return { kind: "set_power", power: d.power }; }
+    case SET_TEMPERATURE: { return { kind: SET_TEMPERATURE, celsius: Number(d.celsius) }; }
+    case "set_mode": { return { kind: "set_mode", mode: d.mode }; }
+    case "set_fan": { return { kind: "set_fan", fanLevel: d.level }; }
+    default: { return { kind: "ventilate", level: d.level }; }
+  }
+}
 export function autoInput(d: AutoDraft, id?: string): Extract<OpInput<"policies.save">, { kind: "automation" }> {
-  const condition: AutoCondition = d.type === "occupancy" ? { type: "occupancy", occupied: d.flag } : d.type === "peak" ? { type: "peak", active: d.flag }
-    : d.type === "tariff" ? { type: "tariff", operator: d.operator, value: Number(d.value), unit: "MYR_per_kWh" } : { type: d.type, operator: d.operator, value: Number(d.value), unit: "kW" };
-  const action: UnitAction = d.actionKind === "set_power" ? { kind: "set_power", power: d.power } : d.actionKind === "set_temperature" ? { kind: "set_temperature", celsius: Number(d.celsius) }
-    : d.actionKind === "set_mode" ? { kind: "set_mode", mode: d.mode } : d.actionKind === "set_fan" ? { kind: "set_fan", fanLevel: d.level } : { kind: "ventilate", level: d.level };
+  const condition = draftCondition(d);
+  const action = draftAction(d);
   return { ...(id && { id }), kind: "automation" as const, name: d.name.trim(), unitIds: d.unitIds, timezone: d.timezone.trim(), enabled: d.enabled, priority: Number(d.priority), condition, action };
 }
 
 /** The fact a condition type reads (IR16 metric/unit table) and how the simulator row is entered. */
-export const factOf: Record<AutoCondition["type"], { metric: string; unit: string; boolean: boolean }> = {
+export const factOf: Record<AutoCondition["type"], { metric: Fact["metric"]; unit: string; boolean: boolean }> = {
   occupancy: { metric: "occupied", unit: "boolean", boolean: true }, peak: { metric: "peak", unit: "boolean", boolean: true },
   tariff: { metric: "tariff", unit: "MYR_per_kWh", boolean: false }, solar: { metric: "solar", unit: "kW", boolean: false }, battery: { metric: "battery", unit: "kW", boolean: false },
 };
 /** One synthetic fact of a simulation: a unit, the kind of fact (the policy's own when omitted; “+ Add fact” adds other
 kinds, so other policies and customer rules can match too — Figma Admin 361:7456, IR323), its value and quality. */
 export interface FactRow { unitId: string; kind?: AutoCondition["type"]; value: string; quality: "valid" | "missing" | "stale" | "suspect" }
+/** A typed fact value: empty is no value, a flag is "true"/"false", anything else a number. */
+function factValue(value: string, fact: { boolean?: boolean }): boolean | number | null {
+  if (value.trim() === "") return null;
+  return fact.boolean ? value === "true" : Number(value);
+}
 /** EvaluationInput for the current business-clock minute (occurredAt must be in it); empty values are null facts and
 each unit is evaluated once, whatever number of facts it has. */
 export function evaluationInput(type: AutoCondition["type"], rows: FactRow[], now: Date, eventId: string): OpInput<"automations.simulate"> {
@@ -133,12 +188,16 @@ export function evaluationInput(type: AutoCondition["type"], rows: FactRow[], no
     facts: rows.map((r) => {
       const f = factOf[r.kind ?? type];
       return {
-        unitId: r.unitId, metric: f.metric as Fact["metric"], unit: f.unit, observedAt: at, quality: r.quality,
-        value: r.value.trim() === "" ? null : (f.boolean ? r.value === "true" : Number(r.value)),
+        unitId: r.unitId, metric: f.metric, unit: f.unit, observedAt: at, quality: r.quality,
+        value: factValue(r.value, f),
       };
     }),
   };
 }
+/** What an evaluation asks, without its time or event ID: a repeated Fire (automations.fire) reuses its one-time event
+ID only while this stays the same. Another body under the same key is refused (D04), and a fact without its own kind
+follows the policy's condition type (IR704). */
+export const evaluationKey = (type: AutoCondition["type"], rows: FactRow[]): string => JSON.stringify(evaluationInput(type, rows, new Date(0), ""));
 /** Why a unit was not acted on (the suppression reasons of automations.simulate / fire), worded for HQ. */
 export function reasonWord(reason: string, t: T = en): string {
   const words: Record<string, string> = {
@@ -147,7 +206,10 @@ export function reasonWord(reason: string, t: T = en): string {
     invalid_capability: t("not supported by the unit"), no_control_action: t("no control action"), reconciliation_required: t("reconciliation required"),
     superseded: t("superseded by a schedule starting in the same minute"),
   };
-  return words[reason] ?? reason;
+  return lookup(words, reason) ?? reason;
 }
 /** A per-unit decision, worded. */
-export const decisionWord = (d: string, t: T = en) => ({ selected: t("selected"), suppressed: t("suppressed"), requested: t("requested"), failed: t("failed") })[d] ?? d;
+export const decisionWord = (d: string, t: T = en) => {
+  const words = new Map(Object.entries({ selected: t("selected"), suppressed: t("suppressed"), requested: t("requested"), failed: t("failed") }));
+  return words.get(d) ?? d; // a value the API adds before this table does
+};

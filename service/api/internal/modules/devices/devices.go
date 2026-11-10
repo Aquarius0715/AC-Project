@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/pradita/ac-project/service/api/internal/modules/maintenance"
 	"github.com/pradita/ac-project/service/api/internal/ops"
@@ -58,6 +59,7 @@ type Device struct {
 	TargetUnitID          uuid.UUID  `json:"targetUnitId"`
 	CreatedByMembershipID uuid.UUID  `json:"createdByMembershipId"`
 	Serial                string     `json:"serial"`
+	MqttNode              *string    `json:"mqttNode"`
 	Connection            string     `json:"connection"`
 	LastSeenAt            *time.Time `json:"lastSeenAt"`
 	FirmwareVersion       string     `json:"firmwareVersion"`
@@ -76,12 +78,13 @@ type DeviceDetail struct {
 
 const devCols = `d.id, d.tenant_id, d.version, d.created_at, d.updated_at, d.binding_id, d.unit_id, d.target_unit_id,` +
 	` d.created_by_membership_id,
-	d.serial, d.connection, d.last_seen_at, d.firmware_version, d.power_signal, d.tamper`
+	d.serial, d.mqtt_node, d.connection, d.last_seen_at, d.firmware_version, d.power_signal, d.tamper`
 
 // The aggregate and audit target kind of a device, its connection states, the tamper state that blocks binding (D05),
 // and the roles the device scope tells apart.
 const (
-	entityDevice = "device"
+	entityDevice     = "device"
+	entityCapability = "capability"
 
 	connOnline     = "online"
 	connOffline    = "offline"
@@ -155,7 +158,7 @@ func deviceScope(call *ops.Call, args *[]any, mode unitscope.Mode) string {
 	) + "))"
 }
 
-func (m *Module) load(
+func (*Module) load(
 	ctx context.Context,
 	call *ops.Call,
 	where string,
@@ -221,6 +224,7 @@ func scanDevices(rows pgx.Rows) ([]Device, error) {
 			&device.TargetUnitID,
 			&device.CreatedByMembershipID,
 			&device.Serial,
+			&device.MqttNode,
 			&device.Connection,
 			&device.LastSeenAt,
 			&device.FirmwareVersion,
@@ -565,7 +569,50 @@ func activeOperation(
 	return json.RawMessage("null"), nil
 }
 
-var serialRe = regexp.MustCompile(`^[A-Z0-9-]{3,64}$`)
+var (
+	serialRe = regexp.MustCompile(`^[A-Z0-9-]{3,64}$`)
+	// mqttNodeRe is a node_id as the firmware sends it (device-firmware.md §2): letters of either case, digits, hyphen
+	// and underscore, matched to the topic exactly (IR635).
+	mqttNodeRe = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
+)
+
+// errMqttNodeFormat is the field error of a node_id that is not 1–64 letters, digits, hyphens or underscores.
+const errMqttNodeFormat = "error.mqttNodeFormat"
+
+// errDuplicateMqttNode refuses a node_id that another device of the tenant has.
+const errDuplicateMqttNode = "error.duplicateMqttNode"
+
+// dupDevice maps the refusal of the unique indexes devices_serial and devices_mqtt_node, which a device saved at the
+// same moment as the check before the write (serialFree, mqttNodeFree) causes, to the conflict that check answers.
+func dupDevice(err error) error {
+	pgErr, matched := errors.AsType[*pgconn.PgError](err)
+	if !matched || pgErr.Code != "23505" {
+		return err
+	}
+
+	switch pgErr.ConstraintName {
+	case "devices_serial":
+		return apperr.E(apperr.Conflict, apperr.KeyDuplicateSerial)
+	case "devices_mqtt_node":
+		return apperr.E(apperr.Conflict, errDuplicateMqttNode)
+	}
+
+	return err
+}
+
+// normalizeMqttNode trims a node_id and makes the empty one absent; ok is false for a malformed one.
+func normalizeMqttNode(raw *string) (*string, bool) {
+	if raw == nil {
+		return nil, true
+	}
+
+	node := strings.TrimSpace(*raw)
+	if node == "" {
+		return nil, true
+	}
+
+	return &node, mqttNodeRe.MatchString(node)
+}
 
 // RegisterInput is devices.register input.
 type RegisterInput struct {
@@ -573,6 +620,9 @@ type RegisterInput struct {
 	SensorTypes []string   `json:"sensorTypes"`
 	UnitID      uuid.UUID  `json:"unitId"`
 	JobID       *uuid.UUID `json:"jobId,omitempty"`
+	// MqttNode is the node_id the device's ESP32 sends as the <node> of smarthome/ac/<node>/… (IR635); the IoT bridge
+	// takes its readings and sends its commands by it once the device is bound.
+	MqttNode *string `json:"mqttNode,omitempty"`
 }
 
 // Validate implements ops.Validator (DD-T11: serial 3–64 letters, digits or hyphens after trim + upper-case).
@@ -595,6 +645,13 @@ func (in *RegisterInput) Validate() map[string]string {
 	if in.UnitID == uuid.Nil {
 		fieldErrs["unitId"] = apperr.KeyRequired
 	}
+
+	node, ok := normalizeMqttNode(in.MqttNode)
+	if !ok {
+		fieldErrs["mqttNode"] = errMqttNodeFormat
+	}
+
+	in.MqttNode = node
 
 	return fieldErrs
 }
@@ -691,6 +748,11 @@ func (m *Module) registerDetail(
 	}
 
 	err = serialFree(ctx, call, input.Serial)
+	if err != nil {
+		return DeviceDetail{}, err
+	}
+
+	err = mqttNodeFree(ctx, call, input.MqttNode, uuid.Nil)
 	if err != nil {
 		return DeviceDetail{}, err
 	}
@@ -792,6 +854,31 @@ func serialFree(ctx context.Context, call *ops.Call, serial string) error {
 	return nil
 }
 
+// mqttNodeFree refuses a node_id that a device other than `self` has (tenant-wide, exact match).
+func mqttNodeFree(ctx context.Context, call *ops.Call, node *string, self uuid.UUID) error {
+	if node == nil {
+		return nil
+	}
+
+	var taken bool
+
+	scanErr := call.Tx.QueryRow(
+		ctx,
+		`SELECT EXISTS (SELECT 1 FROM devices.devices WHERE mqtt_node = $1 AND id <> $2)`,
+		*node,
+		self,
+	).Scan(&taken)
+	if scanErr != nil {
+		return apperr.Wrap(scanErr, "select devices.devices")
+	}
+
+	if taken {
+		return apperr.E(apperr.Conflict, errDuplicateMqttNode)
+	}
+
+	return nil
+}
+
 // insertDevice registers the device with one sensor per requested type, as its model version specifies it. D05:
 // register reserves targetUnitId; unitId stays null until devices.bind.
 func insertDevice(
@@ -803,15 +890,17 @@ func insertDevice(
 ) error {
 	_, execErr := call.Tx.Exec(
 		ctx,
-		`INSERT INTO devices.devices (id, tenant_id, serial, target_unit_id, created_by_membership_id, firmware_version)
-		VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, 'v1')`,
+		`INSERT INTO devices.devices (id, tenant_id, serial, target_unit_id, created_by_membership_id, firmware_version,
+			mqtt_node)
+		VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, 'v1', $5)`,
 		device,
 		input.Serial,
 		input.UnitID,
 		call.Principal.MembershipID,
+		input.MqttNode,
 	)
 	if execErr != nil {
-		return apperr.Wrap(execErr, "insert devices.devices")
+		return apperr.Wrap(dupDevice(execErr), "insert devices.devices")
 	}
 
 	for _, mt := range input.SensorTypes {
@@ -849,6 +938,9 @@ func RegisterDevices(reg *ops.Registry, module *Module) {
 	ops.Register(reg, "devices.get", module.get)
 	ops.Register(reg, "devices.register", module.register)
 	ops.Register(reg, opBind, module.bind)
+	ops.Register(reg, "devices.unbind", module.unbind)
+	ops.Register(reg, "devices.delete", module.deleteDevice)
+	ops.Register(reg, opSetMqttNode, module.setMqttNode)
 	ops.Register(reg, "devices.check", module.check)
 	ops.Register(reg, "devices.updateFirmware", module.updateFirmware)
 	ops.Register(reg, "devices.calibrate", module.calibrate)

@@ -2290,6 +2290,122 @@
                         }
                     }
                 }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Authorization: admin:energy.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR656 only a baseline no MRV report cites (CONFLICT error.baselineCited); deletes every version\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A13",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "baselines"
+                ],
+                "summary": "baselines.delete (write)",
+                "operationId": "baselines.delete",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "D04: the same key replays the stored response; another body for the same key is CONFLICT",
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "all: required (target baselines, read baselines.list)",
+                        "name": "X-Expected-Version",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "input field id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "input field reason",
+                        "name": "reason",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ops.Envelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/energy.DeletedResource"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "403": {
+                        "description": "FORBIDDEN",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "409": {
+                        "description": "CONFLICT / OFFLINE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "422": {
+                        "description": "VALIDATION (fieldErrors)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "429": {
+                        "description": "RATE_LIMITED (retryAfterSeconds)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "503": {
+                        "description": "UNAVAILABLE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "504": {
+                        "description": "TIMEOUT",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    }
+                }
             }
         },
         "/v1/capabilities": {
@@ -2570,6 +2686,122 @@
                                     "properties": {
                                         "data": {
                                             "$ref": "#/definitions/devices.Capability"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "403": {
+                        "description": "FORBIDDEN",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "409": {
+                        "description": "CONFLICT / OFFLINE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "422": {
+                        "description": "VALIDATION (fieldErrors)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "429": {
+                        "description": "RATE_LIMITED (retryAfterSeconds)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "503": {
+                        "description": "UNAVAILABLE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "504": {
+                        "description": "TIMEOUT",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Authorization: admin:device.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR652 only a model no unit uses and no firmware campaign targets (CONFLICT error.modelInUse / error.modelInCampaign); deletes every version of the model\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A04",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "capabilities"
+                ],
+                "summary": "capabilities.delete (write)",
+                "operationId": "capabilities.delete",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "D04: the same key replays the stored response; another body for the same key is CONFLICT",
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "all: required (target capabilities, read capabilities.list)",
+                        "name": "X-Expected-Version",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "input field id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "input field reason",
+                        "name": "reason",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ops.Envelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/devices.DeletedResource"
                                         }
                                     }
                                 }
@@ -3926,7 +4158,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: client:control.execute | technician:control.diagnose:job-required | admin:control.execute\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR46 restriction action table; IR47 derived connection/powerSignal OFFLINE; IR74 client omits reason; IR94 technician write table (assignment and work window, jobId required when typed); IR109 group control sends one command per selected unit (owner only); IR306 source ui (default) or voice, voice only from a client (the assistant of the Client app)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-C03, DD-T10, DD-A11 through automations.fire, DD-C04, DD-C05, DD-A02, DD-C14 · Input versions: expectedUnitVersion=UnitDetail.version",
+                "description": "Authorization: client:control.execute | technician:control.diagnose:job-required | admin:control.execute\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR46 restriction action table; IR47 derived connection/powerSignal OFFLINE; IR74 client omits reason; IR94 technician write table (assignment and work window, jobId required when typed); IR109 group control sends one command per selected unit (owner only); a command asked for here is always source ui (the voice channel was withdrawn, IR648)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-C03, DD-T10, DD-A11 through automations.fire, DD-C04, DD-C05, DD-A02, DD-C14 · Input versions: expectedUnitVersion=UnitDetail.version",
                 "consumes": [
                     "application/json"
                 ],
@@ -4807,6 +5039,128 @@
                         }
                     }
                 }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Authorization: admin:job.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR654 only a contractor company with no job, offer, history, certificate, payout or account (CONFLICT error.contractorInUse); deletes its rate cards and unavailability; IR690 force (data.forceDelete, else FORBIDDEN errors.force_delete_not_allowed): the accounts of the company do not stop the delete, the caller deletes them afterwards with members.delete force, every other record still stops it; the reason is recorded as [forced]\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A21",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "contractors"
+                ],
+                "summary": "contractors.delete (write)",
+                "operationId": "contractors.delete",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "D04: the same key replays the stored response; another body for the same key is CONFLICT",
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "all: required (target contractor, read contractors.list)",
+                        "name": "X-Expected-Version",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "input field id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "input field reason",
+                        "name": "reason",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "input field force",
+                        "name": "force",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ops.Envelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/maintenance.DeletedResource"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "403": {
+                        "description": "FORBIDDEN",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "409": {
+                        "description": "CONFLICT / OFFLINE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "422": {
+                        "description": "VALIDATION (fieldErrors)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "429": {
+                        "description": "RATE_LIMITED (retryAfterSeconds)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "503": {
+                        "description": "UNAVAILABLE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "504": {
+                        "description": "TIMEOUT",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    }
+                }
             }
         },
         "/v1/contracts": {
@@ -5458,6 +5812,128 @@
                                     "properties": {
                                         "data": {
                                             "$ref": "#/definitions/assets.Customer"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "403": {
+                        "description": "FORBIDDEN",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "409": {
+                        "description": "CONFLICT / OFFLINE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "422": {
+                        "description": "VALIDATION (fieldErrors)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "429": {
+                        "description": "RATE_LIMITED (retryAfterSeconds)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "503": {
+                        "description": "UNAVAILABLE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "504": {
+                        "description": "TIMEOUT",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Authorization: admin:asset.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR654 only a customer with no unit (CONFLICT error.customerHasUnits) and no job, contract, invoice, inquiry, restriction, report or account (CONFLICT error.customerInUse); deletes its properties, spaces and unit imports; IR690 force (data.forceDelete, else FORBIDDEN errors.force_delete_not_allowed): the accounts of its organization do not stop the delete, the caller deletes them afterwards with members.delete force, every other record still stops it; the reason is recorded as [forced]\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A02",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "customers"
+                ],
+                "summary": "customers.delete (write)",
+                "operationId": "customers.delete",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "D04: the same key replays the stored response; another body for the same key is CONFLICT",
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "all: required (target customers, read customers.list)",
+                        "name": "X-Expected-Version",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "input field id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "input field reason",
+                        "name": "reason",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "input field force",
+                        "name": "force",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ops.Envelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/assets.DeletedResource"
                                         }
                                     }
                                 }
@@ -6413,6 +6889,124 @@
                 }
             }
         },
+        "/v1/devices/{deviceId}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Authorization: admin:device.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR652 only a device that is not bound, has no operation under way and is in no unfinished firmware campaign (CONFLICT error.deviceBound / error.deviceBusy / error.deviceInCampaign); deletes the device with its own sensors, bindings, operations, events, calibrations and campaign rows\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A04",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "devices"
+                ],
+                "summary": "devices.delete (write)",
+                "operationId": "devices.delete",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "D04: the same key replays the stored response; another body for the same key is CONFLICT",
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "all: required (target device, read devices.get)",
+                        "name": "X-Expected-Version",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "input field deviceId",
+                        "name": "deviceId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "input field reason",
+                        "name": "reason",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ops.Envelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/devices.DeletedResource"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "403": {
+                        "description": "FORBIDDEN",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "409": {
+                        "description": "CONFLICT / OFFLINE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "422": {
+                        "description": "VALIDATION (fieldErrors)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "429": {
+                        "description": "RATE_LIMITED (retryAfterSeconds)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "503": {
+                        "description": "UNAVAILABLE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "504": {
+                        "description": "TIMEOUT",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    }
+                }
+            }
+        },
         "/v1/devices/{deviceId}/bind": {
             "post": {
                 "security": [
@@ -6956,6 +7550,248 @@
                                     "properties": {
                                         "data": {
                                             "$ref": "#/definitions/devices.DeviceOperationPage"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "403": {
+                        "description": "FORBIDDEN",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "409": {
+                        "description": "CONFLICT / OFFLINE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "422": {
+                        "description": "VALIDATION (fieldErrors)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "429": {
+                        "description": "RATE_LIMITED (retryAfterSeconds)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "503": {
+                        "description": "UNAVAILABLE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "504": {
+                        "description": "TIMEOUT",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/devices/{deviceId}/set-mqtt-node": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Authorization: admin:device.write\nValidation: D01; node_id 1–64 letters, digits, hyphens or underscores; one device per node_id in the tenant; expectedVersion required for updates\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A04",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "devices"
+                ],
+                "summary": "devices.setMqttNode (write)",
+                "operationId": "devices.setMqttNode",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "D04: the same key replays the stored response; another body for the same key is CONFLICT",
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "all: required (target device, read devices.get)",
+                        "name": "X-Expected-Version",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "input field deviceId",
+                        "name": "deviceId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "input; the path parameters come from the route",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/devices.SetMqttNodeInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ops.Envelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/devices.Device"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "403": {
+                        "description": "FORBIDDEN",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "409": {
+                        "description": "CONFLICT",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "422": {
+                        "description": "VALIDATION (fieldErrors)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "429": {
+                        "description": "RATE_LIMITED (retryAfterSeconds)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "503": {
+                        "description": "UNAVAILABLE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "504": {
+                        "description": "TIMEOUT",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/devices/{deviceId}/unbind": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Authorization: admin:device.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR652 ends the device's binding (its history stays); CONFLICT error.notBound when it is not bound; a unit with work under way is busy\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A04",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "devices"
+                ],
+                "summary": "devices.unbind (write)",
+                "operationId": "devices.unbind",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "D04: the same key replays the stored response; another body for the same key is CONFLICT",
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "all: required (target device, read devices.get)",
+                        "name": "X-Expected-Version",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "input field deviceId",
+                        "name": "deviceId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "input; the path parameters come from the route",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/devices.UnbindInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ops.Envelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/devices.Device"
                                         }
                                     }
                                 }
@@ -8398,6 +9234,122 @@
                         }
                     }
                 }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Authorization: admin:mrv.factors\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR656 only a factor no MRV report cites (CONFLICT error.factorCited) and not the default factor of energy.summary (error.factorDefault); deletes every version\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A14",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "factors"
+                ],
+                "summary": "factors.delete (write)",
+                "operationId": "factors.delete",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "D04: the same key replays the stored response; another body for the same key is CONFLICT",
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "all: required (target factors, read factors.list)",
+                        "name": "X-Expected-Version",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "input field id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "input field reason",
+                        "name": "reason",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ops.Envelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/energy.DeletedResource"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "403": {
+                        "description": "FORBIDDEN",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "409": {
+                        "description": "CONFLICT / OFFLINE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "422": {
+                        "description": "VALIDATION (fieldErrors)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "429": {
+                        "description": "RATE_LIMITED (retryAfterSeconds)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "503": {
+                        "description": "UNAVAILABLE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "504": {
+                        "description": "TIMEOUT",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    }
+                }
             }
         },
         "/v1/filter-care": {
@@ -9605,6 +10557,122 @@
                                     "properties": {
                                         "data": {
                                             "$ref": "#/definitions/devices.Campaign"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "403": {
+                        "description": "FORBIDDEN",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "409": {
+                        "description": "CONFLICT / OFFLINE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "422": {
+                        "description": "VALIDATION (fieldErrors)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "429": {
+                        "description": "RATE_LIMITED (retryAfterSeconds)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "503": {
+                        "description": "UNAVAILABLE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "504": {
+                        "description": "TIMEOUT",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Authorization: admin:device.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR653 only a campaign that has ended (aborted or completed; CONFLICT error.campaignActive); deletes its device rows\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A20",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "firmwareCampaigns"
+                ],
+                "summary": "firmwareCampaigns.delete (write)",
+                "operationId": "firmwareCampaigns.delete",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "D04: the same key replays the stored response; another body for the same key is CONFLICT",
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "all: required (target firmware_campaign, read firmwareCampaigns.get)",
+                        "name": "X-Expected-Version",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "input field id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "input field reason",
+                        "name": "reason",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ops.Envelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/devices.DeletedResource"
                                         }
                                     }
                                 }
@@ -11035,7 +12103,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: contractor:partner.assign:own-valid-offer | admin:job.write:internal-job\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR89 success updates Job.assignmentId/scheduledSlot and version; IR94 technician scope must include Job.unitId; IR113 client_request/periodic_plan: [startAt,endAt) must equal the agreed slot (offer visitSlot for contractors) else VALIDATION errors.slot_not_agreed; IR433 the technician's access must last until endAt else FORBIDDEN errors.technician_access_ends; creates acknowledgement=pending\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A06, DD-P03",
+                "description": "Authorization: contractor:partner.assign:own-valid-offer | admin:job.write:internal-job\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR89 success updates Job.assignmentId/scheduledSlot and version; IR94 technician scope must include Job.unitId; IR113 client_request/periodic_plan: [startAt,endAt) must equal an agreed slot (one of the offer candidateSlots for contractors, IR636, also to move an assigned job to another candidate that is not over) else VALIDATION errors.slot_not_agreed; IR433 the technician's access must last until endAt else FORBIDDEN errors.technician_access_ends; creates acknowledgement=pending\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A06, DD-P03",
                 "consumes": [
                     "application/json"
                 ],
@@ -12357,7 +13425,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: admin:job.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR48 requested only; offerExpiresAt\u003c=accessValidUntil and \u003c= visit start (IR457); expiry returns requested; IR113 visitSlot must be an agreed slot (preferred or accepted proposal; plan occurrence) else VALIDATION errors.slot_not_agreed; access window covers visitSlot\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A06",
+                "description": "Authorization: admin:job.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR48 requested only; offerExpiresAt\u003c=accessValidUntil and \u003c= the last candidate start (IR457); expiry returns requested; IR636 the offer carries the job's agreed times that have not ended (candidateSlots: preferred times or accepted proposals or else the plan occurrence); none left is VALIDATION candidateSlots=error.past; the access window covers every candidate; the contractor picks one when it assigns a technician\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A06",
                 "consumes": [
                     "application/json"
                 ],
@@ -16394,6 +17462,128 @@
                         }
                     }
                 }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Authorization: admin:identity.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR657 only an account that never acted (no audit entry names it) and has no assignment or certificate (CONFLICT error.memberUsed); not the caller own (error.memberSelf); the only account of its person (error.memberHasOthers); deletes the person, its entry in a user list and the provider account; IR690 force (data.forceDelete, else FORBIDDEN errors.force_delete_not_allowed) also deletes an account that acted or marked a filter cleaning, an assignment or a certificate still stops it; the reason is recorded as [forced]\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A03",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "members"
+                ],
+                "summary": "members.delete (write)",
+                "operationId": "members.delete",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "D04: the same key replays the stored response; another body for the same key is CONFLICT",
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "all: required (target members, read members.list)",
+                        "name": "X-Expected-Version",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "input field id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "input field reason",
+                        "name": "reason",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "input field force",
+                        "name": "force",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ops.Envelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/identity.Deleted"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "403": {
+                        "description": "FORBIDDEN",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "409": {
+                        "description": "CONFLICT / OFFLINE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "422": {
+                        "description": "VALIDATION (fieldErrors)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "429": {
+                        "description": "RATE_LIMITED (retryAfterSeconds)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "503": {
+                        "description": "UNAVAILABLE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "504": {
+                        "description": "TIMEOUT",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    }
+                }
             }
         },
         "/v1/members/{membershipId}/revoke-sessions": {
@@ -17075,6 +18265,122 @@
                                     "properties": {
                                         "data": {
                                             "$ref": "#/definitions/energy.Report"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "403": {
+                        "description": "FORBIDDEN",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "409": {
+                        "description": "CONFLICT / OFFLINE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "422": {
+                        "description": "VALIDATION (fieldErrors)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "429": {
+                        "description": "RATE_LIMITED (retryAfterSeconds)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "503": {
+                        "description": "UNAVAILABLE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "504": {
+                        "description": "TIMEOUT",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Authorization: admin:mrv.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR656 only a report that no review touched (every version a draft; CONFLICT error.reportReviewed); deletes every version\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A14",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "mrv"
+                ],
+                "summary": "mrv.deleteDraft (write)",
+                "operationId": "mrv.deleteDraft",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "D04: the same key replays the stored response; another body for the same key is CONFLICT",
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "all: required (target mrv, read mrv.get)",
+                        "name": "X-Expected-Version",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "input field id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "input field reason",
+                        "name": "reason",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ops.Envelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/energy.DeletedResource"
                                         }
                                     }
                                 }
@@ -18618,6 +19924,122 @@
                                     "properties": {
                                         "data": {
                                             "$ref": "#/definitions/identity.Organization"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "403": {
+                        "description": "FORBIDDEN",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "409": {
+                        "description": "CONFLICT / OFFLINE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "422": {
+                        "description": "VALIDATION (fieldErrors)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "429": {
+                        "description": "RATE_LIMITED (retryAfterSeconds)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "503": {
+                        "description": "UNAVAILABLE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "504": {
+                        "description": "TIMEOUT",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Authorization: admin:asset.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR654 only a customer or contractor organization without a profile (CONFLICT error.orgHasProfile) and without an account (error.orgHasUsers); an operator organization is never deleted (error.orgOperator)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A02, DD-A21",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "organizations"
+                ],
+                "summary": "organizations.delete (write)",
+                "operationId": "organizations.delete",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "D04: the same key replays the stored response; another body for the same key is CONFLICT",
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "all: required (target organizations, read organizations.list)",
+                        "name": "X-Expected-Version",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "input field id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "input field reason",
+                        "name": "reason",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ops.Envelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/identity.Deleted"
                                         }
                                     }
                                 }
@@ -20982,6 +22404,122 @@
                         }
                     }
                 }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Authorization: admin:job.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR655 only a plan that has made no job (CONFLICT error.planHasJobs)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A06",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "plans"
+                ],
+                "summary": "plans.delete (write)",
+                "operationId": "plans.delete",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "D04: the same key replays the stored response; another body for the same key is CONFLICT",
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "all: required (target plans, read plans.get)",
+                        "name": "X-Expected-Version",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "input field id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "input field reason",
+                        "name": "reason",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ops.Envelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/maintenance.DeletedResource"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "403": {
+                        "description": "FORBIDDEN",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "409": {
+                        "description": "CONFLICT / OFFLINE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "422": {
+                        "description": "VALIDATION (fieldErrors)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "429": {
+                        "description": "RATE_LIMITED (retryAfterSeconds)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "503": {
+                        "description": "UNAVAILABLE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "504": {
+                        "description": "TIMEOUT",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    }
+                }
             }
         },
         "/v1/plans/{id}/generate-next": {
@@ -22631,6 +24169,117 @@
                                     "properties": {
                                         "data": {
                                             "$ref": "#/definitions/maintenance.RateCard"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "403": {
+                        "description": "FORBIDDEN",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "409": {
+                        "description": "CONFLICT / OFFLINE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "422": {
+                        "description": "VALIDATION (fieldErrors)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "429": {
+                        "description": "RATE_LIMITED (retryAfterSeconds)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "503": {
+                        "description": "UNAVAILABLE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "504": {
+                        "description": "TIMEOUT",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/rate-cards/{id}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Authorization: admin:job.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR655 only a rate card that has not started (CONFLICT error.rateCardStarted)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A21",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "rateCards"
+                ],
+                "summary": "rateCards.delete (write)",
+                "operationId": "rateCards.delete",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "D04: the same key replays the stored response; another body for the same key is CONFLICT",
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "input field id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "input field reason",
+                        "name": "reason",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ops.Envelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/maintenance.DeletedResource"
                                         }
                                     }
                                 }
@@ -27133,106 +28782,6 @@
                 }
             }
         },
-        "/v1/voice/resolve-intent": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Authorization: client:control.execute | technician:control.diagnose | admin:control.execute\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR65 regex grammar and Space.name matching\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DDC-07",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "voice"
-                ],
-                "summary": "voice.resolveIntent (read)",
-                "operationId": "voice.resolveIntent",
-                "parameters": [
-                    {
-                        "description": "input",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/voice.Input"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/ops.Envelope"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/voice.Intent"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "401": {
-                        "description": "UNAUTHENTICATED",
-                        "schema": {
-                            "$ref": "#/definitions/apperr.DomainError"
-                        }
-                    },
-                    "403": {
-                        "description": "FORBIDDEN",
-                        "schema": {
-                            "$ref": "#/definitions/apperr.DomainError"
-                        }
-                    },
-                    "404": {
-                        "description": "NOT_FOUND",
-                        "schema": {
-                            "$ref": "#/definitions/apperr.DomainError"
-                        }
-                    },
-                    "409": {
-                        "description": "CONFLICT / OFFLINE",
-                        "schema": {
-                            "$ref": "#/definitions/apperr.DomainError"
-                        }
-                    },
-                    "422": {
-                        "description": "VALIDATION (fieldErrors)",
-                        "schema": {
-                            "$ref": "#/definitions/apperr.DomainError"
-                        }
-                    },
-                    "429": {
-                        "description": "RATE_LIMITED (retryAfterSeconds)",
-                        "schema": {
-                            "$ref": "#/definitions/apperr.DomainError"
-                        }
-                    },
-                    "503": {
-                        "description": "UNAVAILABLE",
-                        "schema": {
-                            "$ref": "#/definitions/apperr.DomainError"
-                        }
-                    },
-                    "504": {
-                        "description": "TIMEOUT",
-                        "schema": {
-                            "$ref": "#/definitions/apperr.DomainError"
-                        }
-                    }
-                }
-            }
-        },
         "/v1/writes/{idempotencyKey}": {
             "get": {
                 "security": [
@@ -29297,7 +30846,7 @@
                     "type": "string"
                 },
                 "source": {
-                    "description": "ui | voice | automation | restriction | diagnostic | group (IR216)",
+                    "description": "ui | automation | restriction | diagnostic | group (IR216)",
                     "type": "string"
                 },
                 "status": {
@@ -29351,14 +30900,6 @@
                 },
                 "reason": {
                     "type": "string"
-                },
-                "source": {
-                    "description": "the channel the user chose; ui when omitted (IR306)",
-                    "type": "string",
-                    "enum": [
-                        "ui",
-                        "voice"
-                    ]
                 },
                 "unitId": {
                     "type": "string"
@@ -30072,6 +31613,17 @@
                 }
             }
         },
+        "devices.DeletedResource": {
+            "type": "object",
+            "properties": {
+                "deleted": {
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "string"
+                }
+            }
+        },
         "devices.Device": {
             "type": "object",
             "properties": {
@@ -30094,6 +31646,9 @@
                     "type": "string"
                 },
                 "lastSeenAt": {
+                    "type": "string"
+                },
+                "mqttNode": {
                     "type": "string"
                 },
                 "powerSignal": {
@@ -30159,6 +31714,9 @@
                     "type": "string"
                 },
                 "lastSeenAt": {
+                    "type": "string"
+                },
+                "mqttNode": {
                     "type": "string"
                 },
                 "powerSignal": {
@@ -30414,6 +31972,10 @@
                 "jobId": {
                     "type": "string"
                 },
+                "mqttNode": {
+                    "description": "MqttNode is the node_id the device's ESP32 sends as the \u003cnode\u003e of smarthome/ac/\u003cnode\u003e/… (IR635); the IoT bridge\ntakes its readings and sends its commands by it once the device is bound.",
+                    "type": "string"
+                },
                 "sensorTypes": {
                     "type": "array",
                     "items": {
@@ -30517,6 +32079,17 @@
                 }
             }
         },
+        "devices.SetMqttNodeInput": {
+            "type": "object",
+            "properties": {
+                "deviceId": {
+                    "type": "string"
+                },
+                "mqttNode": {
+                    "type": "string"
+                }
+            }
+        },
         "devices.TempRange": {
             "type": "object",
             "properties": {
@@ -30528,6 +32101,17 @@
                 },
                 "step": {
                     "type": "number"
+                }
+            }
+        },
+        "devices.UnbindInput": {
+            "type": "object",
+            "properties": {
+                "deviceId": {
+                    "type": "string"
+                },
+                "reason": {
+                    "type": "string"
                 }
             }
         },
@@ -30713,6 +32297,17 @@
                     "items": {
                         "type": "string"
                     }
+                }
+            }
+        },
+        "energy.DeletedResource": {
+            "type": "object",
+            "properties": {
+                "deleted": {
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "string"
                 }
             }
         },
@@ -32693,6 +34288,17 @@
                 }
             }
         },
+        "maintenance.DeletedResource": {
+            "type": "object",
+            "properties": {
+                "deleted": {
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "string"
+                }
+            }
+        },
         "maintenance.DocumentOut": {
             "type": "object",
             "properties": {
@@ -33378,9 +34984,6 @@
                 },
                 "termsVersion": {
                     "type": "string"
-                },
-                "visitSlot": {
-                    "$ref": "#/definitions/maintenance.Slot"
                 }
             }
         },
@@ -36355,63 +37958,6 @@
                     "$ref": "#/definitions/summaries.Counts"
                 },
                 "kind": {
-                    "type": "string"
-                }
-            }
-        },
-        "voice.Candidate": {
-            "type": "object",
-            "properties": {
-                "pathLabel": {
-                    "type": "string"
-                },
-                "unitId": {
-                    "type": "string"
-                }
-            }
-        },
-        "voice.Input": {
-            "type": "object",
-            "properties": {
-                "locale": {
-                    "type": "string"
-                },
-                "selectedUnitId": {
-                    "type": "string"
-                },
-                "text": {
-                    "type": "string"
-                }
-            }
-        },
-        "voice.Intent": {
-            "type": "object",
-            "properties": {
-                "before": {
-                    "type": "object"
-                },
-                "candidates": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/voice.Candidate"
-                    }
-                },
-                "celsius": {
-                    "type": "integer"
-                },
-                "expectedVersion": {
-                    "type": "integer"
-                },
-                "kind": {
-                    "type": "string"
-                },
-                "measurement": {
-                    "$ref": "#/definitions/monitoring.Measurement"
-                },
-                "messageKey": {
-                    "type": "string"
-                },
-                "unitId": {
                     "type": "string"
                 }
             }

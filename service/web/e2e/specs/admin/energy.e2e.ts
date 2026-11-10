@@ -2,6 +2,7 @@
 // with nothing filled in asks for both ends of the period and takes focus to the first field to fix — the units —
 // which stops below the sticky header. Nothing is saved.
 import { test, expect } from "../../fixtures/test";
+import { must } from "../../fixtures/must";
 
 test("a baseline names its dates, and an empty new one takes focus to the first field to fix", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
@@ -18,7 +19,7 @@ test("a baseline names its dates, and an empty new one takes focus to the first 
   await expect(main.getByText("Choose 1–100 units")).toBeVisible();
   const first = main.getByRole("checkbox").first();
   await expect(first).toBeFocused();
-  expect((await first.boundingBox())!.y).toBeGreaterThanOrEqual(64); // not behind the 64 px sticky header
+  expect(must((await first.boundingBox())).y).toBeGreaterThanOrEqual(64); // not behind the 64 px sticky header
   await main.getByRole("button", { name: "Cancel" }).click();
   await expect(main.getByRole("button", { name: "Create baseline" })).toHaveCount(0);
 });

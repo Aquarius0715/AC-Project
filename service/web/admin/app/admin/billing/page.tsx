@@ -7,23 +7,20 @@
 // the display language; billing periods, due dates and pay dates are Kuala Lumpur business days, and the inquiry times
 // are formatted here, in the display time zone (IR282, IR299). The Phase 1A demo keeps the fixture rows.
 import { connection } from "next/server";
-import { apiMode, coreAll, coreDisplay, coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
+import { apiMode, coreAll, coreDisplay, coreNow, coreOp, orWhenRefused, coreAllPage } from "@ac/web/lib/dal";
 import { i18nOf } from "@ac/web/lib/i18n";
 import {
   billingMonths, contractOptions, inquiryRows, invoiceDetail, invoiceRows, lastClosedMonth, monthsText, statementDetail, statementRows,
-  type ApiContract, type ApiCustomer, type ApiInquiry, type ApiInvoice, type ApiInvoiceDetail, type ApiOrganization, type ApiProperty, type ApiRecipient, type ApiStatement,
+  type ApiContract, type ApiCustomer, type ApiInvoice, type ApiInvoiceDetail, type ApiOrganization, type ApiProperty, type ApiRecipient, type ApiStatement,
 } from "@ac/web/lib/billing";
 import { withAccess } from "@ac/web/lib/withAccess";
 import { BillingView, type BillingLive } from "./_components/billing-view";
+import { billingInquiries } from "./_lib/inquiries";
+import { queryReader } from "@ac/web/lib/searchParams";
 
 interface Page<T> { items: T[] }
 // a part the session may not read (FORBIDDEN, NOT_FOUND) is left out; UNAVAILABLE and TIMEOUT still fail the page
-const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => {
-  return p.catch((error) => {
-    if (error instanceof CoreError && error.error.code !== "UNAVAILABLE" && error.error.code !== "TIMEOUT") return fallback;
-    throw error;
-  });
-};
+const optional = orWhenRefused;
 
 // a role without the page's read permission sees which one it needs, not a failure (IR582)
 export default async function AdminBillingPage(props: PageProps<"/admin/billing">) {
@@ -34,8 +31,13 @@ async function AdminBillingPageContent({ searchParams }: Readonly<PageProps<"/ad
   await connection();
   if (!apiMode()) return <BillingView />;
   const sp = await searchParams;
-  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k] as string) : undefined);
-  const tab = one("tab") === "payouts" ? "payouts" : (one("tab") === "inquiries" || (!one("tab") && one("inquiryId") && !one("invoiceId")) ? "inquiries" : "invoices");
+  const one = queryReader(sp);
+  // the asked tab, or the inquiries when only an inquiry is named
+  const tabOf = () => {
+    if (one("tab") === "payouts") return "payouts";
+    return one("tab") === "inquiries" || (!one("tab") && one("inquiryId") && !one("invoiceId")) ? "inquiries" : "invoices";
+  };
+  const tab = tabOf();
   const months = billingMonths(one("from"), one("to"));
   const scope = { customerId: one("customerId"), propertyId: one("propertyId"), contractId: one("contractId"), overdueOnly: one("overdueOnly") === "true", from: months.from, to: months.to };
   const filters = {
@@ -45,10 +47,10 @@ async function AdminBillingPageContent({ searchParams }: Readonly<PageProps<"/ad
   const [now, display, invoices, contracts, customers, properties, inquiries] = await Promise.all([
     coreNow(), coreDisplay(),
     coreOp<Page<ApiInvoice>>("invoices.list", { limit: 100, filters }),
-    coreAll<ApiContract>("contracts.list").then((items) => ({ items, total: items.length })),
-    coreAll<ApiCustomer>("customers.list").then((items) => ({ items, total: items.length })),
-    coreAll<ApiProperty>("properties.list").then((items) => ({ items, total: items.length })),
-    coreOp<Page<ApiInquiry>>("inquiries.list", { limit: 100 }),
+    coreAllPage<ApiContract>("contracts.list"),
+    coreAllPage<ApiCustomer>("customers.list"),
+    coreAllPage<ApiProperty>("properties.list"),
+    billingInquiries(), // every received inquiry, then the newest answered (IR713)
   ]);
   const i = i18nOf(display);
   const rows = invoiceRows(invoices.items, contracts.items, customers.items, now, i);
@@ -59,7 +61,7 @@ async function AdminBillingPageContent({ searchParams }: Readonly<PageProps<"/ad
     rows,
     months: monthsText(months.from, months.to, i),
     contracts: contractOptions(contracts.items, customers.items, i.t),
-    inquiries: inquiryRows(inquiries.items, customers.items, i),
+    inquiries: inquiryRows(inquiries, customers.items, i),
     customers: customers.items.map((c) => ({ id: c.id, name: c.name })),
     properties: properties.items.filter((p) => !p.archived).map((p) => ({ id: p.id, name: p.name, customerId: orgCustomer.get(p.customerOrgId) ?? "" })),
     contractsOfCustomer: contracts.items.map((k) => ({ id: k.id, customerId: k.customerId })),
@@ -74,8 +76,7 @@ async function AdminBillingPageContent({ searchParams }: Readonly<PageProps<"/ad
         live.recipients = r.items;
       }
     }
-  }
-  if (tab === "payouts") { // the statement period, contractor and status are URL filters of payouts.list (DD-A23, IR322)
+  } else if (tab === "payouts") { // the statement period, contractor and status are URL filters of payouts.list (DD-A23, IR322)
     const period = /^\d{4}-(0[1-9]|1[0-2])$/.test(one("period") ?? "") ? one("period") : undefined;
     const contractorOrgId = one("contractorOrgId");
     const status = (["draft", "approved", "paid"] as const).find((x) => x === one("status"));
@@ -86,7 +87,7 @@ async function AdminBillingPageContent({ searchParams }: Readonly<PageProps<"/ad
     ]);
     live.payouts = {
       period, contractorOrgId, status, lastClosed: lastClosedMonth(now),
-      contractors: orgs.filter((o) => o.kind === "contractor").map((o) => ({ id: o.id, name: o.name })).sort((a, b) => a.name.localeCompare(b.name)),
+      contractors: orgs.filter((o) => o.kind === "contractor").map((o) => ({ id: o.id, name: o.name })).toSorted((a, b) => a.name.localeCompare(b.name)),
     };
     live.statements = statementRows(statements, orgs, i);
     const wanted = one("statementId");

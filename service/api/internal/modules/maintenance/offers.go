@@ -2,7 +2,9 @@ package maintenance
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -105,7 +107,7 @@ func (r jobRow) current(c *ops.Call) error {
 // load locks a job for update like lock, without the version. A handler whose scope check needs the row checks the
 // scope first and the version after it (current), so a caller outside the scope gets NOT_FOUND / FORBIDDEN for any
 // version and learns nothing of the job (IR366).
-func (m Delivery) load(ctx context.Context, call *ops.Call, jobID uuid.UUID) (jobRow, error) {
+func (Delivery) load(ctx context.Context, call *ops.Call, jobID uuid.UUID) (jobRow, error) {
 	var (
 		job                  jobRow
 		pref                 []byte
@@ -141,8 +143,13 @@ func (m Delivery) load(ctx context.Context, call *ops.Call, jobID uuid.UUID) (jo
 
 func sameSlot(a, b Slot) bool { return a.StartAt.Equal(b.StartAt) && a.EndAt.Equal(b.EndAt) }
 
+// slotIn reports whether slots holds slot.
+func slotIn(slots []Slot, slot Slot) bool {
+	return slices.ContainsFunc(slots, func(s Slot) bool { return sameSlot(s, slot) })
+}
+
 // agreed reports whether a slot is an agreed slot of the job (IR113 item 3).
-func (m Delivery) agreed(
+func (Delivery) agreed(
 	ctx context.Context,
 	call *ops.Call,
 	jobID uuid.UUID,
@@ -178,23 +185,124 @@ func (m Delivery) agreed(
 	return false, nil
 }
 
+// candidates are the times a job is offered for (IR636 item 1): the agreed times that have not ended — the client's
+// preferred times and the slots of accepted proposals, or else the plan occurrence — in the order the client ranked
+// them. The contractor picks one of them when it assigns a technician.
+func (Delivery) candidates(
+	ctx context.Context,
+	call *ops.Call,
+	jobID uuid.UUID,
+	job jobRow,
+) ([]Slot, error) {
+	out := make([]Slot, 0, len(job.preferred)+1)
+	add := func(slot Slot) {
+		if slot.EndAt.After(call.Now) && !slotIn(out, slot) {
+			out = append(out, slot)
+		}
+	}
+
+	for _, p := range job.preferred {
+		add(p)
+	}
+
+	rows, err := call.Tx.Query(
+		ctx,
+		`SELECT lower(slot), upper(slot) FROM maintenance.slot_proposals WHERE job_id = $1
+		AND status = 'accepted' ORDER BY decided_at`,
+		jobID,
+	)
+	if err != nil {
+		return nil, apperr.Wrap(err, "select maintenance.slot_proposals")
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var slot Slot
+
+		scanErr := rows.Scan(&slot.StartAt, &slot.EndAt)
+		if scanErr != nil {
+			return nil, apperr.Wrap(scanErr, "scan maintenance.slot_proposals")
+		}
+
+		add(slot)
+	}
+
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return nil, apperr.Wrap(rowsErr, "select maintenance.slot_proposals")
+	}
+
+	if len(out) == 0 && job.planID != nil && job.occurrence != nil {
+		add(
+			Slot{
+				*job.occurrence,
+				job.occurrence.Add(job.requested.EndAt.Sub(job.requested.StartAt)),
+			},
+		)
+	}
+
+	return out, nil
+}
+
+// offerWindowErrors are the field errors of an offer for its candidate times (IR636 item 2): there is a time left, the
+// access window covers every candidate, and the offer does not outlast the last candidate's start (IR457).
+func offerWindowErrors(input *OfferInput, candidates []Slot) map[string]string {
+	fieldErrs := map[string]string{}
+	if len(candidates) == 0 {
+		fieldErrs["candidateSlots"] = apperr.KeyPast
+
+		return fieldErrs
+	}
+
+	first, last := candidates[0].StartAt, candidates[0].StartAt
+	end := candidates[0].EndAt
+
+	for _, slot := range candidates {
+		if slot.StartAt.Before(first) {
+			first = slot.StartAt
+		}
+
+		if slot.StartAt.After(last) {
+			last = slot.StartAt
+		}
+
+		if slot.EndAt.After(end) {
+			end = slot.EndAt
+		}
+	}
+
+	// an answer after the last visit began could not be worked (IR457)
+	if input.OfferExpiresAt.After(last) && !input.OfferExpiresAt.After(input.AccessValidUntil) {
+		fieldErrs["offerExpiresAt"] = "error.afterVisit"
+	}
+
+	if input.AccessValidFrom.After(first) || end.After(input.AccessValidUntil) {
+		fieldErrs["accessValidFrom"] = "error.accessMustCoverVisit"
+	}
+
+	return fieldErrs
+}
+
 // ---- jobs.offer ----
 
 // keySlotNotAgreed refuses a visit or an assignment slot that is not an agreed slot of the job (IR113 item 3).
 const keySlotNotAgreed = "errors.slot_not_agreed"
 
+// slotNotAgreed is the VALIDATION error of an assignment whose slot is not an agreed one.
+func slotNotAgreed() error { return apperr.Fields(map[string]string{"startAt": keySlotNotAgreed}) }
+
 // OfferInput is jobs.offer input.
 type OfferInput struct {
 	JobID            uuid.UUID `json:"jobId"`
 	ContractorOrgID  uuid.UUID `json:"contractorOrgId"`
-	VisitSlot        Slot      `json:"visitSlot"`
 	OfferExpiresAt   time.Time `json:"offerExpiresAt"`
 	AccessValidFrom  time.Time `json:"accessValidFrom"`
 	AccessValidUntil time.Time `json:"accessValidUntil"`
 	TermsVersion     string    `json:"termsVersion"`
 }
 
-// Validate implements ops.Validator (IR48 / IR123 item 1, clock-free parts).
+// Validate implements ops.Validator (IR48 / IR123 item 1, clock-free parts). The offered times are the job's agreed
+// times, which the server reads (IR636), so the rules that need them are applied by offerJob.
 func (in *OfferInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil {
@@ -205,24 +313,12 @@ func (in *OfferInput) Validate() map[string]string {
 		fieldErrs["contractorOrgId"] = apperr.KeyRequired
 	}
 
-	if !in.VisitSlot.StartAt.Before(in.VisitSlot.EndAt) {
-		fieldErrs["visitSlot"] = apperr.KeyRange
-	}
-
 	if !in.AccessValidFrom.Before(in.AccessValidUntil) {
 		fieldErrs["accessValidUntil"] = apperr.KeyRange
 	}
 
 	if in.OfferExpiresAt.After(in.AccessValidUntil) {
 		fieldErrs["offerExpiresAt"] = "error.afterAccess"
-	} else if in.OfferExpiresAt.After(in.VisitSlot.StartAt) {
-		// an answer after the visit began could not be worked (IR457)
-		fieldErrs["offerExpiresAt"] = "error.afterVisit"
-	}
-
-	if in.AccessValidFrom.After(in.VisitSlot.StartAt) ||
-		in.VisitSlot.EndAt.After(in.AccessValidUntil) {
-		fieldErrs["accessValidFrom"] = "error.accessMustCoverVisit"
 	}
 
 	if n := utf8.RuneCountInString(in.TermsVersion); n < 1 || n > maxCodeLength {
@@ -238,9 +334,11 @@ func (in *OfferInput) Validate() map[string]string {
 //	@ID				jobs.offer
 //	@Description	Authorization: admin:job.write
 //	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
-//	@Description	IR48 requested only; offerExpiresAt<=accessValidUntil and <= visit start (IR457); expiry returns \
-//	@Description	requested; IR113 visitSlot must be an agreed slot (preferred or accepted proposal; plan occurrence) \
-//	@Description	else VALIDATION errors.slot_not_agreed; access window covers visitSlot
+//	@Description	IR48 requested only; offerExpiresAt<=accessValidUntil and <= the last candidate start (IR457); \
+//	@Description	expiry returns requested; IR636 the offer carries the job's agreed times that have not ended \
+//	@Description	(candidateSlots: preferred times or accepted proposals or else the plan occurrence); none left is \
+//	@Description	VALIDATION candidateSlots=error.past; the access window covers every candidate; the contractor picks \
+//	@Description	one when it assigns a technician
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-A06
 //	@Tags			jobs
@@ -302,26 +400,31 @@ func (m Delivery) offerJob(ctx context.Context, call *ops.Call, input *OfferInpu
 		return Job{}, apperr.E(apperr.Conflict, "errors.contractor_suspended")
 	}
 
-	ok, err := m.agreed(ctx, call, input.JobID, job, input.VisitSlot)
+	candidates, err := m.candidates(ctx, call, input.JobID, job)
 	if err != nil {
 		return Job{}, err
 	}
 
-	if !ok {
-		return Job{}, apperr.Fields(map[string]string{"visitSlot": keySlotNotAgreed})
+	fieldErrs := offerWindowErrors(input, candidates)
+	if len(fieldErrs) > 0 {
+		return Job{}, apperr.Fields(fieldErrs)
+	}
+
+	encoded, marshalErr := json.Marshal(candidates)
+	if marshalErr != nil {
+		return Job{}, apperr.Wrap(marshalErr, "json.Marshal")
 	}
 
 	_, execErr := call.Tx.Exec(
 		ctx,
-		`INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, visit_slot, offered_at,
+		`INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, candidate_slots, offered_at,
 			offer_expires_at,
-		access_valid_from, access_valid_until) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, tstzrange($4, $5),
-		$6, $7, $8, $9)`,
+		access_valid_from, access_valid_until) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4,
+		$5, $6, $7, $8)`,
 		input.JobID,
 		input.ContractorOrgID,
 		input.TermsVersion,
-		input.VisitSlot.StartAt,
-		input.VisitSlot.EndAt,
+		encoded,
 		call.Now,
 		input.OfferExpiresAt,
 		input.AccessValidFrom,
@@ -685,7 +788,7 @@ func (in *AssignInput) Validate() map[string]string {
 	}
 
 	if !in.StartAt.Before(in.EndAt) {
-		fieldErrs["endAt"] = apperr.KeyRange
+		fieldErrs[fieldEndAt] = apperr.KeyRange
 	}
 
 	if in.Reason != nil {
@@ -705,9 +808,10 @@ func (in *AssignInput) Validate() map[string]string {
 //	@Description	Authorization: contractor:partner.assign:own-valid-offer | admin:job.write:internal-job
 //	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
 //	@Description	IR89 success updates Job.assignmentId/scheduledSlot and version; IR94 technician scope must include \
-//	@Description	Job.unitId; IR113 client_request/periodic_plan: [startAt,endAt) must equal the agreed slot (offer \
-//	@Description	visitSlot for contractors) else VALIDATION errors.slot_not_agreed; IR433 the technician's access \
-//	@Description	must last until endAt else FORBIDDEN errors.technician_access_ends; creates acknowledgement=pending
+//	@Description	Job.unitId; IR113 client_request/periodic_plan: [startAt,endAt) must equal an agreed slot (one of \
+//	@Description	the offer candidateSlots for contractors, IR636, also to move an assigned job to another candidate \
+//	@Description	that is not over) else VALIDATION errors.slot_not_agreed; IR433 the technician's access must last \
+//	@Description	until endAt else FORBIDDEN errors.technician_access_ends; creates acknowledgement=pending
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-A06, DD-P03
 //	@Tags			jobs
@@ -746,7 +850,7 @@ func (m Delivery) assignJob(ctx context.Context, call *ops.Call, input *AssignIn
 	slot := Slot{input.StartAt, input.EndAt}
 	contractor := call.Principal.Role == roleContractor
 
-	visit, err := assignmentScope(ctx, call, input.JobID, locked, contractor)
+	offered, err := assignmentScope(ctx, call, input.JobID, locked, contractor)
 	if err != nil {
 		return Job{}, err
 	}
@@ -768,7 +872,7 @@ func (m Delivery) assignJob(ctx context.Context, call *ops.Call, input *AssignIn
 		return Job{}, checkTechnicianErr
 	}
 
-	err = m.slotRules(ctx, call, input, locked, slot, visit, contractor)
+	err = m.slotRules(ctx, call, input, locked, slot, offered, contractor)
 	if err != nil {
 		return Job{}, err
 	}
@@ -824,52 +928,53 @@ func (m Delivery) assignJob(ctx context.Context, call *ops.Call, input *AssignIn
 }
 
 // assignmentScope checks who may assign the job: HQ its internal jobs; a contractor the job of its accepted offer,
-// within the offer's access window. It returns the visit of the contractor's offer.
+// within the offer's access window. It returns the candidate times of the contractor's offer (IR636).
 func assignmentScope(
 	ctx context.Context,
 	call *ops.Call,
 	job uuid.UUID,
 	locked jobRow,
 	contractor bool,
-) (Slot, error) {
-	var visit Slot
+) ([]Slot, error) {
+	var offered []Slot
 
 	if contractor {
 		var from, until time.Time
 
-		err := call.Tx.QueryRow(ctx, `SELECT lower(visit_slot), upper(visit_slot), access_valid_from, access_valid_until FROM
-			maintenance.offers
+		err := call.Tx.QueryRow(ctx, `SELECT candidate_slots, access_valid_from, access_valid_until FROM maintenance.offers
 			WHERE job_id = $1 AND contractor_org_id = $2 AND decision = 'accept' ORDER BY decided_at DESC LIMIT
 			1`, job, call.Principal.OrgID).
-			Scan(&visit.StartAt, &visit.EndAt, &from, &until)
+			Scan(&offered, &from, &until)
 		if errors.Is(err, pgx.ErrNoRows) || locked.contractor == nil ||
 			*locked.contractor != call.Principal.OrgID {
-			return visit, apperr.E(apperr.NotFound, apperr.KeyNotFound)
+			return nil, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 		}
 
 		if err != nil {
-			return visit, apperr.Wrap(err, "select maintenance.offers")
+			return nil, apperr.Wrap(err, "select maintenance.offers")
 		}
 
 		if call.Now.Before(from) || !call.Now.Before(until) {
-			return visit, apperr.E(apperr.Forbidden, "errors.access_window")
+			return nil, apperr.E(apperr.Forbidden, "errors.access_window")
 		}
 	} else if locked.contractor != nil {
-		return visit, apperr.E(apperr.Forbidden, "errors.internal_job_only")
+		return nil, apperr.E(apperr.Forbidden, "errors.internal_job_only")
 	}
 
-	return visit, nil
+	return offered, nil
 }
 
-// slotRules applies the state and slot rules of an assignment (IR113 / IR49 / IR123 item 4): a first assignment takes
-// the agreed time, which is not over (IR456); a reassignment keeps the scheduled time; a job under way may only be
-// extended, with a reason (D06).
+// slotRules applies the state and slot rules of an assignment (IR113 / IR49 / IR123 item 4 / IR636): a first assignment
+// takes an agreed time, which is not over (IR456), and a contractor picks one of its offer's candidate times; a
+// reassignment keeps the scheduled time while it is not over (IR642), and a contractor may move to another candidate
+// that is not over; a job under way may only be extended, with a reason (D06).
 func (m Delivery) slotRules(
 	ctx context.Context,
 	call *ops.Call,
 	input *AssignInput,
 	locked jobRow,
-	slot, visit Slot,
+	slot Slot,
+	offered []Slot,
 	contractor bool,
 ) error {
 	switch {
@@ -877,10 +982,10 @@ func (m Delivery) slotRules(
 		if !slot.EndAt.After(
 			call.Now,
 		) { // a time already over cannot be worked (IR456): HQ proposes another
-			return apperr.Fields(map[string]string{"endAt": apperr.KeyPast})
+			return apperr.Fields(map[string]string{fieldEndAt: apperr.KeyPast})
 		}
 
-		agreed := contractor && sameSlot(visit, slot)
+		agreed := contractor && slotIn(offered, slot)
 		if !contractor {
 			var err error
 
@@ -891,11 +996,20 @@ func (m Delivery) slotRules(
 		}
 
 		if !agreed {
-			return apperr.Fields(map[string]string{"startAt": keySlotNotAgreed})
+			return slotNotAgreed()
 		}
 	case locked.status == statusAssigned:
-		if locked.scheduled == nil || !sameSlot(*locked.scheduled, slot) {
-			return apperr.Fields(map[string]string{"startAt": keySlotNotAgreed})
+		keeps := locked.scheduled != nil && sameSlot(*locked.scheduled, slot)
+		// a technician who cannot make the time: the contractor takes another candidate that is not over (IR636 item 3)
+		moves := locked.scheduled != nil && contractor && slot.EndAt.After(call.Now) &&
+			slotIn(offered, slot)
+
+		if !keeps && !moves {
+			return slotNotAgreed()
+		}
+		// a time that is over cannot be worked by a new technician either (IR456, IR642): HQ proposes another time
+		if !slot.EndAt.After(call.Now) {
+			return apperr.Fields(map[string]string{fieldEndAt: apperr.KeyPast})
 		}
 	case locked.status == statusInProgress || locked.status == statusReworkRequested || locked.status == statusOnHold:
 		// D06 extension / reassignment
@@ -980,6 +1094,7 @@ func (m Delivery) checkTechnician(
 			Employment:        "",
 			Timezone:          "",
 			SessionsRevokedAt: nil,
+			IssuerHost:        "",
 		},
 		unit,
 		prop,

@@ -7,19 +7,16 @@
 // qualifications a booked job's unit needs, IR277). Texts in the user's display language; every date and time is
 // formatted here, on the server (IR276).
 import "server-only";
-import { coreAll, coreDisplay, coreIdentity, coreNow, coreOp, corePrincipal, CoreError } from "@ac/web/lib/dal";
-import { i18nOf, showDay, showSpan } from "@ac/web/lib/i18n";
+import { coreAll, coreDisplay, coreIdentity, coreNow, coreOp, corePrincipal, orWhenRefused, coreItems } from "@ac/web/lib/dal";
+import { i18nOf, showDay, showSpan, textOf } from "@ac/web/lib/i18n";
 import { klDay, weekOf, type ApiCapacity, type ApiPartnerJob } from "@ac/web/lib/partnerOverview";
 import { qualificationLabel, requiredFor } from "@ac/web/lib/partnerJobDetail";
 import { activeNow, grantRows, KL, listed, memberRows, QUALIFICATION_CODES, technicianNames, teamQuery, teamStats, UNAVAILABILITY_TYPES, unavailabilityRows, weekday, weekRows, type ApiTeamMember, type ApiUnavailability, type TeamJob } from "@ac/web/lib/partnerTeam";
 import { CERT_STATUSES, certKpis, certQuery, certRows, impact, WINDOWS, type ApiCert, type CertJob } from "@ac/web/lib/partnerCertificates";
 
-const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => {
-  return p.catch((error) => {
-    if (error instanceof CoreError && error.error.code !== "UNAVAILABLE" && error.error.code !== "TIMEOUT") return fallback;
-    throw error;
-  });
-};
+const TECHNICIAN = "technician";
+
+const optional = orWhenRefused;
 const plusDays = (date: string, n: number) => new Date(Date.parse(`${date}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 const noon = (date: string) => `${date}T04:00:00Z`; // 12:00 in Kuala Lumpur
 const STATUS_TEXT: Record<string, string> = { valid: "Valid", expiring: "Expiring", expired: "Expired", pending: "Pending HQ verification", rejected: "Rejected", not_held: "Not held" };
@@ -40,20 +37,19 @@ export async function loadTeam(sp: TeamParams) {
   const dates = [0, 1, 2, 3, 4, 5, 6].map((n) => plusDays(week.from, n));
   const dayIndex = dates.indexOf(q.date);
   const [listedMembers, users] = await Promise.all([
-    coreAll<ApiTeamMember>("members.list", { filters: { role: "technician" } }),
-    optional(coreAll<{ membershipId: string | null; email: string }>("partnerUsers.list", { filters: { partnerRole: "technician" } }), []),
+    coreAll<ApiTeamMember>("members.list", { filters: { role: TECHNICIAN } }),
+    optional(coreAll<{ membershipId: string | null; email: string }>("partnerUsers.list", { filters: { partnerRole: TECHNICIAN } }), []),
   ]);
-  const techs = listedMembers.filter((m) => m.role === "technician");
+  const techs = listedMembers.filter((m) => m.role === TECHNICIAN);
   // one label per technician on the whole screen, sorted by it: a name two technicians share gets each one's e-mail
   const names = technicianNames(techs, new Map(users.flatMap((u) => (u.membershipId ? [[u.membershipId, u.email] as const] : []))));
-  const members = techs.map((m) => ({ ...m, displayName: names.get(m.id) ?? m.displayName })).sort((a, b) => a.displayName.localeCompare(b.displayName) || a.id.localeCompare(b.id));
+  const members = techs.map((m) => ({ ...m, displayName: names.get(m.id) ?? m.displayName })).toSorted((a, b) => a.displayName.localeCompare(b.displayName) || a.id.localeCompare(b.id));
   const current = members.filter((m) => activeNow(m, nowMs)); // capacity and assignments exist only for these
   const shown = listed(members, q, nowMs);
   const [capacity, booked, certs, units, unavailable] = await Promise.all([
-    Promise.all(dates.map((date) => optional(coreOp<Page<ApiCapacity>>("members.capacity", { date, query: { limit: 100 } }).then((r) => r.items), []))),
-    Promise.all(current.map((m) => optional(coreOp<Page<ApiPartnerJob>>("jobs.list", { filters: { membershipId: m.id }, limit: 100 }), { items: [], total: 0 })
-      .then((r) => r.items.flatMap((j): (TeamJob & { unitId: string })[] => (j.projection === "summary" && j.scheduledSlot && j.status !== "completed" && j.status !== "cancelled" // completion releases the assignment (IR234)
-        ? [{ jobId: j.id, short: j.id.slice(0, 8), technicianId: m.id, slot: j.scheduledSlot, text: showSpan(j.scheduledSlot.startAt, j.scheduledSlot.endAt, display), unitId: j.unitId }] : []))))),
+    Promise.all(dates.map((date) => optional(coreItems<ApiCapacity>("members.capacity", { date, query: { limit: 100 } }), []))),
+    Promise.all(current.map(async (m) => { const r = await optional(coreOp<Page<ApiPartnerJob>>("jobs.list", { filters: { membershipId: m.id }, limit: 100 }), { items: [], total: 0 }); return r.items.flatMap((j): (TeamJob & { unitId: string })[] => (j.projection === "summary" && j.scheduledSlot && j.status !== "completed" && j.status !== "cancelled" // completion releases the assignment (IR234)
+        ? [{ jobId: j.id, short: j.id.slice(0, 8), technicianId: m.id, slot: j.scheduledSlot, text: showSpan(j.scheduledSlot.startAt, j.scheduledSlot.endAt, display), unitId: j.unitId }] : [])); })),
     optional(coreAll<ApiCert>("certificates.list"), [] as ApiCert[]),
     optional(coreAll<{ id: string; displayName: string; serviceScope?: string[] }>("units.list"), []),
     optional(coreAll<ApiUnavailability>("members.unavailability"), [] as ApiUnavailability[]),
@@ -66,7 +62,7 @@ export async function loadTeam(sp: TeamParams) {
   const inWeek = shown.rows.filter((m) => activeNow(m, nowMs));
   const from = klDay(week.from, locale);
   return {
-    notFound: false as const, company, query: q, otherZone: display.timeZone !== KL,
+    notFound: false as const, query: q, otherZone: display.timeZone !== KL,
     technicians: current.map((m) => ({ id: m.id, name: m.displayName })), total: members.length, activeCount: current.length,
     unavailable: unavailabilityRows(unavailable, names, q.today, i),
     rows: memberRows(shown.rows, capacity, dayIndex, jobs, nowMs, i), hidden: shown.hidden, expired: shown.expired,
@@ -83,14 +79,13 @@ export async function loadTeam(sp: TeamParams) {
     grants: grantRows(shown.rows, nowMs, i),
     qualifications: QUALIFICATION_CODES.map((code) => ({ code, text: qualificationLabel(code, t) })),
     types: UNAVAILABILITY_TYPES.map((x) => ({ id: x.id, text: t(x.text) })),
-    jobs,
     certificates: {
       query: cq, rows: everyRow.filter((r) => !cq.status || r.status === cq.status), kpis: certKpis(everyRow, certs, cq.within, t), impact: impact(everyRow, certJobs, t),
       people: members.map((m) => ({ id: m.id, name: m.displayName, active: activeNow(m, nowMs) })),
       windows: WINDOWS.map((w) => ({ value: String(w), text: t("{n} days", { n: w }) })),
-      statuses: CERT_STATUSES.map((x) => ({ value: x, text: t(STATUS_TEXT[x]) })),
+      statuses: CERT_STATUSES.map((x) => ({ value: x, text: textOf(STATUS_TEXT, x, t) ?? x })),
       codes: [...QUALIFICATION_CODES, "other" as const].map((code) => ({ code, text: code === "other" ? t("Other") : qualificationLabel(code, t) })),
-    },
+    }, company, jobs,
   };
 }
 

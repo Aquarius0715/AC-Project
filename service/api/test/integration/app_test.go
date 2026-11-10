@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/pradita/ac-project/service/api/internal/modules/identity"
@@ -94,9 +95,15 @@ func seedFixture(t *testing.T) *seed.Fixture {
 type testTokens auth.StaticVerifier
 
 func (v testTokens) Verify(ctx context.Context, token string) (auth.Identity, error) {
+	// tok#host: a token of a sign-in on that address; tok@seconds: a token of a sign-in at that time
+	token, host, onAddress := strings.Cut(token, "#")
 	tok, authTime, signed := strings.Cut(token, "@")
 
 	verified, err := auth.StaticVerifier(v).Verify(ctx, tok)
+	if onAddress {
+		verified.Issuer = "http://" + host + ":8281/realms/ac"
+	}
+
 	if err != nil || !signed {
 		return verified, apperr.Wrap(err, "auth.StaticVerifier.Verify")
 	}
@@ -144,6 +151,7 @@ func serverCfg(t *testing.T, opt func(*apiserver.Config)) *apiserver.Server {
 		DatabaseReaderURL: "",
 		Addr:              "",
 		DemoOps:           false,
+		DemoShared:        false,
 		DemoStart:         time.Time{},
 		Logger:            nil,
 		Domains:           nil,
@@ -363,7 +371,7 @@ func TestUnitsListScopes(t *testing.T) {
 			seed.ID("unit-offline-rto").String(): powerUnknown,
 			seed.ID("unit-limited").String():     "on",
 		}
-		if w, ok := want[unit["id"].(string)]; ok && unit["effectivePowerState"] != w {
+		if w, ok := want[asStr(t, unit["id"])]; ok && unit["effectivePowerState"] != w {
 			t.Fatalf("%v: power %v want %s", unit["displayName"], unit["effectivePowerState"], w)
 		}
 	}
@@ -508,5 +516,87 @@ func TestUnitsGet(t *testing.T) {
 	); code != 404 ||
 		res["messageKey"] != apperr.KeyUnknownOperation { // GET /v1/units/ has no route
 		t.Fatalf("missing id: %d %v", code, res)
+	}
+}
+
+// TestEventCursorIsAPosition: Meta.eventCursor is the tenant's position in its events, so it never goes back. Counting
+// the outbox made it fall when housekeeping removed old events, and made every request of the service read all of them.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
+func TestEventCursorIsAPosition(t *testing.T) {
+	srv := server(t)
+
+	cursor := func() float64 {
+		t.Helper()
+
+		_, res := post(srv, hq(), "session.get", `{}`)
+
+		return asNum(t, asObj(t, res["meta"])["eventCursor"])
+	}
+
+	addEvent := func() string {
+		t.Helper()
+
+		event := uuid.NewString()
+		owner(
+			t,
+			`INSERT INTO platform.outbox (id, tenant_id, aggregate_type, aggregate_id, event_type, payload, correlation_id)
+			VALUES ($1, $2, 'test', $1, 'test.position', '{}', 'corr-position')`,
+			event,
+			seed.ID("tenant-a"),
+		)
+		t.Cleanup(func() { owner(t, `DELETE FROM platform.outbox WHERE id = $1`, event) })
+
+		return event
+	}
+
+	older := addEvent()
+	addEvent()
+
+	before := cursor()
+	if before < 2 {
+		t.Fatalf("cursor %v with two events in the outbox", before)
+	}
+
+	owner(
+		t,
+		`DELETE FROM platform.outbox WHERE id = $1`,
+		older,
+	) // housekeeping removes the old events
+
+	if after := cursor(); after < before {
+		t.Errorf("the cursor went back from %v to %v when an event was removed", before, after)
+	}
+}
+
+// TestEventCursorIsTheTenantsOwn: the outbox is read across tenants (it has no row level security, for the relay), so
+// the cursor has to name its tenant: another tenant's events neither move it nor show how busy that tenant is.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
+func TestEventCursorIsTheTenantsOwn(t *testing.T) {
+	srv := server(t)
+
+	cursor := func() float64 {
+		t.Helper()
+
+		_, res := post(srv, hq(), "session.get", `{}`)
+
+		return asNum(t, asObj(t, res["meta"])["eventCursor"])
+	}
+
+	before := cursor()
+
+	event := uuid.NewString()
+	owner(
+		t,
+		`INSERT INTO platform.outbox (id, tenant_id, aggregate_type, aggregate_id, event_type, payload, correlation_id)
+		VALUES ($1, $2, 'test', $1, 'test.other-tenant', '{}', 'corr-other-tenant')`,
+		event,
+		seed.ID("tenant-b"),
+	)
+	t.Cleanup(func() { owner(t, `DELETE FROM platform.outbox WHERE id = $1`, event) })
+
+	if after := cursor(); after != before {
+		t.Errorf("another tenant's event moved the cursor from %v to %v", before, after)
 	}
 }

@@ -5,20 +5,20 @@ go 1.26.0
 toolchain go1.26.10
 
 require (
-	github.com/MicahParks/keyfunc/v3 v3.8.2
+	github.com/MicahParks/keyfunc/v3 v3.9.1
 	github.com/alicebob/miniredis/v2 v2.40.0
 	github.com/eclipse/paho.mqtt.golang v1.5.1
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
-	github.com/jackc/pgx/v5 v5.11.0
-	github.com/labstack/echo/v5 v5.4.2
+	github.com/jackc/pgx/v5 v5.12.0
+	github.com/labstack/echo/v5 v5.4.4
 	github.com/redis/go-redis/v9 v9.23.0
 	golang.org/x/time v0.16.0
 )
 
 require (
 	github.com/KyleBanks/depth v1.2.1 // indirect
-	github.com/MicahParks/jwkset v0.11.3 // indirect
+	github.com/MicahParks/jwkset v0.11.4 // indirect
 	github.com/PuerkitoBio/purell v1.1.1 // indirect
 	github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
@@ -30,7 +30,7 @@ require (
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
-	github.com/jackc/puddle/v2 v2.2.2 // indirect
+	github.com/jackc/puddle/v2 v2.2.3 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/mailru/easyjson v0.7.6 // indirect
 	github.com/rogpeppe/go-internal v1.16.0 // indirect

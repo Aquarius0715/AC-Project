@@ -1,0 +1,52 @@
+import { describe, expect, it } from "vitest";
+import { qrMatch, qrRefusal, qrRefusalOf, scanCode } from "@ac/web/lib/techQr";
+import { OpError } from "@ac/web/lib/ops";
+import { i18nOf } from "@ac/web/lib/i18n";
+
+const JOB_C_AAAA = "job-c-aaaa";
+
+const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
+
+const NOW = Date.parse("2026-09-21T02:04:00Z"); // Mon 10:04 KL
+const unit = { id: "u1", displayName: "Bedroom AC", location: { pathLabels: ["Home A", "1F", "Bedroom"] }, capabilities: { manufacturer: "DemoAir", model: "SPL-200V" } };
+
+describe("technician QR scan", () => {
+  it("describes the matched unit and the user's job on it", () => {
+    const today = qrMatch({ unitId: "u1", jobId: JOB_C_AAAA }, unit, { projection: "detail", id: JOB_C_AAAA, type: "reactive", status: "in_progress", scheduledSlot: { startAt: "2026-09-21T02:00:00Z", endAt: "2026-09-21T04:00:00Z" }, alertIds: ["a1"] }, NOW);
+    expect(today).toStrictEqual({
+      title: "Bedroom AC", sub: "Home A › 1F › Bedroom · DemoAir SPL-200V",
+      job: { label: "Your job today: job-c-aa", text: "21 Sept, 10:00 am – 12:00 pm MYT · Repair · in progress · 1 linked alert", tone: "ok" },
+      unitHref: "/technician/units/u1?jobId=job-c-aaaa", jobHref: "/technician/jobs/job-c-aaaa",
+    });
+    const later = qrMatch({ unitId: "u1", jobId: "job-d" }, unit, { projection: "detail", id: "job-d", type: "periodic", status: "assigned", scheduledSlot: { startAt: "2026-09-23T02:00:00Z", endAt: "2026-09-23T04:00:00Z" }, alertIds: [] }, NOW);
+    expect(later.job).toStrictEqual({ label: "Your next job: job-d", text: "23 Sept, 10:00 am – 12:00 pm MYT · Periodic inspection · assigned", tone: "primary" });
+    // a job whose window ended reads as its snapshot (IR124): the card names the job only
+    expect(qrMatch({ unitId: "u1", jobId: "job-d" }, unit, { projection: "history" }, NOW).job).toStrictEqual({ label: "Your next job: job-d", text: "", tone: "primary" });
+    expect(qrMatch({ unitId: "u1", jobId: null }, unit, null, NOW)).toMatchObject({ job: null, unitHref: "/technician/units/u1", jobHref: null });
+    expect(qrMatch({ unitId: "u1", jobId: null }, null, null, NOW).title).toBe("Assigned unit");
+    expect(qrMatch({ unitId: "u1", jobId: "job-d" }, null, null, NOW, { name: "Meeting room AC", locked: true })).toMatchObject({ title: "Meeting room AC", sub: "Unit details open when your work window starts." });
+  });
+
+  it("names the refusals and reads the label", () => {
+    expect(qrRefusal({ code: "NOT_FOUND" })).toMatchObject({ title: "Page unavailable", absent: true });
+    expect(qrRefusal({ code: "VALIDATION" }).title).toBe("Not a label");
+    expect(qrRefusal({ code: "UNAVAILABLE" }).text).toBe("The label could not be checked — try again.");
+    expect(scanCode("  ac-unit:u1 ")).toBe("ac-unit:u1");
+  });
+
+  it("reads a call that failed without an answer (network down) as a failed scan, not as an exception", () => {
+    const refused = new OpError({ code: "NOT_FOUND", messageKey: "error.notFound", fieldErrors: {}, correlationId: "", retryAfterSeconds: null }, { status: 404 });
+    expect(qrRefusalOf(refused)).toMatchObject({ title: "Page unavailable", absent: true });
+    expect(qrRefusalOf(new TypeError("Failed to fetch"))).toMatchObject({ title: "Scan failed", absent: false });
+  });
+});
+
+describe("the QR scan in Malay with the display time zone (IR288)", () => {
+  it("words the match and the refusals", () => {
+    const m = qrMatch({ unitId: "u1", jobId: JOB_C_AAAA }, unit, { projection: "detail", id: JOB_C_AAAA, type: "reactive", status: "in_progress", scheduledSlot: { startAt: "2026-09-21T02:00:00Z", endAt: "2026-09-21T04:00:00Z" }, alertIds: ["a1", "a2"] }, NOW, {}, MS);
+    expect(m.job).toStrictEqual({ label: "Kerja anda hari ini: job-c-aa", text: "21 Sep, 11:00 PG – 1:00 PTG GMT+9 · Pembaikan · sedang berjalan · 2 amaran berpaut", tone: "ok" });
+    expect(qrMatch({ unitId: "u1", jobId: null }, null, null, NOW, { locked: true }, MS)).toMatchObject({ title: "Unit yang ditugaskan", sub: "Butiran unit dibuka apabila tetingkap kerja anda bermula." });
+    expect(qrRefusal({ code: "NOT_FOUND" }, MS.t).title).toBe("Halaman tidak tersedia");
+    expect(qrRefusal({ code: "TIMEOUT" }, MS.t)).toMatchObject({ title: "Imbasan gagal", text: "Label tidak dapat disemak — cuba lagi.", absent: false });
+  });
+});

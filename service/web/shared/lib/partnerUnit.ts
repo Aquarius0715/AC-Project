@@ -3,7 +3,7 @@
 // evidence, the latest readings and the last 24 hours of two diagnosis metrics — read only, no control — and, after
 // the delegation, the job's history snapshot. Pure code shared by the server loader and the view; Vitest covers it.
 // Texts in the display language (`t` / `i`, IR280); every time in the user's display time zone (IR44).
-import { EN, showClock, showDate, showSpan, showTime, type I18n, type T } from "@ac/web/lib/i18n";
+import { EN, showClock, showDate, showSpan, showTime, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import { evidenceText } from "@ac/web/lib/evidence";
 import { alertTitle, type ApiAlert } from "@ac/web/lib/alerts";
 import { metricLabel } from "@ac/web/lib/adminAlerts";
@@ -12,6 +12,7 @@ import { until, type Slot } from "@ac/web/lib/partnerOverview";
 import { statusWord, typeLabel, type ApiHistory } from "@ac/web/lib/partnerJobDetail";
 import { bucket, type ApiUnitDetail } from "@ac/web/lib/units";
 import type { Metric } from "@ac/web/lib/contracts.gen";
+import { lookup } from "@ac/web/lib/lookup";
 
 /** jobs.list rows on the unit (the company's own: summaries inside the access window, history after it). */
 export type ApiUnitJob =
@@ -19,12 +20,14 @@ export type ApiUnitJob =
   | { projection: "history"; jobId: string; type: string; status: string; completedAt: string | null }
   | { projection: "offer"; jobId: string; type: string; status: string };
 
+// the mode word after On; any other mode is fan only
+const MODE_WORD: Record<string, string> = { cool: "cooling", dry: "drying" };
 const SCOPE: Record<string, string> = { indoor: "Indoor unit", outdoor: "Outdoor unit", electrical: "Electrical / control" };
 const QUALITY: Record<string, { text: string; tone?: "warn" | "crit" }> = { valid: { text: "good" }, stale: { text: "stale", tone: "warn" }, suspect: { text: "suspect", tone: "crit" }, missing: { text: "missing", tone: "warn" } };
 const EVIDENCE: Record<string, string> = { inferred: "Suspected", inspection: "Inspection record", demo_observation: "Observed (demo)" };
 /** The diagnosis metrics a chart shows first, in order (Figma: vibration and refrigerant pressure). */
-export const CHART_METRICS: Metric[] = ["vibration", "refrigerant_pressure", "temperature", "humidity", "power"];
-const label = (metric: string, t: T) => (metricLabel[metric] ? t(metricLabel[metric]) : metric.replaceAll('_', " "));
+const CHART_METRICS: Metric[] = ["vibration", "refrigerant_pressure", "temperature", "humidity", "power"];
+const label = (metric: string, t: T) => (textOf(metricLabel, metric, t) ?? metric.replaceAll('_', " "));
 
 /** The unit register (Figma: location, model, maintenance scope; the connection — a badge — and the last seen time). */
 export function registerRows(d: ApiUnitDetail, i: I18n = EN): { connection: ApiUnitDetail["connection"]; rows: [string, string][]; lastSeen: string } {
@@ -33,7 +36,7 @@ export function registerRows(d: ApiUnitDetail, i: I18n = EN): { connection: ApiU
     connection: d.connection, lastSeen: showTime(d.lastSeenAt, display),
     rows: [
       [t("Location"), d.location.pathLabels.join(" › ") || "—"], [t("Model"), `${d.capabilities.manufacturer} ${d.capabilities.model}`],
-      [t("Maintenance scope"), d.serviceScope.map((s) => (SCOPE[s] ? t(SCOPE[s]) : s)).join(" · ") || "—"],
+      [t("Maintenance scope"), d.serviceScope.map((s) => (textOf(SCOPE, s, t) ?? s)).join(" · ") || "—"],
     ],
   };
 }
@@ -52,7 +55,7 @@ export function jobContext(j: Extract<ApiUnitJob, { projection: "summary" }>, na
   const tech = j.technicianMembershipId ? names.get(j.technicianMembershipId) ?? t("technician") : null;
   const from = j.accessValidFrom ?? null, to = j.accessValidUntil ?? null;
   const span = from && to ? Date.parse(to) - Date.parse(from) : 0;
-  const pct = span > 0 ? Math.min(100, Math.max(0, Math.round(((nowMs - Date.parse(from!)) / span) * 100))) : null;
+  const pct = from && span > 0 ? Math.min(100, Math.max(0, Math.round(((nowMs - Date.parse(from)) / span) * 100))) : null;
   return {
     id: j.id,
     techMissing: !tech,
@@ -67,11 +70,12 @@ export function jobContext(j: Extract<ApiUnitJob, { projection: "summary" }>, na
 export function pastWork(jobs: ApiUnitJob[], i: I18n = EN) {
   const { t, display } = i;
   return jobs.filter((j): j is Extract<ApiUnitJob, { projection: "history" }> => j.projection === "history")
-    .sort((a, b) => (b.completedAt ?? "").localeCompare(a.completedAt ?? ""))
+    .toSorted((a, b) => (b.completedAt ?? "").localeCompare(a.completedAt ?? ""))
     .map((j) => {
+      const tone: "ok" | "muted" = j.status === "completed" ? "ok" : "muted";
       return {
         id: j.jobId, title: `${j.jobId.slice(0, 8)} · ${typeLabel(j.type, t)}`, sub: j.completedAt ? showDate(j.completedAt, display) : t("not completed"),
-        badge: { text: statusWord(j.status, t), tone: (j.status === "completed" ? "ok" : "muted") as "ok" | "muted" },
+        badge: { text: statusWord(j.status, t), tone },
       };
     });
 }
@@ -79,23 +83,26 @@ export function pastWork(jobs: ApiUnitJob[], i: I18n = EN) {
 /** The alert evidence: the title, the kind of evidence with its text and when it was detected. */
 export function evidenceRows(alerts: ApiAlert[], i: I18n = EN) {
   const { t, display } = i;
-  return [...alerts].sort((a, b) => b.detectedAt.localeCompare(a.detectedAt)).map((a) => {
+  return [...alerts].toSorted((a, b) => b.detectedAt.localeCompare(a.detectedAt)).map((a) => {
     return {
       id: a.id, title: alertTitle(a, t), severity: a.severity, resolved: a.status === "resolved",
-      sub: `${t(EVIDENCE[a.evidenceKind] ?? "Evidence")} — ${evidenceText(a.evidenceText, t)} · ${showTime(a.detectedAt, display)}`,
+      sub: `${t(lookup(EVIDENCE, a.evidenceKind) ?? "Evidence")} — ${evidenceText(a.evidenceText, t)} · ${showTime(a.detectedAt, display)}`,
     };
   });
 }
 
+/** A reading row of the unit card: a tone only for a reading that is not good. */
+interface ReadingRow { label: string; value: string; tone?: "warn" | "crit" }
 /** The latest readings (diagnosis only) with their quality in words, and the power state. */
-export function readingRows(d: ApiUnitDetail, i: I18n = EN): { rows: { label: string; value: string; tone?: "warn" | "crit" }[]; observed: string } {
+export function readingRows(d: ApiUnitDetail, i: I18n = EN): { rows: ReadingRow[]; observed: string } {
   const { t, display } = i;
-  const rows = d.latestMeasurements.map((m) => {
-    const q = QUALITY[m.quality] ?? { text: m.quality };
+  const rows = d.latestMeasurements.map((m): ReadingRow => {
+    const q = lookup(QUALITY, m.quality) ?? { text: m.quality };
     return { label: label(m.metric, t), value: m.value === null ? `— · ${t(q.text)}` : `${airNumber(m.metric, m.value)} ${m.unit} · ${t(q.text)}`, tone: q.tone };
   });
   const s = d.observedState;
-  if (s.power !== null) rows.push({ label: t("Power state"), value: s.power ? `${t("On")}${s.mode ? ` · ${t(s.mode === "cool" ? "cooling" : (s.mode === "dry" ? "drying" : "fan only"))}` : ""}` : t("Off"), tone: undefined });
+  const mode = s.mode ? ` · ${textOf(MODE_WORD, s.mode, t) ?? t("fan only")}` : "";
+  if (s.power !== null) rows.push({ label: t("Power state"), value: s.power ? `${t("On")}${mode}` : t("Off") });
   return { rows, observed: s.observedAt ? showTime(s.observedAt, display) : "—" };
 }
 
@@ -107,10 +114,10 @@ start in the display time zone. */
 export function chart(metric: string, unit: string, items: { value: number | null; observedAt: string; quality?: string }[], nowMs: number, i: I18n = EN): Chart {
   const { t, display } = i;
   const from = new Date(nowMs - 86_400_000), to = new Date(nowMs);
-  const values = bucket(items, from, to, 12);
-  const latest = [...values].reverse().find((v) => v !== null);
+  const values = bucket(items, from, to);
+  const latest = values.findLast((v) => v !== null);
   return {
-    metric, title: `${label(metric, t)} (${unit})`, now: latest === undefined || latest === null ? t("no reading") : t("now {value}", { value: airNumber(metric, latest) }),
+    metric, title: `${label(metric, t)} (${unit})`, now: latest === undefined ? t("no reading") : t("now {value}", { value: airNumber(metric, latest) }),
     labels: values.map((_, k) => showClock(new Date(from.getTime() + k * 2 * 3_600_000).toISOString(), display, false)), values: values.map((v) => v ?? 0),
   };
 }
@@ -119,12 +126,20 @@ export function chart(metric: string, unit: string, items: { value: number | nul
 and that live values are gone. */
 export function snapshotRows(h: ApiHistory, i: I18n = EN): [string, string][] {
   const { t, display } = i;
-  const decision = [...h.ownDecisionEvents].filter((e) => e.action === "offer.accepted" || e.action === "offer.declined").sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))[0];
-  const report = (h.redactedReportSummary ?? null) as { hasReport?: boolean; acceptance?: string } | null;
+  const decision = [...h.ownDecisionEvents].filter((e) => e.action === "offer.accepted" || e.action === "offer.declined").toSorted((a, b) => b.occurredAt.localeCompare(a.occurredAt))[0];
+  const report = h.redactedReportSummary ?? null;
+  const decisionText = () => {
+    if (!decision) return "—";
+    return `${t(decision.action === "offer.accepted" ? "Accepted" : "Declined")} · ${showTime(decision.occurredAt, display)}`;
+  };
+  const reportText = () => {
+    if (!report?.hasReport) return t("No report");
+    return t(report.acceptance === "accepted" ? "Submitted · accepted" : "Submitted · not accepted");
+  };
   return [
-    [t("Your decision"), decision ? `${t(decision.action === "offer.accepted" ? "Accepted" : "Declined")} · ${showTime(decision.occurredAt, display)}` : "—"],
+    [t("Your decision"), decisionText()],
     [t("Work"), `${statusWord(h.status, t)}${h.completedAt ? ` · ${showDate(h.completedAt, display)}` : ""}`],
-    [t("Report"), report?.hasReport ? t(report.acceptance === "accepted" ? "Submitted · accepted" : "Submitted · not accepted") : t("No report")],
+    [t("Report"), reportText()],
     [t("Live unit values"), t("Not available after the period")],
   ];
 }

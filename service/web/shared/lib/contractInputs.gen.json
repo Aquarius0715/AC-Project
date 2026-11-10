@@ -98,6 +98,10 @@
   "phase",
   "unitIds"
  ],
+ "baselines.delete": [
+  "id",
+  "reason"
+ ],
  "baselines.list": [
   "cursor",
   "filters",
@@ -114,6 +118,10 @@
   "period",
   "source",
   "unitIds"
+ ],
+ "capabilities.delete": [
+  "id",
+  "reason"
  ],
  "capabilities.list": [
   "cursor",
@@ -192,7 +200,6 @@
   "expectedUnitVersion",
   "jobId",
   "reason",
-  "source",
   "unitId"
  ],
  "commands.get": [
@@ -209,6 +216,11 @@
  "consents.update": [
   "granted",
   "purpose"
+ ],
+ "contractors.delete": [
+  "force",
+  "id",
+  "reason"
  ],
  "contractors.list": [
   "cursor",
@@ -246,6 +258,11 @@
   "rulesVersion",
   "startAt",
   "unitIds"
+ ],
+ "customers.delete": [
+  "force",
+  "id",
+  "reason"
  ],
  "customers.list": [
   "cursor",
@@ -338,6 +355,10 @@
   "id",
   "jobId"
  ],
+ "devices.delete": [
+  "deviceId",
+  "reason"
+ ],
  "devices.events": [
   "id",
   "query"
@@ -357,9 +378,18 @@
  ],
  "devices.register": [
   "jobId",
+  "mqttNode",
   "sensorTypes",
   "serial",
   "unitId"
+ ],
+ "devices.setMqttNode": [
+  "deviceId",
+  "mqttNode"
+ ],
+ "devices.unbind": [
+  "deviceId",
+  "reason"
  ],
  "devices.updateFirmware": [
   "deviceId",
@@ -397,6 +427,10 @@
   "to",
   "unitIds"
  ],
+ "factors.delete": [
+  "id",
+  "reason"
+ ],
  "factors.list": [
   "cursor",
   "filters",
@@ -431,6 +465,10 @@
   "action",
   "campaignId",
   "deviceId",
+  "reason"
+ ],
+ "firmwareCampaigns.delete": [
+  "id",
   "reason"
  ],
  "firmwareCampaigns.get": [
@@ -576,8 +614,7 @@
   "contractorOrgId",
   "jobId",
   "offerExpiresAt",
-  "termsVersion",
-  "visitSlot"
+  "termsVersion"
  ],
  "jobs.pauseWork": [
   "jobId",
@@ -693,6 +730,11 @@
   "from",
   "id"
  ],
+ "members.delete": [
+  "force",
+  "id",
+  "reason"
+ ],
  "members.eligible": [
   "endAt",
   "jobId",
@@ -734,6 +776,10 @@
   "filters",
   "limit",
   "sort"
+ ],
+ "mrv.deleteDraft": [
+  "id",
+  "reason"
  ],
  "mrv.get": [
   "id",
@@ -821,6 +867,10 @@
   "quoteId",
   "quoteVersion",
   "recordId"
+ ],
+ "organizations.delete": [
+  "id",
+  "reason"
  ],
  "organizations.list": [
   "cursor",
@@ -914,6 +964,10 @@
   "reason",
   "statementId"
  ],
+ "plans.delete": [
+  "id",
+  "reason"
+ ],
  "plans.generateNext": [
   "id",
   "occurrenceDate"
@@ -999,6 +1053,10 @@
   "id",
   "kind",
   "name"
+ ],
+ "rateCards.delete": [
+  "id",
+  "reason"
  ],
  "rateCards.list": [
   "cursor",
@@ -1210,11 +1268,6 @@
   "method",
   "spaceId",
   "unitId"
- ],
- "voice.resolveIntent": [
-  "locale",
-  "selectedUnitId",
-  "text"
  ],
  "writes.getResult": [
   "idempotencyKey",

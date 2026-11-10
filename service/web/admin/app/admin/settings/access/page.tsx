@@ -8,11 +8,12 @@
 import { connection } from "next/server";
 import { apiMode, coreAll, coreDisplay, coreNow, corePermissions, corePrincipal } from "@ac/web/lib/dal";
 import { i18nOf } from "@ac/web/lib/i18n";
-import { memberRows, type ApiMember, type ApiOrganization } from "@ac/web/lib/members";
+import { DATA_FORCE_DELETE, memberRows, type ApiMember, type ApiOrganization } from "@ac/web/lib/members";
 import { AccessDemo } from "./_components/access-demo";
 import { AccessView } from "./_components/access-view";
-import type { Role } from "@ac/web/lib/contracts.gen";
 import { withAccess } from "@ac/web/lib/withAccess";
+import { oneOf } from "@ac/web/lib/oneOf";
+import { queryReader } from "@ac/web/lib/searchParams";
 
 
 // a role without the page's read permission sees which one it needs, not a failure (IR582)
@@ -24,11 +25,11 @@ async function AdminAccessPageContent({ searchParams }: Readonly<PageProps<"/adm
   await connection();
   if (!apiMode()) return <AccessDemo />;
   const sp = await searchParams;
-  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k] as string) : undefined);
-  const role = one("role") === "admin" || one("role") === "contractor" || one("role") === "technician" ? one("role") : undefined;
+  const one = queryReader(sp);
+  const role = oneOf(["admin", "contractor", "technician"] as const, one("role") ?? "", undefined);
   const status = one("status") === "active" || one("status") === "inactive" ? one("status") : undefined;
   const organizationId = one("organizationId");
-  const filters = { ...(role && { role: role as Role }), ...(status === "active" && { activeOnly: true }), ...(organizationId && { organizationId }) };
+  const filters = { ...(role && { role }), ...(status === "active" && { activeOnly: true }), ...(organizationId && { organizationId }) };
   const isFiltered = Object.keys(filters).length > 0;
   const [now, perms, me, display, members, everyone, orgs, properties, units] = await Promise.all([
     coreNow(), corePermissions(), corePrincipal(), coreDisplay(),
@@ -41,11 +42,18 @@ async function AdminAccessPageContent({ searchParams }: Readonly<PageProps<"/adm
   const rows = memberRows(members, orgs, now, i18nOf(display)).filter((r) => status !== "inactive" || !r.active);
   const users = [...new Map((everyone ?? members).filter((m) => m.role !== "client").map((m) => [m.userId, m.displayName]))].map(([id, name]) => ({ id, name }));
   const wanted = one("membershipId");
-  const selected = wanted === "new" ? "new" : (wanted ? rows.find((r) => r.id === wanted)?.id ?? "missing" : rows[0]?.id ?? "new");
+  // the asked membership, a new one, or the first; an asked one that is gone is missing
+  const selectedOf = () => {
+    if (wanted === "new") return "new";
+    if (wanted) return rows.find((r) => r.id === wanted)?.id ?? "missing";
+    return rows[0]?.id ?? "new";
+  };
+  const selected = selectedOf();
   return (
     <AccessView live={{
       now: now.toISOString(),
       canWrite: perms.has("identity.write"),
+      canForce: perms.has(DATA_FORCE_DELETE),
       selfUserId: me.userId,
       tenantId: me.tenantId,
       scope: { role, status, organizationId },

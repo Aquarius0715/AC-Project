@@ -6,6 +6,7 @@
 // switches default rules for the customer (policies.setDefaultRule with the setting version, owner only, IR115).
 import { refresh } from "next/cache";
 import { coreOp, CoreError } from "@ac/web/lib/dal";
+import { actionFailure } from "@ac/web/lib/actionFailure";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import type { OpInput } from "@ac/web/lib/opTypes";
 
@@ -20,7 +21,7 @@ const run = async <T,>(fn: () => Promise<T>): Promise<Result<T>> => {
       if (error.error.code === "CONFLICT") refresh();
       return { ok: false, code: error.error.code, messageKey: error.error.messageKey, fieldErrors: error.error.fieldErrors, retryAfterSeconds: error.error.retryAfterSeconds };
     }
-    throw error;
+    return actionFailure(error);
   }
 };
 
@@ -31,7 +32,7 @@ export async function readAlert(ids: string[]): Promise<ActionFailure | null> {
     await coreOp("notifications.markAllRead", { ids }, { write: true });
     return null;
   } catch (error) {
-    return error instanceof CoreError ? { code: error.error.code, messageKey: error.error.messageKey, fieldErrors: error.error.fieldErrors, retryAfterSeconds: error.error.retryAfterSeconds } : { code: "UNAVAILABLE", messageKey: "error.unavailable", fieldErrors: {} };
+    return actionFailure(error);
   } finally {
     refresh();
   }
@@ -39,7 +40,10 @@ export async function readAlert(ids: string[]): Promise<ActionFailure | null> {
 
 /** policies.save: a new policy, or an own policy at its version (the input of customerPolicies.policyInput). */
 export async function savePolicy(input: OpInput<"policies.save">, version: number | null) {
-  return run(async () => (await coreOp<{ id: string }>("policies.save", input, version === null ? { write: true } : { write: true, expectedVersion: version })).id);
+  return run(async () => {
+    const { id } = await coreOp<{ id: string }>("policies.save", input, version === null ? { write: true } : { write: true, expectedVersion: version });
+    return id;
+  });
 }
 
 /** policies.delete at the policy's version: detaches it from every AC and deletes it (IR108). */

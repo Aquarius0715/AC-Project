@@ -4,18 +4,26 @@
 // with the jobs an ending certificate blocks, the KPIs, the assignment impact and the renewal / training forms.
 // Pure code shared by the server loader and the client view; Vitest covers it. Texts in the display language (`t` /
 // `i`, IR277); certificate dates are Kuala Lumpur days, a job's time an instant in the display time zone.
-import { EN, translator, type I18n, type T } from "@ac/web/lib/i18n";
+import { EN, translator, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import { businessDay } from "@ac/web/lib/clientBilling";
 import { klDay, type Slot } from "@ac/web/lib/partnerOverview";
 import { qualificationLabel } from "@ac/web/lib/partnerJobDetail";
 import type { ApiCertificate } from "@ac/web/lib/adminContractors";
 import { activeNow, klStart, QUALIFICATION_CODES, type ApiTeamMember } from "@ac/web/lib/partnerTeam";
+import { oneOf } from "@ac/web/lib/oneOf";
+import { z } from "@ac/web/lib/zod";
+
+/** The codes a certificate is filed under (Certificate.code of the contract). */
+export const certificateCode = z.enum(["demo_indoor", "demo_outdoor", "demo_electrical", "other"]);
+import { codePoints } from "@ac/web/lib/text";
+import { isAfter } from "@ac/web/lib/order";
+import { entryOf, lookup } from "@ac/web/lib/lookup";
 
 const en = translator("en");
 const DAY = 86_400_000;
 export const WINDOWS = [30, 60, 90] as const;
 export const CERT_STATUSES = ["valid", "expiring", "expired", "pending", "rejected", "not_held"] as const;
-export type CertStatus = (typeof CERT_STATUSES)[number];
+type CertStatus = (typeof CERT_STATUSES)[number];
 /** A certificate as certificates.list returns it (Certificate of service-contracts.ts). */
 export type ApiCert = ApiCertificate;
 /** A booked job of a technician with the qualifications its unit's maintenance scope needs (IR123 item 3). */
@@ -27,7 +35,7 @@ export function certQuery(sp: { membershipId?: string; status?: string; expiring
   const within = WINDOWS.find((w) => String(w) === sp.expiringWithinDays) ?? 60;
   return {
     membershipId: sp.membershipId && technicianIds.includes(sp.membershipId) ? sp.membershipId : null,
-    status: (CERT_STATUSES as readonly string[]).includes(sp.status ?? "") ? (sp.status as CertStatus) : null, within,
+    status: oneOf(CERT_STATUSES, sp.status ?? "", null), within,
   };
 }
 
@@ -38,91 +46,71 @@ export interface CertRow {
   training: string | null; actions: ("view" | "renew" | "training" | "add")[];
 }
 
-/** The rows (Figma 04-6): per technician and qualification the certificate on file — its latest one, with a pending
-renewal noted — else the HQ grant without a certificate on file, else “not held” when a booked job needs it. A
-valid certificate ending within the window is “Expiring”; the jobs that end after it are the ones it blocks. A
-certificate keeps the name it was uploaded with; only an active technician can get a new one (IR133 item 1). */
-export function certRows(members: ApiTeamMember[], certs: ApiCert[], jobs: CertJob[], within: number, nowMs: number, i: I18n = EN): CertRow[] {
-  const { t, display: { locale } } = i;
+/** A grant from HQ: the upload waiting or rejected, or no certificate on file. */
+function grantDetail(upload: string | undefined, t: T): string {
+  if (upload === "pending") return t("granted by HQ · the upload waits for HQ");
+  return t(upload === "rejected" ? "granted by HQ · the upload was rejected" : "granted by HQ · no certificate on file");
+}
+interface RowTools {
+  t: T;
+  locale: I18n["display"]["locale"];
+  blocks: (membershipId: string, code: string, endsAt: number) => CertRow["blocks"];
+  state: (endsAt: number) => { status: CertStatus; days: number };
+  badgeOf: (status: CertStatus, days: number | null) => CertRow["badge"];
+}
+/** A technician's certificates by qualification. An "other" certificate is its own group, and its renewals join it
+however long the chain of renewals is: each one is filed under the first certificate it renews, whatever the order of
+the list (IR706). */
+function groupedCerts(mine: ApiCert[]): Map<string, ApiCert[]> {
+  const byId = new Map(mine.map((c) => [c.id, c]));
+  // the first certificate of an "other" chain: renewalOf followed back while it names one of these, each step once
+  const rootOf = (c: ApiCert): string => {
+    const seen = new Set<string>();
+    let at = c;
+    while (at.renewalOf && !seen.has(at.id)) {
+      seen.add(at.id);
+      const before = byId.get(at.renewalOf);
+      if (before?.code !== "other") break;
+      at = before;
+    }
+    return at.id;
+  };
+  const groups = new Map<string, ApiCert[]>();
+  for (const c of mine) {
+    const k = c.code === "other" ? `other:${rootOf(c)}` : c.code;
+    groups.set(k, [...(groups.get(k) ?? []), c]);
+  }
+  return groups;
+}
+/** The rows of a technician's qualifications without a certificate on file: the HQ grant, else "not held" when a booked job needs it. */
+function grantAndMissingRows(m: ApiTeamMember, groups: Map<string, ApiCert[]>, viaGrant: Map<string, "pending" | "rejected">, isActive: boolean, tools: RowTools): CertRow[] {
+  const { t, locale, blocks, state, badgeOf } = tools;
   const rows: CertRow[] = [];
-  const blocks = (m: string, code: string, endsAt: number) => jobs.filter((j) => j.technicianId === m && j.required.includes(code) && Date.parse(j.slot.endAt) > endsAt)
-    .sort((a, b) => Date.parse(a.slot.startAt) - Date.parse(b.slot.startAt)).map((j) => {
-      const day = klDay(new Date(Date.parse(j.slot.startAt) + 8 * 3_600_000).toISOString().slice(0, 10), locale); // the visit's Kuala Lumpur day
-      return { jobId: j.jobId, text: `${j.short} (${day})`, day };
-    });
-  const state = (endsAt: number): { status: CertStatus; days: number } => {
-    const days = Math.ceil((endsAt - nowMs) / DAY);
-    return { status: endsAt <= nowMs ? "expired" : (days <= within ? "expiring" : "valid"), days };
-  };
-  const badgeOf = (s: CertStatus, days: number | null): CertRow["badge"] => {
-    return ({
-      valid: { text: t("Valid"), tone: "ok" as const }, expiring: { text: t("Expiring · {n} d", { n: days ?? 0 }), tone: "warn" as const }, expired: { text: t("Expired"), tone: "crit" as const },
-      pending: { text: t("Pending HQ verification"), tone: "primary" as const }, rejected: { text: t("Rejected"), tone: "crit" as const }, not_held: { text: t("Not held"), tone: "muted" as const },
-    })[s];
-  };
-  for (const m of members) {
-    const isActive = activeNow(m, nowMs);
-    const mine = certs.filter((c) => c.membershipId === m.id);
-    const groups = new Map<string, ApiCert[]>();
-    for (const c of mine) {
-      const k = c.code === "other" ? `other:${c.id}` : c.code;
-      groups.set(k, [...(groups.get(k) ?? []), c]);
-    }
-    // a renewal of an "other" certificate joins its original
-    for (const [k, list] of [...groups]) {
-      const of = list[0].renewalOf;
-      if (!(k.startsWith("other:") && of && groups.has(`other:${of}`))) {
-        continue;
-      }
-
-      groups.get(`other:${of}`)!.push(...list); groups.delete(k);
-    }
-    const viaGrant = new Map<string, "pending" | "rejected">(); // no certificate on file yet: the HQ grant still decides (BR-P09)
-    for (const [k, list] of groups) {
-      const onFile = list.filter((c) => c.status === "valid" || c.status === "expiring" || c.status === "expired").sort((a, b) => Date.parse(b.expiresAt) - Date.parse(a.expiresAt))[0];
-      const pending = list.filter((c) => c.status === "pending_verification").sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
-      const rejected = list.filter((c) => c.status === "rejected").sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
-      if (!onFile && (m.qualifications ?? []).some((q) => q.code === k && !q.revokedAt && q.validUntil)) { viaGrant.set(k, pending ? "pending" : "rejected"); continue; }
-      const shown = onFile ?? pending ?? rejected!;
-      const s = onFile ? state(Date.parse(onFile.expiresAt)) : { status: (pending ? "pending" : "rejected") as CertStatus, days: null };
-      const ends = Date.parse(shown.expiresAt);
-      const training = onFile?.trainingRequestedAt ? t("Training requested {date}", { date: businessDay(onFile.trainingRequestedAt, locale) }) : null;
-      const actions: CertRow["actions"] = ["view"];
-      if (isActive && !pending && (s.status === "expiring" || s.status === "expired" || s.status === "rejected")) actions.push("renew");
-      if (isActive && onFile && !training && (s.status === "expiring" || s.status === "expired")) actions.push("training");
+  const withoutCertificate = QUALIFICATION_CODES.filter((c) => !groups.has(c) || viaGrant.has(c));
+  for (const code of withoutCertificate) {
+    const upload = viaGrant.get(code);
+    const until = (m.qualifications ?? []).map((q) => (q.code === code && !q.revokedAt ? q.validUntil : null)).filter((v): v is string => !!v).toSorted((a, b) => Date.parse(b) - Date.parse(a)).at(0);
+    if (until) {
+      const s = state(Date.parse(until));
       rows.push({
-        key: `${m.id}:${k}`, technicianId: m.id, technician: m.displayName, code: shown.code, name: shown.name || qualificationLabel(shown.code, t),
-        detail: t("{number} · issued {date}", { number: shown.number, date: businessDay(shown.issuedAt, locale) }), expires: businessDay(shown.expiresAt, locale), expiresAt: shown.expiresAt,
-        status: s.status, badge: badgeOf(s.status, s.days), days: s.days, blocks: s.status === "pending" || s.status === "rejected" ? [] : blocks(m.id, shown.code, ends),
-        cert: { id: shown.id, version: shown.version, number: shown.number, fileName: shown.fileName ?? null }, renewalPending: !!onFile && !!pending, training, actions,
+        key: `${m.id}:${code}`,
+        technicianId: m.id,
+        technician: m.displayName,
+        name: qualificationLabel(code, t),
+        detail: grantDetail(upload, t),
+        expires: businessDay(until, locale),
+        expiresAt: until,
+        status: s.status,
+        badge: badgeOf(s.status, s.days),
+        days: s.days,
+        blocks: blocks(m.id, code, Date.parse(until)),
+        cert: null,
+        renewalPending: upload === "pending",
+        training: null,
+        actions: isActive && upload !== "pending" ? ["add"] : [],
+        code,
       });
-    }
-    for (const code of QUALIFICATION_CODES) {
-      if (groups.has(code) && !viaGrant.has(code)) continue;
-      const upload = viaGrant.get(code);
-      const grant = (m.qualifications ?? []).filter((q) => q.code === code && !q.revokedAt && q.validUntil).sort((a, b) => Date.parse(b.validUntil!) - Date.parse(a.validUntil!))[0];
-      if (grant) {
-        const s = state(Date.parse(grant.validUntil!));
-        rows.push({
-          key: `${m.id}:${code}`,
-          technicianId: m.id,
-          technician: m.displayName,
-          name: qualificationLabel(code, t),
-          detail: t(upload === "pending" ? "granted by HQ · the upload waits for HQ" : (upload === "rejected" ? "granted by HQ · the upload was rejected" : "granted by HQ · no certificate on file")),
-          expires: businessDay(grant.validUntil!, locale),
-          expiresAt: grant.validUntil!,
-          status: s.status,
-          badge: badgeOf(s.status, s.days),
-          days: s.days,
-          blocks: blocks(m.id, code, Date.parse(grant.validUntil!)),
-          cert: null,
-          renewalPending: upload === "pending",
-          training: null,
-          actions: isActive && upload !== "pending" ? ["add"] : [],
-          code,
-        });
-        continue;
-      }
+    } else {
       const needed = blocks(m.id, code, -Infinity);
       if (needed.length > 0) {
         rows.push({
@@ -146,14 +134,68 @@ export function certRows(members: ApiTeamMember[], certs: ApiCert[], jobs: CertJ
       }
     }
   }
+  return rows;
+}
+/** The rows (Figma 04-6): per technician and qualification the certificate on file — its latest one, with a pending
+renewal noted — else the HQ grant without a certificate on file, else “not held” when a booked job needs it. A
+valid certificate ending within the window is “Expiring”; the jobs that end after it are the ones it blocks. A
+certificate keeps the name it was uploaded with; only an active technician can get a new one (IR133 item 1). */
+export function certRows(members: ApiTeamMember[], certs: ApiCert[], jobs: CertJob[], within: number, nowMs: number, i: I18n = EN): CertRow[] {
+  const { t, display: { locale } } = i;
+  const rows: CertRow[] = [];
+  const blocks = (m: string, code: string, endsAt: number) => jobs.filter((j) => j.technicianId === m && j.required.includes(code) && Date.parse(j.slot.endAt) > endsAt)
+    .toSorted((a, b) => Date.parse(a.slot.startAt) - Date.parse(b.slot.startAt)).map((j) => {
+      const day = klDay(new Date(Date.parse(j.slot.startAt) + 8 * 3_600_000).toISOString().slice(0, 10), locale); // the visit's Kuala Lumpur day
+      return { jobId: j.jobId, text: `${j.short} (${day})`, day };
+    });
+  const state = (endsAt: number): { status: CertStatus; days: number } => {
+    const days = Math.ceil((endsAt - nowMs) / DAY);
+    const soon = days <= within ? "expiring" : "valid";
+    return { status: endsAt <= nowMs ? "expired" : soon, days };
+  };
+  const badgeOf = (s: CertStatus, days: number | null): CertRow["badge"] => {
+    return entryOf({
+      valid: { text: t("Valid"), tone: "ok" as const }, expiring: { text: t("Expiring · {n} d", { n: days ?? 0 }), tone: "warn" as const }, expired: { text: t("Expired"), tone: "crit" as const },
+      pending: { text: t("Pending HQ verification"), tone: "primary" as const }, rejected: { text: t("Rejected"), tone: "crit" as const }, not_held: { text: t("Not held"), tone: "muted" as const },
+    }, s);
+  };
+  const tools: RowTools = { t, locale, blocks, state, badgeOf };
+  for (const m of members) {
+    const isActive = activeNow(m, nowMs);
+    const mine = certs.filter((c) => c.membershipId === m.id);
+    const groups = groupedCerts(mine);
+    const viaGrant = new Map<string, "pending" | "rejected">(); // no certificate on file yet: the HQ grant still decides (BR-P09)
+    for (const [k, list] of groups) {
+      const onFile = list.filter((c) => c.status === "valid" || c.status === "expiring" || c.status === "expired").toSorted((a, b) => Date.parse(b.expiresAt) - Date.parse(a.expiresAt))[0];
+      const pending = list.filter((c) => c.status === "pending_verification").toSorted((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
+      const rejected = list.filter((c) => c.status === "rejected").toSorted((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
+      const isViaGrant = !onFile && (m.qualifications ?? []).some((q) => q.code === k && !q.revokedAt && !!q.validUntil);
+      if (isViaGrant) viaGrant.set(k, pending ? "pending" : "rejected");
+      const shown = onFile ?? pending ?? rejected; // a group holds at least one certificate on file, pending or rejected
+      if (isViaGrant || !shown) continue;
+      const s = onFile ? state(Date.parse(onFile.expiresAt)) : { status: (pending ? "pending" : "rejected") as CertStatus, days: null };
+      const ends = Date.parse(shown.expiresAt);
+      const training = onFile?.trainingRequestedAt ? t("Training requested {date}", { date: businessDay(onFile.trainingRequestedAt, locale) }) : null;
+      const actions: CertRow["actions"] = ["view"];
+      if (isActive && !pending && (s.status === "expiring" || s.status === "expired" || s.status === "rejected")) actions.push("renew");
+      if (isActive && onFile && !training && (s.status === "expiring" || s.status === "expired")) actions.push("training");
+      rows.push({
+        key: `${m.id}:${k}`, technicianId: m.id, technician: m.displayName, code: shown.code, name: shown.name || qualificationLabel(shown.code, t),
+        detail: t("{number} · issued {date}", { number: shown.number, date: businessDay(shown.issuedAt, locale) }), expires: businessDay(shown.expiresAt, locale), expiresAt: shown.expiresAt,
+        status: s.status, badge: badgeOf(s.status, s.days), days: s.days, blocks: s.status === "pending" || s.status === "rejected" ? [] : blocks(m.id, shown.code, ends),
+        cert: { id: shown.id, version: shown.version, number: shown.number, fileName: shown.fileName ?? null }, renewalPending: !!onFile && !!pending, training, actions,
+      });
+    }
+    rows.push(...grantAndMissingRows(m, groups, viaGrant, isActive, tools));
+  }
   const rank: Record<CertStatus, number> = { expired: 0, expiring: 1, not_held: 2, rejected: 3, pending: 4, valid: 5 };
-  return rows.sort((a, b) => a.technician.localeCompare(b.technician) || rank[a.status] - rank[b.status] || a.name.localeCompare(b.name));
+  return rows.toSorted((a, b) => a.technician.localeCompare(b.technician) || rank[a.status] - rank[b.status] || a.name.localeCompare(b.name));
 }
 
 /** The four KPIs (Figma 04-6): in date, expiring within the window (the soonest named), expired, pending HQ
 verification (renewals included). */
 export function certKpis(rows: CertRow[], certs: ApiCert[], within: number, t: T = en) {
-  const expiring = rows.filter((r) => r.status === "expiring").sort((a, b) => (a.days ?? 0) - (b.days ?? 0));
+  const expiring = rows.filter((r) => r.status === "expiring").toSorted((a, b) => (a.days ?? 0) - (b.days ?? 0));
   const expired = rows.filter((r) => r.status === "expired");
   const ids = new Set(rows.map((r) => r.technicianId));
   return [
@@ -166,14 +208,17 @@ export function certKpis(rows: CertRow[], certs: ApiCert[], within: number, t: T
 
 /** The assignment impact (Figma 04-6): the first job an expiring, expired or missing qualification blocks. */
 export function impact(rows: CertRow[], jobs: CertJob[], t: T = en) {
-  const row = rows.filter((r) => r.blocks.length && (r.status === "expiring" || r.status === "expired" || r.status === "not_held"))
-    .map((r) => ({ r, job: jobs.find((j) => j.jobId === r.blocks[0].jobId)! })).sort((a, b) => Date.parse(a.job.slot.startAt) - Date.parse(b.job.slot.startAt))[0];
+  const row = rows.filter((r) => r.blocks.length > 0 && (r.status === "expiring" || r.status === "expired" || r.status === "not_held"))
+    .map((r) => ({ r, job: jobs.find((j) => j.jobId === r.blocks[0]?.jobId) })).filter((x): x is { r: CertRow; job: CertJob } => x.job !== undefined).toSorted((a, b) => Date.parse(a.job.slot.startAt) - Date.parse(b.job.slot.startAt))[0];
   if (!row) return null;
   const { r, job } = row;
-  const day = r.blocks[0].day;
-  const text = r.status === "not_held" ? t("{name} does not hold {cert}. {job} ({unit}, {day}) needs it — add the certificate or reassign.", { name: r.technician, cert: r.name, job: job.short, unit: job.unit, day })
-    : t(r.status === "expired" ? "{cert} of {name} expired {date}. {job} ({unit}, {day}) needs it — renew it or reassign." : "{cert} of {name} expires {date}. {job} ({unit}, {day}) needs it — renew before then or reassign.",
+  const day = r.blocks[0]?.day ?? "";
+  const lapseText = () => {
+    if (r.status === "not_held") return t("{name} does not hold {cert}. {job} ({unit}, {day}) needs it — add the certificate or reassign.", { name: r.technician, cert: r.name, job: job.short, unit: job.unit, day });
+    return t(r.status === "expired" ? "{cert} of {name} expired {date}. {job} ({unit}, {day}) needs it — renew it or reassign." : "{cert} of {name} expires {date}. {job} ({unit}, {day}) needs it — renew before then or reassign.",
       { cert: r.name, name: r.technician, date: r.expires, job: job.short, unit: job.unit, day });
+  };
+  const text = lapseText();
   return { text, jobId: job.jobId, rows: [[t("Job"), `${job.short} · ${job.unit}`], [t("Slot"), job.text], [t("Assigned"), r.technician], [t("Requires"), qualificationLabel(r.code, t)]] as [string, string][] };
 }
 
@@ -185,16 +230,26 @@ issue day before the expiry day, and a PDF, JPEG or PNG of at most 10 MB. */
 export function certificateErrors(f: CertForm, t: T = en): Partial<Record<"membershipId" | "name" | "number" | "issued" | "expires" | "file", string>> {
   const e: Partial<Record<"membershipId" | "name" | "number" | "issued" | "expires" | "file", string>> = {};
   if (!f.membershipId) e.membershipId = t("Choose a technician");
-  const name = [...f.name.trim()].length, number = [...f.number.trim()].length;
+  const name = codePoints(f.name.trim()), number = codePoints(f.number.trim());
   if (name < 1 || name > 120) e.name = t("1–120 characters");
   if (number < 1 || number > 64) e.number = t("1–64 characters");
   if (!isDate(f.issued)) e.issued = t("Choose the issue date");
-  if (!isDate(f.expires)) e.expires = t("Choose the expiry date");
-  else if (isDate(f.issued) && f.expires <= f.issued) e.expires = t("The expiry date must be after the issue date");
-  if (!f.file) e.file = t("Attach the certificate file");
-  else if (!FILE_TYPES.includes(f.file.type)) e.file = t("Use a PDF, JPG or PNG file");
-  else if (f.file.size > 10_000_000) e.file = t("The file is larger than 10 MB");
+  const expires = expiryError(f, t);
+  if (expires) e.expires = expires;
+  const file = fileError(f.file, t);
+  if (file) e.file = file;
   return e;
+}
+/** What is wrong with the expiry day, or undefined. */
+function expiryError(f: CertForm, t: T): string | undefined {
+  if (!isDate(f.expires)) return t("Choose the expiry date");
+  return isDate(f.issued) && !isAfter(f.expires, f.issued) ? t("The expiry date must be after the issue date") : undefined;
+}
+/** What is wrong with the attached file, or undefined. */
+function fileError(file: CertForm["file"], t: T): string | undefined {
+  if (!file) return t("Attach the certificate file");
+  if (!FILE_TYPES.includes(file.type)) return t("Use a PDF, JPG or PNG file");
+  return file.size > 10_000_000 ? t("The file is larger than 10 MB") : undefined;
 }
 /** The instants a form's Kuala Lumpur days stand for: the start of the issue day and of the expiry day. */
 export const certDates = (f: { issued: string; expires: string }) => ({ issuedAt: klStart(f.issued), expiresAt: klStart(f.expires) });
@@ -205,11 +260,11 @@ const TEXT: Record<string, string> = {
   "error.invalid": "Not a valid choice",
 };
 /** Readable refusals of certificates.submit and certificates.requestTraining: the fields they name, or the reason. */
-export function certificateRefusal(f: { code: string; messageKey: string; fieldErrors: Record<string, string> }, t: T = en): { fields: Record<string, string>; text: string | null } {
+export function certificateRefusal(f: { code: string; fieldErrors: Record<string, string> }, t: T = en): { fields: Record<string, string>; text: string | null } {
   if (f.code === "NOT_FOUND") return { fields: {}, text: t("That technician or certificate is no longer in your company — reload the page.") };
   if (f.code === "CONFLICT") return { fields: {}, text: t("The certificate changed in the meantime — the page shows the latest state.") };
   if (f.code !== "VALIDATION") return { fields: {}, text: null };
-  const fields = Object.fromEntries(Object.entries(f.fieldErrors).map(([k, v]) => [FIELDS[k] ?? k, TEXT[v] ? t(TEXT[v]) : v]));
+  const fields = Object.fromEntries(Object.entries(f.fieldErrors).map(([k, v]) => [lookup(FIELDS, k) ?? k, textOf(TEXT, v, t) ?? v]));
   return { fields, text: Object.keys(fields).length > 0 ? null : t("Check the input.") };
 }
 /** “412 KB”, “2.4 MB”: a file's size as the form shows it. */

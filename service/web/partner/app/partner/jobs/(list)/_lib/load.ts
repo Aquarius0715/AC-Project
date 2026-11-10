@@ -5,17 +5,12 @@
 // the first page. Texts in the user's display language, slots and deadlines in their time zone, the period in
 // Kuala Lumpur days (IR271).
 import "server-only";
-import { coreAll, coreDisplay, coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
+import { coreAll, coreDisplay, coreNow, coreOp, CoreError, orWhenRefused } from "@ac/web/lib/dal";
 import { i18nOf } from "@ac/web/lib/i18n";
 import { jobRow, pages, PAGE_SIZE, sortOf, sortSpec, SORTS, TABS, tabFilters, tabOf } from "@ac/web/lib/partnerJobs";
 import { period, periodChoice, type ApiMember, type ApiPartnerJob } from "@ac/web/lib/partnerOverview";
 
-const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => {
-  return p.catch((error) => {
-    if (error instanceof CoreError && error.error.code !== "UNAVAILABLE" && error.error.code !== "TIMEOUT") return fallback;
-    throw error;
-  });
-};
+const optional = orWhenRefused;
 const stale = (e: unknown) => e instanceof CoreError && (!!e.error.fieldErrors.cursor || e.error.messageKey === "error.cursorExpired");
 
 export async function loadJobs(sp: { tab?: string; sort?: string; from?: string; to?: string; cursor?: string; page?: string }) {
@@ -27,23 +22,27 @@ export async function loadJobs(sp: { tab?: string; sort?: string; from?: string;
   const p = period(nowIso, sp.from, sp.to);
   const tab = tabOf(sp.tab), sort = sortOf(sp.sort);
   const query = (cursor?: string) => coreOp<Page<ApiPartnerJob>>("jobs.list", { filters: tabFilters(tab, p.fromAt, p.toAt), sort: sortSpec(sort), limit: PAGE_SIZE, ...(cursor && { cursor }) });
-  let isRestarted = false;
-  const list = await query(sp.cursor).catch((error) => {
-    if (!sp.cursor || !stale(error)) throw error;
-    isRestarted = true; // the list changed since the cursor was issued
-    return query();
-  });
+  const firstPage = async () => {
+    try {
+      return { list: await query(sp.cursor), isRestarted: false };
+    } catch (error: unknown) {
+      if (!sp.cursor || !stale(error)) throw error;
+      return { list: await query(), isRestarted: true }; // the list changed since the cursor was issued
+    }
+  };
+  const { list, isRestarted } = await firstPage();
   const [counts, units, members] = await Promise.all([
-    Promise.all(TABS.map((t) => coreOp<Page<unknown>>("jobs.list", { filters: tabFilters(t.id, p.fromAt, p.toAt), limit: 1 }).then((r) => r.total))),
+    Promise.all(TABS.map(async (entry) => { const r = await coreOp<Page<unknown>>("jobs.list", { filters: tabFilters(entry.id, p.fromAt, p.toAt), limit: 1 }); return r.total; })),
     optional(coreAll<{ id: string; displayName: string }>("units.list"), []),
     optional(coreAll<ApiMember>("members.list"), []),
   ]);
   const unitNames = new Map(units.map((u) => [u.id, u.displayName]));
   const names = new Map(members.map((m) => [m.id, m.displayName]));
-  const page = isRestarted ? 1 : Number(sp.page) || (sp.cursor ? 2 : 1);
+  const cursorPage = sp.cursor ? 2 : 1; // a cursor without a page number is past the first page
+  const page = isRestarted ? 1 : Number(sp.page) || cursorPage;
   return {
-    tab, sort, sortText: t(SORTS.find((s) => s.id === sort)!.text), restarted: isRestarted,
-    tabs: TABS.map((tb, k) => ({ id: tb.id, label: t(tb.label), count: counts[k] })),
+    tab, sort, sortText: t((SORTS.find((s) => s.id === sort) ?? SORTS[0]).text), restarted: isRestarted,
+    tabs: TABS.map((tb, k) => ({ id: tb.id, label: t(tb.label), count: counts.at(k) ?? 0 })),
     sorts: SORTS.map((s) => ({ id: s.id, label: t("Sort: {sort}", { sort: t(s.label) }) })),
     ...periodChoice(p, nowIso, i), // period + periods
     rows: list.items.map((j) => jobRow(j, now.getTime(), unitNames, names, i)),

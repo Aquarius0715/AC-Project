@@ -1,0 +1,102 @@
+// @vitest-environment jsdom
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { act, cleanup, render, screen } from "@testing-library/react";
+import { toast } from "sonner";
+import type { unstable_rethrow as rethrow } from "next/navigation";
+import { ToastProvider } from "@ac/web/components/ui";
+import { useAction } from "@ac/web/lib/useAction";
+
+// the router of the page the action runs on: a change that succeeded asks it to read the screen again (IR680)
+const refresh = vi.hoisted(() => vi.fn());
+// the real unstable_rethrow, so Next's own control flow would still go on (IR717)
+vi.mock("next/navigation", async (actual) => {
+  const real = await actual<{ unstable_rethrow: typeof rethrow }>();
+  return { unstable_rethrow: real.unstable_rethrow, useRouter: () => ({ refresh }) };
+});
+
+type Result = { ok: true; value: string } | { ok: false; code: string; messageKey: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null };
+
+const assign = vi.fn();
+beforeEach(() => {
+  assign.mockClear();
+  refresh.mockClear();
+  // the page the action runs on; jsdom cannot navigate, so the sign-in redirect is caught here
+  vi.stubGlobal("location", { href: location.href, origin: location.origin, protocol: location.protocol, host: location.host, hostname: location.hostname, port: location.port, hash: location.hash, pathname: "/admin/units", search: "?customerId=c-1&tab=users", assign });
+});
+afterEach(() => {
+  cleanup();
+  toast.dismiss(); // Sonner's store outlives the Toaster: an open toast would be replayed in the next test
+  vi.unstubAllGlobals();
+});
+
+function Runner({ result, after, failed, reload }: Readonly<{ result: Result; after: (v: string) => void; failed: () => void; reload?: boolean }>) {
+  const [pending, run] = useAction();
+  return <button type="button" disabled={pending} onClick={() => { run(() => Promise.resolve(result), (v: string) => `Saved ${v}`, after, failed, { reload }); }}>go</button>;
+}
+
+const press = async (result: Result, reload = true) => {
+  const after = vi.fn(), failed = vi.fn();
+  render(<ToastProvider><Runner result={result} after={after} failed={failed} reload={reload} /></ToastProvider>);
+  await act(() => { screen.getByRole("button", { name: "go" }).click(); return Promise.resolve(); });
+  return { after, failed };
+};
+
+// useAction runs a Server Action: a toast and `after` on success, the readable refusal otherwise (IR269), and a
+// refused session goes to sign-in and back to this page (IR385)
+describe("useAction", () => {
+  it("shows the success toast and runs after", async () => {
+    const { after, failed } = await press({ ok: true, value: "unit-1" });
+    const status = await screen.findByRole("status");
+    expect([status.textContent, after.mock.calls, failed.mock.calls.length, assign.mock.calls.length]).toStrictEqual(["Saved unit-1", [["unit-1"]], 0, 0]);
+  });
+
+  it("reads the screen again once after a change that succeeded, and not after one that was refused", async () => {
+    await press({ ok: true, value: "unit-1" });
+    await screen.findByRole("status");
+    expect(refresh).toHaveBeenCalledOnce();
+    cleanup();
+    toast.dismiss();
+    refresh.mockClear();
+    await press({ ok: false, code: "CONFLICT", messageKey: "error.versionConflict", fieldErrors: {} });
+    await screen.findByRole("alert");
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it("does not read the screen again when the change takes the screen away (a declined offer), and still shows the toast and runs after", async () => {
+    const { after } = await press({ ok: true, value: "job-1" }, false);
+    const status = await screen.findByRole("status");
+    expect([status.textContent, after.mock.calls, refresh.mock.calls.length]).toStrictEqual(["Saved job-1", [["job-1"]], 0]); // IR685
+  });
+
+  it("shows a refusal as an error toast and runs failed", async () => {
+    const { after, failed } = await press({ ok: false, code: "CONFLICT", messageKey: "error.versionConflict", fieldErrors: {} });
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).not.toBe("");
+    expect([after.mock.calls.length, failed.mock.calls.length, assign.mock.calls.length]).toStrictEqual([0, 1, 0]);
+  });
+
+  it("sends a session HQ signed out everywhere to sign-in, back to this page", async () => {
+    const { after, failed } = await press({ ok: false, code: "UNAUTHENTICATED", messageKey: "errors.session_revoked", fieldErrors: {} });
+    expect(assign.mock.calls).toStrictEqual([["/login?error=revoked&returnTo=%2Fadmin%2Funits%3FcustomerId%3Dc-1%26tab%3Dusers"]]);
+    await act(() => new Promise((r) => { setTimeout(r, 20); })); // past the tick on which Sonner would add a toast
+    expect([after.mock.calls.length, failed.mock.calls.length, screen.queryByRole("alert")?.textContent ?? ""]).toStrictEqual([0, 0, ""]);
+  });
+
+  it("sends an expired session to sign-in too", async () => {
+    await press({ ok: false, code: "UNAUTHENTICATED", messageKey: "error.membershipInvalid", fieldErrors: {} });
+    expect(assign.mock.calls).toStrictEqual([["/login?error=expired&returnTo=%2Fadmin%2Funits%3FcustomerId%3Dc-1%26tab%3Dusers"]]);
+  });
+
+  it("keeps the screen when the Server Action itself cannot be reached, with the unavailable toast and failed (IR717)", async () => {
+    const failed = vi.fn();
+    function Offline() {
+      const [, run] = useAction();
+      return <button type="button" onClick={() => { run(() => Promise.reject(new TypeError("Failed to fetch")), "Saved", undefined, failed); }}>go</button>;
+    }
+    render(<ToastProvider><Offline /></ToastProvider>);
+    await act(() => { screen.getByRole("button", { name: "go" }).click(); return Promise.resolve(); });
+    const alert = await screen.findByRole("alert");
+    expect([alert.textContent, failed.mock.calls.map((c: unknown[]) => c[0]), screen.queryByRole("button", { name: "go" }) !== null])
+      .toStrictEqual(["The service is unavailable — try again shortly", [{ ok: false, code: "UNAVAILABLE", messageKey: "error.unavailable", fieldErrors: {} }], true]);
+  });
+});

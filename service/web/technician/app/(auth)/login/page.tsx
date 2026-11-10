@@ -5,5 +5,5 @@ import { LoginScreen } from "@ac/web/screens/auth/login/page";
 
 export default async function LoginPage({ searchParams }: Readonly<{ searchParams: Promise<Record<string, string | string[] | undefined>> }>) {
   await connection(); // the other apps' URLs and the data source are runtime settings
-  return <LoginScreen role="technician" others={appLinks()} params={await searchParams} api={apiMode()} />;
+  return <LoginScreen appRole="technician" others={await appLinks()} params={await searchParams} api={apiMode()} />;
 }

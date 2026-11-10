@@ -4,6 +4,7 @@
 import type { Page } from "@playwright/test";
 import { test, expect } from "../../fixtures/test";
 import { expectAccessible } from "../../fixtures/a11y";
+import { must } from "../../fixtures/must";
 
 const SEED = "Bedroom AC", TEMP = "Bedroom AC E2E";
 let href: string | null = null;
@@ -32,9 +33,9 @@ test("the unit screen renames its AC and gives it back its name", async ({ page 
   await page.goto("/customer");
   const links = page.getByRole("main").locator('a[href^="/customer/units/"]');
   await links.filter({ hasText: SEED }).first().waitFor(); // the overview's unit table streams in
-  href = await links.evaluateAll((as) => as.find((a) => (a.textContent ?? "").includes("Bedroom AC"))?.getAttribute("href") ?? null);
+  href = await links.evaluateAll((as) => as.find((a) => a.textContent.includes("Bedroom AC"))?.getAttribute("href") ?? null);
   expect(href).toBeTruthy();
-  await page.goto(href!);
+  await page.goto(must(href));
   await rename(page, SEED, TEMP);
   await expect(page.getByRole("main")).toContainText(`Home A › 1F › Bedroom › ${TEMP}`); // the breadcrumb too
   await rename(page, TEMP, SEED);

@@ -5,12 +5,15 @@ import { Badge, Banner, Btn, Card, Check, Choice, DataTable, DemoBadge, EmptySta
 import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
+import { randomId } from "@ac/web/lib/randomId";
 import {
-  actionText, autoDraft, autoErrors, autoInput, conditionText, decisionWord, disabledReasonWord, evaluationInput, factOf, reasonWord, subjectText,
+  acModes, actionKinds, actionText, autoDraft, autoErrors, autoInput, conditionText, decisionWord, disabledReasonWord, evaluationInput, evaluationKey, factOf, factQualities, fanLevels, reasonWord, subjectText,
   type ApiAutoPolicy, type AutoCondition, type AutoDraft, type Compare, type FactRow, type PolicyGroup,
 } from "@ac/web/lib/automation";
+import { oneOf } from "@ac/web/lib/oneOf";
 import { fireAuto, saveAutoPolicy, simulateAuto } from "../actions";
 import { Icon } from "@ac/web/components/Icon";
+import { commonRange } from "@ac/web/lib/temperatureRange";
 
 interface UnitOption { id: string; name: string; customerId: string; propertyId: string; temperature: { min: number; max: number; step: number } | null; ventilation: boolean }
 interface Live {
@@ -20,6 +23,11 @@ interface Live {
 interface Result { unitId: string; decision: string; ruleId: string | null; reason: string | null; commandId?: string | null }
 const compares: { id: Compare; label: string }[] = [{ id: "gt", label: ">" }, { id: "gte", label: "≥" }, { id: "lt", label: "<" }, { id: "lte", label: "≤" }];
 
+/** A simulated decision's tone: a selected or requested action is ok, a failure critical, anything else a warning. */
+function decisionTone(decision: string): "ok" | "crit" | "warn" {
+  if (decision === "selected" || decision === "requested") return "ok";
+  return decision === "failed" ? "crit" : "warn";
+}
 /** HQ automation policies (FR-A11) in API mode: the scope and the selected policy live in the URL; saving, simulating
 and firing (demo) are Server Actions. Tier order: capabilities / restrictions → HQ policies → customer rules. Texts
 in the display language (IR303). */
@@ -34,7 +42,7 @@ export function AutomationView({ live }: Readonly<{ live: Live }>) {
   const [tried, setTried] = useState(false);
   const [facts, setFacts] = useState<FactRow[]>((sel?.unitIds ?? []).map((u) => ({ unitId: u, value: "", quality: "valid" })));
   const [results, setResults] = useState<{ fired: boolean; rows: Result[] } | null>(null);
-  const [event, setEvent] = useState<{ id: string; at: string } | null>(null); // the last Fire: its one-time key and tick
+  const [event, setEvent] = useState<{ id: string; at: string; key: string } | null>(null); // the last Fire: its one-time key, tick and what it asked
   const [showOff, setShowOff] = useState(true);
   if (source !== key) { // restart from each saved policy version (adjust state during render)
     setSource(key);
@@ -45,7 +53,7 @@ export function AutomationView({ live }: Readonly<{ live: Live }>) {
   }
   const set = (patch: Partial<AutoDraft>) => { setD((x) => ({ ...x, ...patch })); };
   const targets = live.units.filter((u) => d.unitIds.includes(u.id));
-  const range = targets.reduce<{ min: number; max: number } | null>((acc, u) => (u.temperature ? { min: Math.max(acc?.min ?? -Infinity, u.temperature.min), max: Math.min(acc?.max ?? Infinity, u.temperature.max) } : acc), null);
+  const range = commonRange(targets);
   const errors = autoErrors(d, range, t);
   const name = (id: string) => live.units.find((u) => u.id === id)?.name ?? id.slice(0, 8);
   const scopeProps = live.properties.filter((p) => !live.scope.customerId || p.customerId === live.scope.customerId);
@@ -64,15 +72,19 @@ export function AutomationView({ live }: Readonly<{ live: Live }>) {
   const evaluate = (fire: boolean) => {
     if (facts.length === 0) return;
     // the Server Action stamps the Core API's current tick (IR491); a repeated Fire sends its event's own tick
-    const input = evaluationInput(d.type, facts, new Date(live.now), fire ? (event?.id ?? crypto.randomUUID()) : crypto.randomUUID());
+    // a repeat of the same evaluation keeps its key; anything else, the condition type included, is a new event (IR704)
+    const asked = evaluationKey(d.type, facts);
+    const repeat = fire && event?.key === asked ? event : null;
+    const input = evaluationInput(d.type, facts, new Date(live.now), repeat?.id ?? randomId());
     if (!fire) { run(() => simulateAuto(input), t("Simulated — no commands created"), (rows) => { setResults({ fired: false, rows }); }); return; }
-    run(() => fireAuto(input, event?.id === input.eventId ? event.at : undefined), t("Fired (demo) — commands go through the shared command rules"), (v) => {
-      setEvent({ id: input.eventId, at: v.at });
+    run(() => fireAuto(input, repeat?.at), t("Fired (demo) — commands go through the shared command rules"), (v) => {
+      setEvent({ id: input.eventId, at: v.at, key: asked });
       setResults({ fired: true, rows: v.results });
     });
   };
-  const err = (k: string) => (tried ? errors[k] : undefined);
+  const fieldError = (k: string) => (tried ? errors[k] : undefined);
   const preview = autoInput(d);
+  const ruleText = (id: string) => (id === sel?.id ? t("this policy") : t("rule {id}", { id: id.slice(0, 8) }));
   return (
     <Page>
       <div className="flex flex-wrap items-end gap-3">
@@ -83,11 +95,9 @@ export function AutomationView({ live }: Readonly<{ live: Live }>) {
       </div>
       <div className="split-rev">
         <Card title={t("HQ automation policies")} sub={t("highest priority first")} action={live.canWrite && <Btn size="sm" variant="primary" onClick={() => { nav({ policyId: "new" }); }}><Icon name="add" /> {t("New policy")}</Btn>} className="self-start">
-          {live.groups.length === 0 ? <EmptyState title={t("No automation policies")}>{t("No HQ automation policy targets this scope.")}</EmptyState> : live.groups.map((g) => ({ ...g, rows: g.rows.filter((p) => showOff || p.enabled || p.id === sel?.id) })).filter((g) => g.rows.length > 0).map((g) => {
-            return (
+          {live.groups.length === 0 ? <EmptyState title={t("No automation policies")}>{t("No HQ automation policy targets this scope.")}</EmptyState> : live.groups.map((g) => ({ ...g, rows: g.rows.filter((p) => showOff || p.enabled || p.id === sel?.id) })).filter((g) => g.rows.length > 0).map((g) => (
               <div key={g.label} className="mb-3"><div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{g.label}</div><div className="flex flex-col gap-2">{g.rows.map((p) => <ListRow key={p.id} selected={sel?.id === p.id} onClick={() => { nav({ policyId: p.id }); }}><div className="min-w-0 flex-1"><b className="text-[13px]">{p.name}</b><div className="text-[11px] text-muted-foreground">{p.sentence}</div><div className="text-[11px] text-muted-foreground">{t("Priority {n}", { n: p.priority })}{!p.enabled && ` · ${t("Off")}`}{p.disabledReason && ` · ${p.disabledReason}`}</div></div></ListRow>)}</div></div>
-            );
-          })}
+            ))}
         </Card>
         <div className="flex min-w-0 flex-col gap-4">
           <Card title={sel ? sel.name : t("New automation policy")} sub={sel ? t("HQ tier · version {v}", { v: sel.version }) : t("Saving creates version 1 (disabled by default)")} action={sel && <Badge tone={sel.enabled ? "ok" : "muted"}>{t(sel.enabled ? "Enabled" : "Disabled")}</Badge>}>
@@ -95,15 +105,15 @@ export function AutomationView({ live }: Readonly<{ live: Live }>) {
               {sel?.disabledReason && <Banner tone="warn">{t("Disabled automatically: {reason}. Review the policy before enabling it again.", { reason: disabledReasonWord(sel.disabledReason, t) })}</Banner>}
               <h3 className="-mb-3 text-[13px] font-bold">{t("Basics")}</h3>
               <section className="grid-fluid" style={{ ["--min" as string]: "160px" }}>
-                <Field label={t("Name")} error={err("name")}><Input value={d.name} maxLength={120} onChange={(e) => { set({ name: e.target.value }); }} /></Field>
-                <Field label={t("Priority")} hint={t("0–100 · higher wins in its tier")} error={err("priority")}><Input type="number" value={d.priority} onChange={(e) => { set({ priority: e.target.value }); }} /></Field>
-                <Field label={t("Timezone")} error={err("timezone")}><Input value={d.timezone} onChange={(e) => { set({ timezone: e.target.value }); }} /></Field>
+                <Field label={t("Name")} error={fieldError("name")}><Input value={d.name} maxLength={120} onChange={(e) => { set({ name: e.target.value }); }} /></Field>
+                <Field label={t("Priority")} hint={t("0–100 · higher wins in its tier")} error={fieldError("priority")}><Input type="number" value={d.priority} onChange={(e) => { set({ priority: e.target.value }); }} /></Field>
+                <Field label={t("Timezone")} error={fieldError("timezone")}><Input value={d.timezone} onChange={(e) => { set({ timezone: e.target.value }); }} /></Field>
                 <div className="self-end pb-2"><Check label={t("Enabled")} checked={d.enabled} onChange={(v) => { set({ enabled: v }); }} /></div>
               </section>
               <section>
                 <h3 className="mb-1 text-[13px] font-bold">{t("Units")}</h3>
                 <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-[13px]">{live.units.map((u) => <Check key={u.id} label={u.name} checked={d.unitIds.includes(u.id)} onChange={(on) => { set({ unitIds: on ? [...d.unitIds, u.id] : d.unitIds.filter((x) => x !== u.id) }); setFacts((f) => (on ? [...f, { unitId: u.id, value: "", quality: "valid" }] : f.filter((x) => x.unitId !== u.id))); }} />)}</div>
-                {err("unitIds") && <p className="mt-1 text-xs text-crit">{err("unitIds")}</p>}
+                {fieldError("unitIds") && <p className="mt-1 text-xs text-crit">{fieldError("unitIds")}</p>}
               </section>
               <section>
                 <h3 className="mb-1 text-[13px] font-bold">{t("When")}</h3>
@@ -111,20 +121,20 @@ export function AutomationView({ live }: Readonly<{ live: Live }>) {
                 <Choice value={d.type} onChange={(type) => { set({ type }); }} options={[{ id: "occupancy", label: t("Occupancy") }, { id: "tariff", label: t("Tariff") }, { id: "peak", label: t("Peak") }, { id: "solar", label: t("Solar") }, { id: "battery", label: t("Battery") }]} />
                 <div className="mt-2 flex flex-wrap items-end gap-2 text-[13px]">
                   {d.type === "occupancy" || d.type === "peak" ? <Select aria-label={t("Condition")} className="w-auto" value={String(d.flag)} onChange={(e) => { set({ flag: e.target.value === "true" }); }}><option value="true">{t(d.type === "occupancy" ? "When the room is occupied" : "When a peak period is active")}</option><option value="false">{t(d.type === "occupancy" ? "When the room is not occupied" : "When no peak period is active")}</option></Select>
-                    : <><span className="pb-2">{subjectText(d.type, t)}</span><Select aria-label={t("Comparison")} className="w-auto" value={d.operator} onChange={(e) => { set({ operator: e.target.value as Compare }); }}>{compares.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}</Select><div className="w-24"><Field label="" error={err("value")}><Input aria-label={t("Value")} type="number" step="0.1" value={d.value} onChange={(e) => { set({ value: e.target.value }); }} /></Field></div><span className="pb-2">{d.type === "tariff" ? "MYR / kWh" : "kW"}</span></>}
+                    : <><span className="pb-2">{subjectText(d.type, t)}</span><Select aria-label={t("Comparison")} className="w-auto" value={d.operator} onChange={(e) => { set({ operator: oneOf(compares.map((c) => c.id), e.target.value, d.operator) }); }}>{compares.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}</Select><div className="w-24"><Field label="" error={fieldError("value")}><Input aria-label={t("Value")} type="number" step="0.1" value={d.value} onChange={(e) => { set({ value: e.target.value }); }} /></Field></div><span className="pb-2">{d.type === "tariff" ? "MYR / kWh" : "kW"}</span></>}
                 </div>
               </section>
               <section>
                 <h3 className="mb-1 text-[13px] font-bold">{t("Then")}</h3>
                 <p className="mb-2 text-xs text-muted-foreground">{t("Only actions every target unit supports, and that no active restriction blocks, can run.")}</p>
                 <div className="flex flex-wrap items-end gap-2 text-[13px]">
-                  <Select aria-label={t("Action")} className="w-auto" value={d.actionKind} onChange={(e) => { set({ actionKind: e.target.value as AutoDraft["actionKind"] }); }}><option value="set_temperature">{t("Set the temperature")}</option><option value="set_power">{t("Set the power")}</option><option value="set_mode">{t("Set the mode")}</option><option value="set_fan">{t("Set the fan")}</option><option value="ventilate">{t("Ventilate")}</option></Select>
-                  {d.actionKind === "set_temperature" && <><div className="w-24"><Field label="" error={err("celsius")}><Input aria-label={t("Temperature (°C)")} type="number" value={d.celsius} onChange={(e) => { set({ celsius: e.target.value }); }} /></Field></div><span className="pb-2">°C {range ? t("(targets allow {min}–{max} °C)", { min: range.min, max: range.max }) : ""}</span></>}
+                  <Select aria-label={t("Action")} className="w-auto" value={d.actionKind} onChange={(e) => { set({ actionKind: oneOf(actionKinds, e.target.value, d.actionKind) }); }}><option value="set_temperature">{t("Set the temperature")}</option><option value="set_power">{t("Set the power")}</option><option value="set_mode">{t("Set the mode")}</option><option value="set_fan">{t("Set the fan")}</option><option value="ventilate">{t("Ventilate")}</option></Select>
+                  {d.actionKind === "set_temperature" && <><div className="w-24"><Field label="" error={fieldError("celsius")}><Input aria-label={t("Temperature (°C)")} type="number" value={d.celsius} onChange={(e) => { set({ celsius: e.target.value }); }} /></Field></div><span className="pb-2">°C {range ? t("(targets allow {min}–{max} °C)", { min: range.min, max: range.max }) : ""}</span></>}
                   {d.actionKind === "set_power" && <Select aria-label={t("Power")} className="w-auto" value={String(d.power)} onChange={(e) => { set({ power: e.target.value === "true" }); }}><option value="false">{t("off")}</option><option value="true">{t("on")}</option></Select>}
-                  {d.actionKind === "set_mode" && <Select aria-label={t("Mode")} className="w-auto" value={d.mode} onChange={(e) => { set({ mode: e.target.value as AutoDraft["mode"] }); }}><option value="cool">{t("cool")}</option><option value="dry">{t("dry")}</option><option value="fan">{t("fan")}</option></Select>}
-                  {(d.actionKind === "set_fan" || d.actionKind === "ventilate") && <Select aria-label={t("Level")} className="w-auto" value={d.level} onChange={(e) => { set({ level: e.target.value as AutoDraft["level"] }); }}><option value="low">{t("low")}</option><option value="mid">{t("mid")}</option><option value="high">{t("high")}</option></Select>}
+                  {d.actionKind === "set_mode" && <Select aria-label={t("Mode")} className="w-auto" value={d.mode} onChange={(e) => { set({ mode: oneOf(acModes, e.target.value, d.mode) }); }}><option value="cool">{t("cool")}</option><option value="dry">{t("dry")}</option><option value="fan">{t("fan")}</option></Select>}
+                  {(d.actionKind === "set_fan" || d.actionKind === "ventilate") && <Select aria-label={t("Level")} className="w-auto" value={d.level} onChange={(e) => { set({ level: oneOf(fanLevels, e.target.value, d.level) }); }}><option value="low">{t("low")}</option><option value="mid">{t("mid")}</option><option value="high">{t("high")}</option></Select>}
                 </div>
-                <p className="mt-2 text-xs text-muted-foreground">{conditionText(preview.condition as AutoCondition, t)} → {actionText(preview.action, t)}.</p>
+                <p className="mt-2 text-xs text-muted-foreground">{conditionText(preview.condition, t)} → {actionText(preview.action, t)}.</p>
               </section>
               <section className="rounded-xl bg-surface2 p-3"><h3 className="mb-2 text-[13px] font-bold">{t("How conflicts are resolved")}</h3><p className="mb-2 text-xs text-muted-foreground">{t("Evaluated per unit — at most one action per unit per evaluation.")}</p><ol className="grid-fluid text-xs" style={{ ["--min" as string]: "180px" }}><li><b>{t("1 Capabilities & active restrictions")}</b><br />{t("always first")}</li><li><b>{t("2 HQ policies")}</b><br />{t("higher priority wins · ties: ascending ID")}</li><li><b>{t("3 Customer rules")}</b><br />{t("only when no HQ policy applies")}</li></ol></section>
               {live.canWrite && (
@@ -138,20 +148,20 @@ export function AutomationView({ live }: Readonly<{ live: Live }>) {
           </Card>
           {sel && (
             <Card title={t("Simulate")} sub={t("Evaluates all enabled HQ policies and customer rules for these units with synthetic facts at the current minute.")}>
-              <ScrollX><table className="w-full min-w-[560px] text-[13px]"><thead className="text-left text-[11px] uppercase text-muted-foreground"><tr><th>{t("Unit")}</th><th>{t("Fact")}</th><th>{t("Value")}</th><th>{t("Quality")}</th><th /></tr></thead><tbody>{facts.map((f, i) => {
+              <ScrollX><table className="w-full min-w-[560px] text-[13px]"><thead className="text-left text-[11px] uppercase text-muted-foreground"><tr><th>{t("Unit")}</th><th>{t("Fact")}</th><th>{t("Value")}</th><th>{t("Quality")}</th><td /></tr></thead><tbody>{facts.map((f, i) => {
                 const fact = factOf[f.kind ?? d.type];
                 return (
                   <tr key={i} className="border-t border-line">
                     <td className="py-2 pr-2"><Select aria-label={t("Unit")} value={f.unitId} onChange={(e) => { editFact(i, { unitId: e.target.value }); }}>{sel.unitIds.map((u) => <option key={u} value={u}>{name(u)}</option>)}</Select></td>
-                    <td className="pr-2"><Select aria-label={t("Fact")} value={f.kind ?? d.type} onChange={(e) => { editFact(i, { kind: e.target.value as AutoCondition["type"], value: "" }); }}>{kinds.map((k) => <option key={k.id} value={k.id}>{k.label} · {factOf[k.id].metric}</option>)}</Select></td>
+                    <td className="pr-2"><Select aria-label={t("Fact")} value={f.kind ?? d.type} onChange={(e) => { editFact(i, { kind: oneOf(kinds.map((k) => k.id), e.target.value, f.kind ?? d.type), value: "" }); }}>{kinds.map((k) => <option key={k.id} value={k.id}>{k.label} · {factOf[k.id].metric}</option>)}</Select></td>
                     <td className="pr-2">{fact.boolean ? <Select aria-label={t("Value")} value={f.value} onChange={(e) => { editFact(i, { value: e.target.value }); }}><option value="">{t("— no reading")}</option><option value="true">{t("true")}</option><option value="false">{t("false")}</option></Select> : <Input aria-label={t("Value")} type="number" step="0.1" value={f.value} placeholder={t("— no reading")} onChange={(e) => { editFact(i, { value: e.target.value }); }} />}</td>
-                    <td className="pr-2"><Select aria-label={t("Quality")} value={f.quality} onChange={(e) => { editFact(i, { quality: e.target.value as FactRow["quality"] }); }}><option value="valid">{t("valid")}</option><option value="stale">{t("stale")}</option><option value="suspect">{t("suspect")}</option><option value="missing">{t("missing")}</option></Select></td>
+                    <td className="pr-2"><Select aria-label={t("Quality")} value={f.quality} onChange={(e) => { editFact(i, { quality: oneOf(factQualities, e.target.value, f.quality) }); }}><option value="valid">{t("valid")}</option><option value="stale">{t("stale")}</option><option value="suspect">{t("suspect")}</option><option value="missing">{t("missing")}</option></Select></td>
                     <td><Plain aria-label={t("Remove the fact")} className="text-muted-foreground hover:text-crit" onClick={() => { removeFact(i); }}><Icon name="close" /></Plain></td>
                   </tr>
                 );
               })}</tbody></table></ScrollX>
               <div className="mt-3 flex flex-wrap gap-2"><Btn disabled={pending || sel.unitIds.length === 0} onClick={addFact}><Icon name="add" /> {t("Add fact")}</Btn><Btn variant="primary" disabled={pending || facts.length === 0} onClick={() => { evaluate(false); }}>{t("Run simulation")}</Btn></div>
-              {results && <div className="mt-3"><div className="mb-1 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">{t(results.fired ? "Fire result per unit" : "Result per unit")}</div><DataTable rows={results.rows} rowKey={(r) => r.unitId} cols={[{ key: "u", label: t("Unit"), render: (r) => <b>{name(r.unitId)}</b> }, { key: "d", label: t("Decision"), render: (r) => <Badge tone={r.decision === "selected" || r.decision === "requested" ? "ok" : (r.decision === "failed" ? "crit" : "warn")}>{decisionWord(r.decision, t)}</Badge> }, { key: "r", label: t("Rule / reason"), render: (r) => <span className="text-xs">{r.ruleId ? (r.ruleId === sel.id ? t("this policy") : t("rule {id}", { id: r.ruleId.slice(0, 8) })) : (r.reason ? reasonWord(r.reason, t) : "—")}{r.commandId ? ` · ${t("command {id}", { id: r.commandId.slice(0, 8) })}` : ""}</span> }]} /></div>}
+              {results && <div className="mt-3"><div className="mb-1 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">{t(results.fired ? "Fire result per unit" : "Result per unit")}</div><DataTable rows={results.rows} rowKey={(r) => r.unitId} cols={[{ key: "u", label: t("Unit"), render: (r) => <b>{name(r.unitId)}</b> }, { key: "d", label: t("Decision"), render: (r) => <Badge tone={decisionTone(r.decision)}>{decisionWord(r.decision, t)}</Badge> }, { key: "r", label: t("Rule / reason"), render: (r) => <span className="text-xs">{r.ruleId ? ruleText(r.ruleId) : null}{!r.ruleId && r.reason && reasonWord(r.reason, t)}{!r.ruleId && !r.reason && "—"}{r.commandId ? ` · ${t("command {id}", { id: r.commandId.slice(0, 8) })}` : ""}</span> }]} /></div>}
               {live.canWrite && <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3"><p className="max-w-xl text-xs text-muted-foreground"><DemoBadge /> {t("Fire runs the same evaluation for real: selected units get a command through the shared command rules. The event ID is a one-time key, so repeating it returns the same result without new commands.")}</p><Btn variant="danger" disabled={pending || !results || facts.length === 0} onClick={() => { evaluate(true); }}>{t("Fire (demo)")}</Btn></div>}
             </Card>
           )}

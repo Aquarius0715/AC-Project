@@ -8,6 +8,7 @@ import { refresh } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { coreClockFresh, coreOp, CoreError } from "@ac/web/lib/dal";
+import { actionFailure } from "@ac/web/lib/actionFailure";
 import { clearedCookieOptions, dropSession, SESSION_COOKIE } from "@ac/web/lib/session";
 import { advanceTarget, nextSequence, openFault, type ApiDevice, type ApiDeviceEvent } from "@ac/web/lib/demoPanel";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
@@ -19,8 +20,7 @@ const run = async <T,>(fn: () => Promise<T>): Promise<Result<T>> => {
     refresh();
     return { ok: true, value };
   } catch (error) {
-    if (error instanceof CoreError) return { ok: false, code: error.error.code, messageKey: error.error.messageKey, fieldErrors: error.error.fieldErrors, retryAfterSeconds: error.error.retryAfterSeconds };
-    throw error;
+    return actionFailure(error);
   }
 };
 const invalid = (field: string): Result<never> => ({ ok: false, code: "VALIDATION", messageKey: "error.validation", fieldErrors: { [field]: "error.invalid" } });
@@ -33,7 +33,12 @@ export async function advanceClock(minutes: number) {
   return run(async () => {
     const to = advanceTarget(await coreClockFresh(), minutes);
     await coreOp("demo.advanceClock", { to }, { write: true });
-    for (let i = 0; i < 12 && (await coreClockFresh()).getTime() < Date.parse(to); i++) await new Promise((r) => setTimeout(r, 250));
+    const target = Date.parse(to);
+    for (let i = 0; i < 12; i++) {
+      const clock = await coreClockFresh();
+      if (clock.getTime() >= target) break;
+      await new Promise((r) => { setTimeout(r, 250); });
+    }
     return null;
   });
 }
@@ -48,7 +53,7 @@ export async function deviceSignal(deviceId: string, restore: boolean) {
       coreClockFresh(),
     ]);
     const fault = openFault(events.items);
-    if (restore && !fault) throw new CoreError(409, { code: "CONFLICT", messageKey: "errors.recovery_source_not_current", fieldErrors: {}, correlationId: "", retryAfterSeconds: null });
+    if (restore && !fault) throw new CoreError({ code: "CONFLICT", messageKey: "errors.recovery_source_not_current", fieldErrors: {}, correlationId: "", retryAfterSeconds: null }, { status: 409 });
     await coreOp("demo.trigger", {
       scenarioId: "demo-panel", eventId: crypto.randomUUID(), occurredAt: now.toISOString(), eventType: "device",
       deviceId, bindingId: device.bindingId, sequence: nextSequence(events.items),

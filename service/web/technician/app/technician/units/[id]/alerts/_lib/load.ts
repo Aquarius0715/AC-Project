@@ -5,19 +5,16 @@
 // Before the work window the page says when it opens (IR76). Texts in the user's display language; every time is
 // formatted here (IR284).
 import "server-only";
-import { coreDisplay, coreNow, coreOp, corePermissions, CoreError } from "@ac/web/lib/dal";
-import { i18nOf, showTime } from "@ac/web/lib/i18n";
+import { coreDisplay, coreNow, coreOp, corePermissions, CoreError, orWhenRefused } from "@ac/web/lib/dal";
+import { unitAlerts } from "@ac/web/lib/unitAlerts";
+import { i18nOf, showTime, textOf } from "@ac/web/lib/i18n";
 import type { ApiUnitDetail } from "@ac/web/lib/units";
 import { alertChoices, alertView, selectAlert, type ApiTechAlert } from "@ac/web/lib/techAlerts";
 import { evidenceRows, type ApiEvidenceCandidate } from "@ac/web/lib/alertEvidence";
 import type { TechJobRead } from "@ac/web/lib/techJob";
+import { recover } from "@ac/web/lib/promises";
 
-const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => {
-  return p.catch((error) => {
-    if (error instanceof CoreError && error.error.code !== "UNAVAILABLE" && error.error.code !== "TIMEOUT") return fallback;
-    throw error;
-  });
-};
+const optional = orWhenRefused;
 const UNAVAILABLE: Record<string, string> = {
   "errors.assignment_ended": "Your work window on this unit has ended.",
   "errors.assignment_required": "You need an active assignment on this unit to see its alerts.",
@@ -31,7 +28,7 @@ export async function loadAlerts(unitId: string, sp: { jobId?: string; alertId?:
   const { t } = i;
   const nowMs = now.getTime();
   const unitHref = `/technician/units/${unitId}${sp.jobId ? `?jobId=${sp.jobId}` : ""}`;
-  const alerts = await coreOp<Page<ApiTechAlert>>("alerts.list", { limit: 50, filters: { unitId } }).then((r) => r.items).catch((error) => {
+  const alerts = await recover(unitAlerts<ApiTechAlert>(unitId, 50), (error: unknown) => { // every unresolved one, then the latest resolved (IR712)
     if (error instanceof CoreError && error.status < 500) return error.error;
     throw error; // error.tsx
   });
@@ -47,7 +44,7 @@ export async function loadAlerts(unitId: string, sp: { jobId?: string; alertId?:
         unitHref,
       };
     }
-    return { kind: "unavailable" as const, title: t("Alerts aren’t available"), back: t("Unit"), text: UNAVAILABLE[alerts.messageKey] ? t(UNAVAILABLE[alerts.messageKey]) : alerts.code, unitHref };
+    return { kind: "unavailable" as const, title: t("Alerts aren’t available"), back: t("Unit"), text: textOf(UNAVAILABLE, alerts.messageKey, t) ?? alerts.code, unitHref };
   }
   const [unit, job, permissions] = await Promise.all([
     optional(coreOp<ApiUnitDetail>("units.get", { id: unitId }), null),
@@ -60,10 +57,10 @@ export async function loadAlerts(unitId: string, sp: { jobId?: string; alertId?:
     ? await optional(coreOp<Page<ApiEvidenceCandidate>>("alerts.evidence", { alertId: selected.id, query: { limit: 100 } }).then((r) => evidenceRows(r.items, nowMs, i)), null)
     : null;
   return {
-    kind: "live" as const, unitId, unitHref, unitName: unit?.displayName ?? unitId.slice(0, 8),
+    kind: "live" as const, unitName: unit?.displayName ?? unitId.slice(0, 8),
     choices: alertChoices(alerts, nowMs, i), count: alerts.length,
     alert: selected ? alertView(selected, { alerts, unit, canResolve, job: job?.projection === "detail" ? { id: job.id, type: job.type } : null }, nowMs, i) : null,
-    evidence, // null: nothing to cite (resolved, no alert.resolve) or not readable now
+    unitId, unitHref, evidence, // null: nothing to cite (resolved, no alert.resolve) or not readable now
   };
 }
 

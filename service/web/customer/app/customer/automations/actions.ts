@@ -3,7 +3,8 @@
 // Server Actions of the customer automations page (FR-C04, FR-C05). Each one is a public endpoint: the DAL verifies
 // the session and the Core API authorizes it (automations.*: client:control.execute:self; consents.*: own membership).
 import { refresh } from "next/cache";
-import { coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
+import { coreNow, coreOp } from "@ac/web/lib/dal";
+import { actionFailure } from "@ac/web/lib/actionFailure";
 import type { ApiAutomation, ApiConsent, ApiDecision } from "@ac/web/lib/clientAutomations";
 import type { OpInput } from "@ac/web/lib/opTypes";
 
@@ -13,7 +14,7 @@ async function run<T>(fn: () => Promise<T>, write = true): Promise<ActionResult<
   try {
     return { ok: true, value: await fn() };
   } catch (error) {
-    return error instanceof CoreError ? { ok: false, messageKey: error.error.messageKey, code: error.error.code, fieldErrors: error.error.fieldErrors ?? {}, retryAfterSeconds: error.error.retryAfterSeconds } : { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
+    return actionFailure(error);
   } finally {
     if (write) refresh();
   }
@@ -35,7 +36,8 @@ export async function updateConsent(granted: boolean, version: number) {
 rules decide, nothing is stored or sent. */
 export async function testEvent(unitId: string, facts: Omit<OpInput<"automations.simulate">["facts"][number], "unitId" | "observedAt">[]) {
   return run(async () => {
-    const at = new Date(Math.floor((await coreNow()).getTime() / 60_000) * 60_000).toISOString();
+    const now = await coreNow();
+    const at = new Date(Math.floor(now.getTime() / 60_000) * 60_000).toISOString();
     const r = await coreOp<{ results: ApiDecision[] }>("automations.simulate", {
       eventId: crypto.randomUUID(), occurredAt: at, unitIds: [unitId], phase: "condition", facts: facts.map((f) => ({ ...f, unitId, observedAt: at })),
     });

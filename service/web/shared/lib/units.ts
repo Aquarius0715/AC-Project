@@ -4,7 +4,8 @@
 import { airNumber } from "@ac/web/lib/air";
 import type { Metric, RestrictionAction, UnitAction as AnyUnitAction, UnitSymbol } from "@ac/web/lib/contracts.gen";
 import { policyText } from "@ac/web/lib/restrictions";
-import { DEFAULT_DISPLAY, showClock, showRecent, showTime, translator, type Display, type T } from "@ac/web/lib/i18n";
+import { DEFAULT_DISPLAY, showClock, showRecent, showTime, translator, type Display, type T, textOf } from "@ac/web/lib/i18n";
+import { lookup } from "@ac/web/lib/lookup";
 
 type Mode = "cool" | "dry" | "fan";
 type Fan = "low" | "mid" | "high";
@@ -12,6 +13,10 @@ export type UnitAction = { kind: "set_power"; power: boolean } | { kind: "set_te
 /** What a stored command did (Command.action): a setting of the remote control, ventilation (an automation) or a
 restriction's apply / remove (IR314). */
 export type CommandAction = AnyUnitAction | RestrictionAction;
+/** A unit's run state from its effective power: running, stopped, or unknown without a reported state. */
+export type RunState = "running" | "stopped" | "unknown";
+const RUN_STATE = new Map<string, RunState>([["on", "running"], ["off", "stopped"]]);
+export const runState = (power: string | null | undefined): RunState => RUN_STATE.get(power ?? "") ?? "unknown";
 
 /** UnitDetail of service-contracts.ts (fields shown on the control screen). */
 export interface ApiUnitDetail {
@@ -101,12 +106,12 @@ export function actionText(a: CommandAction, t: T = en): string {
 }
 
 const statusText: Record<ApiCommand["status"], string> = { requested: "requested", sent: "waiting for device", acknowledged: "acknowledged by device", failed: "failed", expired: "no device response (expired)", cancelled: "cancelled" };
-const sourceText: Record<string, string> = { voice: " · by voice", automation: " · by an automation", restriction: " · by a restriction", diagnostic: " · technician test run" };
+const sourceText: Record<string, string> = { automation: " · by an automation", restriction: " · by a restriction", diagnostic: " · technician test run" };
 
 /** One command history row: the sentence, its state and who sent it, and when it was requested (IR44 time). */
 export function historyRow(c: ApiCommand, t: T = en, display: Display = DEFAULT_DISPLAY) {
   const isBad = c.status === "failed" || c.status === "expired";
-  const by = c.source && sourceText[c.source] ? t(sourceText[c.source]) : "";
+  const by = (c.source ? textOf(sourceText, c.source, t) : undefined) ?? "";
   return { id: c.id.slice(0, 8), text: `${actionText(c.action, t)} — ${t(statusText[c.status])}${c.failureCode && c.status === "failed" ? ` (${c.failureCode})` : ""}${by}`, when: showTime(c.requestedAt, display), bad: isBad };
 }
 
@@ -119,19 +124,20 @@ export function latest(d: ApiUnitDetail, metric: string, t: T = en, display: Dis
   const m = d.latestMeasurements.find((x) => x.metric === metric);
   // with the scenario's now, a reading of another day keeps its date (IR613)
   const at = (iso: string) => (nowMs === undefined ? showClock(iso, display) : showRecent(iso, nowMs, display));
-  return m && m.value !== null ? { text: `${airNumber(metric, m.value)} ${m.unit}${m.quality === "valid" ? "" : ` (${t(qualityText[m.quality] ?? m.quality)})`}`, at: at(m.observedAt) } : null;
+  return m && m.value !== null ? { text: `${airNumber(metric, m.value)} ${m.unit}${m.quality === "valid" ? "" : ` (${t(lookup(qualityText, m.quality) ?? m.quality)})`}`, at: at(m.observedAt) } : null;
 }
 
 // Technician unit monitoring (FR-T02): the rolling series window for telemetry.series. The component groups of the 18
 // ComponentKeys are techJob's componentGroups.
 /** Buckets measurements into n equal slots (latest value per slot; null where no valid measurement). */
 export function bucket(items: { value: number | null; observedAt: string; quality?: string }[], from: Date, to: Date, n = 12): (number | null)[] {
-  const out: (number | null)[] = new Array(n).fill(null);
+  const out: (number | null)[] = Array.from({ length: n }, () => null);
   const span = to.getTime() - from.getTime();
-  for (const m of [...items].sort((a, b) => a.observedAt.localeCompare(b.observedAt))) {
+  const chronological = [...items].toSorted((a, b) => a.observedAt.localeCompare(b.observedAt));
+  for (const m of chronological) {
     if (m.value === null || (m.quality && m.quality !== "valid")) continue;
     const i = Math.min(n - 1, Math.floor(((new Date(m.observedAt).getTime() - from.getTime()) / span) * n));
-    if (i >= 0) out[i] = m.value;
+    if (i >= 0) Object.assign(out, { [i]: m.value });
   }
   return out;
 }

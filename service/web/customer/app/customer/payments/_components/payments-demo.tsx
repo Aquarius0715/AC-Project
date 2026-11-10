@@ -2,14 +2,17 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Badge, Banner, Card, LinkBtn, ListRow, Page, SummaryList, TextLink } from "@ac/web/components/ui";
+import { Badge, Banner, Card, LinkButton, ListRow, Page, SummaryList, TextLink } from "@ac/web/components/ui";
 import { Icon } from "@ac/web/components/Icon";
+import { nonEmpty } from "@ac/web/lib/lists";
 
-const contracts = [
+// a demo contract: its units (name, place) and invoices (id, due, amount, status)
+interface DemoContract { id: string; name: string; sub: string; period: string; plan: string; units: [string, string][]; invoices: [string, string, string, string][] }
+const contracts = nonEmpty<DemoContract>([
   { id: "contract-rto-a", name: "RTO Plan", sub: "contract-rto-a · Jan–Dec 2026", period: "Jan 1 – Dec 31, 2026", plan: "Rent-to-own (RTO)", units: [["Bedroom AC", "Home A › 1F › Bedroom"], ["Meeting room AC", "Office A › Meeting room"], ["Lobby AC", "Office A · not in a room"]], invoices: [["invoice-overdue-a", "Due Sep 10, 2026", "120.00 MYR", "unpaid"], ["invoice-0198", "Due Aug 10 · paid Aug 8", "80.00 MYR", "paid"], ["invoice-0175", "Due Jul 10 · paid Jul 9", "80.00 MYR", "paid"]] },
   { id: "contract-gm-a", name: "General maintenance", sub: "contract-gm-a · Mar 2026 – Feb 2027", period: "Mar 1, 2026 – Feb 28, 2027", plan: "General maintenance", units: [["Study AC", "Home A › 2F › Study"]], invoices: [["invoice-sep-a", "Due Sep 30", "50.00 MYR", "unpaid"]] },
   { id: "contract-es-a", name: "Energy service", sub: "contract-es-a · 2025", period: "2025", plan: "Energy service", units: [["Living room AC", "Home A › 1F"]], invoices: [] },
-];
+]);
 
 /** The Phase 1A demo of /customer/payments (fixtures; DATA_SOURCE≠API). */
 export function PaymentsDemo() {
@@ -22,7 +25,7 @@ export function PaymentsDemo() {
           <p className="mt-3 text-[11px] text-muted-foreground">Contract expiry does not stop monitoring or control.</p>
         </Card>
         <div className="flex min-w-0 flex-col gap-4">
-          <Card title={sel.name} sub={`${sel.id} · plan type ${sel.plan.split(" ", 1)[0]}`}>
+          <Card title={sel.name} sub={`${sel.id} · plan type ${sel.plan.split(" ", 1)[0] ?? sel.plan}`}>
             <SummaryList items={[["Period", sel.period], ["Plan", sel.plan]]} />
             <h3 className="mt-4 mb-2 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Contract scope — equipment this contract relates to</h3>
             <div className="flex flex-col divide-y divide-line">{sel.units.map(([n, l]) => <div key={n} className="flex flex-wrap items-center justify-between gap-2 py-2 text-[13px]"><span><b>{n}</b><span className="block text-xs text-muted-foreground">{l}</span></span><TextLink href="/customer/properties">View unit <Icon name="chevronRight" /></TextLink></div>)}</div>
@@ -32,14 +35,14 @@ export function PaymentsDemo() {
               {sel.invoices.map(([id, due, amt, st]) => (
                 <div key={id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line p-3">
                   <div><b>{id}</b><div className="text-xs text-muted-foreground">{due}</div></div>
-                  <div className="flex items-center gap-3"><b>{amt}</b>{st === "unpaid" ? <><Badge tone="crit">Unpaid</Badge><LinkBtn size="sm" variant="primary" href={`/customer/payments/${id}`}>Pay</LinkBtn></> : <><Badge tone="ok" icon="check">Paid</Badge><Link href={`/customer/payments/${id}`} className="text-muted-foreground" aria-label={`Open invoice ${id}`}><Icon name="chevronRight" /></Link></>}</div>
+                  <div className="flex items-center gap-3"><b>{amt}</b>{st === "unpaid" ? <><Badge tone="crit">Unpaid</Badge><LinkButton size="sm" variant="primary" href={`/customer/payments/${id}`}>Pay</LinkButton></> : <><Badge tone="ok" icon="check">Paid</Badge><Link href={`/customer/payments/${id}`} className="text-muted-foreground" aria-label={`Open invoice ${id}`}><Icon name="chevronRight" /></Link></>}</div>
                 </div>
               ))}
               {sel.invoices.length === 0 && <p className="text-xs text-muted-foreground">No invoices.</p>}
             </div>
             <p className="mt-2 text-[11px] text-muted-foreground">Paid invoices have no payment button. “Processing” is not paid.</p>
           </Card>
-          {sel.id === "contract-rto-a" && <Banner tone="warn" action={<LinkBtn size="sm" href="/customer/payments/invoice-overdue-a?tab=restriction">Details</LinkBtn>}><b>Cooling restriction active</b><div className="text-xs">1 unit in scope · Lobby AC (Office A) — minimum cooling setpoint 24 °C applied. Related to payment, but separate from it: paying does not restore cooling immediately.</div></Banner>}
+          {sel.id === "contract-rto-a" && <Banner tone="warn" action={<LinkButton size="sm" href="/customer/payments/invoice-overdue-a?tab=restriction">Details</LinkButton>}><b>Cooling restriction active</b><div className="text-xs">1 unit in scope · Lobby AC (Office A) — minimum cooling setpoint 24 °C applied. Related to payment, but separate from it: paying does not restore cooling immediately.</div></Banner>}
         </div>
       </div>
     </Page>

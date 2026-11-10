@@ -56,7 +56,6 @@ P = {
  'twoFactor': ('identity', '', ''),
  'units': ('assets', 'assets.units', 'assets.units'),
  'ventilation': ('monitoring', 'monitoring.ventilation_logs', 'monitoring.ventilation_logs'),
- 'voice': ('control', 'assets.units', ''),
  'writes': ('platform', 'platform.idempotency_keys', ''),
 }
 # per-operation overrides: (reads, writes)
@@ -147,7 +146,6 @@ O = {
  'ventilation.list': ('monitoring.ventilation_logs;assets.units', ''),
  'telemetry.series': ('monitoring.measurements;monitoring.allergen_observations;assets.units', ''),
  'telemetry.summary': ('monitoring.measurements;assets.units', ''),
- 'voice.resolveIntent': ('assets.units;control.commands', ''),
 }
 rows = []
 bad = []

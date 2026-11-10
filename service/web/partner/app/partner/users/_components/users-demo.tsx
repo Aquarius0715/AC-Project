@@ -5,11 +5,13 @@ import { partnerUserRows, type PartnerStatus } from "@ac/web/lib/partnerUsers";
 import { DEMO_SELF, partnerUserDemo, usePartnerUsersDemo } from "@ac/web/lib/partnerUsersDemo";
 import { UsersView, type UsersOps } from "./users-view";
 
+// the API code of a demo refusal; any other refusal is a conflict
+const REFUSAL_CODE = new Map([["error.notFound", "NOT_FOUND"], ["errors.email_taken", "VALIDATION"]]);
 /** A demo refusal as the API would answer it. */
-const done = (refused: string | undefined): Promise<Awaited<ReturnType<UsersOps["invite"]>>> => {
+const done = (refused: string | null): Promise<Awaited<ReturnType<UsersOps["invite"]>>> => {
   if (!refused) return Promise.resolve({ ok: true, value: null });
   const fieldErrors: Record<string, string> = refused === "errors.email_taken" ? { email: refused } : {};
-  return Promise.resolve({ ok: false, code: refused === "error.notFound" ? "NOT_FOUND" : (refused === "errors.email_taken" ? "VALIDATION" : "CONFLICT"), messageKey: refused, fieldErrors });
+  return Promise.resolve({ ok: false, code: REFUSAL_CODE.get(refused) ?? "CONFLICT", messageKey: refused, fieldErrors });
 };
 
 const ops: UsersOps = {
@@ -17,7 +19,7 @@ const ops: UsersOps = {
   access: (r, until) => done(partnerUserDemo.setAccess(r.id, until)),
   setStatus: (r, status) => done(partnerUserDemo.setStatus(r.id, status)),
   remove: (r) => done(partnerUserDemo.remove(r.id)),
-  resend: (r) => done(r.status === "invited" ? undefined : "errors.invite_not_pending"),
+  resend: (r) => done(r.status === "invited" ? null : "errors.invite_not_pending"),
 };
 
 /** Phase 1A demo of Users (FR-P11): contractor-a's accounts in the tab's store, the same rules as the API. */

@@ -19,6 +19,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/modules/identity"
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
+	"github.com/pradita/ac-project/service/api/internal/platform/money"
 	"github.com/pradita/ac-project/service/api/internal/platform/paging"
 )
 
@@ -134,7 +135,7 @@ func averageRating(stars, ratings int) float64 {
 }
 
 // kpis computes ContractorKpis for the 90 days ending now (IR131 item 6).
-func (m Partners) kpis(ctx context.Context, call *ops.Call, org uuid.UUID) (KPIs, error) {
+func (Partners) kpis(ctx context.Context, call *ops.Call, org uuid.UUID) (KPIs, error) {
 	kpIs := KPIs{
 		Period:            Range{call.Now.Add(-90 * 24 * time.Hour), call.Now},
 		OfferAcceptance:   nil,
@@ -912,7 +913,7 @@ func (in *RateCardInput) Validate() map[string]string {
 	for i := range in.Lines {
 		rateLine := &in.Lines[i]
 		if !slices.Contains(workTypes(), rateLine.WorkType) || seen[rateLine.WorkType] ||
-			rateLine.AmountMinor < 0 {
+			!money.InRange(int64(rateLine.AmountMinor)) {
 			fieldErrs["lines"] = apperr.KeyInvalid
 		}
 
@@ -984,7 +985,7 @@ const rateCols = `id, tenant_id, version, created_at, contractor_org_id, effecti
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/rate-cards [post]
-func (m Partners) saveRateCard(
+func (Partners) saveRateCard(
 	ctx context.Context,
 	call *ops.Call,
 	input *RateCardInput,
@@ -993,17 +994,33 @@ func (m Partners) saveRateCard(
 		return RateCard{}, apperr.Fields(map[string]string{fieldEffectiveFrom: apperr.KeyPast})
 	}
 
-	var exists bool
+	// the company's row is locked, so two saves for it run one after the other: the next version number and the check
+	// of the start time below see the first one
+	var locked uuid.UUID
 
-	err := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.contractors WHERE organization_id =
-		$1)`, input.ContractorOrgID).
-		Scan(&exists)
+	err := call.Tx.QueryRow(ctx, `SELECT organization_id FROM maintenance.contractors WHERE organization_id = $1
+		FOR UPDATE`, input.ContractorOrgID).
+		Scan(&locked)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return RateCard{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
+	}
+
 	if err != nil {
 		return RateCard{}, apperr.Wrap(err, "select maintenance.contractors")
 	}
 
-	if !exists {
-		return RateCard{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
+	// a company has one card for a start time: a second is refused on the field, not as an unexplained conflict (IR643)
+	var taken bool
+
+	err = call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.rate_cards WHERE contractor_org_id = $1 AND
+		effective_from = $2)`, input.ContractorOrgID, input.EffectiveFrom).
+		Scan(&taken)
+	if err != nil {
+		return RateCard{}, apperr.Wrap(err, "select maintenance.rate_cards")
+	}
+
+	if taken {
+		return RateCard{}, apperr.Fields(map[string]string{fieldEffectiveFrom: apperr.KeyDuplicate})
 	}
 
 	lines, marshalErr := json.Marshal(input.Lines)
@@ -1070,7 +1087,7 @@ func (m Partners) saveRateCard(
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/rate-cards [get]
-func (m Partners) listRateCards(
+func (Partners) listRateCards(
 	ctx context.Context,
 	call *ops.Call,
 	query *paging.Query,
@@ -1271,7 +1288,7 @@ func (in *TargetsInput) Validate() map[string]string {
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/sla/targets/{planType} [put]
-func (m Partners) saveTargets(
+func (Partners) saveTargets(
 	ctx context.Context,
 	call *ops.Call,
 	input *TargetsInput,
@@ -1897,8 +1914,10 @@ func customerStatus(metrics Metrics, tgt SlaTargets) string {
 func RegisterPartners(reg *ops.Registry, partners Partners) {
 	ops.Register(reg, "contractors.list", partners.list)
 	ops.Register(reg, "contractors.save", partners.save)
+	ops.Register(reg, "contractors.delete", partners.delete)
 	ops.Register(reg, "contractors.setOfferStatus", partners.setOfferStatus)
 	ops.Register(reg, "rateCards.save", partners.saveRateCard)
+	ops.Register(reg, "rateCards.delete", partners.deleteRateCard)
 	ops.Register(reg, "rateCards.list", partners.listRateCards)
 	ops.Register(reg, "sla.saveTargets", partners.saveTargets)
 	ops.Register(reg, "sla.scorecard", partners.scorecard)

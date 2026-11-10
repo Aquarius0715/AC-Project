@@ -14,7 +14,7 @@ scope: production-target-logical
 This document designs the production backend that will replace the Phase 1A mock adapter (NFR-06, [common design §4 and §8](common.md#4-frontend-data-service-boundaries)). It started as a logical, cloud-agnostic design (IR116, DEC-67); §3a maps every component to **AWS**, the hosting provider chosen on 2026-10-07 (IR117, DEC-68). Everything here is `PROPOSED` unless marked `OPEN`.
 
 - Phase 1A scope is unchanged: the clickable demo still runs on the shared mock and makes no real payment, notification, IoT, or trading connection (FR-X05).
-- The screens, operations, permissions, and state machines already defined in these documents are the contract the backend implements. The [operation catalog](operation-catalog.csv) (212 operations), [service contracts](service-contracts.ts), [write version catalog](write-version-catalog.csv), and the state transitions in [common design §5](common.md#5-state-transitions-and-consistency) are the source of truth; this document must not redefine them.
+- The screens, operations, permissions, and state machines already defined in these documents are the contract the backend implements. The [operation catalog](operation-catalog.csv) (213 operations), [service contracts](service-contracts.ts), [write version catalog](write-version-catalog.csv), and the state transitions in [common design §5](common.md#5-state-transitions-and-consistency) are the source of truth; this document must not redefine them.
 - Network zones, ports, and traffic rules are in the [network architecture](network-architecture.md).
 - Diagrams: Figma file VOeKPrid46kOf24ktEfe8r, page “System Architecture”, boards 03 (backend), 04 (network), 06 (Go implementation and database), 07 (containers) and 08 (business-domain services and cross-domain contracts as built, IR197).
 
@@ -41,7 +41,6 @@ Decisions applied (DEC-67, DEC-68, DEC-69):
 | Stripe | Hosted Stripe Checkout (cards, FPX) and signed result webhooks | HTTPS redirect + webhook |
 | E-mail and WhatsApp providers | Deliver notifications, payment guidance, reports (a new account's set-up e-mail comes from the identity provider, IR461) | HTTPS API (egress) |
 | Weather and location sources | Automation triggers (weather), client location with consent (FR-C05) | HTTPS API / browser |
-| Speech service | Optional voice recognition for the assistant (FR-X02) | HTTPS API (egress) |
 | Carbon registry / market | Future offset purchase and retirement (FR-A15, FR-C13 remain demo) | HTTPS API (egress), OPEN |
 
 ## 3. Runtime components
@@ -50,7 +49,7 @@ Decisions applied (DEC-67, DEC-68, DEC-69):
 |---|---|---|---|---|
 | Edge (CDN, WAF, DDoS protection) | TLS termination for public names, static asset caching, request filtering, rate limits | Managed edge service | Provider | None |
 | Web / BFF (Next.js) | Serves the four role apps and shared routes; OIDC login flow; server-side session; relays `/bff/ops/<operation>` (the browser's operation call with its JSON input) to the operation's REST route of the Core API with the user context (IR223); pushes change notifications to browsers (SSE) | Stateless containers behind the load balancer | Requests | Session in cache |
-| Core API (modular monolith) | Executes the 212 operations: validation, authorization, state transitions, versions, audit, outbox events | Stateless containers in the app zone | Requests, CPU | Database |
+| Core API (modular monolith) | Executes the 225 operations: validation, authorization, state transitions, versions, audit, outbox events | Stateless containers in the app zone | Requests, CPU | Database |
 | IoT gateway service | Device registry and credentials, MQTT bridge, command dispatch and acknowledgement matching, heartbeat and connection state, firmware operations | Containers next to the MQTT broker | Connected devices, messages | Database, broker |
 | Telemetry processor | Validates and stores measurements (quality valid / missing / stale / suspect), evaluates alert policies, feeds automation conditions; a separate rollup role writes the 15-minute and hourly aggregates | Stream consumers | Messages per second | Time-series store |
 | Automation engine | Evaluates schedules and event conditions; arbitrates capability → restriction → HQ policy → customer rule (DEC-09); creates Commands through the same Command policy | Workers | Rules due | Database |
@@ -93,7 +92,6 @@ As built, the table above is the target. What runs today (IR180, IR335, IR375, I
 | MQTT and device management | AWS IoT Core (X.509 certificates, IoT policies, custom domain), IoT rules → Amazon Kinesis Data Streams, AWS IoT Jobs for firmware | Configurable custom endpoint `mqtt.<domain>` |
 | Scheduler triggers | Amazon EventBridge Scheduler → ECS task / SQS | Each tick still takes the domain and tenant lock (§10, IR356) |
 | E-mail | Amazon SES | SPF, DKIM, DMARC; bounce and complaint events via SNS |
-| Speech (optional) | Amazon Transcribe | Only if en / ms languages meet the assistant's needs |
 | Secrets and keys | AWS Secrets Manager, AWS KMS | Automatic rotation; separate keys per environment |
 | Observability | Amazon CloudWatch, AWS X-Ray / AWS Distro for OpenTelemetry | Logs 90 days hot, archived to S3 |
 | Security and audit of the platform | AWS CloudTrail, Amazon GuardDuty, AWS Security Hub, AWS Config | Organization-wide, delegated security account |
@@ -109,7 +107,7 @@ Each module owns its tables and is reached by other modules only through its pub
 | Identity & access | session, demoSession (replaced by real sign-in), members (list, save), organizations, twoFactor, preferences, consents, clientUsers, auth | User, Membership, Permission grants, QualificationGrant, Preferences, Consent, ClientUser invite | MembershipChanged, ConsentChanged |
 | Assets | customers, properties, spaces, locations, units | Organization, Customer, Property, Space, ACUnit, import batches | UnitChanged, LocationChanged |
 | Devices | capabilities, devices, firmwareCampaigns | Capability, Device, Sensor, Calibration, Firmware operation and campaign | DeviceConnectionChanged, DeviceEventRaised, FirmwareOperationChanged |
-| Control | commands, diagnosticRuns, automations, voice | Command, DiagnosticRun, Automation, Trigger log | CommandRequested, CommandSettled |
+| Control | commands, diagnosticRuns, automations | Command, DiagnosticRun, Automation, Trigger log | CommandRequested, CommandSettled |
 | Monitoring & alerts | telemetry, alerts, policies, ventilation, energy (read side of measurements) | Alert, AlertPolicy, DefaultRuleSetting, Ventilation log | AlertOpened, AlertResolved |
 | Maintenance | jobs, plans, reports, attachments, parts, members (capacity, eligible, setUnavailability), certificates, contractors, rateCards, sla, filterCare | MaintenanceJob, Offer, Assignment, SlotProposal, Plan, WorkReport, Attachment, Certificate, Contractor, RateCard | JobStatusChanged, OfferIssued, ReportSubmitted |
 | Billing | contracts, invoices, payments, inquiries, payouts | Contract, Invoice, PaymentAttempt, Receipt, Inquiry, PayoutStatement | InvoiceIssued, PaymentConfirmed, PayoutChanged |
@@ -122,11 +120,11 @@ Each module owns its tables and is reached by other modules only through its pub
 
 The last column names the design's events. The events the domain services exchange as built are listed in §8 (IR552); the modules also write other event types to the outbox for the planned consumers.
 
-The [operation persistence map](operation-persistence-map.csv) lists, for each of the 212 operations, the owning module, the tables it reads and writes in its own schema, the other modules it calls through their interfaces, and the write side effects (audit row, idempotency record, outbox event); it is generated by `docs/tools/gen_operation_persistence_map.py` from the operation catalog and `db/schema.sql`.
+The [operation persistence map](operation-persistence-map.csv) lists, for each of the 225 operations, the owning module, the tables it reads and writes in its own schema, the other modules it calls through their interfaces, and the write side effects (audit row, idempotency record, outbox event); it is generated by `docs/tools/gen_operation_persistence_map.py` from the operation catalog and `db/schema.sql`.
 
 Cross-module rules that the modules must keep:
 
-- One Command policy for every path (UI, voice, automation, restriction release): capabilities, restrictions and exceptions, online state, permission, and job requirements are checked in the Control module only (common design §5).
+- One Command policy for every path (UI, automation, restriction release): capabilities, restrictions and exceptions, online state, permission, and job requirements are checked in the Control module only (common design §5).
 - Restriction release after payment (IR35) is an event chain: PaymentConfirmed → Restrictions sets release_requested → Control sends release Commands → the restriction is released only after the device observation confirms it.
 - Maintenance job, offer, assignment, and slot rules follow IR113; follow-up classification follows IR114.
 
@@ -161,7 +159,7 @@ As built, three rows of the table are still the target (IR367, IR368, IR389; OPE
 | Password reset | Handled by the identity provider; the response never reveals whether an account exists (FR-X01). |
 | Account set-up | As built (IR423, IR461–IR464, IR468, IR511): a person added by HQ, a contractor or a customer owner, or by `bootstrap-admin`, gets a sign-in account through the `AccountRequested` event. The identity-accounts consumer opens the provider account with the tenant, membership and role claims, and has the provider e-mail a link back to the person's app. The link sets the password and verifies the e-mail; for an HQ account without a code device it also sets up the one-time code. It is valid for 3 days (Keycloak `execute-actions-email` with a lifespan of 259,200 seconds). `resendInvite` mails a new link to a person who has not signed in yet, at most every 5 minutes; the contractor's (`partnerUsers.resendInvite`) is refused once the person's access has ended. A contractor or customer owner adds at most 30 accounts a day per organization (IR464). The provider calls are best effort: a provider that does not answer is logged, and the link is sent again with `resendInvite`. In production the Cognito adapter comes with the AWS target (DEC-68). |
 | Role and membership switch | One person may hold several Memberships; switching re-issues the session context, increments viewEpoch, and clears client caches (as in the demo). |
-| Authorization | Evaluated in the Core API for every operation using the `authorization` column of the operation catalog: Membership.permissions (38 values, IR107), role, tenant, scope (customer / property / unit / job assignment), validity period, qualifications, and client role (owner-only operations such as `policies.setDefaultRule`, IR115). |
+| Authorization | Evaluated in the Core API for every operation using the `authorization` column of the operation catalog: Membership.permissions (39 values, IR107, IR690), role, tenant, scope (customer / property / unit / job assignment), validity period, qualifications, and client role (owner-only operations such as `policies.setDefaultRule`, IR115). |
 | Tenant isolation | Every business row carries tenantId; database row-level security enforces it as a second line of defence behind module checks. |
 | Devices | Each IoT module has its own X.509 certificate issued at provisioning; the MQTT broker allows it to publish and subscribe only to its own topics. Revocation on unbind or tamper. |
 | Services | Workload identities for service-to-service calls; secrets from a managed secret store, rotated automatically; no secrets in images, logs, or URLs (NFR-03). |
@@ -223,7 +221,7 @@ Modelling rules:
 | Topics | `t/<tenantId>/d/<deviceId>/telemetry`, `/heartbeat`, `/event` (up); `/cmd` (down); `/cmd/ack` (up); `/fw` (down) and `/fw/status` (up). QoS 1; commands are not retained. |
 | Telemetry | Batched measurements with sensorId, metric, value, unit, observedAt, sequence. Heartbeat every 60 seconds; a value older than 120 seconds is stale; AC offline alert after 15 minutes without heartbeat (default policy rule). |
 | Connection state | The IoT gateway reports a module's connection with device events (SR20): communication_lost when the connection ends (in production the broker's disconnect of the module; the development bridge once a live node has gone unheard for 3 minutes, IR532) and restored, naming that open fault, when it returns. The API does not derive offline from lastSeenAt; while a module is offline its unit's controls are disabled and commands to it are rejected. |
-| Commands | Control creates the Command (requested) with expiresAt → IoT gateway publishes (sent) → the device acknowledges with the observed state → acknowledged only if received before expiresAt; otherwise expired (the expiry runs 5 s after expiresAt so an acknowledgement received in time but still on its way is not lost, IR453), and a late acknowledgement is recorded as a late event without changing the result (common design §5). Commands to offline devices are rejected before sending. |
+| Commands | Control creates the Command (requested) with expiresAt → IoT gateway publishes (sent) → the device acknowledges with the observed state → acknowledged only if received before expiresAt, also when the acknowledgement overtakes the report that the command was sent (IR694); otherwise expired (the expiry runs 5 s after expiresAt so an acknowledgement received in time but still on its way is not lost, IR453), and a late acknowledgement is recorded as a late event without changing the result (common design §5). Commands to offline devices are rejected before sending. |
 | Restrictions | Restriction and release are sent as Commands with policy versions; the device reports the applied restriction (ObservedRestriction). Release is shown as released only after that observation (IR35). |
 | Firmware | Campaigns stage devices in waves (FR-A20); each device operation moves queued → running → succeeded / failed with checksum verification and rollback to the previous version; control actions are rejected while an update runs. |
 | Device security | Mutual TLS, per-device certificates, topic-level access policy, tamper and power-loss events raised as device events (FR-T12). |
@@ -233,10 +231,11 @@ Modelling rules:
 
 - **Readings.** Each node publishes a JSON message about every 5 seconds on `smarthome/ac/<node>/sensors`. The message has `device_id`, `timestamp` and the fields `temp`, `humidity`, `pressure`, `gas`, `approx_altitude`, `voltage`, `current`, `power` (W) and `energy` (kWh); a field the node does not measure is 0.
   - The bridge tells the nodes apart by the topic, times the readings on the stack's demo clock (not by `timestamp`) and skips retained messages.
-  - It records `temp` (°C) and `humidity` (%) while non-zero: node_1's on the air conditioner, node_2's on its own sensor unit, "Live · node_2 sensors" (DEC-91). It records `power` of node_2 in kW on the air conditioner while its `voltage` is non-zero. The other fields have no platform metric.
+  - Which device a node feeds is registered in Admin's devices (DEC-97, IR635): the device's **MQTT node ID** is the `<node>` of the topic. The bridge reads the registered IDs of bound devices (the internal query `devices.mqttNodes`) at start and every 30 seconds; a node nobody registered is heard but not recorded, and a log line says so once.
+  - For each sensor its device has, it records `temp` (°C) and `humidity` (%) while non-zero, and `power` in kW while `voltage` is non-zero. The other fields have no platform metric. In the development seed node_1 is the air conditioner's device (temperature, humidity) and node_2 the device of "Live · node_2 sensors" (temperature, humidity and the air conditioner's supply power, DEC-91).
   - It keeps one message per node and scenario minute, and passes its readings to the customer's alert policies.
-- **Commands.** The app's power on and off become the plain-text firmware commands `COOL24` (cooling at 24 °C) and `OFF`. They go at QoS 1 to `smarthome/ac/<node>/command` of the command node (`REAL_MQTT_COMMAND_NODE`, node_1 by default), only with `REAL_MQTT_COMMANDS=1`. Infrared is one-way, so a command counts as acknowledged once the broker takes it.
-- **Connection.** Each module follows its own nodes: the air conditioner's are node_1 and node_2, the sensor unit's is node_2. The bridge takes a module offline once one of its nodes has gone unheard for 3 minutes, and brings it back once each has reported within the last minute (IR532). The default rule raises AC offline on a unit once one of its nodes has gone unheard for 15 minutes (IR529).
+- **Commands.** The app's power on and off become the plain-text firmware commands `COOL24` (cooling at 24 °C) and `OFF`. They go at QoS 1 to `smarthome/ac/<node>/command` of the node of the commanded unit's device, when its model takes commands and only with `REAL_MQTT_COMMANDS=1`. Infrared is one-way, so a command counts as acknowledged once the broker takes it.
+- **Connection.** Each device follows its own node. The bridge takes a device offline once its node has gone unheard for 3 minutes, and brings it back once it has reported within the last minute (IR532). The default rule raises AC offline on a unit once its node has gone unheard for 15 minutes (IR529).
 - **OPEN (firmware).** Full remote control needs two firmware changes on the device team's side:
   - a JSON command with the power, temperature, mode and fan level, which the firmware's infrared library (IRremoteESP8266 `IRDaikinESP`) can send;
   - a state message after each send, which the bridge would forward as the module's reported state and acknowledgement.
@@ -303,7 +302,6 @@ Items of the table above that are not scheduled yet:
 | E-mail (Amazon SES) | Notification worker → SES | Templated send; bounce and complaint events via SNS. As built (IR418): the notification worker sends over SMTP (Mailpit locally); the SES adapter is planned | IAM role, SPF / DKIM / DMARC on the sending domain |
 | WhatsApp provider | Notification worker → provider | Business messaging API with approved templates; status webhooks | Provider credentials, signed webhooks |
 | Weather source | Automation engine → provider | Polling per service area | API key, egress allowlist |
-| Speech service (optional) | BFF → provider | Short audio upload or browser speech API; intents resolved by `voice.resolveIntent` | Microphone consent, no audio stored by default |
 | Carbon registry (future) | Energy & carbon → registry | OPEN | OPEN |
 
 ## 12. Cross-cutting requirements

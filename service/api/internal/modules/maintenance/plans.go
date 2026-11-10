@@ -81,7 +81,7 @@ func scanPlan(row pgx.Row) (Plan, error) {
 }
 
 // occurrences reads the jobs generated for the plans in one query, not one per plan (IR497).
-func (m Plans) occurrences(ctx context.Context, call *ops.Call, plans []Plan) error {
+func (Plans) occurrences(ctx context.Context, call *ops.Call, plans []Plan) error {
 	if len(plans) == 0 {
 		return nil
 	}
@@ -691,10 +691,94 @@ func (m Plans) generateNextJob(
 	return job, nil
 }
 
+// PlanDeleteInput is plans.delete input.
+type PlanDeleteInput = ContractorDeleteInput
+
+// delete deletes a plan that has made no job (DEC-103, IR655); a plan with jobs stays with its history (CONFLICT
+// error.planHasJobs).
+//
+//	@Summary		plans.delete (write)
+//	@ID				plans.delete
+//	@Description	Authorization: admin:job.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR655 only a plan that has made no job (CONFLICT error.planHasJobs)
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A06
+//	@Tags			plans
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string	true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer	true	"all: required (target plans, read plans.get)"
+//	@Param			id					path		string	true	"input field id"
+//	@Param			reason				query		string	false	"input field reason"
+//	@Success		200					{object}	ops.Envelope{data=DeletedResource}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/plans/{id} [delete]
+func (Plans) delete(
+	ctx context.Context,
+	call *ops.Call,
+	input *PlanDeleteInput,
+) (DeletedResource, error) {
+	var version int
+
+	err := call.Tx.QueryRow(
+		ctx,
+		`SELECT version FROM maintenance.plans WHERE id = $1 FOR UPDATE`,
+		input.ID,
+	).Scan(&version)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return DeletedResource{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
+	}
+
+	if err != nil {
+		return DeletedResource{}, apperr.Wrap(err, "select maintenance.plans")
+	}
+
+	if call.ExpectedVersion != nil && version != *call.ExpectedVersion {
+		return DeletedResource{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
+	}
+
+	var jobs bool
+
+	err = call.Tx.QueryRow(
+		ctx,
+		`SELECT EXISTS (SELECT 1 FROM maintenance.jobs WHERE plan_id = $1)`,
+		input.ID,
+	).Scan(&jobs)
+	if err != nil {
+		return DeletedResource{}, apperr.Wrap(err, "select maintenance.jobs")
+	}
+
+	if jobs {
+		return DeletedResource{}, apperr.E(apperr.Conflict, "error.planHasJobs")
+	}
+
+	_, err = call.Tx.Exec(ctx, `DELETE FROM maintenance.plans WHERE id = $1`, input.ID)
+	if err != nil {
+		return DeletedResource{}, apperr.Wrap(err, "delete maintenance.plans")
+	}
+
+	call.Emit(outboxEvent("plan", input.ID, "PlanDeleted", nil))
+	call.Audit(
+		auditEntry("plans.delete", "plan", input.ID, call.ExpectedVersion, nil, input.Reason),
+	)
+
+	return DeletedResource{ID: input.ID, Deleted: true}, nil
+}
+
 // RegisterPlans binds the plan operations.
 func RegisterPlans(r *ops.Registry, m Plans) {
 	ops.Register(r, "plans.get", m.get)
 	ops.Register(r, "plans.list", m.list)
 	ops.Register(r, "plans.save", m.save)
+	ops.Register(r, "plans.delete", m.delete)
 	ops.Register(r, "plans.generateNext", m.generateNext)
 }

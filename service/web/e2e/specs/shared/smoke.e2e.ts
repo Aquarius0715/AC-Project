@@ -11,6 +11,7 @@ import { test, expect, FAILED_PAGE } from "../../fixtures/test";
 import { axeViolations } from "../../fixtures/a11y";
 import type { App } from "../../fixtures/apps";
 import { displayZone, ENGLISH, MALAY, setDisplay } from "../../fixtures/display";
+import { must } from "../../fixtures/must";
 
 interface Crawl { seen: number; failed: string[]; inaccessible: string[]; wide: string[]; otherLang: string[]; untitled: string[]; small: string[] }
 
@@ -27,28 +28,30 @@ async function crawl(page: Page, app: App, lang = "en", wideFont = false, touch 
   const queue = [app.home];
   const out: Crawl = { seen: 0, failed: [], inaccessible: [], wide: [], otherLang: [], untitled: [], small: [] };
   while (queue.length > 0 && seen.size < 40) {
-    const path = queue.shift()!;
+    const path = must(queue.shift());
     if (seen.has(path)) continue;
     seen.add(path);
     const res = await page.goto(path, { waitUntil: "networkidle" });
     if (wideFont) await page.addStyleTag({ content: "*{font-family: Verdana, 'DejaVu Sans', sans-serif !important}" });
     const text = await page.locator("body").innerText();
-    if (!res || res.status() >= 400 || FAILED_PAGE.test(text)) out.failed.push(`${path} (${res?.status() ?? "no response"})`);
-    for (const v of await axeViolations(page)) out.inaccessible.push(`${path}: ${v}`);
+    if (!res || res.status() >= 400 || FAILED_PAGE.test(text)) out.failed.push(`${path} (${String(res?.status() ?? "no response")})`);
+    const violations = await axeViolations(page);
+    for (const v of violations) out.inaccessible.push(`${path}: ${v}`);
     const sideways = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     if (sideways > 1) out.wide.push(`${path}: ${String(sideways)}px`);
     if (touch) { // a shared control under the 44 px touch target (IR615)
       const small = await page.locator(TOUCH_CONTROLS).evaluateAll((els) => {
         return els.flatMap((el) => {
           const r = el.getBoundingClientRect();
-          const name = (el.getAttribute("aria-label") ?? el.textContent ?? "").trim().slice(0, 30);
-          return r.width > 0 && r.height > 0 && r.height < 43.5 ? [`${el.getAttribute("data-slot")} "${name}" ${String(Math.round(r.height))}px`] : [];
+          const name = (el.getAttribute("aria-label") ?? el.textContent).trim().slice(0, 30);
+          const slot = el.dataset.slot ?? "";
+          return r.width > 0 && r.height > 0 && r.height < 43.5 ? `${slot} "${name}" ${String(Math.round(r.height))}px` : [];
         });
       });
       for (const x of small) out.small.push(`${path}: ${x}`);
     }
     const declared = await page.locator("html").getAttribute("lang");
-    if (declared !== lang) out.otherLang.push(`${path}: ${declared}`);
+    if (declared !== lang) out.otherLang.push(`${path}: ${declared ?? ""}`);
     const title = await page.title(); // the page's name, then the product (WCAG 2.4.2, IR490)
     if (!/^.+ — AC Project$/.test(title)) out.untitled.push(`${path}: ${title}`);
     const links = await page.locator("a[href^='/']").evaluateAll((as) => as.map((a) => a.getAttribute("href") ?? ""));
@@ -62,10 +65,17 @@ async function crawl(page: Page, app: App, lang = "en", wideFont = false, touch 
   return out;
 }
 
+let zoneBefore: string | null = null;
+
+test.afterEach(async ({ page }) => {
+  if (zoneBefore) await setDisplay(page, ENGLISH, zoneBefore);
+  zoneBefore = null;
+});
+
 test("every linked page of the app renders", async ({ page, app }) => {
   test.setTimeout(240_000);
   const errors: string[] = [];
-  page.on("pageerror", (e) => errors.push(`${page.url()}: ${e.message}`));
+  page.on("pageerror", (e) => { errors.push(`${page.url()}: ${e.message}`); });
   const refused: string[] = []; // Chromium logs each CSP violation as a console error
   page.on("console", (m) => { if (m.type() === "error" && /Content Security Policy/i.test(m.text())) refused.push(`${page.url()}: ${m.text().slice(0, 200)}`); });
   const r = await crawl(page, app);
@@ -79,16 +89,10 @@ test("every linked page of the app renders", async ({ page, app }) => {
   // a client-side navigation names the new page too
   await page.goto(app.home);
   const link = page.locator(`aside nav a[href^="${app.home}/"]`).first(); // a menu page below the home, without a query
-  const name = (await link.locator("span.flex-1").innerText()).trim(); // the label without its badge
+  const label = await link.locator("span.flex-1").innerText();
+  const name = label.trim(); // the label without its badge
   await link.click();
   await expect(page).toHaveTitle(`${name} — AC Project`);
-});
-
-let zoneBefore: string | null = null;
-
-test.afterEach(async ({ page }) => {
-  if (zoneBefore) await setDisplay(page, ENGLISH, zoneBefore);
-  zoneBefore = null;
 });
 
 test.describe("phone width", () => {

@@ -1,6 +1,7 @@
 package iotbridge_test
 
 import (
+	"slices"
 	"testing"
 	"time"
 
@@ -226,7 +227,7 @@ func TestFleetLinksResolve(t *testing.T) {
 	}
 
 	resolver := iotbridge.NewResolver(
-		append(append([]iotbridge.Link{}, iotbridge.Links()...), links...),
+		slices.Concat(iotbridge.Links(), links),
 	)
 
 	out, err := resolver.Triggers(batch("device-mock-tamper", 1, 2), receivedAt())

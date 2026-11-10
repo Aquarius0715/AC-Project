@@ -1,68 +1,122 @@
 # End-to-end tests of the four web apps against the whole compose stack (IR252): the stack is built and started with
-# a fresh demo seed, then Playwright runs every spec. Separate from ci.yml because it takes the longest; it runs in
-# parallel with it on every push to main, on pull requests and by hand.
+# a fresh demo seed, then Playwright runs every spec. It takes the longest, 20 to 25 minutes on the only runner, so it
+# runs by hand (Actions > E2E > Run workflow, on any branch) and every night on main at 02:00 in the lab (WIB, 19:00
+# UTC), not on each push and pull request (DEC-95, IR632). A failed night is mailed by GitHub; the specs also run
+# locally with npm run e2e against the development stack.
+#
+# It runs on the lab server's self-hosted runner (label ac-test, DEC-94), beside the server's own services and the shared
+# test environment: the stack is the compose project ac-e2e, its apps on 127.0.0.1:3300–3303 (Grafana has 3000), and its
+# stores and brokers unpublished (deploy/test/compose.test.yaml; the server's PostgreSQL has 5432 and the real broker
+# 1883). Keycloak (8081) and Mailpit (8025), which the specs open, keep their ports. Playwright runs in its own image, so
+# the dependencies' code never runs on the server itself, and the stack is removed at the end. One run at a time.
 name: E2E
 
-on:   # not for documentation-only changes: ci.yml validates those
-  push:
-    branches: [main]
-    paths-ignore: ["docs/**", "**/*.md"]
-  pull_request:
-    paths-ignore: ["docs/**", "**/*.md"]
+on:
+  schedule:
+    - cron: "0 19 * * *" # 02:00 WIB, when the lab server is idle
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: e2e-${{ github.ref }}-${{ github.event_name == 'pull_request' && 'pr' || github.sha }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}   # every push to main runs to the end
+  group: e2e-lab-server   # one stack at a time on the server; a newer run waiting replaces an older one that waits
+  cancel-in-progress: false
 
 jobs:
   e2e:
     name: Playwright (compose stack)
-    runs-on: ubuntu-24.04
+    # the lab server runs only this repository's own runs, never a fork's or a pull request's (IR732)
+    if: github.repository == 'Aquarius0715/AC-Project' && github.event_name != 'pull_request'
+    runs-on: [self-hosted, ac-test]
     timeout-minutes: 75
+    env:
+      IMAGE_TAG: e2e
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: local settings (random broker keys, never secrets)
+        with: { persist-credentials: false } # no later step pushes or fetches with the job's token
+      - name: local settings (random broker keys and client secrets, never real secrets)
         run: |
-          cp .env.local.example .env.local
+          # the job's env cannot read the runner context: the path goes to the later steps through GITHUB_ENV
+          SETTINGS=$RUNNER_TEMP/e2e.env
+          echo "SETTINGS=$SETTINGS" >>"$GITHUB_ENV"
+          cp .env.local.example "$SETTINGS"
           for key in MQTT_DEVICE_SIM_KEY MQTT_IOT_BRIDGE_KEY; do
-            sed -i "s/^$key=.*/$key=$(openssl rand -hex 24)/" .env.local
+            sed -i "s/^$key=.*/$key=$(openssl rand -hex 24)/" "$SETTINGS"
           done
-          sh docker/mosquitto/passwd.sh
-      - name: build and start the stack
+          cat >>"$SETTINGS" <<EOF
+          CUSTOMER_WEB_PORT=3300
+          PARTNER_WEB_PORT=3301
+          TECHNICIAN_WEB_PORT=3302
+          ADMIN_WEB_PORT=3303
+          CUSTOMER_WEB_URL=http://localhost:3300
+          PARTNER_WEB_URL=http://localhost:3301
+          TECHNICIAN_WEB_URL=http://localhost:3302
+          ADMIN_WEB_URL=http://localhost:3303
+          KEYCLOAK_REALM_FILE=$RUNNER_TEMP/realm-ac.json
+          AC_WEB_CLIENT_SECRET=$(openssl rand -hex 32)
+          AC_ADMIN_WEB_CLIENT_SECRET=$(openssl rand -hex 32)
+          IDP_ADMIN_CLIENT_SECRET=$(openssl rand -hex 32)
+          EOF
+          # the realm returns to these apps' URLs, with these client secrets
+          python3 deploy/test/realm.py docker/keycloak/realm-ac.json "$RUNNER_TEMP/realm-ac.json" "$SETTINGS"
+          ENV_FILE=$SETTINGS sh docker/mosquitto/passwd.sh
+      - name: build the images (the Go ones together, the Next.js ones one at a time)
+        run: |
+          # four Next.js builds at once need several GB beside the server's other projects, so they go one after the
+          # other; the Go images are small and build together in one call (IR634)
+          compose() { docker compose -p ac-e2e --env-file "$SETTINGS" -f compose.yaml -f deploy/test/compose.test.yaml --profile full "$@"; }
+          services=$(compose config --format json | python3 -c '
+          import json, sys
+          seen = set()
+          for name, service in sorted(json.load(sys.stdin)["services"].items()):
+              if "build" in service and service.get("image") not in seen:
+                  seen.add(service.get("image"))
+                  web = service["build"]["context"].rstrip("/").endswith("service/web")
+                  print(("web " if web else "go ") + name)
+          ')
+          go=$(echo "$services" | sed -n "s/^go //p" | tr "\n" " ")
+          echo "::group::$go"
+          # shellcheck disable=SC2086 # the service names split into words
+          compose --progress plain build $go
+          echo "::endgroup::"
+          for service in $(echo "$services" | sed -n "s/^web //p"); do
+            echo "::group::$service"
+            compose --progress plain build "$service"
+            echo "::endgroup::"
+          done
+      - name: start the stack
         run: |
           # on failure the last lines become an annotation, readable on the run without the logs
-          if ! docker compose --env-file .env.local --profile full up -d --build > compose-up.log 2>&1; then
+          if ! docker compose -p ac-e2e --env-file "$SETTINGS" -f compose.yaml -f deploy/test/compose.test.yaml --profile full up -d > compose-up.log 2>&1; then
             tail -n 40 compose-up.log | sed 's/%/%25/g' | awk 'BEGIN{ORS="%0A"} {print}' | sed 's/^/::error title=compose up failed::/'; echo
             exit 1
           fi
       - name: wait for the apps and the identity provider
         run: |
-          for url in http://localhost:8081/realms/ac/.well-known/openid-configuration http://localhost:3000/login http://localhost:3001/login http://localhost:3002/login http://localhost:3003/login; do
+          for url in http://localhost:8081/realms/ac/.well-known/openid-configuration http://localhost:3300/login http://localhost:3301/login http://localhost:3302/login http://localhost:3303/login; do
             for i in $(seq 1 120); do
               if [ "$(curl -s -o /dev/null -w '%{http_code}' "$url")" = 200 ]; then echo "ready: $url"; break; fi
-              [ "$i" = 120 ] && { echo "not ready: $url"; docker compose --env-file .env.local --profile full ps; exit 1; }
+              [ "$i" = 120 ] && { echo "not ready: $url"; docker compose -p ac-e2e --env-file "$SETTINGS" -f compose.yaml -f deploy/test/compose.test.yaml --profile full ps; exit 1; }
               sleep 5
             done
           done
       - name: 30 days of mock fleet history (the IoT demo spec's charts)
-        run: docker compose --env-file .env.local --profile full --profile iot run --rm mock-history
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with: { node-version: 26, cache: npm, cache-dependency-path: service/web/package-lock.json }
-      - name: Playwright
-        working-directory: service/web
+        run: docker compose -p ac-e2e --env-file "$SETTINGS" -f compose.yaml -f deploy/test/compose.test.yaml --profile full --profile iot run --rm mock-history
+      - name: Playwright (in its own image, as the runner's user)
         run: |
-          npm ci
-          npx playwright install --with-deps chromium
           # github: each failure becomes an annotation (readable on the run without the logs); stop early when the
           # stack is broken instead of timing out spec after spec
-          npm run e2e -- --reporter=github,list --max-failures=10
+          mkdir -p "$HOME/.cache/ac-e2e-npm" # the npm cache, kept on the server between runs
+          docker run --rm --network host --ipc host --user "$(id -u):$(id -g)" -e HOME=/tmp/home -e CI=1 \
+            -v "$HOME/.cache/ac-e2e-npm:/tmp/home/.npm" \
+            -e E2E_CUSTOMER_URL=http://localhost:3300 -e E2E_PARTNER_URL=http://localhost:3301 \
+            -e E2E_TECHNICIAN_URL=http://localhost:3302 -e E2E_ADMIN_URL=http://localhost:3303 \
+            -v "$GITHUB_WORKSPACE:/work" -w /work/service/web mcr.microsoft.com/playwright:v1.65.0-noble \
+            bash -c 'npm ci && npm run e2e -- --reporter=github,list --max-failures=10'
       - name: stack logs on failure
         if: failure()
-        run: docker compose --env-file .env.local --profile full logs --no-color --tail 200 > compose-logs.txt
+        run: docker compose -p ac-e2e --env-file "$SETTINGS" -f compose.yaml -f deploy/test/compose.test.yaml --profile full logs --no-color --tail 200 > compose-logs.txt
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure()
         with:
@@ -72,3 +126,13 @@ jobs:
             service/web/e2e/test-results
             compose-logs.txt
           retention-days: 7
+      - name: remove the stack
+        if: always()
+        run: docker compose -p ac-e2e --env-file "$SETTINGS" -f compose.yaml -f deploy/test/compose.test.yaml --profile full --profile iot down --volumes --remove-orphans
+      - name: remove the replaced images and trim the build cache
+        if: always()
+        # the replaced :e2e builds (untagged) and the build cache over 20 GB, as deploy.sh does after a deployment
+        # (IR725): the nightly builds filled the server's disk. Tagged images and volumes, of any project, stay
+        run: |
+          docker image prune -f >/dev/null || true
+          docker builder prune -f --max-used-space 20GB >/dev/null || true

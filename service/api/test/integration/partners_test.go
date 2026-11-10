@@ -259,6 +259,10 @@ func TestContractorRegister(t *testing.T) {
 		t.Fatalf("rate card v2, a blank note is none: %d %v", code, res)
 	}
 
+	// a card already starts at that time: a refusal on the field, not an unexplained conflict (IR643)
+	code, res := saveRateCard(clock().Add(48*time.Hour).Format(time.RFC3339), line)
+	refusal(t, "same start", code, res, "effectiveFrom=error.duplicate")
+
 	if code, _ := write(
 		srv,
 		hq(),
@@ -387,9 +391,12 @@ func TestSLAScorecard(t *testing.T) {
 	)
 	owner(
 		t,
-		`INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, visit_slot, offered_at,
+		`INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, candidate_slots, offered_at,
 			offer_expires_at, access_valid_from, access_valid_until, decision, decided_at)
-		VALUES ($1,$2,$3,'t',tstzrange($4,$5),$4,$5,$4,$5,'accept',$6)`,
+		VALUES ($1,$2,$3,'t',`+oneSlotSQL(
+			"$4",
+			"$5",
+		)+`,$4,$5,$4,$5,'accept',$6)`,
 		seed.ID("tenant-a"),
 		job,
 		seed.ID("org-contractor-a"),
@@ -415,9 +422,12 @@ func TestSLAScorecard(t *testing.T) {
 	)
 	owner(
 		t,
-		`INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, visit_slot, offered_at,
+		`INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, candidate_slots, offered_at,
 			offer_expires_at, access_valid_from, access_valid_until, decision, decided_at)
-		VALUES ($1,$2,$3,'t',tstzrange($4,$5),$4,$5,$4,$5,'accept',$6)`,
+		VALUES ($1,$2,$3,'t',`+oneSlotSQL(
+			"$4",
+			"$5",
+		)+`,$4,$5,$4,$5,'accept',$6)`,
 		seed.ID("tenant-a"),
 		onTime,
 		seed.ID("org-contractor-a"),
@@ -932,8 +942,13 @@ func TestOfferAcceptanceIgnoresCancelledJobs(t *testing.T) {
 			srv,
 			hq(),
 			"jobs.offer",
-			`{"jobId":"`+job+`","contractorOrgId":"`+org.String()+`","visitSlot":`+slotJSON(49, 2)+
-				`,"offerExpiresAt":"`+stamp(12)+`","accessValidFrom":"`+stamp(0)+`","accessValidUntil":"`+stamp(100)+
+			`{"jobId":"`+job+`","contractorOrgId":"`+org.String()+`","offerExpiresAt":"`+stamp(
+				12,
+			)+`","accessValidFrom":"`+stamp(
+				0,
+			)+`","accessValidUntil":"`+stamp(
+				100,
+			)+
 				`","termsVersion":"t"}`,
 			1,
 		); code != 200 {
@@ -1014,16 +1029,12 @@ func TestCancelEndsContractorAccess(t *testing.T) {
 		"jobs.offer",
 		`{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").
 			String()+
-			`","visitSlot":`+slotJSON(
-			49,
-			2,
-		)+
-			`,"offerExpiresAt":"`+stamp(
+			`","offerExpiresAt":"`+stamp(
 			12,
 		)+`","accessValidFrom":"`+stamp(
 			0,
 		)+`","accessValidUntil":"`+stamp(
-			60,
+			100,
 		)+`","termsVersion":"t"}`,
 		1,
 	); code != 200 {
@@ -1064,7 +1075,7 @@ func TestCancelEndsContractorAccess(t *testing.T) {
 		return until
 	}
 
-	planned := clock().Add(60 * time.Hour)
+	planned := clock().Add(100 * time.Hour)
 	if until := access(); !until.Equal(planned) {
 		t.Fatalf("the accepted offer's access in the unit scope: until %v, want %v", until, planned)
 	}

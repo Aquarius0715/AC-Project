@@ -1,14 +1,16 @@
 // A technician's phone (IR615, IR616): on a 390×844 touch screen the overview's job tabs and the devices' state
 // filters are at least 44 px tall, as the shared controls are, and still filter; a filter that hides the open device
 // opens its first device instead. Nothing is written.
+import type { Locator } from "@playwright/test";
 import { test, expect } from "../../fixtures/test";
 import { expectAccessible } from "../../fixtures/a11y";
 
 test.use({ hasTouch: true, viewport: { width: 390, height: 844 } });
 
 test("the job tabs and the device filters are touch-sized and filter", async ({ page }) => {
-  const tall = async (loc: import("@playwright/test").Locator) => {
-    for (const box of await loc.evaluateAll((els) => els.map((el) => el.getBoundingClientRect().height))) expect(box).toBeGreaterThanOrEqual(43.5);
+  const tall = async (loc: Locator) => {
+    const heights = await loc.evaluateAll((els) => els.map((el) => el.getBoundingClientRect().height));
+    for (const box of heights) expect(box).toBeGreaterThanOrEqual(43.5);
   };
   await page.goto("/technician");
   const tabs = page.getByRole("main").getByRole("tab");
@@ -27,7 +29,8 @@ test("the job tabs and the device filters are touch-sized and filter", async ({ 
   await expect(filters.filter({ hasText: /^Offline/ })).toHaveAttribute("aria-pressed", "true");
   const listed = main.getByRole("button").filter({ hasText: /^AC-/ }).first(); // the filter's first device
   if (await listed.count()) { // the detail follows the filter: its heading is that device's serial
-    const serial = (await listed.innerText()).split("\n", 1)[0].trim();
+    const listedText = await listed.innerText();
+    const serial = (listedText.split("\n", 1)[0] ?? "").trim();
     await expect(main.getByRole("heading", { name: serial, exact: true })).toBeVisible();
   }
   await expectAccessible(page);

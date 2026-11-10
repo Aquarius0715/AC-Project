@@ -8,5 +8,5 @@ export async function GET(request: Request, ctx: RouteContext<"/technician/jobs/
   const url = new URL(request.url);
   const reportId = url.searchParams.get("reportId");
   const reportVersion = Number(url.searchParams.get("reportVersion"));
-  return !reportId || !Number.isInteger(reportVersion) || reportVersion < 1 ? new Response("reportId and reportVersion are required", { status: 400 }) : attachmentResponse({ jobId: id, reportId, reportVersion, attachmentId });
+  return !reportId || !Number.isSafeInteger(reportVersion) || reportVersion < 1 ? new Response("reportId and reportVersion are required", { status: 400 }) : attachmentResponse({ jobId: id, reportId, reportVersion, attachmentId });
 }

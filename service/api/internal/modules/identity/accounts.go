@@ -29,6 +29,10 @@ type Provider interface {
 	) error // idp.ErrNoAccount: the provider lost it
 	SendSetup(ctx context.Context, subject string, a idp.Account) error
 	SetEnabled(ctx context.Context, subject string, enabled bool) error
+	DeleteAccount(
+		ctx context.Context,
+		subject string,
+	) error // an account HQ deleted; already gone is no error
 }
 
 // AccountApps are the apps a new account's set-up link returns to, by role.
@@ -52,6 +56,7 @@ func (a AccountApps) of(role string) (string, string) {
 const (
 	EventAccountRequested = "AccountRequested" // create the provider account if missing, then send the set-up e-mail
 	EventAccountEnabled   = "AccountEnabled"   // turn the provider account on or off
+	EventAccountDeleted   = "AccountDeleted"   // delete the provider account of a person HQ deleted (DEC-103)
 )
 
 // TechnicianAccessMax is the longest access a contractor gives a technician it adds (IR461, the user's option 1).
@@ -304,17 +309,23 @@ func createAccount(
 
 // requestAccount asks the identity-accounts consumer to open the provider account (if missing) or point it at this
 // membership, and send the set-up e-mail.
-func requestAccount(c *ops.Call, user, membership uuid.UUID, role string) {
-	c.Emit(
+func requestAccount(call *ops.Call, user, membership uuid.UUID, role string) {
+	payload := map[string]any{
+		"userId":        user,
+		keyMembershipID: membership,
+		keyRole:         role,
+	}
+	// the set-up e-mail's link opens where the sender is (IR695); without it the provider's own address (a bootstrap)
+	if call.Principal != nil && call.Principal.IssuerHost != "" {
+		payload["publicHost"] = call.Principal.IssuerHost
+	}
+
+	call.Emit(
 		ops.Event{
 			AggregateType: kindMembership,
 			AggregateID:   membership,
 			Type:          EventAccountRequested,
-			Payload: map[string]any{
-				"userId":        user,
-				keyMembershipID: membership,
-				keyRole:         role,
-			},
+			Payload:       payload,
 		},
 	)
 }
@@ -345,6 +356,7 @@ func AccountHandlers(provider Provider, apps AccountApps) map[string]events.Hand
 	return map[string]events.Handler{
 		EventAccountRequested: consumer.requested,
 		EventAccountEnabled:   consumer.enabled,
+		EventAccountDeleted:   consumer.deleted,
 	}
 }
 
@@ -369,6 +381,7 @@ func (consumer accountConsumer) requested(
 		UserID       uuid.UUID `json:"userId"`
 		MembershipID uuid.UUID `json:"membershipId"`
 		Role         string    `json:"role"`
+		PublicHost   string    `json:"publicHost"`
 	}
 
 	decodeErr := event.Decode(&input)
@@ -400,6 +413,7 @@ func (consumer accountConsumer) requested(
 		Role:        input.Role,
 		ClientID:    client,
 		RedirectURI: url + "/login",
+		PublicHost:  input.PublicHost,
 	}
 
 	cctx, cancel := context.WithTimeout(ctx, providerTimeout)
@@ -505,6 +519,40 @@ func (consumer accountConsumer) enabled(ctx context.Context, txn pgx.Tx, event e
 			input.MembershipID,
 			"err",
 			setEnabledErr,
+		)
+	}
+
+	return nil
+}
+
+// deleted deletes the provider account of a person HQ deleted. Like the other account events it is best effort: a
+// provider that does not answer is logged and the event is done (the account has no membership, so it cannot sign in).
+func (consumer accountConsumer) deleted(ctx context.Context, _ pgx.Tx, event events.Event) error {
+	var input struct {
+		Subject string `json:"subject"`
+	}
+
+	decodeErr := event.Decode(&input)
+	if decodeErr != nil {
+		return apperr.Wrap(decodeErr, "events.Event.Decode")
+	}
+
+	if input.Subject == "" {
+		return nil
+	}
+
+	cctx, cancel := context.WithTimeout(ctx, providerTimeout)
+	defer cancel()
+
+	deleteErr := consumer.provider.DeleteAccount(cctx, input.Subject)
+	if deleteErr != nil {
+		slog.WarnContext(
+			ctx,
+			"identity: the provider account was not deleted",
+			"subject",
+			input.Subject,
+			"err",
+			deleteErr,
 		)
 	}
 

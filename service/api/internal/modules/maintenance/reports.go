@@ -300,7 +300,7 @@ func scanReport(row pgx.Row) (Report, error) {
 }
 
 // decorate adds attachments, review history and the caller's review availability.
-func (m Reports) decorate(ctx context.Context, call *ops.Call, report *Report) error {
+func (Reports) decorate(ctx context.Context, call *ops.Call, report *Report) error {
 	err := attachmentRefs(ctx, call, report)
 	if err != nil {
 		return err
@@ -547,7 +547,7 @@ func (in *DraftInput) Validate() map[string]string {
 	in.validateRecords(seen, fieldErrs)
 
 	if utf8.RuneCountInString(in.WorkText) > maxWorkTextLength {
-		fieldErrs["workText"] = apperr.KeyLength
+		fieldErrs[fieldWorkText] = apperr.KeyLength
 	}
 
 	validateNextAction(in.NextAction, fieldErrs)
@@ -608,12 +608,16 @@ func (in *DraftInput) validateRecords(seen map[string]bool, fieldErrs map[string
 		}
 	}
 
-	for _, r := range in.Refrigerant {
-		n := utf8.RuneCountInString(r.CylinderID)
-		if !validRefrigerant(r.Refrigerant) || n < 1 || n > maxCodeLength || r.RecoveredKg < 0 ||
-			r.ChargedKg < 0 ||
-			!validLeakCheck(r.LeakCheck) {
-			fieldErrs["refrigerant"] = apperr.KeyInvalid
+	for i := range in.Refrigerant {
+		rec := &in.Refrigerant[i]
+		rec.CylinderID = strings.TrimSpace(rec.CylinderID)
+
+		n := utf8.RuneCountInString(rec.CylinderID)
+		if !validRefrigerant(rec.Refrigerant) || n < 1 || n > maxCodeLength ||
+			rec.RecoveredKg < 0 ||
+			rec.ChargedKg < 0 ||
+			!validLeakCheck(rec.LeakCheck) {
+			fieldErrs[fieldRefrigerant] = apperr.KeyInvalid
 		}
 	}
 }
@@ -640,7 +644,7 @@ func validateNextAction(nextAction *NextAction, fieldErrs map[string]string) {
 }
 
 // currentDraft reads the job's current draft and whether it has one.
-func (m Reports) currentDraft(
+func (Reports) currentDraft(
 	ctx context.Context,
 	call *ops.Call,
 	job uuid.UUID,
@@ -719,6 +723,13 @@ func (m Reports) saveDraft(ctx context.Context, call *ops.Call, input *DraftInpu
 	meas, err := mergeMeasurements(call, input, prev, unit, items)
 	if err != nil {
 		return Report{}, err
+	}
+
+	if input.ReportID != nil { // saving the draft clears its sign-off (writeDraft), so the sign-off's file goes too
+		err = dropSignOffFiles(ctx, call, prev.ID, prev.Version)
+		if err != nil {
+			return Report{}, err
+		}
 	}
 
 	err = writeDraft(ctx, call, input, prev, items, meas)
@@ -1141,7 +1152,9 @@ func (m Reports) load(
 		return report, err
 	}
 
-	return report, m.decorate(ctx, call, &report)
+	err = m.decorate(ctx, call, &report)
+
+	return report, err
 }
 
 // ---- jobs.submit ----
@@ -1479,8 +1492,8 @@ func submitErrors(report *Report, components []string, now time.Time) map[string
 		fieldErrs[fieldItems] = "errors.components_mismatch"
 	}
 
-	if n := utf8.RuneCountInString(report.WorkText); n < 10 || n > 4000 {
-		fieldErrs["workText"] = apperr.KeyLength
+	if n := utf8.RuneCountInString(strings.TrimSpace(report.WorkText)); n < 10 || n > 4000 {
+		fieldErrs[fieldWorkText] = apperr.KeyLength
 	}
 
 	switch {
@@ -1488,7 +1501,7 @@ func submitErrors(report *Report, components []string, now time.Time) map[string
 		fieldErrs[fieldNextAction] = apperr.KeyRequired
 	case report.NextAction.Kind == nextActionFollowUp &&
 		(report.NextAction.Date == nil || !report.NextAction.Date.After(now) || report.NextAction.Note == nil ||
-			utf8.RuneCountInString(*report.NextAction.Note) < 1):
+			strings.TrimSpace(*report.NextAction.Note) == ""):
 		fieldErrs[fieldNextAction] = apperr.KeyInvalid
 	}
 
@@ -1513,7 +1526,7 @@ func submitErrors(report *Report, components []string, now time.Time) map[string
 	return fieldErrs
 }
 
-func (m Reports) reportEvent(
+func (Reports) reportEvent(
 	ctx context.Context,
 	call *ops.Call,
 	job uuid.UUID,

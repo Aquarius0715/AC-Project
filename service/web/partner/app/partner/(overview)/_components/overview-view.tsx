@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { Badge, Banner, Card, cx, EmptyState, Kpi, LinkBtn, Page, Select, TextLink, UtilBar, ScrollX } from "@ac/web/components/ui";
+import { Badge, Banner, Card, cx, EmptyState, Kpi, LinkButton, Page, Select, TextLink, UtilizationBar, ScrollX } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { BUCKETS, DAY_END, DAY_START, OVERVIEW_ROWS, type ActionRow } from "@ac/web/lib/partnerOverview";
 import type { OverviewLive } from "../_lib/load";
 import { Icon } from "@ac/web/components/Icon";
+import { byCount } from "@ac/web/lib/i18n";
 
 const badgeTone: Record<ActionRow["kind"], "primary" | "crit" | "warn"> = { offer: "primary", overdue: "crit", review: "primary", unassigned: "primary" };
 const hours = Array.from({ length: (DAY_END - DAY_START) / 2 + 1 }, (_, i) => DAY_START + i * 2);
@@ -26,7 +27,7 @@ export function OverviewView({ live }: Readonly<{ live: OverviewLive }>) {
     <Page>
       <div className="flex flex-wrap items-center justify-end gap-3 text-xs text-muted-foreground">
         <span>{t("Updated {time} · your company’s jobs only", { time: live.updated })}</span>
-        <Select aria-label={t("Period")} className="w-auto" value={live.period.value} onChange={(e) => { const [from, to] = e.target.value.split("|", 2); patch({ from, to }); }}>
+        <Select aria-label={t("Period")} className="w-auto" value={live.period.value} onChange={(e) => { const [from = "", to = ""] = e.target.value.split("|", 2); patch({ from, to }); }}>
           {live.period.custom && <option value={live.period.value}>{live.period.label}</option>}
           {live.periods.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
         </Select>
@@ -35,7 +36,7 @@ export function OverviewView({ live }: Readonly<{ live: OverviewLive }>) {
         {live.kpis.map((k) => <Kpi key={k.href + k.label} label={k.label} value={k.value} sub={k.sub} href={k.href} link={k.link} tone={k.tone} />)}
       </div>
       <Card title={t("Job progress — {period}", { period })} action={<TextLink href="/partner/jobs">{t("Open all jobs")} <Icon name="arrowRight" /></TextLink>}>
-        <p className="mb-2 text-xs text-muted-foreground">{pr.total ? t(pr.total === 1 ? "{n} job · {done} completed ({pct}%) · counts use the same period as the Jobs list" : "{n} jobs · {done} completed ({pct}%) · counts use the same period as the Jobs list", { n: pr.total, done: pr.counts.completed, pct: pr.completedPct }) : t("No jobs yet — offers from HQ to your company will appear here and in Jobs.")}</p>
+        <p className="mb-2 text-xs text-muted-foreground">{byCount(pr.total, { none: t("No jobs yet — offers from HQ to your company will appear here and in Jobs."), one: t("{n} job · {done} completed ({pct}%) · counts use the same period as the Jobs list", { n: 1, done: pr.counts.completed, pct: pr.completedPct }), many: t("{n} jobs · {done} completed ({pct}%) · counts use the same period as the Jobs list", { n: pr.total, done: pr.counts.completed, pct: pr.completedPct }) })}</p>
         <div className="flex h-3 w-full overflow-hidden rounded-full bg-surface2" role="img" aria-label={t("Jobs by status")}>
           {pr.total > 0 && BUCKETS.map((b) => pr.counts[b.id] > 0 && <div key={b.id} className={cx("h-full", b.tone)} style={{ width: `${String((pr.counts[b.id] / pr.total) * 100)}%` }} title={`${t(b.label)}: ${String(pr.counts[b.id])}`} />)}
         </div>
@@ -54,18 +55,16 @@ export function OverviewView({ live }: Readonly<{ live: OverviewLive }>) {
                       <Badge tone={badgeTone[a.kind]}>{a.badge}</Badge>
                       <span className="min-w-0"><b className="block truncate text-[13px]">{a.title}</b><span className="block text-xs text-muted-foreground">{a.detail}</span></span>
                     </span>
-                    <LinkBtn size="sm" href={a.href}>{a.button}</LinkBtn>
+                    <LinkButton size="sm" href={a.href}>{a.button}</LinkButton>
                   </li>
                 ))}
               </ul>
             )}
           </Card>
           <Card title={t("Team capacity — {period}", { period })} action={<TextLink href="/partner/team">{t("Team & capacity")} <Icon name="arrowRight" /></TextLink>}>
-            {live.capacity.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No technicians in your company yet.")}</p> : live.capacity.slice(0, OVERVIEW_ROWS).map((c) => {
-              return (
-                <div key={c.id} className="mb-3"><div className="mb-1 flex justify-between text-xs"><b>{c.name}</b><span className="text-muted-foreground">{c.text}</span></div><UtilBar pct={c.pct} tone={c.pct !== null && c.pct >= 90 ? "warn" : "primary"} label={`${c.name}: ${c.text}`} /></div>
-              );
-            })}
+            {live.capacity.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No technicians in your company yet.")}</p> : live.capacity.slice(0, OVERVIEW_ROWS).map((c) => (
+                <div key={c.id} className="mb-3"><div className="mb-1 flex justify-between text-xs"><b>{c.name}</b><span className="text-muted-foreground">{c.text}</span></div><UtilizationBar pct={c.pct} tone={c.pct !== null && c.pct >= 90 ? "warn" : "primary"} label={`${c.name}: ${c.text}`} /></div>
+              ))}
             {live.capacity.length > OVERVIEW_ROWS && <p className="mb-2"><TextLink href="/partner/team">{t("{n} more technicians", { n: live.capacity.length - OVERVIEW_ROWS })} <Icon name="arrowRight" /></TextLink></p>}
             <p className="text-[11px] text-muted-foreground">{t("Utilization = assigned hours ÷ available hours. Undefined hours show “—”.")}</p>
           </Card>

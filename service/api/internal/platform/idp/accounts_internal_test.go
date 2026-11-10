@@ -8,7 +8,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"time"
 )
 
 // adminCall is one call the fake admin API took.
@@ -93,11 +92,11 @@ func newAccountsKeycloak(t *testing.T) (*Keycloak, *accountsRealm) {
 		AdminURL:     srv.URL + "/admin",
 		ClientID:     testClientID,
 		ClientSecret: "s",
+		PublicURL:    "",
 		Client:       nil,
 		Now:          nil,
 		mu:           sync.Mutex{},
-		token:        "",
-		until:        time.Time{},
+		tokens:       nil,
 	}, realm
 }
 
@@ -111,6 +110,7 @@ func testAccount() Account {
 		Role:        "technician",
 		ClientID:    "ac-web",
 		RedirectURI: "http://localhost:3002/login",
+		PublicHost:  "",
 	}
 }
 
@@ -166,6 +166,18 @@ func TestKeycloakAccounts(t *testing.T) {
 	err = keycloak.SetEnabled(t.Context(), "new-id", false)
 	if err != nil || realm.calls[0].body != `{"enabled":false}` {
 		t.Errorf("disable: %v %v", err, realm.calls)
+	}
+
+	realm.calls = nil
+
+	err = keycloak.DeleteAccount(t.Context(), "new-id")
+	if err != nil || realm.calls[0].method != http.MethodDelete ||
+		realm.calls[0].path != "/users/new-id" {
+		t.Errorf("delete: %v %v", err, realm.calls)
+	}
+
+	if keycloak.DeleteAccount(t.Context(), "") == nil {
+		t.Error("delete without a subject passes")
 	}
 }
 

@@ -28,6 +28,16 @@ import (
 //nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestPartnerUsers(t *testing.T) {
 	srv := server(t)
+	// the list marks the seed technician as booked while an assignment of it is active: tests that revoke the seed
+	// assignment restore it only when no test assignment holds its window, and a later test may revoke that one
+	owner(
+		t,
+		`UPDATE maintenance.assignments a SET status = 'active' WHERE a.id = $1 AND a.status <> 'active' AND NOT EXISTS (
+			SELECT 1 FROM maintenance.assignments b WHERE b.id <> a.id AND b.status = 'active' AND
+			b.technician_membership_id = a.technician_membership_id AND b.scheduled && a.scheduled)`,
+		seed.ID("assignment-contractor-a"),
+	)
+
 	email := "tech-" + uuid.NewString()[:8] + "@example.com"
 	save := func(a *actor, body string, v int) (int, map[string]any) {
 		return write(srv, a, "partnerUsers.save", body, v)
@@ -512,7 +522,7 @@ func TestPartnerUserAccess(t *testing.T) {
 		"active",
 		userVersion+3,
 	); code != 409 ||
-		res["messageKey"] != "errors.access_expired" {
+		res["messageKey"] != keyAccessExpired {
 		t.Errorf("enable after the access end: %d %v", code, res)
 	}
 	// the last active contractor: another contractor account, with the company's other active contractor accounts
@@ -586,6 +596,7 @@ func TestPartnerAccountCreated(t *testing.T) {
 		updated:    nil,
 		setups:     nil,
 		switched:   nil,
+		removed:    nil,
 		failing:    false,
 		lost:       nil,
 		generation: 0,
@@ -708,6 +719,7 @@ func TestPartnerAccountCreated(t *testing.T) {
 			Employment:        "",
 			Timezone:          "",
 			SessionsRevokedAt: nil,
+			IssuerHost:        "",
 		},
 		clock(),
 	)
@@ -799,6 +811,7 @@ func firstSignIn(t *testing.T, srv *apiserver.Server, membership string) {
 			Employment:        "",
 			Timezone:          "",
 			SessionsRevokedAt: nil,
+			IssuerHost:        "",
 		},
 		clock(),
 	)
@@ -846,7 +859,7 @@ func TestPartnerResendAfterAccessEnd(t *testing.T) {
 		`{"id":"`+partnerUserID+`"}`,
 		0,
 	); code != 409 ||
-		res["messageKey"] != "errors.access_expired" {
+		res["messageKey"] != keyAccessExpired {
 		t.Errorf("resend after the access end: %d %v", code, res)
 	}
 
@@ -1014,7 +1027,7 @@ func TestNotificationMailRetry(t *testing.T) {
 			context.Background(),
 			srv.DB,
 			sender,
-			notify.Apps{Customer: "http://c", Partner: "", Technician: "", Admin: ""},
+			notify.Apps{Customer: "http://c", Partner: "", Technician: "", Admin: "", Hosts: nil},
 			when,
 			500,
 		)
@@ -1121,7 +1134,7 @@ func TestNotificationMail(t *testing.T) {
 		context.Background(),
 		srv.DB,
 		sender,
-		notify.Apps{Customer: "http://c", Partner: "", Technician: "", Admin: ""},
+		notify.Apps{Customer: "http://c", Partner: "", Technician: "", Admin: "", Hosts: nil},
 		clock(),
 		500,
 	)
@@ -1190,7 +1203,7 @@ func TestNotificationMail(t *testing.T) {
 	ownerScan(t, `SELECT count(*) FROM notify.notifications WHERE id = $1`, []any{ended}, &left)
 
 	if left != 1 {
-		t.Errorf("a recent notification was swept")
+		t.Error("a recent notification was swept")
 	}
 }
 
@@ -1363,11 +1376,7 @@ func TestContractorAddedTechnicianAssigned(t *testing.T) {
 		"jobs.offer",
 		`{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").
 			String()+
-			`","visitSlot":`+slotJSON(
-			49,
-			2,
-		)+
-			`,"offerExpiresAt":"`+stamp(
+			`","offerExpiresAt":"`+stamp(
 			12,
 		)+`","accessValidFrom":"`+stamp(
 			0,

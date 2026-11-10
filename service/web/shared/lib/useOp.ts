@@ -3,10 +3,17 @@
 // Data-source switch for screens: in the Phase 1A demo (DATA_SOURCE=mock) screens keep their fixture data; with
 // DATA_SOURCE=API the same screen reads the Core API through the BFF relay.
 import { useEffect, useEffectEvent, useState } from "react";
-import { callOp, OpError } from "@ac/web/lib/ops";
-import type { OpArgs, OpCall } from "@ac/web/lib/opTypes";
+import { z } from "@ac/web/lib/zod";
+import { callRelay, OpError } from "@ac/web/lib/ops";
+import type { OpCall } from "@ac/web/lib/opTypes";
+import { recover } from "@ac/web/lib/promises";
 
 export interface BffSession { dataSource: "mock" | "api"; signedIn: boolean; role: string | null; membershipId: string | null; clientRole: string | null; serverNow: string | null }
+
+const bffSessionSchema = z.object({
+  dataSource: z.enum(["mock", "api"]), signedIn: z.boolean(), role: z.string().nullable(), membershipId: z.string().nullable(), clientRole: z.string().nullable(), serverNow: z.string().nullable(),
+}) satisfies z.ZodType<BffSession>;
+const MOCK_SESSION: BffSession = { dataSource: "mock", signedIn: false, role: null, membershipId: null, clientRole: null, serverNow: null };
 
 let cached: Promise<BffSession> | null = null;
 
@@ -28,10 +35,17 @@ function useRevision(): number {
   return r;
 }
 
+async function readBffSession(): Promise<BffSession> {
+  try {
+    const r = await fetch("/bff/session", { cache: "no-store" });
+    return bffSessionSchema.parse(await r.json());
+  } catch {
+    return MOCK_SESSION; // an unreadable or unexpected answer is the mock session
+  }
+}
+
 export function bffSession(): Promise<BffSession> {
-  cached ??= fetch("/bff/session", { cache: "no-store" })
-    .then((r) => r.json() as Promise<BffSession>)
-    .catch(() => ({ dataSource: "mock", signedIn: false, role: null, membershipId: null, clientRole: null, serverNow: null }) as BffSession);
+  cached ??= readBffSession();
   return cached;
 }
 
@@ -39,7 +53,7 @@ export function useBffSession(): BffSession | null {
   const [s, setS] = useState<BffSession | null>(null);
   useEffect(() => {
     let isLive = true;
-    bffSession().then((v) => isLive && setS(v));
+    void bffSession().then((v) => { if (isLive) setS(v); }); // bffSession never rejects: a failed read is the mock session
     return () => {
       isLive = false;
     };
@@ -49,7 +63,7 @@ export function useBffSession(): BffSession | null {
 
 /** Reads an operation in API mode; returns the mock value in mock mode (and while the data source is unknown).
 The fetch result is stored with the request it answers; `loading` is derived (no setState in the effect body). */
-export function useOp<T, R>(...[operation, input, mock, map, enabled = true]: [...OpCall, mock: R, map: (data: T) => R, enabled?: boolean]): { data: R; loading: boolean; error: OpError | null; source: "mock" | "api" | null } {
+export function useOp<T, R>(...[operation, input, mock, map, enabled = true]: [...call: OpCall, mock: R, map: (data: T) => R, enabled?: boolean]): { data: R; loading: boolean; error: OpError | null; source: "mock" | "api" | null } {
   const session = useBffSession();
   const rev = useRevision();
   const request = `${operation}|${JSON.stringify(input)}|${String(rev)}`;
@@ -57,13 +71,13 @@ export function useOp<T, R>(...[operation, input, mock, map, enabled = true]: [.
   const isActive = session?.dataSource === "api" && enabled;
   // callers pass a new input object and an inline projection on every render: the read uses the latest of both, and
   // the request (operation, input and revision) decides when it runs again
-  const read = useEffectEvent(() => callOp<T>(...([operation, input] as OpArgs<never>)).then(map));
+  const read = useEffectEvent(() => callRelay<T>(operation, input).then(map));
   useEffect(() => {
-    if (!isActive) return;
-    let isLive = true;
-    read()
-      .then((data) => isLive && setState({ request, data, error: null }))
-      .catch((error: unknown) => isLive && setState((s) => ({ request, data: s.data, error: error instanceof OpError ? error : null })));
+    let isLive = isActive; // an inactive read does not run; its cleanup has nothing to stop
+    if (isActive) {
+      void recover(read()
+        .then((data) => { if (isLive) setState({ request, data, error: null }); }), (error: unknown) => { if (isLive) setState((s) => ({ request, data: s.data, error: error instanceof OpError ? error : null })); });
+    }
     return () => {
       isLive = false;
     };

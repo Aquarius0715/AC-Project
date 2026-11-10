@@ -4,6 +4,8 @@
 // hq-override-only out everywhere (IR384, IR385), which is no project's shared user; the other adds a new person and
 // revokes the membership again (IR461).
 import { test, expect } from "../../fixtures/test";
+import { answers, messageCount } from "../../fixtures/mailpit";
+import { pickDateTime } from "../../fixtures/time";
 
 test("the organization filter narrows the memberships; an unknown membership is not opened", async ({ page }) => {
   await page.goto("/admin/settings/access");
@@ -22,7 +24,8 @@ test("the organization filter narrows the memberships; an unknown membership is 
   await expect(org).toHaveValue("Demo Contractor A");
   const rows = main.locator("button[aria-pressed]");
   await expect(rows.first()).toBeVisible();
-  for (const label of await rows.locator("div.text-\\[11px\\]").allInnerTexts()) expect(label).toContain("Demo Contractor A");
+  const contractorLabels = await rows.locator("div.text-\\[11px\\]").allInnerTexts();
+  for (const label of contractorLabels) expect(label).toContain("Demo Contractor A");
   // Escape closes the list and keeps the choice
   await org.click();
   await org.press("Escape");
@@ -37,7 +40,8 @@ test("the organization filter narrows the memberships; an unknown membership is 
   await org.press("Enter");
   await page.waitForURL((u) => !!u.searchParams.get("organizationId") && u.searchParams.get("organizationId") !== before);
   await expect(org).toHaveValue("Demo HQ");
-  for (const label of await rows.locator("div.text-\\[11px\\]").allInnerTexts()) expect(label).toContain("Demo HQ");
+  const hqLabels = await rows.locator("div.text-\\[11px\\]").allInnerTexts();
+  for (const label of hqLabels) expect(label).toContain("Demo HQ");
 
   // a membership the list does not hold: no other membership opens in its place
   await page.goto("/admin/settings/access?role=admin&membershipId=00000000-0000-4000-8000-000000000000");
@@ -79,15 +83,15 @@ test("HQ adds a new person with a membership, and revoking it ends the membershi
   await main.getByRole("textbox", { name: /^Email/ }).fill(email);
   await main.getByRole("button", { name: "Admin", exact: true }).last().click(); // the role, after the role filter
   await main.getByRole("combobox", { name: /^Organization/ }).selectOption({ label: "Demo HQ" });
-  await main.getByLabel("Valid from").fill("2026-09-01T09:00"); // before the seed's demo clock
+  await pickDateTime(main.getByRole("group", { name: "Valid from" }), "2026-09-01T09:00"); // before the seed's demo clock
   await main.getByRole("textbox", { name: /^Change reason/ }).fill("E2E: a new colleague");
   await main.getByRole("button", { name: "Create membership" }).click();
   await expect(page.getByText("Membership created").first()).toBeVisible();
   await page.waitForURL(/membershipId=[0-9a-f-]{36}/);
   await expect(main.locator('button[aria-pressed="true"]', { hasText: "E2E Colleague" })).toBeVisible(); // the new one is selected (an earlier run's stays listed, revoked)
   const search = `http://localhost:8025/api/v1/search?query=${encodeURIComponent(`to:"${email}"`)}`;
-  if ((await fetch(search).catch(() => null))?.ok) {
-    await expect.poll(async () => ((await (await fetch(search)).json()) as { messages_count: number }).messages_count, { timeout: 30_000 }).toBeGreaterThanOrEqual(1);
+  if (await answers(search)) {
+    await expect.poll(() => messageCount(search), { timeout: 30_000 }).toBeGreaterThanOrEqual(1);
   }
   await main.getByRole("button", { name: "Revoke access…" }).click();
   const dialog = page.getByRole("dialog");

@@ -195,7 +195,7 @@ func validProfile(profile string) bool {
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/customers [get]
-func (m *Module) customersList(
+func (*Module) customersList(
 	ctx context.Context,
 	call *ops.Call,
 	query *paging.Query,
@@ -375,7 +375,7 @@ func (m *Module) customersSave(
 }
 
 // addCustomer creates the customer of an organization; one the organization has already is a conflict (23505).
-func (m *Module) addCustomer(
+func (*Module) addCustomer(
 	ctx context.Context,
 	call *ops.Call,
 	input *CustomerSave,
@@ -423,8 +423,19 @@ func (m *Module) addCustomer(
 	return customer, nil
 }
 
-// canDeactivate refuses to deactivate a customer that has units, or active contracts or jobs (D05).
+// canDeactivate refuses to deactivate a customer that has units, or active contracts or jobs (D05). The customer row is
+// locked first: a unit save reads it with a share lock (customerActive), so one of the two waits and then sees the
+// other, and no active unit is left under an inactive customer.
 func (m *Module) canDeactivate(ctx context.Context, call *ops.Call, org uuid.UUID) error {
+	_, lockErr := call.Tx.Exec(
+		ctx,
+		`SELECT 1 FROM assets.customers WHERE organization_id = $1 FOR UPDATE`,
+		org,
+	)
+	if lockErr != nil {
+		return apperr.Wrap(lockErr, "select assets.customers")
+	}
+
 	var units bool
 
 	err := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.units WHERE customer_org_id = $1 AND NOT
@@ -482,7 +493,7 @@ func (m *Module) canDeactivate(ctx context.Context, call *ops.Call, org uuid.UUI
 //	@Failure		504			{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/properties [get]
-func (m *Module) propertiesList(
+func (*Module) propertiesList(
 	ctx context.Context,
 	call *ops.Call,
 	query *paging.Query,
@@ -530,7 +541,7 @@ func (m *Module) propertiesList(
 		call,
 		query,
 		filters,
-		"assets.properties",
+		tableProperties,
 		propertyCols,
 		conds,
 		args,
@@ -566,7 +577,7 @@ func (m *Module) propertiesList(
 //	@Failure		504			{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/spaces [get]
-func (m *Module) spacesList(
+func (*Module) spacesList(
 	ctx context.Context,
 	call *ops.Call,
 	query *paging.Query,
@@ -613,7 +624,7 @@ func (m *Module) spacesList(
 		conds = append(conds, "kind = "+add(*filters.Kind))
 	}
 
-	return list(ctx, call, query, filters, "assets.spaces", spaceCols, conds, args, scanSpace)
+	return list(ctx, call, query, filters, tableSpaces, spaceCols, conds, args, scanSpace)
 }
 
 // ---- locations.rename (IR109) ----
@@ -732,7 +743,8 @@ func (m *Module) locationsRename(
 	}
 
 	if err != nil {
-		return nil, apperr.Wrap(err, "update (locationsRename)")
+		// a sibling saved with the name since the check above: the unique index refuses it (properties_name, spaces_name)
+		return nil, apperr.Wrap(dupSibling(err), "update (locationsRename)")
 	}
 
 	typ := eventLocationChanged
@@ -772,7 +784,7 @@ func renameTargetOf(kind string) renameTarget {
 	switch kind {
 	case kindProperty:
 		return renameTarget{
-			"assets.properties",
+			tableProperties,
 			keyName,
 			"customer_org_id",
 			`SELECT 1 FROM assets.properties o, assets.properties t
@@ -781,7 +793,7 @@ func renameTargetOf(kind string) renameTarget {
 		}
 	case kindSpace:
 		return renameTarget{
-			"assets.spaces",
+			tableSpaces,
 			keyName,
 			"(SELECT customer_org_id FROM assets.properties p WHERE p.id = property_id)",
 			`SELECT 1 FROM assets.spaces o, assets.spaces t WHERE t.id = $1 AND o.property_id = t.property_id AND

@@ -373,8 +373,13 @@ func sortCoverage(units []UnitCoverage, sortBy *paging.SortSpec) {
 			}
 		}
 
-		if field == "id" || equal {
-			return unitCoverage.UnitID.String() < otherCoverage.UnitID.String()
+		byID := unitCoverage.UnitID.String() < otherCoverage.UnitID.String()
+		if field == "id" {
+			return byID != desc
+		}
+
+		if equal {
+			return byID // ties go by unit ID, ascending in both directions
 		}
 
 		return less != desc

@@ -8,10 +8,15 @@ import { jobEventTitle } from "@ac/web/lib/partnerOverview";
 // DATA_SOURCE=API: the company's jobs (offer / summary / history projections, IR23) and their events (jobs.events)
 interface ApiJobRow { projection: string; id?: string; jobId?: string; type: string; status: string; completedAt?: string | null }
 interface ApiEvent { id: string; action: string; occurredAt: string; note: { visibility: "internal" | "customer"; message: string } | null }
-interface Ev { t: string; title: string; d: string; c: boolean }
+interface TimelineEvent { t: string; title: string; d: string; c: boolean }
+/** A demo event's tone: rework warns, an accepted report is ok, anything else is plain. */
+function eventTone(title: string): "warn" | "ok" | undefined {
+  if (title.startsWith("Rework")) return "warn";
+  return title.includes("accepted") && title.startsWith("Report") ? "ok" : undefined;
+}
 const actionTitle = jobEventTitle; // shared with the overview (partnerOverview.ts)
 const kl = (iso: string) => new Date(iso).toLocaleString("en-MY", { dateStyle: "short", timeStyle: "short", hour12: false, timeZone: "Asia/Kuala_Lumpur" });
-function eventRow(e: ApiEvent): Ev {
+function eventRow(e: ApiEvent): TimelineEvent {
   return { t: kl(e.occurredAt), title: actionTitle[e.action] ?? e.action.replaceAll(/[._]/g, " "), d: e.note ? `“${e.note.message}” · ${e.note.visibility}` : e.action, c: e.note?.visibility === "customer" };
 }
 function jobOptions(items: ApiJobRow[]) {
@@ -35,14 +40,14 @@ const events = [
   { t: "2026-09-18 08:30", title: "Job accepted", d: "contractor-a accepted HQ offer", c: false },
   { t: "2026-09-17 16:00", title: "Offer received from HQ", d: "offer-c04-1 · terms v3 · by hq-operator", c: false },
 ];
-type F = "all" | "customer" | "internal";
 
 /** The Phase 1A demo of the job history (fixture events; the BFF reads in API mode moved to the server page). */
 export function HistoryDemo() {
+  type F = "all" | "customer" | "internal";
   const toast = useToast();
   const [job, setJob] = useState("job-p03");
   const [f, setF] = useState<F>("all");
-  const [msg, setMsg] = useState("Schedule moved to 2026-09-22 09:00–11:00 due to technician availability.");
+  const [notice, setNotice] = useState("Schedule moved to 2026-09-22 09:00–11:00 due to technician availability.");
   const [tried, setTried] = useState(false);
   const [role, setRole] = useState("hq");
   const [vis, setVis] = useState<"internal" | "customer">("internal");
@@ -50,8 +55,9 @@ export function HistoryDemo() {
   const jobs = useOp<{ items: ApiJobRow[] }, ReturnType<typeof jobOptions> | null>("jobs.list", { limit: 100 }, null, (p) => jobOptions(p.items));
   const isApi = jobs.source === "api";
   const sel = isApi ? (jobs.data?.find((j) => j.id === job) ?? null) : null;
-  const evs = useOp<{ items: ApiEvent[] }, Ev[] | null>("jobs.events", { jobId: isApi ? job : "", query: { limit: 100, sort: { field: "occurredAt", direction: "desc" } } }, null, (p) => p.items.map(eventRow), !!sel);
-  const all: Ev[] = isApi ? (sel ? (evs.data ?? []) : []) : events;
+  const evs = useOp<{ items: ApiEvent[] }, TimelineEvent[] | null>("jobs.events", { jobId: isApi ? job : "", query: { limit: 100, sort: { field: "occurredAt", direction: "desc" } } }, null, (p) => p.items.map((item) => eventRow(item)), !!sel);
+  const loaded = sel ? (evs.data ?? []) : []; // the selected job's events, once a job is selected
+  const all: TimelineEvent[] = isApi ? loaded : events;
   const shown = all.filter((e) => f === "all" || (f === "customer" ? e.c : !e.c));
   return (
     <Page>
@@ -62,7 +68,7 @@ export function HistoryDemo() {
           <div className="split">
             <Card title={`Job history — ${job}`} action={<Tabs value={f} onChange={setF} tabs={[{ id: "all", label: "All events", count: all.length }, { id: "customer", label: "Customer-visible", count: all.filter((e) => e.c).length }, { id: "internal", label: "Internal", count: all.filter((e) => !e.c).length }]} />}>
               {shown.length === 0 && <p className="text-[13px] text-muted-foreground">{evs.loading ? "Loading…" : "No events in this view."}</p>}
-              <Timeline items={shown.map((e) => ({ time: e.t.slice(5), title: e.title, detail: e.d, tone: e.title.startsWith("Rework") ? "warn" : (e.title.includes("accepted") && e.title.startsWith("Report") ? "ok" : undefined) }))} />
+              <Timeline items={shown.map((e) => ({ time: e.t.slice(5), title: e.title, detail: e.d, tone: eventTone(e.title) }))} />
             </Card>
             <div className="flex min-w-0 flex-col gap-4">
               <Card title="New communication preview">
@@ -70,8 +76,8 @@ export function HistoryDemo() {
                   <Field label="Template"><Select><option>schedule_change</option><option>quality_rework</option></Select></Field>
                   <Field label="Visibility"><Choice value={vis} onChange={setVis} options={[{ id: "internal", label: "Internal (default)" }, { id: "customer", label: "Customer-visible" }]} /></Field>
                   <Field label="Recipient role"><Select value={role} onChange={(e) => { setRole(e.target.value); }}><option value="hq">hq</option><option value="technician">technician</option><option value="customer">customer</option></Select></Field>
-                  <Field label="Message (1–2000 chars)" error={tried && !msg.trim() ? "Message is required" : undefined}><Textarea value={msg} onChange={(e) => { setMsg(e.target.value); }} /></Field>
-                  <Btn variant="primary" disabled={isApi && sel?.projection === "history"} onClick={() => { setTried(true); if (!msg.trim()) return; setPreviews((p) => [{ k: `schedule_change → ${role}`, d: `in-app · preview · ${vis} · just now` }, ...p]); toast("Note saved + preview created"); }}>Save note & create preview</Btn>
+                  <Field label="Message (1–2000 chars)" error={tried && !notice.trim() ? "Message is required" : undefined}><Textarea value={notice} onChange={(e) => { setNotice(e.target.value); }} /></Field>
+                  <Btn variant="primary" disabled={isApi && sel?.projection === "history"} onClick={() => { setTried(true); if (!notice.trim()) { return; } setPreviews((p) => [{ k: `schedule_change → ${role}`, d: `in-app · preview · ${vis} · just now` }, ...p]); toast("Note saved + preview created"); }}>Save note & create preview</Btn>
                   <p className="text-[11px] text-muted-foreground">No real sending. Free-form external recipients and other-job recipients are rejected. Internal notes stay hidden from customers.</p>
                 </div>
               </Card>

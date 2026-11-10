@@ -3,12 +3,15 @@
 // site and the version rows. Pure code shared by the Server Component and the client view. Texts in the display
 // language (`t`, IR282); instants through a formatter (`Fmt`) that reads the loader's server-formatted strings, so the
 // first render matches the server's, and formats in the browser only what appears after the page loaded.
+import { isNone } from "@ac/web/lib/isNone";
 import { metricUnit, type Metric } from "@ac/web/lib/devices";
-import { EN, showClock, showDate, showSpan, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
+import { EN, showClock, showDate, showSpan, showTime, translator, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import { businessDay } from "@ac/web/lib/clientBilling";
 import { statusWord, typeLabel } from "@ac/web/lib/partnerJobDetail";
 import type { OpInput } from "@ac/web/lib/opTypes";
 import type { ComponentKey } from "@ac/web/lib/contracts.gen";
+import { codePoints } from "@ac/web/lib/text";
+import { entryOf, lookup } from "@ac/web/lib/lookup";
 
 const en = translator("en");
 
@@ -20,9 +23,9 @@ export interface Known { clock: Record<string, string>; stamp: Record<string, st
 export const fmtOf = (i: I18n, known?: Known): Fmt => {
   return {
     t: i.t,
-    clock: (iso) => known?.clock[iso] ?? showClock(iso, i.display),
-    stamp: (iso) => known?.stamp[iso] ?? showTime(iso, i.display),
-    span: (from, to) => known?.span[`${from}|${to}`] ?? showSpan(from, to, i.display),
+    clock: (iso) => lookup(known?.clock ?? {}, iso) ?? showClock(iso, i.display),
+    stamp: (iso) => lookup(known?.stamp ?? {}, iso) ?? showTime(iso, i.display),
+    span: (from, to) => lookup(known?.span ?? {}, `${from}|${to}`) ?? showSpan(from, to, i.display),
   };
 };
 /** The server's formatting of the instants a page shows: every time of day, stamp and span it will ask for. */
@@ -35,7 +38,7 @@ const EN_FMT = fmtOf(EN);
 
 export type Group = "indoor" | "outdoor" | "electrical";
 /** The component keys of each group in canonical order (maintenance.ComponentGroups of the Core API). */
-export const componentGroups: { group: Group; keys: string[] }[] = [
+export const componentGroups: { group: Group; keys: ComponentKey[] }[] = [
   { group: "indoor", keys: ["filter", "evaporator_coil", "blower_motor", "blower_fan", "drain_pipe", "drain_pan", "outlet", "louver"] },
   { group: "outdoor", keys: ["condenser_coil", "compressor", "fan", "blade", "refrigerant_pipe"] },
   { group: "electrical", keys: ["thermostat", "sensor", "capacitor", "contactor", "wiring"] },
@@ -46,7 +49,7 @@ export const componentLabel: Record<string, string> = {
   outlet: "Outlet", louver: "Louver", condenser_coil: "Condenser coil", compressor: "Compressor", fan: "Fan", blade: "Fan blade", refrigerant_pipe: "Refrigerant pipe",
   thermostat: "Thermostat", sensor: "Sensor", capacitor: "Capacitor", contactor: "Contactor", wiring: "Wiring insulation",
 };
-export const groupOf = (key: string): Group | null => componentGroups.find((g) => g.keys.includes(key))?.group ?? null;
+export const groupOf = (key: string): Group | null => componentGroups.find((g) => g.keys.some((k) => k === key))?.group ?? null;
 /** The components a report of this unit must cover: every key of the groups in the unit's service scope (IR100). */
 export const componentsFor = (scope: string[]) => componentGroups.filter((g) => scope.includes(g.group)).flatMap((g) => g.keys.map((key) => ({ group: g.group, key })));
 
@@ -60,19 +63,20 @@ export const readingMetrics: { metric: Metric; label: string }[] = [
 /** WorkReport of service-contracts.ts as the technician reads it. */
 export interface ApiTechReport {
   id: string; version: number; jobId: string; authorId: string; state?: string;
-  items: { id: string; componentGroup: Group; componentKey: string; result: Result; reason: string | null; evidenceIds: string[]; authorId: string; observedAt: string }[];
-  measurements: { id: string; componentKey?: string | null; metric: Metric; value: number | null; unit: string; observedAt: string; quality: string; qualityReason?: string | null }[];
+  items: { id: string; componentGroup: Group; componentKey: ComponentKey; result: Result; reason: string | null; evidenceIds: string[]; authorId: string; observedAt: string }[];
+  measurements: { id: string; componentKey?: ComponentKey | null; metric: Metric; value: number | null; unit: string; observedAt: string; quality: string; qualityReason?: string | null }[];
   parts: DraftPart[]; refrigerant: DraftRefrigerant[]; signOff: { signerName: string; signedAt: string; signatureAttachmentId: string | null; absentReason: string | null; reportVersion: number } | null;
   workText: string; nextAction: { kind: "none" } | { kind: "follow_up"; date: string; note: string } | null;
   attachmentRefs: { id: string; name: string; mime: string; size: number; status: "processing" | "ready" | "failed" }[]; submittedAt: string | null; acceptedAt: string | null;
   reviewHistory: { reviewerUserId: string; reportVersion: number; decision: "accept" | "return"; reason: string | null; occurredAt: string }[];
 }
-export type Result = "normal" | "attention" | "not_inspected" | "not_applicable" | null;
-export interface DraftItem { componentGroup: Group; componentKey: string; result: Result; reason: string; evidenceIds: string[] }
-export interface DraftReading { id?: string; componentKey: string; metric: Metric; value: string; observedAt: string }
+export const checkResults = ["normal", "attention", "not_inspected", "not_applicable"] as const;
+export type Result = (typeof checkResults)[number] | null;
+interface DraftItem { componentGroup: Group; componentKey: ComponentKey; result: Result; reason: string; evidenceIds: string[] }
+interface DraftReading { id?: string; componentKey: ComponentKey; metric: Metric; value: string; observedAt: string }
 export interface DraftPart {
   name: string; quantity: number; catalogCode: string | null; source: "van_stock" | "hq_warehouse" | "bought_locally"; lotSerial: string | null;
-  replacesComponentKey: string | null; oldPartDisposal: "disposed_on_site" | "returned" | null; receiptAttachmentId: string | null;
+  replacesComponentKey: ComponentKey | null; oldPartDisposal: "disposed_on_site" | "returned" | null; receiptAttachmentId: string | null;
 }
 export interface DraftRefrigerant { refrigerant: "R32" | "R410A"; cylinderId: string; recoveredKg: number; chargedKg: number; leakCheck: "pass" | "fail" | "not_done"; leakCheckMethod: string | null }
 export type NextAction = { kind: "none" } | { kind: "follow_up"; date: string; note: string };
@@ -80,27 +84,33 @@ export interface Draft { items: DraftItem[]; readings: DraftReading[]; parts: Dr
 
 /** The editable draft of a report: every required component in canonical order (null until a result is chosen — normal
 is never preselected, DD-T04), the readings as text so a half-typed value survives, and the other sections as saved. */
-export function draftFrom(r: ApiTechReport | null, components: { group: Group; key: string }[]): Draft {
+export function draftFrom(r: ApiTechReport | null, components: { group: Group; key: ComponentKey }[]): Draft {
   const items = components.map(({ group, key }) => {
     const it = r?.items.find((x) => x.componentKey === key);
     return { componentGroup: group, componentKey: key, result: it?.result ?? null, reason: it?.reason ?? "", evidenceIds: it?.evidenceIds ?? [] };
   });
+  const readings: DraftReading[] = [];
+  const measurements = r?.measurements ?? [];
+  for (const m of measurements) {
+    const componentKey = m.componentKey ?? components[0]?.key; // a reading without a component is entered on the first one
+    if (componentKey) readings.push({ componentKey, id: m.id, metric: m.metric, value: m.value === null ? "" : String(m.value), observedAt: m.observedAt });
+  }
   return {
     items,
-    readings: (r?.measurements ?? []).map((m) => ({ id: m.id, componentKey: m.componentKey ?? components[0]?.key ?? "", metric: m.metric, value: m.value === null ? "" : String(m.value), observedAt: m.observedAt })),
+    readings,
     parts: r?.parts ?? [], refrigerant: r?.refrigerant ?? [], workText: r?.workText ?? "",
     nextAction: r?.nextAction ?? { kind: "none" }, attachmentIds: (r?.attachmentRefs ?? []).filter((a) => a.status !== "failed").map((a) => a.id),
   };
 }
 
 /** The jobs.saveDraft body of a draft: trimmed reasons (empty → null), numeric readings in their metric's unit. */
+const toNumber = (v: string) => (v.trim() === "" || !Number.isFinite(Number(v)) ? null : Number(v));
 export function draftInput(jobId: string, reportId: string | null, d: Draft): OpInput<"jobs.saveDraft"> {
-  const num = (v: string) => (v.trim() === "" || !Number.isFinite(Number(v)) ? null : Number(v));
   return {
     jobId, ...(reportId && { reportId }),
-    items: d.items.map((it) => ({ componentGroup: it.componentGroup, componentKey: it.componentKey as ComponentKey, result: it.result, reason: it.reason.trim() || null, evidenceIds: it.evidenceIds })),
-    measurements: d.readings.map((m) => ({ ...(m.id && { id: m.id }), componentKey: m.componentKey as ComponentKey, metric: m.metric, value: num(m.value), unit: metricUnit[m.metric], observedAt: m.observedAt })),
-    parts: d.parts.map((p) => ({ ...p, name: p.name.trim(), replacesComponentKey: p.replacesComponentKey as ComponentKey | null })), refrigerant: d.refrigerant, workText: d.workText,
+    items: d.items.map((it) => ({ componentGroup: it.componentGroup, componentKey: it.componentKey, result: it.result, reason: it.reason.trim() || null, evidenceIds: it.evidenceIds })),
+    measurements: d.readings.map((m) => ({ ...(m.id && { id: m.id }), componentKey: m.componentKey, metric: m.metric, value: toNumber(m.value), unit: metricUnit[m.metric], observedAt: m.observedAt })),
+    parts: d.parts.map((p) => ({ ...p, name: p.name.trim(), replacesComponentKey: p.replacesComponentKey })), refrigerant: d.refrigerant, workText: d.workText,
     nextAction: d.nextAction.kind === "none" ? { kind: "none" as const } : { kind: "follow_up" as const, date: d.nextAction.date, note: d.nextAction.note.trim() },
     attachmentIds: d.attachmentIds,
   };
@@ -117,13 +127,15 @@ export function itemPhotos(d: Draft, key: string, photos: PhotoRef[]): { linked:
     free: photos.filter((p) => p.status === "ready" && !ids.includes(p.id)),
   };
 }
+/** The ids with `id` added once (on) or removed (off). */
+function toggled(ids: string[], id: string, on: boolean): string[] {
+  if (!on) return ids.filter((e) => e !== id);
+  return ids.includes(id) ? ids : [...ids, id];
+}
 /** Links a report photo to a component's finding (`on`) or unlinks it; a photo is linked to a finding at most once. */
 export function linkPhoto(d: Draft, key: string, id: string, on: boolean): Draft {
   return {
-    ...d, items: d.items.map((x) => {
-      return (x.componentKey === key ? { ...x, evidenceIds: on ? (x.evidenceIds.includes(id) ? x.evidenceIds : [...x.evidenceIds, id]) : x.evidenceIds.filter((e) => e !== id) }
-        : x);
-    }),
+    ...d, items: d.items.map((x) => (x.componentKey === key ? { ...x, evidenceIds: toggled(x.evidenceIds, id, on) } : x)),
   };
 }
 
@@ -133,20 +145,21 @@ export interface Issue { key: string | null; group: Group | null; text: string }
 const PHOTO_STATE: Record<string, string> = { processing: "processing", failed: "failed", ready: "ready" };
 export function submitIssues(d: Draft, attachments: { id: string; name: string; status: string }[], now: number, t: T = en): Issue[] {
   const out: Issue[] = [];
-  const label = (key: string) => t(componentLabel[key] ?? key);
+  const label = (key: string) => t(lookup(componentLabel, key) ?? key);
   for (const it of d.items) {
-    const where = `${t(groupLabel[it.componentGroup])} › ${label(it.componentKey)}`;
-    if (it.result === null) out.push({ key: it.componentKey, group: it.componentGroup, text: t("{where} has no result", { where }) });
-    else if (it.result !== "normal" && !it.reason.trim()) out.push({ key: it.componentKey, group: it.componentGroup, text: t("{where} needs a reason", { where }) });
+    const where = `${t(entryOf(groupLabel, it.componentGroup))} › ${label(it.componentKey)}`;
+    const text = it.result === null ? t("{where} has no result", { where }) : undefined;
+    const missing = text ?? (it.result === "normal" || it.reason.trim() ? undefined : t("{where} needs a reason", { where }));
+    if (missing) out.push({ key: it.componentKey, group: it.componentGroup, text: missing });
   }
   for (const m of d.readings) {
     if (m.value.trim() !== "" && !Number.isFinite(Number(m.value))) out.push({ key: m.componentKey, group: groupOf(m.componentKey), text: t("{name} reading is not a number", { name: label(m.componentKey) }) });
   }
-  const n = [...d.workText.trim()].length;
+  const n = codePoints(d.workText.trim());
   if (n < 10 || n > 4000) out.push({ key: null, group: null, text: t("Work performed must be 10–4000 characters") });
   if (d.nextAction.kind === "follow_up" && (!d.nextAction.date || Date.parse(d.nextAction.date) <= now || !d.nextAction.note.trim())) out.push({ key: null, group: null, text: t("A follow-up needs a future date and a note") });
   for (const [k, p] of d.parts.entries()) { if (p.quantity < 1 || p.quantity > 999) out.push({ key: null, group: null, text: t("Part {n} ({name}) needs a quantity of 1–999", { n: k + 1, name: p.name || t("unnamed") }) }); }
-  for (const a of attachments.filter((x) => d.attachmentIds.includes(x.id) && x.status !== "ready")) out.push({ key: null, group: null, text: t("Photo {name} is {state} — remove or retry it", { name: a.name, state: PHOTO_STATE[a.status] ? t(PHOTO_STATE[a.status]) : a.status }) });
+  for (const a of attachments) if (d.attachmentIds.includes(a.id) && a.status !== "ready") out.push({ key: null, group: null, text: t("Photo {name} is {state} — remove or retry it", { name: a.name, state: textOf(PHOTO_STATE, a.status, t) ?? a.status }) });
   return out;
 }
 
@@ -154,7 +167,7 @@ export function submitIssues(d: Draft, attachments: { id: string; name: string; 
 export function progress(d: Draft, issues: Issue[], t: T = en) {
   return componentGroups.map(({ group }) => {
     const items = d.items.filter((i) => i.componentGroup === group);
-    return { group, label: t(groupLabel[group]), done: items.filter((i) => i.result !== null).length, total: items.length, issues: issues.filter((x) => x.group === group).length };
+    return { group, label: t(entryOf(groupLabel, group)), done: items.filter((i) => i.result !== null).length, total: items.length, issues: issues.filter((x) => x.group === group).length };
   }).filter((g) => g.total > 0);
 }
 
@@ -188,16 +201,16 @@ export function partErrors(label: string, qty: string, t: T = en): Partial<Recor
   const e: Partial<Record<PartField, string>> = {};
   if (!label.trim()) e.name = t("Choose a catalog part or name it");
   const n = Number(qty);
-  if (!Number.isInteger(n) || n < 1 || n > 999) e.qty = t("Quantity must be 1–999");
+  if (!Number.isSafeInteger(n) || n < 1 || n > 999) e.qty = t("Quantity must be 1–999");
   return e;
 }
 /** Refrigerant's fields and checks: the cylinder, and the kilograms recovered and charged, 0 or more (IR625). */
 export type RefrigerantField = "cylinder" | "recovered" | "charged";
 export const REFRIGERANT_FIELDS: RefrigerantField[] = ["cylinder", "recovered", "charged"];
+const kg = (v: string) => Number.isFinite(Number(v)) && Number(v) >= 0;
 export function refrigerantErrors(cylinder: string, recovered: string, charged: string, t: T = en): Partial<Record<RefrigerantField, string>> {
   const e: Partial<Record<RefrigerantField, string>> = {};
   if (!cylinder.trim()) e.cylinder = t("The cylinder ID is required");
-  const kg = (v: string) => Number.isFinite(Number(v)) && Number(v) >= 0;
   if (!kg(recovered)) e.recovered = t("Kilograms, 0 or more");
   if (!kg(charged)) e.charged = t("Kilograms, 0 or more");
   return e;
@@ -229,19 +242,30 @@ export interface TimeOnSite {
 const duration = (mins: number, t: T) => (mins >= 60 ? t("{h} h {m} min", { h: Math.floor(mins / 60), m: mins % 60 }) : t("{n} min", { n: mins }));
 /** The instants of a time on site, for the loader to format. */
 export const timeInstants = (ts: TimeOnSite | null | undefined) => [ts?.arrivedAt, ts?.startedAt, ts?.finishedAt, ...(ts?.pauses ?? []).flatMap((p) => [p.from, p.to])];
+/** How the technician checked in: manually with the reason, or by QR at a distance from the site. */
+function checkInPlace(ts: TimeOnSite, t: T): string {
+  if (ts.checkInMethod === "manual") return t("manual — {reason}", { reason: ts.checkInReason ?? t("no reason") });
+  return isNone(ts.distanceMeters) ? "—" : t("{m} m from site · QR matched", { m: Math.round(ts.distanceMeters) });
+}
+/** The ended pauses: how many and how long in all. */
+function pausesText(count: number, pausedMs: number, t: T): string {
+  if (count === 0) return "—";
+  return `${t(count === 1 ? "1 pause" : "{n} pauses", { n: count })} · ${duration(Math.round(pausedMs / 60_000), t)}`;
+}
 export function timeRows(ts: TimeOnSite | null | undefined, now: number, f: Fmt = EN_FMT): [string, string][] {
   const { t } = f;
-  if (!ts?.arrivedAt && !ts?.startedAt) return [[t("Arrived"), t("not checked in")]];
+  const arrived = ts?.arrivedAt ?? ts?.startedAt;
+  if (!ts || !arrived) return [[t("Arrived"), t("not checked in")]];
   const pauses = ts.pauses ?? [];
   const open = pauses.find((p) => !p.to);
   const paused = pauses.reduce((sum, p) => sum + ((p.to ? Date.parse(p.to) : now) - Date.parse(p.from)), 0);
-  const from = Date.parse(ts.arrivedAt ?? ts.startedAt!);
+  const from = Date.parse(arrived);
   const minutes = ts.onSiteMinutes ?? Math.max(0, Math.floor((((ts.finishedAt ? Date.parse(ts.finishedAt) : now) - from) - paused) / 60_000));
   return [
-    [t("Arrived"), `${f.clock(ts.arrivedAt ?? ts.startedAt!)} · ${t(ts.checkInMethod === "manual" ? "manual check-in" : "checked in")}`],
-    [t("Location"), ts.checkInMethod === "manual" ? t("manual — {reason}", { reason: ts.checkInReason ?? t("no reason") }) : (ts.distanceMeters == null ? "—" : t("{m} m from site · QR matched", { m: Math.round(ts.distanceMeters) }))],
+    [t("Arrived"), `${f.clock(arrived)} · ${t(ts.checkInMethod === "manual" ? "manual check-in" : "checked in")}`],
+    [t("Location"), checkInPlace(ts, t)],
     [t("Started"), ts.startedAt ? f.clock(ts.startedAt) : "—"],
-    [t("Paused"), open ? t("since {time}", { time: f.clock(open.from) }) : (pauses.length > 0 ? `${t(pauses.length === 1 ? "1 pause" : "{n} pauses", { n: pauses.length })} · ${duration(Math.round(paused / 60_000), t)}` : "—")],
+    [t("Paused"), open ? t("since {time}", { time: f.clock(open.from) }) : pausesText(pauses.length, paused, t)],
     [t("Finished"), ts.finishedAt ? f.clock(ts.finishedAt) : t("— (on submit)")],
     [t("On-site time"), duration(minutes, t)],
   ];
@@ -251,6 +275,18 @@ export function timeRows(ts: TimeOnSite | null | undefined, now: number, f: Fmt 
 and ready photos — the first save creates it without a reload) above the submitted versions with their review. */
 export interface VersionRow { title: string; sub: string; badge: { text: string; tone: "primary" | "ok" | "warn" | "muted" } }
 export interface DraftVersion { version: number; results: number; photos: number; savedAt: string | null }
+/** A submitted version with its review: accepted or returned (when, why), or awaiting review. */
+function reviewedVersion(version: number, rv: ApiTechReport["reviewHistory"][number] | undefined, f: Fmt): VersionRow {
+  const { t } = f;
+  if (!rv) return { title: t("v{version} · {state}", { version, state: t("submitted") }), sub: t("awaiting quality review"), badge: { text: t("Submitted"), tone: "primary" } };
+  const isAccepted = rv.decision === "accept";
+  const reason = rv.reason ? ` — ${rv.reason}` : "";
+  return {
+    title: t("v{version} · {state}", { version, state: t(isAccepted ? "accepted" : "returned") }),
+    sub: `${f.stamp(rv.occurredAt)}${reason}`,
+    badge: isAccepted ? { text: t("Accepted"), tone: "ok" } : { text: t("Returned"), tone: "warn" },
+  };
+}
 export function versionRows(draft: DraftVersion | null, reportRefs: { reportVersion: number }[], reviews: ApiTechReport["reviewHistory"], f: Fmt = EN_FMT): VersionRow[] {
   const { t } = f;
   const rows: VersionRow[] = [];
@@ -260,13 +296,9 @@ export function versionRows(draft: DraftVersion | null, reportRefs: { reportVers
       sub: `${t(draft.results === 1 ? "1 result" : "{n} results", { n: draft.results })} · ${t(draft.photos === 1 ? "1 photo" : "{n} photos", { n: draft.photos })}`, badge: { text: t("Draft"), tone: "warn" },
     });
   }
-  for (const ref of [...reportRefs].reverse()) {
+  for (const ref of reportRefs.toReversed()) {
     const rv = reviews.findLast((h) => h.reportVersion === ref.reportVersion);
-    rows.push({
-      title: t("v{version} · {state}", { version: ref.reportVersion, state: t(rv ? (rv.decision === "accept" ? "accepted" : "returned") : "submitted") }),
-      sub: rv ? `${f.stamp(rv.occurredAt)}${rv.reason ? ` — ${rv.reason}` : ""}` : t("awaiting quality review"),
-      badge: rv?.decision === "accept" ? { text: t("Accepted"), tone: "ok" } : (rv?.decision === "return" ? { text: t("Returned"), tone: "warn" } : { text: t("Submitted"), tone: "primary" }),
-    });
+    rows.push(reviewedVersion(ref.reportVersion, rv, f));
   }
   return rows;
 }
@@ -282,21 +314,30 @@ export interface ApiTechHistory {
   projection: "history"; jobId: string; type: string; status: string; asOf: string; completedAt: string | null;
   redactedReportSummary: { hasReport: boolean; acceptance: "accepted" | "not_accepted" };
 }
+function reportOutcome(r: ApiTechHistory["redactedReportSummary"]): string {
+  if (!r.hasReport) return "No report from your assignment";
+  return r.acceptance === "accepted" ? "Accepted in the quality review" : "Submitted — not accepted while you were assigned";
+}
+/** Why the job is no longer shown: completed, cancelled, or the assignment ended or changed. */
+function endedNote(status: string): string {
+  if (status === "completed") return "Your time is free for other jobs. The report, the unit and its devices stay with HQ and the customer.";
+  if (status === "cancelled") return "The job was cancelled, so the job details and the unit are no longer shown to you.";
+  return "Your work window ended, or HQ or your coordinator changed the assignment, so the job details and the unit are no longer shown to you.";
+}
 /** A job whose viewing window ended (IR49): completed — the assignment ended with it (IR234) — or reassigned / cancelled,
 read as the snapshot frozen when it ended (IR124). */
 export function historyCard(h: ApiTechHistory, i: I18n = EN) {
   const { t, display } = i;
   const isDone = h.status === "completed";
-  const report = h.redactedReportSummary.hasReport ? t(h.redactedReportSummary.acceptance === "accepted" ? "Accepted in the quality review" : "Submitted — not accepted while you were assigned") : t("No report from your assignment");
+  const report = t(reportOutcome(h.redactedReportSummary));
+  const completed = h.completedAt ? t("Completed {time}", { time: showDate(h.completedAt, display) }) : t("Completed");
   return {
     title: `${h.jobId.slice(0, 8)} · ${typeLabel(h.type, t)}`, sub: t(isDone ? "Completed — your assignment ended with the job" : "Your assignment on this job has ended"),
     rows: [
-      [t("Status"), isDone ? (h.completedAt ? t("Completed {time}", { time: showDate(h.completedAt, display) }) : t("Completed")) : t("{status} when your assignment ended", { status: statusWord(h.status, t) })],
+      [t("Status"), isDone ? completed : t("{status} when your assignment ended", { status: statusWord(h.status, t) })],
       [t("Your report"), report], [t("Assignment ended"), showTime(h.asOf, display)],
     ] as [string, string][],
-    note: t(isDone ? "Your time is free for other jobs. The report, the unit and its devices stay with HQ and the customer."
-      : (h.status === "cancelled" ? "The job was cancelled, so the job details and the unit are no longer shown to you."
-      : "Your work window ended, or HQ or your coordinator changed the assignment, so the job details and the unit are no longer shown to you.")), // the snapshot does not say which (IR590)
+    note: t(endedNote(h.status)), // the snapshot does not say which (IR590)
     back: t("Overview"),
   };
 }

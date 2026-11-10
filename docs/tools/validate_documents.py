@@ -378,8 +378,8 @@ opnames = unique(operations, 'operation', 'operation')
 opmap = {row['operation']: row for row in operations}
 types = (ROOT / '02-design/service-contracts.ts').read_text()
 typed = {name:(input_, result, mode) for name,input_,result,mode in re.findall(r"^  '([^']+)': \{input:(.*);result:(.*);mode:'(read|write)'\};$", types, re.M)}
-if set(typed) != opnames or len(operations) != 212:  # IR612 members.unavailability + members.clearUnavailability, IR437 jobs.getAttachment, IR436 certificates.getContent, IR214 automations.delete, IR216 commands.list, IR238 filterCare.getSettings, IR327 alerts.evidence, IR349 attachments.list, IR379 notifications.markAllRead, IR384 members.revokeSessions
-    fail('212 operation/TypeScript contract keys differ')
+if set(typed) != opnames or len(operations) != 225:  # IR657 members.delete, IR656 baselines.delete + factors.delete + mrv.deleteDraft, IR655 plans.delete + rateCards.delete, IR654 customers.delete + contractors.delete + organizations.delete, IR653 firmwareCampaigns.delete, IR652 devices.unbind + devices.delete + capabilities.delete, IR648 voice.resolveIntent removed, IR635 devices.setMqttNode, IR612 members.unavailability + members.clearUnavailability, IR437 jobs.getAttachment, IR436 certificates.getContent, IR214 automations.delete, IR216 commands.list, IR238 filterCare.getSettings, IR327 alerts.evidence, IR349 attachments.list, IR379 notifications.markAllRead, IR384 members.revokeSessions
+    fail('225 operation/TypeScript contract keys differ')
 for row in operations:
     name = row['operation']
     if typed.get(name) != (row['input_contract'], row['result_contract'], row['mode']):
@@ -719,11 +719,6 @@ for sid, dependencies in {'SCR-A05':{'units.list','units.get'}, 'SCR-A08':{'invo
 a09=next(x for x in screens if x['screen_id']=='SCR-A09')
 if a09['primary_queries'] != 'restrictions.list' or 'restriction.override' not in a09['entry']:
     fail('Override-only list entry inaccessible')
-voice=next((x for x in components if x['component']=='VoiceContainer'), None)
-if voice is None or not {'jobs.list','jobs.get','units.get','commands.create'} <= set(voice['api_dependency'].split(';')):
-    fail('Voice command context dependencies missing')
-if not next(x for x in components if x['component']=='VoicePanel')['api_dependency'].startswith('none'):
-    fail('VoicePanel must be presentation only (IR90)')
 if not any(a['permissions']==['restriction.override'] for a in fixture['actors']):
     fail('Override-only fixture missing')
 for path in markdown:
@@ -1126,7 +1121,7 @@ for sid in ['SCR-T02','SCR-T04','SCR-T07','SCR-T10','SCR-T11']:
 for sid, keys in {'SCR-A13':{'unitIds','baselineId'}, 'SCR-A11':{'policyId'}, 'SCR-A05':{'policyId'}}.items():
     if not keys <= set(screen_by_id[sid]['url_selection'].split(',')):
         fail('IR90 URL keys missing '+sid)
-for name in ['KpiCard','VoiceContainer']:
+for name in ['KpiCard']:
     if not any(c['component']==name for c in components):
         fail('IR90 component contract missing '+name)
 if 'refreshing' not in (ROOT/'02-design/deterministic-contracts.md').read_text():
@@ -1181,6 +1176,8 @@ AP = fixture.get('acceptancePatches', {})
 acceptance_text = ''.join((ROOT/f'01-requirements/{r}.md').read_text() for r in ['common','client','contractor','technician','admin']) + (ROOT/'04-agentic-sdlc/verification.md').read_text()
 acceptance_csv_text = ''.join(p.read_text() for p in sorted((ROOT/'04-agentic-sdlc').glob('acceptance-*.csv')))  # IR97
 referenced_keys = set(re.findall(r'\["((?:AT-|shared:)[^"]+)"\]', acceptance_text + acceptance_csv_text.replace('""','"'))) | set(re.findall(r'acceptancePatches (AT-[A-Za-z0-9.\-]*[A-Za-z0-9])', acceptance_csv_text))
+WITHDRAWN_CASES = {'AT-X02-B'}  # IR648: FR-X02 (the assistant) was withdrawn; earlier acceptance records still name it
+referenced_keys -= WITHDRAWN_CASES
 case_keys = {k for k in AP if k.startswith('AT-')}
 for key in sorted(referenced_keys - set(AP)):
     fail('Acceptance patch key missing (IR92) '+key)
@@ -1188,6 +1185,7 @@ for key in sorted(case_keys - referenced_keys):
     fail('Acceptance patch not referenced by acceptance text (IR92) '+key)
 ir92 = resolution[resolution.index('## IR92 '):resolution.index('## IR93 ')] if '## IR92 ' in resolution and '## IR93 ' in resolution else ''
 listed = set(re.findall(r'AT-(?:[A-Z]\d\d|REV\d\d|G\d{3})-[A-Z0-9]+(?:\.\d)?', ir92.split('6. ')[1].split('\n')[0])) if '6. ' in ir92 else set()
+listed -= WITHDRAWN_CASES
 if listed != case_keys:
     fail('IR92 acceptance patch case list differs from fixture: '+str(sorted(listed ^ case_keys)))
 def _instant(value):
@@ -1345,7 +1343,7 @@ if seed:
     if 'sensor-tamper-co2' not in json.dumps(AP.get('AT-A12-N', {})):
         fail('AT-A12-N CO2 sensor patch absent (IR97)')
 common_req = (ROOT/'01-requirements/common.md').read_text()
-if '### Concrete common acceptance criteria' not in common_req or any(f'| AT-X0{i}-{k} |' not in common_req for i in range(1,9) for k in 'NEB'):
+if '### Concrete common acceptance criteria' not in common_req or any(f'| AT-X0{i}-{k} |' not in common_req for i in range(1,9) if i != 2 for k in 'NEB'):  # AT-X02 was withdrawn with FR-X02 (IR648)
     fail('Common acceptance table absent (IR101)')
 if 'summaries.get' not in screen_by_id['SCR-C08']['operations'].split(';') or 'jobId' not in screen_by_id['SCR-P03']['url_selection'].split(','):
     fail('IR102 screen contract missing (SCR-C08 summaries.get / SCR-P03 jobId)')

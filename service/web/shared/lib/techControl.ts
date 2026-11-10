@@ -3,11 +3,13 @@
 // (DiagnosticRun states, IR139), the capability, restriction and authorization texts and a refused write in words.
 // Pure code shared by the Server Component and the client view; Vitest covers it. Texts in the display language (`i`
 // / `t`, IR286); instants in the user's display time zone (IR44). Command codes (“set_mode = cool”) stay codes.
-import { EN, showClock, showSpan, translator, type I18n, type T } from "@ac/web/lib/i18n";
+import { EN, showClock, showSpan, translator, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import { actionMessage } from "@ac/web/lib/actionMessage";
 import type { UnitAction } from "@ac/web/lib/contracts.gen";
 import { FAN_LABEL, MODE_LABEL, type ApiUnitDetail, type CommandAction } from "@ac/web/lib/units";
 import { airNumber } from "@ac/web/lib/air";
+import { lookup } from "@ac/web/lib/lookup";
+import type { ActionGroup } from "@ac/web/lib/clientAutomations";
 
 const en = translator("en");
 
@@ -45,23 +47,51 @@ export function actionCode(a: CommandAction): string {
   }
 }
 /** A test run's start or end action: “Power ON” in words, the other settings as their code. */
-export const actionWord = (a: UnitAction, t: T = en) => (a.kind === "set_power" ? t(a.power ? "Power ON" : "Power OFF") : actionCode(a));
+export function actionWord(a: UnitAction, t: T = en): string {
+  if (a.kind !== "set_power") return actionCode(a);
+  return t(a.power ? "Power ON" : "Power OFF");
+}
+
+/** The action key a select of the unit's options starts at: `key` when the unit offers it, otherwise the first offered
+one, which is what the select shows — a ventilation-only model has no power, and its test run must not send power on
+(IR701). With no options at all the key stays. */
+export function offeredKey(options: readonly ActionGroup[], key: string): string {
+  const offered = options.flatMap((g) => g.options.map((o) => o.key));
+  return offered.includes(key) ? key : offered[0] ?? key;
+}
 
 /** One history row: what was sent, its device outcome and the badge. Test-run commands name their run. */
 export interface HistoryRow { id: string; at: string; title: string; sub: string; badge: { text: string; tone: "ok" | "warn" | "crit" | "muted" | "primary" }; run: boolean }
+const runStartTitle = (run: ApiRun, t: T): string => t("test run start ({action}, {n} min)", { action: actionWord(run.startAction, t), n: run.durationMinutes });
+const runEndTitle = (run: ApiRun, t: T): string => t("test run end ({action})", { action: actionWord(run.endAction, t) });
+/** What became of a command: acknowledged when, rejected (with the device's code), no response, cancelled or waiting. */
+function commandOutcome(c: ApiCommandRow, i: I18n): string {
+  const { t } = i;
+  switch (c.status) {
+    case "acknowledged": { return t("acknowledged {time}", { time: clock(c.acknowledgedAt, i) }); }
+    case "failed": { return c.failureCode ? t("rejected by the device ({code})", { code: c.failureCode }) : t("rejected by the device"); }
+    case "expired": { return t("no device response (expired)"); }
+    case "cancelled": { return t("cancelled"); }
+    default: { return t("waiting for the device"); }
+  }
+}
+const COMMAND_BADGE = new Map<string, { text: string; tone: "ok" | "crit" | "muted" }>([
+  ["acknowledged", { text: "Acked", tone: "ok" }], ["failed", { text: "Rejected", tone: "crit" }], ["expired", { text: "No response", tone: "crit" }], ["cancelled", { text: "Cancelled", tone: "muted" }],
+]);
+function commandBadge(status: string, t: T): HistoryRow["badge"] {
+  const b = COMMAND_BADGE.get(status);
+  return b ? { text: t(b.text), tone: b.tone } : { text: t("Waiting"), tone: "warn" };
+}
 export function historyRows(cs: ApiCommandRow[], runs: ApiRun[], i: I18n = EN): HistoryRow[] {
   const { t } = i;
   return cs.map((c) => {
     const run = runs.find((r) => r.startCommandId === c.id || r.endCommandId === c.id);
     const isStart = !!run && run.startCommandId === c.id;
-    const title = run ? (isStart ? t("test run start ({action}, {n} min)", { action: actionWord(run.startAction, t), n: run.durationMinutes }) : t("test run end ({action})", { action: actionWord(run.endAction, t) })) : actionCode(c.action);
-    const outcome = c.status === "acknowledged" ? t("acknowledged {time}", { time: clock(c.acknowledgedAt, i) })
-      : c.status === "failed" ? (c.failureCode ? t("rejected by the device ({code})", { code: c.failureCode }) : t("rejected by the device"))
-      : c.status === "expired" ? t("no device response (expired)") : t(c.status === "cancelled" ? "cancelled" : "waiting for the device");
-    const ends = isStart && run?.state === "running" && run.endAt ? ` · ${t("ends {time}", { time: clock(run.endAt, i) })}` : "";
-    const badge = isStart && run?.state === "running" ? { text: t("Running"), tone: "primary" as const }
-      : c.status === "acknowledged" ? { text: t("Acked"), tone: "ok" as const } : c.status === "failed" ? { text: t("Rejected"), tone: "crit" as const }
-      : c.status === "expired" ? { text: t("No response"), tone: "crit" as const } : c.status === "cancelled" ? { text: t("Cancelled"), tone: "muted" as const } : { text: t("Waiting"), tone: "warn" as const };
+    let title = actionCode(c.action);
+    if (run) title = isStart ? runStartTitle(run, t) : runEndTitle(run, t);
+    const outcome = commandOutcome(c, i);
+    const ends = isStart && run.state === "running" && run.endAt ? ` · ${t("ends {time}", { time: clock(run.endAt, i) })}` : "";
+    const badge = isStart && run.state === "running" ? { text: t("Running"), tone: "primary" as const } : commandBadge(c.status, t);
     return { id: c.id, at: clock(c.requestedAt, i), sub: `${c.id.slice(0, 8)} · ${outcome}${ends}`, run: !!run, title, badge };
   });
 }
@@ -97,24 +127,26 @@ export function runBanner(r: ApiRun | null, i: I18n = EN): { tone: "primary" | "
 export const runActive = (r: ApiRun | null) => !!r && (r.state === "awaiting_start" || r.state === "running" || r.state === "end_requested");
 
 const QUALITY: Record<string, string> = { stale: "stale", suspect: "suspect", missing: "missing" };
-const word = (v: string, labels: Record<string, string>, t: T) => (labels[v] ? t(labels[v]) : v.charAt(0).toUpperCase() + v.slice(1));
+const word = (v: string, labels: Record<string, string>, t: T) => (textOf(labels, v, t) ?? (v.charAt(0).toUpperCase() + v.slice(1)));
 /** The current state tiles (Figma: Power, Mode, Setpoint, Fan, Room). */
 export function stateTiles(d: { observedState: { power: boolean | null; celsius: number | null; mode: string | null; fanLevel: string | null; observedAt: string | null };
   latestMeasurements: { metric: string; value: number | null; quality: string }[] }, t: T = en): { label: string; value: string; warn?: boolean }[] {
   const o = d.observedState;
   const room = d.latestMeasurements.find((m) => m.metric === "temperature");
+  const powerText = o.power ? "On" : "Off";
+  const roomQuality = !room || room.quality === "valid" ? "" : ` (${t(lookup(QUALITY, room.quality) ?? room.quality)})`;
   return [
-    { label: t("Power"), value: o.power === null ? t("Unknown") : t(o.power ? "On" : "Off") },
+    { label: t("Power"), value: t(o.power === null ? "Unknown" : powerText) },
     { label: t("Mode"), value: o.mode ? word(o.mode, MODE_LABEL, t) : "—" },
     { label: t("Setpoint"), value: o.celsius === null ? "—" : `${String(o.celsius)} °C` },
     { label: t("Fan"), value: o.fanLevel ? word(o.fanLevel, FAN_LABEL, t) : "—" },
-    { label: t("Room"), value: room && room.value !== null ? `${airNumber("temperature", room.value)} °C${room.quality === "valid" ? "" : ` (${t(QUALITY[room.quality] ?? room.quality)})`}` : "—", warn: !!room && room.value !== null && room.value >= 30 },
+    { label: t("Room"), value: room && room.value !== null ? `${airNumber("temperature", room.value)} °C${roomQuality}` : "—", warn: !!room && room.value !== null && room.value >= 30 },
   ];
 }
 export const observedText = (iso: string | null, i: I18n = EN) => (iso ? i.t("observed {time}", { time: clock(iso, i) }) : i.t("no observation yet"));
 const CONNECTION: Record<string, string> = { online: "Online", offline: "Offline", unknown: "Unknown", connecting: "Connecting", error: "Error" };
 /** The unit's connection after the capability text (“Connection: Online.”). */
-export const connectionText = (c: string, t: T = en) => t("Connection: {state}.", { state: CONNECTION[c] ? t(CONNECTION[c]) : c });
+export const connectionText = (c: string, t: T = en) => t("Connection: {state}.", { state: textOf(CONNECTION, c, t) ?? c });
 /** The work window as one span in the display time zone. */
 export const windowText = (from: string, to: string, i: I18n = EN) => showSpan(from, to, i.display);
 
@@ -130,12 +162,13 @@ export function capabilityText(d: Pick<ApiUnitDetail, "capabilities" | "capabili
 /** The active restriction in words: none, a minimum setpoint or power off only. */
 export function restrictionText(d: Pick<ApiUnitDetail, "effectiveControlPolicy">, t: T = en): string | null {
   const p = d.effectiveControlPolicy.state === "restricted" ? d.effectiveControlPolicy.policy : null;
-  return p ? (p.kind === "temperature_limit" ? t("min {celsius} °C", { celsius: p.minimumCoolingSetpoint }) : t("power off only")) : null;
+  if (!p) return null;
+  return p.kind === "temperature_limit" ? t("min {celsius} °C", { celsius: p.minimumCoolingSetpoint }) : t("power off only");
 }
 const BLOCKED: Record<string, string> = { "control.reconciliation_required": "the unit must be reconciled after a restriction" };
 /** Why control is blocked now, in words (controlAvailability). */
 export const blockedText = (d: Pick<ApiUnitDetail, "controlAvailability">, t: T = en) =>
-  d.controlAvailability.state === "blocked" ? (BLOCKED[d.controlAvailability.reasonKey] ? t(BLOCKED[d.controlAvailability.reasonKey]) : d.controlAvailability.reasonKey.replace(/^(errors?|control)\./, "").replaceAll('_', " ")) : null;
+  d.controlAvailability.state === "blocked" ? (textOf(BLOCKED, d.controlAvailability.reasonKey, t) ?? d.controlAvailability.reasonKey.replace(/^(errors?|control)\./, "").replaceAll('_', " ")) : null;
 
 const REFUSED: Record<string, string> = {
   "errors.restriction_active": "The active restriction does not allow this action (for example a setpoint below its minimum).",
@@ -153,9 +186,10 @@ const CODES: Record<string, string> = {
 /** The DomainError of a refused diagnostic write, in the words of Figma Technician 02 (IR46 / IR47 / D04); null for a
 VALIDATION that only marks fields. */
 export function refusal(f: { code: string; messageKey: string; retryAfterSeconds?: number | null }, t: T = en): string | null {
-  if (REFUSED[f.messageKey]) return t(REFUSED[f.messageKey]);
-  return CODES[f.code] ? t(CODES[f.code]) : (f.code === "VALIDATION" ? null : actionMessage({ ...f, fieldErrors: {} }, t)); // the write limit's wait (IR380)
+  const known = REFUSED[f.messageKey];
+  if (known) return t(known);
+  return textOf(CODES, f.code, t) ?? (f.code === "VALIDATION" ? null : actionMessage({ ...f, fieldErrors: {} }, t)); // the write limit's wait (IR380)
 }
 const FIELD: Record<string, string> = { "error.length": "1–1000 characters", "error.required": "Required", "error.range": "1–15 minutes", "error.unsupportedAction": "Not supported by this AC", "error.invalid": "Not valid" };
 /** A field error of the Core API in words. */
-export const fieldText = (key: string, t: T = en) => (FIELD[key] ? t(FIELD[key]) : key.replace(/^errors?\./, "").replaceAll('_', " "));
+export const fieldText = (key: string, t: T = en) => (textOf(FIELD, key, t) ?? key.replace(/^errors?\./, "").replaceAll('_', " "));

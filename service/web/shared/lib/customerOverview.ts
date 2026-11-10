@@ -5,18 +5,22 @@
 // card. Pure code shared by the Server Component and the client view; texts and times in the user's display language and
 // time zone (`i`, IR260), the period note in Asia/Kuala_Lumpur, where the periods are cut.
 import { alertTitle, type ApiAlert } from "@ac/web/lib/alerts";
-import { EN, intlTag, relativeTime, showClock, showTime, type I18n } from "@ac/web/lib/i18n";
+import { EN, intlTag, relativeTime, showClock, showSpan, showTime, type I18n } from "@ac/web/lib/i18n";
 import { airNumber, type ApiMeasurement } from "@ac/web/lib/air";
 import type { ApiPropertyRow, ApiUnitRow } from "@ac/web/lib/assets";
 import type { ApiEnergySummary } from "@ac/web/lib/energy";
 import type { IconName } from "@ac/web/components/Icon";
+import { byText } from "@ac/web/lib/order";
+import { runState } from "@ac/web/lib/units";
+import { entryOf } from "@ac/web/lib/lookup";
+
+const KL = "Asia/Kuala_Lumpur";
 
 export type OverviewPeriod = "today" | "7d" | "30d";
 export const OVERVIEW_PERIODS: { id: OverviewPeriod; label: string }[] = [{ id: "today", label: "Today" }, { id: "7d", label: "7d" }, { id: "30d", label: "30d" }];
 export const periodOf = (v?: string): OverviewPeriod => (v === "7d" || v === "30d" ? v : "today");
 export type OverviewUnit = ApiUnitRow & { latestMeasurements: ApiMeasurement[] };
 
-const KL = "Asia/Kuala_Lumpur";
 const hm = (iso: string) => new Date(iso).toLocaleTimeString("en-GB", { timeZone: KL, hour: "2-digit", minute: "2-digit", hour12: false });
 const md = (iso: string, i: I18n) => new Date(iso).toLocaleDateString(intlTag(i.display.locale), { timeZone: KL, month: "short", day: "numeric" });
 const one = (v: number) => (Math.round(v * 10) / 10).toFixed(1);
@@ -25,12 +29,13 @@ const one = (v: number) => (Math.round(v * 10) / 10).toFixed(1);
 export function overviewScope(units: OverviewUnit[], properties: ApiPropertyRow[], q: { propertyId?: string; unitId?: string }) {
   const props = properties.filter((p) => !p.archived);
   const live = units.filter((u) => !u.archived && props.some((p) => p.id === u.propertyId));
-  const propertyId = props.some((p) => p.id === q.propertyId) ? q.propertyId! : null;
-  const inProperty = live.filter((u) => !propertyId || u.propertyId === propertyId).sort((a, b) => a.displayName.localeCompare(b.displayName));
-  const unitId = inProperty.some((u) => u.id === q.unitId) ? q.unitId! : null;
+  const property = props.find((p) => p.id === q.propertyId);
+  const propertyId = property?.id ?? null;
+  const inProperty = live.filter((u) => !propertyId || u.propertyId === propertyId).toSorted((a, b) => a.displayName.localeCompare(b.displayName));
+  const unitId = inProperty.find((u) => u.id === q.unitId)?.id ?? null;
   return {
     propertyId, unitId, inProperty, scope: unitId ? inProperty.filter((u) => u.id === unitId) : inProperty,
-    propertyName: propertyId ? props.find((p) => p.id === propertyId)!.name : null,
+    propertyName: property?.name ?? null,
   };
 }
 
@@ -39,7 +44,7 @@ export const periodLabel: Record<OverviewPeriod, string> = { today: "Today", "7d
 /** “Today = 00:00–09:12 · Asia/Kuala_Lumpur” (the period the energy figures cover; the periods are Kuala Lumpur days). */
 export function periodNote(kind: OverviewPeriod, p: { from: string; to: string }, i: I18n = EN): string {
   return kind === "today" ? i.t("Today = {from}–{to} · {zone}", { from: hm(p.from), to: hm(p.to), zone: KL })
-    : i.t("{period} = {from} – {to} · {zone}", { period: i.t(periodLabel[kind]), from: `${md(p.from, i)} ${hm(p.from)}`, to: `${md(p.to, i)} ${hm(p.to)}`, zone: KL });
+    : i.t("{period} = {from} – {to} · {zone}", { period: i.t(entryOf(periodLabel, kind)), from: `${md(p.from, i)} ${hm(p.from)}`, to: `${md(p.to, i)} ${hm(p.to)}`, zone: KL });
 }
 /** The period of the same length that ends where this one starts. */
 export function previousRange(p: { from: string; to: string }): { from: string; to: string } {
@@ -48,24 +53,33 @@ export function previousRange(p: { from: string; to: string }): { from: string; 
 }
 
 const latestOf = (u: OverviewUnit, metric: string) => u.latestMeasurements.find((m) => m.metric === metric);
-const current = (m?: ApiMeasurement) => (m && m.quality === "valid" && m.value !== null ? m.value : null);
+const current = (m?: ApiMeasurement) => (m?.quality === "valid" && m.value !== null ? m.value : null);
 
 export interface OverviewRow {
   id: string; name: string; place: string; observed: string; temp: string | null; hum: string | null; power: string | null;
   state: "running" | "stopped" | "unknown"; conn: "online" | "offline" | "connecting" | "unknown" | "error";
 }
+/** Down for less energy than before, up for more, a dash for the same. */
+function trendIcon(delta: number): IconName {
+  if (delta < 0) return "arrowDown";
+  return delta > 0 ? "arrowUp" : "remove";
+}
 /** One row per unit: the latest valid room temperature, humidity and power (W); missing readings stay empty. */
 export function overviewRows(units: OverviewUnit[], place: (u: OverviewUnit) => string, i: I18n = EN): OverviewRow[] {
   return units.map((u) => {
     const t = latestOf(u, "temperature"), h = latestOf(u, "humidity"), p = latestOf(u, "power");
-    const last = [t, h, p].filter((m): m is ApiMeasurement => !!m).map((m) => m.observedAt).sort().at(-1);
-    const watts = current(p) === null ? null : Math.round(p!.unit === "kW" ? p!.value! * 1000 : p!.value!);
+    const last = [t, h, p].filter((m): m is ApiMeasurement => !!m).map((m) => m.observedAt).toSorted(byText).at(-1);
+    const power = current(p), temperature = current(t), humidity = current(h);
+    const perUnit = p?.unit === "kW" ? 1000 : 1;
+    const watts = power === null ? null : Math.round(power * perUnit);
+    const reading = last ? showClock(last, i.display) : i.t("no reading yet");
+    const seen = u.lastSeenAt ? showTime(u.lastSeenAt, i.display) : i.t("never");
     return {
       id: u.id, name: u.displayName, place: place(u),
-      observed: u.connection === "online" ? (last ? showClock(last, i.display) : i.t("no reading yet")) : i.t("last seen {when}", { when: u.lastSeenAt ? showTime(u.lastSeenAt, i.display) : i.t("never") }),
-      temp: current(t) === null ? null : airNumber("temperature", current(t)!), hum: current(h) === null ? null : airNumber("humidity", current(h)!),
+      observed: u.connection === "online" ? reading : i.t("last seen {when}", { when: seen }),
+      temp: temperature === null ? null : airNumber("temperature", temperature), hum: humidity === null ? null : airNumber("humidity", humidity),
       power: watts === null ? null : String(watts),
-      state: u.effectivePowerState === "on" ? "running" : (u.effectivePowerState === "off" ? "stopped" : "unknown"), conn: u.connection,
+      state: runState(u.effectivePowerState), conn: u.connection,
     };
   });
 }
@@ -74,13 +88,13 @@ export interface EnergyCard { sub: string; total: string | null; delta: { text: 
 const previousName: Record<OverviewPeriod, string> = { today: "yesterday at this time", "7d": "the 7 days before", "30d": "the 30 days before" };
 /** The energy card: the period's kWh and its change against the previous period; bars for the last 7 days (dark)
 against the 7 days before (light). A missing value is never a 0 kWh total. */
-export function energyCard(kind: OverviewPeriod, cur: ApiEnergySummary | null, prev: ApiEnergySummary | null, week: { label: string; kWh: number | null }[], before: (number | null)[], scope: string, i: I18n = EN): EnergyCard {
-  const total = cur?.totals.kWh ?? null;
+export function energyCard(kind: OverviewPeriod, selected: ApiEnergySummary | null, prev: ApiEnergySummary | null, week: { label: string; kWh: number | null }[], before: (number | null)[], scope: string, i: I18n = EN): EnergyCard {
+  const total = selected?.totals.kWh ?? null;
   const was = prev?.totals.kWh ?? null;
   const delta = total !== null && was !== null && was > 0 ? Math.round(((total - was) / was) * 100) : null;
   return {
-    sub: `${i.t(periodLabel[kind])} · ${scope}`, total: total === null ? null : one(total),
-    delta: delta === null ? null : { text: i.t("{pct}% vs {previous} ({kWh} kWh)", { pct: Math.abs(delta), previous: i.t(previousName[kind]), kWh: one(was!) }), icon: delta < 0 ? "arrowDown" : (delta > 0 ? "arrowUp" : "remove"), tone: delta <= 0 ? "ok" : "warn" },
+    sub: `${i.t(entryOf(periodLabel, kind))} · ${scope}`, total: total === null ? null : one(total),
+    delta: delta === null || was === null ? null : { text: i.t("{pct}% vs {previous} ({kWh} kWh)", { pct: Math.abs(delta), previous: i.t(entryOf(previousName, kind)), kWh: one(was) }), icon: trendIcon(delta), tone: delta <= 0 ? "ok" : "warn" },
     labels: week.map((d) => d.label), series: [before.map((v) => v ?? 0), week.map((d) => d.kWh ?? 0)], gaps: week.some((d) => d.kWh === null) || before.includes(null),
   };
 }
@@ -88,13 +102,14 @@ export function energyCard(kind: OverviewPeriod, cur: ApiEnergySummary | null, p
 export interface EmissionsCard { total: string | null; factor: string | null; baseline: string | null; saved: string | null }
 /** Estimated emissions of the period (the factor of energy.summary) and, with a comparable baseline, its emissions and
 the estimated saving — an estimate, never a tradable balance. */
-export function emissionsCard(cur: ApiEnergySummary | null, baselineLabel: string | null, i: I18n = EN): EmissionsCard {
-  const e = cur?.totals.emissionsKg ?? null;
-  const saved = cur?.totals.savedEmissionsKg ?? null;
-  const f = cur?.factorSnapshot ?? null;
+export function emissionsCard(selected: ApiEnergySummary | null, baselineLabel: string | null, i: I18n = EN): EmissionsCard {
+  const e = selected?.totals.emissionsKg ?? null;
+  const saved = selected?.totals.savedEmissionsKg ?? null;
+  const f = selected?.factorSnapshot ?? null;
+  const label = baselineLabel ? ` (${baselineLabel})` : "";
   return {
     total: e === null ? null : one(e), factor: f ? i.t("{region} {year} · {factor} kgCO₂e/kWh (demo factor)", { region: f.region, year: f.year, factor: f.kgCO2ePerKWh }) : null,
-    baseline: e === null || saved === null ? null : `${one(e + saved)} kgCO₂e${baselineLabel ? ` (${baselineLabel})` : ""}`, saved: saved === null ? null : `${one(saved)} kgCO₂e`,
+    baseline: e === null || saved === null ? null : `${one(e + saved)} kgCO₂e${label}`, saved: saved === null ? null : `${one(saved)} kgCO₂e`,
   };
 }
 
@@ -108,11 +123,11 @@ unresolved information (normal severity) is counted separately and never in the 
 export function attentionCard(alerts: ApiAlert[], units: OverviewUnit[], nowMs: number, max = 3, i: I18n = EN): AttentionCard {
   const names = new Map(units.map((u) => [u.id, u.displayName]));
   const open = alerts.filter((a) => names.has(a.unitId) && a.status !== "resolved");
-  const warn = open.filter((a) => a.severity !== "normal").sort((a, b) => rank[a.severity] - rank[b.severity] || b.detectedAt.localeCompare(a.detectedAt));
+  const warn = open.filter((a): a is ApiAlert & { severity: "critical" | "warning" } => a.severity !== "normal").toSorted((a, b) => rank[a.severity] - rank[b.severity] || b.detectedAt.localeCompare(a.detectedAt));
   const info = open.filter((a) => a.severity === "normal");
   const titles = [...new Set(info.map((a) => alertTitle(a, i.t).toLowerCase()))];
   return {
-    items: warn.slice(0, max).map((a) => ({ id: a.id, title: alertTitle(a, i.t), severity: a.severity as "critical" | "warning", where: `${names.get(a.unitId)} · ${whenText(a.detectedAt, nowMs, i)}` })),
+    items: warn.slice(0, max).map((a) => ({ id: a.id, title: alertTitle(a, i.t), severity: a.severity, where: `${names.get(a.unitId) ?? "—"} · ${whenText(a.detectedAt, nowMs, i)}` })),
     more: Math.max(0, warn.length - max), info: { count: info.length, text: titles.join(", ") },
   };
 }
@@ -120,6 +135,9 @@ export function attentionCard(alerts: ApiAlert[], units: OverviewUnit[], nowMs: 
 /** The air card's 24 points: the hourly averages of the valid CO2 readings of the last 24 hours, whole (bucketMinutes 60,
 IR607), rounded; an hour without a valid reading stays empty. */
 export const bucketPoints = (buckets: { value: number | null }[]): (number | null)[] => buckets.map((b) => (b.value === null ? null : Math.round(b.value)));
+
+/** The tooltip heading of each hourly point of the air card: the hour as a span in the display time zone (IR689). */
+export const bucketTimes = (buckets: { start: string }[], i: I18n = EN): string[] => buckets.map((b) => showSpan(b.start, new Date(Date.parse(b.start) + 3_600_000).toISOString(), i.display, true));
 
 /** “today 6:00 pm MYT”, “tomorrow 7:30 am MYT”, else the date and time — the next run of a schedule rule (IR260). */
 export const nextRunText = (iso: string, nowMs: number, i: I18n = EN) => relativeTime(iso, nowMs, i);

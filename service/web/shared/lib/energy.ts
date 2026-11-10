@@ -1,8 +1,13 @@
 // Energy analysis (FR-A13, FR-C06, DATA_SOURCE=API): energy.summary and baselines projected for the screens, with the
 // IR68 savings wording and the IR44 number rules. Pure code shared by Server Components and client views; texts in the
 // display language (`t` / `i`, IR265). Numbers keep the en-MY format, which ms-MY shares.
-import { EN, translator, type I18n, type T } from "@ac/web/lib/i18n";
+import { EN, translator, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import type { OpInput } from "@ac/web/lib/opTypes";
+import { codePoints } from "@ac/web/lib/text";
+import { isBefore } from "@ac/web/lib/order";
+
+const DEMO_FIXED = "demo_fixed";
+const KL = "Asia/Kuala_Lumpur";
 
 const en = translator("en");
 
@@ -27,12 +32,18 @@ export function roundAway(x: number, digits: number): number {
 const nf = (digits: number) => new Intl.NumberFormat("en-MY", { minimumFractionDigits: digits, maximumFractionDigits: digits });
 /** One decimal (energy, percentages, kgCO₂e). */
 export const one = (x: number) => nf(1).format(roundAway(x, 1));
+/** A baseline's total, or why there is none. */
+function baselineValue(b: { baselineKWh: number | null } | null | undefined, tr: T): string {
+  if (!b) return tr("No baseline");
+  return b.baselineKWh === null ? tr("No value") : `${one(b.baselineKWh)} kWh`;
+}
 /** Coverage (0–1) as a percentage, rounded as one() rounds, except that coverage below 1 never shows as 100: a
 period missing even one reading must not read 100.0% next to the partial-coverage warning. `digits` 0 is whole. */
 export function coveragePct(coverage: number, digits: 0 | 1 = 1): string {
   const x = coverage * 100;
   const shown = digits === 1 ? roundAway(x, 1) : Math.round(x);
-  const value = coverage < 1 && shown >= 100 ? (digits === 1 ? 99.9 : 99) : shown;
+  const below100 = digits === 1 ? 99.9 : 99; // incomplete coverage never rounds up to 100 %
+  const value = coverage < 1 && shown >= 100 ? below100 : shown;
   return digits === 1 ? nf(1).format(value) : String(value);
 }
 /** An amount in minor units as "120.00 MYR". */
@@ -61,7 +72,6 @@ export interface ApiEnergySummary {
   tariffVersion: string; boundaryId: BoundaryId; boundary: string; coverage: number | null; qualityWarnings: string[];
 }
 
-const KL = "Asia/Kuala_Lumpur";
 export const klStamp = (iso: string) =>
   new Date(iso).toLocaleString("en-CA", { timeZone: KL, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).replace(",", "");
 /** An instant as the datetime-local value in Kuala Lumpur ("2026-09-14T08:00"). */
@@ -77,13 +87,13 @@ const warningText: Record<string, string> = {
   factor_missing: "Emission factor missing — emissions cannot be calculated",
   boundary_mismatch: "Boundary differs from the baseline",
 };
-export const warning = (code: string, t: T = en) => (warningText[code] ? t(warningText[code]) : code);
+export const warning = (code: string, t: T = en) => (textOf(warningText, code, t) ?? code);
 // The same warnings in a few words, for a badge; a code without a label still reads as words (IR577)
 const warningShortText: Record<string, string> = {
   partial_coverage: "Partial coverage", baseline_not_comparable: "Baseline not comparable", modeled_baseline: "Modeled baseline", prorated_modeled_baseline: "Prorated baseline",
   prorated_forecast: "Prorated forecast", factor_missing: "Emission factor missing", boundary_mismatch: "Boundary differs", baseline_unavailable: "Baseline not set", no_units: "No target equipment",
 };
-export const warningShort = (code: string, t: T = en) => (warningShortText[code] ? t(warningShortText[code]) : code.replaceAll('_', " "));
+export const warningShort = (code: string, t: T = en) => (textOf(warningShortText, code, t) ?? code.replaceAll('_', " "));
 
 export interface SummaryView {
   actual: string; baseline: string; difference: string; percent: string; cost: string; savedCost: string; emissions: string; savedEmissions: string;
@@ -98,7 +108,7 @@ export function summaryView(s: ApiEnergySummary, i: I18n = EN): SummaryView {
   const f = s.factorSnapshot;
   return {
     actual: t.kWh === null ? tr("No valid readings") : `${one(t.kWh)} kWh`,
-    baseline: b ? (b.baselineKWh === null ? tr("No value") : `${one(b.baselineKWh)} kWh`) : tr("No baseline"),
+    baseline: baselineValue(b, tr),
     difference: saving(t.savedKWh, " kWh", one, tr), percent: saving(t.savingPercentage, "%", one, tr),
     cost: t.amountMinor === null ? "—" : amount(t.amountMinor, s.currency),
     savedCost: t.savedAmountMinor === null ? tr("Cannot calculate") : saving(t.savedAmountMinor, "", (x) => amount(x, s.currency), tr),
@@ -130,28 +140,33 @@ export function baselineRows(bs: ApiBaseline[], t: T = en): BaselineRow[] {
 export interface BaselineDraft { unitIds: string[]; from: string; to: string; method: ApiBaseline["method"]; baselineKWh: string; boundaryId: BoundaryId; boundary: string; assumptions: string; source: string }
 export function baselineDraft(b?: ApiBaseline): BaselineDraft {
   return {
-    unitIds: b?.unitIds ?? [], from: b ? klLocal(b.period.from) : "", to: b ? klLocal(b.period.to) : "", method: b?.method ?? "demo_fixed",
+    unitIds: b?.unitIds ?? [], from: b ? klLocal(b.period.from) : "", to: b ? klLocal(b.period.to) : "", method: b?.method ?? DEMO_FIXED,
     baselineKWh: b?.baselineKWh === null || b?.baselineKWh === undefined ? "" : String(b.baselineKWh), boundaryId: b?.boundaryId ?? "ac_input_electricity",
     boundary: b?.boundary ?? "", assumptions: b?.assumptions ?? "", source: b?.source ?? "",
   };
 }
+/** periodError words what is wrong with a period of two dates, or is undefined: an empty period is not an end before its start (IR586). */
+export function periodError(from: string, to: string, t: T): string | undefined {
+  if (!from || !to) return t("Enter the start and the end");
+  return isBefore(from, to) ? undefined : t("The end must be after the start");
+}
+
 /** baselines.save rules (IR baselines.save item 3) checked before the call, worded in the display language; the API
 checks them again. */
 export function baselineErrors(d: BaselineDraft, t: T = en): Record<string, string> {
   const e: Record<string, string> = {};
   if (d.unitIds.length === 0 || d.unitIds.length > 100) e.unitIds = t("Choose 1–100 units");
-  if (!d.from || !d.to) e.period = t("Enter the start and the end"); // an empty period is not an end before its start (IR586)
-  else if (d.from >= d.to) e.period = t("The end must be after the start");
-  else if (Date.parse(klInstant(d.to)) - Date.parse(klInstant(d.from)) > 366 * 24 * 3600 * 1000) e.period = t("At most 366 days");
-  if (d.method === "demo_fixed" && !(d.baselineKWh.trim() !== "" && Number.isFinite(+d.baselineKWh) && +d.baselineKWh >= 0)) e.baselineKWh = t("A value ≥ 0 kWh");
+  const period = periodError(d.from, d.to, t) ?? (Date.parse(klInstant(d.to)) - Date.parse(klInstant(d.from)) > 366 * 24 * 3600 * 1000 ? t("At most 366 days") : undefined);
+  if (period) e.period = period;
+  if (d.method === DEMO_FIXED && !(d.baselineKWh.trim() !== "" && Number.isFinite(Number(d.baselineKWh)) && Number(d.baselineKWh) >= 0)) e.baselineKWh = t("A value ≥ 0 kWh");
   if (d.method === "demo_period_comparison" && d.boundaryId === "whole_building_electricity") e.boundaryId = t("Period comparison measures AC input electricity only");
-  if ([...d.boundary.trim()].length === 0 || d.boundary.length > 500) e.boundary = t("1–500 characters");
-  if ([...d.assumptions.trim()].length === 0 || d.assumptions.length > 2000) e.assumptions = t("1–2000 characters");
-  if ([...d.source.trim()].length === 0 || d.source.length > 500) e.source = t("1–500 characters");
+  if (codePoints(d.boundary.trim()) === 0 || d.boundary.length > 500) e.boundary = t("1–500 characters");
+  if (codePoints(d.assumptions.trim()) === 0 || d.assumptions.length > 2000) e.assumptions = t("1–2000 characters");
+  if (codePoints(d.source.trim()) === 0 || d.source.length > 500) e.source = t("1–500 characters");
   return e;
 }
 export function baselineInput(d: BaselineDraft, id?: string): OpInput<"baselines.save"> {
   const base = { ...(id && { id }), unitIds: d.unitIds, period: { from: klInstant(d.from), to: klInstant(d.to) }, boundaryId: d.boundaryId, boundary: d.boundary.trim(), assumptions: d.assumptions.trim(), source: d.source.trim() };
   // a fixed baseline carries its kWh; a period comparison computes it (the contract's two cases)
-  return d.method === "demo_fixed" ? { ...base, method: "demo_fixed", baselineKWh: Number(d.baselineKWh) } : { ...base, method: "demo_period_comparison" };
+  return d.method === DEMO_FIXED ? { ...base, method: DEMO_FIXED, baselineKWh: Number(d.baselineKWh) } : { ...base, method: "demo_period_comparison" };
 }

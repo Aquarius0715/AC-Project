@@ -1,4 +1,22 @@
 "use client";
+const TIME_PROPOSED = "time_proposed";
+const CONTRACTOR = "contractor";
+const PREVENTIVE = "Preventive";
+const TECHNICIAN = "technician";
+const KEY = "ac-jobs-v2";
+const NKEY = "ac-job-notes-v2";
+const SKEY = "ac-job-notes-seed-read-v1";
+const BEDROOM_LOC = "Home A › 1F › Bedroom";
+const WIN_AFTERNOON = "14:00–16:00";
+const WIN_LATE_MORNING = "10:00–12:00";
+const WIN_MORNING = "09:00–11:00";
+const DAY_0915 = "2026-09-15";
+const TECH_INTERNAL_A = "tech-internal-a";
+const CONTRACTOR_A = "contractor-a";
+const UNIT_NON_RTO = "unit-non-rto";
+const LIVING_UNIT = "Living room AC";
+const LIVING_LOC = "Home A › 1F › Living room";
+const PLAN_LIVING_A = "plan-living-a";
 
 /**
 Shared maintenance-job mock store (IR113). All four roles read and write the same jobs, so a
@@ -8,15 +26,21 @@ seed, FR-X05). Phase 1A only: with DATA_SOURCE=API the job screens write through
 stay local and return their refusals at once.
 */
 import { useSyncExternalStore } from "react";
-import { readDemo, writeDemo } from "@ac/web/lib/demoStore";
+import { z } from "@ac/web/lib/zod";
+import { readDemoAs, writeDemo } from "@ac/web/lib/demoStore";
+import { oneOf } from "@ac/web/lib/oneOf";
 import { useOp } from "@ac/web/lib/useOp";
+import { wrapped } from "@ac/web/lib/text";
+import { isBefore } from "@ac/web/lib/order";
+import { lookup } from "@ac/web/lib/lookup";
 
 export interface Slot { date: string; win: string }
 export type Origin = "request" | "plan";
-export type JobStatus = "requested" | "time_proposed" | "offered" | "accepted" | "assigned" | "in_progress" | "submitted" | "rework_requested" | "completed" | "cancelled" | "on_hold";
-export interface Proposal { by: "hq" | "contractor"; slot: Slot; who: string; message: string; replyBy: string; status: "pending" | "accepted" | "declined" | "withdrawn" }
-export interface PartnerProposal { slot: Slot; tech: string; reason: string; sentAt: string; status: "pending" | "sent_to_client" | "rejected" | "approved" | "withdrawn" }
-export interface TechAck { status: "pending" | "accepted" | "cant_make"; reason?: string; alt?: string; at?: string }
+export const jobStatuses = ["requested", TIME_PROPOSED, "offered", "accepted", "assigned", "in_progress", "submitted", "rework_requested", "completed", "cancelled", "on_hold"] as const;
+export type JobStatus = (typeof jobStatuses)[number];
+interface Proposal { by: "hq" | "contractor"; slot: Slot; who: string; message: string; replyBy: string; status: "pending" | "accepted" | "declined" | "withdrawn" }
+interface PartnerProposal { slot: Slot; tech: string; reason: string; sentAt: string; status: "pending" | "sent_to_client" | "rejected" | "approved" | "withdrawn" }
+interface TechAck { status: "pending" | "accepted" | "cant_make"; reason?: string; alt?: string; at?: string }
 export interface Job {
   id: string;
   unitId: string;
@@ -51,9 +75,27 @@ export interface Job {
 }
 export interface Note { id: string; role: "client" | "admin" | "contractor" | "technician"; title: string; detail: string; href: string; at: string; read: boolean }
 
-const KEY = "ac-jobs-v2";
-const NKEY = "ac-job-notes-v2";
-export const NOW = "09-22 11:05";
+/* What the tab may have saved (read back with these shapes; anything else brings back the seed). */
+const slot = z.object({ date: z.string(), win: z.string() }) satisfies z.ZodType<Slot>;
+const techAck = z.object({ status: z.enum(["pending", "accepted", "cant_make"]), reason: z.string().optional(), alt: z.string().optional(), at: z.string().optional() }) satisfies z.ZodType<TechAck>;
+const proposal = z.object({ slot, by: z.enum(["hq", CONTRACTOR]), who: z.string(), message: z.string(), replyBy: z.string(), status: z.enum(["pending", "accepted", "declined", "withdrawn"]) }) satisfies z.ZodType<Proposal>;
+const partnerProposal = z.object({ slot, tech: z.string(), reason: z.string(), sentAt: z.string(), status: z.enum(["pending", "sent_to_client", "rejected", "approved", "withdrawn"]) }) satisfies z.ZodType<PartnerProposal>;
+const declined = z.object({ reason: z.string(), comment: z.string(), at: z.string() });
+const historyEntry = z.object({ at: z.string(), text: z.string() });
+const clientNote = z.object({ by: z.string(), text: z.string(), at: z.string() });
+const job = z.object({
+  id: z.string(), unitId: z.string(), unit: z.string(), loc: z.string(), customer: z.string(), origin: z.enum(["request", "plan"]),
+  type: z.enum(["Reactive", PREVENTIVE, "Periodic"]), planId: z.string().optional(), planVisit: z.string().optional(), symptom: z.string(),
+  status: z.enum(jobStatuses), preferred: z.array(slot), round: z.number(), scheduled: slot.nullable(), delivery: z.enum(["internal", CONTRACTOR]).nullable(),
+  contractor: z.string().nullable(), technician: z.string().nullable(), techAck: techAck.nullable(), proposal: proposal.nullable(), partnerProposal: partnerProposal.nullable(),
+  declined: declined.nullable(), history: z.array(historyEntry), notes: z.array(clientNote).optional(),
+  followUpOf: z.string().optional(), followUpClass: z.enum(["pending", "rework", "new_request"]).optional(), followUpReason: z.string().optional(), rating: z.number().optional(),
+}) satisfies z.ZodType<Job>;
+const note = z.object({
+  id: z.string(), role: z.enum(["client", "admin", CONTRACTOR, TECHNICIAN]), title: z.string(), detail: z.string(), href: z.string(), at: z.string(), read: z.boolean(),
+}) satisfies z.ZodType<Note>;
+
+const NOW = "09-22 11:05";
 
 const req = (id: string, p: Partial<Job> & Pick<Job, "unitId" | "unit" | "loc" | "type" | "symptom" | "status">): Job => {
   return {
@@ -62,29 +104,29 @@ const req = (id: string, p: Partial<Job> & Pick<Job, "unitId" | "unit" | "loc" |
 };
 
 export const SEED: Job[] = [
-  req("job-c07", { unitId: "unit-bedroom-2", unit: "Bedroom AC #2", loc: "Home A › 1F › Bedroom", type: "Reactive", symptom: "Cold air is weak and there is water dripping from the indoor unit.", status: "requested",
-    preferred: [{ date: "2026-09-28", win: "14:00–16:00" }, { date: "2026-09-29", win: "10:00–12:00" }, { date: "2026-09-30", win: "09:00–11:00" }],
+  req("job-c07", { unitId: "unit-bedroom-2", unit: "Bedroom AC #2", loc: BEDROOM_LOC, type: "Reactive", symptom: "Cold air is weak and there is water dripping from the indoor unit.", status: "requested",
+    preferred: [{ date: "2026-09-28", win: WIN_AFTERNOON }, { date: "2026-09-29", win: WIN_LATE_MORNING }, { date: "2026-09-30", win: WIN_MORNING }],
     history: [{ at: "09-22 09:14", text: "customer-a submitted the request with 3 preferred times" }] }),
-  req("job-c04", { unitId: "unit-online-rto", unit: "Bedroom AC", loc: "Home A › 1F › Bedroom", type: "Reactive", symptom: "AC is making a rattling noise and airflow feels weaker than usual since yesterday evening.", status: "in_progress",
-    preferred: [{ date: "2026-09-15", win: "10:00–12:00" }, { date: "2026-09-16", win: "14:00–16:00" }, { date: "2026-09-17", win: "09:00–11:00" }], scheduled: { date: "2026-09-15", win: "10:00–12:00" }, delivery: "internal", technician: "tech-internal-a", techAck: { status: "accepted", at: "09-14 21:05" },
+  req("job-c04", { unitId: "unit-online-rto", unit: "Bedroom AC", loc: BEDROOM_LOC, type: "Reactive", symptom: "AC is making a rattling noise and airflow feels weaker than usual since yesterday evening.", status: "in_progress",
+    preferred: [{ date: DAY_0915, win: WIN_LATE_MORNING }, { date: "2026-09-16", win: WIN_AFTERNOON }, { date: "2026-09-17", win: WIN_MORNING }], scheduled: { date: DAY_0915, win: WIN_LATE_MORNING }, delivery: "internal", technician: TECH_INTERNAL_A, techAck: { status: "accepted", at: "09-14 21:05" },
     history: [{ at: "09-14 20:10", text: "Requested with 3 preferred times" }, { at: "09-14 21:00", text: "HQ booked the 1st preferred time · tech-internal-a" }, { at: "09-15 10:05", text: "Technician on site" }] }),
-  req("job-c05", { unitId: "unit-kitchen-a", unit: "Kitchen AC", loc: "Home A › 1F › Kitchen", type: "Preventive", symptom: "Yearly preventive check before the hot season.", status: "assigned",
-    preferred: [{ date: "2026-09-25", win: "09:00–11:00" }, { date: "2026-09-26", win: "09:00–11:00" }, { date: "2026-09-28", win: "09:00–11:00" }], scheduled: { date: "2026-09-25", win: "09:00–11:00" }, delivery: "contractor", contractor: "contractor-a", technician: "tech-external-a2", techAck: { status: "accepted", at: "09-21 08:30" },
+  req("job-c05", { unitId: "unit-kitchen-a", unit: "Kitchen AC", loc: "Home A › 1F › Kitchen", type: PREVENTIVE, symptom: "Yearly preventive check before the hot season.", status: "assigned",
+    preferred: [{ date: "2026-09-25", win: WIN_MORNING }, { date: "2026-09-26", win: WIN_MORNING }, { date: "2026-09-28", win: WIN_MORNING }], scheduled: { date: "2026-09-25", win: WIN_MORNING }, delivery: CONTRACTOR, contractor: CONTRACTOR_A, technician: "tech-external-a2", techAck: { status: "accepted", at: "09-21 08:30" },
     history: [{ at: "09-20 10:00", text: "Requested with 3 preferred times" }, { at: "09-20 11:00", text: "Offered to contractor-a at the 1st preferred time" }, { at: "09-21 08:30", text: "tech-external-a2 accepted the assignment" }] }),
-  req("job-c03", { unitId: "unit-non-rto", unit: "Living room AC", loc: "Home A › 1F › Living room", type: "Reactive", symptom: "Unit trips the breaker after 10 minutes.", status: "rework_requested", scheduled: { date: "2026-08-22", win: "14:00–16:00" }, delivery: "internal", technician: "tech-internal-a", techAck: { status: "accepted" },
+  req("job-c03", { unitId: UNIT_NON_RTO, unit: LIVING_UNIT, loc: LIVING_LOC, type: "Reactive", symptom: "Unit trips the breaker after 10 minutes.", status: "rework_requested", scheduled: { date: "2026-08-22", win: WIN_AFTERNOON }, delivery: "internal", technician: TECH_INTERNAL_A, techAck: { status: "accepted" },
     history: [{ at: "08-22 16:30", text: "Report returned by HQ for rework" }] }),
-  req("job-c02", { unitId: "unit-non-rto", unit: "Living room AC", loc: "Home A › 1F › Living room", origin: "plan", planId: "plan-living-a", planVisit: "3 of 4", type: "Periodic", symptom: "Periodic inspection & filter cleaning", status: "completed", scheduled: { date: "2026-09-08", win: "09:00–11:00" }, delivery: "internal", technician: "tech-internal-b", techAck: { status: "accepted" },
+  req("job-c02", { unitId: UNIT_NON_RTO, unit: LIVING_UNIT, loc: LIVING_LOC, origin: "plan", planId: PLAN_LIVING_A, planVisit: "3 of 4", type: "Periodic", symptom: "Periodic inspection & filter cleaning", status: "completed", scheduled: { date: "2026-09-08", win: WIN_MORNING }, delivery: "internal", technician: "tech-internal-b", techAck: { status: "accepted" },
     history: [{ at: "09-08 15:00", text: "Report accepted by HQ" }] }),
-  req("job-c08", { unitId: "unit-non-rto", unit: "Living room AC", loc: "Home A › 1F › Living room", origin: "plan", planId: "plan-living-a", planVisit: "4 of 4", type: "Periodic", symptom: "Periodic inspection & filter cleaning", status: "assigned", scheduled: { date: "2026-12-08", win: "09:00–11:00" }, delivery: "internal", technician: "tech-internal-b", techAck: { status: "accepted", at: "11-09 09:00" },
+  req("job-c08", { unitId: UNIT_NON_RTO, unit: LIVING_UNIT, loc: LIVING_LOC, origin: "plan", planId: PLAN_LIVING_A, planVisit: "4 of 4", type: "Periodic", symptom: "Periodic inspection & filter cleaning", status: "assigned", scheduled: { date: "2026-12-08", win: WIN_MORNING }, delivery: "internal", technician: "tech-internal-b", techAck: { status: "accepted", at: "11-09 09:00" },
     history: [{ at: "11-08 09:00", text: "Generated from plan-living-a · client notified" }] }),
   req("job-c01", { unitId: "unit-study-a", unit: "Study AC", loc: "Home A › 2F › Study", type: "Reactive", symptom: "Unit shows offline.", status: "cancelled", history: [{ at: "09-02 10:00", text: "Cancelled by client · resolved itself" }] }),
-  req("job-internal-a", { unitId: "unit-online-rto", unit: "Bedroom AC", loc: "Home A › 1F › Bedroom", type: "Reactive", symptom: "Unit shows offline since 08:12.", status: "requested",
-    preferred: [{ date: "2026-09-24", win: "10:00–12:00" }, { date: "2026-10-05", win: "14:00–16:00" }, { date: "2026-10-06", win: "10:00–12:00" }], history: [{ at: "09-14 08:20", text: "Requested by HQ on behalf of customer-a (phone)" }] }),
-  req("job-a11", { unitId: "unit-p-rooftop", unit: "Rooftop unit", loc: "Office B › Roof", customer: "customer-b", type: "Reactive", symptom: "Loud compressor noise.", status: "offered", scheduled: { date: "2026-09-24", win: "09:00–12:00" }, delivery: "contractor", contractor: "contractor-a",
+  req("job-internal-a", { unitId: "unit-online-rto", unit: "Bedroom AC", loc: BEDROOM_LOC, type: "Reactive", symptom: "Unit shows offline since 08:12.", status: "requested",
+    preferred: [{ date: "2026-09-24", win: WIN_LATE_MORNING }, { date: "2026-10-05", win: WIN_AFTERNOON }, { date: "2026-10-06", win: WIN_LATE_MORNING }], history: [{ at: "09-14 08:20", text: "Requested by HQ on behalf of customer-a (phone)" }] }),
+  req("job-a11", { unitId: "unit-p-rooftop", unit: "Rooftop unit", loc: "Office B › Roof", customer: "customer-b", type: "Reactive", symptom: "Loud compressor noise.", status: "offered", scheduled: { date: "2026-09-24", win: "09:00–12:00" }, delivery: CONTRACTOR, contractor: CONTRACTOR_A,
     history: [{ at: "09-21 09:00", text: "Re-offered to contractor-a after decline" }] }),
-  req("job-a06", { unitId: "unit-non-rto", unit: "Living room AC", loc: "Home A › 1F › Living room", origin: "plan", planId: "plan-living-a", planVisit: "Jun occurrence (2 of 4, visit moved to Sep 15)", type: "Periodic", symptom: "Periodic filter cleaning", status: "submitted", scheduled: { date: "2026-09-15", win: "10:00–12:00" }, delivery: "internal", technician: "tech-internal-a", techAck: { status: "accepted" },
+  req("job-a06", { unitId: UNIT_NON_RTO, unit: LIVING_UNIT, loc: LIVING_LOC, origin: "plan", planId: PLAN_LIVING_A, planVisit: "Jun occurrence (2 of 4, visit moved to Sep 15)", type: "Periodic", symptom: "Periodic filter cleaning", status: "submitted", scheduled: { date: DAY_0915, win: WIN_LATE_MORNING }, delivery: "internal", technician: TECH_INTERNAL_A, techAck: { status: "accepted" },
     history: [{ at: "09-15 11:48", text: "Report v1 submitted" }] }),
-  req("job-p09", { unitId: "unit-p-lobby", unit: "Lobby AC", loc: "Level 2 lobby", customer: "customer-b", origin: "plan", planId: "plan-lobby-b", planVisit: "quarterly", type: "Periodic", symptom: "Quarterly inspection", status: "submitted", scheduled: { date: "2026-09-16", win: "10:00–12:00" }, delivery: "contractor", contractor: "contractor-a", technician: "tech-external-a", techAck: { status: "accepted" },
+  req("job-p09", { unitId: "unit-p-lobby", unit: "Lobby AC", loc: "Level 2 lobby", customer: "customer-b", origin: "plan", planId: "plan-lobby-b", planVisit: "quarterly", type: "Periodic", symptom: "Quarterly inspection", status: "submitted", scheduled: { date: "2026-09-16", win: WIN_LATE_MORNING }, delivery: CONTRACTOR, contractor: CONTRACTOR_A, technician: "tech-external-a", techAck: { status: "accepted" },
     history: [{ at: "09-19 16:00", text: "Report v1 submitted · awaiting contractor review" }] }),
 ];
 
@@ -92,29 +134,31 @@ export const SEED: Job[] = [
 export interface Fit { hq: string; partner: string; fits: "none" | "internal" | "contractor" | "both" }
 export function fitFor(s: Slot): Fit {
   const d = s.date;
-  if (d < "2026-10-01") return { hq: "tech-internal-a: booked · tech-internal-b: not qualified (refrigerant)", partner: "contractor-a: no free hours · contractor-b: outside service area", fits: "none" };
+  if (isBefore(d, "2026-10-01")) return { hq: "tech-internal-a: booked · tech-internal-b: not qualified (refrigerant)", partner: "contractor-a: no free hours · contractor-b: outside service area", fits: "none" };
   if (d === "2026-10-02") return { hq: "tech-internal-a: overlaps job-c04 follow-up", partner: "contractor-a: tech-external-a fully booked", fits: "none" };
-  const isInternal = s.win.startsWith("14") && d >= "2026-10-01";
-  return { hq: isInternal ? "tech-internal-a: free (refrigerant qualified)" : "tech-internal-b: not qualified", partner: "contractor-a: tech-external-a free", fits: isInternal ? "both" : "contractor" };
+  const isInternal = s.win.startsWith("14") && !isBefore(d, "2026-10-01");
+  return { hq: isInternal ? "tech-internal-a: free (refrigerant qualified)" : "tech-internal-b: not qualified", partner: "contractor-a: tech-external-a free", fits: isInternal ? "both" : CONTRACTOR };
 }
 
 /* ---------- store ---------- */
-interface State { jobs: Job[]; notes: Note[] }
+interface State { jobs: Job[]; notes: Note[]; seedRead: string[] }
 let state: State | null = null;
 const listeners = new Set<() => void>();
 const load = (): State => {
   if (state) return state;
-  state = { jobs: readDemo<Job[]>(KEY) ?? SEED, notes: readDemo<Note[]>(NKEY) ?? [] };
+  state = { jobs: readDemoAs(KEY, z.array(job)) ?? SEED, notes: readDemoAs(NKEY, z.array(note)) ?? [], seedRead: readDemoAs(SKEY, z.array(z.string())) ?? [] };
   return state;
 };
 const save = () => {
-  writeDemo(KEY, state!.jobs);
-  writeDemo(NKEY, state!.notes);
+  const s = load();
+  writeDemo(KEY, s.jobs);
+  writeDemo(NKEY, s.notes);
+  writeDemo(SKEY, s.seedRead);
   listeners.forEach((l) => { l(); });
 };
-const SERVER: State = { jobs: SEED, notes: [] };
+const SERVER: State = { jobs: SEED, notes: [], seedRead: [] };
 const subscribe = (l: () => void) => { listeners.add(l); return () => listeners.delete(l); };
-export function useJobStore() {
+function useJobStore() {
   return useSyncExternalStore(subscribe, load, () => SERVER);
 }
 /** JobSummary / Offer / History projections of jobs.list (IR23, IR124), the fields the job screens read. */
@@ -124,11 +168,11 @@ interface ApiJob { projection: "summary" | "offer" | "history"; id?: string; job
 
 const klDate = (iso: string) => new Date(new Date(iso).getTime() + 8 * 3_600_000).toISOString();
 const slotOf = (s: ApiSlot | null | undefined): Slot | null => (s ? { date: klDate(s.startAt).slice(0, 10), win: `${klDate(s.startAt).slice(11, 16)}–${klDate(s.endAt).slice(11, 16)}` } : null);
-const typeLabel: Record<string, Job["type"]> = { reactive: "Reactive", preventive: "Preventive", periodic: "Periodic" };
+const typeLabel: Record<string, Job["type"]> = { reactive: "Reactive", preventive: PREVENTIVE, periodic: "Periodic" };
 
 function jobFromApi(j: ApiJob): Job {
   const id = j.id ?? j.jobId ?? "";
-  const status = (j.displayStatus === "time_proposed" ? "time_proposed" : j.status) as JobStatus;
+  const status = oneOf(jobStatuses, j.displayStatus === TIME_PROPOSED ? TIME_PROPOSED : j.status, "requested"); // an unknown status reads as a new request
   return {
     id,
     status,
@@ -137,9 +181,9 @@ function jobFromApi(j: ApiJob): Job {
     loc: "",
     customer: "",
     origin: j.origin === "periodic_plan" ? "plan" : "request",
-    type: typeLabel[j.type] ?? "Reactive",
+    type: lookup(typeLabel, j.type) ?? "Reactive",
     symptom: "",
-    preferred: (j.preferredSlots ?? []).map((x) => slotOf(x)!),
+    preferred: (j.preferredSlots ?? []).map((x) => slotOf(x)).filter((s): s is Slot => s !== null),
     round: 1,
     scheduled: slotOf(j.scheduledSlot ?? (j.projection === "offer" ? j.requestedSlot : null)),
     delivery: null,
@@ -156,11 +200,26 @@ function jobFromApi(j: ApiJob): Job {
 /** Jobs for the screens: the shared demo store in mock mode, jobs.list (caller projection) with DATA_SOURCE=API. */
 export const useJobs = () => {
   const local = useJobStore().jobs;
-  return useOp<{ items: ApiJob[] }, Job[]>("jobs.list", { limit: 100 }, local, (p) => p.items.map(jobFromApi)).data;
+  return useOp<{ items: ApiJob[] }, Job[]>("jobs.list", { limit: 100 }, local, (p) => p.items.map((item) => jobFromApi(item))).data;
 };
 /** Non-React read (tests, scripts). */
 export const getJobState = () => load();
-export const useNotes = (role: Note["role"]) => useJobStore().notes.filter((n) => n.role === role);
+interface DemoInboxRow { id: string; t: string; d: string; w: string; read: boolean; href: string }
+/** The fixed rows of the demo inbox (every role sees them, Phase 1A); their read state lives in the store, so the
+sidebar badge and the inbox count the same unread notifications. */
+const DEMO_INBOX: readonly DemoInboxRow[] = [
+  { id: "s1", t: "Alert opened on Bedroom AC", d: "alert-window-a · unresolved · linked evidence available", w: "09:12 today", read: false, href: "" },
+  { id: "s2", t: "Work report accepted — job-c02", d: "Quality-reviewed report now visible", w: "Yesterday, 17:20", read: false, href: "" },
+  { id: "s3", t: "Invoice inv-0231 is now unpaid", d: "Read · restriction notice pending", w: "2 days ago", read: false, href: "" },
+  { id: "s4", t: "Session extended by 30 minutes", d: "System · read", w: "3 days ago", read: true, href: "" },
+];
+/** The demo inbox of a role: its own notices, then the fixed rows with the ones read here marked read. */
+export function useDemoInbox(role: Note["role"]) {
+  const { notes, seedRead } = useJobStore();
+  const fixed = DEMO_INBOX.map((r) => ({ ...r, read: r.read || seedRead.includes(r.id) }));
+  const own = notes.filter((n) => n.role === role);
+  return { own, fixed, unread: own.filter((n) => !n.read).length + fixed.filter((r) => !r.read).length };
+}
 
 function update(id: string, fn: (j: Job) => Partial<Job>, log?: string) {
   const s = load();
@@ -169,7 +228,7 @@ function update(id: string, fn: (j: Job) => Partial<Job>, log?: string) {
 }
 function notify(role: Note["role"], title: string, detail: string, href: string) {
   const s = load();
-  state = { ...s, notes: [{ id: `${String(Date.now())}-${String(Math.random())}`, at: "just now", read: false, role, title, detail, href }, ...s.notes] };
+  state = { ...s, notes: [{ id: crypto.randomUUID(), at: "just now", read: false, role, title, detail, href }, ...s.notes] };
   save();
 }
 export const fmt = (s: Slot | null | undefined) => (s ? `${s.date.slice(5)} · ${s.win}` : "—");
@@ -179,12 +238,14 @@ export const longDate = (s: Slot) => {
 };
 
 export const jobActions = {
-  reset() { state = { jobs: SEED, notes: [] }; save(); },
+  reset() { state = { jobs: SEED, notes: [], seedRead: [] }; save(); },
   markRead(id: string) { const s = load(); state = { ...s, notes: s.notes.map((n) => (n.id === id ? { ...n, read: true } : n)) }; save(); },
+  /** Marks fixed demo inbox rows read (their IDs, see useDemoInbox). */
+  markFixedRead(ids: string[]) { const s = load(); state = { ...s, seedRead: [...new Set([...s.seedRead, ...ids])] }; save(); },
   /** Client: new request with 3 preferred times (FR-C09 / IR113). */
   create(p: { unitId: string; unit: string; loc: string; type: "Reactive" | "Preventive"; symptom: string; preferred: Slot[] }) {
     const s = load();
-    const n = s.jobs.filter((j) => /^job-c\d+$/.test(j.id)).map((j) => +j.id.slice(5)).reduce((a, b) => Math.max(a, b), 0) + 1;
+    const n = Math.max(0, ...s.jobs.filter((j) => /^job-c\d+$/.test(j.id)).map((j) => Number(j.id.slice(5)))) + 1;
     const id = `job-c${String(n).padStart(2, "0")}`;
     state = { ...s, jobs: [req(id, { ...p, status: "requested", history: [{ at: NOW, text: "customer-a submitted the request with 3 preferred times" }] }), ...s.jobs] };
     save();
@@ -193,20 +254,20 @@ export const jobActions = {
   },
   cancel(id: string, reason: string) { update(id, () => ({ status: "cancelled", proposal: null }), `Cancelled by client · ${reason}`); notify("admin", `${id} cancelled by the client`, reason, `/admin/jobs?jobId=${id}`); },
   /** HQ: book one of the client's own times — no client approval needed. */
-  book(id: string, slot: Slot, delivery: "internal" | "contractor", who: string) {
+  book(id: string, visit: Slot, delivery: "internal" | "contractor", who: string) {
     if (delivery === "internal") {
-      update(id, () => ({ status: "assigned", scheduled: slot, technician: who, contractor: null, techAck: { status: "pending" }, proposal: null, delivery }), `HQ booked ${fmt(slot)} · assigned ${who}`);
-      notify("technician", `New assignment ${id}`, `${fmt(slot)} — accept or tell HQ you can’t make it`, `/technician/jobs/${id}`);
+      update(id, () => ({ status: "assigned", scheduled: visit, technician: who, contractor: null, techAck: { status: "pending" }, proposal: null, delivery }), `HQ booked ${fmt(visit)} · assigned ${who}`);
+      notify(TECHNICIAN, `New assignment ${id}`, `${fmt(visit)} — accept or tell HQ you can’t make it`, `/technician/jobs/${id}`);
     } else {
-      update(id, () => ({ status: "offered", scheduled: slot, contractor: who, technician: null, techAck: null, proposal: null, partnerProposal: null, delivery }), `HQ offered ${id} to ${who} at ${fmt(slot)}`);
-      notify("contractor", `New offer ${id}`, `Visit time fixed: ${fmt(slot)} — accept, decline or propose another time`, `/partner/jobs/${id}`);
+      update(id, () => ({ status: "offered", scheduled: visit, contractor: who, technician: null, techAck: null, proposal: null, partnerProposal: null, delivery }), `HQ offered ${id} to ${who} at ${fmt(visit)}`);
+      notify(CONTRACTOR, `New offer ${id}`, `Visit time fixed: ${fmt(visit)} — accept, decline or propose another time`, `/partner/jobs/${id}`);
     }
-    notify("client", `Booked: ${id}`, `${fmt(slot)} — one of your preferred times`, `/customer/maintenance?jobId=${id}`);
+    notify("client", `Booked: ${id}`, `${fmt(visit)} — one of your preferred times`, `/customer/maintenance?jobId=${id}`);
   },
   /** HQ: none of the preferred times fits → propose another time (client must accept). */
-  propose(id: string, slot: Slot, who: string, message: string, replyBy: string) {
-    update(id, () => ({ status: "time_proposed", proposal: { by: "hq", status: "pending", slot, who, message, replyBy } }), `HQ proposed ${fmt(slot)} (${who} held) · reply by ${replyBy}`);
-    notify("client", `HQ proposed a new time for ${id}`, `${longDate(slot)} — accept or decline by ${replyBy}`, `/customer/maintenance?jobId=${id}`);
+  propose(id: string, visit: Slot, who: string, message: string, replyBy: string) {
+    update(id, () => ({ status: TIME_PROPOSED, proposal: { by: "hq", status: "pending", slot: visit, who, message, replyBy } }), `HQ proposed ${fmt(visit)} (${who} held) · reply by ${replyBy}`);
+    notify("client", `HQ proposed a new time for ${id}`, `${longDate(visit)} — accept or decline by ${replyBy}`, `/customer/maintenance?jobId=${id}`);
   },
   withdraw(id: string) { update(id, (j) => ({ status: "requested", proposal: j.proposal ? { ...j.proposal, status: "withdrawn" } : null }), "HQ withdrew the proposal"); notify("client", `Proposal withdrawn — ${id}`, "HQ will contact you again", `/customer/maintenance?jobId=${id}`); },
   /** Client accepts a proposed time → booked automatically with the held partner. */
@@ -214,15 +275,15 @@ export const jobActions = {
     const j = load().jobs.find((x) => x.id === id);
     if (!j?.proposal) return;
     const p = j.proposal;
-    if (p.by === "contractor") {
-      update(id, () => ({ status: "offered", scheduled: p.slot, proposal: { ...p, status: "accepted" }, partnerProposal: j.partnerProposal ? { ...j.partnerProposal, status: "approved" } : null }), `Client approved ${fmt(p.slot)} proposed by ${j.contractor}`);
-      notify("contractor", `Client approved your time for ${id}`, `${fmt(p.slot)} — accept the offer`, `/partner/jobs/${id}`);
-    } else if (p.who.startsWith("contractor")) {
-      update(id, () => ({ status: "offered", scheduled: p.slot, delivery: "contractor", contractor: p.who.split(" ", 1)[0], proposal: { ...p, status: "accepted" } }), `Client accepted ${fmt(p.slot)} → offered to ${p.who.split(" ", 1)[0]}`);
-      notify("contractor", `New offer ${id}`, `Visit time agreed with the client: ${fmt(p.slot)}`, `/partner/jobs/${id}`);
+    if (p.by === CONTRACTOR) {
+      update(id, () => ({ status: "offered", scheduled: p.slot, proposal: { ...p, status: "accepted" }, partnerProposal: j.partnerProposal ? { ...j.partnerProposal, status: "approved" } : null }), `Client approved ${fmt(p.slot)} proposed by ${j.contractor ?? "—"}`);
+      notify(CONTRACTOR, `Client approved your time for ${id}`, `${fmt(p.slot)} — accept the offer`, `/partner/jobs/${id}`);
+    } else if (p.who.startsWith(CONTRACTOR)) {
+      update(id, () => ({ status: "offered", scheduled: p.slot, delivery: CONTRACTOR, contractor: p.who.split(" ", 1)[0] ?? p.who, proposal: { ...p, status: "accepted" } }), `Client accepted ${fmt(p.slot)} → offered to ${p.who.split(" ", 1)[0] ?? p.who}`);
+      notify(CONTRACTOR, `New offer ${id}`, `Visit time agreed with the client: ${fmt(p.slot)}`, `/partner/jobs/${id}`);
     } else {
       update(id, () => ({ status: "assigned", scheduled: p.slot, delivery: "internal", technician: p.who, techAck: { status: "pending" }, proposal: { ...p, status: "accepted" } }), `Client accepted ${fmt(p.slot)} → assigned ${p.who}`);
-      notify("technician", `New assignment ${id}`, `${fmt(p.slot)} — accept or tell HQ you can’t make it`, `/technician/jobs/${id}`);
+      notify(TECHNICIAN, `New assignment ${id}`, `${fmt(p.slot)} — accept or tell HQ you can’t make it`, `/technician/jobs/${id}`);
     }
     notify("admin", `Client accepted the proposed time — ${id}`, fmt(p.slot), `/admin/jobs?jobId=${id}`);
   },
@@ -230,7 +291,7 @@ export const jobActions = {
   decline(id: string, reason: string, comment: string, preferred: Slot[]) {
     update(id, (j) => {
       return {
-        status: j.proposal?.by === "contractor" ? "offered" : "requested",
+        status: j.proposal?.by === CONTRACTOR ? "offered" : "requested",
         round: preferred.length > 0 ? j.round + 1 : j.round,
         preferred: preferred.length > 0 ? preferred : j.preferred,
         declined: { reason, comment, at: NOW },
@@ -238,11 +299,11 @@ export const jobActions = {
         partnerProposal: j.partnerProposal ? { ...j.partnerProposal, status: "rejected" } : null,
       };
     }, `Client declined the proposed time · ${reason}${preferred.length > 0 ? " · sent 3 new times" : ""}`);
-    notify("admin", `Client declined the proposal — ${id}`, `${reason}${comment ? ` — “${comment}”` : ""}`, `/admin/jobs?jobId=${id}`);
+    notify("admin", `Client declined the proposal — ${id}`, `${reason}${wrapped(comment, " — “", "”")}`, `/admin/jobs?jobId=${id}`);
   },
   /** Client asks for another time for a periodic plan visit. */
   requestOther(id: string, preferred: Slot[], comment: string) {
-    update(id, (j) => ({ status: "requested", round: j.round + 1, scheduled: null, technician: null, techAck: null, preferred }), `Client asked for another time${comment ? ` — “${comment}”` : ""}`);
+    update(id, (j) => ({ status: "requested", round: j.round + 1, scheduled: null, technician: null, techAck: null, preferred }), `Client asked for another time${wrapped(comment, " — “", "”")}`);
     notify("admin", `Client asked to move ${id}`, "3 new preferred times", `/admin/jobs?jobId=${id}`);
   },
   /** Client: coordination note on an open job (IR114) — never changes time, assignee or status. */
@@ -252,19 +313,19 @@ export const jobActions = {
     if (!text.trim() || text.length > 2000) return "Write 1–2000 characters";
     update(id, (x) => ({ notes: [...(x.notes ?? []), { by: "customer-a", text: text.trim(), at: NOW }] }), `Client note: “${text.trim()}”`);
     notify("admin", `Client note on ${id}`, text.trim().slice(0, 80), `/admin/jobs?jobId=${id}`);
-    if (j.delivery === "contractor") notify("contractor", `Client note on ${id}`, text.trim().slice(0, 80), `/partner/jobs/${id}`);
-    return;
+    if (j.delivery === CONTRACTOR) notify(CONTRACTOR, `Client note on ${id}`, text.trim().slice(0, 80), `/partner/jobs/${id}`);
+    return null;
   },
   /** Client: “Report a problem” on a completed job → requested follow-up job, pending HQ classification (FR-C17). */
   reportProblem(fromId: string, reason: string, details: string, visit: string) {
     const s = load();
-    const src = s.jobs.find((x) => x.id === fromId);
-    if (!src || src.status !== "completed") return { error: "CONFLICT — only completed jobs can be reported" };
-    const n = s.jobs.filter((j) => /^job-c\d+$/.test(j.id)).map((j) => +j.id.slice(5)).reduce((a, b) => Math.max(a, b), 0) + 1;
+    const source = s.jobs.find((x) => x.id === fromId);
+    if (source?.status !== "completed") return { error: "CONFLICT — only completed jobs can be reported" };
+    const n = Math.max(0, ...s.jobs.filter((j) => /^job-c\d+$/.test(j.id)).map((j) => Number(j.id.slice(5)))) + 1;
     const id = `job-c${String(n).padStart(2, "0")}`;
-    const job = req(id, { unitId: src.unitId, unit: src.unit, loc: src.loc, type: "Reactive", symptom: `${reason} — ${details}`, status: "requested", followUpOf: fromId, followUpClass: "pending",
+    const followUp = req(id, { unitId: source.unitId, unit: source.unit, loc: source.loc, type: "Reactive", symptom: `${reason} — ${details}`, status: "requested", followUpOf: fromId, followUpClass: "pending",
       preferred: visit ? [{ date: visit, win: "09:00–12:00" }] : [], history: [{ at: NOW, text: `customer-a reported a problem on ${fromId} — follow-up created, under HQ review` }] });
-    state = { ...s, jobs: [job, ...s.jobs] };
+    state = { ...s, jobs: [followUp, ...s.jobs] };
     save();
     notify("admin", `Follow-up ${id} of ${fromId}`, "Report a problem — classify as rework or new request within 1 business day", `/admin/jobs?jobId=${id}`);
     return { id };
@@ -272,44 +333,44 @@ export const jobActions = {
   /** HQ: classify a follow-up once (jobs.classifyFollowUp, IR114). */
   classifyFollowUp(id: string, cls: "rework" | "new_request", reason: string) {
     const j = load().jobs.find((x) => x.id === id);
-    if (!j || j.followUpClass !== "pending") return "CONFLICT — already classified";
+    if (j?.followUpClass !== "pending") return "CONFLICT — already classified";
     if (!reason.trim() || reason.length > 1000) return "A reason is required (1–1000 characters)";
     update(id, () => ({ followUpClass: cls, followUpReason: reason.trim() }), `HQ classified the follow-up as ${cls === "rework" ? "rework (free)" : "a new request"} · ${reason.trim()}`);
-    notify("client", `${id}: ${cls === "rework" ? "Rework (free)" : "New request"}`, `HQ reviewed your problem report on ${j.followUpOf}`, `/customer/maintenance?jobId=${id}`);
-    return;
+    notify("client", `${id}: ${cls === "rework" ? "Rework (free)" : "New request"}`, `HQ reviewed your problem report on ${j.followUpOf ?? "—"}`, `/customer/maintenance?jobId=${id}`);
+    return null;
   },
   /* ---- contractor ---- */
   partnerAccept(id: string) { update(id, () => ({ status: "accepted", partnerProposal: null }), "contractor-a accepted the offer"); notify("admin", `contractor-a accepted ${id}`, "assign a technician next", `/admin/jobs?jobId=${id}`); },
   partnerDecline(id: string, reason: string) { update(id, () => ({ status: "requested", contractor: null, delivery: null, scheduled: null }), `contractor-a declined · ${reason}`); notify("admin", `contractor-a declined ${id}`, reason, `/admin/jobs?jobId=${id}`); },
-  partnerPropose(id: string, slot: Slot, tech: string, reason: string) {
-    update(id, () => ({ partnerProposal: { slot, tech, reason, sentAt: NOW, status: "pending" } }), `contractor-a proposed ${fmt(slot)} instead`);
-    notify("admin", `contractor-a proposes another time — ${id}`, `${fmt(slot)} · ${reason}`, `/admin/jobs?jobId=${id}`);
+  partnerPropose(id: string, visit: Slot, tech: string, reason: string) {
+    update(id, () => ({ partnerProposal: { tech, reason, slot: visit, sentAt: NOW, status: "pending" } }), `contractor-a proposed ${fmt(visit)} instead`);
+    notify("admin", `contractor-a proposes another time — ${id}`, `${fmt(visit)} · ${reason}`, `/admin/jobs?jobId=${id}`);
   },
   partnerWithdraw(id: string) { update(id, () => ({ partnerProposal: null }), "contractor-a withdrew its time proposal"); },
   partnerAssign(id: string, tech: string) {
     update(id, () => ({ status: "assigned", technician: tech, techAck: { status: "pending" } }), `contractor-a assigned ${tech}`);
-    notify("technician", `New assignment ${id}`, "accept it or tell contractor-a you can’t make it", `/technician/jobs/${id}`);
+    notify(TECHNICIAN, `New assignment ${id}`, "accept it or tell contractor-a you can’t make it", `/technician/jobs/${id}`);
   },
   /* ---- HQ on a partner proposal ---- */
   forwardPartner(id: string, replyBy: string) {
     const j = load().jobs.find((x) => x.id === id);
     if (!j?.partnerProposal) return;
     const pp = j.partnerProposal;
-    update(id, () => ({ status: "time_proposed", proposal: { by: "contractor", slot: pp.slot, who: `${j.contractor} · ${pp.tech}`, message: pp.reason, status: "pending", replyBy }, partnerProposal: { ...pp, status: "sent_to_client" } }), "HQ sent the partner’s time to the client");
+    update(id, () => ({ status: TIME_PROPOSED, proposal: { by: CONTRACTOR, slot: pp.slot, who: `${j.contractor ?? "—"} · ${pp.tech}`, message: pp.reason, status: "pending", replyBy }, partnerProposal: { ...pp, status: "sent_to_client" } }), "HQ sent the partner’s time to the client");
     notify("client", `Your service partner asks for another time — ${id}`, `${longDate(pp.slot)} — accept or decline`, `/customer/maintenance?jobId=${id}`);
   },
-  keepTime(id: string) { update(id, (j) => ({ partnerProposal: j.partnerProposal ? { ...j.partnerProposal, status: "rejected" } : null }), "HQ kept the agreed time"); notify("contractor", `HQ kept the agreed time — ${id}`, "accept or decline the offer", `/partner/jobs/${id}`); },
+  keepTime(id: string) { update(id, (j) => ({ partnerProposal: j.partnerProposal ? { ...j.partnerProposal, status: "rejected" } : null }), "HQ kept the agreed time"); notify(CONTRACTOR, `HQ kept the agreed time — ${id}`, "accept or decline the offer", `/partner/jobs/${id}`); },
   /* ---- technician ---- */
   techAccept(id: string) {
     const j = load().jobs.find((x) => x.id === id);
-    update(id, () => ({ techAck: { status: "accepted", at: NOW } }), `${j?.technician} accepted the assignment`);
-    notify(j?.delivery === "contractor" ? "contractor" : "admin", `${j?.technician} accepted ${id}`, fmt(j?.scheduled), j?.delivery === "contractor" ? "/partner/schedule" : `/admin/jobs?jobId=${id}`);
-    notify("client", `Technician confirmed — ${id}`, `${j?.technician} · ${fmt(j?.scheduled)}`, `/customer/maintenance?jobId=${id}`);
+    update(id, () => ({ techAck: { status: "accepted", at: NOW } }), `${j?.technician ?? "—"} accepted the assignment`);
+    notify(j?.delivery === CONTRACTOR ? CONTRACTOR : "admin", `${j?.technician ?? "—"} accepted ${id}`, fmt(j?.scheduled), j?.delivery === CONTRACTOR ? "/partner/schedule" : `/admin/jobs?jobId=${id}`);
+    notify("client", `Technician confirmed — ${id}`, `${j?.technician ?? "—"} · ${fmt(j?.scheduled)}`, `/customer/maintenance?jobId=${id}`);
   },
   techCantMake(id: string, reason: string, alt: string) {
     const j = load().jobs.find((x) => x.id === id);
-    update(id, () => ({ techAck: { status: "cant_make", at: NOW, reason, alt } }), `${j?.technician} can’t make the time · ${reason}`);
-    notify(j?.delivery === "contractor" ? "contractor" : "admin", `${j?.technician} can’t make ${id}`, `${reason}${alt ? ` · could do ${alt}` : ""}`, j?.delivery === "contractor" ? "/partner/schedule" : `/admin/jobs?jobId=${id}`);
+    update(id, () => ({ techAck: { status: "cant_make", at: NOW, reason, alt } }), `${j?.technician ?? "—"} can’t make the time · ${reason}`);
+    notify(j?.delivery === CONTRACTOR ? CONTRACTOR : "admin", `${j?.technician ?? "—"} can’t make ${id}`, `${reason}${wrapped(alt, " · could do ")}`, j?.delivery === CONTRACTOR ? "/partner/schedule" : `/admin/jobs?jobId=${id}`);
   },
 };
 

@@ -8,11 +8,12 @@ import { test, expect } from "../../fixtures/test";
 import { APPS } from "../../fixtures/apps";
 import { signIn } from "../../fixtures/auth";
 import { expectAccessible } from "../../fixtures/a11y";
+import { must } from "../../fixtures/must";
 
 test.describe.configure({ timeout: 180_000 });
 
 test("an incomplete report names its issues in words and focuses the first one", async ({ browser }) => {
-  const app = APPS.find((a) => a.id === "technician")!;
+  const app = must(APPS.find((a) => a.id === "technician"));
   const ctx = await browser.newContext({ baseURL: app.url, storageState: { cookies: [], origins: [] }, viewport: { width: 390, height: 844 } });
   const page = await ctx.newPage();
   try {

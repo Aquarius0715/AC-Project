@@ -41,6 +41,9 @@ type Principal struct {
 	// SessionsRevokedAt ends every sign-in before it (members.revokeSessions, IR384): a token whose sign-in time is
 	// earlier is refused. Wall clock, as the identity provider's auth_time is; nil when never revoked.
 	SessionsRevokedAt *time.Time
+	// IssuerHost is the host name of the verified token's issuer: the address this request's sign-in was made on (it is
+	// checked against OIDC_ISSUER, so it cannot be made up, IR695). Empty for work without a user's token.
+	IssuerHost string
 }
 
 // TenantPrincipal is the principal of work that acts for no one in tenant, such as a scheduler transaction or a demo
@@ -57,6 +60,7 @@ func TenantPrincipal(tenant uuid.UUID) *Principal {
 		Employment:        "",
 		Timezone:          "",
 		SessionsRevokedAt: nil,
+		IssuerHost:        "",
 	}
 }
 
@@ -134,6 +138,8 @@ type Operation struct {
 	NewInput func() any
 	Result   reflect.Type // the handler's result type, held to the contract's result by TestResultsMatchContract (IR392)
 	Handle   func(ctx context.Context, c *Call, in any) (any, error)
+	// OwnTx is an operation whose handler opens its own transactions (RegisterOwnTx): the pipeline opens none around it.
+	OwnTx bool
 }
 
 // Runner runs fn in one transaction with the RLS context of the principal (implemented by platform/db).
@@ -363,7 +369,22 @@ func Register[I any, O any](
 
 			return handler(ctx, call, input)
 		},
+		OwnTx: false,
 	}
+}
+
+// RegisterOwnTx registers an operation whose handler opens its own transactions, because it does not know its tenant
+// until it has looked (demo.trigger). The pipeline opens none around it: a handler that asked the pool for a connection
+// while its operation's transaction held one would wait for itself once as many calls ran as the pool has connections.
+// call.Tx is nil in it, and what it records goes in its own transactions.
+func RegisterOwnTx[I any, O any](
+	reg *Registry,
+	name string,
+	handler func(context.Context, *Call, *I) (O, error),
+) {
+	Register(reg, name, handler)
+
+	reg.ops[name].OwnTx = true
 }
 
 // Operations returns the registered operations sorted by name.
@@ -609,6 +630,14 @@ func setAppNow(ctx context.Context, txn pgx.Tx, now time.Time) error {
 	return apperr.Wrap(err, "select set_config")
 }
 
+// tenantCursorSQL is the transaction's tenant's position in the outbox (Meta.eventCursor, D07): the highest sequence
+// of its events, 0 before the first.
+const tenantCursorSQL = `SELECT COALESCE(max(seq), 0) FROM platform.outbox
+	WHERE tenant_id = current_setting('app.tenant_id')::uuid`
+
+// TenantCursor is the query of the transaction's tenant's outbox position, for a result that records it.
+func TenantCursor() string { return tenantCursorSQL }
+
 // metaCorrelationID is the ServiceResult meta field of the correlation ID.
 const metaCorrelationID = "correlationId"
 
@@ -838,12 +867,21 @@ func (r *Registry) execute(
 	input any,
 	write bool,
 ) (any, int64, error) {
+	if operation.OwnTx {
+		out, err := operation.Handle(ctx, call, input)
+
+		return out, 0, apperr.Wrap(err, "ops.Operation.Handle")
+	}
+
 	var (
 		out    any
 		cursor int64
 	)
 
 	err := r.DB.Run(ctx, !write, call.Principal, func(txn pgx.Tx) error {
+		// the database runs this callback again after a deadlock or a serialization failure: what an attempt that was
+		// rolled back emitted and audited is not recorded with the one that commits (IR663)
+		call.Events, call.Audits = nil, nil
 		call.Tx = r.txFor(txn)
 		// business time of this transaction for SQL defaults and platform.app_now() (IR157)
 		if txn != nil {
@@ -869,7 +907,10 @@ func (r *Registry) execute(
 
 		if txn != nil &&
 			call.Principal != nil { // Meta.eventCursor: the tenant's event position of this snapshot (D07)
-			return txn.QueryRow(ctx, `SELECT count(*) FROM platform.outbox`).Scan(&cursor)
+			// the tenant's highest position, from the index, not a count: housekeeping removes old events, and a count
+			// would go back and read the whole outbox on every request. The outbox has no row level security (the relay
+			// reads it across tenants), so the tenant is named here, or the cursor would follow every tenant's events
+			return txn.QueryRow(ctx, tenantCursorSQL).Scan(&cursor)
 		}
 
 		return nil

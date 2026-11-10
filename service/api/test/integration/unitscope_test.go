@@ -48,9 +48,12 @@ func TestUnitScopeExternalTechnicianAndContractor(t *testing.T) {
 
 	owner(
 		t,
-		`INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, visit_slot, offered_at,
+		`INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, candidate_slots, offered_at,
 			offer_expires_at, access_valid_from, access_valid_until, decision, decided_at)
-		VALUES ($1,$2,$3,'v1',tstzrange($4,$5),$6,$5,$6,$5,'accept',$6)`,
+		VALUES ($1,$2,$3,'v1',`+oneSlotSQL(
+			"$4",
+			"$5",
+		)+`,$6,$5,$6,$5,'accept',$6)`,
 		seed.ID(
 			"tenant-a",
 		),
@@ -132,6 +135,16 @@ func TestUnitScopeExternalTechnicianAndContractor(t *testing.T) {
 	if alertListed() {
 		t.Fatal("alerts.list before the work window")
 	}
+	// nor does the unit list count it: the alert count is an alert read (IR49(b), IR705)
+	_, unitPage := post(
+		srv,
+		techB(),
+		"units.list",
+		`{"limit":100,"filters":{"unitIds":["`+unit+`"]}}`,
+	)
+	if count := asNum(t, items(t, unitPage)[0]["activeAlertCount"]); count != 0 {
+		t.Fatalf("activeAlertCount before the work window: %v", count)
+	}
 
 	if code, res := post(
 		srv,
@@ -156,6 +169,21 @@ func TestUnitScopeExternalTechnicianAndContractor(t *testing.T) {
 	); code != 403 ||
 		res["messageKey"] != keyAssignmentNotStarted {
 		t.Fatalf("telemetry before the work window: %d %v", code, res)
+	}
+	// the same read by the room the unit stands in is gated alike (IR673)
+	bySpace := `{"from":"` + clock().Add(-time.Hour).
+		Format(time.RFC3339) +
+		`","to":"` + clock().Format(
+		time.RFC3339,
+	) + `","spaceId":"` + seed.ID("room-b-1").String() + `","metric":"temperature","query":{}}`
+	if code, res := post(
+		srv,
+		techB(),
+		"telemetry.series",
+		bySpace,
+	); code != 403 ||
+		res["messageKey"] != keyAssignmentNotStarted {
+		t.Fatalf("telemetry by space before the work window: %d %v", code, res)
 	}
 
 	if code, _ := post(srv, contrA(), "alerts.get", `{"id":"`+alert+`"}`); code != 200 {
@@ -193,6 +221,10 @@ func TestUnitScopeExternalTechnicianAndContractor(t *testing.T) {
 
 	if code, _ := post(srv, techB(), "telemetry.series", series); code != 200 {
 		t.Fatalf("telemetry inside the work window: %d", code)
+	}
+
+	if code, _ := post(srv, techB(), "telemetry.series", bySpace); code != 200 {
+		t.Fatalf("telemetry by space inside the work window: %d", code)
 	}
 
 	if n := readings(); n == 0 { // the inserted temperature, plus readings other tests left on this unit
@@ -234,9 +266,12 @@ func TestUnitAccessProjection(t *testing.T) {
 	)
 	owner(
 		t,
-		`INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, visit_slot, offered_at,
+		`INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, candidate_slots, offered_at,
 			offer_expires_at, access_valid_from, access_valid_until)
-		VALUES ($1,$2,$3,'v1',tstzrange($4,$5),$6,$5,$6,$5)`,
+		VALUES ($1,$2,$3,'v1',`+oneSlotSQL(
+			"$4",
+			"$5",
+		)+`,$6,$5,$6,$5)`,
 		seed.ID(
 			"tenant-a",
 		),

@@ -82,6 +82,7 @@ func FromDTO(principalDTO PrincipalDTO) *ops.Principal {
 		Employment:        principalDTO.Employment,
 		Timezone:          principalDTO.Timezone,
 		SessionsRevokedAt: principalDTO.SessionsRevokedAt,
+		IssuerHost:        "",
 	}
 	for _, perm := range principalDTO.Permissions {
 		principal.Permissions[perm] = true
@@ -174,7 +175,7 @@ func (r *RemoteSource) fetch(
 		ctx,
 		http.MethodGet,
 		r.BaseURL+PrincipalPath+"?"+params.Encode(),
-		nil,
+		http.NoBody,
 	)
 	if err != nil {
 		return nil, apperr.Wrap(err, "http.NewRequestWithContext")

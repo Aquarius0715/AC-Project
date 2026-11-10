@@ -3,8 +3,9 @@
 // provider only to refresh a token that is about to expire. The Core API authorizes every operation (D01); this only keeps signed-out users and the wrong role
 // out of the role areas in API mode. The Phase 1A demo (DATA_SOURCE=mock) is unaffected.
 import { NextResponse, type NextRequest } from "next/server";
-import { clearedCookieOptions, cookieOptions, dropSession, loadSession, needsRefresh, oidcConfig, refresh, renewSessionCookie, roleHome, SESSION_COOKIE, type Session } from "@ac/web/lib/session";
-import { contentSecurityPolicy, HSTS, newNonce, originOf } from "@ac/web/lib/securityHeaders";
+import { clearedCookieOptions, cookieOptions, dropSession, loadSession, needsRefresh, oidcConfigFor, refresh, renewSessionCookie, roleHome, SESSION_COOKIE, type Session } from "@ac/web/lib/session";
+import { contentSecurityPolicy, HSTS, makeNonce as makeNonce, originOf } from "@ac/web/lib/securityHeaders";
+import { entryOf } from "@ac/web/lib/lookup";
 
 const sharedAreas = ["/notifications", "/settings"]; // shared pages that need a session but no particular role
 
@@ -13,8 +14,8 @@ page response also carries the Content-Security-Policy with this request's nonce
 headers to put on its scripts and styles (Next.js CSP guide, network architecture §6, IR354). */
 export async function authProxy(req: NextRequest, appRole: Session["role"]) {
   const isHttps = req.nextUrl.protocol === "https:" || req.headers.get("x-forwarded-proto") === "https";
-  const nonce = newNonce();
-  const idp = originOf(oidcConfig().issuer);
+  const nonce = makeNonce();
+  const idp = originOf(oidcConfigFor(req.headers.get("host")).issuer); // the identity provider on the address this request came by (IR651)
   const csp = contentSecurityPolicy(nonce, { dev: process.env.NODE_ENV === "development", https: isHttps, formActions: idp ? [idp] : [] });
   const headers = new Headers(req.headers);
   headers.set("x-nonce", nonce);
@@ -45,11 +46,11 @@ export async function authProxy(req: NextRequest, appRole: Session["role"]) {
     }
     const res = NextResponse.next({ request: { headers } });
     if (renewed) res.cookies.set(SESSION_COOKIE, renewed, cookieOptions());
-    else if (renewed === null) res.cookies.set(SESSION_COOKIE, "", clearedCookieOptions());
+    if (renewed === null) res.cookies.set(SESSION_COOKIE, "", clearedCookieOptions());
     return secure(res);
   };
   const path = req.nextUrl.pathname;
-  const home = roleHome[appRole];
+  const home = entryOf(roleHome, appRole);
   const isArea = path === home || path.startsWith(home + "/");
   const isShared = sharedAreas.some((p) => path === p || path.startsWith(p + "/"));
   if (!isArea && !isShared) return pass();

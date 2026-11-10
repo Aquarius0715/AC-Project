@@ -6,8 +6,10 @@ automations.delete,all,automations,automations.list,required,none,D01; version m
 automations.fire,all,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 automations.save,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 automations.save,id present,automations,automations.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+baselines.delete,all,baselines,baselines.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 baselines.save,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 baselines.save,id present,baselines,baselines.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+capabilities.delete,all,capabilities,capabilities.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 capabilities.save,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 capabilities.save,id present,capabilities,capabilities.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 certificates.requestTraining,all,certificate,certificates.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
@@ -19,11 +21,13 @@ clientUsers.save,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; 
 clientUsers.save,id present,client_user,clientUsers.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 commands.create,all,none,units.get,omit,expectedUnitVersion=UnitDetail.version,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 consents.update,all,consent,consents.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+contractors.delete,all,contractor,contractors.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 contractors.save,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 contractors.save,id present,contractor,contractors.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 contractors.setOfferStatus,all,contractor,contractors.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 contracts.save,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 contracts.save,id present,contracts,contracts.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+customers.delete,all,customers,customers.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 customers.save,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 customers.save,id present,customers,customers.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 demo.advanceClock,all,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
@@ -37,14 +41,19 @@ devices.addResponseNote,all,device event,devices.events,required,none,D01; versi
 devices.bind,all,device,devices.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 devices.calibrate,all,device,devices.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 devices.check,all,device,devices.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+devices.delete,all,device,devices.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 devices.register,all,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+devices.setMqttNode,all,device,devices.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+devices.unbind,all,device,devices.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 devices.updateFirmware,all,device,devices.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 diagnosticRuns.create,all,none,units.get;jobs.get,omit,expectedUnitVersion=UnitDetail.version;expectedJobVersion=JobDetail.version,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+factors.delete,all,factors,factors.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 factors.save,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 factors.save,id present,factors,factors.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 filterCare.markCleaned,all,none,filterCare.list,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 filterCare.saveSettings,all,none,filterCare.list,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 firmwareCampaigns.control,all,firmware_campaign,firmwareCampaigns.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+firmwareCampaigns.delete,all,firmware_campaign,firmwareCampaigns.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 firmwareCampaigns.schedule,all,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 inquiries.answer,all,inquiries,inquiries.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 inquiries.create,all,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
@@ -83,10 +92,12 @@ jobs.withdrawPartnerSlot,all,job,jobs.get;jobs.list,required,none,D01; version m
 jobs.withdrawProposal,all,job,jobs.get;jobs.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 locations.rename,all,property|space|unit,properties.list;spaces.list;units.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 members.clearUnavailability,all,unavailability,members.unavailability,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+members.delete,all,members,members.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 members.revokeSessions,all,none,members.list,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 members.save,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 members.save,id present,members,members.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 members.setUnavailability,all,none,members.capacity,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+mrv.deleteDraft,all,mrv,mrv.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 mrv.recordReview,all,mrv,mrv.get,required,reportVersion=MRVReport.version,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 mrv.saveDraft,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 mrv.saveDraft,id present,mrv,mrv.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
@@ -96,6 +107,7 @@ offsets.preview,all,none,none,omit,none,D01; version mismatch CONFLICT; missing/
 offsets.simulate,event=purchase_confirm|retire|fail,offset record,offsets.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 offsets.simulate,event=request,none,offsets.preview,omit,quoteVersion=OffsetQuote.version,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 offsets.simulate,event=retry,offset record,offsets.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+organizations.delete,all,organizations,organizations.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 organizations.save,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 organizations.save,id present,organizations,organizations.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 partnerUsers.remove,all,partner_user,partnerUsers.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
@@ -110,6 +122,7 @@ payouts.generate,all,none,payouts.list,omit,none,D01; version mismatch CONFLICT;
 payouts.query,all,payout_statement,payouts.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 payouts.resolveQuery,all,payout_statement,payouts.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 payouts.transition,all,payout_statement,payouts.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+plans.delete,all,plans,plans.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 plans.generateNext,all,plan,plans.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 plans.save,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 plans.save,id present,plans,plans.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
@@ -121,6 +134,7 @@ preferences.update,all,none,none,omit,none,D01; version mismatch CONFLICT; missi
 properties.archive,all,properties,properties.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 properties.save,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 properties.save,id present,properties,properties.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+rateCards.delete,all,none,rateCards.list,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 rateCards.save,all,none,rateCards.list,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 reports.signOff,all,report,reports.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 restrictions.cancel,all,restrictions,restrictions.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects

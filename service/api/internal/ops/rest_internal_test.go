@@ -97,6 +97,7 @@ func restOp(mode Mode, input func() any) *Operation {
 		Expr:     authz.Expr{Alternatives: nil, Notes: nil, Remark: ""},
 		Result:   nil,
 		Handle:   nil,
+		OwnTx:    false,
 	}
 }
 
@@ -761,6 +762,7 @@ func billingPrincipal() *Principal {
 			}, ClientRole: "",
 		}, TenantID: uuid.UUID{}, MembershipID: uuid.UUID{}, UserID: uuid.UUID{}, OrgID: uuid.UUID{}, ScopeVersion: 0,
 		Scopes: nil, Employment: "", Timezone: "", SessionsRevokedAt: nil,
+		IssuerHost: "",
 	}
 }
 

@@ -30,10 +30,22 @@ Sign in as `customer-a` / `customer-b`, `contractor-a`, `tech-external-a`, `hq-o
 the HQ one-time-code secrets are in `docker/keycloak/realm-ac.json` (local values only). `.env.local` (git-ignored,
 from `.env.local.example`) holds local keys; `docker/iot-demo.sh` generates the broker keys on its first run.
 
+`customer-a` sees the demo data only, the mock fleet's simulated air conditioners included; `customer-b` sees the real
+sensor nodes' devices when the stack takes them in (DEC-92).
+
 Real sensor nodes (optional, development only): with `REAL_MQTT_URL` and its login in `.env.local`, `migrate` adds a
-live site and the IoT bridge records the nodes' readings there once a minute; `REAL_MQTT_COMMANDS=1` also lets the app
-switch the real air conditioner on and off. Its client signs in as `live-sensors@example.com` after choosing a password
-from the set-up e-mail in Mailpit (DEC-86, DEC-87, DEC-89; what the nodes must send: backend architecture §9).
+live site to Demo Customer B and the IoT bridge records the nodes' readings there once a minute; `REAL_MQTT_COMMANDS=1`
+also lets the app switch the real air conditioner on and off. `customer-b` keeps its access past the demo data's end
+of access (DEC-86, DEC-89, DEC-92; what the nodes must send: backend architecture §9).
+
+Shared test environment (DEC-93, DEC-94): pushing a tag such as `test1.0.0r2` on a commit of `main` runs the workflow
+"Test deployment" on the lab server, the real nodes' broker's machine, which is the repository's self-hosted runner. Once
+the commit's CI passed it builds the images there and starts them, with the build and deploy logs on the Actions tab. CI
+runs on that runner too on every push, and E2E every night and by hand (DEC-95).
+The apps open at `http://<server>:3200` (customer), `:3201` (partner), `:3202` (technician) and `:3203` (HQ), Keycloak at
+`:8281` and Mailpit at `:8225`. Its data are the default users and the real devices only, on the real clock: `customer-a`
+sees the two real units, and there is no demo data or mock fleet (DEC-96). The server's one-time set-up is `bash deploy/test/setup.sh` from a checkout, then the
+runner's registration (container design §6).
 
 Profiles: `infra` (PostgreSQL, Valkey, LocalStack, Mosquitto, Keycloak, Mailpit, mocks), `backend` (+ API services and
 workers), `full` (+ the four apps), `iot` (bridge, simulator, mock history), `obs`, `stripe`.

@@ -11,6 +11,8 @@
 // on an existing record carries its version as the expected version; CONFLICT refreshes the page.
 import { refresh } from "next/cache";
 import { coreOp, CoreError } from "@ac/web/lib/dal";
+import { deleteAccounts } from "@ac/web/lib/forceDelete";
+import { actionFailure } from "@ac/web/lib/actionFailure";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import type { CostLine } from "@ac/web/lib/adminJobs";
 import type { OpInput } from "@ac/web/lib/opTypes";
@@ -27,18 +29,24 @@ const run = async (fn: () => Promise<unknown>): Promise<Result> => {
       if (error.error.code === "CONFLICT") refresh();
       return { ok: false, code: error.error.code, messageKey: error.error.messageKey, fieldErrors: error.error.fieldErrors, retryAfterSeconds: error.error.retryAfterSeconds };
     }
-    throw error;
+    return actionFailure(error);
   }
 };
 const write = (version: number) => ({ write: true, expectedVersion: version });
+// an update writes over the version it read; a new record has none
+const writeOf = (input: { id: string | null; version: number | null }) => {
+  if (!input.id) return { write: true };
+  if (input.version === null) throw new Error("an update needs the version it changes");
+  return write(input.version);
+};
 
 /** jobs.assign: an internal technician for the agreed time (also a reassignment at the same slot with a reason). */
 export async function assignInternal(jobId: string, version: number, technicianMembershipId: string, slot: Slot, reason?: string) {
   return run(() => coreOp("jobs.assign", { jobId, technicianMembershipId, startAt: slot.startAt, endAt: slot.endAt, ...(reason?.trim() && { reason: reason.trim() }) }, write(version)));
 }
 
-/** jobs.offer: the agreed time offered to a contractor with the offer and access windows and the terms version. */
-export async function offerToContractor(jobId: string, version: number, input: { contractorOrgId: string; visitSlot: Slot; offerExpiresAt: string; accessValidFrom: string; accessValidUntil: string; termsVersion: string }) {
+/** jobs.offer: the job offered to a contractor with all the client's agreed times (IR636) and the offer and access windows and the terms version. */
+export async function offerToContractor(jobId: string, version: number, input: { contractorOrgId: string; offerExpiresAt: string; accessValidFrom: string; accessValidUntil: string; termsVersion: string }) {
   return run(() => coreOp("jobs.offer", { jobId, ...input }, write(version)));
 }
 
@@ -87,6 +95,7 @@ export async function extendAccess(jobId: string, version: number, accessValidUn
 more, due at or after the requested end, an optional contact window. Returns the new job's id. */
 export async function createJob(input: { unitId: string; type: OpInput<"jobs.create">["type"]; symptom: string; slots: Slot[]; dueAt: string | null; contactWindow: string }): Promise<{ ok: true; value: { id: string } } | ({ ok: false } & ActionFailure)> {
   const [first, ...alternatives] = input.slots;
+  if (!first) throw new Error("a job needs its 1st preferred time");
   try {
     const job = await coreOp<{ id: string }>("jobs.create", {
       unitId: input.unitId, type: input.type, symptom: input.symptom.trim(), requestedStart: first.startAt, requestedEnd: first.endAt, alternativeSlots: alternatives,
@@ -94,18 +103,17 @@ export async function createJob(input: { unitId: string; type: OpInput<"jobs.cre
     }, { write: true });
     return { ok: true, value: { id: job.id } };
   } catch (error) {
-    if (error instanceof CoreError) return { ok: false, code: error.error.code, messageKey: error.error.messageKey, fieldErrors: error.error.fieldErrors, retryAfterSeconds: error.error.retryAfterSeconds };
-    throw error;
+    return actionFailure(error);
   }
 }
 
 type Failure = { ok: false } & ActionFailure;
-const failure = (e: unknown, conflictRefresh = true): Failure => {
+const failure = (e: unknown): Failure => {
   if (e instanceof CoreError) {
-    if (conflictRefresh && e.error.code === "CONFLICT") refresh();
+    if (e.error.code === "CONFLICT") refresh();
     return { ok: false, code: e.error.code, messageKey: e.error.messageKey, fieldErrors: e.error.fieldErrors, retryAfterSeconds: e.error.retryAfterSeconds };
   }
-  throw e;
+  return actionFailure(e);
 };
 
 /** plans.save: a new plan for a unit, or the plan's recurrence and next date (monthly, every 1–12 months, the next date in
@@ -113,7 +121,7 @@ the future, stored in UTC with its UTC day as the anchor day). Returns the plan 
 export async function savePlan(input: { id: string | null; version: number | null; unitId: string; intervalMonths: number; nextDueAt: string }): Promise<Failure | { ok: true; value: { id: string } }> {
   try {
     const p = await coreOp<{ id: string }>("plans.save", { ...(input.id && { id: input.id }), unitId: input.unitId, recurrence: { kind: "monthly", intervalMonths: input.intervalMonths }, nextDueAt: input.nextDueAt },
-      input.id ? write(input.version!) : { write: true });
+      writeOf(input));
     refresh();
     return { ok: true, value: { id: p.id } };
   } catch (error) {
@@ -155,8 +163,31 @@ export async function createContractorOrganization(name: string) {
 export async function saveContractor(input: { id: string | null; version: number | null; organizationId: string; registrationNo: string; serviceAreas: string[]; contactEmail: string; insuranceValidUntil: string | null }) {
   return value(async () => {
     const p = await coreOp<{ id: string }>("contractors.save", { ...(input.id && { id: input.id }), organizationId: input.organizationId, registrationNo: input.registrationNo.trim(),
-      serviceAreas: input.serviceAreas, contactEmail: input.contactEmail.trim(), insuranceValidUntil: input.insuranceValidUntil }, input.id ? write(input.version!) : { write: true });
+      serviceAreas: input.serviceAreas, contactEmail: input.contactEmail.trim(), insuranceValidUntil: input.insuranceValidUntil }, writeOf(input));
     return { id: p.id };
+  });
+}
+
+/** plans.delete: a plan that has made no job (DEC-103); a plan with jobs stays with its history. */
+export async function deletePlan(id: string, version: number, reason: string) {
+  return value(async () => { await coreOp("plans.delete", { id, reason: reason.trim() }, write(version)); return null; });
+}
+
+/** rateCards.delete: a rate card that has not started (DEC-103); rate cards have no expected version. */
+export async function deleteRateCard(id: string, reason: string) {
+  return value(async () => { await coreOp("rateCards.delete", { id, reason: reason.trim() }, { write: true }); return null; });
+}
+
+/** contractors.delete (when the company has a profile) and then organizations.delete: a company registered by mistake is
+removed as it was made (DEC-103); one with jobs, offers, certificates, payouts or users is refused with the reason. With
+`force` (the data.forceDelete holder) its accounts go too, even those with history, before the organization. */
+export async function deleteContractor(org: { id: string; version: number }, profile: { id: string; version: number } | null, reason: string, force = false) {
+  return value(async () => {
+    const why = reason.trim();
+    if (profile) await coreOp("contractors.delete", { force, id: profile.id, reason: why }, write(profile.version));
+    if (force) await deleteAccounts(org.id, why);
+    await coreOp("organizations.delete", { id: org.id, reason: why }, write(org.version));
+    return null;
   });
 }
 

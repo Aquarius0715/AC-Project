@@ -14,6 +14,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/modules/maintenance"
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
+	"github.com/pradita/ac-project/service/api/internal/platform/money"
 	"github.com/pradita/ac-project/service/api/internal/platform/paging"
 )
 
@@ -186,7 +187,7 @@ func scanStatement(r pgx.Row) (Statement, error) {
 	return statement, apperr.Wrap(err, "scan (scanStatement)")
 }
 
-func (m Payouts) fill(ctx context.Context, call *ops.Call, statement *Statement) error {
+func (Payouts) fill(ctx context.Context, call *ops.Call, statement *Statement) error {
 	lines, err := payoutLines(ctx, call, statement.ID)
 	if err != nil {
 		return err
@@ -304,7 +305,9 @@ func (m Payouts) load(
 		return statement, err
 	}
 
-	return statement, m.fill(ctx, call, &statement)
+	err = m.fill(ctx, call, &statement)
+
+	return statement, err
 }
 
 // ---- payouts.generate ----
@@ -845,8 +848,9 @@ func (m Payouts) transition(
 			call.Now,
 		)
 	default:
-		today := call.Now.In(kualaLumpur()).Format("2006-01-02")
-		if statement.Status != statementApproved || today < statement.PayDate.Format("2006-01-02") {
+		today := call.Now.In(kualaLumpur()).Format(time.DateOnly)
+		if statement.Status != statementApproved ||
+			today < statement.PayDate.Format(time.DateOnly) {
 			return statement, apperr.E(apperr.Conflict, "errors.not_payable_yet")
 		}
 
@@ -1059,8 +1063,15 @@ func (in *ResolveInput) Validate() map[string]string {
 		fieldErrs["reply"] = apperr.KeyLength
 	}
 
-	if in.AdjustmentMinor != nil && *in.AdjustmentMinor == 0 {
-		fieldErrs["adjustmentMinor"] = "error.nonZero"
+	if in.AdjustmentMinor != nil {
+		switch {
+		case *in.AdjustmentMinor == 0:
+			fieldErrs["adjustmentMinor"] = "error.nonZero"
+		case !money.InRange(max(*in.AdjustmentMinor, -*in.AdjustmentMinor)):
+			// signed, but its size stays within the safe-integer range (IR647, IR659); -MinInt64 wraps to itself, which
+			// is negative and refused here too
+			fieldErrs["adjustmentMinor"] = apperr.KeyRange
+		}
 	}
 
 	return fieldErrs

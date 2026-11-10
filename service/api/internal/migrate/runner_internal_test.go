@@ -1,6 +1,7 @@
 package migrate
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"os"
@@ -56,7 +57,7 @@ func TestInitMatchesDesignSchema(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if string(got) != string(want) {
+	if !bytes.Equal(got, want) {
 		t.Fatal(
 			"migrations/000001_init.up.sql differs from docs/02-design/db/schema.sql; run make migrations",
 		)

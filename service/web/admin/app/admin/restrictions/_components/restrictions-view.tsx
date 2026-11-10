@@ -1,4 +1,5 @@
 "use client";
+const TEMPERATURE_LIMIT = "temperature_limit";
 
 import Link from "next/link";
 import { useState } from "react";
@@ -14,6 +15,10 @@ import {
 } from "@ac/web/lib/restrictions";
 import { executeRestriction, reconcileUnits, requestRelease, retryUnits, scheduleRestriction } from "../actions";
 import { Icon } from "@ac/web/components/Icon";
+import { oneOf } from "@ac/web/lib/oneOf";
+import type { RestrictionRecoveryCase } from "@ac/web/lib/contracts.gen";
+import { commonRange } from "@ac/web/lib/temperatureRange";
+import { DateTimeSelect } from "@ac/web/components/TimeSelect";
 
 interface ScheduleContract {
   id: string; version: number; label: string; rulesVersion: string; recipients: number; invoices: { id: string; number: string }[];
@@ -50,10 +55,14 @@ function Manager({ live }: Readonly<{ live: NonNullable<RestrictionsLive> }>) {
   const [confirmRules, setConfirmRules] = useState(false);
   const [retry, setRetry] = useState<null | { phase: "apply" | "release"; unitIds: string[]; reason: string }>(null);
   const [scheduling, setScheduling] = useState(false);
-  const step = r ? (r.state === "cancelled" ? -1 : lifecycleStates.indexOf(r.state)) : 0;
+  const stepOf = () => {
+    if (!r) return 0;
+    return r.state === "cancelled" ? -1 : lifecycleStates.indexOf(r.state);
+  };
+  const step = stepOf();
   const exec = sel?.texts.execute ?? null;
   const release = sel?.texts.release ?? null;
-  const recovery = { pending: t("pending"), removing: t("removing"), resolved: t("resolved") };
+  const recovery: Partial<Record<RestrictionRecoveryCase["state"], string>> = { pending: t("pending"), removing: t("removing"), resolved: t("resolved") };
   return (
     <Page>
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -75,7 +84,7 @@ function Manager({ live }: Readonly<{ live: NonNullable<RestrictionsLive> }>) {
         <Card title={t("Restrictions")} sub={t("newest first")} className="self-start">
           {live.rows.length === 0 ? <EmptyState title={t("No restrictions")}>{t("No restriction matches this scope.")}</EmptyState> : <div className="flex flex-col gap-2">{live.rows.map((x) => <ListRow key={x.id} selected={r?.id === x.id} onClick={() => { setConfirmRules(false); nav({ restrictionId: x.id }); }}><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="truncate text-[13px]">{x.id.slice(0, 8)}</b><Badge tone={stateTone(x.state)}>{stateWord(x.state, t)}</Badge></div><div className="text-[11px] text-muted-foreground">{x.label}</div><div className="text-[11px] text-muted-foreground">{x.policy} · {t(x.units === 1 ? "1 unit" : "{n} units", { n: x.units })} · {x.progress}</div></div></ListRow>)}</div>}
         </Card>
-        {r && sel ? (
+        {r ? (
           <div className="flex min-w-0 flex-col gap-4">
             <Card title={t("Restriction {id}", { id: r.id.slice(0, 8) })} sub={t("{contract} · rules {rules} · version {v}", { contract: sel.contract, rules: r.rulesVersion, v: r.version })} action={<Link className="text-xs font-semibold text-primary" href={`/admin/restrictions/${r.id}`}>{t("Exception / override")} <Icon name="arrowRight" /></Link>}>
               {step >= 0 ? <Steps steps={lifecycleStates.map((s) => stateWord(s, t))} current={step} /> : <Banner tone="muted">{t("Cancelled — no further commands.")}</Banner>}
@@ -115,9 +124,9 @@ function Manager({ live }: Readonly<{ live: NonNullable<RestrictionsLive> }>) {
           </div>
         ) : <Card title={t("Restriction")}><EmptyState title={t("Nothing selected")}>{t("Choose a restriction.")}</EmptyState></Card>}
       </div>
-      <Modal open={!!retry} onClose={() => { setRetry(null); }} title={t(retry?.phase === "release" ? "Retry release" : "Retry apply")} footer={<><Btn onClick={() => { setRetry(null); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending || !retry?.reason.trim()} onClick={() => r && retry && run(() => retryUnits(r.id, r.version, retry.unitIds, retry.phase, r.rulesVersion, retry.reason.trim()), t("Retry sent"), () => { setRetry(null); })}>{t("Retry")}</Btn></>}>
+      <Modal open={!!retry} onClose={() => { setRetry(null); }} title={t(retry?.phase === "release" ? "Retry release" : "Retry apply")} footer={<><Btn onClick={() => { setRetry(null); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending || !retry?.reason.trim()} onClick={() => { if (r && retry) run(() => retryUnits(r.id, r.version, retry.unitIds, retry.phase, r.rulesVersion, retry.reason.trim()), t("Retry sent"), () => { setRetry(null); }); }}>{t("Retry")}</Btn></>}>
         <p className="text-xs text-muted-foreground">{t(retry?.phase === "release" ? "Sends a new remove command for the unit with rules version {rules}. An undeliverable unit returns Offline with nothing changed." : "Sends a new apply command for the unit with rules version {rules}. An undeliverable unit returns Offline with nothing changed.", { rules: r?.rulesVersion ?? "—" })}</p>
-        <Field label={t("Reason")}><Textarea value={retry?.reason ?? ""} maxLength={1000} onChange={(e) => retry && setRetry({ ...retry, reason: e.target.value })} /></Field>
+        <Field label={t("Reason")}><Textarea value={retry?.reason ?? ""} maxLength={1000} onChange={(e) => { if (retry) setRetry({ ...retry, reason: e.target.value }); }} /></Field>
       </Modal>
       {live.schedule && <ScheduleModal open={scheduling} onClose={() => { setScheduling(false); }} contracts={live.schedule} now={now} onDone={(id) => { setScheduling(false); nav({ restrictionId: id, status: null }); }} />}
     </Page>
@@ -129,7 +138,7 @@ function ScheduleModal({ open, onClose, contracts, now, onDone }: Readonly<{ ope
   const [pending, run] = useAction();
   const [contractId, setContractId] = useState("");
   const [unitIds, setUnitIds] = useState<string[]>([]);
-  const [kind, setKind] = useState<Policy["kind"]>("temperature_limit");
+  const [kind, setKind] = useState<Policy["kind"]>(TEMPERATURE_LIMIT);
   const [setpoint, setSetpoint] = useState("24");
   const [executeAfter, setExecuteAfter] = useState(() => {
     const p = zonedParts(new Date(now.getTime() + 25 * 3600 * 1000).toISOString(), zone); // a whole hour, 25 h ahead in the display zone
@@ -139,7 +148,7 @@ function ScheduleModal({ open, onClose, contracts, now, onDone }: Readonly<{ ope
   const [tried, setTried] = useState(false);
   const k = contracts.find((c) => c.id === contractId);
   const chosen = k?.units.filter((u) => unitIds.includes(u.id)) ?? [];
-  const range = chosen.reduce<{ min: number; max: number } | null>((acc, u) => (u.temperature ? { min: Math.max(acc?.min ?? -Infinity, u.temperature.min), max: Math.min(acc?.max ?? Infinity, u.temperature.max) } : acc), null);
+  const range = commonRange(chosen);
   const sp = Number(setpoint);
   const at = executeAfter ? zonedInstant(executeAfter.slice(0, 10), executeAfter.slice(11, 16), zone) : "";
   const errors: Record<string, string> = {};
@@ -147,7 +156,7 @@ function ScheduleModal({ open, onClose, contracts, now, onDone }: Readonly<{ ope
   else if (k.invoices.length === 0) errors.contractId = t("This contract has no overdue unpaid invoice");
   else if (k.recipients === 0) errors.contractId = t("No active client can receive the notice");
   if (unitIds.length === 0) errors.unitIds = t("Choose at least one unit");
-  if (kind === "temperature_limit" && (!range || !(sp >= range.min && sp <= range.max))) errors.setpoint = range ? t("Within {min}–{max} °C for the chosen units", { min: range.min, max: range.max }) : t("The chosen units need a temperature range");
+  if (kind === TEMPERATURE_LIMIT && (!range || !(sp >= range.min && sp <= range.max))) errors.setpoint = range ? t("Within {min}–{max} °C for the chosen units", { min: range.min, max: range.max }) : t("The chosen units need a temperature range");
   if (!at || Date.parse(at) < now.getTime() + 24 * 3600 * 1000) errors.executeAfter = t("At least 24 hours from now");
   if (reason.trim().length === 0 || reason.length > 1000) errors.reason = t("1–1000 characters, shown to the customer");
   const save = () => {
@@ -171,12 +180,12 @@ function ScheduleModal({ open, onClose, contracts, now, onDone }: Readonly<{ ope
       <Field label={t("Contract (eligible RTO)")} error={tried ? errors.contractId : undefined}><Select value={contractId} onChange={(e) => { setContractId(e.target.value); setUnitIds([]); }}><option value="">{t("Select…")}</option>{contracts.map((c) => <option key={c.id} value={c.id}>{c.label} · {t("rules {rules}", { rules: c.rulesVersion })}</option>)}</Select></Field>
       {k && <>
         <p className="text-xs">{t(k.recipients === 1 ? "Cause invoices (all overdue unpaid of the contract, fixed): {list} · notice to 1 active client" : "Cause invoices (all overdue unpaid of the contract, fixed): {list} · notice to {n} active clients", { list: k.invoices.length > 0 ? k.invoices.map((x) => x.number).join(", ") : t("none"), n: k.recipients })}</p>
-        <div><p className="mb-1 text-[13px] font-semibold">{t("Units")}</p><div className="flex flex-col gap-1">{k.units.map((u) => <Check key={u.id} disabled={!!u.blocked} checked={unitIds.includes(u.id)} onChange={(on) => { setUnitIds(on ? [...unitIds, u.id] : unitIds.filter((x) => x !== u.id)); }} label={<span>{u.name} <span className="text-xs text-muted-foreground">{u.blocked ? `— ${u.blocked}` : (u.temperature ? `${String(u.temperature.min)}–${String(u.temperature.max)} °C` : t("no temperature setpoint"))}</span></span>} />)}</div>{tried && errors.unitIds && <p className="mt-1 text-xs text-crit">{errors.unitIds}</p>}</div>
+        <div><p className="mb-1 text-[13px] font-semibold">{t("Units")}</p><div className="flex flex-col gap-1">{k.units.map((u) => <Check key={u.id} disabled={!!u.blocked} checked={unitIds.includes(u.id)} onChange={(on) => { setUnitIds(on ? [...unitIds, u.id] : unitIds.filter((x) => x !== u.id)); }} label={<span>{u.name} <span className="text-xs text-muted-foreground">{u.blocked ? `— ${u.blocked}` : null}{!u.blocked && u.temperature && `${String(u.temperature.min)}–${String(u.temperature.max)} °C`}{!u.blocked && !u.temperature && t("no temperature setpoint")}</span></span>} />)}</div>{tried && errors.unitIds && <p className="mt-1 text-xs text-crit">{errors.unitIds}</p>}</div>
       </>}
       <div className="grid-fluid" style={{ ["--min" as string]: "190px" }}>
-        <Field label={t("Policy")}><Select value={kind} onChange={(e) => { setKind(e.target.value as Policy["kind"]); }}><option value="temperature_limit">{t("Temperature limit")}</option><option value="power_off">{t("Power off")}</option></Select></Field>
-        {kind === "temperature_limit" && <Field label={t("Minimum cooling setpoint (°C)")} error={tried ? errors.setpoint : undefined}><Input type="number" value={setpoint} onChange={(e) => { setSetpoint(e.target.value); }} /></Field>}
-        <Field label={t("Execute after")} error={tried ? errors.executeAfter : undefined} hint={t("The notice is sent now; at least 24 h ahead · times in {zone}", { zone })}><Input type="datetime-local" value={executeAfter} onChange={(e) => { setExecuteAfter(e.target.value); }} /></Field>
+        <Field label={t("Policy")}><Select value={kind} onChange={(e) => { setKind(oneOf([TEMPERATURE_LIMIT, "power_off"] as const, e.target.value, kind)); }}><option value="temperature_limit">{t("Temperature limit")}</option><option value="power_off">{t("Power off")}</option></Select></Field>
+        {kind === TEMPERATURE_LIMIT && <Field label={t("Minimum cooling setpoint (°C)")} error={tried ? errors.setpoint : undefined}><Input type="number" value={setpoint} onChange={(e) => { setSetpoint(e.target.value); }} /></Field>}
+        <Field label={t("Execute after")} error={tried ? errors.executeAfter : undefined} hint={t("The notice is sent now; at least 24 h ahead · times in {zone}", { zone })}><DateTimeSelect value={executeAfter} onChange={(v) => { setExecuteAfter(v); }} /></Field>
       </div>
       <Field label={t("Reason shown to the customer")} error={tried ? errors.reason : undefined}><Textarea value={reason} maxLength={1000} onChange={(e) => { setReason(e.target.value); }} placeholder={t("Demo: invoice overdue since 2026-09-10")} /></Field>
     </Modal>

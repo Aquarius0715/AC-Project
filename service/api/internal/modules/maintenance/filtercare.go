@@ -258,7 +258,7 @@ func (m FilterCare) Remind(ctx context.Context, call *ops.Call) (int, error) {
 	return count, nil
 }
 
-func (m FilterCare) settings(
+func (FilterCare) settings(
 	ctx context.Context,
 	call *ops.Call,
 	customer uuid.UUID,

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Badge, Banner, Btn, Card, Check, Choice, CodeInput, Modal, Page, QrCode, Select, Toggle, useToast } from "@ac/web/components/ui";
 import { useStoredRole } from "@ac/web/components/AppShell";
 import { useT } from "@ac/web/components/I18n";
-import { isLocale, LOCALE_KEY, translate } from "@ac/web/lib/i18n";
+import { isLocale, LOCALE_KEY, languageOptions, translate } from "@ac/web/lib/i18n";
 import { setStoredValue, useStoredValue } from "@ac/web/lib/urlState";
 import { codeComplete, groupKey, otpauthUri, qrPath } from "@ac/web/lib/twoFactor";
 
@@ -20,15 +20,14 @@ export function PreferencesDemo() {
   const stored = useStoredValue(LOCALE_KEY);
   const lang = isLocale(stored) ? stored : "en";
   const [loc, setLoc] = useState(true);
-  const [mic, setMic] = useState(true);
   const [twoFa, setTwoFa] = useState(false);
   const [modal, setModal] = useState(false);
   const [code, setCode] = useState("");
   const [codes, setCodes] = useState<string[] | null>(null);
   return (
     <Page className="max-w-3xl">
-      <Card title={t("Display language")} sub={t("Affects the screens, notifications and date/time display. Stored data stays UTC. Malay text is a draft under review; text not translated yet stays in English.")}>
-        <Choice value={lang} onChange={(v) => { setStoredValue(LOCALE_KEY, v); toast(translate(v, "Language saved")); }} options={[{ id: "en", label: t("English (default)") }, { id: "ms", label: "Bahasa Melayu" }]} />
+      <Card title={t("Display language")} sub={t("Affects the screens, notifications and date/time display. Stored data stays UTC. Malay and Japanese text is a draft under review; text not translated yet stays in English.")}>
+        <Choice value={lang} onChange={(v) => { setStoredValue(LOCALE_KEY, v); toast(translate(v, "Language saved")); }} options={languageOptions(t)} />
       </Card>
       <Card title={t("Display timezone")} sub={t("Booked times keep their meaning across timezone changes.")}>
         <Select defaultValue="kl" onChange={() => { toast(t("Timezone saved")); }}><option value="kl">Asia/Kuala_Lumpur (UTC+8)</option><option value="sg">Asia/Singapore (UTC+8)</option><option value="tk">Asia/Tokyo (UTC+9)</option></Select>
@@ -40,8 +39,7 @@ export function PreferencesDemo() {
       {role === "client" && (
         <Card title={t("Consent")}>
           <div className="flex flex-col gap-4">
-            <div className="flex items-center justify-between gap-3"><div><div className="text-[13px] font-semibold">{t("Location, for voice room disambiguation")}</div><div className="text-xs text-muted-foreground">{t("Withdrawal discards pending voice requests only")}</div></div><Toggle on={loc} onChange={setLoc} label={t("Location consent")} /></div>
-            <div className="flex items-center justify-between gap-3"><div><div className="text-[13px] font-semibold">{t("Microphone, for voice actions")}</div><div className="text-xs text-muted-foreground">{t("Text input always available as a fallback")}</div></div><Toggle on={mic} onChange={setMic} label={t("Microphone consent")} /></div>
+            <div className="flex items-center justify-between gap-3"><div><div className="text-[13px] font-semibold">{t("Location, for location automations")}</div><div className="text-xs text-muted-foreground">{t("Withdrawal turns off location automations")}</div></div><Toggle on={loc} onChange={setLoc} label={t("Location consent")} /></div>
             <Check label={t("Allow WhatsApp notifications")} checked={false} />
             <Check label={t("Email me the monthly energy report (1st of each month)")} checked={false} />
           </div>
@@ -55,7 +53,7 @@ export function PreferencesDemo() {
               <b>1&nbsp;&nbsp;{t("Scan with an authenticator app")}</b>
               <div className="text-xs text-muted-foreground">{t("or enter key")}&nbsp;&nbsp;<span className="font-mono">{groupKey(DEMO_KEY)}</span></div>
               <b>2&nbsp;&nbsp;{t("Enter the 6-digit code")}</b>
-              <CodeInput label={t("6-digit code")} value={code} onChange={setCode} autoFocus />
+              <CodeInput label={t("6-digit code")} value={code} onChange={setCode} />
               <b>3&nbsp;&nbsp;{t("Save your 8 recovery codes (shown after verifying)")}</b>
             </div>
           </div>

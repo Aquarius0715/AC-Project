@@ -3,9 +3,13 @@
 // Server Actions of the HQ alerts screen (FR-A05). Each one is a public endpoint: the DAL verifies the session and the
 // Core API authorizes the call (alert.resolve, alert.policy.write) and checks the expected version.
 import { refresh } from "next/cache";
-import { coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
+import { coreNow, coreOp } from "@ac/web/lib/dal";
+import { actionFailure } from "@ac/web/lib/actionFailure";
 import { alertPolicyInput, defaultRulesInput, metricUnit, type AdminPolicy, type NotificationDecision } from "@ac/web/lib/adminAlerts";
+import { formValue } from "@ac/web/lib/formValue";
+import { metricSchema } from "@ac/web/lib/devices";
 import type { OpInput } from "@ac/web/lib/opTypes";
+import { lookup } from "@ac/web/lib/lookup";
 
 export type ActionResult = { ok: true } | { ok: false; messageKey: string; code: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null };
 
@@ -14,7 +18,7 @@ async function run(fn: () => Promise<unknown>): Promise<ActionResult> {
     await fn();
     return { ok: true };
   } catch (error) {
-    return error instanceof CoreError ? { ok: false, messageKey: error.error.messageKey, code: error.error.code, fieldErrors: error.error.fieldErrors ?? {}, retryAfterSeconds: error.error.retryAfterSeconds } : { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
+    return actionFailure(error);
   } finally {
     refresh();
   }
@@ -34,7 +38,8 @@ result names the saved policy so the editor can select a new one (IR345). */
 export async function savePolicy(policy: AdminPolicy): Promise<ActionResult & { id?: string }> {
   let id: string | undefined;
   const r = await run(async () => {
-    id = (await coreOp<{ id: string }>("policies.save", alertPolicyInput(policy), { write: true, ...(policy.id && { expectedVersion: policy.version }) })).id;
+    const saved = await coreOp<{ id: string }>("policies.save", alertPolicyInput(policy), { write: true, ...(policy.id && { expectedVersion: policy.version }) });
+    id = saved.id;
   });
   return r.ok ? { ...r, id } : r;
 }
@@ -60,14 +65,15 @@ metric on one of its units, at the Core API's clock. A read: nothing is stored a
 result is this policy's decision for the unit, or null when it did not run there. */
 export async function testPolicy(policyId: string, unitId: string, metric: string, value: number): Promise<Exclude<ActionResult, { ok: true }> | { ok: true; decision: NotificationDecision | null }> {
   try {
-    const at = (await coreNow()).toISOString();
+    const now = await coreNow();
+    const at = now.toISOString();
     const input: OpInput<"automations.simulate"> = {
       eventId: crypto.randomUUID(), occurredAt: at, phase: "condition", unitIds: [unitId],
-      facts: [{ unitId, value, metric: metric as OpInput<"automations.simulate">["facts"][number]["metric"], unit: metricUnit[metric] ?? "", observedAt: at, quality: "valid" }],
+      facts: [{ unitId, value, metric: formValue(metricSchema, metric, "metric"), unit: lookup(metricUnit, metric) ?? "", observedAt: at, quality: "valid" }],
     };
     const r = await coreOp<{ notifications: NotificationDecision[] }>("automations.simulate", input);
     return { ok: true, decision: r.notifications.find((n) => n.policyId === policyId && n.unitId === unitId) ?? null };
   } catch (error) {
-    return error instanceof CoreError ? { ok: false, messageKey: error.error.messageKey, code: error.error.code, fieldErrors: error.error.fieldErrors ?? {}, retryAfterSeconds: error.error.retryAfterSeconds } : { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
+    return actionFailure(error);
   }
 }

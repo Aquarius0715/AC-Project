@@ -71,7 +71,10 @@ type Policies struct {
 	Caps       UnitCaps
 }
 
-// Owners returns owner and kind for the given policy IDs (missing IDs are absent from the map).
+// Owners returns owner and kind for the given policy IDs (missing IDs are absent from the map). The rows are read with
+// a share lock: units.setAlertPolicies attaches a unit to them, and policies.delete locks the row before it detaches
+// the units, so the attach waits for the delete (or the delete for the attach) and never leaves a unit with the ID of a
+// deleted policy (IR677).
 func (Policies) Owners(
 	ctx context.Context,
 	c *ops.Call,
@@ -81,7 +84,7 @@ func (Policies) Owners(
 
 	rows, err := c.Tx.Query(
 		ctx,
-		`SELECT id, customer_id, kind FROM monitoring.alert_policies WHERE id = ANY($1)`,
+		`SELECT id, customer_id, kind FROM monitoring.alert_policies WHERE id = ANY($1) ORDER BY id FOR SHARE`,
 		ids,
 	)
 	if err != nil {
@@ -1063,7 +1066,7 @@ func intersect(ids, others []uuid.UUID) []uuid.UUID {
 	return out
 }
 
-func (m Policies) automationPolicies(
+func (Policies) automationPolicies(
 	ctx context.Context,
 	call *ops.Call,
 	enabled *bool,
@@ -2104,22 +2107,9 @@ func (m Policies) setDefaultRule(
 		return RuleSetting{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
-	var ruleSetting RuleSetting
-
-	err = call.Tx.QueryRow(ctx, `INSERT INTO monitoring.default_rule_settings (tenant_id, policy_id, rule_key, customer_id,
-		enabled, changed_by_membership_id, reason)
-		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5, NULLIF($6, ''))
-		ON CONFLICT (policy_id, rule_key, customer_id) DO UPDATE SET enabled = EXCLUDED.enabled, changed_by_membership_id =
-		EXCLUDED.changed_by_membership_id,
-			reason = EXCLUDED.reason, version = monitoring.default_rule_settings.version + 1, updated_at = platform.app_now()
-		RETURNING id, tenant_id, version, created_at, updated_at, policy_id, rule_key, customer_id, enabled,
-		changed_by_membership_id, reason`,
-		input.PolicyID, input.RuleKey, input.CustomerID, *input.Enabled, call.Principal.MembershipID, deref(input.Reason)).
-		Scan(&ruleSetting.ID, &ruleSetting.TenantID, &ruleSetting.Version, &ruleSetting.CreatedAt, &ruleSetting.UpdatedAt,
-			&ruleSetting.PolicyID, &ruleSetting.RuleKey, &ruleSetting.CustomerID, &ruleSetting.Enabled,
-			&ruleSetting.ChangedByMembershipID, &ruleSetting.Reason)
+	ruleSetting, err := storeRuleSetting(ctx, call, input)
 	if err != nil {
-		return ruleSetting, apperr.Wrap(err, "insert monitoring.default_rule_settings")
+		return ruleSetting, err
 	}
 
 	call.Emit(
@@ -2142,6 +2132,41 @@ func (m Policies) setDefaultRule(
 		NextVersion:     &ruleSetting.Version,
 		Reason:          deref(input.Reason), Result: "", Before: nil, After: nil,
 	})
+
+	return ruleSetting, nil
+}
+
+// storeRuleSetting stores the switch of a default rule for a customer at the version shown: a setting that another
+// switch stored after the version was read (version 0 for a rule without one) is CONFLICT, not overwritten.
+func storeRuleSetting(
+	ctx context.Context,
+	call *ops.Call,
+	input *SetDefaultRuleInput,
+) (RuleSetting, error) {
+	var ruleSetting RuleSetting
+
+	err := call.Tx.QueryRow(ctx, `INSERT INTO monitoring.default_rule_settings (tenant_id, policy_id, rule_key,
+		customer_id, enabled, changed_by_membership_id, reason)
+		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5, NULLIF($6, ''))
+		ON CONFLICT (policy_id, rule_key, customer_id) DO UPDATE SET enabled = EXCLUDED.enabled, changed_by_membership_id =
+		EXCLUDED.changed_by_membership_id,
+			reason = EXCLUDED.reason, version = monitoring.default_rule_settings.version + 1, updated_at = platform.app_now()
+		WHERE monitoring.default_rule_settings.version = $7
+		RETURNING id, tenant_id, version, created_at, updated_at, policy_id, rule_key, customer_id, enabled,
+		changed_by_membership_id, reason`,
+		input.PolicyID, input.RuleKey, input.CustomerID, *input.Enabled, call.Principal.MembershipID, deref(input.Reason),
+		*call.ExpectedVersion).
+		Scan(&ruleSetting.ID, &ruleSetting.TenantID, &ruleSetting.Version, &ruleSetting.CreatedAt, &ruleSetting.UpdatedAt,
+			&ruleSetting.PolicyID, &ruleSetting.RuleKey, &ruleSetting.CustomerID, &ruleSetting.Enabled,
+			&ruleSetting.ChangedByMembershipID, &ruleSetting.Reason)
+	// no row: another switch stored the setting after the version was read (version 0)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ruleSetting, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
+	}
+
+	if err != nil {
+		return ruleSetting, apperr.Wrap(err, "insert monitoring.default_rule_settings")
+	}
 
 	return ruleSetting, nil
 }

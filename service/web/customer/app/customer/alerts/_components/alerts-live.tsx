@@ -13,6 +13,8 @@ import { readAlert } from "../actions";
 import type { AlertsLive } from "../_lib/load";
 import { PoliciesLive } from "./policies-live";
 import { Icon } from "@ac/web/components/Icon";
+import { useRefreshThen } from "@ac/web/lib/useRefreshThen";
+import { orUnreachable } from "@ac/web/lib/unreachable";
 
 /** The customer alert inbox (FR-C08, DD-C08, Figma Client 06a/06b/06g) and the Alert policies tab (FR-C15, 06e/06f) from
 the Core API: filters in the URL, read state from the membership's notifications (opening an alert marks them read; the
@@ -30,16 +32,19 @@ export function AlertsLiveView({ live }: Readonly<{ live: AlertsLive }>) {
     setSeenEditor(editorKey);
     if (editorKey) setResult(null);
   }
-  const [, start] = useTransition();
+  const [pending, start] = useTransition();
+  const refreshThen = useRefreshThen(pending);
   const updated = showClock(live.now, live.display);
   const attn = live.rows.filter((a) => a.group === "attn");
   const info = live.rows.filter((a) => a.group === "info");
   const show = (a: InboxAlert) => {
     setOpen(a);
-    if (a.unread.length > 0) start(async () => { const f = await readAlert(a.unread.map((n) => n.id)); setFailed(f && t("Not marked as read: {reason}", { reason: actionMessage(f, t) })); });
+    // a read that gets no answer reads as unavailable (IR718)
+    if (a.unread.length > 0) start(async () => { const f = await orUnreachable(() => readAlert(a.unread.map((n) => n.id)), (failure) => failure); if (f) setFailed(t("Not marked as read: {reason}", { reason: actionMessage(f, t) })); else refreshThen(() => { setFailed(null); }); });
   };
-  const Item = ({ a }: { a: InboxAlert }) => (
-    <div className="flex w-full items-start gap-3 border-t border-line px-1 py-3 first:border-0">
+  // a function, not a component: a component declared here would be a new type on every render and remount its rows
+  const renderItem = (a: InboxAlert) => (
+    <div key={a.id} className="flex w-full items-start gap-3 border-t border-line px-1 py-3 first:border-0">
       <Icon name={a.group === "attn" ? "warning" : "info"} className="mt-0.5" />
       <div className="min-w-0 flex-1">
         <Plain type="button" onClick={() => { show(a); }} className="block w-full text-left hover:opacity-80">
@@ -60,7 +65,7 @@ export function AlertsLiveView({ live }: Readonly<{ live: AlertsLive }>) {
   );
   return (
     <Page>
-      <Tabs value={live.tab} onChange={(t) => { setResult(null); patch({ tab: t === "policies" ? "policies" : null, policyId: null }); }} tabs={[{ id: "alerts", label: t("Alerts"), count: live.total }, { id: "policies", label: t("Alert policies"), count: live.policies.count }]} />
+      <Tabs value={live.tab} onChange={(next) => { setResult(null); patch({ tab: next === "policies" ? "policies" : null, policyId: null }); }} tabs={[{ id: "alerts", label: t("Alerts"), count: live.total }, { id: "policies", label: t("Alert policies"), count: live.policies.count }]} />
       {result && <Banner tone={result.tone}>{result.text}</Banner>}
       {live.tab === "alerts" ? (
         <>
@@ -76,10 +81,10 @@ export function AlertsLiveView({ live }: Readonly<{ live: AlertsLive }>) {
           </div>
           {failed && <Banner tone="warn">{failed}</Banner>}
           <Card title={t("Needs attention")} sub={t("Unresolved warnings & faults — stays here until resolved, even after you read it")} action={<Badge tone="warn">{attn.length}</Badge>}>
-            {attn.length > 0 ? attn.map((a) => <Item key={a.id} a={a} />) : <p className="text-xs text-muted-foreground">{t(live.unreadOnly || live.severity ? "Nothing in this filter." : "Nothing needs your attention.")}</p>}
+            {attn.length > 0 ? attn.map((a) => renderItem(a)) : <p className="text-xs text-muted-foreground">{t(live.unreadOnly || live.severity ? "Nothing in this filter." : "Nothing needs your attention.")}</p>}
           </Card>
           <Card title={t("Reminders & information")} sub={t("Maintenance reminders, inspection records, notices and resolved alerts")} action={<Badge tone="muted">{info.length}</Badge>}>
-            {info.length > 0 ? info.map((a) => <Item key={a.id} a={a} />) : <p className="text-xs text-muted-foreground">{t("Nothing here.")}</p>}
+            {info.length > 0 ? info.map((a) => renderItem(a)) : <p className="text-xs text-muted-foreground">{t("Nothing here.")}</p>}
           </Card>
         </>
       ) : (

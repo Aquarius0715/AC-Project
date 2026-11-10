@@ -3,18 +3,19 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Banner, Btn, Card, EmptyState, Field, Input, ListRow, Modal, Page, Select, ScrollX } from "@ac/web/components/ui";
+import { Banner, Btn, Card, EmptyState, Field, Input, ListRow, Modal, Page, Select, ScrollX, Textarea } from "@ac/web/components/ui";
 import { JobStatusBadge } from "@ac/web/components/JobBits";
 import { useI18n, useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
-import { zonedParts } from "@ac/web/lib/i18n";
+import { byCount, zonedParts } from "@ac/web/lib/i18n";
 import { fromZonedInput, zonedInput } from "@ac/web/lib/adminJobs";
 import { anchorOf, cadence, everyText, generateConflict, nextBox, nextOccurrence, planDate, planErrors, planRefusal } from "@ac/web/lib/adminPlans";
-import type { JobStatus } from "@ac/web/lib/jobs";
-import { generateJob, savePlan } from "../actions";
+import { deletePlan, generateJob, savePlan } from "../actions";
 import type { PlansLive } from "../_lib/load";
 import { JobsTabs, ScopeBar } from "./jobs-header";
+import { setParams } from "@ac/web/lib/searchParams";
 import { Icon } from "@ac/web/components/Icon";
+import { DateTimeSelect } from "@ac/web/components/TimeSelect";
 
 type Detail = NonNullable<PlansLive["detail"]>;
 /** What the last write on a plan left to show: saved, generated (the box names the job), a refused Generate job (the
@@ -30,7 +31,12 @@ export function PlansView({ live }: Readonly<{ live: PlansLive }>) {
   const [creating, setCreating] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
   const sel = live.detail;
-  const href = (id: string) => `/admin/jobs?${new URLSearchParams({ ...Object.fromEntries(Object.entries(live.q).filter(([, v]) => v) as [string, string][]), tab: "plans", planId: id })}`;
+  const href = (id: string) => `/admin/jobs?${new URLSearchParams([...setParams(live.q), ["tab", "plans"], ["planId", id]])}`;
+  // the detail pane without a selected plan: the selected one is gone, or none is picked yet
+  const emptyText = () => {
+    if ("missing" in live) return t("That plan no longer exists in your scope.");
+    return t(live.rows.length > 0 ? "Pick a plan." : "No plan yet.");
+  };
   return (
     <Page className="max-w-[1440px]">
       <JobsTabs tab="plans" counts={live.counts} q={live.q} action={<Btn variant="primary" size="sm" onClick={() => { setCreating(true); }}><Icon name="add" /> {t("New plan")}</Btn>} />
@@ -39,7 +45,7 @@ export function PlansView({ live }: Readonly<{ live: PlansLive }>) {
         <Card title={t("Recurring plans")} sub={t("next due, soonest first")} className="self-start">
           {live.rows.length === 0 ? <EmptyState title={t("No plans in this scope")}>{t("“+ New plan” sets up a recurring visit for a unit.")}</EmptyState> : (
             <div className="flex flex-col gap-1.5">{live.rows.map((r) => (
-              <ListRow key={r.id} selected={sel ? sel.plan.id === r.id : false} href={href(r.id)}>
+              <ListRow key={r.id} selected={sel?.plan.id === r.id} href={href(r.id)}>
                 <div className="min-w-0 flex-1">
                   <b className="block truncate text-[13px]">{r.unit} · {r.customer}</b>
                   <div className="text-[11px] text-muted-foreground">{r.short}</div>
@@ -50,7 +56,7 @@ export function PlansView({ live }: Readonly<{ live: PlansLive }>) {
           )}
         </Card>
         {sel ? <PlanDetail key={`${sel.plan.id}:${String(sel.plan.version)}`} d={sel} now={Date.parse(live.now)} notice={notice?.planId === sel.plan.id ? notice : null} setNotice={setNotice} />
-          : <Card title={t("Plan")}><p className="text-[13px] text-muted-foreground">{t("missing" in live ? "That plan no longer exists in your scope." : (live.rows.length > 0 ? "Pick a plan." : "No plan yet."))}</p></Card>}
+          : <Card title={t("Plan")}><p className="text-[13px] text-muted-foreground">{emptyText()}</p></Card>}
       </div>
       {creating && <NewPlanModal live={live} onClose={() => { setCreating(false); }} onCreated={(id) => { setCreating(false); setNotice({ planId: id, kind: "saved", text: t("Plan created — Generate job creates the job of its first occurrence.") }); }} href={href} />}
     </Page>
@@ -60,21 +66,29 @@ export function PlansView({ live }: Readonly<{ live: PlansLive }>) {
 function PlanDetail({ d, now, notice, setNotice }: Readonly<{ d: Detail; now: number; notice: Notice | null; setNotice: (n: Notice | null) => void }>) {
   const i = useI18n(), { t } = i, zone = i.display.timeZone;
   const p = d.plan;
+  const router = useRouter();
   const [pending, run] = useAction();
+  const [removing, setRemoving] = useState<string | null>(null);
+  const remove = () => {
+    if (removing?.trim()) run(() => deletePlan(p.id, p.version, removing), t("Plan deleted"), () => { setRemoving(null); router.push("/admin/jobs?tab=plans"); });
+  };
   const [every, setEvery] = useState(p.recurrence.intervalMonths);
   const [next, setNext] = useState(zonedInput(p.nextDueAt, zone));
   const nextIso = next ? fromZonedInput(next, zone) || null : null;
   const isNextChanged = !!nextIso && Date.parse(nextIso) !== Date.parse(p.nextDueAt);
   const isDirty = every !== p.recurrence.intervalMonths || isNextChanged;
   const errors = planErrors({ unitId: p.unitId, nextDueAt: isNextChanged ? nextIso : p.nextDueAt, every }, now, t);
-  const anchor = nextIso ? anchorOf(isNextChanged ? null : p, isNextChanged ? nextIso : p.nextDueAt) : p.anchorDay;
+  const due = isNextChanged ? nextIso : p.nextDueAt;
+  const anchorPlan = isNextChanged ? null : p; // a changed next date starts a new anchor
+  const anchor = nextIso ? anchorOf(anchorPlan, due) : p.anchorDay;
   // the saved plan's following date comes from the loader; an edit computes it here
-  const then = isDirty ? (nextIso ? planDate(nextOccurrence(isNextChanged ? nextIso : p.nextDueAt, every, anchor), i.display) : null) : d.texts.then;
+  const following = nextIso ? planDate(nextOccurrence(due, every, anchor), i.display) : null;
+  const then = isDirty ? following : d.texts.after;
   const box = nextBox(p, now, isDirty, notice?.kind === "generated" ? notice : null, i, d.texts.next);
   const conflict = notice?.kind === "conflict" ? generateConflict(p, notice.attempted, i) : null;
   const save = () => {
     if (Object.keys(errors).length > 0) return;
-    const nextDueAt = isNextChanged ? nextIso! : p.nextDueAt;
+    const nextDueAt = isNextChanged ? nextIso : p.nextDueAt;
     run(() => savePlan({ id: p.id, version: p.version, unitId: p.unitId, intervalMonths: every, nextDueAt }), t("Plan saved"),
       () => { setNotice({ planId: p.id, kind: "saved", text: t("Plan saved — {every}, next due {date} (anchor day {n}).", { every: everyText(every, t).toLowerCase(), date: planDate(nextDueAt, i.display), n: anchor }) }); }, (f) => { setNotice({ planId: p.id, kind: "error", text: planRefusal(f, t) }); });
   };
@@ -92,7 +106,7 @@ function PlanDetail({ d, now, notice, setNotice }: Readonly<{ d: Detail; now: nu
         <div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>
           <Field label={t("Repeat")} hint={t("Only monthly recurrence is supported")}><Input value={t("Monthly")} disabled /></Field>
           <Field label={t("Every")} hint="1–12" error={errors.every}><Select value={String(every)} onChange={(e) => { setEvery(Number(e.target.value)); }}>{MONTHS.map((m) => <option key={m} value={m}>{t(m === 1 ? "1 month" : "{n} months", { n: m })}</option>)}</Select></Field>
-          <Field label={t("Next due")} hint={then ? t("Anchor day {n} · Recurrence uses UTC · then {date} · times in {zone}", { n: anchor, date: then, zone }) : t("Anchor day {n} · Recurrence uses UTC · times in {zone}", { n: anchor, zone })} error={errors.nextDueAt}><Input type="datetime-local" value={next} onChange={(e) => { setNext(e.target.value); }} /></Field>
+          <Field label={t("Next due")} hint={then ? t("Anchor day {n} · Recurrence uses UTC · then {date} · times in {zone}", { n: anchor, date: then, zone }) : t("Anchor day {n} · Recurrence uses UTC · times in {zone}", { n: anchor, zone })} error={errors.nextDueAt}><DateTimeSelect value={next} onChange={(v) => { setNext(v); }} /></Field>
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-3 rounded-2xl border border-[#b9cdf5] bg-primary-soft p-4">
           <div className="min-w-0 flex-1"><b className="text-[13px]">{box.title}</b><p className="text-xs text-muted-foreground">{box.text}</p></div>
@@ -106,18 +120,23 @@ function PlanDetail({ d, now, notice, setNotice }: Readonly<{ d: Detail; now: nu
             <tbody>{d.occurrences.map((o) => (
               <tr key={o.jobId} className="border-t border-line">
                 <td className="py-2 font-semibold">{o.date}</td><td className="text-xs">{o.jobId.slice(0, 8)}</td>
-                <td>{o.status ? <JobStatusBadge s={o.status as JobStatus} /> : <span className="text-xs text-muted-foreground">—</span>}</td>
+                <td>{o.status ? <JobStatusBadge s={o.status} /> : <span className="text-xs text-muted-foreground">—</span>}</td>
                 <td className="text-right"><Link className="text-xs font-semibold text-primary hover:underline" href={`/admin/jobs?jobId=${o.jobId}`}>{t("Open job")} <Icon name="arrowRight" /></Link></td>
               </tr>
             ))}</tbody>
           </table></ScrollX>
         )}
         <div className="mt-4 flex items-center justify-end gap-2">
+          {d.occurrences.length === 0 && <Btn variant="danger" disabled={pending} onClick={() => { setRemoving(""); }}>{t("Delete plan…")}</Btn>}
           {isDirty && <Btn disabled={pending} onClick={() => { setEvery(p.recurrence.intervalMonths); setNext(zonedInput(p.nextDueAt, zone)); }}>{t("Discard")}</Btn>}
           <Btn variant="primary" disabled={pending || !isDirty || Object.keys(errors).length > 0} onClick={save}>{t("Save plan")}</Btn>
         </div>
         <p className="mt-2 text-[11px] text-muted-foreground">{t("Generating creates one job for the saved next date only — no automatic generation or catch-up. Saving does not change jobs already generated.")}</p>
       </Card>
+      <Modal open={removing !== null} onClose={() => { setRemoving(null); }} title={t("Delete plan")} footer={<><Btn onClick={() => { setRemoving(null); }}>{t("Cancel")}</Btn><Btn variant="danger" disabled={pending || !removing?.trim()} onClick={remove}>{t("Delete")}</Btn></>}>
+        <p className="text-[13px]">{t("Delete this plan of {unit}? A plan that has made a job cannot be deleted.", { unit: d.unit })}</p>
+        <Field label={t("Reason")}><Textarea value={removing ?? ""} maxLength={1000} onChange={(e) => { setRemoving(e.target.value); }} /></Field>
+      </Modal>
     </div>
   );
 }
@@ -139,20 +158,20 @@ function NewPlanModal({ live, onClose, onCreated, href }: Readonly<{ live: Plans
   const save = () => {
     setTried(true);
     setRefusal(null);
-    if (Object.keys(errors).length > 0) return;
-    run(() => savePlan({ id: null, version: null, intervalMonths: every, nextDueAt: nextIso!, unitId }), t("Plan created"), (v) => { onCreated(v.id); router.push(href(v.id)); }, (f) => { setRefusal(planRefusal(f, t)); });
+    if (!nextIso || Object.keys(errors).length > 0) return;
+    run(() => savePlan({ id: null, version: null, intervalMonths: every, nextDueAt: nextIso, unitId }), t("Plan created"), (v) => { onCreated(v.id); router.push(href(v.id)); }, (f) => { setRefusal(planRefusal(f, t)); });
   };
   const groups = [...new Set(live.units.map((u) => u.customer))];
   const anchor = nextIso ? new Date(nextIso).getUTCDate() : null;
   return (
     <Modal open onClose={onClose} title={t("New maintenance plan")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={save}>{t("Create plan")}</Btn></>}>
       {refusal && <Banner tone="crit">{refusal}</Banner>}
-      <Field label={t("Unit · required")} error={tried ? errors.unitId : undefined} hint={existing.length > 0 ? t(existing.length === 1 ? "This unit already has 1 plan ({plans})." : "This unit already has {n} plans ({plans}).", { n: existing.length, plans: existing.map((r) => r.line.toLowerCase()).join("; ") }) : undefined}>
+      <Field label={t("Unit · required")} error={tried ? errors.unitId : undefined} hint={existing.length > 0 ? byCount(existing.length, { one: t("This unit already has 1 plan ({plans}).", { plans: existing.map((r) => r.line.toLowerCase()).join("; ") }), many: t("This unit already has {n} plans ({plans}).", { n: existing.length, plans: existing.map((r) => r.line.toLowerCase()).join("; ") }) }) : undefined}>
         <Select value={unitId} onChange={(e) => { setUnitId(e.target.value); }}>{groups.map((g) => <optgroup key={g} label={g}>{live.units.filter((u) => u.customer === g).map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</optgroup>)}</Select>
       </Field>
       <div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>
         <Field label={t("Every")} hint={t("Monthly recurrence, 1–12 months")} error={tried ? errors.every : undefined}><Select value={String(every)} onChange={(e) => { setEvery(Number(e.target.value)); }}>{MONTHS.map((m) => <option key={m} value={m}>{t(m === 1 ? "1 month" : "{n} months", { n: m })}</option>)}</Select></Field>
-        <Field label={t("First visit · next due")} hint={nextIso && anchor ? t("Anchor day {n} · Recurrence uses UTC · then {date} · times in {zone}", { n: anchor, date: planDate(nextOccurrence(nextIso, every, anchor), i.display), zone }) : undefined} error={tried ? errors.nextDueAt : undefined}><Input type="datetime-local" value={next} onChange={(e) => { setNext(e.target.value); }} /></Field>
+        <Field label={t("First visit · next due")} hint={nextIso && anchor ? t("Anchor day {n} · Recurrence uses UTC · then {date} · times in {zone}", { n: anchor, date: planDate(nextOccurrence(nextIso, every, anchor), i.display), zone }) : undefined} error={tried ? errors.nextDueAt : undefined}><DateTimeSelect value={next} onChange={(v) => { setNext(v); }} /></Field>
       </div>
       <Banner>{t("Each occurrence becomes a periodic job (requested) at this time of day when HQ presses Generate job; HQ then books it like any agreed time.")}</Banner>
     </Modal>
