@@ -10089,3 +10089,13 @@ Found in review round 272 (`shared/lib/partnerHistory.ts`) and decided by the us
 3. **The timelines.** The contractor's, HQ's and the customer's timelines title them "Report accepted" and "Returned for rework" (texts already in Malay and Japanese). The customer is still not told who decided (review 2026-10-15); the customer already sees the job's "Rework requested" status. A return is a warning in the contractor's history. The job detail's "Completed" step takes the acceptance, or an old `job.reviewed`.
 4. **Figma.** The wireframes' timelines that show "Report reviewed" are to be brought in step (not checked in this round: the Figma tools were not available).
 5. **Tests.** `TestWorkReports` reads `job.review_returned` for v5 and `job.review_accepted` for v7 (it read two `job.reviewed` before). The integration suite's job event title check refuses an action without a title in `jobEventTitle`. `partnerHistory.test.ts` (titles and tones) and `partnerJobDetail.test.ts` (the Completed step) cover the web.
+
+
+## IR741 A chart's y range follows the size of its values — 2026-11-10
+
+Found in review round 283 (`shared/lib/chartScale.ts`, never reviewed by name).
+
+1. **Before.** `axisRange` scales each axis of a chart with several lines (IR689: the technician's unit monitoring, any metric of the unit, and the customer's air quality chart). It padded the values by at least 1 and rounded the ends to whole numbers. A power of 0.4–1.2 kW was drawn on an axis from −1 to 3: the line filled a fifth of the height and the axis showed a negative kW. A PM2.5 of 0–3 got an axis from −1.
+2. **Now.** The room is 15 % of the values' span or 5 % of the largest value, whichever is more (1 only for a flat zero line). The ends round to the room's magnitude, so 0.4–1.2 kW gets 0.2–1.4. Values that are all zero or more get no axis below zero. Temperatures keep their ranges (22–26 °C: 20–28). The gridlines (`axisTicks`) are unchanged: 0.2–1.4 gets 0.5 and 1.
+3. **Also.** `partnerJobs.ts` reads a job's `origin` and `assignmentAcknowledgement` without type assertions (CLAUDE.md §1); both were already narrowed by the projection. Same behaviour.
+4. **Tests.** `chartScale.test.ts` (new): the kW and PM2.5 cases (both failed before with −1), a flat zero line, the temperature ranges, values below zero, and the gridlines.
