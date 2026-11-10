@@ -6605,7 +6605,7 @@ Found in review: the outbox consumers (IR183) stop at the first failing event to
 Found in review: database design §6 sets the retention of the outbox (7 days), the idempotency keys (24 hours) and the processed-event records (14 days), but nothing deleted any of them; the tables grew without bound, and the `outbox` worker role only idled.
 
 1. `worker --role=outbox` runs `events.Housekeep` every hour on the business clock: it deletes outbox events older than 7 days that every consumer subscribing to their type has applied or dead-lettered (an event a consumer still needs stays), the processed-event records of events no longer in the outbox once they are 14 days old (so nothing is delivered twice), the failure records of such events (IR427), and the expired idempotency keys tenant by tenant (row-level security). Each run logs what it removed.
-2. The same run deletes, tenant by tenant, the notifications older than two years with their deliveries, and the outbound e-mails created before then that are no longer queued (`notify.SweepAll`).
+2. The same run deletes, tenant by tenant, the notifications older than two years with their deliveries, and the outbound e-mails created before then that are no longer queued (`notify.SweepAll`). *IR479 dropped `notify.outbound_mail` with the pre-IR461 invitation queue, and that delete with it: since then the run deletes the old notifications and their deliveries only — an e-mail notification is one of those deliveries (IR762).*
 3. Tests: `TestHousekeep`, `TestNotificationMail` (an old notification goes with its delivery, a recent one stays).
 
 ## IR429 A repeating failure of a polling loop is logged once a minute — 2026-10-14
@@ -10261,3 +10261,11 @@ Found in review round 657 (`platform/events/housekeeping.go`).
 1. **Before.** The idempotency store writes `expires_at = platform.app_now() + 24 hours` and checks expiry with `platform.app_now()` in transactions that never set `app.now`, so both use the database time (IR36). The hourly housekeeping (IR428) deleted keys `WHERE expires_at < $1`, where `$1` is the business clock. In a demo whose clock was moved forward (`demo.advanceClock`), a key written a moment ago already counted as expired for the sweep and was deleted. A retry with that key, still inside its real 24 hours, then ran the write a second time instead of getting the stored response (D04). With the business clock behind real time, keys only stayed longer.
 2. **Now.** The sweep deletes keys `WHERE expires_at < now()`, the clock they are written and checked with. The outbox and processed-event retention keep using the business clock: they compare business times with business times, and a processed record is deleted only once its event has left the outbox.
 3. **Tests.** `TestHousekeepKeepsAnIdempotencyKeyByTheDatabaseTime` sweeps a key that has an hour of database time left, with the business clock three days ahead. The key was deleted before the fix and is kept now. `TestHousekeep`'s key expired in the year 2000, so it is still swept.
+
+## IR762 IR428 no longer describes the dropped invitation e-mail table — 2026-11-11
+
+Found in review round 671 (`notify.Sweep` against IR428).
+
+1. **Before.** IR428 item 2 said that the hourly run also deletes "the outbound e-mails created before then that are no longer queued". That was `notify.outbound_mail`, the invitation e-mail queue from before IR461. IR479 dropped the table and its delete, but did not amend IR428, so the contract still described a table and a sweep that no longer exist. `database-design.md` §6 already listed only the notifications and their deliveries.
+2. **Now.** IR428 item 2 carries a note: since IR479 the run deletes the old notifications and all their deliveries only; an e-mail notification is one of those deliveries. No code changes.
+3. **Checks.** A scan of `docs/02-design` for schema-qualified names that migration 000001 does not define finds no other dropped table described as live. The other hits are operation and permission names, a trigger function, an internal query, and `maintenance.ref_devices`, which is already marked as dropped.
