@@ -22,6 +22,16 @@ describe("actionMessage (one toast line per failed Server Action)", () => {
     expect(actionMessage(failure({ code: "CONFLICT", messageKey: "error.duplicateMqttNode" }))).toBe("Another device already has this MQTT node ID");
     expect(actionMessage(failure({ code: "CONFLICT", messageKey: "error.duplicateMqttNode" }), translator("ms"))).toBe("Peranti lain sudah mempunyai ID nod MQTT ini");
   });
+  it("says why an import commit is refused, in the display language (IR751, IR754)", () => {
+    const inactive = failure({ code: "CONFLICT", messageKey: "error.customerInactive" });
+    const expired = failure({ code: "CONFLICT", messageKey: "error.previewExpired" });
+    expect([actionMessage(inactive), actionMessage(expired)]).toStrictEqual([
+      "This customer is inactive — activate it first",
+      "The checked file has expired or changed — check it again, then import",
+    ]);
+    expect(actionMessage(inactive, translator("ms"))).not.toContain("CONFLICT");
+    expect(actionMessage(expired, translator("ja"))).not.toContain("CONFLICT");
+  });
   it("explains version conflicts, domain errors and bare codes", () => {
     expect(actionMessage(failure({ code: "CONFLICT", messageKey: "error.versionConflict" }))).toMatch(/changed this in the meantime/);
     expect(actionMessage(failure({ code: "CONFLICT", messageKey: "errors.operation_not_running" }))).toBe("Operation not running");

@@ -5899,6 +5899,8 @@ export const ms: Record<string, string> = {
   "Contractor deleted": "Kontraktor dipadam",
   "Delete {name}? Its profile, rate cards and unavailability are removed with it. A company with jobs, offers, certificates, payouts or users cannot be deleted.": "Padam {name}? Profil, kad kadar dan ketidaktersediaannya dipadam bersama. Syarikat yang mempunyai kerja, tawaran, sijil, bayaran atau pengguna tidak boleh dipadam.",
   "This customer still has units — delete them first": "Pelanggan ini masih mempunyai unit — padamkannya dahulu",
+  "This customer is inactive — activate it first": "Pelanggan ini tidak aktif — aktifkannya dahulu",
+  "The checked file has expired or changed — check it again, then import": "Fail yang disemak telah tamat tempoh atau berubah — semak semula, kemudian import",
   "This customer has jobs, contracts, invoices, reports or users, so it cannot be deleted": "Pelanggan ini mempunyai kerja, kontrak, invois, laporan atau pengguna, jadi tidak boleh dipadam",
   "This contractor has jobs, offers, certificates, payouts or users, so it cannot be deleted": "Kontraktor ini mempunyai kerja, tawaran, sijil, bayaran atau pengguna, jadi tidak boleh dipadam",
   "This organization still has a customer or contractor profile — delete that first": "Organisasi ini masih mempunyai profil pelanggan atau kontraktor — padamkannya dahulu",
