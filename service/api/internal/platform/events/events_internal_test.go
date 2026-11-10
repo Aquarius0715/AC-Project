@@ -651,3 +651,54 @@ func checkSwept(t *testing.T, runner testRunner, tenant uuid.UUID, rows sweptRow
 		t.Errorf("expired idempotency key: %d", left)
 	}
 }
+
+// An idempotency key expires on the database's time, the clock the store writes and checks it with (IR36), not on the
+// business clock of the sweep: with a demo clock moved days ahead, a key written a moment ago stays for its 24 hours,
+// so a retry with it still gets the stored response instead of running the write again (D04, IR761).
+//
+//nolint:paralleltest // shares the test database with the other DB tests
+func TestHousekeepKeepsAnIdempotencyKeyByTheDatabaseTime(t *testing.T) {
+	runner := testDB(t)
+	tenant := firstTenant(t, runner)
+	key := "hk-clock-" + uuid.NewString()
+
+	execAs(
+		t,
+		runner,
+		tenantPrincipal(tenant),
+		`INSERT INTO platform.idempotency_keys (tenant_id, membership_id, key, operation, request_hash, status, created_at,
+			expires_at)
+		VALUES ($1, $2, $3, 'test', '\x00', 'completed', now(), now() + interval '1 hour')`,
+		tenant,
+		uuid.New(),
+		key,
+	)
+
+	t.Cleanup(func() {
+		execAs(
+			t,
+			runner,
+			tenantPrincipal(tenant),
+			`DELETE FROM platform.idempotency_keys WHERE key = $1`,
+			key,
+		)
+	})
+
+	_, err := Housekeep(context.Background(), runner, time.Now().Add(72*time.Hour), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if left := countAs(
+		t,
+		runner,
+		tenantPrincipal(tenant),
+		`SELECT count(*) FROM platform.idempotency_keys WHERE key = $1`,
+		key,
+	); left != 1 {
+		t.Errorf(
+			"a key with an hour left, swept with the business clock 3 days ahead: %d left",
+			left,
+		)
+	}
+}

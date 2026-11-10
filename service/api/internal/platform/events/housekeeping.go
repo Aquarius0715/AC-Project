@@ -28,7 +28,7 @@ type Swept struct{ Outbox, Processed, Failures, IdempotencyKeys int64 }
 //     needs stays, however old;
 //   - processed-event records and failure records of events that are no longer in the outbox, the former once they
 //     are older than ProcessedRetention, so an event is never delivered twice;
-//   - idempotency keys past their expiry, tenant by tenant (the table has row-level security).
+//   - idempotency keys past their expiry on the database's time, tenant by tenant (the table has row-level security).
 func Housekeep(
 	ctx context.Context,
 	runner ops.Runner,
@@ -90,14 +90,16 @@ func Housekeep(
 		return swept, apperr.Wrap(err, "ops.Runner.Run")
 	}
 
-	swept.IdempotencyKeys, err = sweepIdempotencyKeys(ctx, runner, now)
+	swept.IdempotencyKeys, err = sweepIdempotencyKeys(ctx, runner)
 
 	return swept, err
 }
 
 // sweepIdempotencyKeys deletes the idempotency keys past their expiry, tenant by tenant (the table has row-level
-// security), and returns how many it deleted, also when a tenant fails.
-func sweepIdempotencyKeys(ctx context.Context, runner ops.Runner, now time.Time) (int64, error) {
+// security), and returns how many it deleted, also when a tenant fails. The expiry is the database's time, the clock
+// the store writes and checks it with (IR36), not the business clock of the sweep: a demo clock moved ahead must not
+// end a key early, or a retry with it would run its write again (D04, IR761).
+func sweepIdempotencyKeys(ctx context.Context, runner ops.Runner) (int64, error) {
 	var (
 		tenants []uuid.UUID
 		swept   int64
@@ -137,8 +139,7 @@ func sweepIdempotencyKeys(ctx context.Context, runner ops.Runner, now time.Time)
 			func(tx pgx.Tx) error {
 				tag, err := tx.Exec(
 					ctx,
-					`DELETE FROM platform.idempotency_keys WHERE expires_at < $1`,
-					now,
+					`DELETE FROM platform.idempotency_keys WHERE expires_at < now()`,
 				)
 				swept += tag.RowsAffected()
 
