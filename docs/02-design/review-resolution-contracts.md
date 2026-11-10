@@ -10078,3 +10078,14 @@ Found in review rounds 265–266 and decided by the user as recommended (B-21). 
 3. **What still stops a delete** is unchanged: units, jobs, contracts, invoices, inquiries, restrictions, reports, offset records and accounts.
 4. **Earlier deletes.** A consumer reads the outbox's events of its types that it has not applied yet, oldest first, so the `CustomerDeleted` events written before this release (still in the outbox) are applied at its first run: the rows those customers left behind are removed then.
 5. **Tests.** `TestCustomerDeleteRemovesItsSettings`: HQ makes a customer, an alert policy for it and one for another customer, a default rule switch, and a filter care settings row; after the delete and the events, the three rows of the deleted customer are gone and the other customer's policy stays. It failed before the change. `make test-all` passes (the packages, the integration shards and the cluster suite).
+
+
+## IR740 A report review's event names its decision — 2026-11-10
+
+Found in review round 272 (`shared/lib/partnerHistory.ts`) and decided by the user as recommended (B-22).
+
+1. **Before.** `jobs.review` wrote one job event, `job.reviewed`, for both decisions, and `maintenance.job_events` keeps no decision. The contractor's history titled it "Report reviewed" and coloured it ok, so a return for rework looked like an acceptance. The contractor's job detail took the "Completed" step's time from it, so a return set the completion time.
+2. **Now.** `jobs.review` writes `job.review_accepted` or `job.review_returned`. Rows written before keep `job.reviewed` and read as before ("Report reviewed").
+3. **The timelines.** The contractor's, HQ's and the customer's timelines title them "Report accepted" and "Returned for rework" (texts already in Malay and Japanese). The customer is still not told who decided (review 2026-10-15); the customer already sees the job's "Rework requested" status. A return is a warning in the contractor's history. The job detail's "Completed" step takes the acceptance, or an old `job.reviewed`.
+4. **Figma.** The wireframes' timelines that show "Report reviewed" are to be brought in step (not checked in this round: the Figma tools were not available).
+5. **Tests.** `TestWorkReports` reads `job.review_returned` for v5 and `job.review_accepted` for v7 (it read two `job.reviewed` before). The integration suite's job event title check refuses an action without a title in `jobEventTitle`. `partnerHistory.test.ts` (titles and tones) and `partnerJobDetail.test.ts` (the Completed step) cover the web.

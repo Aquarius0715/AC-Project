@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.597.0
+version: 0.598.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -301,6 +301,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.598.0: IR740: the job history tells an accepted report from one returned for rework (two job events instead of one). Phase 1A unchanged.
 0.597.0: IR739: deleting a customer also deletes its alert policies, default rule switches and filter care settings (the CustomerDeleted event, B-21). Phase 1A unchanged.
 0.596.0: IR738: the payout statement PDF continues on further pages after 64 lines; a statement longer than one page no longer loses its last lines and totals. Phase 1A unchanged.
 0.595.0: IR737: the return dialogs offer one re-measure item per reading label; two readings of the same metric and part no longer give two items with one label. Phase 1A unchanged.
