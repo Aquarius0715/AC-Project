@@ -9788,3 +9788,17 @@ In a transition the rejection reached the route's error boundary and the typed f
 1. **Reproduced.** `shared/lib/tests/callbackToken.test.ts` runs the callback with a matching state and a token endpoint that answers an HTML page, or rejects with a timeout. Both throw before the fix: `SyntaxError: Unexpected token '<'` and `TimeoutError`.
 2. **Fix.** `exchange` posts the code with a 10-second timeout (`AbortSignal.timeout`). It returns the parsed token response, or null on a refusal, on a body that is not a token response, on an error or on no answer in time. Null sends the sign-in to `/login?error=token`, as a refusal did before.
 3. **Not changed.** The PKCE and state checks, the role and membership checks, the revoked sign-in (IR384 / IR385), the session (IR382) and the address handling (IR651). Every operation, route and count stays the same.
+
+## IR720 The shared test environment keeps Mailpit on the server and its own demo passwords (B-15, decided 2026-11-10)
+
+The shared test environment (DEC-93 / DEC-96) holds the real air conditioner at customer-a, with `REAL_MQTT_COMMANDS=1`. Two things let anyone who reaches the server on the lab network or the Tailnet take over an account there:
+- Mailpit was published on all addresses, and its inbox holds every set-up and password-reset link.
+- The ten demo users kept the passwords of `docker/keycloak/realm-ac.json`, which are in the repository. Only HQ needs a one-time code, so customer-a's password alone switched the real AC.
+
+The user took B-15's recommendation.
+
+1. **Mailpit.** `deploy/test/compose.test.yaml` publishes it on `127.0.0.1:${MAILPIT_PORT:-8225}` (`!override`), whatever `PUBLISH_ADDR` is. It is read through an SSH tunnel: `ssh -L 8225:127.0.0.1:8225 <server>`. The dev stack keeps its loopback default.
+2. **Demo passwords.** The environment file names `DEMO_USER_PASSWORD`, which `setup.sh` writes for a new environment. `realm.py` puts it on every demo user's password credential when it writes a new realm. `configure.sh` (the `keycloak-config` one-shot of every start) sets it with `kcadm.sh set-password` on the ten users of `realm-ac.json` in a realm that exists. The password is passed in `KC_CLI_PASSWORD`, not on the command line. An empty value (dev, CI, E2E) changes nothing.
+3. **Tests.** `deploy/test/test_realm.py` (in CI's Python and shell job): with `DEMO_USER_PASSWORD` every password credential is that value (failed before), and without it the local passwords stay. `docker compose config` of the test files shows Mailpit on 127.0.0.1 (0.0.0.0 before).
+4. **For the running environment.** Mailpit moves to the loopback at the next deployment. The demo passwords change only once `DEMO_USER_PASSWORD=<a secret>` is added to `~/ac-test/env` by hand: `setup.sh` keeps an existing file. The value is then the team's password for the demo users there.
+5. **Not changed.** The apps, Keycloak's ports, the users the team invited (only the ten demo users are set) and every operation.
