@@ -10007,3 +10007,19 @@ With the repository public (IR732), the code and documents keep no address of th
    - On the server, `gh secret set AC_TEST_ENV_FILE --env test < ~/ac-test/env` sets the secret without printing it.
    - In the repository settings, the Environment `test` takes deployments from `main` and the tags `test*` only. A required reviewer is optional: it would hold every automatic deployment until approved.
 
+
+## IR734 The first GitHub alerts after the repository became public — 2026-11-10
+
+With the repository public (IR732), code scanning (CodeQL) and Dependabot alerts were turned on. The first findings:
+
+1. **CodeQL js/incomplete-sanitization (high), `shared/lib/twoFactor.ts`.**
+   - `otpauthUri` encoded "issuer:account" as one string and then turned back only the first `%3A` into the label's separator. CodeQL reads a single `replace` of `%3A` as escaping left incomplete.
+   - The result was right: the Key URI format allows one colon, the separator, and a colon of the account stays encoded. The way of writing it was what CodeQL flagged.
+   - The label is now built as `encodeURIComponent(ISSUER)` + `:` + `encodeURIComponent(account)`, with the same output. `twoFactor.test.ts` already holds it, including an account with a colon ("Demo User:1" → `AC%20Project:Demo%20User%3A1`).
+2. **minimatch (medium), GHSA "potential denial of service via globparts amplification", vulnerable from 7.0.0 to before 11.0.1.**
+   - The workspace had 10.2.6, through development tools only: eslint (config-array), eslint-plugin-sonarjs, typescript-eslint and ts-morph. All of them ask for `^10`, and no 10.x is fixed.
+   - `service/web/package.json` overrides `minimatch@^10` with 11.0.5, and the lock is regenerated. 3.1.5, also in the tree, is outside the range.
+   - The web lint, typecheck, knip and the tests run on it unchanged.
+3. **deepmerge (low), GHSA-gcqx-w48m-w2h4, prototype poisoning, no fixed version yet.**
+   - It comes only with the shadcn CLI (`shadcn` and `@shadcn/registry`), which adds components on a developer's machine. It is not in any app's bundle or server.
+   - Nothing to upgrade to: the alert stays open until a fixed version exists, or the user dismisses it as a tolerable risk.
