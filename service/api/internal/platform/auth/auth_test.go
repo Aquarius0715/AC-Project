@@ -500,3 +500,79 @@ func TestPrincipalNamesTheAddressOfTheSignIn(t *testing.T) {
 		t.Errorf("the shared principal took the address %q", shared.IssuerHost)
 	}
 }
+
+// TestRecordSignInHost: a sign-in records the host of its token's issuer, where the user's e-mails then link (IR721);
+// a later sign-in without one (an internal call) keeps it.
+//
+//nolint:paralleltest // shares the test database with the other DB tests
+func TestRecordSignInHost(t *testing.T) {
+	authenticator := setup(t)
+	ctx := context.Background()
+
+	owner, err := pgx.Connect(
+		ctx,
+		"postgres://postgres:local@localhost:5432/ac_test?sslmode=disable",
+	)
+	if err != nil {
+		t.Skip("database not available:", err)
+	}
+
+	t.Cleanup(func() { _ = owner.Close(ctx) })
+
+	const tailnetHost = "100.99.169.116"
+
+	user := seed.ID("user-customer-b")
+	reset := func() {
+		_, resetErr := owner.Exec(
+			ctx,
+			`UPDATE identity.users SET last_sign_in_at = NULL, sign_in_auth_time = NULL,
+			sign_in_host = NULL WHERE id = $1`,
+			user,
+		)
+		if resetErr != nil {
+			t.Fatal(resetErr)
+		}
+	}
+
+	reset()
+	t.Cleanup(reset)
+
+	loaded, err := authenticator.Load(
+		ctx,
+		user.String(),
+		seed.ID("tenant-a"),
+		seed.ID("customer-b"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	onTailnet := *loaded
+	onTailnet.IssuerHost = tailnetHost
+	signedIn := time.Date(2026, 9, 13, 22, 0, 0, 0, time.UTC)
+	authenticator.RecordSignIn(ctx, &onTailnet, signedIn)
+
+	cold := &auth.Authenticator{
+		DB:       authenticator.DB,
+		Now:      authenticator.Now,
+		Verifier: nil,
+		Source:   nil,
+	}
+	cold.RecordSignIn(
+		ctx,
+		loaded,
+		signedIn.Add(time.Hour),
+	) // no issuer host: the recorded one stays
+
+	var host *string
+
+	scanErr := owner.QueryRow(ctx, `SELECT sign_in_host FROM identity.users WHERE id = $1`, user).
+		Scan(&host)
+	if scanErr != nil {
+		t.Fatal(scanErr)
+	}
+
+	if host == nil || *host != tailnetHost {
+		t.Fatalf("sign-in host: %v", host)
+	}
+}

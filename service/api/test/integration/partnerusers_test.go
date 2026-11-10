@@ -1027,7 +1027,7 @@ func TestNotificationMailRetry(t *testing.T) {
 			context.Background(),
 			srv.DB,
 			sender,
-			notify.Apps{Customer: "http://c", Partner: "", Technician: "", Admin: ""},
+			notify.Apps{Customer: "http://c", Partner: "", Technician: "", Admin: "", Hosts: nil},
 			when,
 			500,
 		)
@@ -1134,7 +1134,7 @@ func TestNotificationMail(t *testing.T) {
 		context.Background(),
 		srv.DB,
 		sender,
-		notify.Apps{Customer: "http://c", Partner: "", Technician: "", Admin: ""},
+		notify.Apps{Customer: "http://c", Partner: "", Technician: "", Admin: "", Hosts: nil},
 		clock(),
 		500,
 	)

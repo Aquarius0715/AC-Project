@@ -352,6 +352,7 @@ services:
       APP_URL_PARTNER: ${PARTNER_WEB_URL:-http://localhost:3001}
       APP_URL_TECHNICIAN: ${TECHNICIAN_WEB_URL:-http://localhost:3002}
       APP_URL_ADMIN: ${ADMIN_WEB_URL:-http://localhost:3003}
+      PUBLIC_HOSTS: ${PUBLIC_HOSTS:-}   # an e-mail links to the listed address its recipient last signed in on (IR721)
     depends_on:
       migrate: { condition: service_completed_successfully }
       mailpit: { condition: service_started }
