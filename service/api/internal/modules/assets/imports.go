@@ -802,8 +802,10 @@ func takePreview(
 		return taken, apperr.Wrap(err, "delete assets.unit_import_previews")
 	}
 
+	// FOR SHARE, as customerActive reads it for properties.save and units.save (IR667, IR751): a customer delete or
+	// deactivation and the commit never both pass
 	scanErr := call.Tx.QueryRow(ctx, `SELECT organization_id FROM assets.customers WHERE id = $1 AND status =
-		'active'`, taken.customer).
+		'active' FOR SHARE`, taken.customer).
 		Scan(&taken.org)
 	if scanErr != nil {
 		return taken, conflict(apperr.KeyCustomerInactive)
