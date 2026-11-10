@@ -430,6 +430,26 @@ func TestDeviceBindAndOperations(t *testing.T) {
 		code, m := write(srv, hq(), "devices.calibrate", body, version)
 		refusal(t, name, code, m, want[name])
 	}
+	// a calibration entered late, done before the last one, joins the history but leaves the sensor's latest (IR748)
+	if code, res := write(
+		srv,
+		hq(),
+		"devices.calibrate",
+		`{"deviceId":"`+dev+`","sensorId":"`+sensor+`","metric":"temperature","unit":"°C","referenceValue":25,`+
+			`"measuredValue":25.1,"calibratedAt":"2026-09-14T00:10:00Z"}`,
+		version,
+	); code != 200 {
+		t.Fatalf("late calibration: %d %v", code, res)
+	}
+
+	version++
+
+	var latest time.Time
+	ownerScan(t, `SELECT calibrated_at FROM devices.sensors WHERE id = $1`, []any{sensor}, &latest)
+
+	if want := time.Date(2026, 9, 14, 0, 30, 0, 0, time.UTC); !latest.Equal(want) {
+		t.Errorf("sensor calibratedAt after a late entry: %v, want %v", latest, want)
+	}
 
 	code, resp = write(srv, hq(), "devices.check", `{"id":"`+dev+`"}`, version)
 	if code != 200 || data(resp)["status"] != statusQueued || data(resp)["kind"] != "check" {

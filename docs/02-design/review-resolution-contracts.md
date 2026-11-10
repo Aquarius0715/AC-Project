@@ -10142,3 +10142,11 @@ Found in review round 412 (`maintenance/jobs.go`).
 2. **Now.** The cancel stores the caller's user ID. Rows written before keep the membership ID; no reader resolves the value to a person.
 3. **The rest of the code.** The other actor columns that take `call.Principal.MembershipID` (alerts acknowledged_by / resolved_by, payout questions asked_by / resolved_by, inquiries answered_by) are not in any contract type and are written the same way throughout; they are unchanged.
 4. **Tests.** `TestCancelWithdrawsOpenProposals` also checks that the cancelled offer is decided by HQ's user (failed before with the membership ID).
+
+## IR748 A late calibration entry keeps the sensor's latest calibration — 2026-11-11
+
+Found in review round 429 (`devices/operations.go`).
+
+1. **Before.** `devices.calibrate` takes `calibratedAt` in the past (only the future is refused, DD-T11) and appends a CalibrationRecord, then set the sensor's `calibratedAt` to that time. A calibration entered late — done before the sensor's last one — moved `Sensor.calibratedAt` back, so the device screens ("Calibrated", technician and HQ) showed an older calibration than the history held.
+2. **Now.** The sensor takes the later of its time and the new one (`GREATEST`, a sensor never calibrated takes the new time). The record is appended as before; the history stays append-only (CalibrationRecord, implementation contracts).
+3. **Tests.** `TestDeviceBindAndOperations`: after a calibration at 00:30 a late entry for 00:10 is accepted and the sensor still reads 00:30 (failed before with 00:10).

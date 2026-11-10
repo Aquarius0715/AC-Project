@@ -1179,7 +1179,7 @@ func matchSensor(ctx context.Context, call *ops.Call, input *CalibrateInput) err
 	return nil
 }
 
-// insertCalibration stores the calibration record and the sensor's calibratedAt.
+// insertCalibration stores the calibration record and, when it is the later one, the sensor's calibratedAt.
 func insertCalibration(
 	ctx context.Context,
 	call *ops.Call,
@@ -1206,9 +1206,10 @@ func insertCalibration(
 		return apperr.Wrap(err, "insert devices.calibration_records")
 	}
 
+	// the sensor keeps its latest calibration: one entered late, done earlier, only joins the history (IR748)
 	_, err = call.Tx.Exec(
 		ctx,
-		`UPDATE devices.sensors SET calibrated_at = $2 WHERE id = $1`,
+		`UPDATE devices.sensors SET calibrated_at = GREATEST(calibrated_at, $2) WHERE id = $1`,
 		input.SensorID,
 		input.CalibratedAt,
 	)
