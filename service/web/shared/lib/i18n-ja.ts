@@ -5556,7 +5556,6 @@ export const ja: Record<string, string> = {
   "The device was rebound — reload to pick it again": "デバイスが再紐づけされました — 再読み込みして、もう一度選んでください",
   "The fault was already restored or replaced — reload": "障害はすでに復旧または置き換えられています — 再読み込みしてください",
   "This device is not visible to you any more": "このデバイスは、もう表示できません",
-  "Not done — try again": "実行できませんでした — もう一度お試しください",
   "Clock advanced +1 min (demo)": "時計を +1 分進めました（デモ）",
   "Clock advanced +1 hour (demo)": "時計を +1 時間進めました（デモ）",
   "Clock advanced +{n} hours (demo)": "時計を +{n} 時間進めました（デモ）",

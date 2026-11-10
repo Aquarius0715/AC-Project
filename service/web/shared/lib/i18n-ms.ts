@@ -5704,7 +5704,6 @@ export const ms: Record<string, string> = {
   "The device was rebound — reload to pick it again": "Peranti telah diikat semula — muat semula untuk memilihnya lagi",
   "The fault was already restored or replaced — reload": "Kerosakan telah dipulihkan atau diganti — muat semula",
   "This device is not visible to you any more": "Peranti ini tidak lagi boleh dilihat oleh anda",
-  "Not done — try again": "Tidak dilakukan — cuba lagi",
   // the demo controls of the browser demo
   "Clock advanced +1 min (demo)": "Jam dimajukan +1 min (demo)",
   "Clock advanced +1 hour (demo)": "Jam dimajukan +1 jam (demo)",

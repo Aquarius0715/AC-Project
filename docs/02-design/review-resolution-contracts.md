@@ -10107,3 +10107,12 @@ Found in review round 333 (`control/automations.go`).
 1. **Before.** SR02: a location condition needs the consent of the rule's owner (the rule acts for that owner, and revoking the consent disables the owner's location rules). `automations.save` checked the consent of the caller. Any member of the customer with control.execute may edit the customer's rules, and an edit keeps the rule's owner. So a member who had consented could turn another member's rule into a location rule, or turn a location rule that had been disabled by its owner's revocation back on, without the owner's consent. Firing already checks the owner (`evaluate.go`), so such a rule then never ran, but it was stored as if allowed.
 2. **Now.** A new rule checks the caller's consent (the caller becomes its owner). An update checks the consent of the rule's owner, after the row is read and the version checked. The refusal is the same: VALIDATION `condition=errors.consent_required`.
 3. **Tests.** `TestAutomationLocationNeedsOwnersConsent`: a consented member's save of another member's rule as a location rule is refused (it answered 200 before). The existing location tests (an owner without consent is refused, with consent it saves) still pass.
+
+## IR743 A refused demo operation does not repeat "Not done" — 2026-11-11
+
+Found in review round 297 (`shared/lib/demoPanel.ts`).
+
+1. **Before.** The demo panel (FR-X05) shows a refused demo operation as "Not done: {reason}", and `demoRefusal`'s reason for any other refusal was "Not done — try again", so the banner read "Not done: Not done — try again" (and likewise in Malay and Japanese).
+2. **Now.** That reason is "Try again" (already in the Malay and Japanese dictionaries). The unused "Not done — try again" entries are removed from both.
+3. **Not changed.** The device picker still shows the raw connection code and an English "Unit" when a unit has no name; the panel is the demo's own control screen.
+4. **Tests.** `demoPanel.test.ts`: the fallback is "Try again", and no reason starts with "Not done" (failed before). `i18n.test.ts` keeps the dictionaries free of unused entries.
