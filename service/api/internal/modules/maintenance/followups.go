@@ -452,6 +452,15 @@ func (m FollowUps) reportProblemJob(
 		!call.Now.Before(state.completedAt.Add(7*24*time.Hour)) {
 		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
+	// an archived unit takes no new job (IR39, IR746), as jobs.create and plans.generateNext refuse
+	_, archived, found, err := m.Jobs.Units.UnitState(ctx, call, state.unit)
+	if err != nil {
+		return Job{}, apperr.Wrap(err, "maintenance.JobUnits.UnitState")
+	}
+
+	if !found || archived {
+		return Job{}, apperr.E(apperr.Conflict, apperr.KeyUnitArchived)
+	}
 
 	requested, preferred, err := followUpSlots(call.Now, input.PreferredSlot)
 	if err != nil {
