@@ -432,6 +432,30 @@ func inviteResendWait(ctx context.Context, call *ops.Call, table string, id uuid
 	return nil
 }
 
+// resendTarget reads the membership of an invited account with a share lock and answers its user, the one the set-up
+// e-mail goes to. HQ ending the access (members.save locks the membership) waits for the re-send or is seen by it, so
+// no set-up e-mail opens the sign-in of an access that ended meanwhile (IR461, IR664, IR757). The account row is locked
+// first by the caller, so the order is always account, then membership.
+func resendTarget(ctx context.Context, call *ops.Call, membership uuid.UUID) (uuid.UUID, error) {
+	var (
+		user  uuid.UUID
+		ended bool
+	)
+
+	err := call.Tx.QueryRow(ctx, `SELECT user_id, valid_until IS NOT NULL AND valid_until <= $2 FROM identity.memberships
+		WHERE id = $1 FOR SHARE`, membership, call.Now).
+		Scan(&user, &ended)
+	if err != nil {
+		return uuid.Nil, apperr.Wrap(err, "select identity.memberships")
+	}
+
+	if ended {
+		return uuid.Nil, apperr.E(apperr.Conflict, "errors.access_expired")
+	}
+
+	return user, nil
+}
+
 // notSelfOrLast refuses a change to the caller's own account, one that would leave the company without an active
 // contractor, and closing a technician who still holds an active assignment (IR421: reassign the job first).
 func notSelfOrLast(ctx context.Context, call *ops.Call, partnerUser PartnerUser) error {
@@ -998,7 +1022,8 @@ func partnerUsersResend(
 	call *ops.Call,
 	in *PartnerResendInput,
 ) (InvitePreview, error) {
-	partnerUser, err := loadPartnerUser(ctx, call, in.ID, false)
+	// locked: a disable or delete of the account at the same moment waits or is seen (IR757)
+	partnerUser, err := loadPartnerUser(ctx, call, in.ID, true)
 	if err != nil {
 		return InvitePreview{}, err
 	}
@@ -1007,24 +1032,18 @@ func partnerUsersResend(
 		return InvitePreview{}, apperr.E(apperr.Conflict, "errors.invite_not_pending")
 	}
 
-	if partnerUser.AccessUntil != nil &&
-		!partnerUser.AccessUntil.After(
-			call.Now,
-		) { // no set-up e-mail once the access has ended (IR461)
-		return InvitePreview{}, apperr.E(apperr.Conflict, "errors.access_expired")
+	user, err := resendTarget(
+		ctx,
+		call,
+		*partnerUser.MembershipID,
+	) // the set-up e-mail again (IR461)
+	if err != nil {
+		return InvitePreview{}, err
 	}
 
 	inviteResendWaitErr := inviteResendWait(ctx, call, "partner_users", partnerUser.ID)
 	if inviteResendWaitErr != nil {
 		return InvitePreview{}, inviteResendWaitErr
-	}
-
-	var user uuid.UUID // the set-up e-mail again (IR461)
-
-	scanErr := call.Tx.QueryRow(ctx, `SELECT user_id FROM identity.memberships WHERE id = $1`, *partnerUser.MembershipID).
-		Scan(&user)
-	if scanErr != nil {
-		return InvitePreview{}, apperr.Wrap(scanErr, "select identity.memberships")
 	}
 
 	requestAccount(call, user, *partnerUser.MembershipID, partnerUser.PartnerRole)
