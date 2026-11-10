@@ -1,13 +1,17 @@
 import { roundAway } from "@ac/web/lib/energy";
 
-/** The y range of the chart: the values and the guide line with some room around them. */
+/** The y range of the chart: the values and the guide line with some room around them, in the values' own size (a
+power of 0.4–1.2 kW gets 0.2–1.4, not −1–3) and rounded to the room's magnitude; values that are all zero or more get
+no axis below zero, and a flat zero line gets 0–1 (IR741). */
 export function axisRange(points: (number | null)[], guide: number | null): { min: number; max: number } {
   const vals = [...points.filter((p): p is number => p !== null), ...(guide === null ? [] : [guide])];
   if (vals.length === 0) return { min: 0, max: 1 };
   const lo = Math.min(...vals);
   const hi = Math.max(...vals);
-  const pad = Math.max((hi - lo) * 0.15, Math.abs(hi) * 0.05, 1);
-  return { min: Math.floor(lo - pad), max: Math.ceil(hi + pad) };
+  const pad = Math.max((hi - lo) * 0.15, Math.abs(hi) * 0.05) || 1;
+  const step = 10 ** Math.floor(Math.log10(pad));
+  const min = roundAway(Math.floor((lo - pad) / step) * step, 6);
+  return { min: lo >= 0 && min < 0 ? 0 : min, max: roundAway(Math.ceil((hi + pad) / step) * step, 6) };
 }
 /** About four round y-axis grid values inside [min, max] (steps of 1, 2 or 5 × 10ⁿ). */
 export function axisTicks(min: number, max: number): number[] {
