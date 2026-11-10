@@ -12,6 +12,7 @@ import { acknowledgeAlert, resolveAlert } from "../actions";
 import type { AlertsLive } from "../_lib/load";
 import { Icon } from "@ac/web/components/Icon";
 import { useRefreshThen } from "@ac/web/lib/useRefreshThen";
+import { reached } from "@ac/web/lib/unreachable";
 
 const BANNER = { crit: "border-crit/40 bg-crit-soft text-crit", warn: "border-[#fdba74] bg-warn-soft text-warn", ok: "border-ok/40 bg-ok-soft text-ok", primary: "border-line bg-surface2 text-ink", muted: "border-line bg-surface2 text-ink" } as const;
 
@@ -38,7 +39,7 @@ export function AlertEvidenceView({ live }: Readonly<{ live: AlertsLive }>) {
     if (problem) { setMessage(problem); return; }
     setMessage(null);
     start(async () => {
-      const res = op === "resolve" ? await resolveAlert(a.id, a.version, reason.trim(), ids) : await acknowledgeAlert(a.id, a.version);
+      const res = await reached(() => (op === "resolve" ? resolveAlert(a.id, a.version, reason.trim(), ids) : acknowledgeAlert(a.id, a.version))); // no answer reads as unavailable (IR718)
       if (!res.ok) { setMessage(evidenceRefusal(res.fieldErrors, t) ?? refusal(res, a.resolution.forbidden, t)); return; }
       refreshThen(() => {
         toast(t(op === "resolve" ? "Alert resolved" : "Alert acknowledged"));

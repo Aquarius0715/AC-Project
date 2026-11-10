@@ -21,6 +21,7 @@ import { ScopeBar } from "../../jobs/_components/jobs-header";
 import { Icon } from "@ac/web/components/Icon";
 import { entryOf } from "@ac/web/lib/lookup";
 import { useRefreshThen } from "@ac/web/lib/useRefreshThen";
+import { reached } from "@ac/web/lib/unreachable";
 
 const ST: Record<AlertState, string> = { open: "Open", acknowledged: ACKNOWLEDGED, resolved: "Resolved" };
 const LIST: Record<AlertState, string> = { open: "Open alerts", acknowledged: "Acknowledged alerts", resolved: "Resolved alerts" };
@@ -136,7 +137,7 @@ export function AdminAlertsView({ live }: Readonly<{ live?: Live }>) {
 
   const act = (fn: () => Promise<ActionResult>, ok: string, after?: () => void, failed?: () => void) => {
     startTransition(async () => {
-      const r = await fn();
+      const r = await reached(fn); // no answer reads as unavailable (IR718)
       if (r.ok) {
         refreshThen(() => { toast(ok); after?.(); });
       } else {
