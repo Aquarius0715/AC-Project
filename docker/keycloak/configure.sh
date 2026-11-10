@@ -49,4 +49,14 @@ if [ -n "${PUBLIC_HOSTS:-}" ]; then
   "$KC" update "clients/$webid" -r ac -s "redirectUris=[$web]" -s "webOrigins=[$(origins "$web")]"
   "$KC" update "clients/$id" -r ac -s "redirectUris=[$admin]" -s "webOrigins=[$(origins "$admin")]"
 fi
+# the demo users' passwords are in the repository: an environment that names its own (the shared test environment's
+# DEMO_USER_PASSWORD, IR720) sets it on every start; empty (dev, CI, E2E) leaves them as imported
+if [ -n "${DEMO_USER_PASSWORD:-}" ]; then
+  # the users of realm-ac.json (deploy/test/realm.py sets the same password when it writes a new realm)
+  for user in customer-a customer-b contractor-a contractor-b tech-internal-a tech-external-a tech-external-b \
+    hq-operator hq-restriction-manager hq-override-only; do
+    KC_CLI_PASSWORD=$DEMO_USER_PASSWORD "$KC" set-password -r ac --username "$user"   # from the environment, not the command line
+  done
+  echo "realm ac: the demo users have this environment's password"
+fi
 echo "realm ac: AC Project sign-in themes and languages are set"
