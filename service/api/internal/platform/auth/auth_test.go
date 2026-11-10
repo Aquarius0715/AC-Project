@@ -477,8 +477,8 @@ func TestPrincipalNamesTheAddressOfTheSignIn(t *testing.T) {
 	tenant, membership := uuid.NewString(), uuid.NewString()
 
 	for issuer, want := range map[string]string{
-		tailnetIssuer:                        "100.99.169.116",
-		"http://10.100.1.17:8281/realms/ac":  "10.100.1.17",
+		tailnetIssuer:                        "100.64.0.10",
+		"http://192.0.2.10:8281/realms/ac":   "192.0.2.10",
 		"https://auth.example.com/realms/ac": "auth.example.com",
 		"":                                   "",
 	} {
