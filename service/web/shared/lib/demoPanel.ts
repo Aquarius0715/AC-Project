@@ -59,5 +59,5 @@ export function demoRefusal(f: ActionFailure): string {
   if (keys.has("errors.binding_mismatch")) return "The device was rebound — reload to pick it again";
   if (keys.has("errors.recovery_source_not_current")) return "The fault was already restored or replaced — reload";
   if (f.code === "FORBIDDEN" || f.code === "NOT_FOUND") return "This device is not visible to you any more";
-  return "Not done — try again";
+  return "Try again"; // the view says "Not done: {reason}" (IR743)
 }

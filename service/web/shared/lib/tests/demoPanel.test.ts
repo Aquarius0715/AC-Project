@@ -52,6 +52,8 @@ describe("Demo controls in API mode (FR-X05, IR249)", () => {
       demoRefusal(f("VALIDATION", "error.validation", { bindingId: "errors.binding_mismatch" })), demoRefusal(f("CONFLICT", "errors.recovery_source_not_current")),
       demoRefusal(f("NOT_FOUND", "error.notFound")), demoRefusal(f("UNAVAILABLE", "error.unavailable")),
     ]).toStrictEqual(["Demo operations are off in this environment", "The clock only moves forward — reload and try again", "The device was rebound — reload to pick it again",
-      "The fault was already restored or replaced — reload", "This device is not visible to you any more", "Not done — try again"]);
+      "The fault was already restored or replaced — reload", "This device is not visible to you any more", "Try again"]);
+    // the view words a refusal "Not done: {reason}", so no reason repeats "Not done" (IR743)
+    expect(demoRefusal(f("UNAVAILABLE", "error.unavailable")).startsWith("Not done")).toBe(false);
   });
 });
