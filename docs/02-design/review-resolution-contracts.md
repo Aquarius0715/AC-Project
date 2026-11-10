@@ -10099,3 +10099,11 @@ Found in review round 283 (`shared/lib/chartScale.ts`, never reviewed by name).
 2. **Now.** The room is 15 % of the values' span or 5 % of the largest value, whichever is more (1 only for a flat zero line). The ends round to the room's magnitude, so 0.4–1.2 kW gets 0.2–1.4. Values that are all zero or more get no axis below zero. Temperatures keep their ranges (22–26 °C: 20–28). The gridlines (`axisTicks`) are unchanged: 0.2–1.4 gets 0.5 and 1.
 3. **Also.** `partnerJobs.ts` reads a job's `origin` and `assignmentAcknowledgement` without type assertions (CLAUDE.md §1); both were already narrowed by the projection. Same behaviour.
 4. **Tests.** `chartScale.test.ts` (new): the kW and PM2.5 cases (both failed before with −1), a flat zero line, the temperature ranges, values below zero, and the gridlines.
+
+## IR742 A location rule needs its owner's consent, whoever edits it — 2026-11-11
+
+Found in review round 333 (`control/automations.go`).
+
+1. **Before.** SR02: a location condition needs the consent of the rule's owner (the rule acts for that owner, and revoking the consent disables the owner's location rules). `automations.save` checked the consent of the caller. Any member of the customer with control.execute may edit the customer's rules, and an edit keeps the rule's owner. So a member who had consented could turn another member's rule into a location rule, or turn a location rule that had been disabled by its owner's revocation back on, without the owner's consent. Firing already checks the owner (`evaluate.go`), so such a rule then never ran, but it was stored as if allowed.
+2. **Now.** A new rule checks the caller's consent (the caller becomes its owner). An update checks the consent of the rule's owner, after the row is read and the version checked. The refusal is the same: VALIDATION `condition=errors.consent_required`.
+3. **Tests.** `TestAutomationLocationNeedsOwnersConsent`: a consented member's save of another member's rule as a location rule is refused (it answered 200 before). The existing location tests (an owner without consent is refused, with consent it saves) still pass.

@@ -823,9 +823,11 @@ func (m Automations) save(
 		return Automation{}, err
 	}
 
-	err = checkLocationConsent(ctx, call, input)
-	if err != nil {
-		return Automation{}, err
+	if input.ID == nil { // a new rule is the caller's; an update checks its owner's consent (updateAutomation)
+		err = checkLocationConsent(ctx, call, input, call.Principal.MembershipID)
+		if err != nil {
+			return Automation{}, err
+		}
 	}
 
 	raw, err := ruleDefinition(call, input)
@@ -921,15 +923,20 @@ func (m Automations) checkAutomationUnits(
 	return nil
 }
 
-// checkLocationConsent checks that the owner consented to location automation when an event rule has a location
-// condition (SR02; identity's record, IR194).
-func checkLocationConsent(ctx context.Context, call *ops.Call, input *AutomationInput) error {
+// checkLocationConsent checks that the rule's owner consented to location automation when an event rule has a location
+// condition (SR02; identity's record, IR194): the owner the rule acts for, not a member who edits it (IR742).
+func checkLocationConsent(
+	ctx context.Context,
+	call *ops.Call,
+	input *AutomationInput,
+	owner uuid.UUID,
+) error {
 	if input.Kind == kindEvent &&
 		input.condition.Type == condLocation { // location conditions need the owner's consent (SR02)
 		granted, err := identity.ConsentGranted(
 			ctx,
 			call,
-			call.Principal.MembershipID,
+			owner,
 			"location_automation",
 		) // identity's record (IR194)
 		if err != nil {
@@ -1026,6 +1033,11 @@ func (m Automations) updateAutomation(
 
 	if cur.Kind != input.Kind {
 		return cur, apperr.Fields(map[string]string{"kind": apperr.KeyImmutable})
+	}
+
+	err = checkLocationConsent(ctx, call, input, cur.OwnerMembershipID)
+	if err != nil {
+		return cur, err
 	}
 
 	_, execErr := call.Tx.Exec(
