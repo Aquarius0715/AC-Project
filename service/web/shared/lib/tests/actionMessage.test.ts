@@ -43,6 +43,17 @@ describe("actionMessage (one toast line per failed Server Action)", () => {
     expect(actionMessage(failure({ code: "CONFLICT", messageKey: "error.unitInUse" }))).toBe("This unit has history (jobs, contracts, invoices, telemetry or devices), so it cannot be deleted — archive it instead");
     expect(actionMessage(failure({ code: "CONFLICT", messageKey: "error.undoWindowClosed" }), translator("ja"))).toBe("この取り込みを取り消せる 24 時間の期限が過ぎました");
   });
+  it("words the shared refusal keys, whatever their code, in every display language (IR758)", () => {
+    const cases = [["CONFLICT", "error.invalidState"], ["CONFLICT", "error.conflict"], ["TIMEOUT", "error.timeout"], ["OFFLINE", "error.offline"], ["CONFLICT", "error.deviceNotBound"], ["CONFLICT", "error.duplicateSerial"], ["CONFLICT", "error.tamperUnresolved"], ["CONFLICT", "error.duplicateName"], ["CONFLICT", "error.unitArchived"]] as const;
+    for (const [code, messageKey] of cases) {
+      for (const language of ["en", "ms", "ja"] as const) {
+        const line = actionMessage(failure({ code, messageKey }), translator(language));
+        expect(line, `${messageKey} (${language})`).not.toContain(code);
+      }
+    }
+    expect(actionMessage(failure({ code: "CONFLICT", messageKey: "error.invalidState" }))).toBe("This is no longer possible in its current state — reload the page to see the latest state");
+    expect(actionMessage(failure({ code: "TIMEOUT", messageKey: "error.timeout" }), translator("ms"))).toBe("Permintaan mengambil masa terlalu lama — semak sama ada perubahan telah disimpan, kemudian cuba lagi");
+  });
   it("explains version conflicts, domain errors and bare codes", () => {
     expect(actionMessage(failure({ code: "CONFLICT", messageKey: "error.versionConflict" }))).toMatch(/changed this in the meantime/);
     expect(actionMessage(failure({ code: "CONFLICT", messageKey: "errors.operation_not_running" }))).toBe("Operation not running");
