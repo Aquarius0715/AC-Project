@@ -352,6 +352,7 @@ services:
       APP_URL_PARTNER: ${PARTNER_WEB_URL:-http://localhost:3001}
       APP_URL_TECHNICIAN: ${TECHNICIAN_WEB_URL:-http://localhost:3002}
       APP_URL_ADMIN: ${ADMIN_WEB_URL:-http://localhost:3003}
+      PUBLIC_HOSTS: ${PUBLIC_HOSTS:-}   # an e-mail links to the listed address its recipient last signed in on (IR721)
     depends_on:
       migrate: { condition: service_completed_successfully }
       mailpit: { condition: service_started }
@@ -415,7 +416,7 @@ services:
 
   # ------------------------------------------------------------------ local stand-ins for AWS services
   postgres:            # Aurora PostgreSQL 18
-    image: postgres:18@sha256:edb0c08dc33befd0262ab3b5cf1c4f3f8cfd8b09e88c05b45adee29d6761ddb6   # pinned by digest (IR373)
+    image: postgres:18@sha256:e3d24f6906d0760bf4da0dae872415391ededefad23fd471c47dc53b0ddf3c42   # pinned by digest (IR373)
     environment:
       POSTGRES_DB: ac
       POSTGRES_PASSWORD: local
@@ -450,7 +451,7 @@ services:
     profiles: [infra, backend, full]
 
   mosquitto:           # AWS IoT Core stand-in (MQTT 3.1.1/5); mutual TLS is verified in staging against IoT Core
-    image: eclipse-mosquitto:2@sha256:860aeb5d63ce509508f6dcfb2bc8a1c1dd2bc60555b562b45ce90e52d8dabb0f   # pinned by digest (IR373)
+    image: eclipse-mosquitto:2@sha256:75d6662dee52c947dc9dd9c29f1d8d7ffef78ddaf38001caa09755681e8bbc98   # pinned by digest (IR373)
     user: "1883:1883"              # the image's mosquitto user, not root (security loop, IR414)
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
@@ -520,7 +521,7 @@ services:
     profiles: [infra, backend, full]
 
   stripe-cli:
-    image: stripe/stripe-cli:v1.55.6@sha256:16a5c75bd681b756fdd174e54840623170f811efe9d49522d401013d97ade7bd   # pinned (IR373)
+    image: stripe/stripe-cli:v1.55.8@sha256:c8e5a48108fb4c1e83583912c85810e9ac3bc8db91070da3f915ac369ceecf31   # pinned (IR373)
     command: ["listen", "--forward-to", "webhook:8080/stripe", "--api-key", "${STRIPE_TEST_SECRET_KEY:-}"]
     networks: [edge]
     profiles: [stripe]

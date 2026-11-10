@@ -26,12 +26,15 @@ concurrency:
 jobs:
   e2e:
     name: Playwright (compose stack)
+    # the lab server runs only this repository's own runs, never a fork's or a pull request's (IR732)
+    if: github.repository == 'Aquarius0715/AC-Project' && github.event_name != 'pull_request'
     runs-on: [self-hosted, ac-test]
     timeout-minutes: 75
     env:
       IMAGE_TAG: e2e
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false } # no later step pushes or fetches with the job's token
       - name: local settings (random broker keys and client secrets, never real secrets)
         run: |
           # the job's env cannot read the runner context: the path goes to the later steps through GITHUB_ENV
@@ -109,7 +112,7 @@ jobs:
             -v "$HOME/.cache/ac-e2e-npm:/tmp/home/.npm" \
             -e E2E_CUSTOMER_URL=http://localhost:3300 -e E2E_PARTNER_URL=http://localhost:3301 \
             -e E2E_TECHNICIAN_URL=http://localhost:3302 -e E2E_ADMIN_URL=http://localhost:3303 \
-            -v "$GITHUB_WORKSPACE:/work" -w /work/service/web mcr.microsoft.com/playwright:v1.64.1-noble \
+            -v "$GITHUB_WORKSPACE:/work" -w /work/service/web mcr.microsoft.com/playwright:v1.65.0-noble \
             bash -c 'npm ci && npm run e2e -- --reporter=github,list --max-failures=10'
       - name: stack logs on failure
         if: failure()
@@ -126,3 +129,10 @@ jobs:
       - name: remove the stack
         if: always()
         run: docker compose -p ac-e2e --env-file "$SETTINGS" -f compose.yaml -f deploy/test/compose.test.yaml --profile full --profile iot down --volumes --remove-orphans
+      - name: remove the replaced images and trim the build cache
+        if: always()
+        # the replaced :e2e builds (untagged) and the build cache over 20 GB, as deploy.sh does after a deployment
+        # (IR725): the nightly builds filled the server's disk. Tagged images and volumes, of any project, stay
+        run: |
+          docker image prune -f >/dev/null || true
+          docker builder prune -f --max-used-space 20GB >/dev/null || true

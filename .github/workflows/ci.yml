@@ -3,19 +3,11 @@
 # against the split services, the web lint (type-aware, no warnings allowed) per workspace, web dead code (knip), Python, shell, workflows and Dockerfiles, web typecheck, web unit tests, and the design document validators. The
 # end-to-end suite needs the whole compose stack and runs in e2e.yml.
 #
-# The jobs run on the lab server's self-hosted runner (label ac-test, DEC-94), each in a container of its own: the dependencies'
-# code then never runs on the server itself, and the job reaches only its workspace. Docker volumes keep the Go and npm caches
-# from one run to the next. A container works as root, so each job hands its workspace back to the runner's user at the end, or
-# the next checkout could not clean it.
-#
-# The three runners take the jobs in three lanes, longest first, so that the run lasts about as long as its longest lane
-# (the runner picks queued jobs in no fixed order, and a long job started last made a run up to 11 minutes):
-# go-test-cluster -> web-test -> go-lint | docs -> web-knip | go-test -> web-typecheck. The six web lint jobs (one per
-# workspace and one for the e2e specs, about two minutes each) have no needs: they take whichever runner is free, so the lanes do not
-# grow by the twelve minutes they would take one after the other. The Go suites run the integration
-# tests in three shards (service/api/scripts/test-shards.sh) and the document regressions run in parallel, so each lane
-# takes about three minutes. A job in a lane waits for the one before it with needs, and runs even when that one failed
-# (!cancelled()), so every check still reports.
+# The jobs run on GitHub-hosted runners (ubuntu-latest, IR732), each in a container of its own (golang, node, python), so
+# the toolchains are the ones the development stack uses. No pull request job runs on the lab server: a pull request from
+# a fork would run its own code there. The Go module and build caches and the npm and pip caches are kept between runs
+# with actions/cache, keyed by the lock files. Every job starts on its own runner at once, so the run lasts about as long
+# as its longest job.
 name: CI
 
 on:
@@ -41,13 +33,20 @@ defaults:
 jobs:
   go-lint:
     name: Go lint (gofmt, vet, golangci-lint, generated files, Swagger)
-    needs: web-test
-    if: ${{ !cancelled() }}
-    runs-on: [self-hosted, ac-test]
-    container: { image: "golang:1.26-trixie", volumes: ["ac-ci-go:/go/pkg/mod", "ac-ci-cache:/root/.cache"] }
+    runs-on: ubuntu-latest
+    container: { image: "golang:1.26-trixie" }
     defaults: { run: { working-directory: service/api } }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false } # no later step pushes or fetches with the job's token
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            /go/pkg/mod
+            /root/.cache/go-build
+            /root/.cache/golangci-lint
+          key: go-${{ runner.os }}-${{ hashFiles('service/api/go.sum') }}
+          restore-keys: go-${{ runner.os }}-
       - name: python3 (make swagger), and git trusts the workspace
         run: |
           apt-get update -qq && apt-get install -y -qq python3 >/dev/null
@@ -67,20 +66,19 @@ jobs:
           go run ./cmd/gen/ops
           make swagger
           git diff --exit-code -- . ../web/shared/lib ../../docs/02-design/api
-      - name: the workspace back to the runner's user
-        if: always()
-        working-directory: .
-        run: chown -R "$(stat -c '%u:%g' .)" .
 
   go-test:
     name: Go tests (unit + integration)
-    runs-on: [self-hosted, ac-test]
-    container: { image: "golang:1.26-trixie", volumes: ["ac-ci-go:/go/pkg/mod", "ac-ci-cache:/root/.cache"] }
+    runs-on: ubuntu-latest
+    container: { image: "golang:1.26-trixie" }
     services:
-      postgres: # no published port: the server's own PostgreSQL has 5432
+      postgres: # reached through socat at localhost:5432 (below), where the tests look
         image: postgres:18
         env: { POSTGRES_PASSWORD: local }
+        # the data directory in memory (IR725): the databases are thrown away after the job, and the image's VOLUME
+        # leaves no anonymous volume behind; 2g only caps a runaway
         options: >-
+          --tmpfs /var/lib/postgresql:rw,size=2g
           --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
     env:
       PG_ADMIN_URL: postgres://postgres:local@localhost:5432/postgres?sslmode=disable
@@ -89,6 +87,15 @@ jobs:
       GOFLAGS: -buildvcs=false
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false } # no later step pushes or fetches with the job's token
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            /go/pkg/mod
+            /root/.cache/go-build
+            /root/.cache/golangci-lint
+          key: go-${{ runner.os }}-${{ hashFiles('service/api/go.sum') }}
+          restore-keys: go-${{ runner.os }}-
       - name: the database at localhost:5432, where the tests look (socat to the service)
         run: |
           apt-get update -qq && apt-get install -y -qq postgresql-client socat >/dev/null
@@ -115,19 +122,19 @@ jobs:
             grep -E -- '--- FAIL|_test\.go:[0-9]+:|panic:' go-test.log | head -40 | sed 's/%/%25/g; s/^/::error title=go test::/'
             exit 1
           fi
-      - name: the workspace back to the runner's user
-        if: always()
-        run: chown -R "$(stat -c '%u:%g' .)" .
 
   go-test-cluster:
     name: Go integration tests (split services)
-    runs-on: [self-hosted, ac-test]
-    container: { image: "golang:1.26-trixie", volumes: ["ac-ci-go:/go/pkg/mod", "ac-ci-cache:/root/.cache"] }
+    runs-on: ubuntu-latest
+    container: { image: "golang:1.26-trixie" }
     services:
-      postgres: # no published port: the server's own PostgreSQL has 5432
+      postgres: # reached through socat at localhost:5432 (below), where the tests look
         image: postgres:18
         env: { POSTGRES_PASSWORD: local }
+        # the data directory in memory (IR725): the databases are thrown away after the job, and the image's VOLUME
+        # leaves no anonymous volume behind; 2g only caps a runaway
         options: >-
+          --tmpfs /var/lib/postgresql:rw,size=2g
           --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
     env:
       PG_ADMIN_URL: postgres://postgres:local@localhost:5432/postgres?sslmode=disable
@@ -136,6 +143,15 @@ jobs:
       GOFLAGS: -buildvcs=false
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false } # no later step pushes or fetches with the job's token
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            /go/pkg/mod
+            /root/.cache/go-build
+            /root/.cache/golangci-lint
+          key: go-${{ runner.os }}-${{ hashFiles('service/api/go.sum') }}
+          restore-keys: go-${{ runner.os }}-
       - name: the database at localhost:5432, where the tests look (socat to the service)
         run: |
           apt-get update -qq && apt-get install -y -qq postgresql-client socat >/dev/null
@@ -154,35 +170,31 @@ jobs:
             grep -E -- '--- FAIL|_test\.go:[0-9]+:|panic:' go-test.log | head -40 | sed 's/%/%25/g; s/^/::error title=go test (cluster)::/'
             exit 1
           }
-      - name: the workspace back to the runner's user
-        if: always()
-        run: chown -R "$(stat -c '%u:%g' .)" .
 
   web-knip:
     name: Web dead code (knip)
-    needs: docs
-    if: ${{ !cancelled() }}
-    runs-on: [self-hosted, ac-test]
-    container: { image: "node:26-bookworm", volumes: ["ac-ci-npm:/root/.npm"] }
+    runs-on: ubuntu-latest
+    container: { image: "node:26-bookworm" }
     defaults: { run: { working-directory: service/web } }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false } # no later step pushes or fetches with the job's token
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: /root/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('service/web/package-lock.json') }}
+          restore-keys: npm-${{ runner.os }}-
       - run: npm ci
       - name: dead code and unused dependencies (knip.jsonc)
         run: npm run knip
-      - name: the workspace back to the runner's user
-        if: always()
-        working-directory: .
-        run: chown -R "$(stat -c '%u:%g' .)" .
 
   # The web lint (type-aware, CLAUDE.md 5) of each workspace and of the e2e specs, one job each: together they take about twelve
-  # minutes on the server, so they run side by side on the free runners instead of one after the other. They need nothing from
-  # the other jobs, so they start as soon as a runner is free. Each app's lint runs `next typegen` first, because the route
-  # types it writes are what the lint reads PageProps from.
+  # minutes, so they run side by side instead of one after the other. Each app's lint runs `next typegen` first, because the
+  # route types it writes are what the lint reads PageProps from.
   web-lint:
     name: Web lint (${{ matrix.workspace }})
-    runs-on: [self-hosted, ac-test]
-    container: { image: "node:26-bookworm", volumes: ["ac-ci-npm:/root/.npm"] }
+    runs-on: ubuntu-latest
+    container: { image: "node:26-bookworm" }
     defaults: { run: { working-directory: service/web } }
     strategy:
       fail-fast: false   # every workspace reports, whichever fails
@@ -190,6 +202,12 @@ jobs:
         workspace: [shared, customer, partner, technician, admin, e2e]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false } # no later step pushes or fetches with the job's token
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: /root/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('service/web/package-lock.json') }}
+          restore-keys: npm-${{ runner.os }}-
       - run: npm ci
       - name: lint
         run: |
@@ -199,76 +217,79 @@ jobs:
           else
             npm run lint --workspace=${{ matrix.workspace }}
           fi
-      - name: the workspace back to the runner's user
-        if: always()
-        working-directory: .
-        run: chown -R "$(stat -c '%u:%g' .)" .
 
-  # Python (ruff, ruff.toml), shell scripts (shellcheck), the workflows (actionlint, with the shell they run) and the Dockerfiles
+  # Python (ruff, ruff.toml), shell scripts (shellcheck), the workflows (actionlint, with the shell they run, and zizmor) and the Dockerfiles
   # (hadolint), through the PyPI packages that carry each tool's binary; the versions are pinned. Nothing here needs the other jobs.
   other-lint:
     name: Python, shell, workflows and Dockerfiles
-    runs-on: [self-hosted, ac-test]
-    container: { image: "python:3.13-bookworm", volumes: ["ac-ci-pip:/root/.cache/pip"] }
+    runs-on: ubuntu-latest
+    container: { image: "python:3.13-bookworm" }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - run: pip install ruff==0.17.3 shellcheck-py==0.11.0.1 actionlint-py==1.7.12.25 hadolint-py==2.15.1.3
+        with: { persist-credentials: false } # no later step pushes or fetches with the job's token
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: /root/.cache/pip
+          key: pip-${{ runner.os }}-${{ hashFiles('.github/workflows/ci.yml') }}
+          restore-keys: pip-${{ runner.os }}-
+      - run: pip install ruff==0.17.3 shellcheck-py==0.11.0.1 actionlint-py==1.7.12.25 hadolint-py==2.15.1.3 zizmor==1.31.1
       - run: ruff check .
       - run: find . -name '*.sh' -not -path './.git/*' -not -path '*/node_modules/*' -print0 | xargs -0 shellcheck
       - run: sh docker/mosquitto/passwd.test.sh # the broker password script writes the file again when a checkout put the committed one back (IR684)
       - run: python3 -m unittest deploy/test/test_realm.py # the test environment's realm takes its own demo password (IR720)
       - run: actionlint -config-file .github/actionlint.yaml
+      - run: zizmor --offline .github/workflows # the workflows' security (IR732): triggers, credentials, permissions, injection
       - run: find . -name '*Dockerfile' -not -path './.git/*' -not -path '*/node_modules/*' -print0 | xargs -0 -n1 hadolint
-      - name: the workspace back to the runner's user
-        if: always()
-        run: chown -R "$(stat -c '%u:%g' .)" .
 
   web-typecheck:
     name: Web typecheck
-    needs: go-test
-    if: ${{ !cancelled() }}
-    runs-on: [self-hosted, ac-test]
-    container: { image: "node:26-bookworm", volumes: ["ac-ci-npm:/root/.npm"] }
+    runs-on: ubuntu-latest
+    container: { image: "node:26-bookworm" }
     defaults: { run: { working-directory: service/web } }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false } # no later step pushes or fetches with the job's token
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: /root/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('service/web/package-lock.json') }}
+          restore-keys: npm-${{ runner.os }}-
       - run: npm ci
       - run: npm run typecheck
-      - name: the workspace back to the runner's user
-        if: always()
-        working-directory: .
-        run: chown -R "$(stat -c '%u:%g' .)" .
 
   web-test:
     name: Web unit tests (Vitest)
-    needs: go-test-cluster
-    if: ${{ !cancelled() }}
-    runs-on: [self-hosted, ac-test]
-    container: { image: "node:26-bookworm", volumes: ["ac-ci-npm:/root/.npm"] }
+    runs-on: ubuntu-latest
+    container: { image: "node:26-bookworm" }
     defaults: { run: { working-directory: service/web } }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false } # no later step pushes or fetches with the job's token
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: /root/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('service/web/package-lock.json') }}
+          restore-keys: npm-${{ runner.os }}-
       - run: npm ci
       - run: npm test
-      - name: the workspace back to the runner's user
-        if: always()
-        working-directory: .
-        run: chown -R "$(stat -c '%u:%g' .)" .
 
   docs:
     name: Design document validators
-    runs-on: [self-hosted, ac-test]
-    container: { image: "python:3.12-bookworm", volumes: ["ac-ci-npm:/root/.npm"] }
+    runs-on: ubuntu-latest
+    container: { image: "python:3.12-bookworm" }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false } # no later step pushes or fetches with the job's token
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: /root/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('service/web/package-lock.json') }}
+          restore-keys: npm-${{ runner.os }}-
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with: { node-version: 26 }
       - name: TypeScript for the contract check
-        run: npm install --no-save --prefix "$RUNNER_TEMP/ts" typescript@6.0.3
+        run: npm install --no-save --prefix "$RUNNER_TEMP/ts" typescript@6.0.3 # zizmor: ignore[adhoc-packages] the exact version of service/web's lock, for the contract check only
       - name: validate_documents.py
         run: python3 docs/tools/validate_documents.py --tsc "$RUNNER_TEMP/ts/node_modules/typescript/lib/tsc.js"
       - name: check_review_regressions.py
         run: python3 docs/tools/check_review_regressions.py
-      - name: the workspace back to the runner's user
-        if: always()
-        run: chown -R "$(stat -c '%u:%g' .)" .

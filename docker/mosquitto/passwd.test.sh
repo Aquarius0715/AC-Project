@@ -11,18 +11,23 @@ mkdir -p "$work/docker/mosquitto" "$work/bin"
 cp "$src/passwd.sh" "$work/docker/mosquitto/passwd.sh"
 printf 'iot-bridge:committed\ndevice-sim:committed\n' >"$work/docker/mosquitto/passwd"
 printf 'MQTT_DEVICE_SIM_KEY=simkey\nMQTT_IOT_BRIDGE_KEY=bridgekey\n' >"$work/keys.env"
+# passwd.sh runs compose.yaml's broker image (IR727)
+image=eclipse-mosquitto:2@sha256:0000000000000000000000000000000000000000000000000000000000000000
+printf 'services:\n  mosquitto:\n    image: %s   # pinned by digest\n' "$image" >"$work/compose.yaml"
 
 # the shim: finds the mounted directory in `-v DIR:/work` and writes passwd.new there from the keys in its environment
 cat >"$work/bin/docker" <<'SHIM'
 #!/bin/sh
 dir=""
+used=""
 while [ $# -gt 0 ]; do
   case "$1" in
   -v) dir=${2%%:*}; shift ;;
+  eclipse-mosquitto:*) used=$1 ;;
   esac
   shift
 done
-echo run >>"$dir/docker.calls"
+echo "run $used" >>"$dir/docker.calls"
 printf 'iot-bridge:fake-%s\ndevice-sim:fake-%s\n' "$MQTT_IOT_BRIDGE_KEY" "$MQTT_DEVICE_SIM_KEY" >"$dir/passwd.new"
 SHIM
 chmod +x "$work/bin/docker"
@@ -34,6 +39,7 @@ fail() { echo "passwd.test: $*" >&2; exit 1; }
 run
 grep -q 'fake-bridgekey' "$work/docker/mosquitto/passwd" || fail "the first run did not write the file from the keys"
 [ "$(calls)" = 1 ] || fail "the first run should call the generator once"
+grep -qxF "run $image" "$work/docker/mosquitto/docker.calls" || fail "the generator did not run compose.yaml's broker image"
 
 run
 [ "$(calls)" = 1 ] || fail "an unchanged file and keys are up to date: the generator should not run again"

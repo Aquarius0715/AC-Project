@@ -1,6 +1,7 @@
 package integration_test
 
 import (
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -556,5 +557,69 @@ func TestDeviceBindAndOperations(t *testing.T) {
 		1,
 	); code != 404 {
 		t.Error("unknown device")
+	}
+}
+
+// TestDeviceListSearchAndModel: HQ finds a device by its serial and the devices of a model on the server, past the
+// first page the registry used to read (IR723, B-14): `search` is part of the serial (case-insensitive, its wildcards
+// literal) and `modelId` the model of the device's unit.
+func TestDeviceListSearchAndModel(t *testing.T) {
+	t.Parallel()
+
+	srv := server(t)
+
+	serials := func(body string) []string {
+		t.Helper()
+
+		code, resp := post(srv, hq(), "devices.list", body)
+		if code != 200 {
+			t.Fatalf("%s: %d %v", body, code, resp)
+		}
+
+		listed := items(t, resp)
+		out := make([]string, 0, len(listed))
+
+		for _, item := range listed {
+			serial, _ := item["serial"].(string)
+			out = append(out, serial)
+		}
+
+		return out
+	}
+
+	if got := serials(
+		`{"filters":{"search":"demo-0004"}}`,
+	); len(got) != 1 ||
+		got[0] != "AC-DEMO-0004" {
+		t.Errorf("search by part of the serial: %v", got)
+	}
+
+	if got := serials(`{"filters":{"search":"AC-DEMO_000%"}}`); len(got) != 0 {
+		t.Errorf("wildcards in a search are literal: %v", got)
+	}
+
+	unitName := serials(
+		`{"filters":{"search":"living"},"sort":{"field":"serial","direction":"desc"}}`,
+	)
+	if len(unitName) == 0 {
+		t.Errorf("search by the bound unit's name: %v", unitName)
+	}
+
+	if got := serials(
+		`{"sort":{"field":"serial","direction":"asc"},"limit":2}`,
+	); len(got) != 2 ||
+		got[0] > got[1] {
+		t.Errorf("sorted by serial: %v", got)
+	}
+
+	model := seed.ID("ventilation-demo").String()
+	if got := serials(
+		`{"filters":{"modelId":"` + model + `"}}`,
+	); !slices.Contains(
+		got,
+		"AC-DEMO-0001",
+	) ||
+		slices.Contains(got, "AC-DEMO-0002") {
+		t.Errorf("devices of a model: %v", got)
 	}
 }
