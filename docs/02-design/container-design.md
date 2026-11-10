@@ -198,7 +198,7 @@ As built (GitHub Actions, IR550), every push to `main` and every pull request ru
 - `.github/workflows/e2e.yml`: the compose stack (`--profile full`, built from the commit one image at a time, with random broker keys and client secrets), 30 days of mock fleet history and the Playwright suite. It takes 20 to 25 minutes on the only runner, so it runs every night on `main` at 02:00 in the lab (WIB, 19:00 UTC) and by hand on any branch, not on each push. GitHub mails a failed night.
   - The stack is the compose project `ac-e2e`, beside the server's own services and the test environment. Its apps listen on `127.0.0.1:3300–3303`, because Grafana has 3000. Its stores and brokers are not published (`deploy/test/compose.test.yaml`), because the server's PostgreSQL has 5432 and the real broker 1883. Keycloak (8081) and Mailpit (8025), which the specs open, keep their ports.
   - Playwright runs in its own image as the runner's user, and the stack is removed at the end. One run at a time.
-  - After the stack, a step of its own removes the untagged images (the replaced `:e2e` builds) and trims the build cache to 20 GB, as a deployment does (IR725).
+  - After the stack, a step of its own removes the untagged images (the replaced `:e2e` builds) and trims the build cache to 20 GB, as a deployment does (IR725). The load test (`load.yml`, by hand) ends with the same step for its `:load` builds.
 
 Each `ci.yml` job runs in a container of its own (`golang:1.26-trixie`, `node:26`, `python:3.12`), so the dependencies' code never runs on the server itself, and the job reaches only its workspace. The runner does not pass the Docker socket into job containers.
 - Docker volumes keep the Go and npm caches from one run to the next.
