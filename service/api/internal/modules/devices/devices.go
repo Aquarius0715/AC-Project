@@ -441,7 +441,10 @@ func deviceConditions(call *ops.Call, filter deviceFilter) (string, []any, error
 		args = append(args, *filter.ModelID)
 		conds = append(
 			conds,
-			fmt.Sprintf("EXISTS (SELECT 1 FROM assets.units mu WHERE mu.id = d.unit_id AND mu.model_id = $%d)", len(args)),
+			fmt.Sprintf(
+				"EXISTS (SELECT 1 FROM assets.units mu WHERE mu.id = d.unit_id AND mu.model_id = $%d)",
+				len(args),
+			),
 		)
 	}
 

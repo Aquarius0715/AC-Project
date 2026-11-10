@@ -576,8 +576,10 @@ func TestDeviceListSearchAndModel(t *testing.T) {
 			t.Fatalf("%s: %d %v", body, code, resp)
 		}
 
-		var out []string
-		for _, item := range items(t, resp) {
+		listed := items(t, resp)
+		out := make([]string, 0, len(listed))
+
+		for _, item := range listed {
 			serial, _ := item["serial"].(string)
 			out = append(out, serial)
 		}
