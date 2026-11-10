@@ -498,6 +498,7 @@ services:
     environment:
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
       PUBLIC_HOSTS: ${PUBLIC_HOSTS:-}   # the realm's redirect URIs for each address of each app (IR651)
+      DEMO_USER_PASSWORD: ${DEMO_USER_PASSWORD:-}   # the demo users' password of an environment that names one (IR720)
       CUSTOMER_WEB_URL: ${CUSTOMER_WEB_URL:-http://localhost:3000}
       PARTNER_WEB_URL: ${PARTNER_WEB_URL:-http://localhost:3001}
       TECHNICIAN_WEB_URL: ${TECHNICIAN_WEB_URL:-http://localhost:3002}

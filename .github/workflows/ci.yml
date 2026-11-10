@@ -216,6 +216,7 @@ jobs:
       - run: ruff check .
       - run: find . -name '*.sh' -not -path './.git/*' -not -path '*/node_modules/*' -print0 | xargs -0 shellcheck
       - run: sh docker/mosquitto/passwd.test.sh # the broker password script writes the file again when a checkout put the committed one back (IR684)
+      - run: python3 -m unittest deploy/test/test_realm.py # the test environment's realm takes its own demo password (IR720)
       - run: actionlint -config-file .github/actionlint.yaml
       - run: find . -name '*Dockerfile' -not -path './.git/*' -not -path '*/node_modules/*' -print0 | xargs -0 -n1 hadolint
       - name: the workspace back to the runner's user
