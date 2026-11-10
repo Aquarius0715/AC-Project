@@ -535,7 +535,7 @@ func sortFilterStatuses(out []FilterStatus, sortBy *paging.SortSpec, desc bool) 
 //	@Summary		filterCare.markCleaned (write)
 //	@ID				filterCare.markCleaned
 //	@Description	Authorization: client:self
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+//	@Description	Validation: D01; input constraints in the corresponding DD
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-C18
 //	@Tags			filterCare
@@ -626,8 +626,8 @@ func (m FilterCare) markCleaned(
 //	@Summary		filterCare.saveSettings (write)
 //	@ID				filterCare.saveSettings
 //	@Description	Authorization: client:self-customer:owner
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
-//	@Description	IR110 thresholdHours 50–2000 or null (model default); fallbackDays 7–180
+//	@Description	Validation: D01; input constraints in the corresponding DD; IR110 thresholdHours 50–2000 or null \
+//	@Description	(model default); fallbackDays 7–180
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-C18
 //	@Tags			filterCare

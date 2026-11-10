@@ -688,8 +688,8 @@ type Unavailability struct {
 //	@Summary		members.setUnavailability (write)
 //	@ID				members.setUnavailability
 //	@Description	Authorization: contractor:partner.assign:own-company | admin:job.write
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
-//	@Description	IR111 from<=to, at most 31 days; conflicting assignments are reported, not changed
+//	@Description	Validation: D01; input constraints in the corresponding DD; IR111 from<=to, at most 31 days; \
+//	@Description	conflicting assignments are reported, not changed
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-P06
 //	@Tags			members

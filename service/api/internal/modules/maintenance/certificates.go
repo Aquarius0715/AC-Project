@@ -501,8 +501,8 @@ func (Certificates) reload(ctx context.Context, c *ops.Call, id uuid.UUID) (Cert
 //	@Summary		certificates.submit (write)
 //	@ID				certificates.submit
 //	@Description	Authorization: contractor:partner.assign:own-company
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
-//	@Description	IR111 PDF/JPEG/PNG up to 10 MB; issuedAt < expiresAt
+//	@Description	Validation: D01; input constraints in the corresponding DD; IR111 PDF/JPEG/PNG up to 10 MB; issuedAt \
+//	@Description	< expiresAt
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-P09
 //	@Tags			certificates

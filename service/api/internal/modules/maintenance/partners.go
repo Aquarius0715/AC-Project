@@ -965,8 +965,8 @@ const rateCols = `id, tenant_id, version, created_at, contractor_org_id, effecti
 //	@Summary		rateCards.save (write)
 //	@ID				rateCards.save
 //	@Description	Authorization: admin:job.write
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
-//	@Description	IR111 effectiveFrom in the future; creates a new version
+//	@Description	Validation: D01; input constraints in the corresponding DD; IR111 effectiveFrom in the future; \
+//	@Description	creates a new version
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-A21
 //	@Tags			rateCards
@@ -1267,8 +1267,8 @@ func (in *TargetsInput) Validate() map[string]string {
 //	@Summary		sla.saveTargets (write)
 //	@ID				sla.saveTargets
 //	@Description	Authorization: admin:job.write
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
-//	@Description	IR111 percentages 0–100; responseHours 1–168; applies to jobs created after effectiveFrom
+//	@Description	Validation: D01; input constraints in the corresponding DD; IR111 percentages 0–100; responseHours \
+//	@Description	1–168; applies to jobs created after effectiveFrom
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-A22
 //	@Tags			sla

@@ -846,9 +846,8 @@ func (in *InvoiceInput) Validate() map[string]string {
 //	@Summary		invoices.create (write)
 //	@ID				invoices.create
 //	@Description	Authorization: admin:billing.write
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
-//	@Description	IR90 dueAt must be after now; no period overlapping an invoice of the contract (CONFLICT \
-//	@Description	errors.invoice_period_exists; IR469)
+//	@Description	Validation: D01; input constraints in the corresponding DD; IR90 dueAt must be after now; no period \
+//	@Description	overlapping an invoice of the contract (CONFLICT errors.invoice_period_exists; IR469)
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-A08 · Input versions: contractVersion=Contract.version
 //	@Tags			invoices

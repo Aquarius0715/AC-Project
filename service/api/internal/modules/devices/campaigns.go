@@ -472,9 +472,9 @@ func waveOf(i, n int, waves []Wave) int {
 //	@Summary		firmwareCampaigns.schedule (write)
 //	@ID				firmwareCampaigns.schedule
 //	@Description	Authorization: admin:device.write
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
-//	@Description	IR111 signed target version from Capability.firmwareCandidates; startAt at least 24 h ahead; waves \
-//	@Description	ascending ending at 100; autoPause 1–50 %
+//	@Description	Validation: D01; input constraints in the corresponding DD; IR111 signed target version from \
+//	@Description	Capability.firmwareCandidates; startAt at least 24 h ahead; waves ascending ending at 100; autoPause \
+//	@Description	1–50 %
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-A20
 //	@Tags			firmwareCampaigns

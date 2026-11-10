@@ -155,7 +155,7 @@ func sameSet(a, b []uuid.UUID) bool {
 //	@Summary		restrictions.schedule (write)
 //	@ID				restrictions.schedule
 //	@Description	Authorization: admin:restriction.write
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+//	@Description	Validation: D01; input constraints in the corresponding DD
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-A09 · Input versions: expectedContractVersion=Contract.version
 //	@Tags			restrictions

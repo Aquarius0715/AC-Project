@@ -184,8 +184,8 @@ type RateCardDeleteInput = ContractorDeleteInput
 //	@Summary		rateCards.delete (write)
 //	@ID				rateCards.delete
 //	@Description	Authorization: admin:job.write
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
-//	@Description	IR655 only a rate card that has not started (CONFLICT error.rateCardStarted)
+//	@Description	Validation: D01; input constraints in the corresponding DD; IR655 only a rate card that has not \
+//	@Description	started (CONFLICT error.rateCardStarted)
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-A21
 //	@Tags			rateCards

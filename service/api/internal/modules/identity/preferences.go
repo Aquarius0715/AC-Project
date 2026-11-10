@@ -89,8 +89,8 @@ func (in *PreferencesInput) Validate() map[string]string {
 //	@Summary		preferences.update (write)
 //	@ID				preferences.update
 //	@Description	Authorization: authenticated:own-session
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
-//	@Description	IR112 monthlyReportEmail only for client sessions
+//	@Description	Validation: D01; input constraints in the corresponding DD; IR112 monthlyReportEmail only for client \
+//	@Description	sessions
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DDC-07
 //	@Tags			preferences

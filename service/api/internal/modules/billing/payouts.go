@@ -341,8 +341,8 @@ func (in *GenerateInput) Validate() map[string]string {
 //	@Summary		payouts.generate (write)
 //	@ID				payouts.generate
 //	@Description	Authorization: admin:billing.payment
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
-//	@Description	IR111 period YYYY-MM already ended; approved or paid statements are untouched
+//	@Description	Validation: D01; input constraints in the corresponding DD; IR111 period YYYY-MM already ended; \
+//	@Description	approved or paid statements are untouched
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-A23
 //	@Tags			payouts

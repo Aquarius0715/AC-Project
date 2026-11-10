@@ -212,11 +212,11 @@ func inScope(p *ops.Principal, unit, property, org uuid.UUID) bool {
 //	@ID				commands.create
 //	@Description	Authorization: client:control.execute | technician:control.diagnose:job-required | \
 //	@Description	admin:control.execute
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
-//	@Description	IR46 restriction action table; IR47 derived connection/powerSignal OFFLINE; IR74 client omits \
-//	@Description	reason; IR94 technician write table (assignment and work window, jobId required when typed); IR109 \
-//	@Description	group control sends one command per selected unit (owner only); a command asked for here is always \
-//	@Description	source ui (the voice channel was withdrawn, IR648)
+//	@Description	Validation: D01; input constraints in the corresponding DD; IR46 restriction action table; IR47 \
+//	@Description	derived connection/powerSignal OFFLINE; IR74 client omits reason; IR94 technician write table \
+//	@Description	(assignment and work window, jobId required when typed); IR109 group control sends one command per \
+//	@Description	selected unit (owner only); a command asked for here is always source ui (the voice channel was \
+//	@Description	withdrawn, IR648)
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-C03, DD-T10, DD-A11 through automations.fire, DD-C04, DD-C05, DD-A02, DD-C14 · Input \
 //	@Description	versions: expectedUnitVersion=UnitDetail.version

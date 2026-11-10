@@ -188,8 +188,8 @@ func (m Diagnostics) checkRun(
 //	@Summary		diagnosticRuns.create (write)
 //	@ID				diagnosticRuns.create
 //	@Description	Authorization: technician:control.diagnose:assigned-valid-job
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
-//	@Description	IR94 technician write table (assignment and work window, jobId required when typed)
+//	@Description	Validation: D01; input constraints in the corresponding DD; IR94 technician write table (assignment \
+//	@Description	and work window, jobId required when typed)
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-T10 · Input versions: \
 //	@Description	expectedUnitVersion=UnitDetail.version;expectedJobVersion=JobDetail.version

@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.615.0 / Created: 2026-09-14 / Updated: 2026-11-11 / Status: Draft for review / Language: English
+Version: 0.616.0 / Created: 2026-09-14 / Updated: 2026-11-11 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -100,6 +100,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.616.0 (2026-11-11): IR759: 24 operations that take no expected version (preferences.update, invoices.create, commands.create and others) no longer say "expectedVersion required for updates" in the catalog and the API description.
 0.615.0 (2026-11-11): IR758: the refusals named by shared keys (a state that no longer allows the action, a clash with another record or change, a timeout, an offline device and five more) say why in the display language instead of "CONFLICT: Invalid state" or "TIMEOUT: Timeout".
 0.614.0 (2026-11-11): IR757: re-sending an invitation waits for a disable of the account or HQ's end of its access happening at the same moment and then refuses, instead of sending the set-up e-mail of an account that was just turned off.
 0.613.0 (2026-11-11): IR756: fifteen more refusals (archiving or deleting what is in use, undoing an import, binding devices, a reused Idempotency-Key) say why in the display language instead of "CONFLICT: …" in English.
