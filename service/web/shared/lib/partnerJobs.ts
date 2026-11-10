@@ -63,7 +63,7 @@ export function jobRow(raw: ApiPartnerJob, now: number, units: Map<string, strin
   const place = j.unit ?? j.address ?? typeLabel(j.type);
   const title = `${j.short} · ${place}`;
   const tech = j.technicianId ? names.get(j.technicianId) ?? t("Technician") : null;
-  const origin = "origin" in raw ? (raw as { origin?: string }).origin ?? null : null;
+  const origin = "origin" in raw ? raw.origin ?? null : null; // offers and summaries carry it, histories do not
   const b = bucket(j, now);
   const detail = `/partner/jobs/${j.id}`;
   if (raw.projection === "offer" && raw.status === "offered") {
@@ -108,7 +108,7 @@ export function jobRow(raw: ApiPartnerJob, now: number, units: Map<string, strin
   }
   const none = { name: "—", sub: "" };
   const due = j.dueAt ? t("Due {time}", { time: at(j.dueAt) }) : "";
-  const known = ack[(raw as { assignmentAcknowledgement?: string | null }).assignmentAcknowledgement ?? ""];
+  const known = ack[raw.assignmentAcknowledgement ?? ""]; // a summary: offers and histories returned above
   const technician = tech ? { name: tech, ...(known ? { sub: t(known.sub), ...(known.tone && { tone: known.tone, subTone: known.tone }) } : { sub: t("assigned") }) } : null;
   switch (b) {
     case "unassigned": {
