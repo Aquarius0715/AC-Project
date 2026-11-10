@@ -125,4 +125,9 @@ jobs:
           retention-days: 7
       - name: remove the stack
         if: always()
-        run: docker compose -p ac-e2e --env-file "$SETTINGS" -f compose.yaml -f deploy/test/compose.test.yaml --profile full --profile iot down --volumes --remove-orphans
+        # then the replaced :e2e builds (untagged) and the build cache over 20 GB, as deploy.sh does after a deployment
+        # (IR725): the nightly builds filled the server's disk. Other projects' tagged images and volumes stay
+        run: |
+          docker compose -p ac-e2e --env-file "$SETTINGS" -f compose.yaml -f deploy/test/compose.test.yaml --profile full --profile iot down --volumes --remove-orphans
+          docker image prune -f >/dev/null || true
+          docker builder prune -f --max-used-space 20GB >/dev/null || true

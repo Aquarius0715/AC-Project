@@ -80,7 +80,11 @@ jobs:
       postgres: # no published port: the server's own PostgreSQL has 5432
         image: postgres:18
         env: { POSTGRES_PASSWORD: local }
+        # the data directory in memory (IR725): the image declares VOLUME /var/lib/postgresql, so each job left an
+        # anonymous volume of its test databases (about 200 MB) that the runner never removes; with a tmpfs on that
+        # path Docker creates none. The databases are thrown away after the job; 2g only caps a runaway
         options: >-
+          --tmpfs /var/lib/postgresql:rw,size=2g
           --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
     env:
       PG_ADMIN_URL: postgres://postgres:local@localhost:5432/postgres?sslmode=disable
@@ -127,7 +131,11 @@ jobs:
       postgres: # no published port: the server's own PostgreSQL has 5432
         image: postgres:18
         env: { POSTGRES_PASSWORD: local }
+        # the data directory in memory (IR725): the image declares VOLUME /var/lib/postgresql, so each job left an
+        # anonymous volume of its test databases (about 200 MB) that the runner never removes; with a tmpfs on that
+        # path Docker creates none. The databases are thrown away after the job; 2g only caps a runaway
         options: >-
+          --tmpfs /var/lib/postgresql:rw,size=2g
           --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
     env:
       PG_ADMIN_URL: postgres://postgres:local@localhost:5432/postgres?sslmode=disable
