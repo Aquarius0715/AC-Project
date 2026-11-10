@@ -104,3 +104,116 @@ func TestCustomerDeleteWaitsForASaveIntoTheCustomer(t *testing.T) {
 		t.Errorf("a save into a deleted customer: %d %v", got.code, got.resp)
 	}
 }
+
+// An import is committed into a customer only while the customer row is read with a share lock, as properties.save and
+// units.save read it (IR667, IR751): a delete of the customer half done makes the commit wait and then refuse, instead
+// of creating a property and a unit of a deleted customer.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
+func TestCustomerDeleteWaitsForAnImportCommit(t *testing.T) {
+	srv := server(t)
+	ctx := context.Background()
+	name := "Import Race " + uuid.NewString()[:8]
+
+	code, resp := write(
+		srv,
+		hq(),
+		"organizations.save",
+		`{"name":"`+name+`","kind":"customer","status":"active"}`,
+		0,
+	)
+	if code != 200 {
+		t.Fatalf("organization: %d %v", code, resp)
+	}
+
+	org := asStr(t, data(resp)["id"])
+
+	code, resp = write(
+		srv,
+		hq(),
+		"customers.save",
+		`{"name":"`+name+`","organizationId":"`+org+`","serviceProfile":"general","status":"active"}`,
+		0,
+	)
+	if code != 200 {
+		t.Fatalf("customer: %d %v", code, resp)
+	}
+
+	cust := asStr(t, data(resp)["id"])
+
+	t.Cleanup(func() {
+		owner(t, `DELETE FROM assets.units WHERE customer_org_id = $1`, org)
+		owner(t, `DELETE FROM assets.properties WHERE customer_org_id = $1`, org)
+		owner(t, `DELETE FROM assets.unit_imports WHERE customer_id = $1`, cust)
+		owner(t, `DELETE FROM assets.customers WHERE id = $1`, cust)
+		owner(t, `DELETE FROM identity.organizations WHERE id = $1`, org)
+	})
+
+	csv := "Property,Unit,Model\nRace import site,Race AC,SPL-100\n"
+	body := `{"customerId":"` + cust + `","fileName":"units.csv","csvText":` + jsonStr(t, csv) +
+		`,"mapping":{"property":"Property","unit_name":"Unit","model_code":"Model"}}`
+
+	// one row that creates its property (a warning, committed like a ready row)
+	code, resp = post(srv, hq(), "units.importPreview", body)
+	if code != 200 || asNum(t, data(resp)["errorCount"]) != 0 ||
+		asNum(t, data(resp)["warningCount"]) != 1 {
+		t.Fatalf("preview: %d %v", code, resp)
+	}
+
+	previewID := asStr(t, data(resp)["previewId"])
+
+	conn, err := pgx.Connect(ctx, testDB("postgres"))
+	if err != nil {
+		t.Skip(err)
+	}
+	defer func() { _ = conn.Close(ctx) }()
+
+	// the customer delete, half done: it holds the customer row and has removed it
+	tx, err := conn.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	_, err = tx.Exec(ctx, `DELETE FROM assets.customers WHERE id = $1`, cust)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	done := make(chan saveResult, 1)
+
+	go func() {
+		status, reply := write(
+			srv,
+			hq(),
+			"units.importCommit",
+			`{"previewId":"`+previewID+`","customerId":"`+cust+`"}`,
+			0,
+		)
+		done <- saveResult{status, reply}
+	}()
+
+	select {
+	case got := <-done:
+		t.Fatalf("the commit did not wait for the customer delete: %d %v", got.code, got.resp)
+	case <-time.After(700 * time.Millisecond):
+	}
+
+	err = tx.Commit(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := <-done
+	if got.code == 200 {
+		t.Errorf("an import committed into a deleted customer: %d %v", got.code, got.resp)
+	}
+
+	var units int
+	ownerScan(t, `SELECT count(*) FROM assets.units WHERE customer_org_id = $1`, []any{org}, &units)
+
+	if units != 0 {
+		t.Errorf("units of the deleted customer: %d", units)
+	}
+}
