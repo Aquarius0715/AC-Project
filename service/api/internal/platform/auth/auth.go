@@ -169,11 +169,13 @@ func (a *Authenticator) RecordSignIn(
 	err := a.DB.Run(ctx, false, principal, func(txn pgx.Tx) error {
 		_, err := txn.Exec(
 			ctx,
-			`UPDATE identity.users SET last_sign_in_at = $3, sign_in_auth_time = $2
+			`UPDATE identity.users SET last_sign_in_at = $3, sign_in_auth_time = $2,
+				sign_in_host = COALESCE(NULLIF($4, ''), sign_in_host)
 			WHERE id = $1 AND (sign_in_auth_time IS NULL OR sign_in_auth_time < $2)`,
 			principal.UserID,
 			signedIn,
 			a.now(),
+			principal.IssuerHost, // where this sign-in was made: its e-mails link there (IR721)
 		)
 		if err != nil {
 			return apperr.Wrap(err, "update identity.users")
