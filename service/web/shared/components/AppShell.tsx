@@ -81,8 +81,12 @@ export function AppShell({ appRole: forced, live, children }: Readonly<{ appRole
   };
   const pathname = usePathname();
   const session = useBffSession();
+  // API mode is the layout's `live` (IR241), known on the first render, or a session that says so (the shared pages pass
+  // no `live` without a session); the session read in the browser is null until it answers and the mock session when it
+  // cannot be read, so it alone does not decide the mode (IR716)
+  const isApiMode = live !== undefined || session?.dataSource === "api";
   // Users is owner-only (FR-C19): the session's client role in API mode, the demo persona otherwise
-  const isOwner = session?.dataSource === "api" ? session.clientRole === "owner" : CURRENT_CLIENT.role === "owner";
+  const isOwner = isApiMode ? session?.clientRole === "owner" : CURRENT_CLIENT.role === "owner";
   const [open, setOpen] = useState(false);
   // close the mobile menu when the route changes: adjust state during render (React: "You might not need an effect")
   const [menuPath, setMenuPath] = useState(pathname);
@@ -161,8 +165,8 @@ export function AppShell({ appRole: forced, live, children }: Readonly<{ appRole
           <main id="main" tabIndex={-1} className="min-w-0 flex-1 px-4 py-5 outline-none sm:px-6 lg:px-8">{children}</main>
         </div>
       </div>
-      {role === "technician" && session?.dataSource === "api" && <QrScan open={qr} onClose={() => { setQr(false); }} />}
-      <Modal open={qr && session?.dataSource !== "api"} onClose={() => { setQr(false); }} title="Scan unit QR" footer={<><Btn onClick={() => { setQr(false); }}>Close</Btn><Link href="/technician/jobs/job-contractor-a" onClick={() => { setQr(false); }} className="inline-flex items-center rounded-control border border-primary bg-primary px-3.5 py-2 text-[13px] font-semibold text-white">Open job <Icon name="arrowRight" /></Link></>}>
+      {role === "technician" && isApiMode && <QrScan open={qr} onClose={() => { setQr(false); }} />}
+      <Modal open={qr && !isApiMode} onClose={() => { setQr(false); }} title="Scan unit QR" footer={<><Btn onClick={() => { setQr(false); }}>Close</Btn><Link href="/technician/jobs/job-contractor-a" onClick={() => { setQr(false); }} className="inline-flex items-center rounded-control border border-primary bg-primary px-3.5 py-2 text-[13px] font-semibold text-white">Open job <Icon name="arrowRight" /></Link></>}>
         <div className="grid h-40 place-items-center rounded-xl bg-ink/90 text-xs text-white">[ camera preview ]</div>
         <SummaryList items={[["Result", <Badge key="m" tone="ok" icon="check">Matched</Badge>], ["Label", "AC-QR-online-rto · scanned 10:04"], ["Unit", "Bedroom AC · unit-online-rto · customer-a · Home A › 1F › Bedroom"], ["Your job today", "job-contractor-a"]]} />
         <Banner>Units outside your assignments show “Not in your assignments” (NOT_FOUND).</Banner>

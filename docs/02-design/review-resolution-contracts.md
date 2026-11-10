@@ -9745,3 +9745,15 @@ The customer has no restriction list. Three pages find a contract's active restr
 1. **Reproduced.** `shared/lib/tests/restrictionLookup.test.ts`: a contract with three newer unpaid invoices, the overdue one the restriction cites, and an older paid one. With the first three unpaid invoices the restriction is not found (the test fails). With the fix it is found on the first request.
 2. **Fix.** `restrictionFor` (`shared/lib/restrictionLookup.ts`) asks about the unpaid invoices oldest due first, then the paid ones latest due first (a restriction being released once they are paid, `release_requested`). It stops at the first restriction the page accepts. The three pages use it; the overview passes the contract's overdue invoices. The `no-await-in-loop` exception of `eslint.base.mjs` names the new file instead of the payments page, which no longer loops.
 3. **Not changed.** What the notices and the link show. Every operation, route and count stays the same.
+
+## IR716 The app shell takes API mode from the layout, not from the session read in the browser (review round 212, 2026-11-10)
+
+The app shell (`shared/components/AppShell.tsx`) has two choices that depend on the mode:
+- the technician's Scan QR opens the real scan (`units.resolveQr`, FR-T13) in API mode, and the Phase 1A demo dialog otherwise. The demo dialog shows a fixture match: "Matched", Bedroom AC, `job-contractor-a`.
+- a client sees the Users page (FR-C19) only as an owner. In API mode that is the session's client role; otherwise it is the demo persona, an owner.
+
+Both took the mode from `useBffSession()`. That hook is null until `/bff/session` answers, and it is the mock session when the answer cannot be read. So in API mode a technician who pressed Scan QR before the session answered, or after a failed read, saw the demo's invented match. In the same cases a client who is not an owner was offered the Users link (the page itself is refused by the Core API).
+
+1. **Reproduced.** `shared/lib/tests/appShellMode.test.tsx` renders the shell in API mode (`live` given) with `/bff/session` unreadable. Before the fix, Scan QR opens the demo dialog ("[ camera preview ]") and a client gets the Users link (both cases fail).
+2. **Fix.** API mode is `live` being given, or a session that says `api`. The role layouts pass `live` only in API mode (IR241), so it is known on the first render; the shared pages (notifications, preferences, demo) pass it only with a session, and there the session still tells. The real QR scan and the owner check use it. In API mode the owner check reads the session's client role, which is false until the session answers. The demo keeps its dialog and persona.
+3. **Not changed.** The QR scan itself, the Users page and its server-side owner check. Every operation, route and count stays the same.
