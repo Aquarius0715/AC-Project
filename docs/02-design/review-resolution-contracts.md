@@ -10176,3 +10176,11 @@ Found in review round 549 (`assets/imports.go`).
 1. **Before.** IR667 made `properties.save` and `units.save` read the customer row `FOR SHARE` (`customerActive`), so a customer delete (IR654) or deactivation (customers.save inactive) and a save never both pass. `units.importCommit` read the customer's organization with a plain `SELECT … AND status = 'active'` and then created the import's properties, spaces and units. With a customer delete half done (the row locked and removed), the commit answered 200 at once and left a property and a unit of a deleted customer — the IR667 case through the import.
 2. **Now.** The commit reads the customer `FOR SHARE`: it waits for the delete or deactivation and then finds no active customer (CONFLICT `error.customerInactive`), or the delete waits for the commit and then finds the units (CONFLICT `error.customerHasUnits`). Nothing else changes.
 3. **Tests.** `TestCustomerDeleteWaitsForAnImportCommit` holds the customer delete open in a second transaction and commits a one-row import that creates its property: before the fix the commit answered 200 at once and created the unit; now it waits for the delete, is refused, and no unit of the customer exists.
+
+## IR752 A job generated from a plan is announced as a new request — 2026-11-11
+
+Found in review round 593 (`server/eventnotify.go`).
+
+1. **Before.** The IR95 table lists `job.requested (jobs.create, plans.generateNext)` → `job_update` to the customer's clients who read the unit and to HQ job.write holders. The notifier maps operations to events by the audit entry; `plans.generateNext` audits its plan (target kind `plan`, as the operation changes the plan's next due date), and the notifier handled only `job` targets and had no event for the operation, so a generated plan visit told nobody.
+2. **Now.** For `plans.generateNext` the notifier takes the generated job from the call's `PlanOccurrenceGenerated` event (its `jobId`) — not the plan's newest job, which two jobs created at one frozen demo time would make ambiguous — and sends the `requested` notices for it, as it does for the follow-up job of `jobs.reportProblem` (IR438). The audit entry still names the plan.
+3. **Tests.** `TestPlans`: the generated job gives customer-b's client one `job_update` notice (failed before with none).

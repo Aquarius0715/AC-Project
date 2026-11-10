@@ -176,6 +176,11 @@ func TestPlans(t *testing.T) {
 	}
 
 	job := asStr(t, data(resp)["id"])
+	// the generated visit is a new request for the customer's clients, as a client's own request is (IR95 job.requested,
+	// IR752)
+	if n := countNotes(t, job, "customer-b", "job_update"); n != 1 {
+		t.Errorf("client notices of the generated plan job: %d", n)
+	}
 
 	_, resp = post(srv, hq(), "plans.get", `{"id":"`+plan+`"}`)
 	if data(resp)["nextDueAt"] != next.AddDate(0, 1, 0).Format(time.RFC3339) ||

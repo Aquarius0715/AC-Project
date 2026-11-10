@@ -202,7 +202,7 @@ func (r notifyingRecorder) send(
 // event gives "".
 func jobEvent(operation, status string) (string, string) {
 	switch operation {
-	case "jobs.create", "jobs.reportProblem":
+	case "jobs.create", "jobs.reportProblem", "plans.generateNext":
 		return "requested", noticeJobUpdate
 	case "jobs.offer":
 		return eventOffered, noticeJobUpdate
@@ -277,6 +277,18 @@ func (r notifyingRecorder) audited(
 		}
 
 		return r.job(ctx, call, operation, target)
+	case "plan":
+		if operation != "plans.generateNext" {
+			return nil
+		}
+		// the audit names the plan; the request is the job it generated, which its PlanOccurrenceGenerated event names
+		// (IR95 job.requested, IR752)
+		job, ok := generatedJob(call, target)
+		if !ok {
+			return nil
+		}
+
+		return r.job(ctx, call, operation, job)
 	case "restriction":
 		if operation == "restrictions.schedule" { // the advance notice is IR05's own notification
 			return nil
@@ -286,6 +298,23 @@ func (r notifyingRecorder) audited(
 	}
 
 	return nil
+}
+
+// generatedJob is the job a plans.generateNext call generated for the plan, read from its PlanOccurrenceGenerated
+// event: the plan's newest job would be ambiguous when two jobs share a creation time (a frozen demo clock).
+func generatedJob(call *ops.Call, plan uuid.UUID) (uuid.UUID, bool) {
+	for _, event := range call.Events {
+		if event.Type != "PlanOccurrenceGenerated" || event.AggregateID != plan {
+			continue
+		}
+
+		payload, _ := event.Payload.(map[string]any)
+		if id, ok := payload["jobId"].(uuid.UUID); ok {
+			return id, true
+		}
+	}
+
+	return uuid.Nil, false
 }
 
 // paymentConfirmed tells the customer's users and HQ that a payment was confirmed.
