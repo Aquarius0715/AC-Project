@@ -81,9 +81,10 @@ export function AppShell({ appRole: forced, live, children }: Readonly<{ appRole
   };
   const pathname = usePathname();
   const session = useBffSession();
-  // API mode is the layout's `live` (IR241), known on the first render; the session read in the browser is null until it
-  // answers and the mock session when it cannot be read, so it does not decide the mode (IR716)
-  const isApiMode = live !== undefined;
+  // API mode is the layout's `live` (IR241), known on the first render, or a session that says so (the shared pages pass
+  // no `live` without a session); the session read in the browser is null until it answers and the mock session when it
+  // cannot be read, so it alone does not decide the mode (IR716)
+  const isApiMode = live !== undefined || session?.dataSource === "api";
   // Users is owner-only (FR-C19): the session's client role in API mode, the demo persona otherwise
   const isOwner = isApiMode ? session?.clientRole === "owner" : CURRENT_CLIENT.role === "owner";
   const [open, setOpen] = useState(false);
