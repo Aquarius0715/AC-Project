@@ -26,12 +26,15 @@ concurrency:
 jobs:
   e2e:
     name: Playwright (compose stack)
+    # the lab server runs only this repository's own runs, never a fork's or a pull request's (IR732)
+    if: github.repository == 'Aquarius0715/AC-Project' && github.event_name != 'pull_request'
     runs-on: [self-hosted, ac-test]
     timeout-minutes: 75
     env:
       IMAGE_TAG: e2e
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false } # no later step pushes or fetches with the job's token
       - name: local settings (random broker keys and client secrets, never real secrets)
         run: |
           # the job's env cannot read the runner context: the path goes to the later steps through GITHUB_ENV

@@ -9856,3 +9856,46 @@ The shared test environment answers on the lab LAN and the Tailnet (DEC-102, IR6
 3. **Tests.** `TestMailLinksAtTheSignInAddress` (notify): the Tailnet host moves the link; the canonical host, an unlisted host and none keep it; a single-address environment never moves it. `TestRecordSignInHost` (auth): a sign-in records its issuer's host and a later call without one keeps it. It fails on the code before this change.
 4. **Data.** The column is added in migration 000001 and `schema.sql` (version 1 is still edited in place). The dev database got it by hand (`ALTER TABLE identity.users ADD COLUMN IF NOT EXISTS sign_in_host text`). The shared test environment builds its data again from the seed at its next deployment, as for any change of the migrations (`deploy.sh`).
 5. **Not changed.** The set-up and invitation e-mails (IR695), the e-mail texts and every operation, route and count.
+
+## IR722 A technician binds the device they registered to its planned unit (B-12, decided 2026-11-10)
+
+FR-T11's flow is "register serial → bind unit → check connection" (AT-T11-N). Since IR467, `devices.register` only reserves the planned unit (`targetUnitId`, D05), and the device stays unbound until `devices.bind`. The admin screens took that step (IR467). The technician app kept saying the opposite:
+- "Bind to unit", "binds it in one step" and "Device registered and bound".
+- For an unbound device the loader found no job: it looked one up by `unitId`, which is null. So every device action was disabled, and there was no Bind….
+
+A technician who registered a device on site could not finish the set-up. The user took B-12's recommendation: mirror IR467 in the technician app.
+
+1. **Reproduced.** `technician/tests/devicesLoad.test.ts`: a device registered for a planned unit on which the technician has an assigned job. The loader answered no job (`null`, the test fails). With the fix it is that unit's job.
+2. **Fix.**
+   - The loader takes the device's unit, or its planned unit while it is not bound. That unit's job is the job the device is bound under; IR709 lets a technician bind an unbound device to its planned unit.
+   - The view has a binding card of its own (`BindingCard`). A device not bound yet reads "Not bound yet", says what to do next, and offers Bind… with the planned unit and "Installed on site" prefilled. A bound device offers Rebind….
+   - Check connection, Calibrate and Update firmware wait for the binding; the API refuses them on an unbound device.
+   - The register form reads "Planned unit", "Registering reserves the device for this unit; Bind connects it once it is installed." and "Register", and its toast is "Device registered — bind it to the unit once it is installed". These are the admin app's texts and keys (en / ms / ja). The four texts the technician app no longer shows were removed from the ms and ja dictionaries.
+3. **Not changed.** The API (IR467, IR709), the admin screens and every operation, route and count.
+4. **Open.** Figma Technician 03 still draws one step, and the E2E path register → bind → check is not written yet.
+
+## IR732 The repository can be public: nobody outside can run, change or start anything — 2026-11-10
+
+The user decided to make the repository public, so that its CI runs on GitHub-hosted runners without a limit. Everything may be seen: the history, the pull requests, the logs and the internal addresses. The condition is that nobody outside can run, change or start anything, nor reach a secret. Before, every workflow ran on the lab server's self-hosted runners, `ci.yml` and `auto-merge.yml` for every pull request too, so a fork's pull request would have run its own code on the lab server.
+
+1. **ci.yml on hosted runners.**
+   - Every job runs on `ubuntu-latest`, in the same containers as before.
+   - The lanes' `needs` are gone; the job names, which are the required checks, stay.
+   - The named volumes are replaced by `actions/cache` (v6.1.0, by SHA), keyed by `go.sum`, `package-lock.json` and `ci.yml`.
+   - The steps that handed the workspace back to the runner's user are gone; a hosted runner is fresh every time.
+2. **Auto-merge.** It runs on `ubuntu-latest` for the owner's own pull requests only (`user.login == github.repository_owner`), not a fork's, another account's or Dependabot's (IR727). Its write permissions are the job's, not the workflow's. The trigger stays `pull_request`, never `pull_request_target`.
+3. **The lab server's workflows.** e2e.yml, load.yml and deploy-test.yml run their jobs only in this repository and never for a pull request: `github.repository == 'Aquarius0715/AC-Project'` and, for e2e and load, `github.event_name != 'pull_request'`. Their triggers cannot be started from outside:
+   - schedule and dispatch, which need write access;
+   - a test tag;
+   - `workflow_run` of CI on a push to `main`, whose checkout is main and the tags, never a pull request's code.
+4. **Credentials and permissions.** Every checkout sets `persist-credentials: false`; no step pushes or fetches with the job's token. deploy.sh's tag fetch is optional and the checkout has the tags. Every workflow's permissions are `contents: read`, plus `actions: read` for deploy-test and the auto-merge job's own.
+5. **zizmor** (1.31.1) lints the workflows' security in other-lint, beside actionlint, at 0 findings. Two exceptions name their rule and reason:
+   - deploy-test's `workflow_run` (dangerous-triggers): it acts only on a push to `main`;
+   - the docs job's `typescript@6.0.3` (adhoc-packages): the lock's exact version.
+6. **CODEOWNERS and SECURITY.md.** `* @Aquarius0715` and `/.github/ @Aquarius0715`; vulnerabilities are reported privately (private vulnerability reporting).
+7. **Repository settings** (2026-11-10, after the repository was made public).
+   - Set through the API: fork pull requests need approval for every external contributor (it was first-time contributors only), and only GitHub's own actions are allowed, pinned by SHA.
+   - Already set: read-only workflow permissions without creating or approving pull requests; main's protection with the 14 required checks and no force push; secret scanning and push protection.
+   - Left to the user: the tag ruleset (`test*`, the owner only); the Environment `test` limited to `main` and `test*`; Dependabot alerts and private vulnerability reporting; Wiki and Projects off.
+   - No required review: the owner alone could not approve the owner's own pull requests, and auto-merge does not use a bypass (the user's choice (a)).
+8. **Order.** Merged after the repository became public, so the hosted runners' minutes are free; it went ahead of the queued changes.
