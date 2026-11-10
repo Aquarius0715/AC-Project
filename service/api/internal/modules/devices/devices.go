@@ -300,17 +300,17 @@ func withSensors(ctx context.Context, call *ops.Call, devices []Device) error {
 //	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
 //	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
 //	@Description	Design: DD-A04, DD-T02, DD-T11, DD-A16, DD-A20, DD-T12 · Query: filters unitId,status,search,modelId \
-//	@Description	· sort id,createdAt,updatedAt (default id asc)
+//	@Description	· sort id,createdAt,updatedAt,serial (default id asc)
 //	@Tags			devices
 //	@Accept			json
 //	@Produce		json
 //	@Param			cursor	query		string	false	"page cursor: nextCursor of the previous page (D12)"
 //	@Param			limit	query		integer	false	"page size 1–100, default 25"
-//	@Param			sort	query		string	false	"field:direction — fields id,createdAt,updatedAt; default id asc"
+//	@Param			sort	query		string	false	"field:direction — fields id,createdAt,updatedAt,serial; default id asc"
 //	@Param			unitId	query		string	false	"filter → unitId"
 //	@Param			status	query		string	false	"filter → connection"
-//	@Param			search	query		string	false	"filter → part of serial (IR723)"
-//	@Param			modelId	query		string	false	"filter → model of the bound unit (IR723)"
+//	@Param			search	query		string	false	"filter → part of the serial"
+//	@Param			modelId	query		string	false	"filter"
 //	@Success		200		{object}	ops.Envelope{data=DevicePage}
 //	@Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
 //	@Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
@@ -340,6 +340,7 @@ func (m *Module) list(
 			"id":           "d.id",
 			fieldCreatedAt: "d.created_at",
 			fieldUpdatedAt: "d.updated_at",
+			"serial":       "d.serial", // HQ's registry pages in the order it shows (IR723)
 		},
 		"d.id ASC",
 	)
@@ -386,7 +387,7 @@ func (m *Module) list(
 type deviceFilter struct {
 	UnitID  *uuid.UUID `json:"unitId,omitempty"`
 	Status  *string    `json:"status,omitempty"`
-	Search  *string    `json:"search,omitempty"`  // part of the serial, case-insensitive (IR723)
+	Search  *string    `json:"search,omitempty"`  // part of the serial, MQTT node ID or unit name (IR723)
 	ModelID *uuid.UUID `json:"modelId,omitempty"` // the model of the device's bound unit (IR723)
 }
 
@@ -434,7 +435,11 @@ func deviceConditions(call *ops.Call, filter deviceFilter) (string, []any, error
 	// HQ finds a device and a model's devices on the server, past any one page (IR723)
 	if filter.Search != nil && strings.TrimSpace(*filter.Search) != "" {
 		args = append(args, paging.Contains(*filter.Search))
-		conds = append(conds, fmt.Sprintf("d.serial ILIKE $%d", len(args)))
+		conds = append(
+			conds,
+			fmt.Sprintf(`(d.serial ILIKE $%[1]d OR d.mqtt_node ILIKE $%[1]d OR EXISTS (SELECT 1 FROM
+			assets.units su WHERE su.id = d.unit_id AND su.display_name ILIKE $%[1]d))`, len(args)),
+		)
 	}
 
 	if filter.ModelID != nil {

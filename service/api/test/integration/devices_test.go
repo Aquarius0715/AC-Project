@@ -598,6 +598,20 @@ func TestDeviceListSearchAndModel(t *testing.T) {
 		t.Errorf("wildcards in a search are literal: %v", got)
 	}
 
+	unitName := serials(
+		`{"filters":{"search":"living"},"sort":{"field":"serial","direction":"desc"}}`,
+	)
+	if len(unitName) == 0 {
+		t.Errorf("search by the bound unit's name: %v", unitName)
+	}
+
+	if got := serials(
+		`{"sort":{"field":"serial","direction":"asc"},"limit":2}`,
+	); len(got) != 2 ||
+		got[0] > got[1] {
+		t.Errorf("sorted by serial: %v", got)
+	}
+
 	model := seed.ID("ventilation-demo").String()
 	if got := serials(
 		`{"filters":{"modelId":"` + model + `"}}`,
