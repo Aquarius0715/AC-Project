@@ -29,8 +29,10 @@ type NodeDevice struct {
 type NodeField struct {
 	Field string  // the field of the node's message
 	Scale float64 // to the sensor's unit (W → kW: 0.001)
-	// Gate is the field that must be non-zero for the value to be a reading: a node sends 0 for what it does not
-	// measure, so a zero temperature is no reading, while a zero power is one when the meter sees a voltage.
+	// Gate is the field that must be non-zero for the value to be a reading: the first firmware sends 0 for what a node
+	// does not measure, so a zero temperature is no reading, while a zero power is one when the meter sees a voltage.
+	// "" lets a value through whenever its field is there: firmware 0.4 leaves out a sensor it does not have (DEV-31),
+	// and 0 µg/m³ of PM2.5 is clean air, not a missing sensor.
 	Gate string
 }
 
@@ -45,6 +47,7 @@ func NodeFields() map[string]NodeField {
 		sensorTemperature: {Field: fieldTemp, Scale: 1, Gate: fieldTemp},
 		sensorHumidity:    {Field: sensorHumidity, Scale: 1, Gate: sensorHumidity},
 		sensorPower:       {Field: sensorPower, Scale: kWPerWatt, Gate: "voltage"},
+		sensorPM25:        {Field: sensorPM25, Scale: 1, Gate: ""},
 	}
 }
 

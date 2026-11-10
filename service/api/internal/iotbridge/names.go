@@ -9,6 +9,7 @@ const (
 	fieldTemp         = "temp"
 	qualityValid      = "valid"
 	sensorHumidity    = "humidity"
+	sensorPM25        = "pm25"
 	sensorPower       = "power"
 	sensorTemperature = "temperature"
 )

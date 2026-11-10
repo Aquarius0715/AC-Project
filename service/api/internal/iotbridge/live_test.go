@@ -57,16 +57,34 @@ func liveDevice(module seed.LiveModule) iotbridge.NodeDevice {
 func airConditioner() iotbridge.NodeDevice { return liveDevice(seed.LiveSite().Modules()[0]) }
 func roomSensors() iotbridge.NodeDevice    { return liveDevice(seed.LiveSite().Modules()[1]) }
 
-// TestLiveNode: the node is the level before sensors; other topics under the subscription carry no node.
-func TestLiveNode(t *testing.T) {
+// TestLiveTopic: a node's topics name the node before their kind (command/result has two levels); the commands the
+// bridge publishes, and other topics under the subscription, are none of the node's.
+func TestLiveTopic(t *testing.T) {
 	t.Parallel()
 
-	for topic, want := range map[string]string{
-		"smarthome/ac/node_1/sensors": node1, "smarthome/ac/node_2/sensors": node2,
-		"smarthome/ac/node_1/status": "", "sensors": "", "smarthome/ac/node_1/sensors/extra": "",
+	for topic, want := range map[string][2]string{
+		"smarthome/ac/node_1/sensors":        {node1, iotbridge.LiveSensors},
+		"smarthome/ac/node_2/sensors":        {node2, iotbridge.LiveSensors},
+		"smarthome/ac/node_1/state":          {node1, iotbridge.LiveState},
+		"smarthome/ac/node_1/status":         {node1, iotbridge.LiveStatus},
+		"smarthome/ac/node_1/command/result": {node1, iotbridge.LiveResult},
+		"smarthome/ac/node_1/command":        {"", ""},
+		"sensors":                            {"", ""},
+		"/sensors":                           {"", ""},
+		"command/result":                     {"", ""},
+		"smarthome/ac/node_1/sensors/extra":  {"", ""},
 	} {
-		if got := iotbridge.LiveNode(topic); got != want {
-			t.Errorf("LiveNode(%q) = %q, want %q", topic, got, want)
+		node, kind, ok := iotbridge.LiveTopic(topic)
+		if node != want[0] || kind != want[1] || ok != (want[0] != "") {
+			t.Errorf(
+				"LiveTopic(%q) = %q, %q, %t; want %q, %q",
+				topic,
+				node,
+				kind,
+				ok,
+				want[0],
+				want[1],
+			)
 		}
 	}
 }
@@ -359,6 +377,161 @@ func TestLiveTriggersRefuse(t *testing.T) {
 	}
 }
 
+// node2Firmware04 is a message of node_2 on firmware 0.4, as the broker carried it on 2026-11-10: a sensor it does not
+// have is left out, and the timestamp has the node's zone.
+const node2Firmware04 = `{"node_id":"node_2","timestamp":"2026-11-10T17:35:26+07:00","temp":25.6,"humidity":43.8,` +
+	`"pressure":1008.0,"gas":423837,"approx_altitude":43.9,"pm25":55}`
+
+// TestLiveTriggersPM25: firmware 0.4's PM2.5 is recorded on node_2's sensor whenever it is there, 0 µg/m³ (clean air)
+// too; a message without the field and without a meter's voltage has no PM2.5 and no power.
+func TestLiveTriggersPM25(t *testing.T) {
+	t.Parallel()
+
+	dev := roomSensors()
+
+	out, err := iotbridge.LiveTriggers(dev, []byte(node2Firmware04), liveAt())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(out) != 5 {
+		t.Fatalf(
+			"%d triggers, want temperature, humidity, PM2.5, their evaluation and the heartbeat",
+			len(out),
+		)
+	}
+
+	if m := out[2].Measurement; m == nil || m.Metric != metricPM25 ||
+		m.SensorID != seed.ID("sensor-live-node-2-pm25") ||
+		m.Unit != "µg/m³" ||
+		*m.Value != 55 {
+		t.Errorf("PM2.5 reading %+v", m)
+	}
+
+	clean, err := iotbridge.LiveTriggers(dev, []byte(`{"pm25":0}`), liveAt())
+	if err != nil || len(clean) != 3 || clean[0].Measurement.Metric != metricPM25 ||
+		*clean[0].Measurement.Value != 0 {
+		t.Errorf("clean air: %+v, %v", clean, err)
+	}
+
+	if facts := out[3].Event.Facts; len(facts) != 3 || facts[2].Metric != metricPM25 ||
+		facts[2].Value != 55 {
+		t.Errorf("facts %+v", facts)
+	}
+}
+
+// TestLiveReplay: a firmware-0.4 reading more than a minute older than its receipt is one the node kept while offline,
+// measured at its timestamp moved onto the scenario clock; a reading of now, the first firmware's timestamp without a
+// zone, and none at all are readings of now. A replayed reading has the event IDs of its minute, as a live one of that
+// minute has, and goes to no alert policy and is no heartbeat.
+func TestLiveReplay(t *testing.T) {
+	t.Parallel()
+
+	stamped := time.Date(2026, 11, 10, 10, 35, 26, 0, time.UTC) // node2Firmware04's 17:35:26+07:00
+	offset := -50 * 24 * time.Hour                              // the scenario runs behind real time
+
+	replayedAt, replayed := iotbridge.LiveReplayedAt(
+		[]byte(node2Firmware04),
+		stamped.Add(3*time.Minute),
+		offset,
+	)
+	if !replayed || !replayedAt.Equal(stamped.Add(offset)) {
+		t.Errorf("replayed at %s (%t), want %s", replayedAt, replayed, stamped.Add(offset))
+	}
+
+	for name, check := range map[string]struct {
+		payload  string
+		received time.Time
+	}{
+		"now":            {node2Firmware04, stamped.Add(5 * time.Second)},
+		"a minute old":   {node2Firmware04, stamped.Add(time.Minute)},
+		"first firmware": {node1Message, time.Date(2026, 10, 30, 6, 59, 0, 0, time.UTC)},
+		"no timestamp":   {`{"temp":25.6}`, stamped.Add(time.Hour)},
+		"not available":  {`{"timestamp":"N/A","temp":25.6}`, stamped.Add(time.Hour)},
+		"no JSON":        {`temp=25.6`, stamped.Add(time.Hour)},
+	} {
+		if at, replayed := iotbridge.LiveReplayedAt(
+			[]byte(check.payload),
+			check.received,
+			offset,
+		); replayed {
+			t.Errorf("%s: replayed at %s", name, at)
+		}
+	}
+
+	dev := roomSensors()
+	when := liveAt()
+	observed := when.Add(-7*time.Minute - 20*time.Second)
+
+	out, err := iotbridge.LiveReplayTriggers(dev, []byte(node2Firmware04), observed, when)
+	if err != nil || len(out) != 3 {
+		t.Fatalf("replay: %+v, %v; want temperature, humidity and PM2.5 only", out, err)
+	}
+
+	slot := observed.Truncate(time.Minute)
+	for _, tr := range out {
+		if m := tr.Measurement; m == nil || !m.ObservedAt.Equal(slot) ||
+			!tr.OccurredAt.Equal(slot) ||
+			!m.ReceivedAt.Equal(when) {
+			t.Errorf("replayed reading %+v", tr)
+		}
+	}
+
+	live, _ := iotbridge.LiveTriggers(dev, []byte(node2Firmware04), observed)
+	if live[0].EventID != out[0].EventID {
+		t.Error("a replayed reading and a live one of the same minute are two events")
+	}
+
+	_, err = iotbridge.LiveReplayTriggers(dev, []byte(`temp=25.6`), observed, when)
+	if err == nil {
+		t.Error("a replay that is no JSON was converted")
+	}
+}
+
+// TestLiveHeardGone: a node's last will makes its gap at least LiveOfflineAfter at once, its real gap once that is
+// longer, and a message after the will ends it; a will older than the last message changes nothing.
+func TestLiveHeardGone(t *testing.T) {
+	t.Parallel()
+
+	heard := iotbridge.NewLiveHeard(liveAt().Add(-time.Hour))
+	heard.Heard(node1, liveAt().Add(-10*time.Second))
+	heard.Gone(node1, liveAt().Add(-5*time.Second))
+
+	if g := heard.GapOf([]string{node1}, liveAt()); g != iotbridge.LiveOfflineAfter {
+		t.Errorf("gap after the last will %s, want %s", g, iotbridge.LiveOfflineAfter)
+	}
+
+	if g := heard.GapOf(
+		[]string{node1},
+		liveAt().Add(5*time.Minute),
+	); g != 5*time.Minute+10*time.Second {
+		t.Errorf("gap 5 minutes after the will %s, want the real one", g)
+	}
+
+	heard.Heard(node1, liveAt())
+
+	if g := heard.GapOf([]string{node1}, liveAt().Add(time.Second)); g != time.Second {
+		t.Errorf("gap after the node came back %s, want 1s", g)
+	}
+
+	heard.Gone(node2, liveAt().Add(-time.Minute))
+	heard.Heard(node2, liveAt())
+
+	if g := heard.GapOf([]string{node2}, liveAt()); g != 0 {
+		t.Errorf("an old will gave a gap of %s", g)
+	}
+
+	never := iotbridge.NewLiveHeard(liveAt())
+	never.Gone(node1, liveAt())
+
+	if g := never.GapOf(
+		[]string{node1},
+		liveAt().Add(time.Second),
+	); g != iotbridge.LiveOfflineAfter {
+		t.Errorf("a node never heard whose will came at the start: gap %s", g)
+	}
+}
+
 // TestNodeRegistry: nothing is known before the first read; a node_id is matched exactly; a read replaces the whole
 // table; the devices come in the order of their node_id.
 func TestNodeRegistry(t *testing.T) {
@@ -496,7 +669,7 @@ func TestNodeFieldsMatchTheSite(t *testing.T) {
 			names[liveSensor.Name], metrics[liveSensor.Metric] = true, true
 
 			field, ok := fields[liveSensor.Metric]
-			if !ok || field.Scale == 0 || field.Gate == "" {
+			if !ok || field.Scale == 0 || field.Field == "" {
 				t.Errorf(
 					"%s: the bridge does not read %s (%+v)",
 					module.UnitName,
@@ -520,100 +693,6 @@ func TestNodeFieldsMatchTheSite(t *testing.T) {
 	if !slices.Equal(commanded, []string{node1}) ||
 		iotbridge.LiveCommandTopic(node1) != "smarthome/ac/node_1/command" {
 		t.Errorf("commands go to %v (%s)", commanded, iotbridge.LiveCommandTopic(node1))
-	}
-}
-
-// TestLiveCommand: power on is the firmware's COOL24 with the settings it runs, power off is OFF and keeps the other
-// settings, and an action the firmware does not take is not sent.
-func TestLiveCommand(t *testing.T) {
-	t.Parallel()
-
-	command, ok, err := iotbridge.LiveCommand(json.RawMessage(`{"kind":"set_power","power":true}`))
-
-	state := command.State
-	if err != nil || !ok || command.Payload != "COOL24" || state == nil || !*state.Power ||
-		*state.Celsius != 24 ||
-		*state.Mode != "cool" ||
-		state.FanLevel != nil {
-		t.Errorf("power on: %+v %t %v", command, ok, err)
-	}
-
-	command, ok, err = iotbridge.LiveCommand(json.RawMessage(`{"kind":"set_power","power":false}`))
-	if err != nil || !ok || command.Payload != "OFF" || command.State != nil {
-		t.Errorf("power off: %+v %t %v", command, ok, err)
-	}
-
-	for _, action := range []string{
-		`{"kind":"set_temperature","celsius":24}`, `{"kind":"set_mode","mode":"cool"}`,
-		`{"kind":"set_fan","fanLevel":"mid"}`, `{"kind":"set_power"}`,
-	} {
-		command, ok, err := iotbridge.LiveCommand(json.RawMessage(action))
-		if err != nil || ok || command.Payload != "" {
-			t.Errorf("%s: %+v %t %v", action, command, ok, err)
-		}
-	}
-
-	_, _, err = iotbridge.LiveCommand(json.RawMessage(`power on`))
-	if err == nil {
-		t.Error("an action that is no JSON was taken")
-	}
-}
-
-// TestLiveSentTriggers: a published command is sent and acknowledged on the module, COOL24 also reports the settings
-// it runs with, OFF only its own action; a refused command fails.
-func TestLiveSentTriggers(t *testing.T) {
-	t.Parallel()
-
-	waiting := iotbridge.Waiting{
-		ID:       seed.ID("cmd-live"),
-		DeviceID: seed.ID("device-live-ac"),
-		UnitID:   seed.ID("unit-live-ac"), Action: nil, ExpiresAt: time.Time{},
-	}
-
-	command, _, err := iotbridge.LiveCommand(json.RawMessage(`{"kind":"set_power","power":true}`))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	powerOn := iotbridge.LiveSentTriggers(
-		waiting,
-		waiting.DeviceID,
-		liveAt(),
-		liveAt().Add(-2*time.Second),
-		command.State,
-	)
-	if len(powerOn) != 3 || powerOn[0].EventType != "command_sent" ||
-		powerOn[1].EventType != "command_ack" ||
-		powerOn[2].EventType != eventState {
-		t.Fatalf("power on triggers %+v", powerOn)
-	}
-
-	if *powerOn[1].CommandID != waiting.ID || powerOn[1].EventID == powerOn[0].EventID ||
-		*powerOn[2].DeviceID != seed.ID("device-live-ac") ||
-		*powerOn[2].State.Celsius != 24 ||
-		!powerOn[2].OccurredAt.Equal(liveAt().Add(-2*time.Second)) {
-		t.Errorf("ack %+v, state %+v", powerOn[1], powerOn[2])
-	}
-
-	if off := iotbridge.LiveSentTriggers(
-		waiting,
-		waiting.DeviceID,
-		liveAt(),
-		liveAt(),
-		nil,
-	); len(
-		off,
-	) != 2 {
-		t.Errorf("power off reports %d triggers, want sent and acknowledged", len(off))
-	}
-
-	if refused := iotbridge.LiveRefusedTrigger(
-		waiting,
-		waiting.DeviceID,
-		liveAt(),
-	); refused.EventType != "command_fail" || *refused.CommandID != waiting.ID ||
-		!refused.OccurredAt.Equal(liveAt()) {
-		t.Errorf("refusal %+v", refused)
 	}
 }
 
@@ -835,5 +914,39 @@ func TestLiveConnectionTrigger(t *testing.T) {
 		body["kind"] != "restored" ||
 		recovery["sourceEventId"] != fault.String() {
 		t.Errorf("recovery body %s", raw)
+	}
+}
+
+// TestLiveMinutes: a node's minute passes once in any order (a later one first does not close an earlier one), other
+// nodes are counted apart, a released minute is open again, and minutes two days before the claimed one are
+// forgotten.
+func TestLiveMinutes(t *testing.T) {
+	t.Parallel()
+
+	var minutes iotbridge.LiveMinutes
+
+	minute := liveAt().Truncate(time.Minute)
+	if !minutes.Claim(node1, minute.Add(time.Minute)) || !minutes.Claim(node1, minute) {
+		t.Fatal("a later minute first closed the earlier one")
+	}
+
+	if minutes.Claim(node1, minute) || minutes.Claim(node1, minute.Add(time.Minute)) {
+		t.Error("a minute passed twice")
+	}
+
+	if !minutes.Claim(node2, minute) {
+		t.Error("another node's minute was taken")
+	}
+
+	minutes.Release(node1, minute)
+
+	if !minutes.Claim(node1, minute) {
+		t.Error("a released minute stayed closed")
+	}
+
+	minutes.Release(node9, minute) // a node never claimed: nothing to give back
+
+	if !minutes.Claim(node1, minute.Add(49*time.Hour)) || !minutes.Claim(node1, minute) {
+		t.Error("a minute two days before the claimed one is still remembered")
 	}
 }

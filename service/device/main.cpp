@@ -268,8 +268,8 @@ boolean connectMQTT() {
     StaticJsonDocument<128> bootDoc;
     bootDoc["power"] = ac_power ? "ON" : "OFF";
     bootDoc["temp"] = ac_temp;
-    bootDoc["mode"] = ac_mode;
-    bootDoc["fan"] = ac_fan;
+    bootDoc["mode"] = getModeString(ac_mode);
+    bootDoc["fan"] = getFanString(ac_fan);
     
     String bootPayload;
     serializeJson(bootDoc, bootPayload);

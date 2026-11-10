@@ -27,8 +27,17 @@ type LiveModule struct {
 	Unit, UnitName, Device, Serial, Binding string
 	Node                                    string // the ESP32 node's ID, the <node> of smarthome/ac/<node>/… (IR635)
 	Capability, Manufacturer, Model         string
-	Control                                 bool // the model takes power commands
-	Sensors                                 []LiveSensor
+	Control                                 bool // the model takes commands
+	// Settings are the air conditioner's settings the model offers beyond the power; nil for none
+	Settings *LiveSettings
+	Sensors  []LiveSensor
+}
+
+// LiveSettings are the settings of a live air conditioner's model (DD-C03): the setpoint range and step, and the modes
+// and fan levels, as the node's firmware takes them (device-firmware.md §3.2).
+type LiveSettings struct {
+	TempMin, TempMax, TempStep float64
+	Modes, FanLevels           []string
 }
 
 // Site is a site the seed adds outside the fixture, by the fixture-style names of its records: the fixture customer it
@@ -58,6 +67,12 @@ func (site Site) UnitNames() []string {
 	return names
 }
 
+// The setpoint range of the live air conditioner: what the nodes' firmware takes (16–30 °C).
+const (
+	liveCelsiusMin = 16
+	liveCelsiusMax = 30
+)
+
 // liveStaleAfterSeconds is when a live reading goes stale: two missed minutes (the bridge sends one reading a minute).
 const liveStaleAfterSeconds = 120
 
@@ -71,11 +86,11 @@ type liveExec func(what, sql string, args ...any) error
 // B, so that its client customer-b sees the real devices while customer-a keeps the demo data (DEC-92, IR628), with one
 // Daikin air conditioner (DEC-89, IR528); LiveSiteAt puts it at another customer. One device per unit, one node per
 // device (IR635): node_1 is the air conditioner's device (the room's temperature and humidity, and its infrared LED
-// switches the air conditioner on and off; the model offers the power only, the one setting the nodes' firmware
-// takes), node_2 the device of a sensor unit of its own in the same room (temperature, humidity and the air
-// conditioner's supply power, DEC-91). The IoT bridge subscribes to the nodes' broker (REAL_MQTT_URL) and sends the
-// readings of each node that a device has registered (devices.mqttNodes) to that device's sensors and the power
-// commands to its node. Development and the shared test environment only.
+// sets the air conditioner: power, setpoint, mode and fan, as firmware 0.4 takes them), node_2 the device of a sensor
+// unit of its own in the same room (temperature, humidity, PM2.5 and the air conditioner's supply power, DEC-91). The
+// IoT bridge subscribes to the nodes' broker (REAL_MQTT_URL) and sends the readings of each node that a device has
+// registered (devices.mqttNodes) to that device's sensors and the commands to its node. Development and the shared test
+// environment only.
 func LiveSite() Site {
 	return Site{
 		Tenant:        demoTenant,
@@ -91,12 +106,19 @@ func LiveSite() Site {
 			Manufacturer: "Daikin",
 			Model:        "IR via node_1",
 			Control:      true,
-			UnitName:     "Live · Daikin AC",
-			Serial:       "LIVE-AC-NODE-1",
-			Node:         "node_1",
-			Unit:         "unit-live-ac",
-			Device:       "device-live-ac",
-			Binding:      "binding-live-ac",
+			Settings: &LiveSettings{
+				TempMin:   liveCelsiusMin,
+				TempMax:   liveCelsiusMax,
+				TempStep:  1,
+				Modes:     []string{"cool", "dry", "fan"},
+				FanLevels: []string{"low", "mid", "high"},
+			},
+			UnitName: "Live · Daikin AC",
+			Serial:   "LIVE-AC-NODE-1",
+			Node:     "node_1",
+			Unit:     "unit-live-ac",
+			Device:   "device-live-ac",
+			Binding:  "binding-live-ac",
 			Sensors: []LiveSensor{
 				{Name: "sensor-live-temperature", Metric: keyTemperature, Unit: "°C", Boundary: ""},
 				{Name: "sensor-live-humidity", Metric: keyHumidity, Unit: "%", Boundary: ""},
@@ -108,6 +130,7 @@ func LiveSite() Site {
 				Manufacturer: "ESP32 node",
 				Model:        "BME680 and PZEM on node_2",
 				Control:      false,
+				Settings:     nil,
 				UnitName:     "Live · node_2 sensors",
 				Serial:       "LIVE-NODE-2",
 				Node:         "node_2",
@@ -125,6 +148,12 @@ func LiveSite() Site {
 						Name:     "sensor-live-node-2-humidity",
 						Metric:   keyHumidity,
 						Unit:     "%",
+						Boundary: "",
+					},
+					{
+						Name:     "sensor-live-node-2-pm25",
+						Metric:   "pm25",
+						Unit:     "µg/m³",
 						Boundary: "",
 					},
 					{
@@ -169,7 +198,7 @@ func LiveSiteAt(fixture *Fixture, client string) (Site, error) {
 }
 
 // ApplyLive adds the site to a database with the fixture: a property of the fixture customer with one room, and in it
-// the air conditioner (remote power only) and the nodes' sensor units, each with its model and its module, online as
+// the air conditioner (remote settings) and the nodes' sensor units, each with its model and its module, online as
 // of now. The customer's client keeps the access without an end date, so the real devices stay in view after the
 // fixture's access ends (DEC-92); an end date set since is cleared at the next start. Records that exist are kept (ON
 // CONFLICT DO NOTHING), so it can run on every start, and a unit added to the site comes in at the next start.
@@ -220,9 +249,8 @@ func ApplyLive(ctx context.Context, txn pgx.Tx, site Site, now time.Time) error 
 	return nil
 }
 
-// liveModel adds a live unit's model with the module's sensors: the air conditioner's offers the remote power only, a
-// sensor unit's no control; neither has a mode, fan or temperature setting (the deterministic contracts take empty
-// lists and a null temperature).
+// liveModel adds a live unit's model with the module's sensors: the air conditioner's offers its settings, a sensor
+// unit's no control (the deterministic contracts take empty lists and a null temperature).
 func liveModel(exec liveExec, module LiveModule, tenant uuid.UUID) error {
 	type capSensor struct {
 		Metric            string  `json:"metric"`
@@ -251,18 +279,43 @@ func liveModel(exec liveExec, module LiveModule, tenant uuid.UUID) error {
 		return apperr.Wrap(err, "json.Marshal")
 	}
 
+	var (
+		temperature      []byte
+		modes, fanLevels = []string{}, []string{}
+	)
+
+	if settings := module.Settings; settings != nil {
+		temperature, err = json.Marshal(
+			map[string]float64{
+				"min":  settings.TempMin,
+				"max":  settings.TempMax,
+				"step": settings.TempStep,
+			},
+		)
+		if err != nil {
+			return apperr.Wrap(err, "json.Marshal")
+		}
+
+		modes, fanLevels = settings.Modes, settings.FanLevels
+	}
+
 	return exec(
 		"model",
 		`INSERT INTO devices.capabilities (id, version, tenant_id, manufacturer, model, control, mode_control, fan_control,
 			temperature,
 		modes, fan_levels, ventilation, ventilation_levels, sensors, firmware_candidates, is_current)
-		VALUES ($1,1,$2,$3,$4,$6,false,false,NULL,'{}','{}',false,'{}',$5,'{}',true) ON CONFLICT DO NOTHING`,
+		VALUES ($1,1,$2,$3,$4,$6,$7,$8,$9,$10,$11,false,'{}',$5,'{}',true) ON CONFLICT DO NOTHING`,
 		ID(module.Capability),
 		tenant,
 		module.Manufacturer,
 		module.Model,
 		capSensors,
 		module.Control,
+		len(modes) > 0,
+		len(fanLevels) > 0,
+		temperature,
+		modes,
+		fanLevels,
 	)
 }
 
@@ -303,8 +356,8 @@ func livePlace(exec liveExec, site Site, tenant uuid.UUID) error {
 	)
 }
 
-// liveUnit adds a live unit in the room as of now; the air conditioner's settings are unknown until a command sets
-// them (the nodes report none).
+// liveUnit adds a live unit in the room as of now; the air conditioner's settings are unknown until its node reports
+// them or a command sets them.
 func liveUnit(exec liveExec, site Site, module LiveModule, tenant uuid.UUID, now time.Time) error {
 	state, marshalErr := json.Marshal(
 		map[string]any{
