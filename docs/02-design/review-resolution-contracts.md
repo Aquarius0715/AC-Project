@@ -9802,3 +9802,19 @@ The user took B-15's recommendation.
 3. **Tests.** `deploy/test/test_realm.py` (in CI's Python and shell job): with `DEMO_USER_PASSWORD` every password credential is that value (failed before), and without it the local passwords stay. `docker compose config` of the test files shows Mailpit on 127.0.0.1 (0.0.0.0 before).
 4. **For the running environment.** Mailpit moves to the loopback at the next deployment. The demo passwords change only once `DEMO_USER_PASSWORD=<a secret>` is added to `~/ac-test/env` by hand: `setup.sh` keeps an existing file. The value is then the team's password for the demo users there.
 5. **Not changed.** The apps, Keycloak's ports, the users the team invited (only the ten demo users are set) and every operation.
+
+## IR725 The lab server's disk stays bounded: CI's PostgreSQL in tmpfs, the build cache capped — 2026-11-10
+
+On 2026-11-10 the lab server's disk (461 GB) was full. The three self-hosted runners went offline: they could not write their logs and restarted every five seconds. Of the 433 Docker volumes, 410 were unused (about 90 GB), and the build cache held about 47 GB. The disk was cleaned by hand (118 GB freed). Left alone, it would fill again at the same pace, so the causes are removed.
+
+1. **Causes.**
+   - `ci.yml`'s `go-test` and `go-test-cluster` start `postgres:18` as a service container. The image declares `VOLUME /var/lib/postgresql`, so every job created an anonymous volume holding its test databases (about 200 MB). The runner removes the containers after a job but not their volumes. The job containers' images (golang, node, python) declare no volume.
+   - A job cannot remove its own volume at the end: the job containers have no Docker socket (IR632), and the service container still runs when the last step does.
+   - `deploy.sh` and `e2e.yml` build with BuildKit, and nothing trimmed its cache. `deploy.sh`'s `prune` removed only the old `ac-*:test*` images, so each nightly rebuild of `ac-*:e2e` left the one before as an untagged image (16 GB of them at the time).
+2. **CI's PostgreSQL in memory.** Both Go jobs mount a tmpfs on the service's data directory (`--tmpfs /var/lib/postgresql:rw,size=2g`). On the path of a `VOLUME`, Docker creates no anonymous volume. The test databases are thrown away after the job anyway; 2 GB only caps a runaway. Checked locally: a `postgres:18` container with the tmpfs answers `pg_isready`, creates a database and leaves the volume count unchanged (57 before and after); without the tmpfs it leaves one more volume.
+3. **After a deployment.** `deploy.sh`'s `prune` also removes the untagged images (`docker image prune -f`) and trims the build cache to `CACHE_LIMIT=20GB` (`docker builder prune -f --max-used-space`; `--keep-storage` is deprecated since Docker 28, the server runs 29). A clean-up that fails does not fail the deployment, like the image removal before it.
+4. **After the E2E.** A last step of `e2e.yml`, after `remove the stack`, always run and on the server itself, does the same with the same 20 GB. It is a step of its own, so it runs even when `down` fails. The load test (`load.yml`, run by hand) rebuilds its `:load` images each time and ends with the same step (found in round 251).
+5. **Not done.**
+   - A regular `docker volume prune`: Supabase, Grafana and Mosquitto run on the same server, and it could remove their anonymous volumes. With (2) the volumes are no longer made.
+   - `docker system prune -a`: it would remove the stopped projects' images on the server too.
+6. **Checks.** actionlint, shellcheck and ruff as in CI; `bash -n deploy/test/deploy.sh`. On the server, the number of unused volumes (`docker volume ls -qf dangling=true | wc -l`) stays the same across this PR's CI. The deployment's clean-up shows at the next deployment the user asks for; the E2E's at the next nightly run.
