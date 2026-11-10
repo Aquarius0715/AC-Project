@@ -730,7 +730,7 @@ func TestInvitationNamesTheAddressItCameFrom(t *testing.T) {
 		func(c *apiserver.Config) { c.IdentityProvider = fake; c.Domains = ops.Domains },
 	)
 
-	const tailnet = "100.99.169.116"
+	const tailnet = "100.64.0.10"
 
 	for sender, want := range map[string]string{
 		contrA().token:                 "",
