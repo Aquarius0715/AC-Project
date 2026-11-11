@@ -3,6 +3,7 @@ package devicesim_test
 import (
 	"encoding/json"
 	"math"
+	"sync"
 	"testing"
 	"time"
 
@@ -261,4 +262,40 @@ func TestAcknowledgeRefusesMalformedAndKeepsUnknownKinds(t *testing.T) {
 	if answer["result"] != "unsupported" || observedSetpoint(t, answer) != 24.0 {
 		t.Errorf("unknown kind: %v", answer)
 	}
+}
+
+// The broker's command handler (Acknowledge, Keep) and the publishing loop (Beat) run on different goroutines; with
+// -race this fails when the setpoint and the reported state they share are not guarded.
+func TestCommandsAndHeartbeatsDoNotRace(t *testing.T) {
+	t.Parallel()
+
+	celsius := 24.0
+	module := devicesim.NewModule(tenant, device, "v1", 1).Reports(nil, &celsius, nil, nil)
+	now := time.Date(2026, 11, 11, 12, 0, 0, 0, time.UTC)
+	cmd := `{"commandId":"c-1","kind":"set_temperature","setpointCelsius":22,"expiresAt":"2026-11-11T13:00:00Z"}`
+
+	var group sync.WaitGroup
+
+	group.Go(func() {
+		for range 200 {
+			_, _, err := module.Acknowledge([]byte(cmd), now)
+			if err != nil {
+				t.Error(err)
+			}
+
+			_, err = module.Keep()
+			if err != nil {
+				t.Error(err)
+			}
+		}
+	})
+	group.Go(func() {
+		for range 200 {
+			_, err := module.Beat(now)
+			if err != nil {
+				t.Error(err)
+			}
+		}
+	})
+	group.Wait()
 }
