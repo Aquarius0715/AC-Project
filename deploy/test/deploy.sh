@@ -8,10 +8,10 @@
 # deployed tags stay; untagged images go and the build cache is trimmed to CACHE_LIMIT), and starts the compose
 # project ac-test: compose.yaml with deploy/test/compose.test.yaml and deploy/test/compose.live.yaml on top and the
 # server's environment file ~/ac-test/env (deploy/test/setup.sh writes it). The data are the fixture's accounts and
-# the real devices at customer-a, on the real clock (DEC-96). They stay from one deployment to the next, except when
-# the migrations or compose.live.yaml changed: version 1 is edited in place before the first release and never applied
-# again to a database that has it, so the data is then built again from the seed. A deployment that fails brings back
-# the tag before it.
+# the real devices at customer-a, on the real clock (DEC-96). They stay from one deployment to the next: a new
+# migration is applied to them by the stack's migrate service (ALTERs, IR785), and the data is built again from the
+# seed only when a migration the deployed tag had was edited or removed, or compose.live.yaml changed. A deployment
+# that fails brings back the tag before it (a migration it applied stays: they only add).
 #
 #   deploy.sh deploy TAG   deploys the tag (the workflow; by hand, from a checkout that has the tag)
 #   deploy.sh boot         after a reboot: the stack again, then the API services once Keycloak answers, as they load
@@ -200,10 +200,19 @@ prune() {
   docker builder prune -f --max-used-space "$CACHE_LIMIT" >/dev/null 2>&1 || true
 }
 
-# what the data of the tag $1 are built from: the migrations, and this environment's data settings
+# this environment's data settings at the tag $1 (compose.live.yaml)
 data_of() {
-  git -C "$REPO" rev-parse "refs/tags/$1:$MIGRATIONS" || return 1
   git -C "$REPO" rev-parse --quiet --verify "refs/tags/$1:$LIVE" || echo none
+}
+
+# whether every migration of the tag $1 is, byte for byte, in the tag $2: a new migration is applied to the data, but a
+# migration that was applied and then edited or removed cannot be, so the data must be built again (IR785)
+migrations_kept() {
+  local mode type blob path
+  while read -r mode type blob path; do
+    [ "$(git -C "$REPO" rev-parse --quiet --verify "refs/tags/$2:$path" || true)" = "$blob" ] || return 1
+  done < <(git -C "$REPO" ls-tree -r "refs/tags/$1" -- "$MIGRATIONS")
+  return 0
 }
 
 # deploys the tag $1: from the seed again when what the data are built from changed since the deployed tag; back to
@@ -216,9 +225,10 @@ release() {
   fi
   data=$(data_of "$tag") || return 1
   previous=$(state deployed)
-  if [ -n "$previous" ] && [ "$(state data)" != "$data" ]; then
+  # state data holds the data settings; a record from before IR785 has the migrations' hash on the line before
+  if [ -n "$previous" ] && { [ "$(state data | tail -n 1)" != "$data" ] || ! migrations_kept "$previous" "$tag"; }; then
     fresh=1
-    log "$tag: the migrations or the data settings changed since $previous; the data is built again from the seed"
+    log "$tag: a migration of $previous was changed, or the data settings changed; the data is built again from the seed"
   fi
   log "deploying $tag ($(git -C "$REPO" rev-parse --short "refs/tags/$tag^{commit}")) after ${previous:-nothing}"
   if deploy "$tag" "$fresh"; then # each step returns its own failure

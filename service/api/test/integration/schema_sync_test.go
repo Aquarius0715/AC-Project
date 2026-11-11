@@ -104,11 +104,13 @@ func catalogOf(
 	for kind, query := range map[string]string{
 		"column": `SELECT table_schema || '.' || table_name || '.' || column_name || ' ' || data_type || ' ' || udt_name || ' ' ||
 				is_nullable || ' ' || coalesce(column_default, '')
-			FROM information_schema.columns WHERE table_schema NOT IN ('pg_catalog', 'information_schema')`,
+			FROM information_schema.columns WHERE table_schema NOT IN ('pg_catalog', 'information_schema') AND table_name <>
+				'schema_migrations'`,
 		"constraint": `SELECT conrelid::regclass::text || ' ' || contype::text || ' ' || pg_get_constraintdef(oid) FROM pg_constraint
-			WHERE connamespace NOT IN ('pg_catalog'::regnamespace, 'information_schema'::regnamespace)`,
+			WHERE connamespace NOT IN ('pg_catalog'::regnamespace, 'information_schema'::regnamespace) AND
+			conrelid::regclass::text <> 'schema_migrations'`,
 		"index": `SELECT schemaname || '.' || indexdef FROM pg_indexes WHERE schemaname NOT IN ('pg_catalog',
-			'information_schema')`,
+			'information_schema') AND tablename <> 'schema_migrations'`,
 	} {
 		rows, err := conn.Query(ctx, query)
 		if err != nil {
