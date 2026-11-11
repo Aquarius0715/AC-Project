@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand/v2"
+	"sync"
 	"time"
 
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
@@ -120,7 +121,11 @@ type ReportedState struct {
 }
 
 // Module is one simulated device: its identity, its firmware and the next sequence number of its readings.
+//
+// The broker's command handler (Acknowledge, Restore, Keep) runs on another goroutine than the publishing loop (Beat),
+// so the setpoint and the reported state they share are guarded by lock.
 type Module struct {
+	lock     sync.Mutex
 	TenantID string
 	DeviceID string
 	Firmware string
@@ -144,6 +149,7 @@ const (
 // NewModule starts a module with its own random source, so each device drifts independently.
 func NewModule(tenantID, deviceID, firmware string, seed uint64) *Module {
 	return &Module{
+		lock:     sync.Mutex{},
 		TenantID: tenantID,
 		DeviceID: deviceID,
 		Firmware: firmware,
@@ -247,6 +253,9 @@ func (m *Module) Telemetry(at time.Time) ([]byte, error) {
 
 // Beat returns the heartbeat at the given time.
 func (m *Module) Beat(at time.Time) ([]byte, error) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
 	out, err := json.Marshal(
 		Heartbeat{DeviceID: m.DeviceID, At: at.UTC(), Firmware: m.Firmware, State: m.state},
 	)
@@ -301,6 +310,9 @@ const lateAnswerDelay = 2 * time.Second
 // The pattern changes the answer: reject answers unsupported without applying, ignore sends nothing (nil), late
 // applies the command but sends the answer two seconds after the command expired.
 func (m *Module) Acknowledge(raw []byte, when time.Time) ([]byte, time.Time, error) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
 	var command Command
 
 	err := json.Unmarshal(raw, &command)
@@ -355,6 +367,9 @@ func (m *Module) KeptTopic() string { return Topic(m.TenantID, m.DeviceID, "sim/
 
 // Keep returns the module's kept state.
 func (m *Module) Keep() ([]byte, error) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
 	out, err := json.Marshal(Kept{SetpointCelsius: m.setpoint})
 
 	return out, apperr.Wrap(err, "json.Marshal")
@@ -365,6 +380,9 @@ var errOutOfRange = errors.New("out of range")
 
 // Restore applies a kept state read back from the broker; a setpoint outside 16–30 °C is ignored.
 func (m *Module) Restore(raw []byte) error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
 	var kept Kept
 
 	err := json.Unmarshal(raw, &kept)
