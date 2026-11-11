@@ -32,6 +32,15 @@ func (unitDetails) Detail(
 		detailExtras.Capabilities = cp
 	}
 
+	if unit.IoTModelID != nil && unit.IoTModelVersion != nil {
+		iot, found, err := devices.LoadIoTModel(ctx, call, *unit.IoTModelID, *unit.IoTModelVersion)
+		if err != nil {
+			return detailExtras, apperr.Wrap(err, "devices.LoadIoTModel")
+		} else if found {
+			detailExtras.IoTModel = iot
+		}
+	}
+
 	err = restrictionParts(ctx, call, unit.ID, &detailExtras)
 	if err != nil {
 		return detailExtras, err

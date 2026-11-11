@@ -18,6 +18,7 @@ var (
 	_ = swaggerFirmwareCampaignsControlAbort
 	_ = swaggerFirmwareCampaignsControlResume
 	_ = swaggerFirmwareCampaignsControlRetryDevice
+	_ = swaggerIotModelsSaveUpdate
 )
 
 // swaggerCapabilitiesSaveUpdate documents a further REST route.
@@ -135,3 +136,31 @@ func swaggerFirmwareCampaignsControlResume() {}
 //	@Security		BearerAuth
 //	@Router			/v1/firmware-campaigns/{campaignId}/devices/{deviceId}/retry [post]
 func swaggerFirmwareCampaignsControlRetryDevice() {}
+
+// swaggerIotModelsSaveUpdate documents a further REST route.
+//
+//	@Summary		iotModels.save (write) — update
+//	@ID				iotModels.save.update
+//	@Description	Authorization: admin:device.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A04
+//	@Tags			iotModels
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer			true	"id present: required (target iotModels, read iotModels.list)"
+//	@Param			id					path		string			true	"input field id"
+//	@Param			request				body		IoTModelSave	true	"input; the path parameters come from the route"
+//	@Success		200					{object}	ops.Envelope{data=IoTModel}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/iot-models/{id} [put]
+func swaggerIotModelsSaveUpdate() {}

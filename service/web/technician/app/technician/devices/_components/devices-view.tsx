@@ -214,7 +214,7 @@ export function TechDevicesView({ live }: Readonly<{ live: TechDevicesLive }>) {
               )}{!(live.events && dv.eventsLocked) && !dv.events && (
                 <>
                   <div>
-                    <b className="text-[15px]">{t("Sensors ({n}) · from the unit’s capability", { n: dv.sensors.length })}</b>
+                    <b className="text-[15px]">{t("Sensors ({n}) · from the IoT model", { n: dv.sensors.length })}</b>
                     {dv.sensors.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("This device has no sensors.")}</p> : (
                       <ScrollX className="mt-2 rounded-xl border border-line"><table className="w-full min-w-[420px] text-[13px] [&_td]:pr-3 [&_th]:pr-3">
                         <thead className="bg-surface2 text-left text-[11px] uppercase text-muted-foreground"><tr><th className="px-3 py-2">{t("Metric")}</th><th>{t("Unit")}</th><th>{t("Stale after")}</th><th>{t("Last calibrated")}</th><td /></tr></thead>

@@ -14,7 +14,8 @@ const unit = (id: string, over: Partial<ApiUnitDetail> = {}): ApiUnitDetail => {
       { id: "m1", unitId: id, sensorId: "s1", metric: "temperature", value: 27.04, unit: "°C", observedAt: TEXT_2026_09_14T01_10_00Z, origin: "measured", quality: "valid", qualityReason: null },
       { id: "m2", unitId: id, sensorId: "s2", metric: "power", value: 0.68, unit: "kW", observedAt: TEXT_2026_09_14T01_10_00Z, origin: "measured", quality: "valid", qualityReason: null },
     ],
-    capabilities: { manufacturer: "Demo", model: "M", control: true, modeControl: true, fanControl: true, temperature: { min: 16, max: 30, step: 1 }, modes: ["cool", "dry", "fan"], fanLevels: ["low", "mid", "high"], ventilation: false, ventilationLevels: [], sensors: [] },
+    capabilities: { manufacturer: "Demo", model: "M", control: true, modeControl: true, fanControl: true, temperature: { min: 16, max: 30, step: 1 }, modes: ["cool", "dry", "fan"], fanLevels: ["low", "mid", "high"], ventilation: false, ventilationLevels: [] },
+    iotModel: null,
     effectiveControlPolicy: { state: "unrestricted" }, controlAvailability: { state: "available" }, pendingCommands: [],
     location: { pathLabels: ["Home A", "1F", "Bedroom"], address: null, accessInstructions: null }, installedAt: null, capabilityVersion: 1, serviceScope: ["indoor"], components: [], ...over,
   };

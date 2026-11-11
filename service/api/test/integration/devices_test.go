@@ -29,6 +29,8 @@ func newUnit(t *testing.T, s *apiserver.Server, name string) string {
 			String()+
 			`","spaceId":null,"displayName":"`+name+` `+uuid.NewString()[:12]+`","modelId":"`+seed.ID("ventilation-demo").
 			String()+
+			`","iotModelId":"`+seed.ID("ventilation-demo").
+			String()+
 			`","type":"split","installedAt":null,"serviceScope":["indoor"]}`,
 		0,
 	)
@@ -634,7 +636,7 @@ func TestDeviceListSearchAndModel(t *testing.T) {
 
 	model := seed.ID("ventilation-demo").String()
 	if got := serials(
-		`{"filters":{"modelId":"` + model + `"}}`,
+		`{"filters":{"modelId":"` + model + `"},"sort":{"field":"serial","direction":"asc"},"limit":100}`,
 	); !slices.Contains(
 		got,
 		"AC-DEMO-0001",

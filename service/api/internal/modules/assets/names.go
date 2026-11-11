@@ -13,6 +13,7 @@ const (
 	keyFiltersKind       = "filters.kind"
 	keyInstalledAt       = "installedAt"
 	keyModelID           = "modelId"
+	keyIoTModelID        = "iotModelId"
 	keyName              = "name"
 	keyPropertyID        = "propertyId"
 	keySpaceID           = "spaceId"
