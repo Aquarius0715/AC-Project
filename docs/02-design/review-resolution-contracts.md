@@ -10293,3 +10293,17 @@ Found in review round 101 (noted) and round 687 (`energy/mrv.go`, `energy/delete
 1. **Before.** `mrv.deleteDraft`, `mrv.saveDraft` with an `id` (a new version of a draft) and `mrv.recordReview` each read the report's latest version with a plain `max(version)` and checked the expected version against it; none took a lock. If a new version was saved while the same draft was being deleted, the delete removed the versions it could see and the save inserted the next one. That version then remained as the whole report after the delete.
 2. **Now.** Those three writes lock the report's first version row `FOR UPDATE` and then read the latest version afresh (`lockLatest`). The first version is a row no new version or review changes, so every write of the report waits for the same lock (locking the latest row instead would let a writer that waited hold a stale row while the next one locks the new latest). They follow one another: a write after a delete finds no row and answers NOT_FOUND. A review or a new version that comes first makes the delete wait and then see it (CONFLICT `error.reportReviewed` for a reviewed or non-draft report). The reads (`mrv.get`, the version list) keep the lock-free `latestVersion`.
 3. **Tests.** `TestMRVDraftVersionWaitsForTheDraftDelete` holds a draft delete half done. Before the fix, the new version answered 200 at once and survived the delete. Now it waits, then answers 404. The other MRV tests are unchanged.
+
+## IR765 A new factor or baseline version is never saved beside the record's delete — 2026-11-11
+
+Found in review round 694 (`energy/factors.go`, `energy/baselines.go`).
+
+1. **Before.** For a new version, `factors.save` and `baselines.save` read the current version without a lock, cleared its `is_current` and inserted the next version.
+   - `factors.delete` and `baselines.delete` (DEC-103, IR656) lock the current version and delete every version.
+   - When a save ran at the same moment as the delete, its UPDATE waited for the delete and then touched no row, and its insert succeeded. The record survived its own delete as a lone later version.
+   - Two saves of one record were already safe: the second met the primary key and answered CONFLICT. Two new factors of one region and year were safe too: the unique index answered CONFLICT.
+2. **Now.** Before reading the current version, the save locks every version of the record `FOR UPDATE` (`lockVersions`).
+   - A save beside a delete waits, then finds no row and answers NOT_FOUND.
+   - A save after another save reads the new current version afresh and compares its expected version with it.
+   - `capabilities.save` already reads its current version `FOR UPDATE`, and contracts have no delete, so no other versioned record has the gap.
+3. **Tests.** `TestEnergyRecordSaveWaitsForItsDelete` holds a factor delete, and then a baseline delete, half done. Before the fix, the save answered 200 after the delete and left a lone version. Now it answers 404.

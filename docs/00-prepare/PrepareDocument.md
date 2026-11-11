@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.621.0
+version: 0.622.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -301,6 +301,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.622.0: IR765: a new factor or baseline version is never saved beside the record's delete. Phase 1A unchanged.
 0.621.0: IR764: the writes of an MRV report lock its latest version. Phase 1A unchanged.
 0.620.0: IR763: an MRV draft never cites a factor or baseline deleted at the same moment. Phase 1A unchanged.
 0.619.0: IR762: IR428 no longer describes the dropped invitation e-mail table. Phase 1A unchanged.

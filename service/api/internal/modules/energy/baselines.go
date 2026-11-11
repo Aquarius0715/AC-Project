@@ -504,6 +504,11 @@ func saveBaseline(ctx context.Context, call *ops.Call, input *BaselineInput) (Ba
 	baselineID, version := uuid.New(), 1
 
 	if input.ID != nil {
+		lockErr := lockVersions(ctx, call, "energy.baselines", *input.ID)
+		if lockErr != nil {
+			return Baseline{}, lockErr
+		}
+
 		cur, err := LoadBaseline(ctx, call, *input.ID, nil)
 		if err != nil {
 			return cur, err

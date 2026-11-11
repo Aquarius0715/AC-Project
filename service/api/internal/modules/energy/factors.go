@@ -54,6 +54,32 @@ func scanFactor(r pgx.Row) (Factor, error) {
 	return factor, apperr.Wrap(err, "scan (scanFactor)")
 }
 
+// lockVersions locks every version row of a factor or a baseline FOR UPDATE before a new version is saved (IR765):
+// factors.delete / baselines.delete lock the current version and remove them all, so a save at the same moment waits
+// for the delete and then finds no row (NOT_FOUND) instead of inserting a version that survives the delete; a save
+// after another save reads the new current version afresh and compares its expected version with it.
+func lockVersions(ctx context.Context, call *ops.Call, table string, id uuid.UUID) error {
+	rows, err := call.Tx.Query(
+		ctx,
+		"SELECT version FROM "+table+" WHERE id = $1 ORDER BY version FOR UPDATE",
+		id,
+	)
+	if err != nil {
+		return apperr.Wrap(err, "select "+table)
+	}
+
+	versions, err := pgx.CollectRows(rows, pgx.RowTo[int])
+	if err != nil {
+		return apperr.Wrap(err, "select "+table)
+	}
+
+	if len(versions) == 0 {
+		return apperr.E(apperr.NotFound, apperr.KeyNotFound)
+	}
+
+	return nil
+}
+
 // LoadFactor returns a factor version (current when version is nil).
 func LoadFactor(
 	ctx context.Context,
@@ -289,6 +315,11 @@ func saveFactor(ctx context.Context, call *ops.Call, input *FactorInput) (Factor
 	factorID, version := uuid.New(), 1
 
 	if input.ID != nil {
+		lockErr := lockVersions(ctx, call, "energy.emission_factors", *input.ID)
+		if lockErr != nil {
+			return Factor{}, lockErr
+		}
+
 		cur, err := LoadFactor(ctx, call, *input.ID, nil)
 		if err != nil {
 			return cur, err
