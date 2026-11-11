@@ -152,6 +152,45 @@ func TestNowKeepsOffsetWhenDatabaseFails(t *testing.T) {
 	}
 }
 
+// A refresh that times out (the table is locked) is not retried by the next call: the stale offset is served until
+// the next refreshEvery, so a polling loop does not wait out refreshTimeout on every tick.
+//
+//nolint:paralleltest // every test rebuilds the same scratch database ac_democlock_test
+func TestFailedRefreshIsNotRetriedAtOnce(t *testing.T) {
+	ctx := context.Background()
+	pool := scratch(t)
+	wall := time.Date(2026, 10, 8, 12, 0, 0, 0, time.UTC)
+	clock := open(t, pool, func() time.Time { return wall }, time.Time{})
+
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	_, lockErr := tx.Exec(ctx, `LOCK TABLE platform.demo_clock IN ACCESS EXCLUSIVE MODE`)
+	if lockErr != nil {
+		t.Fatal(lockErr)
+	}
+
+	wall = wall.Add(2 * time.Second)
+
+	clock.Now() // stale: waits for refreshTimeout, then keeps the offset
+
+	wall = wall.Add(100 * time.Millisecond)
+
+	start := time.Now()
+	clock.Now()
+
+	if took := time.Since(start); took > 500*time.Millisecond {
+		t.Fatalf(
+			"second Now took %v: a failed refresh was retried before refreshEvery passed",
+			took,
+		)
+	}
+}
+
 //nolint:paralleltest // every test rebuilds the same scratch database ac_democlock_test
 func TestMissingRowKeepsOffset(t *testing.T) {
 	ctx := context.Background()
