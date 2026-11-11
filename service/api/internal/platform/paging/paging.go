@@ -17,6 +17,9 @@ import (
 const (
 	DefaultLimit = 25
 	MaxLimit     = 100
+	// maxOffset bounds the offset a cursor may carry: the cursor is not signed, and an offset near the largest integer
+	// would wrap Offset+Limit negative in the handlers that slice a list in memory.
+	maxOffset = 1 << 31
 )
 
 // The sort directions, and the field that names a wrong one.
@@ -168,7 +171,8 @@ func cursorOffset(token, hash string, scopeVersion, snapshot int) (int, error) {
 	raw, err := base64.RawURLEncoding.DecodeString(token)
 
 	var decoded cursor
-	if err != nil || json.Unmarshal(raw, &decoded) != nil || decoded.Offset < 0 {
+	if err != nil || json.Unmarshal(raw, &decoded) != nil || decoded.Offset < 0 ||
+		decoded.Offset > maxOffset {
 		return 0, apperr.Fields(map[string]string{"cursor": apperr.KeyInvalid})
 	}
 
