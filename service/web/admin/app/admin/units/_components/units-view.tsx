@@ -22,17 +22,18 @@ import {
   type Selection, type TreeProperty, type TreeSpace, type UnitDraft, type UnitRow, type registerKpis,
 } from "@ac/web/lib/assets";
 import { nameError as personNameError } from "@ac/web/lib/partnerUsers";
-import { metricUnit, mqttNodeValue, type Metric } from "@ac/web/lib/devices";
+import type { Metric } from "@ac/web/lib/devices";
 import { amount } from "@ac/web/lib/energy";
 import { typeLabel } from "@ac/web/lib/partnerJobDetail";
 import { type NewUnitDevice, archiveLocation, archiveUnit, createCustomer, deleteCustomer, deleteUnit, importCommit, importPreview, importUndo, inviteClientUser, previewPasswordReset, recordWarrantyClaim, removeClientUser, resendInvite, saveProperty, saveSpace, saveUnit, saveUnitWithDevice, setDefaultRule, setUnitPolicies, updateClientUser, updateCustomer, signOutEverywhere } from "../actions";
+import { NewUnitDeviceSection, UnitDevicePanel, type UnitDevice } from "./unit-device";
 import { Icon, type IconName } from "@ac/web/components/Icon";
 import { NeedsAccess } from "@ac/web/components/NeedsAccess";
 import { ForceDeleteField, forceReady, noForce } from "@ac/web/components/DeleteDialog";
 import { entryOf, lookup } from "@ac/web/lib/lookup";
 
 export interface UnitLive {
-  u: ApiUnitDetail; path: string; model: string; device: { id: string; serial: string; connection: Connection } | null; deviceKnown: boolean;
+  u: ApiUnitDetail; path: string; model: string; device: UnitDevice | null; deviceKnown: boolean;
   attached: { id: string; kind: "default_alert" | "alert"; name: string; type: string; condition: string; madeBy: string; on: string }[];
   blockers: { label: string; href: string | null }[] | null; archivedNote: string | null; seen: string | null;
 }
@@ -266,7 +267,7 @@ function CustomerScreen({ live, c }: Readonly<{ live: UnitsLive; c: CustomerLive
       {m?.kind === "unit" && <NewUnitModal live={live} c={c} init={m} pending={pending} onClose={close}
         onSave={(d, device) => {
           if (!device) { run(() => saveUnit(unitInput(d, r.orgId)), t("Unit “{name}” registered", { name: d.displayName.trim() }), (id) => { close(); nav({ locationId: d.spaceId || d.propertyId, unitId: id }); }); return; }
-          run(() => saveUnitWithDevice(unitInput(d, r.orgId), device), (x) => (x.deviceError ? t("Unit “{name}” registered, but its device was not: {reason} — register it on the Devices screen", { name: d.displayName.trim(), reason: x.deviceError }) : t("Unit “{name}” registered with its device", { name: d.displayName.trim() })), (x) => { close(); nav({ locationId: d.spaceId || d.propertyId, unitId: x.id }); });
+          run(() => saveUnitWithDevice(unitInput(d, r.orgId), device), (x) => (x.deviceError ? t("Unit “{name}” registered, but its device was not connected: {reason} — connect it from the unit’s page", { name: d.displayName.trim(), reason: x.deviceError }) : t("Unit “{name}” registered with its device", { name: d.displayName.trim() })), (x) => { close(); nav({ locationId: d.spaceId || d.propertyId, unitId: x.id }); });
         }} />}
     </Page>
   );
@@ -419,22 +420,16 @@ function UnitEdit({ live, c, x, nav, run, pending }: Readonly<{ live: UnitsLive;
               {c.places.map((p) => <option key={`${p.propertyId}|${p.spaceId}`} value={`${p.propertyId}|${p.spaceId}`}>{p.label}</option>)}
             </Select>
           </Field>
-          <Field label={t("Model")} hint={t(c.models.length > 0 ? "From capabilities.list · type split (fixed)" : "Models need device.read — the current model stays")} error={fieldError("modelId")}>
+          <Field label={t("Aircon model")} hint={t(c.models.length > 0 ? "Which controls the unit has · type split (fixed)" : "Models need device.read — the current model stays")} error={fieldError("modelId")}>
             <Select value={d.modelId} disabled={isRo || c.models.length === 0} onChange={(e) => { set({ modelId: e.target.value }); }}>
               {c.models.every((k) => k.id !== d.modelId) && <option value={d.modelId}>{x.model}</option>}
               {c.models.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}
             </Select>
           </Field>
-          <Field label={t("IoT model · optional")} hint={t(c.iotModels.length > 0 ? "The sensors and firmware of the unit's device" : "IoT models need device.read — the current one stays")}>
-            <Select value={d.iotModelId} disabled={isRo || c.iotModels.length === 0} onChange={(e) => { set({ iotModelId: e.target.value }); }}>
-              <option value="">{t("No IoT model")}</option>
-              {c.iotModels.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}
-            </Select>
-          </Field>
           <Field label={t("Installed at")} hint={t("A Kuala Lumpur day · leave empty for “Not registered”")} error={fieldError("installedAt")}><Input type="date" max={live.todayKL} value={d.installedAt} disabled={isRo} onChange={(e) => { set({ installedAt: e.target.value }); }} /></Field>
           <Field label={t("Warranty end")} hint={t("Manufacturer warranty; coverage also counts active maintenance contracts")} error={fieldError("warrantyEnd")}><Input type="date" min={d.installedAt || undefined} value={d.warrantyEnd} disabled={isRo} onChange={(e) => { set({ warrantyEnd: e.target.value }); }} /></Field>
-          <Field label={t("IoT device")} hint={x.device ? t("Rebinding is done in Devices and keeps the command history on the unit.") : undefined}>
-            <div className="flex min-h-9 items-center gap-2 text-[13px]">{x.device ? <><b>{x.device.serial}</b><ConnBadge s={x.device.connection} /><TextLink href={`/admin/devices?tab=devices&deviceId=${x.device.id}`}>{t("Devices")} <Icon name="chevronRight" /></TextLink></> : null}{!x.device && x.deviceKnown && <span className="text-muted-foreground">{t("No device bound")}</span>}{!x.device && !x.deviceKnown && <span className="text-muted-foreground">{t("Needs device.read")}</span>}</div>
+          <Field label={t("IoT device")} hint={t("The device's IoT model sets its sensors; it is shown here as registered. The aircon model above is the unit's own.")}>
+            <UnitDevicePanel unitId={u.id} unitName={u.displayName} device={x.device} deviceKnown={x.deviceKnown} canWrite={live.canWrite && c.canRegisterDevice && !u.archived} iotModels={c.iotModels} />
           </Field>
           <Field label={t("Service scope")} hint={t("Target inspection groups")} error={fieldError("serviceScope")}>
             <div className="flex flex-wrap gap-3">{scopes.map((sc) => <Check key={sc} label={t(entryOf(scopeLabel, sc))} disabled={isRo} checked={d.serviceScope.includes(sc)} onChange={(on) => { set({ serviceScope: on ? [...d.serviceScope, sc] : d.serviceScope.filter((v) => v !== sc) }); }} />)}</div>
@@ -616,20 +611,17 @@ function ArchiveLocationModal({ p, s, pending, onClose, onSave }: Readonly<{ p?:
 function NewUnitModal({ live, c, init, pending, onClose, onSave }: Readonly<{ live: UnitsLive; c: CustomerLive; init: { propertyId: string; spaceId: string }; pending: boolean; onClose: () => void; onSave: (d: UnitDraft, device: NewUnitDevice | null) => void }>) {
   const t = useT();
   const [d, setD] = useState<UnitDraft>({ ...unitDraft(undefined, init.propertyId, init.spaceId), modelId: c.models[0]?.id ?? "" });
-  const [device, setDevice] = useState({ serial: "", node: "", sensors: [] as Metric[] }); // the optional device registered with the unit (DEC-105)
+  const [device, setDevice] = useState<{ value: NewUnitDevice | null; incomplete: boolean }>({ value: null, incomplete: false }); // the optional device connected with the unit (DEC-105)
   const [tried, setTried] = useState(false);
-  const iot = c.iotModels.find((k) => k.id === d.iotModelId);
-  const node = mqttNodeValue(device.node);
   const e: Record<string, string> = {
     ...unitErrors(d, live.todayKL, t),
-    ...(device.serial.trim() && !d.iotModelId && { iotModelId: t("Choose an IoT model to register a device") }),
-    ...(node === undefined && { mqttNode: t("Use 1–64 letters, digits, hyphens or underscores") }),
+    ...(device.incomplete && !device.value && { device: t("Choose the device, or leave it out") }),
   };
   const fieldError = (k: string) => (tried ? e[k] : undefined);
   const set = (patch: Partial<UnitDraft>) => { setD((v) => ({ ...v, ...patch })); };
   const p = c.tree.find((x) => x.id === d.propertyId);
   return (
-    <Modal open wide onClose={onClose} title={t("New unit")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (Object.keys(e).length === 0) onSave(d, device.serial.trim() ? { serial: device.serial.trim(), mqttNode: node ?? null, sensorTypes: device.sensors } : null); }}>{t("Register unit")}</Btn></>}>
+    <Modal open wide onClose={onClose} title={t("New unit")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (Object.keys(e).length === 0) onSave(d, device.value); }}>{t("Register unit")}</Btn></>}>
       <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2">
         <p className="text-[12px] text-muted-foreground sm:col-span-2">{t("The location and the model must belong to this customer.")}</p>
         <Field label={t("Customer · fixed")}><Input value={c.row.name} disabled /></Field>
@@ -637,11 +629,8 @@ function NewUnitModal({ live, c, init, pending, onClose, onSave }: Readonly<{ li
         <Field label={t("Room / space · optional")} hint={t("Same property only. Leave empty for no room or floor.")}>
           <Select value={d.spaceId} onChange={(x) => { set({ spaceId: x.target.value }); }}><option value="">{t("— not assigned —")}</option>{(p ? flatten(p.spaces) : []).map((x) => <option key={x.id} value={x.id}>{x.name} ({(textOf(kindLabel, x.kind, t) ?? x.kind)})</option>)}</Select>
         </Field>
-        <Field label={t("Model · required")} hint={t(c.models.length > 0 ? "From capabilities.list" : "Models need device.read")} error={fieldError("modelId")}>
+        <Field label={t("Aircon model · required")} hint={t(c.models.length > 0 ? "Which controls the unit has" : "Models need device.read")} error={fieldError("modelId")}>
           <Select value={d.modelId} onChange={(x) => { set({ modelId: x.target.value }); }}>{c.models.length === 0 && <option value="">{t("no model available")}</option>}{c.models.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}</Select>
-        </Field>
-        <Field label={t("IoT model · optional")} hint={t(c.iotModels.length > 0 ? "The sensors and firmware of the unit's device" : "IoT models need device.read")} error={fieldError("iotModelId")}>
-          <Select value={d.iotModelId} onChange={(x) => { set({ iotModelId: x.target.value }); setDevice({ ...device, sensors: [] }); }}><option value="">{t("No IoT model")}</option>{c.iotModels.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}</Select>
         </Field>
         <Field label={t("Display name · required")} hint={t("1–120 characters, unique in its room")} error={fieldError("displayName")}><Input value={d.displayName} onChange={(x) => { set({ displayName: x.target.value }); }} /></Field>
         <Field label={t("Installed at · optional")} hint={t("A Kuala Lumpur day · leave empty for “Not registered”")} error={fieldError("installedAt")}><Input type="date" max={live.todayKL} value={d.installedAt} onChange={(x) => { set({ installedAt: x.target.value }); }} /></Field>
@@ -649,16 +638,7 @@ function NewUnitModal({ live, c, init, pending, onClose, onSave }: Readonly<{ li
         <Field label={t("Service scope · required · type: split (fixed)")} error={fieldError("serviceScope")} className="sm:col-span-2">
           <div className="flex flex-wrap gap-3">{scopes.map((sc) => <Check key={sc} label={t(entryOf(scopeLabel, sc))} checked={d.serviceScope.includes(sc)} onChange={(on) => { set({ serviceScope: on ? [...d.serviceScope, sc] : d.serviceScope.filter((v) => v !== sc) }); }} />)}</div>
         </Field>
-        {c.canRegisterDevice && (
-          <section className="grid gap-x-4 gap-y-3 rounded-xl bg-surface2 p-3 sm:col-span-2 sm:grid-cols-2" aria-label={t("IoT device · optional")}>
-            <p className="text-[12px] text-muted-foreground sm:col-span-2">{t("Optional: register the unit's IoT device now. It can also be registered later on the Devices screen. Bind it once it is installed.")}</p>
-            <Field label={t("Device serial · optional")} error={fieldError("iotModelId")}><Input value={device.serial} onChange={(x) => { setDevice({ ...device, serial: x.target.value }); }} placeholder="AC-DEMO-0006" /></Field>
-            <Field label={t("MQTT node ID (optional)")} error={fieldError("mqttNode")}><Input value={device.node} onChange={(x) => { setDevice({ ...device, node: x.target.value }); }} placeholder="node_3" /></Field>
-            {device.serial.trim() && iot && iot.sensors.length > 0 && (
-              <div className="sm:col-span-2"><p className="mb-1 text-[13px] font-semibold">{t("Sensors")}</p><div className="flex flex-wrap gap-x-5 gap-y-1.5">{iot.sensors.map((m) => <Check key={m} label={`${m} (${metricUnit[m]})`} checked={device.sensors.includes(m)} onChange={(on) => { setDevice({ ...device, sensors: on ? [...device.sensors, m] : device.sensors.filter((x) => x !== m) }); }} />)}</div></div>
-            )}
-          </section>
-        )}
+        {c.canRegisterDevice && <NewUnitDeviceSection iotModels={c.iotModels} onChange={(value, incomplete) => { setDevice({ value, incomplete }); }} />}
       </div>
     </Modal>
   );

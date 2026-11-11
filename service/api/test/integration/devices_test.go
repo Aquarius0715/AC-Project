@@ -162,7 +162,6 @@ func TestDevicesRegisterListGet(t *testing.T) {
 		body("a", unit, `[]`, ""):                     "serial=error.serialFormat",
 		body("bad serial!", unit, `[]`, ""):           "serial=error.serialFormat",
 		body("OK-123", unit, `["power","power"]`, ""): "sensorTypes=error.duplicate",
-		`{"serial":"OK-1","unitId":"` + unit + `"}`:   "sensorTypes=error.required",
 	} {
 		code, m := write(srv, hq(), "devices.register", payload, 0)
 		refusal(t, payload, code, m, want)

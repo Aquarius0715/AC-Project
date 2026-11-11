@@ -1,14 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Badge, Btn, Card, Check, ConnBadge, cx, EmptyState, Field, Input, ListRow, Modal, Search, Select, Textarea, Plain, ScrollX } from "@ac/web/components/ui";
+import { Badge, Btn, Card, ConnBadge, cx, EmptyState, Field, Input, ListRow, Modal, Search, Select, Textarea, Plain, ScrollX } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
-import { metrics, metricUnit, mqttNodeValue, type Metric } from "@ac/web/lib/devices";
+import { mqttNodeValue } from "@ac/web/lib/devices";
 import { connectionDot, filterOf, firmwareCardLook, firmwareSub, followFilter, HQ_FILTERS, operationTone, type Filter, metricText } from "@ac/web/lib/techDevices";
-import { bindDevice, calibrateSensor, checkDevice, deleteDevice, registerDevice, setMqttNode, unbindDevice, updateFirmware } from "../actions";
+import { calibrateSensor, checkDevice, deleteDevice, setMqttNode, unbindDevice, updateFirmware } from "../actions";
 import type { DevicesLive } from "./devices-view";
+import { BindDeviceModal } from "./bind-device-modal";
+import { RegisterDeviceModal } from "./register-device-modal";
 import { Icon } from "@ac/web/components/Icon";
 
 const dot: Record<string, string> = { ok: "bg-ok", crit: "bg-crit", warn: "bg-warn", primary: "bg-primary", muted: "bg-line" };
@@ -26,9 +28,7 @@ export function DeviceTab({ live }: Readonly<{ live: DevicesLive }>) {
   const [q, setQ] = useServerSearch(live.page?.q);
   const [modal, setModal] = useState<null | "register" | "bind" | "unbind" | "delete" | "calibrate" | "firmware" | "node">(null);
   const [tried, setTried] = useState(false);
-  const [reg, setReg] = useState({ serial: "", unitId: "", iotModelId: "", sensors: [] as Metric[], node: "" });
   const [node, setNode] = useState("");
-  const [bind, setBind] = useState({ unitId: "", reason: "" });
   const reasonMissing = t("A reason is required");
   const [why, setWhy] = useState(""); // the reason of an unbind or a delete (DEC-103)
   const [cal, setCal] = useState({ sensorId: "", reference: "", measured: "" });
@@ -40,12 +40,6 @@ export function DeviceTab({ live }: Readonly<{ live: DevicesLive }>) {
   const close = () => { setModal(null); setTried(false); };
   const isBusy = !!dv?.detail.activeOperation;
 
-  const register = () => {
-    setTried(true);
-    const regNode = mqttNodeValue(reg.node);
-    if (!reg.serial.trim() || !reg.unitId || regNode === undefined) return;
-    run(() => registerDevice(reg.serial.trim(), reg.sensors, reg.unitId, regNode, reg.iotModelId || null), t("Device registered — bind it to the unit once it is installed"), (id) => { close(); setReg({ serial: "", unitId: "", iotModelId: "", sensors: [], node: "" }); nav({ deviceId: id }); });
-  };
   // the node ID the device's ESP32 sends: the IoT bridge feeds and commands the device by it (IR635)
   const saveNode = () => {
     setTried(true);
@@ -55,11 +49,6 @@ export function DeviceTab({ live }: Readonly<{ live: DevicesLive }>) {
   };
   // the first binding connects the device to its planned unit; a rebinding moves it (D05, IR467)
   const isFirst = !!dv && !dv.row.unitId;
-  const rebind = () => {
-    setTried(true);
-    if (!dv || !bind.unitId || !bind.reason.trim()) return;
-    run(() => bindDevice(dv.detail.id, dv.detail.version, bind.unitId, bind.reason.trim()), t(isFirst ? "Device bound to the unit — it is connected now" : "Device bound — new sensor IDs issued"), close);
-  };
   const leave = (kind: "unbind" | "delete") => {
     setTried(true);
     if (!dv || !why.trim()) return;
@@ -123,8 +112,8 @@ export function DeviceTab({ live }: Readonly<{ live: DevicesLive }>) {
                   {dv.unit ? <><b>{dv.unit.name}</b><div className="text-xs text-muted-foreground">{dv.unit.place} · {t("model {model}", { model: dv.unit.model })}</div></> : <b>{dv.row.unit}</b>}
                   {isFirst && <div className="text-xs text-muted-foreground">{t("Registered only: bind it once it is installed, then the unit's data and controls use it.")}</div>}</div>
                 {live.canWrite && (isFirst
-                  ? <Btn size="sm" variant="primary" disabled={pending} onClick={() => { setBind({ unitId: dv.row.targetUnitId ?? "", reason: t("Installed on site") }); setModal("bind"); }}>{t("Bind…")}</Btn>
-                  : <span className="flex flex-wrap gap-2"><Btn size="sm" disabled={pending} onClick={() => { setBind({ unitId: "", reason: "" }); setModal("bind"); }}>{t("Rebind…")}</Btn>
+                  ? <Btn size="sm" variant="primary" disabled={pending} onClick={() => { setModal("bind"); }}>{t("Bind…")}</Btn>
+                  : <span className="flex flex-wrap gap-2"><Btn size="sm" disabled={pending} onClick={() => { setModal("bind"); }}>{t("Rebind…")}</Btn>
                     <Btn size="sm" disabled={pending || isBusy} onClick={() => { setWhy(""); setModal("unbind"); }}>{t("Unbind…")}</Btn></span>)}
               </div>
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line p-3">
@@ -208,21 +197,11 @@ export function DeviceTab({ live }: Readonly<{ live: DevicesLive }>) {
           </Card>
         ) : <Card title={t("Device")}><EmptyState title={t("No device selected")}>{t("Choose a device.")}</EmptyState></Card>}
       </div>
-      <Modal open={modal === "register"} onClose={close} title={t("Register device")} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={register}>{t("Register")}</Btn></>}>
-        <Field label={t("Serial")} error={tried && !reg.serial.trim() ? t("Serial is required") : undefined}><Input value={reg.serial} onChange={(e) => { setReg({ ...reg, serial: e.target.value }); }} placeholder="AC-DEMO-0006" /></Field>
-        <Field label={t("MQTT node ID (optional)")} hint={t("The node ID the device sends in its MQTT topics. Once the device is bound, its readings and commands use it.")} error={tried && mqttNodeValue(reg.node) === undefined ? t("Use 1–64 letters, digits, hyphens or underscores") : undefined}><Input value={reg.node} onChange={(e) => { setReg({ ...reg, node: e.target.value }); }} placeholder="node_3" /></Field>
-        <Field label={t("Planned unit")} hint={t("Registering reserves the device for this unit; Bind connects it once it is installed.")} error={tried && !reg.unitId ? t("Choose a unit") : undefined}><Select value={reg.unitId} onChange={(e) => { setReg({ ...reg, unitId: e.target.value, iotModelId: live.units.find((u) => u.id === e.target.value)?.iotModelId ?? "", sensors: [] }); }}><option value="">{t("Select…")}</option>{live.units.map((u) => <option key={u.id} value={u.id}>{u.label}</option>)}</Select></Field>
-        <Field label={t("IoT model (optional)")} hint={t("Defaults to the unit's IoT model. The sensors below come from it.")}><Select value={reg.iotModelId} onChange={(e) => { setReg({ ...reg, iotModelId: e.target.value, sensors: [] }); }}><option value="">{t("No IoT model")}</option>{live.iotModels.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</Select></Field>
-        <div><p className="mb-1 text-[13px] font-semibold">{t("Sensors")}</p><p className="mb-2 text-xs text-muted-foreground">{t("Each must be defined in the IoT model; none is allowed.")}</p><div className="flex flex-wrap gap-x-5 gap-y-1.5">{metrics.filter((m) => live.iotModels.find((k) => k.id === reg.iotModelId)?.model.sensors.some((x) => x.metric === m)).map((m) => <Check key={m} label={`${m} (${metricUnit[m]})`} checked={reg.sensors.includes(m)} onChange={(on) => { setReg({ ...reg, sensors: on ? [...reg.sensors, m] : reg.sensors.filter((x) => x !== m) }); }} />)}</div></div>
-      </Modal>
+      {modal === "register" && <RegisterDeviceModal onClose={close} iotModels={live.iotModels} onDone={(id) => { nav({ deviceId: id }); }} />}
       <Modal open={modal === "node"} onClose={close} title={t("MQTT node ID")} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={saveNode}>{t("Save")}</Btn></>}>
         <Field label={t("Node ID")} hint={t("Leave it empty to stop taking this device's readings in; another device cannot use the same ID.")} error={tried && mqttNodeValue(node) === undefined ? t("Use 1–64 letters, digits, hyphens or underscores") : undefined}><Input value={node} onChange={(e) => { setNode(e.target.value); }} placeholder="node_3" /></Field>
       </Modal>
-      <Modal open={modal === "bind"} onClose={close} title={t(isFirst ? "Bind device" : "Rebind device")} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={rebind}>{t(isFirst ? "Bind" : "Rebind")}</Btn></>}>
-        <Field label={t(isFirst ? "Unit" : "New unit")} error={tried && !bind.unitId ? t("Choose a unit") : undefined}><Select value={bind.unitId} onChange={(e) => { setBind({ ...bind, unitId: e.target.value }); }}><option value="">{t("Select…")}</option>{live.units.filter((u) => u.id !== dv?.row.unitId).map((u) => <option key={u.id} value={u.id}>{u.label}</option>)}</Select></Field>
-        <Field label={t("Reason")} error={tried && !bind.reason.trim() ? reasonMissing : undefined}><Textarea value={bind.reason} maxLength={1000} onChange={(e) => { setBind({ ...bind, reason: e.target.value }); }} /></Field>
-        <p className="text-[11px] text-muted-foreground">{t(isFirst ? "The device's sensors start reporting for this unit." : "History stays with the previous binding; the device gets new sensor IDs on the new unit.")}</p>
-      </Modal>
+      {dv && modal === "bind" && <BindDeviceModal onClose={close} device={{ id: dv.detail.id, version: dv.detail.version, from: dv.row.unitId ? dv.row.unit : null }} first={isFirst} />}
       <Modal open={modal === "unbind"} onClose={close} title={t("Unbind device")} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { leave("unbind"); }}>{t("Unbind")}</Btn></>}>
         <Field label={t("Reason")} error={tried && !why.trim() ? reasonMissing : undefined}><Textarea value={why} maxLength={1000} onChange={(e) => { setWhy(e.target.value); }} /></Field>
         <p className="text-[11px] text-muted-foreground">{t("The device leaves its unit and stays registered; history stays with the binding, and the unit has no device until you bind another.")}</p>

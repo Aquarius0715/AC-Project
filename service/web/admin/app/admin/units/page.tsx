@@ -162,7 +162,7 @@ interface Ctx {
 }
 /** The unit edit card: the bound device, the attached policies (default first) and what blocks taking the unit out of use (D05). */
 async function unitLive(d: ApiUnitDetail, x: Ctx): Promise<UnitLive> {
-  interface Device { id: string; serial: string; unitId: string | null; connection: Connection }
+  interface Device { id: string; version: number; serial: string; unitId: string | null; connection: Connection; iotModelId?: string | null; mqttNode?: string | null }
   interface Job { projection: "summary"; id: string; type: string; status: string }
   const [jobs, devices, archived] = await Promise.all([
     x.has("job.read") && !d.archived ? coreAll<Job>("jobs.list", { filters: { unitId: d.id } }) : Promise.resolve(null),
@@ -200,7 +200,7 @@ async function unitLive(d: ApiUnitDetail, x: Ctx): Promise<UnitLive> {
     u: d,
     path: d.location.pathLabels.join(" › "),
     model: `${modelLabel(d, x.models)} · split`,
-    device: device ? { id: device.id, serial: device.serial, connection: device.connection } : null,
+    device: device ? { id: device.id, version: device.version, serial: device.serial, connection: device.connection, iotModelId: device.iotModelId ?? null, mqttNode: device.mqttNode ?? null } : null,
     deviceKnown: devices !== null,
     blockers: x.has("job.read", DEVICE_READ) || x.contracts ? blockers : null,
     archivedNote: d.archived ? archivedText() : null,

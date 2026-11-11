@@ -4,12 +4,13 @@
 // and the Core API authorizes the call (device.write, audit.read) and checks the expected version where the write
 // version catalog requires one.
 import { refresh } from "next/cache";
-import { coreNow, coreOp } from "@ac/web/lib/dal";
+import { CoreError, coreNow, coreOp } from "@ac/web/lib/dal";
 import { actionFailure } from "@ac/web/lib/actionFailure";
 import type { CampaignDraft, Metric } from "@ac/web/lib/devices";
 import { parseWaves } from "@ac/web/lib/devices";
 import type { OpInput } from "@ac/web/lib/opTypes";
 import { lookup } from "@ac/web/lib/lookup";
+import { deviceOptions, unitOptions } from "../_lib/pickers";
 
 export type ActionResult<T = null> = { ok: true; value: T } | { ok: false; messageKey: string; code: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null };
 
@@ -52,8 +53,38 @@ export async function capabilityHistory(capabilityId: string) {
   }, false);
 }
 
-export async function registerDevice(serial: string, sensorTypes: Metric[], unitId: string, mqttNode: string | null, iotModelId: string | null) {
-  return run(async () => { const d = await coreOp<{ id: string }>("devices.register", { serial, sensorTypes, unitId, ...(mqttNode && { mqttNode }), ...(iotModelId && { iotModelId }) }, { write: true }); return d.id; });
+/** devices.register and, when a unit is chosen, devices.bind to it (replacing `replaceDeviceId` on the unit when given).
+The device is registered either way: if the bind is refused (the unit took another device meanwhile, a tamper)
+`bindError` says why and the device waits, unbound, to be connected from its page or the unit's; nothing is registered
+twice. */
+export async function registerAndBind(input: { serial: string; sensorTypes: Metric[] | null; mqttNode: string | null; iotModelId: string; unitId: string | null; replaceDeviceId?: string; reason?: string }) {
+  return run(async () => {
+    const d = await coreOp<{ id: string; version: number }>("devices.register", { serial: input.serial, iotModelId: input.iotModelId, ...(input.sensorTypes && { sensorTypes: input.sensorTypes }), ...(input.unitId && { unitId: input.unitId }), ...(input.mqttNode && { mqttNode: input.mqttNode }) }, { write: true });
+    if (!input.unitId) return { id: d.id, bindError: null as string | null };
+    try {
+      await coreOp("devices.bind", { deviceId: d.id, unitId: input.unitId, reason: input.reason ?? "Registered with the unit", ...(input.replaceDeviceId && { replaceDeviceId: input.replaceDeviceId }) }, { write: true, expectedVersion: d.version });
+      return { id: d.id, bindError: null as string | null };
+    } catch (error) {
+      if (error instanceof CoreError) return { id: d.id, bindError: error.error.messageKey };
+      throw error;
+    }
+  });
+}
+
+/** Units matching the text, for a search select (customer, place and aircon model beside each name). */
+export async function searchUnits(search: string, withoutDevice: boolean) {
+  return run(() => unitOptions(search, withoutDevice), false);
+}
+/** Devices matching the text; `free` marks the ones already on a unit as not to be chosen. */
+export async function searchDevices(search: string, bound: boolean | null, free: boolean) {
+  return run(() => deviceOptions(search, bound, free), false);
+}
+/** The device now bound to a unit, if any: a bind to this unit replaces it. */
+export async function deviceOnUnit(unitId: string) {
+  return run(async () => {
+    const page = await coreOp<{ items: { id: string; serial: string }[] }>("devices.list", { limit: 1, filters: { unitId } });
+    return page.items.at(0) ?? null;
+  }, false);
 }
 
 /** devices.setMqttNode: the node ID the device's ESP32 sends (null clears it); the IoT bridge reads it within 30 seconds (IR635). */
@@ -61,8 +92,10 @@ export async function setMqttNode(deviceId: string, version: number, mqttNode: s
   return run(async () => { await coreOp("devices.setMqttNode", { deviceId, mqttNode }, { write: true, expectedVersion: version }); return null; });
 }
 
-export async function bindDevice(deviceId: string, version: number, unitId: string, reason: string) {
-  return run(async () => { await coreOp("devices.bind", { deviceId, unitId, reason }, { write: true, expectedVersion: version }); return null; });
+/** devices.bind. With `replaceDeviceId` the device now on the unit is unbound in the same write: a replacement leaves the
+unit with one device, never two and never none, and the old device keeps its history. */
+export async function bindDevice(deviceId: string, version: number, unitId: string, reason: string, replaceDeviceId?: string) {
+  return run(async () => { await coreOp("devices.bind", { deviceId, unitId, reason, ...(replaceDeviceId && { replaceDeviceId }) }, { write: true, expectedVersion: version }); return null; });
 }
 
 /** devices.unbind: the device leaves its unit and stays registered (DEC-103). */

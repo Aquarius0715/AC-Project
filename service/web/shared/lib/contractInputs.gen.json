@@ -333,6 +333,7 @@
   "deviceId",
   "jobId",
   "reason",
+  "replaceDeviceId",
   "unitId"
  ],
  "devices.calibrate": [

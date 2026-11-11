@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Children, cloneElement, createContext, isValidElement, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useT } from "@ac/web/components/I18n";
 import type { T as Translate } from "@ac/web/lib/i18n";
+import type { PickerOption } from "@ac/web/lib/pickerOption";
 import { Icon, type IconName } from "@ac/web/components/Icon";
 import { Alert } from "@ac/web/components/ui/alert";
 import { Badge as UIBadge } from "@ac/web/components/ui/badge";
@@ -457,6 +458,50 @@ export function SearchSelect({ value, onChange, options, label, placeholder, lim
         <ComboboxEmpty>{t("No match — try another name")}</ComboboxEmpty>
         <ComboboxList aria-label={label}>{(o: { id: string; label: string }) => <ComboboxItem key={o.id || "all"} value={o}>{o.label}</ComboboxItem>}</ComboboxList>
         {matches.length > limit && <p className="px-3 py-1.5 text-[11px] text-muted-foreground">{t("{n} more — type to narrow the list", { n: matches.length - limit })}</p>}
+      </ComboboxContent>
+    </Combobox>
+  );
+}
+
+/** A select for lists too long to read whole (units, devices): typing asks `search` on the server, so every record in
+scope can be found, not only the first page. Each option shows its label with a second line of details (customer, place,
+model, serial…) and one that cannot be chosen says why. Closed, it shows the chosen option. */
+export function AsyncSearchSelect({ value, onChange, search, label, placeholder, className }: Readonly<{
+  value: PickerOption | null; onChange: (o: PickerOption | null) => void; search: (query: string) => Promise<PickerOption[]>; label: string; placeholder?: string; className?: string;
+}>) {
+  const t = useT();
+  const [query, setQuery] = useState("");
+  const [options, setOptions] = useState<PickerOption[]>([]);
+  const [failed, setFailed] = useState(false);
+  // a new query asks after a short pause, and an answer that comes after a newer query is dropped
+  useEffect(() => {
+    let current = true;
+    const timer = setTimeout(() => {
+      search(query === value?.label ? "" : query).then((found) => {
+        if (!current) return;
+        setOptions(found);
+        setFailed(false);
+      }).catch(() => { if (current) setFailed(true); });
+    }, 250);
+    return () => { current = false; clearTimeout(timer); };
+  }, [query, search, value?.label]);
+  return (
+    <Combobox items={options} filteredItems={options} value={value} openOnInputClick
+      itemToStringLabel={(o: PickerOption) => o.label} isItemEqualToValue={(a: PickerOption, b: PickerOption) => a.id === b.id}
+      onInputValueChange={(q) => { setQuery(q); }} onValueChange={(o) => { onChange(o); }}>
+      <ComboboxInput aria-label={label} placeholder={placeholder ?? t("Type to search…")} showTrigger={false} className={cn("w-full min-w-0", className)}>
+        <InputGroupAddon align="inline-end" aria-hidden><Icon name="chevronDown" className="text-muted-foreground" /></InputGroupAddon>
+      </ComboboxInput>
+      <ComboboxContent>
+        <ComboboxEmpty>{t(failed ? "The search failed — try again" : "No match — try another name")}</ComboboxEmpty>
+        <ComboboxList aria-label={label}>
+          {(o: PickerOption) => (
+            <ComboboxItem key={o.id} value={o} disabled={o.blocked !== null}>
+              <span className="flex min-w-0 flex-col"><span>{o.label}</span>
+                {(o.detail || o.blocked) && <span className="truncate text-[11px] text-muted-foreground">{o.blocked ? t("On {unit} — move it from its page", { unit: o.blocked }) : o.detail}</span>}</span>
+            </ComboboxItem>
+          )}
+        </ComboboxList>
       </ComboboxContent>
     </Combobox>
   );

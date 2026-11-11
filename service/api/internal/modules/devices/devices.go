@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -58,7 +60,7 @@ type Device struct {
 	UpdatedAt             time.Time  `json:"updatedAt"`
 	BindingID             *uuid.UUID `json:"bindingId"`
 	UnitID                *uuid.UUID `json:"unitId"`
-	TargetUnitID          uuid.UUID  `json:"targetUnitId"`
+	TargetUnitID          *uuid.UUID `json:"targetUnitId"`
 	CreatedByMembershipID uuid.UUID  `json:"createdByMembershipId"`
 	Serial                string     `json:"serial"`
 	MqttNode              *string    `json:"mqttNode"`
@@ -309,8 +311,8 @@ func withSensors(ctx context.Context, call *ops.Call, devices []Device) error {
 //	@Description	admin:device.read | admin:audit.read
 //	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
 //	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-//	@Description	Design: DD-A04, DD-T02, DD-T11, DD-A16, DD-A20, DD-T12 · Query: filters unitId,status,search,modelId \
-//	@Description	· sort id,createdAt,updatedAt,serial (default id asc)
+//	@Description	Design: DD-A04, DD-T02, DD-T11, DD-A16, DD-A20, DD-T12 · Query: filters \
+//	@Description	unitId,status,search,modelId,bound · sort id,createdAt,updatedAt,serial (default id asc)
 //	@Tags			devices
 //	@Accept			json
 //	@Produce		json
@@ -319,8 +321,9 @@ func withSensors(ctx context.Context, call *ops.Call, devices []Device) error {
 //	@Param			sort	query		string	false	"field:direction — fields id,createdAt,updatedAt,serial; default id asc"
 //	@Param			unitId	query		string	false	"filter → unitId"
 //	@Param			status	query		string	false	"filter → connection"
-//	@Param			search	query		string	false	"filter → part of the serial or the MQTT node ID or the bound unit's name (IR723)"
+//	@Param			search	query		string	false	"filter → part of the serial or the MQTT node ID or the IoT model's name or the bound unit's name or customer or property or space or aircon model (IR723)"
 //	@Param			modelId	query		string	false	"filter → model of the bound unit (IR723)"
+//	@Param			bound	query		boolean	false	"filter → true: on a unit"
 //	@Success		200		{object}	ops.Envelope{data=DevicePage}
 //	@Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
 //	@Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
@@ -397,7 +400,8 @@ func (m *Module) list(
 type deviceFilter struct {
 	UnitID  *uuid.UUID `json:"unitId,omitempty"`
 	Status  *string    `json:"status,omitempty"`
-	Search  *string    `json:"search,omitempty"`  // part of the serial, MQTT node ID or unit name (IR723)
+	Search  *string    `json:"search,omitempty"`  // serial, node ID, IoT model, unit, customer, place or aircon model
+	Bound   *bool      `json:"bound,omitempty"`   // true: on a unit; false: on none (spare or not installed)
 	ModelID *uuid.UUID `json:"modelId,omitempty"` // the IoT model of the device (IR723, DEC-105)
 }
 
@@ -447,9 +451,26 @@ func deviceConditions(call *ops.Call, filter deviceFilter) (string, []any, error
 		args = append(args, paging.Contains(*filter.Search))
 		conds = append(
 			conds,
-			fmt.Sprintf(`(d.serial ILIKE $%[1]d OR d.mqtt_node ILIKE $%[1]d OR EXISTS (SELECT 1 FROM
-			assets.units su WHERE su.id = d.unit_id AND su.display_name ILIKE $%[1]d))`, len(args)),
+			fmt.Sprintf(`(d.serial ILIKE $%[1]d OR d.mqtt_node ILIKE $%[1]d
+			OR EXISTS (SELECT 1 FROM devices.iot_models im WHERE im.id = d.iot_model_id AND im.is_current
+				AND (im.manufacturer || ' ' || im.model) ILIKE $%[1]d)
+			OR EXISTS (SELECT 1 FROM assets.units su
+				LEFT JOIN assets.customers sc ON sc.organization_id = su.customer_org_id
+				LEFT JOIN assets.properties sp ON sp.id = su.property_id
+				LEFT JOIN assets.spaces ss ON ss.id = su.space_id
+				LEFT JOIN devices.capabilities cm ON cm.id = su.model_id AND cm.is_current
+				WHERE su.id = d.unit_id AND (su.display_name ILIKE $%[1]d OR sc.name ILIKE $%[1]d
+					OR sp.name ILIKE $%[1]d OR ss.name ILIKE $%[1]d
+					OR (cm.manufacturer || ' ' || cm.model) ILIKE $%[1]d)))`, len(args)),
 		)
+	}
+
+	if filter.Bound != nil {
+		if *filter.Bound {
+			conds = append(conds, "d.unit_id IS NOT NULL")
+		} else {
+			conds = append(conds, "d.unit_id IS NULL")
+		}
 	}
 
 	if filter.ModelID != nil {
@@ -653,7 +674,7 @@ func normalizeMqttNode(raw *string) (*string, bool) {
 type RegisterInput struct {
 	Serial      string     `json:"serial"`
 	SensorTypes []string   `json:"sensorTypes"`
-	UnitID      uuid.UUID  `json:"unitId"`
+	UnitID      *uuid.UUID `json:"unitId,omitempty"` // the planned unit; omitted: an unplanned device
 	JobID       *uuid.UUID `json:"jobId,omitempty"`
 	// MqttNode is the node_id the device's ESP32 sends as the <node> of smarthome/ac/<node>/… (IR635); the IoT bridge
 	// takes its readings and sends its commands by it once the device is bound.
@@ -672,16 +693,12 @@ func (in *RegisterInput) Validate() map[string]string {
 		fieldErrs["serial"] = "error.serialFormat"
 	}
 
-	if in.SensorTypes == nil {
-		fieldErrs["sensorTypes"] = apperr.KeyRequired
-	}
-
 	if !uniqueIn(in.SensorTypes, nil) {
 		fieldErrs["sensorTypes"] = apperr.KeyDuplicate
 	}
 
-	if in.UnitID == uuid.Nil {
-		fieldErrs["unitId"] = apperr.KeyRequired
+	if in.UnitID != nil && *in.UnitID == uuid.Nil {
+		fieldErrs["unitId"] = apperr.KeyInvalid
 	}
 
 	node, ok := normalizeMqttNode(in.MqttNode)
@@ -739,8 +756,9 @@ func (m *Module) existingUnit(
 //	@ID				devices.register
 //	@Description	Authorization: technician:device.maintain:assigned-valid-job | admin:device.write
 //	@Description	Validation: D01; input constraints in the corresponding DD; IR43 sensorTypes⊆IoTModel.sensors \
-//	@Description	(DEC-105: the iotModelId, else the unit's IoT model; none allows no sensors); IR94 technician write \
-//	@Description	table (assignment and work window, jobId required when typed)
+//	@Description	(DEC-105: the iotModelId, else the planned unit's IoT model; none allows no sensors; sensorTypes \
+//	@Description	omitted = every sensor of the model); unitId omitted registers an unplanned device (HQ only); IR94 \
+//	@Description	technician write table (assignment and work window, jobId required when typed)
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-T11, DD-A04
 //	@Tags			devices
@@ -771,24 +789,19 @@ func (m *Module) registerDetail(
 	call *ops.Call,
 	input *RegisterInput,
 ) (DeviceDetail, error) {
-	err := m.technicianGate(ctx, call, input.JobID, input.UnitID)
+	iotModel, err := m.plannedModel(ctx, call, input)
 	if err != nil {
 		return DeviceDetail{}, err
-	}
-
-	unitInfo, err := m.existingUnit(ctx, call, input.UnitID)
-	if err != nil {
-		return DeviceDetail{}, err
-	}
-
-	iotModel := input.IoTModelID
-	if iotModel == nil {
-		iotModel = unitInfo.IoTModelID
 	}
 
 	byMetric, iotVersion, err := iotModelSensors(ctx, call, iotModel, input.SensorTypes)
 	if err != nil {
 		return DeviceDetail{}, err
+	}
+	// sensorTypes omitted: the device starts with every sensor its IoT model lists; a list picks fewer (an option the
+	// device does not carry), and an empty list none
+	if input.SensorTypes == nil {
+		input.SensorTypes = slices.Sorted(maps.Keys(byMetric))
 	}
 
 	err = serialFree(ctx, call, input.Serial)
@@ -838,6 +851,38 @@ func (m *Module) registerDetail(
 		"d.id = $1",
 		[]any{deviceID},
 	) // own write result; read scope applies to later reads
+}
+
+// plannedModel checks the unit a registration plans (none for an unplanned device, HQ's alone) and returns the IoT
+// model the device is registered with: the input's, else the planned unit's.
+func (m *Module) plannedModel(
+	ctx context.Context,
+	call *ops.Call,
+	input *RegisterInput,
+) (*uuid.UUID, error) {
+	if input.UnitID == nil {
+		if call.Principal.Role == roleTechnician {
+			return nil, apperr.Fields(map[string]string{fieldUnitID: apperr.KeyRequired})
+		}
+
+		return input.IoTModelID, nil
+	}
+
+	err := m.technicianGate(ctx, call, input.JobID, *input.UnitID)
+	if err != nil {
+		return nil, err
+	}
+
+	unitInfo, err := m.existingUnit(ctx, call, *input.UnitID)
+	if err != nil {
+		return nil, err
+	}
+
+	if input.IoTModelID != nil {
+		return input.IoTModelID, nil
+	}
+
+	return unitInfo.IoTModelID, nil
 }
 
 // iotModelSensors is the sensor specs of the IoT model's current version by metric; each requested sensor type must
