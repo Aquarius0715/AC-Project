@@ -131,6 +131,8 @@ func TestQueryCatalogFilters(t *testing.T) {
 		"unreadOnly":         jsonTrue,
 		"activeOnly":         jsonTrue,
 		"unassignedOnly":     jsonTrue,
+		"bound":              jsonTrue,
+		"withoutDevice":      jsonTrue,
 		"proposalPending":    jsonTrue,
 		fieldEnabled:         jsonTrue,
 	}

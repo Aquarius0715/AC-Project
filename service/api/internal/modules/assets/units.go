@@ -160,6 +160,11 @@ type UnitFilters struct {
 	UnitIDs            *[]uuid.UUID `json:"unitIds,omitempty"`
 	OrganizationID     *uuid.UUID   `json:"organizationId,omitempty"`
 	UnassignedOnly     *bool        `json:"unassignedOnly,omitempty"`
+	// Search is part of the unit's name or its customer's, property's, space's, aircon model's name or the serial of
+	// its device (case-insensitive).
+	Search *string `json:"search,omitempty"`
+	// WithoutDevice true lists the units with no device bound: the candidates for a connection.
+	WithoutDevice *bool `json:"withoutDevice,omitempty"`
 }
 
 // validConnection reports whether state is a unit's connection.
@@ -363,7 +368,7 @@ func (m *Module) enrich(ctx context.Context, call *ops.Call, units []Unit) error
 //	@Description	DD-A06, DD-A07, DD-A09, DD-A11, DD-A12, DD-A13, DD-A14, DD-A15, DD-A05, DD-C14, DD-C15, DD-C03, \
 //	@Description	DD-T12, DD-P01, DD-P03, DD-P07, DD-T01, DD-T13, DD-C08 · Query: filters \
 //	@Description	customerId,propertyId,status,spaceId,includeDescendants,connections,powerState,unitIds,\
-//	@Description	organizationId,unassignedOnly · sort id,createdAt,updatedAt (default id asc)
+//	@Description	organizationId,search,withoutDevice,unassignedOnly · sort id,createdAt,updatedAt (default id asc)
 //	@Tags			units
 //	@Accept			json
 //	@Produce		json
@@ -379,6 +384,8 @@ func (m *Module) enrich(ctx context.Context, call *ops.Call, units []Unit) error
 //	@Param			powerState			query		string		false	"filter → SR27 effectivePowerState (not observedState.power)"
 //	@Param			unitIds				query		[]string	false	"filter → id in unitIds (empty array returns zero) (repeat the parameter or separate values with commas; an empty value is the empty list)"	collectionFormat(multi)
 //	@Param			organizationId		query		string		false	"filter → ACUnit.customerOrgId"
+//	@Param			search				query		string		false	"filter → part of the unit or customer or property or space or aircon model name or the serial of its device"
+//	@Param			withoutDevice		query		boolean		false	"filter → true => units with no device bound"
 //	@Param			unassignedOnly		query		boolean		false	"filter → true => spaceId=null (combined with spaceId is VALIDATION)"
 //	@Success		200					{object}	ops.Envelope{data=UnitPage}
 //	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
@@ -542,6 +549,25 @@ func (filters UnitFilters) where(call *ops.Call, args *[]any) string {
 
 	if filters.UnitIDs != nil {
 		conds = append(conds, "u.id = ANY("+add(*filters.UnitIDs)+")")
+	}
+
+	if filters.WithoutDevice != nil && *filters.WithoutDevice {
+		conds = append(
+			conds,
+			"NOT EXISTS (SELECT 1 FROM devices.device_bindings wb WHERE wb.unit_id = u.id AND wb.unbound_at IS NULL)",
+		)
+	}
+
+	if filters.Search != nil && strings.TrimSpace(*filters.Search) != "" {
+		like := add(paging.Contains(*filters.Search))
+		conds = append(conds, fmt.Sprintf(`(u.display_name ILIKE %[1]s
+			OR EXISTS (SELECT 1 FROM assets.customers sc WHERE sc.organization_id = u.customer_org_id AND sc.name ILIKE %[1]s)
+			OR EXISTS (SELECT 1 FROM assets.properties sp WHERE sp.id = u.property_id AND sp.name ILIKE %[1]s)
+			OR EXISTS (SELECT 1 FROM assets.spaces ss WHERE ss.id = u.space_id AND ss.name ILIKE %[1]s)
+			OR EXISTS (SELECT 1 FROM devices.capabilities cm WHERE cm.id = u.model_id AND cm.is_current
+				AND (cm.manufacturer || ' ' || cm.model) ILIKE %[1]s)
+			OR EXISTS (SELECT 1 FROM devices.device_bindings sb JOIN devices.devices sd ON sd.id = sb.device_id
+				WHERE sb.unit_id = u.id AND sb.unbound_at IS NULL AND sd.serial ILIKE %[1]s))`, like))
 	}
 
 	return strings.Join(conds, " AND ")

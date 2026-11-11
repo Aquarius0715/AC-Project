@@ -42,7 +42,7 @@ const (
 
 type devState struct {
 	unit       *uuid.UUID
-	target     uuid.UUID
+	target     *uuid.UUID
 	creator    uuid.UUID
 	version    int
 	connection string
@@ -133,6 +133,9 @@ type BindInput struct {
 	UnitID   uuid.UUID  `json:"unitId"`
 	JobID    *uuid.UUID `json:"jobId,omitempty"`
 	Reason   string     `json:"reason"`
+	// ReplaceDeviceID is the device now on the unit that this bind takes over from: it is unbound in the same
+	// transaction, so a replacement never leaves the unit with two devices or none.
+	ReplaceDeviceID *uuid.UUID `json:"replaceDeviceId,omitempty"`
 }
 
 // Validate implements ops.Validator.
@@ -140,6 +143,11 @@ func (in *BindInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.DeviceID == uuid.Nil {
 		fieldErrs["deviceId"] = apperr.KeyRequired
+	}
+
+	if in.ReplaceDeviceID != nil &&
+		(*in.ReplaceDeviceID == uuid.Nil || *in.ReplaceDeviceID == in.DeviceID) {
+		fieldErrs["replaceDeviceId"] = apperr.KeyInvalid
 	}
 
 	if in.UnitID == uuid.Nil {
@@ -213,6 +221,11 @@ func (m *Module) bindDetail(
 		return DeviceDetail{}, err
 	}
 
+	err = m.releaseReplaced(ctx, call, input)
+	if err != nil {
+		return DeviceDetail{}, err
+	}
+
 	err = m.unitsFree(ctx, call, input.UnitID, state.unit)
 	if err != nil {
 		return DeviceDetail{}, err
@@ -248,6 +261,71 @@ func (m *Module) bindDetail(
 	)
 
 	return m.detail(ctx, call, "d.id = $1", []any{input.DeviceID})
+}
+
+// releaseReplaced unbinds the device a replacement takes over from (input.ReplaceDeviceID) in the bind's transaction:
+// it must be the device now active on the target unit (CONFLICT error.notOnUnit otherwise), and a caller who may not
+// read it gets NOT_FOUND.
+func (m *Module) releaseReplaced(ctx context.Context, call *ops.Call, input *BindInput) error {
+	if input.ReplaceDeviceID == nil {
+		return nil
+	}
+
+	old, err := lockDevice(ctx, call, *input.ReplaceDeviceID)
+	if err != nil {
+		return err
+	}
+
+	if old.unit == nil || *old.unit != input.UnitID {
+		return apperr.E(apperr.Conflict, "error.notOnUnit")
+	}
+
+	if call.Principal.Role == roleTechnician {
+		err = m.UnitAccess.TechnicianUnit(ctx, call, input.UnitID, false, false)
+		if err != nil {
+			return apperr.Wrap(err, "devices.TechUnitAccess.TechnicianUnit")
+		}
+	}
+
+	err = m.exclusive(ctx, call, input.UnitID)
+	if err != nil {
+		return err
+	}
+
+	err = releaseBinding(ctx, call, *input.ReplaceDeviceID, input.Reason)
+	if err != nil {
+		return err
+	}
+
+	var version int
+
+	err = call.Tx.QueryRow(ctx, `UPDATE devices.devices SET unit_id = NULL, binding_id = NULL, version = version + 1,
+		updated_at = platform.app_now() WHERE id = $1 RETURNING version`, *input.ReplaceDeviceID).
+		Scan(&version)
+	if err != nil {
+		return apperr.Wrap(err, "update devices.devices")
+	}
+
+	call.Emit(
+		ops.Event{
+			AggregateType: entityDevice,
+			AggregateID:   *input.ReplaceDeviceID,
+			Type:          "DeviceUnbound",
+			Payload:       map[string]any{fieldPreviousUnitID: input.UnitID},
+		},
+	)
+	call.Audit(
+		ops.AuditEntry{
+			Action:          "devices.unbind",
+			TargetKind:      entityDevice,
+			TargetID:        input.ReplaceDeviceID.String(),
+			PreviousVersion: &old.version,
+			NextVersion:     &version,
+			Reason:          input.Reason, Result: "", Before: nil, After: nil,
+		},
+	)
+
+	return nil
 }
 
 // ---- unbind / delete (DEC-103) ----
@@ -538,7 +616,8 @@ func (m *Module) rebindable(
 	// a device not bound yet goes to the unit HQ planned for it, or anywhere by HQ or the member who registered it: a
 	// technician cannot take another member's planned device to a unit of their own (NOT_FOUND, as the device reads
 	// for them, whatever its version: IR366, IR709)
-	if state.unit == nil && unit != state.target && hiddenUnbound(call, state) {
+	if state.unit == nil && (state.target == nil || unit != *state.target) &&
+		hiddenUnbound(call, state) {
 		return apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 

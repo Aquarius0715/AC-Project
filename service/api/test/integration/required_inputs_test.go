@@ -148,7 +148,7 @@ func TestRequiredInputs(t *testing.T) {
 		{"units.importCommit", `{}`, map[string]string{"previewId": req, fieldCustomerID: req}},
 		{"units.importUndo", `{"reason":` + long(1001) + `}`, map[string]string{"importId": req, fieldReason: length}},
 		// devices
-		{"devices.register", `{}`, map[string]string{fieldUnitID: req}},
+		{"devices.register", `{}`, map[string]string{"serial": "error.serialFormat"}},
 		{"devices.bind", `{}`, map[string]string{fieldDeviceID: req, fieldUnitID: req}},
 		{"devices.calibrate", `{}`, map[string]string{fieldDeviceID: req, "sensorId": req, "calibratedAt": req}},
 		{"devices.updateFirmware", `{}`, map[string]string{fieldDeviceID: req, "firmwareVersion": req}},

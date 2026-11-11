@@ -6679,7 +6679,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | admin:device.read | admin:audit.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A04, DD-T02, DD-T11, DD-A16, DD-A20, DD-T12 · Query: filters unitId,status,search,modelId · sort id,createdAt,updatedAt,serial (default id asc)",
+                "description": "Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | admin:device.read | admin:audit.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A04, DD-T02, DD-T11, DD-A16, DD-A20, DD-T12 · Query: filters unitId,status,search,modelId,bound · sort id,createdAt,updatedAt,serial (default id asc)",
                 "consumes": [
                     "application/json"
                 ],
@@ -6724,7 +6724,7 @@
                     },
                     {
                         "type": "string",
-                        "description": "filter → part of the serial or the MQTT node ID or the bound unit's name (IR723)",
+                        "description": "filter → part of the serial or the MQTT node ID or the IoT model's name or the bound unit's name or customer or property or space or aircon model (IR723)",
                         "name": "search",
                         "in": "query"
                     },
@@ -6732,6 +6732,12 @@
                         "type": "string",
                         "description": "filter → model of the bound unit (IR723)",
                         "name": "modelId",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "filter → true: on a unit",
+                        "name": "bound",
                         "in": "query"
                     }
                 ],
@@ -6810,7 +6816,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: technician:device.maintain:assigned-valid-job | admin:device.write\nValidation: D01; input constraints in the corresponding DD; IR43 sensorTypes⊆IoTModel.sensors (DEC-105: the iotModelId, else the unit's IoT model; none allows no sensors); IR94 technician write table (assignment and work window, jobId required when typed)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-T11, DD-A04",
+                "description": "Authorization: technician:device.maintain:assigned-valid-job | admin:device.write\nValidation: D01; input constraints in the corresponding DD; IR43 sensorTypes⊆IoTModel.sensors (DEC-105: the iotModelId, else the planned unit's IoT model; none allows no sensors; sensorTypes omitted = every sensor of the model); unitId omitted registers an unplanned device (HQ only); IR94 technician write table (assignment and work window, jobId required when typed)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-T11, DD-A04",
                 "consumes": [
                     "application/json"
                 ],
@@ -27601,7 +27607,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | admin:dashboard.read | admin:asset.read | admin:control.execute:scope-candidate-read-only | admin:device.read:scope-candidate-read-only | admin:job.read:scope-candidate-read-only | admin:contract.read:scope-candidate-read-only | admin:restriction.read:scope-candidate-read-only | admin:automation.policy.read:scope-candidate-read-only | admin:alert.policy.read:scope-candidate-read-only | admin:energy.read:scope-candidate-read-only | admin:mrv.read:scope-candidate-read-only | admin:offset.read:scope-candidate-read-only\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR62 unassignedOnly; IR213 latestMeasurements: latest reading per metric with read-time quality; [] before an external technician's work window\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A02, DD-C01, DD-C02, DD-C04, DD-C05, DD-C06, DD-C07, DD-C09, DD-C13, DD-T11, DD-A04, DD-A06, DD-A07, DD-A09, DD-A11, DD-A12, DD-A13, DD-A14, DD-A15, DD-A05, DD-C14, DD-C15, DD-C03, DD-T12, DD-P01, DD-P03, DD-P07, DD-T01, DD-T13, DD-C08 · Query: filters customerId,propertyId,status,spaceId,includeDescendants,connections,powerState,unitIds,organizationId,unassignedOnly · sort id,createdAt,updatedAt (default id asc)",
+                "description": "Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | admin:dashboard.read | admin:asset.read | admin:control.execute:scope-candidate-read-only | admin:device.read:scope-candidate-read-only | admin:job.read:scope-candidate-read-only | admin:contract.read:scope-candidate-read-only | admin:restriction.read:scope-candidate-read-only | admin:automation.policy.read:scope-candidate-read-only | admin:alert.policy.read:scope-candidate-read-only | admin:energy.read:scope-candidate-read-only | admin:mrv.read:scope-candidate-read-only | admin:offset.read:scope-candidate-read-only\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR62 unassignedOnly; IR213 latestMeasurements: latest reading per metric with read-time quality; [] before an external technician's work window\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A02, DD-C01, DD-C02, DD-C04, DD-C05, DD-C06, DD-C07, DD-C09, DD-C13, DD-T11, DD-A04, DD-A06, DD-A07, DD-A09, DD-A11, DD-A12, DD-A13, DD-A14, DD-A15, DD-A05, DD-C14, DD-C15, DD-C03, DD-T12, DD-P01, DD-P03, DD-P07, DD-T01, DD-T13, DD-C08 · Query: filters customerId,propertyId,status,spaceId,includeDescendants,connections,powerState,unitIds,organizationId,search,withoutDevice,unassignedOnly · sort id,createdAt,updatedAt (default id asc)",
                 "consumes": [
                     "application/json"
                 ],
@@ -27692,6 +27698,18 @@
                         "type": "string",
                         "description": "filter → ACUnit.customerOrgId",
                         "name": "organizationId",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "filter → part of the unit or customer or property or space or aircon model name or the serial of its device",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "filter → true =\u003e units with no device bound",
+                        "name": "withoutDevice",
                         "in": "query"
                     },
                     {
@@ -31696,6 +31714,10 @@
                 "reason": {
                     "type": "string"
                 },
+                "replaceDeviceId": {
+                    "description": "ReplaceDeviceID is the device now on the unit that this bind takes over from: it is unbound in the same\ntransaction, so a replacement never leaves the unit with two devices or none.",
+                    "type": "string"
+                },
                 "unitId": {
                     "type": "string"
                 }
@@ -32562,6 +32584,7 @@
                     "type": "string"
                 },
                 "unitId": {
+                    "description": "the planned unit; omitted: an unplanned device",
                     "type": "string"
                 }
             }

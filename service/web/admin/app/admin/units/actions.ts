@@ -92,15 +92,24 @@ export interface UnitInput {
 export async function saveUnit(input: UnitInput, version?: number) {
   return run(async () => { const u = await coreOp<{ id: string }>("units.save", input, write(version)); return u.id; });
 }
-/** A device registered together with its new unit (DEC-105): the serial, the optional MQTT node ID and the sensors the IoT model has. */
-export interface NewUnitDevice { serial: string; mqttNode: string | null; sensorTypes: Metric[] }
-/** units.save, then devices.register for the unit's IoT model. The unit stays if the device is refused: `deviceError` says so
-and the device can be registered on the Devices screen. */
+/** The device connected to a new unit (DEC-105): one that is registered already and not on a unit (its version is the one
+read with the search), or a new one: the serial, the optional MQTT node ID, its IoT model and the sensors it carries. */
+export type NewUnitDevice =
+  | { kind: "existing"; deviceId: string; version: number }
+  | { kind: "new"; serial: string; mqttNode: string | null; iotModelId: string; sensorTypes: Metric[] };
+/** units.save, then (a new device) devices.register and devices.bind to the unit. The unit stays if the device is refused:
+`deviceError` says so, and the device — registered, not bound — is connected from the unit's page; nothing is created twice. */
 export async function saveUnitWithDevice(input: UnitInput, device: NewUnitDevice) {
   return run(async () => {
     const u = await coreOp<{ id: string }>("units.save", input, write());
+    const reason = "Registered with the unit";
     try {
-      await coreOp("devices.register", { serial: device.serial, sensorTypes: device.sensorTypes, unitId: u.id, ...(device.mqttNode && { mqttNode: device.mqttNode }), ...(input.iotModelId && { iotModelId: input.iotModelId }) }, { write: true });
+      if (device.kind === "existing") {
+        await coreOp("devices.bind", { deviceId: device.deviceId, unitId: u.id, reason }, { write: true, expectedVersion: device.version });
+      } else {
+        const made = await coreOp<{ id: string; version: number }>("devices.register", { serial: device.serial, iotModelId: device.iotModelId, sensorTypes: device.sensorTypes, unitId: u.id, ...(device.mqttNode && { mqttNode: device.mqttNode }) }, { write: true });
+        await coreOp("devices.bind", { deviceId: made.id, unitId: u.id, reason }, { write: true, expectedVersion: made.version });
+      }
       return { id: u.id, deviceError: null as string | null };
     } catch (error) {
       if (error instanceof CoreError) return { id: u.id, deviceError: Object.entries(error.error.fieldErrors).map(([k, v]) => `${k}: ${v}`).join(", ") || error.error.messageKey };

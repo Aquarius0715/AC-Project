@@ -528,7 +528,7 @@ CREATE TABLE devices.devices (
   certificate_arn           text,
   binding_id                uuid,
   unit_id                   uuid,                -- current binding (denormalised)
-  target_unit_id            uuid NOT NULL,
+  target_unit_id            uuid,
   created_by_membership_id  uuid NOT NULL,
   connection                text NOT NULL DEFAULT 'unknown' CHECK (connection IN ('online','offline','unknown','connecting','error')),
   last_seen_at              timestamptz,
