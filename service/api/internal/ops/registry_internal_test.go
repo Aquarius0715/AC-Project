@@ -92,6 +92,16 @@ func (f *fakeIdem) Complete(
 	return nil
 }
 
+func (f *fakeIdem) CompleteTx(
+	ctx context.Context,
+	_ pgx.Tx,
+	principal *Principal,
+	operation, key string,
+	resp json.RawMessage,
+) error {
+	return f.Complete(ctx, principal, operation, key, resp)
+}
+
 func (f *fakeIdem) Abort(_ context.Context, _ *Principal, _, key string) {
 	f.aborted++
 	delete(f.hash, key)

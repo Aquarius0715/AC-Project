@@ -178,9 +178,28 @@ func (s Idempotency) Begin(
 	return stored, err
 }
 
-// Complete stores the response.
+// Complete stores the response in a transaction of its own, after the operation's commit: for an operation that runs
+// in its own transaction, which cannot store it with its change.
 func (s Idempotency) Complete(
 	ctx context.Context,
+	principal *ops.Principal,
+	operation, key string,
+	resp json.RawMessage,
+) error {
+	if principal == nil {
+		return nil
+	}
+
+	return s.tx(ctx, principal, func(tx pgx.Tx) error {
+		return s.CompleteTx(ctx, tx, principal, operation, key, resp)
+	})
+}
+
+// CompleteTx stores the response in the operation's own transaction, so that the change and its receipt commit
+// together and a committed write never reads as "in progress" (IR777).
+func (s Idempotency) CompleteTx(
+	ctx context.Context,
+	txn pgx.Tx,
 	principal *ops.Principal,
 	_, key string,
 	resp json.RawMessage,
@@ -189,19 +208,17 @@ func (s Idempotency) Complete(
 		return nil
 	}
 
-	return s.tx(ctx, principal, func(tx pgx.Tx) error {
-		_, err := tx.Exec(
-			ctx,
-			`UPDATE platform.idempotency_keys SET status='completed', http_status=200, response=$4
-			WHERE tenant_id=$1 AND membership_id=$2 AND key=$3`,
-			principal.TenantID,
-			principal.MembershipID,
-			key,
-			resp,
-		)
+	_, err := txn.Exec(
+		ctx,
+		`UPDATE platform.idempotency_keys SET status='completed', http_status=200, response=$4
+		WHERE tenant_id=$1 AND membership_id=$2 AND key=$3`,
+		principal.TenantID,
+		principal.MembershipID,
+		key,
+		resp,
+	)
 
-		return apperr.Wrap(err, "update platform.idempotency_keys")
-	})
+	return apperr.Wrap(err, "update platform.idempotency_keys")
 }
 
 // Abort releases a key after a failed attempt so the client may retry with the same key.

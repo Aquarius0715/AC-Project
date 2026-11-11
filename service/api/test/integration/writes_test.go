@@ -1,17 +1,86 @@
 package integration_test
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 
+	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
+
+var errStoreAfterCommit = errors.New("the receipt cannot be stored after the commit")
+
+// afterCommitFails is an idempotency store whose store-after-the-commit fails, as a database that goes away right
+// after the commit does (IR777): a write that stores its receipt in its own transaction does not use it.
+type afterCommitFails struct{ ops.Idempotency }
+
+func (afterCommitFails) Complete(context.Context, *ops.Principal, string, string, json.RawMessage) error {
+	return errStoreAfterCommit
+}
+
+// TestCommittedWriteKeepsItsReceipt: the response of a write is stored with the write's commit, so a failure after
+// the commit cannot leave the Idempotency-Key "in progress" for 24 hours (IR777): the caller gets the answer, the key
+// replays it, and writes.getResult says succeeded.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
+func TestCommittedWriteKeepsItsReceipt(t *testing.T) {
+	srv := server(t)
+	srv.Registry.Idem = afterCommitFails{srv.Registry.Idem}
+	key := "rc-" + uuid.NewString()
+
+	put := func() *httptest.ResponseRecorder {
+		req := httptest.NewRequestWithContext(
+			t.Context(),
+			http.MethodPut,
+			"/v1/preferences",
+			strings.NewReader(`{"locale":"en","timezone":"Asia/Kuala_Lumpur"}`),
+		)
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+techB().token)
+		req.Header.Set("X-Tenant-Id", seed.ID("tenant-a").String())
+		req.Header.Set("X-Membership-Id", seed.ID(techB().membership).String())
+		req.Header.Set("Idempotency-Key", key)
+
+		rec := httptest.NewRecorder()
+		srv.Echo.ServeHTTP(rec, req)
+
+		return rec
+	}
+
+	first := put()
+	if first.Code != 200 {
+		t.Fatalf("write: %d %s", first.Code, first.Body.String())
+	}
+
+	var sent, replayed map[string]any
+
+	again := put()
+
+	_ = json.Unmarshal(first.Body.Bytes(), &sent)
+	_ = json.Unmarshal(again.Body.Bytes(), &replayed)
+
+	if again.Code != 200 || !reflect.DeepEqual(sent, replayed) { // the stored copy is jsonb: compare the content
+		t.Errorf("the same key does not replay the answer: %d %s", again.Code, again.Body.String())
+	}
+
+	if _, m := post(
+		srv,
+		techB(),
+		"writes.getResult",
+		`{"operation":"preferences.update","idempotencyKey":"`+key+`"}`,
+	); data(m)["state"] != stateSucceeded {
+		t.Errorf("writes.getResult: %v", m)
+	}
+}
 
 //nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestWritesGetResult(t *testing.T) {

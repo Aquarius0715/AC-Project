@@ -127,7 +127,7 @@ func TestAssetLists(t *testing.T) {
 //nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestCustomersSaveAndRename(t *testing.T) {
 	srv := server(t)
-	org := uuid.NewString()
+	org := customerOrg(t)
 	body := `{"name":"Test Co","organizationId":"` + org + `","serviceProfile":"general","status":"active"}`
 
 	code, resp := write(srv, hq(), "customers.save", body, 0)
@@ -139,6 +139,28 @@ func TestCustomersSaveAndRename(t *testing.T) {
 
 	if code, _ := write(srv, hq(), "customers.save", body, 0); code != 409 {
 		t.Fatalf("one customer per organization: %d", code)
+	}
+
+	// only a customer organization has a customer record (IR780)
+	for name, other := range map[string]struct {
+		org  string
+		want int
+	}{
+		"a contractor company": {seed.ID("org-contractor-a").String(), 422},
+		"the operator":         {seed.ID("org-operator-a").String(), 422},
+		"an unknown ID":        {uuid.NewString(), 404},
+	} {
+		code, res := write(
+			srv,
+			hq(),
+			"customers.save",
+			`{"name":"Not a customer","organizationId":"`+other.org+`","serviceProfile":"general","status":"active"}`,
+			0,
+		)
+		if code != other.want ||
+			(other.want == 422 && fields(res) != "organizationId=error.notCustomerOrganization") {
+			t.Errorf("%s: %d %s", name, code, fields(res))
+		}
 	}
 
 	if code, res := write(
@@ -349,4 +371,22 @@ func TestCustomersSaveAndRename(t *testing.T) {
 	); code != 404 {
 		t.Fatal("unknown customer")
 	}
+}
+
+// customerOrg inserts a customer organization of the test tenant and returns its ID: customers.save refuses an
+// organization that does not exist or is of another kind (IR780). It is removed when the test ends.
+func customerOrg(t *testing.T) string {
+	t.Helper()
+
+	org := uuid.NewString()
+	owner(
+		t,
+		`INSERT INTO identity.organizations (id, tenant_id, name, kind, status) VALUES ($1, $2, $3, 'customer', 'active')`,
+		org,
+		seed.ID("tenant-a"),
+		"Test customer "+org[:8],
+	)
+	t.Cleanup(func() { owner(t, `DELETE FROM identity.organizations WHERE id = $1`, org) })
+
+	return org
 }

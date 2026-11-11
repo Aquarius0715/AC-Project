@@ -6701,7 +6701,7 @@ Decided by the user (2026-10-23), following IR439: an assignment must not stay w
 2. A job already started keeps its assignment: HQ handles it.
 3. The web names the event (“Technician's qualification ended — to be reassigned”, English and Malay) in the customer's and the contractor's job history.
 4. No operation revokes a grant (`revoked_at`) today; one added later must release the same way.
-5. Test: `TestReleaseQualificationEnded` (a covering certificate releases nothing; one ending during the visit releases the contractor's job).
+5. Test: `TestReleaseQualificationEnded` (a covering certificate releases nothing; one ending during the visit releases the contractor's job). IR781 changes the grant to what the technician's valid certificates of the code cover together, so "replaces the technician's grant" above reads "sets the grant to the covered span" and a shorter certificate no longer releases a visit another valid one covers.
 
 ## IR441 Dependency upgrades: Node 26, PostgreSQL 18, TypeScript 6 — 2026-10-23
 
@@ -10409,3 +10409,44 @@ Proposal B-26 (rounds 368 and 369), built with the recommended option 1.
 1. **Before.** A scheduler tick ran each tenant in one transaction: the equipment tick, then every registered job of the held domains, then the maintenance tick, with no savepoint, and it returned at the first error. One failing job rolled back the whole tenant's tick and the later steps never ran. While identity was out of reach the certificate reminder job failed every tick, so offers and proposals did not expire, unrated jobs were not confirmed and ended histories were not frozen; while billing was out of reach, `control.AdvanceRuns` rolled back the command expiry done just before it and kept the equipment jobs from running (IR427's neighbour, IR429 logs the repeat).
 2. **Now.** Every step runs in a savepoint of the tenant's transaction: the equipment tick, each registered job (named by domain and position), the maintenance tick. A failing step rolls back only its own work and its own counts, the other steps go on, and the tenant's transaction commits the rest. The failures are returned together with the tick's error (`errors.Join`, each naming its tenant and step), so the worker's loop still logs them (IR429) and the next tick tries the step again as before. The tenant's advisory locks are taken outside the savepoints.
 3. **Tests.** `TestFailingSchedulerJobDoesNotStopTheTick`: an equipment job that fails, one after it, and an offer due to expire: the tick reports the failure, the second job runs and the offer expires (none of the three before). The tenant-failure test of IR (errTenantBroken) is unchanged.
+
+## IR777 A write's response is stored in the write's own transaction — 2026-11-11
+
+Proposals B-24 (round 363) and B-37 (round 613), built with the recommended option 1.
+
+1. **Before.** The write pipeline claimed the Idempotency-Key in its own transaction (`Idempotency.Begin`), ran the operation in a second one and stored the response in a third (`Idempotency.Complete`) after the commit. When that third step failed (the database briefly out of reach, the process stopped between the two), the caller got an error for a write that had taken effect, and the key stayed `in_progress` until it expired 24 hours later: a retry with the same key answered CONFLICT `error.requestInProgress`, `writes.getResult` answered `pending`, and after the expiry the same intent would have run a second time.
+2. **Now.** `Registry.execute` stores the response under the key (`Idempotency.CompleteTx`, an UPDATE on the operation's own transaction) after the handler, the audit and event recording and the cursor read, before the commit. The change, its events and its receipt commit together; a failed commit rolls all of them back and the abort path releases the key as before. `respond` sends the stored bytes. An operation that runs in its own transaction (`OwnTx`) and a call without a database transaction still store after the commit (`Complete`), as before.
+3. **Tests.** `TestCommittedWriteKeepsItsReceipt`: with the after-commit store made to fail, the write answers 200 (503 before), the same key replays the answer, and `writes.getResult` says succeeded. `registry_internal_test.go`'s fake store implements `CompleteTx`.
+
+## IR778 Two saves at once never store one version number twice — 2026-11-11
+
+Proposal B-31 (rounds 486 and 715), built with the recommended option 1.
+
+1. **Before.** `sla.saveTargets` and `rateCards.save` insert with `version = max(version) + 1` per plan type (per contractor) in one statement. Their tables were unique only on the start date, so two saves of one plan type (contractor) with different start dates at the same moment both read the same maximum and stored one version number twice. Which target or rate card applies is decided by the start date, so nothing computed was wrong; the version shown on the screen and in the audit entries repeated.
+2. **Now.** `maintenance.sla_targets` is unique on (tenant, plan type, version) and `maintenance.rate_cards` on (contractor, version). The second of two simultaneous saves waits for the first, then fails the unique key and answers CONFLICT (`errors.targets_exist` for the targets); HQ saves again and gets the next number.
+3. **Migration.** `schema.sql` and migration 000001 carry the constraints. A database created before this change gets them by hand (the dev database and the shared test environment): `ALTER TABLE maintenance.rate_cards ADD CONSTRAINT rate_cards_contractor_org_id_version_key UNIQUE (contractor_org_id, version); ALTER TABLE maintenance.sla_targets ADD CONSTRAINT sla_targets_tenant_id_plan_type_version_key UNIQUE (tenant_id, plan_type, version);`. If a repeated version exists already, renumber it first.
+4. **Tests.** `TestSlaTargetSavesNeverStoreOneVersionTwice` and `TestRateCardSavesNeverStoreOneVersionTwice` hold the other save half done on a second connection: the second save answered 200 with the same version before, and answers 409 now; saving again succeeds.
+
+## IR779 invoices.remind checks that the recipient can be reached on the channel — 2026-11-11
+
+Proposal B-36 (round 590), built with the recommended option 1.
+
+1. **Before.** IR04 says the recipient of a reminder must be "an active Membership of that customer eligible for the channel". `remindable` checked the active client only, and the channel only against inApp / email / whatsapp, so a direct call recorded a WhatsApp reminder for a client with no phone number. The screen picks the channel from `notifications.recipients`, which does not offer it.
+2. **Now.** `identity.members` takes a `channel` and, for WhatsApp, keeps only a client whose account has a phone number — the rule of `notifications.recipients` (`recipientsSQL`). `remindable` asks it after the active-client check; a recipient who cannot be reached answers VALIDATION `channel=errors.channel_not_allowed`. inApp and email are open to every active client.
+3. **Tests.** `TestContractsAndInvoices` (invoices.remind): WhatsApp to a client without a phone number answers 422 `channel=errors.channel_not_allowed` (the reminder was recorded before).
+
+## IR780 customers.save refuses an organization that is not a customer's — 2026-11-11
+
+Proposal B-33 (round 524), built with the recommended option 1; the query already existed (`identity.orgState`, used by `contractors.save`).
+
+1. **Before.** The contract says `customers.save` "checks that organizationId has kind=customer and is within management scope". `addCustomer` inserted any `organizationId`: a contractor's or the operator's organization, or an ID that does not exist, got a customer row. The admin screen always creates the organization as a customer first, so only a direct call by an HQ `asset.write` holder could do it.
+2. **Now.** `addCustomer` asks `identity.Directory.OrgState` (a delegated query in the split services): an unknown organization is NOT_FOUND and one of another kind is VALIDATION `organizationId=error.notCustomerOrganization`. An update of an existing customer is unchanged.
+3. **Tests.** `TestCustomersSaveAndRename`: a contractor company and the operator answer 422, an unknown ID 404 (200 before). The tests that created customers on made-up organization IDs now insert a customer organization (`customerOrg`).
+
+## IR781 A shorter certificate never cuts a qualification another valid one still covers — 2026-11-11
+
+Proposal B-28 (round 384), built with the recommended option 1.
+
+1. **Before.** Approving a certificate of a qualification code set the technician's grant to that certificate's own issue and expiry dates (IR440). A technician may hold several valid certificates of one code: approving one that expires sooner than another valid one cut the grant to the earlier date and released the later assignments the other certificate still covers (a one-year certificate approved, then a three-month one: the grant ended after three months).
+2. **Now.** The grant is what the technician's valid certificates (status `valid` or `expiring`) of the code cover together: the approved certificate's span, widened by every valid certificate that overlaps or touches it, repeatedly (`coveredSpan`). A gap between two certificates is not covered. IR440's release uses the same span: it releases only the visits no valid certificate covers.
+3. **Tests.** `TestReleaseQualificationEnded` was rewritten: a single certificate ending during the visit releases it (as before); after a longer certificate is approved and the job assigned again, approving a shorter one releases nothing and the grant ends at the longest certificate's end (it was cut to the shorter one before).

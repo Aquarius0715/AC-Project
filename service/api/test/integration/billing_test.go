@@ -438,6 +438,22 @@ func TestContractsAndInvoices(t *testing.T) {
 		t.Errorf("bad channel: %d %s", code, fields(res))
 	}
 
+	// a WhatsApp reminder needs the client's phone number, as the recipients list says (IR779)
+	owner(
+		t,
+		`UPDATE identity.users SET phone = NULL WHERE id = (SELECT user_id FROM identity.memberships WHERE id = $1)`,
+		seed.ID("customer-b"),
+	)
+
+	if code, res := remind(
+		seed.ID("customer-b").String(),
+		"whatsapp",
+		1,
+	); code != 422 ||
+		fields(res) != "channel=errors.channel_not_allowed" {
+		t.Errorf("whatsapp without a phone number: %d %s", code, fields(res))
+	}
+
 	code, resp = remind(seed.ID("customer-b").String(), "email", 1)
 	if code != 200 || asNum(t, data(resp)["invoiceVersion"]) != 2 ||
 		data(resp)["notificationId"] == nil {
