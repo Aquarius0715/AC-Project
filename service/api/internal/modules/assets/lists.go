@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/pradita/ac-project/service/api/internal/modules/identity"
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/platform/authz"
@@ -380,6 +381,21 @@ func (*Module) addCustomer(
 	call *ops.Call,
 	input *CustomerSave,
 ) (Customer, error) {
+	state, err := identity.Directory{}.OrgState(ctx, call, input.OrganizationID)
+	if err != nil {
+		return Customer{}, apperr.Wrap(err, "identity.Directory.OrgState")
+	}
+
+	if !state.Found {
+		return Customer{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
+	}
+
+	if state.Kind != "customer" { // IR780: only a customer organization has a customer record
+		return Customer{}, apperr.Fields(
+			map[string]string{"organizationId": "error.notCustomerOrganization"},
+		)
+	}
+
 	customerID := uuid.Must(uuid.NewV7())
 
 	customer, err := scanCustomer(

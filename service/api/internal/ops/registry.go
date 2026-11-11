@@ -262,6 +262,15 @@ type Idempotency interface {
 	// with another hash or an in-progress key, or (nil, nil) when the caller may proceed.
 	Begin(ctx context.Context, p *Principal, op, key, hash string) (json.RawMessage, error)
 	Complete(ctx context.Context, p *Principal, op, key string, resp json.RawMessage) error
+	// CompleteTx stores the response in the operation's own transaction, so that the change and its receipt commit
+	// together (IR777).
+	CompleteTx(
+		ctx context.Context,
+		txn pgx.Tx,
+		p *Principal,
+		op, key string,
+		resp json.RawMessage,
+	) error
 	Abort(ctx context.Context, p *Principal, op, key string)
 }
 
@@ -686,7 +695,7 @@ func (r *Registry) run(ectx *echo.Context, operation *Operation, body []byte, co
 		return fail(ectx, err, corr)
 	}
 
-	out, cursor, err := r.execute(ctx, operation, call, input, write)
+	out, cursor, stored, err := r.execute(ctx, operation, call, input, write, key)
 	if err != nil {
 		r.abort(ctx, write, principal, name, key)
 
@@ -697,7 +706,7 @@ func (r *Registry) run(ectx *echo.Context, operation *Operation, body []byte, co
 		return fail(ectx, err, corr)
 	}
 
-	return r.respond(ectx, call, write, name, key, out, cursor)
+	return r.respond(ectx, call, write, name, key, out, cursor, stored)
 }
 
 // decodeInput decodes the JSON input strictly (an unknown field is malformed input) and applies the input's own
@@ -859,23 +868,27 @@ func (r *Registry) newCall(
 }
 
 // execute runs the handler in one transaction at the call's business time, records a write's audits and events, and
-// returns the result with the tenant's event position (Meta.eventCursor, D07).
+// returns the result with the tenant's event position (Meta.eventCursor, D07). A write also stores its response under
+// its Idempotency-Key in that transaction and returns it as stored, so that the change and its receipt commit
+// together; stored is nil when the response has to be stored after the commit (respond).
 func (r *Registry) execute(
 	ctx context.Context,
 	operation *Operation,
 	call *Call,
 	input any,
 	write bool,
-) (any, int64, error) {
+	key string,
+) (any, int64, json.RawMessage, error) {
 	if operation.OwnTx {
 		out, err := operation.Handle(ctx, call, input)
 
-		return out, 0, apperr.Wrap(err, "ops.Operation.Handle")
+		return out, 0, nil, apperr.Wrap(err, "ops.Operation.Handle")
 	}
 
 	var (
 		out    any
 		cursor int64
+		stored json.RawMessage
 	)
 
 	err := r.DB.Run(ctx, !write, call.Principal, func(txn pgx.Tx) error {
@@ -910,13 +923,79 @@ func (r *Registry) execute(
 			// the tenant's highest position, from the index, not a count: housekeeping removes old events, and a count
 			// would go back and read the whole outbox on every request. The outbox has no row level security (the relay
 			// reads it across tenants), so the tenant is named here, or the cursor would follow every tenant's events
-			return txn.QueryRow(ctx, tenantCursorSQL).Scan(&cursor)
+			err := txn.QueryRow(ctx, tenantCursorSQL).Scan(&cursor)
+			if err != nil {
+				return apperr.Wrap(err, "select platform.outbox")
+			}
+
+			return r.storeResponse(
+				ctx,
+				txn,
+				call,
+				operation.Spec.Name,
+				key,
+				out,
+				cursor,
+				write,
+				&stored,
+			)
 		}
 
 		return nil
 	})
 
-	return out, cursor, apperr.Wrap(err, "ops.Runner.Run")
+	return out, cursor, stored, apperr.Wrap(err, "ops.Runner.Run")
+}
+
+// storeResponse encodes a write's response and stores it under its Idempotency-Key in the operation's transaction
+// (IR777). The response is left in stored for respond to send.
+func (r *Registry) storeResponse(
+	ctx context.Context,
+	txn pgx.Tx,
+	call *Call,
+	name, key string,
+	out any,
+	cursor int64,
+	write bool,
+	stored *json.RawMessage,
+) error {
+	if !write || r.Idem == nil {
+		return nil
+	}
+
+	resp, err := encodeResult(name, call, out, cursor)
+	if err != nil {
+		return err
+	}
+
+	err = r.Idem.CompleteTx(ctx, txn, call.Principal, name, key, resp)
+	if err != nil {
+		return apperr.Wrap(err, "ops.Idempotency.CompleteTx")
+	}
+
+	*stored = resp
+
+	return nil
+}
+
+// encodeResult is the JSON of a ServiceResult.
+func encodeResult(name string, call *Call, out any, cursor int64) (json.RawMessage, error) {
+	resp, err := json.Marshal(
+		Result{
+			Data: out,
+			Meta: map[string]any{
+				"operation":       name,
+				metaCorrelationID: call.CorrelationID,
+				"snapshotAt":      call.Now.UTC(),
+				"eventCursor":     cursor,
+			},
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("encode: %w", err)
+	}
+
+	return resp, nil
 }
 
 // respond writes the ServiceResult; a write stores it under its Idempotency-Key and then lets its committed events
@@ -928,26 +1007,23 @@ func (r *Registry) respond(
 	name, key string,
 	out any,
 	cursor int64,
+	stored json.RawMessage,
 ) error {
 	ctx := ectx.Request().Context()
 	corr := call.CorrelationID
 
-	resp, err := json.Marshal(
-		Result{
-			Data: out,
-			Meta: map[string]any{
-				"operation":       name,
-				metaCorrelationID: corr,
-				"snapshotAt":      call.Now.UTC(),
-				"eventCursor":     cursor,
-			},
-		},
-	)
-	if err != nil {
-		return fail(ectx, fmt.Errorf("encode: %w", err), corr)
+	resp := stored
+	if resp == nil {
+		encoded, err := encodeResult(name, call, out, cursor)
+		if err != nil {
+			return fail(ectx, err, corr)
+		}
+
+		resp = encoded
 	}
 
-	if write && r.Idem != nil {
+	if write && r.Idem != nil &&
+		stored == nil { // an operation with its own transaction: stored after its commit
 		err := r.Idem.Complete(ctx, call.Principal, name, key, resp)
 		if err != nil {
 			return fail(ectx, err, corr)

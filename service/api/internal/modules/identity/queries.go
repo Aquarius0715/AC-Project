@@ -39,6 +39,7 @@ func RegisterQueries(reg *ops.Registry) {
 		},
 	)
 	ops.RegisterQuery(reg, ops.DomainIdentity, QueryMembers, members)
+	ops.RegisterQuery(reg, ops.DomainIdentity, QueryReachable, reachable)
 	ops.RegisterQuery(reg, ops.DomainIdentity, QueryNotificationsStored, notificationsStored)
 	ops.RegisterQuery(reg, ops.DomainIdentity, QueryConsent, consent)
 	ops.RegisterQuery(reg, ops.DomainIdentity, QueryLoadMembers, loadMembers)

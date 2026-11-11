@@ -130,7 +130,7 @@ func TestArchiveRulesD05(t *testing.T) {
 		t.Fatalf("deactivation with units: %d %v", code, resp)
 	}
 	// an organization with only an unexpired contract also blocks deactivation
-	org := uuid.NewString()
+	org := customerOrg(t)
 	_, newCustomer := write(
 		srv,
 		hq(),

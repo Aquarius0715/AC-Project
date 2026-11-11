@@ -60,12 +60,39 @@ type QualifiedInput struct {
 	End          time.Time `json:"end"`
 }
 
+// QueryReachable reports whether an active membership can be reached on a notification channel (IR779).
+const QueryReachable = "identity.reachable"
+
+// ReachableInput is QueryReachable input.
+type ReachableInput struct {
+	MembershipID uuid.UUID `json:"membershipId"`
+	Channel      string    `json:"channel"`
+}
+
 func registerDirectory(r *ops.Registry) {
 	ops.RegisterQuery(r, ops.DomainIdentity, QueryNonReaders, nonReaders)
 	ops.RegisterQuery(r, ops.DomainIdentity, QueryOrgState, orgState)
 	ops.RegisterQuery(r, ops.DomainIdentity, QueryOrgName, orgName)
 	ops.RegisterQuery(r, ops.DomainIdentity, QueryTechnician, technician)
 	ops.RegisterQuery(r, ops.DomainIdentity, QueryQualified, qualified)
+}
+
+// reachable is true for an active membership that a notice can reach on the channel: inApp and email for anyone,
+// WhatsApp only for a client whose account has a phone number — the rule of notifications.recipients (IR779).
+func reachable(ctx context.Context, call *ops.Call, input *ReachableInput) (bool, error) {
+	var ok bool
+
+	err := call.Tx.QueryRow(
+		ctx,
+		`SELECT EXISTS (SELECT 1 FROM identity.memberships m JOIN identity.users u ON u.id = m.user_id
+			WHERE m.id = $1 AND m.valid_from <= $3 AND (m.valid_until IS NULL OR m.valid_until > $3)
+			AND ($2 <> 'whatsapp' OR (m.role = 'client' AND u.phone IS NOT NULL)))`,
+		input.MembershipID,
+		input.Channel,
+		call.Now,
+	).Scan(&ok)
+
+	return ok, apperr.Wrap(err, "select identity.memberships")
 }
 
 func nonReaders(ctx context.Context, c *ops.Call, input *NonReadersInput) ([]uuid.UUID, error) {

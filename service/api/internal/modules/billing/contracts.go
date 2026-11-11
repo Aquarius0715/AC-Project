@@ -44,6 +44,7 @@ type Restrictions interface {
 // Recipients checks reminder recipients (Identity).
 type Recipients interface {
 	ActiveClientOf(ctx context.Context, c *ops.Call, membership, org uuid.UUID) (bool, error)
+	Reachable(ctx context.Context, c *ops.Call, membership uuid.UUID, channel string) (bool, error)
 }
 
 // Billing is the contract and invoice operation set (IR135).
@@ -1521,6 +1522,15 @@ func (m Billing) remindable(
 		return apperr.Fields(
 			map[string]string{"recipientMembershipId": "errors.recipient_not_eligible"},
 		)
+	}
+
+	reachable, err := m.Recipients.Reachable(ctx, call, input.RecipientMembershipID, input.Channel)
+	if err != nil {
+		return apperr.Wrap(err, "billing.Recipients.Reachable")
+	}
+
+	if !reachable { // IR779: a WhatsApp reminder needs the client's phone number
+		return apperr.Fields(map[string]string{"channel": "errors.channel_not_allowed"})
 	}
 
 	return nil

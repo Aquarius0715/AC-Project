@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -692,8 +693,9 @@ func (m Certificates) verify(
 	return certificate, nil
 }
 
-// approve makes the certificate valid; one of a qualification code sets the membership's grant to its validity, and an
-// assignment that grant no longer covers is released (IR440).
+// approve makes the certificate valid; one of a qualification code sets the membership's grant to what the member's
+// valid certificates of that code cover together, and an assignment that grant no longer covers is released (IR440,
+// IR781).
 func (m Certificates) approve(ctx context.Context, call *ops.Call, certificate Certificate) error {
 	_, err := call.Tx.Exec(
 		ctx,
@@ -707,34 +709,103 @@ func (m Certificates) approve(ctx context.Context, call *ops.Call, certificate C
 		return apperr.Wrap(err, "update maintenance.certificates")
 	}
 
-	if certificate.Code != codeOther {
-		err := m.Grants.SetGrant(
-			ctx,
-			call,
-			certificate.MembershipID,
-			certificate.Code,
-			certificate.IssuedAt,
-			certificate.ExpiresAt,
-		)
-		if err != nil {
-			return apperr.Wrap(err, "maintenance.Grants.SetGrant")
-		}
+	if certificate.Code == codeOther {
+		return nil
+	}
 
-		err = releaseQualificationEnded(
-			ctx,
-			call,
-			m.Delivery.Units,
-			certificate.MembershipID,
-			certificate.Code,
-			certificate.IssuedAt,
-			certificate.ExpiresAt,
-		)
-		if err != nil { // IR440
-			return err
-		}
+	from, until, err := coveredSpan(ctx, call, certificate)
+	if err != nil {
+		return err
+	}
+
+	err = m.Grants.SetGrant(ctx, call, certificate.MembershipID, certificate.Code, from, until)
+	if err != nil {
+		return apperr.Wrap(err, "maintenance.Grants.SetGrant")
+	}
+
+	err = releaseQualificationEnded(
+		ctx,
+		call,
+		m.Delivery.Units,
+		certificate.MembershipID,
+		certificate.Code,
+		from,
+		until,
+	)
+	if err != nil { // IR440
+		return err
 	}
 
 	return nil
+}
+
+// coveredSpan is the time the approved certificate and the member's other valid certificates of its code cover
+// together: its own span, widened by every valid certificate that overlaps or touches it, again and again (IR781). A
+// shorter certificate approved beside a longer one never cuts what the longer one still proves, and a gap between two
+// certificates is not covered.
+func coveredSpan(
+	ctx context.Context,
+	call *ops.Call,
+	certificate Certificate,
+) (time.Time, time.Time, error) {
+	rows, err := call.Tx.Query(
+		ctx,
+		`SELECT issued_at, expires_at FROM maintenance.certificates WHERE membership_id = $1 AND code = $2 AND id <> $3
+			AND status IN ('valid', 'expiring')`,
+		certificate.MembershipID,
+		certificate.Code,
+		certificate.ID,
+	)
+	if err != nil {
+		return time.Time{}, time.Time{}, apperr.Wrap(err, "select maintenance.certificates")
+	}
+
+	type span struct{ from, until time.Time }
+
+	others, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (span, error) {
+		var other span
+
+		return other, row.Scan(&other.from, &other.until)
+	})
+	if err != nil {
+		return time.Time{}, time.Time{}, apperr.Wrap(err, "select maintenance.certificates")
+	}
+
+	from, until := certificate.IssuedAt, certificate.ExpiresAt
+
+	for widened := true; widened; {
+		widened = false
+
+		for i, other := range others {
+			if other.from.After(until) || other.until.Before(from) {
+				continue
+			}
+
+			from, until = minTime(from, other.from), maxTime(until, other.until)
+			others = slices.Delete(others, i, i+1)
+			widened = true
+
+			break
+		}
+	}
+
+	return from, until, nil
+}
+
+func minTime(a, b time.Time) time.Time {
+	if b.Before(a) {
+		return b
+	}
+
+	return a
+}
+
+func maxTime(a, b time.Time) time.Time {
+	if b.After(a) {
+		return b
+	}
+
+	return a
 }
 
 // reject refuses the certificate with the reason.

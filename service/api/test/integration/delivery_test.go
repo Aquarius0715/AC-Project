@@ -1130,6 +1130,35 @@ func TestReleaseQualificationEnded(t *testing.T) {
 		)
 	})
 
+	// the member's own certificates of the code cover the visit too, so they are put aside: what is left is what the
+	// test approves (IR781)
+	var aside []string
+
+	ownerScan(
+		t,
+		`SELECT coalesce(array_agg(id::text), '{}') FROM maintenance.certificates WHERE membership_id = $1 AND code =
+			'demo_indoor' AND status IN ('valid', 'expiring')`,
+		[]any{tech},
+		&aside,
+	)
+	owner(
+		t,
+		`UPDATE maintenance.certificates SET status = 'expired' WHERE id::text = ANY($1)`,
+		aside,
+	)
+	t.Cleanup(func() {
+		owner(
+			t,
+			`UPDATE maintenance.certificates SET status = 'valid' WHERE id::text = ANY($1)`,
+			aside,
+		)
+		owner(
+			t,
+			`DELETE FROM maintenance.certificates WHERE membership_id = $1 AND number = 'N-2'`,
+			tech,
+		)
+	})
+
 	stamp := func(h int) string { return clock().Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
 
 	code, resp := write(
@@ -1245,13 +1274,8 @@ func TestReleaseQualificationEnded(t *testing.T) {
 	}
 	before := countNotes(t, job, "contractor-a", "job_update")
 
-	approve(100) // still covers the visit
-
-	if status, assignment, _ := state(); status != statusAssigned || assignment == nil {
-		t.Fatalf("a covering certificate released the job: %s %v", status, assignment)
-	}
-
-	approve(50) // ends during the visit
+	// the member's first valid certificate ends during the visit: nothing else covers it, so the visit is released
+	approve(50)
 
 	if status, assignment, reason := state(); status != statusAccepted || assignment != nil ||
 		reason == nil ||
@@ -1278,6 +1302,45 @@ func TestReleaseQualificationEnded(t *testing.T) {
 
 	if events != 1 {
 		t.Errorf("job.qualification_released events: %d", events)
+	}
+
+	// a longer certificate approved beside it covers the visit again, and a shorter one approved after that never
+	// cuts what the longer one still proves (IR781)
+	approve(100)
+
+	_, detail := post(srv, hq(), "jobs.get", `{"jobId":"`+job+`"}`)
+	if code, res := write(
+		srv,
+		contrA(),
+		"jobs.assign",
+		`{"jobId":"`+job+`","technicianMembershipId":"`+tech.String()+`","startAt":"`+stamp(
+			49,
+		)+`","endAt":"`+stamp(
+			51,
+		)+`"}`,
+		ver(t, detail),
+	); code != 200 {
+		t.Fatalf("assign again: %d %v", code, res)
+	}
+
+	approve(
+		60,
+	) // shorter than the one before, and it ends after the visit began: the 100 h certificate still covers it
+
+	if status, assignment, _ := state(); status != statusAssigned || assignment == nil {
+		t.Errorf("a shorter certificate cut the qualification: %s %v", status, assignment)
+	}
+
+	var grantEnds time.Time
+	ownerScan(
+		t,
+		`SELECT valid_until FROM identity.qualification_grants WHERE membership_id = $1 AND code = 'demo_indoor'`,
+		[]any{tech},
+		&grantEnds,
+	)
+
+	if !grantEnds.Equal(clock().Add(100 * time.Hour)) {
+		t.Errorf("the grant ends %v, want the longest certificate's end", grantEnds)
 	}
 }
 
