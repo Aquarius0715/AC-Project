@@ -370,18 +370,25 @@ func TestFailingSchedulerJobDoesNotStopTheTick(t *testing.T) {
 		srv,
 		hq(),
 		"jobs.offer",
-		`{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").String()+`","offerExpiresAt":"`+stamp(1)+
-			`","accessValidFrom":"`+stamp(1)+`","accessValidUntil":"`+stamp(100)+`","termsVersion":"t"}`,
+		`{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").
+			String()+
+			`","offerExpiresAt":"`+stamp(
+			1,
+		)+
+			`","accessValidFrom":"`+stamp(
+			1,
+		)+`","accessValidUntil":"`+stamp(
+			100,
+		)+`","termsVersion":"t"}`,
 		1,
 	); code != 200 {
 		t.Fatalf("offer: %d %v", code, resp)
 	}
 
-	errBoom := errors.New("the identity provider is out of reach")
 	ran := 0
 
 	srv.Registry.AddJob(ops.DomainEquipment, func(context.Context, *ops.Call) (int, error) {
-		return 0, errBoom
+		return 0, errTenantBroken
 	})
 	srv.Registry.AddJob(ops.DomainEquipment, func(context.Context, *ops.Call) (int, error) {
 		ran++
@@ -389,8 +396,13 @@ func TestFailingSchedulerJobDoesNotStopTheTick(t *testing.T) {
 		return 0, nil
 	})
 
-	r, err := scheduler.Tick(context.Background(), srv.DB, clock().Add(time.Hour), srv.Registry)
-	if !errors.Is(err, errBoom) {
+	result, err := scheduler.Tick(
+		context.Background(),
+		srv.DB,
+		clock().Add(time.Hour),
+		srv.Registry,
+	)
+	if !errors.Is(err, errTenantBroken) {
 		t.Errorf("the tick reports the failed job: %v", err)
 	}
 
@@ -398,8 +410,8 @@ func TestFailingSchedulerJobDoesNotStopTheTick(t *testing.T) {
 		t.Error("the job after the failing one did not run")
 	}
 
-	if r.ExpiredOffers < 1 {
-		t.Errorf("the maintenance tick did not run: %+v", r)
+	if result.ExpiredOffers < 1 {
+		t.Errorf("the maintenance tick did not run: %+v", result)
 	}
 
 	_, res = post(srv, hq(), "jobs.get", `{"jobId":"`+job+`"}`)

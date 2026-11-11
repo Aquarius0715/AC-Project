@@ -470,26 +470,12 @@ func (m Commands) get(ctx context.Context, call *ops.Call, in *GetInput) (Comman
 	}
 
 	if call.Principal.Role == authz.RoleClient || call.Principal.Role == authz.RoleTechnician {
-		target, found, err := m.Units.Target(ctx, call, command.UnitID)
+		readable, err := m.readsUnit(ctx, call, command.UnitID)
 		if err != nil {
-			return command, apperr.Wrap(err, "control.Units.Target")
+			return command, err
 		}
 
-		ok := found &&
-			((call.Principal.Role == authz.RoleClient && target.OrgID == call.Principal.OrgID) ||
-				(call.Principal.Role == authz.RoleTechnician &&
-					inScope(call.Principal, command.UnitID, target.PropertyID, target.OrgID)))
-		if ok && call.Principal.Role == authz.RoleTechnician {
-			// the platform unit scope (IR774): an external technician reads a unit only inside an assignment's work window
-			readable, err := unitscope.EquipmentReadable(ctx, call, []uuid.UUID{command.UnitID})
-			if err != nil {
-				return command, apperr.Wrap(err, "unitscope.EquipmentReadable")
-			}
-
-			ok = len(readable) == 1
-		}
-
-		if !ok {
+		if !readable {
 			return Command{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 		}
 	}
@@ -497,6 +483,35 @@ func (m Commands) get(ctx context.Context, call *ops.Call, in *GetInput) (Comman
 	hideForeignReason(call, &command)
 
 	return command, nil
+}
+
+// readsUnit reports whether a client or a technician may read the commands of the unit: a client those of its
+// organization's units, a technician those of its scoped units — an external one only inside an assignment's work
+// window (IR774).
+func (m Commands) readsUnit(ctx context.Context, call *ops.Call, unit uuid.UUID) (bool, error) {
+	target, found, err := m.Units.Target(ctx, call, unit)
+	if err != nil {
+		return false, apperr.Wrap(err, "control.Units.Target")
+	}
+
+	if !found {
+		return false, nil
+	}
+
+	if call.Principal.Role == authz.RoleClient {
+		return target.OrgID == call.Principal.OrgID, nil
+	}
+
+	if !inScope(call.Principal, unit, target.PropertyID, target.OrgID) {
+		return false, nil
+	}
+
+	readable, err := unitscope.EquipmentReadable(ctx, call, []uuid.UUID{unit})
+	if err != nil {
+		return false, apperr.Wrap(err, "unitscope.EquipmentReadable")
+	}
+
+	return len(readable) == 1, nil
 }
 
 // hideForeignReason withholds from a client the reason of a command that someone else sent: a technician's or HQ's

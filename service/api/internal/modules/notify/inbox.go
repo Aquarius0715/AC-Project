@@ -115,8 +115,10 @@ func readableSQL(principal *ops.Principal, now time.Time, kind, id string, args 
 		) + "))"
 		membership := add(principal.MembershipID)
 
-		if principal.Employment != employmentInternal { // IR774: an external technician reads a unit's notices inside an assignment's window
-			unitScope = "(" + unitScope + " AND EXISTS (SELECT 1 FROM notify.ref_assignments ua JOIN notify.ref_jobs uj ON uj.id = ua.job_id" +
+		if principal.Employment != employmentInternal {
+			// IR774: an external technician reads a unit's notices only inside an assignment's work window
+			unitScope = "(" + unitScope + " AND EXISTS (SELECT 1 FROM notify.ref_assignments ua" +
+				" JOIN notify.ref_jobs uj ON uj.id = ua.job_id" +
 				" WHERE uj.unit_id = t.unit_id AND ua.technician_membership_id = " + membership +
 				" AND ua.status = 'active' AND ua.scheduled @> " + add(now) + "::timestamptz))"
 		}
@@ -253,6 +255,9 @@ func scanNotification(row pgx.Row) (Notification, error) {
 	return notification, apperr.Wrap(err, "scan (scanNotification)")
 }
 
+// jobLabelIDLen is how many characters of the job ID a masked label shows.
+const jobLabelIDLen = 8
+
 // jobLabel is what a contractor's notice calls a job instead of the customer's unit name (IR775): the unit is the
 // customer's data, and the contractor's job page shows none before the access window opens, after it ends, or for an
 // offer it declined. masked is false for every other reader.
@@ -261,7 +266,7 @@ func jobLabel(role, kind, id string) (string, bool) {
 		return "", false
 	}
 
-	return "Job " + id[:min(len(id), 8)], true
+	return "Job " + id[:min(len(id), jobLabelIDLen)], true
 }
 
 // QueryJobsOpen asks maintenance which jobs open for the caller — jobs.get answers them, live or as the caller's
@@ -283,7 +288,11 @@ func openTargets(ctx context.Context, call *ops.Call, items []Notification) erro
 	}
 
 	for i, x := range items { // IR775
-		if label, masked := jobLabel(call.Principal.Role, x.Target["kind"], x.Target["id"]); masked {
+		if label, masked := jobLabel(
+			call.Principal.Role,
+			x.Target["kind"],
+			x.Target["id"],
+		); masked {
 			items[i].Params.TargetName = label
 		}
 	}

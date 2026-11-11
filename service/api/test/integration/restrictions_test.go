@@ -661,6 +661,7 @@ func TestRestrictionCancelAndPayment(t *testing.T) {
 	}
 
 	owner(t, `UPDATE billing.invoices SET status = 'unpaid' WHERE id = $1`, inv)
+
 	_, resp = write(
 		srv,
 		restrMgr(),

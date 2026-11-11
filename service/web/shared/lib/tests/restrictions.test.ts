@@ -54,7 +54,7 @@ describe("HQ restrictions (FR-A09, FR-A10)", () => {
       executeBlocker(restriction({ state: "scheduled" }), NOW),
     ]).toStrictEqual(["Only a scheduled restriction can be executed", "Executes after 16 Sept 2026, 8:00 am MYT", "Wait 24 hours after the notice", "Grace until 20 Sept 2026, 8:00 am MYT — execution waits", null]);
     // a payment under way waits for its outcome (IR773); an active grace period is named first
-    expect([executeBlocker(restriction({ state: "scheduled" }), NOW, EN, true), executeBlocker(restriction({ state: "scheduled" }), NOW, EN, false)]).toStrictEqual([
+    expect([executeBlocker(restriction({ state: "scheduled" }), NOW, EN, true), executeBlocker(restriction({ state: "scheduled" }), NOW)]).toStrictEqual([
       "A payment of a cause invoice is in progress — wait for it to be confirmed or to fail", null,
     ]);
     expect([

@@ -1067,7 +1067,13 @@ func TestWithdrawnOfferNoticeHasNoLink(t *testing.T) {
 //nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestExternalTechnicianUnitNotificationScope(t *testing.T) {
 	srv := server(t)
-	tenant, tech, unit := seed.ID("tenant-a"), seed.ID("tech-external-a"), seed.ID("unit-online-rto")
+	tenant, tech, unit := seed.ID(
+		"tenant-a",
+	), seed.ID(
+		"tech-external-a",
+	), seed.ID(
+		"unit-online-rto",
+	)
 	nid, jid, aid := uuid.NewString(), uuid.NewString(), uuid.NewString()
 
 	owner(
@@ -1087,7 +1093,13 @@ func TestExternalTechnicianUnitNotificationScope(t *testing.T) {
 		`UPDATE notify.ref_assignments SET status = 'aside' WHERE technician_membership_id = $1 AND status = 'active'`,
 		tech,
 	)
-	owner(t, `INSERT INTO notify.ref_jobs (id, tenant_id, unit_id) VALUES ($1,$2,$3)`, jid, tenant, unit)
+	owner(
+		t,
+		`INSERT INTO notify.ref_jobs (id, tenant_id, unit_id) VALUES ($1,$2,$3)`,
+		jid,
+		tenant,
+		unit,
+	)
 	owner(
 		t,
 		`INSERT INTO notify.ref_assignments (id, tenant_id, job_id, technician_membership_id, status, scheduled)

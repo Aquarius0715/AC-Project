@@ -48,16 +48,18 @@ type Result struct {
 	Skipped          int // domains × tenants left to the instance holding their lock (IR356)
 }
 
-// add counts the changes of another result in this one.
-func (r *Result) add(o Result) {
-	r.ExpiredOffers += o.ExpiredOffers
-	r.ExpiredCommands += o.ExpiredCommands
-	r.Runs += o.Runs
-	r.Confirmed += o.Confirmed
-	r.ExpiredProposals += o.ExpiredProposals
-	r.FrozenHistories += o.FrozenHistories
-	r.Jobs += o.Jobs
-	r.Skipped += o.Skipped
+// plus is the sum of two results.
+func (r Result) plus(other Result) Result {
+	return Result{
+		ExpiredOffers:    r.ExpiredOffers + other.ExpiredOffers,
+		ExpiredCommands:  r.ExpiredCommands + other.ExpiredCommands,
+		Runs:             r.Runs + other.Runs,
+		Confirmed:        r.Confirmed + other.Confirmed,
+		ExpiredProposals: r.ExpiredProposals + other.ExpiredProposals,
+		FrozenHistories:  r.FrozenHistories + other.FrozenHistories,
+		Jobs:             r.Jobs + other.Jobs,
+		Skipped:          r.Skipped + other.Skipped,
+	}
 }
 
 func (r Result) changes() int {
@@ -144,7 +146,9 @@ func tick(
 			// work, is reported with the tick's error, and does not stop the other steps; the next tick tries it again
 			if held[ops.DomainEquipment] {
 				stepErrs = append(stepErrs, isolated(ctx, txn, "equipment tick", &result,
-					func(sp pgx.Tx, res *Result) error { return tickEquipment(ctx, sp, tenant, now, reg, res) }))
+					func(savepoint pgx.Tx, res *Result) error {
+						return tickEquipment(ctx, savepoint, tenant, now, reg, res)
+					}))
 			}
 
 			if reg != nil {
@@ -153,7 +157,9 @@ func tick(
 
 			if held[ops.DomainMaintenance] {
 				stepErrs = append(stepErrs, isolated(ctx, txn, "maintenance tick", &result,
-					func(sp pgx.Tx, res *Result) error { return tickMaintenance(ctx, sp, now, res) }))
+					func(savepoint pgx.Tx, res *Result) error {
+						return tickMaintenance(ctx, savepoint, now, res)
+					}))
 			}
 
 			return nil
@@ -299,9 +305,9 @@ func runJobs(
 
 		for i, job := range reg.Jobs[domain] {
 			err := isolated(ctx, txn, fmt.Sprintf("%s job %d", domain, i+1), result,
-				func(sp pgx.Tx, res *Result) error {
+				func(savepoint pgx.Tx, res *Result) error {
 					call := &ops.Call{
-						Tx:              sp,
+						Tx:              savepoint,
 						Now:             now,
 						CorrelationID:   uuid.NewString(),
 						Queries:         reg,
@@ -321,7 +327,7 @@ func runJobs(
 					res.Jobs += changed
 
 					if reg.Rec != nil {
-						err := reg.Rec.Record(ctx, sp, call, "scheduler")
+						err := reg.Rec.Record(ctx, savepoint, call, "scheduler")
 						if err != nil {
 							return apperr.Wrap(err, "ops.Recorder.Record")
 						}
@@ -366,7 +372,7 @@ func isolated(
 		return fmt.Errorf("%s: %w", name, apperr.Wrap(err, "pgx.Tx.Commit (savepoint)"))
 	}
 
-	result.add(counted)
+	*result = result.plus(counted)
 
 	return nil
 }
