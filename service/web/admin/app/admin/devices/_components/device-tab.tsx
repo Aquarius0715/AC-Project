@@ -26,7 +26,7 @@ export function DeviceTab({ live }: Readonly<{ live: DevicesLive }>) {
   const [q, setQ] = useServerSearch(live.page?.q);
   const [modal, setModal] = useState<null | "register" | "bind" | "unbind" | "delete" | "calibrate" | "firmware" | "node">(null);
   const [tried, setTried] = useState(false);
-  const [reg, setReg] = useState({ serial: "", unitId: "", sensors: [] as Metric[], node: "" });
+  const [reg, setReg] = useState({ serial: "", unitId: "", iotModelId: "", sensors: [] as Metric[], node: "" });
   const [node, setNode] = useState("");
   const [bind, setBind] = useState({ unitId: "", reason: "" });
   const reasonMissing = t("A reason is required");
@@ -44,7 +44,7 @@ export function DeviceTab({ live }: Readonly<{ live: DevicesLive }>) {
     setTried(true);
     const regNode = mqttNodeValue(reg.node);
     if (!reg.serial.trim() || !reg.unitId || regNode === undefined) return;
-    run(() => registerDevice(reg.serial.trim(), reg.sensors, reg.unitId, regNode), t("Device registered — bind it to the unit once it is installed"), (id) => { close(); setReg({ serial: "", unitId: "", sensors: [], node: "" }); nav({ deviceId: id }); });
+    run(() => registerDevice(reg.serial.trim(), reg.sensors, reg.unitId, regNode, reg.iotModelId || null), t("Device registered — bind it to the unit once it is installed"), (id) => { close(); setReg({ serial: "", unitId: "", iotModelId: "", sensors: [], node: "" }); nav({ deviceId: id }); });
   };
   // the node ID the device's ESP32 sends: the IoT bridge feeds and commands the device by it (IR635)
   const saveNode = () => {
@@ -162,7 +162,7 @@ export function DeviceTab({ live }: Readonly<{ live: DevicesLive }>) {
                 </div>
               )}
               <div>
-                <h3 className="text-[15px] font-bold">{t("Sensors ({n}) · from the unit’s capability", { n: dv.sensors.length })}</h3>
+                <h3 className="text-[15px] font-bold">{t("Sensors ({n}) · from the IoT model", { n: dv.sensors.length })}</h3>
                 {dv.sensors.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("This device has no sensors.")}</p> : (
                   <ScrollX className="mt-2 rounded-xl border border-line"><table className="w-full min-w-[420px] text-[13px]">
                     <thead className="bg-surface2 text-left text-[11px] uppercase text-muted-foreground"><tr><th className="px-3 py-2">{t("Metric")}</th><th>{t("Unit")}</th><th>{t("Stale after")}</th><th>{t("Last calibrated")}</th><td /></tr></thead>
@@ -211,8 +211,9 @@ export function DeviceTab({ live }: Readonly<{ live: DevicesLive }>) {
       <Modal open={modal === "register"} onClose={close} title={t("Register device")} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={register}>{t("Register")}</Btn></>}>
         <Field label={t("Serial")} error={tried && !reg.serial.trim() ? t("Serial is required") : undefined}><Input value={reg.serial} onChange={(e) => { setReg({ ...reg, serial: e.target.value }); }} placeholder="AC-DEMO-0006" /></Field>
         <Field label={t("MQTT node ID (optional)")} hint={t("The node ID the device sends in its MQTT topics. Once the device is bound, its readings and commands use it.")} error={tried && mqttNodeValue(reg.node) === undefined ? t("Use 1–64 letters, digits, hyphens or underscores") : undefined}><Input value={reg.node} onChange={(e) => { setReg({ ...reg, node: e.target.value }); }} placeholder="node_3" /></Field>
-        <Field label={t("Planned unit")} hint={t("Registering reserves the device for this unit; Bind connects it once it is installed.")} error={tried && !reg.unitId ? t("Choose a unit") : undefined}><Select value={reg.unitId} onChange={(e) => { setReg({ ...reg, unitId: e.target.value }); }}><option value="">{t("Select…")}</option>{live.units.map((u) => <option key={u.id} value={u.id}>{u.label}</option>)}</Select></Field>
-        <div><p className="mb-1 text-[13px] font-semibold">{t("Sensors")}</p><p className="mb-2 text-xs text-muted-foreground">{t("Each must be defined in the unit model’s capability; none is allowed.")}</p><div className="flex flex-wrap gap-x-5 gap-y-1.5">{metrics.map((m) => <Check key={m} label={`${m} (${metricUnit[m]})`} checked={reg.sensors.includes(m)} onChange={(on) => { setReg({ ...reg, sensors: on ? [...reg.sensors, m] : reg.sensors.filter((x) => x !== m) }); }} />)}</div></div>
+        <Field label={t("Planned unit")} hint={t("Registering reserves the device for this unit; Bind connects it once it is installed.")} error={tried && !reg.unitId ? t("Choose a unit") : undefined}><Select value={reg.unitId} onChange={(e) => { setReg({ ...reg, unitId: e.target.value, iotModelId: live.units.find((u) => u.id === e.target.value)?.iotModelId ?? "", sensors: [] }); }}><option value="">{t("Select…")}</option>{live.units.map((u) => <option key={u.id} value={u.id}>{u.label}</option>)}</Select></Field>
+        <Field label={t("IoT model (optional)")} hint={t("Defaults to the unit's IoT model. The sensors below come from it.")}><Select value={reg.iotModelId} onChange={(e) => { setReg({ ...reg, iotModelId: e.target.value, sensors: [] }); }}><option value="">{t("No IoT model")}</option>{live.iotModels.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</Select></Field>
+        <div><p className="mb-1 text-[13px] font-semibold">{t("Sensors")}</p><p className="mb-2 text-xs text-muted-foreground">{t("Each must be defined in the IoT model; none is allowed.")}</p><div className="flex flex-wrap gap-x-5 gap-y-1.5">{metrics.filter((m) => live.iotModels.find((k) => k.id === reg.iotModelId)?.model.sensors.some((x) => x.metric === m)).map((m) => <Check key={m} label={`${m} (${metricUnit[m]})`} checked={reg.sensors.includes(m)} onChange={(on) => { setReg({ ...reg, sensors: on ? [...reg.sensors, m] : reg.sensors.filter((x) => x !== m) }); }} />)}</div></div>
       </Modal>
       <Modal open={modal === "node"} onClose={close} title={t("MQTT node ID")} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={saveNode}>{t("Save")}</Btn></>}>
         <Field label={t("Node ID")} hint={t("Leave it empty to stop taking this device's readings in; another device cannot use the same ID.")} error={tried && mqttNodeValue(node) === undefined ? t("Use 1–64 letters, digits, hyphens or underscores") : undefined}><Input value={node} onChange={(e) => { setNode(e.target.value); }} placeholder="node_3" /></Field>

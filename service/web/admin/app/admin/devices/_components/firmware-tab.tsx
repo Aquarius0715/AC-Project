@@ -32,11 +32,10 @@ export function FirmwareTab({ live }: Readonly<{ live: DevicesLive }>) {
   const [tried, setTried] = useState(false);
   const [reason, setReason] = useState("");
   const now = new Date(live.now);
-  const blank = (): CampaignDraft => ({ modelId: live.models[0]?.id ?? "", targetVersion: "", deviceIds: [], waves: "10, 50, 100", startLocal: "02:00", endLocal: "05:00", autoPause: "5", startAt: "" });
+  const blank = (): CampaignDraft => ({ modelId: live.iotModels[0]?.id ?? "", targetVersion: "", deviceIds: [], waves: "10, 50, 100", startLocal: "02:00", endLocal: "05:00", autoPause: "5", startAt: "" });
   const [d, setD] = useState<CampaignDraft>(blank);
-  const model = live.models.find((m) => m.id === d.modelId);
-  const modelUnits = new Set(live.units.filter((u) => u.modelId === d.modelId).map((u) => u.id));
-  const modelDevices = live.devices.filter((x) => !!x.unitId && modelUnits.has(x.unitId));
+  const model = live.iotModels.find((m) => m.id === d.modelId);
+  const modelDevices = live.devices.filter((x) => !!x.unitId && x.iotModelId === d.modelId);
   const errors = campaignErrors(d, now, zone, t);
   const sel = live.campaign;
   const close = () => { setModal(null); setTried(false); };
@@ -76,10 +75,10 @@ export function FirmwareTab({ live }: Readonly<{ live: DevicesLive }>) {
       ) : <Card title={t("Campaign")}><EmptyState title={t("Nothing selected")}>{t("Choose or schedule a campaign.")}</EmptyState></Card>}
       <Modal open={modal === "new"} onClose={close} title={t("New firmware campaign")} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={schedule}>{t("campaign::Schedule")}</Btn></>}>
         <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}>
-          <Field label={t("Model")} error={tried ? errors.modelId : undefined}><Select value={d.modelId} onChange={(e) => { setD({ ...d, modelId: e.target.value, targetVersion: "", deviceIds: [] }); }}>{live.models.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</Select></Field>
-          <Field label={t("Target version")} error={tried ? errors.targetVersion : undefined} hint={t("A firmware candidate of the model")}><Select value={d.targetVersion} onChange={(e) => { setD({ ...d, targetVersion: e.target.value }); }}><option value="">{t("Select…")}</option>{model?.cap.firmwareCandidates.map((v) => <option key={v} value={v}>{v}</option>)}</Select></Field>
+          <Field label={t("Model")} error={tried ? errors.modelId : undefined}><Select value={d.modelId} onChange={(e) => { setD({ ...d, modelId: e.target.value, targetVersion: "", deviceIds: [] }); }}>{live.iotModels.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</Select></Field>
+          <Field label={t("Target version")} error={tried ? errors.targetVersion : undefined} hint={t("A firmware candidate of the IoT model")}><Select value={d.targetVersion} onChange={(e) => { setD({ ...d, targetVersion: e.target.value }); }}><option value="">{t("Select…")}</option>{model?.model.firmwareCandidates.map((v) => <option key={v} value={v}>{v}</option>)}</Select></Field>
         </div>
-        <div><p className="mb-1 text-[13px] font-semibold">{t("Devices of this model")}</p>{modelDevices.length === 0 ? <p className="text-xs text-muted-foreground">{t("No device is bound to a unit of this model.")}</p> : <div className="flex flex-col gap-1">{modelDevices.map((x) => <Check key={x.id} label={<span>{x.serial} <span className="text-xs text-muted-foreground">{x.unit} · {x.fw}{x.tamper ? ` · ${t("tamper (skipped)")}` : ""}</span></span>} checked={d.deviceIds.includes(x.id)} onChange={(on) => { setD({ ...d, deviceIds: on ? [...d.deviceIds, x.id] : d.deviceIds.filter((y) => y !== x.id) }); }} />)}</div>}{tried && errors.deviceIds && <p className="mt-1 text-xs text-crit">{errors.deviceIds}</p>}</div>
+        <div><p className="mb-1 text-[13px] font-semibold">{t("Devices of this IoT model")}</p>{modelDevices.length === 0 ? <p className="text-xs text-muted-foreground">{t("No device of this IoT model is bound to a unit.")}</p> : <div className="flex flex-col gap-1">{modelDevices.map((x) => <Check key={x.id} label={<span>{x.serial} <span className="text-xs text-muted-foreground">{x.unit} · {x.fw}{x.tamper ? ` · ${t("tamper (skipped)")}` : ""}</span></span>} checked={d.deviceIds.includes(x.id)} onChange={(on) => { setD({ ...d, deviceIds: on ? [...d.deviceIds, x.id] : d.deviceIds.filter((y) => y !== x.id) }); }} />)}</div>}{tried && errors.deviceIds && <p className="mt-1 text-xs text-crit">{errors.deviceIds}</p>}</div>
         <Field label={t("Waves (ascending %, ends at 100)")} error={tried ? errors.waves : undefined}><Input value={d.waves} onChange={(e) => { setD({ ...d, waves: e.target.value }); }} /></Field>
         <div className="grid-fluid" style={{ ["--min" as string]: "140px" }}>
           <Field label={t("Window start")} hint={t("Device local time")} error={tried ? errors.window : undefined}><TimeSelect value={d.startLocal} onChange={(v) => { setD({ ...d, startLocal: v }); }} /></Field>

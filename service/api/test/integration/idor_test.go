@@ -878,6 +878,7 @@ func TestForeignTargets(t *testing.T) {
 			[]string{unitA},
 		},
 		{customerB(), "capabilities.list", bodyFirstHundred, []string{unitA, unitW}},
+		{customerB(), "iotModels.list", bodyFirstHundred, []string{unitA, unitW}},
 		{
 			contrB(),
 			opJobsList,

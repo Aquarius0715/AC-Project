@@ -6810,7 +6810,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: technician:device.maintain:assigned-valid-job | admin:device.write\nValidation: D01; input constraints in the corresponding DD; IR43 sensorTypes⊆Capability.sensors; IR94 technician write table (assignment and work window, jobId required when typed)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-T11, DD-A04",
+                "description": "Authorization: technician:device.maintain:assigned-valid-job | admin:device.write\nValidation: D01; input constraints in the corresponding DD; IR43 sensorTypes⊆IoTModel.sensors (DEC-105: the iotModelId, else the unit's IoT model; none allows no sensors); IR94 technician write table (assignment and work window, jobId required when typed)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-T11, DD-A04",
                 "consumes": [
                     "application/json"
                 ],
@@ -11662,6 +11662,457 @@
                                     "properties": {
                                         "data": {
                                             "$ref": "#/definitions/restrictions.RestrictionPage"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "403": {
+                        "description": "FORBIDDEN",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "409": {
+                        "description": "CONFLICT / OFFLINE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "422": {
+                        "description": "VALIDATION (fieldErrors)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "429": {
+                        "description": "RATE_LIMITED (retryAfterSeconds)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "503": {
+                        "description": "UNAVAILABLE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "504": {
+                        "description": "TIMEOUT",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iot-models": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | admin:dashboard.read | admin:device.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A02, DD-A04 · Query: filters none · sort id,createdAt,updatedAt (default id asc)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "iotModels"
+                ],
+                "summary": "iotModels.list (read)",
+                "operationId": "iotModels.list",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "page cursor: nextCursor of the previous page (D12)",
+                        "name": "cursor",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "page size 1–100, default 25",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "field:direction — fields id,createdAt,updatedAt; default id asc",
+                        "name": "sort",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ops.Envelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/devices.IoTModelPage"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "403": {
+                        "description": "FORBIDDEN",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "409": {
+                        "description": "CONFLICT / OFFLINE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "422": {
+                        "description": "VALIDATION (fieldErrors)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "429": {
+                        "description": "RATE_LIMITED (retryAfterSeconds)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "503": {
+                        "description": "UNAVAILABLE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "504": {
+                        "description": "TIMEOUT",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Authorization: admin:device.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A04",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "iotModels"
+                ],
+                "summary": "iotModels.save (write)",
+                "operationId": "iotModels.save",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "D04: the same key replays the stored response; another body for the same key is CONFLICT",
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "input",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/devices.IoTModelSave"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ops.Envelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/devices.IoTModel"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "403": {
+                        "description": "FORBIDDEN",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "409": {
+                        "description": "CONFLICT / OFFLINE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "422": {
+                        "description": "VALIDATION (fieldErrors)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "429": {
+                        "description": "RATE_LIMITED (retryAfterSeconds)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "503": {
+                        "description": "UNAVAILABLE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "504": {
+                        "description": "TIMEOUT",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iot-models/{id}": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Authorization: admin:device.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A04",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "iotModels"
+                ],
+                "summary": "iotModels.save (write) — update",
+                "operationId": "iotModels.save.update",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "D04: the same key replays the stored response; another body for the same key is CONFLICT",
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "id present: required (target iotModels, read iotModels.list)",
+                        "name": "X-Expected-Version",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "input field id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "input; the path parameters come from the route",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/devices.IoTModelSave"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ops.Envelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/devices.IoTModel"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "403": {
+                        "description": "FORBIDDEN",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "409": {
+                        "description": "CONFLICT / OFFLINE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "422": {
+                        "description": "VALIDATION (fieldErrors)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "429": {
+                        "description": "RATE_LIMITED (retryAfterSeconds)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "503": {
+                        "description": "UNAVAILABLE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "504": {
+                        "description": "TIMEOUT",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Authorization: admin:device.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; DEC-105 only an IoT model no unit or device uses and no firmware campaign targets (CONFLICT error.modelInUse / error.modelInCampaign); deletes every version of the model\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A04",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "iotModels"
+                ],
+                "summary": "iotModels.delete (write)",
+                "operationId": "iotModels.delete",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "D04: the same key replays the stored response; another body for the same key is CONFLICT",
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "all: required (target iotModels, read iotModels.list)",
+                        "name": "X-Expected-Version",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "input field id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "input field reason",
+                        "name": "reason",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ops.Envelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/devices.DeletedResource"
                                         }
                                     }
                                 }
@@ -28990,6 +29441,12 @@
                 "installedAt": {
                     "type": "string"
                 },
+                "iotModelId": {
+                    "type": "string"
+                },
+                "iotModelVersion": {
+                    "type": "integer"
+                },
                 "lastSeenAt": {
                     "type": "string"
                 },
@@ -29527,6 +29984,12 @@
                 "installedAt": {
                     "type": "string"
                 },
+                "iotModelId": {
+                    "type": "string"
+                },
+                "iotModelVersion": {
+                    "type": "integer"
+                },
                 "lastSeenAt": {
                     "type": "string"
                 },
@@ -29671,6 +30134,13 @@
                 },
                 "installedAt": {
                     "type": "string"
+                },
+                "iotModel": {},
+                "iotModelId": {
+                    "type": "string"
+                },
+                "iotModelVersion": {
+                    "type": "integer"
                 },
                 "lastSeenAt": {
                     "type": "string"
@@ -29819,6 +30289,10 @@
                     "type": "string"
                 },
                 "installedAt": {
+                    "type": "string"
+                },
+                "iotModelId": {
+                    "description": "IoTModelID is the unit's planned IoT model (DEC-105); null or omitted is none.",
                     "type": "string"
                 },
                 "modelId": {
@@ -31471,12 +31945,6 @@
                         "type": "string"
                     }
                 },
-                "firmwareCandidates": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
                 "id": {
                     "type": "string"
                 },
@@ -31493,12 +31961,6 @@
                     "type": "array",
                     "items": {
                         "type": "string"
-                    }
-                },
-                "sensors": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/devices.SensorSpec"
                     }
                 },
                 "temperature": {
@@ -31562,12 +32024,6 @@
                         "type": "string"
                     }
                 },
-                "firmwareCandidates": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
                 "id": {
                     "type": "string"
                 },
@@ -31584,12 +32040,6 @@
                     "type": "array",
                     "items": {
                         "type": "string"
-                    }
-                },
-                "sensors": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/devices.SensorSpec"
                     }
                 },
                 "temperature": {
@@ -31666,6 +32116,13 @@
                 "id": {
                     "type": "string"
                 },
+                "iotModelId": {
+                    "description": "IoTModelID and IoTModelVersion are the IoT model the device was registered with (nil when none, DEC-105).",
+                    "type": "string"
+                },
+                "iotModelVersion": {
+                    "type": "integer"
+                },
                 "lastSeenAt": {
                     "type": "string"
                 },
@@ -31733,6 +32190,13 @@
                 },
                 "id": {
                     "type": "string"
+                },
+                "iotModelId": {
+                    "description": "IoTModelID and IoTModelVersion are the IoT model the device was registered with (nil when none, DEC-105).",
+                    "type": "string"
+                },
+                "iotModelVersion": {
+                    "type": "integer"
                 },
                 "lastSeenAt": {
                     "type": "string"
@@ -31959,6 +32423,93 @@
                 }
             }
         },
+        "devices.IoTModel": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "type": "string"
+                },
+                "firmwareCandidates": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "id": {
+                    "type": "string"
+                },
+                "manufacturer": {
+                    "type": "string"
+                },
+                "model": {
+                    "type": "string"
+                },
+                "sensors": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/devices.SensorSpec"
+                    }
+                },
+                "tenantId": {
+                    "type": "string"
+                },
+                "updatedAt": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "integer"
+                }
+            }
+        },
+        "devices.IoTModelPage": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/devices.IoTModel"
+                    }
+                },
+                "nextCursor": {
+                    "type": "string"
+                },
+                "snapshotVersion": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "devices.IoTModelSave": {
+            "type": "object",
+            "properties": {
+                "changeReason": {
+                    "type": "string"
+                },
+                "firmwareCandidates": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "id": {
+                    "type": "string"
+                },
+                "manufacturer": {
+                    "type": "string"
+                },
+                "model": {
+                    "type": "string"
+                },
+                "sensors": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/devices.SensorSpec"
+                    }
+                }
+            }
+        },
         "devices.NoteInput": {
             "type": "object",
             "properties": {
@@ -31990,6 +32541,10 @@
         "devices.RegisterInput": {
             "type": "object",
             "properties": {
+                "iotModelId": {
+                    "description": "IoTModelID is the IoT model of the device (DEC-105); omitted it is the unit's planned IoT model, and a device\nwithout one has no sensors.",
+                    "type": "string"
+                },
                 "jobId": {
                     "type": "string"
                 },

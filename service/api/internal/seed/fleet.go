@@ -62,6 +62,13 @@ func ApplyFleet(
 		}
 	}
 
+	for _, statement := range iotModelStatements() {
+		err := exec(statement)
+		if err != nil {
+			return n, fmt.Errorf("fleet iot models: %w", err)
+		}
+	}
+
 	return n, nil
 }
 

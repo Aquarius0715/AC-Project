@@ -39,19 +39,24 @@ export const metricUnit: Record<Metric, UnitSymbol> = {
 export const modes: Mode[] = ["cool", "dry", "fan"];
 export const fans: Fan[] = ["low", "mid", "high"];
 
-/** Capability of service-contracts.ts. */
+/** Capability of service-contracts.ts: the air conditioner model (DEC-105: its sensors and firmware live in the IoT model). */
 export interface ApiCapability {
   id: string; version: number; updatedAt: string; manufacturer: string; model: string; control: boolean; modeControl: boolean; fanControl: boolean;
   temperature: { min: number; max: number; step: number } | null; modes: Mode[]; fanLevels: Fan[]; ventilation: boolean; ventilationLevels: Fan[];
+}
+/** IoTModel of service-contracts.ts (DEC-105): what a device of the model measures and the firmware it can be updated to. */
+export interface ApiIoTModel {
+  id: string; version: number; updatedAt: string; manufacturer: string; model: string;
   sensors: { metric: Metric; unit: UnitSymbol; staleAfterSeconds: number; boundaryId: string | null }[]; firmwareCandidates: string[];
 }
 /** The unit fields this screen needs (UnitSummary). */
-export interface ApiUnitLite { id: string; displayName: string; modelId: string; customerOrgId: string; archived: boolean }
+export interface ApiUnitLite { id: string; displayName: string; modelId: string; iotModelId?: string | null; customerOrgId: string; archived: boolean }
 /** Device / DeviceDetail of service-contracts.ts. */
 export interface ApiDevice {
   id: string; version: number; unitId: string | null; serial: string; connection: Connection; lastSeenAt: string | null; firmwareVersion: string;
   targetUnitId?: string | null; // the unit chosen at registration: devices.bind connects it (D05)
   mqttNode?: string | null; // the node ID the device's ESP32 sends in its MQTT topics: the IoT bridge feeds the device by it (IR635)
+  iotModelId?: string | null; // the IoT model the device was registered with (DEC-105)
   powerSignal: "unknown" | "on" | "off"; tamper: "clear" | "detected"; sensors: { id: string; metric: Metric; unit: UnitSymbol; staleAfterSeconds: number; calibratedAt: string | null }[];
 }
 export interface ApiDeviceOperation { id: string; kind: "check" | "calibrate" | "firmware"; status: "queued" | "running" | "succeeded" | "failed"; targetVersion: string | null; failureCode: string | null; createdAt: string; finishedAt: string | null }
@@ -69,6 +74,8 @@ export const klTime = (iso: string) =>
   new Date(iso).toLocaleString("en-CA", { timeZone: KL, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).replace(",", "");
 
 export interface ModelRow { id: string; version: number; name: string; used: string; ventilation: boolean; updated: string; cap: ApiCapability }
+/** A row of the IoT model list: the model and how many units and devices use it. */
+export interface IoTModelRow { id: string; version: number; name: string; used: string; updated: string; model: ApiIoTModel }
 
 export function modelRows(caps: ApiCapability[], units: ApiUnitLite[], devices: ApiDevice[], i: I18n = EN): ModelRow[] {
   const { t } = i;
@@ -83,18 +90,29 @@ export function modelRows(caps: ApiCapability[], units: ApiUnitLite[], devices: 
   });
 }
 
+export function iotModelRows(models: ApiIoTModel[], units: ApiUnitLite[], devices: ApiDevice[], i: I18n = EN): IoTModelRow[] {
+  const { t } = i;
+  return models.map((k) => {
+    const mine = units.filter((u) => u.iotModelId === k.id && !u.archived).length;
+    const devs = devices.filter((d) => d.iotModelId === k.id).length;
+    return {
+      id: k.id, version: k.version, name: `${k.manufacturer} ${k.model}`, updated: showTime(k.updatedAt, i.display), model: k,
+      used: `${t(mine === 1 ? "1 unit" : "{n} units", { n: mine })} · ${t(devs === 1 ? "1 device" : "{n} devices", { n: devs })}`,
+    };
+  });
+}
+
 /** The editable capability form (DD-A04 fields). Numbers stay strings until saved. */
 export interface CapabilityDraft {
   manufacturer: string; model: string; control: boolean; modeControl: boolean; fanControl: boolean; temperatureOn: boolean; min: string; max: string; step: string;
-  modes: Mode[]; fanLevels: Fan[]; ventilation: boolean; ventilationLevels: Fan[]; sensors: { metric: Metric; staleAfterSeconds: string }[]; firmware: string[]; changeReason: string;
+  modes: Mode[]; fanLevels: Fan[]; ventilation: boolean; ventilationLevels: Fan[]; changeReason: string;
 }
 
 export function capabilityDraft(k?: ApiCapability): CapabilityDraft {
   return {
     manufacturer: k?.manufacturer ?? "", model: k?.model ?? "", control: k?.control ?? false, modeControl: k?.modeControl ?? false, fanControl: k?.fanControl ?? false,
     temperatureOn: !!k?.temperature, min: String(k?.temperature?.min ?? 16), max: String(k?.temperature?.max ?? 30), step: String(k?.temperature?.step ?? 1),
-    modes: k?.modes ?? [], fanLevels: k?.fanLevels ?? [], ventilation: k?.ventilation ?? false, ventilationLevels: k?.ventilationLevels ?? [],
-    sensors: (k?.sensors ?? []).map((s) => ({ metric: s.metric, staleAfterSeconds: String(s.staleAfterSeconds) })), firmware: [...(k?.firmwareCandidates ?? [])], changeReason: "",
+    modes: k?.modes ?? [], fanLevels: k?.fanLevels ?? [], ventilation: k?.ventilation ?? false, ventilationLevels: k?.ventilationLevels ?? [], changeReason: "",
   };
 }
 
@@ -106,17 +124,60 @@ function temperatureError(d: CapabilityDraft, t: T): string | null {
   if (Number.isNaN(min) || Number.isNaN(max) || min >= max) return t("min must be below max");
   return step > 0 && step <= max - min ? null : t("0 < step ≤ max − min");
 }
-/** The capability rules of DD-A04 (boundary cases) checked before capabilities.save; the API checks them again. */
-export function capabilityErrors(d: CapabilityDraft, update: boolean, t: T = en): Record<string, string> {
+/** The manufacturer and model of an aircon or IoT model: 1–120 characters each. */
+function identityErrors(d: { manufacturer: string; model: string }, t: T): Record<string, string> {
   const e: Record<string, string> = {};
   if (codePoints(d.manufacturer.trim()) === 0 || codePoints(d.manufacturer.trim()) > 120) e.manufacturer = t("1–120 characters");
   if (codePoints(d.model.trim()) === 0 || codePoints(d.model.trim()) > 120) e.model = t("1–120 characters");
+  return e;
+}
+/** The capability rules of DD-A04 (boundary cases) checked before capabilities.save; the API checks them again. */
+export function capabilityErrors(d: CapabilityDraft, update: boolean, t: T = en): Record<string, string> {
+  const e = identityErrors(d, t);
   if ((d.modeControl || d.fanControl || d.temperatureOn) && !d.control) e.control = t("Mode, fan or temperature control needs power control");
   if (d.modeControl && d.modes.length === 0) e.modes = t("Choose at least one mode");
   if (d.fanControl && d.fanLevels.length === 0) e.fanLevels = t("Choose at least one fan level");
   const temperature = d.temperatureOn ? temperatureError(d, t) : null;
   if (temperature) e.temperature = temperature;
   if (d.ventilation && (d.ventilationLevels.length === 0 || !d.ventilationLevels.includes("low"))) e.ventilationLevels = t("Ventilation levels must include Low");
+  if (update && (codePoints(d.changeReason.trim()) === 0 || codePoints(d.changeReason.trim()) > 1000)) e.changeReason = t("A reason is required (1–1000 characters)");
+  return e;
+}
+
+/** The capabilities.save input (Save<Capability> & {changeReason}); sensor units and boundaries are derived (IR11/12). */
+export function capabilityInput(d: CapabilityDraft, id?: string): OpInput<"capabilities.save"> {
+  return {
+    ...(id && { id, changeReason: d.changeReason.trim() }),
+    manufacturer: d.manufacturer.trim(), model: d.model.trim(), control: d.control, modeControl: d.modeControl, fanControl: d.fanControl,
+    temperature: d.temperatureOn ? { min: toNumber(d.min), max: toNumber(d.max), step: toNumber(d.step) } : null,
+    modes: d.modeControl ? d.modes : [], fanLevels: d.fanControl ? d.fanLevels : [], ventilation: d.ventilation, ventilationLevels: d.ventilation ? d.ventilationLevels : [],
+  };
+}
+
+const CAPABILITY_PARTS: [string, (d: CapabilityDraft) => unknown][] = [
+  ["identity", (d) => [d.manufacturer.trim(), d.model.trim()]], ["controls", (d) => [d.control, d.modeControl, d.fanControl, d.temperatureOn]],
+  ["temperature", (d) => (d.temperatureOn ? [toNumber(d.min), toNumber(d.max), toNumber(d.step)] : null)], ["modes", (d) => [...d.modes].toSorted(byText)], ["fan levels", (d) => [...d.fanLevels].toSorted(byText)],
+  ["ventilation levels", (d) => [d.ventilation, [...d.ventilationLevels].toSorted(byText)]],
+];
+/** What a model's draft changes against its saved capability (Figma Admin 106:3 “1 change · ventilation levels”); the
+change reason is not a change. */
+export function capabilityChanges(d: CapabilityDraft, saved: CapabilityDraft, t: T = en): string[] {
+  return CAPABILITY_PARTS.filter(([, f]) => JSON.stringify(f(d)) !== JSON.stringify(f(saved))).map(([k]) => t(k));
+}
+
+/** The editable IoT model form (DEC-105): identity, the sensors and the firmware candidates. Numbers stay strings until saved. */
+export interface IoTModelDraft { manufacturer: string; model: string; sensors: { metric: Metric; staleAfterSeconds: string }[]; firmware: string[]; changeReason: string }
+
+export function iotModelDraft(k?: ApiIoTModel): IoTModelDraft {
+  return {
+    manufacturer: k?.manufacturer ?? "", model: k?.model ?? "", changeReason: "",
+    sensors: (k?.sensors ?? []).map((s) => ({ metric: s.metric, staleAfterSeconds: String(s.staleAfterSeconds) })), firmware: [...(k?.firmwareCandidates ?? [])],
+  };
+}
+
+/** The IoT model rules of DD-A04 checked before iotModels.save; the API checks them again. */
+export function iotModelErrors(d: IoTModelDraft, update: boolean, t: T = en): Record<string, string> {
+  const e = identityErrors(d, t);
   const seen = new Set<string>();
   for (const s of d.sensors) {
     if (seen.has(s.metric)) e.sensors = t("One sensor per metric ({metric} twice)", { metric: s.metric });
@@ -129,28 +190,23 @@ export function capabilityErrors(d: CapabilityDraft, update: boolean, t: T = en)
   return e;
 }
 
-/** The capabilities.save input (Save<Capability> & {changeReason}); sensor units and boundaries are derived (IR11/12). */
-export function capabilityInput(d: CapabilityDraft, id?: string): OpInput<"capabilities.save"> {
+/** The iotModels.save input (Save<IoTModel> & {changeReason}); sensor units and boundaries are derived (IR11/12). */
+export function iotModelInput(d: IoTModelDraft, id?: string): OpInput<"iotModels.save"> {
   return {
     ...(id && { id, changeReason: d.changeReason.trim() }),
-    manufacturer: d.manufacturer.trim(), model: d.model.trim(), control: d.control, modeControl: d.modeControl, fanControl: d.fanControl,
-    temperature: d.temperatureOn ? { min: toNumber(d.min), max: toNumber(d.max), step: toNumber(d.step) } : null,
-    modes: d.modeControl ? d.modes : [], fanLevels: d.fanControl ? d.fanLevels : [], ventilation: d.ventilation, ventilationLevels: d.ventilation ? d.ventilationLevels : [],
+    manufacturer: d.manufacturer.trim(), model: d.model.trim(),
     sensors: d.sensors.map((s) => ({ metric: s.metric, unit: metricUnit[s.metric], staleAfterSeconds: toNumber(s.staleAfterSeconds), boundaryId: s.metric === "power" ? "ac_input_electricity" : null })),
     firmwareCandidates: [...new Set(d.firmware.map((x) => x.trim()).filter(Boolean))],
   };
 }
 
-const CAPABILITY_PARTS: [string, (d: CapabilityDraft) => unknown][] = [
-  ["identity", (d) => [d.manufacturer.trim(), d.model.trim()]], ["controls", (d) => [d.control, d.modeControl, d.fanControl, d.temperatureOn]],
-  ["temperature", (d) => (d.temperatureOn ? [toNumber(d.min), toNumber(d.max), toNumber(d.step)] : null)], ["modes", (d) => [...d.modes].toSorted(byText)], ["fan levels", (d) => [...d.fanLevels].toSorted(byText)],
-  ["ventilation levels", (d) => [d.ventilation, [...d.ventilationLevels].toSorted(byText)]], ["sensors", (d) => d.sensors.map((x) => [x.metric, toNumber(x.staleAfterSeconds)])],
+const IOT_MODEL_PARTS: [string, (d: IoTModelDraft) => unknown][] = [
+  ["identity", (d) => [d.manufacturer.trim(), d.model.trim()]], ["sensors", (d) => d.sensors.map((x) => [x.metric, toNumber(x.staleAfterSeconds)])],
   ["firmware candidates", (d) => d.firmware],
 ];
-/** What a model's draft changes against its saved capability (Figma Admin 106:3 “1 change · ventilation levels”); the
-change reason is not a change. */
-export function capabilityChanges(d: CapabilityDraft, saved: CapabilityDraft, t: T = en): string[] {
-  return CAPABILITY_PARTS.filter(([, f]) => JSON.stringify(f(d)) !== JSON.stringify(f(saved))).map(([k]) => t(k));
+/** What an IoT model's draft changes against its saved version; the change reason is not a change. */
+export function iotModelChanges(d: IoTModelDraft, saved: IoTModelDraft, t: T = en): string[] {
+  return IOT_MODEL_PARTS.filter(([, f]) => JSON.stringify(f(d)) !== JSON.stringify(f(saved))).map(([k]) => t(k));
 }
 
 /** A firmware candidate to add: trimmed, 1–32 characters and not listed yet; otherwise the reason. */
@@ -162,7 +218,7 @@ export function firmwareProblem(v: string, listed: string[], t: T = en): string 
 }
 
 /** `unit` names the bound unit; a device not bound yet says so with its planned unit (`targetUnitId`, D05, IR467). */
-export interface DeviceRow { id: string; version: number; serial: string; unitId: string | null; targetUnitId: string | null; unit: string; conn: Connection; fw: string; tamper: boolean; power: string }
+export interface DeviceRow { id: string; version: number; serial: string; unitId: string | null; iotModelId: string | null; targetUnitId: string | null; unit: string; conn: Connection; fw: string; tamper: boolean; power: string }
 
 export function deviceRows(devices: ApiDevice[], units: ApiUnitLite[], t: T = en): DeviceRow[] {
   const name = new Map(units.map((u) => [u.id, u.displayName]));
@@ -170,7 +226,7 @@ export function deviceRows(devices: ApiDevice[], units: ApiUnitLite[], t: T = en
   const planned = (target: string | null) => (target ? t("Not bound yet — planned for {unit}", { unit: name.get(target) ?? t("unit") }) : t("Unbound"));
   return devices.map((d) => {
     return {
-      id: d.id, version: d.version, serial: d.serial, unitId: d.unitId, targetUnitId: d.targetUnitId ?? null, conn: d.connection, fw: d.firmwareVersion,
+      id: d.id, version: d.version, serial: d.serial, unitId: d.unitId, iotModelId: d.iotModelId ?? null, targetUnitId: d.targetUnitId ?? null, conn: d.connection, fw: d.firmwareVersion,
       unit: d.unitId ? name.get(d.unitId) ?? t("unit") : planned(d.targetUnitId ?? null),
       tamper: d.tamper === "detected", power: d.powerSignal,
     };
@@ -180,7 +236,7 @@ export function deviceRows(devices: ApiDevice[], units: ApiUnitLite[], t: T = en
 export interface CampaignRow { id: string; version: number; model: string; versions: string; state: ApiCampaign["state"]; devices: number; start: string; createdBy: string | null; c: ApiCampaign }
 /** The campaigns with their model and start; createdBy is the scheduling member's name where the session may read the
 members (IR344). */
-export function campaignRows(cs: ApiCampaign[], caps: ApiCapability[], i: I18n = EN, people = new Map<string, string>()): CampaignRow[] {
+export function campaignRows(cs: ApiCampaign[], caps: readonly { id: string; manufacturer: string; model: string }[], i: I18n = EN, people = new Map<string, string>()): CampaignRow[] {
   const { t } = i;
   const model = new Map(caps.map((k) => [k.id, `${k.manufacturer} ${k.model}`]));
   return cs.map((c) => {

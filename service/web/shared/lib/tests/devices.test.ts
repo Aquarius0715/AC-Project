@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
-  campaignErrors, campaignFacts, campaignRows, campaignStart, capabilityChanges, capabilityDraft, capabilityErrors, capabilityInput, deviceRows, firmwareProblem, modelRows, parseWaves,
+  campaignErrors, campaignFacts, campaignRows, campaignStart, capabilityChanges, capabilityDraft, capabilityErrors, deviceRows, firmwareProblem, iotModelChanges, iotModelDraft, iotModelInput, iotModelRows, modelRows, parseWaves,
   mqttNodeValue, resultReason, shortChecksum, waveStates,
-  type ApiCampaign, type ApiCapability, type ApiDevice, type CampaignDraft,
+  type ApiCampaign, type ApiCapability, type ApiDevice, type ApiIoTModel, type CampaignDraft,
 } from "@ac/web/lib/devices";
 import { i18nOf } from "@ac/web/lib/i18n";
 import { must } from "./must";
@@ -15,10 +15,13 @@ const MS = i18nOf({ locale: "ms", timeZone: ASIA_TOKYO });
 const NOW = new Date("2026-09-14T01:00:00Z"); // 09:00 in Kuala Lumpur, 10:00 in Tokyo
 const cap: ApiCapability = {
   id: "m1", version: 3, updatedAt: "2026-09-10T02:00:00Z", manufacturer: "DemoAir", model: "SPL-100", control: true, modeControl: true, fanControl: false, temperature: { min: 16, max: 30, step: 1 },
-  modes: ["cool"], fanLevels: [], ventilation: false, ventilationLevels: [], sensors: [{ metric: "temperature", unit: "°C", staleAfterSeconds: 120, boundaryId: null }], firmwareCandidates: ["v1", "v2"],
+  modes: ["cool"], fanLevels: [], ventilation: false, ventilationLevels: [],
 };
-const row = (over: Partial<ApiDevice>): ApiDevice => ({ id: "d1", version: 2, unitId: "u1", serial: "AC-DEMO-0001", connection: "online", lastSeenAt: null, firmwareVersion: "v1", powerSignal: "on", tamper: "clear", sensors: [], ...over });
-const units = [{ id: "u1", displayName: "Bedroom AC", modelId: "m1", customerOrgId: "org-a", archived: false }, { id: "u2", displayName: "Old AC", modelId: "m1", customerOrgId: "org-a", archived: true }];
+const iot: ApiIoTModel = {
+  id: "m1", version: 2, updatedAt: "2026-09-10T02:00:00Z", manufacturer: "DemoNode", model: "ESP-1", sensors: [{ metric: "temperature", unit: "°C", staleAfterSeconds: 120, boundaryId: null }], firmwareCandidates: ["v1", "v2"],
+};
+const row = (over: Partial<ApiDevice>): ApiDevice => ({ id: "d1", version: 2, unitId: "u1", iotModelId: "m1", serial: "AC-DEMO-0001", connection: "online", lastSeenAt: null, firmwareVersion: "v1", powerSignal: "on", tamper: "clear", sensors: [], ...over });
+const units = [{ id: "u1", displayName: "Bedroom AC", modelId: "m1", iotModelId: "m1", customerOrgId: "org-a", archived: false }, { id: "u2", displayName: "Old AC", modelId: "m1", iotModelId: "m1", customerOrgId: "org-a", archived: true }];
 const draft = (over: Partial<CampaignDraft>): CampaignDraft => ({ modelId: "m1", targetVersion: "v2", deviceIds: ["d1"], waves: "10, 50, 100", startLocal: "02:00", endLocal: "05:00", autoPause: "5", startAt: "2026-09-16T10:00", ...over });
 
 const r = (waveIndex: number, status: ApiCampaign["results"][number]["status"]) => ({ deviceId: `d${String(waveIndex)}${status}`, reasonKey: null, at: null, waveIndex, status });
@@ -26,6 +29,7 @@ const r = (waveIndex: number, status: ApiCampaign["results"][number]["status"]) 
 describe("HQ device registry", () => {
   it("lists models and devices", () => {
     expect(modelRows([cap], units, [row({}), row({ id: "d2", unitId: null })])[0]).toMatchObject({ name: "DemoAir SPL-100", used: "1 unit · 1 device", updated: "10 Sept 2026, 10:00 am MYT" });
+    expect(iotModelRows([iot], units, [row({}), row({ id: "d2", unitId: null })])[0]).toMatchObject({ name: "DemoNode ESP-1", used: "1 unit · 2 devices" });
     expect(deviceRows([row({}), row({ id: "d2", unitId: null, tamper: "detected" })], units).map((device) => [device.unit, device.tamper])).toStrictEqual([["Bedroom AC", false], ["Unbound", true]]);
     expect(capabilityErrors({ ...capabilityDraft(cap), control: false, changeReason: "" }, true)).toStrictEqual({ control: "Mode, fan or temperature control needs power control", changeReason: "A reason is required (1–1000 characters)" });
   });
@@ -41,16 +45,16 @@ describe("HQ device registry", () => {
     const c: ApiCampaign = { id: "k1", version: 1, modelId: "m1", fromVersions: [], targetVersion: "v2", deviceIds: ["d1"], waves: [{ label: "Wave 1 · 100 %", percent: 100 }], window: { startLocal: "02:00", endLocal: "05:00" },
       autoPauseFailurePercent: 5, startAt: "2026-09-16T02:00:00Z", state: "scheduled", progress: { succeeded: 0, installing: 0, pending: 1, failed: 0, skipped: 0 }, results: [], reason: null,
       checksum: "sha256:9f3c0e5d7a1b2c3da1", createdAt: "2026-09-14T01:00:00Z", createdByMembershipId: "m-hq" };
-    expect(campaignRows([c], [cap])[0]).toMatchObject({ model: "DemoAir SPL-100", versions: "any → v2", start: "16 Sept 2026, 10:00 am MYT" });
+    expect(campaignRows([c], [iot])[0]).toMatchObject({ model: "DemoNode ESP-1", versions: "any → v2", start: "16 Sept 2026, 10:00 am MYT" });
     // the facts above the waves (Figma Admin 04-9)
-    expect(campaignFacts(firstRow([c], [cap]))).toStrictEqual([
-      ["Model / version", "DemoAir SPL-100 · any → v2 (signed, sha256 9f3c…a1)"], ["Window", "02:00–05:00 device local time"], ["Auto-pause", "failure rate > 5 % in a wave"],
+    expect(campaignFacts(firstRow([c], [iot]))).toStrictEqual([
+      ["Model / version", "DemoNode ESP-1 · any → v2 (signed, sha256 9f3c…a1)"], ["Window", "02:00–05:00 device local time"], ["Auto-pause", "failure rate > 5 % in a wave"],
       ["Starts", "16 Sept 2026, 10:00 am MYT"], ["Created", "14 Sept 2026, 9:00 am MYT"],
     ]);
     // the scheduling member's name where the session may read members (IR344)
-    expect(campaignFacts(firstRow([c], [cap], undefined, new Map([["m-hq", "hq-operator"]]))).at(-1)).toStrictEqual(["Created", "hq-operator · 14 Sept 2026, 9:00 am MYT"]);
+    expect(campaignFacts(firstRow([c], [iot], undefined, new Map([["m-hq", "hq-operator"]]))).at(-1)).toStrictEqual(["Created", "hq-operator · 14 Sept 2026, 9:00 am MYT"]);
     expect([shortChecksum("sha256:abcd"), shortChecksum("plain0123456789")]).toStrictEqual(["sha256 abcd", "plai…89"]);
-    expect(campaignFacts(firstRow([c], [cap], MS), MS).map(([k]) => k)).toStrictEqual(["Model / versi", "Tetingkap", "Jeda automatik", "Bermula", "Dicipta"]);
+    expect(campaignFacts(firstRow([c], [iot], MS), MS).map(([k]) => k)).toStrictEqual(["Model / versi", "Tetingkap", "Jeda automatik", "Bermula", "Dicipta"]);
   });
 
   it("words the runner's results and each wave's state (BR-A20, IR339)", () => {
@@ -81,15 +85,17 @@ describe("the model editor's changes and firmware candidates (Figma Admin 106:3,
     const saved = capabilityDraft(cap);
     expect(capabilityChanges(saved, saved)).toStrictEqual([]);
     expect(capabilityChanges({ ...saved, changeReason: "bulletin" }, saved)).toStrictEqual([]);
-    expect(capabilityChanges({ ...saved, ventilation: true, ventilationLevels: ["low"], firmware: ["v1"], max: "28" }, saved)).toStrictEqual(["temperature", "ventilation levels", "firmware candidates"]);
+    expect(capabilityChanges({ ...saved, ventilation: true, ventilationLevels: ["low"], max: "28" }, saved)).toStrictEqual(["temperature", "ventilation levels"]);
+    const iotSaved = iotModelDraft(iot);
+    expect(iotModelChanges({ ...iotSaved, firmware: ["v1"] }, iotSaved)).toStrictEqual(["firmware candidates"]);
     expect(capabilityChanges({ ...saved, modes: ["cool"], min: "16.0" }, saved)).toStrictEqual([]); // the same values written differently
     expect(capabilityChanges({ ...saved, model: "SPL-101" }, saved, MS.t)).toStrictEqual(["identiti"]);
   });
   it("adds a firmware version once, trimmed, and saves the list without duplicates", () => {
     expect([firmwareProblem("", ["v1"]), firmwareProblem(" v1 ", ["v1"]), firmwareProblem("x".repeat(33), []), firmwareProblem(" v3 ", ["v1"])])
       .toStrictEqual(["Enter a version", "v1 is already a candidate", "Firmware versions are at most 32 characters", null]);
-    expect(capabilityInput({ ...capabilityDraft(cap), firmware: ["v1", " v2", "v1"] }).firmwareCandidates).toStrictEqual(["v1", "v2"]);
-    expect(capabilityDraft(cap).firmware).toStrictEqual(["v1", "v2"]);
+    expect(iotModelInput({ ...iotModelDraft(iot), firmware: ["v1", " v2", "v1"] }).firmwareCandidates).toStrictEqual(["v1", "v2"]);
+    expect(iotModelDraft(iot).firmware).toStrictEqual(["v1", "v2"]);
   });
 });
 

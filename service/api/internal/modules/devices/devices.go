@@ -24,6 +24,8 @@ import (
 type UnitInfo struct {
 	OrgID, PropertyID, ModelID uuid.UUID
 	CapabilityVersion          int
+	// IoTModelID is the unit's planned IoT model (nil when none, DEC-105).
+	IoTModelID *uuid.UUID
 }
 
 // Units looks units up in the Assets module.
@@ -65,7 +67,10 @@ type Device struct {
 	FirmwareVersion       string     `json:"firmwareVersion"`
 	PowerSignal           string     `json:"powerSignal"`
 	Tamper                string     `json:"tamper"`
-	Sensors               []Sensor   `json:"sensors"`
+	// IoTModelID and IoTModelVersion are the IoT model the device was registered with (nil when none, DEC-105).
+	IoTModelID      *uuid.UUID `json:"iotModelId"`
+	IoTModelVersion *int       `json:"iotModelVersion"`
+	Sensors         []Sensor   `json:"sensors"`
 }
 
 // DeviceDetail is DeviceDetail of service-contracts.ts.
@@ -78,7 +83,8 @@ type DeviceDetail struct {
 
 const devCols = `d.id, d.tenant_id, d.version, d.created_at, d.updated_at, d.binding_id, d.unit_id, d.target_unit_id,` +
 	` d.created_by_membership_id,
-	d.serial, d.mqtt_node, d.connection, d.last_seen_at, d.firmware_version, d.power_signal, d.tamper`
+	d.serial, d.mqtt_node, d.connection, d.last_seen_at, d.firmware_version, d.power_signal, d.tamper,
+	d.iot_model_id, d.iot_model_version`
 
 // The aggregate and audit target kind of a device, its connection states, the tamper state that blocks binding (D05),
 // and the roles the device scope tells apart.
@@ -232,6 +238,8 @@ func scanDevices(rows pgx.Rows) ([]Device, error) {
 			&device.FirmwareVersion,
 			&device.PowerSignal,
 			&device.Tamper,
+			&device.IoTModelID,
+			&device.IoTModelVersion,
 		)
 		if err != nil {
 			rows.Close()
@@ -390,7 +398,7 @@ type deviceFilter struct {
 	UnitID  *uuid.UUID `json:"unitId,omitempty"`
 	Status  *string    `json:"status,omitempty"`
 	Search  *string    `json:"search,omitempty"`  // part of the serial, MQTT node ID or unit name (IR723)
-	ModelID *uuid.UUID `json:"modelId,omitempty"` // the model of the device's bound unit (IR723)
+	ModelID *uuid.UUID `json:"modelId,omitempty"` // the IoT model of the device (IR723, DEC-105)
 }
 
 // decodeFilters reads the query's filters into filter, a struct of the catalogued keys: another key is VALIDATION.
@@ -449,7 +457,7 @@ func deviceConditions(call *ops.Call, filter deviceFilter) (string, []any, error
 		conds = append(
 			conds,
 			fmt.Sprintf(
-				"EXISTS (SELECT 1 FROM assets.units mu WHERE mu.id = d.unit_id AND mu.model_id = $%d)",
+				"d.iot_model_id = $%d",
 				len(args),
 			),
 		)
@@ -650,6 +658,9 @@ type RegisterInput struct {
 	// MqttNode is the node_id the device's ESP32 sends as the <node> of smarthome/ac/<node>/… (IR635); the IoT bridge
 	// takes its readings and sends its commands by it once the device is bound.
 	MqttNode *string `json:"mqttNode,omitempty"`
+	// IoTModelID is the IoT model of the device (DEC-105); omitted it is the unit's planned IoT model, and a device
+	// without one has no sensors.
+	IoTModelID *uuid.UUID `json:"iotModelId,omitempty"`
 }
 
 // Validate implements ops.Validator (DD-T11: serial 3–64 letters, digits or hyphens after trim + upper-case).
@@ -727,8 +738,9 @@ func (m *Module) existingUnit(
 //	@Summary		devices.register (write)
 //	@ID				devices.register
 //	@Description	Authorization: technician:device.maintain:assigned-valid-job | admin:device.write
-//	@Description	Validation: D01; input constraints in the corresponding DD; IR43 sensorTypes⊆Capability.sensors; \
-//	@Description	IR94 technician write table (assignment and work window, jobId required when typed)
+//	@Description	Validation: D01; input constraints in the corresponding DD; IR43 sensorTypes⊆IoTModel.sensors \
+//	@Description	(DEC-105: the iotModelId, else the unit's IoT model; none allows no sensors); IR94 technician write \
+//	@Description	table (assignment and work window, jobId required when typed)
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-T11, DD-A04
 //	@Tags			devices
@@ -769,7 +781,12 @@ func (m *Module) registerDetail(
 		return DeviceDetail{}, err
 	}
 
-	byMetric, err := capabilitySensors(ctx, call, unitInfo, input.SensorTypes)
+	iotModel := input.IoTModelID
+	if iotModel == nil {
+		iotModel = unitInfo.IoTModelID
+	}
+
+	byMetric, iotVersion, err := iotModelSensors(ctx, call, iotModel, input.SensorTypes)
 	if err != nil {
 		return DeviceDetail{}, err
 	}
@@ -786,7 +803,7 @@ func (m *Module) registerDetail(
 
 	deviceID := uuid.Must(uuid.NewV7())
 
-	err = insertDevice(ctx, call, deviceID, input, byMetric)
+	err = insertDevice(ctx, call, deviceID, input, byMetric, iotModel, iotVersion)
 	if err != nil {
 		return DeviceDetail{}, err
 	}
@@ -823,41 +840,64 @@ func (m *Module) registerDetail(
 	) // own write result; read scope applies to later reads
 }
 
-// capabilitySensors is the sensor specs of the unit's model version by metric; each requested sensor type must be one
-// of them (IR43).
-func capabilitySensors(
+// iotModelSensors is the sensor specs of the IoT model's current version by metric; each requested sensor type must
+// be one of them (IR43). A device without an IoT model has no sensor to register. It returns the version it read.
+func iotModelSensors(
 	ctx context.Context,
 	call *ops.Call,
-	unitInfo UnitInfo,
+	model *uuid.UUID,
 	sensorTypes []string,
-) (map[string]SensorSpec, error) {
-	var sensorsRaw []byte
+) (map[string]SensorSpec, *int, error) {
+	byMetric := map[string]SensorSpec{}
 
-	scanErr := call.Tx.QueryRow(ctx, `SELECT sensors FROM devices.capabilities WHERE id = $1 AND version =
-		$2`, unitInfo.ModelID, unitInfo.CapabilityVersion).
-		Scan(&sensorsRaw)
+	if model == nil {
+		if len(sensorTypes) > 0 {
+			return nil, nil, apperr.Fields(
+				map[string]string{"sensorTypes": "error.notInCapability"},
+			)
+		}
+
+		return byMetric, nil, nil
+	}
+
+	var (
+		sensorsRaw []byte
+		version    int
+	)
+
+	scanErr := call.Tx.QueryRow(
+		ctx,
+		`SELECT sensors, version FROM devices.iot_models WHERE id = $1 AND is_current`,
+		*model,
+	).Scan(&sensorsRaw, &version)
+	if errors.Is(scanErr, pgx.ErrNoRows) {
+		return nil, nil, apperr.Fields(map[string]string{"iotModelId": "error.unknownModel"})
+	}
+
 	if scanErr != nil {
-		return nil, apperr.Wrap(scanErr, "select devices.capabilities")
+		return nil, nil, apperr.Wrap(scanErr, "select devices.iot_models")
 	}
 
 	var specs []SensorSpec
 
-	_ = json.Unmarshal(sensorsRaw, &specs)
+	err := json.Unmarshal(sensorsRaw, &specs)
+	if err != nil {
+		return nil, nil, apperr.Wrap(err, "json.Unmarshal")
+	}
 
-	byMetric := map[string]SensorSpec{}
 	for _, s := range specs {
 		byMetric[s.Metric] = s
 	}
 
 	for _, mt := range sensorTypes {
 		if _, ok := byMetric[mt]; !ok {
-			return nil, apperr.Fields(
+			return nil, nil, apperr.Fields(
 				map[string]string{"sensorTypes": "error.notInCapability"},
 			) // IR43
 		}
 	}
 
-	return byMetric, nil
+	return byMetric, &version, nil
 }
 
 // serialFree refuses a serial that another device has, tenant-wide after normalisation (D05).
@@ -914,17 +954,21 @@ func insertDevice(
 	device uuid.UUID,
 	input *RegisterInput,
 	byMetric map[string]SensorSpec,
+	iotModel *uuid.UUID,
+	iotVersion *int,
 ) error {
 	_, execErr := call.Tx.Exec(
 		ctx,
 		`INSERT INTO devices.devices (id, tenant_id, serial, target_unit_id, created_by_membership_id, firmware_version,
-			mqtt_node)
-		VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, 'v1', $5)`,
+			mqtt_node, iot_model_id, iot_model_version)
+		VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, 'v1', $5, $6, $7)`,
 		device,
 		input.Serial,
 		input.UnitID,
 		call.Principal.MembershipID,
 		input.MqttNode,
+		iotModel,
+		iotVersion,
 	)
 	if execErr != nil {
 		return apperr.Wrap(dupDevice(execErr), "insert devices.devices")

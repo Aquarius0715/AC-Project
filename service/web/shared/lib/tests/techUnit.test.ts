@@ -25,8 +25,9 @@ const unit: ApiTechUnit = {
   location: { pathLabels: ["customer-a", "Home A", "1F", "Bedroom"], address: null, accessInstructions: null },
   capabilities: {
     manufacturer: "AC-Co", model: "ventilation-demo v3", control: true, modeControl: true, fanControl: true, temperature: { min: 18, max: 30, step: 1 }, modes: ["cool", "dry", "fan"],
-    fanLevels: ["low", "mid", "high"], ventilation: false, ventilationLevels: [], sensors: [],
+    fanLevels: ["low", "mid", "high"], ventilation: false, ventilationLevels: [],
   },
+  iotModel: null,
   effectiveControlPolicy: { state: "unrestricted" }, controlAvailability: { state: "available" }, pendingCommands: [],
   observedState: { power: true, celsius: 24, mode: "cool", fanLevel: "mid", observedAt: "2026-09-14T01:34:30Z" },
   latestMeasurements: [m(TEMPERATURE, 24.5, "°C"), m("power", 1.2, "kW"), m("humidity", 60, "%", "stale")],

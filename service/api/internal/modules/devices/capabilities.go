@@ -34,33 +34,30 @@ type SensorSpec struct {
 
 // Capability is Capability of service-contracts.ts (one row per version; the current row is listed).
 type Capability struct {
-	ID                 uuid.UUID    `json:"id"`
-	TenantID           uuid.UUID    `json:"tenantId"`
-	Version            int          `json:"version"`
-	CreatedAt          time.Time    `json:"createdAt"`
-	UpdatedAt          time.Time    `json:"updatedAt"`
-	Manufacturer       string       `json:"manufacturer"`
-	Model              string       `json:"model"`
-	Control            bool         `json:"control"`
-	ModeControl        bool         `json:"modeControl"`
-	FanControl         bool         `json:"fanControl"`
-	Temperature        *TempRange   `json:"temperature"`
-	Modes              []string     `json:"modes"`
-	FanLevels          []string     `json:"fanLevels"`
-	Ventilation        bool         `json:"ventilation"`
-	VentilationLevels  []string     `json:"ventilationLevels"`
-	Sensors            []SensorSpec `json:"sensors"`
-	FirmwareCandidates []string     `json:"firmwareCandidates"`
+	ID                uuid.UUID  `json:"id"`
+	TenantID          uuid.UUID  `json:"tenantId"`
+	Version           int        `json:"version"`
+	CreatedAt         time.Time  `json:"createdAt"`
+	UpdatedAt         time.Time  `json:"updatedAt"`
+	Manufacturer      string     `json:"manufacturer"`
+	Model             string     `json:"model"`
+	Control           bool       `json:"control"`
+	ModeControl       bool       `json:"modeControl"`
+	FanControl        bool       `json:"fanControl"`
+	Temperature       *TempRange `json:"temperature"`
+	Modes             []string   `json:"modes"`
+	FanLevels         []string   `json:"fanLevels"`
+	Ventilation       bool       `json:"ventilation"`
+	VentilationLevels []string   `json:"ventilationLevels"`
 }
 
 const capCols = `id, tenant_id, version, created_at, created_at AS updated_at, manufacturer, model, control, ` +
-	`mode_control, fan_control, temperature, modes, fan_levels,
-	ventilation, ventilation_levels, sensors, firmware_candidates`
+	`mode_control, fan_control, temperature, modes, fan_levels, ventilation, ventilation_levels`
 
 func scanCap(row pgx.Row) (Capability, error) {
 	var (
-		capability    Capability
-		temp, sensors []byte
+		capability Capability
+		temp       []byte
 	)
 
 	err := row.Scan(
@@ -79,8 +76,6 @@ func scanCap(row pgx.Row) (Capability, error) {
 		&capability.FanLevels,
 		&capability.Ventilation,
 		&capability.VentilationLevels,
-		&sensors,
-		&capability.FirmwareCandidates,
 	)
 	if err != nil {
 		return capability, apperr.Wrap(err, "scan (scanCap)")
@@ -90,14 +85,6 @@ func scanCap(row pgx.Row) (Capability, error) {
 		capability.Temperature = &TempRange{Min: 0, Max: 0, Step: 0}
 
 		err := json.Unmarshal(temp, capability.Temperature)
-		if err != nil {
-			return capability, apperr.Wrap(err, "json.Unmarshal")
-		}
-	}
-
-	capability.Sensors = []SensorSpec{}
-	if len(sensors) > 0 {
-		err := json.Unmarshal(sensors, &capability.Sensors)
 		if err != nil {
 			return capability, apperr.Wrap(err, "json.Unmarshal")
 		}
@@ -137,92 +124,23 @@ func capabilitiesList(
 	call *ops.Call,
 	query *paging.Query,
 ) (paging.Page[Capability], error) {
-	if len(query.Filters) > 0 && string(query.Filters) != "{}" && string(query.Filters) != "null" {
-		return paging.Page[Capability]{}, apperr.Fields(
-			map[string]string{fieldFilters: apperr.KeyInvalid},
-		) // query catalog: no filters
-	}
-
-	order, err := paging.OrderBy(
-		query.Sort,
-		map[string]string{"id": "id", fieldCreatedAt: colCreatedAt, fieldUpdatedAt: colCreatedAt},
-		"id ASC",
-	)
-	if err != nil {
-		return paging.Page[Capability]{}, apperr.Wrap(err, "paging.OrderBy")
-	}
-
-	window, err := paging.Resolve(*query, nil, call.Principal.ScopeVersion, 1)
-	if err != nil {
-		return paging.Page[Capability]{}, apperr.Wrap(err, "paging.Resolve")
-	}
-
-	var total int
-
-	scanErr := call.Tx.QueryRow(ctx, `SELECT count(*) FROM devices.capabilities WHERE is_current`).
-		Scan(&total)
-	if scanErr != nil {
-		return paging.Page[Capability]{}, apperr.Wrap(scanErr, "select devices.capabilities")
-	}
-
-	rows, err := call.Tx.Query(
-		ctx,
-		fmt.Sprintf(
-			`SELECT %s FROM devices.capabilities WHERE is_current ORDER BY %s LIMIT %d OFFSET %d`,
-			capCols,
-			order,
-			window.Limit,
-			window.Offset,
-		),
-	)
-	if err != nil {
-		return paging.Page[Capability]{}, apperr.Wrap(err, "select devices.capabilities")
-	}
-
-	items, err := scanCaps(rows)
-
-	return paging.Page[Capability]{
-		Items:           items,
-		NextCursor:      window.Next(total),
-		Total:           total,
-		SnapshotVersion: window.Snapshot,
-	}, err
-}
-
-// scanCaps reads a page of capabilities.
-func scanCaps(rows pgx.Rows) ([]Capability, error) {
-	defer rows.Close()
-
-	items := []Capability{}
-
-	for rows.Next() {
-		capability, err := scanCap(rows)
-		if err != nil {
-			return nil, err
-		}
-
-		items = append(items, capability)
-	}
-
-	return items, apperr.Wrap(rows.Err(), "select devices.capabilities")
+	return capabilityRegister().list(ctx, call, query)
 }
 
 // CapabilitySave is capabilities.save input.
 type CapabilitySave struct {
-	ID                 *uuid.UUID   `json:"id,omitempty"`
-	Manufacturer       string       `json:"manufacturer"`
-	Model              string       `json:"model"`
-	Control            bool         `json:"control"`
-	ModeControl        bool         `json:"modeControl"`
-	FanControl         bool         `json:"fanControl"`
-	Temperature        *TempRange   `json:"temperature"`
-	Modes              []string     `json:"modes"`
-	FanLevels          []string     `json:"fanLevels"`
-	Ventilation        bool         `json:"ventilation"`
-	VentilationLevels  []string     `json:"ventilationLevels"`
-	Sensors            []SensorSpec `json:"sensors"`
-	FirmwareCandidates []string     `json:"firmwareCandidates"`
-	ChangeReason       *string      `json:"changeReason,omitempty"`
+	ID                *uuid.UUID `json:"id,omitempty"`
+	Manufacturer      string     `json:"manufacturer"`
+	Model             string     `json:"model"`
+	Control           bool       `json:"control"`
+	ModeControl       bool       `json:"modeControl"`
+	FanControl        bool       `json:"fanControl"`
+	Temperature       *TempRange `json:"temperature"`
+	Modes             []string   `json:"modes"`
+	FanLevels         []string   `json:"fanLevels"`
+	Ventilation       bool       `json:"ventilation"`
+	VentilationLevels []string   `json:"ventilationLevels"`
+	ChangeReason      *string    `json:"changeReason,omitempty"`
 }
 
 // knownModes are the operating modes a model may support.
@@ -278,8 +196,6 @@ func (in *CapabilitySave) Validate() map[string]string {
 
 	in.validateControl(fieldErrs)
 	in.validateLevels(fieldErrs)
-	validateSensors(fieldErrs, in.Sensors)
-	validateFirmwareCandidates(fieldErrs, in.FirmwareCandidates)
 	in.validateChangeReason(fieldErrs)
 
 	return fieldErrs
@@ -365,18 +281,16 @@ func validateFirmwareCandidates(fieldErrs map[string]string, candidates []string
 // fields are the audited capability values (the before/after of capabilities.save).
 func (c Capability) fields() map[string]any {
 	return map[string]any{
-		"manufacturer":       c.Manufacturer,
-		"model":              c.Model,
-		"control":            c.Control,
-		"modeControl":        c.ModeControl,
-		"fanControl":         c.FanControl,
-		"temperature":        c.Temperature,
-		"modes":              c.Modes,
-		"fanLevels":          c.FanLevels,
-		"ventilation":        c.Ventilation,
-		"ventilationLevels":  c.VentilationLevels,
-		"sensors":            c.Sensors,
-		"firmwareCandidates": c.FirmwareCandidates,
+		"manufacturer":      c.Manufacturer,
+		"model":             c.Model,
+		"control":           c.Control,
+		"modeControl":       c.ModeControl,
+		"fanControl":        c.FanControl,
+		"temperature":       c.Temperature,
+		"modes":             c.Modes,
+		"fanLevels":         c.FanLevels,
+		"ventilation":       c.Ventilation,
+		"ventilationLevels": c.VentilationLevels,
 	}
 }
 
@@ -469,23 +383,19 @@ func (Capabilities) delete(
 		return DeletedResource{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
-	var units, campaigns bool
+	var units bool
 
 	scanErr := call.Tx.QueryRow(
 		ctx,
-		`SELECT EXISTS (SELECT 1 FROM assets.units WHERE model_id = $1),
-		EXISTS (SELECT 1 FROM devices.firmware_campaigns WHERE model_id = $1)`,
+		`SELECT EXISTS (SELECT 1 FROM assets.units WHERE model_id = $1)`,
 		input.ID,
-	).Scan(&units, &campaigns)
+	).Scan(&units)
 	if scanErr != nil {
 		return DeletedResource{}, apperr.Wrap(scanErr, "select devices.capabilities")
 	}
 
-	switch {
-	case units:
+	if units {
 		return DeletedResource{}, apperr.E(apperr.Conflict, "error.modelInUse")
-	case campaigns:
-		return DeletedResource{}, apperr.E(apperr.Conflict, "error.modelInCampaign")
 	}
 
 	_, execErr := call.Tx.Exec(ctx, `DELETE FROM devices.capabilities WHERE id = $1`, input.ID)
@@ -551,7 +461,7 @@ func (m Capabilities) save(
 	call *ops.Call,
 	input *CapabilitySave,
 ) (Capability, error) {
-	temp, sensors, err := capabilityJSON(input)
+	temp, err := capabilityJSON(input)
 	if err != nil {
 		return Capability{}, err
 	}
@@ -571,12 +481,12 @@ func (m Capabilities) save(
 		return Capability{}, apperr.E(apperr.Conflict, "error.duplicateModel")
 	}
 
-	revision, err := nextRevision(ctx, call, input)
+	revision, err := capabilityRegister().revise(ctx, call, input.ID, input.ChangeReason)
 	if err != nil {
 		return Capability{}, err
 	}
 
-	capability, err := insertCapability(ctx, call, input, revision, temp, sensors)
+	capability, err := insertCapability(ctx, call, input, revision, temp)
 	if err != nil {
 		return Capability{}, err
 	}
@@ -603,15 +513,14 @@ func insertCapability(
 	input *CapabilitySave,
 	revision capabilityRevision,
 	temp any,
-	sensors []byte,
 ) (Capability, error) {
 	return scanCap(
 		call.Tx.QueryRow(
 			ctx,
 			`INSERT INTO devices.capabilities (id, version, tenant_id, manufacturer, model, control, mode_control, fan_control,
 				temperature,
-		modes, fan_levels, ventilation, ventilation_levels, sensors, firmware_candidates, is_current)
-		VALUES ($1,$2,current_setting('app.tenant_id')::uuid,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,true) RETURNING
+		modes, fan_levels, ventilation, ventilation_levels, is_current)
+		VALUES ($1,$2,current_setting('app.tenant_id')::uuid,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true) RETURNING
 		`+capCols,
 			revision.modelID,
 			revision.version,
@@ -625,31 +534,24 @@ func insertCapability(
 			nz(input.FanLevels),
 			input.Ventilation,
 			nz(input.VentilationLevels),
-			sensors,
-			nz(input.FirmwareCandidates),
 		),
 	)
 }
 
-// capabilityJSON is the temperature range (nil without one) and the sensor specs as their JSON columns store them.
-func capabilityJSON(input *CapabilitySave) (any, []byte, error) {
+// capabilityJSON is the temperature range as its JSON column stores it (nil without one).
+func capabilityJSON(input *CapabilitySave) (any, error) {
 	var temp any
 
 	if input.Temperature != nil {
 		tempJSON, err := json.Marshal(input.Temperature)
 		if err != nil {
-			return nil, nil, apperr.Wrap(err, "json.Marshal")
+			return nil, apperr.Wrap(err, "json.Marshal")
 		}
 
 		temp = tempJSON
 	}
 
-	sensors, err := json.Marshal(append([]SensorSpec{}, input.Sensors...))
-	if err != nil {
-		return nil, nil, apperr.Wrap(err, "json.Marshal")
-	}
-
-	return temp, sensors, nil
+	return temp, nil
 }
 
 // capabilityRevision is the model row a save writes: its ID and version, the change reason and the audited values
@@ -659,67 +561,6 @@ type capabilityRevision struct {
 	version int
 	reason  string
 	before  map[string]any
-}
-
-// nextRevision is version 1 of a new model or, for an update, the next version of the current row, which it retires
-// after the expected-version check (the change reason is taken on update only).
-func nextRevision(
-	ctx context.Context,
-	call *ops.Call,
-	input *CapabilitySave,
-) (capabilityRevision, error) {
-	revision := capabilityRevision{
-		modelID: uuid.Must(uuid.NewV7()),
-		version: 1,
-		reason:  "",
-		before:  nil,
-	}
-	if input.ID == nil {
-		return revision, nil
-	}
-
-	lockErr := lockModelRows(ctx, call, *input.ID)
-	if lockErr != nil {
-		return revision, lockErr
-	}
-
-	old, err := scanCap(
-		call.Tx.QueryRow(
-			ctx,
-			`SELECT `+capCols+` FROM devices.capabilities WHERE id = $1 AND is_current FOR UPDATE`,
-			*input.ID,
-		),
-	)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return revision, apperr.E(apperr.NotFound, apperr.KeyNotFound)
-	}
-
-	if err != nil {
-		return revision, err
-	}
-
-	revision.before = old.fields()
-
-	if old.Version != *call.ExpectedVersion {
-		return revision, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
-	}
-
-	_, execErr := call.Tx.Exec(
-		ctx,
-		`UPDATE devices.capabilities SET is_current = false WHERE id = $1 AND version = $2`,
-		*input.ID,
-		old.Version,
-	)
-	if execErr != nil {
-		return revision, apperr.Wrap(execErr, "update devices.capabilities")
-	}
-
-	revision.modelID, revision.version = *input.ID, old.Version+1
-	if input.ChangeReason != nil {
-		revision.reason = *input.ChangeReason
-	}
-
-	return revision, nil
 }
 
 // capabilitySaved emits CapabilityChanged and audits capabilities.save with the values it changed.
@@ -784,15 +625,8 @@ func LoadCapability(
 	return capability, err == nil, err
 }
 
-// lockModelRows locks every version row of a capability FOR UPDATE before a write reads its current version (IR766):
-// a write that waited for a new version saved meanwhile then reads that version and answers a version conflict,
-// instead of finding the row it waited for no longer current and answering NOT_FOUND.
+// lockModelRows locks every version row of a capability FOR UPDATE before a write reads its current version (IR766);
+// see modelRegister.lock.
 func lockModelRows(ctx context.Context, call *ops.Call, id uuid.UUID) error {
-	_, err := call.Tx.Exec(
-		ctx,
-		`SELECT 1 FROM devices.capabilities WHERE id = $1 ORDER BY version FOR UPDATE`,
-		id,
-	)
-
-	return apperr.Wrap(err, "select devices.capabilities")
+	return capabilityRegister().lock(ctx, call, id)
 }

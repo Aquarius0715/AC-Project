@@ -17,7 +17,7 @@ import { businessDay } from "@ac/web/lib/clientBilling";
 import { statusWord, typeLabel } from "@ac/web/lib/partnerJobDetail";
 import { metricLabel } from "@ac/web/lib/adminAlerts";
 import type { Currency } from "@ac/web/lib/contracts.gen";
-import type { ApiCapability } from "@ac/web/lib/devices";
+import type { ApiCapability, ApiIoTModel } from "@ac/web/lib/devices";
 import {
   claimCandidate, clientUserRows, coverageKpis, coverageRows, connections, customerRows, defaultRules, filterUnits, locationTree, modelLabel, placeOptions, policyLines, powerStates, registerKpis, selection, standing, unitRows, unitsAt,
   conditionText, type ApiContractLite, type ApiCustomerPolicy, type ApiCustomerRow, type ApiInvoiceLite, type ApiOrgRow, type ApiPropertyRow, type ApiRestrictionLite,
@@ -97,10 +97,12 @@ export default async function AdminUnitsPage({ searchParams }: Readonly<PageProp
   const orgUnits = units.filter((u) => u.customerOrgId === cust.orgId);
   const props = properties.filter((p) => p.customerOrgId === cust.orgId);
   const canPolicies = has("alert.policy.read");
+  const canModels = has("dashboard.read", DEVICE_READ); // the model registers
   const unitId = one("unitId");
-  const [spaces, caps, policies, openAlerts, detail] = await Promise.all([
+  const [spaces, caps, iotModels, policies, openAlerts, detail] = await Promise.all([
     Promise.all(props.map((p) => coreAll<ApiSpaceRow>("spaces.list", { filters: { propertyId: p.id } }))).then((x) => x.flat()),
-    has("dashboard.read", DEVICE_READ) ? coreAll<ApiCapability>("capabilities.list") : Promise.resolve([] as ApiCapability[]),
+    canModels ? coreAll<ApiCapability>("capabilities.list") : Promise.resolve([] as ApiCapability[]),
+    canModels ? coreAll<ApiIoTModel>("iotModels.list") : Promise.resolve([] as ApiIoTModel[]),
     canPolicies ? coreAll<ApiCustomerPolicy>("policies.list", { filters: { customerId: cust.id } }) : Promise.resolve(null),
     has("alert.read", "alert.policy.read")
       ? Promise.all((["open", "acknowledged"] as const).map((status) => coreAll<Alert>("alerts.list", { filters: { customerId: cust.id, status } }))).then((x) => x.flat())
@@ -131,6 +133,8 @@ export default async function AdminUnitsPage({ searchParams }: Readonly<PageProp
     places: placeOptions(tree, spaces, t),
     users: clientUserRows(clientUsers, (m) => memberName.get(m) ?? t("{name} owner", { name: cust.name }), undefined, i),
     models: caps.map((k) => ({ id: k.id, label: `${k.manufacturer} ${k.model}` })).toSorted((a, b) => a.label.localeCompare(b.label)),
+    iotModels: iotModels.map((k) => ({ id: k.id, label: `${k.manufacturer} ${k.model}`, sensors: k.sensors.map((s) => s.metric) })).toSorted((a, b) => a.label.localeCompare(b.label)),
+    canRegisterDevice: has("device.write"),
     perProperty: tree.map((p) => `${p.name} ${String(p.units)}`).join(" · ") || t("no properties yet"),
     alertsSub: openAlerts ? ([["{n} critical", sev("critical")], ["{n} warning", sev("warning")], ["{n} info", sev("normal")]] as const).filter(([, n]) => n > 0).map(([l, n]) => t(l, { n })).join(" · ") || t("none open") : null,
     filter: { powerState, connections: conns, search: one("search") ?? "" },

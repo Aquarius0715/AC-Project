@@ -547,7 +547,7 @@ func (m *Module) campaignsSchedule(
 func targetSupported(ctx context.Context, call *ops.Call, input *ScheduleInput) error {
 	var candidates []string
 
-	err := call.Tx.QueryRow(ctx, `SELECT firmware_candidates FROM devices.capabilities WHERE id = $1 AND
+	err := call.Tx.QueryRow(ctx, `SELECT firmware_candidates FROM devices.iot_models WHERE id = $1 AND
 		is_current`, input.ModelID).
 		Scan(&candidates)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -555,7 +555,7 @@ func targetSupported(ctx context.Context, call *ops.Call, input *ScheduleInput) 
 	}
 
 	if err != nil {
-		return apperr.Wrap(err, "select devices.capabilities")
+		return apperr.Wrap(err, "select devices.iot_models")
 	}
 
 	if !slices.Contains(candidates, input.TargetVersion) {
@@ -571,11 +571,12 @@ func targetSupported(ctx context.Context, call *ops.Call, input *ScheduleInput) 
 type scheduledDevice struct {
 	fw, tamper string
 	unit       uuid.UUID
+	iotModel   *uuid.UUID
 }
 
-// fromVersions checks the campaign's devices, the devices of the model (via their current unit's model) without an
+// fromVersions checks the campaign's devices, the devices of the IoT model without an
 // open tamper and not on the target version yet, and returns their firmware versions, sorted.
-func (m *Module) fromVersions(
+func (*Module) fromVersions(
 	ctx context.Context,
 	call *ops.Call,
 	input *ScheduleInput,
@@ -605,12 +606,7 @@ func (m *Module) fromVersions(
 			)
 		}
 
-		unitInfo, unitFound, err := m.Units.UnitInfo(ctx, call, device.unit)
-		if err != nil {
-			return nil, apperr.Wrap(err, "devices.Units.UnitInfo")
-		}
-
-		if !unitFound || unitInfo.ModelID != input.ModelID {
+		if device.iotModel == nil || *device.iotModel != input.ModelID {
 			return nil, apperr.Fields(map[string]string{fieldDeviceIDs: "error.otherModel"})
 		}
 
@@ -632,8 +628,8 @@ func scheduledDevices(
 ) (map[uuid.UUID]scheduledDevice, error) {
 	rows, err := call.Tx.Query(
 		ctx,
-		`SELECT d.id, d.firmware_version, d.tamper, COALESCE(d.unit_id, d.target_unit_id) FROM devices.devices d WHERE d.id =
-			ANY($1)`,
+		`SELECT d.id, d.firmware_version, d.tamper, COALESCE(d.unit_id, d.target_unit_id), d.iot_model_id
+		FROM devices.devices d WHERE d.id = ANY($1)`,
 		deviceIDs,
 	)
 	if err != nil {
@@ -648,7 +644,7 @@ func scheduledDevices(
 			device   scheduledDevice
 		)
 
-		err := rows.Scan(&deviceID, &device.fw, &device.tamper, &device.unit)
+		err := rows.Scan(&deviceID, &device.fw, &device.tamper, &device.unit, &device.iotModel)
 		if err != nil {
 			rows.Close()
 

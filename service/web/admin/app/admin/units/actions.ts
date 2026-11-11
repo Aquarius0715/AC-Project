@@ -8,6 +8,7 @@ import { coreAll, coreOp, CoreError } from "@ac/web/lib/dal";
 import { actionFailure } from "@ac/web/lib/actionFailure";
 import { deleteAccounts } from "@ac/web/lib/forceDelete";
 import type { ApiCustomerRow, ApiImportPreview, ApiOrgRow, ApiUnitImport, Profile, Scope } from "@ac/web/lib/assets";
+import type { Metric } from "@ac/web/lib/devices";
 import type { OpInput } from "@ac/web/lib/opTypes";
 
 export type ActionResult<T = null> = { ok: true; value: T } | { ok: false; messageKey: string; code: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null };
@@ -85,11 +86,27 @@ export async function archiveLocation(kind: "property" | "space", id: string, ve
 }
 
 export interface UnitInput {
-  id?: string; customerOrgId: string; propertyId: string; spaceId: string | null; displayName: string; modelId: string; type: "split"; installedAt: string | null;
+  id?: string; customerOrgId: string; propertyId: string; spaceId: string | null; displayName: string; modelId: string; iotModelId?: string | null; type: "split"; installedAt: string | null;
   serviceScope: Scope[]; warrantyEndsAt?: string | null; changeReason?: string;
 }
 export async function saveUnit(input: UnitInput, version?: number) {
   return run(async () => { const u = await coreOp<{ id: string }>("units.save", input, write(version)); return u.id; });
+}
+/** A device registered together with its new unit (DEC-105): the serial, the optional MQTT node ID and the sensors the IoT model has. */
+export interface NewUnitDevice { serial: string; mqttNode: string | null; sensorTypes: Metric[] }
+/** units.save, then devices.register for the unit's IoT model. The unit stays if the device is refused: `deviceError` says so
+and the device can be registered on the Devices screen. */
+export async function saveUnitWithDevice(input: UnitInput, device: NewUnitDevice) {
+  return run(async () => {
+    const u = await coreOp<{ id: string }>("units.save", input, write());
+    try {
+      await coreOp("devices.register", { serial: device.serial, sensorTypes: device.sensorTypes, unitId: u.id, ...(device.mqttNode && { mqttNode: device.mqttNode }), ...(input.iotModelId && { iotModelId: input.iotModelId }) }, { write: true });
+      return { id: u.id, deviceError: null as string | null };
+    } catch (error) {
+      if (error instanceof CoreError) return { id: u.id, deviceError: Object.entries(error.error.fieldErrors).map(([k, v]) => `${k}: ${v}`).join(", ") || error.error.messageKey };
+      throw error;
+    }
+  });
 }
 /** units.archive takes the unit out of use and keeps its ID and history (D05: CONFLICT while it is still in use). */
 export async function archiveUnit(id: string, version: number, reason: string) {

@@ -100,6 +100,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.633.0 (2026-11-11): the IoT model is a register of its own beside the aircon model; a unit takes an optional IoT model and a device can be registered with the unit (228 operations, 250 routes; DEC-105, IR788).
 0.632.0 (2026-11-12): IR787: a cursor's offset is bounded (an edited cursor with an offset near the largest integer made a list slice panic). Phase 1A unchanged.
 
 0.631.0 (2026-11-12): IR786: the migration versions must be 1, 2, 3 … without a gap (`migrate.Load` refuses a hole, which a database already past it would never fill). Phase 1A unchanged.
@@ -134,7 +135,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 0.603.0 (2026-11-11): IR746: a problem reported on a unit archived after the visit is refused (CONFLICT `error.unitArchived`) instead of opening a follow-up job on it.
 0.602.0 (2026-11-11): IR745: the auto-confirmation of unrated jobs wraps its database error with where it happened (lint constitution §2); found by an AST scan that wrapcheck missed.
 0.601.0 (2026-11-11): IR743: a refused demo operation reads "Not done: Try again", not "Not done: Not done — try again".
-0.600.0 (2026-11-11): IR742: a location rule needs its owner's consent also when another member of the customer edits it (SR02).
+0.633.0 (2026-11-11): IR742: a location rule needs its owner's consent also when another member of the customer edits it (SR02).
 0.599.0 (2026-11-10): IR741: a chart with several lines scales its axes to the size of its values (a power of 0.4–1.2 kW gets 0.2–1.4, not −1–3) and never below zero for values that are all zero or more.
 0.598.0 (2026-11-10): IR740: a report review's job event names its decision (job.review_accepted / job.review_returned, B-22), so a return no longer reads as a green "Report reviewed".
 0.597.0 (2026-11-10): IR739: a deleted customer's alert policies, default rule switches and filter care settings are deleted with it (B-21, DEC-103 changed).

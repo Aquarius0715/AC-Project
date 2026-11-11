@@ -45,6 +45,8 @@ func TestEffectivePower(t *testing.T) {
 				AlertPolicyIDs:      nil,
 				Archived:            false,
 				CapabilityVersion:   0,
+				IoTModelID:          nil,
+				IoTModelVersion:     nil,
 				ObservedRestriction: nil,
 				LastSeenAt:          nil,
 			}, EffectivePowerState: "", LatestMeasurements: nil, ActiveAlertCount: 0,

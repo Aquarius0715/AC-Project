@@ -6,8 +6,9 @@ export const unitDetail = (over: Partial<ApiUnitDetail> = {}): ApiUnitDetail => 
   observedState: { power: true, celsius: 24, mode: "cool", fanLevel: "mid", observedAt: null }, lastSeenAt: null, latestMeasurements: [],
   capabilities: {
     manufacturer: "AC-Co", model: "m1", control: true, modeControl: true, fanControl: true, temperature: { min: 18, max: 30, step: 1 }, modes: ["cool", "dry", "fan"],
-    fanLevels: ["low", "mid", "high"], ventilation: false, ventilationLevels: [], sensors: [],
+    fanLevels: ["low", "mid", "high"], ventilation: false, ventilationLevels: [],
   },
+  iotModel: null,
   effectiveControlPolicy: { state: "unrestricted" }, controlAvailability: { state: "available" }, pendingCommands: [],
   location: { pathLabels: [], address: null, accessInstructions: null }, installedAt: null, capabilityVersion: 1, serviceScope: ["indoor"], components: [], ...over,
 });

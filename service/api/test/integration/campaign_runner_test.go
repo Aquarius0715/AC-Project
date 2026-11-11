@@ -485,9 +485,10 @@ func TestFirmwareCampaignSkipsAndCompletion(t *testing.T) {
 	)
 	owner(
 		t,
-		`UPDATE devices.devices SET unit_id = $2 WHERE id = $1`,
+		`UPDATE devices.devices SET unit_id = $2, iot_model_id = $3 WHERE id = $1`,
 		devs[1],
 		asStr(t, data(otherUnit)["id"]),
+		seed.ID("cap-split-std"),
 	)
 
 	cmd := uuid.NewString()

@@ -273,6 +273,7 @@ const (
 	casePriorityOver100 = "priority 101"
 	caseSizeMismatch    = "size mismatch"
 	caseUnitMismatch    = "unit mismatch"
+	caseEmptyName       = "empty name"
 	caseUnknownField    = "unknown field"
 	caseUnknownMetric   = "unknown metric"
 	caseUnknownModel    = "unknown model"

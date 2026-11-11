@@ -3,15 +3,17 @@
 import { Page, Tabs } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
-import type { ApiDeviceDetail, CampaignRow, DeviceRow, ModelRow } from "@ac/web/lib/devices";
+import type { ApiDeviceDetail, CampaignRow, DeviceRow, IoTModelRow, ModelRow } from "@ac/web/lib/devices";
 import type { deviceTiles, EventRow, firmwareCard, OperationRow, sensorRows, TechDeviceRow } from "@ac/web/lib/techDevices";
 import { DeviceTab } from "./device-tab";
 import { FirmwareTab } from "./firmware-tab";
+import { IoTModelsTab } from "./iot-models-tab";
 import { ModelsTab } from "./models-tab";
 
 export interface DevicesLive {
-  tab: "models" | "devices" | "firmware"; now: string; canAudit: boolean; canWrite: boolean;
-  models: ModelRow[]; devices: DeviceRow[]; units: { id: string; label: string; modelId: string }[];
+  tab: "models" | "iot" | "devices" | "firmware"; now: string; canAudit: boolean; canWrite: boolean;
+  /** the air conditioner models and the IoT models are two registers (DEC-105) */
+  models: ModelRow[]; iotModels: IoTModelRow[]; devices: DeviceRow[]; units: { id: string; label: string; modelId: string; iotModelId: string | null }[];
   /** how many devices the registry holds, and on the devices tab the page of it (server search, cursor, IR723) */
   deviceTotal: number; page?: { q: string; next: string | null; cursor: string | null };
   /** the devices tab's list (Figma Admin 246:2): sorted by serial, with the state of each */
@@ -33,10 +35,11 @@ export function DevicesView({ live }: Readonly<{ live: DevicesLive }>) {
   return (
     <Page>
       <Tabs value={live.tab} onChange={(v) => { nav({ tab: v === "models" ? null : v, deviceId: null, campaignId: null, q: null, cursor: null }); }} tabs={[
-        { id: "models", label: t("Models"), count: live.models.length }, { id: "devices", label: t("IoT devices"), count: live.deviceTotal },
+        { id: "models", label: t("Aircon models"), count: live.models.length }, { id: "iot", label: t("IoT models"), count: live.iotModels.length },
+        { id: "devices", label: t("IoT devices"), count: live.deviceTotal },
         { id: "firmware", label: t("Firmware campaigns"), count: live.campaigns?.length },
       ]} />
-      {live.tab === "models" ? <ModelsTab live={live} /> : null}{live.tab !== "models" && live.tab === "devices" && <DeviceTab live={live} />}{live.tab !== "models" && live.tab !== "devices" && <FirmwareTab live={live} />}
+      {live.tab === "models" && <ModelsTab live={live} />}{live.tab === "iot" && <IoTModelsTab live={live} />}{live.tab === "devices" && <DeviceTab live={live} />}{live.tab === "firmware" && <FirmwareTab live={live} />}
     </Page>
   );
 }

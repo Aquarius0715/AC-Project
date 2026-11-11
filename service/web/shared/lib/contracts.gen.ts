@@ -36,17 +36,19 @@ export type UnitSymbol = '°C'|'%'|'ppm'|'µg/m³'|'kW'|'mm/s'|'kPa'|'cycles/h'|
 export type Quality = 'valid'|'missing'|'stale'|'suspect';
 export type Measurement = Entity & {boundaryId:EnergyBoundaryId|null;qualityReason:MeasurementIssue|null;rawUnit:string|null;unitId:ID;sensorId:ID;metric:Metric;value:number|null;unit:UnitSymbol;observedAt:Instant;receivedAt:Instant;origin:'measured'|'estimated'|'inspection';quality:Quality;isDemo:true;sequence:number;eventId:ID};
 export type Sensor = {boundaryId:EnergyBoundaryId|null;id:ID;deviceId:ID;metric:Metric;unit:UnitSymbol;staleAfterSeconds:number;calibratedAt:Instant|null};
-export type Capability = Entity & {manufacturer:string;model:string;control:boolean;modeControl:boolean;fanControl:boolean;temperature:{min:number;max:number;step:number}|null;modes:Mode[];fanLevels:Fan[];ventilation:boolean;ventilationLevels:Fan[];sensors:Omit<Sensor,'id'|'deviceId'|'calibratedAt'>[];firmwareCandidates:string[]};
+export type Capability = Entity & {manufacturer:string;model:string;control:boolean;modeControl:boolean;fanControl:boolean;temperature:{min:number;max:number;step:number}|null;modes:Mode[];fanLevels:Fan[];ventilation:boolean;ventilationLevels:Fan[]};
+/** DEC-105: the IoT model is its own register (devices.iot_models): the sensors a device of the model has and the firmware versions that can be installed; the aircon model (Capability) keeps the controls. */
+export type IoTModel = Entity & {manufacturer:string;model:string;sensors:Omit<Sensor,'id'|'deviceId'|'calibratedAt'>[];firmwareCandidates:string[]};
 export type Mode = 'cool'|'dry'|'fan';
 export type Fan = 'low'|'mid'|'high';
 export type Connection = 'online'|'offline'|'unknown'|'connecting'|'error';
 export type ObservedState = {power:boolean|null;celsius:number|null;mode:Mode|null;fanLevel:Fan|null;observedAt:Instant|null};
 export type RestrictionPolicy = {kind:'temperature_limit';minimumCoolingSetpoint:number}|{kind:'power_off'};
 export type ObservedRestriction = {restrictionId:ID;rulesVersion:ID;policy:RestrictionPolicy;observedAt:Instant}|null;
-export type ACUnit = Entity & {customerOrgId:ID;propertyId:ID;spaceId:ID|null;displayName:string;modelId:ID;type:'split';installedAt:Instant|null;serviceScope:('indoor'|'outdoor'|'electrical')[];warrantyEndsAt:Instant|null;alertPolicyIds:ID[];archived:boolean;capabilityVersion:number;connection:Connection;observedState:ObservedState;observedRestriction:ObservedRestriction;lastSeenAt:Instant|null};
+export type ACUnit = Entity & {customerOrgId:ID;propertyId:ID;spaceId:ID|null;displayName:string;modelId:ID;type:'split';installedAt:Instant|null;serviceScope:('indoor'|'outdoor'|'electrical')[];warrantyEndsAt:Instant|null;alertPolicyIds:ID[];archived:boolean;capabilityVersion:number;iotModelId:ID|null;iotModelVersion:number|null;connection:Connection;observedState:ObservedState;observedRestriction:ObservedRestriction;lastSeenAt:Instant|null};
 /** IR213: latestMeasurements = per metric the latest reading at or before now (observedAt desc, sequence desc, id asc), read-time quality (stale past the sensor's staleAfterSeconds); [] without readings. */
 export type UnitSummary = ACUnit & {effectivePowerState:EffectivePowerState;latestMeasurements:Measurement[];activeAlertCount:number};
-export type UnitDetail = UnitSummary & {capabilities:Capability;effectiveControlPolicy:EffectiveControlPolicy;controlAvailability:ControlAvailability;components:ComponentKey[];pendingCommands:Command[];pendingCommandIds:ID[];location:{pathLabels:string[];address:string|null;accessInstructions:string|null}};
+export type UnitDetail = UnitSummary & {capabilities:Capability;iotModel:IoTModel|null;effectiveControlPolicy:EffectiveControlPolicy;controlAvailability:ControlAvailability;components:ComponentKey[];pendingCommands:Command[];pendingCommandIds:ID[];location:{pathLabels:string[];address:string|null;accessInstructions:string|null}};
 export type UnitAction = {kind:'set_power';power:boolean}|{kind:'set_temperature';celsius:number}|{kind:'set_mode';mode:Mode}|{kind:'set_fan';fanLevel:Fan}|{kind:'ventilate';level:Fan};
 export type RestrictionAction = {kind:'apply_restriction';restrictionId:ID;rulesVersion:ID;policy:RestrictionPolicy}|{kind:'remove_restriction';restrictionId:ID;rulesVersion:ID};
 export type Command = Entity & {unitId:ID;actorMembershipId:ID;action:UnitAction|RestrictionAction;diagnosticRunId:ID|null;jobId:ID|null;reason:string|null;status:'requested'|'sent'|'acknowledged'|'failed'|'expired'|'cancelled';delivery:'not_sent'|'sent';requestedAt:Instant;sentAt:Instant|null;acknowledgedAt:Instant|null;expiresAt:Instant;failureCode:ErrorCode|null;correlationId:ID;source:'ui'|'automation'|'restriction'|'diagnostic'|'group'};
@@ -114,7 +116,7 @@ export type RestrictionDetail = Restriction;
 export type RestrictionReleaseView = Pick<Restriction,'id'|'version'|'createdAt'|'updatedAt'|'unitIds'|'rulesVersion'|'policy'|'state'|'perUnit'|'recoveryCases'|'noticeAt'|'executeAfter'> & {projection:'release';releaseIntent:Pick<ReleaseIntent,'source'|'at'>|null};
 export type RestrictionRead = RestrictionDetail|RestrictionReleaseView;
 export type Inquiry = Entity & {customerId:ID;invoiceId:ID|null;restrictionId:ID|null;subjectType:'payment'|'restriction';message:string;state:'received'|'answered';reply:string|null};
-export type Device = Entity & {bindingId:ID|null;unitId:ID|null;targetUnitId:ID;createdByMembershipId:ID;serial:string;mqttNode:string|null;connection:Connection;lastSeenAt:Instant|null;firmwareVersion:string;powerSignal:'unknown'|'on'|'off';tamper:'clear'|'detected';sensors:Sensor[]};
+export type Device = Entity & {bindingId:ID|null;unitId:ID|null;targetUnitId:ID;createdByMembershipId:ID;serial:string;mqttNode:string|null;connection:Connection;lastSeenAt:Instant|null;firmwareVersion:string;powerSignal:'unknown'|'on'|'off';tamper:'clear'|'detected';iotModelId:ID|null;iotModelVersion:number|null;sensors:Sensor[]};
 export type DeviceOperation = Entity & DeviceHistoryScope & {deviceId:ID;kind:'check'|'calibrate'|'firmware';status:'queued'|'running'|'succeeded'|'failed';targetVersion:string|null;failureCode:ErrorCode|null;startedAt:Instant|null;finishedAt:Instant|null;expiresAt:Instant};
 export type DeviceDetail = Device & {calibrationRefs:ID[];activeOperation:DeviceOperation|null};
 export type DeviceEvent = Entity & DeviceHistoryScope & {alertIds:ID[];deviceId:ID;eventType:'communication_lost'|'power_lost'|'tamper'|'restored'|'operation_failed';recovery:DeviceRecovery|null;evidenceSource:'heartbeat'|'power_signal'|'tamper_signal';sequence:number;occurredAt:Instant;restoredAt:Instant|null;responseNotes:{actorId:ID;message:string;at:Instant}[]};
@@ -281,6 +283,9 @@ export type OperationContracts = {
   'capabilities.list': {input:Query;result:Page<Capability>;mode:'read'};
   'capabilities.save': {input:Save<Capability> & {changeReason?:string};result:Capability;mode:'write'};
   'capabilities.delete': {input:{id:ID;reason:string};result:DeletedResource;mode:'write'};
+  'iotModels.list': {input:Query;result:Page<IoTModel>;mode:'read'};
+  'iotModels.save': {input:Save<IoTModel> & {changeReason?:string};result:IoTModel;mode:'write'};
+  'iotModels.delete': {input:{id:ID;reason:string};result:DeletedResource;mode:'write'};
   'commands.create': {input:{unitId:ID;action:UnitAction;jobId?:ID;reason?:string;expectedUnitVersion:number};result:Command;mode:'write'};
   'commands.get': {input:{id:ID};result:Command;mode:'read'};
   'commands.list': {input:{unitId:ID;jobId?:ID;query:Query};result:Page<Command>;mode:'read'};
@@ -307,7 +312,7 @@ export type OperationContracts = {
   'devices.events': {input:{id:ID;query:Query};result:Page<DeviceEvent>;mode:'read'};
   'devices.get': {input:{id:ID};result:DeviceDetail;mode:'read'};
   'devices.list': {input:Query;result:Page<Device>;mode:'read'};
-  'devices.register': {input:{serial:string;sensorTypes:Metric[];unitId:ID;mqttNode?:string;jobId?:ID};result:Device;mode:'write'};
+  'devices.register': {input:{serial:string;sensorTypes:Metric[];unitId:ID;mqttNode?:string;iotModelId?:ID;jobId?:ID};result:Device;mode:'write'};
   'devices.setMqttNode': {input:{deviceId:ID;mqttNode:string|null};result:Device;mode:'write'};
   'devices.updateFirmware': {input:{deviceId:ID;firmwareVersion:string;jobId?:ID};result:DeviceOperation;mode:'write'};
   'diagnosticRuns.create': {input:{jobId:ID;unitId:ID;startAction:UnitAction;endAction:UnitAction;durationMinutes:number;reason:string;expectedUnitVersion:number;expectedJobVersion:number};result:DiagnosticRun;mode:'write'};
@@ -413,7 +418,7 @@ export type OperationContracts = {
   'units.delete': {input:{id:ID;reason:string};result:DeletedResource;mode:'write'};
   'units.get': {input:{id:ID;jobId?:ID};result:UnitDetail;mode:'read'};
   'units.list': {input:Query;result:Page<UnitSummary>;mode:'read'};
-  'units.save': {input:{id?:ID;customerOrgId:ID;propertyId:ID;spaceId:ID|null;displayName:string;modelId:ID;type:'split';installedAt:Instant|null;warrantyEndsAt?:Instant|null;serviceScope:ACUnit['serviceScope'];changeReason?:string};result:ACUnit;mode:'write'};
+  'units.save': {input:{id?:ID;customerOrgId:ID;propertyId:ID;spaceId:ID|null;displayName:string;modelId:ID;iotModelId?:ID|null;type:'split';installedAt:Instant|null;warrantyEndsAt?:Instant|null;serviceScope:ACUnit['serviceScope'];changeReason?:string};result:ACUnit;mode:'write'};
   'locations.rename': {input:{target:LocationTarget;name:string};result:Property|Space|ACUnit;mode:'write'};
   'units.setAlertPolicies': {input:{unitId:ID;alertPolicyIds:ID[]};result:ACUnit;mode:'write'};
   'policies.setDefaultRule': {input:{policyId:ID;ruleKey:ID;customerId:ID;enabled:boolean;reason?:string};result:DefaultRuleSetting;mode:'write'};

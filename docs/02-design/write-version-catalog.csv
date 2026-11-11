@@ -59,6 +59,9 @@ inquiries.answer,all,inquiries,inquiries.list,required,none,D01; version mismatc
 inquiries.create,all,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 invoices.create,all,none,contracts.list,omit,contractVersion=Contract.version,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 invoices.remind,all,invoice,invoices.get,required,none,IR04; paid/processing/not overdue or version conflict: no effects
+iotModels.delete,all,iotModels,iotModels.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+iotModels.save,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+iotModels.save,id present,iotModels,iotModels.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 jobs.accept,all,job,jobs.get;jobs.list,required,none; options.expectedVersion=JobOfferSummary.jobVersion,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 jobs.acknowledgeAssignment,all,job,jobs.get;jobs.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 jobs.addNote,all,job,jobs.get;jobs.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects

@@ -808,9 +808,16 @@ func (m *Module) unitSkipReason(
 	device pendingDevice,
 	model uuid.UUID,
 ) (string, error) {
-	unitInfo, found, err := m.Units.UnitInfo(ctx, call, *device.unit)
-	if err != nil {
-		return "", apperr.Wrap(err, "devices.Units.UnitInfo")
+	var sameModel bool // the device was registered with the campaign's IoT model (DEC-105)
+
+	modelErr := call.Tx.QueryRow(
+		ctx,
+		`SELECT iot_model_id IS NOT DISTINCT FROM $2 FROM devices.devices WHERE id = $1`,
+		device.id,
+		model,
+	).Scan(&sameModel)
+	if modelErr != nil {
+		return "", apperr.Wrap(modelErr, "select devices.devices")
 	}
 
 	var open bool // an operation of the device not finished yet, expired or not (one firmware operation per device)
@@ -824,13 +831,13 @@ func (m *Module) unitSkipReason(
 	}
 
 	switch {
-	case !found || unitInfo.ModelID != model:
+	case !sameModel:
 		return keyOtherModel, nil
 	case open:
 		return keyDeviceBusy, nil
 	}
 
-	err = m.exclusive(ctx, call, *device.unit)
+	err := m.exclusive(ctx, call, *device.unit)
 	if err == nil {
 		return "", nil
 	}

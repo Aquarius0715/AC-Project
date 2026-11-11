@@ -381,6 +381,8 @@ CREATE TABLE assets.units (                      -- ACUnit
   warranty_ends_at    timestamptz,
   archived            boolean NOT NULL DEFAULT false,
   capability_version  int NOT NULL,
+  iot_model_id        uuid,                      -- planned IoT model (devices.iot_models.id, optional; DEC-105)
+  iot_model_version   int,
   -- Repository-derived read model (written by Devices / Control events, IR47)
   connection          text NOT NULL DEFAULT 'unknown' CHECK (connection IN ('online','offline','unknown','connecting','error')),
   observed_state      jsonb NOT NULL DEFAULT '{"power":null,"celsius":null,"mode":null,"fanLevel":null,"observedAt":null}',
@@ -500,11 +502,28 @@ CREATE TABLE devices.capabilities (              -- model register (FR-A04); one
 CREATE UNIQUE INDEX capabilities_current ON devices.capabilities (id) WHERE is_current;
 CREATE UNIQUE INDEX capabilities_model ON devices.capabilities (tenant_id, lower(manufacturer), lower(model)) WHERE is_current;
 
+CREATE TABLE devices.iot_models (                -- IoT model register (DEC-105); one row per version; sensors and firmware candidates live here
+  id                  uuid NOT NULL,
+  version             int NOT NULL,
+  tenant_id           uuid NOT NULL,
+  manufacturer        text NOT NULL,
+  model               text NOT NULL,
+  sensors             jsonb NOT NULL DEFAULT '[]',
+  firmware_candidates text[] NOT NULL DEFAULT '{}',
+  is_current          boolean NOT NULL DEFAULT true,
+  created_at          timestamptz NOT NULL DEFAULT platform.app_now(),
+  PRIMARY KEY (id, version)
+);
+CREATE UNIQUE INDEX iot_models_current ON devices.iot_models (id) WHERE is_current;
+CREATE UNIQUE INDEX iot_models_model ON devices.iot_models (tenant_id, lower(manufacturer), lower(model)) WHERE is_current;
+
 CREATE TABLE devices.devices (
   id                        uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id                 uuid NOT NULL,
   serial                    text NOT NULL,
   iot_thing_name            text UNIQUE,         -- AWS IoT Core thing
+  iot_model_id              uuid,                -- devices.iot_models: the model it was registered with (DEC-105)
+  iot_model_version         int,
   mqtt_node                 text CHECK (mqtt_node ~ '^[A-Za-z0-9_-]{1,64}$'),   -- node_id of the ESP32 node: the <node> of smarthome/ac/<node>/... (IR635)
   certificate_arn           text,
   binding_id                uuid,

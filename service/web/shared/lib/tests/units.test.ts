@@ -51,7 +51,7 @@ describe("unit commands and readings in the display language and time zone (FR-X
 const model = (over: Partial<ApiUnitDetail["capabilities"]>): ApiUnitDetail["capabilities"] => {
   return {
     manufacturer: "DemoAir", model: "SPL-100", control: true, modeControl: true, fanControl: true, temperature: { min: 16, max: 30, step: 1 },
-    modes: ["cool", "dry", "fan"], fanLevels: ["low", "mid", "high"], ventilation: false, ventilationLevels: [], sensors: [], ...over,
+    modes: ["cool", "dry", "fan"], fanLevels: ["low", "mid", "high"], ventilation: false, ventilationLevels: [], ...over,
   };
 };
 

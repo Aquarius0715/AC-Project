@@ -32,7 +32,7 @@ export interface ApiPropertyRow {
 export interface ApiSpaceRow { id: string; version: number; propertyId: string; parentSpaceId: string | null; kind: "area" | "floor" | "room" | "space"; name: string; archived: boolean }
 /** UnitSummary of service-contracts.ts (fields shown on this screen). */
 export interface ApiUnitRow {
-  id: string; version: number; customerOrgId: string; propertyId: string; spaceId: string | null; displayName: string; modelId: string; type: "split"; installedAt: string | null;
+  id: string; version: number; customerOrgId: string; propertyId: string; spaceId: string | null; displayName: string; modelId: string; iotModelId?: string | null; type: "split"; installedAt: string | null;
   serviceScope: Scope[]; alertPolicyIds: string[]; archived: boolean; capabilityVersion: number; connection: Connection; lastSeenAt: string | null; warrantyEndsAt: string | null;
   effectivePowerState: PowerState; activeAlertCount: number;
 }
@@ -277,11 +277,12 @@ export function filterUnits(us: ApiUnitRow[], f: { powerState?: PowerState; conn
 }
 
 /** The unit form (DD-A02 fields, warranty end IR209). installedAt and warrantyEnd are Kuala Lumpur dates. */
-export interface UnitDraft { displayName: string; propertyId: string; spaceId: string; modelId: string; installedAt: string; warrantyEnd: string; serviceScope: Scope[] }
+/** iotModelId is the unit's planned IoT model; empty is none (DEC-105). */
+export interface UnitDraft { displayName: string; propertyId: string; spaceId: string; modelId: string; iotModelId: string; installedAt: string; warrantyEnd: string; serviceScope: Scope[] }
 const klDate = (iso: string | null | undefined) => (iso ? klStamp(iso).slice(0, 10) : "");
-export const unitDraft = (u?: Pick<ApiUnitRow, "displayName" | "propertyId" | "spaceId" | "modelId" | "installedAt" | "warrantyEndsAt" | "serviceScope">, propertyId = "", spaceId = ""): UnitDraft => {
+export const unitDraft = (u?: Pick<ApiUnitRow, "displayName" | "propertyId" | "spaceId" | "modelId" | "iotModelId" | "installedAt" | "warrantyEndsAt" | "serviceScope">, propertyId = "", spaceId = ""): UnitDraft => {
   return {
-    displayName: u?.displayName ?? "", propertyId: u?.propertyId ?? propertyId, spaceId: u?.spaceId ?? (u ? "" : spaceId), modelId: u?.modelId ?? "",
+    displayName: u?.displayName ?? "", propertyId: u?.propertyId ?? propertyId, spaceId: u?.spaceId ?? (u ? "" : spaceId), modelId: u?.modelId ?? "", iotModelId: u?.iotModelId ?? "",
     installedAt: klDate(u?.installedAt), warrantyEnd: klDate(u?.warrantyEndsAt), serviceScope: u?.serviceScope ?? ["indoor", "outdoor"],
   };
 };
@@ -297,7 +298,7 @@ export function unitErrors(d: UnitDraft, todayKL: string, t: T = en): Record<str
 }
 export const unitInput = (d: UnitDraft, orgId: string, id?: string, changeReason?: string) => {
   return {
-    ...(id && { id }), customerOrgId: orgId, propertyId: d.propertyId, spaceId: d.spaceId || null, displayName: d.displayName.trim(), modelId: d.modelId, type: "split" as const,
+    ...(id && { id }), customerOrgId: orgId, propertyId: d.propertyId, spaceId: d.spaceId || null, displayName: d.displayName.trim(), modelId: d.modelId, iotModelId: d.iotModelId || null, type: "split" as const,
     installedAt: d.installedAt ? `${d.installedAt}T00:00:00+08:00` : null, warrantyEndsAt: d.warrantyEnd ? `${d.warrantyEnd}T00:00:00+08:00` : null,
     serviceScope: d.serviceScope, ...(changeReason && { changeReason }),
   };
@@ -311,6 +312,7 @@ export function changedFields(u: ApiUnitRow, d: UnitDraft, t: T = en): string[] 
   if (saved.displayName !== d.displayName.trim()) out.push(t("Name"));
   if (relocates(u, d)) out.push(t("Location"));
   if (saved.modelId !== d.modelId) out.push(t("Model"));
+  if (saved.iotModelId !== d.iotModelId) out.push(t("IoT model"));
   if (saved.installedAt !== d.installedAt) out.push(t("Installed at"));
   if (saved.warrantyEnd !== d.warrantyEnd) out.push(t("Warranty end"));
   if ([...saved.serviceScope].toSorted(byText).join(',') !== [...d.serviceScope].toSorted(byText).join(',')) out.push(t("Service scope"));

@@ -48,6 +48,8 @@ type devState struct {
 	connection string
 	tamper     string
 	firmware   string
+	iotModel   *uuid.UUID // devices.iot_models.id the device was registered with (DEC-105)
+	iotVersion *int
 }
 
 // lockDevice loads the device for update (NOT_FOUND). The handler checks the caller's scope on the device's unit first
@@ -57,9 +59,10 @@ func lockDevice(ctx context.Context, c *ops.Call, id uuid.UUID) (devState, error
 	var state devState
 
 	err := c.Tx.QueryRow(ctx, `SELECT unit_id, target_unit_id, created_by_membership_id, version, connection, tamper,
-		firmware_version
+		firmware_version, iot_model_id, iot_model_version
 		FROM devices.devices WHERE id = $1 FOR UPDATE`, id).
-		Scan(&state.unit, &state.target, &state.creator, &state.version, &state.connection, &state.tamper, &state.firmware)
+		Scan(&state.unit, &state.target, &state.creator, &state.version, &state.connection, &state.tamper, &state.firmware,
+			&state.iotModel, &state.iotVersion)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return state, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
@@ -768,26 +771,23 @@ func (m *Module) lockBoundDevice(
 	return state, state.current(call)
 }
 
-// firmwareAllowed checks a firmware update of a locked device: the target is a candidate of its unit's model version
-// other than the installed one, and the device is online (IR94: no DeviceOperation when not online).
-func (m *Module) firmwareAllowed(
+// firmwareAllowed checks a firmware update of a locked device: the target is a candidate of its IoT model's current
+// version other than the installed one, and the device is online (IR94: no DeviceOperation when not online).
+func (*Module) firmwareAllowed(
 	ctx context.Context,
 	call *ops.Call,
 	state devState,
 	target string,
 ) error {
-	unitInfo, _, err := m.Units.UnitInfo(ctx, call, *state.unit)
-	if err != nil {
-		return apperr.Wrap(err, "devices.Units.UnitInfo")
-	}
+	var candidates []string // none for a device without an IoT model
 
-	var candidates []string
-
-	scanErr := call.Tx.QueryRow(ctx, `SELECT firmware_candidates FROM devices.capabilities WHERE id = $1 AND version =
-		$2`, unitInfo.ModelID, unitInfo.CapabilityVersion).
-		Scan(&candidates)
-	if scanErr != nil {
-		return apperr.Wrap(scanErr, "select devices.capabilities")
+	if state.iotModel != nil {
+		scanErr := call.Tx.QueryRow(ctx, `SELECT firmware_candidates FROM devices.iot_models WHERE id = $1 AND is_current`,
+			*state.iotModel).
+			Scan(&candidates)
+		if scanErr != nil {
+			return apperr.Wrap(scanErr, "select devices.iot_models")
+		}
 	}
 
 	if !slices.Contains(candidates, target) || target == state.firmware {

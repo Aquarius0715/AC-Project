@@ -7,8 +7,8 @@ import { connection } from "next/server";
 import { apiMode, coreAll, coreDisplay, coreNow, coreOp, corePermissions, orWhenForbidden, orAbsent, coreAllPage } from "@ac/web/lib/dal";
 import { i18nOf } from "@ac/web/lib/i18n";
 import {
-  campaignRows, deviceRows, modelRows,
-  type ApiCalibration, type ApiCampaign, type ApiCapability, type ApiDevice, type ApiDeviceDetail, type ApiDeviceOperation, type ApiUnitLite,
+  campaignRows, deviceRows, iotModelRows, modelRows,
+  type ApiCalibration, type ApiCampaign, type ApiCapability, type ApiDevice, type ApiIoTModel, type ApiDeviceDetail, type ApiDeviceOperation, type ApiUnitLite,
 } from "@ac/web/lib/devices";
 import {
   calibrationText, deviceTiles, eventRows, firmwareCard, newerFirmware, newerVersions, openFaults, operationRows, sensorRows, techDeviceRows,
@@ -38,12 +38,13 @@ async function AdminDevicesPageContent({ searchParams }: Readonly<PageProps<"/ad
   const sp = await searchParams;
   const one = queryReader(sp);
   const asked = one("tab");
-  const tab = asked === "devices" || asked === "firmware" ? asked : "models";
+  const tab = asked === "devices" || asked === "firmware" || asked === "iot" ? asked : "models";
   // the devices tab pages the registry on the server; the models and firmware tabs count every device of each model and
   // version and offer them to a campaign, so they read them all (IR723)
-  const [now, perms, display, caps, units, registry, all] = await Promise.all([
+  const [now, perms, display, caps, iot, units, registry, all] = await Promise.all([
     coreNow(), corePermissions(), coreDisplay(),
     coreAllPage<ApiCapability>("capabilities.list"),
+    coreAllPage<ApiIoTModel>("iotModels.list"),
     coreAllPage<ApiUnitLite>("units.list"),
     tab === "devices" ? registryPage(one("q")?.trim() ?? "", one("cursor") ?? null, one("deviceId") ?? null) : null,
     tab === "devices" ? Promise.resolve([] as ApiDevice[]) : coreAll<ApiDevice>("devices.list", {}, 10_000),
@@ -55,8 +56,8 @@ async function AdminDevicesPageContent({ searchParams }: Readonly<PageProps<"/ad
     tab, now: now.toISOString(), canAudit: perms.has("audit.read"), canWrite: perms.has("device.write"),
     deviceTotal: registry?.total ?? all.length,
     ...(registry && { page: { q: one("q")?.trim() ?? "", next: registry.next, cursor: one("cursor") ?? null } }),
-    models: modelRows(caps.items, units.items, devices.items, i), devices: rows,
-    units: units.items.filter((u) => !u.archived).map((u) => ({ id: u.id, label: u.displayName, modelId: u.modelId })),
+    models: modelRows(caps.items, units.items, devices.items, i), iotModels: iotModelRows(iot.items, units.items, devices.items, i), devices: rows,
+    units: units.items.filter((u) => !u.archived).map((u) => ({ id: u.id, label: u.displayName, modelId: u.modelId, iotModelId: u.iotModelId ?? null })),
   };
   if (tab === "devices") {
     // the list and the detail as Figma Admin 246:2 and the technician's device screen draw them: sorted by serial, the
@@ -79,8 +80,7 @@ async function AdminDevicesPageContent({ searchParams }: Readonly<PageProps<"/ad
         d.unitId ? absent(coreOp<ApiUnitDetail>("units.get", { id: d.unitId })) : null,
         Promise.all([...new Set(events.items.flatMap((e) => e.alertIds))].map((a) => absent(coreOp<ApiAlertLite>("alerts.get", { id: a })))),
       ]);
-      const model = units.items.find((u) => u.id === d.unitId)?.modelId;
-      const candidates = caps.items.find((k) => k.id === model)?.firmwareCandidates ?? [];
+      const candidates = iot.items.find((k) => k.id === d.iotModelId)?.firmwareCandidates ?? [];
       live.device = {
         row, detail: d,
         tiles: deviceTiles(d, newerFirmware(d.firmwareVersion, candidates), now.getTime(), openFaults(events.items), i), sensors: sensorRows(d, i),
@@ -96,9 +96,9 @@ async function AdminDevicesPageContent({ searchParams }: Readonly<PageProps<"/ad
       optional(coreAll<{ id: string; displayName: string }>("members.list"), []), // who scheduled it, where the session may read members (IR344)
     ]);
     const people = new Map(members.map((m) => [m.id, m.displayName]));
-    live.campaigns = campaignRows(campaigns.items, caps.items, i, people);
+    live.campaigns = campaignRows(campaigns.items, iot.items, i, people);
     const id = live.campaigns.find((c) => c.id === one("campaignId"))?.id ?? live.campaigns[0]?.id;
-    if (id) live.campaign = campaignRows([await coreOp<ApiCampaign>("firmwareCampaigns.get", { id })], caps.items, i, people)[0];
+    if (id) live.campaign = campaignRows([await coreOp<ApiCampaign>("firmwareCampaigns.get", { id })], iot.items, i, people)[0];
   }
   return <DevicesView live={live} />;
 }

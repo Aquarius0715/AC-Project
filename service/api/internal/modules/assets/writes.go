@@ -22,6 +22,8 @@ import (
 // Models is what Assets needs from the Devices module.
 type Models interface {
 	CurrentVersion(ctx context.Context, c *ops.Call, modelID uuid.UUID) (int, bool, error)
+	// IoTCurrentVersion is CurrentVersion of an IoT model (DEC-105).
+	IoTCurrentVersion(ctx context.Context, c *ops.Call, modelID uuid.UUID) (int, bool, error)
 }
 
 // The longest texts the forms take, in characters (the DDs' input constraints).
@@ -283,10 +285,12 @@ type UnitSave struct {
 	SpaceID       *uuid.UUID `json:"spaceId"`
 	DisplayName   string     `json:"displayName"`
 	ModelID       uuid.UUID  `json:"modelId"`
-	Type          string     `json:"type"`
-	InstalledAt   *time.Time `json:"installedAt"`
-	ServiceScope  []string   `json:"serviceScope"`
-	ChangeReason  *string    `json:"changeReason,omitempty"`
+	// IoTModelID is the unit's planned IoT model (DEC-105); null or omitted is none.
+	IoTModelID   *uuid.UUID `json:"iotModelId,omitempty"`
+	Type         string     `json:"type"`
+	InstalledAt  *time.Time `json:"installedAt"`
+	ServiceScope []string   `json:"serviceScope"`
+	ChangeReason *string    `json:"changeReason,omitempty"`
 	// WarrantyEndsAt is optional: omitted keeps the stored end (none for a new unit), null clears it (IR209).
 	WarrantyEndsAt json.RawMessage `json:"warrantyEndsAt,omitempty" swaggertype:"object"`
 	warranty       *time.Time
@@ -454,6 +458,51 @@ func (*Module) MoveToCapabilityVersion(
 	return moved, apperr.Wrap(rows.Err(), "update assets.units")
 }
 
+// MoveToIoTModelVersion points every unit and device of the IoT model at its new version (called by Devices on
+// iotModels.save); returns the number of units changed.
+func (*Module) MoveToIoTModelVersion(
+	ctx context.Context,
+	call *ops.Call,
+	modelID uuid.UUID,
+	version int,
+) (int, error) {
+	rows, err := call.Tx.Query(
+		ctx,
+		`UPDATE assets.units SET iot_model_version = $2, version = version + 1, updated_at = platform.app_now()
+		WHERE iot_model_id = $1 AND iot_model_version IS DISTINCT FROM $2 RETURNING id`,
+		modelID,
+		version,
+	)
+	if err != nil {
+		return 0, apperr.Wrap(err, "update assets.units")
+	}
+	defer rows.Close()
+
+	moved := 0
+
+	for rows.Next() {
+		var unitID uuid.UUID
+
+		err := rows.Scan(&unitID)
+		if err != nil {
+			return moved, apperr.Wrap(err, "update assets.units")
+		}
+
+		call.Emit(
+			ops.Event{
+				AggregateType: kindUnit,
+				AggregateID:   unitID,
+				Type:          eventUnitChanged,
+				Payload:       nil,
+			},
+		)
+
+		moved++
+	}
+
+	return moved, apperr.Wrap(rows.Err(), "update assets.units")
+}
+
 // UnitInfo answers unit lookups for Devices (scope is applied by the calling operation's own rules).
 func (*Module) UnitInfo(
 	ctx context.Context,
@@ -462,9 +511,9 @@ func (*Module) UnitInfo(
 ) (devices.UnitInfo, bool, error) {
 	var unitInfo devices.UnitInfo
 
-	err := c.Tx.QueryRow(ctx, `SELECT customer_org_id, property_id, model_id, capability_version FROM assets.units WHERE id
-		= $1 AND NOT archived`, unit).
-		Scan(&unitInfo.OrgID, &unitInfo.PropertyID, &unitInfo.ModelID, &unitInfo.CapabilityVersion)
+	err := c.Tx.QueryRow(ctx, `SELECT customer_org_id, property_id, model_id, capability_version, iot_model_id FROM
+		assets.units WHERE id = $1 AND NOT archived`, unit).
+		Scan(&unitInfo.OrgID, &unitInfo.PropertyID, &unitInfo.ModelID, &unitInfo.CapabilityVersion, &unitInfo.IoTModelID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return unitInfo, false, nil
 	}
@@ -1357,16 +1406,16 @@ func (m *Module) unitsSaveUnit(ctx context.Context, call *ops.Call, input *UnitS
 		return Unit{}, apperr.Fields(map[string]string{keyInstalledAt: apperr.KeyFuture})
 	}
 
-	capVer, err := m.unitPlace(ctx, call, input)
+	models, err := m.unitPlace(ctx, call, input)
 	if err != nil {
 		return Unit{}, err
 	}
 
 	if input.ID == nil {
-		return m.addUnit(ctx, call, input, capVer)
+		return m.addUnit(ctx, call, input, models)
 	}
 
-	return m.updateUnit(ctx, call, input, capVer)
+	return m.updateUnit(ctx, call, input, models)
 }
 
 // unitValues are the values of a unit its form changes, as stored or as the form sends them.
@@ -1375,6 +1424,7 @@ type unitValues struct {
 	space     *uuid.UUID
 	name      string
 	model     uuid.UUID
+	iotModel  *uuid.UUID
 	installed *time.Time
 	scope     []string
 	warranty  *time.Time
@@ -1387,6 +1437,7 @@ func (values unitValues) history() map[string]any {
 		keySpaceID:        values.space,
 		"displayName":     values.name,
 		keyModelID:        values.model,
+		keyIoTModelID:     values.iotModel,
 		keyInstalledAt:    values.installed,
 		"serviceScope":    values.scope,
 		keyWarrantyEndsAt: values.warranty,
@@ -1403,11 +1454,11 @@ func (values unitValues) moved(property uuid.UUID, space *uuid.UUID) bool {
 func storedUnit(ctx context.Context, call *ops.Call, id, org uuid.UUID) (unitValues, error) {
 	var values unitValues
 
-	err := call.Tx.QueryRow(ctx, `SELECT property_id, space_id, display_name, model_id, installed_at, service_scope,
-		warranty_ends_at FROM assets.units WHERE id = $1 AND customer_org_id = $2 AND NOT archived`,
+	err := call.Tx.QueryRow(ctx, `SELECT property_id, space_id, display_name, model_id, iot_model_id, installed_at,
+		service_scope, warranty_ends_at FROM assets.units WHERE id = $1 AND customer_org_id = $2 AND NOT archived`,
 		id, org).
-		Scan(&values.property, &values.space, &values.name, &values.model, &values.installed, &values.scope,
-			&values.warranty)
+		Scan(&values.property, &values.space, &values.name, &values.model, &values.iotModel, &values.installed,
+			&values.scope, &values.warranty)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return values, notFound()
 	}
@@ -1422,7 +1473,7 @@ func (m *Module) updateUnit(
 	ctx context.Context,
 	call *ops.Call,
 	input *UnitSave,
-	capVer int,
+	models unitModels,
 ) (Unit, error) {
 	current, err := storedUnit(ctx, call, *input.ID, input.CustomerOrgID)
 	if err != nil {
@@ -1452,10 +1503,11 @@ func (m *Module) updateUnit(
 
 	err = call.Tx.QueryRow(ctx, `UPDATE assets.units SET property_id=$3, space_id=$4, display_name=$5, model_id=$6,
 		installed_at=$7, service_scope=$8,
-		capability_version=$9, warranty_ends_at=$10, version = version + 1, updated_at = platform.app_now()
+		capability_version=$9, warranty_ends_at=$10, iot_model_id=$11, iot_model_version=$12, version = version + 1,
+		updated_at = platform.app_now()
 		WHERE id = $1 AND version = $2 AND NOT archived RETURNING version`,
 		*input.ID, *call.ExpectedVersion, input.PropertyID, input.SpaceID, input.DisplayName, input.ModelID,
-		input.InstalledAt, input.ServiceScope, capVer, warranty).
+		input.InstalledAt, input.ServiceScope, models.capVer, warranty, input.IoTModelID, models.iotVer).
 		Scan(&version)
 	if err != nil {
 		return Unit{}, versionedUpdate(ctx, call, "assets.units", *input.ID, err)
@@ -1480,6 +1532,7 @@ func (m *Module) updateUnit(
 		space:     input.SpaceID,
 		name:      input.DisplayName,
 		model:     input.ModelID,
+		iotModel:  input.IoTModelID,
 		installed: input.InstalledAt,
 		scope:     input.ServiceScope,
 		warranty:  warranty,
@@ -1504,22 +1557,33 @@ func (m *Module) updateUnit(
 
 // unitPlace checks the unit's place and model: the property is the customer's, the space is in the property, and the
 // model is in the register. It returns the model's current capability version.
-func (m *Module) unitPlace(ctx context.Context, call *ops.Call, input *UnitSave) (int, error) {
+// unitModels are the versions a unit is saved with: the aircon model's capability version and the IoT model's version
+// (nil without an IoT model).
+type unitModels struct {
+	capVer int
+	iotVer *int
+}
+
+func (m *Module) unitPlace(
+	ctx context.Context,
+	call *ops.Call,
+	input *UnitSave,
+) (unitModels, error) {
 	var propOrg uuid.UUID
 	// the property and the space are read with a share lock: their archive waits, or is waited for and seen (IR478)
 	err := call.Tx.QueryRow(ctx, `SELECT customer_org_id FROM assets.properties WHERE id = $1 AND NOT archived FOR
 		SHARE`, input.PropertyID).
 		Scan(&propOrg)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return 0, notFound()
+		return unitModels{}, notFound()
 	}
 
 	if err != nil {
-		return 0, apperr.Wrap(err, "select assets.properties")
+		return unitModels{}, apperr.Wrap(err, "select assets.properties")
 	}
 
 	if propOrg != input.CustomerOrgID {
-		return 0, apperr.Fields(map[string]string{keyPropertyID: "error.otherCustomer"})
+		return unitModels{}, apperr.Fields(map[string]string{keyPropertyID: "error.otherCustomer"})
 	}
 
 	if input.SpaceID != nil {
@@ -1527,24 +1591,40 @@ func (m *Module) unitPlace(ctx context.Context, call *ops.Call, input *UnitSave)
 			SHARE`, *input.SpaceID, input.PropertyID).
 			Scan(new(int))
 		if errors.Is(err, pgx.ErrNoRows) {
-			return 0, apperr.Fields(map[string]string{keySpaceID: "error.otherProperty"})
+			return unitModels{}, apperr.Fields(map[string]string{keySpaceID: "error.otherProperty"})
 		}
 
 		if err != nil {
-			return 0, apperr.Wrap(err, "select assets.spaces")
+			return unitModels{}, apperr.Wrap(err, "select assets.spaces")
 		}
 	}
 
 	capVer, ok, err := m.Models.CurrentVersion(ctx, call, input.ModelID)
 	if err != nil {
-		return 0, apperr.Wrap(err, "assets.Models.CurrentVersion")
+		return unitModels{}, apperr.Wrap(err, "assets.Models.CurrentVersion")
 	}
 
 	if !ok {
-		return 0, apperr.Fields(map[string]string{keyModelID: "error.unknownModel"})
+		return unitModels{}, apperr.Fields(map[string]string{keyModelID: "error.unknownModel"})
 	}
 
-	return capVer, nil
+	models := unitModels{capVer: capVer, iotVer: nil}
+	if input.IoTModelID == nil {
+		return models, nil
+	}
+
+	iotVer, ok, err := m.Models.IoTCurrentVersion(ctx, call, *input.IoTModelID)
+	if err != nil {
+		return unitModels{}, apperr.Wrap(err, "assets.Models.IoTCurrentVersion")
+	}
+
+	if !ok {
+		return unitModels{}, apperr.Fields(map[string]string{keyIoTModelID: "error.unknownModel"})
+	}
+
+	models.iotVer = &iotVer
+
+	return models, nil
 }
 
 // addUnit creates the unit of an active customer with the model's current capability version.
@@ -1552,7 +1632,7 @@ func (m *Module) addUnit(
 	ctx context.Context,
 	call *ops.Call,
 	input *UnitSave,
-	capVer int,
+	models unitModels,
 ) (Unit, error) {
 	err := m.customerActive(ctx, call, input.CustomerOrgID)
 	if err != nil {
@@ -1564,8 +1644,8 @@ func (m *Module) addUnit(
 	_, err = call.Tx.Exec(
 		ctx,
 		`INSERT INTO assets.units (id, tenant_id, customer_org_id, property_id, space_id, display_name, model_id, type,
-			installed_at, service_scope, capability_version, warranty_ends_at)
-		VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+			installed_at, service_scope, capability_version, warranty_ends_at, iot_model_id, iot_model_version)
+		VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
 		unitID,
 		input.CustomerOrgID,
 		input.PropertyID,
@@ -1575,8 +1655,10 @@ func (m *Module) addUnit(
 		input.Type,
 		input.InstalledAt,
 		input.ServiceScope,
-		capVer,
+		models.capVer,
 		input.warranty,
+		input.IoTModelID,
+		models.iotVer,
 	)
 	if err != nil {
 		return Unit{}, apperr.Wrap(err, "insert assets.units")
