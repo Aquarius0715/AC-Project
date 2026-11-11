@@ -122,6 +122,12 @@ func LiveSite() Site {
 			Sensors: []LiveSensor{
 				{Name: "sensor-live-temperature", Metric: keyTemperature, Unit: "°C", Boundary: ""},
 				{Name: "sensor-live-humidity", Metric: keyHumidity, Unit: "%", Boundary: ""},
+				{
+					Name:     "sensor-live-power",
+					Metric:   keyPower,
+					Unit:     "kW",
+					Boundary: "ac_input_electricity",
+				},
 			},
 		},
 		SensorUnits: []LiveModule{
@@ -446,6 +452,19 @@ func liveModuleOf(
 			liveSensor.Unit,
 			boundary,
 			liveStaleAfterSeconds,
+		)
+		if err != nil {
+			return err
+		}
+		// a sensor of the device that is there already, under whatever id, takes the module's energy boundary: the
+		// insert above leaves it as it is, and a power sensor without the boundary is skipped by the energy sums
+		err = exec(
+			"sensor "+liveSensor.Metric+" boundary",
+			`UPDATE devices.sensors SET boundary_id = $3
+			WHERE device_id = $1 AND metric = $2 AND boundary_id IS DISTINCT FROM $3`,
+			device,
+			liveSensor.Metric,
+			boundary,
 		)
 		if err != nil {
 			return err
