@@ -516,13 +516,30 @@ func (Directory) SetGrant(
 	)
 }
 
+// Reachable reports whether the active membership can be reached on the notification channel (IR779).
+func (Directory) Reachable(
+	ctx context.Context,
+	call *ops.Call,
+	membership uuid.UUID,
+	channel string,
+) (bool, error) {
+	ok, err := ops.Delegate(
+		ctx,
+		call,
+		QueryReachable,
+		ReachableInput{MembershipID: membership, Channel: channel},
+		reachable,
+	)
+
+	return ok, apperr.Wrap(err, "delegate identity.reachable")
+}
+
 // ActiveClientOf reports whether a membership is an active client membership of the organization (identity.members,
-// so callers in other domains ask identity-api, IR191) that a notice can reach on the channel ("" asks for none, IR779).
+// so callers in other domains ask identity-api, IR191).
 func (Directory) ActiveClientOf(
 	ctx context.Context,
 	c *ops.Call,
 	membership, org uuid.UUID,
-	channel string,
 ) (bool, error) {
 	ids, err := ops.Query[[]uuid.UUID](
 		ctx,
@@ -534,7 +551,6 @@ func (Directory) ActiveClientOf(
 			OrganizationID: &org,
 			Permission:     "",
 			ClientRole:     "",
-			Channel:        channel,
 		},
 	)
 

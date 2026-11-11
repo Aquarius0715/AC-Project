@@ -264,7 +264,13 @@ type Idempotency interface {
 	Complete(ctx context.Context, p *Principal, op, key string, resp json.RawMessage) error
 	// CompleteTx stores the response in the operation's own transaction, so that the change and its receipt commit
 	// together (IR777).
-	CompleteTx(ctx context.Context, txn pgx.Tx, p *Principal, op, key string, resp json.RawMessage) error
+	CompleteTx(
+		ctx context.Context,
+		txn pgx.Tx,
+		p *Principal,
+		op, key string,
+		resp json.RawMessage,
+	) error
 	Abort(ctx context.Context, p *Principal, op, key string)
 }
 
@@ -922,7 +928,17 @@ func (r *Registry) execute(
 				return apperr.Wrap(err, "select platform.outbox")
 			}
 
-			return r.storeResponse(ctx, txn, call, operation.Spec.Name, key, out, cursor, write, &stored)
+			return r.storeResponse(
+				ctx,
+				txn,
+				call,
+				operation.Spec.Name,
+				key,
+				out,
+				cursor,
+				write,
+				&stored,
+			)
 		}
 
 		return nil
@@ -1006,7 +1022,8 @@ func (r *Registry) respond(
 		resp = encoded
 	}
 
-	if write && r.Idem != nil && stored == nil { // an operation with its own transaction: stored after its commit
+	if write && r.Idem != nil &&
+		stored == nil { // an operation with its own transaction: stored after its commit
 		err := r.Idem.Complete(ctx, call.Principal, name, key, resp)
 		if err != nil {
 			return fail(ectx, err, corr)

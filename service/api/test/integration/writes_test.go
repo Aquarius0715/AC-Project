@@ -23,7 +23,13 @@ var errStoreAfterCommit = errors.New("the receipt cannot be stored after the com
 // after the commit does (IR777): a write that stores its receipt in its own transaction does not use it.
 type afterCommitFails struct{ ops.Idempotency }
 
-func (afterCommitFails) Complete(context.Context, *ops.Principal, string, string, json.RawMessage) error {
+func (afterCommitFails) Complete(
+	context.Context,
+	*ops.Principal,
+	string,
+	string,
+	json.RawMessage,
+) error {
 	return errStoreAfterCommit
 }
 
@@ -68,17 +74,18 @@ func TestCommittedWriteKeepsItsReceipt(t *testing.T) {
 	_ = json.Unmarshal(first.Body.Bytes(), &sent)
 	_ = json.Unmarshal(again.Body.Bytes(), &replayed)
 
-	if again.Code != 200 || !reflect.DeepEqual(sent, replayed) { // the stored copy is jsonb: compare the content
+	if again.Code != 200 ||
+		!reflect.DeepEqual(sent, replayed) { // the stored copy is jsonb: compare the content
 		t.Errorf("the same key does not replay the answer: %d %s", again.Code, again.Body.String())
 	}
 
-	if _, m := post(
+	if _, res := post(
 		srv,
 		techB(),
 		"writes.getResult",
 		`{"operation":"preferences.update","idempotencyKey":"`+key+`"}`,
-	); data(m)["state"] != stateSucceeded {
-		t.Errorf("writes.getResult: %v", m)
+	); data(res)["state"] != stateSucceeded {
+		t.Errorf("writes.getResult: %v", res)
 	}
 }
 

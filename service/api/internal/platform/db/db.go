@@ -197,7 +197,7 @@ func (s Idempotency) Complete(
 
 // CompleteTx stores the response in the operation's own transaction, so that the change and its receipt commit
 // together and a committed write never reads as "in progress" (IR777).
-func (s Idempotency) CompleteTx(
+func (Idempotency) CompleteTx(
 	ctx context.Context,
 	txn pgx.Tx,
 	principal *ops.Principal,

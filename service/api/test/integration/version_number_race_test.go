@@ -25,7 +25,9 @@ func TestSlaTargetSavesNeverStoreOneVersionTwice(t *testing.T) {
 			hq(),
 			"sla.saveTargets",
 			`{"planType":"environment","responseHours":6,"arrivalInWindowPercent":90,"firstTimeFixPercent":80,`+
-				`"effectiveFrom":"`+clock().Add(time.Duration(hours)*time.Hour).Format(time.RFC3339)+`"}`,
+				`"effectiveFrom":"`+clock().Add(time.Duration(hours)*time.Hour).
+				Format(time.RFC3339)+
+				`"}`,
 			0,
 		)
 	}
@@ -62,7 +64,11 @@ func TestSlaTargetSavesNeverStoreOneVersionTwice(t *testing.T) {
 	}
 
 	t.Cleanup(func() {
-		owner(t, `DELETE FROM maintenance.sla_targets WHERE plan_type = 'environment' AND tenant_id = $1`, seed.ID("tenant-a"))
+		owner(
+			t,
+			`DELETE FROM maintenance.sla_targets WHERE plan_type = 'environment' AND tenant_id = $1`,
+			seed.ID("tenant-a"),
+		)
 	})
 
 	done := make(chan saveResult, 1)
@@ -123,7 +129,8 @@ func TestRateCardSavesNeverStoreOneVersionTwice(t *testing.T) {
 			hq(),
 			"rateCards.save",
 			`{"contractorOrgId":"`+org.String()+`","effectiveFrom":"`+clock().Add(time.Duration(hours)*time.Hour).
-				Format(time.RFC3339)+`","currency":"MYR","lines":[{"workType":"repair_base","amountMinor":45000,"note":"base"}]}`,
+				Format(time.RFC3339)+
+				`","currency":"MYR","lines":[{"workType":"repair_base","amountMinor":45000,"note":"base"}]}`,
 			0,
 		)
 	}

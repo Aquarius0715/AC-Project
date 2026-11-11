@@ -1152,7 +1152,11 @@ func TestReleaseQualificationEnded(t *testing.T) {
 			`UPDATE maintenance.certificates SET status = 'valid' WHERE id::text = ANY($1)`,
 			aside,
 		)
-		owner(t, `DELETE FROM maintenance.certificates WHERE membership_id = $1 AND number = 'N-2'`, tech)
+		owner(
+			t,
+			`DELETE FROM maintenance.certificates WHERE membership_id = $1 AND number = 'N-2'`,
+			tech,
+		)
 	})
 
 	stamp := func(h int) string { return clock().Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
@@ -1309,13 +1313,19 @@ func TestReleaseQualificationEnded(t *testing.T) {
 		srv,
 		contrA(),
 		"jobs.assign",
-		`{"jobId":"`+job+`","technicianMembershipId":"`+tech.String()+`","startAt":"`+stamp(49)+`","endAt":"`+stamp(51)+`"}`,
+		`{"jobId":"`+job+`","technicianMembershipId":"`+tech.String()+`","startAt":"`+stamp(
+			49,
+		)+`","endAt":"`+stamp(
+			51,
+		)+`"}`,
 		ver(t, detail),
 	); code != 200 {
 		t.Fatalf("assign again: %d %v", code, res)
 	}
 
-	approve(60) // shorter than the one before, and it ends after the visit began: the 100 h certificate still covers it
+	approve(
+		60,
+	) // shorter than the one before, and it ends after the visit began: the 100 h certificate still covers it
 
 	if status, assignment, _ := state(); status != statusAssigned || assignment == nil {
 		t.Errorf("a shorter certificate cut the qualification: %s %v", status, assignment)

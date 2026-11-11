@@ -10432,7 +10432,7 @@ Proposal B-31 (rounds 486 and 715), built with the recommended option 1.
 Proposal B-36 (round 590), built with the recommended option 1.
 
 1. **Before.** IR04 says the recipient of a reminder must be "an active Membership of that customer eligible for the channel". `remindable` checked the active client only, and the channel only against inApp / email / whatsapp, so a direct call recorded a WhatsApp reminder for a client with no phone number. The screen picks the channel from `notifications.recipients`, which does not offer it.
-2. **Now.** `identity.members` takes a `channel` and, for WhatsApp, keeps only a client whose account has a phone number — the rule of `notifications.recipients` (`recipientsSQL`). `remindable` asks it after the active-client check; a recipient who cannot be reached answers VALIDATION `channel=errors.channel_not_allowed`. inApp and email are open to every active client.
+2. **Now.** a new internal query `identity.reachable` (membership, channel) is true for an active membership that a notice can reach: inApp and email for anyone, WhatsApp only for a client whose account has a phone number — the rule of `notifications.recipients` (`recipientsSQL`). `remindable` asks it after the active-client check; a recipient who cannot be reached answers VALIDATION `channel=errors.channel_not_allowed`. inApp and email are open to every active client.
 3. **Tests.** `TestContractsAndInvoices` (invoices.remind): WhatsApp to a client without a phone number answers 422 `channel=errors.channel_not_allowed` (the reminder was recorded before).
 
 ## IR780 customers.save refuses an organization that is not a customer's — 2026-11-11

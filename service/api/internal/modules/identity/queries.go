@@ -39,6 +39,7 @@ func RegisterQueries(reg *ops.Registry) {
 		},
 	)
 	ops.RegisterQuery(reg, ops.DomainIdentity, QueryMembers, members)
+	ops.RegisterQuery(reg, ops.DomainIdentity, QueryReachable, reachable)
 	ops.RegisterQuery(reg, ops.DomainIdentity, QueryNotificationsStored, notificationsStored)
 	ops.RegisterQuery(reg, ops.DomainIdentity, QueryConsent, consent)
 	ops.RegisterQuery(reg, ops.DomainIdentity, QueryLoadMembers, loadMembers)
@@ -75,9 +76,6 @@ type MembersInput struct {
 	Permission     string      `json:"permission,omitempty"`
 	// owner / member (filter cleaning reminders to the owners, IR239)
 	ClientRole string `json:"clientRole,omitempty"`
-	// Channel keeps the members the notice may reach on it: every channel but WhatsApp for anyone, WhatsApp only for a
-	// client whose account has a phone number, as notifications.recipients says (IR779)
-	Channel string `json:"channel,omitempty"`
 }
 
 // QueryConsent reports whether a membership granted a consent purpose (IR194: SR02 location automations).
@@ -142,9 +140,7 @@ func members(ctx context.Context, call *ops.Call, input *MembersInput) ([]uuid.U
 		$4)
 		AND ($5 = '' OR EXISTS (SELECT 1 FROM identity.membership_permissions p WHERE p.membership_id = m.id AND p.permission
 		= $5))
-		AND ($6 = '' OR m.client_role = $6)
-		AND ($7 = '' OR $7 <> 'whatsapp' OR (m.role = 'client' AND EXISTS (SELECT 1 FROM identity.users u WHERE u.id = m.user_id
-		AND u.phone IS NOT NULL))) ORDER BY m.id`
+		AND ($6 = '' OR m.client_role = $6) ORDER BY m.id`
 
 	var ids []uuid.UUID
 	if input.IDs != nil {
@@ -160,7 +156,6 @@ func members(ctx context.Context, call *ops.Call, input *MembersInput) ([]uuid.U
 		input.OrganizationID,
 		input.Permission,
 		input.ClientRole,
-		input.Channel,
 	)
 	if err != nil {
 		return nil, apperr.Wrap(err, "select identity.memberships")
