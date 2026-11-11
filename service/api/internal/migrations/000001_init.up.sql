@@ -1283,8 +1283,7 @@ CREATE TABLE maintenance.rate_cards (
   lines              jsonb NOT NULL,             -- [{workType, amountMinor, note}]
   version            int NOT NULL DEFAULT 1,
   created_at         timestamptz NOT NULL DEFAULT platform.app_now(),
-  UNIQUE (contractor_org_id, effective_from),
-  UNIQUE (contractor_org_id, version)       -- two saves at once cannot store one version twice (IR778)
+  UNIQUE (contractor_org_id, effective_from)
 );
 
 CREATE TABLE maintenance.certificates (          -- FR-P09
@@ -1345,8 +1344,7 @@ CREATE TABLE maintenance.sla_targets (           -- FR-A22
   first_time_fix_percent     numeric(5,2) NOT NULL,
   effective_from             timestamptz NOT NULL,
   version                    int NOT NULL DEFAULT 1,
-  UNIQUE (tenant_id, plan_type, effective_from),
-  UNIQUE (tenant_id, plan_type, version)    -- two saves at once cannot store one version twice (IR778)
+  UNIQUE (tenant_id, plan_type, effective_from)
 );
 
 CREATE TABLE maintenance.filter_care_settings (  -- FR-C18
