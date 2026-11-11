@@ -156,7 +156,8 @@ func (h *liveHandler) unhold(node string) ([]byte, bool) {
 	return payload, ok
 }
 
-// status takes a node's status: its heartbeat marks it heard and tells its firmware; its last will marks it gone.
+// status takes a node's status: its heartbeat (not a retained one) marks it heard and tells its firmware; its last will
+// marks it gone.
 func (h *liveHandler) status(node string, msg mqtt.Message, now time.Time) {
 	status, err := iotbridge.ParseLiveStatus(msg.Payload())
 	if err != nil {
@@ -168,7 +169,9 @@ func (h *liveHandler) status(node string, msg mqtt.Message, now time.Time) {
 	h.firmware.Noted(node, status)
 
 	if status.Online {
-		h.heard.Heard(node, now)
+		if !msg.Retained() { // the broker replays a retained status on a reconnect: not a sign of life
+			h.heard.Heard(node, now)
+		}
 
 		return
 	}
