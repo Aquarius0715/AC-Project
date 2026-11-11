@@ -279,6 +279,17 @@ func scheduledContract(
 		termStart, termUntil time.Time
 	)
 
+	// every version of the contract first (IR766): a schedule that waited for a new contract version reads that
+	// version, instead of NOT_FOUND for the row that is no longer current
+	_, lockErr := call.Tx.Exec(
+		ctx,
+		`SELECT 1 FROM billing.contracts WHERE id = $1 ORDER BY version FOR UPDATE`,
+		input.ContractID,
+	)
+	if lockErr != nil {
+		return scheduleContract{}, apperr.Wrap(lockErr, "select billing.contracts")
+	}
+
 	err := call.Tx.QueryRow(ctx, `SELECT k.version, k.plan_type, k.restriction_eligible, k.rules_version, k.customer_id,
 		k.customer_org_id, lower(k.term), upper(k.term),
 		COALESCE((SELECT array_agg(cu.unit_id) FROM billing.contract_units cu WHERE cu.contract_id = k.id AND

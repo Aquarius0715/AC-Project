@@ -10307,3 +10307,11 @@ Found in review round 694 (`energy/factors.go`, `energy/baselines.go`).
    - A save after another save reads the new current version afresh and compares its expected version with it.
    - `capabilities.save` already reads its current version `FOR UPDATE`, and contracts have no delete, so no other versioned record has the gap.
 3. **Tests.** `TestEnergyRecordSaveWaitsForItsDelete` holds a factor delete, and then a baseline delete, half done. Before the fix, the save answered 200 after the delete and left a lone version. Now it answers 404.
+
+## IR766 A write that waited for a new version of the same record answers a version conflict — 2026-11-11
+
+Found in review rounds 697–698 (`devices/capabilities.go`, `billing/contracts.go`, `restrictions/schedule.go`, `energy/deletes.go`).
+
+1. **Before.** Several writes locked only `id AND is_current` FOR UPDATE: `capabilities.save` and `capabilities.delete`, the locked contract read of `contracts.save` and `invoices.create`, `restrictions.schedule`'s contract lock, and `factors.delete` / `baselines.delete`. When one of them waited for a new version of the same record being saved, the row it waited for was no longer current once that save committed, so under READ COMMITTED its WHERE failed and it answered NOT_FOUND. The record still existed, and the right answer was CONFLICT `error.versionConflict` (the screen would say the model, contract or factor was gone). No data was harmed: the waiter wrote nothing.
+2. **Now.** Each of them first locks every version row of the record by id (`ORDER BY version FOR UPDATE`) and then runs its current read as before, so after waiting it reads the new current version and its expected-version check answers the conflict. Energy reuses IR765's `lockVersions`; the record that is gone still answers NOT_FOUND.
+3. **Tests.** `TestAWriteThatWaitedForANewVersionIsAVersionConflict`: a capability revision, a contract revision and a factor delete, each waiting for another save of the record half done (a second connection copies version 1 into version 2 and clears the old flag) — 404 before, 409 error.versionConflict now.

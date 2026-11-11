@@ -27,7 +27,7 @@ func TestEnergyRecordSaveWaitsForItsDelete(t *testing.T) {
 	for _, testCase := range []struct {
 		operation, table, body string
 	}{
-		{"factors.save", "energy.emission_factors", factorBody},
+		{opFactorsSave, tableEmissionFactors, factorBody},
 		{"baselines.save", "energy.baselines", baselineBody},
 	} {
 		code, resp := write(srv, hq(), testCase.operation, "{"+testCase.body, 0)
