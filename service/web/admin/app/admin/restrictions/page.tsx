@@ -85,7 +85,7 @@ export default async function AdminRestrictionsPage({ searchParams }: Readonly<P
       isFull && r.contractId ? coreOp<Page<ApiInvoice>>(INVOICES_LIST, { limit: 100, filters: { contractId: r.contractId } }) : Promise.resolve({ items: [] as ApiInvoice[] }),
     ]);
     const invoice = new Map(invoices.items.map((inv) => [inv.id, inv]));
-    const causeRows = (r.causeInvoiceIds ?? []).map((invoiceId) => ({ id: invoiceId, number: invoice.get(invoiceId)?.number ?? invoiceId.slice(0, 8), paid: invoice.get(invoiceId)?.status === "paid", amountMinor: invoice.get(invoiceId)?.amountMinor ?? null, currency: invoice.get(invoiceId)?.currency ?? "" }));
+    const causeRows = (r.causeInvoiceIds ?? []).map((invoiceId) => ({ id: invoiceId, number: invoice.get(invoiceId)?.number ?? invoiceId.slice(0, 8), paid: invoice.get(invoiceId)?.status === "paid", processing: invoice.get(invoiceId)?.status === "processing", amountMinor: invoice.get(invoiceId)?.amountMinor ?? null, currency: invoice.get(invoiceId)?.currency ?? "" }));
     const isAllPaid = causeRows.length > 0 && causeRows.every((c) => c.paid);
     const notices = r.noticeNotificationIds?.length ?? 0;
     live.selected = {
@@ -97,7 +97,7 @@ export default async function AdminRestrictionsPage({ searchParams }: Readonly<P
       texts: {
         notice: t(notices === 1 ? "{time} · 1 client notice" : "{time} · {n} client notices", { time: showTime(r.noticeAt, display), n: notices }),
         executeAfter: showTime(r.executeAfter, display), period: activePeriod(r, now, i), intent: intentText(r, i),
-        execute: executeBlocker(r, now, i), release: releaseBlocker(r, isAllPaid, now, i),
+        execute: executeBlocker(r, now, i, causeRows.some((c) => c.processing)), release: releaseBlocker(r, isAllPaid, now, i),
       },
     };
   }

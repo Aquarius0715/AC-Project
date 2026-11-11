@@ -117,6 +117,80 @@ func TestCommands(t *testing.T) {
 		t.Error("out-of-scope technician get")
 	}
 
+	// the platform unit scope (IR774): an internal technician reads by scopes, an external one only inside an
+	// assignment's work window. techA's own access rows on this unit are put aside, and one of the test's is used.
+	techAMembership, unitID := seed.ID("tech-external-a"), seed.ID("unit-online-rto")
+
+	var aside []string
+
+	ownerScan(
+		t,
+		`SELECT coalesce(array_agg(assignment_id::text), '{}') FROM assets.unit_assignment_access WHERE
+			technician_membership_id = $1 AND unit_id = $2 AND active`,
+		[]any{techAMembership, unitID},
+		&aside,
+	)
+	owner(
+		t,
+		`UPDATE assets.unit_assignment_access SET active = false WHERE technician_membership_id = $1 AND unit_id = $2`,
+		techAMembership,
+		unitID,
+	)
+
+	job, offer, assignment := uuid.New(), uuid.New(), uuid.New()
+	owner(
+		t,
+		`INSERT INTO assets.unit_offer_access (tenant_id, offer_id, job_id, unit_id, contractor_org_id, access_valid_from,
+			access_valid_until) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+		seed.ID("tenant-a"),
+		offer,
+		job,
+		unitID,
+		seed.ID("org-contractor-a"),
+		clock().Add(-2*time.Hour),
+		clock().Add(2*time.Hour),
+	)
+	owner(
+		t,
+		`INSERT INTO assets.unit_assignment_access (tenant_id, assignment_id, job_id, unit_id, technician_membership_id,
+			created_at, scheduled, active) VALUES ($1,$2,$3,$4,$5,$6,tstzrange($7,$8),true)`,
+		seed.ID("tenant-a"),
+		assignment,
+		job,
+		unitID,
+		techAMembership,
+		clock(),
+		clock().Add(-time.Hour),
+		clock().Add(time.Hour),
+	)
+	t.Cleanup(func() {
+		owner(t, `DELETE FROM assets.unit_assignment_access WHERE assignment_id = $1`, assignment)
+		owner(t, `DELETE FROM assets.unit_offer_access WHERE offer_id = $1`, offer)
+		owner(
+			t,
+			`UPDATE assets.unit_assignment_access SET active = true WHERE assignment_id::text = ANY($1)`,
+			aside,
+		)
+	})
+
+	if code, _ := post(srv, techInt(), "commands.get", `{"id":"`+commandID+`"}`); code != 200 {
+		t.Error("internal technician get")
+	}
+
+	if code, _ := post(srv, techA(), "commands.get", `{"id":"`+commandID+`"}`); code != 200 {
+		t.Error("external technician inside an assignment's window get")
+	}
+
+	owner(
+		t,
+		`UPDATE assets.unit_assignment_access SET active = false WHERE assignment_id = $1`,
+		assignment,
+	)
+
+	if code, _ := post(srv, techA(), "commands.get", `{"id":"`+commandID+`"}`); code != 404 {
+		t.Error("external technician after the assignment ended get")
+	}
+
 	if code, _ := post(srv, hq(), "commands.get", `{"id":"`+uuid.NewString()+`"}`); code != 404 {
 		t.Error("unknown command")
 	}

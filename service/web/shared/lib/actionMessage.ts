@@ -25,6 +25,8 @@ const fieldText: Record<string, string> = {
   // HQ ended this person's access: only HQ gives it back, not a new account (IR508)
   "errors.revoked_by_hq": "HQ ended this person's access — only HQ can give it back",
   // a QR check-in with another unit's label, or one the technician's units do not have (jobs.checkIn, IR486)
+  // a cause invoice of the restriction has a payment under way (restrictions.execute, IR773)
+  "errors.payment_processing": "A payment of a cause invoice is in progress — wait for it to be confirmed or to fail",
   "errors.qr_unit_mismatch": "The scanned QR label is not this job's unit — scan the label on this AC, or check in manually with a reason",
 };
 // the refusals of the user management and assignment (IR416, IR417, IR420, IR421, IR433) say what to do

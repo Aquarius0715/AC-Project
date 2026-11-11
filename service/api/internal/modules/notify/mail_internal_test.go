@@ -252,3 +252,26 @@ func TestSMTPSends(t *testing.T) {
 		t.Errorf("received: %q", message)
 	}
 }
+
+// TestJobLabel: only a contractor's notice about a job drops the unit's name for the job's short ID (IR775).
+func TestJobLabel(t *testing.T) {
+	t.Parallel()
+
+	const id = "0a1b2c3d-0000-4000-8000-000000000001"
+
+	for _, testCase := range []struct {
+		role, kind, label string
+		masked            bool
+	}{
+		{authz.RoleContractor, targetJob, "Job 0a1b2c3d", true},
+		{authz.RoleContractor, targetUnit, "", false},
+		{authz.RoleTechnician, targetJob, "", false},
+		{authz.RoleClient, targetJob, "", false},
+		{authz.RoleAdmin, targetJob, "", false},
+	} {
+		label, masked := jobLabel(testCase.role, testCase.kind, id)
+		if label != testCase.label || masked != testCase.masked {
+			t.Errorf("jobLabel(%s, %s) = %q, %v", testCase.role, testCase.kind, label, masked)
+		}
+	}
+}

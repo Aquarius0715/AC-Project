@@ -348,3 +348,74 @@ func TestSchedulerTicksTheOtherTenantsWhenOneFails(t *testing.T) {
 		t.Errorf("the tick visited %d of %d tenants after the first failed", len(visited), tenants)
 	}
 }
+
+// TestFailingSchedulerJobDoesNotStopTheTick: a scheduler job that fails rolls back only its own work (a savepoint,
+// IR776); the equipment jobs after it and the maintenance tick still run and commit, and the tick reports the
+// failure.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
+func TestFailingSchedulerJobDoesNotStopTheTick(t *testing.T) {
+	srv := server(t)
+	stamp := func(h int) string { return clock().Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	_, res := write(
+		srv,
+		customerA(),
+		"jobs.create",
+		jobBody(seed.ID("unit-non-rto").String(), nil),
+		0,
+	)
+	job := asStr(t, data(res)["id"])
+
+	if code, resp := write(
+		srv,
+		hq(),
+		"jobs.offer",
+		`{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").
+			String()+
+			`","offerExpiresAt":"`+stamp(
+			1,
+		)+
+			`","accessValidFrom":"`+stamp(
+			1,
+		)+`","accessValidUntil":"`+stamp(
+			100,
+		)+`","termsVersion":"t"}`,
+		1,
+	); code != 200 {
+		t.Fatalf("offer: %d %v", code, resp)
+	}
+
+	ran := 0
+
+	srv.Registry.AddJob(ops.DomainEquipment, func(context.Context, *ops.Call) (int, error) {
+		return 0, errTenantBroken
+	})
+	srv.Registry.AddJob(ops.DomainEquipment, func(context.Context, *ops.Call) (int, error) {
+		ran++
+
+		return 0, nil
+	})
+
+	result, err := scheduler.Tick(
+		context.Background(),
+		srv.DB,
+		clock().Add(time.Hour),
+		srv.Registry,
+	)
+	if !errors.Is(err, errTenantBroken) {
+		t.Errorf("the tick reports the failed job: %v", err)
+	}
+
+	if ran == 0 {
+		t.Error("the job after the failing one did not run")
+	}
+
+	if result.ExpiredOffers < 1 {
+		t.Errorf("the maintenance tick did not run: %+v", result)
+	}
+
+	_, res = post(srv, hq(), "jobs.get", `{"jobId":"`+job+`"}`)
+	if data(res)["status"] != statusRequested {
+		t.Errorf("the offer did not expire: %v", res["data"])
+	}
+}

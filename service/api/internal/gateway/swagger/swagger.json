@@ -24925,7 +24925,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: admin:restriction.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR90 device operation running: not_sent intent\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A09",
+                "description": "Authorization: admin:restriction.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR90 device operation running: not_sent intent; IR773 a cause invoice with a payment under way (processing) answers CONFLICT errors.payment_processing\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A09",
                 "consumes": [
                     "application/json"
                 ],

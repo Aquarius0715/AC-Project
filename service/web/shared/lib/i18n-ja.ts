@@ -2692,6 +2692,7 @@ export const ja: Record<string, string> = {
   "your work window has not started": "作業時間がまだ始まっていません",
   "your work window has ended": "作業時間が終了しました",
   "you are not assigned to this job": "この作業に割り当てられていません",
+  "A payment of a cause invoice is in progress — wait for it to be confirmed or to fail": "原因となった請求書の支払いが処理中です — 確定するか失敗するまでお待ちください",
   "The scanned QR label is not this job's unit — scan the label on this AC, or check in manually with a reason": "スキャンした QR ラベルは、この作業のユニットのものではありません — このエアコンのラベルをスキャンするか、理由を添えて手動でチェックインしてください",
   "The report or job changed elsewhere; reload the page to continue from the latest version.": "報告書または作業が別の場所で変更されました。ページを再読み込みして、最新の版から続けてください。",
   "The job is not in a state that allows this (on hold, submitted or cancelled); the page shows the latest state.": "作業がこの操作を許可する状態ではありません（保留中、提出済み、キャンセル済み）。ページは最新の状態を表示しています。",
