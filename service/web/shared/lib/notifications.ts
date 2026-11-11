@@ -80,6 +80,9 @@ const statusWords: Record<string, string> = {
   in_progress: "In progress", submitted: "Submitted", returned: "Returned for rework", rework_requested: "Rework requested", completed: "Completed", cancelled: "Cancelled",
   on_hold: "On hold", scheduled: "Scheduled", applied: "Applied", release_requested: "Release requested", released: "Released", received: "Received", answered: "Answered",
   confirmed: "Payment confirmed", failed: "Failed", // a device operation that failed (IR753)
+  // the time proposals and the technician's answer (IR113 item 9, IR783)
+  escalated: "Escalated — nobody acknowledged it", expired: "Expired", reschedule_requested: "Reschedule requested", time_change_proposed: "Time change proposed",
+  time_change_kept: "Time change not accepted", cant_make: "Can’t make the visit",
 };
 /** Why an assignment was released (the access-release notice, IR439). */
 const reasonWords: Record<string, string> = {

@@ -865,6 +865,7 @@ CREATE TABLE monitoring.alerts (
   acknowledged_at     timestamptz,
   resolved_at         timestamptz,
   resolution_reason   text,
+  escalated_at        timestamptz,                -- when HQ was told nobody acknowledged it in the policy's escalation time (IR784)
   resolution_evidence_ids uuid[] NOT NULL DEFAULT '{}',   -- DD-T07 remeasurement / confirmation records
   acknowledged_by     uuid,
   resolved_by         uuid,
@@ -1207,6 +1208,7 @@ CREATE TABLE maintenance.attachments (
   uploaded_by uuid NOT NULL,
   created_at  timestamptz NOT NULL DEFAULT platform.app_now(),
   updated_at  timestamptz NOT NULL DEFAULT platform.app_now(),
+  added_version int NOT NULL DEFAULT 1,           -- the report version it was added in: a version lists the files added in it and before (IR782)
   FOREIGN KEY (tenant_id, job_id) REFERENCES maintenance.jobs(tenant_id, id)
 );
 

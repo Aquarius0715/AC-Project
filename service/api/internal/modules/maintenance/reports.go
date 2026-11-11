@@ -314,13 +314,15 @@ func (Reports) decorate(ctx context.Context, call *ops.Call, report *Report) err
 	return reviewAvailability(ctx, call, report)
 }
 
-// attachmentRefs lists the report's attachments, the oldest first.
+// attachmentRefs lists the attachments of this version of the report, the oldest first: the files added in it and in
+// the versions before it, not those of a later rework draft (IR782).
 func attachmentRefs(ctx context.Context, call *ops.Call, report *Report) error {
 	rows, err := call.Tx.Query(
 		ctx,
 		`SELECT id, tenant_id, created_at, updated_at, job_id, name, mime, size_bytes, status FROM maintenance.attachments
-		WHERE report_id = $1 ORDER BY created_at, id`,
+		WHERE report_id = $1 AND added_version <= $2 ORDER BY created_at, id`,
 		report.ID,
+		report.Version,
 	)
 	if err != nil {
 		return apperr.Wrap(err, "select maintenance.attachments")

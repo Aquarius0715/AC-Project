@@ -158,7 +158,7 @@ func tick(
 			if held[ops.DomainMaintenance] {
 				stepErrs = append(stepErrs, isolated(ctx, txn, "maintenance tick", &result,
 					func(savepoint pgx.Tx, res *Result) error {
-						return tickMaintenance(ctx, savepoint, now, res)
+						return tickMaintenance(ctx, savepoint, tenant, now, reg, res)
 					}))
 			}
 
@@ -379,7 +379,14 @@ func isolated(
 
 // tickMaintenance expires the offers and proposals whose time ran out, confirms the jobs left unrated, then freezes
 // the histories that ended, after the expiries, so that they keep the tick's final state.
-func tickMaintenance(ctx context.Context, txn pgx.Tx, now time.Time, result *Result) error {
+func tickMaintenance(
+	ctx context.Context,
+	txn pgx.Tx,
+	tenant uuid.UUID,
+	now time.Time,
+	reg *ops.Registry,
+	result *Result,
+) error {
 	expiredOffers, err := maintenance.ExpireOffers(ctx, txn, now, seed.ID("system-demo"))
 	if err != nil {
 		return apperr.Wrap(err, "maintenance.ExpireOffers")
@@ -392,7 +399,14 @@ func tickMaintenance(ctx context.Context, txn pgx.Tx, now time.Time, result *Res
 		return apperr.Wrap(err, "maintenance.ExpireProposals")
 	}
 
-	result.ExpiredProposals += expiredProposals
+	result.ExpiredProposals += len(expiredProposals)
+
+	for _, job := range expiredProposals {
+		err := tellProposalExpired(ctx, txn, tenant, now, reg, job)
+		if err != nil {
+			return err
+		}
+	}
 
 	confirmed, err := maintenance.ConfirmUnrated(ctx, txn, now)
 	if err != nil {
@@ -405,6 +419,51 @@ func tickMaintenance(ctx context.Context, txn pgx.Tx, now time.Time, result *Res
 	result.FrozenHistories += frozen
 
 	return apperr.Wrap(err, "maintenance.FreezeEnded")
+}
+
+// tellProposalExpired records the expiry of a job's time proposal like a write of the scheduler's system user, so that
+// the notifier tells HQ (IR113 item 9, IR783). Without a registry nothing is recorded.
+func tellProposalExpired(
+	ctx context.Context,
+	txn pgx.Tx,
+	tenant uuid.UUID,
+	now time.Time,
+	reg *ops.Registry,
+	job uuid.UUID,
+) error {
+	if reg == nil || reg.Rec == nil {
+		return nil
+	}
+
+	call := &ops.Call{
+		Tx:              txn,
+		Now:             now,
+		CorrelationID:   uuid.NewString(),
+		Queries:         reg,
+		Principal:       ops.SystemPrincipal(tenant, seed.ID("system-scheduler")),
+		Bearer:          "",
+		ExpectedVersion: nil,
+		Candidates:      nil,
+		Events:          nil,
+		Audits:          nil,
+	}
+	call.Audit(
+		ops.AuditEntry{
+			Action:          maintenance.OperationProposalExpiry,
+			TargetKind:      "job",
+			TargetID:        job.String(),
+			PreviousVersion: nil,
+			NextVersion:     nil,
+			Reason:          "",
+			Result:          "",
+			Before:          nil,
+			After:           nil,
+		},
+	)
+
+	err := reg.Rec.Record(ctx, txn, call, maintenance.OperationProposalExpiry)
+
+	return apperr.Wrap(err, "ops.Recorder.Record")
 }
 
 // RunDomains ticks the given domains (every domain when domains is nil) every interval until ctx is cancelled.

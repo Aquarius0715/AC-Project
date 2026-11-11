@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/pradita/ac-project/service/api/internal/modules/identity"
+	"github.com/pradita/ac-project/service/api/internal/modules/maintenance"
 	"github.com/pradita/ac-project/service/api/internal/modules/notify"
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
@@ -207,11 +208,11 @@ func jobEvent(operation, status string) (string, string) {
 	case "jobs.offer":
 		return eventOffered, noticeJobUpdate
 	case "jobs.accept":
-		return "accepted", noticeJobUpdate
+		return eventAccepted, noticeJobUpdate
 	case "jobs.decline":
-		return "declined", noticeJobUpdate
+		return eventDeclined, noticeJobUpdate
 	case "jobs.assign":
-		return "assigned", "schedule_change"
+		return eventAssigned, noticeScheduleChange
 	case "jobs.submit":
 		return "submitted", noticeJobUpdate
 	case "jobs.review": // a returned report, or a completed job
@@ -386,6 +387,17 @@ func (r notifyingRecorder) job(
 
 	event, template := jobEvent(operation, status)
 	if event == "" {
+		var proposalErr error
+
+		event, proposalErr = proposalEvent(ctx, call, operation, job)
+		if proposalErr != nil {
+			return proposalErr
+		}
+
+		template = noticeScheduleChange
+	}
+
+	if event == "" {
 		return nil
 	}
 
@@ -406,7 +418,7 @@ func (r notifyingRecorder) job(
 
 	set := &recipientSet{ids: nil}
 
-	for _, audience := range jobAudiences(event, contractor != nil) {
+	for _, audience := range jobAudiences(event, contractor != nil, status) {
 		ids, err := r.jobRecipients(
 			ctx,
 			call,
@@ -420,22 +432,157 @@ func (r notifyingRecorder) job(
 		set.add(ids...)
 	}
 
-	return r.send(ctx, call, set, template, "job", job, "normal", event)
+	return r.send(ctx, call, set, template, "job", job, "normal", noticeStatus(event))
+}
+
+// The events of IR113 item 9 beyond IR95's own table (IR783): the time proposals and the technician's answer.
+const (
+	eventTimeProposed       = "time_proposed"
+	eventProposalAccepted   = "proposal_accepted"
+	eventProposalDeclined   = "proposal_declined"
+	eventProposalExpired    = "proposal_expired"
+	eventRescheduleAsked    = "reschedule_requested"
+	eventTimeChangeProposed = "time_change_proposed"
+	eventTimeChangeKept     = "time_change_kept"
+	eventCantMake           = "cant_make"
+	eventVisitAccepted      = "visit_accepted"
+)
+
+// proposalEvent maps the time-proposal and acknowledgement writes of IR113 item 9 to their event; a write that is
+// none of them gives "". The outcome of a write that has two (an answer to a proposal, the technician's answer, HQ's
+// decision on a contractor's time) is read from what the write emitted or stored.
+func proposalEvent(
+	ctx context.Context,
+	call *ops.Call,
+	operation string,
+	job uuid.UUID,
+) (string, error) {
+	switch operation {
+	case "jobs.proposeSlot":
+		return eventTimeProposed, nil
+	case "jobs.respondProposal":
+		if hasEvent(call, "ProposalAccepted") {
+			return eventProposalAccepted, nil
+		}
+
+		return eventProposalDeclined, nil
+	case maintenance.OperationProposalExpiry:
+		return eventProposalExpired, nil
+	case "jobs.requestReschedule":
+		return eventRescheduleAsked, nil
+	case "jobs.proposePartnerSlot":
+		return eventTimeChangeProposed, nil
+	case "jobs.resolvePartnerSlot":
+		var status string
+
+		err := call.Tx.QueryRow(
+			ctx,
+			`SELECT p.status FROM maintenance.partner_slot_proposals p JOIN maintenance.offers o ON o.id = p.offer_id
+			WHERE o.job_id = $1 AND p.status IN ('kept', 'sent_to_client') ORDER BY p.sent_at DESC, p.id DESC LIMIT 1`,
+			job,
+		).Scan(&status)
+		if err != nil {
+			return "", apperr.Wrap(err, "select maintenance.partner_slot_proposals")
+		}
+
+		if status == "sent_to_client" {
+			return eventTimeProposed, nil
+		}
+
+		return eventTimeChangeKept, nil
+	case "jobs.acknowledgeAssignment":
+		if hasEvent(call, "AssignmentAcknowledged") && acknowledged(call) == "cant_make" {
+			return eventCantMake, nil
+		}
+
+		return eventVisitAccepted, nil
+	}
+
+	return "", nil
+}
+
+// hasEvent reports whether the write emitted an event of the type.
+func hasEvent(call *ops.Call, eventType string) bool {
+	return slices.ContainsFunc(
+		call.Events,
+		func(event ops.Event) bool { return event.Type == eventType },
+	)
+}
+
+// acknowledged is the technician's answer a jobs.acknowledgeAssignment write emitted.
+func acknowledged(call *ops.Call) string {
+	for _, event := range call.Events {
+		if event.Type != "AssignmentAcknowledged" {
+			continue
+		}
+
+		payload, _ := event.Payload.(map[string]any)
+
+		return fmt.Sprint(payload["acknowledgement"])
+	}
+
+	return ""
+}
+
+// noticeStatus is the status word a notice shows for an event: IR95's own events are their own words, the events of
+// IR113 item 9 use the words of the job statuses where there is one.
+func noticeStatus(event string) string {
+	switch event {
+	case eventProposalAccepted, eventVisitAccepted:
+		return eventAccepted
+	case eventProposalDeclined:
+		return eventDeclined
+	case eventProposalExpired:
+		return "expired"
+	}
+
+	return event
 }
 
 // jobAudiences are the audiences of a job event in the order IR95 lists them: the customer's users, HQ, the assigned
 // technician, or the contractor's users who hold a partner permission (the audience is that permission).
-func jobAudiences(event string, contracted bool) []string {
+func jobAudiences(event string, contracted bool, status string) []string {
 	switch event {
+	case eventTimeProposed: // IR113 item 9: a proposal sent to the client
+		return []string{audienceClients}
+	case eventProposalAccepted: // HQ, and who the accepted time put to work: the offered contractor, the technician
+		audiences := []string{audienceHQ}
+		if contracted && status == eventOffered {
+			audiences = append(audiences, permPartnerAccept)
+		}
+
+		if status == eventAssigned {
+			audiences = append(audiences, audienceTechnician)
+		}
+
+		return audiences
+	case eventTimeChangeKept: // HQ kept the agreed time: the contractor that asked for another is told
+		return []string{permPartnerAssign}
+	case eventCantMake: // the coordinator: HQ for an internal job, the receiving contractor otherwise
+		if contracted {
+			return []string{permPartnerAssign}
+		}
+
+		return []string{audienceHQ}
+	case eventVisitAccepted: // the coordinator and the client
+		if contracted {
+			return []string{permPartnerAssign, audienceClients}
+		}
+
+		return []string{audienceHQ, audienceClients}
 	case "requested":
 		return []string{audienceClients, audienceHQ}
 	case eventOffered:
 		return []string{permPartnerAccept, audienceClients}
-	case "accepted":
+	case eventAccepted:
 		return []string{audienceHQ, audienceClients}
-	case "declined":
-		return []string{audienceHQ}
-	case "assigned":
+	case eventDeclined,
+		eventProposalDeclined,
+		eventProposalExpired,
+		eventRescheduleAsked,
+		eventTimeChangeProposed:
+		return []string{audienceHQ} // IR113 item 9: the answers and requests HQ has to act on
+	case eventAssigned:
 		return []string{audienceTechnician, audienceClients, audienceHQ, permPartnerAssign}
 	case "submitted":
 		if contracted {

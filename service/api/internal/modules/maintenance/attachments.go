@@ -80,11 +80,13 @@ func dropSignOffFiles(ctx context.Context, call *ops.Call, report uuid.UUID, ver
 	return apperr.Wrap(err, "delete maintenance.attachments")
 }
 
-// store saves one file as a ready Attachment of the report and returns its ID.
+// store saves one file as a ready Attachment of the report, added in the report version it is made in (a later
+// version lists it, an earlier one does not, IR782), and returns its ID.
 func (m Files) store(
 	ctx context.Context,
 	call *ops.Call,
 	job, report uuid.UUID,
+	version int,
 	blobInput BlobInput,
 ) (uuid.UUID, error) {
 	attachmentID := uuid.New()
@@ -99,8 +101,8 @@ func (m Files) store(
 	_, err := call.Tx.Exec(
 		ctx,
 		`INSERT INTO maintenance.attachments (id, tenant_id, job_id, report_id, object_key, name, mime, size_bytes, status,
-			uploaded_by, created_at, updated_at)
-		VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7, 'ready', $8, $9, $9)`,
+			uploaded_by, created_at, updated_at, added_version)
+		VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7, 'ready', $8, $9, $9, $10)`,
 		attachmentID,
 		job,
 		report,
@@ -110,6 +112,7 @@ func (m Files) store(
 		blobInput.Size,
 		call.Principal.UserID,
 		call.Now,
+		version,
 	)
 
 	return attachmentID, apperr.Wrap(err, "insert maintenance.attachments")
@@ -198,7 +201,7 @@ func (m Files) add(ctx context.Context, call *ops.Call, input *AddInput) (Attach
 		return AttachmentRef{}, apperr.E(apperr.Conflict, "errors.too_many_attachments")
 	}
 
-	attachmentID, err := m.store(ctx, call, input.JobID, input.ReportID, input.File)
+	attachmentID, err := m.store(ctx, call, input.JobID, input.ReportID, draft.Version, input.File)
 	if err != nil {
 		return AttachmentRef{}, err
 	}
@@ -362,14 +365,14 @@ func (m Files) signOff(ctx context.Context, call *ops.Call, input *SignOffInput)
 		ReportVersion: draft.Version, SignatureAttachmentID: nil, SitePhotoAttachmentID: nil,
 	}
 	if input.Signature != nil {
-		id, err := m.store(ctx, call, input.JobID, input.ReportID, *input.Signature)
+		id, err := m.store(ctx, call, input.JobID, input.ReportID, draft.Version, *input.Signature)
 		if err != nil {
 			return Report{}, err
 		}
 
 		signOff.SignatureAttachmentID = &id
 	} else {
-		id, err := m.store(ctx, call, input.JobID, input.ReportID, *input.SitePhoto)
+		id, err := m.store(ctx, call, input.JobID, input.ReportID, draft.Version, *input.SitePhoto)
 		if err != nil {
 			return Report{}, err
 		}
@@ -477,7 +480,7 @@ type BlobOut struct {
 //	@Security		BearerAuth
 //	@Router			/v1/jobs/{jobId}/reports/{reportId}/attachments/{attachmentId}/content [get]
 func (m Files) content(ctx context.Context, call *ops.Call, input *ContentInput) (BlobOut, error) {
-	_, getErr := m.Reports.get(
+	report, getErr := m.Reports.get(
 		ctx,
 		call,
 		&GetReportInput{
@@ -496,8 +499,8 @@ func (m Files) content(ctx context.Context, call *ops.Call, input *ContentInput)
 	)
 
 	err := call.Tx.QueryRow(ctx, `SELECT object_key, name, mime, size_bytes FROM maintenance.attachments WHERE id = $1 AND
-		report_id = $2 AND job_id = $3 AND status = 'ready'`,
-		input.AttachmentID, input.ReportID, input.JobID).
+		report_id = $2 AND job_id = $3 AND status = 'ready' AND added_version <= $4`,
+		input.AttachmentID, input.ReportID, input.JobID, report.Version).
 		Scan(&key, &out.Name, &out.Mime, &out.Size)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return out, apperr.E(apperr.NotFound, apperr.KeyNotFound)

@@ -32,9 +32,9 @@ func hq() *actor        { return &actor{"tok-hq", membershipHQOperator} }
 func customerA() *actor { return &actor{"tok-a", membershipCustomerA} }
 func customerB() *actor { return &actor{"tok-b", membershipCustomerB} }
 func techB() *actor     { return &actor{"tok-tb", "tech-external-b"} }
-func techA() *actor     { return &actor{"tok-ta", "tech-external-a"} }
-func contrA() *actor    { return &actor{"tok-ca", "contractor-a"} }
-func contrB() *actor    { return &actor{"tok-cb", "contractor-b"} }
+func techA() *actor     { return &actor{"tok-ta", membershipTechExternalA} }
+func contrA() *actor    { return &actor{"tok-ca", membershipContractorA} }
+func contrB() *actor    { return &actor{"tok-cb", membershipContractorB} }
 func restrMgr() *actor  { return &actor{"tok-rm", "hq-restriction-manager"} }
 func overrider() *actor { return &actor{"tok-oo", "hq-override-only"} }
 
