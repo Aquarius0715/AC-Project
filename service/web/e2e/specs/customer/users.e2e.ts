@@ -3,7 +3,7 @@
 // dialog refuses a missing name, a bad address and an existing user, then closes without adding anyone.
 import { test, expect } from "../../fixtures/test";
 import { expectAccessible } from "../../fixtures/a11y";
-import { answers, messageCount } from "../../fixtures/mailpit";
+import { inboxAvailable, messageCount } from "../../fixtures/mailpit";
 
 test("the owner's own row shows the last sign-in", async ({ page }) => {
   await page.goto("/customer/users");
@@ -51,7 +51,7 @@ test("the owner adds a user, changes the role and removes them", async ({ page }
   await expect(row).toContainText("Not signed in yet");
   await expect(row).toContainText("Owner");
   const search = `http://localhost:8025/api/v1/search?query=${encodeURIComponent(`to:"${email}"`)}`;
-  if (await answers(search)) {
+  if (await inboxAvailable()) {
     await expect.poll(() => messageCount(search), { timeout: 30_000 }).toBeGreaterThanOrEqual(1);
   }
   await row.getByRole("button", { name: "Make member" }).click();

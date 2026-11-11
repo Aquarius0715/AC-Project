@@ -1,15 +1,23 @@
 // The local Mailpit inbox (DEC-78): the stack's e-mails, the sign-in service's account set-up e-mails among them
-// (IR461). Specs that read it skip on a stack without it.
+// (IR461). Specs that read it skip on a developer's stack without it and fail in CI (inboxAvailable).
 import { expect } from "@playwright/test";
 import { z } from "zod";
 
 const MAILPIT = "http://localhost:8025/api/v1";
 
 /** Whether the inbox answers. */
-export const mailpitUp = async (): Promise<boolean> => answers(`${MAILPIT}/messages?limit=1`);
+const mailpitUp = async (): Promise<boolean> => answers(`${MAILPIT}/messages?limit=1`);
+
+// Whether the inbox answers, for a spec that reads it. On a developer's stack without Mailpit the spec skips; in CI
+// (`CI` set, as the nightly run does) the compose stack always has it, so a silent inbox is a failure (IR772).
+export async function inboxAvailable(): Promise<boolean> {
+  const up = await mailpitUp();
+  if (!up && process.env.CI) throw new Error(`the inbox (Mailpit, ${MAILPIT}) does not answer in CI`);
+  return up;
+}
 
 /** Whether `url` answers with a success. */
-export async function answers(url: string): Promise<boolean> {
+async function answers(url: string): Promise<boolean> {
   const res = await fetch(url).catch(() => null);
   return res?.ok ?? false;
 }

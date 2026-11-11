@@ -520,8 +520,8 @@ func (in *ListInput) Validate() map[string]string {
 //
 //	@Summary		commands.list (read)
 //	@ID				commands.list
-//	@Description	Authorization: client:self | technician:control.diagnose:assigned-valid-job | admin:control.execute \
-//	@Description	| admin:job.read
+//	@Description	Authorization: client:self | technician:control.diagnose:assigned-history | admin:control.execute | \
+//	@Description	admin:job.read
 //	@Description	Validation: D01; SR08/SR09; IR216 the unit's history newest first; a client sees others' reasons \
 //	@Description	withheld; a technician sees one job it holds or held an Assignment of (jobId required)
 //	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice

@@ -7,7 +7,7 @@ import type { Browser, Page } from "@playwright/test";
 import { test, expect, FAILED_PAGE } from "../../fixtures/test";
 import { APPS } from "../../fixtures/apps";
 import { startSignIn, totpBase32 } from "../../fixtures/auth";
-import { mailpitUp, setupLink } from "../../fixtures/mailpit";
+import { inboxAvailable, setupLink } from "../../fixtures/mailpit";
 import { must } from "../../fixtures/must";
 import { pickDateTime } from "../../fixtures/time";
 
@@ -19,7 +19,7 @@ const open = async (browser: Browser, signedIn = true): Promise<Page> => {
 
 test("a new HQ administrator sets a password and a one-time-code device, then signs in with both", async ({ browser }) => {
   test.setTimeout(240_000);
-  test.skip(!(await mailpitUp()), "needs the local Mailpit inbox");
+  test.skip(!(await inboxAvailable()), "needs the local Mailpit inbox");
   const email = `e2e-admin-${String(Date.now())}@example.com`;
   const admin = await open(browser);
   const main = admin.getByRole("main");

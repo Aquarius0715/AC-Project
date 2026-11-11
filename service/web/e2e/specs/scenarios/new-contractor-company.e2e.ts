@@ -7,7 +7,7 @@ import type { Browser, Page } from "@playwright/test";
 import { test, expect, FAILED_PAGE } from "../../fixtures/test";
 import { APPS, type App } from "../../fixtures/apps";
 import { startSignIn } from "../../fixtures/auth";
-import { mailpitUp, setupLink } from "../../fixtures/mailpit";
+import { inboxAvailable, setupLink } from "../../fixtures/mailpit";
 import { must } from "../../fixtures/must";
 import { pickDateTime } from "../../fixtures/time";
 
@@ -19,7 +19,7 @@ const open = async (browser: Browser, a: App, signedIn = true): Promise<Page> =>
 
 test("HQ adds a contractor company and its first contractor, who signs in to the partner app", async ({ browser }) => {
   test.setTimeout(240_000);
-  test.skip(!(await mailpitUp()), "needs the local Mailpit inbox");
+  test.skip(!(await inboxAvailable()), "needs the local Mailpit inbox");
   const stamp = Date.now();
   const company = `E2E Partner ${String(stamp)}`;
   const email = `e2e-boss-${String(stamp)}@example.com`;
