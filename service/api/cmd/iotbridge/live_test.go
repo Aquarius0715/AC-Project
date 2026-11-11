@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -75,6 +76,8 @@ type triggerLog struct {
 	got []iotbridge.Trigger
 	// refuse is how many of the next requests the API answers 503 to (an API blip)
 	refuse int
+	// refuseWith is the status of a refused request (503 when zero)
+	refuseWith int
 }
 
 func (l *triggerLog) types() []string {
@@ -117,7 +120,7 @@ type liveFixture struct {
 func newLiveFixture(t *testing.T) *liveFixture {
 	t.Helper()
 
-	api := &triggerLog{mu: sync.Mutex{}, got: nil, refuse: 0}
+	api := &triggerLog{mu: sync.Mutex{}, got: nil, refuse: 0, refuseWith: 0}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var trigger iotbridge.Trigger
 
@@ -134,7 +137,7 @@ func newLiveFixture(t *testing.T) *liveFixture {
 		if api.refuse > 0 {
 			api.refuse--
 
-			w.WriteHeader(http.StatusServiceUnavailable)
+			w.WriteHeader(cmp.Or(api.refuseWith, http.StatusServiceUnavailable))
 
 			return
 		}
@@ -211,7 +214,7 @@ func TestLiveControlJSONNode(t *testing.T) {
 	live := newLiveFixture(t)
 	live.handler.handle(t.Context(), &fakeMessage{
 		topic:    "smarthome/ac/node_1/status",
-		payload:  `{"online":true,"fw":"0.4.0","parts":{"ir":true}}`,
+		payload:  statusFirmware04,
 		retained: true,
 	})
 
@@ -299,6 +302,64 @@ func TestLiveControlDoesNotRepublishAfterFailedReport(t *testing.T) {
 	}
 }
 
+// TestLiveControlSentReportAlreadyRecorded: a "sent" report the API answers 409 to (it has it, the reply was lost)
+// does not stop the rest of the command's reports, and is not repeated at the next poll.
+func TestLiveControlSentReportAlreadyRecorded(t *testing.T) {
+	t.Parallel()
+
+	live := newLiveFixture(t)
+	waiting := iotbridge.Waiting{
+		ID:        uuid.New(),
+		DeviceID:  live.air.DeviceID,
+		UnitID:    live.air.UnitID,
+		Action:    json.RawMessage(`{"kind":"set_power","power":false}`),
+		ExpiresAt: time.Now().Add(time.Minute),
+	}
+
+	live.api.refuse, live.api.refuseWith = 1, http.StatusConflict
+
+	err := live.control.send(t.Context(), live.handler.httpc, live.srv.URL, live.air, waiting, 0)
+	if err != nil {
+		t.Fatalf("a report the API already has was an error: %v", err)
+	}
+
+	if !slices.Equal(live.api.types(), []string{eventCommandAck}) {
+		t.Errorf("triggers %v, want the acknowledgement after the 409", live.api.types())
+	}
+
+	if len(live.control.published) != 0 {
+		t.Errorf("%d published commands kept", len(live.control.published))
+	}
+}
+
+// TestLiveResultDoesNotRetryAClientError: an answer the API refuses for good is tried once.
+func TestLiveResultDoesNotRetryAClientError(t *testing.T) {
+	t.Parallel()
+
+	live := newLiveFixture(t)
+	live.handler.handle(t.Context(), &fakeMessage{
+		topic:    "smarthome/ac/" + node1Name + "/status",
+		payload:  statusFirmware04,
+		retained: true,
+	})
+
+	waiting := live.command(t, `{"kind":"set_temperature","celsius":26}`)
+	live.api.refuse, live.api.refuseWith = 2, http.StatusUnprocessableEntity
+
+	live.handler.handle(t.Context(), message(
+		"smarthome/ac/node_1/command/result",
+		`{"commandId":"`+waiting.ID.String()+`","command":"{}","result":"sent","at":"x"}`,
+	))
+
+	live.api.mu.Lock()
+	left := live.api.refuse
+	live.api.mu.Unlock()
+
+	if left != 1 {
+		t.Errorf("the API was asked %d times, want once", 2-left+1)
+	}
+}
+
 // TestLiveResultRetriesRefusedReport: a node's answer is taken from the broker once, so an API blip while it is passed
 // on is retried instead of losing the answer.
 func TestLiveResultRetriesRefusedReport(t *testing.T) {
@@ -307,7 +368,7 @@ func TestLiveResultRetriesRefusedReport(t *testing.T) {
 	live := newLiveFixture(t)
 	live.handler.handle(t.Context(), &fakeMessage{
 		topic:    "smarthome/ac/" + node1Name + "/status",
-		payload:  `{"online":true,"fw":"0.4.0","parts":{"ir":true}}`,
+		payload:  statusFirmware04,
 		retained: true,
 	})
 
@@ -581,6 +642,7 @@ func TestLiveHandlerLastWill(t *testing.T) {
 // The live site's node IDs and the event types the tests compare.
 const (
 	node1Name        = "node_1"
+	statusFirmware04 = `{"online":true,"fw":"0.4.0","parts":{"ir":true}}`
 	node2Name        = "node_2"
 	eventCommandSent = "command_sent"
 	eventCommandAck  = "command_ack"

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -285,6 +286,14 @@ func (h *liveHandler) result(
 	}
 }
 
+// refused is true when the API answered with a client error: trying the same report again would be refused again.
+func refused(err error) bool {
+	var se *statusError
+
+	return errors.As(err, &se) && se.code >= http.StatusBadRequest &&
+		se.code < http.StatusInternalServerError
+}
+
 // The answer of a node is taken from the broker once and has no second delivery, so passing it on to the API is tried
 // a few times before it is given up.
 const (
@@ -293,7 +302,7 @@ const (
 )
 
 // sendRetried is send, tried up to reportTries times while the API does not take it (not for an answer that it
-// already has, nor after the context ends).
+// already has or refuses for good, nor after the context ends).
 func sendRetried(
 	ctx context.Context,
 	httpc *http.Client,
@@ -304,7 +313,7 @@ func sendRetried(
 
 	for try := range reportTries {
 		err = send(ctx, httpc, endpoint, trigger)
-		if err == nil || recorded(err) || try == reportTries-1 {
+		if err == nil || recorded(err) || refused(err) || try == reportTries-1 {
 			return err
 		}
 
@@ -420,7 +429,7 @@ func (l *liveControl) send(
 	when := sent.sentAt.Add(off)
 	for _, tr := range iotbridge.LiveSentTriggers(waiting, dev.DeviceID, when, when.Add(-clockMargin), sent.command) {
 		err := send(ctx, httpc, endpoint, tr)
-		if err != nil {
+		if err != nil && !recorded(err) { // the API already has it: its reply was lost earlier
 			return err
 		}
 	}
