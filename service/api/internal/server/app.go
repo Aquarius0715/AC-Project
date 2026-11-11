@@ -467,6 +467,10 @@ func (w *wiring) registerDevices() {
 	devices.RegisterCampaigns(w.reg, module)
 	w.reg.AddJob(
 		ops.DomainEquipment,
+		monitoring.Escalation{Notify: notify.Store{}}.Run,
+	) // IR784: an alert nobody acknowledged in the policy's escalation time goes to HQ (DD-A05)
+	w.reg.AddJob(
+		ops.DomainEquipment,
 		devices.Lifecycle{Guard: control.Busy{}}.Advance,
 	) // IR67: operations start and time out on the w.equipment scheduler
 	w.reg.AddJob(

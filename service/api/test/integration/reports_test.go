@@ -444,6 +444,66 @@ func TestWorkReports(t *testing.T) {
 		t.Error("resume twice")
 	}
 
+	// a photo added to the rework draft (version 6) is no part of the returned version 5 (IR782)
+	img := pngHeader(8, 8)
+
+	code, added := write(
+		srv,
+		techInt(),
+		"attachments.add",
+		`{"jobId":"`+job+`","reportId":"`+rep+`","file":`+blobJSON(
+			"rework.png",
+			"image/png",
+			img,
+			len(img),
+		)+`}`,
+		6,
+	)
+	if code != 200 {
+		t.Fatalf("add to the rework draft: %d %v", code, added)
+	}
+
+	photo := asStr(t, data(added)["id"])
+	listsPhoto := func(version int) bool {
+		_, res := getRep(hq(), version)
+
+		for _, ref := range asArr(t, data(res)["attachmentRefs"]) {
+			if asObj(t, ref)["id"] == photo {
+				return true
+			}
+		}
+
+		return false
+	}
+
+	if !listsPhoto(7) {
+		t.Error("the rework draft does not list its own photo")
+	}
+
+	if listsPhoto(5) {
+		t.Error("the returned version 5 lists the rework draft's photo")
+	}
+
+	content := func(version int) int {
+		code, _ := post(
+			srv,
+			hq(),
+			"attachments.getContent",
+			`{"jobId":"`+job+`","reportId":"`+rep+`","reportVersion":`+itoa(
+				version,
+			)+`,"attachmentId":"`+photo+`"}`,
+		)
+
+		return code
+	}
+	if content(5) != 404 || content(7) != 200 {
+		t.Errorf(
+			"getContent of the rework photo: version 5 %d, version 7 %d",
+			content(5),
+			content(7),
+		)
+	}
+
 	if _, m := getRep(
 		hq(),
 		5,

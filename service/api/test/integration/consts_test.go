@@ -370,3 +370,10 @@ const (
 func oneSlotSQL(start, end string) string {
 	return "jsonb_build_array(jsonb_build_object('startAt'," + start + "::timestamptz,'endAt'," + end + "::timestamptz))"
 }
+
+// The seeded memberships the actors and the notice checks name.
+const (
+	membershipTechExternalA = "tech-external-a"
+	membershipContractorA   = "contractor-a"
+	membershipContractorB   = "contractor-b"
+)

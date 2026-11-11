@@ -1642,8 +1642,11 @@ func (m Proposals) sendToClient(
 	return err
 }
 
+// OperationProposalExpiry names the scheduler write that tells HQ a time proposal ran out unanswered (IR783).
+const OperationProposalExpiry = "proposals.expire"
+
 // ExpireProposals applies IR128 item 4 in the worker tick.
-func ExpireProposals(ctx context.Context, txn pgx.Tx, now time.Time) (int, error) {
+func ExpireProposals(ctx context.Context, txn pgx.Tx, now time.Time) ([]uuid.UUID, error) {
 	rows, err := txn.Query(
 		ctx,
 		`UPDATE maintenance.slot_proposals SET status = 'expired', decided_at = $1 WHERE status = 'pending' AND reply_by <= $1
@@ -1651,12 +1654,12 @@ func ExpireProposals(ctx context.Context, txn pgx.Tx, now time.Time) (int, error
 		now,
 	)
 	if err != nil {
-		return 0, apperr.Wrap(err, "update maintenance.slot_proposals")
+		return nil, apperr.Wrap(err, "update maintenance.slot_proposals")
 	}
 
 	jobs, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
 	if err != nil || len(jobs) == 0 {
-		return 0, apperr.Wrap(err, "update maintenance.slot_proposals")
+		return nil, apperr.Wrap(err, "update maintenance.slot_proposals")
 	}
 	// a contractor's time change the client left unanswered ends as declined, as when the client declines (IR443)
 	_, execErr := txn.Exec(
@@ -1666,10 +1669,10 @@ func ExpireProposals(ctx context.Context, txn pgx.Tx, now time.Time) (int, error
 		jobs,
 	)
 	if execErr != nil {
-		return 0, apperr.Wrap(execErr, "update maintenance.partner_slot_proposals")
+		return nil, apperr.Wrap(execErr, "update maintenance.partner_slot_proposals")
 	}
 
-	return len(jobs), nil
+	return jobs, nil
 }
 
 // RegisterProposals binds the IR128 operations.
