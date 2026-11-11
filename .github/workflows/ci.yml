@@ -7,7 +7,8 @@
 # the toolchains are the ones the development stack uses. No pull request job runs on the lab server: a pull request from
 # a fork would run its own code there. The Go module and build caches and the npm and pip caches are kept between runs
 # with actions/cache, keyed by the lock files. Every job starts on its own runner at once, so the run lasts about as long
-# as its longest job.
+# as its longest job. Each job has a timeout (45 minutes for the Go suites, 30 for the rest): a hung step (a database that
+# never answers) otherwise holds a required check pending for GitHub's six hours and the pull request with it.
 name: CI
 
 on:
@@ -34,6 +35,7 @@ jobs:
   go-lint:
     name: Go lint (gofmt, vet, golangci-lint, generated files, Swagger)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     container: { image: "golang:1.26-trixie" }
     defaults: { run: { working-directory: service/api } }
     steps:
@@ -70,6 +72,7 @@ jobs:
   go-test:
     name: Go tests (unit + integration)
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     container: { image: "golang:1.26-trixie" }
     services:
       postgres: # reached through socat at localhost:5432 (below), where the tests look
@@ -126,6 +129,7 @@ jobs:
   go-test-cluster:
     name: Go integration tests (split services)
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     container: { image: "golang:1.26-trixie" }
     services:
       postgres: # reached through socat at localhost:5432 (below), where the tests look
@@ -174,6 +178,7 @@ jobs:
   web-knip:
     name: Web dead code (knip)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     container: { image: "node:26-bookworm" }
     defaults: { run: { working-directory: service/web } }
     steps:
@@ -194,6 +199,7 @@ jobs:
   web-lint:
     name: Web lint (${{ matrix.workspace }})
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     container: { image: "node:26-bookworm" }
     defaults: { run: { working-directory: service/web } }
     strategy:
@@ -223,6 +229,7 @@ jobs:
   other-lint:
     name: Python, shell, workflows and Dockerfiles
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     container: { image: "python:3.13-bookworm" }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -244,6 +251,7 @@ jobs:
   web-typecheck:
     name: Web typecheck
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     container: { image: "node:26-bookworm" }
     defaults: { run: { working-directory: service/web } }
     steps:
@@ -260,6 +268,7 @@ jobs:
   web-test:
     name: Web unit tests (Vitest)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     container: { image: "node:26-bookworm" }
     defaults: { run: { working-directory: service/web } }
     steps:
@@ -276,6 +285,7 @@ jobs:
   docs:
     name: Design document validators
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     container: { image: "python:3.12-bookworm" }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
