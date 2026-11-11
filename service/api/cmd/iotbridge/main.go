@@ -665,6 +665,10 @@ func pollCommands(
 
 			rep.OK("requested commands")
 
+			if waitForNodes(live) {
+				continue
+			}
+
 			for _, command := range waiting {
 				var err error
 				if dev, ok := liveNode(live, command.DeviceID); ok {
@@ -679,6 +683,13 @@ func pollCommands(
 			}
 		}
 	}
+}
+
+// waitForNodes is true while the nodes' broker is configured but the registry of nodes has not been read yet: which
+// devices are live is not known, and a live device's command must not go to the simulator's broker meanwhile. The
+// commands stay requested for the next poll.
+func waitForNodes(live *liveControl) bool {
+	return live != nil && !live.nodes.Loaded()
 }
 
 // liveNode is the registered node of a command's device when the nodes' broker is configured.

@@ -73,6 +73,8 @@ func (b *fakeBroker) Publish(topic string, _ byte, _ bool, payload any) mqtt.Tok
 type triggerLog struct {
 	mu  sync.Mutex
 	got []iotbridge.Trigger
+	// refuse is how many of the next requests the API answers 503 to (an API blip)
+	refuse int
 }
 
 func (l *triggerLog) types() []string {
@@ -115,7 +117,7 @@ type liveFixture struct {
 func newLiveFixture(t *testing.T) *liveFixture {
 	t.Helper()
 
-	api := &triggerLog{mu: sync.Mutex{}, got: nil}
+	api := &triggerLog{mu: sync.Mutex{}, got: nil, refuse: 0}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var trigger iotbridge.Trigger
 
@@ -127,8 +129,17 @@ func newLiveFixture(t *testing.T) *liveFixture {
 		}
 
 		api.mu.Lock()
+		defer api.mu.Unlock()
+
+		if api.refuse > 0 {
+			api.refuse--
+
+			w.WriteHeader(http.StatusServiceUnavailable)
+
+			return
+		}
+
 		api.got = append(api.got, trigger)
-		api.mu.Unlock()
 	}))
 	t.Cleanup(srv.Close)
 
@@ -224,7 +235,7 @@ func TestLiveControlJSONNode(t *testing.T) {
 		`{"commandId":"`+uuid.NewString()+`","command":"{}","result":"sent"}`,
 	))
 
-	if !slices.Equal(live.api.types(), []string{eventCommandSent, "command_ack"}) ||
+	if !slices.Equal(live.api.types(), []string{eventCommandSent, eventCommandAck}) ||
 		*live.api.last().CommandID != waiting.ID {
 		t.Fatalf("triggers %v, want the one acknowledgement", live.api.types())
 	}
@@ -253,6 +264,91 @@ func TestLiveControlJSONNode(t *testing.T) {
 	}
 }
 
+// TestLiveControlDoesNotRepublishAfterFailedReport: a command already on the broker whose "sent" report the API
+// refused is reported again at the next poll, not published to the real device a second time.
+func TestLiveControlDoesNotRepublishAfterFailedReport(t *testing.T) {
+	t.Parallel()
+
+	live := newLiveFixture(t)
+	waiting := iotbridge.Waiting{
+		ID:        uuid.New(),
+		DeviceID:  live.air.DeviceID,
+		UnitID:    live.air.UnitID,
+		Action:    json.RawMessage(`{"kind":"set_power","power":false}`),
+		ExpiresAt: time.Now().Add(time.Minute),
+	}
+
+	live.api.refuse = 1
+
+	err := live.control.send(t.Context(), live.handler.httpc, live.srv.URL, live.air, waiting, 0)
+	if err == nil {
+		t.Fatal("a refused report was not an error")
+	}
+
+	err = live.control.send(t.Context(), live.handler.httpc, live.srv.URL, live.air, waiting, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got := live.broker.published[iotbridge.LiveCommandTopic(node1Name)]; len(got) != 1 {
+		t.Errorf("the command was published %d times: %v", len(got), got)
+	}
+
+	if !slices.Equal(live.api.types(), []string{eventCommandSent, eventCommandAck}) {
+		t.Errorf("triggers %v, want the sent and acknowledged reports once", live.api.types())
+	}
+}
+
+// TestLiveResultRetriesRefusedReport: a node's answer is taken from the broker once, so an API blip while it is passed
+// on is retried instead of losing the answer.
+func TestLiveResultRetriesRefusedReport(t *testing.T) {
+	t.Parallel()
+
+	live := newLiveFixture(t)
+	live.handler.handle(t.Context(), &fakeMessage{
+		topic:    "smarthome/ac/" + node1Name + "/status",
+		payload:  `{"online":true,"fw":"0.4.0","parts":{"ir":true}}`,
+		retained: true,
+	})
+
+	waiting := live.command(t, `{"kind":"set_temperature","celsius":26}`)
+	live.api.refuse = 2
+
+	live.handler.handle(t.Context(), message(
+		"smarthome/ac/node_1/command/result",
+		`{"commandId":"`+waiting.ID.String()+`","command":"{}","result":"sent","at":"x"}`,
+	))
+
+	if !slices.Equal(live.api.types(), []string{eventCommandSent, eventCommandAck}) {
+		t.Errorf("triggers %v, want the acknowledgement after the retries", live.api.types())
+	}
+}
+
+// TestWaitForNodes: commands wait while the registry of nodes is unread, and never when no live broker is configured.
+func TestWaitForNodes(t *testing.T) {
+	t.Parallel()
+
+	live := newLiveFixture(t)
+	if waitForNodes(live.control) {
+		t.Error("commands wait although the registry is loaded")
+	}
+
+	unread := newLiveControl(
+		live.broker,
+		iotbridge.NewNodeRegistry(),
+		live.handler.firmware,
+		live.handler.outstanding,
+		true,
+	)
+	if !waitForNodes(unread) {
+		t.Error("commands do not wait for an unread registry")
+	}
+
+	if waitForNodes(nil) {
+		t.Error("commands wait without a live broker")
+	}
+}
+
 // TestLiveControlTextNode: a node that sent no firmware-0.4 status gets the first firmware's text for the power, which
 // the bridge acknowledges with the settings it runs with; an action the text firmware does not take fails.
 func TestLiveControlTextNode(t *testing.T) {
@@ -266,7 +362,7 @@ func TestLiveControlTextNode(t *testing.T) {
 		t.Fatalf("published %v", live.broker.published)
 	}
 
-	if !slices.Equal(live.api.types(), []string{eventCommandSent, "command_ack", "state"}) {
+	if !slices.Equal(live.api.types(), []string{eventCommandSent, eventCommandAck, "state"}) {
 		t.Fatalf("triggers %v", live.api.types())
 	}
 
@@ -487,6 +583,7 @@ const (
 	node1Name        = "node_1"
 	node2Name        = "node_2"
 	eventCommandSent = "command_sent"
+	eventCommandAck  = "command_ack"
 	eventTelemetry   = "telemetry"
 	eventState       = "state"
 	testToken        = "tok"
