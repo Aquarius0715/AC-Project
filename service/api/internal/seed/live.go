@@ -126,7 +126,7 @@ func LiveSite() Site {
 					Name:     "sensor-live-power",
 					Metric:   keyPower,
 					Unit:     "kW",
-					Boundary: "",
+					Boundary: "ac_input_electricity",
 				},
 			},
 		},
@@ -444,7 +444,8 @@ func liveModuleOf(
 			"sensor "+liveSensor.Metric,
 			`INSERT INTO devices.sensors (id, tenant_id, device_id, metric, unit, boundary_id, stale_after_seconds,
 				calibrated_at)
-			VALUES ($1,$2,$3,$4,$5,$6,$7,NULL) ON CONFLICT DO NOTHING`,
+			VALUES ($1,$2,$3,$4,$5,$6,$7,NULL)
+			ON CONFLICT (id) DO UPDATE SET boundary_id = EXCLUDED.boundary_id`,
 			ID(liveSensor.Name),
 			tenant,
 			device,

@@ -291,9 +291,28 @@ func TestLiveSiteSeeds(t *testing.T) {
 		t.Fatal(execErr)
 	}
 
+	// the air conditioner's power sensor, added without the energy boundary before it counted (node_1's meter)
+	_, execErr = txn.Exec(
+		ctx,
+		`UPDATE devices.sensors SET boundary_id = NULL WHERE id = $1`,
+		seed.ID("sensor-live-power"),
+	)
+	if execErr != nil {
+		t.Fatal(execErr)
+	}
+
 	applyLiveErr = seed.ApplyLive(ctx, txn, site, clock().Add(time.Hour))
 	if applyLiveErr != nil {
 		t.Fatalf("second apply: %v", applyLiveErr)
+	}
+
+	if c := count(
+		`SELECT count(*) FROM devices.sensors WHERE id = $1 AND boundary_id = 'ac_input_electricity'`,
+		seed.ID("sensor-live-power"),
+	); c != 1 {
+		t.Error(
+			"the next start did not give the air conditioner's power sensor the energy boundary",
+		)
 	}
 
 	if ends() != 0 {
