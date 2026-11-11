@@ -291,9 +291,30 @@ func TestLiveSiteSeeds(t *testing.T) {
 		t.Fatal(execErr)
 	}
 
+	// the air conditioner's power sensor as an installation may have it: under another id, without the energy
+	// boundary (the unique (device, metric) is what an insert by id would meet)
+	_, execErr = txn.Exec(
+		ctx,
+		`UPDATE devices.sensors SET id = gen_random_uuid(), boundary_id = NULL WHERE id = $1`,
+		seed.ID("sensor-live-power"),
+	)
+	if execErr != nil {
+		t.Fatal(execErr)
+	}
+
 	applyLiveErr = seed.ApplyLive(ctx, txn, site, clock().Add(time.Hour))
 	if applyLiveErr != nil {
 		t.Fatalf("second apply: %v", applyLiveErr)
+	}
+
+	if c := count(
+		`SELECT count(*) FROM devices.sensors WHERE device_id = $1 AND metric = 'power'
+			AND boundary_id = 'ac_input_electricity'`,
+		seed.ID(site.Device),
+	); c != 1 {
+		t.Error(
+			"the next start did not give the air conditioner's power sensor the energy boundary",
+		)
 	}
 
 	if ends() != 0 {
