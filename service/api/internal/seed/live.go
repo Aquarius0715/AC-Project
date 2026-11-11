@@ -444,8 +444,7 @@ func liveModuleOf(
 			"sensor "+liveSensor.Metric,
 			`INSERT INTO devices.sensors (id, tenant_id, device_id, metric, unit, boundary_id, stale_after_seconds,
 				calibrated_at)
-			VALUES ($1,$2,$3,$4,$5,$6,$7,NULL)
-			ON CONFLICT (id) DO UPDATE SET boundary_id = EXCLUDED.boundary_id`,
+			VALUES ($1,$2,$3,$4,$5,$6,$7,NULL) ON CONFLICT DO NOTHING`,
 			ID(liveSensor.Name),
 			tenant,
 			device,
@@ -453,6 +452,19 @@ func liveModuleOf(
 			liveSensor.Unit,
 			boundary,
 			liveStaleAfterSeconds,
+		)
+		if err != nil {
+			return err
+		}
+		// a sensor of the device that is there already, under whatever id, takes the module's energy boundary: the
+		// insert above leaves it as it is, and a power sensor without the boundary is skipped by the energy sums
+		err = exec(
+			"sensor "+liveSensor.Metric+" boundary",
+			`UPDATE devices.sensors SET boundary_id = $3
+			WHERE device_id = $1 AND metric = $2 AND boundary_id IS DISTINCT FROM $3`,
+			device,
+			liveSensor.Metric,
+			boundary,
 		)
 		if err != nil {
 			return err
