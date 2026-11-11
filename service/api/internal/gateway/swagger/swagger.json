@@ -4039,7 +4039,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: client:self | technician:control.diagnose:assigned-valid-job | admin:control.execute | admin:job.read\nValidation: D01; SR08/SR09; IR216 the unit's history newest first; a client sees others' reasons withheld; a technician sees one job it holds or held an Assignment of (jobId required)\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-C03, DD-T10 · Query: filters none · sort id,requestedAt (default requestedAt desc;id asc)",
+                "description": "Authorization: client:self | technician:control.diagnose:assigned-history | admin:control.execute | admin:job.read\nValidation: D01; SR08/SR09; IR216 the unit's history newest first; a client sees others' reasons withheld; a technician sees one job it holds or held an Assignment of (jobId required)\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-C03, DD-T10 · Query: filters none · sort id,requestedAt (default requestedAt desc;id asc)",
                 "consumes": [
                     "application/json"
                 ],
@@ -8345,7 +8345,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: technician:control.diagnose:assigned-valid-job | admin:job.read | admin:control.execute\nValidation: D01; SR08/SR09\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-T10, DD-A02 · Query: filters none · sort id,createdAt (default createdAt desc;id asc)",
+                "description": "Authorization: technician:control.diagnose:assigned-history | admin:job.read | admin:control.execute\nValidation: D01; SR08/SR09\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-T10, DD-A02 · Query: filters none · sort id,createdAt (default createdAt desc;id asc)",
                 "consumes": [
                     "application/json"
                 ],
@@ -8571,7 +8571,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: technician:control.diagnose:assigned-valid-job | admin:job.read | admin:control.execute\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-T10, DD-A02",
+                "description": "Authorization: technician:control.diagnose:assigned-history | admin:job.read | admin:control.execute\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-T10, DD-A02",
                 "consumes": [
                     "application/json"
                 ],

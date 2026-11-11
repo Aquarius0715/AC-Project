@@ -4,7 +4,7 @@
 // hq-override-only out everywhere (IR384, IR385), which is no project's shared user; the other adds a new person and
 // revokes the membership again (IR461).
 import { test, expect } from "../../fixtures/test";
-import { answers, messageCount } from "../../fixtures/mailpit";
+import { inboxAvailable, messageCount } from "../../fixtures/mailpit";
 import { pickDateTime } from "../../fixtures/time";
 
 test("the organization filter narrows the memberships; an unknown membership is not opened", async ({ page }) => {
@@ -90,7 +90,7 @@ test("HQ adds a new person with a membership, and revoking it ends the membershi
   await page.waitForURL(/membershipId=[0-9a-f-]{36}/);
   await expect(main.locator('button[aria-pressed="true"]', { hasText: "E2E Colleague" })).toBeVisible(); // the new one is selected (an earlier run's stays listed, revoked)
   const search = `http://localhost:8025/api/v1/search?query=${encodeURIComponent(`to:"${email}"`)}`;
-  if (await answers(search)) {
+  if (await inboxAvailable()) {
     await expect.poll(() => messageCount(search), { timeout: 30_000 }).toBeGreaterThanOrEqual(1);
   }
   await main.getByRole("button", { name: "Revoke access…" }).click();

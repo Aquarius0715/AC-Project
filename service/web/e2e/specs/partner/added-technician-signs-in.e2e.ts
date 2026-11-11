@@ -7,12 +7,12 @@
 import { test, expect, FAILED_PAGE } from "../../fixtures/test";
 import { APPS } from "../../fixtures/apps";
 import { startSignIn } from "../../fixtures/auth";
-import { mailpitUp, setupLink } from "../../fixtures/mailpit";
+import { inboxAvailable, setupLink } from "../../fixtures/mailpit";
 import { must } from "../../fixtures/must";
 
 test("a technician the contractor adds sets a password from the e-mail and signs in as themselves", async ({ page, app, browser }) => {
   test.skip(app.id !== "partner", "partner only");
-  test.skip(!(await mailpitUp()), "needs the local Mailpit inbox");
+  test.skip(!(await inboxAvailable()), "needs the local Mailpit inbox");
   const email = `e2e-signin-${String(Date.now())}@example.com`;
   await page.goto("/partner/users");
   await page.getByRole("button", { name: "Add user" }).click();

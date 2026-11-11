@@ -132,7 +132,7 @@ For both simulate/fire, new input occurredAt must match the current demo clock t
 
 ## IR22 Saving raw measurements and inspections — CV-006
 
-RawMeasurement is only for demo.trigger telemetry. jobs.saveDraft continues to use InspectionMeasurementInput and accepts only known UnitSymbol values. A mismatched unit in inspection input returns VALIDATION and rejects the entire report save, with no partial update. This differs from IR12, which saves mismatched raw input as suspect. Nonfinite values, out-of-range values, and future times in inspections use the same quality causes and value=null. Other normal values use qualityReason/rawUnit=null, origin=inspection, and boundaryId=null. Always set isDemo=true when creating a public Measurement.
+RawMeasurement is only for demo.trigger telemetry. jobs.saveDraft continues to use InspectionMeasurementInput and accepts only known UnitSymbol values. A mismatched unit in inspection input returns VALIDATION and rejects the entire report save, with no partial update. This differs from IR12, which saves mismatched raw input as suspect. Nonfinite values in inspections are stored as `missing` and a unit that differs from the metric's is refused at submit (IR118 item 2, IR769); out-of-range values and future times are not checked for inspections. Other normal values use qualityReason/rawUnit=null, origin=inspection, and boundaryId=null. Always set isDemo=true when creating a public Measurement.
 
 ## IR23 Job list projections and search — PV-001–003
 
@@ -734,7 +734,7 @@ Qualifiers in the operation catalog's authorization column have only the meaning
 | contractor:partner.assign:own-valid-offer / own-company | Within the access window of the company's accepted Offer / only role=technician Memberships in the user's own organization |
 | contractor:partner.review:own-offer / submitted | Submitted versions for jobs contracted by the user's own company |
 | technician:assigned (read) | Internal: Units within Membership.scopes (except job-based reads under IR49(a)); external: own Assignment's viewing window ∩ scopes |
-| technician:assigned-history | IR23/IR24 projections |
+| technician:assigned-history | IR23/IR24 projections; a job's diagnostic runs and commands for a technician who holds or held an Assignment of it (IR771) |
 | technician:*:assigned / assigned-valid-job / job-required (write) | Table below |
 | admin:<permission> | Holds the permission and is within managed scope |
 | admin:<permission>:scope-candidate-read-only | D12 supporting reads |
@@ -6597,7 +6597,7 @@ Found in review: correcting the address of a pending invite sent nothing to the 
 Found in review: the outbox consumers (IR183) stop at the first failing event to keep the order, and retried it on every poll without a bound or a pause. One event that could never apply (a handler bug, data it does not accept) stopped that consumer for every tenant for good, with only a log line each poll. Backend architecture §8 asks for bounded retries with backoff and dead letters.
 
 1. `platform.event_failures` (consumer, event, attempts, last error, last attempt, `dead_at`) records each failed attempt. The consumer retries the event 1, 2, 4 and 8 minutes after the attempt before (the events after it wait, so the order holds) and, after the fifth failure, dead-letters it: `dead_at` is set, the event is recorded as processed for that consumer, the log names it, and the events after it are applied.
-2. A dead-lettered event is replayed by deleting its rows for that consumer from `platform.processed_events` and `platform.event_failures` once the cause is fixed.
+2. A dead-lettered event is replayed by deleting its rows for that consumer from `platform.processed_events` and `platform.event_failures` once the cause is fixed, for a one-shot event only: a copy event (the access and ref copies) is not replayed, because it applies the whole state and an old event would write it back (IR770).
 3. Tests: `TestConsumerOrderDedupAndRetry` (the retry waits a minute), `TestConsumerDeadLetters` (five attempts at 0, 1, 2, 4 and 8 minutes, then skipped and recorded).
 
 ## IR428 The platform tables are kept to their retention — 2026-10-14
@@ -10345,3 +10345,35 @@ Found in review round 456 (proposal B-30, high), built on the user's decision of
    - `TestDemoOperationsNeedASessionOrTheService`: anonymous and a wrong token answered 422 before (the handler was reached) and 401 now; the service token and a signed-in session reach the handler; an acknowledgement naming another device was 200 and is 422 now.
    - The bridge's concurrency test sends the service token.
    - `bffOpsRoute.test.ts`: the relay answers 401 for `demo.*` without a session and does not call the Core API.
+
+## IR769 The inspection measurement rule says what the code does — 2026-11-11
+
+Proposal B-32 (round 515), built with the recommended option 2 (the document describes what runs).
+
+1. **Before.** IR12 said that non-finite values, out-of-range values and future times in inspections use the same quality causes as telemetry (`value=null`). IR118 item 2 lists two cases only, and the code does exactly that: an inspection measurement in another unit than the metric's is refused at submit (`unit_mismatch`), and a null or non-finite value is stored as `missing`. An out-of-range value or a future `observedAt` is stored as a valid inspection measurement.
+2. **Now.** IR12's sentence about inspections points at IR118 item 2: inspections are range-checked by the technician and the reviewer, not by the platform; only the telemetry boundary (`demo.trigger`, the IoT bridge) applies `out_of_range` and `invalid_time`. Range-checking inspections (the telemetry ranges per metric, a future time refused) stays open until HQ asks for it.
+3. **Tests.** None: a text change.
+
+## IR770 A dead-lettered copy event is not replayed — 2026-11-11
+
+Proposal B-39 (round 654), built with the recommended option 1 (a runbook rule).
+
+1. **Before.** IR427 item 2 replays a dead-lettered event by deleting its rows from `platform.processed_events` and `platform.event_failures`. That is right for a one-shot event (a notification, an audit entry, a command acknowledgement). The copy handlers (assets' offer and assignment access, and the `Replicas()` of billing, notify, maintenance and energy) apply each event as the whole current state with no version guard and rely on the consumer's order. A replayed copy event arrives after newer ones and writes the older state back — a reopened access window, an earlier name or status — until the next event of that aggregate.
+2. **Now.** IR427 item 2 holds for one-shot events only. A dead-lettered copy event is not replayed: once the cause is fixed, the aggregate's next state event repairs the copy, or every later event of the same aggregate is replayed after it, in order. Guarding the copies with the source version (option 2) stays open for when replays become routine.
+3. **Tests.** None: a runbook rule.
+
+## IR771 A technician keeps the history of a job's diagnostic runs and commands — 2026-11-11
+
+Proposal B-40 (rounds 742 and 743), built with the recommended option 1 (the technician's own work record).
+
+1. **Before.** `diagnosticRuns.get`, `diagnosticRuns.list` and `commands.list` read `assets.unit_assignment_access` for the job, with no check of the assignment's active flag or window (IR139 item 3, IR216: "holds or held an Assignment"), while the catalog authorized them as `technician:control.diagnose:assigned-valid-job`, the name of the job writes.
+2. **Now.** The three reads are authorized as `technician:control.diagnose:assigned-history`, the name `jobs.get` uses for a held or past assignment (IR23/IR24). `diagnosticRuns.create` and the other job writes keep `assigned-valid-job`; the unit scope of IR94's writes stays strict. The code is unchanged.
+3. **Tests.** None: the catalog and the handlers' Swagger text agree with the code.
+
+## IR772 The nightly E2E run fails when its inbox is missing — 2026-11-11
+
+Proposal B-41 (round 746), built with the recommended option 1 for the Mailpit checks.
+
+1. **Before.** Four specs skipped with `test.skip(!(await mailpitUp()))` and five more checked the e-mail only `if (await answers(search))`. The list reporter counts a skip as a pass, so a Mailpit container that had died turned the night green with those checks not run.
+2. **Now.** `inboxAvailable()` (e2e fixtures) skips on a developer's stack without Mailpit as before, and throws when `CI` is set: the workflow's compose stack always publishes Mailpit on 8025 (`deploy/test/compose.test.yaml`). All nine specs use it. The skips on seed state (`unit-chart`, `qr-scan`, `restriction-notice`, `diagnostics`, `report-checks`, `partner/jobs`) are left: the seed's work window can pass on a long-lived stack, and the run's report lists them.
+3. **Tests.** The specs themselves; the helper is exercised by the nightly run.

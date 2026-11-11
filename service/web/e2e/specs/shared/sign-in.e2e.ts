@@ -2,7 +2,7 @@
 // pages speak it, with the address already filled in; a forgotten password is reset there, and its e-mail reaches the inbox.
 import { test, expect } from "../../fixtures/test";
 import { emailOf, startSignIn } from "../../fixtures/auth";
-import { mailpitUp, mailsTo } from "../../fixtures/mailpit";
+import { inboxAvailable, mailsTo } from "../../fixtures/mailpit";
 
 test.describe("signed out", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
@@ -22,7 +22,7 @@ test.describe("signed out", () => {
 
   test("a forgotten password is reset on the identity provider's pages: the e-mail reaches the inbox", async ({ page, app }) => {
     test.skip(app.id !== "customer", "one app is enough: every app leads to the same identity provider");
-    test.skip(!(await mailpitUp()), "no inbox on this stack");
+    test.skip(!(await inboxAvailable()), "no inbox on this stack");
     const email = emailOf("customer-b");
     const before = await mailsTo(email);
     await page.goto("/login");
