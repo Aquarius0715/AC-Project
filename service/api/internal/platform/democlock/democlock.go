@@ -63,10 +63,17 @@ func Open(
 	return clock, nil
 }
 
-// Now is the scenario time. A failed refresh keeps the last known offset.
+// Now is the scenario time. A failed refresh keeps the last known offset. The caller that finds the offset stale
+// claims the refresh by moving loadedAt first, so while the database is down or slow the next refresh is one
+// refreshEvery away and concurrent callers do not each wait out their own refreshTimeout.
 func (c *Clock) Now() time.Time {
 	c.mu.Lock()
 	stale := c.base().Sub(c.loadedAt) >= refreshEvery
+
+	if stale {
+		c.loadedAt = c.base()
+	}
+
 	c.mu.Unlock()
 
 	if stale {
