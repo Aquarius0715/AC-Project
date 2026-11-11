@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.630.0
+version: 0.631.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -301,6 +301,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.631.0: IR786: the migration versions must be 1, 2, 3 … without a gap. Phase 1A unchanged.
 0.630.0: IR785: schema changes are migrations with ALTERs and the test deployment applies them without resetting the data; four review findings fixed. Phase 1A unchanged.
 0.629.0: IR782–IR784: a submitted report version lists only the files added up to it, the time-proposal notices of IR113 item 9 are sent, and an alert nobody acknowledges is escalated to HQ. Phase 1A unchanged.
 0.628.0: IR777–IR781: a write's response is stored with the write, two saves never store one version twice, a reminder checks its channel, a customer record needs a customer organization, and a shorter certificate never cuts a qualification. Phase 1A unchanged.

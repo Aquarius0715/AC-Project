@@ -31,6 +31,7 @@ var (
 	errBadFileName        = errors.New("bad file name")
 	errVersionNotPositive = errors.New("version must be positive")
 	errVersionUsed        = errors.New("used by")
+	errVersionGap         = errors.New("version missing before")
 )
 
 // Migration is one numbered up migration.
@@ -103,6 +104,14 @@ func Load(fsys fs.FS) ([]Migration, error) {
 	}
 
 	sort.Slice(out, func(i, j int) bool { return out[i].Version < out[j].Version })
+
+	// Up skips every version at or below the recorded one, so a gap filled later would never run on a database that
+	// is already past it: the versions are 1, 2, 3 ... without a hole.
+	for i, migration := range out {
+		if migration.Version != int64(i+1) {
+			return nil, fmt.Errorf("migrate: %w %d", errVersionGap, migration.Version)
+		}
+	}
 
 	return out, nil
 }

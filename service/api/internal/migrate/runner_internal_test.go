@@ -17,12 +17,14 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/migrations"
 )
 
+const firstFile = "000001_a.up.sql"
+
 func TestLoadSortsAndValidates(t *testing.T) {
 	t.Parallel()
 
 	loaded, err := Load(fstest.MapFS{
 		"000002_b.up.sql": {Data: []byte("SELECT 2"), Mode: 0, ModTime: time.Time{}, Sys: nil},
-		"000001_a.up.sql": {Data: []byte("SELECT 1"), Mode: 0, ModTime: time.Time{}, Sys: nil},
+		firstFile:         {Data: []byte("SELECT 1"), Mode: 0, ModTime: time.Time{}, Sys: nil},
 		"README.md":       {Data: []byte("ignored"), Mode: 0, ModTime: time.Time{}, Sys: nil},
 	})
 	if err != nil || len(loaded) != 2 || loaded[0].Version != 1 || loaded[1].Name != "b" {
@@ -33,8 +35,14 @@ func TestLoadSortsAndValidates(t *testing.T) {
 		"bad name": {"init.sql": {Data: nil, Mode: 0, ModTime: time.Time{}, Sys: nil}},
 		"zero":     {"000000_zero.up.sql": {Data: nil, Mode: 0, ModTime: time.Time{}, Sys: nil}},
 		"duplicate": {
-			"000001_a.up.sql": {Data: nil, Mode: 0, ModTime: time.Time{}, Sys: nil},
-			"1_b.up.sql":      {Data: nil, Mode: 0, ModTime: time.Time{}, Sys: nil},
+			firstFile:    {Data: nil, Mode: 0, ModTime: time.Time{}, Sys: nil},
+			"1_b.up.sql": {Data: nil, Mode: 0, ModTime: time.Time{}, Sys: nil},
+		},
+		// a gap: a database already at 4 would never apply a 3 added later (Up skips versions <= the recorded one)
+		"gap": {
+			firstFile:         {Data: nil, Mode: 0, ModTime: time.Time{}, Sys: nil},
+			"000002_b.up.sql": {Data: nil, Mode: 0, ModTime: time.Time{}, Sys: nil},
+			"000004_d.up.sql": {Data: nil, Mode: 0, ModTime: time.Time{}, Sys: nil},
 		},
 	} {
 		_, err := Load(fsys)
