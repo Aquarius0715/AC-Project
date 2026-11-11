@@ -4,7 +4,9 @@ never from a command line that other users of the server could see, and prints e
 
 usage: GITHUB_TOKEN=... GITHUB_REPOSITORY=owner/name python3 deploy/test/ci_gate.py SHA [MINUTES]
   exit 0 when CI passed; 1 when it failed, or did not pass within MINUTES (60). MINUTES 0 reads once and exits 3 while
-  CI still runs: the CI runs on the same runner, so the deployment workflow must not hold it waiting. GITHUB_API_URL
+  CI still runs, and 4 when no CI run exists for the commit at all (a merge made with the workflow's own token starts
+  no CI on main: the deployment workflow then starts it). The CI runs on the same runner, so the deployment workflow
+  must not hold it waiting. GITHUB_API_URL
   and CI_GATE_POLL_SECONDS change the API and the pause between two reads (tests).
 """
 
@@ -60,7 +62,7 @@ def main() -> int:
         now = progress(repo, runs[0]) if runs else "not started yet"
         if minutes == 0:
             print(f"{WORKFLOW} on {sha[:8]}: {now}", flush=True)
-            return 3
+            return 3 if runs else 4
         if now != last:
             print(f"waiting for {WORKFLOW} on {sha[:8]}: {now}", flush=True)
             last = now

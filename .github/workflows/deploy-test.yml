@@ -2,7 +2,9 @@
 # ac-test), so the build and deploy logs show here. A tag test<major>.<minor>.<patch>r<n> on a commit of main deploys
 # that commit once its CI passed:
 # - pushing the tag deploys at once when CI passed on the commit already;
-# - while that CI still runs, the run ends, and the CI's own completion deploys the newest test tag on its commit.
+# - while that CI still runs, the run ends, and the CI's own completion deploys the newest test tag on its commit;
+# - when the commit has no CI at all (a merge by the Auto-merge workflow starts none), the run starts it, and its
+#   completion deploys the tag in the same way.
 # CI runs on the same runner, so a deployment never holds it waiting. The job runs deploy/test/deploy.sh from the
 # checkout with the environment file of the Environment test's secret AC_TEST_ENV_FILE, written to the runner's temporary
 # directory for the job and removed after it (IR733); without that secret, with the server's ~/ac-test/env as before.
@@ -20,7 +22,7 @@ on:
     branches: [main]
 
 permissions:
-  actions: read # the CI run of the commit
+  actions: write # the CI run of the commit, and starting it when the commit has none
   contents: read
 
 concurrency:
@@ -33,7 +35,7 @@ jobs:
     # a tag push, or a CI run that passed on a push to main; only in this repository, never a fork's (IR732)
     if: >-
       github.repository == 'Aquarius0715/AC-Project' &&
-      (github.event_name == 'push' || (github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success'))
+      (github.event_name == 'push' || (contains(fromJSON('["push", "workflow_dispatch"]'), github.event.workflow_run.event) && github.event.workflow_run.conclusion == 'success'))
     runs-on: [self-hosted, ac-test]
     environment: test # its secrets, for main and the test tags only (repository settings, IR733)
     timeout-minutes: 120
@@ -59,6 +61,18 @@ jobs:
             python3 deploy/test/ci_gate.py "$sha" 0 || result=$?
             if [ "$result" = 3 ]; then
               echo "::notice::CI on ${sha:0:8} still runs; $tag is deployed when it passes"
+              exit 0
+            elif [ "$result" = 4 ]; then
+              # no CI on the commit (a pull request merged by the Auto-merge workflow starts none on main): run it now;
+              # its completion deploys the tag, as for a CI that was still running
+              if [ "$sha" != "$(git rev-parse origin/main)" ]; then
+                echo "::error::CI never ran on ${sha:0:8} and main has moved on: tag the current main"
+                exit 1
+              fi
+              curl --fail --silent --show-error -X POST -H "Authorization: Bearer $GITHUB_TOKEN" \
+                -H "Accept: application/vnd.github+json" \
+                "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/dispatches" -d '{"ref":"main"}'
+              echo "::notice::CI had not run on ${sha:0:8}: started it; $tag is deployed when it passes"
               exit 0
             elif [ "$result" != 0 ]; then
               exit 1
