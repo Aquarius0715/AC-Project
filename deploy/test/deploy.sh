@@ -208,8 +208,8 @@ data_of() {
 # whether every migration of the tag $1 is, byte for byte, in the tag $2: a new migration is applied to the data, but a
 # migration that was applied and then edited or removed cannot be, so the data must be built again (IR785)
 migrations_kept() {
-  local mode type blob path
-  while read -r mode type blob path; do
+  local blob path
+  while read -r _ _ blob path; do
     case $path in *.sql) ;; *) continue ;; esac # the Go file next to them is no migration
     [ "$(git -C "$REPO" rev-parse --quiet --verify "refs/tags/$2:$path" || true)" = "$blob" ] || return 1
   done < <(git -C "$REPO" ls-tree -r "refs/tags/$1" -- "$MIGRATIONS")
