@@ -447,6 +447,11 @@ func (Capabilities) delete(
 ) (DeletedResource, error) {
 	var version int
 
+	lockErr := lockModelRows(ctx, call, input.ID)
+	if lockErr != nil {
+		return DeletedResource{}, lockErr
+	}
+
 	err := call.Tx.QueryRow(
 		ctx,
 		`SELECT version FROM devices.capabilities WHERE id = $1 AND is_current FOR UPDATE`,
@@ -673,6 +678,11 @@ func nextRevision(
 		return revision, nil
 	}
 
+	lockErr := lockModelRows(ctx, call, *input.ID)
+	if lockErr != nil {
+		return revision, lockErr
+	}
+
 	old, err := scanCap(
 		call.Tx.QueryRow(
 			ctx,
@@ -772,4 +782,17 @@ func LoadCapability(
 	}
 
 	return capability, err == nil, err
+}
+
+// lockModelRows locks every version row of a capability FOR UPDATE before a write reads its current version (IR766):
+// a write that waited for a new version saved meanwhile then reads that version and answers a version conflict,
+// instead of finding the row it waited for no longer current and answering NOT_FOUND.
+func lockModelRows(ctx context.Context, call *ops.Call, id uuid.UUID) error {
+	_, err := call.Tx.Exec(
+		ctx,
+		`SELECT 1 FROM devices.capabilities WHERE id = $1 ORDER BY version FOR UPDATE`,
+		id,
+	)
+
+	return apperr.Wrap(err, "select devices.capabilities")
 }

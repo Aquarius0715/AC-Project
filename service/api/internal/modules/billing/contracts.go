@@ -242,7 +242,19 @@ func (m Billing) loadContract(
 	lock bool,
 ) (Contract, error) {
 	stmt := "SELECT " + contractCols + " FROM billing.contracts k WHERE k.id = $1 AND k.is_current"
+
 	if lock {
+		// every version first (IR766): a write that waited for a new version saved meanwhile reads that version
+		// and answers a version conflict, instead of NOT_FOUND for the row that is no longer current
+		_, err := call.Tx.Exec(
+			ctx,
+			`SELECT 1 FROM billing.contracts WHERE id = $1 ORDER BY version FOR UPDATE`,
+			contractID,
+		)
+		if err != nil {
+			return Contract{}, apperr.Wrap(err, "select billing.contracts")
+		}
+
 		stmt += sqlForUpdate
 	}
 

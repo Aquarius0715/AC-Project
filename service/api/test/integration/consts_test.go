@@ -3,6 +3,12 @@ package integration_test
 import "github.com/pradita/ac-project/service/api/internal/platform/apperr"
 
 // The operations the tables and lists name.
+// tableEmissionFactors is the emission factors' table, which the race tests hold on a second connection.
+const tableEmissionFactors = "energy.emission_factors"
+
+// opFactorsSave saves an emission factor.
+const opFactorsSave = "factors.save"
+
 const (
 	opAlertsList                  = "alerts.list"
 	opAutomationsNextRuns         = "automations.nextRuns"

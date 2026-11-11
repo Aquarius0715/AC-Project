@@ -195,7 +195,7 @@ func TestRequiredInputs(t *testing.T) {
 			"baselines.save", `{"unitIds":["00000000-0000-0000-0000-000000000000"]}`,
 			map[string]string{fieldUnitIDs: inv, fieldBoundaryID: inv},
 		},
-		{"factors.save", `{}`, map[string]string{"region": length}},
+		{opFactorsSave, `{}`, map[string]string{"region": length}},
 		{opOffsetsPreview, `{"unitIds":["00000000-0000-0000-0000-000000000000"],"period":{"from":"2026-09-02T00:00:00Z",` +
 			`"to":"2026-09-01T00:00:00Z"}}`, map[string]string{"purpose": length, fieldPeriod: rng, fieldUnitIDs: inv}},
 		{opOffsetsPreview, `{"unitIds":[]}`, map[string]string{fieldUnitIDs: inv}},

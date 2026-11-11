@@ -54,7 +54,8 @@ func scanFactor(r pgx.Row) (Factor, error) {
 	return factor, apperr.Wrap(err, "scan (scanFactor)")
 }
 
-// lockVersions locks every version row of a factor or a baseline FOR UPDATE before a new version is saved (IR765):
+// lockVersions locks every version row of a factor or a baseline FOR UPDATE before a new version is saved (IR765)
+// or the record is deleted (IR766):
 // factors.delete / baselines.delete lock the current version and remove them all, so a save at the same moment waits
 // for the delete and then finds no row (NOT_FOUND) instead of inserting a version that survives the delete; a save
 // after another save reads the new current version afresh and compares its expected version with it.

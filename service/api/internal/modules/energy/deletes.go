@@ -63,6 +63,12 @@ func (r removal) remove(
 	refuse func(context.Context, *ops.Call) error,
 ) (DeletedResource, error) {
 	var version int
+	// every version first (IR766): a delete that waited for a new version saved meanwhile reads that version and
+	// answers a version conflict, instead of NOT_FOUND for the row that is no longer current
+	lockErr := lockVersions(ctx, call, r.table, input.ID)
+	if lockErr != nil {
+		return DeletedResource{}, lockErr
+	}
 
 	err := call.Tx.QueryRow(
 		ctx,
