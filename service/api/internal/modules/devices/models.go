@@ -22,12 +22,23 @@ type Models struct{}
 // for and seen, so a unit is never saved with a model that is deleted or has moved on at the same moment.
 func (Models) CurrentVersion(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	modelID uuid.UUID,
 ) (int, bool, error) {
 	var version int
+	// every version first (IR767): a unit save that waited for a new version of the model reads that version, instead
+	// of finding the row it waited for no longer current and taking the model for unknown
+	_, lockErr := call.Tx.Exec(
+		ctx,
+		`SELECT 1 FROM devices.capabilities WHERE id = $1 ORDER BY version FOR SHARE`,
+		modelID,
+	)
+	if lockErr != nil {
+		return 0, false, apperr.Wrap(lockErr, "select devices.capabilities")
+	}
 
-	err := c.Tx.QueryRow(ctx, `SELECT version FROM devices.capabilities WHERE id = $1 AND is_current FOR SHARE`, modelID).
+	err := call.Tx.QueryRow(ctx, `SELECT version FROM devices.capabilities WHERE id = $1 AND is_current
+		FOR SHARE`, modelID).
 		Scan(&version)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

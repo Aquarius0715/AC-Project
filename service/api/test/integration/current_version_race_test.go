@@ -76,25 +76,8 @@ func TestAWriteThatWaitedForANewVersionIsAVersionConflict(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		// another save of the record half done: version 1 is no longer current and version 2 is; the whole row is
-		// copied, whatever the table's columns, to stand for that save's next version
-		for _, stmt := range []string{
-			`CREATE TEMP TABLE next_version ON COMMIT DROP AS SELECT * FROM ` + //nolint:unqueryvet // copies the whole row
-				testCase.table + ` WHERE id = $1 AND version = 1`,
-			`UPDATE next_version SET version = 2`,
-			`UPDATE ` + testCase.table + ` SET is_current = false WHERE id = $1 AND version = 1`,
-			`INSERT INTO ` + testCase.table + ` SELECT * FROM next_version`, //nolint:unqueryvet // the copied row as a whole
-		} {
-			args := []any{}
-			if strings.Contains(stmt, "$1") {
-				args = append(args, id)
-			}
 
-			_, err = tx.Exec(ctx, stmt, args...)
-			if err != nil {
-				t.Fatalf("%s: %s: %v", testCase.name, stmt, err)
-			}
-		}
+		holdNextVersion(ctx, t, tx, testCase.table, id)
 
 		done := make(chan saveResult, 1)
 
@@ -136,6 +119,34 @@ func TestAWriteThatWaitedForANewVersionIsAVersionConflict(t *testing.T) {
 				got.code,
 				got.resp,
 			)
+		}
+	}
+}
+
+// holdNextVersion makes, in tx, another save of the record half done: version 1 is no longer current and version 2 is.
+// The whole row is copied, whatever the table's columns, to stand for that save's next version; tx holds the locks
+// until the caller commits it.
+func holdNextVersion(ctx context.Context, t *testing.T, tx pgx.Tx, table, id string) {
+	t.Helper()
+
+	for _, step := range []struct {
+		stmt string
+		byID bool
+	}{
+		{`CREATE TEMP TABLE next_version ON COMMIT DROP AS SELECT * FROM ` + //nolint:unqueryvet // copies the whole row
+			table + ` WHERE id = $1 AND version = 1`, true},
+		{`UPDATE next_version SET version = 2`, false},
+		{`UPDATE ` + table + ` SET is_current = false WHERE id = $1 AND version = 1`, true},
+		{`INSERT INTO ` + table + ` SELECT * FROM next_version`, false}, //nolint:unqueryvet // the copied row as a whole
+	} {
+		args := []any{}
+		if step.byID {
+			args = append(args, id)
+		}
+
+		_, err := tx.Exec(ctx, step.stmt, args...)
+		if err != nil {
+			t.Fatalf("%s: %s: %v", table, step.stmt, err)
 		}
 	}
 }
