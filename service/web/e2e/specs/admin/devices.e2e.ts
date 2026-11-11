@@ -26,7 +26,7 @@ test("the device list filters by state and the detail shows the device as Figma 
   expect(await seed()).toEqual(["AC-DEMO-0005"]);
   await main.getByRole("button", { name: /^All\s*\d+$/ }).click();
   await main.getByPlaceholder("Search serial, device or unit…").fill("DEMO-0004");
-  expect(await serials()).toEqual(["AC-DEMO-0004"]);
+  await expect.poll(serials).toEqual(["AC-DEMO-0004"]); // the search runs on the server
   await main.getByPlaceholder("Search serial, device or unit…").fill("");
 
   await list.getByRole("button", { name: /AC-DEMO-0001/ }).click();
@@ -88,26 +88,26 @@ test("the IoT model editor marks a draft, adds a firmware version and discards i
   await expect(main.getByRole("heading", { name: /Editing → v\d+/ })).toHaveCount(0);
 });
 
-// Registering reserves a device for its planned unit; it is bound only by Bind (D05, business operation review
-// 2026-10-15, IR467): the detail says "Not bound yet", and Bind opens with the planned unit chosen. Nothing is bound
-// here (Cancel); the registered device stays, under a serial of its own per run.
-test("a registered device is not bound yet, and Bind starts from its planned unit", async ({ page }) => {
+// A device can be registered on its own (no unit: a spare, or one not installed yet) and connected later: Bind searches
+// every unit on the server, shows the old and the new unit side by side and replaces the device a unit already has.
+// Nothing is bound here (Cancel); the registered device stays, under a serial of its own per run.
+test("a device is registered without a unit, and Bind searches the units on the server", async ({ page }) => {
   await page.goto("/admin/devices?tab=devices");
   const main = page.getByRole("main");
   await main.getByRole("button", { name: "Register device" }).click();
   const dialog = page.getByRole("dialog");
-  await dialog.getByRole("textbox", { name: /^Serial/ }).fill(`AC-E2E-${String(Date.now())}`);
-  const planned = dialog.getByRole("combobox", { name: /^Planned unit/ });
-  await planned.selectOption({ index: 1 });
-  const unitText = await planned.locator("option:checked").innerText();
-  const unit = unitText.trim();
+  await dialog.getByRole("textbox", { name: /^Device serial/ }).fill(`AC-E2E-${String(Date.now())}`);
+  await dialog.getByRole("combobox", { name: /^IoT model/ }).selectOption({ index: 1 });
   await dialog.getByRole("button", { name: "Register", exact: true }).click();
-  await expect(page.getByText("Device registered — bind it to the unit once it is installed").first()).toBeVisible();
+  await expect(page.getByText("Device registered — connect it to a unit when it is installed").first()).toBeVisible();
   await page.waitForURL(/deviceId=/);
-  await expect(main).toContainText("Not bound yet");
   await main.getByRole("button", { name: "Bind…" }).click();
   await expect(dialog.getByRole("heading", { name: "Bind device" })).toBeVisible();
-  await expect(dialog.getByRole("combobox", { name: /^Unit/ }).locator("option:checked")).toHaveText(unit);
+  await dialog.getByRole("combobox", { name: "AC unit" }).click();
+  const option = page.getByRole("option").first();
+  await expect(option).toBeVisible(); // the first page of the server's search
+  await option.click();
+  await expect(dialog.getByText("Not connected")).toBeVisible(); // From
   await dialog.getByRole("button", { name: "Cancel" }).click();
 });
 
@@ -118,8 +118,8 @@ test("a device is registered with its MQTT node ID, which Edit… changes and cl
   const node = `e2e_${stamp}`;
   await main.getByRole("button", { name: "Register device" }).click();
   const dialog = page.getByRole("dialog");
-  await dialog.getByRole("textbox", { name: /^Serial/ }).fill(`AC-E2E-${stamp}`);
-  await dialog.getByRole("combobox", { name: /^Planned unit/ }).selectOption({ index: 1 });
+  await dialog.getByRole("textbox", { name: /^Device serial/ }).fill(`AC-E2E-${stamp}`);
+  await dialog.getByRole("combobox", { name: /^IoT model/ }).selectOption({ index: 1 });
   const nodeBox = dialog.getByRole("textbox", { name: /^MQTT node ID/ });
   await nodeBox.fill("bad node");
   await dialog.getByRole("button", { name: "Register", exact: true }).click();
@@ -149,8 +149,8 @@ test("a device registered by mistake is deleted, and a bound device must be unbo
   const dialog = page.getByRole("dialog");
   const serial = `AC-E2E-${String(Date.now())}`;
   await main.getByRole("button", { name: "Register device" }).click();
-  await dialog.getByRole("textbox", { name: /^Serial/ }).fill(serial);
-  await dialog.getByRole("combobox", { name: /^Planned unit/ }).selectOption({ index: 1 });
+  await dialog.getByRole("textbox", { name: /^Device serial/ }).fill(serial);
+  await dialog.getByRole("combobox", { name: /^IoT model/ }).selectOption({ index: 1 });
   await dialog.getByRole("button", { name: "Register", exact: true }).click();
   await page.waitForURL(/deviceId=/);
   await expect(main.getByRole("heading", { name: serial })).toBeVisible();
