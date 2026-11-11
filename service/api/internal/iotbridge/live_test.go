@@ -2,6 +2,7 @@ package iotbridge_test
 
 import (
 	"encoding/json"
+	"math"
 	"regexp"
 	"slices"
 	"strings"
@@ -252,6 +253,37 @@ func TestLiveTriggersPowerNode(t *testing.T) {
 	)
 	if err != nil || none != nil {
 		t.Errorf("a meter without voltage gave %+v, %v", none, err)
+	}
+}
+
+// TestLiveTriggersNode1Power: firmware 0.4 puts a power meter on node_1 too; its power is recorded on the air
+// conditioner's own power sensor in kW, after the temperature and humidity, once the meter sees a voltage.
+func TestLiveTriggersNode1Power(t *testing.T) {
+	t.Parallel()
+
+	const message = `{"node_id":"node_1","timestamp":"2026-11-11T18:07:43+07:00","temp":27.5,"humidity":57.3,` +
+		`"pressure":1008.5,"gas":137520,"approx_altitude":39.6,"voltage":227.5,"current":0.068,"power":12.7,` +
+		`"energy":0.067}`
+
+	out, err := iotbridge.LiveTriggers(airConditioner(), []byte(message), liveAt())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(out) != 5 {
+		t.Fatalf(
+			"%d triggers, want temperature, humidity, power, their alert evaluation and the heartbeat",
+			len(out),
+		)
+	}
+
+	reading := out[2].Measurement
+	if reading == nil || reading.Metric != sensorPower || reading.Unit != "kW" ||
+		reading.UnitID != seed.ID("unit-live-ac") ||
+		reading.SensorID != seed.ID("sensor-live-power") ||
+		reading.Value == nil ||
+		math.Abs(*reading.Value-0.0127) > 1e-9 {
+		t.Errorf("power reading %+v, want 0.0127 kW on sensor-live-power", reading)
 	}
 }
 
