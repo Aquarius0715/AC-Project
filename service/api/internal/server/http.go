@@ -46,6 +46,7 @@ func newEcho(
 	}))
 	app.Use(requestLogger(app))
 	app.Use(middleware.ContextTimeout(requestTimeout))
+	app.Use(ops.InternalCallerMiddleware(internalToken)) // the service token's callers (IR768)
 
 	app.GET("/healthz", func(c *echo.Context) error { return c.NoContent(http.StatusOK) })
 	app.GET("/readyz", func(ectx *echo.Context) error {

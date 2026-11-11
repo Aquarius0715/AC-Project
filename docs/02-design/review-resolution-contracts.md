@@ -10324,3 +10324,24 @@ Found in review round 706 (`devices/models.go`, `Models.CurrentVersion`).
 1. **Before.** `units.save` reads its model's current version through `Models.CurrentVersion`, with `id AND is_current FOR SHARE`. That share lock makes `capabilities.delete` and a new model version wait for the unit save, or makes the unit save wait for them. A unit save that waited for a new model version found the row it waited for no longer current once that save committed. The model looked missing, and the save was refused with VALIDATION `modelId=error.unknownModel`, although the model existed. This is IR766's wrong answer, under a share lock.
 2. **Now.** `CurrentVersion` first share-locks every version of the model (`ORDER BY version FOR SHARE`) and then reads the current one. A unit save that waited reads the new version and saves the unit with it. A deleted model is still unknown. The lock order is the same as for IR766's capability writes (every version, in version order), so they cannot deadlock. `units.save` is the only caller; the unit import resolves models through `ByCode`.
 3. **Tests.** `TestUnitSaveWaitsForANewModelVersion` holds a model's next version half done on a second connection. Before the fix the unit save answered 422 `modelId=error.unknownModel`; now it saves the unit. The helper that holds the next version is shared with IR766's test (`holdNextVersion`).
+
+## IR768 demo.* answers a signed-in session or the service, never an anonymous request — 2026-11-11
+
+Found in review round 456 (proposal B-30, high), built on the user's decision of 2026-11-11 ("fix all", the recommended option).
+
+1. **Before.** `demo.advanceClock`, `demo.reset` and `demo.trigger` are `public:demo-panel-only`, and an anonymous principal passed. The BFF relay `/bff/ops/<operation>` forwarded a call without a session as an anonymous Core API call. `DEMO_OPS=1` was the only switch, and it is on in the compose stack and on the shared test environment (DEC-96: real accounts and real units). Anyone who could reach a web app could therefore do two things:
+   - move the scenario clock forward, which IR36 cannot undo;
+   - send `demo.trigger` events — measurements, device faults and tamper, command results, restriction observations and state reports — on any unit, probed across every tenant and counted by no write limit.
+
+   A command acknowledgement or failure also settled the command by its ID without checking the device it named.
+2. **Now.**
+   - The Core API serves `demo.*` only to a signed-in principal (the demo panel, through the BFF) or to a request carrying the service token (`X-Internal-Token` = `INTERNAL_API_TOKEN`, compared in constant time; `ops.InternalCallerMiddleware`). An anonymous request answers UNAUTHENTICATED `error.unauthenticated`.
+   - A signed-in caller acts on its own tenant's rows only. The service (the IoT bridge) still finds the row's tenant.
+   - The BFF relay refuses `demo.*` without a session before calling the Core API.
+   - The IoT bridge sends the service token on every request (`serviceToken` transport); compose and the test deployment already give it `INTERNAL_API_TOKEN`.
+   - A `command_ack` / `command_fail` that names a device other than the command's answers VALIDATION `deviceId=errors.command_of_other_device`. The bridge sends no device on these, so its results are taken as the command's own.
+   - `payments.simulate`, `offsets.simulate` and `automations.fire` stay as they are. They need a signed-in caller already, and gating them is left to D11's production replacement of the demo-only operations: the test environment runs the demo, so a gate would not change it.
+3. **Tests.**
+   - `TestDemoOperationsNeedASessionOrTheService`: anonymous and a wrong token answered 422 before (the handler was reached) and 401 now; the service token and a signed-in session reach the handler; an acknowledgement naming another device was 200 and is 422 now.
+   - The bridge's concurrency test sends the service token.
+   - `bffOpsRoute.test.ts`: the relay answers 401 for `demo.*` without a session and does not call the Core API.

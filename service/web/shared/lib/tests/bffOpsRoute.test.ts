@@ -31,6 +31,17 @@ describe("POST /bff/ops/<operation>", () => {
     expect([res.status, await res.json()]).toStrictEqual([200, { data: { id: "u-1" } }]);
     expect(sentCall(fetch.mock.calls)[0]).toBe("https://core:8080/v1/units/00000000-0000-4000-8000-000000000001");
   });
+  it("refuses demo.* without a session, without calling the Core API (IR768)", async () => {
+    vi.stubEnv(DATA_SOURCE_2, "api");
+    const fetch = vi.fn();
+    vi.stubGlobal("fetch", fetch);
+    for (const operation of ["demo.advanceClock", "demo.trigger", "demo.reset"]) {
+      const res = await relay(operation, {});
+      const body: unknown = await res.json();
+      expect([res.status, body]).toMatchObject([401, { code: "UNAUTHENTICATED", messageKey: "error.unauthenticated" }]);
+    }
+    expect(fetch).not.toHaveBeenCalled();
+  });
   it("refuses another site's read or write without calling the Core API", async () => {
     vi.stubEnv(DATA_SOURCE_2, "api");
     const fetch = vi.fn();

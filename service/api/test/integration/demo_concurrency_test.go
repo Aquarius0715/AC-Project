@@ -28,6 +28,7 @@ func TestDemoTriggersDoNotWaitForTheirOwnConnections(t *testing.T) {
 
 	srv := serverCfg(t, func(c *apiserver.Config) {
 		c.DemoOps = true
+		c.InternalToken = internalToken // the bridge's triggers carry the service token (IR768)
 		c.DatabaseURL = testDB("ac_app_login") + "&pool_max_conns=2"
 	})
 	device, unit := seed.ID("device-limited"), seed.ID("unit-limited")
@@ -73,7 +74,8 @@ func TestDemoTriggersDoNotWaitForTheirOwnConnections(t *testing.T) {
 	}
 }
 
-// anonymousTrigger sends one state report as the bridge does, without a user, and returns the status.
+// anonymousTrigger sends one state report as the bridge does, without a user but with the service token (IR768), and
+// returns the status.
 func anonymousTrigger(ctx context.Context, srv *apiserver.Server, device uuid.UUID) (int, string) {
 	event := uuid.NewString()
 	body := `{"scenarioId":"t","eventId":"` + event + `","occurredAt":"` +
@@ -85,6 +87,7 @@ func anonymousTrigger(ctx context.Context, srv *apiserver.Server, device uuid.UU
 	req := httptest.NewRequestWithContext(ctx, method, target, reqBody)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Idempotency-Key", event)
+	req.Header.Set(ops.InternalTokenHeader, internalToken)
 
 	rec := httptest.NewRecorder()
 	srv.Echo.ServeHTTP(rec, req)

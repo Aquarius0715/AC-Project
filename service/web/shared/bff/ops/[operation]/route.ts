@@ -58,6 +58,8 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ operation:
   const call = coreRequest(operation, input);
   if (!call) return domainError(404, "NOT_FOUND", "error.unknownOperation");
   const session = await readSession();
+  // the demo panel's operations need a signed-in session: the Core API refuses an anonymous demo.* too (IR768)
+  if (!session && operation.startsWith("demo.")) return domainError(401, "UNAUTHENTICATED", "error.unauthenticated");
   const headers = new Headers(call.body === undefined ? {} : { "Content-Type": "application/json" });
   if (session) {
     headers.set("Authorization", `Bearer ${session.accessToken}`);

@@ -74,6 +74,16 @@ type demoOps struct {
 
 func demoOnly() error { return apperr.E(apperr.Unavailable, "errors.demo_only") }
 
+// demoCaller admits a demo.* call from a signed-in session (the demo panel, through the BFF) or from the service
+// token's caller (the IoT bridge); an anonymous one is UNAUTHENTICATED (IR768, B-30).
+func demoCaller(ctx context.Context, call *ops.Call) error {
+	if call.Principal == nil && !ops.InternalCaller(ctx) {
+		return apperr.E(apperr.Unauthenticated, apperr.KeyUnauthenticated)
+	}
+
+	return nil
+}
+
 // AdvanceInput is demo.advanceClock input.
 type AdvanceInput struct {
 	To time.Time `json:"to"`
@@ -99,7 +109,7 @@ type Generation struct {
 //	@ID				demo.advanceClock
 //	@Description	Authorization: public:demo-panel-only
 //	@Description	Validation: D01; IR36 forward jumps; set initial time only immediately after reset; shift Session \
-//	@Description	expiry
+//	@Description	expiry; IR768 a signed-in session or the service token only (anonymous UNAUTHENTICATED)
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DDC-07
 //	@Tags			demo
@@ -123,6 +133,11 @@ func (d *demoOps) advance(
 	call *ops.Call,
 	input *AdvanceInput,
 ) (Generation, error) {
+	callerErr := demoCaller(ctx, call)
+	if callerErr != nil {
+		return Generation{}, callerErr
+	}
+
 	if !d.enabled {
 		return Generation{}, demoOnly()
 	}
@@ -168,13 +183,15 @@ func (in *ResetInput) Validate() map[string]string {
 //	@Summary		demo.reset (write)
 //	@ID				demo.reset
 //	@Description	Authorization: public:demo-panel-only
-//	@Description	Validation: D01; input constraints in the corresponding DD
+//	@Description	Validation: D01; input constraints in the corresponding DD; IR768 a signed-in session or the service \
+//	@Description	token only (anonymous UNAUTHENTICATED)
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DDC-07
 //	@Tags			demo
 //	@Accept			json
 //	@Produce		json
-//	@Param			Idempotency-Key	header		string	true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			Idempotency-Key	header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			request			body		ResetInput	true	"input"
 //	@Success		200				{object}	ops.Envelope{data=Generation}
 //	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
 //	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
@@ -186,7 +203,12 @@ func (in *ResetInput) Validate() map[string]string {
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/demo/reset [post]
-func (d *demoOps) reset(context.Context, *ops.Call, *ResetInput) (Generation, error) {
+func (d *demoOps) reset(ctx context.Context, call *ops.Call, _ *ResetInput) (Generation, error) {
+	callerErr := demoCaller(ctx, call)
+	if callerErr != nil {
+		return Generation{}, callerErr
+	}
+
 	if !d.enabled {
 		return Generation{}, demoOnly()
 	}
@@ -406,22 +428,30 @@ func metricUnits() map[string]metricRange {
 	}
 }
 
-// inTenant runs fn in the tenant that owns the row found by probe (demo triggers are anonymous, RLS needs a tenant).
+// inTenant runs fn in the tenant that owns the row found by probe (RLS needs a tenant). The service (the IoT bridge,
+// IR768) probes every tenant; a signed-in caller only its own, so a session acts on its own tenant's rows alone.
 func (d *demoOps) inTenant(
 	ctx context.Context,
-	now time.Time,
+	call *ops.Call,
 	probe string,
 	probeID uuid.UUID,
 	callback func(pgx.Tx, uuid.UUID) error,
 ) error {
-	rows, err := d.m.Writer.Query(ctx, `SELECT id FROM platform.tenants ORDER BY id`)
-	if err != nil {
-		return apperr.Wrap(err, "select platform.tenants")
-	}
+	now := call.Now
 
-	tenants, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
-	if err != nil {
-		return apperr.Wrap(err, "select platform.tenants")
+	tenants := []uuid.UUID{}
+	if call.Principal != nil {
+		tenants = append(tenants, call.Principal.TenantID)
+	} else {
+		rows, err := d.m.Writer.Query(ctx, `SELECT id FROM platform.tenants ORDER BY id`)
+		if err != nil {
+			return apperr.Wrap(err, "select platform.tenants")
+		}
+
+		tenants, err = pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+		if err != nil {
+			return apperr.Wrap(err, "select platform.tenants")
+		}
 	}
 
 	for _, tenant := range tenants {
@@ -487,6 +517,11 @@ func (d *demoOps) inTenant(
 //	@Security		BearerAuth
 //	@Router			/v1/demo/trigger [post]
 func (d *demoOps) trigger(ctx context.Context, call *ops.Call, input *TriggerInput) (Event, error) {
+	callerErr := demoCaller(ctx, call)
+	if callerErr != nil {
+		return Event{}, callerErr
+	}
+
 	if !d.enabled {
 		return Event{}, demoOnly()
 	}
@@ -527,11 +562,34 @@ func (d *demoOps) trigger(ctx context.Context, call *ops.Call, input *TriggerInp
 // commandProbe finds the tenant of a command.
 const commandProbe = `SELECT EXISTS (SELECT 1 FROM control.commands WHERE id = $1)`
 
+// commandOfDevice refuses a command result that names another device than the command's (IR768, B-30): a caller
+// holding one command's ID cannot settle it in another device's name. A trigger without a device (the bridge's) is
+// taken as the command's own device.
+func commandOfDevice(ctx context.Context, txn pgx.Tx, input *TriggerInput) error {
+	if input.DeviceID == nil {
+		return nil
+	}
+
+	var device *uuid.UUID
+
+	err := txn.QueryRow(ctx, `SELECT device_id FROM control.commands WHERE id = $1`, *input.CommandID).
+		Scan(&device)
+	if err != nil {
+		return apperr.Wrap(err, "select control.commands")
+	}
+
+	if device == nil || *device != *input.DeviceID {
+		return apperr.Fields(map[string]string{"deviceId": "errors.command_of_other_device"})
+	}
+
+	return nil
+}
+
 // commandSent marks a requested command sent.
 func (d *demoOps) commandSent(ctx context.Context, call *ops.Call, input *TriggerInput) error {
 	return d.inTenant(
 		ctx,
-		call.Now,
+		call,
 		commandProbe,
 		*input.CommandID,
 		func(txn pgx.Tx, _ uuid.UUID) error {
@@ -556,10 +614,15 @@ func (d *demoOps) commandAcknowledged(
 ) error {
 	return d.inTenant(
 		ctx,
-		call.Now,
+		call,
 		commandProbe,
 		*input.CommandID,
 		func(txn pgx.Tx, _ uuid.UUID) error {
+			deviceErr := commandOfDevice(ctx, txn, input)
+			if deviceErr != nil {
+				return deviceErr
+			}
+
 			_, err := control.Acknowledge(ctx, txn, *input.CommandID, input.OccurredAt)
 
 			return apperr.Wrap(err, "control.Acknowledge")
@@ -572,10 +635,15 @@ func (d *demoOps) commandAcknowledged(
 func (d *demoOps) commandFailed(ctx context.Context, call *ops.Call, input *TriggerInput) error {
 	return d.inTenant(
 		ctx,
-		call.Now,
+		call,
 		commandProbe,
 		*input.CommandID,
 		func(txn pgx.Tx, _ uuid.UUID) error {
+			deviceErr := commandOfDevice(ctx, txn, input)
+			if deviceErr != nil {
+				return deviceErr
+			}
+
 			tag, err := txn.Exec(
 				ctx,
 				`UPDATE control.commands SET status = 'failed', failure_code = 'DEVICE_REJECTED', version = version + 1, updated_at
@@ -636,7 +704,7 @@ func (d *demoOps) deviceSignal(ctx context.Context, call *ops.Call, input *Trigg
 
 	return d.inTenant(
 		ctx,
-		call.Now,
+		call,
 		`SELECT EXISTS (SELECT 1 FROM devices.devices WHERE id = $1)`,
 		*input.DeviceID,
 		func(txn pgx.Tx, _ uuid.UUID) error {
@@ -657,7 +725,7 @@ func (d *demoOps) deviceSignal(ctx context.Context, call *ops.Call, input *Trigg
 func (d *demoOps) operationResult(ctx context.Context, call *ops.Call, input *TriggerInput) error {
 	return d.inTenant(
 		ctx,
-		call.Now,
+		call,
 		`SELECT EXISTS (SELECT 1 FROM devices.device_operations WHERE id = $1)`,
 		*input.OperationID,
 		func(txn pgx.Tx, tenant uuid.UUID) error {
@@ -705,7 +773,7 @@ func (d *demoOps) gatewayFacts(ctx context.Context, call *ops.Call, input *Trigg
 
 	return d.inTenant(
 		ctx,
-		call.Now,
+		call,
 		`SELECT EXISTS (SELECT 1 FROM assets.units WHERE id = $1)`,
 		evaluationInput.UnitIDs[0],
 		func(txn pgx.Tx, tenant uuid.UUID) error {
@@ -744,7 +812,7 @@ func (d *demoOps) stateReport(ctx context.Context, call *ops.Call, input *Trigge
 
 	return d.inTenant(
 		ctx,
-		call.Now,
+		call,
 		`SELECT EXISTS (SELECT 1 FROM devices.devices WHERE id = $1 AND unit_id IS NOT NULL)`,
 		*input.DeviceID,
 		func(txn pgx.Tx, _ uuid.UUID) error {
@@ -831,7 +899,7 @@ func (d *demoOps) restrictionObserved(
 
 	return d.inTenant(
 		ctx,
-		call.Now,
+		call,
 		`SELECT EXISTS (SELECT 1 FROM assets.units WHERE id = $1)`,
 		*input.UnitID,
 		func(txn pgx.Tx, _ uuid.UUID) error {
@@ -871,7 +939,7 @@ func (d *demoOps) telemetry(ctx context.Context, call *ops.Call, input *TriggerI
 
 	return d.inTenant(
 		ctx,
-		call.Now,
+		call,
 		`SELECT EXISTS (SELECT 1 FROM devices.sensors s JOIN devices.devices d ON d.id = s.device_id WHERE s.id = $1)`,
 		measurement.SensorID,
 		func(txn pgx.Tx, tenant uuid.UUID) error {
