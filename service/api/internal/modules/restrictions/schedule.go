@@ -592,13 +592,26 @@ func causesPaid(ctx context.Context, c *ops.Call, id uuid.UUID) (bool, error) {
 	return !unpaid, apperr.Wrap(err, "select restrictions.restriction_invoices")
 }
 
+// causesProcessing reports whether a cause invoice of the restriction has a payment under way (status processing).
+func causesProcessing(ctx context.Context, c *ops.Call, id uuid.UUID) (bool, error) {
+	var processing bool
+
+	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM restrictions.restriction_invoices ri JOIN billing.invoices i ON
+		i.id = ri.invoice_id
+		WHERE ri.restriction_id = $1 AND i.status = 'processing')`, id).
+		Scan(&processing)
+
+	return processing, apperr.Wrap(err, "select restrictions.restriction_invoices")
+}
+
 // execute serves restrictions.execute.
 //
 //	@Summary		restrictions.execute (write)
 //	@ID				restrictions.execute
 //	@Description	Authorization: admin:restriction.write
 //	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
-//	@Description	IR90 device operation running: not_sent intent
+//	@Description	IR90 device operation running: not_sent intent; IR773 a cause invoice with a payment under way \
+//	@Description	(processing) answers CONFLICT errors.payment_processing
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-A09
 //	@Tags			restrictions
@@ -661,6 +674,15 @@ func (m Restrictions) execute(
 
 	if paid { // all causes paid right before execution: cancel without apply requests (DD-A09)
 		return cancelPaid(ctx, call, restriction)
+	}
+
+	processing, err := causesProcessing(ctx, call, restriction.ID)
+	if err != nil {
+		return restriction, err
+	}
+
+	if processing { // IR773: a payment under way is what the restriction is meant to bring about; wait for its outcome
+		return restriction, apperr.E(apperr.Conflict, "errors.payment_processing")
 	}
 
 	action, err := commandAction(restriction, phaseApply)

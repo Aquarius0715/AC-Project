@@ -24,6 +24,7 @@ const (
 	targetJob             = "job"
 	targetRestriction     = "restriction"
 	targetUnit            = "unit"
+	employmentInternal    = "internal" // a technician employed by the operator (Principal.Employment)
 )
 
 // The values this package compares and writes by name.

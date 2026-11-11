@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { i18nOf, translator } from "@ac/web/lib/i18n";
+import { EN, i18nOf, translator } from "@ac/web/lib/i18n";
 import {
   actionOutcome, activePeriod, executeBlocker, intentText, policyText, progressText, releaseBlocker, restrictionRows, stateWord, unitRows,
   type ApiCommand, type ApiRestriction, type PerUnit,
@@ -53,6 +53,10 @@ describe("HQ restrictions (FR-A09, FR-A10)", () => {
       executeBlocker(restriction({ state: "scheduled", noticeAt: "2026-09-14T12:00:00Z" }), NOW), executeBlocker(restriction({ state: "scheduled", graceUntil: TEXT_2026_09_20T00_00_00Z }), NOW),
       executeBlocker(restriction({ state: "scheduled" }), NOW),
     ]).toStrictEqual(["Only a scheduled restriction can be executed", "Executes after 16 Sept 2026, 8:00 am MYT", "Wait 24 hours after the notice", "Grace until 20 Sept 2026, 8:00 am MYT — execution waits", null]);
+    // a payment under way waits for its outcome (IR773); an active grace period is named first
+    expect([executeBlocker(restriction({ state: "scheduled" }), NOW, EN, true), executeBlocker(restriction({ state: "scheduled" }), NOW, EN, false)]).toStrictEqual([
+      "A payment of a cause invoice is in progress — wait for it to be confirmed or to fail", null,
+    ]);
     expect([
       releaseBlocker(restriction({ state: RELEASE_REQUESTED }), false, NOW), releaseBlocker(restriction({ state: "scheduled" }), false, NOW), releaseBlocker(restriction({}), false, NOW),
       releaseBlocker(restriction({}), true, NOW), releaseBlocker(restriction({ exception: { until: TEXT_2026_09_20T00_00_00Z, reason: null } }), false, NOW),

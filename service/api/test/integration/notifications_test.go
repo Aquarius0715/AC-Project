@@ -1031,6 +1031,10 @@ func TestWithdrawnOfferNoticeHasNoLink(t *testing.T) {
 	if n := notice(); n == nil || n["targetOpen"] != true {
 		t.Fatalf("the open offer's notice links the offer: %v", n)
 	}
+	// the notice names the job, never the customer's unit (IR775)
+	if params, _ := notice()["params"].(map[string]any); params["targetName"] != "Job "+job[:8] {
+		t.Errorf("the contractor's notice names %v, want Job %s", params["targetName"], job[:8])
+	}
 
 	if code, res := write(
 		srv,
@@ -1053,5 +1057,93 @@ func TestWithdrawnOfferNoticeHasNoLink(t *testing.T) {
 
 	if code, _ := post(srv, contrA(), "jobs.get", `{"jobId":"`+job+`"}`); code != 404 {
 		t.Errorf("the withdrawn offer's job opens for the company: %d", code)
+	}
+}
+
+// TestExternalTechnicianUnitNotificationScope: an external technician's notice about a unit is listed only while an
+// assignment of a job at that unit lets them in — active and inside its work window — as for the unit's other data
+// (IR774); an internal technician reads it by scopes.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
+func TestExternalTechnicianUnitNotificationScope(t *testing.T) {
+	srv := server(t)
+	tenant, tech, unit := seed.ID("tenant-a"), seed.ID("tech-external-a"), seed.ID("unit-online-rto")
+	nid, jid, aid := uuid.NewString(), uuid.NewString(), uuid.NewString()
+
+	owner(
+		t,
+		`INSERT INTO notify.notifications (id, tenant_id, recipient_membership_id, scope_version_at_creation, type,
+			template_key, target, params, severity, occurred_at)
+		VALUES ($1,$2,$3,1,'schedule_change','schedule_change',$4,'{}','normal',$5)`,
+		nid,
+		tenant,
+		tech,
+		`{"kind":"unit","id":"`+unit.String()+`"}`,
+		clock(),
+	)
+	// the seed's own assignments of this technician are put aside, so that only the one below counts
+	owner(
+		t,
+		`UPDATE notify.ref_assignments SET status = 'aside' WHERE technician_membership_id = $1 AND status = 'active'`,
+		tech,
+	)
+	owner(t, `INSERT INTO notify.ref_jobs (id, tenant_id, unit_id) VALUES ($1,$2,$3)`, jid, tenant, unit)
+	owner(
+		t,
+		`INSERT INTO notify.ref_assignments (id, tenant_id, job_id, technician_membership_id, status, scheduled)
+		VALUES ($1,$2,$3,$4,'active',tstzrange($5,$6))`,
+		aid,
+		tenant,
+		jid,
+		tech,
+		clock().Add(-time.Hour),
+		clock().Add(time.Hour),
+	)
+	t.Cleanup(func() {
+		owner(t, `DELETE FROM notify.notifications WHERE id = $1`, nid)
+		owner(t, `DELETE FROM notify.ref_assignments WHERE id = $1`, aid)
+		owner(t, `DELETE FROM notify.ref_jobs WHERE id = $1`, jid)
+		owner(
+			t,
+			`UPDATE notify.ref_assignments SET status = 'active' WHERE technician_membership_id = $1 AND status = 'aside'`,
+			tech,
+		)
+	})
+
+	listed := func() bool {
+		_, res := post(
+			srv,
+			techA(),
+			"notifications.list",
+			`{"filters":{"type":"schedule_change"},"limit":100}`,
+		)
+		for _, it := range items(t, res) {
+			if it["id"] == nid {
+				return true
+			}
+		}
+
+		return false
+	}
+	if !listed() {
+		t.Fatal("assignment inside its window: the unit notice is not listed")
+	}
+
+	owner(t, `UPDATE notify.ref_assignments SET status = 'revoked' WHERE id = $1`, aid)
+
+	if listed() {
+		t.Error("revoked assignment: the unit notice is still listed")
+	}
+
+	owner(
+		t,
+		`UPDATE notify.ref_assignments SET status = 'active', scheduled = tstzrange($2,$3) WHERE id = $1`,
+		aid,
+		clock().Add(-3*time.Hour),
+		clock().Add(-time.Hour),
+	)
+
+	if listed() {
+		t.Error("assignment window over: the unit notice is still listed")
 	}
 }

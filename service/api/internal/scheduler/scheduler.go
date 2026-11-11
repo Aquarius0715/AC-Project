@@ -48,6 +48,18 @@ type Result struct {
 	Skipped          int // domains × tenants left to the instance holding their lock (IR356)
 }
 
+// add counts the changes of another result in this one.
+func (r *Result) add(o Result) {
+	r.ExpiredOffers += o.ExpiredOffers
+	r.ExpiredCommands += o.ExpiredCommands
+	r.Runs += o.Runs
+	r.Confirmed += o.Confirmed
+	r.ExpiredProposals += o.ExpiredProposals
+	r.FrozenHistories += o.FrozenHistories
+	r.Jobs += o.Jobs
+	r.Skipped += o.Skipped
+}
+
 func (r Result) changes() int {
 	return r.ExpiredOffers + r.ExpiredCommands + r.Runs + r.ExpiredProposals + r.Confirmed + r.FrozenHistories + r.Jobs
 }
@@ -111,6 +123,8 @@ func tick(
 	// each tenant in its own transaction, and one that fails does not hold up the others: its failure is reported and
 	// its transaction rolled back, and the next tick tries it again
 	for _, tenant := range tenants {
+		var stepErrs []error
+
 		err := txm.Run(ctx, false, ops.TenantPrincipal(tenant), func(txn pgx.Tx) error {
 			_, err := txn.Exec(
 				ctx,
@@ -126,26 +140,27 @@ func tick(
 				return err
 			}
 
+			// every step runs in a savepoint of the tenant's transaction (IR776): a failing step rolls back only its own
+			// work, is reported with the tick's error, and does not stop the other steps; the next tick tries it again
 			if held[ops.DomainEquipment] {
-				err := tickEquipment(ctx, txn, tenant, now, reg, &result)
-				if err != nil {
-					return err
-				}
+				stepErrs = append(stepErrs, isolated(ctx, txn, "equipment tick", &result,
+					func(sp pgx.Tx, res *Result) error { return tickEquipment(ctx, sp, tenant, now, reg, res) }))
 			}
 
 			if reg != nil {
-				err := runJobs(ctx, txn, tenant, now, reg, held, &result)
-				if err != nil {
-					return err
-				}
+				stepErrs = append(stepErrs, runJobs(ctx, txn, tenant, now, reg, held, &result)...)
 			}
 
 			if held[ops.DomainMaintenance] {
-				return tickMaintenance(ctx, txn, now, &result)
+				stepErrs = append(stepErrs, isolated(ctx, txn, "maintenance tick", &result,
+					func(sp pgx.Tx, res *Result) error { return tickMaintenance(ctx, sp, now, res) }))
 			}
 
 			return nil
 		})
+		stepErrs = append(stepErrs, err)
+
+		err = errors.Join(stepErrs...)
 		if err != nil {
 			failed = append(failed, fmt.Errorf("tenant %s: %w", tenant, err))
 		}
@@ -264,7 +279,8 @@ func tickEquipment(
 }
 
 // runJobs runs the modules' jobs of the domains whose lock the transaction holds, each recorded like a write (its
-// events and audits) as the scheduler's system user.
+// events and audits) as the scheduler's system user, each in a savepoint of its own (IR776). It returns the errors of
+// the jobs that failed.
 func runJobs(
 	ctx context.Context,
 	txn pgx.Tx,
@@ -273,41 +289,84 @@ func runJobs(
 	reg *ops.Registry,
 	held map[string]bool,
 	result *Result,
-) error {
+) []error {
+	var failed []error
+
 	for _, domain := range Domains() {
 		if !held[domain] {
 			continue
 		}
 
-		for _, job := range reg.Jobs[domain] {
-			call := &ops.Call{
-				Tx:              txn,
-				Now:             now,
-				CorrelationID:   uuid.NewString(),
-				Queries:         reg,
-				Principal:       ops.SystemPrincipal(tenant, seed.ID("system-scheduler")),
-				Bearer:          "",
-				ExpectedVersion: nil,
-				Candidates:      nil,
-				Events:          nil,
-				Audits:          nil,
-			}
+		for i, job := range reg.Jobs[domain] {
+			err := isolated(ctx, txn, fmt.Sprintf("%s job %d", domain, i+1), result,
+				func(sp pgx.Tx, res *Result) error {
+					call := &ops.Call{
+						Tx:              sp,
+						Now:             now,
+						CorrelationID:   uuid.NewString(),
+						Queries:         reg,
+						Principal:       ops.SystemPrincipal(tenant, seed.ID("system-scheduler")),
+						Bearer:          "",
+						ExpectedVersion: nil,
+						Candidates:      nil,
+						Events:          nil,
+						Audits:          nil,
+					}
 
-			changed, err := job(ctx, call)
+					changed, err := job(ctx, call)
+					if err != nil {
+						return err
+					}
+
+					res.Jobs += changed
+
+					if reg.Rec != nil {
+						err := reg.Rec.Record(ctx, sp, call, "scheduler")
+						if err != nil {
+							return apperr.Wrap(err, "ops.Recorder.Record")
+						}
+					}
+
+					return nil
+				})
 			if err != nil {
-				return err
-			}
-
-			result.Jobs += changed
-
-			if reg.Rec != nil {
-				err := reg.Rec.Record(ctx, txn, call, "scheduler")
-				if err != nil {
-					return apperr.Wrap(err, "ops.Recorder.Record")
-				}
+				failed = append(failed, err)
 			}
 		}
 	}
+
+	return failed
+}
+
+// isolated runs one step of a tenant's tick in a savepoint: its work and its counts are kept when it succeeds and
+// rolled back, with an error naming the step, when it fails (IR776).
+func isolated(
+	ctx context.Context,
+	txn pgx.Tx,
+	name string,
+	result *Result,
+	step func(pgx.Tx, *Result) error,
+) error {
+	savepoint, err := txn.Begin(ctx)
+	if err != nil {
+		return apperr.Wrap(err, "pgx.Tx.Begin (savepoint)")
+	}
+
+	var counted Result
+
+	err = step(savepoint, &counted)
+	if err != nil {
+		rollbackErr := savepoint.Rollback(ctx)
+
+		return fmt.Errorf("%s: %w", name, errors.Join(err, rollbackErr))
+	}
+
+	err = savepoint.Commit(ctx)
+	if err != nil {
+		return fmt.Errorf("%s: %w", name, apperr.Wrap(err, "pgx.Tx.Commit (savepoint)"))
+	}
+
+	result.add(counted)
 
 	return nil
 }

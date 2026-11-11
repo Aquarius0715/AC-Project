@@ -232,6 +232,8 @@ func Deliver(
 type pendingMail struct {
 	id            uuid.UUID
 	to, key, role string
+	targetKind    string
+	targetID      string
 	host          string // the host the recipient last signed in on (IR721); empty when none was recorded
 	params        []byte
 	attempts      int
@@ -244,7 +246,7 @@ func dueMails(ctx context.Context, txn pgx.Tx, now time.Time, limit int) ([]pend
 	rows, err := txn.Query(
 		ctx,
 		`SELECT n.id, u.email::text, n.template_key, m.role, n.params, COALESCE(d.attempts, 0), m.valid_until IS NOT NULL AND
-			m.valid_until <= $3, COALESCE(u.sign_in_host, '')
+			m.valid_until <= $3, COALESCE(u.sign_in_host, ''), n.target->>'kind', n.target->>'id'
 		FROM notify.notifications n JOIN identity.memberships m ON m.id = n.recipient_membership_id JOIN identity.users u ON
 		u.id = m.user_id
 		LEFT JOIN notify.deliveries d ON d.notification_id = n.id AND d.channel = 'email'
@@ -278,6 +280,8 @@ func dueMails(ctx context.Context, txn pgx.Tx, now time.Time, limit int) ([]pend
 			&email.attempts,
 			&email.ended,
 			&email.host,
+			&email.targetKind,
+			&email.targetID,
 		)
 		if err != nil {
 			return nil, apperr.Wrap(err, "select notify.notifications")
@@ -310,6 +314,10 @@ func deliverOne(
 	case json.Unmarshal(email.params, &params) != nil:
 		state, reason = "suppressed", new("parameters do not decode")
 	default:
+		if label, masked := jobLabel(email.role, email.targetKind, email.targetID); masked {
+			params["targetName"] = label // a company's notice never names the customer's unit (IR775)
+		}
+
 		subject, body := notificationMail(email.key, params, email.role, email.host, apps)
 
 		var err error

@@ -115,6 +115,12 @@ func readableSQL(principal *ops.Principal, now time.Time, kind, id string, args 
 		) + "))"
 		membership := add(principal.MembershipID)
 
+		if principal.Employment != employmentInternal { // IR774: an external technician reads a unit's notices inside an assignment's window
+			unitScope = "(" + unitScope + " AND EXISTS (SELECT 1 FROM notify.ref_assignments ua JOIN notify.ref_jobs uj ON uj.id = ua.job_id" +
+				" WHERE uj.unit_id = t.unit_id AND ua.technician_membership_id = " + membership +
+				" AND ua.status = 'active' AND ua.scheduled @> " + add(now) + "::timestamptz))"
+		}
+
 		return "((" + kind + " = 'job' AND (EXISTS (SELECT 1 FROM notify.ref_assignments a WHERE a.job_id = " + id +
 			" AND a.technician_membership_id = " + membership +
 			" AND a.status = 'active' AND (a.scheduled IS NULL OR " + add(
@@ -247,6 +253,17 @@ func scanNotification(row pgx.Row) (Notification, error) {
 	return notification, apperr.Wrap(err, "scan (scanNotification)")
 }
 
+// jobLabel is what a contractor's notice calls a job instead of the customer's unit name (IR775): the unit is the
+// customer's data, and the contractor's job page shows none before the access window opens, after it ends, or for an
+// offer it declined. masked is false for every other reader.
+func jobLabel(role, kind, id string) (string, bool) {
+	if role != authz.RoleContractor || kind != targetJob {
+		return "", false
+	}
+
+	return "Job " + id[:min(len(id), 8)], true
+}
+
 // QueryJobsOpen asks maintenance which jobs open for the caller — jobs.get answers them, live or as the caller's
 // history — so a contractor's or a technician's notice links its job only while the page opens: an offer withdrawn
 // before the company accepted it leaves a notice without a link (IR602). Maintenance serves it under this name;
@@ -263,6 +280,12 @@ type JobsOpenInput struct {
 func openTargets(ctx context.Context, call *ops.Call, items []Notification) error {
 	if call.Principal.Role != authz.RoleContractor && call.Principal.Role != authz.RoleTechnician {
 		return nil
+	}
+
+	for i, x := range items { // IR775
+		if label, masked := jobLabel(call.Principal.Role, x.Target["kind"], x.Target["id"]); masked {
+			items[i].Params.TargetName = label
+		}
 	}
 
 	ids := []uuid.UUID{}

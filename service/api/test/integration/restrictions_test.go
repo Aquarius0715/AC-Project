@@ -647,6 +647,20 @@ func TestRestrictionCancelAndPayment(t *testing.T) {
 	}
 
 	due(t, restrictionID)
+	// a payment under way (IR773): execution waits; when the payment fails the invoice is unpaid again
+	owner(t, `UPDATE billing.invoices SET status = 'processing' WHERE id = $1`, inv)
+
+	if code, res := write(
+		srv,
+		restrMgr(),
+		"restrictions.execute",
+		`{"restrictionId":"`+restrictionID+`","confirmedRulesVersion":"rules-1"}`,
+		1,
+	); code != 409 || res["messageKey"] != "errors.payment_processing" {
+		t.Errorf("execute while a payment is processing: %d %v", code, res)
+	}
+
+	owner(t, `UPDATE billing.invoices SET status = 'unpaid' WHERE id = $1`, inv)
 	_, resp = write(
 		srv,
 		restrMgr(),

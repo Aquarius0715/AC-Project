@@ -117,6 +117,28 @@ func TestCommands(t *testing.T) {
 		t.Error("out-of-scope technician get")
 	}
 
+	// the platform unit scope (IR774): an internal technician reads by scopes, an external one only inside an
+	// assignment's work window (techA has one on this unit in the seed, and loses it below)
+	if code, _ := post(srv, techInt(), "commands.get", `{"id":"`+commandID+`"}`); code != 200 {
+		t.Error("internal technician get")
+	}
+
+	if code, _ := post(srv, techA(), "commands.get", `{"id":"`+commandID+`"}`); code != 200 {
+		t.Error("external technician with an assignment get")
+	}
+
+	const setAccess = `UPDATE assets.unit_assignment_access SET active = $3 WHERE technician_membership_id = $1 AND unit_id = $2`
+
+	owner(t, setAccess, seed.ID("tech-external-a"), seed.ID("unit-online-rto"), false)
+
+	code, _ = post(srv, techA(), "commands.get", `{"id":"`+commandID+`"}`)
+
+	owner(t, setAccess, seed.ID("tech-external-a"), seed.ID("unit-online-rto"), true)
+
+	if code != 404 {
+		t.Errorf("external technician after the assignment ended: %d want 404", code)
+	}
+
 	if code, _ := post(srv, hq(), "commands.get", `{"id":"`+uuid.NewString()+`"}`); code != 404 {
 		t.Error("unknown command")
 	}

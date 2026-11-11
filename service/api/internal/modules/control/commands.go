@@ -18,6 +18,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/platform/authz"
 	"github.com/pradita/ac-project/service/api/internal/platform/events"
 	"github.com/pradita/ac-project/service/api/internal/platform/paging"
+	"github.com/pradita/ac-project/service/api/internal/platform/unitscope"
 )
 
 // Target is what Control needs to know about a unit.
@@ -478,6 +479,16 @@ func (m Commands) get(ctx context.Context, call *ops.Call, in *GetInput) (Comman
 			((call.Principal.Role == authz.RoleClient && target.OrgID == call.Principal.OrgID) ||
 				(call.Principal.Role == authz.RoleTechnician &&
 					inScope(call.Principal, command.UnitID, target.PropertyID, target.OrgID)))
+		if ok && call.Principal.Role == authz.RoleTechnician {
+			// the platform unit scope (IR774): an external technician reads a unit only inside an assignment's work window
+			readable, err := unitscope.EquipmentReadable(ctx, call, []uuid.UUID{command.UnitID})
+			if err != nil {
+				return command, apperr.Wrap(err, "unitscope.EquipmentReadable")
+			}
+
+			ok = len(readable) == 1
+		}
+
 		if !ok {
 			return Command{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 		}

@@ -30,7 +30,7 @@ export type RestrictionsLive = {
   /** the invoices that restrictions cite as a cause, for the Cause invoice filter */
   causes: { id: string; label: string }[];
   selected?: {
-    r: ApiRestriction; contract: string; causes: { id: string; number: string; paid: boolean; amountMinor: number | null; currency: string }[]; allPaid: boolean; units: UnitRow[];
+    r: ApiRestriction; contract: string; causes: { id: string; number: string; paid: boolean; processing: boolean; amountMinor: number | null; currency: string }[]; allPaid: boolean; units: UnitRow[];
     /** formatted on the server in the display language and time zone (IR282) */
     texts: { notice: string; executeAfter: string; period: string | null; intent: string; execute: string | null; release: string | null };
   };
@@ -106,7 +106,7 @@ function Manager({ live }: Readonly<{ live: NonNullable<RestrictionsLive> }>) {
             </Card>
             {live.full && (
               <Card title={t("Cause invoices")} action={<Link className="text-xs font-semibold text-primary" href="/admin/billing?overdueOnly=true">{t("Open in Billing")} <Icon name="arrowRight" /></Link>}>
-                {sel.causes.map((c) => <p key={c.id} className="text-[13px]"><Link className="font-semibold text-primary" href={`/admin/billing?invoiceId=${c.id}`}>{c.number}</Link> · {c.amountMinor === null ? "—" : amount(c.amountMinor, c.currency)} <Badge tone={c.paid ? "ok" : "warn"}>{t(c.paid ? "paid" : "unpaid")}</Badge></p>)}
+                {sel.causes.map((c) => <p key={c.id} className="text-[13px]"><Link className="font-semibold text-primary" href={`/admin/billing?invoiceId=${c.id}`}>{c.number}</Link> · {c.amountMinor === null ? "—" : amount(c.amountMinor, c.currency)} <Badge tone={c.paid ? "ok" : "warn"}>{t(c.paid ? "paid" : c.processing ? "processing" : "unpaid")}</Badge></p>)}
                 <p className="mt-1 text-xs text-muted-foreground">{t("{unpaid} of {total} cause invoices unpaid. When every cause invoice is paid, a scheduled restriction is cancelled and an applied one moves to “release requested”.", { unpaid: sel.causes.filter((c) => !c.paid).length, total: sel.causes.length })}</p>
               </Card>
             )}

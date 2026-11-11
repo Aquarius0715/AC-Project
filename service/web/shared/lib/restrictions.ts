@@ -114,14 +114,15 @@ export function unitRows(r: ApiRestriction, names: Map<string, string>, commands
 
 /** Execute is enabled only for scheduled restrictions at or after executeAfter and 24 h after the notice, without an
 active grace period or exception (IR140 item 2); otherwise the reason. */
-export function executeBlocker(r: ApiRestriction, now: Date, i: I18n = EN): string | null {
+export function executeBlocker(r: ApiRestriction, now: Date, i: I18n = EN, processing = false): string | null {
   const { t } = i;
   if (r.state !== "scheduled") return t("Only a scheduled restriction can be executed");
   const ms = now.getTime();
   if (ms < Date.parse(r.executeAfter)) return t("Executes after {time}", { time: showTime(r.executeAfter, i.display) });
   if (ms < Date.parse(r.noticeAt) + 24 * 3600 * 1000) return t("Wait 24 hours after the notice");
   const p = activePeriod(r, now, i);
-  return p ? t("{period} — execution waits", { period: p }) : null;
+  if (p) return t("{period} — execution waits", { period: p });
+  return processing ? t("A payment of a cause invoice is in progress — wait for it to be confirmed or to fail") : null; // the Core API refuses it too (IR773)
 }
 
 /** An explicit release request needs requested/applied and all causes paid or an active grace/exception (IR35). */
