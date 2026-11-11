@@ -19,7 +19,7 @@ import type { TechDevicesLive } from "../_components/devices-view";
 const quiet = orAbsent;
 
 export async function loadDevices(options: { selected?: string; unitId?: string; jobId?: string; events: boolean }): Promise<TechDevicesLive> {
-  type Unit = ApiUnitDetail & { capabilities: ApiUnitDetail["capabilities"] & { firmwareCandidates?: string[] } };
+  type Unit = ApiUnitDetail;
   interface JobRow { projection: string; id?: string; unitId?: string; status?: string }
   interface UnitRow { id: string; displayName: string; archived: boolean }
   const [now, display, perms, devices, units, jobs] = await Promise.all([
@@ -38,7 +38,7 @@ export async function loadDevices(options: { selected?: string; unitId?: string;
     register: free.flatMap((u, index) => {
       const d = freeDetails.at(index);
       return d ? { unitId: u.id, label: `${d.displayName} · ${d.location.pathLabels.join(" › ")}`, model: `${d.capabilities.manufacturer} ${d.capabilities.model}`,
-        sensors: d.capabilities.sensors.map((s) => s.metric), jobs: myJobs.filter((j) => j.unitId === u.id).map((j) => ({ id: j.id, label: `${j.id.slice(0, 8)} · ${statusWord(j.status, t)}` })) } : [];
+        sensors: (d.iotModel?.sensors ?? []).map((s) => s.metric), jobs: myJobs.filter((j) => j.unitId === u.id).map((j) => ({ id: j.id, label: `${j.id.slice(0, 8)} · ${statusWord(j.status, t)}` })) } : [];
     }),
     rebind: units.filter((u) => !u.archived).map((u) => ({ unitId: u.id, label: u.displayName, jobId: jobFor(u.id, myJobs) })).filter((r): r is typeof r & { jobId: string } => !!r.jobId),
   };
@@ -50,7 +50,7 @@ export async function loadDevices(options: { selected?: string; unitId?: string;
   const home = d.unitId ?? d.targetUnitId ?? null;
   const unit = home ? await quiet(coreOp<Unit>("units.get", { id: home })) : null;
   const jobId = (options.jobId && myJobs.some((j) => j.id === options.jobId && j.unitId === home) ? options.jobId : null) ?? jobFor(home, myJobs);
-  const candidates = unit?.capabilities.firmwareCandidates ?? [];
+  const candidates = unit?.iotModel && unit.iotModel.id === d.iotModelId ? unit.iotModel.firmwareCandidates : []; // the firmware of the IoT model the device was registered with
   const isMaintain = live.canMaintain && !!jobId;
   const [ops, cals, evs] = await Promise.all([
     isMaintain && !options.events ? quiet(coreOp<{ items: (ApiDeviceOperation & { startedAt?: string | null; expiresAt?: string })[] }>("devices.operations", { deviceId: id, query: { limit: 20, sort: { field: "createdAt", direction: "desc" } } })) : null,

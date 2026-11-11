@@ -33,8 +33,10 @@ export interface ApiUnitDetail {
   latestMeasurements: { id: string; unitId: string; sensorId: string; metric: Metric; value: number | null; unit: UnitSymbol; observedAt: string; origin: "measured" | "estimated" | "inspection"; quality: "valid" | "missing" | "stale" | "suspect"; qualityReason: string | null }[];
   capabilities: {
     manufacturer: string; model: string; control: boolean; modeControl: boolean; fanControl: boolean; temperature: { min: number; max: number; step: number } | null; modes: Mode[]; fanLevels: Fan[];
-    ventilation: boolean; ventilationLevels: Fan[]; sensors: { metric: Metric; unit: UnitSymbol; staleAfterSeconds: number }[];
+    ventilation: boolean; ventilationLevels: Fan[];
   };
+  /** The unit's IoT model (DEC-105): its sensors and the firmware versions a device can be updated to; null without one. */
+  iotModel: { id: string; manufacturer: string; model: string; sensors: { metric: Metric; unit: UnitSymbol; staleAfterSeconds: number }[]; firmwareCandidates: string[] } | null;
   effectiveControlPolicy: { state: "unrestricted" } | { state: "restricted"; phase: string; policy: { kind: "temperature_limit"; minimumCoolingSetpoint: number } | { kind: "power_off" } };
   controlAvailability: { state: "available" } | { state: "blocked"; reasonKey: string };
   pendingCommands: ApiCommand[];

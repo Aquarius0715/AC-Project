@@ -28,6 +28,11 @@ export async function saveCapability(input: OpInput<"capabilities.save">, versio
   return run(async () => { const k = await coreOp<{ id: string; version: number }>("capabilities.save", input, { write: true, expectedVersion: input.id ? version : undefined }); return ({ id: k.id, version: k.version }); });
 }
 
+/** iotModels.save: a new IoT model (no id) or its next version (id + the version it was read at; DEC-105). */
+export async function saveIotModel(input: OpInput<"iotModels.save">, version?: number) {
+  return run(async () => { const k = await coreOp<{ id: string; version: number }>("iotModels.save", input, { write: true, expectedVersion: input.id ? version : undefined }); return ({ id: k.id, version: k.version }); });
+}
+
 export interface HistoryEntry { at: string; actor: string; from: number | null; to: number | null; reason: string | null; changes: string[] }
 
 /** The saved versions of a capability: audit.list for its id over the last 12 months (DD-A04 step 6; a read). */
@@ -47,8 +52,8 @@ export async function capabilityHistory(capabilityId: string) {
   }, false);
 }
 
-export async function registerDevice(serial: string, sensorTypes: Metric[], unitId: string, mqttNode: string | null) {
-  return run(async () => { const d = await coreOp<{ id: string }>("devices.register", { serial, sensorTypes, unitId, ...(mqttNode && { mqttNode }) }, { write: true }); return d.id; });
+export async function registerDevice(serial: string, sensorTypes: Metric[], unitId: string, mqttNode: string | null, iotModelId: string | null) {
+  return run(async () => { const d = await coreOp<{ id: string }>("devices.register", { serial, sensorTypes, unitId, ...(mqttNode && { mqttNode }), ...(iotModelId && { iotModelId }) }, { write: true }); return d.id; });
 }
 
 /** devices.setMqttNode: the node ID the device's ESP32 sends (null clears it); the IoT bridge reads it within 30 seconds (IR635). */
@@ -73,6 +78,11 @@ export async function deleteDevice(deviceId: string, version: number, reason: st
 /** capabilities.delete: a model no unit uses and no campaign targets, with every version (DEC-103). */
 export async function deleteCapability(id: string, version: number, reason: string) {
   return run(async () => { await coreOp("capabilities.delete", { id, reason }, { write: true, expectedVersion: version }); return null; });
+}
+
+/** iotModels.delete: an IoT model no unit or device uses and no campaign targets, with every version (DEC-105). */
+export async function deleteIotModel(id: string, version: number, reason: string) {
+  return run(async () => { await coreOp("iotModels.delete", { id, reason }, { write: true, expectedVersion: version }); return null; });
 }
 
 export async function checkDevice(deviceId: string, version: number) {

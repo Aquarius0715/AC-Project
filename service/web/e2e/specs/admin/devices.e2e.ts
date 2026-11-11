@@ -32,7 +32,7 @@ test("the device list filters by state and the detail shows the device as Figma 
   await list.getByRole("button", { name: /AC-DEMO-0001/ }).click();
   await page.waitForURL(/deviceId=/);
   for (const label of ["Connection", "Power signal", "Tamper", "Firmware", "Bound to unit"]) await expect(main).toContainText(label);
-  for (const name of [/^Sensors \(\d+\) · from the unit’s capability$/, "Operation history", "Calibration history", "Device events"]) await expect(main.getByRole("heading", { name })).toBeVisible();
+  for (const name of [/^Sensors \(\d+\) · from the IoT model$/, "Operation history", "Calibration history", "Device events"]) await expect(main.getByRole("heading", { name })).toBeVisible();
   await expect(main.getByRole("button", { name: "Calibrate…", exact: true }).first()).toBeVisible(); // a small button like Rebind… (IR576)
   for (const name of [/^Check connection/, /^Calibrate sensor/, /^Update firmware/]) await expect(main.getByRole("button", { name })).toBeVisible();
 
@@ -45,15 +45,28 @@ test("the device list filters by state and the detail shows the device as Figma 
   await expect(dialog).toHaveCount(0);
 });
 
-// The model editor (DD-A04, Figma Admin 106:3, IR350): a saved model shows its capability version; an edit marks the
-// draft "Editing → v<next>" and names what changed; the firmware candidates are chips with "Add version" (a listed
-// version is refused); Discard puts the saved capability back. Nothing is saved.
-test("the model editor marks a draft, adds a firmware version and discards it", async ({ page }) => {
+// The aircon model editor (DD-A04, DEC-105): a saved model shows its capability version and only the controls of the
+// air conditioner; the sensors and firmware are in the IoT models. Nothing is saved.
+test("the aircon model editor has the controls and no sensors or firmware", async ({ page }) => {
   await page.goto("/admin/devices?tab=models");
   const main = page.getByRole("main");
   await expect(main.getByRole("heading", { name: /Capability v\d+/ })).toBeVisible();
   await expect(main).toContainText("No unsaved changes");
   await expect(main.getByRole("button", { name: /^Save as capability v\d+$/ })).toBeDisabled();
+  await expect(main.getByRole("heading", { name: "Controls" })).toBeVisible();
+  await expect(main.getByRole("region", { name: "Firmware candidates" })).toHaveCount(0);
+  await expect(main.getByRole("heading", { name: "Sensors", exact: true })).toHaveCount(0);
+});
+
+// The IoT model editor (DD-A04, DEC-105, Figma Admin 106:3, IR350): a saved model shows its version; an edit marks the
+// draft "Editing → v<next>" and names what changed; the firmware candidates are chips with "Add version" (a listed
+// version is refused); Discard puts the saved model back. Nothing is saved.
+test("the IoT model editor marks a draft, adds a firmware version and discards it", async ({ page }) => {
+  await page.goto("/admin/devices?tab=iot");
+  const main = page.getByRole("main");
+  await expect(main.getByRole("heading", { name: /IoT model v\d+/ })).toBeVisible();
+  await expect(main).toContainText("No unsaved changes");
+  await expect(main.getByRole("button", { name: /^Save as IoT model v\d+$/ })).toBeDisabled();
   const firmware = main.getByRole("region", { name: "Firmware candidates" });
   await expect(firmware.getByRole("button", { name: "Remove v1" })).toBeVisible();
 
@@ -67,7 +80,7 @@ test("the model editor marks a draft, adds a firmware version and discards it", 
   await expect(firmware.getByRole("button", { name: "Remove v9-e2e" })).toBeVisible();
   await expect(main.getByRole("heading", { name: /Editing → v\d+/ })).toBeVisible();
   await expect(main).toContainText("1 change · firmware candidates");
-  await expect(main.getByRole("button", { name: /^Save as capability v\d+$/ })).toBeEnabled();
+  await expect(main.getByRole("button", { name: /^Save as IoT model v\d+$/ })).toBeEnabled();
 
   await main.getByRole("button", { name: "Discard" }).click();
   await expect(main).toContainText("No unsaved changes");

@@ -69,3 +69,13 @@ type DevicePage struct {
 }
 
 var _ = paging.Page[Device](DevicePage{})
+
+// IoTModelPage is paging.Page[IoTModel].
+type IoTModelPage struct {
+	Items           []IoTModel `json:"items"`
+	NextCursor      *string    `json:"nextCursor"`
+	Total           int        `json:"total"`
+	SnapshotVersion int        `json:"snapshotVersion"`
+}
+
+var _ = paging.Page[IoTModel](IoTModelPage{})

@@ -11,8 +11,6 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
-const refusedFirmwareCandidatesInvalid = "firmwareCandidates=" + apperr.KeyInvalid
-
 func capBody(id, model, extra string) string {
 	idf := ""
 	if id != "" {
@@ -23,10 +21,7 @@ func capBody(id, model, extra string) string {
 		`"model":"` + model + `","control":true,"modeControl":true,` +
 		`"fanControl":true,` +
 		`"temperature":{"min":16,"max":30,"step":0.5},"modes":["cool","dry"],"fanLevels":["low","high"],` +
-		`"ventilation":false,"ventilationLevels":[],` +
-		`"sensors":[{"metric":"temperature","unit":"°C","staleAfterSeconds":120,"boundaryId":null},{"metric":"power",` +
-		`"unit":"kW","staleAfterSeconds":120,"boundaryId":"ac_input_electricity"}],` +
-		`"firmwareCandidates":["v1"]` + extra + `}`
+		`"ventilation":false,"ventilationLevels":[]` + extra + `}`
 }
 
 //nolint:paralleltest // the integration tests share one server and the seeded test database
@@ -55,7 +50,7 @@ func TestCapabilities(t *testing.T) {
 	model := "TA-" + uuid.NewString()[:6]
 
 	code, resp = write(srv, hq(), "capabilities.save", capBody("", model, ""), 0)
-	if code != 200 || ver(t, resp) != 1 || len(asArr(t, data(resp)["sensors"])) != 2 {
+	if code != 200 || ver(t, resp) != 1 || data(resp)["sensors"] != nil {
 		t.Fatalf("create: %d %v", code, resp)
 	}
 
@@ -90,19 +85,6 @@ func TestCapabilities(t *testing.T) {
 			`["low","low"]`,
 			1,
 		),
-		caseUnitMismatch: strings.Replace(capBody("", "x4", ""), `"unit":"°C"`, `"unit":"%"`, 1),
-		"stale too low": strings.Replace(
-			capBody("", "x5", ""),
-			`"staleAfterSeconds":120,"boundaryId":null`,
-			`"staleAfterSeconds":1,"boundaryId":null`,
-			1,
-		),
-		fieldBoundary: strings.Replace(
-			capBody("", "x6", ""),
-			`"staleAfterSeconds":120,"boundaryId":null`,
-			`"staleAfterSeconds":120,"boundaryId":"ac_input_electricity"`,
-			1,
-		),
 		"no control": strings.Replace(
 			capBody("", "x7", ""),
 			`"control":true`,
@@ -115,16 +97,7 @@ func TestCapabilities(t *testing.T) {
 			`"ventilationLevels":["low"]`,
 			1,
 		),
-		"empty name":   capBody("", "", ""),
-		"dup firmware": strings.Replace(capBody("", "x9", ""), `["v1"]`, `["v1","v1"]`, 1),
-		"firmware too long": strings.Replace(
-			capBody("", "x11", ""),
-			`["v1"]`,
-			`["`+strings.Repeat("v", 33)+`"]`,
-			1,
-		),
-		"firmware blank":    strings.Replace(capBody("", "x12", ""), `["v1"]`, `[" "]`, 1),
-		"firmware dup trim": strings.Replace(capBody("", "x13", ""), `["v1"]`, `["v1"," v1 "]`, 1),
+		caseEmptyName: capBody("", "", ""),
 		"modes required": strings.Replace(
 			capBody("", "x10", ""),
 			`"modes":["cool","dry"]`,
@@ -134,20 +107,13 @@ func TestCapabilities(t *testing.T) {
 	}
 	// the field each case is refused for
 	want := map[string]string{
-		caseBadMode:         "modes=error.invalid",
-		fieldBoundary:       "sensors[0].boundaryId=error.invalid",
-		"dup fan":           "fanLevels=error.invalid",
-		"dup firmware":      refusedFirmwareCandidatesInvalid,
-		"firmware too long": refusedFirmwareCandidatesInvalid,
-		"firmware blank":    refusedFirmwareCandidatesInvalid,
-		"firmware dup trim": refusedFirmwareCandidatesInvalid,
-		"empty name":        "model=error.length",
-		"modes required":    "modes=error.invalid",
-		"no control":        "control=error.controlRequired",
-		"stale too low":     "sensors[0].staleAfterSeconds=error.range",
-		"temp range":        "temperature=error.range",
-		caseUnitMismatch:    "sensors[0].unit=error.unitMismatch",
-		"vent levels":       "ventilationLevels=error.invalid",
+		caseBadMode:      "modes=error.invalid",
+		"dup fan":        "fanLevels=error.invalid",
+		caseEmptyName:    "model=error.length",
+		"modes required": "modes=error.invalid",
+		"no control":     "control=error.controlRequired",
+		"temp range":     "temperature=error.range",
+		"vent levels":    "ventilationLevels=error.invalid",
 	}
 
 	for name, b := range bad {

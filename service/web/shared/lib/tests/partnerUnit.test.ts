@@ -19,7 +19,7 @@ const unit = unitDetail({
   location: { pathLabels: ["customer-b", "Tower A rooftop"], address: null, accessInstructions: null },
   capabilities: {
     manufacturer: "cap-split-std", model: "v2", control: true, modeControl: true, fanControl: true, temperature: { min: 18, max: 30, step: 1 }, modes: ["cool", "dry", "fan"],
-    fanLevels: ["low", "mid", "high"], ventilation: false, ventilationLevels: [], sensors: [],
+    fanLevels: ["low", "mid", "high"], ventilation: false, ventilationLevels: [],
   },
   observedState: { power: true, celsius: 22, mode: "cool", fanLevel: "mid", observedAt: TEXT_2026_09_14T01_35_00Z },
   latestMeasurements: [m("temperature", 14.2, "°C"), m("refrigerant_pressure", 310, "kPa"), m("vibration", 2.1, "mm/s", "suspect")],

@@ -60,6 +60,12 @@ func boundUnit(t *testing.T, s *apiserver.Server, connection string) string {
 		clock().Add(-time.Hour),
 		seed.ID("hq-operator"),
 	)
+	owner(
+		t,
+		`UPDATE devices.devices d SET iot_model_id = u.iot_model_id, iot_model_version = u.iot_model_version
+		FROM assets.units u WHERE u.id = d.unit_id AND d.id = $1`,
+		dev,
+	)
 	owner(t, `UPDATE assets.units SET connection = $2 WHERE id = $1`, unit, connection)
 
 	return unit

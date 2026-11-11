@@ -134,13 +134,11 @@
   "control",
   "fanControl",
   "fanLevels",
-  "firmwareCandidates",
   "id",
   "manufacturer",
   "modeControl",
   "model",
   "modes",
-  "sensors",
   "temperature",
   "ventilation",
   "ventilationLevels"
@@ -377,6 +375,7 @@
   "query"
  ],
  "devices.register": [
+  "iotModelId",
   "jobId",
   "mqttNode",
   "sensorTypes",
@@ -527,6 +526,24 @@
   "invoiceId",
   "reason",
   "recipientMembershipId"
+ ],
+ "iotModels.delete": [
+  "id",
+  "reason"
+ ],
+ "iotModels.list": [
+  "cursor",
+  "filters",
+  "limit",
+  "sort"
+ ],
+ "iotModels.save": [
+  "changeReason",
+  "firmwareCandidates",
+  "id",
+  "manufacturer",
+  "model",
+  "sensors"
  ],
  "jobs.accept": [
   "jobId",
@@ -1246,6 +1263,7 @@
   "displayName",
   "id",
   "installedAt",
+  "iotModelId",
   "modelId",
   "propertyId",
   "serviceScope",

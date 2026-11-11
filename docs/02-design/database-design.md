@@ -22,7 +22,7 @@ The source of truth for fields and states is [service-contracts.ts](service-cont
 | platform | shared infrastructure | tenants, outbox, idempotency_keys, scheduled_items, processed_events, event_failures (IR427), stream_checkpoints, demo_clock (demo environment only, IR168) |
 | identity | Identity & access | users, organizations, memberships, membership_permissions, membership_scopes, qualification_grants, permissions (39), preferences, two_factor, consents, client_users (the customer owners' user lists, IR417), partner_users (the contractors' user lists, IR416) |
 | assets | Assets | customers, properties, spaces, units, unit_alert_policies, unit_imports, unit_import_previews (30-minute CSV validation results written outside the read transaction of `units.importPreview`, purged after expiry), warranty_reminders (the BR-A19 reminders sent, IR340), unit_offer_access and unit_assignment_access (projections of accepted Offers and of Assignments with an `active` flag for the unit scope and the diagnostic-run scope, fed by change-capture events, IR186, IR187) |
-| devices | Devices | capabilities (versioned), devices, sensors, device_bindings, device_operations, device_events, device_event_notes, calibration_records, firmware_campaigns, firmware_campaign_devices |
+| devices | Devices | capabilities (versioned; the aircon models), iot_models (versioned; the IoT models, DEC-105, migration 000002), devices, sensors, device_bindings, device_operations, device_events, device_event_notes, calibration_records, firmware_campaigns, firmware_campaign_devices |
 | control | Control | commands, diagnostic_runs, automations, automation_units, automation_policies, automation_policy_units, automation_runs, evaluation_events, schedule_watermarks |
 | monitoring | Monitoring & alerts | alert_policies, default_rule_settings, alerts, ventilation_logs, allergen_observations, measurements (partitioned), measurements_15m, measurements_1h, alert_notifications (requested alert notifications for the cooldown, IR191) |
 | maintenance | Maintenance | plans, jobs, job_alerts, slot_proposals, offers, partner_slot_proposals, assignments, work_reports (versioned), report_reviews, attachments, job_notes, job_events, job_history_snapshots, contractors, rate_cards, certificates, certificate_reminders (the BR-P09 expiry reminders sent, IR336), unavailability, sla_targets, filter_care_settings, filter_cleanings, filter_reminders, filter_reminder_watermarks, parts_catalog, ref_memberships reference copy (IR192) |
@@ -91,7 +91,7 @@ identity:  organizations 1─* memberships *─1 users
            memberships 1─* membership_scopes · 1─* qualification_grants · 1─* consents
 assets:    customers(1 organization) · properties 1─* spaces (self-parent) · properties 1─* units
            units 1─* unit_alert_policies
-devices:   capabilities(id,version) · devices 1─* sensors · devices 1─* device_bindings (one active)
+devices:   capabilities(id,version) · iot_models(id,version) · devices 1─* sensors · devices 1─* device_bindings (one active)
            devices 1─* device_operations · 1─* device_events 1─* device_event_notes · firmware_campaigns *─* devices
 control:   commands · diagnostic_runs → commands(start/end) · automations *─* units · automation_policies *─* units
            automation_runs → commands

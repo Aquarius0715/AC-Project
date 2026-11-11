@@ -91,7 +91,7 @@ describe("capability, restriction and refusals (IR286)", () => {
     capabilityVersion: 3, connection: "online",
     capabilities: {
       manufacturer: "AC-Co", model: "m1", control: true, modeControl: true, modes: ["cool", "dry", "fan"], temperature: { min: 16, max: 30, step: 1 }, fanControl: true, fanLevels: ["low", "mid", "high"],
-      ventilation: false, ventilationLevels: [], sensors: [],
+      ventilation: false, ventilationLevels: [],
     },
     effectiveControlPolicy: { state: "restricted", phase: "active", policy: { kind: "temperature_limit", minimumCoolingSetpoint: 24 } },
     controlAvailability: { state: "blocked", reasonKey: "control.reconciliation_required" },

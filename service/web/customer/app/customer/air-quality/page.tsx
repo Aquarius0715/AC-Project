@@ -50,7 +50,7 @@ export default async function CustomerAirQualityPage({ searchParams }: Readonly<
     sel.room.spaceId ? coreOp<{ items: ApiVentilationLog[]; total: number }>("ventilation.list", { filters: { spaceId: sel.room.spaceId }, limit: 10 }) : null,
   ]);
   const latest = (m: string) => d.latestMeasurements.find((x) => x.metric === m);
-  const sensors = new Set(d.capabilities.sensors.map((s) => s.metric));
+  const sensors = new Set((d.iotModel?.sensors ?? []).map((s) => s.metric));
   const isFreshAir = d.capabilities.ventilation && d.capabilities.ventilationLevels.includes("low");
   const guidance = airGuidance(latest("co2"), latest("pm25"), isFreshAir);
   const roomName = sel.room.spaceId ? spaces.find((s) => s.id === sel.room.spaceId)?.name ?? i.t("this room") : sel.room.path; // outside rooms: the property

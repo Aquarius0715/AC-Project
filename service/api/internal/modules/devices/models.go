@@ -51,6 +51,28 @@ func (Models) CurrentVersion(
 	return version, true, nil
 }
 
+// IoTCurrentVersion is CurrentVersion of an IoT model (DEC-105): the current version of devices.iot_models, read with
+// a share lock so that iotModels.delete and a new version wait for the unit save, or are waited for and seen.
+func (Models) IoTCurrentVersion(
+	ctx context.Context,
+	c *ops.Call,
+	modelID uuid.UUID,
+) (int, bool, error) {
+	var version int
+
+	err := c.Tx.QueryRow(ctx, `SELECT version FROM devices.iot_models WHERE id = $1 AND is_current FOR SHARE`, modelID).
+		Scan(&version)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return 0, false, nil
+		}
+
+		return 0, false, apperr.Wrap(err, "select devices.iot_models")
+	}
+
+	return version, true, nil
+}
+
 // ByCode resolves a model code (Capability.model, case-insensitive) to its ID and current version.
 func (Models) ByCode(
 	ctx context.Context,

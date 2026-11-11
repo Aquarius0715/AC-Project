@@ -28,7 +28,7 @@ const advice = (cap: ApiUnitDetail["capabilities"]) => metricCard(TEMPERATURE, m
 const model = (over: Partial<ApiUnitDetail["capabilities"]>): ApiUnitDetail["capabilities"] => {
   return {
     manufacturer: "Daikin", model: "IR via node_1", control: true, modeControl: false, fanControl: false, temperature: { min: 16, max: 30, step: 1 },
-    modes: [], fanLevels: [], ventilation: false, ventilationLevels: [], sensors: [], ...over,
+    modes: [], fanLevels: [], ventilation: false, ventilationLevels: [], ...over,
   };
 };
 describe("air-quality metric cards (FR-C07, IR44, IR99, IR213, IR260)", () => {

@@ -246,6 +246,13 @@ func ApplyLive(ctx context.Context, txn pgx.Tx, site Site, now time.Time) error 
 		}
 	}
 
+	for _, statement := range iotModelStatements() {
+		err := exec("iot models", statement)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 

@@ -331,6 +331,7 @@ func apply(ctx context.Context, txn pgx.Tx, fixture *Fixture, accountsOnly bool)
 		run.filterCleanings,
 		run.jobEvents,
 		run.policies,
+		run.iotModels,
 	}
 	if accountsOnly {
 		steps = []func() error{
@@ -369,6 +370,38 @@ type seeding struct {
 
 	orgTenant, propertyTenant, unitTenant, unitOrg, memberTenant map[string]string
 	customerTenant, contractTenant, contractCustomer, jobTenant  map[string]string
+}
+
+// iotModelStatements make the IoT models out of the capabilities the seed wrote, as migration 000002 does for a
+// database that has them (DEC-105): a capability version with a sensor or a firmware candidate is copied, with the same
+// ID and version, to devices.iot_models, and its units and their devices point at it. Each statement can run twice.
+func iotModelStatements() []string {
+	return []string{
+		`INSERT INTO devices.iot_models (id, version, tenant_id, manufacturer, model, sensors,
+		firmware_candidates, is_current, created_at)
+	SELECT c.id, c.version, c.tenant_id, c.manufacturer, c.model, c.sensors, c.firmware_candidates, c.is_current,
+		c.created_at
+	FROM devices.capabilities c
+	WHERE EXISTS (SELECT 1 FROM devices.capabilities k WHERE k.id = c.id
+		AND (jsonb_array_length(k.sensors) > 0 OR cardinality(k.firmware_candidates) > 0))
+	ON CONFLICT (id, version) DO NOTHING`,
+		`UPDATE assets.units u SET iot_model_id = m.id, iot_model_version = m.version FROM devices.iot_models m
+	WHERE m.id = u.model_id AND m.version = u.capability_version AND u.iot_model_id IS NULL`,
+		`UPDATE devices.devices d SET iot_model_id = u.iot_model_id, iot_model_version = u.iot_model_version
+	FROM assets.units u WHERE u.id = d.unit_id AND u.iot_model_id IS NOT NULL AND d.iot_model_id IS NULL`,
+	}
+}
+
+// iotModels runs iotModelStatements after the units and devices are in.
+func (s *seeding) iotModels() error {
+	for _, statement := range iotModelStatements() {
+		err := s.exec(statement)
+		if err != nil {
+			return fmt.Errorf("iot models: %w", err)
+		}
+	}
+
+	return nil
 }
 
 // newSeeding prepares a run of Apply, or of ApplyAccounts when accountsOnly, on the fixture.

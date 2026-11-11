@@ -44,6 +44,8 @@ type ACUnit struct {
 	AlertPolicyIDs      []uuid.UUID     `json:"alertPolicyIds"`
 	Archived            bool            `json:"archived"`
 	CapabilityVersion   int             `json:"capabilityVersion"`
+	IoTModelID          *uuid.UUID      `json:"iotModelId"`
+	IoTModelVersion     *int            `json:"iotModelVersion"`
 	Connection          string          `json:"connection"`
 	ObservedState       ObservedState   `json:"observedState"`
 	ObservedRestriction json.RawMessage `json:"observedRestriction" swaggertype:"object"`
@@ -68,6 +70,7 @@ type UnitDetail struct {
 // DetailExtras are the UnitDetail fields owned by Devices, Control, Restrictions and Maintenance (assembled by app/).
 type DetailExtras struct {
 	Capabilities           any         `json:"capabilities"`
+	IoTModel               any         `json:"iotModel"`
 	EffectiveControlPolicy any         `json:"effectiveControlPolicy"`
 	ControlAvailability    any         `json:"controlAvailability"`
 	Components             []string    `json:"components"`
@@ -180,7 +183,7 @@ func scopeSQL(
 const unitCols = `u.id, u.tenant_id, u.version, u.created_at, u.updated_at, u.customer_org_id, u.property_id, ` +
 	`u.space_id, u.display_name,
 	u.model_id, u.type, u.installed_at, u.service_scope, u.warranty_ends_at, u.archived, u.capability_version, ` +
-	`u.connection,
+	`u.iot_model_id, u.iot_model_version, u.connection,
 	u.observed_state, u.observed_restriction, u.last_seen_at,
 	COALESCE((SELECT array_agg(policy_id ORDER BY policy_id) FROM assets.unit_alert_policies ap WHERE ap.unit_id = ` +
 	`u.id), '{}')`
@@ -237,6 +240,8 @@ func (m *Module) query(
 			&unit.WarrantyEndsAt,
 			&unit.Archived,
 			&unit.CapabilityVersion,
+			&unit.IoTModelID,
+			&unit.IoTModelVersion,
 			&unit.Connection,
 			&state,
 			&unit.ObservedRestriction,
@@ -660,6 +665,7 @@ func (m *Module) unitsGet(
 		Unit: units[0],
 		DetailExtras: DetailExtras{
 			Capabilities:           nil,
+			IoTModel:               nil,
 			EffectiveControlPolicy: nil,
 			ControlAvailability:    nil,
 			Components:             nil,

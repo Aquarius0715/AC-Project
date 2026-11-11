@@ -266,6 +266,7 @@ func registerEquipment(reg *ops.Registry, txm *db.TxManager) (*assets.Module, eq
 		models: devices.Models{},
 	} // other domains' view (IR193)
 	devices.Register(reg, devices.Capabilities{Units: assetsModule})
+	devices.RegisterIoTModels(reg, devices.IoTModels{Units: assetsModule})
 	assets.RegisterQueries(reg)
 	devices.RegisterQueries(
 		reg,
