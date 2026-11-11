@@ -175,13 +175,35 @@ func run(broker, api, equipment, tenant string) error {
 func newHTTPClient() *http.Client {
 	client := &http.Client{Timeout: httpTimeout, Transport: nil, CheckRedirect: nil, Jar: nil}
 
-	if base, ok := http.DefaultTransport.(*http.Transport); ok {
-		transport := base.Clone()
+	base := http.DefaultTransport
+	if defaults, ok := http.DefaultTransport.(*http.Transport); ok {
+		transport := defaults.Clone()
 		transport.MaxIdleConnsPerHost = workers
-		client.Transport = transport
+		base = transport
 	}
 
+	client.Transport = serviceToken{base: base, token: internalToken()}
+
 	return client
+}
+
+// serviceToken adds the service token to every request the bridge sends to the Core API: demo.trigger takes only a
+// signed-in session or the service (IR768), and the internal queries ask for it too.
+type serviceToken struct {
+	base  http.RoundTripper
+	token string
+}
+
+// RoundTrip implements http.RoundTripper.
+func (s serviceToken) RoundTrip(req *http.Request) (*http.Response, error) {
+	if s.token != "" && req.Header.Get(ops.InternalTokenHeader) == "" {
+		req = req.Clone(req.Context())
+		req.Header.Set(ops.InternalTokenHeader, s.token)
+	}
+
+	resp, err := s.base.RoundTrip(req)
+
+	return resp, apperr.Wrap(err, "http.RoundTripper.RoundTrip")
 }
 
 // subscribeDemo subscribes to the simulated modules' topics (QoS 1, as the design says). It runs on every connect; a

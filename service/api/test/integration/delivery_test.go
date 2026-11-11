@@ -118,6 +118,13 @@ func TestOfferAcceptAssign(t *testing.T) {
 		t.Error("suspended contractor")
 	}
 
+	// a suspended contractor-b left in the shard would refuse every later test that holds or offers to it
+	owner(
+		t,
+		`DELETE FROM maintenance.contractors WHERE organization_id = $1`,
+		seed.ID("org-contractor-b"),
+	)
+
 	if code, _ := write(srv, customerA(), "jobs.offer", offerBody(nil), 1); code != 403 {
 		t.Error("client offer")
 	}
