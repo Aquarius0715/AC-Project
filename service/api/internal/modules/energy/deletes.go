@@ -241,7 +241,7 @@ func deleteFactor(
 //	@Security		BearerAuth
 //	@Router			/v1/mrv/{id} [delete]
 func deleteDraft(ctx context.Context, call *ops.Call, input *DeleteInput) (DeletedResource, error) {
-	latest, err := latestVersion(ctx, call, input.ID)
+	latest, err := lockLatest(ctx, call, input.ID)
 	if err != nil {
 		return DeletedResource{}, err
 	}

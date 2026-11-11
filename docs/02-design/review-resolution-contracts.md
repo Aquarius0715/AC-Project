@@ -10269,3 +10269,27 @@ Found in review round 671 (`notify.Sweep` against IR428).
 1. **Before.** IR428 item 2 said that the hourly run also deletes "the outbound e-mails created before then that are no longer queued". That was `notify.outbound_mail`, the invitation e-mail queue from before IR461. IR479 dropped the table and its delete, but did not amend IR428, so the contract still described a table and a sweep that no longer exist. `database-design.md` §6 already listed only the notifications and their deliveries.
 2. **Now.** IR428 item 2 carries a note: since IR479 the run deletes the old notifications and all their deliveries only; an e-mail notification is one of those deliveries. No code changes.
 3. **Checks.** A scan of `docs/02-design` for schema-qualified names that migration 000001 does not define finds no other dropped table described as live. The other hits are operation and permission names, a trigger function, an internal query, and `maintenance.ref_devices`, which is already marked as dropped.
+
+## IR763 An MRV draft never cites a factor or baseline deleted at the same moment — 2026-11-11
+
+Found in review round 435 (proposal B-29), built in round 686, using the recommended option.
+
+1. **Before.**
+   - `factors.delete` and `baselines.delete` (DEC-103, IR656) lock the record's current row `FOR UPDATE`, look for an MRV report that cites it, and delete every version.
+   - `mrv.saveDraft` read the cited factor and baseline with plain SELECTs, which never wait for that lock.
+   - So a draft saved while the same record was being deleted passed both checks: the delete found no citation, the draft read the old row. The new report then cited a record that was gone.
+   - B-29 was kept as a proposal because no test could hold one transaction open; the race tests of IR751 and IR757 since do that on a second connection.
+2. **Now.** Before it computes the draft, `mrv.saveDraft` takes every version of the cited factor and of the cited baseline with a share lock. This leaves only two outcomes:
+   - The delete waits for the draft, then sees the citation (CONFLICT `error.factorCited` / `error.baselineCited`).
+   - The draft waits for the delete, then finds the record gone (NOT_FOUND).
+
+   Every version is locked, not only the current one, so a version saved meanwhile does not make the record look gone. `mrv.preview`, a read, takes no lock.
+3. **Tests.** `TestMRVDraftWaitsForADeleteOfWhatItCites` holds a factor delete, and then a baseline delete, half done. The draft answered 200 at once before the fix. Now it waits, then answers 404. `TestMRVDeletes` and the other MRV tests are unchanged.
+
+## IR764 The writes of an MRV report lock its latest version — 2026-11-11
+
+Found in review round 101 (noted) and round 687 (`energy/mrv.go`, `energy/deletes.go`).
+
+1. **Before.** `mrv.deleteDraft`, `mrv.saveDraft` with an `id` (a new version of a draft) and `mrv.recordReview` each read the report's latest version with a plain `max(version)` and checked the expected version against it; none took a lock. If a new version was saved while the same draft was being deleted, the delete removed the versions it could see and the save inserted the next one. That version then remained as the whole report after the delete.
+2. **Now.** Those three writes lock the report's first version row `FOR UPDATE` and then read the latest version afresh (`lockLatest`). The first version is a row no new version or review changes, so every write of the report waits for the same lock (locking the latest row instead would let a writer that waited hold a stale row while the next one locks the new latest). They follow one another: a write after a delete finds no row and answers NOT_FOUND. A review or a new version that comes first makes the delete wait and then see it (CONFLICT `error.reportReviewed` for a reviewed or non-draft report). The reads (`mrv.get`, the version list) keep the lock-free `latestVersion`.
+3. **Tests.** `TestMRVDraftVersionWaitsForTheDraftDelete` holds a draft delete half done. Before the fix, the new version answered 200 at once and survived the delete. Now it waits, then answers 404. The other MRV tests are unchanged.

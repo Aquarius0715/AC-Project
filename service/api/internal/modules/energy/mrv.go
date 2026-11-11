@@ -89,6 +89,38 @@ type Preview struct {
 	IsDemo     bool       `json:"isDemo"`
 }
 
+// lockCited takes the factor and the baseline a draft cites, every version of each, with a share lock (IR763, B-29):
+// factors.delete and baselines.delete lock the record and then delete all its versions, so a delete at the same moment
+// waits for the draft and then sees its citation (CONFLICT), or the draft waits for the delete and finds the record
+// gone (NOT_FOUND) — a draft never cites a deleted record. Every version is locked, not only the current one, so a new
+// version saved meanwhile does not make the record look gone. Only the write takes it: mrv.preview reads alone.
+func lockCited(ctx context.Context, call *ops.Call, conditions *Conditions) error {
+	for _, cited := range []struct {
+		table string
+		id    uuid.UUID
+	}{{"energy.emission_factors", conditions.FactorID}, {"energy.baselines", conditions.BaselineID}} {
+		rows, err := call.Tx.Query(
+			ctx,
+			"SELECT version FROM "+cited.table+" WHERE id = $1 FOR SHARE",
+			cited.id,
+		)
+		if err != nil {
+			return apperr.Wrap(err, "select "+cited.table)
+		}
+
+		versions, err := pgx.CollectRows(rows, pgx.RowTo[int])
+		if err != nil {
+			return apperr.Wrap(err, "select "+cited.table)
+		}
+
+		if len(versions) == 0 {
+			return apperr.E(apperr.NotFound, apperr.KeyNotFound)
+		}
+	}
+
+	return nil
+}
+
 // preview computes the MRV result for the conditions with the referenced baseline and factor versions (SR09,
 // IR149): every unit must be a not archived unit of the customer organization (VALIDATION); unknown versions are
 // NOT_FOUND. incomplete when the boundary differs from the actual boundary or the baseline, coverage < 1, or the
@@ -295,6 +327,28 @@ func latestVersion(ctx context.Context, c *ops.Call, id uuid.UUID) (int, error) 
 	}
 
 	return *latest, nil
+}
+
+// lockLatest is latestVersion for a write (IR764): it locks the report's first version row FOR UPDATE — a row that no
+// new version or review changes, so every write of the report waits for the same lock — and then reads the latest
+// version afresh. A delete of the draft (it removes every version), a new version and a review follow one another: a
+// write after the delete finds no row and answers NOT_FOUND, instead of leaving its new version as the whole report,
+// and a write after a new version compares its expected version with that one.
+func lockLatest(ctx context.Context, call *ops.Call, id uuid.UUID) (int, error) {
+	var first int
+
+	err := call.Tx.QueryRow(ctx, `SELECT version FROM energy.mrv_reports WHERE id = $1 ORDER BY version LIMIT 1
+		FOR UPDATE`, id).
+		Scan(&first)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, apperr.E(apperr.NotFound, apperr.KeyNotFound)
+	}
+
+	if err != nil {
+		return 0, apperr.Wrap(err, "select energy.mrv_reports")
+	}
+
+	return latestVersion(ctx, call, id)
 }
 
 // LoadReport returns a report version (latest when version is nil).
@@ -725,7 +779,7 @@ func saveDraft(ctx context.Context, call *ops.Call, input *SaveInput) (Report, e
 	reportID, version := uuid.New(), 1
 
 	if input.ID != nil {
-		latest, err := latestVersion(ctx, call, *input.ID)
+		latest, err := lockLatest(ctx, call, *input.ID)
 		if err != nil {
 			return Report{}, err
 		}
@@ -747,6 +801,11 @@ func saveDraft(ctx context.Context, call *ops.Call, input *SaveInput) (Report, e
 
 	if found != len(input.EvidenceIDs) {
 		return Report{}, apperr.Fields(map[string]string{"evidenceIds": "errors.evidence_unknown"})
+	}
+
+	citedErr := lockCited(ctx, call, &input.Conditions)
+	if citedErr != nil {
+		return Report{}, citedErr
 	}
 
 	p, err := preview(ctx, call, &input.Conditions)
@@ -828,7 +887,7 @@ func (in *ReviewInput) Validate() map[string]string {
 //	@Security		BearerAuth
 //	@Router			/v1/mrv/{reportId}/review [post]
 func recordReview(ctx context.Context, call *ops.Call, input *ReviewInput) (Report, error) {
-	latest, err := latestVersion(ctx, call, input.ReportID)
+	latest, err := lockLatest(ctx, call, input.ReportID)
 	if err != nil {
 		return Report{}, err
 	}
