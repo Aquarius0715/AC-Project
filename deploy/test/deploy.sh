@@ -210,6 +210,7 @@ data_of() {
 migrations_kept() {
   local mode type blob path
   while read -r mode type blob path; do
+    case $path in *.sql) ;; *) continue ;; esac # the Go file next to them is no migration
     [ "$(git -C "$REPO" rev-parse --quiet --verify "refs/tags/$2:$path" || true)" = "$blob" ] || return 1
   done < <(git -C "$REPO" ls-tree -r "refs/tags/$1" -- "$MIGRATIONS")
   return 0

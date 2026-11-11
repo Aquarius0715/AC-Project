@@ -44,7 +44,9 @@ func TestMigrationsMatchSchema(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		t.Cleanup(func() { _, _ = admin.Exec(ctx, "DROP DATABASE IF EXISTS "+name+" WITH (FORCE)") })
+		t.Cleanup(
+			func() { _, _ = admin.Exec(ctx, "DROP DATABASE IF EXISTS "+name+" WITH (FORCE)") },
+		)
 	}
 
 	migrated := catalogOf(ctx, t, fromMigrations, func(conn *pgx.Conn) error {
@@ -74,7 +76,12 @@ func TestMigrationsMatchSchema(t *testing.T) {
 		other := difference(documented[kind], migrated[kind])
 
 		if len(only) > 0 || len(other) > 0 {
-			t.Errorf("%ss differ: only in the migrations %q; only in schema.sql %q", kind, only, other)
+			t.Errorf(
+				"%ss differ: only in the migrations %q; only in schema.sql %q",
+				kind,
+				only,
+				other,
+			)
 		}
 	}
 }
@@ -88,10 +95,13 @@ func catalogOf(
 ) map[string][]string {
 	t.Helper()
 
-	conn, err := pgx.Connect(ctx, strings.Replace(testDB("postgres"), "/"+databaseOf(testDB("postgres"))+"?", "/"+name+"?", 1))
+	url := testDB("postgres")
+
+	conn, err := pgx.Connect(ctx, strings.Replace(url, "/"+databaseOf(url)+"?", "/"+name+"?", 1))
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	defer func() { _ = conn.Close(ctx) }()
 
 	err = setup(conn)
@@ -102,12 +112,12 @@ func catalogOf(
 	out := map[string][]string{}
 
 	for kind, query := range map[string]string{
-		"column": `SELECT table_schema || '.' || table_name || '.' || column_name || ' ' || data_type || ' ' || udt_name || ' ' ||
-				is_nullable || ' ' || coalesce(column_default, '')
+		"column": `SELECT table_schema || '.' || table_name || '.' || column_name || ' ' || data_type || ' ' ||
+				udt_name || ' ' || is_nullable || ' ' || coalesce(column_default, '')
 			FROM information_schema.columns WHERE table_schema NOT IN ('pg_catalog', 'information_schema') AND table_name <>
 				'schema_migrations'`,
-		"constraint": `SELECT conrelid::regclass::text || ' ' || contype::text || ' ' || pg_get_constraintdef(oid) FROM pg_constraint
-			WHERE connamespace NOT IN ('pg_catalog'::regnamespace, 'information_schema'::regnamespace) AND
+		"constraint": `SELECT conrelid::regclass::text || ' ' || contype::text || ' ' || pg_get_constraintdef(oid)
+			FROM pg_constraint WHERE connamespace NOT IN ('pg_catalog'::regnamespace, 'information_schema'::regnamespace) AND
 			conrelid::regclass::text <> 'schema_migrations'`,
 		"index": `SELECT schemaname || '.' || indexdef FROM pg_indexes WHERE schemaname NOT IN ('pg_catalog',
 			'information_schema') AND tablename <> 'schema_migrations'`,
@@ -129,21 +139,21 @@ func catalogOf(
 }
 
 func databaseOf(url string) string {
-	rest := url[strings.LastIndex(url, "/")+1:]
+	name, _, _ := strings.Cut(url[strings.LastIndex(url, "/")+1:], "?")
 
-	return rest[:strings.Index(rest, "?")]
+	return name
 }
 
-// difference lists what is in a and not in b.
-func difference(a, b []string) []string {
+// difference lists what is in left and not in right.
+func difference(left, right []string) []string {
 	have := map[string]bool{}
-	for _, item := range b {
+	for _, item := range right {
 		have[item] = true
 	}
 
 	var out []string
 
-	for _, item := range a {
+	for _, item := range left {
 		if !have[item] {
 			out = append(out, item)
 		}

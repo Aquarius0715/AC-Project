@@ -563,11 +563,15 @@ func (d *demoOps) trigger(ctx context.Context, call *ops.Call, input *TriggerInp
 const commandProbe = `SELECT EXISTS (SELECT 1 FROM control.commands WHERE id = $1)`
 
 // commandOfDevice refuses a command result that names another device than the command's (IR768, B-30): a caller
-// holding one command's ID cannot settle it in another device's name. A trigger without a device (the bridge's) is
-// taken as the command's own device.
-func commandOfDevice(ctx context.Context, txn pgx.Tx, input *TriggerInput) error {
+// holding one command's ID cannot settle it in another device's name. Only the service (the bridge) may leave the
+// device out and have the result taken as the command's own; a signed-in caller must name it.
+func commandOfDevice(ctx context.Context, txn pgx.Tx, input *TriggerInput, internal bool) error {
 	if input.DeviceID == nil {
-		return nil
+		if internal {
+			return nil
+		}
+
+		return apperr.Fields(map[string]string{"deviceId": apperr.KeyRequired})
 	}
 
 	var device *uuid.UUID
@@ -618,7 +622,7 @@ func (d *demoOps) commandAcknowledged(
 		commandProbe,
 		*input.CommandID,
 		func(txn pgx.Tx, _ uuid.UUID) error {
-			deviceErr := commandOfDevice(ctx, txn, input)
+			deviceErr := commandOfDevice(ctx, txn, input, ops.InternalCaller(ctx))
 			if deviceErr != nil {
 				return deviceErr
 			}
@@ -639,7 +643,7 @@ func (d *demoOps) commandFailed(ctx context.Context, call *ops.Call, input *Trig
 		commandProbe,
 		*input.CommandID,
 		func(txn pgx.Tx, _ uuid.UUID) error {
-			deviceErr := commandOfDevice(ctx, txn, input)
+			deviceErr := commandOfDevice(ctx, txn, input, ops.InternalCaller(ctx))
 			if deviceErr != nil {
 				return deviceErr
 			}

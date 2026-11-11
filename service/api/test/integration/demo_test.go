@@ -336,7 +336,10 @@ func TestDemoOperations(t *testing.T) {
 		srv,
 		`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+clock().Add(time.Second).
 			Format(time.RFC3339)+
-			`","eventType":"command_ack","commandId":"`+cmd+`","sequence":2}`,
+			`","eventType":"command_ack","commandId":"`+cmd+`","deviceId":"`+deviceOf(
+			t,
+			cmd,
+		)+`","sequence":2}`,
 	); code != 200 {
 		t.Fatal("ack trigger")
 	}

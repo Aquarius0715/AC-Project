@@ -751,10 +751,11 @@ func coveredSpan(
 	rows, err := call.Tx.Query(
 		ctx,
 		`SELECT issued_at, expires_at FROM maintenance.certificates WHERE membership_id = $1 AND code = $2 AND id <> $3
-			AND status IN ('valid', 'expiring')`,
+			AND status IN ('valid', 'expiring') AND expires_at > $4`,
 		certificate.MembershipID,
 		certificate.Code,
 		certificate.ID,
+		call.Now,
 	)
 	if err != nil {
 		return time.Time{}, time.Time{}, apperr.Wrap(err, "select maintenance.certificates")

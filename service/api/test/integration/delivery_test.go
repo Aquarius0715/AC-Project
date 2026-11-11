@@ -1323,6 +1323,17 @@ func TestReleaseQualificationEnded(t *testing.T) {
 		t.Fatalf("assign again: %d %v", code, res)
 	}
 
+	// a certificate that ran out but still reads "valid" is no part of what the new one joins (IR785)
+	owner(
+		t,
+		`INSERT INTO maintenance.certificates (tenant_id, membership_id, organization_id, code, name, number, issued_at,
+			expires_at, status) VALUES ($1, $2, $3, 'demo_indoor', 'Old', 'N-0', $4, $5, 'valid')`,
+		seed.ID("tenant-a"),
+		tech,
+		seed.ID("org-contractor-a"),
+		clock().Add(-500*time.Hour),
+		clock().Add(-10*time.Hour),
+	)
 	approve(
 		60,
 	) // shorter than the one before, and it ends after the visit began: the 100 h certificate still covers it
@@ -1331,13 +1342,18 @@ func TestReleaseQualificationEnded(t *testing.T) {
 		t.Errorf("a shorter certificate cut the qualification: %s %v", status, assignment)
 	}
 
-	var grantEnds time.Time
+	var grantStarts, grantEnds time.Time
 	ownerScan(
 		t,
-		`SELECT valid_until FROM identity.qualification_grants WHERE membership_id = $1 AND code = 'demo_indoor'`,
+		`SELECT valid_from, valid_until FROM identity.qualification_grants WHERE membership_id = $1 AND code = 'demo_indoor'`,
 		[]any{tech},
+		&grantStarts,
 		&grantEnds,
 	)
+
+	if !grantStarts.Equal(clock().Add(-240 * time.Hour)) {
+		t.Errorf("the grant starts %v: the expired certificate was joined", grantStarts)
+	}
 
 	if !grantEnds.Equal(clock().Add(100 * time.Hour)) {
 		t.Errorf("the grant ends %v, want the longest certificate's end", grantEnds)

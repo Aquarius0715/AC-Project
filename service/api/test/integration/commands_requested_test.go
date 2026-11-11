@@ -146,7 +146,7 @@ func TestAcknowledgementAheadOfTheSentReport(t *testing.T) {
 			`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+
 				clock().Add(-ago).
 					Format(time.RFC3339)+
-				`","eventType":"`+kind+`","commandId":"`+command+`"}`,
+				`","eventType":"`+kind+`","commandId":"`+command+`","deviceId":"`+deviceOf(t, command)+`"}`,
 			0,
 		)
 		if code != http.StatusOK {

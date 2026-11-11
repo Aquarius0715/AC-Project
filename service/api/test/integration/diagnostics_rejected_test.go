@@ -28,7 +28,7 @@ func rejectCommand(t *testing.T, srv *apiserver.Server, commandID string, when t
 			`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+when.Format(
 				time.RFC3339,
 			)+
-				`","eventType":"command_fail","commandId":"`+commandID+`"}`,
+				`","eventType":"command_fail","commandId":"`+commandID+`","deviceId":"`+deviceOf(t, commandID)+`"}`,
 			0,
 		)
 		if code != 200 {
