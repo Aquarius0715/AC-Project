@@ -1,7 +1,9 @@
 package paging_test
 
 import (
+	"encoding/base64"
 	"errors"
+	"regexp"
 	"testing"
 
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
@@ -251,5 +253,37 @@ func TestContains(t *testing.T) {
 		if got := paging.Contains(input); got != want {
 			t.Errorf("Contains(%q) = %q, want %q", input, got, want)
 		}
+	}
+}
+
+// A cursor is not signed, so a caller can edit its offset. One near the largest integer made Offset+Limit wrap
+// negative in the handlers that slice a list in memory (a slice-bounds panic, a 500): it is VALIDATION on cursor.
+func TestResolveRefusesAnAbsurdCursorOffset(t *testing.T) {
+	t.Parallel()
+
+	cond := map[string]any{keyPropertyID: "p1"}
+	first, _ := paging.Resolve(
+		paging.Query{Limit: new(2), Cursor: nil, Sort: nil, Filters: nil},
+		cond,
+		1,
+		1,
+	)
+
+	raw, err := base64.RawURLEncoding.DecodeString(*first.Next(5))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	forged := regexp.MustCompile(`"o":\d+`).ReplaceAll(raw, []byte(`"o":9223372036854775800`))
+	token := base64.RawURLEncoding.EncodeToString(forged)
+
+	_, err = paging.Resolve(
+		paging.Query{Limit: new(2), Cursor: &token, Sort: nil, Filters: nil},
+		cond,
+		1,
+		1,
+	)
+	if code(err) != apperr.Validation {
+		t.Fatalf("offset near MaxInt64: %v", err)
 	}
 }

@@ -10502,3 +10502,7 @@ Decided by the user (2026-11-11): the test environment's tables are altered when
 ## IR786 Migration versions must be 1, 2, 3 … without a gap — 2026-11-12
 
 Review round 747 (the migration runner). `migrate.Up` skips every migration at or below the recorded version, so a file numbered below the database's version is never applied. With a hole in the numbering (1, 2, 4 on main, 3 added later) the test environment, already at 4, would keep running without the change of 3, and `deploy.sh` would treat 3 as an ordinary new migration. `migrate.Load` now refuses a set whose versions are not 1, 2, 3 … (`migrate: version missing before N`), so the set cannot reach main with a hole; two pull requests that take the same number already fail as a duplicate. Test: `TestLoadSortsAndValidates` (case "gap"). Nothing else changes; Phase 1A unchanged.
+
+## IR787 A cursor's offset is bounded — 2026-11-12
+
+Review round 749 (`platform/paging`). A cursor is base64 JSON with no signature, so a caller can edit its offset (the hash and versions are copied from a real cursor). An offset near the largest integer made `Offset+Limit` wrap negative in the handlers that slice a list in memory (`jobs.go` merged list: slice bounds out of range, a 500). `cursorOffset` now answers VALIDATION on `cursor` (`error.invalid`) for an offset above 2^31. Test: `TestResolveRefusesAnAbsurdCursorOffset`. Phase 1A unchanged.
