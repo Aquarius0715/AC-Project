@@ -70,9 +70,10 @@ swagger:
 	$(GO) tool swag init -g cmd/gateway/main.go -d . --parseInternal --overridesFile .swaggo -o internal/gateway/swagger --outputTypes json
 	mkdir -p ../../docs/02-design/api && cp internal/gateway/swagger/swagger.json ../../docs/02-design/api/swagger.json
 
-# migrations copies the design schema into the first migration (until the first release freezes it)
+# migrations: 000001 is frozen (IR785); a schema change is a new internal/migrations/NNNNNN_name.up.sql with ALTERs,
+# and the same change in docs/02-design/db/schema.sql (TestMigrationsMatchSchema checks they agree)
 migrations:
-	cp ../../docs/02-design/db/schema.sql internal/migrations/000001_init.up.sql
+	@echo "000001_init.up.sql is frozen: add internal/migrations/NNNNNN_name.up.sql with the ALTERs, and the same change to docs/02-design/db/schema.sql"
 
 # resetdb rebuilds the development database "ac"; testdb / testdb-cluster rebuild the test databases (the suites
 # leave their rows behind, so every suite run starts from a fresh one)

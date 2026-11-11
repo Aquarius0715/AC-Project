@@ -125,9 +125,17 @@ func tick(
 	// each tenant in its own transaction, and one that fails does not hold up the others: its failure is reported and
 	// its transaction rolled back, and the next tick tries it again
 	for _, tenant := range tenants {
-		var stepErrs []error
+		// what one attempt of the transaction found: a serialization failure runs it again, and the attempt that was
+		// rolled back leaves neither its failures nor its counts (IR785)
+		var (
+			stepErrs     = make([]error, 0, 1)
+			tenantResult Result
+			noResult     Result
+		)
 
 		err := txm.Run(ctx, false, ops.TenantPrincipal(tenant), func(txn pgx.Tx) error {
+			stepErrs, tenantResult = stepErrs[:0], noResult
+
 			_, err := txn.Exec(
 				ctx,
 				`SELECT set_config('app.now', $1, true)`,
@@ -137,7 +145,7 @@ func tick(
 				return apperr.Wrap(err, "select set_config")
 			}
 
-			held, err := lockDomains(ctx, txn, tenant, domains, wait, &result)
+			held, err := lockDomains(ctx, txn, tenant, domains, wait, &tenantResult)
 			if err != nil {
 				return err
 			}
@@ -145,18 +153,20 @@ func tick(
 			// every step runs in a savepoint of the tenant's transaction (IR776): a failing step rolls back only its own
 			// work, is reported with the tick's error, and does not stop the other steps; the next tick tries it again
 			if held[ops.DomainEquipment] {
-				stepErrs = append(stepErrs, isolated(ctx, txn, "equipment tick", &result,
+				stepErrs = append(stepErrs, isolated(ctx, txn, "equipment tick", &tenantResult,
 					func(savepoint pgx.Tx, res *Result) error {
 						return tickEquipment(ctx, savepoint, tenant, now, reg, res)
 					}))
 			}
 
 			if reg != nil {
-				stepErrs = append(stepErrs, runJobs(ctx, txn, tenant, now, reg, held, &result)...)
+				stepErrs = append(
+					stepErrs,
+					runJobs(ctx, txn, tenant, now, reg, held, &tenantResult)...)
 			}
 
 			if held[ops.DomainMaintenance] {
-				stepErrs = append(stepErrs, isolated(ctx, txn, "maintenance tick", &result,
+				stepErrs = append(stepErrs, isolated(ctx, txn, "maintenance tick", &tenantResult,
 					func(savepoint pgx.Tx, res *Result) error {
 						return tickMaintenance(ctx, savepoint, tenant, now, reg, res)
 					}))
@@ -164,6 +174,10 @@ func tick(
 
 			return nil
 		})
+		if err == nil {
+			result = result.plus(tenantResult)
+		}
+
 		stepErrs = append(stepErrs, err)
 
 		err = errors.Join(stepErrs...)

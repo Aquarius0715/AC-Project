@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.629.0 / Created: 2026-09-14 / Updated: 2026-11-11 / Status: Draft for review / Language: English
+Version: 0.630.0 / Created: 2026-09-14 / Updated: 2026-11-11 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -100,6 +100,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.630.0 (2026-11-11): IR785: a schema change is a numbered migration with ALTERs (000001 is frozen, a test compares the migrations with schema.sql), the test deployment applies new migrations without rebuilding the data, and four findings of the review of IR768–IR784 are fixed (a signed-in demo command result must name its device, the e-mail worker's null params, a retried scheduler tick, an expired certificate joined to a new one).
 0.629.0 (2026-11-11): IR782–IR784 (B-38, B-34, B-35): a submitted report version lists only the photos and sign-off files added up to it, not those of a later rework draft; the time-proposal and acknowledgement notices of IR113 item 9 are sent; and an alert nobody acknowledges within its policy's escalation time is escalated to HQ once.
 0.628.0 (2026-11-11): IR777–IR781 (B-24, B-37, B-31, B-36, B-33, B-28): a write's response is stored in the write's own transaction, SLA targets and rate cards never store one version number twice, a reminder checks that the client can be reached on its channel, a customer record needs a customer organization, and approving a shorter certificate no longer cuts a qualification another valid one still covers.
 0.627.0 (2026-11-11): IR773–IR776 (B-23, B-25, B-26, B-27): HQ cannot execute a restriction while a payment of its cause is processing, a contractor's job notice names the job instead of the customer's unit, one failing scheduler job no longer stops the tenant's other jobs, and an external technician reads a unit's commands and notices only inside an assignment's work window.

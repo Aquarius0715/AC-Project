@@ -865,7 +865,6 @@ CREATE TABLE monitoring.alerts (
   acknowledged_at     timestamptz,
   resolved_at         timestamptz,
   resolution_reason   text,
-  escalated_at        timestamptz,                -- when HQ was told nobody acknowledged it in the policy's escalation time (IR784)
   resolution_evidence_ids uuid[] NOT NULL DEFAULT '{}',   -- DD-T07 remeasurement / confirmation records
   acknowledged_by     uuid,
   resolved_by         uuid,
@@ -1208,7 +1207,6 @@ CREATE TABLE maintenance.attachments (
   uploaded_by uuid NOT NULL,
   created_at  timestamptz NOT NULL DEFAULT platform.app_now(),
   updated_at  timestamptz NOT NULL DEFAULT platform.app_now(),
-  added_version int NOT NULL DEFAULT 1,           -- the report version it was added in: a version lists the files added in it and before (IR782)
   FOREIGN KEY (tenant_id, job_id) REFERENCES maintenance.jobs(tenant_id, id)
 );
 
@@ -1283,8 +1281,7 @@ CREATE TABLE maintenance.rate_cards (
   lines              jsonb NOT NULL,             -- [{workType, amountMinor, note}]
   version            int NOT NULL DEFAULT 1,
   created_at         timestamptz NOT NULL DEFAULT platform.app_now(),
-  UNIQUE (contractor_org_id, effective_from),
-  UNIQUE (contractor_org_id, version)       -- two saves at once cannot store one version twice (IR778)
+  UNIQUE (contractor_org_id, effective_from)
 );
 
 CREATE TABLE maintenance.certificates (          -- FR-P09
@@ -1345,8 +1342,7 @@ CREATE TABLE maintenance.sla_targets (           -- FR-A22
   first_time_fix_percent     numeric(5,2) NOT NULL,
   effective_from             timestamptz NOT NULL,
   version                    int NOT NULL DEFAULT 1,
-  UNIQUE (tenant_id, plan_type, effective_from),
-  UNIQUE (tenant_id, plan_type, version)    -- two saves at once cannot store one version twice (IR778)
+  UNIQUE (tenant_id, plan_type, effective_from)
 );
 
 CREATE TABLE maintenance.filter_care_settings (  -- FR-C18

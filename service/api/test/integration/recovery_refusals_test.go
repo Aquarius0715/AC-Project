@@ -192,7 +192,10 @@ func TestRestrictionRecoveryRefusals(t *testing.T) {
 		"demo.trigger",
 		`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+clock().Add(3*time.Second).
 			Format(time.RFC3339)+
-			`","eventType":"command_fail","commandId":"`+cmd+`"}`,
+			`","eventType":"command_fail","commandId":"`+cmd+`","deviceId":"`+deviceOf(
+			t,
+			cmd,
+		)+`"}`,
 		0,
 	); code != 200 {
 		t.Fatalf("command_fail: %d %v", code, resp)

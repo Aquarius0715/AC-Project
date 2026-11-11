@@ -80,6 +80,21 @@ func TestDemoOperationsNeedASessionOrTheService(t *testing.T) {
 	cmd := asStr(t, data(res)["id"])
 	keepObserved(t, cmd)
 
+	// a signed-in caller names the device too: only the service may leave it out (IR785)
+	noDevice := `{"scenarioId":"t","eventId":"` + uuid.NewString() + `","occurredAt":"` + clock().Add(time.Second).
+		Format(time.RFC3339) +
+		`","eventType":"command_ack","commandId":"` + cmd + `","sequence":2}`
+	if code, res := write(
+		srv,
+		customerB(),
+		"demo.trigger",
+		noDevice,
+		0,
+	); code != http.StatusUnprocessableEntity ||
+		fields(res) != "deviceId=error.required" {
+		t.Errorf("an acknowledgement without a device from a signed-in caller: %d %v", code, res)
+	}
+
 	ack := `{"scenarioId":"t","eventId":"` + uuid.NewString() + `","occurredAt":"` +
 		clock().Add(time.Second).
 			Format(time.RFC3339) +
@@ -117,4 +132,19 @@ func demoCall(
 	srv.Echo.ServeHTTP(rec, req)
 
 	return rec.Code, rec.Body.String()
+}
+
+// deviceOf is the device a command is for: a signed-in caller names it when it reports a command's result (IR785).
+func deviceOf(t *testing.T, command string) string {
+	t.Helper()
+
+	var device string
+	ownerScan(
+		t,
+		`SELECT device_id::text FROM control.commands WHERE id = $1`,
+		[]any{command},
+		&device,
+	)
+
+	return device
 }

@@ -275,3 +275,28 @@ func TestJobLabel(t *testing.T) {
 		}
 	}
 }
+
+// TestMaskedParams: a contractor's job notice gets the job label even when its stored parameters are JSON null, which
+// decode to a nil map (the e-mail worker must not panic on it); another reader's parameters stay as they are.
+func TestMaskedParams(t *testing.T) {
+	t.Parallel()
+
+	const id = "0a1b2c3d-0000-4000-8000-000000000001"
+
+	got := maskedParams(nil, authz.RoleContractor, targetJob, id)
+	if got[keyTargetName] != "Job 0a1b2c3d" {
+		t.Errorf("nil parameters: %v", got)
+	}
+
+	kept := map[string]any{keyTargetName: "Kitchen AC"}
+	if got := maskedParams(
+		kept,
+		authz.RoleClient,
+		targetJob,
+		id,
+	); got[keyTargetName] != "Kitchen AC" {
+		t.Errorf("a client's parameters changed: %v", got)
+	}
+}
+
+const keyTargetName = "targetName"

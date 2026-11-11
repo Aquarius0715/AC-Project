@@ -1,5 +1,8 @@
 // Package migrations embeds the sequential SQL migrations (golang-migrate naming: NNNNNN_name.up.sql).
-// 000001_init.up.sql is docs/02-design/db/schema.sql (database design §9); applied files are never edited.
+// 000001_init.up.sql is the baseline of docs/02-design/db/schema.sql (database design §9) and is frozen (IR785): a
+// change of the schema after it is a new numbered migration with ALTERs, and docs/02-design/db/schema.sql stays the
+// schema the migrations add up to (TestMigrationsMatchSchema). An applied file is never edited, and no database is
+// rebuilt for a schema change.
 package migrations
 
 import "embed"

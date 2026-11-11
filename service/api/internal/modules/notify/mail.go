@@ -227,6 +227,23 @@ func Deliver(
 	return sent, nil
 }
 
+// maskedParams are the parameters of a notice's e-mail with the contractor's job label instead of the customer's unit
+// name (IR775); stored parameters of JSON null have no map to put it in.
+func maskedParams(params map[string]any, role, kind, id string) map[string]any {
+	label, masked := jobLabel(role, kind, id)
+	if !masked {
+		return params
+	}
+
+	if params == nil {
+		params = map[string]any{}
+	}
+
+	params["targetName"] = label
+
+	return params
+}
+
 // pendingMail is one e-mail notification waiting to be sent: its recipient's address and role, its template and
 // parameters, the attempts so far, and whether the recipient's membership has ended.
 type pendingMail struct {
@@ -314,9 +331,7 @@ func deliverOne(
 	case json.Unmarshal(email.params, &params) != nil:
 		state, reason = "suppressed", new("parameters do not decode")
 	default:
-		if label, masked := jobLabel(email.role, email.targetKind, email.targetID); masked {
-			params["targetName"] = label // a company's notice never names the customer's unit (IR775)
-		}
+		params = maskedParams(params, email.role, email.targetKind, email.targetID)
 
 		subject, body := notificationMail(email.key, params, email.role, email.host, apps)
 

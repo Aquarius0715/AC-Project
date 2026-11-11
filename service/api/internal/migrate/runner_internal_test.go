@@ -1,9 +1,10 @@
 package migrate
 
 import (
-	"bytes"
 	"context"
+	"crypto/sha256"
 	"errors"
+	"fmt"
 	"os"
 	"slices"
 	"strings"
@@ -43,23 +44,23 @@ func TestLoadSortsAndValidates(t *testing.T) {
 	}
 }
 
-// The first migration is the design schema verbatim until the first release freezes it.
-func TestInitMatchesDesignSchema(t *testing.T) {
-	t.Parallel()
+// baselineSum is the SHA-256 of 000001_init.up.sql as the shared test environment applied it (test1.0.0r16): the file
+// is frozen (IR785). A change of the schema is a new migration with ALTERs, and docs/02-design/db/schema.sql follows
+// it (test/integration TestMigrationsMatchSchema).
+const baselineSum = "125ee737099ede72d1b39c2894c2cddf9a68834951b7a35845eeda39abf7a89d"
 
-	want, err := os.ReadFile("../../../../docs/02-design/db/schema.sql")
-	if err != nil {
-		t.Skip("design schema not available:", err)
-	}
+func TestBaselineIsFrozen(t *testing.T) {
+	t.Parallel()
 
 	got, err := migrations.FS.ReadFile("000001_init.up.sql")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if !bytes.Equal(got, want) {
-		t.Fatal(
-			"migrations/000001_init.up.sql differs from docs/02-design/db/schema.sql; run make migrations",
+	if sum := fmt.Sprintf("%x", sha256.Sum256(got)); sum != baselineSum {
+		t.Fatalf(
+			"000001_init.up.sql changed (sha256 %s): it is frozen, add a migration with the ALTERs instead (IR785)",
+			sum,
 		)
 	}
 }
