@@ -122,6 +122,12 @@ func LiveSite() Site {
 			Sensors: []LiveSensor{
 				{Name: "sensor-live-temperature", Metric: keyTemperature, Unit: "°C", Boundary: ""},
 				{Name: "sensor-live-humidity", Metric: keyHumidity, Unit: "%", Boundary: ""},
+				{
+					Name:     "sensor-live-power",
+					Metric:   keyPower,
+					Unit:     "kW",
+					Boundary: "",
+				},
 			},
 		},
 		SensorUnits: []LiveModule{
