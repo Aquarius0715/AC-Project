@@ -101,8 +101,14 @@ func run(service string, domains []string) error {
 		go c.Run(ctx, consumerPoll)
 	}
 
+	return serve(ctx, cfg.Addr, srv.Echo)
+}
+
+// serve runs app on addr until ctx is cancelled and the requests in flight have finished or gracefulTimeout has passed.
+// A normal stop returns nil; a failure to listen is an error, so the process exits non-zero.
+func serve(ctx context.Context, addr string, app *echo.Echo) error {
 	startConfig := echo.StartConfig{
-		Address:          cfg.Addr,
+		Address:          addr,
 		HideBanner:       true,
 		HidePort:         true,
 		GracefulTimeout:  gracefulTimeout,
@@ -115,9 +121,9 @@ func run(service string, domains []string) error {
 		BeforeServeFunc:  nil,
 	}
 
-	startErr := startConfig.Start(ctx, srv.Echo)
-	if startErr != nil && !errors.Is(startErr, http.ErrServerClosed) {
-		slog.Error("serve", "err", startErr)
+	err := startConfig.Start(ctx, app)
+	if err != nil && !errors.Is(err, http.ErrServerClosed) {
+		return apperr.Wrap(err, "serve")
 	}
 
 	return nil
