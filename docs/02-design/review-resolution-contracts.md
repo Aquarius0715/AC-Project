@@ -10506,3 +10506,7 @@ Review round 747 (the migration runner). `migrate.Up` skips every migration at o
 ## IR787 A cursor's offset is bounded — 2026-11-12
 
 Review round 749 (`platform/paging`). A cursor is base64 JSON with no signature, so a caller can edit its offset (the hash and versions are copied from a real cursor). An offset near the largest integer made `Offset+Limit` wrap negative in the handlers that slice a list in memory (`jobs.go` merged list: slice bounds out of range, a 500). `cursorOffset` now answers VALIDATION on `cursor` (`error.invalid`) for an offset above 2^31. Test: `TestResolveRefusesAnAbsurdCursorOffset`. Phase 1A unchanged.
+
+## IR788 The Demo clock's long jumps work, and the shown time runs — 2026-11-12
+
+Reported on the test environment: the Demo clock "does not move". Two causes. (1) IR641 added the +2, +4, +8, +12 and +24 hour buttons, but the Server Action `advanceClock` still accepted 1 and 60 minutes only, so each of the five answered VALIDATION `minutes` ("Not done: Try again") and the clock stayed. The action now accepts every `CLOCK_JUMPS` value. (2) The page printed the clock once, when the server rendered it, although the card says "Real-time speed"; `DemoView` now gets the ISO time and shows it ticking each second from that moment (`clockAt`), starting over when a jump re-renders the page. The Core API clock itself was right (shared offset 0 with `DEMO_CLOCK_START=now`). Tests: `advanceClockAction.test.ts` (every jump reaches `demo.advanceClock`, an unknown one is refused), `demoPanel.test.ts` (`clockAt`). Phase 1A unchanged.

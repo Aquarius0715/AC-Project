@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { advanceTarget, CLOCK_JUMPS, clockText, demoRefusal, deviceOptions, jumpDone, jumpDoneDemo, jumpLabel, nextSequence, openFault, type ApiDeviceEvent } from "@ac/web/lib/demoPanel";
+import { advanceTarget, CLOCK_JUMPS, clockAt, clockText, demoRefusal, deviceOptions, jumpDone, jumpDoneDemo, jumpLabel, nextSequence, openFault, type ApiDeviceEvent } from "@ac/web/lib/demoPanel";
 import { translator } from "@ac/web/lib/i18n";
 
 const event = (over: Partial<ApiDeviceEvent>): ApiDeviceEvent => ({ id: "e", eventType: "communication_lost", sequence: 1, occurredAt: "2026-09-14T01:00:00Z", restoredAt: null, ...over });
@@ -16,6 +16,10 @@ describe("Demo controls in API mode (FR-X05, IR249)", () => {
   it("shows the scenario clock in UTC and moves it forward", () => {
     expect(clockText("2026-09-14T01:41:07.123Z")).toBe("2026-09-14 01:41 UTC");
     expect([advanceTarget(new Date("2026-09-14T01:41:00Z"), 1), advanceTarget(new Date("2026-09-14T23:30:00Z"), 60)]).toStrictEqual(["2026-09-14T01:42:00.000Z", "2026-09-15T00:30:00.000Z"]);
+  });
+
+  it("lets the shown clock run at real-time speed from the rendered time", () => {
+    expect([clockAt("2026-09-14T01:41:07Z", 0), clockAt("2026-09-14T01:41:07Z", 61_000), clockAt("2026-09-14T23:59:30Z", 60_000)]).toStrictEqual(["2026-09-14 01:41 UTC", "2026-09-14 01:42 UTC", "2026-09-15 00:00 UTC"]);
   });
 
   // IR641: a minute, then 1, 2, 4, 8, 12 and 24 hours
