@@ -13,11 +13,19 @@ import (
 func TestServeReportsListenFailure(t *testing.T) {
 	t.Parallel()
 
-	taken, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "127.0.0.1:0")
+	var lc net.ListenConfig
+
+	taken, err := lc.Listen(context.Background(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer taken.Close()
+
+	t.Cleanup(func() {
+		closeErr := taken.Close()
+		if closeErr != nil {
+			t.Errorf("close listener: %v", closeErr)
+		}
+	})
 
 	err = serve(context.Background(), taken.Addr().String(), echo.New())
 	if err == nil {
