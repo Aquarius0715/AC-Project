@@ -5,7 +5,7 @@
 // Phase 1A demo keeps its browser-only controls.
 import { connection } from "next/server";
 import { apiMode, coreAll, coreNow, coreItems } from "@ac/web/lib/dal";
-import { clockText, deviceOptions, openFault, type ApiDevice, type ApiDeviceEvent } from "@ac/web/lib/demoPanel";
+import { deviceOptions, openFault, type ApiDevice, type ApiDeviceEvent } from "@ac/web/lib/demoPanel";
 import { DemoMock } from "./_components/demo-mock";
 import { DemoView } from "./_components/demo-view";
 import { orNull } from "@ac/web/lib/promises";
@@ -29,5 +29,5 @@ export default async function DemoPage() {
   const faults = new Map<string, string>();
   for (const [i, h] of histories.entries()) { const f = h && openFault(h); const device = listed.at(i); if (f && device) faults.set(device.id, f.id); }
   const usable = listed.filter((_, i) => histories.at(i) !== null);
-  return <DemoView live={{ clock: clockText(now.toISOString()), devices: devices && deviceOptions(usable, new Map(units.map((u) => [u.id, u.displayName])), faults), hidden: listed.length - usable.length }} />;
+  return <DemoView live={{ clock: now.toISOString(), devices: devices && deviceOptions(usable, new Map(units.map((u) => [u.id, u.displayName])), faults), hidden: listed.length - usable.length }} />;
 }

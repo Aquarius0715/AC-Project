@@ -6,6 +6,9 @@ import type { T } from "@ac/web/lib/i18n";
 /** “2026-09-14 09:41 UTC”, the clock as Figma 10e shows it. */
 export const clockText = (iso: string) => `${iso.slice(0, 10)} ${iso.slice(11, 16)} UTC`;
 
+/** The clock `elapsedMs` after the moment the page was rendered: the panel runs at real-time speed. */
+export const clockAt = (iso: string, elapsedMs: number) => clockText(new Date(Date.parse(iso) + elapsedMs).toISOString());
+
 /** demo.advanceClock moves forward only: the target is the clock now plus the jump. */
 export const advanceTarget = (now: Date, minutes: number) => new Date(now.getTime() + minutes * 60_000).toISOString();
 
