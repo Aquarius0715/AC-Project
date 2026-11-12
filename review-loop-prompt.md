@@ -7,13 +7,15 @@
      gateway、worker、iot-bridge、platform 配下の共通パッケージ、schema.sql とマイグレーション
    - service/web：shared（lib・components）、customer / partner / technician / admin の各アプリ（BFF・DAL・画面）
    - scripts、CI（.github/workflows）、docker / compose / deploy
-   - 未レビュー優先（2026-11-12 のファイル名突き合わせ。Go は約 92%、web は約 41% 言及済み）。先に次を回す：
-     ① service/api/internal/ops の残り（changes, client, domains, forcedelete, internalcaller, query, readcheck, rest）
-     ② server/crossdomain.go, unitdetail.go ③ modules/devices の iot_models.go, model_register.go（DEC-105）、
-     modules/monitoring/escalation.go、iotbridge/dispatch.go ④ web の shared/screens、shared/bff
-     ⑤ web 各アプリの _components と _lib（*-demo.tsx / *-view.tsx）。
-     各回の記録に「この回で新たに読んだファイル」を書き、残りが分かるようにする。
-     この一覧が空になったら、ファイル名が review-log.md に一度も出ない git 管理ファイルを自分で探して続ける。
+   - 【必須】まず下の未レビュー一覧を上から見て、review-log.md に「新たに読んだ」と記録のない最初の項目を、この回の領域にする。
+     一覧に残りがある間は、上の領域リストや「前回問題があったもの」より優先する（他の領域を選ぶなら、その理由を記録に 1 行書く）。
+     ① service/api/internal/ops：changes, client, domains, forcedelete, internalcaller, query, readcheck, rest（1 回 3〜4 ファイル）
+     ② server/crossdomain.go, server/unitdetail.go
+     ③ modules/devices の iot_models.go, model_register.go（DEC-105）、modules/monitoring/escalation.go、iotbridge/dispatch.go
+     ④ web の shared/screens、shared/bff
+     ⑤ web 各アプリの _components と _lib（*-demo.tsx / *-view.tsx）、アプリごとに 1 回
+     読んだら記録に「新たに読んだファイル: …」の行を書く（これで残りが分かる）。
+     一覧が空になったら、ファイル名が review-log.md に一度も出ない git 管理ファイルを自分で探して続ける。
    - 1回の範囲は読み切れる大きさ（目安：数ファイル〜1パッケージ）に絞る。
    - 間引き：前回のレビュー以降に差分がほぼない領域（`git diff --stat` で数行以下、前回の問題もなし）は、
      連続 2 回までスキップして他の領域を優先し、3 回目に回す。スキップしたことも review-log.md に 1 行残す。
