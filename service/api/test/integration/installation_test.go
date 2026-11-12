@@ -92,6 +92,17 @@ func TestInstallationFlow(t *testing.T) {
 		}), 0)
 	}
 
+	// a unit that is not installed yet has no maintenance to plan
+	code, res = write(
+		srv,
+		hq(),
+		"plans.save",
+		`{"unitId":"`+unit+`","recurrence":{"kind":"monthly","intervalMonths":3},`+
+			`"nextDueAt":"`+clock().Add(48*time.Hour).Format(time.RFC3339)+`"}`,
+		0,
+	)
+	refusal(t, "a plan for a planned unit", code, res, "unitId="+apperr.KeyInvalidState)
+
 	code, res = create(hq(), unit, `"reactive"`)
 	refusal(t, "another job on a planned unit", code, res, "type="+apperr.KeyInvalidState)
 

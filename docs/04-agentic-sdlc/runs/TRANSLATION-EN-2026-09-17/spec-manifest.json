@@ -1,6 +1,6 @@
 {
   "version": "0.210.0",
-  "spec_baseline_id": "436b01dcdeea2aca4a36e5c49e7fad73b9593aec1079ffae55a2d00d273a68f0",
+  "spec_baseline_id": "9d2b13a82f350d7a7251ad125985cdb41625d9a5e4216e4a92ab1b2762d22f68",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
@@ -74,7 +74,7 @@
     },
     {
       "path": "01-requirements/admin.md",
-      "sha256": "cc677c93b458b590ae5ee45c09dba0c52e2f7b2fac1ecdd4e2b506fd76128b25"
+      "sha256": "579b096f42554c15029a8ecb7b47b686c7f380a2775648db7042fc12ac537564"
     },
     {
       "path": "01-requirements/client.md",
@@ -90,7 +90,7 @@
     },
     {
       "path": "01-requirements/technician.md",
-      "sha256": "32206df3c057d7a7a499897a643b5fbb9a9c758e81c862d661f3f8e149fba5af"
+      "sha256": "0c9ca890111dbfd788ebabec409ea07fa1bfc9bedcc1a26a11fb830600f6c92c"
     },
     {
       "path": "01-requirements/use-case-catalogue.csv",
