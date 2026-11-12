@@ -1,0 +1,65 @@
+{
+  "name": "expensive-precool",
+  "description": "安い時間帯を使っても総額130円に増えるので予冷を見送り",
+  "device_id": "ac-living",
+  "timezone": "Asia/Tokyo",
+  "as_of": "2026-11-01T00:00:00+09:00",
+  "history_start": "2026-09-01T00:00:00+09:00",
+  "learning_enabled_at": "2026-10-30T00:00:00+09:00",
+  "checks": [
+    "precool"
+  ],
+  "schedule": {
+    "weekday": 2,
+    "start": "18:30",
+    "end": "23:30",
+    "temperature_c": 24
+  },
+  "trips": [],
+  "operations": [],
+  "energy": {
+    "start": "2026-11-04T17:00:00+09:00",
+    "end": "2026-11-04T23:30:00+09:00",
+    "required_at": "2026-11-04T20:00:00+09:00",
+    "comfort_target_c": 24,
+    "slots": [
+      {
+        "start": "2026-11-04T17:00:00+09:00",
+        "end": "2026-11-04T18:00:00+09:00",
+        "jpy_per_kwh": "10"
+      },
+      {
+        "start": "2026-11-04T18:00:00+09:00",
+        "end": "2026-11-04T20:00:00+09:00",
+        "jpy_per_kwh": "20"
+      },
+      {
+        "start": "2026-11-04T20:00:00+09:00",
+        "end": "2026-11-04T23:30:00+09:00",
+        "jpy_per_kwh": "40"
+      }
+    ],
+    "plans": [
+      {
+        "name": "普段の運転24℃",
+        "kind": "usual",
+        "kwh": [
+          "0",
+          "1",
+          "2"
+        ],
+        "indoor_c_at_required": 24
+      },
+      {
+        "name": "17時から予冷して20時の快適さを確保",
+        "kind": "precool",
+        "kwh": [
+          "4",
+          "1.5",
+          "1.5"
+        ],
+        "indoor_c_at_required": 24
+      }
+    ]
+  }
+}

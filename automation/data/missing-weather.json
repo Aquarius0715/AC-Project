@@ -1,0 +1,49 @@
+{
+  "name": "missing-weather",
+  "description": "3回の温度変更があっても気象との対応不明なので見送り",
+  "device_id": "ac-living",
+  "timezone": "Asia/Tokyo",
+  "as_of": "2026-11-01T00:00:00+09:00",
+  "history_start": "2026-09-01T00:00:00+09:00",
+  "learning_enabled_at": "2026-10-30T00:00:00+09:00",
+  "checks": [
+    "temperature"
+  ],
+  "schedule": {
+    "weekday": 2,
+    "start": "18:30",
+    "end": "23:30",
+    "temperature_c": 24
+  },
+  "trips": [],
+  "operations": [
+    {
+      "device_id": "ac-living",
+      "at": "2026-10-07T19:00:00+09:00",
+      "source": "web_manual",
+      "action": "temperature",
+      "once": false,
+      "from_c": 24,
+      "to_c": 22
+    },
+    {
+      "device_id": "ac-living",
+      "at": "2026-10-14T19:00:00+09:00",
+      "source": "web_manual",
+      "action": "temperature",
+      "once": false,
+      "from_c": 24,
+      "to_c": 22
+    },
+    {
+      "device_id": "ac-living",
+      "at": "2026-10-21T19:00:00+09:00",
+      "source": "web_manual",
+      "action": "temperature",
+      "once": false,
+      "from_c": 24,
+      "to_c": 22
+    }
+  ],
+  "weather": []
+}

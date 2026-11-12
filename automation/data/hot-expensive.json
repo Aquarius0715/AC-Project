@@ -1,0 +1,121 @@
+{
+  "name": "hot-expensive",
+  "description": "暑い日22℃を提案し費用は100円→132円と別表示。78円の予冷は快適性不足で除外",
+  "device_id": "ac-living",
+  "timezone": "Asia/Tokyo",
+  "as_of": "2026-11-01T00:00:00+09:00",
+  "history_start": "2026-09-01T00:00:00+09:00",
+  "learning_enabled_at": "2026-10-30T00:00:00+09:00",
+  "checks": [
+    "temperature",
+    "precool"
+  ],
+  "schedule": {
+    "weekday": 2,
+    "start": "18:30",
+    "end": "23:30",
+    "temperature_c": 24
+  },
+  "trips": [],
+  "operations": [
+    {
+      "device_id": "ac-living",
+      "at": "2026-10-07T19:00:00+09:00",
+      "source": "web_manual",
+      "action": "temperature",
+      "once": false,
+      "from_c": 24,
+      "to_c": 22
+    },
+    {
+      "device_id": "ac-living",
+      "at": "2026-10-14T19:00:00+09:00",
+      "source": "web_manual",
+      "action": "temperature",
+      "once": false,
+      "from_c": 24,
+      "to_c": 22
+    },
+    {
+      "device_id": "ac-living",
+      "at": "2026-10-21T19:00:00+09:00",
+      "source": "web_manual",
+      "action": "temperature",
+      "once": false,
+      "from_c": 24,
+      "to_c": 22
+    }
+  ],
+  "weather": [
+    {
+      "device_id": "ac-living",
+      "at": "2026-10-07T19:00:00+09:00",
+      "outdoor_c": 33
+    },
+    {
+      "device_id": "ac-living",
+      "at": "2026-10-14T19:00:00+09:00",
+      "outdoor_c": 34
+    },
+    {
+      "device_id": "ac-living",
+      "at": "2026-10-21T19:00:00+09:00",
+      "outdoor_c": 35
+    }
+  ],
+  "energy": {
+    "start": "2026-11-04T17:00:00+09:00",
+    "end": "2026-11-04T23:30:00+09:00",
+    "required_at": "2026-11-04T20:00:00+09:00",
+    "comfort_target_c": 22,
+    "slots": [
+      {
+        "start": "2026-11-04T17:00:00+09:00",
+        "end": "2026-11-04T18:00:00+09:00",
+        "jpy_per_kwh": "10"
+      },
+      {
+        "start": "2026-11-04T18:00:00+09:00",
+        "end": "2026-11-04T20:00:00+09:00",
+        "jpy_per_kwh": "20"
+      },
+      {
+        "start": "2026-11-04T20:00:00+09:00",
+        "end": "2026-11-04T23:30:00+09:00",
+        "jpy_per_kwh": "40"
+      }
+    ],
+    "plans": [
+      {
+        "name": "普段の運転24℃",
+        "kind": "usual",
+        "kwh": [
+          "0",
+          "1",
+          "2"
+        ],
+        "indoor_c_at_required": 24
+      },
+      {
+        "name": "快適性のため22℃で運転",
+        "kind": "comfort",
+        "kwh": [
+          "0",
+          "1.4",
+          "2.6"
+        ],
+        "indoor_c_at_required": 22
+      },
+      {
+        "name": "17時から予冷して20時の快適さを確保",
+        "kind": "precool",
+        "kwh": [
+          "1.2",
+          "0.5",
+          "1.4"
+        ],
+        "indoor_c_at_required": "23.5"
+      }
+    ]
+  }
+}

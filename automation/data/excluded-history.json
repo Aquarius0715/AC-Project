@@ -1,0 +1,68 @@
+{
+  "name": "excluded-history",
+  "description": "旅行・今回だけ・自動運転・付属リモコン・別機器を除外し、手動オン1回で見送り",
+  "device_id": "ac-living",
+  "timezone": "Asia/Tokyo",
+  "as_of": "2026-11-01T00:00:00+09:00",
+  "history_start": "2026-09-01T00:00:00+09:00",
+  "learning_enabled_at": "2026-10-30T00:00:00+09:00",
+  "checks": [
+    "start"
+  ],
+  "schedule": {
+    "weekday": 2,
+    "start": "18:30",
+    "end": "23:30",
+    "temperature_c": 24
+  },
+  "trips": [
+    {
+      "start": "2026-10-07T00:00:00+09:00",
+      "end": "2026-10-08T00:00:00+09:00"
+    }
+  ],
+  "operations": [
+    {
+      "device_id": "ac-living",
+      "at": "2026-10-07T20:00:00+09:00",
+      "source": "web_manual",
+      "action": "on",
+      "once": false
+    },
+    {
+      "device_id": "ac-living",
+      "at": "2026-10-14T20:00:00+09:00",
+      "source": "web_manual",
+      "action": "on",
+      "once": true
+    },
+    {
+      "device_id": "ac-living",
+      "at": "2026-10-21T20:00:00+09:00",
+      "source": "automation",
+      "action": "on",
+      "once": false
+    },
+    {
+      "device_id": "ac-living",
+      "at": "2026-10-28T20:00:00+09:00",
+      "source": "web_manual",
+      "action": "on",
+      "once": false
+    },
+    {
+      "device_id": "ac-living",
+      "at": "2026-10-21T20:00:00+09:00",
+      "source": "remote",
+      "action": "on",
+      "once": false
+    },
+    {
+      "device_id": "ac-bedroom",
+      "at": "2026-10-21T20:00:00+09:00",
+      "source": "web_manual",
+      "action": "on",
+      "once": false
+    }
+  ]
+}
