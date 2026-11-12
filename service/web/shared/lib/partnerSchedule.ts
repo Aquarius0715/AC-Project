@@ -23,6 +23,8 @@ export type ScheduleSort = (typeof SORTS)[number]["id"];
 export const sortOf = (v = ""): ScheduleSort => oneOf(SORTS.map((s) => s.id), v, "status");
 
 type Tone = "crit" | "warn" | "ok" | "primary" | "muted";
+/** The same instant, whatever the notation: the API sends 10:00:00Z, the form builds 10:00:00.000Z. */
+export const sameInstant = (a: string, b: string) => Date.parse(a) === Date.parse(b);
 const ended = (s: Slot | null, now: number) => !!s && Date.parse(s.endAt) <= now;
 const ACKS: Record<string, string> = { accepted: "accepted", cant_make: "can’t make it" };
 // the job's state in a reassignment title; any other state is rework
