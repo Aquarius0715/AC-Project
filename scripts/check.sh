@@ -63,6 +63,12 @@ job "docs" "sh docker/mosquitto/passwd.test.sh && python3 docs/tools/validate_do
 
 failed=0
 printf '\n'
+# a job killed before it wrote its status (out of memory, a signal) leaves no .rc file: that is a failure, not a pass
+reported=$(find "$logs" -name '*.rc' | wc -l)
+if [ "$reported" -ne "$count" ]; then
+  printf 'FAILED  %s of %s jobs reported no exit status\n' "$((count - reported))" "$count"
+  failed=1
+fi
 for rc in "$logs"/*.rc; do
   name=$(basename "$rc" .rc)
   read -r status seconds <"$rc"

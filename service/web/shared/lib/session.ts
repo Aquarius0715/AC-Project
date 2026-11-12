@@ -139,6 +139,7 @@ export async function refresh(s: Session): Promise<Session | null> {
       method: "POST", cache: "no-store",
       headers: { "Content-Type": "application/x-www-form-urlencoded", ...issuerHeaders(s.refreshToken) },
       body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: s.refreshToken, client_id: roleConfig.clientId, client_secret: roleConfig.clientSecret }),
+      signal: AbortSignal.timeout(3000), // the proxy refreshes on page requests: a hung provider must not hold them
     });
     if (!r.ok) return null;
     const tokens = tokenResponse.safeParse(await r.json());
