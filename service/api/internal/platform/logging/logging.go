@@ -18,7 +18,7 @@ const Masked = "[masked]"
 var (
 	email   = regexp.MustCompile(`[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}`)
 	phone   = regexp.MustCompile(`\+\d[\d \-]{6,16}\d`)
-	userURL = regexp.MustCompile(`(://[^/:@\s]+:)[^@\s]+@`)
+	userURL = regexp.MustCompile(`(://[^/:@\s]+:)[^/\s]+@`)
 )
 
 // secretKey reports whether an attribute's key names a secret.
