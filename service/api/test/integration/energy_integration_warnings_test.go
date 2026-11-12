@@ -1,6 +1,7 @@
 package integration_test
 
 import (
+	"fmt"
 	"slices"
 	"testing"
 	"time"
@@ -34,13 +35,14 @@ func TestEnergySlotWarnings(t *testing.T) {
 		uuid.NewString(),
 	)
 
-	to := start.Add(4 * time.Minute) // minute 3 has no sample
-	code, resp := post(
-		srv,
-		hq(),
-		"energy.summary",
-		`{"from":"`+start.Format(time.RFC3339)+`","to":"`+to.Format(time.RFC3339)+`","unitIds":["`+unit+`"]}`,
+	end := start.Add(4 * time.Minute) // minute 3 has no sample
+	body := fmt.Sprintf(
+		`{"from":%q,"to":%q,"unitIds":[%q]}`,
+		start.Format(time.RFC3339),
+		end.Format(time.RFC3339),
+		unit,
 	)
+	code, resp := post(srv, hq(), "energy.summary", body)
 
 	if code != 200 {
 		t.Fatalf("summary: %d %v", code, resp)
