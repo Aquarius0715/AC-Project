@@ -263,6 +263,7 @@ const (
 	roleAdmin       = "admin"
 	roleClient      = "client"
 	jobInstallation = "installation"
+	installPlanned  = "planned"
 	roleContractor  = "contractor"
 	roleTechnician  = "technician"
 )
@@ -586,7 +587,7 @@ func (m Jobs) checkInstallation(ctx context.Context, call *ops.Call, input *Crea
 		return apperr.Wrap(err, "maintenance.JobUnits.UnitInstall")
 	}
 
-	planned := state == "planned"
+	planned := state == installPlanned
 
 	switch {
 	case input.Type == jobInstallation && call.Principal.Role == roleClient:
