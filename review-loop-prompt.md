@@ -41,6 +41,12 @@
    - Web：`npm run lint`、`npm run typecheck`、`npm test` が 0 errors
    - `sh scripts/check.sh` の終了コードを取得して 0 を確認する（パイプしない）
    - これらの生の出力を記録に残す
+   - 【PR を出す前に必須】Go のコードを 1 行でも変えたら、PR の前に `make -C <worktree>/service/api lint` が `0 issues.` になるまで直す
+     （2026-11-12 に #242・#244 が lint 未実行のまま出て CI で落ちた。整形は `go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0 fmt ./...`）。
+     テストコードも対象：構造体リテラルは全フィールド（exhaustruct）→ `new(T)` に代入、`if err := …; err != nil` は使わない、短い変数名を避ける。
+     走らせられなかったら PR を出さず、ブランチをローカルに残して記録に理由を書く（CI に任せない）。
+   - 非対話の実行では複合コマンド（`cd … && …`、`;`）とプロジェクト外へのリダイレクトが拒否される。`make -C <dir> …` を使い、
+     check.sh のログは `.review-loop-logs/` 内の絶対パスに書く。
    - 非対話の実行では `$?` が拒否される。check.sh は `sh scripts/check.sh > $LOG 2>&1` で実行し、ログ末尾の「all checks passed」の有無で成否を判定して、その旨を記録に書く。
 5. PR を作る：
    - origin/main から作業ブランチを切る（PR を積み重ねない）
