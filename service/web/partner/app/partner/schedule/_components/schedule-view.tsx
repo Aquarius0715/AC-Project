@@ -9,7 +9,7 @@ import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { zonedInstant } from "@ac/web/lib/i18n";
-import { assignRefusal, weekGrid, type WeekCell } from "@ac/web/lib/partnerSchedule";
+import { assignRefusal, sameInstant, weekGrid, type WeekCell } from "@ac/web/lib/partnerSchedule";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import { assignTechnician } from "../actions";
 import type { ScheduleLive } from "../_lib/load";
@@ -129,7 +129,7 @@ function AssignCard({ sel, choice, zone, otherZone }: Readonly<{ sel: Selected; 
   const slot = proposedSlot(m, end, zone);
   const endOk = !m.endEditable || (!!end && Date.parse(slot.endAt) >= Date.parse(m.slot.endAt));
   const isReasonMissing = m.reasonRequired && !reason.trim();
-  const isSame = tech === sel.currentId && !sel.moved && (!m.endEditable || slot.endAt === m.slot.endAt);
+  const isSame = tech === sel.currentId && !sel.moved && (!m.endEditable || sameInstant(slot.endAt, m.slot.endAt));
   const sameWhy = m.kind === "reassign" ? "Choose another technician or another time" : "Choose another technician or a later end";
   const sameError = tried && isSame ? t(sameWhy) : undefined;
   const save = () => {
@@ -208,7 +208,7 @@ function AssignCard({ sel, choice, zone, otherZone }: Readonly<{ sel: Selected; 
 function WeekCard({ week, members, sel, choice, zone }: Readonly<{ week: NonNullable<ScheduleLive["week"]>; members: ScheduleLive["members"]; sel: Selected; choice: Choice; zone: string }>) {
   const t = useT();
   const slot = proposed(sel, choice.end, zone);
-  const isUnchanged = choice.tech === sel.currentId && slot?.endAt === sel.mode.slot?.endAt; // the current booking, not a proposal
+  const isUnchanged = choice.tech === sel.currentId && !!slot && !!sel.mode.slot && sameInstant(slot.endAt, sel.mode.slot.endAt); // the current booking, not a proposal
   const proposal = slot && sel.mode.kind !== "blocked" && choice.tech && !isUnchanged ? { technicianId: choice.tech, short: sel.short, slot } : null;
   const rows = weekGrid(week.dates, members, week.capacity, new Map(Object.entries(week.jobsOf)), proposal, t);
   return (
