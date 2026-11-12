@@ -760,7 +760,7 @@ func (m *Module) existingUnit(
 //	@Description	omitted = every sensor of the model); unitId omitted registers an unplanned device (HQ only); IR94 \
 //	@Description	technician write table (assignment and work window, jobId required when typed)
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-//	@Description	Design: DD-T11, DD-A04
+//	@Description	Design: DD-T11, DD-A04, DD-T16
 //	@Tags			devices
 //	@Accept			json
 //	@Produce		json

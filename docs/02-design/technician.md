@@ -38,6 +38,7 @@ Treat route parameters as untrusted input and always validate them. Service name
 | DD-T13 / FR-T13 | `/technician` (Scan QR), `/technician/jobs/:id` (Check in) / `QrScan`, `SiteCheckIn` | `units.resolveQr`, `jobs.checkIn`, `jobs.get`, `units.get`, `units.list`, `jobs.list` | Assigned units only; location ≤ 200 m, QR match, inside the window; manual reason 1–1000 | Unassigned label → Page unavailable; outside window rejected as jobs.start |
 | DD-T14 / FR-T14 | `/technician/jobs/:id` / `PartsAndTime` | `jobs.saveDraft`, `jobs.pauseWork`, `parts.list` | Parts qty > 0, receipt for bought-locally; refrigerant kg ≥ 0 | Read-only after submit |
 | DD-T15 / FR-T15 | `/technician/jobs/:id` / `CustomerSignOff` | `reports.signOff`, `reports.get` | Signature or absence reason with site photo; bound to report version | Editing the draft clears the sign-off |
+| DD-T16 / FR-T16 | `/technician/jobs/:id` / `InstallationWorkspace` | `jobs.get`, `jobs.saveDraft`, `jobs.submit`, `devices.register`, `devices.bind` | Every checklist item has a result or a reason; model equals the unit's model; serial; name plate, indoor and outdoor photos; sign-off | VALIDATION names the field; a returned report keeps the unit planned |
 
 ## Shared Implementation Steps
 
@@ -485,6 +486,31 @@ Scope: FR-T15 / Main display pattern: **UI-FORM**. Service boundary: `reports.si
 **Boundary cases and failures**: A newer draft version clears the sign-off (CONFLICT if the version changed while signing).
 
 **Verification**: Check the traceability entries under AT-T15 (N/E/B).
+
+### DD-T16 Details
+
+**Source mapping**: Added design details → FR-T16 → DD-T16 (DEC-106, 2026-11-12), supporting SRC-06 BIZ-07, BIZ-12, BIZ-20.
+
+Scope: FR-T16 / Main display pattern: **UI-FORM**. Service boundary: `jobs.get, jobs.saveDraft, jobs.submit, devices.register, devices.bind`.
+
+**Initial view and prerequisites**: `/technician/jobs/:id` of a job with `type=installation`, started (FR-T13). The unit is `planned`.
+
+| Field | Type / required | Default / constraints | Purpose |
+|---|---|---|---|
+| items (installation group) | InspectionItemInput[]/required | keys `mounting`, `refrigerant_piping`, `vacuum_leak_test`, `electrical_connection`, `drainage`, `test_run`, `customer_handover`; result or reason | Installation checklist |
+| installation.confirmedModelId | ID/required | must equal the unit's modelId | Equipment check |
+| installation.serial | string/required | trimmed, 1–80 characters | Equipment check |
+| attachmentIds | ID[]/required | one ready photo each tagged name plate, indoor unit, outdoor unit | Equipment check |
+
+**Steps**
+
+1. The workspace shows the checklist group "Installation", then "Equipment check", "IoT device" and the sign-off step.
+2. "IoT device" opens the FR-T11 register and bind dialogs with the job id; skipping is allowed.
+3. Submit lists the missing items by field; HQ review is the normal review (`jobs.review`). Accept emits `UnitInstalled`; assets marks the unit installed and sets installedAt and warrantyEndsAt.
+
+**Boundary cases and failures**: `errors.model_mismatch` keeps the report in draft. A returned report leaves the unit `planned`.
+
+**Verification**: Check the traceability entries under AT-T16 (N/E/B).
 
 0.9.0 correction contracts: Read the [Strict Review Correction Contracts](strict-review-contracts.md) and [Per-Operation Version Contract](write-version-catalog.csv) together.
 

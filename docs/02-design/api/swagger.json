@@ -6816,7 +6816,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: technician:device.maintain:assigned-valid-job | admin:device.write\nValidation: D01; input constraints in the corresponding DD; IR43 sensorTypes⊆IoTModel.sensors (DEC-105: the iotModelId, else the planned unit's IoT model; none allows no sensors; sensorTypes omitted = every sensor of the model); unitId omitted registers an unplanned device (HQ only); IR94 technician write table (assignment and work window, jobId required when typed)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-T11, DD-A04",
+                "description": "Authorization: technician:device.maintain:assigned-valid-job | admin:device.write\nValidation: D01; input constraints in the corresponding DD; IR43 sensorTypes⊆IoTModel.sensors (DEC-105: the iotModelId, else the planned unit's IoT model; none allows no sensors; sensorTypes omitted = every sensor of the model); unitId omitted registers an unplanned device (HQ only); IR94 technician write table (assignment and work window, jobId required when typed)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-T11, DD-A04, DD-T16",
                 "consumes": [
                     "application/json"
                 ],
@@ -12495,7 +12495,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: client:self | contractor:offer-projection-or-delegated-history | technician:assigned-history | admin:job.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR86 expired unanswered offer: NOT_FOUND for contractor\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A06, DD-C09, DD-P01, DD-P02, DD-P05, DD-P08, DD-T04, DD-T05, DD-T06, DD-T08, DD-T09, DD-T10, DD-C17, DD-T13, DD-P10, DD-P03, DD-T02, DD-T07",
+                "description": "Authorization: client:self | contractor:offer-projection-or-delegated-history | technician:assigned-history | admin:job.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR86 expired unanswered offer: NOT_FOUND for contractor\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A06, DD-C09, DD-P01, DD-P02, DD-P05, DD-P08, DD-T04, DD-T05, DD-T06, DD-T08, DD-T09, DD-T10, DD-C17, DD-T13, DD-P10, DD-P03, DD-T02, DD-T07, DD-T16",
                 "consumes": [
                     "application/json"
                 ],
@@ -14899,7 +14899,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: technician:assigned-valid-job\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR94 technician write table (assignment and work window, jobId required when typed); IR100 partial items allowed\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-T04, DD-T05, DD-T06, DD-T09, DD-T14",
+                "description": "Authorization: technician:assigned-valid-job\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR94 technician write table (assignment and work window, jobId required when typed); IR100 partial items allowed\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-T04, DD-T05, DD-T06, DD-T09, DD-T14, DD-T16",
                 "consumes": [
                     "application/json"
                 ],
@@ -16607,7 +16607,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: technician:assigned-valid-job\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR94 technician write table (assignment and work window, jobId required when typed); IR100 component set and report completeness\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-T04, DD-T05, DD-T06, DD-T08, DD-T09 · Input versions: reportVersion=WorkReport.version",
+                "description": "Authorization: technician:assigned-valid-job\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR94 technician write table (assignment and work window, jobId required when typed); IR100 component set and report completeness\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-T04, DD-T05, DD-T06, DD-T08, DD-T09, DD-T16 · Input versions: reportVersion=WorkReport.version",
                 "consumes": [
                     "application/json"
                 ],
