@@ -213,7 +213,7 @@ func TestLiveControlJSONNode(t *testing.T) {
 
 	live := newLiveFixture(t)
 	live.handler.handle(t.Context(), &fakeMessage{
-		topic:    "smarthome/ac/node_1/status",
+		topic:    node1StatusTopic,
 		payload:  statusFirmware04,
 		retained: true,
 	})
@@ -601,10 +601,10 @@ func TestLiveHandlerLastWill(t *testing.T) {
 	live := newLiveFixture(t)
 	live.handler.handle(
 		t.Context(),
-		message("smarthome/ac/node_1/status", `{"online":true,"fw":"0.4.0"}`),
+		message(node1StatusTopic, `{"online":true,"fw":"0.4.0"}`),
 	)
 	live.handler.handle(t.Context(), &fakeMessage{
-		topic:    "smarthome/ac/node_1/status",
+		topic:    node1StatusTopic,
 		payload:  `{"online":false}`,
 		retained: true,
 	})
@@ -622,7 +622,7 @@ func TestLiveHandlerLastWill(t *testing.T) {
 
 	live.handler.handle(
 		t.Context(),
-		message("smarthome/ac/node_1/status", `{"online":true,"fw":"0.4.0"}`),
+		message(node1StatusTopic, `{"online":true,"fw":"0.4.0"}`),
 	)
 
 	if gap := live.handler.heard.GapOf([]string{node1Name}, time.Now()); gap > time.Second {
@@ -639,9 +639,40 @@ func TestLiveHandlerLastWill(t *testing.T) {
 	}
 }
 
+// TestLiveHandlerRetainedOnlineIsNotAHeartbeat: a retained "online" status is what the broker replays on a reconnect,
+// so it is not a sign of life; the node's own next message is.
+func TestLiveHandlerRetainedOnlineIsNotAHeartbeat(t *testing.T) {
+	t.Parallel()
+
+	live := newLiveFixture(t)
+	live.handler.heard.Gone(node1Name, time.Now())
+	live.handler.handle(t.Context(), &fakeMessage{
+		topic:    node1StatusTopic,
+		payload:  `{"online":true,"fw":"0.4.0"}`,
+		retained: true,
+	})
+
+	if gap := live.handler.heard.GapOf(
+		[]string{node1Name},
+		time.Now(),
+	); gap < iotbridge.LiveOfflineAfter {
+		t.Errorf("a retained online status counted as a sign of life: gap %s", gap)
+	}
+
+	live.handler.handle(
+		t.Context(),
+		message(node1StatusTopic, `{"online":true,"fw":"0.4.0"}`),
+	)
+
+	if gap := live.handler.heard.GapOf([]string{node1Name}, time.Now()); gap > time.Second {
+		t.Errorf("a live online status did not count: gap %s", gap)
+	}
+}
+
 // The live site's node IDs and the event types the tests compare.
 const (
 	node1Name        = "node_1"
+	node1StatusTopic = "smarthome/ac/node_1/status"
 	statusFirmware04 = `{"online":true,"fw":"0.4.0","parts":{"ir":true}}`
 	node2Name        = "node_2"
 	eventCommandSent = "command_sent"
