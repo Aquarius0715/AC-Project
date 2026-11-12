@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Badge, Banner, Btn, Card, Choice, EmptyState, Field, Input, ListRow, Modal, Page, Select, SummaryList, Textarea, cx, Plain, ScrollX } from "@ac/web/components/ui";
 import { JobStatusBadge, OriginBadge } from "@ac/web/components/JobBits";
+import { originOf } from "@ac/web/lib/origin";
 import { useI18n, useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
@@ -89,7 +90,7 @@ function JobsTab({ live, patch, fresh, onFresh }: Readonly<{ live: JobsLive; pat
               <ListRow key={r.id} selected={!!sel && !("missing" in live) && sel.job.id === r.id} href={`/admin/jobs?${new URLSearchParams({ ...Object.fromEntries(Object.entries(q).filter(([, v]) => typeof v === "string" && v !== "")), ...((live.sort !== "status") && { sort: live.sort }), jobId: r.id })}`}>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-2"><b className="truncate text-[13px]">{r.short} · {r.title}</b><JobStatusBadge s={r.badge.status} /></div>
-                  <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground"><OriginBadge origin={r.origin === PERIODIC_PLAN ? "plan" : "request"} />{r.customer} · {r.type}{r.badge.overdue && <Badge tone="crit">{t("!! Overdue")}</Badge>}</div>
+                  <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground"><OriginBadge origin={originOf(r.origin)} />{r.customer} · {r.type}{r.badge.overdue && <Badge tone="crit">{t("!! Overdue")}</Badge>}</div>
                   <div className={cx("text-[11px]", r.lineTone === "warn" ? "text-warn" : TEXT_MUTED_FOREGROUND)}>{r.line}</div>
                 </div>
               </ListRow>
@@ -264,7 +265,7 @@ function JobDetail({ d, live, fresh, onFresh }: Readonly<{ d: Detail; live: Jobs
   return (
     <div className="flex min-w-0 flex-col gap-4">
       {result && <Banner tone={result.tone}>{result.text}</Banner>}
-      <Card title={<span className="flex flex-wrap items-center gap-2">{j.id.slice(0, 8)} · {d.title} <JobStatusBadge s={sp?.status === "pending" ? "time_proposed" : j.status} /><OriginBadge origin={j.origin === PERIODIC_PLAN ? "plan" : "request"} /></span>}
+      <Card title={<span className="flex flex-wrap items-center gap-2">{j.id.slice(0, 8)} · {d.title} <JobStatusBadge s={sp?.status === "pending" ? "time_proposed" : j.status} /><OriginBadge origin={originOf(j.origin)} /></span>}
         sub={`${typeLabel(j.type, t)} · ${d.customer}${d.location ? ` · ${d.location}` : ""}${j.planId ? ` · ${t("plan occurrence {date}", { date: d.texts.occurrence ?? "" })}` : ""}`}
         action={<div className="flex gap-2">
           {c.hold && <Btn size="sm" disabled={pending} onClick={() => { setModal({ kind: "reason", what: "hold" }); }}>{t("Hold…")}</Btn>}
@@ -408,13 +409,13 @@ function ReasonModal({ d, live, what, onClose, onFail }: ModalProps & { what: "h
     setTried(true);
     if (!r.trim() || r.length > 1000 || (what === "reassign" && !tech)) return;
     const slot = j.assignment ? { startAt: j.assignment.scheduledStart, endAt: j.assignment.scheduledEnd } : j.scheduledSlot;
-    if (!slot) return;
+    if (what === "reassign" && !slot) return; // only a reassignment keeps the agreed time; holding or cancelling a job that is not booked yet needs none
     const done = t({ hold: "Job put on hold — scheduling and reports are blocked.", resume: "Job resumed.", cancel: "Job cancelled.", reassign: "Reassigned — the new technician must accept." }[what]);
     const send = () => {
       if (what === "hold") return holdJob(j.id, j.version, r);
       if (what === "resume") return resumeJob(j.id, j.version, r);
       if (what === "cancel") return cancelJob(j.id, j.version, r);
-      return assignInternal(j.id, j.version, tech, slot, r);
+      return slot ? assignInternal(j.id, j.version, tech, slot, r) : Promise.reject(new Error("a reassignment keeps the agreed time"));
     };
     run(send, done, () => { onClose(done); }, onFail);
   };

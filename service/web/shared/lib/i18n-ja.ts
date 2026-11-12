@@ -2636,6 +2636,7 @@ export const ja: Record<string, string> = {
   "Capacitor": "コンデンサー",
   "Contactor": "コンタクター",
   "Wiring insulation": "配線の絶縁",
+  "HQ request": "HQ 依頼",
   "A planned unit has no installation date yet": "設置予定のユニットにはまだ設置日がありません",
   "A planned unit has no warranty end yet": "設置予定のユニットにはまだ保証期限がありません",
   "Confirm that the installed model is the registered one": "設置した機種が登録された機種であることを確認してください",

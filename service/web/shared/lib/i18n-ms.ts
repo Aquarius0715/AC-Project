@@ -2713,6 +2713,7 @@ export const ms: Record<string, string> = {
   "Capacitor": "Kapasitor",
   "Contactor": "Penyentuh",
   "Wiring insulation": "Penebat pendawaian",
+  "HQ request": "Permintaan HQ",
   "A planned unit has no installation date yet": "Unit yang dirancang belum mempunyai tarikh pemasangan",
   "A planned unit has no warranty end yet": "Unit yang dirancang belum mempunyai tarikh tamat waranti",
   "Confirm that the installed model is the registered one": "Sahkan bahawa model yang dipasang ialah model yang didaftarkan",
