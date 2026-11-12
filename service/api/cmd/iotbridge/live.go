@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -279,10 +280,51 @@ func (h *liveHandler) result(
 
 	log.Printf("live command %s: %s by node %s", *trigger.CommandID, trigger.EventType, dev.Node)
 
-	sendErr := send(ctx, h.httpc, h.endpoint, trigger)
+	sendErr := sendRetried(ctx, h.httpc, h.endpoint, trigger)
 	if sendErr != nil && !recorded(sendErr) {
 		log.Printf("live command %s: %s: %v", *trigger.CommandID, trigger.EventType, sendErr)
 	}
+}
+
+// refused is true when the API answered with a client error: trying the same report again would be refused again.
+func refused(err error) bool {
+	var se *statusError
+
+	return errors.As(err, &se) && se.code >= http.StatusBadRequest &&
+		se.code < http.StatusInternalServerError
+}
+
+// The answer of a node is taken from the broker once and has no second delivery, so passing it on to the API is tried
+// a few times before it is given up.
+const (
+	reportTries     = 3
+	reportRetryWait = 200 * time.Millisecond
+)
+
+// sendRetried is send, tried up to reportTries times while the API does not take it (not for an answer that it
+// already has or refuses for good, nor after the context ends).
+func sendRetried(
+	ctx context.Context,
+	httpc *http.Client,
+	endpoint string,
+	trigger iotbridge.Trigger,
+) error {
+	var err error
+
+	for try := range reportTries {
+		err = send(ctx, httpc, endpoint, trigger)
+		if err == nil || recorded(err) || refused(err) || try == reportTries-1 {
+			return err
+		}
+
+		select {
+		case <-ctx.Done():
+			return err
+		case <-time.After(reportRetryWait):
+		}
+	}
+
+	return err
 }
 
 // liveCommandSpacing keeps one node's commands apart: firmware 0.4 refuses (invalid) a command that comes within a
@@ -300,6 +342,16 @@ type liveControl struct {
 	enabled     bool
 	// last is when each node last got a command; only pollCommands sends, one command at a time
 	last map[string]time.Time
+	// published are the commands on the broker whose "sent" report the API has not taken yet: the next poll lists them
+	// as requested again and reports them, but never publishes them to the node a second time
+	published map[uuid.UUID]publishedCommand
+}
+
+// publishedCommand is a command that was published to its node: what was sent, when, and when the API ends it.
+type publishedCommand struct {
+	command iotbridge.LiveAction
+	sentAt  time.Time
+	expires time.Time
 }
 
 func newLiveControl(
@@ -324,6 +376,7 @@ func newLiveControl(
 		outstanding: outstanding,
 		enabled:     enabled,
 		last:        map[string]time.Time{},
+		published:   map[uuid.UUID]publishedCommand{},
 	}
 }
 
@@ -345,6 +398,8 @@ func (l *liveControl) send(
 	waiting iotbridge.Waiting,
 	off time.Duration,
 ) error {
+	l.forgetEnded(time.Now().Add(off))
+
 	command, supported, err := iotbridge.LiveCommand(waiting, l.firmware.Answers(dev.Node))
 	if err != nil {
 		return apperr.Wrap(err, "iotbridge.LiveCommand")
@@ -359,8 +414,42 @@ func (l *liveControl) send(
 		)
 	}
 
+	sent, again := l.published[waiting.ID]
+	if !again {
+		var publishErr error
+
+		sent, publishErr = l.publish(ctx, dev, waiting, command)
+		if publishErr != nil {
+			return publishErr
+		}
+
+		l.published[waiting.ID] = sent
+	}
+
+	when := sent.sentAt.Add(off)
+	for _, tr := range iotbridge.LiveSentTriggers(waiting, dev.DeviceID, when, when.Add(-clockMargin), sent.command) {
+		err := send(ctx, httpc, endpoint, tr)
+		if err != nil && !recorded(err) { // the API already has it: its reply was lost earlier
+			return err
+		}
+	}
+
+	delete(l.published, waiting.ID)
+
+	return nil
+}
+
+// publish carries the command to its node's command topic (QoS 1) and notes it as published.
+func (l *liveControl) publish(
+	ctx context.Context,
+	dev iotbridge.NodeDevice,
+	waiting iotbridge.Waiting,
+	command iotbridge.LiveAction,
+) (publishedCommand, error) {
+	var none publishedCommand
+
 	if !l.client.IsConnectionOpen() {
-		return errLiveBrokerDown
+		return none, errLiveBrokerDown
 	}
 
 	l.space(ctx, dev.Node)
@@ -373,12 +462,12 @@ func (l *liveControl) send(
 
 	tok := l.client.Publish(topic, 1, false, command.Payload)
 	if !tok.WaitTimeout(liveCommandWait) {
-		return errLiveCommandTimeout
+		return none, errLiveCommandTimeout
 	}
 
 	publishErr := tok.Error()
 	if publishErr != nil {
-		return apperr.Wrap(publishErr, "mqtt.Token.Error")
+		return none, apperr.Wrap(publishErr, "mqtt.Token.Error")
 	}
 
 	sentAt := time.Now()
@@ -391,15 +480,17 @@ func (l *liveControl) send(
 		strconv.Quote(topic),
 	)
 
-	when := sentAt.Add(off)
-	for _, tr := range iotbridge.LiveSentTriggers(waiting, dev.DeviceID, when, when.Add(-clockMargin), command) {
-		err := send(ctx, httpc, endpoint, tr)
-		if err != nil {
-			return err
+	return publishedCommand{command: command, sentAt: sentAt, expires: waiting.ExpiresAt}, nil
+}
+
+// forgetEnded drops the published commands whose report was never taken and that the API has ended by now (scenario
+// clock), so the API no longer lists them.
+func (l *liveControl) forgetEnded(now time.Time) {
+	for id, sent := range l.published {
+		if now.After(sent.expires) {
+			delete(l.published, id)
 		}
 	}
-
-	return nil
 }
 
 // space waits until the node's last command is liveCommandSpacing old, or the context ends.
