@@ -17,12 +17,13 @@ func TestEffectivePower(t *testing.T) {
 
 		return &x
 	}
-	newUnit := func(conn string, p *bool, obs *time.Time) *Unit {
+	newUnit := func(conn string, powered *bool, obs *time.Time) *Unit {
 		return &Unit{
 			ACUnit: ACUnit{
-				Connection: conn,
+				InstallState: "installed",
+				Connection:   conn,
 				ObservedState: ObservedState{
-					Power:      p,
+					Power:      powered,
 					ObservedAt: obs,
 					Celsius:    nil,
 					Mode:       nil,

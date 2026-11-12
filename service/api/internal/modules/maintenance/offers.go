@@ -37,6 +37,12 @@ type Directory interface {
 
 // ServiceUnits returns organization, property and service scope of a unit (Assets).
 type ServiceUnits interface {
+	// UnitInstall is the install state and the model of the unit (installation reports, DEC-106).
+	UnitInstall(
+		ctx context.Context,
+		c *ops.Call,
+		unit uuid.UUID,
+	) (state string, model uuid.UUID, err error)
 	UnitService(
 		ctx context.Context,
 		c *ops.Call,

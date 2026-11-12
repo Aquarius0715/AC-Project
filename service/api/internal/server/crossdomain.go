@@ -65,6 +65,12 @@ type runHoursIn struct {
 	Since  *time.Time `json:"since"`
 }
 
+// unitInstallOut is the install state and the model of a unit.
+type unitInstallOut struct {
+	State   string    `json:"state"`
+	ModelID uuid.UUID `json:"modelId"`
+}
+
 type unitStateOut struct {
 	OrgID    uuid.UUID `json:"orgId"`
 	Archived bool      `json:"archived"`
@@ -108,6 +114,7 @@ type deviceOut struct {
 // Internal query names of the equipment domain.
 const (
 	qUnitState         = "assets.unitState"
+	qUnitInstall       = "assets.unitInstall"
 	qUnitsOfProperty   = "assets.unitsOfProperty"
 	qOrgOfCustomer     = "assets.orgOfCustomer"
 	qUnitsOfOrg        = "assets.unitsOfOrg"
@@ -134,6 +141,16 @@ func (v equipmentView) UnitState(
 	r, err := ops.Delegate(ctx, c, qUnitState, unitIn{unit}, v.unitState)
 
 	return r.OrgID, r.Archived, r.Found, apperr.Wrap(err, "delegate assets.unitState")
+}
+
+func (v equipmentView) UnitInstall(
+	ctx context.Context,
+	c *ops.Call,
+	unit uuid.UUID,
+) (string, uuid.UUID, error) {
+	r, err := ops.Delegate(ctx, c, qUnitInstall, unitIn{unit}, v.unitInstall)
+
+	return r.State, r.ModelID, apperr.Wrap(err, "delegate assets.unitInstall")
 }
 
 func (v equipmentView) UnitsOfProperty(
@@ -319,6 +336,16 @@ func (v equipmentView) unitState(
 	org, archived, found, err := v.am.UnitState(ctx, c, in.UnitID)
 
 	return unitStateOut{org, archived, found}, apperr.Wrap(err, "assets.Module.UnitState")
+}
+
+func (v equipmentView) unitInstall(
+	ctx context.Context,
+	c *ops.Call,
+	in *unitIn,
+) (unitInstallOut, error) {
+	state, model, err := v.am.UnitInstall(ctx, c, in.UnitID)
+
+	return unitInstallOut{state, model}, apperr.Wrap(err, "assets.Module.UnitInstall")
 }
 
 func (v equipmentView) unitsOfProperty(
@@ -575,6 +602,7 @@ func registerCrossDomain(
 ) {
 	equipmentDomain := ops.DomainEquipment
 	ops.RegisterQuery(reg, equipmentDomain, qUnitState, equipment.unitState)
+	ops.RegisterQuery(reg, equipmentDomain, qUnitInstall, equipment.unitInstall)
 	ops.RegisterQuery(reg, equipmentDomain, qUnitsOfProperty, equipment.unitsOfProperty)
 	ops.RegisterQuery(reg, equipmentDomain, qOrgOfCustomer, equipment.orgOfCustomer)
 	ops.RegisterQuery(reg, equipmentDomain, qUnitsOfOrg, equipment.unitsOfOrg)

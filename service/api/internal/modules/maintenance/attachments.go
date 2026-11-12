@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"slices"
 	"strings"
 	"time"
 
@@ -20,6 +21,9 @@ type Files struct {
 	Reports Reports
 	Blobs   blob.Store
 }
+
+// attachmentReady is the status of a stored report file.
+const attachmentReady = "ready"
 
 // MaxReportAttachments is the provisional DD-T09 limit per report.
 const MaxReportAttachments = 10
@@ -88,6 +92,7 @@ func (m Files) store(
 	job, report uuid.UUID,
 	version int,
 	blobInput BlobInput,
+	tag *string,
 ) (uuid.UUID, error) {
 	attachmentID := uuid.New()
 
@@ -101,8 +106,8 @@ func (m Files) store(
 	_, err := call.Tx.Exec(
 		ctx,
 		`INSERT INTO maintenance.attachments (id, tenant_id, job_id, report_id, object_key, name, mime, size_bytes, status,
-			uploaded_by, created_at, updated_at, added_version)
-		VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7, 'ready', $8, $9, $9, $10)`,
+			uploaded_by, created_at, updated_at, added_version, tag)
+		VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7, 'ready', $8, $9, $9, $10, $11)`,
 		attachmentID,
 		job,
 		report,
@@ -113,6 +118,7 @@ func (m Files) store(
 		call.Principal.UserID,
 		call.Now,
 		version,
+		tag,
 	)
 
 	return attachmentID, apperr.Wrap(err, "insert maintenance.attachments")
@@ -125,6 +131,8 @@ type AddInput struct {
 	JobID    uuid.UUID `json:"jobId"`
 	ReportID uuid.UUID `json:"reportId"`
 	File     BlobInput `json:"file"`
+	// Tag says what a photo of an installation report shows (name plate, indoor unit, outdoor unit; DEC-106).
+	Tag *string `json:"tag,omitempty"`
 }
 
 // Validate implements ops.Validator.
@@ -136,6 +144,11 @@ func (in *AddInput) Validate() map[string]string {
 
 	if !ValidBlob(in.File, photoMaxBytes) {
 		fieldErrs["file"] = apperr.KeyInvalidFile
+	}
+
+	if in.Tag != nil &&
+		!slices.Contains([]string{"name_plate", "indoor_unit", "outdoor_unit"}, *in.Tag) {
+		fieldErrs["tag"] = apperr.KeyInvalid
 	}
 
 	return fieldErrs
@@ -201,7 +214,15 @@ func (m Files) add(ctx context.Context, call *ops.Call, input *AddInput) (Attach
 		return AttachmentRef{}, apperr.E(apperr.Conflict, "errors.too_many_attachments")
 	}
 
-	attachmentID, err := m.store(ctx, call, input.JobID, input.ReportID, draft.Version, input.File)
+	attachmentID, err := m.store(
+		ctx,
+		call,
+		input.JobID,
+		input.ReportID,
+		draft.Version,
+		input.File,
+		input.Tag,
+	)
 	if err != nil {
 		return AttachmentRef{}, err
 	}
@@ -251,12 +272,13 @@ func (m Files) add(ctx context.Context, call *ops.Call, input *AddInput) (Attach
 		JobID:     input.JobID,
 		ReportID:  input.ReportID,
 		BlobID:    attachmentID,
+		Tag:       input.Tag,
 		Name: strings.TrimSpace(
 			input.File.Name,
 		),
 		Mime:   input.File.Mime,
 		Size:   input.File.Size,
-		Status: "ready",
+		Status: attachmentReady,
 	}, nil
 }
 
@@ -365,14 +387,30 @@ func (m Files) signOff(ctx context.Context, call *ops.Call, input *SignOffInput)
 		ReportVersion: draft.Version, SignatureAttachmentID: nil, SitePhotoAttachmentID: nil,
 	}
 	if input.Signature != nil {
-		id, err := m.store(ctx, call, input.JobID, input.ReportID, draft.Version, *input.Signature)
+		id, err := m.store(
+			ctx,
+			call,
+			input.JobID,
+			input.ReportID,
+			draft.Version,
+			*input.Signature,
+			nil,
+		)
 		if err != nil {
 			return Report{}, err
 		}
 
 		signOff.SignatureAttachmentID = &id
 	} else {
-		id, err := m.store(ctx, call, input.JobID, input.ReportID, draft.Version, *input.SitePhoto)
+		id, err := m.store(
+			ctx,
+			call,
+			input.JobID,
+			input.ReportID,
+			draft.Version,
+			*input.SitePhoto,
+			nil,
+		)
 		if err != nil {
 			return Report{}, err
 		}

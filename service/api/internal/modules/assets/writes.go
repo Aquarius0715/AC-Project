@@ -286,8 +286,11 @@ type UnitSave struct {
 	DisplayName   string     `json:"displayName"`
 	ModelID       uuid.UUID  `json:"modelId"`
 	// IoTModelID is the unit's planned IoT model (DEC-105); null or omitted is none.
-	IoTModelID   *uuid.UUID `json:"iotModelId,omitempty"`
-	Type         string     `json:"type"`
+	IoTModelID *uuid.UUID `json:"iotModelId,omitempty"`
+	Type       string     `json:"type"`
+	// InstallState is planned for a unit not installed yet (DEC-106): omitted is installed for a new unit and the
+	// stored state for a saved one; it never changes by a save (an accepted installation report installs the unit).
+	InstallState *string    `json:"installState,omitempty"`
 	InstalledAt  *time.Time `json:"installedAt"`
 	ServiceScope []string   `json:"serviceScope"`
 	ChangeReason *string    `json:"changeReason,omitempty"`
@@ -326,6 +329,11 @@ func (in *UnitSave) Validate() map[string]string {
 
 	if in.Type != "split" {
 		fieldErrs["type"] = apperr.KeyInvalid
+	}
+
+	if in.InstallState != nil && *in.InstallState != installPlanned &&
+		*in.InstallState != installInstalled {
+		fieldErrs[keyInstallState] = apperr.KeyInvalid
 	}
 
 	if !strLen(in.DisplayName, 1, maxName) {
@@ -382,6 +390,34 @@ func (in *UnitSave) readWarranty() string {
 	in.warranty = &endsAt
 
 	return ""
+}
+
+// stateOf is the install state a new unit is saved with: installed unless the form says planned.
+func stateOf(state *string) string {
+	if state == nil {
+		return installInstalled
+	}
+
+	return *state
+}
+
+// plannedFieldErrs refuses what a planned unit cannot have (DEC-106): it is not installed, so it has no installation
+// date and no warranty end until an accepted installation report sets them.
+func plannedFieldErrs(input *UnitSave, state string) map[string]string {
+	fieldErrs := map[string]string{}
+	if state != installPlanned {
+		return fieldErrs
+	}
+
+	if input.InstalledAt != nil {
+		fieldErrs[keyInstalledAt] = apperr.KeyNotAllowed
+	}
+
+	if input.warranty != nil {
+		fieldErrs[keyWarrantyEndsAt] = apperr.KeyNotAllowed
+	}
+
+	return fieldErrs
 }
 
 // ---- archive ----
@@ -892,6 +928,27 @@ func (*Module) UnitState(
 	}
 
 	return org, archived, err == nil, apperr.Wrap(err, "select assets.units")
+}
+
+// UnitInstall returns the install state and the model of a unit, "" for the state when there is no such unit
+// (Maintenance installation jobs).
+func (*Module) UnitInstall(
+	ctx context.Context,
+	call *ops.Call,
+	unit uuid.UUID,
+) (string, uuid.UUID, error) {
+	var (
+		state string
+		model uuid.UUID
+	)
+
+	err := call.Tx.QueryRow(ctx, `SELECT install_state, model_id FROM assets.units WHERE id = $1`, unit).
+		Scan(&state, &model)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", uuid.Nil, nil
+	}
+
+	return state, model, apperr.Wrap(err, "select assets.units")
 }
 
 // UnitService returns the organization, property and service scope of a unit (Maintenance qualification checks).
@@ -1412,6 +1469,11 @@ func (m *Module) unitsSaveUnit(ctx context.Context, call *ops.Call, input *UnitS
 	}
 
 	if input.ID == nil {
+		fieldErrs := plannedFieldErrs(input, stateOf(input.InstallState))
+		if len(fieldErrs) > 0 {
+			return Unit{}, apperr.Fields(fieldErrs)
+		}
+
 		return m.addUnit(ctx, call, input, models)
 	}
 
@@ -1425,6 +1487,7 @@ type unitValues struct {
 	name      string
 	model     uuid.UUID
 	iotModel  *uuid.UUID
+	state     string
 	installed *time.Time
 	scope     []string
 	warranty  *time.Time
@@ -1438,6 +1501,7 @@ func (values unitValues) history() map[string]any {
 		"displayName":     values.name,
 		keyModelID:        values.model,
 		keyIoTModelID:     values.iotModel,
+		keyInstallState:   values.state,
 		keyInstalledAt:    values.installed,
 		"serviceScope":    values.scope,
 		keyWarrantyEndsAt: values.warranty,
@@ -1454,11 +1518,12 @@ func (values unitValues) moved(property uuid.UUID, space *uuid.UUID) bool {
 func storedUnit(ctx context.Context, call *ops.Call, id, org uuid.UUID) (unitValues, error) {
 	var values unitValues
 
-	err := call.Tx.QueryRow(ctx, `SELECT property_id, space_id, display_name, model_id, iot_model_id, installed_at,
-		service_scope, warranty_ends_at FROM assets.units WHERE id = $1 AND customer_org_id = $2 AND NOT archived`,
+	err := call.Tx.QueryRow(ctx, `SELECT property_id, space_id, display_name, model_id, iot_model_id, install_state,
+		installed_at, service_scope, warranty_ends_at FROM assets.units
+		WHERE id = $1 AND customer_org_id = $2 AND NOT archived`,
 		id, org).
-		Scan(&values.property, &values.space, &values.name, &values.model, &values.iotModel, &values.installed,
-			&values.scope, &values.warranty)
+		Scan(&values.property, &values.space, &values.name, &values.model, &values.iotModel, &values.state,
+			&values.installed, &values.scope, &values.warranty)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return values, notFound()
 	}
@@ -1478,6 +1543,15 @@ func (m *Module) updateUnit(
 	current, err := storedUnit(ctx, call, *input.ID, input.CustomerOrgID)
 	if err != nil {
 		return Unit{}, err
+	}
+
+	fieldErrs := plannedFieldErrs(input, current.state)
+	if input.InstallState != nil && *input.InstallState != current.state {
+		fieldErrs[keyInstallState] = apperr.KeyNotAllowed
+	}
+
+	if len(fieldErrs) > 0 {
+		return Unit{}, apperr.Fields(fieldErrs)
 	}
 
 	reason := ""
@@ -1533,6 +1607,7 @@ func (m *Module) updateUnit(
 		name:      input.DisplayName,
 		model:     input.ModelID,
 		iotModel:  input.IoTModelID,
+		state:     current.state,
 		installed: input.InstalledAt,
 		scope:     input.ServiceScope,
 		warranty:  warranty,
@@ -1644,8 +1719,8 @@ func (m *Module) addUnit(
 	_, err = call.Tx.Exec(
 		ctx,
 		`INSERT INTO assets.units (id, tenant_id, customer_org_id, property_id, space_id, display_name, model_id, type,
-			installed_at, service_scope, capability_version, warranty_ends_at, iot_model_id, iot_model_version)
-		VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+			install_state, installed_at, service_scope, capability_version, warranty_ends_at, iot_model_id, iot_model_version)
+		VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
 		unitID,
 		input.CustomerOrgID,
 		input.PropertyID,
@@ -1653,6 +1728,7 @@ func (m *Module) addUnit(
 		input.DisplayName,
 		input.ModelID,
 		input.Type,
+		stateOf(input.InstallState),
 		input.InstalledAt,
 		input.ServiceScope,
 		models.capVer,

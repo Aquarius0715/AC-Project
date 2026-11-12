@@ -29,7 +29,8 @@
  "attachments.add": [
   "file",
   "jobId",
-  "reportId"
+  "reportId",
+  "tag"
  ],
  "attachments.getContent": [
   "attachmentId",
@@ -711,6 +712,7 @@
  ],
  "jobs.saveDraft": [
   "attachmentIds",
+  "installation",
   "items",
   "jobId",
   "measurements",
@@ -1263,6 +1265,7 @@
   "customerOrgId",
   "displayName",
   "id",
+  "installState",
   "installedAt",
   "iotModelId",
   "modelId",

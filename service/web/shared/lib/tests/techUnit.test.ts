@@ -15,7 +15,7 @@ const NOT_REGISTERED = "Not registered";
 
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 const NOW = Date.parse("2026-09-14T01:35:00Z"); // 09:35 in Kuala Lumpur
-const ALL = componentGroups.flatMap((g) => g.keys);
+const ALL = componentGroups.filter((g) => g.group !== "installation").flatMap((g) => g.keys);
 type Reading = ApiTechUnit["latestMeasurements"][number];
 const m = (metric: Reading["metric"], value: number | null, unit: Reading["unit"], quality: Reading["quality"] = "valid"): Reading =>
   ({ metric, value, unit, quality, id: metric, unitId: "u1", sensorId: "s", origin: "measured", qualityReason: null, observedAt: "2026-09-14T01:35:00Z" });
