@@ -426,8 +426,9 @@ function UnitEdit({ live, c, x, nav, run, pending }: Readonly<{ live: UnitsLive;
               {c.models.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}
             </Select>
           </Field>
-          <Field label={t("Installed at")} hint={t("A Kuala Lumpur day · leave empty for “Not registered”")} error={fieldError("installedAt")}><Input type="date" max={live.todayKL} value={d.installedAt} disabled={isRo} onChange={(e) => { set({ installedAt: e.target.value }); }} /></Field>
-          <Field label={t("Warranty end")} hint={t("Manufacturer warranty; coverage also counts active maintenance contracts")} error={fieldError("warrantyEnd")}><Input type="date" min={d.installedAt || undefined} value={d.warrantyEnd} disabled={isRo} onChange={(e) => { set({ warrantyEnd: e.target.value }); }} /></Field>
+          {d.installState === "planned" && <Banner tone="primary">{t("Installation planned: the installation date is set when HQ accepts the technician’s installation report. Create the installation job in Jobs.")}</Banner>}
+          <Field label={t("Installed at")} hint={t("A Kuala Lumpur day · leave empty for “Not registered”")} error={fieldError("installedAt")}><Input type="date" max={live.todayKL} value={d.installedAt} disabled={isRo || d.installState === "planned"} onChange={(e) => { set({ installedAt: e.target.value }); }} /></Field>
+          <Field label={t("Warranty end")} hint={t("Manufacturer warranty; coverage also counts active maintenance contracts")} error={fieldError("warrantyEnd")}><Input type="date" min={d.installedAt || undefined} value={d.warrantyEnd} disabled={isRo || d.installState === "planned"} onChange={(e) => { set({ warrantyEnd: e.target.value }); }} /></Field>
           <Field label={t("IoT device")} hint={t("The device's IoT model sets its sensors; it is shown here as registered. The aircon model above is the unit's own.")}>
             <UnitDevicePanel unitId={u.id} unitName={u.displayName} device={x.device} deviceKnown={x.deviceKnown} canWrite={live.canWrite && c.canRegisterDevice && !u.archived} iotModels={c.iotModels} />
           </Field>
@@ -633,8 +634,11 @@ function NewUnitModal({ live, c, init, pending, onClose, onSave }: Readonly<{ li
           <Select value={d.modelId} onChange={(x) => { set({ modelId: x.target.value }); }}>{c.models.length === 0 && <option value="">{t("no model available")}</option>}{c.models.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}</Select>
         </Field>
         <Field label={t("Display name · required")} hint={t("1–120 characters, unique in its room")} error={fieldError("displayName")}><Input value={d.displayName} onChange={(x) => { set({ displayName: x.target.value }); }} /></Field>
-        <Field label={t("Installed at · optional")} hint={t("A Kuala Lumpur day · leave empty for “Not registered”")} error={fieldError("installedAt")}><Input type="date" max={live.todayKL} value={d.installedAt} onChange={(x) => { set({ installedAt: x.target.value }); }} /></Field>
-        <Field label={t("Warranty end · optional")} error={fieldError("warrantyEnd")}><Input type="date" min={d.installedAt || undefined} value={d.warrantyEnd} onChange={(x) => { set({ warrantyEnd: x.target.value }); }} /></Field>
+        <Field label={t("Installation")} hint={t("A planned unit is installed by a technician; HQ creates the installation job for it.")} className="sm:col-span-2">
+          <Choice value={d.installState} onChange={(installState) => { set({ installState, ...(installState === "planned" && { installedAt: "", warrantyEnd: "" }) }); }} options={[{ id: "installed" as const, label: t("Already installed") }, { id: "planned" as const, label: t("Installation planned") }]} />
+        </Field>
+        <Field label={t("Installed at · optional")} hint={t("A Kuala Lumpur day · leave empty for “Not registered”")} error={fieldError("installedAt")}><Input type="date" max={live.todayKL} value={d.installedAt} disabled={d.installState === "planned"} onChange={(x) => { set({ installedAt: x.target.value }); }} /></Field>
+        <Field label={t("Warranty end · optional")} error={fieldError("warrantyEnd")}><Input type="date" min={d.installedAt || undefined} value={d.warrantyEnd} disabled={d.installState === "planned"} onChange={(x) => { set({ warrantyEnd: x.target.value }); }} /></Field>
         <Field label={t("Service scope · required · type: split (fixed)")} error={fieldError("serviceScope")} className="sm:col-span-2">
           <div className="flex flex-wrap gap-3">{scopes.map((sc) => <Check key={sc} label={t(entryOf(scopeLabel, sc))} checked={d.serviceScope.includes(sc)} onChange={(on) => { set({ serviceScope: on ? [...d.serviceScope, sc] : d.serviceScope.filter((v) => v !== sc) }); }} />)}</div>
         </Field>

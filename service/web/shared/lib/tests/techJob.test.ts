@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkInErrors, CHECK_IN_API_FIELDS, componentsFor, partErrors, refrigerantErrors, draftFrom, draftInput, fmtOf, followUpText, groupOf, historyCard, itemPhotos, knownOf, linkPhoto, progress, submitIssues, timeRows, versionRows, warnAt, windowState, type ApiTechReport, type Draft } from "@ac/web/lib/techJob";
+import { componentGroups, checkInErrors, CHECK_IN_API_FIELDS, componentsFor, partErrors, refrigerantErrors, draftFrom, draftInput, fmtOf, followUpText, groupOf, historyCard, itemPhotos, knownOf, linkPhoto, photoTags, progress, submitIssues, timeRows, versionRows, warnAt, windowState, type ApiTechReport, type Draft } from "@ac/web/lib/techJob";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
 import { must } from "./must";
 
@@ -19,13 +19,13 @@ const NOW = Date.parse("2026-09-14T03:00:00Z"); // 11:00 in Kuala Lumpur
 const all = componentsFor(["indoor", "outdoor", ELECTRICAL]);
 const report = (over: Partial<ApiTechReport> = {}): ApiTechReport => {
   return {
-    id: "rep", version: 3, jobId: "job", authorId: "tech", items: [
+    id: "rep", version: 3, jobId: "job", authorId: "tech", installation: null, items: [
       { id: "i1", componentGroup: "indoor", componentKey: "filter", result: "attention", reason: "dusty", evidenceIds: [], authorId: "tech", observedAt: TEXT_2026_09_14T02_00_00Z },
       { id: "i2", componentGroup: ELECTRICAL, componentKey: "wiring", result: "not_applicable", reason: "no wiring", evidenceIds: [], authorId: "tech", observedAt: TEXT_2026_09_14T02_00_00Z },
     ],
     measurements: [{ id: "m1", componentKey: "outlet", metric: TEMPERATURE, value: 13.9, unit: "°C", observedAt: TEXT_2026_09_14T02_10_00Z, quality: "valid" }],
     parts: [], refrigerant: [], signOff: null, workText: "Cleaned the filter.", nextAction: { kind: "none" },
-    attachmentRefs: [{ id: "a1", name: "p1.png", mime: "image/png", size: 10, status: "ready" }, { id: "a2", name: "p2.heic", mime: "image/png", size: 10, status: "failed" }],
+    attachmentRefs: [{ id: "a1", name: "p1.png", mime: "image/png", size: 10, status: "ready", tag: null }, { id: "a2", name: "p2.heic", mime: "image/png", size: 10, status: "failed", tag: null }],
     submittedAt: null, acceptedAt: null, reviewHistory: [], ...over,
   };
 };
@@ -212,5 +212,58 @@ describe("part and refrigerant checks", () => {
     expect(refrigerantErrors(" ", "-1", "x")).toStrictEqual({ cylinder: "The cylinder ID is required", recovered: "Kilograms, 0 or more", charged: "Kilograms, 0 or more" });
     expect(refrigerantErrors("CYL", "0", "0")).toStrictEqual({}); // nothing recovered or charged is a valid line
     expect(refrigerantErrors(" ", "0", "0", translator("ms")).cylinder).toBe("ID silinder diperlukan");
+  });
+});
+
+describe("installation report (DEC-106)", () => {
+  const checklist = componentGroups.find((g) => g.group === "installation")?.keys ?? [];
+  const installation = componentsFor(["installation"]);
+  const ready = (tag: (typeof photoTags)[number]) => ({ tag, id: tag, name: `${tag}.png`, status: "ready" });
+  const photos = photoTags.map((tag) => ready(tag));
+  const filled = (): Draft => {
+    const d = draftFrom(null, checklist.map((key) => ({ group: "installation" as const, key })), true);
+    d.items = d.items.map((i) => ({ ...i, result: "normal" }));
+    d.workText = "Mounted the indoor unit and tested it.";
+    d.installation = { confirmed: true, serial: " SN-1 " };
+    return d;
+  };
+
+  it("has its own checklist, never part of a unit's service scope", () => {
+    expect(checklist).toHaveLength(7);
+    expect(installation).toHaveLength(7); // the checklist of an installation job, asked for by name
+    expect(componentsFor(["indoor", "outdoor", "electrical"]).some((c) => c.group === "installation")).toBe(false);
+    expect(groupOf("mounting")).toBe("installation");
+    expect(draftFrom(null, all).installation).toBeNull();
+  });
+
+  it("sends the confirmed model with the trimmed serial, and nothing before it is confirmed", () => {
+    expect(draftInput("job", null, filled(), "model-1").installation).toStrictEqual({ confirmedModelId: "model-1", serial: "SN-1" });
+    const unconfirmed = filled();
+    unconfirmed.installation = { confirmed: false, serial: "SN-1" };
+    expect(draftInput("job", null, unconfirmed, "model-1")).not.toHaveProperty("installation");
+    expect(draftInput("job", null, draftFrom(null, all), "model-1")).not.toHaveProperty("installation");
+  });
+
+  it("reads the saved equipment back as confirmed", () => {
+    const saved = report({ installation: { confirmedModelId: "model-1", serial: "SN-9" } });
+    expect(draftFrom(saved, all, true).installation).toStrictEqual({ confirmed: true, serial: "SN-9" });
+  });
+
+  it("passes with the equipment, the three photos and the sign-off", () => {
+    expect(submitIssues(filled(), photos, NOW)).toStrictEqual([]);
+  });
+
+  it("names each thing that is missing", () => {
+    const bare = filled();
+    bare.installation = { confirmed: false, serial: " " };
+    const texts = submitIssues(bare, [ready("name_plate"), { ...ready("indoor_unit"), status: "processing" }], NOW, undefined, false).map((i) => i.text);
+    expect(texts).toStrictEqual([
+      "Confirm that the installed model is the registered one", "Enter the serial number of the installed unit",
+      "Add a photo of the indoor unit", "Add a photo of the outdoor unit", "An installation needs the customer’s sign-off",
+    ]);
+  });
+
+  it("asks for nothing extra of another job", () => {
+    expect(submitIssues(complete(), report().attachmentRefs, NOW, undefined, false)).toStrictEqual([]);
   });
 });

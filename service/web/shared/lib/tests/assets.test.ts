@@ -14,7 +14,7 @@ const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 const NOW = new Date("2026-09-14T01:00:00Z"); // 09:00 in Kuala Lumpur
 const unit = (over: Partial<ApiUnitRow>): ApiUnitRow => {
   return {
-    id: "u1", version: 3, customerOrgId: "org-a", propertyId: "p1", spaceId: "s1", displayName: BEDROOM_AC, modelId: "m1", type: "split", installedAt: "2026-01-09T16:00:00Z",
+    id: "u1", version: 3, customerOrgId: "org-a", propertyId: "p1", spaceId: "s1", displayName: BEDROOM_AC, modelId: "m1", type: "split", installState: "installed", installedAt: "2026-01-09T16:00:00Z",
     serviceScope: ["indoor", "outdoor"], alertPolicyIds: [], archived: false, capabilityVersion: 2, connection: "online", lastSeenAt: null, warrantyEndsAt: "2027-01-09T16:00:00Z",
     effectivePowerState: "on", activeAlertCount: 0, ...over,
   };

@@ -8,7 +8,7 @@ const TEXT_2026_09_14T01_10_00Z = "2026-09-14T01:10:00Z";
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 const unit = (id: string, over: Partial<ApiUnitDetail> = {}): ApiUnitDetail => {
   return {
-    id, version: 1, spaceId: "room", displayName: `AC ${id}`, alertPolicyIds: [], connection: "online", effectivePowerState: "on",
+    id, version: 1, spaceId: "room", displayName: `AC ${id}`, installState: "installed", modelId: "model-1", alertPolicyIds: [], connection: "online", effectivePowerState: "on",
     observedState: { power: true, celsius: 26, mode: "cool", fanLevel: "mid", observedAt: "2026-09-14T01:00:00Z" }, lastSeenAt: TEXT_2026_09_14T01_10_00Z,
     latestMeasurements: [
       { id: "m1", unitId: id, sensorId: "s1", metric: "temperature", value: 27.04, unit: "°C", observedAt: TEXT_2026_09_14T01_10_00Z, origin: "measured", quality: "valid", qualityReason: null },

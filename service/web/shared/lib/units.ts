@@ -42,6 +42,9 @@ export interface ApiUnitDetail {
   pendingCommands: ApiCommand[];
   location: { pathLabels: string[]; address: string | null; accessInstructions: string | null };
   installedAt: string | null;
+  /** planned until an accepted installation report installs the unit (DEC-106) */
+  installState: "planned" | "installed";
+  modelId: string;
   capabilityVersion: number;
   serviceScope: ("indoor" | "outdoor" | "electrical")[];
   components: string[];

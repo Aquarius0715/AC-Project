@@ -30,9 +30,11 @@ export interface ApiPropertyRow {
   id: string; version: number; customerOrgId: string; kind: "home" | "office"; name: string; address: string | null; accessInstructions: string | null; archived: boolean; updatedAt: string;
 }
 export interface ApiSpaceRow { id: string; version: number; propertyId: string; parentSpaceId: string | null; kind: "area" | "floor" | "room" | "space"; name: string; archived: boolean }
+/** planned until an accepted installation report installs the unit (DEC-106) */
+type InstallState = "planned" | "installed";
 /** UnitSummary of service-contracts.ts (fields shown on this screen). */
 export interface ApiUnitRow {
-  id: string; version: number; customerOrgId: string; propertyId: string; spaceId: string | null; displayName: string; modelId: string; iotModelId?: string | null; type: "split"; installedAt: string | null;
+  id: string; version: number; customerOrgId: string; propertyId: string; spaceId: string | null; displayName: string; modelId: string; iotModelId?: string | null; type: "split"; installState: InstallState; installedAt: string | null;
   serviceScope: Scope[]; alertPolicyIds: string[]; archived: boolean; capabilityVersion: number; connection: Connection; lastSeenAt: string | null; warrantyEndsAt: string | null;
   effectivePowerState: PowerState; activeAlertCount: number;
 }
@@ -278,11 +280,11 @@ export function filterUnits(us: ApiUnitRow[], f: { powerState?: PowerState; conn
 
 /** The unit form (DD-A02 fields, warranty end IR209). installedAt and warrantyEnd are Kuala Lumpur dates. */
 /** iotModelId is the unit's planned IoT model; empty is none (DEC-105). */
-export interface UnitDraft { displayName: string; propertyId: string; spaceId: string; modelId: string; iotModelId: string; installedAt: string; warrantyEnd: string; serviceScope: Scope[] }
+export interface UnitDraft { displayName: string; propertyId: string; spaceId: string; modelId: string; iotModelId: string; installState: InstallState; installedAt: string; warrantyEnd: string; serviceScope: Scope[] }
 const klDate = (iso: string | null | undefined) => (iso ? klStamp(iso).slice(0, 10) : "");
-export const unitDraft = (u?: Pick<ApiUnitRow, "displayName" | "propertyId" | "spaceId" | "modelId" | "iotModelId" | "installedAt" | "warrantyEndsAt" | "serviceScope">, propertyId = "", spaceId = ""): UnitDraft => {
+export const unitDraft = (u?: Pick<ApiUnitRow, "displayName" | "propertyId" | "spaceId" | "modelId" | "iotModelId" | "installState" | "installedAt" | "warrantyEndsAt" | "serviceScope">, propertyId = "", spaceId = ""): UnitDraft => {
   return {
-    displayName: u?.displayName ?? "", propertyId: u?.propertyId ?? propertyId, spaceId: u?.spaceId ?? (u ? "" : spaceId), modelId: u?.modelId ?? "", iotModelId: u?.iotModelId ?? "",
+    displayName: u?.displayName ?? "", propertyId: u?.propertyId ?? propertyId, spaceId: u?.spaceId ?? (u ? "" : spaceId), modelId: u?.modelId ?? "", iotModelId: u?.iotModelId ?? "", installState: u?.installState ?? "installed",
     installedAt: klDate(u?.installedAt), warrantyEnd: klDate(u?.warrantyEndsAt), serviceScope: u?.serviceScope ?? ["indoor", "outdoor"],
   };
 };
@@ -291,6 +293,8 @@ export function unitErrors(d: UnitDraft, todayKL: string, t: T = en): Record<str
   if (!hasLength(d.displayName, 120)) e.displayName = t(TEXT_1_120_CHARACTERS);
   if (!d.propertyId) e.propertyId = t("Choose a location");
   if (!d.modelId) e.modelId = t("Choose a model");
+  if (d.installState === "planned" && d.installedAt) e.installedAt = t("A planned unit has no installation date yet");
+  if (d.installState === "planned" && d.warrantyEnd) e.warrantyEnd = t("A planned unit has no warranty end yet");
   if (d.installedAt && isAfter(d.installedAt, todayKL)) e.installedAt = t("An installation date cannot be in the future");
   if (d.warrantyEnd && d.installedAt && isBefore(d.warrantyEnd, d.installedAt)) e.warrantyEnd = t("A warranty cannot end before the installation");
   if (d.serviceScope.length === 0) e.serviceScope = t("Choose at least one inspection group");
@@ -298,7 +302,7 @@ export function unitErrors(d: UnitDraft, todayKL: string, t: T = en): Record<str
 }
 export const unitInput = (d: UnitDraft, orgId: string, id?: string, changeReason?: string) => {
   return {
-    ...(id && { id }), customerOrgId: orgId, propertyId: d.propertyId, spaceId: d.spaceId || null, displayName: d.displayName.trim(), modelId: d.modelId, iotModelId: d.iotModelId || null, type: "split" as const,
+    ...(id && { id }), customerOrgId: orgId, propertyId: d.propertyId, spaceId: d.spaceId || null, displayName: d.displayName.trim(), modelId: d.modelId, iotModelId: d.iotModelId || null, type: "split" as const, installState: d.installState,
     installedAt: d.installedAt ? `${d.installedAt}T00:00:00+08:00` : null, warrantyEndsAt: d.warrantyEnd ? `${d.warrantyEnd}T00:00:00+08:00` : null,
     serviceScope: d.serviceScope, ...(changeReason && { changeReason }),
   };

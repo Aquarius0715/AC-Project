@@ -16,10 +16,11 @@ import { typeLabel } from "@ac/web/lib/partnerJobDetail";
 import { actionMessage, fieldErrorTexts, type ActionFailure } from "@ac/web/lib/actionMessage";
 import {
   CHECK_IN_API_FIELDS, CHECK_IN_FIELDS, checkInErrors, checkResults, componentLabel, PART_FIELDS, partErrors, REFRIGERANT_FIELDS, refrigerantErrors, draftFrom, draftInput, fmtOf, followUpText, groupLabel, itemPhotos, linkPhoto, progress, readingMetrics, submitIssues, timeRows, versionRows, windowState,
-  type ApiTechReport, type CheckInField, type Draft, type DraftPart, type DraftRefrigerant, type Group, type Issue, type Known, type Result, type TimeOnSite,
+  type ApiTechReport, type PhotoTag, type CheckInField, type Draft, type DraftPart, type DraftRefrigerant, type Group, type Issue, type Known, type Result, type TimeOnSite,
 } from "@ac/web/lib/techJob";
 import { acknowledge, checkIn, pauseWork, resumeRework, saveDraft, signOff, submitReport, uploadPhoto } from "../actions";
 import { Icon } from "@ac/web/components/Icon";
+import { EquipmentCard } from "./equipment-card";
 import type { ComponentKey } from "@ac/web/lib/contracts.gen";
 import { without } from "@ac/web/lib/omit";
 import { lookup } from "@ac/web/lib/lookup";
@@ -32,7 +33,7 @@ export interface WorkspaceLive {
     timeOnSite: TimeOnSite | null; draftReportRef: { reportId: string; reportVersion: number } | null; reportRefs: { reportId: string; reportVersion: number }[];
     problemPhotos: { id: string; name: string }[];
   };
-  unit: { name: string; place: string; access: string | null; model: string; scope: string[] } | null; unitRefused: string | null;
+  unit: { name: string; place: string; access: string | null; model: string; modelId: string; planned: boolean; scope: string[] } | null; unitRefused: string | null;
   unitName: string | null; // also before the window, when the unit itself is not open yet
   components: { group: Group; key: ComponentKey }[];
   report: ApiTechReport | null; reportRefused: string | null;
@@ -57,6 +58,7 @@ const refusal = (f: ActionFailure, t: T): string => {
 }; // field errors, the write limit's wait and other codes (IR380)
 const LEAK: Record<string, string> = { pass: "passed", fail: "failed", not_done: "not done" };
 const MAX_PHOTOS = 10, MAX_BYTES = 5 << 20;
+const ORIGIN_TEXT: Record<string, string> = { periodic_plan: "periodic plan", hq_request: "HQ request" };
 
 /** The technician's job workspace (FR-T04–T06, T08, T09, T13–T15): assignment, check-in, the inspection checklist of the
 unit's service scope, readings, parts and refrigerant, photos, the work report with its next action, the customer's
@@ -88,7 +90,7 @@ function JobUnitCard({ live, win, isUnitOpen }: Readonly<{ live: WorkspaceLive; 
         <SummaryList items={[
           [t("Window"), <span key="w" className={win.phase === "ending" || win.phase === "ended" ? "font-semibold text-crit" : undefined}>{job.assignment ? f.span(job.assignment.scheduledStart, job.assignment.scheduledEnd) : "—"}</span>],
           [t("Site"), live.unit?.place ?? (live.unitRefused ? t("opens at the start of your window") : "—")], [t("Access"), live.unit?.access ?? "—"], [t("Unit"), live.unit ? `${live.unit.name} · ${live.unit.model}` : live.unitName ?? job.unitId.slice(0, 8)],
-          [t("Job"), `${typeLabel(job.type, t)} · ${t(job.origin === "periodic_plan" ? "periodic plan" : "client request")}`], [t("Request"), job.symptom ? `“${job.symptom}”` : "—"],
+          [t("Job"), `${typeLabel(job.type, t)} · ${t(ORIGIN_TEXT[job.origin] ?? "client request")}`], [t("Request"), job.symptom ? `“${job.symptom}”` : "—"],
           ...(job.problemPhotos.length > 0 ? [[t("Client’s photos"), <span key="p" className="flex flex-wrap gap-x-3">{job.problemPhotos.map((p) => <a key={p.id} href={`/technician/jobs/${job.id}/problem-photos/${p.id}`} target="_blank" rel="noreferrer" className="font-semibold text-primary">{p.name}</a>)}</span>] as [string, React.ReactNode]] : []),
           [t("Linked alerts"), job.alertCount ? <Link key="a" className="font-semibold text-crit" href={`/technician/units/${job.unitId}/alerts?jobId=${job.id}`}>{t(job.alertCount === 1 ? "1 alert" : "{n} alerts", { n: job.alertCount })} <Icon name="arrowRight" /></Link> : t("none")],
         ]} />
@@ -239,7 +241,8 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
     return () => { clearInterval(timer); };
   }, [live.now]);
   const editableReport = job.draftReportRef && live.report?.version === job.draftReportRef.reportVersion ? live.report : null;
-  const [draft, setDraft] = useState<Draft>(() => draftFrom(editableReport ?? (job.status === IN_PROGRESS ? null : live.report), live.components));
+  const isInstallation = job.type === "installation";
+  const [draft, setDraft] = useState<Draft>(() => draftFrom(editableReport ?? (job.status === IN_PROGRESS ? null : live.report), live.components, isInstallation));
   const [rep, setRep] = useState<Rep | null>(editableReport);
   const [dirty, setDirty] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
@@ -281,14 +284,15 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
   const failed = (x: ActionFailure) => { setRefused(refusal(x, t)); };
   const edit = (fn: (d: Draft) => Draft) => { setDraft(fn); setDirty(true); };
   const photos = (rep ?? live.report)?.attachmentRefs.filter((a) => a.id !== (rep ?? live.report)?.signOff?.signatureAttachmentId) ?? [];
-  const issues: Issue[] | null = checked ? submitIssues(draft, photos, now, t) : null;
+  const signedOff = !!(rep ?? live.report)?.signOff;
+  const issues: Issue[] | null = checked ? submitIssues(draft, photos, now, t, signedOff) : null;
   const photoUrl = (a: { id: string }) => {
     const r = rep ?? live.report;
     return r ? `/technician/jobs/${job.id}/photos/${a.id}?reportId=${r.id}&reportVersion=${String(r.version)}` : "";
   };
 
   const save = (after?: (r: Rep) => void) => {
-    run(() => saveDraft(draftInput(job.id, rep?.id ?? null, draft), rep?.version ?? null), t("Draft saved"), (r) => {
+    run(() => saveDraft(draftInput(job.id, rep?.id ?? null, draft, live.unit?.modelId ?? null), rep?.version ?? null), t("Draft saved"), (r) => {
       setRep(r); setDirty(false); setSavedAt(new Date(now).toISOString()); setRefused(null); after?.(r);
     }, failed);
   };
@@ -301,7 +305,7 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
   }, [draft, dirty, isEditable, pending]);
   const withSaved = (fn: (r: Rep) => void) => { if (dirty || !rep) save(fn); else fn(rep); };
   const photoAdded = (next: Rep) => { setRep(next); edit((d) => ({ ...d, attachmentIds: next.attachmentRefs.map((a) => a.id) })); setDirty(false); };
-  const addPhotos = (files: FileList | null) => {
+  const addPhotos = (files: FileList | null, tag?: PhotoTag) => {
     const file = files?.[0];
     if (!file) return;
     if (!["image/jpeg", "image/png"].includes(file.type) || file.size > MAX_BYTES || photos.length >= MAX_PHOTOS) {
@@ -312,11 +316,12 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
     withSaved((r) => {
       const form = new FormData();
       form.set("jobId", job.id); form.set("reportId", r.id); form.set("reportVersion", String(r.version)); form.set("file", file);
+      if (tag) form.set("tag", tag);
       run(() => uploadPhoto(form), t("Photo {name} added — sign-off cleared", { name: file.name }), photoAdded, failed);
     });
   };
   const trySubmit = () => {
-    const found = submitIssues(draft, photos, now, t);
+    const found = submitIssues(draft, photos, now, t, signedOff);
     setChecked(true);
     if (found.length > 0) {
       const first = found.find((i) => i.group);
@@ -439,6 +444,7 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
               <p className="mt-2 text-[11px] text-muted-foreground">{t("Initial result is always empty — normal is never preselected. Attention, not inspected and not applicable need a reason.")}</p>
             </Card>
             <div className="flex min-w-0 flex-col gap-4">
+              <EquipmentCard draft={draft} edit={edit} isEditable={isEditable} model={live.unit?.model ?? null} photos={photos} pending={pending} addPhoto={addPhotos} />
               <ChecklistProgressCard groups={groups} issues={issues} isEditable={isEditable} emptyCount={draft.items.filter((x) => x.result === null).length} />
               <JobUnitCard live={live} win={win} isUnitOpen={isUnitOpen} />
             </div>

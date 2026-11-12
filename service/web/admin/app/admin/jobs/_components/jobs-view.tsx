@@ -26,7 +26,7 @@ import { isBefore } from "@ac/web/lib/order";
 import { DateTimeSelect, TimeSelect } from "@ac/web/components/TimeSelect";
 
 type Detail = NonNullable<JobsLive["detail"]>;
-const TYPES = [{ id: "", label: "All" }, { id: "reactive", label: "Repair" }, { id: "periodic", label: "Periodic" }, { id: "preventive", label: "Preventive" }];
+const TYPES = [{ id: "", label: "All" }, { id: "reactive", label: "Repair" }, { id: "periodic", label: "Periodic" }, { id: "preventive", label: "Preventive" }, { id: "installation", label: "Installation" }];
 const RANK = ["1st", "2nd", "3rd"];
 // a step's dot and label by its state; a step to do keeps the plain dot and a done step the plain label
 const STEP_DOT = new Map<string, string>([["done", "bg-primary text-white"], ["current", "border-2 border-primary text-primary"]]);
@@ -566,6 +566,7 @@ function ExtendModal({ d, live, until, onClose, onFail }: ModalProps & { until: 
 
 const JOB_TYPES = [{ id: "reactive" as const, label: "Repair" }, { id: "preventive" as const, label: "Preventive" }, { id: "periodic" as const, label: "Periodic" }];
 
+
 /** New job (DD-A06 item 8, Figma 06-1 New job): step 1 creates the job (requested) with the customer's preferred times
 asked by phone; “Save as requested” stops there, “Next: choose delivery” opens step 2 (the booking dialog) on it. */
 export function NewJobModal({ live, initial, onClose, onCreated }: Readonly<{ live: { now: string; units: JobsLive["units"]; q: { unitId?: string } }; initial?: { unitId: string; symptom: string }; onClose: () => void; onCreated?: (f: Fresh) => void }>) {
@@ -574,7 +575,9 @@ export function NewJobModal({ live, initial, onClose, onCreated }: Readonly<{ li
   const now = Date.parse(live.now);
   const [pending, run] = useAction();
   const [unitId, setUnitId] = useState(initial?.unitId ?? live.q.unitId ?? live.units[0]?.id ?? "");
-  const [type, setType] = useState<"reactive" | "preventive" | "periodic">("reactive");
+  const [chosenType, setChosenType] = useState<"reactive" | "preventive" | "periodic">("reactive");
+  const isPlanned = live.units.find((u) => u.id === unitId)?.planned ?? false;
+  const type = isPlanned ? "installation" : chosenType;
   const [symptom, setSymptom] = useState(initial?.symptom ?? "");
   const tomorrow = tomorrowIn(now, zone);
   const [times, setTimes] = useState([{ date: tomorrow, from: "10:00", to: "12:00" }]);
@@ -605,7 +608,7 @@ export function NewJobModal({ live, initial, onClose, onCreated }: Readonly<{ li
       {refusal && <Banner tone="crit">{refusal}</Banner>}
       <div className="grid-fluid" style={{ ["--min" as string]: "220px" }}>
         <Field label={t("Unit · required")} error={tried ? errors.unitId : undefined}><Select value={unitId} onChange={(e) => { setUnitId(e.target.value); }}>{groups.map((g) => <optgroup key={g} label={g}>{live.units.filter((u) => u.customer === g).map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</optgroup>)}</Select></Field>
-        <Field label={t("Type")}><Choice value={type} onChange={setType} options={JOB_TYPES.map((x) => ({ id: x.id, label: t(x.label) }))} /></Field>
+        <Field label={t("Type")}>{isPlanned ? <Badge tone="primary">{t("Installation")}</Badge> : <Choice value={chosenType} onChange={setChosenType} options={JOB_TYPES.map((x) => ({ id: x.id, label: t(x.label) }))} />}</Field>
       </div>
       <Field label={t("Symptom · required (10–2000)")} error={tried ? errors.symptom : undefined}><Textarea value={symptom} maxLength={2000} onChange={(e) => { setSymptom(e.target.value); }} placeholder={t("Unit shows offline since 08:12; the customer reports no cooling.")} /></Field>
       <div className="flex flex-col gap-2">

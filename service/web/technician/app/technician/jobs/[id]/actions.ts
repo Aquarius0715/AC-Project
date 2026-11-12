@@ -8,7 +8,8 @@ import { refresh } from "next/cache";
 import { coreOp, CoreError } from "@ac/web/lib/dal";
 import { actionFailure } from "@ac/web/lib/actionFailure";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
-import type { ApiTechReport } from "@ac/web/lib/techJob";
+import { photoTags, type ApiTechReport } from "@ac/web/lib/techJob";
+import { z } from "zod";
 import { uploadName, uploadType } from "@ac/web/lib/files";
 import type { OpInput } from "@ac/web/lib/opTypes";
 import { formText } from "@ac/web/lib/formData";
@@ -64,9 +65,10 @@ export async function uploadPhoto(form: FormData) {
   const jobId = formText(form, "jobId"), reportId = formText(form, "reportId"), version = Number(form.get("reportVersion"));
   const file = form.get("file");
   if (!(file instanceof File)) return { ok: false as const, code: "VALIDATION", messageKey: "error.validation", fieldErrors: { file: "error.required" } };
+  const tag = form.has("tag") ? formValue(z.enum(photoTags), form.get("tag"), "tag") : null; // what an installation report photo shows (DEC-106)
   const buffer = Buffer.from(await file.arrayBuffer());
   return run(async () => {
-    await coreOp("attachments.add", { jobId, reportId, file: { name: uploadName(file.name), mime: formValue(imageMime, uploadType(buffer, file.type), "file"), size: file.size, bytes: buffer.toString("base64") } }, { write: true, expectedVersion: version });
+    await coreOp("attachments.add", { jobId, reportId, file: { name: uploadName(file.name), mime: formValue(imageMime, uploadType(buffer, file.type), "file"), size: file.size, bytes: buffer.toString("base64") }, ...(tag && { tag }) }, { write: true, expectedVersion: version });
     return reportState(await coreOp<ApiTechReport>("reports.get", { jobId, reportId, reportVersion: version + 1 }));
   });
 }
