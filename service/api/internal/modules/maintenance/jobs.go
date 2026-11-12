@@ -29,6 +29,13 @@ type JobUnits interface {
 		c *ops.Call,
 		unit uuid.UUID,
 	) (org uuid.UUID, archived bool, found bool, err error)
+	// UnitInstall is the install state, "planned" or "installed" ("" for no such unit), and the model of the unit: only a
+	// planned unit has an installation job.
+	UnitInstall(
+		ctx context.Context,
+		c *ops.Call,
+		unit uuid.UUID,
+	) (state string, model uuid.UUID, err error)
 	UnitsOfProperty(ctx context.Context, c *ops.Call, property uuid.UUID) ([]uuid.UUID, error)
 	OrgOfCustomer(ctx context.Context, c *ops.Call, customer uuid.UUID) (uuid.UUID, bool, error)
 	UnitsOfOrg(ctx context.Context, c *ops.Call, org uuid.UUID) ([]uuid.UUID, error)
@@ -253,10 +260,11 @@ func completeScan(job Job, preferred []byte, schedStart, schedEnd *time.Time) (J
 
 // The roles of the callers (Principal.Role).
 const (
-	roleAdmin      = "admin"
-	roleClient     = "client"
-	roleContractor = "contractor"
-	roleTechnician = "technician"
+	roleAdmin       = "admin"
+	roleClient      = "client"
+	jobInstallation = "installation"
+	roleContractor  = "contractor"
+	roleTechnician  = "technician"
 )
 
 // employmentInternal is the employment of HQ's own technicians (Principal.Employment, identity.Technician.Employment).
@@ -285,6 +293,7 @@ const (
 	fieldJobID          = "jobId"
 	fieldName           = "name"
 	fieldNextAction     = "nextAction"
+	fieldInstallation   = "installation"
 	fieldWorkText       = "workText"
 	fieldOrganizationID = "organizationId"
 	fieldReason         = "reason"
@@ -354,7 +363,12 @@ type CreateInput struct {
 
 // jobTypes are the types of a job (MaintenanceJob.type).
 func jobTypes() map[string]bool {
-	return map[string]bool{"periodic": true, "reactive": true, "preventive": true}
+	return map[string]bool{
+		"periodic":      true,
+		"reactive":      true,
+		"preventive":    true,
+		jobInstallation: true,
+	}
 }
 
 // maxContactWindowLength is the longest contact window, in characters after trimming.
@@ -561,7 +575,45 @@ func (m Jobs) unitToRequest(
 		return uuid.Nil, apperr.Fields(map[string]string{fieldUnitID: apperr.KeyUnitArchived})
 	}
 
-	return org, nil
+	return org, m.checkInstallation(ctx, call, input)
+}
+
+// checkInstallation applies DEC-106 to a new job: an installation job is HQ's, for a planned unit and the only
+// unfinished one of the unit, and a planned unit has no other kind of job.
+func (m Jobs) checkInstallation(ctx context.Context, call *ops.Call, input *CreateInput) error {
+	state, _, err := m.Units.UnitInstall(ctx, call, input.UnitID)
+	if err != nil {
+		return apperr.Wrap(err, "maintenance.JobUnits.UnitInstall")
+	}
+
+	planned := state == "planned"
+
+	switch {
+	case input.Type == jobInstallation && call.Principal.Role == roleClient:
+		return apperr.Fields(map[string]string{"type": apperr.KeyNotAllowed})
+	case input.Type == jobInstallation && !planned, input.Type != jobInstallation && planned:
+		return apperr.Fields(map[string]string{"type": apperr.KeyInvalidState})
+	case input.Type != jobInstallation:
+		return nil
+	}
+
+	var open bool
+
+	err = call.Tx.QueryRow(
+		ctx,
+		`SELECT EXISTS (SELECT 1 FROM maintenance.jobs WHERE unit_id = $1 AND type = 'installation'
+			AND status NOT IN ('completed','cancelled'))`,
+		input.UnitID,
+	).Scan(&open)
+	if err != nil {
+		return apperr.Wrap(err, "select maintenance.jobs")
+	}
+
+	if open {
+		return apperr.E(apperr.Conflict, apperr.KeyConflict)
+	}
+
+	return nil
 }
 
 // requestedSlots answers the job's preferred slots, the requested slot and its alternatives (IR113 item 2: a client
@@ -620,7 +672,7 @@ func insertRequest(
 	err = call.Tx.QueryRow(ctx, `INSERT INTO maintenance.jobs (tenant_id, unit_id, customer_org_id, type, status, origin,
 		symptom, contact_window, requested_slot,
 		preferred_slots, preference_round, due_at) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, 'requested',
-		'client_request', $4, $5,
+		CASE WHEN $3 = 'installation' THEN 'hq_request' ELSE 'client_request' END, $4, $5,
 		tstzrange($6, $7), $8, 1, $9) RETURNING
 		id`, input.UnitID, org, input.Type, input.Symptom, contactWindow, input.RequestedStart, input.RequestedEnd, pref,
 		due).
@@ -2514,7 +2566,7 @@ func (m Jobs) cancelJob(ctx context.Context, call *ops.Call, input *CancelInput)
 	}
 
 	if !allowed {
-		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
+		return Job{}, apperr.E(apperr.Conflict, apperr.KeyConflict)
 	}
 
 	_, execErr := call.Tx.Exec(
@@ -2650,7 +2702,7 @@ func (m Jobs) holdJob(ctx context.Context, call *ops.Call, input *ReasonInput) (
 	}
 
 	if status != statusInProgress && status != statusSubmitted {
-		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
+		return Job{}, apperr.E(apperr.Conflict, apperr.KeyConflict)
 	}
 
 	_, execErr := call.Tx.Exec(
@@ -2714,7 +2766,7 @@ func (m Jobs) resumeHoldJob(ctx context.Context, call *ops.Call, input *ReasonIn
 	}
 
 	if status != statusOnHold {
-		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
+		return Job{}, apperr.E(apperr.Conflict, apperr.KeyConflict)
 	}
 
 	_, execErr := call.Tx.Exec(
@@ -2810,7 +2862,7 @@ func (m Jobs) addNote(ctx context.Context, call *ops.Call, input *NoteInput) (No
 	}
 
 	if status == statusCompleted || status == statusCancelled {
-		return Note{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
+		return Note{}, apperr.E(apperr.Conflict, apperr.KeyConflict)
 	}
 
 	var note uuid.UUID

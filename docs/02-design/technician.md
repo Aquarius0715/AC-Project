@@ -500,13 +500,13 @@ Scope: FR-T16 / Main display pattern: **UI-FORM**. Service boundary: `jobs.get, 
 | items (installation group) | InspectionItemInput[]/required | keys `mounting`, `refrigerant_piping`, `vacuum_leak_test`, `electrical_connection`, `drainage`, `test_run`, `customer_handover`; result or reason | Installation checklist |
 | installation.confirmedModelId | ID/required | must equal the unit's modelId | Equipment check |
 | installation.serial | string/required | trimmed, 1–80 characters | Equipment check |
-| attachmentIds | ID[]/required | one ready photo each tagged name plate, indoor unit, outdoor unit | Equipment check |
+| attachmentIds | ID[]/required | one ready photo each tagged `name_plate`, `indoor_unit`, `outdoor_unit` (`attachments.add` tag) | Equipment check |
 
 **Steps**
 
 1. The workspace shows the checklist group "Installation", then "Equipment check", "IoT device" and the sign-off step.
 2. "IoT device" opens the FR-T11 register and bind dialogs with the job id; skipping is allowed.
-3. Submit lists the missing items by field; HQ review is the normal review (`jobs.review`). Accept emits `UnitInstalled`; assets marks the unit installed and sets installedAt and warrantyEndsAt.
+3. Submit lists the missing items by field; HQ review is the normal review (`jobs.review`). Accept emits `UnitInstalled`; assets marks the unit installed and sets installedAt (the warranty end stays for the unit edit).
 
 **Boundary cases and failures**: `errors.model_mismatch` keeps the report in draft. A returned report leaves the unit `planned`.
 

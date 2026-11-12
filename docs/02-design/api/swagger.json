@@ -29456,6 +29456,9 @@
                 "id": {
                     "type": "string"
                 },
+                "installState": {
+                    "type": "string"
+                },
                 "installedAt": {
                     "type": "string"
                 },
@@ -29999,6 +30002,9 @@
                 "id": {
                     "type": "string"
                 },
+                "installState": {
+                    "type": "string"
+                },
                 "installedAt": {
                     "type": "string"
                 },
@@ -30148,6 +30154,9 @@
                     "type": "string"
                 },
                 "id": {
+                    "type": "string"
+                },
+                "installState": {
                     "type": "string"
                 },
                 "installedAt": {
@@ -30304,6 +30313,10 @@
                     "type": "string"
                 },
                 "id": {
+                    "type": "string"
+                },
+                "installState": {
+                    "description": "InstallState is planned for a unit not installed yet (DEC-106): omitted is installed for a new unit and the\nstored state for a saved one; it never changes by a save (an accepted installation report installs the unit).",
                     "type": "string"
                 },
                 "installedAt": {
@@ -34373,6 +34386,10 @@
                 },
                 "reportId": {
                     "type": "string"
+                },
+                "tag": {
+                    "description": "Tag says what a photo of an installation report shows (name plate, indoor unit, outdoor unit; DEC-106).",
+                    "type": "string"
                 }
             }
         },
@@ -34484,6 +34501,9 @@
                     "type": "integer"
                 },
                 "status": {
+                    "type": "string"
+                },
+                "tag": {
                     "type": "string"
                 },
                 "tenantId": {
@@ -34927,6 +34947,14 @@
                         "type": "string"
                     }
                 },
+                "installation": {
+                    "description": "Installation is the equipment an installation job confirms (DEC-106); null on any other job.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/maintenance.InstallationCheck"
+                        }
+                    ]
+                },
                 "items": {
                     "type": "array",
                     "items": {
@@ -35052,6 +35080,9 @@
                     "type": "integer"
                 },
                 "status": {
+                    "type": "string"
+                },
+                "tag": {
                     "type": "string"
                 },
                 "tenantId": {
@@ -35213,6 +35244,17 @@
                     "type": "string"
                 },
                 "technicianMembershipId": {
+                    "type": "string"
+                }
+            }
+        },
+        "maintenance.InstallationCheck": {
+            "type": "object",
+            "properties": {
+                "confirmedModelId": {
+                    "type": "string"
+                },
+                "serial": {
                     "type": "string"
                 }
             }
@@ -36130,6 +36172,9 @@
                 },
                 "id": {
                     "type": "string"
+                },
+                "installation": {
+                    "$ref": "#/definitions/maintenance.InstallationCheck"
                 },
                 "items": {
                     "type": "array",

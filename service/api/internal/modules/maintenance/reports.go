@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"maps"
 	"math"
 	"slices"
 	"strings"
@@ -15,7 +16,28 @@ import (
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
+	"github.com/pradita/ac-project/service/api/internal/platform/events"
 )
+
+// groupInstallation is the checklist group of an installation job (DEC-106): no unit's service scope has it, so it is
+// not one of ComponentGroups.
+const groupInstallation = "installation"
+
+// installationGroup is the checklist of an installation job in its order.
+func installationGroup() ComponentGroup {
+	return ComponentGroup{
+		groupInstallation,
+		[]string{
+			"mounting",
+			"refrigerant_piping",
+			"vacuum_leak_test",
+			"electrical_connection",
+			"drainage",
+			"test_run",
+			"customer_handover",
+		},
+	}
+}
 
 // ComponentGroup is one Unit.serviceScope group and its inspection components in order.
 type ComponentGroup struct {
@@ -44,8 +66,11 @@ func ComponentGroups() []ComponentGroup {
 	}
 }
 
+// InstallationKeys are the checklist components of an installation job in order.
+func InstallationKeys() []string { return installationGroup().Keys }
+
 func groupOf(key string) string {
-	for _, g := range ComponentGroups() {
+	for _, g := range append(ComponentGroups(), installationGroup()) {
 		if slices.Contains(g.Keys, key) {
 			return g.Group
 		}
@@ -184,11 +209,21 @@ type AttachmentRef struct {
 	JobID     uuid.UUID `json:"jobId"`
 	ReportID  uuid.UUID `json:"reportId"`
 	BlobID    uuid.UUID `json:"blobId"`
+	Tag       *string   `json:"tag"`
 	Name      string    `json:"name"`
 	Mime      string    `json:"mime"`
 	Size      int       `json:"size"`
 	Status    string    `json:"status"`
 }
+
+// InstallationCheck is InstallationCheck of service-contracts.ts: the equipment an installation report confirms.
+type InstallationCheck struct {
+	ConfirmedModelID uuid.UUID `json:"confirmedModelId"`
+	Serial           string    `json:"serial"`
+}
+
+// maxSerialLength is the longest serial of the confirmed equipment, in characters after trimming.
+const maxSerialLength = 80
 
 // Report is WorkReport.
 type Report struct {
@@ -200,6 +235,7 @@ type Report struct {
 	ReviewAvailability map[string]any      `json:"reviewAvailability"`
 	JobID              uuid.UUID           `json:"jobId"`
 	AuthorID           uuid.UUID           `json:"authorId"`
+	Installation       *InstallationCheck  `json:"installation"`
 	Items              []Item              `json:"items"`
 	Measurements       []ReportMeasurement `json:"measurements"`
 	Parts              []Part              `json:"parts"`
@@ -235,12 +271,13 @@ type Reports struct {
 
 const reportCols = `id, tenant_id, version, created_at, updated_at, job_id, author_id, state, items, measurements, ` +
 	`parts, refrigerant, sign_off, work_text,
-	next_action, submitted_at, accepted_at`
+	next_action, submitted_at, accepted_at, installation`
 
 func scanReport(row pgx.Row) (Report, error) {
 	var (
 		report                         Report
 		items, meas, parts, refr, next []byte
+		install                        []byte
 	)
 
 	err := row.Scan(
@@ -261,9 +298,19 @@ func scanReport(row pgx.Row) (Report, error) {
 		&next,
 		&report.SubmittedAt,
 		&report.AcceptedAt,
+		&install,
 	)
 	if err != nil {
 		return report, apperr.Wrap(err, "scan (scanReport)")
+	}
+
+	if len(install) > 0 && string(install) != jsonNull {
+		report.Installation = &InstallationCheck{ConfirmedModelID: uuid.Nil, Serial: ""}
+
+		err := json.Unmarshal(install, report.Installation)
+		if err != nil {
+			return report, apperr.Wrap(err, "json.Unmarshal")
+		}
 	}
 
 	report.Items = []Item{}
@@ -319,8 +366,8 @@ func (Reports) decorate(ctx context.Context, call *ops.Call, report *Report) err
 func attachmentRefs(ctx context.Context, call *ops.Call, report *Report) error {
 	rows, err := call.Tx.Query(
 		ctx,
-		`SELECT id, tenant_id, created_at, updated_at, job_id, name, mime, size_bytes, status FROM maintenance.attachments
-		WHERE report_id = $1 AND added_version <= $2 ORDER BY created_at, id`,
+		`SELECT id, tenant_id, created_at, updated_at, job_id, tag, name, mime, size_bytes, status
+		FROM maintenance.attachments WHERE report_id = $1 AND added_version <= $2 ORDER BY created_at, id`,
 		report.ID,
 		report.Version,
 	)
@@ -339,6 +386,7 @@ func attachmentRefs(ctx context.Context, call *ops.Call, report *Report) error {
 			&attachmentRef.CreatedAt,
 			&attachmentRef.UpdatedAt,
 			&attachmentRef.JobID,
+			&attachmentRef.Tag,
 			&attachmentRef.Name,
 			&attachmentRef.Mime,
 			&attachmentRef.Size,
@@ -469,6 +517,8 @@ type DraftInput struct {
 	WorkText      string             `json:"workText"`
 	NextAction    *NextAction        `json:"nextAction"`
 	AttachmentIDs []uuid.UUID        `json:"attachmentIds"`
+	// Installation is the equipment an installation job confirms (DEC-106); null on any other job.
+	Installation *InstallationCheck `json:"installation,omitempty"`
 }
 
 // validItemResult reports whether value is an inspection item's result.
@@ -553,6 +603,15 @@ func (in *DraftInput) Validate() map[string]string {
 	}
 
 	validateNextAction(in.NextAction, fieldErrs)
+
+	if in.Installation != nil {
+		in.Installation.Serial = strings.TrimSpace(in.Installation.Serial)
+		if in.Installation.ConfirmedModelID == uuid.Nil {
+			fieldErrs[fieldInstallation] = apperr.KeyInvalid
+		} else if utf8.RuneCountInString(in.Installation.Serial) > maxSerialLength {
+			fieldErrs[fieldInstallation] = apperr.KeyLength
+		}
+	}
 
 	return fieldErrs
 }
@@ -833,6 +892,7 @@ func (m Reports) previousDraft(
 			ReviewAvailability: nil,
 			JobID:              uuid.UUID{},
 			AuthorID:           uuid.UUID{},
+			Installation:       nil,
 			Items:              nil,
 			Measurements:       nil,
 			Parts:              nil,
@@ -1026,6 +1086,20 @@ func mergeMeasurements(
 
 // writeDraft stores the draft: a new report or the next version of the previous one, with its attachments, and the
 // job's draft version.
+// optionalJSON is the JSON column value of an optional object: SQL NULL when there is none.
+func optionalJSON[T any](value *T) (any, error) {
+	if value == nil {
+		return nil, nil //nolint:nilnil // a nil column value is SQL NULL, and there is no error
+	}
+
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		return nil, apperr.Wrap(err, "json.Marshal")
+	}
+
+	return encoded, nil
+}
+
 func writeDraft(
 	ctx context.Context,
 	call *ops.Call,
@@ -1050,26 +1124,23 @@ func writeDraft(
 		cols[i] = encoded
 	}
 
-	var next any
-
-	if input.NextAction != nil {
-		encoded, marshalErr := json.Marshal(input.NextAction)
-		if marshalErr != nil {
-			return apperr.Wrap(marshalErr, "json.Marshal")
-		}
-
-		next = encoded
+	install, err := optionalJSON(input.Installation)
+	if err != nil {
+		return err
 	}
 
-	var err error
+	next, err := optionalJSON(input.NextAction)
+	if err != nil {
+		return err
+	}
 
 	if input.ReportID == nil {
 		_, err = call.Tx.Exec(
 			ctx,
 			`INSERT INTO maintenance.work_reports (id, version, tenant_id, job_id, author_id, state, items, measurements, parts,
 				refrigerant, work_text,
-			next_action, created_at, updated_at) VALUES ($1, 1, current_setting('app.tenant_id')::uuid, $2, $3, 'draft', $4, $5,
-			$6, $7, $8, $9, $10, $10)`,
+			next_action, created_at, updated_at, installation) VALUES ($1, 1, current_setting('app.tenant_id')::uuid, $2, $3,
+			'draft', $4, $5, $6, $7, $8, $9, $10, $10, $11)`,
 			prev.ID,
 			input.JobID,
 			call.Principal.UserID,
@@ -1080,13 +1151,14 @@ func writeDraft(
 			input.WorkText,
 			next,
 			call.Now,
+			install,
 		)
 	} else {
 		_, err = call.Tx.Exec(
 			ctx,
 			`UPDATE maintenance.work_reports SET version = version + 1, items = $3, measurements = $4, parts = $5, refrigerant =
 				$6, work_text = $7,
-			next_action = $8, sign_off = NULL, updated_at = $9 WHERE id = $1 AND version = $2`,
+			next_action = $8, sign_off = NULL, updated_at = $9, installation = $10 WHERE id = $1 AND version = $2`,
 			prev.ID,
 			prev.Version,
 			cols[0],
@@ -1096,6 +1168,7 @@ func writeDraft(
 			input.WorkText,
 			next,
 			call.Now,
+			install,
 		)
 	}
 
@@ -1275,13 +1348,13 @@ func (m Reports) submitJob(ctx context.Context, call *ops.Call, input *SubmitInp
 		return Job{}, decorateErr
 	}
 
-	_, _, scope, err := m.Units.UnitService(ctx, call, unit)
+	fieldErrs, err := m.submitFieldErrs(ctx, call, input.JobID, unit, draft)
 	if err != nil {
-		return Job{}, apperr.Wrap(err, "maintenance.ServiceUnits.UnitService")
+		return Job{}, err
 	}
 
-	if fe := submitErrors(draft, Components(scope), call.Now); len(fe) > 0 {
-		return Job{}, apperr.Fields(fe)
+	if len(fieldErrs) > 0 {
+		return Job{}, apperr.Fields(fieldErrs)
 	}
 
 	_, execErr := call.Tx.Exec(
@@ -1326,6 +1399,74 @@ func (m Reports) submitJob(ctx context.Context, call *ops.Call, input *SubmitInp
 	}
 
 	return m.Jobs.finishScoped(ctx, call, input.JobID, "jobs.submit", "ReportSubmitted", "")
+}
+
+// submitFieldErrs checks the draft against what its job's report must cover: the inspection components of the unit's
+// service scope, or, for an installation job, the installation checklist and the equipment it confirms (DEC-106).
+func (m Reports) submitFieldErrs(
+	ctx context.Context,
+	call *ops.Call,
+	job, unit uuid.UUID,
+	draft *Report,
+) (map[string]string, error) {
+	var jobType string
+
+	err := call.Tx.QueryRow(ctx, `SELECT type FROM maintenance.jobs WHERE id = $1`, job).
+		Scan(&jobType)
+	if err != nil {
+		return nil, apperr.Wrap(err, "select maintenance.jobs")
+	}
+
+	if jobType == jobInstallation {
+		_, model, err := m.Units.UnitInstall(ctx, call, unit)
+		if err != nil {
+			return nil, apperr.Wrap(err, "maintenance.ServiceUnits.UnitInstall")
+		}
+
+		fieldErrs := submitErrors(draft, installationGroup().Keys, call.Now)
+		maps.Copy(fieldErrs, installationErrors(draft, model))
+
+		return fieldErrs, nil
+	}
+
+	_, _, scope, err := m.Units.UnitService(ctx, call, unit)
+	if err != nil {
+		return nil, apperr.Wrap(err, "maintenance.ServiceUnits.UnitService")
+	}
+
+	return submitErrors(draft, Components(scope), call.Now), nil
+}
+
+// installationErrors are what an installation report needs besides the checklist (BR-T16): the confirmed model is the
+// unit's model, the serial is given, a ready photo of each of the name plate, the indoor and the outdoor unit is
+// attached, and the customer has signed off (or is absent, with a photo).
+func installationErrors(report *Report, model uuid.UUID) map[string]string {
+	fieldErrs := map[string]string{}
+
+	switch {
+	case report.Installation == nil || report.Installation.Serial == "":
+		fieldErrs[fieldInstallation] = apperr.KeyRequired
+	case report.Installation.ConfirmedModelID != model:
+		fieldErrs[fieldInstallation] = "errors.model_mismatch"
+	}
+
+	tagged := map[string]bool{}
+
+	for _, a := range report.AttachmentRefs {
+		if a.Tag != nil && a.Status == attachmentReady {
+			tagged[*a.Tag] = true
+		}
+	}
+
+	if !tagged["name_plate"] || !tagged["indoor_unit"] || !tagged["outdoor_unit"] {
+		fieldErrs["attachmentIds"] = "errors.photos_required"
+	}
+
+	if len(report.SignOff) == 0 || string(report.SignOff) == jsonNull {
+		fieldErrs["signOff"] = apperr.KeyRequired
+	}
+
+	return fieldErrs
 }
 
 // closedTimeOnSite is the job's time on site closed at the submission: it finishes now, a pause still open ends with
@@ -1515,7 +1656,7 @@ func submitErrors(report *Report, components []string, now time.Time) map[string
 	}
 
 	for _, a := range report.AttachmentRefs {
-		if a.Status != "ready" {
+		if a.Status != attachmentReady {
 			fieldErrs["attachmentIds"] = "errors.attachment_not_ready"
 		}
 	}
@@ -1707,6 +1848,11 @@ func (m Reports) reviewJob(ctx context.Context, call *ops.Call, input *ReviewInp
 		if err != nil {
 			return Job{}, err
 		}
+
+		installErr := emitUnitInstalled(ctx, call, input.JobID)
+		if installErr != nil {
+			return Job{}, installErr
+		}
 	}
 
 	// the decision is the action (IR740, B-22): `job.reviewed`, written before, named both
@@ -1728,6 +1874,44 @@ func (m Reports) reviewJob(ctx context.Context, call *ops.Call, input *ReviewInp
 		"ReportReviewed",
 		deref(input.Reason),
 	)
+}
+
+// emitUnitInstalled tells Assets that an accepted installation report installed its unit, on the day the job started
+// (DEC-106); another kind of job does nothing.
+func emitUnitInstalled(ctx context.Context, call *ops.Call, job uuid.UUID) error {
+	var (
+		unit      uuid.UUID
+		startedAt *time.Time
+	)
+
+	err := call.Tx.QueryRow(
+		ctx,
+		`SELECT unit_id, started_at FROM maintenance.jobs WHERE id = $1 AND type = 'installation'`,
+		job,
+	).Scan(&unit, &startedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+
+	if err != nil {
+		return apperr.Wrap(err, "select maintenance.jobs")
+	}
+
+	installedAt := call.Now
+	if startedAt != nil {
+		installedAt = *startedAt
+	}
+
+	call.Emit(
+		outboxEvent(
+			"unit",
+			unit,
+			events.UnitInstalled,
+			events.UnitInstalledPayload{UnitID: unit, InstalledAt: installedAt},
+		),
+	)
+
+	return nil
 }
 
 // checkReviewer checks who reviews the job: its contractor, in the normal review only, or HQ, in the normal review of

@@ -376,6 +376,7 @@ CREATE TABLE assets.units (                      -- ACUnit
   display_name        text NOT NULL CHECK (length(display_name) BETWEEN 1 AND 120),
   model_id            uuid NOT NULL,             -- devices.capabilities.id (other module: no FK)
   type                text NOT NULL DEFAULT 'split' CHECK (type = 'split'),
+  install_state       text NOT NULL DEFAULT 'installed' CHECK (install_state IN ('planned','installed')),  -- DEC-106: planned until an installation report is accepted
   installed_at        timestamptz,
   service_scope       text[] NOT NULL DEFAULT '{indoor,outdoor,electrical}',
   warranty_ends_at    timestamptz,
@@ -1021,9 +1022,9 @@ CREATE TABLE maintenance.jobs (
   customer_org_id        uuid NOT NULL,
   plan_id                uuid,
   occurrence_at          timestamptz,
-  type                   text NOT NULL CHECK (type IN ('periodic','reactive','preventive')),
+  type                   text NOT NULL CHECK (type IN ('periodic','reactive','preventive','installation')),
   status                 text NOT NULL CHECK (status IN ('requested','offered','accepted','assigned','in_progress','submitted','completed','rework_requested','cancelled','on_hold')),
-  origin                 text NOT NULL CHECK (origin IN ('client_request','periodic_plan')),
+  origin                 text NOT NULL CHECK (origin IN ('client_request','periodic_plan','hq_request')),
   symptom                text NOT NULL DEFAULT '',
   contact_window         text,
   requested_slot         tstzrange NOT NULL,
@@ -1052,6 +1053,7 @@ CREATE TABLE maintenance.jobs (
   UNIQUE (tenant_id, id),
   UNIQUE (plan_id, occurrence_at)
 );
+CREATE UNIQUE INDEX jobs_one_installation ON maintenance.jobs (tenant_id, unit_id) WHERE type = 'installation' AND status NOT IN ('completed','cancelled');
 CREATE INDEX jobs_status ON maintenance.jobs (tenant_id, status, due_at);
 CREATE INDEX jobs_unit ON maintenance.jobs (tenant_id, unit_id, created_at DESC);
 CREATE INDEX jobs_customer ON maintenance.jobs (tenant_id, customer_org_id, created_at DESC);
@@ -1187,6 +1189,7 @@ CREATE TABLE maintenance.work_reports (          -- one row per report version; 
   parts               jsonb NOT NULL DEFAULT '[]',
   refrigerant         jsonb NOT NULL DEFAULT '[]',
   sign_off            jsonb,
+  installation        jsonb,                         -- InstallationCheck of an installation job: confirmed model and serial (DEC-106)
   work_text           text NOT NULL DEFAULT '',
   next_action         jsonb,
   review_availability text NOT NULL DEFAULT 'pending',
@@ -1224,6 +1227,7 @@ CREATE TABLE maintenance.attachments (
   size_bytes  int NOT NULL CHECK (size_bytes BETWEEN 1 AND 10485760),
   status      text NOT NULL CHECK (status IN ('processing','ready','failed')),
   scan_result text,
+  tag         text CHECK (tag IN ('name_plate','indoor_unit','outdoor_unit')),  -- installation report photos (DEC-106)
   uploaded_by uuid NOT NULL,
   created_at  timestamptz NOT NULL DEFAULT platform.app_now(),
   updated_at  timestamptz NOT NULL DEFAULT platform.app_now(),

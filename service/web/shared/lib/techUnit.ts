@@ -66,7 +66,7 @@ const label = (metric: string, t: T) => (textOf(metricLabel, metric, t) ?? metri
 
 const SCOPE: Record<string, string> = { indoor: "Indoor", outdoor: "Outdoor", electrical: "Electrical" };
 const TYPE: Record<string, string> = { split: "Split" };
-const COUNT: Record<Group, string> = { indoor: "{n} indoor", outdoor: "{n} outdoor", electrical: "{n} electrical" };
+const COUNT: Record<Group, string> = { indoor: "{n} indoor", outdoor: "{n} outdoor", electrical: "{n} electrical", installation: "{n} installation" };
 export interface Register { rows: [string, string][]; missing: boolean; note: string }
 /** The unit register (Figma: location, manufacturer / model, configuration, installed, capability version, maintenance
 scope). A value the register lacks says “Not registered” — never a similar model's value or today's date (DD-T02). */
