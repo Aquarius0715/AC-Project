@@ -23,6 +23,9 @@ const PrincipalPath = "/internal/v1/principal"
 // fetchTimeout bounds one request to identity-api when RemoteSource has no Client of its own.
 const fetchTimeout = 5 * time.Second
 
+// cacheSweepAt is the size of RemoteSource's cache from which a new entry first drops the stale ones.
+const cacheSweepAt = 256
+
 // PrincipalDTO is the wire form of ops.Principal between identity-api and the other services.
 type PrincipalDTO struct {
 	UserID       uuid.UUID              `json:"userId"`
@@ -148,6 +151,15 @@ func (r *RemoteSource) Principal(
 	r.mu.Lock()
 	if r.cache == nil {
 		r.cache = map[string]cached{}
+	}
+
+	if len(r.cache) >= cacheSweepAt {
+		// an entry is read only while it is fresh, so the stale ones (and every membership ID a caller made up) go
+		for k, c := range r.cache {
+			if now().Sub(c.at) >= r.TTL {
+				delete(r.cache, k)
+			}
+		}
 	}
 
 	r.cache[key] = cached{p: principal, err: err, at: now()}
