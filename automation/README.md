@@ -4,9 +4,9 @@
 
 実装範囲は表示までです。Web・API・DB・実機との通信、承認の保存、予定の更新、付属リモコン対応、完全おまかせ運転は含みません。元の依頼は [ac-automation-demo-handoff.md](ac-automation-demo-handoff.md) にあります。
 
-## 24顧客・30日分の月次評価
+## 27顧客・30日分の月次評価
 
-月次データは **2026-10-01〜10-30の連続30日、24顧客、1顧客1機器、30分ごと48区間/日**です。判定日時は`2026-10-31T12:00:00+09:00`に固定しています。2地点の天気と2料金プランを共有参照します。利用開始前の日も30日分の枠に含め、`not_enrolled`で表します。
+月次データは **2026-10-01〜10-30の連続30日、27顧客、1顧客1機器、30分ごと48区間/日**です。判定日時は`2026-10-31T12:00:00+09:00`に固定しています。2地点の天気と2料金プランを共有参照します。利用開始前の日も30日分の枠に含め、`not_enrolled`で表します。
 
 既存の個別ケースCLIとテストも引き続き利用できます。Python 3.12以上の標準ライブラリだけで動きます。以下はすべてリポジトリ直下から実行してください。
 
@@ -45,7 +45,7 @@ python3 -B -m unittest discover -s automation/tests -v
 
 ### パターンと出力例
 
-標準seedでは、**0件が10顧客、1件が10顧客、複数件が4顧客、合計21件**です。
+標準seedでは、**0件が11顧客、1件が12顧客、複数件が4顧客、合計23件**です。
 
 | 顧客 | パターン | 提案結果 |
 |---|---|---|
@@ -73,6 +73,33 @@ python3 -B -m unittest discover -s automation/tests -v
 | C022 | 平日は現行予定、週末は未利用確認 | 0件、週末の予定は追加しない |
 | C023 | 開始変更と電力量欠損が重なる | 水曜20:00の1件。予冷は欠損で見送り、月額も不明と表示 |
 | C024 | 木曜は早い、涼しい日も22℃、予冷は高い | 木曜17:00の1件。暑い日限定の温度案と割高な予冷は見送り |
+| C025 | 水曜18:30に自動オン、20:00に手動温度変更 | 水曜の開始変更は0件。自動オンを支持票にせず、暑い日の温度変更1件は返す |
+| C026 | 水曜3回は17:20・17:30・17:40に手動オン、1回は18:30自動オン | 水曜17:30への前倒し1件、23:00終了維持 |
+| C027 | 水曜の手動オンが17:10・18:00・18:50・19:40と分散 | 開始変更0件。4日分の履歴はあるが、候補±15分の支持が1日で見送り |
+
+### 自動運転と手動操作・週ごとのばらつきの追加3ケース
+
+```bash
+python3 -B -m automation.src.cli --customer C025
+python3 -B -m automation.src.cli --customer C026
+python3 -B -m automation.src.cli --customer C027
+# 操作時刻と30分電力量を確認（他の顧客・日付にも指定可能）
+python3 -B -m automation.src.cli --customer C026 --day 2026-10-07
+# 同じ30日分を再生成
+python3 -B -m automation.src.generate_monthly --seed 42
+```
+
+- **C025**: 全4回の水曜は18:30に`automation/on`、20:00に`web_manual/temperature`。水曜開始の支持は0日で、20:00への変更を出しません。暑い日に22℃を選ぶ別の根拠は残しており、温度提案は従来どおり返します。涼しい10/21の20:00は23℃へ変更するため、暑い日の22℃と区別できます。
+- **C026**: 10/7の17:20、10/14の17:30、10/21の17:40をWeb手動オンの3票とし、17:30±15分の条件を満たします。10/28の18:30自動オンは票に数えません。開始17:30を提案し、現行23:00終了を維持します。CLIの`evidence`と`evidence_ids`に3日分の手動操作が残ります。各対象日は、前日23:00のオフ以後に別のオン記録がなく、手動操作直前のオフを履歴から確認できます。
+- **C027**: 同じ4回の水曜に17:10・18:00・18:50・19:40のWeb手動オンがあり、時刻が分散しています。支持は最大1日で開始変更を見送ります。この顧客の水曜の現行予定は20:30〜23:00で、4回とも予定より早い手動オンです。C026の早い3日とC027では、予定開始時にはすでにオンのため、重複した自動オンの実行記録を作りません。終了は予定どおり自動オフにします。
+
+生成の追加は [generate_monthly.py](src/generate_monthly.py) の`PROFILES`と`build_data`です。`weekly_on`で曜日ごとの週別オン時刻と操作元、`temperature_times`で温度操作の時刻、`scheduled_starts`で現行予定を指定します。生成した操作を既存の`measured_energy`へ渡して電力量を再計算するため、稼働前は既知のゼロ、稼働区間は実際のオン時刻に応じたkWhになります。元の24顧客と共通の天気・料金データも維持します。
+
+開始時刻の扱いは [engine.py](src/engine.py) の`exclusions`・`usable_operations`・`start_pattern`にあります。**自動オンは除外し、Web手動オンだけを1日につき最初の1件まで数え、温度変更をオンへ読み替えません。** 現行予定の開始時刻自体もユーザーの支持票にはしません。`schedule_results`（[monthly_engine.py](src/monthly_engine.py)）が同じ集計を全曜日へ適用します。今回、集計・閾値・提案条件の変更はありません。手動オンが3日以上あっても支持がそろわない場合の理由だけを「履歴はあるが時刻が分散」と明記しました。顧客ID・ケース名・特定曜日や時刻で判定を分岐させていません。
+
+**電源状態の限界**: 現行の開始判定は、`web_manual/on`という記録を使い、操作直前の電源状態を判定条件として再構築していません。入力には操作直前の状態・初期状態・実機確認値がないため、観測開始直後や欠損・未記録の付属リモコン操作がある場合、すでにオンの状態で送ったオン指示との区別は保証できません。`operation_status=complete`だけでオフ→オンの実遷移を保証するものでもありません。C026は前日のオフと連続した記録で対象3日のオフ状態を確認するテストを置いています。電力量生成時の各日初期オフは仮定であり、実データの状態確認とは別です。
+
+追加テストは [test_monthly.py](tests/test_monthly.py) の`test_automatic_on_then_temperature_change_is_not_a_manual_start`、`test_three_early_manual_starts_have_exact_dated_evidence_and_keep_end`、`test_variable_weekly_starts_show_dispersion_not_absence_of_history`です。対象曜日の開始提案・支持件数・根拠ID、稼働前後の電力、別種の温度提案の維持を確認します。`test_mixed_start_inference_follows_times_and_not_customer_identity`では顧客ID・説明を変更し、手動時刻を1時間早めると16:30の候補へ追従することも検証します。
 
 一覧出力の例です。個別表示には現在の全曜日の予定、変更先、支持日数・日付、判断履歴の影響、費用と見送り理由が続きます。
 
@@ -133,14 +160,14 @@ C021  5件  提案あり / start:月、start:水、start:金、temperature:暑�
 
 ### データを変えて確認するテスト
 
-[tests/test_monthly.py](tests/test_monthly.py) は24顧客の件数・曜日・時刻・温度・予冷案を照合し、次の変更も検証します。
+[tests/test_monthly.py](tests/test_monthly.py) は27顧客の件数・曜日・時刻・温度・予冷案を照合し、次の変更も検証します。
 
 - `test_operation_only_changes_move_weekday_start_and_temperature`: 現行予定は固定し、水曜20:00、火曜17:00、暑い日23℃という操作の変更に提案が追従する。
 - `test_fixed_cli_command_follows_only_operation_data_changes`: 同じ`--customer`・同じ`--monthly-data`・同じ実行コマンドを維持し、操作だけを書き換えて0→金曜21:00の1件になる。
 - `test_weather_only_changes_remove_hot_day_proposal`: 操作を変えず外気温だけを涼しくすると、暑い日の温度案だけが消える。
 - `test_tariff_only_changes_remove_savings`: 予冷する時間の単価だけを上げると節約案が消え、総額が下がらない理由が残る。
 - `test_judgment_only_changes_approval_rejection_and_no_response`: 利用履歴を固定し、修正承認・見送り・無反応の違いを検証する。
-- `test_changes_to_one_customers_operations_and_judgments_do_not_affect_others`: 2顧客の操作・判断を変更しても、他の22顧客の詳細結果は一致する。
+- `test_changes_to_one_customers_operations_and_judgments_do_not_affect_others`: 2顧客の操作・判断を変更しても、他の25顧客の詳細結果は一致する。
 - 生成の再現性、観測電力と稼働時間・天気・温度の整合、未利用と欠損、区間料金と日合計、未来データの除外、初回予定の根拠不足、予報と予測の前提不一致、快適性を保つ比較元も検証する。
 
 実データ接続や本番反映は後続です。現在の30分グリッドは日本の2地点の24時間/日を前提にしており、実機の不規則なサンプル間隔、夏時間、料金プランの適用期間、複数機器・複数予定、室温予測の校正と不確かさは接続時に扱います。承認・見送りの新規保存や予定適用は行いません。
