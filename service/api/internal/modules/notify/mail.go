@@ -2,6 +2,7 @@ package notify
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -40,7 +41,7 @@ type SMTP struct {
 
 // Send implements Sender.
 func (s SMTP) Send(
-	_ context.Context,
+	ctx context.Context,
 	recipient, subject, body string,
 ) (string, error) { //nolint:unparam // Send implements Sender, whose caller reads the message ID
 	if strings.ContainsAny(recipient, "\r\n") ||
@@ -71,10 +72,80 @@ func (s SMTP) Send(
 		return "", fmt.Errorf("mail: sender %q: %w", s.From, err)
 	}
 
-	return id, apperr.Wrap(
-		smtp.SendMail(s.Addr, nil, from.Address, []string{recipient}, []byte(msg)),
-		"smtp.SendMail",
-	)
+	return id, apperr.Wrap(s.deliver(ctx, from.Address, recipient, []byte(msg)), "smtp.SendMail")
+}
+
+// smtpTimeout bounds one message when the context has no deadline of its own: the send runs inside a database
+// transaction, so a server that stops answering must not hold it (smtp.SendMail has no deadline at all).
+const smtpTimeout = 30 * time.Second
+
+// deliver is smtp.SendMail (STARTTLS when offered, no authentication) with a deadline: the connection is closed when
+// the context ends or smtpTimeout has passed.
+func (s SMTP) deliver(ctx context.Context, from, recipient string, msg []byte) error {
+	ctx, cancel := context.WithTimeout(ctx, smtpTimeout)
+	defer cancel()
+
+	var dialer net.Dialer
+
+	conn, err := dialer.DialContext(ctx, "tcp", s.Addr)
+	if err != nil {
+		return fmt.Errorf("dial %s: %w", s.Addr, err)
+	}
+
+	stop := context.AfterFunc(ctx, func() { _ = conn.Close() })
+	defer stop()
+
+	host, _, err := net.SplitHostPort(s.Addr)
+	if err != nil {
+		return fmt.Errorf("address %s: %w", s.Addr, err)
+	}
+
+	client, err := smtp.NewClient(conn, host)
+	if err != nil {
+		return fmt.Errorf("greeting: %w", err)
+	}
+	defer func() { _ = client.Close() }()
+
+	if ok, _ := client.Extension("STARTTLS"); ok {
+		err = client.StartTLS(tlsConfig(host))
+		if err != nil {
+			return fmt.Errorf("starttls: %w", err)
+		}
+	}
+
+	err = client.Mail(from)
+	if err == nil {
+		err = client.Rcpt(recipient)
+	}
+
+	if err != nil {
+		return fmt.Errorf("envelope: %w", err)
+	}
+
+	bodyWriter, err := client.Data()
+	if err != nil {
+		return fmt.Errorf("data: %w", err)
+	}
+
+	_, err = bodyWriter.Write(msg)
+	if err == nil {
+		err = bodyWriter.Close()
+	}
+
+	if err != nil {
+		return fmt.Errorf("write message: %w", err)
+	}
+
+	return apperr.Wrap(client.Quit(), "quit")
+}
+
+// tlsConfig verifies the server's certificate against its host name.
+func tlsConfig(host string) *tls.Config {
+	cfg := new(tls.Config)
+	cfg.MinVersion = tls.VersionTLS12
+	cfg.ServerName = host
+
+	return cfg
 }
 
 // Apps are the sign-in addresses of the web apps that e-mails link to, and the host names the deployment also answers
