@@ -12,6 +12,16 @@ import (
 // errConnect carries a connection URL with its password, as a driver error does.
 var errConnect = errors.New(`connect postgres://ac_app_login:hunter2@db:5432/ac failed`)
 
+// A connection-URL password that holds an "@" is masked whole, not only up to the first "@".
+func TestMaskPasswordWithAt(t *testing.T) {
+	t.Parallel()
+
+	got := logging.Mask("connect postgres://ac:p@ss@db:5432/ac failed")
+	if want := "connect postgres://ac:[masked]@db:5432/ac failed"; got != want {
+		t.Errorf("Mask = %q, want %q", got, want)
+	}
+}
+
 // IR369: what must never reach a log line is masked, whatever the code passes; IDs, dates and paths stay readable.
 func TestMasking(t *testing.T) {
 	t.Parallel()
