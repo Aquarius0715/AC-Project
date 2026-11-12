@@ -132,6 +132,7 @@ describe("refreshing the access token", () => {
     const [url, init] = sentCall(fetch.mock.calls);
     expect(url).toBe("https://keycloak:8080/realms/ac/protocol/openid-connect/token");
     expect(Object.fromEntries(new URLSearchParams(bodyText(init)))).toStrictEqual({ grant_type: "refresh_token", refresh_token: "r-1", client_id: "ac-web", client_secret: TEST_CLIENT_SECRET });
+    expect(init.signal).toBeInstanceOf(AbortSignal); // a hung provider must not hold every page request (proxy.ts refreshes there)
   });
 
   it("gives nothing for another membership, a refused grant, a network failure or no refresh token", async () => {
