@@ -274,6 +274,12 @@ def schedule_results(
             if support >= START_MIN_SUPPORT and candidate >= current.end:
                 status = "rejected"
                 reason = "開始候補が現行の終了以降になるため見送り。"
+            manual_days = sum(time is not None for _, time in votes)
+            if status == "insufficient" and manual_days >= START_MIN_SUPPORT:
+                reason = (
+                    f"手動オンの履歴は{manual_days}日ありますが、開始時刻が分散しています。"
+                    f"候補±15分の支持は{support}日で、直近4回中3回の条件を満たしません。"
+                )
             current_values = dict(
                 start=clock(current.start),
                 end=clock(current.end),

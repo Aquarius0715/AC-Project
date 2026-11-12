@@ -9,6 +9,7 @@ from decimal import Decimal
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from .models import clock
 from .monthly_data import local_midnight, normalize_bundle
 from .monthly_engine import evaluate_customer, signature
 
@@ -80,6 +81,38 @@ PROFILES = (
         hot=True,
         cool_change=True,
         prediction="expensive",
+    ),
+    dict(
+        description="自動オン後に水曜20時の温度変更だけ",
+        automatic=True,
+        hot=True,
+        temperature_times={2: 1200},
+        cool_temperature=23,
+    ),
+    dict(
+        description="水曜は3週が早い手動オン、1週が予定オン",
+        weekly_on={
+            2: (
+                (1040, "web_manual"),
+                (1050, "web_manual"),
+                (1060, "web_manual"),
+                (1110, "automation"),
+            )
+        },
+        off_source="automation",
+    ),
+    dict(
+        description="水曜の手動オンが週ごとに分散",
+        weekly_on={
+            2: (
+                (1030, "web_manual"),
+                (1080, "web_manual"),
+                (1130, "web_manual"),
+                (1180, "web_manual"),
+            )
+        },
+        scheduled_starts={2: 1230},
+        off_source="automation",
     ),
 )
 
@@ -270,7 +303,12 @@ def build_data(seed: int = 42) -> dict:
             []
             if profile.get("no_schedule")
             else [
-                dict(weekday=weekday, start="18:30", end="23:00", temperature_c=24)
+                dict(
+                    weekday=weekday,
+                    start=clock(profile.get("scheduled_starts", {}).get(weekday, 1110)),
+                    end="23:00",
+                    temperature_c=24,
+                )
                 for weekday in profile.get("weekdays", range(7))
             ]
         )
@@ -309,27 +347,44 @@ def build_data(seed: int = 42) -> dict:
                     start += (-10, 0, 10, 0)[(offset // 7) % 4]
                 once = bool(profile.get("once") and day.weekday() == 2 and day.day < 28)
                 source = "automation" if profile.get("automatic") else "web_manual"
+                weekly_on = profile.get("weekly_on", {}).get(day.weekday())
+                if weekly_on:
+                    start, source = weekly_on[(offset // 7) % len(weekly_on)]
                 operations.append(
                     operation_record(
                         customer_id, day, start, "on", source, once, after=24
                     )
                 )
-                if profile.get("hot") and (
-                    day.day % 3 != 0 or profile.get("cool_change")
+                temperature_at = profile.get("temperature_times", {}).get(day.weekday())
+                if (
+                    temperature_at is not None
+                    or profile.get("hot")
+                    and (day.day % 3 != 0 or profile.get("cool_change"))
                 ):
                     operations.append(
                         operation_record(
                             customer_id,
                             day,
-                            start + 30,
+                            temperature_at
+                            if temperature_at is not None
+                            else start + 30,
                             "temperature",
                             "web_manual",
                             before=24,
-                            after=22,
+                            after=profile.get("cool_temperature", 22)
+                            if day.day % 3 == 0
+                            else 22,
                         )
                     )
                 operations.append(
-                    operation_record(customer_id, day, 1380, "off", source, once)
+                    operation_record(
+                        customer_id,
+                        day,
+                        1380,
+                        "off",
+                        profile.get("off_source", source),
+                        once,
+                    )
                 )
             outdoor = sites[site_id]["observations"][offset]["outdoor_c"]
             kwh = (
@@ -415,17 +470,20 @@ def build_data(seed: int = 42) -> dict:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="24顧客・30日分の再現可能な仮データを生成"
+        description=f"{len(PROFILES)}顧客・30日分の再現可能な仮データを生成"
     )
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     args = parser.parse_args(argv)
     args.output.parent.mkdir(parents=True, exist_ok=True)
+    data = build_data(args.seed)
     args.output.write_text(
-        json.dumps(build_data(args.seed), ensure_ascii=False, indent=2) + "\n",
+        json.dumps(data, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
-    print(f"生成: {args.output} (24顧客 × 30日、seed={args.seed})")
+    print(
+        f"生成: {args.output} ({len(data['customers'])}顧客 × 30日、seed={args.seed})"
+    )
     return 0
 
 

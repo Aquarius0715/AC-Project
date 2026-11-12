@@ -114,7 +114,9 @@ def monthly_command(args: argparse.Namespace) -> int:
         if args.json:
             print(json.dumps(summaries, ensure_ascii=False, indent=2))
         else:
-            print("仮データ・仮ルール / 24顧客程度の月次評価。金額・室温は仮の値です。")
+            print(
+                f"仮データ・仮ルール / {len(summaries)}顧客の月次評価。金額・室温は仮の値です。"
+            )
             for report in summaries:
                 proposals = (
                     "、".join(

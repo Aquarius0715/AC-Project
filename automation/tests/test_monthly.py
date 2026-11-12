@@ -49,6 +49,9 @@ EXPECTED = {
     "C022": [],
     "C023": [("start", 2, "20:00")],
     "C024": [("start", 3, "17:00")],
+    "C025": [("temperature", None, "22")],
+    "C026": [("start", 2, "17:30")],
+    "C027": [],
 }
 
 
@@ -115,7 +118,7 @@ class MonthlyTests(unittest.TestCase):
             r["customer_id"]: r for r in evaluate_bundle(normalize_bundle(cls.raw))
         }
 
-    def test_all_24_customers_have_exact_counts_and_contents(self):
+    def test_all_customers_have_exact_counts_and_contents(self):
         self.assertEqual(set(self.reports), set(EXPECTED))
         for customer_id, expected in EXPECTED.items():
             with self.subTest(customer_id=customer_id):
@@ -589,6 +592,111 @@ class MonthlyTests(unittest.TestCase):
         self.assertEqual(
             find_decision(report_for(raw, "C007"), "precool", 6)["status"], "suppressed"
         )
+
+    def test_automatic_on_then_temperature_change_is_not_a_manual_start(self):
+        customer = raw_customer(self.raw, "C025")
+        for day in customer["days"]:
+            if date.fromisoformat(day["date"]).weekday() != 2:
+                continue
+            on = next(op for op in day["operations"] if op["action"] == "on")
+            change = next(
+                op for op in day["operations"] if op["action"] == "temperature"
+            )
+            self.assertEqual((on["at"][11:16], on["source"]), ("18:30", "automation"))
+            self.assertEqual(
+                (change["at"][11:16], change["source"]), ("20:00", "web_manual")
+            )
+            self.assertTrue(all(Decimal(kwh) == 0 for kwh in day["kwh"][:37]))
+            self.assertGreater(
+                Decimal(day["kwh"][39]), 0
+            )  # Already running before 20:00.
+        item = find_decision(self.reports["C025"], "start", 2)
+        self.assertEqual(item["status"], "unchanged")
+        self.assertEqual(item["support_count"], 0)
+        self.assertEqual(item["evidence_ids"], [])
+        self.assertFalse(
+            any(
+                p["kind"] == "start" and p["weekday"] == 2
+                for p in self.reports["C025"]["proposals"]
+            )
+        )
+        self.assertTrue(
+            any(p["kind"] == "temperature" for p in self.reports["C025"]["proposals"])
+        )
+
+    def test_three_early_manual_starts_have_exact_dated_evidence_and_keep_end(self):
+        customer = raw_customer(self.raw, "C026")
+        power = None
+        starts = []
+        manual_ids = []
+        for day in customer["days"]:
+            for op in day["operations"]:
+                if (
+                    op["action"] == "on"
+                    and date.fromisoformat(day["date"]).weekday() == 2
+                ):
+                    self.assertIs(
+                        power, False
+                    )  # Previous day's recorded off, no intervening on.
+                    starts.append((day["date"], op["at"][11:16], op["source"]))
+                    if op["source"] == "web_manual":
+                        manual_ids.append(op["id"])
+                if op["action"] in ("on", "off"):
+                    power = op["action"] == "on"
+        self.assertEqual(
+            starts,
+            [
+                ("2026-10-07", "17:20", "web_manual"),
+                ("2026-10-14", "17:30", "web_manual"),
+                ("2026-10-21", "17:40", "web_manual"),
+                ("2026-10-28", "18:30", "automation"),
+            ],
+        )
+        item = find_decision(self.reports["C026"], "start", 2)
+        self.assertEqual(item["status"], "proposed")
+        self.assertEqual(item["values"]["start"], "17:30")
+        self.assertEqual(item["values"]["end"], "23:00")
+        self.assertEqual(item["support_count"], 3)
+        self.assertEqual(item["evidence_ids"], sorted(manual_ids))
+        for day, time, source in starts:
+            if source == "web_manual":
+                self.assertTrue(
+                    any(day in line and time in line for line in item["evidence"])
+                )
+
+    def test_variable_weekly_starts_show_dispersion_not_absence_of_history(self):
+        customer = raw_customer(self.raw, "C027")
+        times = [
+            op["at"][11:16]
+            for day in customer["days"]
+            if date.fromisoformat(day["date"]).weekday() == 2
+            for op in day["operations"]
+            if op["action"] == "on"
+        ]
+        self.assertEqual(times, ["17:10", "18:00", "18:50", "19:40"])
+        item = find_decision(self.reports["C027"], "start", 2)
+        self.assertNotEqual(item["status"], "proposed")
+        self.assertEqual(len(item["evidence_ids"]), 4)
+        self.assertEqual(item["support_count"], 1)
+        self.assertIn("履歴は4日", item["reason"])
+        self.assertIn("時刻が分散", item["reason"])
+        for time in times:
+            self.assertTrue(any(time in line for line in item["evidence"]))
+
+    def test_mixed_start_inference_follows_times_and_not_customer_identity(self):
+        raw = copy.deepcopy(self.raw)
+        customer = raw_customer(raw, "C026")
+        customer.update(customer_id="renamed-mixed", description="unseen")
+        for day in customer["days"]:
+            if date.fromisoformat(day["date"]).weekday() == 2:
+                for op in day["operations"]:
+                    if op["action"] == "on" and op["source"] == "web_manual":
+                        op["at"] = (
+                            datetime.fromisoformat(op["at"]) - timedelta(hours=1)
+                        ).isoformat()
+        item = find_decision(report_for(raw, "renamed-mixed"), "start", 2)
+        self.assertEqual(item["values"]["start"], "16:30")
+        self.assertEqual(item["support_count"], 3)
 
 
 if __name__ == "__main__":
