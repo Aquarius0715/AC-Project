@@ -674,7 +674,7 @@ func (Reports) currentDraft(
 //	@Description	IR94 technician write table (assignment and work window, jobId required when typed); IR100 partial \
 //	@Description	items allowed
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-//	@Description	Design: DD-T04, DD-T05, DD-T06, DD-T09, DD-T14
+//	@Description	Design: DD-T04, DD-T05, DD-T06, DD-T09, DD-T14, DD-T16
 //	@Tags			jobs
 //	@Accept			json
 //	@Produce		json
@@ -1225,7 +1225,8 @@ func (m Reports) lockJob(
 //	@Description	IR94 technician write table (assignment and work window, jobId required when typed); IR100 component \
 //	@Description	set and report completeness
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-//	@Description	Design: DD-T04, DD-T05, DD-T06, DD-T08, DD-T09 · Input versions: reportVersion=WorkReport.version
+//	@Description	Design: DD-T04, DD-T05, DD-T06, DD-T08, DD-T09, DD-T16 · Input versions: \
+//	@Description	reportVersion=WorkReport.version
 //	@Tags			jobs
 //	@Accept			json
 //	@Produce		json

@@ -1267,7 +1267,7 @@ func (m Jobs) getAttachment(
 //	@Description	unanswered offer: NOT_FOUND for contractor
 //	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
 //	@Description	Design: DD-A06, DD-C09, DD-P01, DD-P02, DD-P05, DD-P08, DD-T04, DD-T05, DD-T06, DD-T08, DD-T09, \
-//	@Description	DD-T10, DD-C17, DD-T13, DD-P10, DD-P03, DD-T02, DD-T07
+//	@Description	DD-T10, DD-C17, DD-T13, DD-P10, DD-P03, DD-T02, DD-T07, DD-T16
 //	@Tags			jobs
 //	@Accept			json
 //	@Produce		json

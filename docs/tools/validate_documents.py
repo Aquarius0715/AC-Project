@@ -346,13 +346,14 @@ trace = rows('00-prepare/traceability.csv')
 # 0.27.0 (2026-10-07): IR117 AWS / Stripe / HQ network restriction / retention / capacity (production target only); counts unchanged.
 # 0.26.0 (2026-10-07): IR116 Next.js stack + backend-architecture.md / network-architecture.md (production target, not 1A inputs); counts unchanged.
 # 0.25.0 (2026-10-07): IR115 consistency fixes (tabs, permissions, owner-only default rules); counts unchanged.
+# 0.634.0 (2026-11-12): IR789 adds FR-T16 (new aircon installation, DD-T16); 85 requirement IDs, 69 role rows, 228 operations.
 # 0.288.0 (2026-10-13): IR416 adds FR-P11 (contractor company users, SCR-P11, DD-P11, partnerUsers.*); 84 requirement IDs, 68 role rows, 208 operations.
 # 0.24.0 (2026-10-06): IR114 adds FR-C19 (customer users, SCR-C19, DD-C19); 83 requirement IDs, 67 role rows.
 # 0.23.0 (2026-10-02): IR113 maintenance scheduling adds 8 job operations (197); no new requirement IDs.
 # 0.22.0 (2026-10-01): Figma-confirmed screens add FR-C14–C18, FR-P09–P10, FR-T13–T15, FR-A17–A23 and FR-X08 (IR107–IR112).
-expected = {f'FR-{letter}{i:02}' for letter, n in [('C',19),('P',11),('T',15),('A',23),('X',8)] for i in range(1,n+1)} | {f'NFR-{i:02}' for i in range(1,9)}
+expected = {f'FR-{letter}{i:02}' for letter, n in [('C',19),('P',11),('T',16),('A',23),('X',8)] for i in range(1,n+1)} | {f'NFR-{i:02}' for i in range(1,9)}
 if unique(trace, 'requirement_id', 'requirement') != expected:
-    fail('Requirement coverage must be 84 IDs')
+    fail('Requirement coverage must be 85 IDs')
 acceptance = set()
 for row in trace:
     req = (ROOT / row['requirement_file']).read_text()
@@ -481,8 +482,8 @@ for role in ['client','contractor','technician','admin']:
         for op in re.findall(r'[a-zA-Z]+\.[a-zA-Z]+', cells[3]):
             if op not in opmap or did not in opmap[op]['design_ids'].split(';'):
                 fail('DD/catalog mismatch '+did+' '+op)
-if role_tables != 68:
-    fail('Expected 68 role requirement rows')
+if role_tables != 69:
+    fail('Expected 69 role requirement rows')
 # FRV-011: detail-section service boundary sentences must equal the summary table (single source of operations).
 for role in ['client','contractor','technician','admin']:
     text = (ROOT / f'02-design/{role}.md').read_text()
