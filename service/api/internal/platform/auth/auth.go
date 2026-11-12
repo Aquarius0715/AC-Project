@@ -283,7 +283,13 @@ func (a *Authenticator) authenticate(ectx *echo.Context, header string) (*ops.Pr
 	}
 
 	if err != nil {
-		return nil, unauth(ectx, apperr.KeyMembershipInvalid)
+		// only a membership that is not there (or not valid) ends the session; a database that cannot be read is
+		// a 503 the client retries, not a 401 that signs everybody out while it restarts
+		if errors.Is(err, ErrNoMembership) || apperr.From(err).Code == apperr.NotFound {
+			return nil, unauth(ectx, apperr.KeyMembershipInvalid)
+		}
+
+		return nil, apperr.From(err)
 	}
 
 	refusal := refused(ectx, principal, identity)
