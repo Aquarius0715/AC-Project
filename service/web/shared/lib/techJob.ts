@@ -36,21 +36,18 @@ export function knownOf(i: I18n, clocks: (string | null | undefined)[], stamps: 
 }
 const EN_FMT = fmtOf(EN);
 
-export type Group = "indoor" | "outdoor" | "electrical" | "installation";
+export type Group = "indoor" | "outdoor" | "electrical";
 /** The component keys of each group in canonical order (maintenance.ComponentGroups of the Core API). */
 export const componentGroups: { group: Group; keys: ComponentKey[] }[] = [
   { group: "indoor", keys: ["filter", "evaporator_coil", "blower_motor", "blower_fan", "drain_pipe", "drain_pan", "outlet", "louver"] },
   { group: "outdoor", keys: ["condenser_coil", "compressor", "fan", "blade", "refrigerant_pipe"] },
   { group: "electrical", keys: ["thermostat", "sensor", "capacitor", "contactor", "wiring"] },
-  { group: "installation", keys: ["mounting", "refrigerant_piping", "vacuum_leak_test", "electrical_connection", "drainage", "test_run", "customer_handover"] },
 ];
-export const groupLabel: Record<Group, string> = { indoor: "Indoor", outdoor: "Outdoor", electrical: "Electrical", installation: "Installation" };
+export const groupLabel: Record<Group, string> = { indoor: "Indoor", outdoor: "Outdoor", electrical: "Electrical" };
 export const componentLabel: Record<string, string> = {
   filter: "Filter", evaporator_coil: "Evaporator coil", blower_motor: "Blower motor", blower_fan: "Blower fan", drain_pipe: "Drain pipe", drain_pan: "Drain pan",
   outlet: "Outlet", louver: "Louver", condenser_coil: "Condenser coil", compressor: "Compressor", fan: "Fan", blade: "Fan blade", refrigerant_pipe: "Refrigerant pipe",
   thermostat: "Thermostat", sensor: "Sensor", capacitor: "Capacitor", contactor: "Contactor", wiring: "Wiring insulation",
-  mounting: "Mounting", refrigerant_piping: "Refrigerant piping", vacuum_leak_test: "Vacuum and leak test", electrical_connection: "Electrical connection",
-  drainage: "Drainage", test_run: "Test run", customer_handover: "Customer handover",
 };
 export const groupOf = (key: string): Group | null => componentGroups.find((g) => g.keys.some((k) => k === key))?.group ?? null;
 /** The components a report of this unit must cover: every key of the groups in the unit's service scope (IR100). */

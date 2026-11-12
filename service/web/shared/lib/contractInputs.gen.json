@@ -711,7 +711,6 @@
  ],
  "jobs.saveDraft": [
   "attachmentIds",
-  "installation",
   "items",
   "jobId",
   "measurements",

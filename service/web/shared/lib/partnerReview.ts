@@ -11,7 +11,7 @@ const en = translator("en");
 
 /** WorkReport of service-contracts.ts (the parts the review shows). */
 export interface ApiInspectionItem {
-  id: string; componentGroup: "indoor" | "outdoor" | "electrical" | "installation"; componentKey: string;
+  id: string; componentGroup: "indoor" | "outdoor" | "electrical"; componentKey: string;
   result: "normal" | "attention" | "not_inspected" | "not_applicable" | null; reason: string | null; evidenceIds: string[]; authorId: string; observedAt: string;
 }
 export interface ApiReportMeasurement { id: string; componentKey?: string | null; metric: string; value: number | null; unit: string; quality: string; qualityReason?: string | null; observedAt: string }
@@ -35,13 +35,11 @@ export interface ApiReviewJob {
 }
 export interface ApiAlertLite { id: string; type: string; severity: string; status: string; evidenceText: string; detectedAt: string }
 
-const groupLabel: Record<ApiInspectionItem["componentGroup"], string> = { indoor: "Indoor unit", outdoor: "Outdoor unit", electrical: "Electrical", installation: "Installation" };
+const groupLabel: Record<ApiInspectionItem["componentGroup"], string> = { indoor: "Indoor unit", outdoor: "Outdoor unit", electrical: "Electrical" };
 const componentLabel: Record<string, string> = {
   filter: "filter condition", evaporator_coil: "evaporator coil", blower_motor: "blower motor", blower_fan: "blower fan", drain_pipe: "drain pipe", drain_pan: "drain pan", outlet: "outlet",
   louver: "louver", condenser_coil: "condenser coil", compressor: "compressor", fan: "fan", blade: "fan blade", refrigerant_pipe: "refrigerant pipe", thermostat: "thermostat",
   sensor: "sensor", capacitor: "capacitor", contactor: "contactor", wiring: "wiring insulation",
-  mounting: "mounting", refrigerant_piping: "refrigerant piping", vacuum_leak_test: "vacuum and leak test", electrical_connection: "electrical connection", drainage: "drainage",
-  test_run: "test run", customer_handover: "customer handover",
 };
 // the words the technician chose the result from (IR597)
 export const resultText: Record<NonNullable<ApiInspectionItem["result"]>, { label: string; tone: "ok" | "warn" | "muted" | "crit" }> = {
@@ -74,7 +72,7 @@ names of the report photos linked to its finding (InspectionItem.evidenceIds, IR
 lists keeps its ID. */
 export interface InspectionRow { id: string; label: string; result: ApiInspectionItem["result"]; reason: string | null; photos: string[] }
 export function inspectionRows(items: ApiInspectionItem[], t: T = en, attachments: Pick<ApiAttachment, "id" | "name">[] = []): InspectionRow[] {
-  const order = { indoor: 0, outdoor: 1, electrical: 2, installation: 3 };
+  const order = { indoor: 0, outdoor: 1, electrical: 2 };
   const names = new Map(attachments.map((a) => [a.id, a.name]));
   return [...items].toSorted((a, b) => order[a.componentGroup] - order[b.componentGroup]).map((it) => {
     return {
