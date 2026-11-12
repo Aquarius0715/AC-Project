@@ -1036,6 +1036,35 @@ func TestWithdrawnOfferNoticeHasNoLink(t *testing.T) {
 		t.Errorf("the contractor's notice names %v, want Job %s", params["targetName"], job[:8])
 	}
 
+	// a preview shown to the contractor names the job too (IR775)
+	code, res := post(
+		srv,
+		contrA(),
+		"notifications.recipients",
+		`{"target":{"kind":"job","id":"`+job+`"},"templateKey":"job_update","channel":"inApp","query":{}}`,
+	)
+	if code != 200 || len(items(t, res)) == 0 {
+		t.Fatalf("contractor recipients: %d %v", code, res)
+	}
+
+	code, res = post(
+		srv,
+		contrA(),
+		"notifications.preview",
+		`{"target":{"kind":"job","id":"`+job+`"},"templateKey":"job_update","channel":"inApp","recipientMembershipId":"`+
+			asStr(
+				t,
+				items(t, res)[0]["id"],
+			)+`"}`,
+	)
+	if code != 200 {
+		t.Fatalf("contractor preview: %d %v", code, res)
+	}
+
+	if name := asObj(t, data(res)["params"])["targetName"]; name != "Job "+job[:8] {
+		t.Errorf("the contractor's preview names %v, want Job %s (IR775)", name, job[:8])
+	}
+
 	if code, res := write(
 		srv,
 		hq(),
