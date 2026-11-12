@@ -34,7 +34,8 @@ def usable_operations(scenario: Scenario) -> tuple[Operation, ...]:
                         key=lambda op: op.at))
 
 
-def start_decision(scenario: Scenario) -> Decision:
+def start_pattern(scenario: Scenario) -> tuple[int, int, tuple]:
+    """Shared monthly/single-case aggregation: candidate, support, dated votes."""
     schedule = scenario.schedule
     today = scenario.as_of.astimezone(scenario.timezone).date()
     dates = []
@@ -50,8 +51,6 @@ def start_decision(scenario: Scenario) -> Decision:
         if op.action == "on" and local.date() in dates:
             first_on.setdefault(local.date(), local.hour * 60 + local.minute)
     times = tuple(first_on.values())
-    evidence = tuple(f"{day.isoformat()}: {clock(first_on[day]) if day in first_on else '有効な手動オンなし（欠損・除外含む）'}"
-                     for day in sorted(dates))
     candidates = []
     # At most 4 samples × 1440 minutes. Prefer most supporting dates, then
     # smallest total deviation, then the earlier time for deterministic ties.
@@ -59,10 +58,17 @@ def start_decision(scenario: Scenario) -> Decision:
         supported = [time for time in times if abs(time - candidate) <= START_TOLERANCE_MINUTES]
         candidates.append((len(supported), -sum(abs(time - candidate) for time in supported), -candidate))
     support, _, negative_candidate = max(candidates)
+    return -negative_candidate, support, tuple((day, first_on.get(day)) for day in sorted(dates))
+
+
+def start_decision(scenario: Scenario) -> Decision:
+    schedule = scenario.schedule
+    candidate, support, votes = start_pattern(scenario)
+    evidence = tuple(f"{day.isoformat()}: {clock(time) if time is not None else '有効な手動オンなし（欠損・除外含む）'}"
+                     for day, time in votes)
     if support < START_MIN_SUPPORT:
         return Decision("start", False,
                         "証拠不足: 直近4回の対象曜日のうち、候補時刻の前後15分に3回以上が必要です。", evidence)
-    candidate = -negative_candidate
     if candidate == schedule.start:
         return Decision("start", False, "手動操作の傾向が現行の開始時刻と一致しています。", evidence)
     if candidate >= schedule.end:
@@ -191,7 +197,8 @@ def energy_decision(scenario: Scenario, temperature: Decision | None) -> Decisio
     return Decision("precool", True,
                     f"仮データ上で同等の快適性を満たし、{reference.name}比で{money(savings)}下がります。",
                     tuple(evidence), (f"運転候補: {winner.name}",
-                                      f"比較期間の総額 {money(costs[reference.name])} → {money(costs[winner.name])}"))
+                                      f"比較期間の総額 {money(costs[reference.name])} → {money(costs[winner.name])}"),
+                    target_plan=winner.name)
 
 
 def evaluate(scenario: Scenario) -> tuple[Decision, ...]:

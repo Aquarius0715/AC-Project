@@ -86,6 +86,7 @@ class Decision:
     evidence: tuple[str, ...] = ()
     changes: tuple[str, ...] = ()
     target_temperature_c: str | None = None
+    target_plan: str | None = None
 
 
 def clock(minutes: int) -> str:
