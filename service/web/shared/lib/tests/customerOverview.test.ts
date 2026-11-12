@@ -21,7 +21,7 @@ const m = (metric: string, value: number | null, over: Record<string, unknown> =
 };
 const unit = (id: string, over: Partial<OverviewUnit> = {}): OverviewUnit => {
   return {
-    id, version: 1, customerOrgId: "o", propertyId: "home", spaceId: null, displayName: `AC ${id}`, modelId: "m", type: "split", installedAt: null, serviceScope: ["indoor"], alertPolicyIds: [],
+    id, version: 1, customerOrgId: "o", propertyId: "home", spaceId: null, displayName: `AC ${id}`, modelId: "m", type: "split", installState: "installed", installedAt: null, serviceScope: ["indoor"], alertPolicyIds: [],
     archived: false, capabilityVersion: 1, connection: "online", lastSeenAt: TEXT_2026_09_14T01_12_00Z, warrantyEndsAt: null, effectivePowerState: "on", activeAlertCount: 0, latestMeasurements: [], ...over,
   };
 };

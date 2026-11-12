@@ -37,7 +37,7 @@ async function shared(sp: SP) {
   const i = i18nOf(display);
   const [orgs, customers, properties, units, members] = await Promise.all([
     optional(coreAll<Org>("organizations.list"), []), optional(coreAll<{ id: string; name: string; organizationId: string }>("customers.list"), []),
-    optional(coreAll<{ id: string; name: string; customerOrgId: string }>("properties.list"), []), optional(coreAll<{ id: string; displayName: string; customerOrgId: string; propertyId: string }>("units.list"), []),
+    optional(coreAll<{ id: string; name: string; customerOrgId: string }>("properties.list"), []), optional(coreAll<{ id: string; displayName: string; customerOrgId: string; propertyId: string; installState: "planned" | "installed" }>("units.list"), []),
     optional(coreAll<Member>("members.list"), []),
   ]);
   const hq = orgs.find((o) => o.kind === "operator") ?? null;
@@ -63,7 +63,7 @@ async function shared(sp: SP) {
         properties: properties.filter((p) => !custOrg || p.customerOrgId === custOrg).map((p) => ({ id: p.id, name: p.name })),
         units: units.filter((u) => (!custOrg || u.customerOrgId === custOrg) && (!sq.propertyId || u.propertyId === sq.propertyId)).map((u) => ({ id: u.id, name: u.displayName })),
       },
-      units: units.map((u) => ({ id: u.id, name: u.displayName, customer: names.customers.get(u.customerOrgId) ?? i.t("customer") })).toSorted((a, b) => a.customer.localeCompare(b.customer) || a.name.localeCompare(b.name)),
+      units: units.map((u) => ({ id: u.id, name: u.displayName, planned: u.installState === "planned", customer: names.customers.get(u.customerOrgId) ?? i.t("customer") })).toSorted((a, b) => a.customer.localeCompare(b.customer) || a.name.localeCompare(b.name)),
     },
   };
 }

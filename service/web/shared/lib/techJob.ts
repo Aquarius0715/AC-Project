@@ -66,13 +66,19 @@ export const readingMetrics: { metric: Metric; label: string }[] = [
 /** WorkReport of service-contracts.ts as the technician reads it. */
 export interface ApiTechReport {
   id: string; version: number; jobId: string; authorId: string; state?: string;
+  /** The equipment an installation report confirms (DEC-106); null on any other job. */
+  installation: { confirmedModelId: string; serial: string } | null;
   items: { id: string; componentGroup: Group; componentKey: ComponentKey; result: Result; reason: string | null; evidenceIds: string[]; authorId: string; observedAt: string }[];
   measurements: { id: string; componentKey?: ComponentKey | null; metric: Metric; value: number | null; unit: string; observedAt: string; quality: string; qualityReason?: string | null }[];
   parts: DraftPart[]; refrigerant: DraftRefrigerant[]; signOff: { signerName: string; signedAt: string; signatureAttachmentId: string | null; absentReason: string | null; reportVersion: number } | null;
   workText: string; nextAction: { kind: "none" } | { kind: "follow_up"; date: string; note: string } | null;
-  attachmentRefs: { id: string; name: string; mime: string; size: number; status: "processing" | "ready" | "failed" }[]; submittedAt: string | null; acceptedAt: string | null;
+  attachmentRefs: { id: string; name: string; mime: string; size: number; status: "processing" | "ready" | "failed"; tag: PhotoTag | null }[]; submittedAt: string | null; acceptedAt: string | null;
   reviewHistory: { reviewerUserId: string; reportVersion: number; decision: "accept" | "return"; reason: string | null; occurredAt: string }[];
 }
+/** What a photo of an installation report shows (attachments.add `tag`, DEC-106): the report needs one of each. */
+export const photoTags = ["name_plate", "indoor_unit", "outdoor_unit"] as const;
+export type PhotoTag = (typeof photoTags)[number];
+export const photoTagLabel: Record<PhotoTag, string> = { name_plate: "Name plate", indoor_unit: "Indoor unit", outdoor_unit: "Outdoor unit" };
 export const checkResults = ["normal", "attention", "not_inspected", "not_applicable"] as const;
 export type Result = (typeof checkResults)[number] | null;
 interface DraftItem { componentGroup: Group; componentKey: ComponentKey; result: Result; reason: string; evidenceIds: string[] }
@@ -83,11 +89,14 @@ export interface DraftPart {
 }
 export interface DraftRefrigerant { refrigerant: "R32" | "R410A"; cylinderId: string; recoveredKg: number; chargedKg: number; leakCheck: "pass" | "fail" | "not_done"; leakCheckMethod: string | null }
 export type NextAction = { kind: "none" } | { kind: "follow_up"; date: string; note: string };
-export interface Draft { items: DraftItem[]; readings: DraftReading[]; parts: DraftPart[]; refrigerant: DraftRefrigerant[]; workText: string; nextAction: NextAction; attachmentIds: string[] }
+/** The equipment check of an installation draft: the technician confirms the registered model is the one installed
+(`confirmed`) and gives the serial; null on any other job. */
+interface DraftInstallation { confirmed: boolean; serial: string }
+export interface Draft { installation: DraftInstallation | null; items: DraftItem[]; readings: DraftReading[]; parts: DraftPart[]; refrigerant: DraftRefrigerant[]; workText: string; nextAction: NextAction; attachmentIds: string[] }
 
 /** The editable draft of a report: every required component in canonical order (null until a result is chosen — normal
 is never preselected, DD-T04), the readings as text so a half-typed value survives, and the other sections as saved. */
-export function draftFrom(r: ApiTechReport | null, components: { group: Group; key: ComponentKey }[]): Draft {
+export function draftFrom(r: ApiTechReport | null, components: { group: Group; key: ComponentKey }[], isInstallation = false): Draft {
   const items = components.map(({ group, key }) => {
     const it = r?.items.find((x) => x.componentKey === key);
     return { componentGroup: group, componentKey: key, result: it?.result ?? null, reason: it?.reason ?? "", evidenceIds: it?.evidenceIds ?? [] };
@@ -101,6 +110,7 @@ export function draftFrom(r: ApiTechReport | null, components: { group: Group; k
   return {
     items,
     readings,
+    installation: isInstallation ? { confirmed: !!r?.installation, serial: r?.installation?.serial ?? "" } : null,
     parts: r?.parts ?? [], refrigerant: r?.refrigerant ?? [], workText: r?.workText ?? "",
     nextAction: r?.nextAction ?? { kind: "none" }, attachmentIds: (r?.attachmentRefs ?? []).filter((a) => a.status !== "failed").map((a) => a.id),
   };
@@ -108,9 +118,11 @@ export function draftFrom(r: ApiTechReport | null, components: { group: Group; k
 
 /** The jobs.saveDraft body of a draft: trimmed reasons (empty → null), numeric readings in their metric's unit. */
 const toNumber = (v: string) => (v.trim() === "" || !Number.isFinite(Number(v)) ? null : Number(v));
-export function draftInput(jobId: string, reportId: string | null, d: Draft): OpInput<"jobs.saveDraft"> {
+export function draftInput(jobId: string, reportId: string | null, d: Draft, modelId: string | null = null): OpInput<"jobs.saveDraft"> {
   return {
     jobId, ...(reportId && { reportId }),
+    // only a confirmed model is sent: the report keeps the model the technician checked (the API compares it with the unit's)
+    ...(d.installation?.confirmed && modelId && { installation: { confirmedModelId: modelId, serial: d.installation.serial.trim() } }),
     items: d.items.map((it) => ({ componentGroup: it.componentGroup, componentKey: it.componentKey, result: it.result, reason: it.reason.trim() || null, evidenceIds: it.evidenceIds })),
     measurements: d.readings.map((m) => ({ ...(m.id && { id: m.id }), componentKey: m.componentKey, metric: m.metric, value: toNumber(m.value), unit: metricUnit[m.metric], observedAt: m.observedAt })),
     parts: d.parts.map((p) => ({ ...p, name: p.name.trim(), replacesComponentKey: p.replacesComponentKey })), refrigerant: d.refrigerant, workText: d.workText,
@@ -142,12 +154,29 @@ export function linkPhoto(d: Draft, key: string, id: string, on: boolean): Draft
   };
 }
 
+/** What an installation report needs besides the checklist (BR-T16): the model confirmed, the serial, a ready photo of
+each of the name plate, the indoor unit and the outdoor unit, and the customer's sign-off. */
+function installationIssues(i: DraftInstallation, attachments: { status: string; tag?: PhotoTag | null }[], signedOff: boolean, t: T): Issue[] {
+  const issue = (text: string): Issue => ({ key: null, group: null, text });
+  const out: Issue[] = [];
+  if (!i.confirmed) out.push(issue(t("Confirm that the installed model is the registered one")));
+  if (!i.serial.trim()) out.push(issue(t("Enter the serial number of the installed unit")));
+  const added = new Set(attachments.filter((a) => a.status === "ready").map((a) => a.tag));
+  for (const tag of photoTags) {
+    const part = t(entryOf(photoTagLabel, tag)).toLowerCase();
+    if (!added.has(tag)) out.push(issue(t("Add a photo of the {part}", { part })));
+  }
+  if (!signedOff) out.push(issue(t("An installation needs the customer’s sign-off")));
+  return out;
+}
+
 /** What blocks a submit (the IR100 / IR126 submit rules of the Core API, checked first in the browser so the
 technician sees every issue at once; the API stays the authority). */
 export interface Issue { key: string | null; group: Group | null; text: string }
 const PHOTO_STATE: Record<string, string> = { processing: "processing", failed: "failed", ready: "ready" };
-export function submitIssues(d: Draft, attachments: { id: string; name: string; status: string }[], now: number, t: T = en): Issue[] {
+export function submitIssues(d: Draft, attachments: { id: string; name: string; status: string; tag?: PhotoTag | null }[], now: number, t: T = en, signedOff = true): Issue[] {
   const out: Issue[] = [];
+  if (d.installation) out.push(...installationIssues(d.installation, attachments, signedOff, t));
   const label = (key: string) => t(lookup(componentLabel, key) ?? key);
   for (const it of d.items) {
     const where = `${t(entryOf(groupLabel, it.componentGroup))} › ${label(it.componentKey)}`;

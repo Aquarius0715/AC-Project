@@ -85,7 +85,7 @@ export function periodOfQuery(q: Pick<Query, "from" | "to">): { from: string; to
 export const periodChip = (p: { from: string; to: string }, i: I18n = EN) => i.t("Requested time {span}", { span: showSpan(p.from, p.to, i.display) });
 /** Every status but cancelled: the list without a stage tile, and the jobs counted "in scope" (no tile names cancelled). */
 export const LISTED = ["requested", "offered", "accepted", "assigned", IN_PROGRESS, "submitted", REWORK_REQUESTED, "completed", "on_hold"];
-const TYPE_IDS = new Set(["reactive", "periodic", "preventive"]);
+const TYPE_IDS = new Set(["reactive", "periodic", "preventive", "installation"]);
 /** The jobs.list filters of the scope and the filter bar; delivery is the HQ organization (internal) or a contractor.
 The type and the default "not cancelled" are filters of jobs.list too (IR290), so its total counts what the list shows. */
 export function filtersOf(q: Query, hqOrgId: string | null, withStage = true): Record<string, unknown> {

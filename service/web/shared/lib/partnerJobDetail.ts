@@ -38,9 +38,10 @@ export const qualificationLabel = (code: string, t: T = en) => (textOf(QUALIFICA
 const SCOPE_QUALIFICATION: Record<string, string> = { indoor: "demo_indoor", outdoor: "demo_outdoor", electrical: "demo_electrical" }; // fixture qualificationRequirements
 /** The qualifications a delegated job requires: one per entry of the unit's maintenance scope (IR123 item 3). */
 export const requiredFor = (serviceScope: string[]) => serviceScope.map((s) => lookup(SCOPE_QUALIFICATION, s)).filter((q): q is string => !!q);
-const TYPES: Record<string, string> = { periodic: "Periodic inspection", reactive: "Repair", preventive: "Preventive maintenance" };
+const TYPES: Record<string, string> = { periodic: "Periodic inspection", reactive: "Repair", preventive: "Preventive maintenance", installation: "Installation" };
 export const typeLabel = (type: string, t: T = en) => (textOf(TYPES, type, t) ?? type);
-export const originLabel = (o: string, t: T = en) => t(o === "periodic_plan" ? "from the periodic plan" : "agreed with the client");
+const ORIGINS: Record<string, string> = { periodic_plan: "from the periodic plan", hq_request: "requested by HQ" };
+export const originLabel = (o: string, t: T = en) => t(lookup(ORIGINS, o) ?? "agreed with the client");
 const STATUS_WORDS: Record<string, string> = {
   requested: "requested", offered: "offered", accepted: "accepted", assigned: "assigned", in_progress: "in progress", on_hold: "on hold", submitted: "submitted",
   rework_requested: "rework requested", completed: "completed", cancelled: "cancelled",

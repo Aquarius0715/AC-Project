@@ -64,7 +64,7 @@ describe("air-quality metric cards (FR-C07, IR44, IR99, IR213, IR260)", () => {
 const property = (id: string, name: string): ApiPropertyRow => ({ id, name, version: 1, customerOrgId: "org-1", kind: "home", address: null, accessInstructions: null, archived: false, updatedAt: "2026-09-01T00:00:00Z" });
 const space = (id: string, parentSpaceId: string | null, name: string, kind: ApiSpaceRow["kind"]): ApiSpaceRow => ({ id, parentSpaceId, kind, name, version: 1, propertyId: "p1", archived: false });
 const unit = (id: string, spaceId: string | null, displayName: string): ApiUnitRow => ({
-  id, spaceId, displayName, version: 1, customerOrgId: "org-1", propertyId: "p1", modelId: "model-1", type: "split", installedAt: null, serviceScope: [], alertPolicyIds: [], archived: false,
+  id, spaceId, displayName, version: 1, customerOrgId: "org-1", propertyId: "p1", modelId: "model-1", type: "split", installState: "installed", installedAt: null, serviceScope: [], alertPolicyIds: [], archived: false,
   capabilityVersion: 1, connection: "online", lastSeenAt: null, warrantyEndsAt: null, effectivePowerState: "on", activeAlertCount: 0,
 });
 
