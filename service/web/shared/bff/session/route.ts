@@ -15,7 +15,7 @@ export async function GET() {
   if (isApi && s) {
     try {
       const r = await fetch(`${process.env.CORE_API_URL ?? "http://localhost:8080"}/v1/session`, {
-        cache: "no-store",
+        cache: "no-store", signal: AbortSignal.timeout(3000), // a stalled Core API must not hang the page's session bootstrap
         headers: { Authorization: `Bearer ${s.accessToken}`, "X-Tenant-Id": s.tenantId, "X-Membership-Id": s.membershipId },
       });
       if (r.ok) {
