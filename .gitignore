@@ -41,3 +41,8 @@ __pycache__/
 
 # the results of a load run (deploy/load/run.sh): summary, k6 log, samples, settings
 load-out/
+
+# the review-loop runner (scripts/review-loop.sh): per-round logs, run output, stop file
+.review-loop-logs/
+.review-loop-run.out
+.review-loop-stop
