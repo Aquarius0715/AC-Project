@@ -10,6 +10,7 @@ from .engine import evaluate
 from .loader import InputError, load, timestamp
 from .monthly_data import calendar_date, load_bundle
 from .monthly_engine import WEEKDAYS, evaluate_customer
+from .presence_cli import presence_command
 
 DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 LABELS = {
@@ -185,6 +186,13 @@ def main(argv: list[str] | None = None) -> int:
         "--customers", action="store_true", help="全顧客の月次評価・件数一覧"
     )
     selection.add_argument("--customer", help="顧客IDを指定して月次評価の詳細を表示")
+    selection.add_argument(
+        "--households", action="store_true", help="スマホ由来の在宅デモを全世帯評価"
+    )
+    selection.add_argument("--household", help="在宅デモの世帯IDを指定して確認")
+    parser.add_argument(
+        "--presence-data", type=Path, help="在宅デモのJSONまたはJSON.gz"
+    )
     parser.add_argument(
         "--monthly-data", type=Path, help="月次データの別のローカルJSON"
     )
@@ -196,10 +204,22 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--json", action="store_true", help="構造化JSONで出力")
     args = parser.parse_args(argv)
-    if args.day and not args.customer:
-        parser.error("--dayは--customerと一緒に指定してください")
-    if (args.monthly_data or args.as_of) and not (args.customers or args.customer):
-        parser.error("--monthly-data / --as-ofは月次評価で指定してください")
+    if args.day and not (args.customer or args.household):
+        parser.error("--dayは--customerまたは--householdと一緒に指定してください")
+    if args.monthly_data and not (args.customers or args.customer):
+        parser.error("--monthly-dataは従来の月次評価で指定してください")
+    if args.presence_data and not (args.households or args.household):
+        parser.error("--presence-dataは在宅デモで指定してください")
+    if args.as_of and not (
+        args.customers or args.customer or args.households or args.household
+    ):
+        parser.error("--as-ofは月次評価または在宅デモで指定してください")
+    if args.households or args.household:
+        try:
+            return presence_command(args)
+        except InputError as exc:
+            print(f"入力エラー: {exc}", file=sys.stderr)
+            return 2
     if args.customers or args.customer:
         try:
             return monthly_command(args)

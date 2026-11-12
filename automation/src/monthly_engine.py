@@ -208,15 +208,31 @@ def apply_judgments(item: dict, current: dict | None, known: list[dict]) -> dict
 
 
 def schedule_results(
-    bundle: Bundle, customer: Customer, known: list[dict]
+    bundle: Bundle,
+    customer: Customer,
+    known: list[dict],
+    confirmed_on_ids: frozenset[str] | None = None,
 ) -> list[dict]:
     schedules = {plan.weekday: plan for plan in customer.schedules}
     days = {day.date: day for day in available_days(bundle, customer)}
     results = []
+    base = base_scenario(bundle, customer, Schedule(0, 0, 1439, Decimal(24)))
+    if confirmed_on_ids is not None:
+        permitted = {
+            op
+            for day in days.values()
+            for event_id, op in day.events
+            if op.action != "on"
+            or op.source != "web_manual"
+            or event_id in confirmed_on_ids
+        }
+        base = replace(
+            base, operations=tuple(op for op in base.operations if op in permitted)
+        )
     for weekday in range(7):
         current = schedules.get(weekday)
-        scenario = base_scenario(
-            bundle, customer, current or Schedule(weekday, 0, 1439, Decimal(24))
+        scenario = replace(
+            base, schedule=current or Schedule(weekday, 0, 1439, Decimal(24))
         )
         candidate, support, votes = start_pattern(scenario)
         allowed_dates = {day for day, _ in votes}
@@ -765,29 +781,29 @@ def precool_results(
     return results
 
 
-def billing(bundle: Bundle, customer: Customer) -> dict:
+def billing(bundle: Bundle, customer: Customer, include_intervals: bool = True) -> dict:
     days = []
     for day in available_days(bundle, customer):
         intervals = []
+        costs = []
         for index, kwh in enumerate(day.kwh):
             at = local_midnight(day.date, customer.timezone) + timedelta(
                 minutes=index * 30
             )
             price = bundle.tariffs[customer.tariff_id][index]
             cost = None if kwh is None or price is None else kwh * price
-            intervals.append(
-                dict(
-                    start=at.isoformat(),
-                    kwh=None if kwh is None else str(kwh),
-                    jpy_per_kwh=None if price is None else str(price),
-                    jpy=None if cost is None else str(cost),
+            costs.append(cost)
+            if include_intervals:
+                intervals.append(
+                    dict(
+                        start=at.isoformat(),
+                        kwh=None if kwh is None else str(kwh),
+                        jpy_per_kwh=None if price is None else str(price),
+                        jpy=None if cost is None else str(cost),
+                    )
                 )
-            )
-        complete = all(item["jpy"] is not None for item in intervals)
-        subtotal = sum(
-            (Decimal(item["jpy"]) for item in intervals if item["jpy"] is not None),
-            Decimal(0),
-        )
+        complete = all(cost is not None for cost in costs)
+        subtotal = sum((cost for cost in costs if cost is not None), Decimal(0))
         days.append(
             dict(
                 date=str(day.date),
@@ -809,9 +825,15 @@ def billing(bundle: Bundle, customer: Customer) -> dict:
     )
 
 
-def evaluate_customer(bundle: Bundle, customer: Customer) -> dict:
+def evaluate_customer(
+    bundle: Bundle,
+    customer: Customer,
+    *,
+    confirmed_on_ids: frozenset[str] | None = None,
+    include_intervals: bool = True,
+) -> dict:
     known = judgments_as_of(bundle, customer)
-    decisions = schedule_results(bundle, customer, known)
+    decisions = schedule_results(bundle, customer, known, confirmed_on_ids)
     heat = temperature_results(bundle, customer, known)
     decisions.extend(heat)
     decisions.extend(precool_results(bundle, customer, heat, known))
@@ -868,7 +890,7 @@ def evaluate_customer(bundle: Bundle, customer: Customer) -> dict:
             )
             for j in known
         ],
-        billing=billing(bundle, customer),
+        billing=billing(bundle, customer, include_intervals),
     )
 
 
