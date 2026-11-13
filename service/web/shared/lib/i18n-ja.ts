@@ -1501,6 +1501,7 @@ export const ja: Record<string, string> = {
   "Rent-to-own (RTO)": "買い取り前提のレンタル（RTO）",
   "Active": "有効",
   "Upcoming": "開始前",
+  "Coming soon": "近日公開",
   "Expired": "期限切れ",
   "Due {date}": "期限 {date}",
   "paid {date}": "{date} に支払済み",
