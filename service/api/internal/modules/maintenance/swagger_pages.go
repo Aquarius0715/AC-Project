@@ -61,6 +61,16 @@ type FilterStatusPage struct {
 
 var _ = paging.Page[FilterStatus](FilterStatusPage{})
 
+// InstallationRequestPage is paging.Page[InstallationRequest].
+type InstallationRequestPage struct {
+	Items           []InstallationRequest `json:"items"`
+	NextCursor      *string               `json:"nextCursor"`
+	Total           int                   `json:"total"`
+	SnapshotVersion int                   `json:"snapshotVersion"`
+}
+
+var _ = paging.Page[InstallationRequest](InstallationRequestPage{})
+
 // MemberPage is paging.Page[identity.Member].
 type MemberPage struct {
 	Items           []identity.Member `json:"items"`

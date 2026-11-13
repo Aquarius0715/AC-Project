@@ -17,7 +17,7 @@ const keep = (q: Scope, extra: Record<string, string> = {}) => {
 unit scope is shared, so the tab links keep it (DD-A06 item 5). Texts in the display language (IR290). */
 export function JobsTabs({ tab, counts, q, action }: Readonly<{ tab: string; counts: { jobs: number; plans: number; contractors: number }; q: Scope; action?: React.ReactNode }>) {
   const t = useT();
-  const tabs = [{ id: "jobs", label: "Jobs", count: counts.jobs }, { id: "plans", label: "Plans", count: counts.plans }, { id: "contractors", label: "Contractors", count: counts.contractors }, { id: "sla", label: "SLA by customer" }];
+  const tabs = [{ id: "jobs", label: "Jobs", count: counts.jobs }, { id: "plans", label: "Plans", count: counts.plans }, { id: "contractors", label: "Contractors", count: counts.contractors }, { id: "sla", label: "SLA by customer" }, { id: "installations", label: "Installation requests" }];
   return (
     <div className="flex flex-wrap items-end justify-between gap-2 border-b border-line">
       <div role="tablist" className="flex flex-wrap gap-4">

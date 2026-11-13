@@ -71,6 +71,7 @@ Mapping of notable TypeScript types:
 | `Membership.scopes: ScopeRef[]` | `identity.membership_scopes (kind, ref_id)` |
 | `ACUnit.installState` | `assets.units.install_state` `planned`/`installed` (DEC-106, IR789, migration 000005): a planned unit has no `installed_at`; the `UnitInstalled` event from an accepted installation report sets `installed` and `installed_at` (the warranty end is set in the unit edit) |
 | `MaintenanceJob.type = 'installation'`, `origin = 'hq_request'` | `maintenance.jobs` CHECK lists widened; a partial unique index allows one unfinished installation job per unit; `work_reports.installation` and `attachments.tag` (migration 000005) |
+| `InstallationRequest` | `maintenance.installation_requests` (DEC-107, IR794, migration 000006): a customer owner's request for 1–10 new aircons with 3 preferred slots; `maintenance.jobs.installation_request_id` links the installation jobs HQ creates for it, and the first such job sets the request `approved` in the same transaction |
 | `ACUnit.observedState`, `observedRestriction` | `jsonb` read-model columns on `assets.units`, written only from device events (IR47) |
 | `ACUnit.alertPolicyIds` | `assets.unit_alert_policies`; the HQ default policy is implicit and never stored per unit (IR108) |
 | `Policy` (`automation` / `alert` / `default_alert`) | `control.automation_policies` and `monitoring.alert_policies` (kind alert or default_alert); `policies.*` operations dispatch on kind |

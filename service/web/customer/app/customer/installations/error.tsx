@@ -1,0 +1,7 @@
+"use client"; // error boundaries are Client Components
+
+import { RouteError } from "@ac/web/components/RouteStates";
+
+export default function SegmentError({ error, retry }: Readonly<{ error: Error & { digest?: string }; retry: () => void }>) {
+  return <RouteError what="Installations" error={error} retry={retry} />;
+}

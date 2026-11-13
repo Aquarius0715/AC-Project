@@ -48,6 +48,7 @@ P0 means the core foundational flow. P1 is also required for completion in phase
 | FR-C17 | P1 | Figma-confirmed screen specification 2026-10-01 (07g–07i) / BIZ-12 | Confirm, rate, and report a problem | After HQ accepts the report, confirm the job and rate it; report a problem that creates a follow-up request. |
 | FR-C18 | P1 | Figma-confirmed screen specification 2026-10-01 (07j) / BIZ-18, BIZ-12 | Filter care | Show filter run time since cleaning per AC with reminders; mark self-cleaning or request cleaning. |
 | FR-C19 | P1 | Figma-confirmed screen specification 2026-10-06 (11a–11c) / BIZ-04 | Customer users (owner) | The customer owner manages the customer's client users: lists them, adds members and owners (the sign-in account is created at once and gets a set-up e-mail, IR461), resends the set-up e-mail until they sign in, changes a user's role, disables / enables and removes users with a reason; never the own account, and the customer keeps an active owner (IR417). Password resets stay with HQ (FR-A17). Members do not see the page. |
+| FR-C20 | P1 | User request 2026-11-13 (DEC-107) / BIZ-07, BIZ-12, BIZ-20 | Installation request | The customer owner asks HQ to install new air conditioners: property and space, number of units (1–10), model or “not decided”, whether an IoT device is installed with them, 3 preferred times and a note. HQ reviews the request, creates the planned units and the installation job (FR-A06, FR-T16) or declines it with a reason. The owner sees the state, the reason and the job. |
 
 ## Business boundaries and dependencies
 
@@ -452,6 +453,24 @@ Design: [DD-C18](../02-design/client.md#dd-c18-details). Assess parent AT-C18 us
 | AT-C19-B | ① Add with an empty or malformed e-mail, or without a name ② Resend the set-up e-mail for an active user ③ Change a user's e-mail ④ Demote the last active owner | ① VALIDATION, zero saves ② CONFLICT (only users not signed in yet get it), no e-mail ③ VALIDATION (immutable, also for HQ, IR422) ④ CONFLICT |
 
 Design: [DD-C19](../02-design/client.md#dd-c19-details). Assess parent AT-C19 using all N/E/B cases in traceability.
+
+### FR-C20 Installation request
+
+- **Company request basis**: none directly; user request 2026-11-13 (“クライアント側から、エアコン・デバイスの導入申請をできるようにしたい”, DEC-107) supporting SRC-06 BIZ-07 (unit register), BIZ-12 (work requests), BIZ-20 (IoT lifecycle). It replaces the DEC-106 rule that a client cannot ask for an installation: the client asks, HQ still creates every unit and every installation job.
+- **Entry conditions**: Client Membership with clientRole=owner of the customer; sidebar Installations (`/customer/installations`). Members see no Installations item; opening the URL directly shows the shared Page unavailable view (FORBIDDEN, IR112).
+- **Main flow**: Installations → list of the customer's requests (number, property, units, IoT yes/no, status, preferred time, linked jobs) → + New request (property, optional space, number of units 1–10, model or “Not decided”, “Install an IoT device with each unit”, 3 preferred times, contact window, note) → request number and state Submitted → HQ approves (planned units and installation jobs appear; the jobs follow FR-C09: HQ offers a time, the owner accepts or declines it) or declines (the reason is shown) → the owner may cancel a Submitted request.
+- **Business rule BR-C20**: Owners use `installationRequests.create`, `installationRequests.list` and `installationRequests.cancel` for their own customer. The property (and space) must belong to the customer and not be archived (NOT_FOUND otherwise); the model, when given, is an active model of the register. Preferred times follow the IR113 rule of `jobs.create`: 3 distinct future slots, each starting at least 1 day ahead (VALIDATION `preferredSlots`). Note 0–2000 characters. A request is `submitted`, then `approved` (HQ created at least one installation job for it), `declined` (HQ gave a reason of 5–500 characters) or `cancelled` (by the owner, only while submitted). HQ creates the planned units (FR-A02) and the installation jobs with `jobs.create(type=installation, installationRequestId)`; at most `quantity` unfinished jobs belong to one request (CONFLICT), the unit and the request belong to the same customer, and a declined or cancelled request takes no job (CONFLICT). A job made from a request has origin `client_request`, so FR-C09 and FR-C17 apply to it; a client still cannot call `jobs.create` with type installation (VALIDATION `type`). The request's “IoT device” choice is shown to HQ and to the technician; binding stays optional (FR-T16).
+- **Resulting business state**: InstallationRequest row (status, decision, linked jobs); planned units and installation jobs created by HQ; notifications to HQ and to the owner are not part of DEC-107 (HQ finds submitted requests in Jobs › Installation requests, the owner sees the state in the list).
+- **Boundaries/prohibitions**: Another customer's property → NOT_FOUND. A member session → FORBIDDEN for every operation. No unit is created by the client; the request lists no device and no price.
+
+| Acceptance ID | Given / When | Then (observable result) |
+|---|---|---|
+| AT-C20-N | customer-a owner Tan Wei. When: Installations → New request (property prop-a01, 2 units, model not decided, IoT yes, 3 preferred times, note) → HQ creates two planned units and two installation jobs for it → HQ's offer is accepted by the owner | ① Request number shown, state Submitted, HQ notified ② after the first job the state is Approved and the list shows both jobs ③ the jobs have origin client_request and appear in Maintenance as requests |
+| AT-C20-E | ① Property of customer-b ② Preferred times: 2 slots, a past slot, a duplicate slot ③ Member Mei Tan opens /customer/installations ④ Owner cancels an approved request ⑤ Client calls `jobs.create` with type installation | ① NOT_FOUND ② VALIDATION (`preferredSlots`), zero requests ③ Page unavailable (FORBIDDEN) ④ CONFLICT ⑤ VALIDATION (`type`) |
+| AT-C20-B | ① 0 or 11 units ② HQ declines without a reason ③ HQ creates a third job for a 2-unit request ④ HQ links a job to a declined request | ① VALIDATION (`quantity`) ② VALIDATION (`reason`) ③ CONFLICT ④ CONFLICT |
+
+Design: [DD-C20](../02-design/client.md#dd-c20-details). Assess parent AT-C20 using all N/E/B cases in traceability.
+
 
 
 0.9.0 correction contracts: Read [strict review correction contracts](../02-design/strict-review-contracts.md) and [operation version contracts](../02-design/write-version-catalog.csv) together.

@@ -115,6 +115,7 @@ type deviceOut struct {
 const (
 	qUnitState         = "assets.unitState"
 	qUnitInstall       = "assets.unitInstall"
+	qInstallSite       = "assets.installSite"
 	qUnitsOfProperty   = "assets.unitsOfProperty"
 	qOrgOfCustomer     = "assets.orgOfCustomer"
 	qUnitsOfOrg        = "assets.unitsOfOrg"
@@ -151,6 +152,16 @@ func (v equipmentView) UnitInstall(
 	r, err := ops.Delegate(ctx, c, qUnitInstall, unitIn{unit}, v.unitInstall)
 
 	return r.State, r.ModelID, apperr.Wrap(err, "delegate assets.unitInstall")
+}
+
+func (v equipmentView) InstallSite(
+	ctx context.Context,
+	c *ops.Call,
+	in maintenance.InstallSiteInput,
+) (maintenance.InstallSite, error) {
+	r, err := ops.Delegate(ctx, c, qInstallSite, in, v.installSite)
+
+	return r, apperr.Wrap(err, "delegate assets.installSite")
 }
 
 func (v equipmentView) UnitsOfProperty(
@@ -346,6 +357,39 @@ func (v equipmentView) unitInstall(
 	state, model, err := v.am.UnitInstall(ctx, c, in.UnitID)
 
 	return unitInstallOut{state, model}, apperr.Wrap(err, "assets.Module.UnitInstall")
+}
+
+func (v equipmentView) installSite(
+	ctx context.Context,
+	call *ops.Call,
+	input *maintenance.InstallSiteInput,
+) (maintenance.InstallSite, error) {
+	org, archived, found, spaceOK, err := v.am.PropertySite(
+		ctx,
+		call,
+		input.PropertyID,
+		input.SpaceID,
+	)
+	if err != nil {
+		return maintenance.InstallSite{}, apperr.Wrap(err, "assets.Module.PropertySite")
+	}
+
+	site := maintenance.InstallSite{
+		OrgID:    org,
+		Found:    found,
+		Archived: archived,
+		SpaceOK:  spaceOK,
+		ModelOK:  true,
+	}
+
+	if input.ModelID != nil {
+		_, site.ModelOK, err = v.models.CurrentVersion(ctx, call, *input.ModelID)
+		if err != nil {
+			return maintenance.InstallSite{}, apperr.Wrap(err, "devices.Models.CurrentVersion")
+		}
+	}
+
+	return site, nil
 }
 
 func (v equipmentView) unitsOfProperty(
@@ -603,6 +647,7 @@ func registerCrossDomain(
 	equipmentDomain := ops.DomainEquipment
 	ops.RegisterQuery(reg, equipmentDomain, qUnitState, equipment.unitState)
 	ops.RegisterQuery(reg, equipmentDomain, qUnitInstall, equipment.unitInstall)
+	ops.RegisterQuery(reg, equipmentDomain, qInstallSite, equipment.installSite)
 	ops.RegisterQuery(reg, equipmentDomain, qUnitsOfProperty, equipment.unitsOfProperty)
 	ops.RegisterQuery(reg, equipmentDomain, qOrgOfCustomer, equipment.orgOfCustomer)
 	ops.RegisterQuery(reg, equipmentDomain, qUnitsOfOrg, equipment.unitsOfOrg)

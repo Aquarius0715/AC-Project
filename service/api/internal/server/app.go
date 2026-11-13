@@ -298,6 +298,10 @@ func registerMaintenance(
 		Blobs:    blobs,
 	}
 	maintenance.RegisterJobs(reg, jobs)
+	maintenance.RegisterInstallationRequests(
+		reg,
+		maintenance.InstallationRequests{Units: equipment},
+	)
 	maintenance.RegisterOnSite(
 		reg,
 		maintenance.OnSite{Jobs: jobs, Access: maintenance.Access{}},
