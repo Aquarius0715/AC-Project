@@ -1501,6 +1501,7 @@ export const id: Record<string, string> = {
   "Rent-to-own (RTO)": "Sewa-beli (RTO)",
   "Active": "Aktif",
   "Upcoming": "Akan datang",
+  "Coming soon": "Segera hadir",
   "Expired": "Kedaluwarsa",
   "Due {date}": "Jatuh tempo {date}",
   "paid {date}": "dibayar {date}",
