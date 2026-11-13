@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  airChartSeries, airGuidance, airMetricsOf, airNumber, airRooms, airRows, airSlots, airWindow, allergenView, axisLabels, cleanNote, co2Now, metricCard, slotHeadings, toggleAirMetric, ventRow, ventStrip, windowSub, windowTitle,
-  type ApiAllergen, type ApiMeasurement, type ApiVentilationLog,
+  airChartGroups, airChartSeries, airGuidance, airMetricsOf, airNumber, airRooms, airRows, airSlots, airWindow, allergenView, axisLabels, cleanNote, co2Now, metricCard, slotHeadings, toggleAirMetric, ventRow, ventStrip, windowSub, windowTitle,
+  type AirMetric, type ApiAllergen, type ApiMeasurement, type ApiVentilationLog,
 } from "@ac/web/lib/air";
 import type { ApiPropertyRow, ApiSpaceRow, ApiUnitRow } from "@ac/web/lib/assets";
 import { i18nOf, showClock, showDay } from "@ac/web/lib/i18n";
@@ -148,14 +148,22 @@ describe("the air-quality screen in the display language and time zone (FR-C07, 
 const slotsOf = (avgs: (number | null)[]) => avgs.map((avg, k) => ({ avg, start: `2026-09-14T0${String(k)}:00:00.000Z`, n: avg === null ? 0 : 3 }));
 // IR689: several metrics in one chart, each on the axis of its unit, with the time of every slot in the tooltip
 describe("metrics in one chart", () => {
-  it("reads the metrics of the URL: known ones, each once, two units at most, CO2 when none is left", () => {
+  it("reads the metrics of the URL: known ones, each once, all four allowed, CO2 when none is left", () => {
     expect([airMetricsOf(undefined), airMetricsOf("pm25"), airMetricsOf("co2,pm25"), airMetricsOf("pm25,pm25,nonsense,co2"), airMetricsOf("co2,pm25,humidity,temperature"), airMetricsOf("nonsense")])
-      .toStrictEqual([["co2"], ["pm25"], ["co2", "pm25"], ["pm25", "co2"], ["co2", "pm25"], ["co2"]]);
+      .toStrictEqual([["co2"], ["pm25"], ["co2", "pm25"], ["pm25", "co2"], ["co2", "pm25", "humidity", TEMPERATURE], ["co2"]]);
   });
 
-  it("puts a metric in or takes it out, never the last one, and refuses a third unit", () => {
+  it("puts a metric in or takes it out, never the last one", () => {
     expect([toggleAirMetric(["co2"], "pm25"), toggleAirMetric(["co2", "pm25"], "co2"), toggleAirMetric(["co2"], "co2"), toggleAirMetric(["co2", "pm25"], TEMPERATURE)])
-      .toStrictEqual([["co2", "pm25"], ["pm25"], ["co2"], null]);
+      .toStrictEqual([["co2", "pm25"], ["pm25"], ["co2"], ["co2", "pm25", TEMPERATURE]]);
+  });
+
+  it("keeps one or two units in one chart and gives three or more a chart each on its own axis", () => {
+    const all = new Set(["co2", "pm25", TEMPERATURE, "humidity"]);
+    const of = (ms: AirMetric[]) => airChartSeries(ms, {}, all);
+    expect(airChartGroups(of(["co2", "pm25"])).map((g) => g.map((l) => `${l.metric}:${l.axis}`))).toStrictEqual([["co2:left", "pm25:right"]]);
+    const four = airChartGroups(of(["co2", "pm25", TEMPERATURE, "humidity"]));
+    expect(four.map((g) => g.map((l) => `${l.metric}:${l.axis}`))).toStrictEqual([["co2:left"], ["pm25:left"], ["temperature:left"], ["humidity:left"]]);
   });
 
   it("gives the first unit the left axis and the second the right one, with the values of each metric", () => {
