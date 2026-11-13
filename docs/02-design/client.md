@@ -44,6 +44,7 @@ Always validate route parameters (values in URLs) as untrusted input. “Service
 | DD-C17 / FR-C17 | `/customer/maintenance?jobId=` / `JobCompletionFeedback` | `jobs.get`, `jobs.rate`, `jobs.reportProblem` | 1–5 ★ required; editable 7 days; problem details 10–2000, up to 5 photos | Not completed → CONFLICT; ratings never shown to other customers |
 | DD-C18 / FR-C18 | `/customer/maintenance?tab=filter-care` / `FilterCare` | `filterCare.list`, `filterCare.markCleaned`, `filterCare.saveSettings`, `filterCare.getSettings` | Run time since cleaning per AC; threshold 50–2000 h or model default; fallback days 7–180 | Offline → unknown, never 0 |
 | DD-C19 / FR-C19 | `/customer/users` / `ClientUsers` | `clientUsers.list`, `clientUsers.save`, `clientUsers.remove`, `clientUsers.resendInvite` | Owner only; e-mail unique per customer (case-insensitive); the account is created when added and its e-mail is fixed (IR461); never the own account; the customer keeps an active owner (IR417) | Password resets stay with HQ (DD-A17) |
+| DD-C20 / FR-C20 | `/customer/installations` / `InstallationRequests` | `installationRequests.list`, `installationRequests.create`, `installationRequests.cancel`, `properties.list`, `spaces.list`, `capabilities.list` | Owner only; property (and space) of the customer; units 1–10; model or not decided; IoT yes/no; 3 distinct future slots ≥ 1 day ahead; note ≤ 2000 | The client creates no unit and no installation job; HQ decides (DD-A06) |
 
 ## Shared Implementation Steps
 
@@ -666,6 +667,39 @@ Scope: FR-C19 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 **Boundary cases and failures**: Duplicate e-mail → VALIDATION (fieldErrors.email, input kept, 11c); an address someone with access holds → VALIDATION `errors.email_taken` (a person removed here is added again instead, IR462). A refused add or change takes the focus to the first field to fix, and a field the Core API refuses shows its message under that field as well as in the toast (IR620); a changed e-mail → VALIDATION `error.immutable`; a 31st account the owner adds to the customer within 24 hours → RATE_LIMITED `errors.too_many_accounts` with the seconds to wait (IR464; HQ is not limited). The own account → CONFLICT `errors.own_account`; demoting, disabling or removing the last active owner → CONFLICT `errors.last_owner`; a user whose access HQ revoked → CONFLICT `errors.revoked_by_hq` on any change but disabling, and adding the person again → VALIDATION `email` `errors.revoked_by_hq` (the row shows “Access ended by HQ” and offers only Remove; DEC-83, IR508); a stale version → CONFLICT, the list refetches. Member sessions have no sidebar item; the direct URL shows Page unavailable (FORBIDDEN). Password resets stay with HQ (DD-A17).
 
 **Verification**: Check the traceability entries under AT-C19 (N/E/B).
+
+### DD-C20 Details
+
+**Source mapping**: user request 2026-11-13 (DEC-107, IR794) → FR-C20 → DD-C20, supporting SRC-06 BIZ-07, BIZ-12, BIZ-20.
+
+Scope: FR-C20 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `installationRequests.list, installationRequests.create, installationRequests.cancel, properties.list, spaces.list, capabilities.list`.
+
+**Initial view and prerequisites**: clientRole=owner; sidebar Installations (`/customer/installations`), shown only for owners (Shell sidebar variant Active=installations).
+
+| Field | Type / required | Default / constraints | Purpose |
+|---|---|---|---|
+| propertyId | ID/required | A property of the customer, not archived | Where |
+| spaceId | ID/optional | A space of that property | Where in the property |
+| quantity | integer/required | 1–10 | Units to install |
+| modelId | ID/optional | An active model of the register; empty = not decided | Model |
+| withIot | boolean | false; “Install an IoT device with each unit” | IoT choice, shown to HQ and the technician |
+| preferredSlots | Slot[3]/required | 3 distinct future slots, each starting ≥ 1 day ahead (IR113) | Visit time |
+| contactWindow | string/optional | As jobs.create | Contact |
+| note | string/optional | 0–2000 | Free text |
+| status | enum, read-only | submitted / approved / declined / cancelled | State |
+| declineReason | string, read-only | 5–500 | Why HQ declined |
+| jobIds | ID[], read-only | Unfinished and finished installation jobs of the request | Link to FR-C09 |
+
+**Steps**
+
+1. `installationRequests.list` (own customer) shows number, property, units, IoT, status, the first preferred time and the linked jobs.
+2. + New request opens a centered dialog; the property list comes from `properties.list`, the spaces from `spaces.list`, the models from `capabilities.list`. `installationRequests.create` answers the request with its number; an idempotency key is sent (D04).
+3. Submitted: Cancel (`installationRequests.cancel`, expectedVersion). Approved: each job id opens `/customer/maintenance?jobId=` where the owner accepts or declines the time HQ offers (FR-C09). Declined: the reason is shown.
+4. HQ is notified (target kind `installation_request`) when a request is created; the owner is notified when HQ approves or declines.
+
+**Boundary cases and failures**: another customer's property or space → NOT_FOUND; an archived property → VALIDATION (`propertyId`); fewer than 3 slots, a duplicate, a past slot or one less than 1 day ahead → VALIDATION (`preferredSlots`); quantity outside 1–10 → VALIDATION (`quantity`); cancelling a request that is not submitted → CONFLICT; a member session → FORBIDDEN.
+
+**Verification**: Check the traceability entries under AT-C20 (N/E/B).
 
 Convert condition forms to the Condition type's discriminated union. occupancy is {type,occupied}, location is {type,event}, pattern is {type,localTime}, weather is {type,metric:"temperature",operator,value}, tariff is {type,operator,value,unit:"MYR_per_kWh"}, peak is {type,active}, and solar/battery is {type,operator,value,unit:"kW"}. A customer automation takes ClientCondition (occupancy, location, pattern, weather); tariff, peak, solar and battery are HQ automation policy conditions (PolicyCondition, IR314). Do not send an extra params wrapper. Use weather_temperature for weather Fact.metric; do not confuse it with the room-temperature Fact temperature.
 

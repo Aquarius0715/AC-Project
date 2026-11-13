@@ -57,6 +57,9 @@ firmwareCampaigns.delete,all,firmware_campaign,firmwareCampaigns.get,required,no
 firmwareCampaigns.schedule,all,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 inquiries.answer,all,inquiries,inquiries.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 inquiries.create,all,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+installationRequests.cancel,all,installation_request,installationRequests.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+installationRequests.create,all,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+installationRequests.decline,all,installation_request,installationRequests.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 invoices.create,all,none,contracts.list,omit,contractVersion=Contract.version,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 invoices.remind,all,invoice,invoices.get,required,none,IR04; paid/processing/not overdue or version conflict: no effects
 iotModels.delete,all,iotModels,iotModels.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
