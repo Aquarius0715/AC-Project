@@ -5,7 +5,7 @@
   "loginTheme": "ac",
   "emailTheme": "ac",
   "internationalizationEnabled": true,
-  "supportedLocales": ["en", "ms", "ja"],
+  "supportedLocales": ["en", "ms", "ja", "id"],
   "defaultLocale": "en",
   "resetPasswordAllowed": true,
   "loginWithEmailAllowed": true,

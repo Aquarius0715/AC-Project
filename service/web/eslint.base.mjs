@@ -429,7 +429,7 @@ export function webConfig(tsconfigRootDir) {
       // the Japanese dictionary is the same table (IR639). Besides its length: the same Japanese text answers several
       // English keys (a constant per repeated text would make the table harder to read), and the texts about passwords
       // and sign-in ("パスワードを再設定") are labels, not credentials
-      files: ["**/lib/i18n-ja.ts"],
+      files: ["**/lib/i18n-ja.ts", "**/lib/i18n-id.ts"],
       rules: { "sonarjs/max-lines": "off", "sonarjs/no-duplicate-string": "off", "sonarjs/no-hardcoded-passwords": "off" },
     },
     {

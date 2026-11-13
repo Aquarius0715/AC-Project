@@ -670,6 +670,22 @@ func TestPreferencesAndConsents(t *testing.T) {
 		t.Error("the saved Japanese preference")
 	}
 
+	// and so is Bahasa Indonesia (DEC-108)
+	if code, res := write(
+		srv,
+		customerB(),
+		"preferences.update",
+		`{"locale":"id","timezone":"Asia/Jakarta"}`,
+		0,
+	); code != 200 ||
+		data(res)["locale"] != "id" {
+		t.Fatalf("update to Indonesian: %d %v", code, res)
+	}
+
+	if _, m := post(srv, customerB(), "preferences.get", `{}`); data(m)["locale"] != "id" {
+		t.Error("the saved Indonesian preference")
+	}
+
 	if code, res := write(
 		srv,
 		customerB(),

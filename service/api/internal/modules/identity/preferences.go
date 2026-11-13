@@ -73,7 +73,7 @@ func ValidTimezone(tz string) bool {
 // Validate implements ops.Validator.
 func (in *PreferencesInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
-	if !slices.Contains([]string{"en", "ms", "ja"}, in.Locale) {
+	if !slices.Contains([]string{"en", "ms", "ja", "id"}, in.Locale) {
 		fieldErrs["locale"] = apperr.KeyInvalid
 	}
 

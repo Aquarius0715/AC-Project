@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.632.0 / Created: 2026-09-14 / Updated: 2026-11-11 / Status: Draft for review / Language: English
+Version: 0.633.0 / Created: 2026-09-14 / Updated: 2026-11-13 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -106,6 +106,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 0.635.0 (2026-11-13): IR790: one sign-in screen (the identity provider's; the app's e-mail step is removed, DEC-100 replaced), one Keycloak client per app (ac-customer-web, ac-partner-web, ac-technician-web, ac-admin-web) so the screen names the service, and (IR791) a portal that lists every service address, with the API documentation relayed from the gateway. Phase 1A unchanged.
 0.634.0 (2026-11-12): new aircon installation (DEC-106, IR789): FR-T16 and DD-T16, `installation` job type created by HQ for a planned unit, installation checklist and equipment check in the work report, HQ acceptance installs the unit (85 requirement IDs, 228 operations; the contract types, API and web follow in later PRs).
 0.633.0 (2026-11-11): the IoT model is a register of its own beside the aircon model; a unit takes an optional IoT model and a device can be registered with the unit (228 operations, 250 routes; DEC-105, IR788).
+0.633.0 (2026-11-13): Bahasa Indonesia is a fourth display language beside English, Malay and Japanese: every translated text, the sign-in pages and the date and time formats (DEC-108, IR795).
 0.632.0 (2026-11-12): IR787: a cursor's offset is bounded (an edited cursor with an offset near the largest integer made a list slice panic). Phase 1A unchanged.
 
 0.631.0 (2026-11-12): IR786: the migration versions must be 1, 2, 3 … without a gap (`migrate.Load` refuses a hole, which a database already past it would never fill). Phase 1A unchanged.

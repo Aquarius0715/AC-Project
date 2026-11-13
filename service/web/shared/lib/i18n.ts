@@ -1,22 +1,23 @@
 // Display language (FR-X01, AT-X01-N, IR44, IR258, IR639). English is the default and the key: each text is looked up in
-// the dictionary of the language (lib/i18n-ms.ts, lib/i18n-ja.ts: drafts until Business / UI / UX review them) and stays
+// the dictionary of the language (lib/i18n-ms.ts, lib/i18n-ja.ts, lib/i18n-id.ts: drafts until Business / UI / UX review them) and stays
 // English when it has no entry, with a warning in development (IR44). The language never changes stored values, units, IDs or UTC times. As in the
 // Next.js internationalization guide, the dictionary is a plain object and the locale comes from the server (the
 // user's Preferences). lib/tests/i18n.test.ts keeps the code's texts and the dictionary's keys the same (NFR-07).
+import { id as indonesian } from "@ac/web/lib/i18n-id";
 import { ja } from "@ac/web/lib/i18n-ja";
 import { ms } from "@ac/web/lib/i18n-ms";
 import { entryOf, lookup } from "@ac/web/lib/lookup";
 
-export type Locale = "en" | "ms" | "ja";
-export const LOCALES: readonly Locale[] = ["en", "ms", "ja"];
+export type Locale = "en" | "ms" | "ja" | "id";
+export const LOCALES: readonly Locale[] = ["en", "ms", "ja", "id"];
 export const isLocale = (v: unknown): v is Locale => LOCALES.some((l) => l === v);
 /** Each language's own name, as its speakers read it (not translated). */
-const LANGUAGE_NAMES: Readonly<Record<Locale, string>> = { en: "English", ms: "Bahasa Melayu", ja: "日本語" };
+const LANGUAGE_NAMES: Readonly<Record<Locale, string>> = { en: "English", ms: "Bahasa Melayu", ja: "日本語", id: "Bahasa Indonesia" };
 /** The choices of the display language: English first and marked as the default. */
 export const languageOptions = (t: T): { id: Locale; label: string }[] =>
   LOCALES.map((id) => ({ id, label: id === "en" ? t("English (default)") : entryOf(LANGUAGE_NAMES, id) }));
 /** The dictionary of each language that is not English (the keys are the English texts). */
-export const DICTIONARIES: Readonly<Record<Exclude<Locale, "en">, Readonly<Record<string, string>>>> = { ms, ja };
+export const DICTIONARIES: Readonly<Record<Exclude<Locale, "en">, Readonly<Record<string, string>>>> = { ms, ja, id: indonesian };
 /** The browser demo keeps the chosen language in this browser (Preferences demo). */
 export const LOCALE_KEY = "ac-locale";
 
@@ -44,14 +45,14 @@ export function translate(locale: Locale, text: string, params?: Params): string
 
 export const translator = (locale: Locale): T => (text, params) => translate(locale, text, params);
 
-/** The BCP 47 tag for dates and numbers shown in `locale` (Malaysia for English and Malay, Japan's formats for Japanese). */
-export const intlTag = (locale: Locale) => entryOf<Locale, string>({ en: "en-MY", ms: "ms-MY", ja: "ja-JP" }, locale);
+/** The BCP 47 tag for dates and numbers shown in `locale` (Malaysia for English and Malay, Japan's formats for Japanese, Indonesia's for Indonesian). */
+export const intlTag = (locale: Locale) => entryOf<Locale, string>({ en: "en-MY", ms: "ms-MY", ja: "ja-JP", id: "id-ID" }, locale);
 
 /** The abbreviation of a time zone at an instant (“MYT”, “SGT”) in the language's own data. Japanese data names most
 zones as GMT+8 (Kuala Lumpur, Singapore) or by Japanese names, so Japanese takes the abbreviation from the English data,
-which reads the same as in an English user's screen. */
+which reads the same as in an English user's screen. Indonesian data does the same (id-ID says GMT+8 for Kuala Lumpur). */
 export function zoneName(at: Date, timeZone: string, locale: Locale): string | undefined {
-  const tag = intlTag(locale === "ja" ? "en" : locale);
+  const tag = intlTag(locale === "ja" || locale === "id" ? "en" : locale);
   return new Intl.DateTimeFormat(tag, { timeZone, timeZoneName: "short" }).formatToParts(at).find((p) => p.type === "timeZoneName")?.value;
 }
 
