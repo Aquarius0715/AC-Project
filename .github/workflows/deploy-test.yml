@@ -17,7 +17,6 @@ on:
     tags: ["test[0-9]+.[0-9]+.[0-9]+r[0-9]+"]
 
 permissions:
-  actions: write # the CI run of the commit, and starting it when the commit has none
   contents: read
 
 jobs:
@@ -26,6 +25,9 @@ jobs:
     if: github.repository == 'Aquarius0715/AC-Project' # only in this repository, never a fork's (IR732)
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    permissions:
+      actions: write # the CI run of the commit, and starting it when the commit has none (this job only)
+      contents: read
     outputs:
       tag: ${{ steps.pick.outputs.tag }}
     steps:
