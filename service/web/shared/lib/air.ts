@@ -6,7 +6,7 @@
 import { periodRange } from "@ac/web/lib/clientEnergy";
 import { evidenceText } from "@ac/web/lib/evidence";
 import { roundAway } from "@ac/web/lib/energy";
-import { toggleSeries, unitAxes } from "@ac/web/lib/chartScale";
+import { unitAxes } from "@ac/web/lib/chartScale";
 import { spacePath, type ApiPropertyRow, type ApiSpaceRow, type ApiUnitRow } from "@ac/web/lib/assets";
 import { DEFAULT_DISPLAY, EN, relativeTime, showClock, showDate, showDay, showSpan, translator, type Display, type I18n, type T } from "@ac/web/lib/i18n";
 import type { IconName } from "@ac/web/components/Icon";
@@ -229,17 +229,17 @@ export function windowSub(w: AirWindow, unit: string, room: string, i: I18n = EN
   return `${unit} · ${room} · ${span}`;
 }
 
-/** The metrics the URL's `metric` names ("co2,pm25"; a single name is the old form of the link): the known ones, each once,
-and no more than a chart has axes for — one unit on the left axis, another on the right, a third is left out (IR689). CO2
-when none is left. */
+/** The metrics the URL's `metric` names ("co2,pm25"; a single name is the old form of the link): the known ones, each once —
+all four may be shown at once (IR793). CO2 when none is left. */
 export function airMetricsOf(text = ""): AirMetric[] {
   const named = [...new Set(text.split(",").filter((m): m is AirMetric => (airMetrics as string[]).includes(m)))];
-  const axes = unitAxes(named.map((m) => entryOf(metricInfo, m).unit));
-  const fits = named.filter((m) => axes.has(entryOf(metricInfo, m).unit));
-  return fits.length > 0 ? fits : ["co2"];
+  return named.length > 0 ? named : ["co2"];
 }
-/** The selection after a metric is pressed: taken out (never the last one) or put in; null when its unit would be a third on a chart with two axes. */
-export const toggleAirMetric = (selected: AirMetric[], metric: AirMetric): AirMetric[] | null => toggleSeries(selected, metric, (m) => entryOf(metricInfo, m).unit);
+/** The selection after a metric is pressed: taken out (never the last one) or put in. */
+export const toggleAirMetric = (selected: AirMetric[], metric: AirMetric): AirMetric[] => {
+  if (!selected.includes(metric)) return [...selected, metric];
+  return selected.length > 1 ? selected.filter((m) => m !== metric) : selected;
+};
 /** The heading of each slot in the chart's tooltip: its span in the display time zone ("Mon 9 Nov, 15:00 – 15:05 MYT"). */
 export function slotHeadings(slots: AirSlot[], slotMs: number, i: I18n = EN): string[] {
   return slots.map((s) => showSpan(s.start, new Date(Date.parse(s.start) + slotMs).toISOString(), i.display, true));
@@ -255,6 +255,12 @@ export function airChartSeries(metrics: AirMetric[], series: Partial<Record<AirM
     const points = (got?.slots ?? []).map((s) => s.avg);
     return { metric, points, name: i.t(info.label), unit: info.unit, guide: info.guide, axis: axes.get(info.unit) ?? "left", hasSensor: sensors.has(metric), valid: points.some((p) => p !== null), readings: got?.total ?? 0 };
   });
+}
+/** The charts of the selected lines: one or two units share a chart (the first unit on the left axis, the second on the right);
+three or more would need more axes than a chart has, so each line gets a chart of its own on the same time axis (IR793). */
+export function airChartGroups(lines: AirChartSeries[]): AirChartSeries[][] {
+  if (new Set(lines.map((l) => l.unit)).size <= 2) return lines.length > 0 ? [lines] : [];
+  return lines.map((l) => [{ ...l, axis: "left" }]);
 }
 
 /** The averages of valid readings per slot of the window (null = no valid reading: a gap the chart never joins). */
