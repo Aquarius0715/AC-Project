@@ -695,7 +695,7 @@ Scope: FR-C20 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 1. `installationRequests.list` (own customer) shows number, property, units, IoT, status, the first preferred time and the linked jobs.
 2. + New request opens a centered dialog; the property list comes from `properties.list`, the spaces from `spaces.list`, the models from `capabilities.list`. `installationRequests.create` answers the request with its number; an idempotency key is sent (D04).
 3. Submitted: Cancel (`installationRequests.cancel`, expectedVersion). Approved: each job id opens `/customer/maintenance?jobId=` where the owner accepts or declines the time HQ offers (FR-C09). Declined: the reason is shown.
-4. HQ is notified (target kind `installation_request`) when a request is created; the owner is notified when HQ approves or declines.
+4. No notification is sent in DEC-107: HQ finds the submitted requests in Jobs › Installation requests, the owner sees the state in the list.
 
 **Boundary cases and failures**: another customer's property or space → NOT_FOUND; an archived property → VALIDATION (`propertyId`); fewer than 3 slots, a duplicate, a past slot or one less than 1 day ahead → VALIDATION (`preferredSlots`); quantity outside 1–10 → VALIDATION (`quantity`); cancelling a request that is not submitted → CONFLICT; a member session → FORBIDDEN.
 

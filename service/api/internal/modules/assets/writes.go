@@ -951,6 +951,46 @@ func (*Module) UnitInstall(
 	return state, model, apperr.Wrap(err, "select assets.units")
 }
 
+// PropertySite answers who owns a property and whether it is archived, and whether space (when given) is a live space
+// of that property: what an installation request is checked against (Maintenance, DEC-107).
+func (*Module) PropertySite(
+	ctx context.Context,
+	call *ops.Call,
+	property uuid.UUID,
+	space *uuid.UUID,
+) (uuid.UUID, bool, bool, bool, error) {
+	var (
+		org      uuid.UUID
+		archived bool
+	)
+
+	err := call.Tx.QueryRow(ctx, `SELECT customer_org_id, archived FROM assets.properties WHERE id = $1`, property).
+		Scan(&org, &archived)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return org, false, false, false, nil
+	}
+
+	if err != nil {
+		return org, false, false, false, apperr.Wrap(err, "select assets.properties")
+	}
+
+	spaceOK := space == nil
+
+	if space != nil {
+		err = call.Tx.QueryRow(
+			ctx,
+			`SELECT EXISTS (SELECT 1 FROM assets.spaces WHERE id = $1 AND property_id = $2 AND NOT archived)`,
+			*space,
+			property,
+		).Scan(&spaceOK)
+		if err != nil {
+			return org, archived, true, false, apperr.Wrap(err, "select assets.spaces")
+		}
+	}
+
+	return org, archived, true, spaceOK, nil
+}
+
 // UnitService returns the organization, property and service scope of a unit (Maintenance qualification checks).
 func (*Module) UnitService(
 	ctx context.Context,

@@ -19,8 +19,8 @@ const query = (path: string) => {
 
 describe("coreRequest", () => {
   it("covers every operation of the catalog", () => {
-    expect(Object.keys(coreRoutes)).toHaveLength(228); // IR657 members.delete, IR656 baselines.delete + factors.delete + mrv.deleteDraft, IR655 plans.delete + rateCards.delete, IR654 customers.delete + contractors.delete + organizations.delete, IR653 firmwareCampaigns.delete, IR652 devices.unbind + devices.delete + capabilities.delete, IR648 voice.resolveIntent removed, IR635 devices.setMqttNode, IR612 members.unavailability + members.clearUnavailability, IR437 jobs.getAttachment, IR436 certificates.getContent, IR416 partnerUsers.*, IR238 filterCare.getSettings, IR327 alerts.evidence, IR349 attachments.list, IR379 notifications.markAllRead, IR384 members.revokeSessions
-    expect(Object.values(coreRoutes).flat()).toHaveLength(250);
+    expect(Object.keys(coreRoutes)).toHaveLength(232); // IR657 members.delete, IR656 baselines.delete + factors.delete + mrv.deleteDraft, IR655 plans.delete + rateCards.delete, IR654 customers.delete + contractors.delete + organizations.delete, IR653 firmwareCampaigns.delete, IR652 devices.unbind + devices.delete + capabilities.delete, IR648 voice.resolveIntent removed, IR635 devices.setMqttNode, IR612 members.unavailability + members.clearUnavailability, IR437 jobs.getAttachment, IR436 certificates.getContent, IR416 partnerUsers.*, IR238 filterCare.getSettings, IR327 alerts.evidence, IR349 attachments.list, IR379 notifications.markAllRead, IR384 members.revokeSessions
+    expect(Object.values(coreRoutes).flat()).toHaveLength(254);
     expect(coreRequest("filterCare.getSettings", {})).toStrictEqual({ method: "GET", path: "/v1/filter-care/settings" });
     expect(coreRequest("alerts.evidence", { alertId: "a1", query: { limit: 100 } })).toStrictEqual({ method: "GET", path: "/v1/alerts/a1/evidence?limit=100" });
     // IR349: the MRV evidence candidates take their units and period in the query string

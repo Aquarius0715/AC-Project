@@ -506,6 +506,29 @@
   "limit",
   "sort"
  ],
+ "installationRequests.cancel": [
+  "id"
+ ],
+ "installationRequests.create": [
+  "contactWindow",
+  "modelId",
+  "note",
+  "preferredSlots",
+  "propertyId",
+  "quantity",
+  "spaceId",
+  "withIot"
+ ],
+ "installationRequests.decline": [
+  "id",
+  "reason"
+ ],
+ "installationRequests.list": [
+  "cursor",
+  "filters",
+  "limit",
+  "sort"
+ ],
  "invoices.create": [
   "amountMinor",
   "contractId",
@@ -590,6 +613,7 @@
   "alternativeSlots",
   "contactWindow",
   "dueAt",
+  "installationRequestId",
   "requestedEnd",
   "requestedStart",
   "symptom",
