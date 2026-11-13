@@ -7,7 +7,7 @@ const event = (over: Partial<ApiDeviceEvent>): ApiDeviceEvent => ({ id: "e", eve
 const f = (code: string, messageKey: string, fieldErrors: Record<string, string> = {}) => ({ code, messageKey, fieldErrors });
 
 /** The button, toast and demo toast texts of some jumps in a language. */
-const words = (locale: "en" | "ms" | "ja") => {
+const words = (locale: "en" | "ms" | "ja" | "id") => {
   const t = translator(locale);
   return [jumpLabel(1, t), jumpLabel(60, t), jumpLabel(120, t), jumpLabel(1440, t), jumpDone(1, t), jumpDone(60, t), jumpDone(480, t), jumpDoneDemo(60, t), jumpDoneDemo(720, t)];
 };
@@ -29,6 +29,7 @@ describe("Demo controls in API mode (FR-X05, IR249)", () => {
     expect(words("en")).toStrictEqual(["+1 min", "+1 hour", "+2 hours", "+24 hours", "Clock advanced 1 minute", "Clock advanced 1 hour", "Clock advanced 8 hours", "Clock advanced +1 hour (demo)", "Clock advanced +12 hours (demo)"]);
     expect(words("ms")).toStrictEqual(["+1 min", "+1 jam", "+2 jam", "+24 jam", "Jam dimajukan 1 minit", "Jam dimajukan 1 jam", "Jam dimajukan 8 jam", "Jam dimajukan +1 jam (demo)", "Jam dimajukan +12 jam (demo)"]);
     expect(words("ja")).toStrictEqual(["+1 分", "+1 時間", "+2 時間", "+24 時間", "時計を1分進めました", "時計を1時間進めました", "時計を 8 時間進めました", "時計を +1 時間進めました（デモ）", "時計を +12 時間進めました（デモ）"]);
+    expect(words("id")).toStrictEqual(["+1 mnt", "+1 jam", "+2 jam", "+24 jam", "Jam dimajukan 1 menit", "Jam dimajukan 1 jam", "Jam dimajukan 8 jam", "Jam dimajukan +1 jam (demo)", "Jam dimajukan +12 jam (demo)"]);
   });
 
   it("finds the open connection fault and the next sequence", () => {

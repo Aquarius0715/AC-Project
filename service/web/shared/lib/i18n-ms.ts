@@ -53,7 +53,7 @@ export const ms: Record<string, string> = {
 
   // preferences
   "Display language": "Bahasa paparan",
-  "Affects the screens, notifications and date/time display. Stored data stays UTC. Malay and Japanese text is a draft under review; text not translated yet stays in English.":
+  "Affects the screens, notifications and date/time display. Stored data stays UTC. Malay, Japanese and Indonesian text is a draft under review; text not translated yet stays in English.":
     "Mempengaruhi skrin, pemberitahuan dan paparan tarikh/masa. Data yang disimpan kekal dalam UTC. Teks Bahasa Melayu dan Bahasa Jepun ialah draf yang sedang disemak; teks yang belum diterjemah kekal dalam Bahasa Inggeris.",
   "English (default)": "Bahasa Inggeris (lalai)",
   "Display timezone": "Zon waktu paparan",

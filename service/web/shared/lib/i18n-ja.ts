@@ -47,7 +47,7 @@ export const ja: Record<string, string> = {
   "Partner portal": "パートナーポータル",
   "HQ Admin": "本部管理",
   "Display language": "表示言語",
-  "Affects the screens, notifications and date/time display. Stored data stays UTC. Malay and Japanese text is a draft under review; text not translated yet stays in English.": "画面、通知、日付と時刻の表示に反映されます。保存されるデータは UTC のままです。マレー語と日本語のテキストは確認中の草案で、まだ翻訳されていないテキストは英語のままです。",
+  "Affects the screens, notifications and date/time display. Stored data stays UTC. Malay, Japanese and Indonesian text is a draft under review; text not translated yet stays in English.": "画面、通知、日付と時刻の表示に反映されます。保存されるデータは UTC のままです。マレー語と日本語のテキストは確認中の草案で、まだ翻訳されていないテキストは英語のままです。",
   "English (default)": "英語（既定）",
   "Display timezone": "表示タイムゾーン",
   "Booked times keep their meaning across timezone changes.": "予約した時刻は、タイムゾーンを変えても同じ時点を指します。",

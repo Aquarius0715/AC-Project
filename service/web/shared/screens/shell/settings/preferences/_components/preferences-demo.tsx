@@ -26,7 +26,7 @@ export function PreferencesDemo() {
   const [codes, setCodes] = useState<string[] | null>(null);
   return (
     <Page className="max-w-3xl">
-      <Card title={t("Display language")} sub={t("Affects the screens, notifications and date/time display. Stored data stays UTC. Malay and Japanese text is a draft under review; text not translated yet stays in English.")}>
+      <Card title={t("Display language")} sub={t("Affects the screens, notifications and date/time display. Stored data stays UTC. Malay, Japanese and Indonesian text is a draft under review; text not translated yet stays in English.")}>
         <Choice value={lang} onChange={(v) => { setStoredValue(LOCALE_KEY, v); toast(translate(v, "Language saved")); }} options={languageOptions(t)} />
       </Card>
       <Card title={t("Display timezone")} sub={t("Booked times keep their meaning across timezone changes.")}>

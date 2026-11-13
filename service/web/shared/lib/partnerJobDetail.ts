@@ -48,9 +48,9 @@ const STATUS_WORDS: Record<string, string> = {
 };
 /** A job status inside a sentence (“the job is on hold”), in the display language. */
 export const statusWord = (status: string, t: T = en) => (textOf(STATUS_WORDS, status, t) ?? status.replaceAll('_', " "));
-/** “1st”, “2nd”, “3rd”, “4th” … in English, “ke-1” in Malay, “第1” in Japanese. */
+/** “1st”, “2nd”, “3rd”, “4th” … in English, “ke-1” in Malay and Indonesian, “第1” in Japanese. */
 export function ordinal(n: number, locale: Locale = "en"): string {
-  if (locale === "ms") return `ke-${String(n)}`;
+  if (locale === "ms" || locale === "id") return `ke-${String(n)}`;
   if (locale === "ja") return `第${String(n)}`;
   const teen = n % 100 >= 11 && n % 100 <= 13;
   const suffix = teen ? "th" : (["th", "st", "nd", "rd"].at(n % 10) ?? "th");
