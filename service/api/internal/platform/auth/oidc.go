@@ -24,6 +24,7 @@ var (
 	errNoSubject    = errors.New("no subject")
 	errClaimsFormat = errors.New("claims are not a JSON object")
 	errNoIssuer     = errors.New("OIDC_ISSUER is required")
+	errNoAppClient  = errors.New("OIDC_APP_CLIENT_ID is required")
 )
 
 // The JWKS refresh of NewVerifierFromEnv (keyfunc.Override).
@@ -76,11 +77,16 @@ func NewVerifierFromEnv(ctx context.Context) (*OIDCVerifier, error) {
 		return nil, fmt.Errorf("jwks: %w", err)
 	}
 
+	apps := commaList(os.Getenv("OIDC_APP_CLIENT_ID"))
+	if len(apps) == 0 {
+		return nil, errNoAppClient
+	}
+
 	admin := os.Getenv("OIDC_ADMIN_CLIENT_ID")
 
 	return &OIDCVerifier{
 		Issuers:     issuers,
-		Audiences:   append(commaList(os.Getenv("OIDC_APP_CLIENT_ID")), admin),
+		Audiences:   append(apps, admin),
 		AdminClient: admin,
 		Keyfunc:     keys.Keyfunc,
 	}, nil

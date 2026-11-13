@@ -26,10 +26,7 @@ const link = (id: string, name: string, note: string, href: string | undefined):
 
 /** The groups of links for a request that came by `host`; empty groups are dropped. */
 export function serviceGroups(env: Env, host: string | null): ServiceGroup[] {
-  const s = settings.parse({
-    ...env,
-    ...Object.fromEntries(Object.entries(env).filter(([, v]) => v === "").map(([k]) => [k, undefined])), // "" is unset
-  });
+  const s = settings.parse(env); // an empty or malformed address fails the check and leaves the service out
   const on = (base: string | undefined, path = "") => (base ? `${addressFor(base, host, env)}${path}` : undefined);
   const groups: ServiceGroup[] = [
     { id: "apps", title: "Applications", links: [

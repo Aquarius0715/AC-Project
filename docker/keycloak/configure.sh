@@ -24,6 +24,7 @@ SERVER=${KEYCLOAK_INTERNAL_URL:-http://keycloak:8080}
 # One client per app (IR790), so the one sign-in page names the service: a realm imported before has only ac-web.
 # ensure_client CLIENT_ID TITLE URL THEME creates the client with the claims the apps read when it is missing.
 ensure_client() {
+  [ -n "$3" ] || { echo "realm ac: no address for $1: CUSTOMER_WEB_URL, PARTNER_WEB_URL and TECHNICIAN_WEB_URL are required" >&2; exit 1; }
   cid=$("$KC" get clients -r ac -q "clientId=$1" --fields id --format csv --noquotes)
   if [ -z "$cid" ]; then
     "$KC" create clients -r ac -s "clientId=$1" -s "name=$2" -s publicClient=false \
@@ -66,12 +67,15 @@ if [ -n "${PUBLIC_HOSTS:-}" ]; then
     printf '%s' "${out%,}"
   }
   origins() { printf '%s' "$1" | sed 's#/\*"#"#g'; }
-  for app in customer:CUSTOMER partner:PARTNER technician:TECHNICIAN; do
-    eval "url=\${${app#*:}_WEB_URL}"
-    web=$(urls_on_hosts "${url%/}")
-    webid=$("$KC" get clients -r ac -q "clientId=ac-${app%%:*}-web" --fields id --format csv --noquotes)
+  # each app's client gets that app's own addresses
+  set_uris() {
+    web=$(urls_on_hosts "${2%/}")
+    webid=$("$KC" get clients -r ac -q "clientId=$1" --fields id --format csv --noquotes)
     "$KC" update "clients/$webid" -r ac -s "redirectUris=[$web]" -s "webOrigins=[$(origins "$web")]"
-  done
+  }
+  set_uris ac-customer-web "$CUSTOMER_WEB_URL"
+  set_uris ac-partner-web "$PARTNER_WEB_URL"
+  set_uris ac-technician-web "$TECHNICIAN_WEB_URL"
   admin=$(urls_on_hosts "${ADMIN_WEB_URL%/}")
   "$KC" update "clients/$id" -r ac -s "redirectUris=[$admin]" -s "webOrigins=[$(origins "$admin")]"
 fi

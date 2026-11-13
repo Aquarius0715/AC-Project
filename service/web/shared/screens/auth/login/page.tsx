@@ -20,7 +20,8 @@ browser demo has no identity service, so Continue opens the app. */
 export async function LoginScreen({ appRole: role, params = NO_PARAMS, api }: Readonly<{ appRole: Role; params?: Params; api: boolean }>) {
   const returnTo = safeReturnTo(role, one(params.returnTo));
   const error = loginError(one(params.error));
-  const start = `/bff/auth/login?returnTo=${encodeURIComponent(returnTo)}`;
+  const reauth = one(params.reauth) === "1"; // after sign-out: the identity provider asks for the password again (prompt=login)
+  const start = `/bff/auth/login?returnTo=${encodeURIComponent(returnTo)}${reauth ? "&reauth=1" : ""}`;
   if (api && !error) redirect(start);
   const config = roleConfig(role);
   const { locale } = await coreDisplay();
