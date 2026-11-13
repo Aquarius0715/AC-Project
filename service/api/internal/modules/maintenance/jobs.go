@@ -596,7 +596,7 @@ func (m Jobs) unitToRequest(
 		return org, err
 	}
 
-	return org, checkRequestLink(ctx, call, input, org)
+	return org, checkRequestLink(ctx, call, m.Units, input, org)
 }
 
 // checkInstallation applies DEC-106 to a new job: an installation job is HQ's, for a planned unit and the only

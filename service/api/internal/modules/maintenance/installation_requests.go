@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -104,7 +105,7 @@ const requestCols = `r.id, r.tenant_id, r.version, r.created_at, r.updated_at, r
 	r.space_id, r.quantity, r.model_id, r.with_iot, r.preferred_slots, r.contact_window, r.note, r.status,
 	r.decline_reason, r.decided_at,
 	COALESCE((SELECT array_agg(j.id ORDER BY j.created_at, j.id) FROM maintenance.jobs j
-		WHERE j.installation_request_id = r.id), '{}')`
+		WHERE j.installation_request_id = r.id AND j.status <> 'cancelled'), '{}')`
 
 func scanRequest(row pgx.Row) (InstallationRequest, error) {
 	var (
@@ -673,6 +674,12 @@ func (m InstallationRequests) decide(
 		return request, err
 	}
 
+	if call.ExpectedVersion == nil {
+		return InstallationRequest{}, apperr.Fields(
+			map[string]string{"expectedVersion": apperr.KeyRequired},
+		)
+	}
+
 	if request.Version != *call.ExpectedVersion {
 		return InstallationRequest{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
@@ -728,6 +735,7 @@ func (m InstallationRequests) decide(
 func checkRequestLink(
 	ctx context.Context,
 	call *ops.Call,
+	units JobUnits,
 	input *CreateInput,
 	org uuid.UUID,
 ) error {
@@ -742,12 +750,16 @@ func checkRequestLink(
 	var (
 		status   string
 		customer uuid.UUID
+		property uuid.UUID
 		quantity int
 	)
 
-	err := call.Tx.QueryRow(ctx, `SELECT status, customer_org_id, quantity FROM maintenance.installation_requests
-		WHERE id = $1 FOR UPDATE`, *input.InstallationRequestID).
-		Scan(&status, &customer, &quantity)
+	err := call.Tx.QueryRow(
+		ctx,
+		`SELECT status, customer_org_id, property_id, quantity FROM maintenance.installation_requests
+		WHERE id = $1 FOR UPDATE`,
+		*input.InstallationRequestID,
+	).Scan(&status, &customer, &property, &quantity)
 	if errors.Is(err, pgx.ErrNoRows) || (err == nil && customer != org) {
 		return apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
@@ -760,10 +772,19 @@ func checkRequestLink(
 		return apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
+	atProperty, err := units.UnitsOfProperty(ctx, call, property)
+	if err != nil {
+		return apperr.Wrap(err, "maintenance.JobUnits.UnitsOfProperty")
+	}
+
+	if !slices.Contains(atProperty, input.UnitID) {
+		return apperr.Fields(map[string]string{fieldUnitID: apperr.KeyInvalid})
+	}
+
 	var open int
 
 	err = call.Tx.QueryRow(ctx, `SELECT count(*) FROM maintenance.jobs WHERE installation_request_id = $1
-		AND status NOT IN ('completed','cancelled')`, *input.InstallationRequestID).
+		AND status <> 'cancelled'`, *input.InstallationRequestID).
 		Scan(&open)
 	if err != nil {
 		return apperr.Wrap(err, "select maintenance.jobs")
@@ -781,6 +802,18 @@ func approveRequest(ctx context.Context, call *ops.Call, request uuid.UUID) erro
 	_, err := call.Tx.Exec(ctx, `UPDATE maintenance.installation_requests SET status = 'approved',
 		decided_by = COALESCE(decided_by, $2), decided_at = COALESCE(decided_at, $3), version = version + 1,
 		updated_at = $3 WHERE id = $1 AND status = 'submitted'`, request, call.Principal.UserID, call.Now)
+	if err != nil {
+		return apperr.Wrap(err, "update maintenance.installation_requests")
+	}
 
-	return apperr.Wrap(err, "update maintenance.installation_requests")
+	call.Emit(
+		outboxEvent(
+			"installation_request",
+			request,
+			"InstallationRequestApproved",
+			map[string]any{},
+		),
+	)
+
+	return nil
 }

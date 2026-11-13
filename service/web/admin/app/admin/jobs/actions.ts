@@ -239,7 +239,7 @@ export async function approveInstallationRequest(input: InstallationInput): Prom
   const results = await Promise.allSettled(input.names.map((name) => makeInstallationJob(input, name)));
   refresh();
   const refused = results.find((r) => r.status === "rejected");
-  return refused ? actionFailure(refused.reason) : { ok: true, value: { made: results.length } };
+  return refused ? actionFailure(refused.reason) : { ok: true, value: { made: results.filter((r) => r.status === "fulfilled").length } };
 }
 
 export async function declineInstallationRequest(id: string, version: number, reason: string) {
