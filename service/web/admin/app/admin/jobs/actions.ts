@@ -211,3 +211,37 @@ export async function saveSlaTargets(input: OpInput<"sla.saveTargets">) {
   return value(async () => { const t = await coreOp<{ version: number }>("sla.saveTargets", input, { write: true }); return { version: t.version }; });
 }
 
+
+interface InstallationInput {
+  requestId: string; customerOrgId: string; propertyId: string; spaceId: string | null; modelId: string; names: string[];
+  symptom: string; slots: Slot[]; contactWindow: string;
+}
+
+/** One planned unit and its installation job for a name. */
+async function makeInstallationJob(input: InstallationInput, name: string): Promise<void> {
+  const [first, ...alternatives] = input.slots;
+  if (!first) throw new Error("a job needs its 1st preferred time");
+  const unit = await coreOp<{ id: string }>("units.save", {
+    customerOrgId: input.customerOrgId, propertyId: input.propertyId, spaceId: input.spaceId, displayName: name.trim(), modelId: input.modelId,
+    type: "split", installState: "planned", installedAt: null, serviceScope: ["indoor", "outdoor"],
+  }, { write: true });
+  await coreOp("jobs.create", {
+    unitId: unit.id, type: "installation", symptom: input.symptom.trim(), requestedStart: first.startAt, requestedEnd: first.endAt, alternativeSlots: alternatives,
+    installationRequestId: input.requestId, ...(input.contactWindow.trim() && { contactWindow: input.contactWindow.trim() }),
+  }, { write: true });
+}
+
+/** The units and jobs HQ makes for one installation request (FR-C20, DEC-107): a planned unit and an installation job
+linked to the request for each name. The pairs do not depend on each other (the Core API locks the request while it counts
+its jobs, so no more than the request's number is made); a refusal of one leaves the others, which the page shows as the
+request's jobs, and the next approval makes the units still missing. */
+export async function approveInstallationRequest(input: InstallationInput): Promise<{ ok: true; value: { made: number } } | ({ ok: false } & ActionFailure)> {
+  const results = await Promise.allSettled(input.names.map((name) => makeInstallationJob(input, name)));
+  refresh();
+  const refused = results.find((r) => r.status === "rejected");
+  return refused ? actionFailure(refused.reason) : { ok: true, value: { made: results.length } };
+}
+
+export async function declineInstallationRequest(id: string, version: number, reason: string) {
+  return run(() => coreOp("installationRequests.decline", { id, reason: reason.trim() }, write(version)));
+}

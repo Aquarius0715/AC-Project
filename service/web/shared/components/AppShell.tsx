@@ -117,6 +117,7 @@ export function AppShell({ appRole: forced, live, children }: Readonly<{ appRole
           <Suspense fallback={<RoleNav items={items} base={config.base} pathname={pathname} search="" />}><RoleNavWithQuery items={items} base={config.base} pathname={pathname} /></Suspense>
           <div className="my-2 border-t border-line" />
           <nav className="flex flex-col gap-0.5">
+            {role === "client" && isOwner && <NavLink href="/customer/installations" label={t("Installations")} icon="maintenance" active={pathname === "/customer/installations"} />}
             {role === "client" && isOwner && <NavLink href="/customer/users" label={t("Users")} icon="users" active={pathname === "/customer/users"} />}
             {role === "contractor" && <NavLink href="/partner/users" label={t("Users")} icon="users" active={pathname === "/partner/users"} />}
             {SHARED.map((s) => <NavLink key={s.href} {...s} label={t(s.label)} active={pathname === s.href} badge={s.href === "/notifications" ? unreadBadge(s.href) : undefined} />)}

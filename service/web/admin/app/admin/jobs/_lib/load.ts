@@ -19,6 +19,9 @@ import { nextOccurrence, planDate, planRows, type ApiPlan } from "@ac/web/lib/ad
 import { breachRows, PERIODS, periodOf, slaRows, slaTiles, targetsByPlan, type ApiScorecard } from "@ac/web/lib/adminSla";
 import { contractorRows, kpiTiles, pendingCertificates, profileFacts, rateCardView, technicianRows, type ApiCertificate, type ApiProfile, type ApiRateCard, type ApiTechnician } from "@ac/web/lib/adminContractors";
 import { recover } from "@ac/web/lib/promises";
+import { requestRows, type InstallationRequest } from "@ac/web/lib/installationRequests";
+import type { ApiCapability } from "@ac/web/lib/devices";
+import type { ApiSpaceRow } from "@ac/web/lib/assets";
 
 const TECHNICIAN = "technician";
 
@@ -250,3 +253,24 @@ export async function loadSla(sp: SP) {
 
 export type SlaLive = Awaited<ReturnType<typeof loadSla>>;
 
+
+const REQUEST_STATUSES = ["submitted", "approved", "declined", "cancelled"] as const;
+
+/** The Installation requests tab (FR-C20, DEC-107): the customers' requests with the status from the URL (submitted
+unless asked otherwise, "all" for every one), the names of the place and the model, and what HQ needs to make the units. */
+export async function loadInstallations(sp: SP) {
+  const [{ i, properties, names, head }, perms] = await Promise.all([shared(sp), corePermissions()]);
+  const asked = one(sp.status);
+  const status = REQUEST_STATUSES.find((s) => s === asked) ?? (asked === "all" ? "all" : "submitted");
+  const [requests, spaces, models] = await Promise.all([
+    coreAll<InstallationRequest>("installationRequests.list", { filters: status === "all" ? {} : { status } }),
+    optional(coreAll<ApiSpaceRow>("spaces.list"), []), optional(coreAll<ApiCapability>("capabilities.list"), []),
+  ]);
+  const rows = requestRows(requests, { properties, spaces, models }, i).map((r) => ({ ...r, customer: names.customers.get(r.customerOrgId) ?? "—" }));
+  return {
+    ...head, q: {}, canDecline: perms.has("job.write"), canApprove: perms.has("job.write") && perms.has("asset.write"), status, statuses: ["all", ...REQUEST_STATUSES], rows, models: models.map((m) => ({ id: m.id, name: `${m.manufacturer} ${m.model}` })),
+    spaceOf: Object.fromEntries(requests.map((r) => [r.id, r.spaceId])),
+  };
+}
+
+export type InstallationsLive = Awaited<ReturnType<typeof loadInstallations>>;
