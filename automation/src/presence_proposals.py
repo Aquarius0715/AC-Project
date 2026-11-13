@@ -4,10 +4,10 @@ from collections import Counter
 from datetime import timedelta
 from time import perf_counter
 
-from .engine import START_MIN_SUPPORT, START_TOLERANCE_MINUTES, start_pattern
+from .engine import START_MIN_SUPPORT, START_TOLERANCE_MINUTES
 from .models import clock
 from .monthly_data import Customer, local_midnight
-from .monthly_engine import base_scenario, evaluate_customer, result, signature
+from .monthly_engine import evaluate_customer, result, signature
 from .presence import PresenceIndex
 from .presence_data import Household, PresenceBundle
 
@@ -70,16 +70,46 @@ def review_weekday(
     index: PresenceIndex,
 ) -> dict:
     monthly = data.monthly
-    _, _, votes = start_pattern(base_scenario(monthly, customer, schedule))
+    day = monthly.as_of.astimezone(customer.timezone).date() - timedelta(days=1)
+    dates = []
+    while len(dates) < 4:
+        if day.weekday() == schedule.weekday:
+            dates.append(day)
+        day -= timedelta(days=1)
     days = {day.date: day for day in customer.days}
     comparisons = []
-    for day, _ in votes:
-        at = local_midnight(day, customer.timezone) + timedelta(minutes=schedule.start)
+    for day in sorted(dates):
+        historical = schedule
+        versions = data.schedule_versions.get(customer.device_id, ())
+        if versions:
+            eligible = [
+                v
+                for v in versions
+                if v["valid_from"] <= local_midnight(day, customer.timezone)
+            ]
+            historical = (
+                next(
+                    (
+                        s
+                        for s in eligible[-1]["schedules"]
+                        if s.weekday == schedule.weekday
+                    ),
+                    None,
+                )
+                if eligible
+                else None
+            )
+        start_minutes = historical.start if historical else schedule.start
+        at = local_midnight(day, customer.timezone) + timedelta(minutes=start_minutes)
         end = local_midnight(day + timedelta(days=1), customer.timezone)
         record = days.get(day)
         exclusion = None
-        if record is None or record.status != "complete":
+        if historical is None:
+            exclusion = "no_schedule"
+        elif record is None or record.status != "complete":
             exclusion = "operation_record_missing"
+        elif historical.start != schedule.start:
+            exclusion = "schedule_changed"
         elif any(
             period.start < end and period.end > local_midnight(day, customer.timezone)
             for period in customer.trips
@@ -148,7 +178,7 @@ def review_weekday(
             else "確認なし"
         )
         evidence.append(
-            f"{row['date']}: {clock(schedule.start)}時点 {row['state']} / 帰宅確認 {arrival} / 除外 {row['excluded_reason'] or 'なし'}"
+            f"{row['date']}: {row['scheduled_at'][11:16]}時点 {row['state']} / 帰宅確認 {arrival} / 除外 {row['excluded_reason'] or 'なし'}"
         )
     evidence.append(
         "帰宅前の予冷・遠隔運転もあり得るため、帰宅時刻だけで遅らせません。具体時刻・節約額は別の根拠がなければ表示しません。"
@@ -190,9 +220,14 @@ def review_weekday(
 
 
 def evaluate_household(
-    data: PresenceBundle, household: Household, *, include_intervals: bool = False
+    data: PresenceBundle,
+    household: Household,
+    *,
+    include_intervals: bool = False,
+    include_billing: bool = True,
+    presence_index: PresenceIndex | None = None,
 ) -> dict:
-    index = PresenceIndex(household, data.monthly.as_of)
+    index = presence_index or PresenceIndex(household, data.monthly.as_of)
     devices = []
     customers = {customer.device_id: customer for customer in data.monthly.customers}
     for device_id in household.device_ids:
@@ -203,6 +238,7 @@ def evaluate_household(
             customer,
             confirmed_on_ids=confirmed_ids,
             include_intervals=include_intervals,
+            include_billing=include_billing,
         )
         # A prior choice remains visible, but a concrete new start in this demo
         # additionally needs three actual off→on events near that chosen time.

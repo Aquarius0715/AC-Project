@@ -1,13 +1,20 @@
 """JSON adapter. Missing measurements stay unknown; malformed inputs fail clearly."""
 
-import json
 import re
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
-from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from .models import EnergyComparison, Operation, Period, Plan, Scenario, Schedule, Slot, Weather
+from .models import (
+    EnergyComparison,
+    Operation,
+    Period,
+    Plan,
+    Scenario,
+    Schedule,
+    Slot,
+    Weather,
+)
 
 
 class InputError(ValueError):
@@ -79,7 +86,10 @@ def operation(value: object) -> Operation:
     after = raw.get("to_c")
     return Operation(
         string(raw.get("device_id"), "operation.device_id"),
-        timestamp(raw.get("at"), "operation.at"), source, action, once,
+        timestamp(raw.get("at"), "operation.at"),
+        source,
+        action,
+        once,
         None if before is None else number(before, "operation.from_c", "16", "30"),
         None if after is None else number(after, "operation.to_c", "16", "30"),
     )
@@ -97,7 +107,13 @@ def weather_samples(value: object) -> tuple[Weather, ...]:
             raise InputError("weather: 同じ機器・日時の気温が重複しています")
         keys.add(key)
         if raw.get("outdoor_c") is not None:
-            samples.append(Weather(device_id, at, number(raw["outdoor_c"], "weather.outdoor_c", "-60", "60")))
+            samples.append(
+                Weather(
+                    device_id,
+                    at,
+                    number(raw["outdoor_c"], "weather.outdoor_c", "-60", "60"),
+                )
+            )
     return tuple(samples)
 
 
@@ -117,10 +133,19 @@ def energy_comparison(value: object) -> EnergyComparison | None:
         slot_start = timestamp(slot.get("start"), "slot.start")
         slot_end = timestamp(slot.get("end"), "slot.end")
         if slot_start != cursor or slot_end <= slot_start or slot_end > end:
-            raise InputError("energy.slots: 比較期間を隙間・重複なく時刻順で覆ってください")
+            raise InputError(
+                "energy.slots: 比較期間を隙間・重複なく時刻順で覆ってください"
+            )
         price = slot.get("jpy_per_kwh")
-        slots.append(Slot(slot_start, slot_end,
-                          None if price is None else number(price, "slot.jpy_per_kwh", "0", "10000")))
+        slots.append(
+            Slot(
+                slot_start,
+                slot_end,
+                None
+                if price is None
+                else number(price, "slot.jpy_per_kwh", "0", "10000"),
+            )
+        )
         cursor = slot_end
     if not slots or cursor != end:
         raise InputError("energy.slots: 比較期間全体の単価が必要です")
@@ -131,20 +156,37 @@ def energy_comparison(value: object) -> EnergyComparison | None:
         name = string(plan.get("name"), "plan.name")
         kind = plan.get("kind")
         if name in names or kind not in ("usual", "comfort", "precool"):
-            raise InputError("energy.plans: 固有のnameとkind (usual / comfort / precool) が必要です")
+            raise InputError(
+                "energy.plans: 固有のnameとkind (usual / comfort / precool) が必要です"
+            )
         names.add(name)
         energy = array(plan.get("kwh"), "plan.kwh")
         if len(energy) != len(slots):
-            raise InputError("plan.kwh: 単価の時間帯と同じ要素数が必要です。不明はnullにしてください")
+            raise InputError(
+                "plan.kwh: 単価の時間帯と同じ要素数が必要です。不明はnullにしてください"
+            )
         indoor = plan.get("indoor_c_at_required")
-        plans.append(Plan(name, kind, tuple(None if kwh is None else number(kwh, "plan.kwh", "0", "10000")
-                                            for kwh in energy),
-                          None if indoor is None else number(indoor, "plan.indoor_c_at_required", "-20", "60")))
+        plans.append(
+            Plan(
+                name,
+                kind,
+                tuple(
+                    None if kwh is None else number(kwh, "plan.kwh", "0", "10000")
+                    for kwh in energy
+                ),
+                None
+                if indoor is None
+                else number(indoor, "plan.indoor_c_at_required", "-20", "60"),
+            )
+        )
     if sum(plan.kind == "usual" for plan in plans) != 1:
         raise InputError("energy.plans: 普段の運転 (usual) を1件指定してください")
-    return EnergyComparison(tuple(slots), required_at,
-                            number(raw.get("comfort_target_c"), "energy.comfort_target_c", "16", "30"),
-                            tuple(plans))
+    return EnergyComparison(
+        tuple(slots),
+        required_at,
+        number(raw.get("comfort_target_c"), "energy.comfort_target_c", "16", "30"),
+        tuple(plans),
+    )
 
 
 def normalize(value: object) -> Scenario:
@@ -173,27 +215,33 @@ def normalize(value: object) -> Scenario:
     trips = []
     for item in array(raw.get("trips", []), "trips"):
         trip = obj(item, "trip")
-        period = Period(timestamp(trip.get("start"), "trip.start"),
-                        timestamp(trip.get("end"), "trip.end"))
+        period = Period(
+            timestamp(trip.get("start"), "trip.start"),
+            timestamp(trip.get("end"), "trip.end"),
+        )
         if period.start >= period.end:
             raise InputError("trip: start < endが必要です")
         trips.append(period)
-    operations = tuple(operation(item) for item in array(raw.get("operations"), "operations"))
+    operations = tuple(
+        operation(item) for item in array(raw.get("operations"), "operations")
+    )
     return Scenario(
-        string(raw.get("name"), "name"), string(raw.get("description"), "description"),
-        string(raw.get("device_id"), "device_id"), timezone, as_of, history_start,
-        timestamp(raw.get("learning_enabled_at"), "learning_enabled_at"), tuple(checks),
-        Schedule(weekday, start, end, number(schedule.get("temperature_c"),
-                                          "schedule.temperature_c", "16", "30")),
-        operations, tuple(trips), weather_samples(raw.get("weather", [])),
+        string(raw.get("name"), "name"),
+        string(raw.get("description"), "description"),
+        string(raw.get("device_id"), "device_id"),
+        timezone,
+        as_of,
+        history_start,
+        timestamp(raw.get("learning_enabled_at"), "learning_enabled_at"),
+        tuple(checks),
+        Schedule(
+            weekday,
+            start,
+            end,
+            number(schedule.get("temperature_c"), "schedule.temperature_c", "16", "30"),
+        ),
+        operations,
+        tuple(trips),
+        weather_samples(raw.get("weather", [])),
         energy_comparison(raw.get("energy")),
     )
-
-
-def load(path: Path) -> Scenario:
-    try:
-        with path.open(encoding="utf-8") as stream:
-            raw = json.load(stream, parse_float=Decimal)
-    except (OSError, ValueError) as exc:
-        raise InputError(f"{path.name}: JSONを読み込めません: {exc}") from exc
-    return normalize(raw)

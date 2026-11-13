@@ -831,6 +831,7 @@ def evaluate_customer(
     *,
     confirmed_on_ids: frozenset[str] | None = None,
     include_intervals: bool = True,
+    include_billing: bool = True,
 ) -> dict:
     known = judgments_as_of(bundle, customer)
     decisions = schedule_results(bundle, customer, known, confirmed_on_ids)
@@ -890,7 +891,7 @@ def evaluate_customer(
             )
             for j in known
         ],
-        billing=billing(bundle, customer, include_intervals),
+        billing=billing(bundle, customer, include_intervals) if include_billing else None,
     )
 
 

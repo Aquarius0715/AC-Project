@@ -1,10 +1,7 @@
 """Phone/installation/power-evidence contract, separate from weather and legacy data."""
 
-import gzip
-import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
-from pathlib import Path
 
 from .loader import InputError, array, obj, string, timestamp
 from .monthly_data import Bundle, normalize_bundle
@@ -48,6 +45,7 @@ class PresenceBundle:
     installations: dict
     households: tuple[Household, ...]
     power: dict[str, tuple[PowerEvidence, ...]]
+    schedule_versions: dict = field(default_factory=dict)
 
 
 def boolean(value: object, field: str) -> bool:
@@ -227,16 +225,3 @@ def normalize_presence(value: object) -> PresenceBundle:
             )
         power[device_id] = tuple(samples)
     return PresenceBundle(monthly, installations, tuple(households), power)
-
-
-def read_data(path: Path) -> dict:
-    try:
-        opener = gzip.open if path.suffix == ".gz" else open
-        with opener(path, "rt", encoding="utf-8") as stream:
-            return obj(json.load(stream), "presence bundle")
-    except (OSError, ValueError, EOFError) as exc:
-        raise InputError(f"在宅データを読み込めません: {exc}") from exc
-
-
-def load_presence(path: Path) -> PresenceBundle:
-    return normalize_presence(read_data(path))

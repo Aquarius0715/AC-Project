@@ -1,10 +1,8 @@
 """Validate a monthly bundle and normalize shared references before evaluation."""
 
-import json
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from decimal import Decimal
-from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from .loader import (
@@ -393,12 +391,3 @@ def normalize_bundle(value: object) -> Bundle:
     if not customers:
         raise InputError("customers: 1顧客以上が必要です")
     return Bundle(as_of, start_date, end_date, sites, tariffs, tuple(customers))
-
-
-def load_bundle(path: Path) -> Bundle:
-    try:
-        with path.open(encoding="utf-8") as stream:
-            raw = json.load(stream)
-    except (OSError, ValueError) as exc:
-        raise InputError(f"月次データを読み込めません: {exc}") from exc
-    return normalize_bundle(raw)

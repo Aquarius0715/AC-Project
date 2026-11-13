@@ -24,6 +24,7 @@ class PresenceIndex:
             for resident, records in self.records.items()
         }
         self.cache = {}
+        self.arrivals = {}
 
     def resident_at(self, resident: str, query: datetime) -> dict:
         times = self.times[resident]
@@ -170,6 +171,8 @@ class PresenceIndex:
         return report
 
     def first_home_after(self, start: datetime, end: datetime) -> dict | None:
+        if (start, end) in self.arrivals:
+            return self.arrivals[(start, end)]
         points = sorted(
             {
                 max(obs.at, obs.received_at)
@@ -182,10 +185,13 @@ class PresenceIndex:
         for point in points:
             presence = self.at(point)
             if presence["state"] == "home":
-                return dict(
+                result = dict(
                     confirmed_at=point.isoformat(),
                     residents=[
                         r for r in presence["residents"] if r["state"] == "home"
                     ],
                 )
+                self.arrivals[(start, end)] = result
+                return result
+        self.arrivals[(start, end)] = None
         return None

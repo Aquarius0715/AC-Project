@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 from zoneinfo import ZoneInfo
+from functools import cached_property
 
 
 @dataclass(frozen=True)
@@ -76,6 +77,11 @@ class Scenario:
     trips: tuple[Period, ...]
     weather: tuple[Weather, ...] = ()
     energy: EnergyComparison | None = None
+
+    @cached_property
+    def weather_index(self):
+        samples = tuple(sorted(self.weather, key=lambda sample: sample.at))
+        return tuple(sample.at for sample in samples), samples
 
 
 @dataclass(frozen=True)
