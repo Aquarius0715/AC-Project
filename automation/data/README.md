@@ -52,3 +52,19 @@ python3 -B -m automation.src.cli replay --data automation/data --customer H001 \
 生成する曜日別予定の終了は22:00・22:30・23:00・23:30に分散しています。自動オフはその日に有効な予定の終了時刻に対応し、電力は実際の操作から再積算しています。開始だけの提案は、この入力の終了時刻と設定温度を維持します。終了時刻を編集する場合は、過去の自動オフ・電源の前後観測・kWhと、今後の通常運転/予冷候補の比較終了・配列の区間数もそろえてください。
 
 評価JSONの開始提案は、`values`が表示・承認対象、`candidate_values`が毎日の計算結果です。継続中は初回表示から±15分以内の候補変化でも`values`と提案IDを維持します。仮の反応を追加するときは、候補ではなく**その日に表示した`values`と根拠署名**を参照してください。`selected`は修正して選んだ値です。出力上の提案IDを記録する場合は`feedback.proposal_id`に残せます。
+
+## 曜日まとめ・部分承認の追加データ
+
+`weekday-demo/`は、既存100世帯とは別に開ける4世帯×90日の入力です。`weekday-demo/dataset.json`から参照し、顧客JSONは`weekday-demo/customers/G001.json`〜`G004.json`です。共有する天気・料金は、この独立したデータセットの`weather/`・`tariffs/`を使います。根拠判定は既存と同じです。
+
+| 追加の顧客フィールド | 内容 |
+|---|---|
+| `start_controls` | 明示的な曜日固定・解除の記録。`id`, `device_id`, `weekday`（月0〜日6）, `action=lock/unlock`, `at`, `received_at` |
+| `card_responses` | カードを見て選んだ曜日別の反応。`id`, `card_id`, `proposed_at`, `responded_at`, `members` |
+| `card_responses[].members[]` | その時の`device_id`, `weekday`, `proposal_id`, 表示した`values`, `evidence_ids`, `evidence_signature`, `decision` |
+
+`decision`は`approved`（その曜日を承認）、`declined`（その曜日・候補を見送り）、`excluded_once`（今回の承認だけから外す）です。固定は別の`start_controls`へ記録します。カード全体の承認を、選ばなかった曜日へ拡大しません。見送りの対象をカードIDだけで判定せず、曜日と表示した候補を保持します。
+
+反応を編集するときは、先に再生して表示された日時・カード・各曜日のIDと内容・根拠をコピーしてください。`responded_at`はその表示判定時刻より後にします。別の曜日のIDや候補に取り替えると入力エラーです。実際に予定変更した過去の事実は、承認した曜日だけの`devices[].schedule_versions`にも記録し、自動操作・電源・電力を対応させます。HTMLの曜日チェックは保存用ではなくプレビューです。
+
+G003では8/24のカードを見て水曜だけ`excluded_once`、他4曜日を`approved`としています。G004は水曜の20:00を`declined`とし、10/1には新しい操作の根拠で21:00を評価できます。支持日が増えただけで20:00を再提示することはありません。詳細な再生コマンドは`automation/README.md`を参照してください。

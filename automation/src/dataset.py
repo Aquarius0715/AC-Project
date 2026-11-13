@@ -113,6 +113,9 @@ class Dataset:
     def prepare(self, household_id: str):
         raw = self.customers[household_id]
         device_ids = {d["device_id"] for d in raw["devices"]}
+        from .weekday_cards import validate_controls
+
+        validate_controls(raw, device_ids)
         feedback_ids = set()
         for response in array(raw.get("feedback"), "feedback"):
             response = obj(response, "feedback row")

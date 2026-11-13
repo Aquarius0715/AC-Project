@@ -20,6 +20,11 @@ def main(argv=None):
     gen.add_argument("--customers", type=int, default=100)
     gen.add_argument("--days", type=int, default=90)
     gen.add_argument("--seed", type=int, default=42)
+    weekdays = sub.add_parser(
+        "generate-weekday-demo", help="曜日まとめ・部分承認の4世帯×90日を生成"
+    )
+    weekdays.add_argument("--output", type=Path, default=ROOT / "data" / "weekday-demo")
+    weekdays.add_argument("--seed", type=int, default=42)
     for name in ("replay", "snapshot"):
         run = sub.add_parser(name)
         run.add_argument("--data", type=Path, default=DEFAULT_DATA)
@@ -32,11 +37,23 @@ def main(argv=None):
             default=15,
             help="開始提案を継続する初回表示からの幅。0は従来の完全一致との比較用",
         )
+        run.add_argument(
+            "--presentation",
+            choices=("grouped-weekly", "individual-daily"),
+            default="grouped-weekly",
+            help="既定は曜日をまとめ週1回まで。individual-dailyは曜日別カード・新規案の日に通知する比較基準",
+        )
     args = parser.parse_args(argv)
     try:
         if args.command == "generate":
             make_dataset(args.output, args.customers, args.days, args.seed)
             print(f"生成完了: {args.output}")
+            return 0
+        if args.command == "generate-weekday-demo":
+            from .generate_weekday_demo import make_weekday_demo
+
+            make_weekday_demo(args.output, args.seed)
+            print(f"生成完了: {args.output} / 4世帯 × 90日")
             return 0
         dataset = load_dataset(args.data)
         if args.customer and args.customer not in dataset.customers:
@@ -46,6 +63,7 @@ def main(argv=None):
             [args.customer] if args.customer else None,
             "daily" if args.command == "replay" else "snapshot",
             start_tolerance_minutes=args.start_tolerance_minutes,
+            presentation=args.presentation,
         )
         output = write_report(result, args.output)
         print(

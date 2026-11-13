@@ -10,8 +10,16 @@ from .loader import InputError, minute, timestamp
 from .models import clock
 from .monthly_data import local_midnight
 from .monthly_engine import signature
+from .notifications import NotificationPlanner
 from .presence import PresenceIndex
 from .presence_proposals import evaluate_household
+from .weekday_cards import (
+    apply_fixed_weekdays,
+    build_cards,
+    known_card_feedback,
+    same_start_choice,
+    validate_response_references,
+)
 
 NEW_EVENTS = {"first", "changed", "reappeared"}
 START_DISPLAY_TOLERANCE_MINUTES = 15
@@ -93,7 +101,7 @@ def known_feedback(raw, at):
         if responded is None or responded > at:
             row.update(response="no_response", responded_at=None, selected={})
         known.append(row)
-    return known
+    return known + known_card_feedback(raw, at)
 
 
 def apply_feedback(report, raw, at):
@@ -130,6 +138,15 @@ def apply_feedback(report, raw, at):
                 and f["weekday"] == item["weekday"]
             ]
             explicit = [f for f in matching if f["response"] in ("approved", "edited")]
+            explicit = [
+                f
+                for f in explicit
+                if not (
+                    f.get("origin") == "card_response"
+                    and item["kind"] == "start"
+                    and not same_start_choice(item["values"], f["values"])
+                )
+            ]
             if explicit:
                 chosen = max(explicit, key=lambda f: f["responded_at"])
                 values = dict(chosen["values"], **chosen.get("selected", {}))
@@ -178,6 +195,10 @@ def apply_feedback(report, raw, at):
                     item["judgment_influence"].append(
                         f"{feedback['id']}: 無反応は意思不明"
                     )
+                if feedback["response"] == "excluded_once":
+                    item["judgment_influence"].append(
+                        f"{feedback['id']}: 今回の承認だけ対象外。固定・拒否はしません。"
+                    )
                 if feedback["response"] == "declined":
                     item["judgment_influence"].append(
                         f"{feedback['id']}: 見送りの参照内容 {feedback['values']}"
@@ -189,12 +210,16 @@ def apply_feedback(report, raw, at):
                     ):
                         continue
                     if (
-                        feedback["evidence_signature"] == item["evidence_signature"]
-                        and item["status"] == "proposed"
-                    ):
+                        same_start_choice(feedback["values"], item["values"])
+                        if item["kind"] == "start"
+                        else feedback["evidence_signature"]
+                        == item["evidence_signature"]
+                    ) and item["status"] == "proposed":
                         item.update(
                             status="suppressed",
-                            reason="同じ根拠で見送り済みのため再提案を抑制しました。",
+                            reason="この曜日・候補は見送り済みです。支持日の追加やカード構成の変化だけでは再提示しません。"
+                            if item["kind"] == "start"
+                            else "同じ根拠で見送り済みのため再提案を抑制しました。",
                         )
                     else:
                         item["judgment_influence"].append(
@@ -288,11 +313,39 @@ def replay_customer(
     household_id: str,
     mode="daily",
     start_tolerance_minutes=START_DISPLAY_TOLERANCE_MINUTES,
+    presentation="grouped-weekly",
 ):
     if start_tolerance_minutes not in (0, START_DISPLAY_TOLERANCE_MINUTES):
         raise InputError(
             "開始提案の継続幅は0分（従来比較）または15分を指定してください"
         )
+    if presentation not in ("grouped-weekly", "individual-daily"):
+        raise InputError("表示・通知方式が不正です")
+    if mode == "snapshot" and dataset.customers[household_id].get("card_responses"):
+        # A card response references a historical displayed ID. Validate it by
+        # replaying its original display, then expose just the final decision.
+        final = replay_customer(
+            dataset, household_id, "daily", start_tolerance_minutes, presentation
+        )
+        row = final["days"][-1]
+        new = [e for e in row["events"] if e["is_new"]]
+        final.update(
+            mode="snapshot",
+            days=[row],
+            new_proposal_count=len(new),
+            new_by_kind=dict(Counter(e["kind"] for e in new)),
+            first_proposal_at=row["decision_at"] if new else None,
+            notification_count=int(row["notification"]["scheduled"]),
+            notification_target_count=len(row["notification"]["targets"]),
+        )
+        for total, daily in (
+            ("eligible_start_day_count", "eligible_start_count"),
+            ("start_weekday_day_count", "start_weekday_count"),
+            ("card_day_count", "card_count"),
+            ("start_card_day_count", "start_card_count"),
+        ):
+            final[total] = row[daily]
+        return final
     prepared = dataset.prepare(household_id)
     raw = dataset.customers[household_id]
     start = date.fromisoformat(dataset.config["start_date"])
@@ -310,12 +363,15 @@ def replay_customer(
     last_content = {}
     serial = 0
     rows = []
+    ledger = {}
+    planner = NotificationPlanner(presentation)
     previous_at = local_midnight(start, prepared.full.monthly.customers[0].timezone)
     for target in targets:
         at = local_midnight(
             target + timedelta(days=1), prepared.full.monthly.customers[0].timezone
         ) + timedelta(hours=12)
         snapshot = prepared.snapshot(at)
+        validate_response_references(raw, at, ledger)
         report = evaluate_household(
             snapshot,
             snapshot.households[0],
@@ -328,7 +384,13 @@ def replay_customer(
                 stabilize_start(
                     item, active.get(proposal_key(item)), start_tolerance_minutes
                 )
+        eligible_start_count = sum(
+            i["kind"] == "start" and i["status"] == "proposed"
+            for d in report["devices"]
+            for i in d["decisions"]
+        )
         known = apply_feedback(report, raw, at)
+        controls = apply_fixed_weekdays(report, raw, at)
         for device in report["devices"]:
             for item in device["decisions"]:
                 if item["kind"] == "precool" and item.get("estimate"):
@@ -418,6 +480,15 @@ def replay_customer(
             if f.get("responded_at")
             and previous_at < timestamp(f["responded_at"], "responded_at") <= at
         ]
+        canonical_cards = build_cards(report, household_id)
+        cards = (
+            canonical_cards
+            if presentation == "grouped-weekly"
+            else build_cards(report, household_id, grouped=False)
+        )
+        for card in canonical_cards:
+            ledger[(at, card["card_id"])] = copy.deepcopy(card["members"])
+        notification = planner.evaluate(at, cards, events, known)
         for device in report["devices"]:
             device.pop("billing", None)
             device.pop(
@@ -442,6 +513,25 @@ def replay_customer(
                 responses=responses,
                 devices=report["devices"],
                 context=day_context(prepared, snapshot, target, at),
+                cards=cards,
+                card_count=len(cards),
+                start_card_count=sum(c["kind"] == "start" for c in cards),
+                eligible_start_count=eligible_start_count,
+                start_weekday_count=sum(
+                    len(c["members"]) for c in cards if c["kind"] == "start"
+                ),
+                start_controls=controls,
+                approval_targets=[
+                    dict(
+                        device_id=f["device_id"],
+                        weekday=f["weekday"],
+                        proposal_id=f.get("proposal_id"),
+                        values=dict(f["values"], **f.get("selected", {})),
+                    )
+                    for f in responses
+                    if f["response"] in ("approved", "edited")
+                ],
+                notification=notification,
             )
         )
         active = next_active
@@ -461,10 +551,17 @@ def replay_customer(
     return dict(
         household_id=household_id,
         start_tolerance_minutes=start_tolerance_minutes,
+        presentation=presentation,
         installation=raw["installation"],
         residents=raw["residents"],
         mode=mode,
         new_proposal_count=len(new),
+        eligible_start_day_count=sum(r["eligible_start_count"] for r in rows),
+        start_weekday_day_count=sum(r["start_weekday_count"] for r in rows),
+        card_day_count=sum(r["card_count"] for r in rows),
+        start_card_day_count=sum(r["start_card_count"] for r in rows),
+        notification_count=sum(r["notification"]["scheduled"] for r in rows),
+        notification_target_count=sum(len(r["notification"]["targets"]) for r in rows),
         new_by_kind=dict(Counter(e["kind"] for e in new)),
         first_proposal_at=new[0]["decision_at"] if new else None,
         last_reason_counts=dict(last_reasons),
@@ -478,11 +575,14 @@ def replay_dataset(
     customers=None,
     mode="daily",
     start_tolerance_minutes=START_DISPLAY_TOLERANCE_MINUTES,
+    presentation="grouped-weekly",
 ):
     started = perf_counter()
     reports = []
     for hid in customers or dataset.customers:
-        reports.append(replay_customer(dataset, hid, mode, start_tolerance_minutes))
+        reports.append(
+            replay_customer(dataset, hid, mode, start_tolerance_minutes, presentation)
+        )
         print(
             f"評価済み: {hid} / 新規 {reports[-1]['new_proposal_count']}件", flush=True
         )
@@ -499,8 +599,20 @@ def replay_dataset(
         customer_count=len(reports),
         day_count=len(reports[0]["days"]),
         mode=mode,
+        presentation=presentation,
         start_tolerance_minutes=start_tolerance_minutes,
         new_proposal_count=sum(r["new_proposal_count"] for r in reports),
+        **{
+            k: sum(r[k] for r in reports)
+            for k in (
+                "eligible_start_day_count",
+                "start_weekday_day_count",
+                "card_day_count",
+                "start_card_day_count",
+                "notification_count",
+                "notification_target_count",
+            )
+        },
         new_by_kind=dict(sum((Counter(r["new_by_kind"]) for r in reports), Counter())),
         decision_day_reason_counts=dict(reasons),
         evaluation_seconds=round(perf_counter() - started, 3),
