@@ -417,11 +417,17 @@ export function Check({ label, checked, onChange, disabled }: Readonly<{ label: 
 export function Toggle({ on, onChange, label, disabled }: Readonly<{ on: boolean; onChange: (v: boolean) => void; label?: string; disabled?: boolean }>) {
   return <Switch checked={on} onCheckedChange={(v) => { onChange(v); }} aria-label={label} disabled={disabled} />;
 }
-/** One choice of a few, shown as pressed buttons: the shadcn/ui ToggleGroup. The chosen one stays chosen when pressed again. */
-export function Choice<T extends string>({ options, value, onChange, disabled }: Readonly<{ options: { id: T; label: string }[]; value: T; onChange: (v: T) => void; disabled?: boolean }>) {
+// One choice of a few, shown as pressed buttons: the shadcn/ui ToggleGroup. The chosen one stays chosen when pressed again.
+// An option marked `soon` is shown as Coming soon and cannot be chosen, unless it is the current value (a saved rule keeps showing it).
+export function Choice<T extends string>({ options, value, onChange, disabled }: Readonly<{ options: { id: T; label: string; soon?: boolean }[]; value: T; onChange: (v: T) => void; disabled?: boolean }>) {
+  const t = useT();
   return (
-    <ToggleGroup value={[value]} disabled={disabled} onValueChange={(v) => { const next = options.find((o) => o.id === v.at(-1)); if (next && next.id !== value) onChange(next.id); }} variant="outline" className="flex-wrap">
-      {options.map((o) => <ToggleGroupItem key={o.id} value={o.id} className="px-3 text-[13px] font-semibold data-pressed:border-primary data-pressed:bg-primary-soft data-pressed:text-primary">{o.label}</ToggleGroupItem>)}
+    <ToggleGroup value={[value]} disabled={disabled} onValueChange={(v) => { const next = options.find((o) => o.id === v.at(-1)); if (next && next.id !== value && !next.soon) onChange(next.id); }} variant="outline" className="flex-wrap">
+      {options.map((o) => (
+        <ToggleGroupItem key={o.id} value={o.id} disabled={!!o.soon && o.id !== value} className="px-3 text-[13px] font-semibold data-pressed:border-primary data-pressed:bg-primary-soft data-pressed:text-primary">
+          {o.label}{o.soon && o.id !== value && <span className="ml-1.5 rounded-full bg-surface2 px-1.5 text-[11px] font-medium text-muted-foreground">{t("Coming soon")}</span>}
+        </ToggleGroupItem>
+      ))}
     </ToggleGroup>
   );
 }

@@ -265,9 +265,9 @@ function Editor({ live, onDone, onCancel }: Readonly<{ live: AutomationsLive; on
             {step(1, t("When …"), rule ? undefined : t("Choose what starts the automation"))}
             <div className="grid-fluid" style={{ ["--min" as string]: "150px" }} role="radiogroup" aria-label={t("Trigger")}>
               {triggers.map((tr) => (
-                <Plain key={tr} type="button" role="radio" aria-checked={draft.trigger === tr} disabled={!!rule && (tr === "schedule") !== isSched} onClick={() => { set({ trigger: tr, extras: fitExtras({ ...draft, trigger: tr }) }); }}
+                <Plain key={tr} type="button" role="radio" aria-checked={draft.trigger === tr} disabled={(!!rule && (tr === "schedule") !== isSched) || (tr === "presence" && draft.trigger !== "presence")} onClick={() => { set({ trigger: tr, extras: fitExtras({ ...draft, trigger: tr }) }); }}
                   className={cx("rounded-xl border px-3 py-2 text-left disabled:cursor-not-allowed disabled:opacity-50", draft.trigger === tr ? "border-primary bg-primary-soft text-primary ring-1 ring-primary" : "border-line bg-surface hover:bg-surface2")}>
-                  <div className="flex items-center gap-1.5 text-[13px] font-semibold"><Icon name={entryOf(triggerInfo, tr).icon} />{t(entryOf(triggerInfo, tr).label)}</div><div className="text-[11px] text-muted-foreground">{t(entryOf(triggerInfo, tr).sub)}</div>
+                  <div className="flex items-center gap-1.5 text-[13px] font-semibold"><Icon name={entryOf(triggerInfo, tr).icon} />{t(entryOf(triggerInfo, tr).label)}{tr === "presence" && draft.trigger !== "presence" && <span className="rounded-full bg-surface2 px-1.5 text-[11px] font-medium text-muted-foreground">{t("Coming soon")}</span>}</div><div className="text-[11px] text-muted-foreground">{t(entryOf(triggerInfo, tr).sub)}</div>
                 </Plain>
               ))}
             </div>
@@ -420,7 +420,9 @@ function OnlyIf({ draft, errors, set }: Readonly<{ draft: Draft; errors: Record<
       ))}
       {errors.onlyIf && <p className="flex items-center gap-1 text-xs font-medium text-crit"><Icon name="error" />{errors.onlyIf}</p>}
       <div className="flex flex-wrap items-center gap-2">
-        {adding && choices.length > 0 ? choices.map((c) => <Btn key={c} size="sm" onClick={() => { set({ extras: [...extras, blankExtra(c)] }); setAdding(false); }}>{t(entryOf(extraLabel, c))}</Btn>)
+        {adding && choices.length > 0 ? choices.map((c) => c === "occupancy"
+          ? <Btn key={c} size="sm" disabled>{t(entryOf(extraLabel, c))} <span className="rounded-full bg-surface2 px-1.5 text-[11px] font-medium text-muted-foreground">{t("Coming soon")}</span></Btn>
+          : <Btn key={c} size="sm" onClick={() => { set({ extras: [...extras, blankExtra(c)] }); setAdding(false); }}>{t(entryOf(extraLabel, c))}</Btn>)
           : <Btn size="sm" disabled={choices.length === 0} onClick={() => { setAdding(true); }}><Icon name="add" /> {t("Add condition")}</Btn>}
         <span className="text-xs text-muted-foreground">{t(choices.length === 0 && extras.length > 0 ? "No more condition types for this trigger" : "e.g. only if someone is home · only if outdoor ≥ 30°C")}</span>
       </div>
