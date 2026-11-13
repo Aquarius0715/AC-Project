@@ -45,7 +45,7 @@ export function PreferencesView({ live }: Readonly<{ live: PreferencesLive }>) {
     <Page className="max-w-3xl">
       {failed && <Banner tone="crit">{t("Not saved: {reason}", { reason: failed })}</Banner>}
       <Card>
-        <Field label={t("Display language")} hint={t("Affects the screens, notifications and date/time display. Stored data stays UTC. Malay and Japanese text is a draft under review; text not translated yet stays in English.")}>
+        <Field label={t("Display language")} hint={t("Affects the screens, notifications and date/time display. Stored data stays UTC. Malay, Japanese and Indonesian text is a draft under review; text not translated yet stays in English.")}>
           <Choice value={locale} onChange={setLocale} options={languageOptions(t)} />
         </Field>
         <div className="my-4 border-t border-line" />
