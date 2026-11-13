@@ -9,7 +9,7 @@ function renderProposalCards(day, parent) {
     article.dataset.cardId = card.card_id;
     article.append(el('h3', card.title), el('p', card.device_id + ' / カード ' + card.card_id, 'muted'));
     if (card.kind !== 'start') {
-      card.members.forEach(m => article.append(el('p', m.proposal_id + ' / ' + label(m.kind) + ' / ' + JSON.stringify(m.values))));
+      card.members.forEach(m => article.append(el('p', m.proposal_id + ' / ' + label(m.kind) + (m.target_date ? ' / 実行対象日 ' + m.target_date : '') + ' / ' + JSON.stringify(m.values))));
       detail(article, '根拠と対象の詳細', card.members);
       panel.append(article);
       return;
@@ -56,20 +56,28 @@ function renderDelivery(day, parent) {
   const panel = el('article', undefined, 'panel');
   panel.id = 'delivery';
   panel.append(el('h2', '通知予定と曜日別の反応'));
+  const approvals = day.devices.flatMap(device => device.approval_states || []);
+  if (approvals.length) {
+    const section = el('section'); section.id = 'approval-states';
+    section.append(el('h3', '承認した曜日の反映状況'));
+    const scheduleText = s => s ? s.start + '〜' + s.end + ' / ' + s.temperature_c + '℃' : '予定なし';
+    table(section, ['機器・曜日', '状態', '判定時点の現行予定', '承認した変更', '承認した曜日別ID', '承認日時'], approvals.map(a => [a.device_id + ' / ' + WEEKDAY_NAMES[a.weekday], label(a.status), scheduleText(a.current_schedule), scheduleText(a.values), a.proposal_id, a.approved_at]));
+    panel.append(section);
+  }
   const notice = day.notification;
   if (notice) {
     panel.append(el('p', (notice.scheduled ? '通知予定あり：' + notice.scheduled_at : '通知予定なし') + ' / 週の開始 ' + notice.week_start, 'notice'), el('p', notice.reason));
-    const rows = members => members.map(m => [m.device_id, label(m.kind), m.weekday === null ? '共通' : WEEKDAY_NAMES[m.weekday], m.values, m.proposal_id, m.first_waiting_at]);
-    if (notice.targets.length) table(panel, ['機器', '種類', '曜日', '通知する内容', '曜日別ID', '確認待ち開始'], rows(notice.targets));
+    const rows = members => members.map(m => [m.device_id, label(m.kind), m.weekday === null ? '共通' : WEEKDAY_NAMES[m.weekday], m.target_date || '曜日別予定', m.values, m.proposal_id, m.first_waiting_at]);
+    if (notice.targets.length) table(panel, ['機器', '種類', '曜日', '実行対象日', '通知する内容', '曜日別ID', '確認待ち開始'], rows(notice.targets));
     if (notice.pending.length) {
       panel.append(el('h3', '有効な未通知案（翌週へ持ち越し）'));
-      table(panel, ['機器', '種類', '曜日', '内容', '曜日別ID', '確認待ち開始'], rows(notice.pending));
+      table(panel, ['機器', '種類', '曜日', '実行対象日', '内容', '曜日別ID', '確認待ち開始'], rows(notice.pending));
     }
     if (notice.dropped.length) detail(panel, '有効でなくなったため通知待ちから除外', notice.dropped);
   }
   if (day.responses.length) {
     panel.append(el('h3', '入力した反応の再生結果'));
-    table(panel, ['反応日時', '曜日', '判断', '参照カード / 提案ID', '表示していた内容'], day.responses.map(r => [r.responded_at, r.weekday === null ? '共通' : WEEKDAY_NAMES[r.weekday], label(r.response), (r.card_id || '') + ' / ' + (r.proposal_id || r.id), r.values]));
+    table(panel, ['反応日時', '曜日', '判断', '実行対象日と特定方法', '参照カード / 提案ID', '表示していた内容'], day.responses.map(r => [r.responded_at, r.weekday === null ? '共通' : WEEKDAY_NAMES[r.weekday], label(r.response), r.kind === 'precool' ? (r.target_date || '未特定') + ' / ' + (r.target_date_source || '') : '曜日別予定', (r.card_id || '') + ' / ' + (r.proposal_id || r.id), r.values]));
   }
   if (day.approval_targets?.length) {
     panel.append(el('h3', '今回承認した曜日だけの変更対象'));
@@ -78,4 +86,11 @@ function renderDelivery(day, parent) {
   }
   if (day.start_controls?.length) detail(panel, 'この判定までに受信した固定・解除設定', day.start_controls);
   parent.append(panel);
+}
+
+function approvalStatusText(day) {
+  const states = day.devices.flatMap(device => device.approval_states || []);
+  const pending = states.filter(a => a.status === 'approved_pending').length;
+  const applied = states.filter(a => a.status === 'applied').length;
+  return (pending ? ' / 反映待ち ' + pending : '') + (applied ? ' / 反映済み ' + applied : '');
 }

@@ -1,8 +1,9 @@
 """Record hypothetical notifications; no transport or persistence side effects."""
 
 import copy
-from datetime import timedelta
+from datetime import date, timedelta
 
+from .feedback_scope import feedback_matches
 from .weekday_cards import same_start_choice
 
 
@@ -10,7 +11,7 @@ def review_key(member):
     return (
         member["device_id"],
         member["kind"],
-        member["weekday"],
+        None if member["kind"] == "precool" else member["weekday"],
         member["values"].get("base_temperature_c"),
         member.get("target_date"),
     )
@@ -46,11 +47,19 @@ class NotificationPlanner:
                 )
                 target["target_date"] = event.get("target_date")
                 target["current_start"] = event.get("current_start")
+                if target["kind"] == "precool" and (
+                    not target["target_date"]
+                    or date.fromisoformat(target["target_date"]) < at.date()
+                ):
+                    continue
                 active[review_key(target)] = target
         dropped = [
             dict(
                 value,
-                drop_reason="提案終了・承認・固定・見送りなどで有効でなくなりました",
+                drop_reason="実行対象日が過ぎた予冷案のため通知待ちから除外しました"
+                if value.get("target_date")
+                and date.fromisoformat(value["target_date"]) < at.date()
+                else "提案終了・承認・固定・見送りなどで有効でなくなりました",
             )
             for key, value in self.pending.items()
             if key not in active
@@ -59,15 +68,15 @@ class NotificationPlanner:
         for key, member in active.items():
             anchor = self.anchors.get(key)
             acknowledged = any(
-                f["device_id"] == member["device_id"]
-                and f["kind"] == member["kind"]
-                and f["weekday"] == member["weekday"]
+                feedback_matches(member, f)
                 and f["response"] in ("approved", "edited", "declined", "excluded_once")
                 and (
                     same_start_choice(
                         member["values"], dict(f["values"], **f.get("selected", {}))
                     )
                     if member["kind"] == "start"
+                    else True
+                    if member["kind"] == "precool"
                     else member["values"] == dict(f["values"], **f.get("selected", {}))
                 )
                 for f in known

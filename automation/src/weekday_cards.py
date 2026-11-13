@@ -197,6 +197,7 @@ def build_cards(report, household_id, grouped=True):
                     "support_count",
                     "first_displayed_at",
                     "candidate_values",
+                    "target_date",
                 )
                 if k in item
             }

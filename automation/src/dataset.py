@@ -148,6 +148,10 @@ class Dataset:
                 raise InputError("判断と提案・反応日時が不正です")
             values = obj(response.get("values"), "feedback.values")
             selected = obj(response.get("selected"), "feedback.selected")
+            if response["kind"] == "precool":
+                from .feedback_scope import resolve_precool_date
+
+                resolve_precool_date(response)
             if response["response"] == "edited" and not selected:
                 raise InputError("修正して承認した値が必要です")
             for fields in (values, selected):

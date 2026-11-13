@@ -5,7 +5,9 @@ from collections import Counter
 from datetime import date, timedelta
 from time import perf_counter
 
+from .approval_state import apply_card_approval, card_approval_states
 from .dataset import Dataset
+from .feedback_scope import feedback_matches, resolve_precool_date
 from .loader import InputError, minute, timestamp
 from .models import clock
 from .monthly_data import local_midnight
@@ -77,7 +79,7 @@ def content(item):
     )
 
 
-def known_feedback(raw, at):
+def known_feedback(raw, at, proposal_history=()):
     known = []
     for original in raw["feedback"]:
         proposed = timestamp(original["proposed_at"], "feedback.proposed_at")
@@ -100,14 +102,21 @@ def known_feedback(raw, at):
         row = copy.deepcopy(original)
         if responded is None or responded > at:
             row.update(response="no_response", responded_at=None, selected={})
+        if row["kind"] == "precool":
+            row["target_date"], row["target_date_source"] = resolve_precool_date(
+                row, proposal_history
+            )
         known.append(row)
     return known + known_card_feedback(raw, at)
 
 
-def apply_feedback(report, raw, at):
-    known = known_feedback(raw, at)
+def apply_feedback(report, raw, at, proposal_history=()):
+    known = known_feedback(raw, at, proposal_history)
     for device in report["devices"]:
         schedules = {s["weekday"]: s for s in device["current_schedules"]}
+        device["approval_states"] = card_approval_states(
+            known, device["device_id"], schedules
+        )
         for item in device["decisions"]:
             if item["kind"] == "start_review" and item["status"] == "merged":
                 start = next(
@@ -119,7 +128,13 @@ def apply_feedback(report, raw, at):
                     None,
                 )
                 if start and start["status"] != "proposed":
-                    if start["status"] == "suppressed":
+                    if start["status"] == "approved_pending":
+                        item.update(
+                            status="approved_pending",
+                            reason_code="start_review:approved_pending",
+                            reason="この根拠を統合した開始変更は承認済み・反映待ちです。重ねて確認しません。",
+                        )
+                    elif start["status"] == "suppressed":
                         item.update(
                             status="suppressed",
                             reason="同じ根拠を含む開始変更が見送り済みのため抑制しました。",
@@ -130,14 +145,21 @@ def apply_feedback(report, raw, at):
                             reason_code="repeated_absence",
                             reason=f"直近4回中{item['support_count']}回、{item['current_start']}時点で不在でした。開始時刻を見直しますか？",
                         )
-            matching = [
-                f
-                for f in known
-                if f["device_id"] == item["device_id"]
-                and f["kind"] == item["kind"]
-                and f["weekday"] == item["weekday"]
-            ]
-            explicit = [f for f in matching if f["response"] in ("approved", "edited")]
+            matching = [f for f in known if feedback_matches(item, f)]
+            handled_approval = apply_card_approval(item, device["approval_states"])
+            if item["kind"] == "precool":
+                item["judgment_influence"].extend(
+                    f"{f['id']}: {f['target_date_source']}。対象日不明の反応をこの予冷案の抑制には使いません。"
+                    for f in known
+                    if f["kind"] == "precool"
+                    and f["device_id"] == item["device_id"]
+                    and f.get("target_date") is None
+                )
+            explicit = (
+                []
+                if handled_approval
+                else [f for f in matching if f["response"] in ("approved", "edited")]
+            )
             explicit = [
                 f
                 for f in explicit
@@ -212,6 +234,8 @@ def apply_feedback(report, raw, at):
                     if (
                         same_start_choice(feedback["values"], item["values"])
                         if item["kind"] == "start"
+                        else True
+                        if item["kind"] == "precool"
                         else feedback["evidence_signature"]
                         == item["evidence_signature"]
                     ) and item["status"] == "proposed":
@@ -219,6 +243,8 @@ def apply_feedback(report, raw, at):
                             status="suppressed",
                             reason="この曜日・候補は見送り済みです。支持日の追加やカード構成の変化だけでは再提示しません。"
                             if item["kind"] == "start"
+                            else f"実行対象日{item['target_date']}の予冷は見送り済みです。その実行日の再提示を抑制します。"
+                            if item["kind"] == "precool"
                             else "同じ根拠で見送り済みのため再提案を抑制しました。",
                         )
                     else:
@@ -321,7 +347,11 @@ def replay_customer(
         )
     if presentation not in ("grouped-weekly", "individual-daily"):
         raise InputError("表示・通知方式が不正です")
-    if mode == "snapshot" and dataset.customers[household_id].get("card_responses"):
+    raw = dataset.customers[household_id]
+    if mode == "snapshot" and (
+        raw.get("card_responses")
+        or any(f["kind"] == "precool" and f.get("proposal_id") for f in raw["feedback"])
+    ):
         # A card response references a historical displayed ID. Validate it by
         # replaying its original display, then expose just the final decision.
         final = replay_customer(
@@ -364,6 +394,7 @@ def replay_customer(
     serial = 0
     rows = []
     ledger = {}
+    proposal_history = []
     planner = NotificationPlanner(presentation)
     previous_at = local_midnight(start, prepared.full.monthly.customers[0].timezone)
     for target in targets:
@@ -381,6 +412,8 @@ def replay_customer(
         # Feedback must inspect the same values that the ID and HTML refer to.
         for device in report["devices"]:
             for item in device["decisions"]:
+                if item["kind"] == "precool" and item.get("estimate"):
+                    item["target_date"] = item["estimate"]["required_at"][:10]
                 stabilize_start(
                     item, active.get(proposal_key(item)), start_tolerance_minutes
                 )
@@ -389,12 +422,8 @@ def replay_customer(
             for d in report["devices"]
             for i in d["decisions"]
         )
-        known = apply_feedback(report, raw, at)
+        known = apply_feedback(report, raw, at, proposal_history)
         controls = apply_fixed_weekdays(report, raw, at)
-        for device in report["devices"]:
-            for item in device["decisions"]:
-                if item["kind"] == "precool" and item.get("estimate"):
-                    item["target_date"] = item["estimate"]["required_at"][:10]
         next_active = {}
         events = []
         for device in report["devices"]:
@@ -425,6 +454,16 @@ def replay_customer(
                     else at.isoformat()
                 )
                 item["first_displayed_at"] = first_displayed_at
+                if item["kind"] == "precool":
+                    proposal_history.append(
+                        dict(
+                            at=at,
+                            device_id=item["device_id"],
+                            proposal_id=proposal_id,
+                            target_date=item["target_date"],
+                            evidence_signature=item["evidence_signature"],
+                        )
+                    )
                 next_active[key] = dict(
                     content=value,
                     proposal_id=proposal_id,
