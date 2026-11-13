@@ -9428,19 +9428,19 @@
             {
               "weekday": 0,
               "start": "20:30",
-              "end": "23:00",
+              "end": "23:30",
               "temperature_c": 24
             },
             {
               "weekday": 1,
               "start": "20:30",
-              "end": "23:00",
+              "end": "22:00",
               "temperature_c": 24
             },
             {
               "weekday": 2,
               "start": "20:30",
-              "end": "23:00",
+              "end": "22:30",
               "temperature_c": 24
             },
             {
@@ -9452,19 +9452,19 @@
             {
               "weekday": 4,
               "start": "20:30",
-              "end": "23:00",
+              "end": "23:30",
               "temperature_c": 24
             },
             {
               "weekday": 5,
               "start": "20:30",
-              "end": "23:00",
+              "end": "22:00",
               "temperature_c": 24
             },
             {
               "weekday": 6,
               "start": "20:30",
-              "end": "23:00",
+              "end": "22:30",
               "temperature_c": 24
             }
           ]

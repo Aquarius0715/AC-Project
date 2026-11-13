@@ -129,6 +129,8 @@ class OfflineReportTests(unittest.TestCase):
                             str(path / "data"),
                             "--customer",
                             "H001",
+                            "--start-tolerance-minutes",
+                            "0",
                             "--output",
                             str(path / "results"),
                         ]
@@ -150,6 +152,12 @@ class OfflineReportTests(unittest.TestCase):
             self.assertTrue((path / "results/index.html").exists())
             self.assertEqual(
                 json.loads((path / "results/summary.json").read_text())["day_count"], 28
+            )
+            self.assertEqual(
+                json.loads((path / "results/summary.json").read_text())[
+                    "start_tolerance_minutes"
+                ],
+                0,
             )
             self.assertEqual(
                 json.loads((path / "snapshot/summary.json").read_text())["day_count"], 1
@@ -200,7 +208,7 @@ class OfflineReportTests(unittest.TestCase):
                 recorded_at="2026-11-01T12:10:00+09:00",
             )
             for plan in version["schedules"]:
-                plan["start"] = "22:00"
+                plan["start"] = "21:45"
             device["schedule_versions"].append(version)
         self.assertEqual(
             replay_customer(dataset, "H001")["days"],

@@ -65,7 +65,7 @@ class DatasetRegressionTests(unittest.TestCase):
         item = next(d for d in decisions(report, "start") if d["weekday"] == 2)
         self.assertEqual(item["status"], "proposed")
         self.assertEqual(item["values"]["start"], "17:30")
-        self.assertEqual(item["values"]["end"], "23:00")
+        self.assertEqual(item["values"]["end"], "22:00")
         self.assertEqual(item["support_count"], 3)
         self.assertEqual(len(item["evidence_ids"]), 3)
 
@@ -199,7 +199,10 @@ class DatasetRegressionTests(unittest.TestCase):
     def test_cheap_expensive_uncomfortable_and_missing_precool(self):
         cheap = decisions(evaluate(self.dataset, "H011"), "precool")[0]
         self.assertEqual(cheap["status"], "proposed")
-        self.assertIn("40.00円", cheap["reason"])
+        self.assertEqual(
+            cheap["estimate"]["costs_jpy"],
+            {"普段の24℃運転": "136.0", "17時から予冷": "90.00"},
+        )
         for hid in ("H020", "H021", "H022"):
             with self.subTest(hid=hid):
                 item = decisions(evaluate(self.dataset, hid), "precool")[0]

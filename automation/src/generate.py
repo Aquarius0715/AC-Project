@@ -121,6 +121,10 @@ def make_dataset(
             device["site_id"] = weather_names[site_id]
             device["tariff_id"] = device["tariff_id"].replace("_", "-")
             plans = device.pop("schedules")
+            for plan in plans:
+                plan["end"] = ("22:00", "22:30", "23:00", "23:30")[
+                    (index + plan["weekday"]) % 4
+                ]
             if mode == 15:
                 for plan in plans:
                     plan["start"] = "20:30"
@@ -258,6 +262,24 @@ def make_dataset(
                         + 30
                     )
                     ops.append(op(minute, "temperature", before=24, after=22))
+                versions = [
+                    v
+                    for v in device["schedule_versions"]
+                    if v["valid_from"][:10] <= str(day)
+                ]
+                current = next(
+                    (
+                        p
+                        for p in versions[-1]["schedules"]
+                        if p["weekday"] == day.weekday()
+                    ),
+                    None,
+                )
+                if current:
+                    for event in ops:
+                        if event["source"] == "automation" and event["action"] == "off":
+                            # Keep IDs opaque; timestamps are authoritative.
+                            event["at"] = f"{day}T{current['end']}:00+09:00"
                 row["operations"] = sorted(ops, key=lambda o: o["at"])
                 row["usage"] = "used" if ops else "unused"
                 row["available_at"] = (
@@ -307,6 +329,20 @@ def make_dataset(
                             local_midnight(day, ZONE) + timedelta(hours=7)
                         ).isoformat(),
                     )
+                    plan = next(
+                        (p for p in plans if p["weekday"] == day.weekday()), None
+                    )
+                    if plan:
+                        candidate["end"] = plan["end"]
+                        slots = (
+                            int(plan["end"][:2]) * 60 + int(plan["end"][3:]) - 1020
+                        ) // 30
+                        for forecast_plan in candidate["plans"]:
+                            energy = forecast_plan["kwh"]
+                            forecast_plan["kwh"] = (energy + [energy[-1]] * slots)[
+                                :slots
+                            ]
+                            forecast_plan["controls"]["end"] = plan["end"]
                     forecast = next(
                         r for r in site["forecast"] if r["date"] == str(day)
                     )

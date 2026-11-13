@@ -25,6 +25,13 @@ def main(argv=None):
         run.add_argument("--data", type=Path, default=DEFAULT_DATA)
         run.add_argument("--customer")
         run.add_argument("--output", type=Path, default=ROOT / "results" / name)
+        run.add_argument(
+            "--start-tolerance-minutes",
+            type=int,
+            choices=(0, 15),
+            default=15,
+            help="開始提案を継続する初回表示からの幅。0は従来の完全一致との比較用",
+        )
     args = parser.parse_args(argv)
     try:
         if args.command == "generate":
@@ -38,6 +45,7 @@ def main(argv=None):
             dataset,
             [args.customer] if args.customer else None,
             "daily" if args.command == "replay" else "snapshot",
+            start_tolerance_minutes=args.start_tolerance_minutes,
         )
         output = write_report(result, args.output)
         print(

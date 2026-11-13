@@ -6,7 +6,7 @@ from datetime import date, timedelta
 from time import perf_counter
 
 from .dataset import Dataset
-from .loader import InputError, timestamp
+from .loader import InputError, minute, timestamp
 from .models import clock
 from .monthly_data import local_midnight
 from .monthly_engine import signature
@@ -14,6 +14,43 @@ from .presence import PresenceIndex
 from .presence_proposals import evaluate_household
 
 NEW_EVENTS = {"first", "changed", "reappeared"}
+START_DISPLAY_TOLERANCE_MINUTES = 15
+
+
+def stabilize_start(item, previous, tolerance_minutes=START_DISPLAY_TOLERANCE_MINUTES):
+    """Keep the episode's first displayed value, never the previous day's candidate."""
+    if item["kind"] != "start" or item["status"] != "proposed":
+        return
+    candidate = copy.deepcopy(item["values"])
+    item["candidate_values"] = candidate
+    item["candidate_reason"] = item["reason"]
+    reference = previous["values"] if previous else candidate
+    delta = minute(candidate["start"], "start") - minute(reference["start"], "start")
+    retained = bool(
+        previous
+        and abs(delta) <= tolerance_minutes
+        and {k: v for k, v in candidate.items() if k != "start"}
+        == {k: v for k, v in reference.items() if k != "start"}
+        and previous.get("current_start") == item.get("current_start")
+    )
+    item["stabilization"] = dict(
+        reference_start=reference["start"],
+        candidate_start=candidate["start"],
+        delta_minutes=delta,
+        tolerance_minutes=tolerance_minutes,
+        retained=retained,
+    )
+    if retained:
+        item["values"] = copy.deepcopy(reference)
+        item["proposal_id"] = previous["proposal_id"]
+        item["first_displayed_at"] = previous["first_displayed_at"]
+        if candidate != reference:
+            item["reason"] = (
+                f"毎日の計算候補は{candidate['start']}（支持{item['support_count']}日）。"
+                f"初回表示{reference['start']}との差が{tolerance_minutes}分以内のため同じ提案を継続。"
+                f"表示・承認対象は{reference['start']}開始、終了{reference['end']}、"
+                f"設定{reference['temperature_c']}℃を維持します。"
+            )
 
 
 def proposal_key(item):
@@ -111,12 +148,22 @@ def apply_feedback(report, raw, at):
                             reason="承認・修正して承認した内容が現在の予定に反映されています。",
                         )
                     elif item["status"] == "proposed" and values != item["values"]:
-                        # Do not invent power/comfort predictions for edited values.
-                        item.update(
-                            status="insufficient",
-                            reason="明示的な選択値を優先しますが、その値の運転根拠・候補予測が不足しています。",
-                            requested_values=values,
-                        )
+                        if values == item.get("candidate_values"):
+                            # A supported explicit edit takes precedence over smoothing.
+                            item["values"] = copy.deepcopy(values)
+                            item["reason"] = item["candidate_reason"]
+                            item["stabilization"].update(
+                                retained=False, override="explicit_choice"
+                            )
+                            item.pop("proposal_id", None)
+                            item.pop("first_displayed_at", None)
+                        else:
+                            # Do not invent power/comfort predictions for edited values.
+                            item.update(
+                                status="insufficient",
+                                reason="明示的な選択値を優先しますが、その値の運転根拠・候補予測が不足しています。",
+                                requested_values=values,
+                            )
                 elif (
                     item["kind"] == "start_review"
                     and chosen["evidence_signature"] == item["evidence_signature"]
@@ -132,6 +179,9 @@ def apply_feedback(report, raw, at):
                         f"{feedback['id']}: 無反応は意思不明"
                     )
                 if feedback["response"] == "declined":
+                    item["judgment_influence"].append(
+                        f"{feedback['id']}: 見送りの参照内容 {feedback['values']}"
+                    )
                     if (
                         explicit
                         and max(f["responded_at"] for f in explicit)
@@ -233,7 +283,16 @@ def day_context(prepared, snapshot, target, at):
     return dict(devices=devices, presence=observations)
 
 
-def replay_customer(dataset: Dataset, household_id: str, mode="daily"):
+def replay_customer(
+    dataset: Dataset,
+    household_id: str,
+    mode="daily",
+    start_tolerance_minutes=START_DISPLAY_TOLERANCE_MINUTES,
+):
+    if start_tolerance_minutes not in (0, START_DISPLAY_TOLERANCE_MINUTES):
+        raise InputError(
+            "開始提案の継続幅は0分（従来比較）または15分を指定してください"
+        )
     prepared = dataset.prepare(household_id)
     raw = dataset.customers[household_id]
     start = date.fromisoformat(dataset.config["start_date"])
@@ -263,6 +322,12 @@ def replay_customer(dataset: Dataset, household_id: str, mode="daily"):
             include_billing=False,
             presence_index=index,
         )
+        # Feedback must inspect the same values that the ID and HTML refer to.
+        for device in report["devices"]:
+            for item in device["decisions"]:
+                stabilize_start(
+                    item, active.get(proposal_key(item)), start_tolerance_minutes
+                )
         known = apply_feedback(report, raw, at)
         for device in report["devices"]:
             for item in device["decisions"]:
@@ -291,6 +356,13 @@ def replay_customer(dataset: Dataset, household_id: str, mode="daily"):
                     if state == "continued"
                     else f"{household_id}-P{serial:04d}"
                 )
+                item["proposal_id"] = proposal_id
+                first_displayed_at = (
+                    previous["first_displayed_at"]
+                    if state == "continued"
+                    else at.isoformat()
+                )
+                item["first_displayed_at"] = first_displayed_at
                 next_active[key] = dict(
                     content=value,
                     proposal_id=proposal_id,
@@ -298,6 +370,8 @@ def replay_customer(dataset: Dataset, household_id: str, mode="daily"):
                     weekday=item["weekday"],
                     device_id=item["device_id"],
                     values=item["values"],
+                    current_start=item.get("current_start"),
+                    first_displayed_at=first_displayed_at,
                     target_date=item.get("target_date"),
                 )
                 events.append(
@@ -308,6 +382,11 @@ def replay_customer(dataset: Dataset, household_id: str, mode="daily"):
                         evidence_ids=item["evidence_ids"],
                         evidence_signature=item["evidence_signature"],
                         support_count=item["support_count"],
+                        **{
+                            k: copy.deepcopy(item[k])
+                            for k in ("candidate_values", "stabilization")
+                            if k in item
+                        },
                     )
                 )
                 seen.add(key)
@@ -381,6 +460,7 @@ def replay_customer(dataset: Dataset, household_id: str, mode="daily"):
     )
     return dict(
         household_id=household_id,
+        start_tolerance_minutes=start_tolerance_minutes,
         installation=raw["installation"],
         residents=raw["residents"],
         mode=mode,
@@ -393,11 +473,16 @@ def replay_customer(dataset: Dataset, household_id: str, mode="daily"):
     )
 
 
-def replay_dataset(dataset, customers=None, mode="daily"):
+def replay_dataset(
+    dataset,
+    customers=None,
+    mode="daily",
+    start_tolerance_minutes=START_DISPLAY_TOLERANCE_MINUTES,
+):
     started = perf_counter()
     reports = []
     for hid in customers or dataset.customers:
-        reports.append(replay_customer(dataset, hid, mode))
+        reports.append(replay_customer(dataset, hid, mode, start_tolerance_minutes))
         print(
             f"評価済み: {hid} / 新規 {reports[-1]['new_proposal_count']}件", flush=True
         )
@@ -414,6 +499,7 @@ def replay_dataset(dataset, customers=None, mode="daily"):
         customer_count=len(reports),
         day_count=len(reports[0]["days"]),
         mode=mode,
+        start_tolerance_minutes=start_tolerance_minutes,
         new_proposal_count=sum(r["new_proposal_count"] for r in reports),
         new_by_kind=dict(sum((Counter(r["new_by_kind"]) for r in reports), Counter())),
         decision_day_reason_counts=dict(reasons),
