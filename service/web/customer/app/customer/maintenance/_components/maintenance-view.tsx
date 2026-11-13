@@ -22,12 +22,12 @@ import { TimeSelect } from "@ac/web/components/TimeSelect";
 
 type Detail = NonNullable<MaintenanceLive["detail"]>;
 interface Slot { startAt: string; endAt: string }
-interface Row { date: string; from: string; to: string }
+export interface Row { date: string; from: string; to: string }
 type ModalKind = null | "new" | "decline" | "other" | "rate" | "problem" | "note" | "cancel";
 // The preferred times are typed in the user's display time zone and sent as instants (NFR-08); "" while incomplete.
-const toSlot = (r: Row, tz: string): Slot => ({ startAt: zonedInstant(r.date, r.from, tz), endAt: zonedInstant(r.date, r.to, tz) });
+export const toSlot = (r: Row, tz: string): Slot => ({ startAt: zonedInstant(r.date, r.from, tz), endAt: zonedInstant(r.date, r.to, tz) });
 const dayAfter = (now: number, n: number, tz: string) => zonedParts(new Date(now + n * 86_400_000).toISOString(), tz).date;
-const threeRows = (now: number, tz: string, start = 2): Row[] => [0, 1, 2].map((i) => ({ date: dayAfter(now, start + i, tz), from: i === 1 ? "14:00" : "10:00", to: i === 1 ? "16:00" : "12:00" }));
+export const threeRows = (now: number, tz: string, start = 2): Row[] => [0, 1, 2].map((i) => ({ date: dayAfter(now, start + i, tz), from: i === 1 ? "14:00" : "10:00", to: i === 1 ? "16:00" : "12:00" }));
 
 /** Customer maintenance (FR-C09, FR-C17, FR-C18, Figma Client 07a–07p) from the Core API. The tab is in the URL (tab=
 filter-care): the server reads only what the shown tab needs. */
@@ -191,7 +191,7 @@ interface ModalProps { onClose: Done; onFail: (f: ActionFailure) => void }
 /** Three preferred times: date, from, to (each 1–4 h, from tomorrow, all different — IR113). */
 // One group for the times: its error describes the group, which names it when focus enters (IR573); `firstId` lets a
 // failed submit focus the first date.
-function TimesInput({ rows, onChange, error, label, firstId }: Readonly<{ rows: Row[]; onChange: (r: Row[]) => void; error?: string | null; label?: string; firstId?: string }>) {
+export function TimesInput({ rows, onChange, error, label, firstId }: Readonly<{ rows: Row[]; onChange: (r: Row[]) => void; error?: string | null; label?: string; firstId?: string }>) {
   const t = useT();
   const { timeZone } = useDisplay();
   const titleId = useId(), errorId = useId();

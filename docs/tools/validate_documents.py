@@ -346,15 +346,18 @@ trace = rows('00-prepare/traceability.csv')
 # 0.27.0 (2026-10-07): IR117 AWS / Stripe / HQ network restriction / retention / capacity (production target only); counts unchanged.
 # 0.26.0 (2026-10-07): IR116 Next.js stack + backend-architecture.md / network-architecture.md (production target, not 1A inputs); counts unchanged.
 # 0.25.0 (2026-10-07): IR115 consistency fixes (tabs, permissions, owner-only default rules); counts unchanged.
+# 0.638.0 (2026-11-13): IR794 adds FR-C20 (installation request, DD-C20, SCR-C20); 86 requirement IDs, 70 role rows, 232 operations.
+# 0.637.0 (2026-11-13): IR793 air quality shows all four metrics at once; counts unchanged.
+# 0.636.0 (2026-11-13): IR792 the test deployment waits for CI in its own run; counts unchanged.
 # 0.635.0 (2026-11-13): IR790 one sign-in screen, one Keycloak client per app; IR791 the portal; counts unchanged.
 # 0.634.0 (2026-11-12): IR789 adds FR-T16 (new aircon installation, DD-T16); 85 requirement IDs, 69 role rows, 228 operations.
 # 0.288.0 (2026-10-13): IR416 adds FR-P11 (contractor company users, SCR-P11, DD-P11, partnerUsers.*); 84 requirement IDs, 68 role rows, 208 operations.
 # 0.24.0 (2026-10-06): IR114 adds FR-C19 (customer users, SCR-C19, DD-C19); 83 requirement IDs, 67 role rows.
 # 0.23.0 (2026-10-02): IR113 maintenance scheduling adds 8 job operations (197); no new requirement IDs.
 # 0.22.0 (2026-10-01): Figma-confirmed screens add FR-C14–C18, FR-P09–P10, FR-T13–T15, FR-A17–A23 and FR-X08 (IR107–IR112).
-expected = {f'FR-{letter}{i:02}' for letter, n in [('C',19),('P',11),('T',16),('A',23),('X',8)] for i in range(1,n+1)} | {f'NFR-{i:02}' for i in range(1,9)}
+expected = {f'FR-{letter}{i:02}' for letter, n in [('C',20),('P',11),('T',16),('A',23),('X',8)] for i in range(1,n+1)} | {f'NFR-{i:02}' for i in range(1,9)}
 if unique(trace, 'requirement_id', 'requirement') != expected:
-    fail('Requirement coverage must be 85 IDs')
+    fail('Requirement coverage must be 86 IDs')
 acceptance = set()
 for row in trace:
     req = (ROOT / row['requirement_file']).read_text()
@@ -380,8 +383,8 @@ opnames = unique(operations, 'operation', 'operation')
 opmap = {row['operation']: row for row in operations}
 types = (ROOT / '02-design/service-contracts.ts').read_text()
 typed = {name:(input_, result, mode) for name,input_,result,mode in re.findall(r"^  '([^']+)': \{input:(.*);result:(.*);mode:'(read|write)'\};$", types, re.M)}
-if set(typed) != opnames or len(operations) != 228:  # IR657 members.delete, IR656 baselines.delete + factors.delete + mrv.deleteDraft, IR655 plans.delete + rateCards.delete, IR654 customers.delete + contractors.delete + organizations.delete, IR653 firmwareCampaigns.delete, IR652 devices.unbind + devices.delete + capabilities.delete, IR648 voice.resolveIntent removed, IR635 devices.setMqttNode, IR612 members.unavailability + members.clearUnavailability, IR437 jobs.getAttachment, IR436 certificates.getContent, IR214 automations.delete, IR216 commands.list, IR238 filterCare.getSettings, IR327 alerts.evidence, IR349 attachments.list, IR379 notifications.markAllRead, IR384 members.revokeSessions
-    fail('228 operation/TypeScript contract keys differ')
+if set(typed) != opnames or len(operations) != 232:  # IR794 installationRequests.create + list + cancel + decline, IR657 members.delete, IR656 baselines.delete + factors.delete + mrv.deleteDraft, IR655 plans.delete + rateCards.delete, IR654 customers.delete + contractors.delete + organizations.delete, IR653 firmwareCampaigns.delete, IR652 devices.unbind + devices.delete + capabilities.delete, IR648 voice.resolveIntent removed, IR635 devices.setMqttNode, IR612 members.unavailability + members.clearUnavailability, IR437 jobs.getAttachment, IR436 certificates.getContent, IR214 automations.delete, IR216 commands.list, IR238 filterCare.getSettings, IR327 alerts.evidence, IR349 attachments.list, IR379 notifications.markAllRead, IR384 members.revokeSessions
+    fail('232 operation/TypeScript contract keys differ')
 for row in operations:
     name = row['operation']
     if typed.get(name) != (row['input_contract'], row['result_contract'], row['mode']):
@@ -483,8 +486,8 @@ for role in ['client','contractor','technician','admin']:
         for op in re.findall(r'[a-zA-Z]+\.[a-zA-Z]+', cells[3]):
             if op not in opmap or did not in opmap[op]['design_ids'].split(';'):
                 fail('DD/catalog mismatch '+did+' '+op)
-if role_tables != 69:
-    fail('Expected 69 role requirement rows')
+if role_tables != 70:
+    fail('Expected 70 role requirement rows')
 # FRV-011: detail-section service boundary sentences must equal the summary table (single source of operations).
 for role in ['client','contractor','technician','admin']:
     text = (ROOT / f'02-design/{role}.md').read_text()

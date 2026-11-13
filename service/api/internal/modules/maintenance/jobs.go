@@ -39,6 +39,9 @@ type JobUnits interface {
 	UnitsOfProperty(ctx context.Context, c *ops.Call, property uuid.UUID) ([]uuid.UUID, error)
 	OrgOfCustomer(ctx context.Context, c *ops.Call, customer uuid.UUID) (uuid.UUID, bool, error)
 	UnitsOfOrg(ctx context.Context, c *ops.Call, org uuid.UUID) ([]uuid.UUID, error)
+	// InstallSite answers whether the property, space and model of an installation request exist, and who owns the
+	// property (DEC-107).
+	InstallSite(ctx context.Context, c *ops.Call, in InstallSiteInput) (InstallSite, error)
 }
 
 // UnitSeverity returns the IR23 job severity per unit (highest open/acknowledged alert, normal without one).
@@ -360,6 +363,8 @@ type CreateInput struct {
 	AlternativeSlots []Slot     `json:"alternativeSlots"`
 	ContactWindow    *string    `json:"contactWindow,omitempty"`
 	DueAt            *time.Time `json:"dueAt,omitempty"`
+	// InstallationRequestID links an installation job to the client request it answers (HQ only, DEC-107).
+	InstallationRequestID *uuid.UUID `json:"installationRequestId,omitempty"`
 }
 
 // jobTypes are the types of a job (MaintenanceJob.type).
@@ -489,7 +494,10 @@ func PreferredSlotsOK(now time.Time, slots []Slot) bool {
 //	@Description	Authorization: client:self | admin:job.write
 //	@Description	Validation: D01; input constraints in the corresponding DD; IR38 dueAt only for job.write; defaults \
 //	@Description	to requestedEnd; IR113 client: requested slot + exactly 2 alternativeSlots, 3 distinct future slots \
-//	@Description	≥1 day ahead; HQ on behalf: 0–2
+//	@Description	≥1 day ahead; HQ on behalf: 0–2; DEC-107 installationRequestId (HQ only, type installation): the \
+//	@Description	request is submitted or approved, of the unit's customer, with fewer unfinished jobs than its \
+//	@Description	quantity (CONFLICT), the job has origin client_request and the client slot rule applies; the first \
+//	@Description	job sets the request approved
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-A06, DD-C09
 //	@Tags			jobs
@@ -527,6 +535,13 @@ func (m Jobs) createJob(ctx context.Context, call *ops.Call, input *CreateInput)
 	jobID, err := insertRequest(ctx, call, input, org, slots, due)
 	if err != nil {
 		return Job{}, err
+	}
+
+	if input.InstallationRequestID != nil {
+		err = approveRequest(ctx, call, *input.InstallationRequestID)
+		if err != nil {
+			return Job{}, err
+		}
 	}
 
 	eventErr := m.event(ctx, call, jobID, "job.created", nil)
@@ -576,7 +591,12 @@ func (m Jobs) unitToRequest(
 		return uuid.Nil, apperr.Fields(map[string]string{fieldUnitID: apperr.KeyUnitArchived})
 	}
 
-	return org, m.checkInstallation(ctx, call, input)
+	err = m.checkInstallation(ctx, call, input)
+	if err != nil {
+		return org, err
+	}
+
+	return org, checkRequestLink(ctx, call, m.Units, input, org)
 }
 
 // checkInstallation applies DEC-106 to a new job: an installation job is HQ's, for a planned unit and the only
@@ -623,7 +643,8 @@ func requestedSlots(call *ops.Call, input *CreateInput) ([]Slot, time.Time, erro
 	slots := append([]Slot{{input.RequestedStart, input.RequestedEnd}}, input.AlternativeSlots...)
 
 	alts := len(input.AlternativeSlots)
-	if (call.Principal.Role == roleClient && alts != 2) || alts > 2 {
+	if ((call.Principal.Role == roleClient || input.InstallationRequestID != nil) && alts != 2) ||
+		alts > 2 {
 		return nil, time.Time{}, apperr.Fields(
 			map[string]string{"alternativeSlots": apperr.KeyCount},
 		)
@@ -672,11 +693,12 @@ func insertRequest(
 
 	err = call.Tx.QueryRow(ctx, `INSERT INTO maintenance.jobs (tenant_id, unit_id, customer_org_id, type, status, origin,
 		symptom, contact_window, requested_slot,
-		preferred_slots, preference_round, due_at) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, 'requested',
-		CASE WHEN $3 = 'installation' THEN 'hq_request' ELSE 'client_request' END, $4, $5,
-		tstzrange($6, $7), $8, 1, $9) RETURNING
+		preferred_slots, preference_round, due_at, installation_request_id)
+		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, 'requested',
+		CASE WHEN $3 = 'installation' AND $10::uuid IS NULL THEN 'hq_request' ELSE 'client_request' END, $4, $5,
+		tstzrange($6, $7), $8, 1, $9, $10) RETURNING
 		id`, input.UnitID, org, input.Type, input.Symptom, contactWindow, input.RequestedStart, input.RequestedEnd, pref,
-		due).
+		due, input.InstallationRequestID).
 		Scan(&jobID)
 
 	return jobID, apperr.Wrap(err, "insert maintenance.jobs")

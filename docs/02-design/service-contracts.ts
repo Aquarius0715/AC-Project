@@ -222,6 +222,7 @@ export type SessionsRevoked = {membershipId:ID;userId:ID;revokedAt:Instant;membe
 export type ClientUser = Entity & {customerId:ID;membershipId:ID|null;email:string;displayName:string|null;clientRole:ClientRole;status:'invited'|'active'|'disabled';lastSignInAt:Instant|null;allowedChannels:Channel[];invitedAt:Instant;invitedByMembershipId:ID;revokedAt:Instant|null};
 export type PartnerRole = 'contractor'|'technician';
 export type PartnerUser = Entity & {organizationId:ID;membershipId:ID|null;email:string;displayName:string|null;partnerRole:PartnerRole;status:'invited'|'active'|'disabled';lastSignInAt:Instant|null;accessUntil:Instant|null;invitedAt:Instant;invitedByMembershipId:ID;booked:boolean;revokedAt:Instant|null};
+export type InstallationRequest = Entity & {customerOrgId:ID;propertyId:ID;spaceId:ID|null;quantity:number;modelId:ID|null;withIot:boolean;preferredSlots:Slot[];contactWindow:string|null;note:string|null;status:'submitted'|'approved'|'declined'|'cancelled';declineReason:string|null;decidedAt:Instant|null;jobIds:ID[]};
 export type LocationTarget = {kind:'property'|'space'|'unit';id:ID};
 export type VentilationLog = Entity & {spaceId:ID;unitId:ID|null;method:'window_opened'|'door_opened'|'ventilation_fan'|'other';durationMinutes:number;co2AtLog:{value:number;unit:'ppm';observedAt:Instant}|null;loggedByMembershipId:ID;loggedAt:Instant};
 export type ImportRow = {rowNumber:number;propertyName:string;floorName:string|null;roomName:string|null;unitName:string;modelCode:string;serial:string|null;installedOn:string|null;warrantyEnd:string|null;result:'ready'|'warning'|'error';messageKey:string|null};
@@ -330,7 +331,7 @@ export type OperationContracts = {
   'jobs.addNote': {input:{jobId:ID;message:string;visibility:'internal'|'customer'};result:JobNote;mode:'write'};
   'jobs.assign': {input:{jobId:ID;technicianMembershipId:ID;startAt:Instant;endAt:Instant;reason?:string};result:MaintenanceJob;mode:'write'};
   'jobs.cancel': {input:{jobId:ID;cancelReason:string};result:MaintenanceJob;mode:'write'};
-  'jobs.create': {input:{unitId:ID;type:MaintenanceJob['type'];symptom:string;requestedStart:Instant;requestedEnd:Instant;alternativeSlots:Slot[];contactWindow?:string;dueAt?:Instant};result:MaintenanceJob;mode:'write'};
+  'jobs.create': {input:{unitId:ID;type:MaintenanceJob['type'];symptom:string;requestedStart:Instant;requestedEnd:Instant;alternativeSlots:Slot[];contactWindow?:string;dueAt?:Instant;installationRequestId?:ID};result:MaintenanceJob;mode:'write'};
   'jobs.decline': {input:{jobId:ID;offerId:ID;reason:string};result:JobDecisionReceipt;mode:'write'};
   'jobs.events': {input:{jobId:ID;query:Query};result:Page<JobEvent>;mode:'read'};
   'jobs.extendAccess': {input:{jobId:ID;accessValidUntil:Instant;reason:string};result:MaintenanceJob;mode:'write'};
@@ -432,6 +433,10 @@ export type OperationContracts = {
   'partnerUsers.save': {input:{id?:ID;email:string;partnerRole:PartnerRole;status?:'active'|'disabled';reason?:string;displayName?:string;accessUntil?:Instant};result:PartnerUser;mode:'write'};
   'partnerUsers.remove': {input:{id:ID;reason:string};result:DeletedResource;mode:'write'};
   'partnerUsers.resendInvite': {input:{id:ID};result:NotificationPreview;mode:'write'};
+  'installationRequests.create': {input:{propertyId:ID;spaceId?:ID;quantity:number;modelId?:ID;withIot:boolean;preferredSlots:Slot[];contactWindow?:string;note?:string};result:InstallationRequest;mode:'write'};
+  'installationRequests.list': {input:Query;result:Page<InstallationRequest>;mode:'read'};
+  'installationRequests.cancel': {input:{id:ID};result:InstallationRequest;mode:'write'};
+  'installationRequests.decline': {input:{id:ID;reason:string};result:InstallationRequest;mode:'write'};
   'units.importPreview': {input:{customerId:ID;fileName:string;csvText:string;mapping:Record<string,string>};result:ImportPreview;mode:'read'};
   'units.importCommit': {input:{previewId:ID;customerId:ID};result:UnitImport;mode:'write'};
   'units.importUndo': {input:{importId:ID;reason:string};result:UnitImport;mode:'write'};

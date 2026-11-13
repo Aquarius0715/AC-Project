@@ -1672,6 +1672,103 @@
    "version"
   ]
  },
+ "installationRequests.cancel": {
+  "fields": [
+   "contactWindow",
+   "createdAt",
+   "customerOrgId",
+   "decidedAt",
+   "declineReason",
+   "id",
+   "jobIds",
+   "modelId",
+   "note",
+   "preferredSlots",
+   "propertyId",
+   "quantity",
+   "spaceId",
+   "status",
+   "tenantId",
+   "updatedAt",
+   "version",
+   "withIot"
+  ],
+  "items": null
+ },
+ "installationRequests.create": {
+  "fields": [
+   "contactWindow",
+   "createdAt",
+   "customerOrgId",
+   "decidedAt",
+   "declineReason",
+   "id",
+   "jobIds",
+   "modelId",
+   "note",
+   "preferredSlots",
+   "propertyId",
+   "quantity",
+   "spaceId",
+   "status",
+   "tenantId",
+   "updatedAt",
+   "version",
+   "withIot"
+  ],
+  "items": null
+ },
+ "installationRequests.decline": {
+  "fields": [
+   "contactWindow",
+   "createdAt",
+   "customerOrgId",
+   "decidedAt",
+   "declineReason",
+   "id",
+   "jobIds",
+   "modelId",
+   "note",
+   "preferredSlots",
+   "propertyId",
+   "quantity",
+   "spaceId",
+   "status",
+   "tenantId",
+   "updatedAt",
+   "version",
+   "withIot"
+  ],
+  "items": null
+ },
+ "installationRequests.list": {
+  "fields": [
+   "items",
+   "nextCursor",
+   "snapshotVersion",
+   "total"
+  ],
+  "items": [
+   "contactWindow",
+   "createdAt",
+   "customerOrgId",
+   "decidedAt",
+   "declineReason",
+   "id",
+   "jobIds",
+   "modelId",
+   "note",
+   "preferredSlots",
+   "propertyId",
+   "quantity",
+   "spaceId",
+   "status",
+   "tenantId",
+   "updatedAt",
+   "version",
+   "withIot"
+  ]
+ },
  "invoices.create": {
   "fields": [
    "amountMinor",

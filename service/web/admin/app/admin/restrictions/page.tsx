@@ -57,8 +57,8 @@ export default async function AdminRestrictionsPage({ searchParams }: Readonly<P
   };
   const rows = restrictionRows(scoped.items, contractLabel, i);
   const counts: Record<RestrictionState, number> = { scheduled: countOf("scheduled"), requested: countOf("requested"), applied: countOf("applied"), release_requested: countOf("release_requested"), released: countOf("released"), cancelled: countOf("cancelled") };
-  // every restriction (the scope may narrow the list): the cause invoices of the filter and the units under restriction
-  const all = Object.keys(filters).length > 0 ? await coreOp<Page<ApiRestriction>>("restrictions.list", { limit: 100 }) : scoped;
+  // every restriction, all pages (the scope may narrow the list): the cause invoices of the filter and the units under restriction
+  const all = await coreAllPage<ApiRestriction>("restrictions.list");
   const invoicesOf = isFull ? await coreAll<ApiInvoice>(INVOICES_LIST) : [];
   const contractOf = new Map(contracts.items.map((k) => [k.id, k]));
   const causeIds = new Set(new Set(all.items.flatMap((x) => x.causeInvoiceIds ?? [])));
@@ -104,9 +104,9 @@ export default async function AdminRestrictionsPage({ searchParams }: Readonly<P
 
   if (canWrite) { // the schedule form: eligible contracts, their overdue unpaid invoices, units and recipients
     const [overdue, caps, clients] = await Promise.all([
-      coreOp<Page<ApiInvoice>>(INVOICES_LIST, { limit: 100, filters: { overdueOnly: true } }),
+      coreAllPage<ApiInvoice>(INVOICES_LIST, { filters: { overdueOnly: true } }),
       coreAllPage<ApiCapability>("capabilities.list"),
-      coreOp<Page<{ customerId: string; status: string }>>("clientUsers.list", { limit: 100, filters: { status: "active" } }),
+      coreAllPage<{ customerId: string; status: string }>("clientUsers.list", { filters: { status: "active" } }),
     ]);
     const busy = new Map<string, string>();
     const restricted = all.items.filter((x) => active.has(x.state)).flatMap((x) => x.unitIds.map((u) => [u, t("under restriction {id} ({state})", { id: x.id.slice(0, 8), state: stateWord(x.state, t) })] as const));

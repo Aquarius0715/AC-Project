@@ -7,7 +7,7 @@ import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import {
-  airMetrics, airNumber, airPeriods, metricInfo, toggleAirMetric, ventDurations, ventMethods, type AirChartSeries, type AirMetric, type AirPeriod, type AirRow, type MetricCard, type VentMethod,
+  airChartGroups, airMetrics, airNumber, airPeriods, metricInfo, toggleAirMetric, ventDurations, ventMethods, type AirChartSeries, type AirMetric, type AirPeriod, type AirRow, type MetricCard, type VentMethod,
 } from "@ac/web/lib/air";
 import { logVentilation } from "../actions";
 import { Icon, type IconName } from "@ac/web/components/Icon";
@@ -58,8 +58,12 @@ export function AirQualityView({ live }: Readonly<{ live: AirLive | null }>) {
     many: t("No valid {metric} readings in this window ({n} readings without a valid value) — missing data is never drawn as a line.", { metric: l.name, n: l.readings }),
   });
   const shown = c.series.filter((l) => l.hasSensor && l.valid);
-  // a chip or a card puts its metric in the chart or takes it out; a third unit starts the chart again with that metric alone
-  const press = (metric: AirMetric, alone: boolean) => { patch({ metric: (toggleAirMetric(live.metrics, metric) ?? (alone ? [metric] : live.metrics)).join(",") }); };
+  // a chip or a card puts its metric in the chart or takes it out; "All" shows the four, or goes back to the first one
+  const press = (metric: AirMetric) => { patch({ metric: toggleAirMetric(live.metrics, metric).join(",") }); };
+  const allOn = airMetrics.every((k) => live.metrics.includes(k));
+  const pressAll = () => { patch({ metric: (allOn ? live.metrics.slice(0, 1) : airMetrics).join(",") }); };
+  const groups = airChartGroups(shown);
+  const stacked = groups.length > 1;
   return (
     <Page>
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-line bg-surface px-4 py-3 text-xs">
@@ -76,7 +80,7 @@ export function AirQualityView({ live }: Readonly<{ live: AirLive | null }>) {
       </div>
       <div className="grid-fluid" style={{ ["--min" as string]: "210px" }}>
         {live.cards.map((m) => (
-          <Plain key={m.metric} type="button" aria-pressed={live.metrics.includes(m.metric)} onClick={() => { press(m.metric, true); }}
+          <Plain key={m.metric} type="button" aria-pressed={live.metrics.includes(m.metric)} onClick={() => { press(m.metric); }}
             className={cx("flex min-w-0 flex-col gap-1 rounded-2xl border bg-surface p-4 text-left", live.metrics.includes(m.metric) ? "border-primary ring-1 ring-primary" : "border-line hover:border-primary/50")}>
             <span className="flex items-center justify-between gap-2 text-xs text-muted-foreground">{m.label}<Badge tone={m.feed.tone} icon={m.feed.icon}>{m.feed.text}</Badge></span>
             <span className="text-[28px] font-bold leading-9">{m.value ?? "—"}{m.value !== null && <span className="ml-1 text-sm font-medium text-muted-foreground">{m.unit}</span>}</span>
@@ -93,12 +97,15 @@ export function AirQualityView({ live }: Readonly<{ live: AirLive | null }>) {
       </Banner>
       <Card title={c.title} sub={c.sub} action={<div className="flex flex-wrap gap-2">
         <div className="flex flex-wrap gap-1" role="group" aria-label={t("Metrics in the chart")}>
+          <Plain type="button" aria-pressed={allOn} onClick={pressAll}
+            className={cx("rounded-control border px-3 py-1.5 text-xs font-semibold", allOn ? "border-primary bg-primary-soft text-primary" : "border-line text-muted-foreground hover:bg-surface2")}>
+            {t("All")}
+          </Plain>
           {airMetrics.map((k) => {
             const isOn = live.metrics.includes(k);
-            const isFull = !isOn && toggleAirMetric(live.metrics, k) === null;
             return (
-              <Plain key={k} type="button" aria-pressed={isOn} disabled={isFull} title={isFull ? t("A chart shows two units at most — take one out first") : undefined} onClick={() => { press(k, false); }}
-                className={cx("rounded-control border px-3 py-1.5 text-xs font-semibold", isOn ? "border-primary bg-primary-soft text-primary" : "border-line text-muted-foreground hover:bg-surface2", isFull && "opacity-50")}>
+              <Plain key={k} type="button" aria-pressed={isOn} onClick={() => { press(k); }}
+                className={cx("rounded-control border px-3 py-1.5 text-xs font-semibold", isOn ? "border-primary bg-primary-soft text-primary" : "border-line text-muted-foreground hover:bg-surface2")}>
                 {t(entryOf(metricInfo, k).tab)}
               </Plain>
             );
@@ -108,15 +115,20 @@ export function AirQualityView({ live }: Readonly<{ live: AirLive | null }>) {
         <Tabs value={view} onChange={setView} tabs={[{ id: "chart", label: t("Chart") }, { id: "table", label: t("Table") }]} />
       </div>}>
         {view === "chart" && shown.length > 0 ? (
-            <>
-              <LineChart series={shown.map((l) => ({ name: l.name, unit: l.unit, points: l.points, axis: l.axis, ...(l.guide !== null && { threshold: l.guide }), format: (v: number) => airNumber(l.metric, v) }))}
-                times={c.times} shadeGaps height={300} labels={c.labels} />
-              <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
-                {shown.length === 1 && shown.map((l) => <span key={l.metric} className="text-primary">— {l.name} ({l.unit})</span>)}
-                {shown.map((l) => l.guide !== null && <span key={`g${l.metric}`} className="text-crit">- - {l.guide} {l.unit} {t(l.metric === "co2" ? "ventilation guide" : "cleaning guide")}</span>)}
-                {c.gaps && <span className="inline-flex items-center gap-1"><span aria-hidden className="inline-block h-2.5 w-2.5 rounded-sm border border-dashed border-muted-foreground" />{t("No data (gap, not joined)")}</span>}
-              </div>
-            </>
+            <div className="flex flex-col gap-4">
+              {groups.map((g) => (
+                <div key={g.map((l) => l.metric).join(",")}>
+                  {stacked && g.map((l) => <div key={l.metric} className="mb-1 text-xs font-semibold">{l.name} ({l.unit})</div>)}
+                  <LineChart series={g.map((l) => ({ name: l.name, unit: l.unit, points: l.points, axis: l.axis, ...(l.guide !== null && { threshold: l.guide }), format: (v: number) => airNumber(l.metric, v) }))}
+                    times={c.times} shadeGaps height={stacked ? 160 : 300} labels={c.labels} />
+                  <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+                    {!stacked && g.length === 1 && g.map((l) => <span key={l.metric} className="text-primary">— {l.name} ({l.unit})</span>)}
+                    {g.map((l) => l.guide !== null && <span key={`g${l.metric}`} className="text-crit">- - {l.guide} {l.unit} {t(l.metric === "co2" ? "ventilation guide" : "cleaning guide")}</span>)}
+                  </div>
+                </div>
+              ))}
+              {c.gaps && <div className="flex flex-wrap gap-x-4 text-[11px] text-muted-foreground"><span className="inline-flex items-center gap-1"><span aria-hidden className="inline-block h-2.5 w-2.5 rounded-sm border border-dashed border-muted-foreground" />{t("No data (gap, not joined)")}</span></div>}
+            </div>
           ) : null}
         {view === "table" ? live.tables.filter((tb) => shown.some((l) => l.metric === tb.metric)).map((tb) => (
             // the table scrolls on its own: it takes the focus so a keyboard can scroll it, named as the chart is (axe

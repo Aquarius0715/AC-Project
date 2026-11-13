@@ -138,6 +138,7 @@ export function pageLabel(role: Role, pathname: string): string | null {
   const shared = SHARED_PAGES.find((s) => pathname === s.href);
   if (shared) return shared.label;
   if (pathname === "/customer/users" || pathname === "/partner/users") return "Users";
+  if (pathname === "/customer/installations") return "Installations";
   if (pathname === "/demo") return "Demo controls";
   const { base, nav } = roleConfig(role);
   const score = (href: string, match?: string[]) => {

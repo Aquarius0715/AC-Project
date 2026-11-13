@@ -1015,6 +1015,32 @@ CREATE TABLE maintenance.plans (                 -- periodic plans (FR-A06)
   UNIQUE (tenant_id, id)
 );
 
+CREATE TABLE maintenance.installation_requests (   -- a customer owner's request for new aircons (DEC-107, FR-C20)
+  id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id         uuid NOT NULL,
+  customer_org_id   uuid NOT NULL,
+  property_id       uuid NOT NULL,                 -- assets.properties of the customer (checked through the assets query interface, no cross-schema FK)
+  space_id          uuid,
+  quantity          int NOT NULL CHECK (quantity BETWEEN 1 AND 10),
+  model_id          uuid,                          -- null = model not decided
+  with_iot          boolean NOT NULL DEFAULT false,
+  preferred_slots   jsonb NOT NULL,                -- Slot[3] (IR113)
+  contact_window    text,
+  note              text CHECK (char_length(note) <= 2000),
+  status            text NOT NULL DEFAULT 'submitted' CHECK (status IN ('submitted','approved','declined','cancelled')),
+  decline_reason    text CHECK (char_length(decline_reason) BETWEEN 5 AND 500),
+  decided_by        uuid,
+  decided_at        timestamptz,
+  created_by        uuid NOT NULL,
+  version           int NOT NULL DEFAULT 1,
+  created_at        timestamptz NOT NULL DEFAULT platform.app_now(),
+  updated_at        timestamptz NOT NULL DEFAULT platform.app_now(),
+  UNIQUE (tenant_id, id),
+  CHECK ((status = 'declined') = (decline_reason IS NOT NULL))
+);
+CREATE INDEX installation_requests_customer ON maintenance.installation_requests (tenant_id, customer_org_id, created_at DESC);
+CREATE INDEX installation_requests_open ON maintenance.installation_requests (tenant_id, created_at) WHERE status = 'submitted';
+
 CREATE TABLE maintenance.jobs (
   id                     uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id              uuid NOT NULL,
@@ -1046,10 +1072,12 @@ CREATE TABLE maintenance.jobs (
   customer_confirmed_at  timestamptz,
   warranty_claims        jsonb NOT NULL DEFAULT '[]',
   hold_reason            text,
+  installation_request_id uuid,                 -- DEC-107: the client request this installation job answers
   version                int NOT NULL DEFAULT 1,
   created_at             timestamptz NOT NULL DEFAULT platform.app_now(),
   updated_at             timestamptz NOT NULL DEFAULT platform.app_now(),
   FOREIGN KEY (tenant_id, plan_id) REFERENCES maintenance.plans(tenant_id, id),
+  FOREIGN KEY (tenant_id, installation_request_id) REFERENCES maintenance.installation_requests(tenant_id, id),
   UNIQUE (tenant_id, id),
   UNIQUE (plan_id, occurrence_at)
 );
