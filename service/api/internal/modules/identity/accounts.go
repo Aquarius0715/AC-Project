@@ -42,14 +42,14 @@ type AccountApps struct{ Customer, Partner, Technician, Admin string }
 func (a AccountApps) of(role string) (string, string) {
 	switch role {
 	case authz.RoleClient:
-		return a.Customer, appClientID
+		return a.Customer, clientCustomer
 	case authz.RoleContractor:
-		return a.Partner, appClientID
+		return a.Partner, clientPartner
 	case authz.RoleTechnician:
-		return a.Technician, appClientID
+		return a.Technician, clientTechnician
 	}
 
-	return a.Admin, "ac-admin-web"
+	return a.Admin, clientAdmin
 }
 
 // Events of IR461, handled by the identity-accounts consumer (IR511).

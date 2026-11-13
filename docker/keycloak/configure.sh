@@ -21,6 +21,29 @@ SERVER=${KEYCLOAK_INTERNAL_URL:-http://keycloak:8080}
   -s loginWithEmailAllowed=true \
   -s 'smtpServer.fromDisplayName=AC Project'
 
+# One client per app (IR790), so the one sign-in page names the service: a realm imported before has only ac-web.
+# ensure_client CLIENT_ID TITLE URL THEME creates the client with the claims the apps read when it is missing.
+ensure_client() {
+  cid=$("$KC" get clients -r ac -q "clientId=$1" --fields id --format csv --noquotes)
+  if [ -z "$cid" ]; then
+    "$KC" create clients -r ac -s "clientId=$1" -s "name=$2" -s publicClient=false \
+      -s "secret=${AC_WEB_CLIENT_SECRET:-local-ac-web-secret}" -s standardFlowEnabled=true -s directAccessGrantsEnabled=false \
+      -s "redirectUris=[\"$3/*\"]" -s "webOrigins=[\"$3\"]" -s 'attributes."pkce.code.challenge.method"=S256'
+    cid=$("$KC" get clients -r ac -q "clientId=$1" --fields id --format csv --noquotes)
+    for claim in tenant_id membership_id role; do
+      "$KC" create "clients/$cid/protocol-mappers/models" -r ac -s "name=$claim" -s protocol=openid-connect \
+        -s protocolMapper=oidc-usermodel-attribute-mapper -s consentRequired=false \
+        -s "config.\"user.attribute\"=$claim" -s "config.\"claim.name\"=$claim" -s 'config."jsonType.label"=String' \
+        -s 'config."id.token.claim"=true' -s 'config."access.token.claim"=true' -s 'config."userinfo.token.claim"=true'
+    done
+    echo "realm ac: client $1 created"
+  fi
+  "$KC" update "clients/$cid" -r ac -s "attributes.login_theme=$4"
+}
+ensure_client ac-customer-web "Customer app" "${CUSTOMER_WEB_URL%/}" ac-customer
+ensure_client ac-partner-web "Partner app" "${PARTNER_WEB_URL%/}" ac-partner
+ensure_client ac-technician-web "Technician app" "${TECHNICIAN_WEB_URL%/}" ac-technician
+
 # HQ Admin has its own title and accent
 id=$("$KC" get clients -r ac -q clientId=ac-admin-web --fields id --format csv --noquotes)
 "$KC" update "clients/$id" -r ac -s 'attributes.login_theme=ac-hq'
@@ -43,10 +66,13 @@ if [ -n "${PUBLIC_HOSTS:-}" ]; then
     printf '%s' "${out%,}"
   }
   origins() { printf '%s' "$1" | sed 's#/\*"#"#g'; }
-  web=$(urls_on_hosts "${CUSTOMER_WEB_URL%/}" "${PARTNER_WEB_URL%/}" "${TECHNICIAN_WEB_URL%/}")
+  for app in customer:CUSTOMER partner:PARTNER technician:TECHNICIAN; do
+    eval "url=\${${app#*:}_WEB_URL}"
+    web=$(urls_on_hosts "${url%/}")
+    webid=$("$KC" get clients -r ac -q "clientId=ac-${app%%:*}-web" --fields id --format csv --noquotes)
+    "$KC" update "clients/$webid" -r ac -s "redirectUris=[$web]" -s "webOrigins=[$(origins "$web")]"
+  done
   admin=$(urls_on_hosts "${ADMIN_WEB_URL%/}")
-  webid=$("$KC" get clients -r ac -q clientId=ac-web --fields id --format csv --noquotes)
-  "$KC" update "clients/$webid" -r ac -s "redirectUris=[$web]" -s "webOrigins=[$(origins "$web")]"
   "$KC" update "clients/$id" -r ac -s "redirectUris=[$admin]" -s "webOrigins=[$(origins "$admin")]"
 fi
 # Keycloak 26.8.2 admits a service account to the admin API only with the built-in client scope kc-admin-api, which

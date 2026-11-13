@@ -346,6 +346,7 @@ trace = rows('00-prepare/traceability.csv')
 # 0.27.0 (2026-10-07): IR117 AWS / Stripe / HQ network restriction / retention / capacity (production target only); counts unchanged.
 # 0.26.0 (2026-10-07): IR116 Next.js stack + backend-architecture.md / network-architecture.md (production target, not 1A inputs); counts unchanged.
 # 0.25.0 (2026-10-07): IR115 consistency fixes (tabs, permissions, owner-only default rules); counts unchanged.
+# 0.635.0 (2026-11-13): IR790 one sign-in screen, one Keycloak client per app; counts unchanged.
 # 0.634.0 (2026-11-12): IR789 adds FR-T16 (new aircon installation, DD-T16); 85 requirement IDs, 69 role rows, 228 operations.
 # 0.288.0 (2026-10-13): IR416 adds FR-P11 (contractor company users, SCR-P11, DD-P11, partnerUsers.*); 84 requirement IDs, 68 role rows, 208 operations.
 # 0.24.0 (2026-10-06): IR114 adds FR-C19 (customer users, SCR-C19, DD-C19); 83 requirement IDs, 67 role rows.

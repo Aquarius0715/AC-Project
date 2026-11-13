@@ -8,7 +8,6 @@ import { dropSession, loadSession, needsRefresh, SESSION_COOKIE, type Session } 
 import { domainError, type DomainError } from "@ac/web/lib/domainError";
 import { coreRequest } from "@ac/web/lib/rest";
 import { DEFAULT_DISPLAY, isLocale, type Display } from "@ac/web/lib/i18n";
-import { SIGN_IN_LOCALE_COOKIE } from "@ac/web/lib/login";
 import type { ListArgs, OpArgs } from "@ac/web/lib/opTypes";
 import { orNull } from "@ac/web/lib/promises";
 import { answerOf } from "@ac/web/lib/answer";
@@ -140,13 +139,9 @@ export async function coreClockFresh(): Promise<Date> {
 
 /** The signed-in user's display language and time zone (preferences.get, FR-X01, IR258), once per render pass: the
 shell and the screens that show times read the same answer. Unreadable preferences show the defaults. Before sign-in the
-language is the one chosen on the sign-in page (IR646), English when none was. */
+language is English (the identity provider's own sign-in pages choose their language, IR790). */
 export const coreDisplay = cache(async (): Promise<Display> => {
-  if (!(await getSession())) {
-    const jar = await cookies();
-    const chosen = jar.get(SIGN_IN_LOCALE_COOKIE)?.value;
-    return { ...DEFAULT_DISPLAY, locale: isLocale(chosen) ? chosen : DEFAULT_DISPLAY.locale };
-  }
+  if (!(await getSession())) return DEFAULT_DISPLAY;
   try {
     const p = await coreOp<{ locale?: string; timezone?: string }>("preferences.get", {});
     return { locale: isLocale(p.locale) ? p.locale : DEFAULT_DISPLAY.locale, timeZone: filled(p.timezone) ?? DEFAULT_DISPLAY.timeZone };

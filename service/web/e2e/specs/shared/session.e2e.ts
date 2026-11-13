@@ -3,7 +3,7 @@
 // sign-in that came back says why.
 import type { Page } from "@playwright/test";
 import { test, expect } from "../../fixtures/test";
-import { emailOf, signIn, startSignIn } from "../../fixtures/auth";
+import { enterPassword, signIn } from "../../fixtures/auth";
 
 // the page's own alerts, not Next.js's route announcer (role alert too)
 const notice = (page: Page) => page.locator('[role="alert"]:not(#__next-route-announcer__)');
@@ -36,10 +36,8 @@ test("Sign out ends the session, at the identity provider too", async ({ browser
   await page.getByRole("button", { name: "Sign out" }).click();
   await page.waitForURL(/\/login$/);
   await page.goto(app.home);
-  await expect(page).toHaveURL(new RegExp(String.raw`/login\?returnTo=${encodeURIComponent(app.home)}`));
-  await expect(page.locator('input[name="returnTo"]')).toHaveValue(app.home);
-  // the provider's session ended with the sign-out: signing in again asks for the password instead of coming back
-  await startSignIn(page, emailOf(app.user));
+  // the provider's session ended with the sign-out: the app's sign-in leads to the provider, which asks for the password
+  // instead of letting the person straight back in
   await expect(page.locator("#password")).toBeVisible();
 });
 
@@ -77,13 +75,13 @@ test.describe("signed out", () => {
     await expect(notice(page)).toContainText("belongs to another AC Project service"); // an error banner is an alert (IR362)
     await page.goto("/login?error=expired");
     await expect(notice(page)).toContainText("Your session ended");
-    await page.goto("/login");
-    await expect(notice(page)).toHaveCount(0);
+    await page.goto("/login"); // a plain visit goes straight on to the identity provider (IR790)
+    await expect(page.locator("#password")).toBeVisible();
   });
 
   test("a protected page keeps where it was going", async ({ page, app }) => {
     await page.goto(`${app.home}/x-not-a-page`);
-    await expect(page).toHaveURL(new RegExp(String.raw`/login\?returnTo=${encodeURIComponent(`${app.home}/x-not-a-page`)}`));
-    await expect(page.locator('input[name="returnTo"]')).toHaveValue(`${app.home}/x-not-a-page`);
+    await enterPassword(page, app.user); // the identity provider's page; the sign-in returns to where it was going
+    await expect(page).toHaveURL(new RegExp(`${app.home}/x-not-a-page$`));
   });
 });
