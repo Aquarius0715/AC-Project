@@ -1,41 +1,73 @@
-# The shared test environment's deployment (DEC-93, DEC-94, IR631), on the lab server's self-hosted runner (label
+# The shared test environment's deployment (DEC-93, DEC-94, IR631, IR792), on the lab server's self-hosted runner (label
 # ac-test), so the build and deploy logs show here. A tag test<major>.<minor>.<patch>r<n> on a commit of main deploys
-# that commit once its CI passed:
-# - pushing the tag deploys at once when CI passed on the commit already;
-# - while that CI still runs, the run ends, and the CI's own completion deploys the newest test tag on its commit;
-# - when the commit has no CI at all (a merge by the Auto-merge workflow starts none), the run starts it, and its
-#   completion deploys the tag in the same way.
-# CI runs on the same runner, so a deployment never holds it waiting. The job runs deploy/test/deploy.sh from the
-# checkout with the environment file of the Environment test's secret AC_TEST_ENV_FILE, written to the runner's temporary
-# directory for the job and removed after it (IR733); without that secret, with the server's ~/ac-test/env as before.
-# Its passwords, secrets, tokens and keys are masked in the log. One deployment runs at a time; a newer one waiting
-# replaces an older one that waits.
+# that commit once its CI passed, all in this one run:
+# - job "gate" (a GitHub-hosted runner, so it never holds the lab server's runners): checks the tag is on main, starts
+#   the commit's CI when it has none (a merge by the Auto-merge workflow starts none on main), and waits for CI to pass;
+# - job "deploy" (the lab server): runs deploy/test/deploy.sh once the gate passed.
+# The run therefore stays open and green only when the deployment was done; a CI that fails ends it red. Before IR792 the
+# tag's run ended at once while CI still ran and a second run, started by CI's completion, deployed: the first one looked
+# like a deployment that never happened. The job runs deploy/test/deploy.sh from the checkout with the environment file of
+# the Environment test's secret AC_TEST_ENV_FILE, written to the runner's temporary directory for the job and removed after
+# it (IR733); without that secret, with the server's ~/ac-test/env as before. Its passwords, secrets, tokens and keys are
+# masked in the log. One deployment runs at a time; a newer one waiting replaces an older one that waits.
 name: Test deployment
 
 on:
   push:
     tags: ["test[0-9]+.[0-9]+.[0-9]+r[0-9]+"]
-  # zizmor: ignore[dangerous-triggers] the job runs only for CI on a push to main (event push, conclusion success) and checks out main and the tags, never a pull request's code (IR732)
-  workflow_run:
-    workflows: [CI]
-    types: [completed]
-    branches: [main]
 
 permissions:
-  actions: write # the CI run of the commit, and starting it when the commit has none
   contents: read
 
-concurrency:
-  group: test-deployment
-  cancel-in-progress: false
-
 jobs:
+  gate:
+    name: Wait for CI
+    if: github.repository == 'Aquarius0715/AC-Project' # only in this repository, never a fork's (IR732)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      actions: write # the CI run of the commit, and starting it when the commit has none (this job only)
+      contents: read
+    outputs:
+      tag: ${{ steps.pick.outputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false # no later step pushes or fetches with the job's token
+          fetch-depth: 0 # main and the tags
+      - name: CI must pass on the tagged commit
+        id: pick
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          tag=$GITHUB_REF_NAME sha=$GITHUB_SHA
+          if ! git merge-base --is-ancestor "$sha" origin/main; then
+            echo "::error::$tag is not on main: not deployed"
+            exit 1
+          fi
+          result=0
+          python3 deploy/test/ci_gate.py "$sha" 0 || result=$?
+          if [ "$result" = 4 ]; then
+            # no CI on the commit (a pull request merged by the Auto-merge workflow starts none on main): start it
+            if [ "$sha" != "$(git rev-parse origin/main)" ]; then
+              echo "::error::CI never ran on ${sha:0:8} and main has moved on: tag the current main"
+              exit 1
+            fi
+            curl --fail --silent --show-error -X POST -H "Authorization: Bearer $GITHUB_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/dispatches" -d '{"ref":"main"}'
+            echo "::notice::CI had not run on ${sha:0:8}: started it"
+          fi
+          python3 deploy/test/ci_gate.py "$sha" 80 # passes at once when CI passed; waits while it runs; fails when it fails
+          echo "tag=$tag" >>"$GITHUB_OUTPUT"
+
   deploy:
     name: Deploy to the lab server
-    # a tag push, or a CI run that passed on a push to main; only in this repository, never a fork's (IR732)
-    if: >-
-      github.repository == 'Aquarius0715/AC-Project' &&
-      (github.event_name == 'push' || (contains(fromJSON('["push", "workflow_dispatch"]'), github.event.workflow_run.event) && github.event.workflow_run.conclusion == 'success'))
+    needs: gate
+    # one deployment at a time; a newer one waiting replaces an older one that waits (not at the gate: waiting for CI is cheap)
+    concurrency:
+      group: test-deployment
+      cancel-in-progress: false
     runs-on: [self-hosted, ac-test]
     environment: test # its secrets, for main and the test tags only (repository settings, IR733)
     timeout-minutes: 120
@@ -47,49 +79,13 @@ jobs:
       - name: the tag to deploy
         id: pick
         env:
-          GITHUB_TOKEN: ${{ github.token }}
-          RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+          TAG: ${{ needs.gate.outputs.tag }}
         run: |
-          pattern='^test[0-9]+[.][0-9]+[.][0-9]+r[0-9]+$'
-          if [ "$GITHUB_EVENT_NAME" = push ]; then
-            tag=$GITHUB_REF_NAME sha=$GITHUB_SHA
-            if ! git merge-base --is-ancestor "$sha" origin/main; then
-              echo "::error::$tag is not on main: not deployed"
-              exit 1
-            fi
-            result=0
-            python3 deploy/test/ci_gate.py "$sha" 0 || result=$?
-            if [ "$result" = 3 ]; then
-              echo "::notice::CI on ${sha:0:8} still runs; $tag is deployed when it passes"
-              exit 0
-            elif [ "$result" = 4 ]; then
-              # no CI on the commit (a pull request merged by the Auto-merge workflow starts none on main): run it now;
-              # its completion deploys the tag, as for a CI that was still running
-              if [ "$sha" != "$(git rev-parse origin/main)" ]; then
-                echo "::error::CI never ran on ${sha:0:8} and main has moved on: tag the current main"
-                exit 1
-              fi
-              curl --fail --silent --show-error -X POST -H "Authorization: Bearer $GITHUB_TOKEN" \
-                -H "Accept: application/vnd.github+json" \
-                "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/dispatches" -d '{"ref":"main"}'
-              echo "::notice::CI had not run on ${sha:0:8}: started it; $tag is deployed when it passes"
-              exit 0
-            elif [ "$result" != 0 ]; then
-              exit 1
-            fi
-          else
-            sha=$RUN_SHA
-            tag=$(git tag --points-at "$sha" | grep -E "$pattern" | sort -V | tail -n 1 || true)
-            if [ -z "$tag" ]; then
-              echo "No test tag on ${sha:0:8}: nothing to deploy."
-              exit 0
-            fi
-          fi
-          if [ "$tag" = "$(cat "$HOME/ac-test/state/deployed" 2>/dev/null || true)" ]; then
-            echo "$tag is deployed already."
+          if [ "$TAG" = "$(cat "$HOME/ac-test/state/deployed" 2>/dev/null || true)" ]; then
+            echo "$TAG is deployed already."
             exit 0
           fi
-          echo "tag=$tag" >>"$GITHUB_OUTPUT"
+          echo "tag=$TAG" >>"$GITHUB_OUTPUT"
       - name: the environment file
         id: settings
         if: steps.pick.outputs.tag != ''
