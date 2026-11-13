@@ -203,6 +203,22 @@ services:
     profiles: [full]
     depends_on: { gateway: { condition: service_started }, keycloak: { condition: service_healthy }, valkey: { condition: service_started } }
 
+  portal-web:          # the page that lists every service address (IR791): no sign-in, no data; relays the API's /docs from the gateway
+    <<: *web
+    image: ac-portal-web:${IMAGE_TAG:-dev}
+    build: { context: ./service/web, args: { APP: portal } }
+    ports: ["${PUBLISH_ADDR:-127.0.0.1}:${PORTAL_WEB_PORT:-3004}:3000"]
+    tmpfs: [/tmp, /app/portal/.next/cache]
+    environment:
+      <<: *web-env
+      KEYCLOAK_URL: ${KEYCLOAK_URL:-http://localhost:8081}
+      MAILPIT_URL: http://localhost:${MAILPIT_PORT:-8025}   # this machine's inbox (IR373): the test environment's override leaves it out
+      JAEGER_URL: http://localhost:16686
+      CORE_API_URL: http://gateway:8080
+    networks: [edge, app]
+    profiles: [full]
+    depends_on: { gateway: { condition: service_started } }
+
   # ------------------------------------------------------------------ backend (Go + Echo)
   migrate:             # one-off: embedded migrations (cmd/migrate), local login role, demo fixture once
     image: ac-migrate:${IMAGE_TAG:-dev}

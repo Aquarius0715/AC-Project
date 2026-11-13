@@ -6,7 +6,8 @@
     "customer",
     "partner",
     "technician",
-    "admin"
+    "admin",
+    "portal"
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",

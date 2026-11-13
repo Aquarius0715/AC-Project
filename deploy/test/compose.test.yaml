@@ -25,6 +25,11 @@ services:
   partner-web-api: { restart: unless-stopped }
   technician-web-api: { restart: unless-stopped }
   admin-web-api: { restart: unless-stopped }
+  # the portal (IR791): published like the apps; the inbox and the traces are on the server's loopback, so it does not list them
+  portal-web:
+    restart: unless-stopped
+    ports: !override ["${PUBLISH_ADDR:-127.0.0.1}:${PORTAL_WEB_PORT:-3204}:3000"]
+    environment: { MAILPIT_URL: "", JAEGER_URL: "" }
   iot-bridge: { restart: unless-stopped }
   device-sim: { restart: unless-stopped }
 
