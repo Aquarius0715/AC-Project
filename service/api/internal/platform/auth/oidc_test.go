@@ -243,6 +243,14 @@ func TestNewVerifierFromEnv(t *testing.T) {
 	}
 
 	t.Setenv("OIDC_ISSUER", "http://127.0.0.1:1/realms/ac")
+	t.Setenv("OIDC_APP_CLIENT_ID", "")
+
+	_, err = auth.NewVerifierFromEnv(context.Background())
+	if err == nil {
+		t.Fatal("an app client is required (IR790)")
+	}
+
+	t.Setenv("OIDC_APP_CLIENT_ID", "ac-customer-web,ac-partner-web")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()

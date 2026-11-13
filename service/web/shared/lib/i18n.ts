@@ -11,7 +11,7 @@ export type Locale = "en" | "ms" | "ja";
 export const LOCALES: readonly Locale[] = ["en", "ms", "ja"];
 export const isLocale = (v: unknown): v is Locale => LOCALES.some((l) => l === v);
 /** Each language's own name, as its speakers read it (not translated). */
-export const LANGUAGE_NAMES: Readonly<Record<Locale, string>> = { en: "English", ms: "Bahasa Melayu", ja: "日本語" };
+const LANGUAGE_NAMES: Readonly<Record<Locale, string>> = { en: "English", ms: "Bahasa Melayu", ja: "日本語" };
 /** The choices of the display language: English first and marked as the default. */
 export const languageOptions = (t: T): { id: Locale; label: string }[] =>
   LOCALES.map((id) => ({ id, label: id === "en" ? t("English (default)") : entryOf(LANGUAGE_NAMES, id) }));

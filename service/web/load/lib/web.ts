@@ -61,7 +61,7 @@ function signIn(user: User, group: WebGroup): boolean {
   let status = 0;
   let ok: boolean;
   try {
-    const login = http.get(`${base}/bff/auth/login?login_hint=${encodeURIComponent(email)}&returnTo=${encodeURIComponent(HOME[group])}`, {
+    const login = http.get(`${base}/bff/auth/login?returnTo=${encodeURIComponent(HOME[group])}`, {
       responseType: "text",
       tags: { name: "sign-in start", kind: "signin" },
     });

@@ -56,7 +56,7 @@ x-backend: &backend          # Core API business-domain services (service/api/cm
     OIDC_ISSUER: ${API_OIDC_ISSUER:-${KEYCLOAK_URL:-http://localhost:8081}/realms/ac}   # must equal the iss claim of the tokens the BFF gets (the browser's address, or keycloak:8080 when the provider has several, IR651)
     OIDC_JWKS_URL: http://keycloak:8080/realms/ac/protocol/openid-connect/certs
     OIDC_ADMIN_CLIENT_ID: ac-admin-web
-    OIDC_APP_CLIENT_ID: ac-web
+    OIDC_APP_CLIENT_ID: ac-customer-web,ac-partner-web,ac-technician-web   # one client per app (IR790), comma separated
     APP_URL_CUSTOMER: ${CUSTOMER_WEB_URL:-http://localhost:3000}
     APP_URL_PARTNER: ${PARTNER_WEB_URL:-http://localhost:3001}
     APP_URL_TECHNICIAN: ${TECHNICIAN_WEB_URL:-http://localhost:3002}
@@ -128,7 +128,7 @@ services:
     environment:
       <<: *web-api-env
       APP_URL: ${CUSTOMER_WEB_URL:-http://localhost:3000}
-      OIDC_APP_CLIENT_ID: ac-web
+      OIDC_APP_CLIENT_ID: ac-customer-web
       OIDC_APP_CLIENT_SECRET: ${AC_WEB_CLIENT_SECRET:-local-ac-web-secret}
     networks: [edge, app]
     profiles: [full]
@@ -151,7 +151,7 @@ services:
     environment:
       <<: *web-api-env
       APP_URL: ${PARTNER_WEB_URL:-http://localhost:3001}
-      OIDC_APP_CLIENT_ID: ac-web
+      OIDC_APP_CLIENT_ID: ac-partner-web
       OIDC_APP_CLIENT_SECRET: ${AC_WEB_CLIENT_SECRET:-local-ac-web-secret}
     networks: [edge, app]
     profiles: [full]
@@ -174,7 +174,7 @@ services:
     environment:
       <<: *web-api-env
       APP_URL: ${TECHNICIAN_WEB_URL:-http://localhost:3002}
-      OIDC_APP_CLIENT_ID: ac-web
+      OIDC_APP_CLIENT_ID: ac-technician-web
       OIDC_APP_CLIENT_SECRET: ${AC_WEB_CLIENT_SECRET:-local-ac-web-secret}
     networks: [edge, app]
     profiles: [full]
@@ -202,6 +202,22 @@ services:
     networks: [edge, app]
     profiles: [full]
     depends_on: { gateway: { condition: service_started }, keycloak: { condition: service_healthy }, valkey: { condition: service_started } }
+
+  portal-web:          # the page that lists every service address (IR791): no sign-in, no data; relays the API's /docs from the gateway
+    <<: *web
+    image: ac-portal-web:${IMAGE_TAG:-dev}
+    build: { context: ./service/web, args: { APP: portal } }
+    ports: ["${PUBLISH_ADDR:-127.0.0.1}:${PORTAL_WEB_PORT:-3004}:3000"]
+    tmpfs: [/tmp, /app/portal/.next/cache]
+    environment:
+      <<: *web-env
+      KEYCLOAK_URL: ${KEYCLOAK_URL:-http://localhost:8081}
+      MAILPIT_URL: http://localhost:${MAILPIT_PORT:-8025}   # this machine's inbox (IR373): the test environment's override leaves it out
+      JAEGER_URL: http://localhost:16686
+      CORE_API_URL: http://gateway:8080
+    networks: [edge, app]
+    profiles: [full]
+    depends_on: { gateway: { condition: service_started } }
 
   # ------------------------------------------------------------------ backend (Go + Echo)
   migrate:             # one-off: embedded migrations (cmd/migrate), local login role, demo fixture once
@@ -472,7 +488,7 @@ services:
     networks: [app]
     profiles: [infra, backend, full]
 
-  keycloak:            # Amazon Cognito stand-in (OIDC, TOTP); realm "ac" with clients ac-web and ac-admin-web
+  keycloak:            # Amazon Cognito stand-in (OIDC, TOTP); realm "ac" with one client per app (ac-customer-web, ac-partner-web, ac-technician-web, ac-admin-web)
     image: quay.io/keycloak/keycloak:26.8@sha256:723b1d6e254c0fc96d5cffec860c7e0744d6a3277822b865bb538cf891575e41   # pinned by digest (IR373)
     command: ["start-dev", "--import-realm", "--http-port=8080"]
     environment:
@@ -500,6 +516,7 @@ services:
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
       PUBLIC_HOSTS: ${PUBLIC_HOSTS:-}   # the realm's redirect URIs for each address of each app (IR651)
       DEMO_USER_PASSWORD: ${DEMO_USER_PASSWORD:-}   # the demo users' password of an environment that names one (IR720)
+      AC_WEB_CLIENT_SECRET: ${AC_WEB_CLIENT_SECRET:-local-ac-web-secret}   # the secret of the app clients configure.sh creates (IR790)
       CUSTOMER_WEB_URL: ${CUSTOMER_WEB_URL:-http://localhost:3000}
       PARTNER_WEB_URL: ${PARTNER_WEB_URL:-http://localhost:3001}
       TECHNICIAN_WEB_URL: ${TECHNICIAN_WEB_URL:-http://localhost:3002}

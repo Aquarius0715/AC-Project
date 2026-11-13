@@ -3,7 +3,7 @@ that allows the password grant and the synthetic accounts of the manifest loadse
 never changed: the copy is imported by the throwaway Keycloak of the compose project ac-load only.
 
 - client ac-load: confidential, password grant on (the API scenarios) and the authorization code flow with PKCE for the
-  three web apps (the web scenarios), which sign in with it; it carries the same claims as ac-web. The Core API takes it as
+  three web apps (the web scenarios), which sign in with it; it carries the same claims as the apps' clients. The Core API takes it as
   its app client (OIDC_APP_CLIENT_ID in deploy/load/compose.load.yaml).
 - client ac-admin-web: password grant on in the copy, because HQ's accounts may only use their own app's client (the Core
   API refuses an HQ membership on another client, IR510). The copy's accounts have no one-time code device.
@@ -22,7 +22,9 @@ LOAD_CLIENT = "ac-load"
 SECRETS = {
     LOAD_CLIENT: "LOAD_CLIENT_SECRET",
     "ac-admin-web": "AC_ADMIN_WEB_CLIENT_SECRET",
-    "ac-web": "AC_WEB_CLIENT_SECRET",
+    "ac-customer-web": "AC_WEB_CLIENT_SECRET",
+    "ac-partner-web": "AC_WEB_CLIENT_SECRET",
+    "ac-technician-web": "AC_WEB_CLIENT_SECRET",
     "ac-identity-admin": "IDP_ADMIN_CLIENT_SECRET",
 }
 
@@ -91,7 +93,7 @@ def main() -> None:
 
     clients = {c["clientId"]: c for c in realm["clients"]}
     urls = [settings[name].rstrip("/") for name in ("CUSTOMER_WEB_URL", "PARTNER_WEB_URL", "TECHNICIAN_WEB_URL") if settings.get(name)]
-    realm["clients"].append(load_client(clients["ac-web"], urls))
+    realm["clients"].append(load_client(clients["ac-customer-web"], urls))
     clients[LOAD_CLIENT] = realm["clients"][-1]
     clients["ac-admin-web"]["directAccessGrantsEnabled"] = True
     for client_id, name in SECRETS.items():

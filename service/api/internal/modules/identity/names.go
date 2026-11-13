@@ -2,7 +2,10 @@ package identity
 
 // The values the identity module compares and writes by name: statuses, kinds, field and payload keys.
 const (
-	appClientID        = "ac-web"
+	clientAdmin        = "ac-admin-web" // one Keycloak client per app (IR790): its sign-in page names the service
+	clientCustomer     = "ac-customer-web"
+	clientPartner      = "ac-partner-web"
+	clientTechnician   = "ac-technician-web"
 	clientRoleMember   = "member"
 	employmentExternal = "external"
 	everyRow           = "TRUE"

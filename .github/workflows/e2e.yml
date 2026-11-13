@@ -96,7 +96,9 @@ jobs:
         run: |
           for url in http://localhost:8081/realms/ac/.well-known/openid-configuration http://localhost:3300/login http://localhost:3301/login http://localhost:3302/login http://localhost:3303/login; do
             for i in $(seq 1 120); do
-              if [ "$(curl -s -o /dev/null -w '%{http_code}' "$url")" = 200 ]; then echo "ready: $url"; break; fi
+              # an app's /login answers 307 to the identity provider (IR790): up is any answer below 400
+              code=$(curl -s -o /dev/null -w '%{http_code}' "$url")
+              if [ "$code" -ge 200 ] && [ "$code" -lt 400 ]; then echo "ready: $url"; break; fi
               [ "$i" = 120 ] && { echo "not ready: $url"; docker compose -p ac-e2e --env-file "$SETTINGS" -f compose.yaml -f deploy/test/compose.test.yaml --profile full ps; exit 1; }
               sleep 5
             done

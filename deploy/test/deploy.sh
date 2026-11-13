@@ -103,8 +103,10 @@ ready() {
   local deadline=$((SECONDS + $1)) url
   for url in "$(setting KEYCLOAK_URL)/realms/ac/.well-known/openid-configuration" \
     "$(setting CUSTOMER_WEB_URL)/login" "$(setting PARTNER_WEB_URL)/login" \
-    "$(setting TECHNICIAN_WEB_URL)/login" "$(setting ADMIN_WEB_URL)/login"; do
-    until [ "$(curl -s -o /dev/null --max-time 10 -w '%{http_code}' "$url")" = 200 ]; do
+    "$(setting TECHNICIAN_WEB_URL)/login" "$(setting ADMIN_WEB_URL)/login" \
+    $(setting PORTAL_WEB_URL); do   # an environment file from before the portal (IR791) has none: then it is left out
+    # /login of an app answers 307 to the identity provider (IR790): up is any answer below 400
+    until code=$(curl -s -o /dev/null --max-time 10 -w '%{http_code}' "$url") && [ "$code" -ge 200 ] && [ "$code" -lt 400 ]; do
       if [ "$SECONDS" -ge "$deadline" ]; then
         log "not ready: $url"
         return 1

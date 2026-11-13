@@ -46,7 +46,7 @@ run_job() {
 
 web="cd service/web"
 # the apps' lint and typecheck both run `next typegen` into the app's own .next: one job each, one after the other
-for app in customer partner technician admin; do
+for app in customer partner technician admin portal; do
   job "web $app" "$web && npm run lint --workspace=$app && npm run typecheck --workspace=$app"
 done
 job "web shared" "$web && npm run lint --workspace=shared && npm run typecheck --workspace=shared"

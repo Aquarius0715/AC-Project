@@ -13,11 +13,15 @@ import sys
 from urllib.parse import urlsplit, urlunsplit
 
 APPS = {  # client -> the apps that sign in with it
-    "ac-web": ["CUSTOMER_WEB_URL", "PARTNER_WEB_URL", "TECHNICIAN_WEB_URL"],
+    "ac-customer-web": ["CUSTOMER_WEB_URL"],
+    "ac-partner-web": ["PARTNER_WEB_URL"],
+    "ac-technician-web": ["TECHNICIAN_WEB_URL"],
     "ac-admin-web": ["ADMIN_WEB_URL"],
 }
 SECRETS = {
-    "ac-web": "AC_WEB_CLIENT_SECRET",
+    "ac-customer-web": "AC_WEB_CLIENT_SECRET",
+    "ac-partner-web": "AC_WEB_CLIENT_SECRET",
+    "ac-technician-web": "AC_WEB_CLIENT_SECRET",
     "ac-admin-web": "AC_ADMIN_WEB_CLIENT_SECRET",
     "ac-identity-admin": "IDP_ADMIN_CLIENT_SECRET",
 }

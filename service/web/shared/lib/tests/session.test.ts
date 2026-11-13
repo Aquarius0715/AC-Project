@@ -131,7 +131,7 @@ describe("refreshing the access token", () => {
     expect(await refresh(session())).toMatchObject({ refreshToken: "r-2", tenantId: "t-1", membershipId: "m-1", expiresAt: NOW / 1000 + 300 });
     const [url, init] = sentCall(fetch.mock.calls);
     expect(url).toBe("https://keycloak:8080/realms/ac/protocol/openid-connect/token");
-    expect(Object.fromEntries(new URLSearchParams(bodyText(init)))).toStrictEqual({ grant_type: "refresh_token", refresh_token: "r-1", client_id: "ac-web", client_secret: TEST_CLIENT_SECRET });
+    expect(Object.fromEntries(new URLSearchParams(bodyText(init)))).toStrictEqual({ grant_type: "refresh_token", refresh_token: "r-1", client_id: "ac-customer-web", client_secret: TEST_CLIENT_SECRET });
     expect(init.signal).toBeInstanceOf(AbortSignal); // a hung provider must not hold every page request (proxy.ts refreshes there)
   });
 
@@ -163,7 +163,7 @@ describe("ending the identity provider's session", () => {
     expect(await endIdpSession("r-1")).toBe(true);
     const [url, init] = sentCall(fetch.mock.calls);
     expect([url, init.method]).toStrictEqual(["https://keycloak:8080/realms/ac/protocol/openid-connect/logout", "POST"]);
-    expect(Object.fromEntries(new URLSearchParams(bodyText(init)))).toStrictEqual({ refresh_token: "r-1", client_id: "ac-web", client_secret: TEST_CLIENT_SECRET });
+    expect(Object.fromEntries(new URLSearchParams(bodyText(init)))).toStrictEqual({ refresh_token: "r-1", client_id: "ac-customer-web", client_secret: TEST_CLIENT_SECRET });
     expect(init.signal).toBeInstanceOf(AbortSignal); // never waits long for the provider
   });
   it("answers false when the provider refuses or cannot be reached", async () => {
@@ -232,7 +232,7 @@ describe("where sign-in returns to", () => {
 
 describe("the identity provider's settings", () => {
   it("defaults to the local realm and reads the deployment's environment", () => {
-    expect(oidcConfig()).toMatchObject({ issuer: "http://localhost:8081/realms/ac", internalIssuer: "http://localhost:8081/realms/ac", clientId: "ac-web", appUrl: "http://localhost:3000" });
+    expect(oidcConfig()).toMatchObject({ issuer: "http://localhost:8081/realms/ac", internalIssuer: "http://localhost:8081/realms/ac", clientId: "ac-customer-web", appUrl: "http://localhost:3000" });
     vi.stubEnv("OIDC_ISSUER", HTTPS_ID_EXAMPLE_REALMS_AC);
     vi.stubEnv("OIDC_APP_CLIENT_ID", "ac-admin-web");
     expect(oidcConfig()).toMatchObject({ issuer: HTTPS_ID_EXAMPLE_REALMS_AC, internalIssuer: HTTPS_ID_EXAMPLE_REALMS_AC, clientId: "ac-admin-web" });

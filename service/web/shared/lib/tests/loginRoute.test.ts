@@ -11,20 +11,15 @@ const start = async (query: string, host?: string) => {
   return { to, params: to.searchParams, cookie: res.headers.get("set-cookie") ?? "" };
 };
 
-// IR646: the sign-in page gives an address and a language; the BFF starts the authorization-code flow with PKCE
+// IR790: the app's /login goes straight here; the BFF starts the authorization-code flow with PKCE
 describe("GET /bff/auth/login", () => {
-  it("redirects to the identity provider with PKCE, the address as login hint and the language as ui_locales", async () => {
-    const { to, params, cookie } = await start("login_hint=mia%40example.com&returnTo=%2Fcustomer%2Fautomations&ui_locales=ja");
+  it("redirects to the identity provider with PKCE and keeps the state in a sealed cookie", async () => {
+    const { to, params, cookie } = await start("returnTo=%2Fcustomer%2Fautomations");
     expect(to.pathname).toBe("/realms/ac/protocol/openid-connect/auth");
-    expect([params.get("response_type"), params.get("code_challenge_method"), params.get("login_hint"), params.get("ui_locales"), params.get("prompt")])
-      .toStrictEqual(["code", "S256", "mia@example.com", "ja", null]);
+    expect([params.get("response_type"), params.get("code_challenge_method"), params.has("login_hint"), params.has("ui_locales"), params.get("prompt")])
+      .toStrictEqual(["code", "S256", false, false, null]);
     expect(params.get("state")?.length).toBeGreaterThan(10);
     expect(cookie).toContain("ac_oidc_");
-  });
-
-  it("passes on neither a hint that is no address nor a language that is not a display language", async () => {
-    const { params } = await start("login_hint=customer-a&ui_locales=fr");
-    expect([params.has("login_hint"), params.has("ui_locales")]).toStrictEqual([false, false]);
   });
 
   it("asks for the password again after a revocation (reauth=1)", async () => {

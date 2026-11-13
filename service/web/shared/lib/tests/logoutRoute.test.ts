@@ -40,7 +40,7 @@ describe("POST /bff/auth/logout", () => {
     const res = await signOut(seal(session));
     expect(fetch).toHaveBeenCalledOnce();
     expect(sentForm(fetch.mock.calls).get("refresh_token")).toBe("r-1");
-    expect([res.status, res.headers.get("location"), dropped(res)]).toStrictEqual([303, "http://localhost:3000/login", true]);
+    expect([res.status, res.headers.get("location"), dropped(res)]).toStrictEqual([303, "http://localhost:3000/login?reauth=1", true]);
   });
   it("still signs out when the provider cannot be reached, and calls nothing without a session", async () => {
     vi.stubGlobal("fetch", vi.fn(() => Promise.reject(new TypeError("fetch failed"))));

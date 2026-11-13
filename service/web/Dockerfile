@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 # AC Project web apps (Next.js App Router): one image per entry point, built from the npm workspace in service/
-# (IR178). Build with --build-arg APP=customer | partner | technician | admin; context service/web/.
+# (IR178). Build with --build-arg APP=customer | partner | technician | admin | portal; context service/web/.
 ARG NODE_VERSION=26.12.1
 
 FROM node:${NODE_VERSION}-bookworm-slim AS deps
@@ -11,6 +11,7 @@ COPY customer/package.json customer/
 COPY partner/package.json partner/
 COPY technician/package.json technician/
 COPY admin/package.json admin/
+COPY portal/package.json portal/
 RUN --mount=type=cache,target=/root/.npm npm ci
 
 FROM node:${NODE_VERSION}-bookworm-slim AS build
