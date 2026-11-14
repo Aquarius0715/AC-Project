@@ -1209,6 +1209,7 @@ export const ja: Record<string, string> = {
   "Then …": "動作 …",
   "Action for one AC": "1台のエアコンへの動作",
   "Target AC": "対象のエアコン",
+  "Choose the AC to control…": "操作するエアコンを選択…",
   "No AC available": "利用できるエアコンがありません",
   "Start action (at {time})": "開始時の動作（{time}）",
   "End action (at {time}) — required": "終了時の動作（{time}）— 必須",

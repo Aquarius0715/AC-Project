@@ -173,7 +173,8 @@ function Editor({ live, onDone, onCancel }: Readonly<{ live: AutomationsLive; on
   const i18n = useI18n();
   const { t } = i18n;
   const rule = live.editing === "new" ? null : live.rules.find((r) => r.id === live.editing) ?? null;
-  const [draft, setDraft] = useState<Draft>(() => (rule ? draftOf(rule) : blankDraft(live.acs[0]?.id ?? "", live.timezone)));
+  const soleAc = live.acs.length === 1 ? live.acs[0]?.id ?? "" : ""; // a new rule names its AC only when there is one
+  const [draft, setDraft] = useState<Draft>(() => (rule ? draftOf(rule) : blankDraft(soleAc, live.timezone)));
   const [apiError, setApiError] = useState<Record<string, string>>({});
   const [shown, setShown] = useState(false); // client checks shown after the first Save / Test
   const [test, setTest] = useState<TestRow[] | null>(null);
@@ -320,7 +321,8 @@ function Editor({ live, onDone, onCancel }: Readonly<{ live: AutomationsLive; on
             {step(3, t("Then …"), t("Action for one AC"))}
             <Field label={t("Target AC")} error={errors.unitId}>
               <Select value={draft.unitId} onChange={(e) => { set({ unitId: e.target.value }); }}>
-                {live.acs.length === 0 && <option value="">{t("No AC available")}</option>}
+                {/* no AC is chosen for the user (one AC aside): a preselected first AC was easy to save unnoticed */}
+                <option value="" disabled>{t(live.acs.length === 0 ? "No AC available" : "Choose the AC to control…")}</option>
                 {live.acs.map((u) => <option key={u.id} value={u.id}>{u.name} · {u.path}</option>)}
               </Select>
             </Field>

@@ -1253,6 +1253,7 @@ export const ms: Record<string, string> = {
   "Then …": "Kemudian …",
   "Action for one AC": "Tindakan untuk satu AC",
   "Target AC": "AC sasaran",
+  "Choose the AC to control…": "Pilih AC untuk dikawal…",
   "No AC available": "Tiada AC tersedia",
   "Start action (at {time})": "Tindakan mula (pada {time})",
   "End action (at {time}) — required": "Tindakan akhir (pada {time}) — diperlukan",
