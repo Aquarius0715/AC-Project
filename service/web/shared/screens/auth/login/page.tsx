@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { Banner, LinkButton } from "@ac/web/components/ui";
 import { Icon } from "@ac/web/components/Icon";
 import { roleConfig, type Role } from "@ac/web/lib/nav";
-import { demoHref, loginError, safeReturnTo } from "@ac/web/lib/login";
+import { demoHref, loginError, needsOtherAccount, safeReturnTo, signInStart } from "@ac/web/lib/login";
 import { coreDisplay } from "@ac/web/lib/dal";
 import { translator } from "@ac/web/lib/i18n";
 import { ContinueLink } from "./continue-link";
@@ -20,8 +20,10 @@ browser demo has no identity service, so Continue opens the app. */
 export async function LoginScreen({ appRole: role, params = NO_PARAMS, api }: Readonly<{ appRole: Role; params?: Params; api: boolean }>) {
   const returnTo = safeReturnTo(role, one(params.returnTo));
   const error = loginError(one(params.error));
-  const reauth = one(params.reauth) === "1"; // after sign-out: the identity provider asks for the password again (prompt=login)
-  const start = `/bff/auth/login?returnTo=${encodeURIComponent(returnTo)}${reauth ? "&reauth=1" : ""}`;
+  const isOtherAccount = needsOtherAccount(one(params.error)); // the same single sign-on would bring the same account back
+  // after sign-out, or for another account: the identity provider asks for the sign-in again (prompt=login)
+  const reauth = one(params.reauth) === "1" || isOtherAccount;
+  const start = signInStart(returnTo, reauth);
   if (api && !error) redirect(start);
   const config = roleConfig(role);
   const { locale } = await coreDisplay();
@@ -35,13 +37,14 @@ export async function LoginScreen({ appRole: role, params = NO_PARAMS, api }: Re
         <p className="mt-1 text-[13px] text-muted-foreground">{t(config.loginSub)}</p>
         {error && <div className="mt-4 text-left"><Banner tone="crit">{t(error)}</Banner></div>}
         {api ? (
-          <LinkButton href={start} variant="primary" className="mt-5 w-full">{t("Sign in")} <Icon name="arrowRight" /></LinkButton>
+          <LinkButton href={start} variant="primary" className="mt-5 w-full">{t(isOtherAccount ? "Sign in with another account" : "Sign in")} <Icon name="arrowRight" /></LinkButton>
         ) : (
           <>
             <p className="mt-4 text-left text-xs text-muted-foreground">{t("This preview has no sign-in service. Continue opens the app.")}</p>
             <ContinueLink appRole={role} href={demoHref(role)}>{t("Continue")} <Icon name="arrowRight" /></ContinueLink>
           </>
         )}
+        {api && isOtherAccount && <p className="mt-2 text-xs text-muted-foreground">{t("On the next page, change the e-mail address (↻) to this service's account.")}</p>}
       </div>
     </main>
   );

@@ -26,5 +26,13 @@ export const signedOutReason = (messageKey?: string): "revoked" | "expired" => (
 /** Sign-in again after a refused session, back to the page it was on (IR385). */
 export const signInAgainHref = (reason: "revoked" | "expired", path: string): string => `/login?error=${reason}&returnTo=${encodeURIComponent(path)}`;
 
+/** The sign-in came back because of the account itself (another service's, or no membership): signing in again through
+single sign-on would bring the same account back, so the start asks the identity provider for the sign-in form
+(prompt=login) where another account can be entered. */
+export const needsOtherAccount = (code: string | undefined): boolean => code === "role" || code === "membership";
+
+/** Where the Sign in button starts the BFF flow; `reauth` asks the identity provider for the password (prompt=login). */
+export const signInStart = (returnTo: string, reauth: boolean): string => `/bff/auth/login?returnTo=${encodeURIComponent(returnTo)}${reauth ? "&reauth=1" : ""}`;
+
 /** Why the browser is back on sign-in, or null for a plain visit. */
 export const loginError = (code: string | undefined): string | null => (code ? lookup(ERRORS, code) ?? "The sign-in did not complete — try again." : null);
