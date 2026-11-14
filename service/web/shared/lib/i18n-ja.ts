@@ -1215,6 +1215,7 @@ export const ja: Record<string, string> = {
   "Never assumed — choose explicitly.": "自動では決めません — 明示的に選んでください。",
   "Action": "動作",
   "the AC's place": "エアコンの場所",
+  "Only after you turn it on — it is saved off": "オンにした後にだけ実行されます — 保存時はオフです",
   "Next runs": "次回の実行",
   "Fix the schedule to preview": "スケジュールを修正すると予定を確認できます",
   "Checking…": "確認中…",

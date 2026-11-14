@@ -350,7 +350,8 @@ function Editor({ live, onDone, onCancel }: Readonly<{ live: AutomationsLive; on
             {isSched && (
               <div className="mt-3 grid grid-cols-[90px_1fr] gap-2 border-t border-line pt-2 text-xs">
                 <span className="text-muted-foreground">{t("Next runs")}</span>
-                <span>{nextRuns()}</span>
+                {/* saved off, nothing runs: the times say when it would run once turned on */}
+                <span>{nextRuns()}{!draft.enabled && <span className="mt-0.5 block font-semibold text-warn">{t("Only after you turn it on — it is saved off")}</span>}</span>
               </div>
             )}
             <div className="mt-2 flex items-center justify-between gap-2 border-t border-line pt-2 text-xs">
