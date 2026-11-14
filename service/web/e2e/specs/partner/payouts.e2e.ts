@@ -1,5 +1,5 @@
-// Payouts (FR-P10, IR584): the seed has no approved or paid statement, so the page says when the first one appears
-// and the empty detail does not ask to select one. A filter that matches nothing says so and offers "Clear the
+// Payouts (FR-P10, IR584): the seed has no approved or paid statement, so the page says when the first one appears,
+// in one empty state without the filters. A filter that matches nothing says so and offers "Clear the
 // filters", as HQ's payouts tab does. Nothing is written.
 import { test, expect } from "../../fixtures/test";
 import { expectAccessible } from "../../fixtures/a11y";
@@ -9,7 +9,9 @@ test("an empty payouts page explains itself and clears its filters", async ({ pa
   const main = page.getByRole("main");
   await expect(main.getByRole("heading", { name: "No statements yet" })).toBeVisible();
   await expect(main).toContainText("A statement appears here once HQ approves your first one.");
-  await expect(main.getByRole("heading", { name: "No statement to show" })).toBeVisible();
+  // before the first statement: one empty state, no filters and no empty detail beside it (UI/UX loop R14)
+  await expect(main.getByRole("heading", { name: "No statement to show" })).toHaveCount(0);
+  await expect(main.getByRole("combobox", { name: "Period" })).toHaveCount(0);
   await expect(main.getByRole("button", { name: "Clear the filters" })).toHaveCount(0);
   await expectAccessible(page);
 
