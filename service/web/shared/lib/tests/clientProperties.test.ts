@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { changeText, groupPlan, roomUnits, type GroupChange } from "@ac/web/lib/clientProperties";
+import { changeText, groupPlan, hasChoice, KEEP_ALL, roomUnits, type GroupChange } from "@ac/web/lib/clientProperties";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
 import type { ApiUnitDetail } from "@ac/web/lib/units";
 
@@ -43,12 +43,24 @@ describe("units & locations: the room list and group control (FR-C02, FR-C14, IR
       ["off", "Skipped", "—", "Offline since 9:10 am MYT — not sent", 0],
       ["blocked", "Skipped", "—", "Control blocked (reconciliation required)", 0],
     ]);
-    expect([changeText(ch), changeText({ ...ch, power: false }), changeText({ ...ch, fan: null })]).toStrictEqual(["Power On · 24 °C · Dry · Fan high", "Power Off", "Power On · 24 °C · Dry · Fan unchanged"]);
+    expect([changeText(ch), changeText({ ...ch, power: false }), changeText({ ...ch, fan: null })]).toStrictEqual(["Power On · 24 °C · Dry · Fan high", "Power Off", "Power On · 24 °C · Dry"]);
   });
 
   it("words the plan in Malay; the result stays the plan's code", () => {
     const [ok, off] = groupPlan([unit("ok"), unit("off", { connection: "offline", lastSeenAt: null })], ch, MS);
     expect([ok?.result, ok?.change, off?.note]).toStrictEqual(["Will send", "26 → 24 °C, Kering, Kipas tinggi", "Luar talian — tidak dihantar"]);
     expect(changeText(ch, translator("ms"))).toBe("Kuasa Hidup · 24 °C · Kering · Kipas tinggi");
+  });
+
+  // UI/UX loop R6: the panel used to start at Power on · 24 °C · Cool, so Review & send changed a Dry AC to Cool though the
+  // user chose nothing. It now starts with every setting kept; only what is chosen is planned.
+  it("starts with every setting kept and plans only the chosen ones", () => {
+    expect([hasChoice(KEEP_ALL), changeText(KEEP_ALL), hasChoice({ ...KEEP_ALL, mode: "dry" })]).toStrictEqual([false, "No change chosen", true]);
+    const dry = unit("dry", { observedState: { power: true, celsius: 26, mode: "dry", fanLevel: "mid", observedAt: null } });
+    const offAc = unit("offac", { observedState: { power: false, celsius: 26, mode: "cool", fanLevel: "mid", observedAt: null } });
+    const plan = groupPlan([dry, offAc], { ...KEEP_ALL, celsius: 24 });
+    expect(plan.map((r) => [r.id, r.change, r.actions.map((a) => a.kind)])).toStrictEqual([["dry", "26 → 24 °C", ["set_temperature"]], ["offac", "26 → 24 °C", ["set_temperature"]]]);
+    expect(groupPlan([dry], KEEP_ALL).map((r) => r.result)).toStrictEqual(["No change"]);
+    expect(groupPlan([dry], { ...KEEP_ALL, power: false, celsius: 20 }).map((r) => r.actions)).toStrictEqual([[{ kind: "set_power", power: false }]]);
   });
 });
