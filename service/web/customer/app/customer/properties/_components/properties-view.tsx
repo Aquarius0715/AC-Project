@@ -107,7 +107,7 @@ function UnitRows({ units }: Readonly<{ units: (RoomUnit & { place: string })[] 
       {units.map((u) => (
         <Link key={u.id} href={`/customer/units/${u.id}`} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line p-3 hover:bg-surface2/60">
           <span className="min-w-0"><span className="flex items-center gap-2 font-bold"><Icon name="units" className="text-primary" />{u.name}</span><span className="block text-[11px] text-muted-foreground">{u.set} · {u.place}</span></span>
-          <span className="flex flex-wrap items-center gap-3 text-xs"><span>{u.temp}</span><span>{u.watts}</span><PowerBadge s={u.power} /><ConnBadge s={u.conn} />{!u.online && u.seen && <span className="text-muted-foreground">{t("seen {time}", { time: u.seen })}</span>}<span className="font-semibold text-primary">{t("Open control")} <Icon name="arrowRight" /></span></span>
+          <span className="flex flex-wrap items-center gap-3 text-xs"><Readings temp={u.temp} watts={u.watts} /><PowerBadge s={u.power} /><ConnBadge s={u.conn} />{!u.online && u.seen && <span className="text-muted-foreground">{t("seen {time}", { time: u.seen })}</span>}<span className="font-semibold text-primary">{t("Open control")} <Icon name="arrowRight" /></span></span>
         </Link>
       ))}
     </div>
@@ -186,6 +186,13 @@ function Panel({ live, sel, rename, go }: Readonly<{ live: PropertiesLive; sel: 
   );
 }
 
+/** The room temperature and power draw of a row: only what was read (a bare "—" said nothing), and "no recent reading" when neither was. */
+function Readings({ temp, watts }: Readonly<{ temp: string; watts: string }>) {
+  const t = useT();
+  const read = [temp, watts].filter((v) => v !== "—");
+  return read.length === 0 ? <span className="text-muted-foreground">{t("no recent reading")}</span> : <span>{read.join(" · ")}</span>;
+}
+
 // ---- group control (FR-C14) ----
 
 /** Unknown: the command was sent but its answer could not be read, so it is neither failed nor retried (IR728). */
@@ -245,7 +252,7 @@ function GroupPanel({ live, space }: Readonly<{ live: PropertiesLive; space: str
             <Plain key={u.id} type="button" disabled={sending} onClick={() => { toggle(u.id); }} aria-pressed={sel.includes(u.id)}
               className={cx("rounded-xl border p-3 text-left disabled:opacity-60", sel.includes(u.id) ? "border-2 border-primary bg-primary-soft/50" : "border-line bg-surface")}>
               <div className="flex items-center justify-between"><b className="text-[13px]">{u.name}</b><Icon name={sel.includes(u.id) ? "checked" : "unchecked"} className="text-sm" /></div>
-              <div className="text-[11px] text-muted-foreground">{u.online && (u.temp === "—" && u.watts === "—" ? t("no recent reading") : `${u.temp} · ${u.watts}`)}{!u.online && u.seen && t("last seen {when}", { when: u.seen })}{!u.online && !u.seen && t("no connection yet")}</div>
+              <div className="text-[11px] text-muted-foreground">{u.online && <Readings temp={u.temp} watts={u.watts} />}{!u.online && u.seen && t("last seen {when}", { when: u.seen })}{!u.online && !u.seen && t("no connection yet")}</div>
               <div className="mt-1 flex flex-wrap gap-1"><PowerBadge s={u.power} /><ConnBadge s={u.conn} />{tr && <Badge tone={TRY_TONE.get(tr.status) ?? "primary"}>{t(tr.status)}</Badge>}</div>
               {(tr?.status === "Failed" || tr?.status === "Waiting" || tr?.status === "Unknown") && <div className={cx("mt-1 text-[11px]", tr.status === "Failed" ? "text-crit" : "text-warn")}>{tr.note}</div>}
             </Plain>
