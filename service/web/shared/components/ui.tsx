@@ -63,23 +63,27 @@ export function Badge({ tone = "muted", icon, children, className }: Readonly<{ 
   );
 }
 
-// the state badges speak the display language (IR258); the state values themselves stay as stored
+// the state badges speak the display language (IR258); the state values themselves stay as stored. The power and the
+// connection badge stand side by side, so each names what it describes: a hidden "Power state:" / "Connection:" for screen
+// readers, and an unknown state says which one is unknown ("Unknown" twice read as one state).
 export function PowerBadge({ s }: Readonly<{ s: "running" | "stopped" | "unknown" }>) {
   const t = useT();
+  const what = <span className="sr-only">{t("Power state")}: </span>;
   switch (s) {
-    case "running": { return <Badge tone="ok" icon="running">{t("Running")}</Badge>; }
-    case "stopped": { return <Badge tone="muted" icon="stopped">{t("Stopped")}</Badge>; }
-    case "unknown": { return <Badge tone="unknown" icon="unknown">{t("Unknown")}</Badge>; }
+    case "running": { return <Badge tone="ok" icon="running">{what}{t("Running")}</Badge>; }
+    case "stopped": { return <Badge tone="muted" icon="stopped">{what}{t("Stopped")}</Badge>; }
+    case "unknown": { return <Badge tone="unknown" icon="unknown">{what}{t("Power unknown")}</Badge>; }
   }
 }
 export function ConnBadge({ s }: Readonly<{ s: "online" | "offline" | "connecting" | "unknown" | "error" }>) {
   const t = useT();
+  const what = <span className="sr-only">{t("Connection")}: </span>;
   switch (s) {
-    case "online": { return <Badge tone="ok" icon="online">{t("Online")}</Badge>; }
-    case "offline": { return <Badge tone="unknown" icon="offline">{t("Offline")}</Badge>; }
-    case "error": { return <Badge tone="crit" icon="error">{t("Error")}</Badge>; }
-    case "unknown": { return <Badge tone="unknown" icon="unknown">{t("Unknown")}</Badge>; }
-    case "connecting": { return <Badge tone="primary" icon="refresh">{t("Connecting")}</Badge>; }
+    case "online": { return <Badge tone="ok" icon="online">{what}{t("Online")}</Badge>; }
+    case "offline": { return <Badge tone="unknown" icon="offline">{what}{t("Offline")}</Badge>; }
+    case "error": { return <Badge tone="crit" icon="error">{what}{t("Error")}</Badge>; }
+    case "unknown": { return <Badge tone="unknown" icon="unknown">{what}{t("Connection unknown")}</Badge>; }
+    case "connecting": { return <Badge tone="primary" icon="refresh">{what}{t("Connecting")}</Badge>; }
   }
 }
 export function SeverityBadge({ s }: Readonly<{ s: "critical" | "warning" | "normal" }>) {

@@ -2532,6 +2532,8 @@ export const id: Record<string, string> = {
   "Access ends in {left}. After that, live values are cleared and only a history snapshot remains.": "Akses berakhir dalam {left}. Setelah itu, nilai langsung dihapus dan hanya cuplikan riwayat yang tersisa.",
   "Access ends with the accepted offer’s access window; after that only a history snapshot remains.": "Akses berakhir bersama jendela akses penawaran yang diterima; setelah itu hanya cuplikan riwayat yang tersisa.",
   "not completed": "tidak selesai",
+  "Power unknown": "Daya tidak diketahui",
+  "Connection unknown": "Koneksi tidak diketahui",
   "Power state": "Status daya",
   "cooling": "mendinginkan",
   "drying": "mengeringkan",
