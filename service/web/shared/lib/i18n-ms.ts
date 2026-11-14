@@ -457,7 +457,6 @@ export const ms: Record<string, string> = {
   "Inspection record": "Rekod pemeriksaan",
   "Evidence (demo observation)": "Bukti (pemerhatian demo)",
   "Evidence": "Bukti",
-  "Read": "Dibaca",
   "View unit": "Lihat unit",
   "Book cleaning": "Tempah pembersihan",
   "Request repair": "Minta pembaikan",
