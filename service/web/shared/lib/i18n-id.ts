@@ -1215,6 +1215,7 @@ export const id: Record<string, string> = {
   "Never assumed — choose explicitly.": "Tidak pernah diasumsikan — pilih secara eksplisit.",
   "Action": "Aksi",
   "the AC's place": "lokasi AC",
+  "Only after you turn it on — it is saved off": "Hanya setelah Anda menyalakannya — disimpan dalam keadaan mati",
   "Next runs": "Jalan berikutnya",
   "Fix the schedule to preview": "Perbaiki jadwal untuk pratinjau",
   "Checking…": "Memeriksa…",

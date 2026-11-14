@@ -1259,6 +1259,7 @@ export const ms: Record<string, string> = {
   "Never assumed — choose explicitly.": "Tidak pernah diandaikan — pilih secara jelas.",
   "Action": "Tindakan",
   "the AC's place": "tempat AC",
+  "Only after you turn it on — it is saved off": "Hanya selepas anda menghidupkannya — ia disimpan dalam keadaan mati",
   "Next runs": "Larian seterusnya",
   "Fix the schedule to preview": "Betulkan jadual untuk pratonton",
   "Checking…": "Menyemak…",
