@@ -886,6 +886,8 @@ export const ja: Record<string, string> = {
   "Date {n}": "日付 {n}",
   "From {n}": "開始 {n}",
   "To {n}": "終了 {n}",
+  "Choose the AC that needs service": "サービスが必要なエアコンを選んでください",
+  "Choose an AC…": "エアコンを選択…",
   "Symptoms must be 10–2000 characters": "症状は10～2000文字で入力してください",
   "Request sent": "依頼を送信しました",
   "Request {job} sent with 3 preferred times — nothing is booked until a time is confirmed.": "依頼 {job} を、希望する3つの日時とともに送信しました — 時刻が確定するまで、何も確定しません。",

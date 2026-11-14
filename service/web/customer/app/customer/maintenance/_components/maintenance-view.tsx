@@ -219,7 +219,9 @@ function NewRequest({ live, prefill, onClose, onFail }: ModalProps & { live: Mai
   const router = useRouter();
   const now = Date.parse(live.now);
   const [pending, run] = useAction();
-  const [unitId, setUnitId] = useState(prefill?.unitId ?? live.units[0]?.id ?? "");
+  // the AC is chosen by the user unless the request was opened for one (or there is only one): a preselected first AC
+  // was easy to send unnoticed for the wrong unit
+  const [unitId, setUnitId] = useState(prefill?.unitId ?? (live.units.length === 1 ? live.units[0]?.id ?? "" : ""));
   const [type, setType] = useState<"reactive" | "preventive">(prefill?.type ?? (prefill ? "preventive" : "reactive"));
   const [sym, setSym] = useState(prefill?.symptom ?? "");
   const [rows, setRows] = useState<Row[]>(threeRows(now, timeZone));
@@ -229,6 +231,7 @@ function NewRequest({ live, prefill, onClose, onFail }: ModalProps & { live: Mai
   const symError = symptomLength(sym) < 10 || symptomLength(sym) > 2000 ? t("Symptoms must be 10–2000 characters") : null;
   const slotError = preferredError(slots, now, 3, t);
   const cError = contactError(contact, t);
+  const unitError = unitId ? null : t("Choose the AC that needs service");
   const ids = { unit: useId(), sym: useId(), times: useId(), contact: useId() };
   // the first field to fix, top to bottom, or null when the form is valid
   const firstBad = () => {
@@ -250,7 +253,7 @@ function NewRequest({ live, prefill, onClose, onFail }: ModalProps & { live: Mai
   };
   return (
     <Modal open wide onClose={() => { onClose(); }} title={t("New maintenance request")} footer={<><Btn onClick={() => { onClose(); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={submit}>{t("Submit request")}</Btn></>}>
-      <Field label={t("Unit")}><Select id={ids.unit} value={unitId} onChange={(e) => { setUnitId(e.target.value); }}>{live.units.map((u) => <option key={u.id} value={u.id}>{u.name}{u.place ? ` · ${u.place}` : ""}</option>)}</Select></Field>
+      <Field label={t("Unit")} error={tried ? unitError ?? undefined : undefined}><Select id={ids.unit} value={unitId} onChange={(e) => { setUnitId(e.target.value); }}><option value="" disabled>{t("Choose an AC…")}</option>{live.units.map((u) => <option key={u.id} value={u.id}>{u.name}{u.place ? ` · ${u.place}` : ""}</option>)}</Select></Field>
       <Field label={t("Type")}><Choice value={type} onChange={setType} options={[{ id: "reactive", label: t("Repair") }, { id: "preventive", label: t("Preventive") }]} /></Field>
       <Field label={t("Symptoms (10–2000 characters)")} error={tried ? symError ?? undefined : undefined} hint={`${String(symptomLength(sym))} / 2000`}><Textarea id={ids.sym} value={sym} onChange={(e) => { setSym(e.target.value); }} placeholder={t("Cold air is weak and there is water dripping from the indoor unit.")} /></Field>
       <TimesInput rows={rows} onChange={setRows} error={tried ? slotError : null} firstId={ids.times} />
