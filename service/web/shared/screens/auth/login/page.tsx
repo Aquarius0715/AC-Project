@@ -22,7 +22,8 @@ export async function LoginScreen({ appRole: role, params = NO_PARAMS, api }: Re
   const error = loginError(one(params.error));
   const reauth = one(params.reauth) === "1"; // after sign-out: the identity provider asks for the password again (prompt=login)
   const start = `/bff/auth/login?returnTo=${encodeURIComponent(returnTo)}${reauth ? "&reauth=1" : ""}`;
-  if (api && !error) redirect(start);
+  const signedOut = one(params.signedOut) === "1"; // just signed out: say so here before the provider's form
+  if (api && !error && !signedOut) redirect(start);
   const config = roleConfig(role);
   const { locale } = await coreDisplay();
   const t = translator(locale);
@@ -34,6 +35,7 @@ export async function LoginScreen({ appRole: role, params = NO_PARAMS, api }: Re
         <h1 className="mt-1 text-lg font-bold">{t("Sign in")}</h1>
         <p className="mt-1 text-[13px] text-muted-foreground">{t(config.loginSub)}</p>
         {error && <div className="mt-4 text-left"><Banner tone="crit">{t(error)}</Banner></div>}
+        {signedOut && !error && <div className="mt-4 text-left"><Banner tone="ok">{t("You signed out. Sign in again to continue.")}</Banner></div>}
         {api ? (
           <LinkButton href={start} variant="primary" className="mt-5 w-full">{t("Sign in")} <Icon name="arrowRight" /></LinkButton>
         ) : (

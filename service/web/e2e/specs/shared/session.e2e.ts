@@ -34,7 +34,10 @@ test("Sign out ends the session, at the identity provider too", async ({ browser
   const page = await context.newPage();
   await signIn(page, app);
   await page.getByRole("button", { name: "Sign out" }).click();
-  await expect(page.locator("#password")).toBeVisible(); // /login leads on to the identity provider's sign-in (IR790)
+  // the sign-in page says the sign-out happened (UI/UX loop R18), and its Sign in leads on to the provider (IR790)
+  await expect(page.getByText("You signed out.")).toBeVisible();
+  await page.getByRole("link", { name: "Sign in" }).click();
+  await expect(page.locator("#password")).toBeVisible();
   await page.goto(app.home);
   // the provider's session ended with the sign-out: the app's sign-in leads to the provider, which asks for the password
   // instead of letting the person straight back in
@@ -58,7 +61,7 @@ test("a copy of the session cookie stops working at sign-out", async ({ browser,
     await elsewhere.goto(app.home);
     await expect(elsewhere.getByRole("banner")).toContainText(app.user); // the copy works while the session lasts
     await page.getByRole("button", { name: "Sign out" }).click();
-    await expect(page.locator("#password")).toBeVisible(); // /login leads on to the identity provider's sign-in (IR790)
+    await expect(page.getByText("You signed out.")).toBeVisible(); // the sign-in page says so (UI/UX loop R18)
     await elsewhere.goto(app.home);
     await expect(elsewhere.locator("#password")).toBeVisible(); // the copy is refused: the sign-in starts again`);
   } finally {

@@ -2,6 +2,7 @@
 // acceptance (IR639). Keys are the English texts (the same keys as i18n-ms.ts); a text without an entry is shown in
 // English. Keep {name} placeholders as they are.
 export const ja: Record<string, string> = {
+  "You signed out. Sign in again to continue.": "サインアウトしました。続けるにはもう一度サインインしてください。",
   "Overview": "概要",
   "Units & locations": "ユニットと設置場所",
   "Automations & schedules": "自動化とスケジュール",
