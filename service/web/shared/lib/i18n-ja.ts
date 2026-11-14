@@ -5050,8 +5050,6 @@ export const ja: Record<string, string> = {
   "A price ≥ 0 with at most 2 decimals": "0 以上で、小数点以下2桁までの金額",
   "Only RTO contracts can be restriction eligible": "利用制限の対象にできるのは RTO 契約だけです",
   "Required when eligible (1–64 characters)": "対象の場合は必須（1～64文字）",
-  "No access": "アクセスできません",
-  "Restrictions need restriction.read, restriction.write or restriction.override.": "利用制限には、restriction.read、restriction.write、または restriction.override が必要です。",
   "removing": "解除中",
   "Release view (restriction.override only): billing fields are not shown.": "解除の表示（restriction.override のみ）: 請求の項目は表示されません。",
   "newest first": "新しい順",

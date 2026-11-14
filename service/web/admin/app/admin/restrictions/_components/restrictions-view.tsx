@@ -15,6 +15,7 @@ import {
 } from "@ac/web/lib/restrictions";
 import { executeRestriction, reconcileUnits, requestRelease, retryUnits, scheduleRestriction } from "../actions";
 import { Icon } from "@ac/web/components/Icon";
+import { NeedsAccess } from "@ac/web/components/NeedsAccess";
 import { oneOf } from "@ac/web/lib/oneOf";
 import type { RestrictionRecoveryCase } from "@ac/web/lib/contracts.gen";
 import { commonRange } from "@ac/web/lib/temperatureRange";
@@ -47,8 +48,7 @@ function causeStatus(c: { paid: boolean; processing: boolean }): "paid" | "proce
 }
 
 export function RestrictionsView({ live }: { live: RestrictionsLive }) {
-  const t = useT();
-  return live ? <Manager live={live} /> : <Page><EmptyState title={t("No access")}>{t("Restrictions need restriction.read, restriction.write or restriction.override.")}</EmptyState></Page>;
+  return live ? <Manager live={live} /> : <NeedsAccess what="Restrictions" permission="restriction.read" />;
 }
 
 function Manager({ live }: Readonly<{ live: NonNullable<RestrictionsLive> }>) {

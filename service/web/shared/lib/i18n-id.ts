@@ -5050,8 +5050,6 @@ export const id: Record<string, string> = {
   "A price ≥ 0 with at most 2 decimals": "Harga ≥ 0 dengan paling banyak 2 desimal",
   "Only RTO contracts can be restriction eligible": "Hanya kontrak RTO yang dapat layak dibatasi",
   "Required when eligible (1–64 characters)": "Wajib bila layak (1–64 karakter)",
-  "No access": "Tidak ada akses",
-  "Restrictions need restriction.read, restriction.write or restriction.override.": "Pembatasan memerlukan restriction.read, restriction.write, atau restriction.override.",
   "removing": "menghapus",
   "Release view (restriction.override only): billing fields are not shown.": "Tampilan pencabutan (hanya restriction.override): bidang penagihan tidak ditampilkan.",
   "newest first": "terbaru dulu",
