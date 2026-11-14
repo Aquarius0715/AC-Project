@@ -36,7 +36,8 @@ function NavLink({ href, label, icon, badge, active }: Readonly<{ href: string; 
     <Link href={href} aria-current={active ? "page" : undefined} className={cx("flex items-center gap-2.5 rounded-control px-3 py-2 text-[13px] font-semibold", active ? "bg-primary-soft text-primary" : "text-ink hover:bg-surface2")}>
       <Icon name={icon} className={cx("text-[15px]", active ? "text-primary" : "text-muted-foreground")} />
       <span className="min-w-0 flex-1 leading-tight">{label}</span>
-      {badge && <span className="grid h-[18px] min-w-[18px] place-items-center rounded-full bg-crit px-1 text-[10px] font-bold text-white">{badge}</span>}
+      {/* a count, not a severity: red stays for critical and errors (the alert itself carries its severity) */}
+      {badge && <span className="grid h-[18px] min-w-[18px] place-items-center rounded-full bg-primary px-1 text-[10px] font-bold text-white">{badge}</span>}
     </Link>
   );
 }
