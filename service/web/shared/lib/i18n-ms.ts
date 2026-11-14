@@ -307,6 +307,8 @@ export const ms: Record<string, string> = {
   "Weekdays": "Hari bekerja",
   "Weekends": "Hujung minggu",
   "{list} & {last}": "{list} & {last}",
+  "Turn this AC on?": "Hidupkan AC ini?",
+  "Turn this AC off?": "Matikan AC ini?",
   "Power ON": "Kuasa HIDUP",
   "Power OFF": "Kuasa MATI",
   "Mode {mode}": "Mod {mode}",
