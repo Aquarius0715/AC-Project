@@ -24,6 +24,11 @@ test("a request is validated, sent with three preferred times, noted and cancell
     await page.getByRole("button", { name: "New maintenance request" }).click();
     const dialog = page.getByRole("dialog");
     await dialog.getByRole("button", { name: "Submit request" }).click();
+    // no AC is chosen for the user (UI/UX loop R8): the unit is the first field to fix
+    await expect(dialog).toContainText("Choose the AC that needs service");
+    await expect(dialog.getByRole("combobox", { name: /^Unit/ })).toBeFocused();
+    await dialog.getByRole("combobox", { name: /^Unit/ }).selectOption({ index: 1 });
+    await dialog.getByRole("button", { name: "Submit request" }).click();
     await expect(dialog).toContainText("Symptoms must be 10–2000 characters");
     // a failed submit takes focus to the first field to fix and marks it invalid (IR573)
     await expect(dialog.getByLabel(/Symptoms/)).toBeFocused();

@@ -926,6 +926,8 @@ export const ms: Record<string, string> = {
   "Date {n}": "Tarikh {n}",
   "From {n}": "Dari {n}",
   "To {n}": "Hingga {n}",
+  "Choose the AC that needs service": "Pilih AC yang perlu diservis",
+  "Choose an AC…": "Pilih AC…",
   "Symptoms must be 10–2000 characters": "Simptom mesti 10–2000 aksara",
   "Request sent": "Permintaan dihantar",
   "Request {job} sent with 3 preferred times — nothing is booked until a time is confirmed.": "Permintaan {job} dihantar dengan 3 masa pilihan — tiada apa-apa ditempah sehingga masa disahkan.",
