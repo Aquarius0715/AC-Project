@@ -2532,6 +2532,8 @@ export const ja: Record<string, string> = {
   "Access ends in {left}. After that, live values are cleared and only a history snapshot remains.": "アクセスは {left} 後に終了します。その後はライブの値が消え、履歴のスナップショットだけが残ります。",
   "Access ends with the accepted offer’s access window; after that only a history snapshot remains.": "アクセスは、承諾したオファーのアクセス期間の終了とともに終わります。その後は、履歴のスナップショットだけが残ります。",
   "not completed": "未完了",
+  "Power unknown": "電源不明",
+  "Connection unknown": "接続不明",
   "Power state": "電源の状態",
   "cooling": "冷房",
   "drying": "除湿",

@@ -2605,6 +2605,8 @@ export const ms: Record<string, string> = {
   "Access ends in {left}. After that, live values are cleared and only a history snapshot remains.": "Akses tamat dalam {left}. Selepas itu, nilai langsung dikosongkan dan hanya rakaman sejarah kekal.",
   "Access ends with the accepted offer’s access window; after that only a history snapshot remains.": "Akses tamat bersama tetingkap akses tawaran yang diterima; selepas itu hanya rakaman sejarah kekal.",
   "not completed": "belum selesai",
+  "Power unknown": "Kuasa tidak diketahui",
+  "Connection unknown": "Sambungan tidak diketahui",
   "Power state": "Keadaan kuasa",
   "cooling": "menyejuk",
   "drying": "mengering",
