@@ -2,6 +2,8 @@
 // company acceptance (DEC-108). Keys are the English texts (the same keys, in the same order, as i18n-ms.ts); a text without an
 // entry is shown in English. Keep {name} placeholders as they are.
 export const id: Record<string, string> = {
+  "Turn off “{name}” for all your ACs?": "Matikan “{name}” untuk semua AC Anda?",
+  "This rule then raises no alert on any of your ACs until it is switched on again. HQ still sees device status.": "Aturan ini tidak akan memunculkan peringatan pada AC Anda mana pun sampai dinyalakan lagi. HQ tetap melihat status perangkat.",
   "Overview": "Ringkasan",
   "Units & locations": "Unit & lokasi",
   "Automations & schedules": "Otomasi & jadwal",

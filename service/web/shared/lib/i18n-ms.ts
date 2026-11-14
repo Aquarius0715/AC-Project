@@ -5,6 +5,8 @@ const BUKA_KERJA = "Buka kerja";
 // company acceptance (REV18-047 in IR74, IR258). Keys are the English texts; a text without an entry is shown in
 // English. Keep {name} placeholders as they are.
 export const ms: Record<string, string> = {
+  "Turn off “{name}” for all your ACs?": "Matikan “{name}” untuk semua AC anda?",
+  "This rule then raises no alert on any of your ACs until it is switched on again. HQ still sees device status.": "Peraturan ini tidak akan menaikkan amaran pada mana-mana AC anda sehingga dihidupkan semula. HQ masih melihat status peranti.",
   // shell
   "Overview": "Gambaran keseluruhan",
   "Units & locations": "Unit & lokasi",
