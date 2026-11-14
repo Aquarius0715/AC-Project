@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { Badge, Banner, Btn, Card, Choice, ConnBadge, cx, DataTable, EmptyState, Field, Modal, Page, PowerBadge, SummaryList, useToast, Plain } from "@ac/web/components/ui";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { selectionId, type Connection, type PowerState, type Selection, type TreeProperty, type TreeSpace } from "@ac/web/lib/assets";
-import { changeText, groupPlan, type GroupChange, type PlanRow, type RoomUnit } from "@ac/web/lib/clientProperties";
+import { changeText, groupPlan, hasChoice, KEEP_ALL, type GroupChange, type PlanRow, type RoomUnit } from "@ac/web/lib/clientProperties";
 import { historyRow, type ApiCommand, type ApiUnitDetail } from "@ac/web/lib/units";
 import { followCommand } from "@ac/web/lib/unitCommands";
 import { sendPaced } from "@ac/web/lib/writeLimit";
@@ -188,6 +188,28 @@ function Panel({ live, sel, rename, go }: Readonly<{ live: PropertiesLive; sel: 
 
 // ---- group control (FR-C14) ----
 
+/** The power choice of the group panel: Keep (null), On or Off. */
+const powerChoice = (power: boolean | null): "keep" | "on" | "off" => {
+  if (power === null) return "keep";
+  return power ? "on" : "off";
+};
+
+/** The group setpoint: Keep (each AC keeps its own) until a step is pressed, which starts from 24 °C within the range. */
+function TemperatureStep({ celsius, lo, hi, onChange }: Readonly<{ celsius: number | null; lo: number; hi: number; onChange: (celsius: number | null) => void }>) {
+  const { t } = useI18n();
+  const step = (delta: number) => { onChange(Math.min(hi, Math.max(lo, celsius === null ? 24 : celsius + delta))); };
+  return (
+    <Field label={t("Set temperature")}>
+      <div className="flex items-center gap-2">
+        <Btn size="sm" onClick={() => { step(-1); }} aria-label={t("Lower the temperature")}><Icon name="remove" /></Btn>
+        <b className="w-16 text-center">{celsius === null ? t("Keep") : `${String(celsius)} °C`}</b>
+        <Btn size="sm" onClick={() => { step(1); }} aria-label={t("Raise the temperature")}><Icon name="add" /></Btn>
+        {celsius !== null && <Btn size="sm" variant="ghost" onClick={() => { onChange(null); }}>{t("Keep")}</Btn>}
+      </div>
+    </Field>
+  );
+}
+
 /** Unknown: the command was sent but its answer could not be read, so it is neither failed nor retried (IR728). */
 interface Track { status: "Sending" | "Waiting" | "Confirmed" | "Failed" | "Unknown"; note: string }
 function GroupPanel({ live, space }: Readonly<{ live: PropertiesLive; space: string }>) {
@@ -197,7 +219,7 @@ function GroupPanel({ live, space }: Readonly<{ live: PropertiesLive; space: str
   const router = useRouter();
   const online = live.units.filter((u) => u.online).map((u) => u.id);
   const [sel, setSel] = useState<string[]>(live.selectedUnits.length > 0 ? live.selectedUnits.filter((id) => online.includes(id)) : online);
-  const [ch, setCh] = useState<GroupChange>({ power: true, celsius: 24, mode: "cool", fan: null });
+  const [ch, setCh] = useState<GroupChange>(KEEP_ALL); // every setting kept until the user chooses one
   const [review, setReview] = useState<PlanRow[] | null>(null);
   const [track, setTrack] = useState<Record<string, Track>>({});
   const [sending, setSending] = useState(false);
@@ -254,14 +276,15 @@ function GroupPanel({ live, space }: Readonly<{ live: PropertiesLive; space: str
       </div>
       <Card title={t(sel.length === 1 ? "Apply to {n} selected AC" : "Apply to {n} selected ACs", { n: sel.length })}>
         <div className="flex flex-wrap items-center gap-4">
-          <Field label={t("Power")}><Choice value={ch.power ? "on" : "off"} onChange={(v: "on" | "off") => { setCh({ ...ch, power: v === "on" }); }} options={[{ id: "on", label: t("On") }, { id: "off", label: t("Off") }]} /></Field>
-          {ch.power && <>
-            <Field label={t("Set temperature")}><div className="flex items-center gap-2"><Btn size="sm" onClick={() => { setCh({ ...ch, celsius: Math.max(lo, ch.celsius - 1) }); }} aria-label={t("Lower the temperature")}><Icon name="remove" /></Btn><b className="w-14 text-center">{ch.celsius} °C</b><Btn size="sm" onClick={() => { setCh({ ...ch, celsius: Math.min(hi, ch.celsius + 1) }); }} aria-label={t("Raise the temperature")}><Icon name="add" /></Btn></div></Field>
-            <Field label={t("Mode")}><Choice value={ch.mode} onChange={(v: GroupChange["mode"]) => { setCh({ ...ch, mode: v }); }} options={[{ id: "cool", label: t("Cool") }, { id: "dry", label: t("Dry") }, { id: "fan", label: t("Fan") }]} /></Field>
+          <Field label={t("Power")}><Choice value={powerChoice(ch.power)} onChange={(v: string) => { setCh({ ...ch, power: v === "keep" ? null : v === "on" }); }} options={[{ id: "keep", label: t("Keep") }, { id: "on", label: t("On") }, { id: "off", label: t("Off") }]} /></Field>
+          {ch.power !== false && <>
+            <TemperatureStep celsius={ch.celsius} lo={lo} hi={hi} onChange={(celsius) => { setCh({ ...ch, celsius }); }} />
+            <Field label={t("Mode")}><Choice value={ch.mode ?? "keep"} onChange={(v: string) => { setCh({ ...ch, mode: oneOf(["cool", "dry", "fan"] as const, v, null) }); }} options={[{ id: "keep", label: t("Keep") }, { id: "cool", label: t("Cool") }, { id: "dry", label: t("Dry") }, { id: "fan", label: t("Fan") }]} /></Field>
             <Field label={t("Fan")}><Choice value={ch.fan ?? "keep"} onChange={(v: string) => { setCh({ ...ch, fan: oneOf(["low", "mid", "high"] as const, v, null) }); }} options={[{ id: "keep", label: t("Keep") }, { id: "low", label: t("Low") }, { id: "mid", label: t("Mid") }, { id: "high", label: t("High") }]} /></Field>
           </>}
-          <Btn variant="primary" disabled={sel.length === 0 || sending} onClick={() => { setReview(plan(sel)); }}>{t("Review & send")}</Btn>
+          <Btn variant="primary" disabled={sel.length === 0 || sending || !hasChoice(ch)} onClick={() => { setReview(plan(sel)); }}>{t("Review & send")}</Btn>
         </div>
+        {!hasChoice(ch) && <p className="mt-2 text-xs text-muted-foreground">{t("Every setting is kept — choose what to change.")}</p>}
         <p className="mt-2 text-[11px] text-muted-foreground">{t("Each AC gets its own command and confirmation (same as single control). Offline ACs are skipped; restrictions such as a minimum temperature still apply per AC. One space only · owner role only.")}</p>
         {Object.values(track).some((x) => x.status === "Failed") && !sending && (
           <div className="mt-2"><Btn size="sm" onClick={() => { const ids = Object.entries(track).filter(([, x]) => x.status === "Failed").map(([id]) => id); setReview(plan(ids)); }}>{t("Retry failed ACs")}</Btn></div>
