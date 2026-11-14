@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  actionGroupOf, actionLabel, actionOptions, apiErrors, consentCard, firstAction, draftErrors, draftOf, eventTest, ruleCard, runClock, runText, saveInput, scheduleTest, summaryText, weekdaysText, whenText, type ApiAutomation, type Caps,
+  actionGroupOf, actionLabel, actionOptions, apiErrors, blankDraft, consentCard, firstAction, draftErrors, draftOf, eventTest, ruleCard, runClock, runText, saveInput, scheduleTest, summaryText, weekdaysText, whenText, type ApiAutomation, type Caps,
 } from "@ac/web/lib/clientAutomations";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
 
@@ -51,6 +51,9 @@ describe("customer automation sentences (FR-C04, FR-C05, IR260)", () => {
     expect(summaryText(d, BEDROOM_AC, "Home A")).toBe("When Weekdays at 18:00 → Bedroom AC power ON. At 22:00 → Bedroom AC power OFF.");
     expect(summaryText({ ...d, endsNextDay: true, endLocal: "06:00", startAction: "temp:24" }, BEDROOM_AC, "Home A", ms)).toBe("Apabila Hari bekerja pada 18:00 → tetapkan Bedroom AC kepada 24°C. Pada 06:00 (hari berikutnya) → Bedroom AC kuasa MATI.");
     expect(draftErrors({ ...d, name: "", weekdays: [], startLocal: "18:00", endLocal: "18:00" }, ms)).toStrictEqual({ name: "1–120 aksara", weekdays: "Pilih sekurang-kurangnya satu hari", endLocal: "Mula dan tamat tidak boleh sama — bukan operasi 24 jam" });
+    // UI/UX loop R11: the end action is "never assumed": a new schedule starts without one and cannot be saved so
+    const blank = { ...blankDraft("u1", "Asia/Kuala_Lumpur"), name: "Pre-cool" };
+    expect([blank.endAction, draftErrors(blank).endAction, summaryText(blank, BEDROOM_AC, "Home A")]).toStrictEqual(["", "Choose what happens at the end", "When Weekdays at 18:00 → set Bedroom AC to 25°C. At 22:00 → (not chosen yet)."]);
     expect(apiErrors({ "draft.endsNextDay": "errors.over_24_hours", name: "error.length" }, ms)).toStrictEqual({ endsNextDay: "Paling lama 24 jam", name: "1–120 aksara" });
     const choices = actionOptions({ control: true, modeControl: true, fanControl: false, temperature: { min: 24, max: 25, step: 1 }, modes: ["cool"], fanLevels: [] }, ms);
     expect(choices.map((g) => [g.group, g.options.map((o) => o.label)])).toStrictEqual([["Kuasa", ["Kuasa HIDUP", "Kuasa MATI"]], ["Suhu", ["Tetapkan suhu 24°C", "Tetapkan suhu 25°C"]], ["Mod", ["Mod Sejuk"]]]);

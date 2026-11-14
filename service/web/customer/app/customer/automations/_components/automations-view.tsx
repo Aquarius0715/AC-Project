@@ -190,7 +190,7 @@ function Editor({ live, onDone, onCancel }: Readonly<{ live: AutomationsLive; on
   const ac = live.acs.find((u) => u.id === draft.unitId);
   const options = actionOptions(live.caps[draft.unitId] ?? null, t);
   const supported = (k: string) => options.some((g) => g.options.some((o) => o.key === k));
-  const unsupported = (k: string) => (draft.unitId && !supported(k) ? t("Not supported by this AC — choose another action") : undefined);
+  const unsupported = (k: string) => (draft.unitId && k && !supported(k) ? t("Not supported by this AC — choose another action") : undefined);
   const isDirty = !rule || JSON.stringify(saveInput(draft)) !== JSON.stringify(saveInput(draftOf(rule)));
   const runsShown = preview.data.filter((o) => o.phase === "schedule_start").slice(0, 2).map((s) => ({ start: s, end: preview.data.find((o) => o.phase === "schedule_end" && isAfter(o.at, s.at)) }));
   const previewError = preview.error ? apiErrors(preview.error.error.fieldErrors, t) : {};
@@ -241,7 +241,7 @@ function Editor({ live, onDone, onCancel }: Readonly<{ live: AutomationsLive; on
         <div className="@container"><div className="grid grid-cols-1 items-start gap-3 @[22rem]:grid-cols-[minmax(120px,170px)_minmax(0,1fr)]">
           {part(t("Setting"), (
             <Select aria-label={t("{label} — setting", { label })} value={group?.id ?? ""} onChange={(e) => { pick(firstAction(options, e.target.value)); }}>
-              {!group && <option value="">{supported(value) ? t("Choose a setting") : t("{action} (not supported)", { action: actionLabel(actionOf(value), t) })}</option>}
+              {!group && <option value="">{!value || supported(value) ? t("Choose a setting") : t("{action} (not supported)", { action: actionLabel(actionOf(value), t) })}</option>}
               {options.map((g) => <option key={g.id} value={g.id}>{g.group}</option>)}
             </Select>
           ))}
