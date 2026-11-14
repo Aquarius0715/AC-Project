@@ -429,7 +429,6 @@ export const ja: Record<string, string> = {
   "Inspection record": "点検記録",
   "Evidence (demo observation)": "根拠（デモの観測）",
   "Evidence": "根拠",
-  "Read": "既読にする",
   "View unit": "ユニットを表示",
   "Book cleaning": "清掃を予約",
   "Request repair": "修理を依頼",
