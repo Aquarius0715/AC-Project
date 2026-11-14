@@ -989,6 +989,7 @@ export const id: Record<string, string> = {
   "Office": "Kantor",
   "Floor": "Lantai",
   "Space": "Ruang",
+  "Not in a property": "Tidak di properti",
   "{n} unit": "{n} unit",
   "{n} units": "{n} unit",
   "{n} AC": "{n} AC",

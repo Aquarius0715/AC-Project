@@ -87,6 +87,17 @@ export function overviewRows(units: OverviewUnit[], place: (u: OverviewUnit) => 
   });
 }
 
+/** The overview's unit rows under their property (the first part of the place, "" for a unit not in a property), in the
+order the properties first appear: a flat list of a whole account mixed the homes and offices. */
+export function byProperty(rows: OverviewRow[]): { property: string; rows: OverviewRow[] }[] {
+  const groups = new Map<string, OverviewRow[]>();
+  for (const r of rows) {
+    const property = r.place.split(" › ", 1)[0] ?? "";
+    groups.set(property, [...(groups.get(property) ?? []), r]);
+  }
+  return [...groups].map(([property, list]) => ({ property, rows: list }));
+}
+
 export interface EnergyCard { sub: string; total: string | null; delta: { text: string; icon: IconName; tone: "ok" | "warn" } | null; labels: string[]; series: number[][]; gaps: boolean }
 const previousName: Record<OverviewPeriod, string> = { today: "yesterday at this time", "7d": "the 7 days before", "30d": "the 30 days before" };
 /** The energy card: the period's kWh and its change against the previous period; bars for the last 7 days (dark)

@@ -1031,6 +1031,7 @@ export const ms: Record<string, string> = {
   "Office": "Pejabat",
   "Floor": "Tingkat",
   "Space": "Ruang",
+  "Not in a property": "Bukan dalam premis",
   "{n} unit": "{n} unit",
   "{n} units": "{n} unit",
   "{n} AC": "{n} AC",
