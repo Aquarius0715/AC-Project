@@ -176,7 +176,10 @@ export function ContractsView({ live }: Readonly<{ live?: Live }>) {
     if (creating || !sel) return t("Saving creates version 1");
     const n = sel.restrictionIds.length;
     const held = n > 0 ? ` · ${byCount(n, { one: t("1 active restriction"), many: t("{n} active restrictions", { n }) })}` : "";
-    return `${sel.cust} · ${t("Version {v} · Editing → v{next}", { v: sel.version, next: sel.version + 1 })}${held}`;
+    // "Editing → v{next}" once the form differs from the saved version: before, it read as an edit nobody had started
+    const isDirty = JSON.stringify(d) !== JSON.stringify(draftOf(sel));
+    const version = isDirty ? t("Version {v} · Editing → v{next}", { v: sel.version, next: sel.version + 1 }) : t("Version {v}", { v: sel.version });
+    return `${sel.cust} · ${version}${held}`;
   };
   return (
     <Page>
@@ -197,6 +200,8 @@ export function ContractsView({ live }: Readonly<{ live?: Live }>) {
         {creating || sel ? (
           <Card title={cardTitle()} sub={cardSub()} action={<Badge tone="primary">{planWord(d.planType, t)}</Badge>}>
             <div className="flex flex-col gap-5">
+              {/* said before the fields: they all look editable, and the reason sat by the Save button at the bottom */}
+              {isBlocked && <Banner>{t("Read-only while a restriction is active")}</Banner>}
               <section>
                 <h3 className="mb-1 text-[13px] font-bold">{t("Customer & units")}</h3>
                 <p className="mb-2 text-xs text-muted-foreground">{t("Only this customer’s active units can be included. A unit on another contract is labelled, not hidden.")}</p>
@@ -229,7 +234,7 @@ export function ContractsView({ live }: Readonly<{ live?: Live }>) {
               </section>
               {isBlocked && <Banner tone="warn" action={sel.restrictionIds[0] && <Link className="text-xs font-semibold text-primary" href={live ? `/admin/restrictions?restrictionId=${sel.restrictionIds[0]}` : "/admin/restrictions"}>{t("Open restriction")} <Icon name="arrowRight" /></Link>}>{t("Save is disabled: {reason}. Cancel the notice or release the restriction first — contract changes never cancel or release restrictions.", { reason: byCount(sel.restrictionIds.length, { none: t("an unresolved recovery case exists"), one: t("1 active restriction on this contract"), many: t("{n} active restrictions on this contract", { n: sel.restrictionIds.length }) }) })}</Banner>}
               <section className="rounded-xl bg-surface2 p-3 text-xs"><b className="text-[13px]">{t("What saving does")}</b><ul className="mt-1 list-disc pl-5">{creating || !sel ? <><li>{t("Creates version 1 of a new contract for this customer")}</li><li>{t("New invoices can be issued against it")}</li></> : <><li>{t("Creates version {next} — version {v} stays in history", { next: sel.version + 1, v: sel.version })}</li><li>{t("Invoices already issued keep version {v} and their original amounts", { v: sel.version })}</li><li>{t("New invoices will use version {next} ({amount})", { next: sel.version + 1, amount: `${/^\d+(\.\d{1,2})?$/.test(d.price.trim()) ? amount(priceMinor(d.price)) : "—"} ${d.currency}` })}</li></>}</ul></section>
-              <div className="flex justify-end gap-2">{creating && <Btn onClick={() => { setCreating(false); }}>{t("Cancel")}</Btn>}{isBlocked && <Badge tone="muted">{t("Read-only while a restriction is active")}</Badge>}<Btn variant="primary" disabled={pending || isBlocked} onClick={save}>{creating || !sel ? t("Create contract") : t("Save as version {n}", { n: sel.version + 1 })}</Btn></div>
+              <div className="flex justify-end gap-2">{creating && <Btn onClick={() => { setCreating(false); }}>{t("Cancel")}</Btn>}<Btn variant="primary" disabled={pending || isBlocked} onClick={save}>{creating || !sel ? t("Create contract") : t("Save as version {n}", { n: sel.version + 1 })}</Btn></div>
             </div>
           </Card>
         ) : <Card title={t("Contract")}><EmptyState title={t("Nothing selected")}>{t("Choose a contract or create a new one.")}</EmptyState></Card>}
