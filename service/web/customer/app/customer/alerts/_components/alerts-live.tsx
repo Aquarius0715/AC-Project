@@ -71,7 +71,7 @@ export function AlertsLiveView({ live }: Readonly<{ live: AlertsLive }>) {
         <>
           <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
             <Select aria-label={t("Severity")} className="w-auto text-xs" value={live.severity ?? ""} onChange={(e) => { patch({ severity: e.target.value || null }); }}>
-              <option value="">{t("Severity: All")}</option><option value="critical">{t("Severity: Critical")}</option><option value="warning">{t("Severity: Warning")}</option>
+              <option value="">{t("Severity: All")}</option><option value="critical">{t("Severity: Critical")}</option><option value="warning">{t("Severity: Warning")}</option><option value="normal">{t("Severity: Info")}</option>
             </Select>
             <Select aria-label={t("Unit")} className="w-auto text-xs" value={live.unitId ?? ""} onChange={(e) => { patch({ unitId: e.target.value || null }); }}>
               <option value="">{t("Unit: All units")}</option>{live.units.map((u) => <option key={u.id} value={u.id}>{t("Unit: {name}", { name: `${u.name}${u.place ? ` · ${u.place}` : ""}` })}</option>)}
