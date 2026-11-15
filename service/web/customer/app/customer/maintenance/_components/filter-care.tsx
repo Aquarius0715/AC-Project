@@ -33,7 +33,7 @@ export function FilterCareTab({ f, owner, onRequest, onDone, onFail }: Readonly<
       <td className="px-3 py-2.5 max-sm:hidden"><Progress pct={r.pct} tone={filterStatus[r.state].bar} text={r.progress} /></td>
       <td className="px-3 py-2.5"><Badge tone={filterStatus[r.state].badge}>{t(filterStatus[r.state].label)}</Badge></td>
       <td className="px-3 py-2.5">
-        <div className="flex justify-end gap-1.5 whitespace-nowrap">
+        <div className="flex flex-col items-stretch gap-1.5 whitespace-nowrap">
           {r.state === "overdue" && <Btn size="sm" variant="primary" onClick={() => { onRequest({ unitId: r.unitId, symptom: cleaningSymptom(r, t) }); }}>{t("Request cleaning")}</Btn>}
           <Btn size="sm" disabled={pending} onClick={() => { mark(r); }} aria-label={t("Mark cleaned — {unit}", { unit: r.unit })}>{t("Mark cleaned")}</Btn>
         </div>
@@ -61,10 +61,11 @@ export function FilterCareTab({ f, owner, onRequest, onDone, onFail }: Readonly<
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,360px)]">
       <Card title={t("Filters by AC")} sub={t("Run time since the last cleaning, from telemetry · reminder at {hours}", { hours: f.settings.thresholdHours ? `${String(f.settings.thresholdHours)} h` : t("{n} h (model default)", { n: DEFAULT_FILTER_HOURS }) })}>
         <ScrollX className="rounded-xl border border-line">
+          {/* the AC column keeps room for the name and place (they wrapped word by word into six lines), and the two actions stack so the row stays narrow (UI/UX loop R106) */}
           <table className="w-full border-collapse text-left text-[13px]">
             <thead>
               <tr className="bg-surface2 text-[11px] uppercase tracking-wide text-muted-foreground">
-                <th className="px-3 py-2 font-semibold">AC</th><th className="px-3 py-2 font-semibold">{t("Run time")}</th><th className="px-3 py-2 font-semibold max-sm:hidden">{t("Progress")}</th>
+                <th className="min-w-40 px-3 py-2 font-semibold">{t("AC")}</th><th className="px-3 py-2 font-semibold">{t("Run time")}</th><th className="px-3 py-2 font-semibold max-sm:hidden">{t("Progress")}</th>
                 <th className="px-3 py-2 font-semibold">{t("Status")}</th><th className="px-3 py-2"><span className="sr-only">{t("Actions")}</span></th>
               </tr>
             </thead>
