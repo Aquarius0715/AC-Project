@@ -4932,7 +4932,7 @@ export const id: Record<string, string> = {
   "All contracts": "Semua kontrak",
   "Overdue only — show all invoices": "Hanya yang terlambat — tampilkan semua faktur",
   "Outstanding": "Tertunggak",
-  "unpaid · processing": "belum dibayar · diproses",
+  "unpaid + overdue + processing": "belum dibayar + terlambat + diproses",
   "reminders allowed": "pengingat diizinkan",
   "awaiting HQ confirmation": "menunggu konfirmasi HQ",
   "in this scope": "dalam cakupan ini",

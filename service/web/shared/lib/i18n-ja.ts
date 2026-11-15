@@ -4932,7 +4932,7 @@ export const ja: Record<string, string> = {
   "All contracts": "すべての契約",
   "Overdue only — show all invoices": "期限超過のみ — すべての請求書を表示",
   "Outstanding": "未払い残高",
-  "unpaid · processing": "未払い · 処理中",
+  "unpaid + overdue + processing": "未払い + 延滞 + 処理中",
   "reminders allowed": "お知らせを送れます",
   "awaiting HQ confirmation": "本部の確認待ち",
   "in this scope": "この範囲内",
