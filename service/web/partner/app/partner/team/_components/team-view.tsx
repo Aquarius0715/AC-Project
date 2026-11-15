@@ -40,10 +40,10 @@ export function TeamView({ live }: Readonly<{ live: TeamLive }>) {
       </Page>
     );
   }
-  return <Team live={live} tab={tab} tabs={tabs} />;
+  return <Team live={live} tab={tab} tabs={tabs} onCerts={() => { setTab("certs"); }} />;
 }
 
-function Team({ live, tab, tabs }: Readonly<{ live: Live; tab: "members" | "certs"; tabs: React.ReactNode }>) {
+function Team({ live, tab, tabs, onCerts }: Readonly<{ live: Live; tab: "members" | "certs"; tabs: React.ReactNode; onCerts: () => void }>) {
   const t = useT();
   const patch = useUrlPatch();
   const [open, setOpen] = useState(false);
@@ -107,7 +107,8 @@ function Team({ live, tab, tabs }: Readonly<{ live: Live; tab: "members" | "cert
       {!isNone && (
         <div className="split">
           <WeekCard live={live} />
-          <Card title={t("Qualifications")}>
+          {/* an expiring qualification comes with the way to renew it, here, rather than a hint to find the tab (UI/UX loop R113) */}
+          <Card title={t("Qualifications")} action={live.grants.some((g) => g.badge.tone === "warn") && <Btn size="sm" onClick={onCerts}>{t("Upload renewal")}</Btn>}>
             <ul className="divide-y divide-line">
               {live.grants.map((g) => (
                 <li key={g.key} className="flex items-center justify-between gap-2 py-2">
