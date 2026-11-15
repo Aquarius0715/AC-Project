@@ -11,6 +11,9 @@ export const ms: Record<string, string> = {
   "Turn off “{name}” for all your ACs?": "Matikan “{name}” untuk semua AC anda?",
   "This rule then raises no alert on any of your ACs until it is switched on again. HQ still sees device status.": "Peraturan ini tidak akan menaikkan amaran pada mana-mana AC anda sehingga dihidupkan semula. HQ masih melihat status peranti.",
   "billed as {name} · {id}": "dibilkan sebagai {name} · {id}",
+  "Membership": "Keahlian",
+  "Choose a membership": "Pilih keahlian",
+  "Pick one in the list to see or change its access, or start a New membership.": "Pilih satu dalam senarai untuk melihat atau mengubah aksesnya, atau mulakan Keahlian baharu.",
   // shell
   "Overview": "Gambaran keseluruhan",
   "Units & locations": "Unit & lokasi",
