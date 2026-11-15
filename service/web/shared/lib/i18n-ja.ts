@@ -5,6 +5,8 @@ export const ja: Record<string, string> = {
   "On the next page, change the e-mail address (↻) to this service's account.": "次の画面でメールアドレスを変更（↻）し、このサービスのアカウントでサインインしてください。",
   "Sign in with another account": "別のアカウントでサインイン",
   "You signed out. Sign in again to continue.": "サインアウトしました。続けるにはもう一度サインインしてください。",
+  "Turn off “{name}” for all your ACs?": "すべてのエアコンで「{name}」をオフにしますか？",
+  "This rule then raises no alert on any of your ACs until it is switched on again. HQ still sees device status.": "オンに戻すまで、このルールはどのエアコンでもアラートを出しません。HQ は引き続き機器の状態を確認できます。",
   "Overview": "概要",
   "Units & locations": "ユニットと設置場所",
   "Automations & schedules": "自動化とスケジュール",

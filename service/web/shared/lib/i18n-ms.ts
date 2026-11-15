@@ -8,6 +8,8 @@ export const ms: Record<string, string> = {
   "On the next page, change the e-mail address (↻) to this service's account.": "Pada halaman seterusnya, tukar alamat e-mel (↻) kepada akaun perkhidmatan ini.",
   "Sign in with another account": "Log masuk dengan akaun lain",
   "You signed out. Sign in again to continue.": "Anda telah log keluar. Log masuk semula untuk meneruskan.",
+  "Turn off “{name}” for all your ACs?": "Matikan “{name}” untuk semua AC anda?",
+  "This rule then raises no alert on any of your ACs until it is switched on again. HQ still sees device status.": "Peraturan ini tidak akan menaikkan amaran pada mana-mana AC anda sehingga dihidupkan semula. HQ masih melihat status peranti.",
   // shell
   "Overview": "Gambaran keseluruhan",
   "Units & locations": "Unit & lokasi",

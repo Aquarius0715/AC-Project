@@ -5,6 +5,8 @@ export const id: Record<string, string> = {
   "On the next page, change the e-mail address (↻) to this service's account.": "Di halaman berikutnya, ubah alamat email (↻) ke akun layanan ini.",
   "Sign in with another account": "Masuk dengan akun lain",
   "You signed out. Sign in again to continue.": "Anda telah keluar. Masuk lagi untuk melanjutkan.",
+  "Turn off “{name}” for all your ACs?": "Matikan “{name}” untuk semua AC Anda?",
+  "This rule then raises no alert on any of your ACs until it is switched on again. HQ still sees device status.": "Aturan ini tidak akan memunculkan peringatan pada AC Anda mana pun sampai dinyalakan lagi. HQ tetap melihat status perangkat.",
   "Overview": "Ringkasan",
   "Units & locations": "Unit & lokasi",
   "Automations & schedules": "Otomasi & jadwal",

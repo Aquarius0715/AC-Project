@@ -44,6 +44,8 @@ function PolicyList({ p, onDone, onFail }: Readonly<Props>) {
   const t = useT();
   const [pending, run] = useAction();
   const [remove, setRemove] = useState<PolicyCard | null>(null);
+  // switching a default rule off stops its alerts on every AC of the account: it asks first (switching on does not)
+  const [turnOff, setTurnOff] = useState<{ ruleKey: string; name: string; version: number } | null>(null);
   const d = p.defaults;
   const fail = (f: ActionFailure) => { onFail(f); };
   useEffect(() => { takeListFocus(); }, []);
@@ -68,12 +70,18 @@ function PolicyList({ p, onDone, onFail }: Readonly<Props>) {
               <tr key={r.ruleKey} className={cx("border-t border-line", !r.enabled && "text-muted-foreground")}>
                 <td className="py-2 pr-3 font-semibold">{r.name}</td><td className="pr-3">{r.condition}</td><td className="pr-3"><Badge tone={r.category === "air_quality" ? "primary" : "muted"}>{r.type}</Badge></td>
                 <td className="pr-3"><SeverityBadge s={r.severity} /></td>
-                <td><Toggle on={r.enabled} disabled={!p.owner || pending} onChange={(v) => { toggleRule(r.ruleKey, r.name, v, r.version); }} label={r.name} /></td>
+                <td><Toggle on={r.enabled} disabled={!p.owner || pending} onChange={(v) => { if (v) toggleRule(r.ruleKey, r.name, true, r.version); else setTurnOff({ ruleKey: r.ruleKey, name: r.name, version: r.version }); }} label={r.name} /></td>
               </tr>
             ))}</tbody>
           </table></ScrollX>
           {d.notes.map((n) => <p key={n} className="mt-2 text-xs text-muted-foreground">{n}</p>)}
         </Card>
+      )}
+      {turnOff && (
+        <Modal open onClose={() => { setTurnOff(null); }} title={t("Turn off “{name}” for all your ACs?", { name: turnOff.name })}
+          footer={<><Btn onClick={() => { setTurnOff(null); }}>{t("Keep it on")}</Btn><Btn variant="danger" disabled={pending} onClick={() => { toggleRule(turnOff.ruleKey, turnOff.name, false, turnOff.version); setTurnOff(null); }}>{t("Turn off")}</Btn></>}>
+          <p className="text-[13px]">{t("This rule then raises no alert on any of your ACs until it is switched on again. HQ still sees device status.")}</p>
+        </Modal>
       )}
       <div id="your-policies" tabIndex={-1} className="rounded text-[13px] font-bold outline-none focus-visible:ring-2 focus-visible:ring-ring/50">{t("Your policies")} <span className="text-xs font-normal text-muted-foreground">{t("{n} · added on top of the default policy · a policy belongs to your account and can be attached to many ACs", { n: p.cards.length })}</span></div>
       {p.cards.map((c) => (
