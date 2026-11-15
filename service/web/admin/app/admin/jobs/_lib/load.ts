@@ -14,7 +14,7 @@ import { i18nOf, showTime, textOf } from "@ac/web/lib/i18n";
 import { alertTitle } from "@ac/web/lib/alerts";
 import { jobEventTitle, type ApiJobEvent } from "@ac/web/lib/partnerOverview";
 import type { ApiWorkReport } from "@ac/web/lib/partnerReview";
-import { agreedSlots, classifyBy, controls, costTotals, delivery, facts, filtersOf, hqRow, LISTED, longSlot, periodChip, periodOfQuery, preferredRows, reportCard, slotText, SORTS, sortOf, STAGES, stageOf, stepper, type ApiHqJob, type ApiHqRow, type Names, type Query } from "@ac/web/lib/adminJobs";
+import { agreedSlots, assigneeGroups, classifyBy, controls, costTotals, delivery, facts, filtersOf, hqRow, LISTED, longSlot, periodChip, periodOfQuery, preferredRows, reportCard, slotText, SORTS, sortOf, STAGES, stageOf, stepper, type ApiHqJob, type ApiHqRow, type Names, type Query } from "@ac/web/lib/adminJobs";
 import { nextOccurrence, planDate, planRows, type ApiPlan } from "@ac/web/lib/adminPlans";
 import { breachRows, PERIODS, periodOf, slaRows, slaTiles, targetsByPlan, type ApiScorecard } from "@ac/web/lib/adminSla";
 import { contractorRows, kpiTiles, pendingCertificates, profileFacts, rateCardView, technicianRows, type ApiCertificate, type ApiProfile, type ApiRateCard, type ApiTechnician } from "@ac/web/lib/adminContractors";
@@ -27,7 +27,7 @@ const TECHNICIAN = "technician";
 
 interface Page<T> { items: T[]; total: number }
 interface Org { id: string; version: number; name: string; kind: string; status: string }
-interface Member { id: string; userId: string; displayName: string; role: string; employment: string | null; organizationId: string; validUntil: string | null; qualifications?: ApiTechnician["qualifications"] }
+interface Member { id: string; userId: string; displayName: string; role: string; employment: string | null; organizationId: string; validUntil: string | null; revokedAt?: string | null; qualifications?: ApiTechnician["qualifications"] }
 const optional = orWhenRefused;
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
@@ -96,7 +96,7 @@ export async function loadJobs(sp: SP) {
     ...head, q, requestDraft: jobRequest, created, period, periodChip: period ? periodChip(period, i) : null, sort, sorts: SORTS.map((x) => ({ id: x.id, text: t(x.text) })), total: list.total,
     stages: STAGES.map((x, k) => ({ id: x.id, label: t(x.label), count: counts.at(k) ?? 0 })),
     deliveries: [{ id: "internal", name: t("Internal") }, ...contractors.map((c) => ({ id: c.id, name: c.name }))],
-    assignees: members.filter((m) => m.role === TECHNICIAN).map((m) => ({ id: m.id, name: m.displayName })),
+    assignees: assigneeGroups(members.filter((m) => m.role === TECHNICIAN), names.orgs, nowMs, t),
     contractors: contractors.map((c) => ({ id: c.id, name: c.name, status: profiles.find((p) => p.organizationId === c.id)?.status === "suspended" ? "suspended" : c.status })),
     internalTechs: members.filter((m) => m.role === TECHNICIAN && m.employment === "internal").map((m) => ({ id: m.id, name: m.displayName })),
     rows,

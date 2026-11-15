@@ -3662,6 +3662,7 @@ export const ms: Record<string, string> = {
   "Access extended to {time}. The contractor keeps the site details until then.": "Akses dilanjutkan hingga {time}. Kontraktor menyimpan butiran tapak sehingga itu.",
   "Extend contractor access": "Lanjutkan akses kontraktor",
   "Extend": "Lanjutkan",
+  "{name} (access ended)": "{name} (akses tamat)",
   "access ended {time}": "akses tamat {time}",
   "access now ends {time}": "akses kini tamat {time}",
   "New end · required": "Tamat baharu · diperlukan",

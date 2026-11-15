@@ -3571,6 +3571,7 @@ export const id: Record<string, string> = {
   "Access extended to {time}. The contractor keeps the site details until then.": "Akses diperpanjang sampai {time}. Kontraktor mempertahankan detail lokasi sampai saat itu.",
   "Extend contractor access": "Perpanjang akses kontraktor",
   "Extend": "Perpanjang",
+  "{name} (access ended)": "{name} (akses berakhir)",
   "access ended {time}": "akses berakhir {time}",
   "access now ends {time}": "akses kini berakhir {time}",
   "New end · required": "Akhir baru · wajib",
