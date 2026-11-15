@@ -1,6 +1,7 @@
 "use client";
 const DEMO_FIXED = "demo_fixed";
 
+import { anySet } from "@ac/web/lib/filters";
 import { useId, useState } from "react";
 import { Badge, Banner, Btn, Card, Check, Choice, EmptyState, Field, Input, ListRow, Page, Select, SummaryList, Tabs, Textarea } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
@@ -144,7 +145,7 @@ function Baselines({ live, l }: Readonly<{ live: EnergyLive; l: NonNullable<Ener
       </div>
       <div className="split-rev">
         <Card title={customer ? t("Baselines · {customer}", { customer }) : t("Baselines · all customers")} action={live.canWrite && <Btn size="sm" variant="primary" onClick={() => { setCreating(true); }}><Icon name="add" /> {t("New baseline")}</Btn>} className="self-start">
-          {l.rows.length === 0 ? <EmptyState title={t("No baselines")}>{t("No baseline matches this scope.")}</EmptyState> : <div className="flex flex-col gap-2">{l.rows.map((x) => <ListRow key={x.id} selected={sel?.id === x.id} onClick={() => { setCreating(false); nav({ baselineId: x.id }); }}><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="text-[13px]">{x.id.slice(0, 8)}</b><Badge tone={x.method === DEMO_FIXED ? "muted" : "primary"}>{t(x.method === DEMO_FIXED ? "v{v} · modeled" : "v{v} · measured", { v: x.version })}</Badge></div><div className="text-[11px] text-muted-foreground">{x.units} · {x.period}</div><div className="text-[11px] text-muted-foreground">{x.method} · {x.value} · {x.boundaryId}</div></div></ListRow>)}</div>}
+          {l.rows.length === 0 ? <EmptyState title={t("No baselines")}>{t(anySet(live.scope.customerId, live.scope.propertyId, live.scope.unitId, l.from, l.to) ? "No baseline matches this scope." : "Create the first one with New baseline.")}</EmptyState> : <div className="flex flex-col gap-2">{l.rows.map((x) => <ListRow key={x.id} selected={sel?.id === x.id} onClick={() => { setCreating(false); nav({ baselineId: x.id }); }}><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="text-[13px]">{x.id.slice(0, 8)}</b><Badge tone={x.method === DEMO_FIXED ? "muted" : "primary"}>{t(x.method === DEMO_FIXED ? "v{v} · modeled" : "v{v} · measured", { v: x.version })}</Badge></div><div className="text-[11px] text-muted-foreground">{x.units} · {x.period}</div><div className="text-[11px] text-muted-foreground">{x.method} · {x.value} · {x.boundaryId}</div></div></ListRow>)}</div>}
         </Card>
         {creating || sel ? (
           <Card title={sel ? <span className="flex flex-wrap items-center gap-2">{t("Baseline {id}", { id: sel.id.slice(0, 8) })}<Badge>{t("Version {v}", { v: sel.version })}</Badge><Badge tone="warn">{t("Editing → v{n}", { n: sel.version + 1 })}</Badge></span> : t("New baseline")}

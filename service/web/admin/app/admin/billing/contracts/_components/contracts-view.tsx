@@ -7,6 +7,7 @@ const UNIT_OFFLINE_RTO = "unit-offline-rto";
 const UNIT_LIMITED = "unit-limited";
 const UNIT_OTHER_CUSTOMER = "unit-other-customer";
 
+import { anySet } from "@ac/web/lib/filters";
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { usePathname, useRouter } from "next/navigation";
@@ -194,7 +195,7 @@ export function ContractsView({ live }: Readonly<{ live?: Live }>) {
       <Tabs value={kind} onChange={(k) => { if (live) nav({ kind: k === "all" ? null : k, contractId: null }); else setDemoKind(k); }} tabs={(["all", ...plans] as const).map((k) => ({ id: k, label: k === "all" ? t("All") : planWord(k, t), count: live ? live.counts[k] : demoCount(k) }))} />
       <div className="split-rev">
         <Card title={t("Contracts")} sub={t("sorted by ID")} action={<Btn size="sm" variant="primary" onClick={() => { setCreating(true); }}><Icon name="add" /> {t("New contract")}</Btn>} className="self-start">
-          {rows.length === 0 ? <EmptyState title={t("No contracts")}>{t("No contract matches this scope.")}</EmptyState> : <div className="flex flex-col gap-2">{rows.map((c) => <ListRow key={c.id} selected={sel?.id === c.id} onClick={() => { select(c.id); }}><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="truncate text-[13px]">{live ? c.id.slice(0, 8) : c.id}</b><b className="text-[13px]">{c.price}</b></div><div className="flex items-center gap-1.5 text-[11px] text-muted-foreground"><Badge tone={c.planType === "rto" ? "primary" : "muted"}>{planWord(c.planType, t)}</Badge>{c.cust} · {c.units}</div><div className="text-[11px] text-muted-foreground">{c.period}</div><div className="mt-1">{c.restrictionEligible ? <Badge tone="ok">{t("Eligible · {rules}", { rules: c.rulesVersion ?? "—" })}{c.restrictionIds.length > 0 ? ` · ${t("restriction active")}` : ""}</Badge> : <Badge tone="muted">{t("Not restriction eligible")}</Badge>}</div></div></ListRow>)}</div>}
+          {rows.length === 0 ? <EmptyState title={t("No contracts")}>{t(anySet(live?.scope.customerId, live?.scope.unitId, live?.scope.kind) ? "No contract matches this scope." : "Create the first one with New contract.")}</EmptyState> : <div className="flex flex-col gap-2">{rows.map((c) => <ListRow key={c.id} selected={sel?.id === c.id} onClick={() => { select(c.id); }}><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="truncate text-[13px]">{live ? c.id.slice(0, 8) : c.id}</b><b className="text-[13px]">{c.price}</b></div><div className="flex items-center gap-1.5 text-[11px] text-muted-foreground"><Badge tone={c.planType === "rto" ? "primary" : "muted"}>{planWord(c.planType, t)}</Badge>{c.cust} · {c.units}</div><div className="text-[11px] text-muted-foreground">{c.period}</div><div className="mt-1">{c.restrictionEligible ? <Badge tone="ok">{t("Eligible · {rules}", { rules: c.rulesVersion ?? "—" })}{c.restrictionIds.length > 0 ? ` · ${t("restriction active")}` : ""}</Badge> : <Badge tone="muted">{t("Not restriction eligible")}</Badge>}</div></div></ListRow>)}</div>}
           <p className="mt-3 text-[11px] text-muted-foreground">{t("Units without a contract can still be monitored and maintained.")}</p>
         </Card>
         {creating || sel ? (
