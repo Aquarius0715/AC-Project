@@ -5062,7 +5062,7 @@ export const ms: Record<string, string> = {
   "All contracts": "Semua kontrak",
   "Overdue only — show all invoices": "Tertunggak sahaja — tunjukkan semua invois",
   "Outstanding": "Belum dijelaskan",
-  "unpaid · processing": "belum dibayar · sedang diproses",
+  "unpaid + overdue + processing": "belum dibayar + tertunggak + diproses",
   "reminders allowed": "peringatan dibenarkan",
   "awaiting HQ confirmation": "menunggu pengesahan HQ",
   "in this scope": "dalam skop ini",
