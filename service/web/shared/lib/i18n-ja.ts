@@ -1021,6 +1021,7 @@ export const ja: Record<string, string> = {
   "Rename {name}": "{name} の名前を変更",
   "{name} · {kind} in {property}": "{name} · {property} の {kind}",
   "seen {time}": "{time} に確認",
+  "Open {name}’s control": "{name} の操作を開く",
   "Open control": "操作を開く",
   "Power: {state}": "電源: {state}",
   "Connection: {states}": "接続: {states}",

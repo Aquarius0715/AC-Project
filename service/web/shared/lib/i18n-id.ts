@@ -1021,6 +1021,7 @@ export const id: Record<string, string> = {
   "Rename {name}": "Ganti nama {name}",
   "{name} · {kind} in {property}": "{name} · {kind} di {property}",
   "seen {time}": "terlihat {time}",
+  "Open {name}’s control": "Buka kontrol {name}",
   "Open control": "Buka kontrol",
   "Power: {state}": "Daya: {state}",
   "Connection: {states}": "Koneksi: {states}",
