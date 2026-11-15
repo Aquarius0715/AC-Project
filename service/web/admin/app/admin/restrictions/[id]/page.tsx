@@ -6,7 +6,7 @@
 // restriction.
 import { connection } from "next/server";
 import { notFound } from "next/navigation";
-import { EmptyState, Page as Screen } from "@ac/web/components/ui";
+import { NeedsAccess } from "@ac/web/components/NeedsAccess";
 import { apiMode, coreDisplay, coreNow, coreOp, corePermissions, CoreError, coreAllPage } from "@ac/web/lib/dal";
 import { auditItem, type ApiAudit } from "@ac/web/lib/audit";
 import { i18nOf } from "@ac/web/lib/i18n";
@@ -22,11 +22,11 @@ export default async function AdminRestrictionPage({ params }: Readonly<PageProp
   const { id } = await params;
   if (!apiMode()) return <ExceptionDemo id={id} />;
   const [now, perms, display] = await Promise.all([coreNow(), corePermissions(), coreDisplay()]);
-  const i = i18nOf(display), { t } = i;
   // the same permission state as the list (D01): without restriction.read / .write / .override nothing is read
   if (!perms.has("restriction.read") && !perms.has("restriction.write") && !perms.has("restriction.override")) {
-    return <Screen><EmptyState title={t("No access")}>{t("Restrictions need restriction.read, restriction.write or restriction.override.")}</EmptyState></Screen>;
+    return <NeedsAccess what="Restrictions" permission="restriction.read" />; // as every HQ page says it, with whom to ask (IR581)
   }
+  const i = i18nOf(display);
   const [r, units] = await Promise.all([
     recover(coreOp<ApiRestriction>("restrictions.get", { id }), (error: unknown) => {
       if (error instanceof CoreError && error.error.code === "NOT_FOUND") notFound();

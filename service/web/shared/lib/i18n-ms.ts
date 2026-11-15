@@ -5184,8 +5184,6 @@ export const ms: Record<string, string> = {
   "Required when eligible (1–64 characters)": "Diperlukan apabila layak (1–64 aksara)",
 
   // HQ restrictions (lib/restrictions, IR301)
-  "No access": "Tiada akses",
-  "Restrictions need restriction.read, restriction.write or restriction.override.": "Sekatan memerlukan restriction.read, restriction.write atau restriction.override.",
   "removing": "sedang dibuang",
   "Release view (restriction.override only): billing fields are not shown.": "Paparan pelepasan (restriction.override sahaja): medan pengebilan tidak ditunjukkan.",
   "newest first": "terbaharu dahulu",
