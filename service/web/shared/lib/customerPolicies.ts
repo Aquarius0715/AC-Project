@@ -205,3 +205,10 @@ export function policyRefusal(f: { code: string; fieldErrors: Record<string, str
   if (fe.name) return t("Not saved: the name is 1–120 characters.");
   return t("Not saved ({code}).", { code: f.code });
 }
+
+/** Where a policy made from an AC's Attach dialog goes back to (UI/UX loop R46): only an AC page of this app, with the
+new policy to tick there; null for any other address. */
+export function unitBackHref(returnTo: string | null, policyId?: string): string | null {
+  if (!returnTo || !/^\/customer\/units\/[\w-]+$/.test(returnTo)) return null;
+  return policyId ? `${returnTo}?attach=${encodeURIComponent(policyId)}` : returnTo;
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import {
+import { unitBackHref,
   conditionText, defaultRuleRows, durationText, POLICY_FIELDS, policyCards, policyErrors, policyFieldId, policyForm, policyInput, policyRefusal, summaryText, toggledInput, windowText,
   type ApiAlertPolicy, type ApiDefaultPolicy,
 } from "@ac/web/lib/customerPolicies";
@@ -85,5 +85,17 @@ describe("the editor's field order", () => {
     expect(Object.keys(all).toSorted(byText)).toStrictEqual([...POLICY_FIELDS].toSorted(byText));
     expect(POLICY_FIELDS.find((k) => lookup(all, k))).toBe("name");
     expect(policyFieldId("recovery")).toBe("policy-recovery");
+  });
+});
+
+describe("the way back from a new policy to its AC (UI/UX loop R46)", () => {
+  it("goes back only to an AC page, with the new policy to tick", () => {
+    expect(unitBackHref("/customer/units/u-1", "p1")).toBe("/customer/units/u-1?attach=p1");
+    expect(unitBackHref("/customer/units/u-1")).toBe("/customer/units/u-1");
+    expect(unitBackHref("https://example.com/customer/units/u-1", "p1")).toBeNull();
+    expect(unitBackHref("//example.com/customer/units/u-1", "p1")).toBeNull();
+    expect(unitBackHref("/customer/units/u-1?x=1", "p1")).toBeNull();
+    expect(unitBackHref("/customer/payments", "p1")).toBeNull();
+    expect(unitBackHref(null, "p1")).toBeNull();
   });
 });
