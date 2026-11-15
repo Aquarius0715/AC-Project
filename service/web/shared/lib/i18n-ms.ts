@@ -5077,6 +5077,7 @@ export const ms: Record<string, string> = {
   "in this scope": "dalam skop ini",
   "Totals per currency — never converted": "Jumlah mengikut mata wang — tidak pernah ditukar",
   "Billing periods and due dates are Kuala Lumpur dates ({zone}).": "Tempoh pengebilan dan tarikh akhir ialah tarikh Kuala Lumpur ({zone}).",
+  "No invoice has been issued yet.": "Belum ada invois dikeluarkan.",
   "No invoices": "Tiada invois",
   "No invoice matches this scope.": "Tiada invois sepadan dengan skop ini.",
   "No {status} invoices": "Tiada invois {status}",

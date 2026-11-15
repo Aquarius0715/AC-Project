@@ -4960,6 +4960,7 @@ export const id: Record<string, string> = {
   "in this scope": "dalam cakupan ini",
   "Totals per currency — never converted": "Total per mata uang — tidak pernah dikonversi",
   "Billing periods and due dates are Kuala Lumpur dates ({zone}).": "Periode penagihan dan tanggal jatuh tempo adalah tanggal Kuala Lumpur ({zone}).",
+  "No invoice has been issued yet.": "Belum ada faktur yang diterbitkan.",
   "No invoices": "Tidak ada faktur",
   "No invoice matches this scope.": "Tidak ada faktur yang cocok dengan cakupan ini.",
   "No {status} invoices": "Tidak ada faktur {status}",
