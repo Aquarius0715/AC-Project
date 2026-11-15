@@ -50,7 +50,7 @@ function CommandHistoryCard({ hist }: Readonly<{ hist: CommandRow[] }>) {
   const t = useT();
   return (
     <Card title={t("Command history")} sub={t("This unit only · newest first")}>
-      <ul className="flex flex-col divide-y divide-line">{hist.length === 0 && <li className="py-2 text-[13px] text-muted-foreground">{t("No commands for this AC yet")}</li>}{hist.map((h) => <li key={h.id} className="flex flex-wrap justify-between gap-2 py-2 text-[13px]"><span className={h.bad ? "text-crit" : ""}>{h.text}</span><span className="text-xs text-muted-foreground">{h.id} · {h.when}</span></li>)}</ul>
+      <ul className="flex flex-col divide-y divide-line">{hist.length === 0 && <li className="py-2 text-[13px] text-muted-foreground">{t("No commands for this AC yet")}</li>}{hist.map((h) => <li key={h.id} className="flex flex-wrap justify-between gap-2 py-2 text-[13px]"><span className={cx("flex items-start gap-1.5", h.bad && "text-crit")}>{h.bad && <Icon name="error" className="mt-0.5 shrink-0" />}{h.bad && <span className="sr-only">{t("Failed")}: </span>}{h.text}</span><span className="text-xs text-muted-foreground">{h.id} · {h.when}</span></li>)}</ul>
     </Card>
   );
 }
