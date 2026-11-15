@@ -21,7 +21,7 @@ export function TechUnitView({ live }: Readonly<{ live: UnitLive }>) {
   return (
     <Page>
       <div className="flex flex-wrap items-center gap-2 text-[13px]">
-        <Link href={live.back} className="font-semibold text-primary" aria-label={t("Back")}><Icon name="chevronLeft" /></Link><h1 className="text-base font-bold">{live.name}</h1><span className="text-muted-foreground">· {live.short}</span><ConnBadge s={live.connection} />
+        <Link href={live.back} className="font-semibold text-primary" aria-label={t("Back")}><Icon name="chevronLeft" /></Link><h1 className="text-base font-bold">{live.name}</h1><span className="text-muted-foreground">· {live.short}</span><ConnBadge s={live.connection} offlineTone="crit" />
       </div>
       <div><Tabs value={live.tab} onChange={(v) => { patch({ metric: v === "monitoring" ? live.metrics.join(",") : null }); }} tabs={live.tabs} /></div>
       {live.tab === "register" ? (

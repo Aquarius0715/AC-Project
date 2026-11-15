@@ -132,7 +132,7 @@ export function TechDevicesView({ live }: Readonly<{ live: TechDevicesLive }>) {
             <div className="flex flex-col gap-2">{shown.map((r) => (
               <ListRow key={r.id} selected={dv?.row.id === r.id} onClick={() => { open(r.id); }}>
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-2"><b className="whitespace-nowrap text-[13px]">{r.serial}</b><span className="flex flex-wrap items-center justify-end gap-1"><ConnBadge s={r.conn} />{r.tamper && <Badge tone="warn">{t("Tamper")}</Badge>}{r.connText && <span className="text-[10px] text-muted-foreground">{r.connText}</span>}</span></div>
+                  <div className="flex items-center justify-between gap-2"><b className="whitespace-nowrap text-[13px]">{r.serial}</b><span className="flex flex-wrap items-center justify-end gap-1"><ConnBadge s={r.conn} offlineTone="crit" />{r.tamper && <Badge tone="warn">{t("Tamper")}</Badge>}{r.connText && <span className="text-[10px] text-muted-foreground">{r.connText}</span>}</span></div>
                   <div className="truncate text-[11px] text-muted-foreground">{r.id.slice(0, 8)}</div>
                   <div className="flex justify-between gap-2 text-[11px] text-muted-foreground"><span className="truncate">{r.unit}</span><span>{t("fw {version}", { version: r.fw })}</span></div>
                 </div>
