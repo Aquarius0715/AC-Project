@@ -127,7 +127,7 @@ function CustomerList({ live }: Readonly<{ live: UnitsLive }>) {
         </div>
         {live.rows.length === 0 ? <EmptyState title={t("No customers yet")}>{t(live.canWrite ? "Create the first customer, then add its properties and units." : "Customers appear here once HQ registers them.")}</EmptyState> : (
           <DataTable rows={rows} rowKey={(r) => r.id} onRowClick={(r) => { nav({ customerId: r.id, tab: null, locationId: null, unitId: null, powerState: null, connections: null, search: null }); }} cols={[
-            { key: "c", label: t("Customer"), render: (r) => <><b>{r.name}</b><div className="text-xs text-muted-foreground">{r.billingName} · {r.id.slice(0, 8)}</div></> },
+            { key: "c", label: t("Customer"), render: (r) => <><b>{r.name}</b><div className="text-xs text-muted-foreground">{r.billingName && r.billingName !== r.name ? t("billed as {name} · {id}", { name: r.billingName, id: r.id.slice(0, 8) }) : r.id.slice(0, 8)}</div></> },
             { key: "s", label: t("Status"), render: (r) => <Badge tone={r.status === "active" ? "ok" : "unknown"}>{t(r.status === "active" ? "Active" : "Inactive")}</Badge> },
             { key: "p", label: t("Properties"), render: (r) => r.properties, hideBelow: "sm" },
             { key: "u", label: t("Units"), render: (r) => r.units },
