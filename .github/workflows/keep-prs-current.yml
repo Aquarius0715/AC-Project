@@ -1,0 +1,41 @@
+# Keeps the owner's auto-merge pull requests moving into main. main requires a branch that is up to
+# date with it, so after one pull request merges every other one is behind, and auto-merge waits for ever: 34 green pull
+# requests stood still on 2026-11-14. A merge or branch update made with the workflow token also starts no CI, on main or on
+# the branch. Every five minutes .github/scripts/keep_prs_current.py takes one step: CI on main when its head has none,
+# CI on an updated branch that has none, a wait while one pull request's CI runs or it merges, or else bringing the oldest
+# behind pull request up to date with main and starting its CI. So the pull requests merge one after another, each tested
+# on the main it merges into. A pull request that conflicts with main gets a warning in the run and is left alone.
+name: Keep pull requests current
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: keep-prs-current
+  cancel-in-progress: false
+
+jobs:
+  step:
+    name: Bring one pull request up to date
+    if: github.repository == 'Aquarius0715/AC-Project' # only in this repository, never a fork's (IR732)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: write # start CI (workflow_dispatch) on main or on an updated branch
+      contents: write # update a pull request's branch with main
+      pull-requests: write # the same update, through the pull request
+    container: { image: "python:3.13-bookworm" }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false # the script calls the API with the token; git never pushes
+          sparse-checkout: .github/scripts
+      - name: one step
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 .github/scripts/keep_prs_current.py

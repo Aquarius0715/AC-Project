@@ -346,6 +346,7 @@ trace = rows('00-prepare/traceability.csv')
 # 0.27.0 (2026-10-07): IR117 AWS / Stripe / HQ network restriction / retention / capacity (production target only); counts unchanged.
 # 0.26.0 (2026-10-07): IR116 Next.js stack + backend-architecture.md / network-architecture.md (production target, not 1A inputs); counts unchanged.
 # 0.25.0 (2026-10-07): IR115 consistency fixes (tabs, permissions, owner-only default rules); counts unchanged.
+# 0.639.0 (2026-11-15): IR796 auto-merge pull requests are brought up to date one at a time; counts unchanged.
 # 0.638.0 (2026-11-13): IR794 adds FR-C20 (installation request, DD-C20, SCR-C20); 86 requirement IDs, 70 role rows, 232 operations.
 # 0.637.0 (2026-11-13): IR793 air quality shows all four metrics at once; counts unchanged.
 # 0.636.0 (2026-11-13): IR792 the test deployment waits for CI in its own run; counts unchanged.
