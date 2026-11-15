@@ -5389,6 +5389,7 @@ export const ja: Record<string, string> = {
   "exception until {time}": "{time} まで例外",
   "{state} — as this entry recorded it": "{state} — この記録に記録されたとおり",
   "version {from} → {to}": "バージョン {from} → {to}",
+  "This entry": "この記録",
   "Correlation trace": "相関のトレース",
   "Pending is shown on its own; the final result is a new entry with the same correlation ID. Earlier entries are never edited.": "「保留中」は単独で表示されます。最終結果は、同じ相関 ID の新しい記録です。以前の記録が編集されることはありません。",
   "Load more": "さらに読み込む",
