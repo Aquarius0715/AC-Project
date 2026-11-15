@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Badge, Banner, Btn, Card, Choice, ConnBadge, cx, DataTable, EmptyState, Field, Modal, Page, PowerBadge, SummaryList, useToast, Plain } from "@ac/web/components/ui";
-import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
+import { useUrlPatchPending } from "@ac/web/lib/useUrlPatch";
 import { selectionId, type Connection, type PowerState, type Selection, type TreeProperty, type TreeSpace } from "@ac/web/lib/assets";
 import { changeText, groupPlan, hasChoice, KEEP_ALL, type GroupChange, type PlanRow, type RoomUnit } from "@ac/web/lib/clientProperties";
 import { historyRow, type ApiCommand, type ApiUnitDetail } from "@ac/web/lib/units";
@@ -41,7 +41,7 @@ const TRY_TONE = new Map<string, "ok" | "crit" | "warn">([["Confirmed", "ok"], [
 const RESULT_TONE = new Map<string, "unknown" | "warn" | "muted">([["Skipped", "unknown"], ["Clamped", "warn"], ["No change", "muted"]]);
 export function PropertiesView({ live }: Readonly<{ live: PropertiesLive }>) {
   const t = useT();
-  const nav = useUrlPatch();
+  const [nav, isNavPending] = useUrlPatchPending();
   const [renaming, setRenaming] = useState<Renaming | null>(null);
   if (live.tree.length === 0) return <Page><EmptyState title={t("No properties yet")}>{t("HQ registers your homes and offices with their rooms and air conditioners; they appear here once set up.")}</EmptyState></Page>;
   const sel = live.selection;
@@ -64,7 +64,7 @@ export function PropertiesView({ live }: Readonly<{ live: PropertiesLive }>) {
           <p className="mt-3 text-[11px] text-muted-foreground">{t("Read-only — HQ sets up properties, floors, rooms and units. You can rename any location with its edit button or Rename; nothing else here changes the structure.")}</p>
         </Card>
         <div className="flex min-w-0 flex-col gap-4">
-          {live.filter ? <FilteredUnits live={live} clear={() => { go({}); }} /> : sel && <Panel live={live} sel={sel} rename={setRenaming} go={go} />}
+          {live.filter ? <FilteredUnits live={live} clear={() => { go({}); }} /> : sel && <Panel live={live} sel={sel} rename={setRenaming} go={go} isPending={isNavPending} />}
         </div>
       </div>
       {renaming && <RenameModal r={renaming} onClose={() => { setRenaming(null); }} />}
@@ -127,7 +127,9 @@ function FilteredUnits({ live, clear }: Readonly<{ live: PropertiesLive; clear: 
   );
 }
 
-function Panel({ live, sel, rename, go }: Readonly<{ live: PropertiesLive; sel: Selection; rename: (r: Renaming) => void; go: (x: Record<string, string | null>) => void }>) {
+function Panel({ live, sel, rename, go, isPending }: Readonly<{ live: PropertiesLive; sel: Selection; rename: (r: Renaming) => void; go: (x: Record<string, string | null>) => void; isPending: boolean }>) {
+  // the mode the user just chose, shown at once while the server renders it (the switch took a second with no sign)
+  const [chosen, setChosen] = useState<"single" | "group" | null>(null);
   const t = useT();
   const p = sel.property;
   if (sel.kind === "property") {
@@ -169,6 +171,7 @@ function Panel({ live, sel, rename, go }: Readonly<{ live: PropertiesLive; sel: 
   const direct = live.units.filter((u) => live.details.find((d) => d.id === u.id)?.spaceId === s.id);
   const canGroup = live.owner && direct.length >= 2;
   const mode = canGroup ? live.mode : "single";
+  const shownMode = isPending && chosen ? chosen : mode;
   return (
     <>
       <div className="text-[13px] text-muted-foreground">{t(MY_PROPERTIES)} › {sel.path.split(" › ").map((x, i, a) => <span key={i}>{i === a.length - 1 ? <b className="text-ink">{x}</b> : `${x} › `}</span>)}</div>
@@ -178,8 +181,9 @@ function Panel({ live, sel, rename, go }: Readonly<{ live: PropertiesLive; sel: 
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <span className="text-xs text-muted-foreground">{t("{acs} in {space} ·", { acs: acsText(t, direct.length), space: s.name })}</span>
             {(["single", "group"] as const).map((m) => {
-              return <Plain key={m} type="button" aria-pressed={mode === m} onClick={() => { go({ spaceId: s.id, mode: m === "group" ? "group" : null }); }}
-                className={cx("inline-flex items-center gap-1 rounded-control border px-3 py-1 text-xs font-semibold", mode === m ? "border-primary bg-primary-soft text-primary" : "border-line")}>{mode === m && <Icon name="check" />}{t(m === "single" ? "Single AC" : "Group control")}</Plain>;
+              const isLoading = isPending && chosen === m && mode !== m;
+              return <Plain key={m} type="button" aria-pressed={shownMode === m} aria-busy={isLoading} onClick={() => { setChosen(m); go({ spaceId: s.id, mode: m === "group" ? "group" : null }); }}
+                className={cx("inline-flex items-center gap-1 rounded-control border px-3 py-1 text-xs font-semibold", shownMode === m ? "border-primary bg-primary-soft text-primary" : "border-line")}>{isLoading ? <Icon name="refresh" className="animate-spin" /> : shownMode === m && <Icon name="check" />}{t(m === "single" ? "Single AC" : "Group control")}</Plain>;
             })}
           </div>
         )}
