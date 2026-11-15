@@ -10544,3 +10544,13 @@ The user asked for Indonesian to be selectable as a language, as Japanese was ad
 5. **The payout PDF.** The statement PDF has an ASCII-only Courier font; Indonesian is written in Latin letters, so an Indonesian user's PDF is in Indonesian (a Japanese user's stays English, IR639).
 6. **Tests.** Vitest runs the dictionary checks for the new language (placeholders, keys, once-only keys, role words), the Indonesian date, ordinal, locale list and PDF; the Go integration test saves `id` with `Asia/Jakarta` and reads it back; Playwright saves Indonesian in Preferences, reads the shell back and puts English back.
 7. **Not done.** Figma (the language chooser of Preferences in each role's Shared row), as for Japanese.
+
+## IR796 Auto-merge pull requests are brought up to date one at a time — 2026-11-15
+
+`main` requires a branch that is up to date with it (strict required checks). Once one pull request merged, every other open one was behind, and GitHub's auto-merge waited for ever: 34 green UI/UX pull requests (#277–#310) stood still until they were merged together through #311. A merge or a branch update made with the workflow token also starts no workflow, so `main` had no CI after an auto-merge (deploy-test starts it for a tag, IR792).
+
+1. **The workflow.** `.github/workflows/keep-prs-current.yml` runs every five minutes (and by hand) on a GitHub-hosted runner, only in this repository, with `actions`, `contents` and `pull-requests` write for its one job.
+2. **One step per run** (`.github/scripts/keep_prs_current.py`): CI on `main` when its head has none, and then one step for the pull requests: CI on an up-to-date pull request whose head has none and is older than three minutes (a branch it updated); a wait while one pull request's CI runs or one that passed is about to merge; otherwise the oldest behind pull request is brought up to date with `main` (`update-branch`) and its CI started (`workflow_dispatch` on its branch, whose check runs on the head satisfy the required checks).
+3. **Which pull requests.** The ones `auto-merge.yml` turns auto-merge on for: open, not draft, the owner's, from a branch of this repository, auto-merge on. A conflicting one (`dirty`) gets a warning in the run and is left for its own merge of `main`.
+4. **Kept.** The strict rule stays: each pull request is tested on the `main` it merges into. A merge queue would do the same but is for organisation repositories only.
+5. **Tests.** `test_keep_prs_current.py` (other-lint) covers the order of the steps: the oldest behind one, waiting for one that runs or merges, the grace for a fresh push, and failed or conflicting ones not holding the others.
