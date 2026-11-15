@@ -2,6 +2,8 @@
 // company acceptance (DEC-108). Keys are the English texts (the same keys, in the same order, as i18n-ms.ts); a text without an
 // entry is shown in English. Keep {name} placeholders as they are.
 export const id: Record<string, string> = {
+  "Air conditioners in this property ({n})": "AC di properti ini ({n})",
+  "No air conditioner in a room of this property yet.": "Belum ada AC di ruangan properti ini.",
   "Overview": "Ringkasan",
   "Units & locations": "Unit & lokasi",
   "Automations & schedules": "Otomasi & jadwal",
@@ -1017,8 +1019,6 @@ export const id: Record<string, string> = {
   "Air conditioners": "Pendingin udara",
   "{inRooms} in rooms · {unassigned} unassigned": "{inRooms} di ruangan · {unassigned} belum ditempatkan",
   "Last edited": "Terakhir diubah",
-  "Select a room to see its air conditioners": "Pilih ruangan untuk melihat pendingin udaranya",
-  "Floor → Room → Air conditioner. Each room lists every AC inside it; open one to control it.": "Lantai → Ruangan → Pendingin udara. Setiap ruangan mencantumkan semua AC di dalamnya; buka salah satu untuk mengontrolnya.",
   "? Unassigned units ({n})": "? Unit yang belum ditempatkan ({n})",
   "Not in any room": "Tidak di ruangan mana pun",
   "Moving a unit into a room is done in HQ’s unit register — contact HQ.": "Memindahkan unit ke ruangan dilakukan di register unit HQ — hubungi HQ.",

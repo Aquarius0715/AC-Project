@@ -2,6 +2,8 @@
 // acceptance (IR639). Keys are the English texts (the same keys as i18n-ms.ts); a text without an entry is shown in
 // English. Keep {name} placeholders as they are.
 export const ja: Record<string, string> = {
+  "Air conditioners in this property ({n})": "この施設のエアコン（{n}）",
+  "No air conditioner in a room of this property yet.": "この施設の部屋にはまだエアコンがありません。",
   "Overview": "概要",
   "Units & locations": "ユニットと設置場所",
   "Automations & schedules": "自動化とスケジュール",
@@ -1017,8 +1019,6 @@ export const ja: Record<string, string> = {
   "Air conditioners": "エアコン",
   "{inRooms} in rooms · {unassigned} unassigned": "部屋に {inRooms} 台 · 未割り当て {unassigned} 台",
   "Last edited": "最終編集",
-  "Select a room to see its air conditioners": "部屋を選ぶと、その部屋のエアコンが表示されます",
-  "Floor → Room → Air conditioner. Each room lists every AC inside it; open one to control it.": "フロア → 部屋 → エアコン。各部屋にはその中のすべてのエアコンが並びます。開くと操作できます。",
   "? Unassigned units ({n})": "? 未割り当てのユニット（{n}）",
   "Not in any room": "どの部屋にもありません",
   "Moving a unit into a room is done in HQ’s unit register — contact HQ.": "ユニットを部屋に移す作業は、本部のユニット台帳で行います — 本部にご連絡ください。",

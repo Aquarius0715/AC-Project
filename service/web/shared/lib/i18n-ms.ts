@@ -5,6 +5,8 @@ const BUKA_KERJA = "Buka kerja";
 // company acceptance (REV18-047 in IR74, IR258). Keys are the English texts; a text without an entry is shown in
 // English. Keep {name} placeholders as they are.
 export const ms: Record<string, string> = {
+  "Air conditioners in this property ({n})": "Penyaman udara di premis ini ({n})",
+  "No air conditioner in a room of this property yet.": "Belum ada penyaman udara di bilik premis ini.",
   // shell
   "Overview": "Gambaran keseluruhan",
   "Units & locations": "Unit & lokasi",
@@ -1059,8 +1061,6 @@ export const ms: Record<string, string> = {
   "Air conditioners": "Penyaman udara",
   "{inRooms} in rooms · {unassigned} unassigned": "{inRooms} dalam bilik · {unassigned} tanpa bilik",
   "Last edited": "Kali terakhir disunting",
-  "Select a room to see its air conditioners": "Pilih bilik untuk melihat penyaman udaranya",
-  "Floor → Room → Air conditioner. Each room lists every AC inside it; open one to control it.": "Tingkat → Bilik → Penyaman udara. Setiap bilik menyenaraikan setiap AC di dalamnya; buka satu untuk mengawalnya.",
   "? Unassigned units ({n})": "? Unit tanpa bilik ({n})",
   "Not in any room": "Tidak dalam mana-mana bilik",
   "Moving a unit into a room is done in HQ’s unit register — contact HQ.": "Memindahkan unit ke dalam bilik dilakukan dalam daftar unit HQ — hubungi HQ.",

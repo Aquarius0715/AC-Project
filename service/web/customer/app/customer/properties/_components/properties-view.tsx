@@ -133,16 +133,23 @@ function Panel({ live, sel, rename, go }: Readonly<{ live: PropertiesLive; sel: 
   if (sel.kind === "property") {
     const s = live.summary;
     if (!s) return null;
+    const isUnassigned = (id: string) => live.details.find((d) => d.id === id)?.spaceId === null;
+    const unassigned = live.units.filter((u) => isUnassigned(u.id));
+    const inRooms = live.units.filter((u) => !isUnassigned(u.id));
     return (
       <>
         <div className="text-[13px] text-muted-foreground">{t(MY_PROPERTIES)} › <b className="text-ink">{p.name}</b></div>
         <Card title={<span className="flex items-center gap-2">{p.name}<Badge tone="muted" icon="home">{kind(t, p.kind)}</Badge></span>}
           action={<Btn size="sm" onClick={() => { rename({ kind: "property", id: p.id, version: p.version, name: p.name, where: t("{name} · {kind} (property)", { name: p.name, kind: kind(t, p.kind) }) }); }}><Icon name="edit" />{t("Rename")}</Btn>}>
           <SummaryList cols={2} items={[[t("Type"), kind(t, s.kind)], [t("Floors"), s.floors.length > 0 ? `${String(s.floors.length)} (${s.floors.join(", ")})` : t("none")], [t("Rooms"), s.rooms], [t("Air conditioners"), t("{inRooms} in rooms · {unassigned} unassigned", { inRooms: s.inRooms, unassigned: s.unassigned })], [t("Last edited"), s.edited]]} />
-          <div className="my-4 rounded-xl bg-surface2 p-4 text-center"><div className="font-bold">{t("Select a room to see its air conditioners")}</div><div className="text-xs text-muted-foreground">{t("Floor → Room → Air conditioner. Each room lists every AC inside it; open one to control it.")}</div></div>
-          {live.units.length > 0 && <>
-            <div className="mb-2 text-[13px] font-bold">{t("? Unassigned units ({n})", { n: live.units.length })} <span className="text-xs font-normal text-muted-foreground">{t("Not in any room")}</span></div>
-            <UnitRows units={live.units} />
+          {/* the property's ACs at a glance, each with its room, instead of "select a room" first */}
+          {inRooms.length > 0 ? <div className="mt-4">
+            <div className="mb-2 text-[13px] font-bold">{t("Air conditioners in this property ({n})", { n: inRooms.length })}</div>
+            <UnitRows units={inRooms} />
+          </div> : <p className="my-4 text-[13px] text-muted-foreground">{t("No air conditioner in a room of this property yet.")}</p>}
+          {unassigned.length > 0 && <>
+            <div className="mb-2 mt-4 text-[13px] font-bold">{t("? Unassigned units ({n})", { n: unassigned.length })} <span className="text-xs font-normal text-muted-foreground">{t("Not in any room")}</span></div>
+            <UnitRows units={unassigned} />
             <p className="mt-2 text-[11px] text-muted-foreground">{t("Moving a unit into a room is done in HQ’s unit register — contact HQ.")}</p>
           </>}
         </Card>
