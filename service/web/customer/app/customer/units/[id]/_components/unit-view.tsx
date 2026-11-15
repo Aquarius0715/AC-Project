@@ -57,11 +57,12 @@ function CommandHistoryCard({ hist }: Readonly<{ hist: CommandRow[] }>) {
   );
 }
 
-/** The units of the room, the shown one marked. */
+/** The units of the room, the shown one marked. On a phone it follows the AC's own card and controls (the reason one
+opens this page); beside them from 880 px as before. */
 function RoomDevicesCard({ id, d, rows }: Readonly<{ id: string; d: ApiUnitDetail | null; rows: UnitRow[] }>) {
   const t = useT();
   return (
-      <Card title={t("DEVICES IN THIS ROOM")} sub={d ? byCount(rows.length, { one: t("{room} · {n} AC", { room: d.location.pathLabels.at(-1) ?? t("Room"), n: 1 }), many: t("{room} · {n} ACs", { room: d.location.pathLabels.at(-1) ?? t("Room"), n: rows.length }) }) : "Bedroom · 2 ACs · Home A › 1F"} className="self-start">
+      <Card title={t("DEVICES IN THIS ROOM")} sub={d ? byCount(rows.length, { one: t("{room} · {n} AC", { room: d.location.pathLabels.at(-1) ?? t("Room"), n: 1 }), many: t("{room} · {n} ACs", { room: d.location.pathLabels.at(-1) ?? t("Room"), n: rows.length }) }) : "Bedroom · 2 ACs · Home A › 1F"} className="order-last self-start @min-[880px]:order-none">
         <div className="flex flex-col gap-2">
           {rows.map((s) => (
             <Link key={s.id} href={`/customer/units/${s.id}`} className={cx("rounded-xl border p-3", s.id === id ? "border-primary bg-primary-soft/60" : "border-line hover:bg-surface2/60")}>
