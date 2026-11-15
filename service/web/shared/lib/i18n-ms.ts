@@ -15,6 +15,8 @@ export const ms: Record<string, string> = {
   "Choose a membership": "Pilih keahlian",
   "Pick one in the list to see or change its access, or start a New membership.": "Pilih satu dalam senarai untuk melihat atau mengubah aksesnya, atau mulakan Keahlian baharu.",
   "Cooling restricted": "Penyejukan dihadkan",
+  "Air conditioners in this property ({n})": "Penyaman udara di premis ini ({n})",
+  "No air conditioner in a room of this property yet.": "Belum ada penyaman udara di bilik premis ini.",
   // shell
   "Overview": "Gambaran keseluruhan",
   "Units & locations": "Unit & lokasi",
@@ -1075,8 +1077,6 @@ export const ms: Record<string, string> = {
   "Air conditioners": "Penyaman udara",
   "{inRooms} in rooms · {unassigned} unassigned": "{inRooms} dalam bilik · {unassigned} tanpa bilik",
   "Last edited": "Kali terakhir disunting",
-  "Select a room to see its air conditioners": "Pilih bilik untuk melihat penyaman udaranya",
-  "Floor → Room → Air conditioner. Each room lists every AC inside it; open one to control it.": "Tingkat → Bilik → Penyaman udara. Setiap bilik menyenaraikan setiap AC di dalamnya; buka satu untuk mengawalnya.",
   "? Unassigned units ({n})": "? Unit tanpa bilik ({n})",
   "Not in any room": "Tidak dalam mana-mana bilik",
   "Moving a unit into a room is done in HQ’s unit register — contact HQ.": "Memindahkan unit ke dalam bilik dilakukan dalam daftar unit HQ — hubungi HQ.",
