@@ -2,6 +2,8 @@
 // acceptance (IR639). Keys are the English texts (the same keys as i18n-ms.ts); a text without an entry is shown in
 // English. Keep {name} placeholders as they are.
 export const ja: Record<string, string> = {
+  "On the next page, change the e-mail address (↻) to this service's account.": "次の画面でメールアドレスを変更（↻）し、このサービスのアカウントでサインインしてください。",
+  "Sign in with another account": "別のアカウントでサインイン",
   "Overview": "概要",
   "Units & locations": "ユニットと設置場所",
   "Automations & schedules": "自動化とスケジュール",
