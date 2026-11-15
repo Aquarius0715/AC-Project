@@ -35,10 +35,11 @@ export default async function CustomerPropertiesPage({ searchParams }: Readonly<
   const isFiltered = !one("spaceId") && !one(PROPERTYID) && (!!powerState || conns.length > 0);
   const propertySel = one("unassignedOnly") === "true" && one(PROPERTYID) ? selection(tree, `unassigned:${one(PROPERTYID) ?? ""}`, spaces) : selection(tree, one(PROPERTYID), spaces);
   const sel = one("spaceId") ? selection(tree, one("spaceId"), spaces) : propertySel;
-  // the units whose detail the panel needs: the KPI filter, a room / area (descendants included) or the property's unassigned units
+  // the units whose detail the panel needs: the KPI filter, a room / area (descendants included) or the property's units
   const selectedUnits = () => {
     if (!sel) return [];
-    return sel.kind === "property" ? units.filter((u) => u.propertyId === sel.property.id && u.spaceId === null) : unitsAt(sel, units);
+    // a property lists all its units (those in rooms and the unassigned ones), as a floor or room lists those beneath it
+    return sel.kind === "property" ? units.filter((u) => u.propertyId === sel.property.id) : unitsAt(sel, units);
   };
   const shown = isFiltered ? filterUnits(units, { powerState, connections: conns, search: "" }) : selectedUnits();
   const details = await Promise.all(shown.map((u) => coreOp<ApiUnitDetail>("units.get", { id: u.id })));

@@ -144,7 +144,7 @@ Scope: FR-C03 / Main display pattern: **UI-DETAIL**. Service boundary: `units.ge
    - Offer only what the model supports (IR524, IR530; Figma 02o, 02p).
      - A model without control shows "No remote control on this model" and that settings are changed on the AC itself.
      - The temperature row needs a temperature range. The mode and fan rows need their control and list only the model's own values.
-     - A model with the power only sends it at once, with no change summary or review bar.
+     - A model with the power only has no change summary or review bar. The power switch, on any model, asks first (target and change) and sends after the confirmation.
    - A change is only what the user changed: a setting the AC has not reported is no change from the screen's default (IR524).
    - Devices in this room show each AC's latest valid room temperature and power draw, never its setting (IR527).
    - A power-OFF request does not set measured temperature to 0.
@@ -523,7 +523,7 @@ Scope: FR-C14 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 **Steps**
 
 1. Toggle Single AC / Group control. Cards show each AC with power/connection badges; “Select all online” and Clear.
-2. Choose the change; Review & send opens a centered modal listing each AC: change (before → after), Will send, Skipped (offline), or clamped value under a restriction (IR46).
+2. Choose the change. Power, temperature, mode and fan each start on Keep (every AC keeps its own setting), and Review & send stays disabled until one is chosen; Power Off sends only the power. Review & send opens a centered modal listing each AC: change (before → after), Will send, Skipped (offline), or clamped value under a restriction (IR46).
 3. Send calls `commands.create` per AC that will be sent and per changed setting (a Command carries one UnitAction, as in single control), each with its own idempotency key and expectedUnitVersion (IR109, IR211); an AC's settings go one after another and stop at its first failure. Each card follows its Command with `commands.get` (Sending → Confirmed / Failed); Retry resends one AC.
    - As built (IR380): a command refused by the member's write limit (RATE_LIMITED, IR375) changed nothing, so it waits the advised seconds and is sent again, up to five times. Meanwhile its card shows Waiting with the seconds. Any other refusal shows the shared wording on the card.
 4. Queries to update: `units / commands`.

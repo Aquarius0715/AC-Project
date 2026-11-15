@@ -42,11 +42,12 @@ async function AdminAccessPageContent({ searchParams }: Readonly<PageProps<"/adm
   const rows = memberRows(members, orgs, now, i18nOf(display)).filter((r) => status !== "inactive" || !r.active);
   const users = [...new Map((everyone ?? members).filter((m) => m.role !== "client").map((m) => [m.userId, m.displayName]))].map(([id, name]) => ({ id, name }));
   const wanted = one("membershipId");
-  // the asked membership, a new one, or the first; an asked one that is gone is missing
+  // the asked membership, a new one, or none until one is chosen (the first used to open, its editable access shown for
+  // a member nobody picked); an asked one that is gone is missing
   const selectedOf = () => {
     if (wanted === "new") return "new";
     if (wanted) return rows.find((r) => r.id === wanted)?.id ?? "missing";
-    return rows[0]?.id ?? "new";
+    return rows.length > 0 ? "none" : "new";
   };
   const selected = selectedOf();
   return (

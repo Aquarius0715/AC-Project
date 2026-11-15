@@ -63,23 +63,27 @@ export function Badge({ tone = "muted", icon, children, className }: Readonly<{ 
   );
 }
 
-// the state badges speak the display language (IR258); the state values themselves stay as stored
+// the state badges speak the display language (IR258); the state values themselves stay as stored. The power and the
+// connection badge stand side by side, so each names what it describes: a hidden "Power state:" / "Connection:" for screen
+// readers, and an unknown state says which one is unknown ("Unknown" twice read as one state).
 export function PowerBadge({ s }: Readonly<{ s: "running" | "stopped" | "unknown" }>) {
   const t = useT();
+  const what = <span className="sr-only">{t("Power state")}: </span>;
   switch (s) {
-    case "running": { return <Badge tone="ok" icon="running">{t("Running")}</Badge>; }
-    case "stopped": { return <Badge tone="muted" icon="stopped">{t("Stopped")}</Badge>; }
-    case "unknown": { return <Badge tone="unknown" icon="unknown">{t("Unknown")}</Badge>; }
+    case "running": { return <Badge tone="ok" icon="running">{what}{t("Running")}</Badge>; }
+    case "stopped": { return <Badge tone="muted" icon="stopped">{what}{t("Stopped")}</Badge>; }
+    case "unknown": { return <Badge tone="unknown" icon="unknown">{what}{t("Power unknown")}</Badge>; }
   }
 }
 export function ConnBadge({ s }: Readonly<{ s: "online" | "offline" | "connecting" | "unknown" | "error" }>) {
   const t = useT();
+  const what = <span className="sr-only">{t("Connection")}: </span>;
   switch (s) {
-    case "online": { return <Badge tone="ok" icon="online">{t("Online")}</Badge>; }
-    case "offline": { return <Badge tone="unknown" icon="offline">{t("Offline")}</Badge>; }
-    case "error": { return <Badge tone="crit" icon="error">{t("Error")}</Badge>; }
-    case "unknown": { return <Badge tone="unknown" icon="unknown">{t("Unknown")}</Badge>; }
-    case "connecting": { return <Badge tone="primary" icon="refresh">{t("Connecting")}</Badge>; }
+    case "online": { return <Badge tone="ok" icon="online">{what}{t("Online")}</Badge>; }
+    case "offline": { return <Badge tone="unknown" icon="offline">{what}{t("Offline")}</Badge>; }
+    case "error": { return <Badge tone="crit" icon="error">{what}{t("Error")}</Badge>; }
+    case "unknown": { return <Badge tone="unknown" icon="unknown">{what}{t("Connection unknown")}</Badge>; }
+    case "connecting": { return <Badge tone="primary" icon="refresh">{what}{t("Connecting")}</Badge>; }
   }
 }
 export function SeverityBadge({ s }: Readonly<{ s: "critical" | "warning" | "normal" }>) {
@@ -660,17 +664,30 @@ export function ListRow({ id, selected, onClick, href, children, className }: { 
 const axisTick = { fontSize: 10 };
 const defaultBarColors = ["#c9d8ee", "#005bea"];
 
-/** Grouped bars, one group per label. `names` name the series in the tooltip and the legend under the chart. */
-export function BarChart({ labels, series, names, unit, height = 160, colors = defaultBarColors }: Readonly<{ labels: string[]; series: number[][]; names?: string[]; unit?: string; height?: number; colors?: string[] }>) {
+/** A day label of a bar chart, with "no data" under it when no series has a value there (a missing reading is no bar, never 0). */
+function BarTick({ x, y, payload, missing }: Readonly<{ x?: number; y?: number; payload?: { value?: string; index?: number }; missing: ReadonlySet<number> }>) {
   const t = useT();
-  const max = Math.max(1, ...series.flat()) * 1.1;
+  return (
+    <text x={x} y={y} dy={10} textAnchor="middle" fontSize={10} className="fill-muted-foreground">
+      {payload?.value}
+      {payload?.index !== undefined && missing.has(payload.index) && <tspan x={x} dy={12} fontStyle="italic">{t("no data")}</tspan>}
+    </text>
+  );
+}
+
+/** Grouped bars, one group per label. `names` name the series in the tooltip and the legend under the chart; a null value
+is a missing reading: no bar, and "no data" under the label when every series misses it. */
+export function BarChart({ labels, series, names, unit, height = 160, colors = defaultBarColors }: Readonly<{ labels: string[]; series: (number | null)[][]; names?: string[]; unit?: string; height?: number; colors?: string[] }>) {
+  const t = useT();
+  const max = Math.max(1, ...series.flat().filter((v): v is number => v !== null)) * 1.1;
+  const missing = new Set(labels.map((_, i) => i).filter((i) => series.every((s) => (s.at(i) ?? null) === null)));
   const data = labels.map((label, i) => ({ label, ...Object.fromEntries(series.map((s, j) => [`s${String(j)}`, s.at(i)])) }));
   const config: ChartConfig = Object.fromEntries(series.map((_, j) => [`s${String(j)}`, { label: names?.at(j) ?? t("Value"), color: colors.at(j % colors.length) }]));
   return (
     <ChartContainer config={config} className="aspect-auto w-full" style={{ height: height + (names ? 28 : 0) }}>
       <RBarChart data={data} margin={{ top: unit ? 14 : 6, right: 4, bottom: 0, left: 0 }} title={t("Bar chart")}>
         <CartesianGrid vertical={false} />
-        <XAxis dataKey="label" tickLine={false} axisLine={false} tick={axisTick} interval={0} />
+        <XAxis dataKey="label" tickLine={false} axisLine={false} tick={<BarTick missing={missing} />} interval={0} height={missing.size > 0 ? 34 : 22} />
         <YAxis domain={[0, max]} ticks={[0, max / 2, max]} tickFormatter={(v: number) => (max < 10 ? v.toFixed(1) : String(Math.round(v)))} tickLine={false} axisLine={false} tick={axisTick} width={28} />
         {unit && <text x="100%" y={10} dx={-2} textAnchor="end" fontSize={10} className="fill-muted-foreground">{unit}</text>}
         <ChartTooltip cursor={false} content={<ChartTooltipContent labelFormatter={(v) => (unit ? <>{v} <span className="font-normal text-muted-foreground">· {unit}</span></> : v)} />} />

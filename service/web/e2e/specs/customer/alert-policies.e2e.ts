@@ -29,6 +29,8 @@ test("an owner switches a default rule and back", async ({ page }) => {
   const isBefore = (await rule.getAttribute("aria-checked")) === "true";
   for (const isWant of [!isBefore, isBefore]) {
     await rule.click();
+    // switching a rule off for every AC asks first (UI/UX loop R23); switching it on does not
+    if (!isWant) await page.getByRole("dialog").getByRole("button", { name: "Turn off" }).click();
     await expect(page.getByText(`Default rule “AC offline” switched ${isWant ? "on" : "off"}`)).toBeVisible();
     await expect(rule).toHaveAttribute("aria-checked", String(isWant));
   }

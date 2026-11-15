@@ -272,7 +272,7 @@ export function blankDraft(unitId: string, timezone: string): Draft {
     endLocal: "22:00",
     endsNextDay: false,
     startAction: "temp:25",
-    endAction: "power:off",
+    endAction: "", // never assumed: the customer chooses what happens at the end
     occupied: false,
     event: "arrival",
     localTime: "18:00",
@@ -335,6 +335,7 @@ export function draftErrors(d: Draft, tr: T = en): Record<string, string> {
   if (!d.unitId) e.unitId = tr("Choose the AC");
   if (d.trigger === "schedule") {
     if (d.weekdays.length === 0) e.weekdays = tr("Choose at least one weekday");
+    if (!d.endAction) e.endAction = tr("Choose what happens at the end");
     if (!hhmm.test(d.startLocal)) e.startLocal = noTime;
     if (!hhmm.test(d.endLocal)) e.endLocal = noTime;
     if (!e.startLocal && !e.endLocal) {
@@ -412,6 +413,7 @@ export function firstAction(groups: ActionGroup[], id: string): string {
 /** The editor summary (Figma 03b/03e right panel). */
 export function summaryText(d: Draft, unit: string, place: string, t: T = en): string {
   const set = (k: string) => {
+    if (!k) return t("(not chosen yet)");
     const a = actionOf(k);
     switch (a.kind) {
       case "set_power": { return t(a.power ? "{unit} power ON" : "{unit} power OFF", { unit });

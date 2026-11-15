@@ -18,7 +18,7 @@ interface Live {
   waiting: number | null; // requests waiting for HQ, any requested time (IR611); null without job.read
 }
 const PERIODS = [{ id: "today", label: "Today" }, { id: "7d", label: "Last 7 days" }, { id: "30d", label: "Last 30 days" }, { id: "custom", label: "Custom" }];
-const barTone: Record<AxisRow["tone"], string> = { primary: "bg-primary", muted: "bg-muted-foreground/50", warn: "bg-warn", ok: "bg-ok", crit: "bg-crit" };
+const barTone: Record<AxisRow["tone"], string> = { muted: "bg-muted-foreground/30", ok: "bg-ok", unknown: "bg-unknown" };
 
 // The custom period's two ends. Each is kept here too, so a picker shows its choice while the page reads the new period.
 function CustomPeriod({ from, to }: Readonly<{ from: string; to: string }>) {

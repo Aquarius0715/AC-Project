@@ -37,12 +37,26 @@ function memberTone(u: { active: boolean; revoked: boolean }): Tone {
 the URL; saving and revoking are members.save through a Server Action (a revoke sets validUntil to now). The
 organization filter and the scope targets are search-selects (DD-A03, IR321). Texts in the display language; the
 valid period is typed in the display time zone (IR302). */
+/** The right column when no membership is open: an asked one this list does not hold (with Clear the filters when a
+filter may hide it), or none chosen yet — no form opens on its own for a member nobody picked. */
+function NoMembership({ missing, scope, onClear }: Readonly<{ missing: boolean; scope: { role?: string; status?: string; organizationId?: string }; onClear: () => void }>) {
+  const { t } = useI18n();
+  if (!missing) return <Card title={t("Membership")}><EmptyState title={t("Choose a membership")}>{t("Pick one in the list to see or change its access, or start a New membership.")}</EmptyState></Card>;
+  const filtered = [scope.role, scope.status, scope.organizationId].some(Boolean);
+  return (
+    <EmptyState title={t("That membership is not in this list")} action={filtered ? <Btn size="sm" onClick={onClear}>{t("Clear the filters")}</Btn> : undefined}>
+      {t("It does not exist, or the organization, role or status filter hides it.")}
+    </EmptyState>
+  );
+}
+
 export function AccessView({ live }: Readonly<{ live: Live }>) {
   const i = useI18n(), { t } = i, zone = i.display.timeZone;
   const nav = useUrlPatch();
   const [pending, run] = useAction();
   const [q, setQ] = useState("");
   const isMissing = live.selected === "missing";
+  // "none": nothing chosen yet, so no form opens on its own (NoMembership)
   const sel = live.selected === "new" || isMissing ? null : live.rows.find((r) => r.id === live.selected) ?? null;
   const key = sel ? `${sel.id}:${String(sel.version)}` : "new";
   const [source, setSource] = useState(key);
@@ -135,10 +149,8 @@ export function AccessView({ live }: Readonly<{ live: Live }>) {
           {shown.length === 0 ? <EmptyState title={t("No memberships")}>{t("No membership matches these filters.")}</EmptyState> : <div className="flex flex-col gap-1.5">{shown.map((u) => <ListRow key={u.id} id={`member-row-${u.id}`} selected={sel?.id === u.id} onClick={() => { nav({ membershipId: u.id }); }}><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="truncate text-[13px]">{u.name}</b><Badge tone={memberTone(u)}>{memberWord(u)}</Badge></div><div className="truncate text-[11px] text-muted-foreground">{u.label}</div></div></ListRow>)}</div>}
           <p className="mt-3 text-[11px] text-muted-foreground">{t("Client accounts are not listed here — they are managed per customer in Customers & units › Users.")}</p>
         </Card>
-        {isMissing ? (
-          <EmptyState title={t("That membership is not in this list")} action={(live.scope.role || live.scope.status || live.scope.organizationId) ? <Btn size="sm" onClick={() => { nav({ role: null, status: null, organizationId: null }); }}>{t("Clear the filters")}</Btn> : undefined}>
-            {t("It does not exist, or the organization, role or status filter hides it.")}
-          </EmptyState>
+        {sel === null && live.selected !== "new" ? (
+          <NoMembership missing={isMissing} scope={live.scope} onClear={() => { nav({ role: null, status: null, organizationId: null }); }} />
         ) : (
         <Card title={sel ? sel.name : t("New membership")} sub={sel ? t("{validity} · scope version {scope} · version {v}", { validity: sel.validity, scope: sel.m.scopeVersion, v: sel.version }) : t("For an existing user, or a new person whose account is created with it")}>
           <div className="flex flex-col gap-5">

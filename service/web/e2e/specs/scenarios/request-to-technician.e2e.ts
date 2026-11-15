@@ -30,6 +30,7 @@ test("a customer request reaches the partner's technician", async ({ browser }) 
       const dialog = customer.getByRole("dialog");
       await dialog.getByLabel(/Symptoms/).fill("E2E scenario: water drips from the indoor unit.");
       await dialog.getByLabel(/Contact window/).fill("Weekdays 09:00-18:00");
+      await dialog.getByRole("combobox", { name: "Unit", exact: true }).selectOption({ index: 1 }); // no AC is preselected
       const selected = await dialog.getByRole("combobox", { name: "Unit", exact: true }).evaluate((s: HTMLSelectElement) => s.selectedOptions[0]?.text ?? "");
       unitName = selected.split(" · ", 1)[0] ?? "";
       expect(unitName).not.toBe("");

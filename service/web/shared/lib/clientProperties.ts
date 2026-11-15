@@ -11,6 +11,7 @@ type Fan = "low" | "mid" | "high";
 const modeLabel: Record<Mode, string> = { cool: "Cool", dry: "Dry", fan: "Fan" };
 const fanLabel: Record<Fan, string> = { low: "low", mid: "mid", high: "high" };
 const en = translator("en");
+const FAN_LEVEL = "Fan {level}";
 
 /** One air conditioner of a room (Figma Client 02d): setting, room temperature, power draw, power and connection. */
 export interface RoomUnit {
@@ -23,7 +24,7 @@ export function roomUnits(ds: ApiUnitDetail[], i: I18n = EN): RoomUnit[] {
   const { t } = i;
   return [...ds].toSorted((a, b) => a.displayName.localeCompare(b.displayName)).map((d) => {
     const o = d.observedState;
-    const set = [o.celsius === null ? null : t("Set {celsius}°C", { celsius: o.celsius }), o.mode ? t(modeLabel[o.mode]) : null, o.fanLevel ? t("Fan {level}", { level: t(fanLabel[o.fanLevel]) }) : null].filter(Boolean).join(" · ");
+    const set = [o.celsius === null ? null : t("Set {celsius}°C", { celsius: o.celsius }), o.mode ? t(modeLabel[o.mode]) : null, o.fanLevel ? t(FAN_LEVEL, { level: t(fanLabel[o.fanLevel]) }) : null].filter(Boolean).join(" · ");
     const temperatureText = metric(d, "temperature");
     const kw = metric(d, "power");
     return {
@@ -34,8 +35,13 @@ export function roomUnits(ds: ApiUnitDetail[], i: I18n = EN): RoomUnit[] {
   });
 }
 
-/** The group change (FR-C14): power, and with power on a setpoint, mode and fan level (null = keep the fan). */
-export interface GroupChange { power: boolean; celsius: number; mode: Mode; fan: Fan | null }
+/** The group change (FR-C14): power, setpoint, mode and fan level; null keeps that setting as each AC has it, and the
+panel starts with every setting kept, so nothing is sent that the user did not choose. Power off sends only the power. */
+export interface GroupChange { power: boolean | null; celsius: number | null; mode: Mode | null; fan: Fan | null }
+/** Nothing kept back: the change the panel starts from. */
+export const KEEP_ALL: GroupChange = { power: null, celsius: null, mode: null, fan: null };
+/** The user chose at least one setting to send. */
+export const hasChoice = (ch: GroupChange): boolean => ch.power !== null || ch.celsius !== null || ch.mode !== null || ch.fan !== null;
 /** `result` is the plan's outcome (its English word, also the dictionary key); change and note are in the display language. */
 export interface PlanRow { id: string; name: string; change: string; result: "Will send" | "Clamped" | "Skipped" | "No change"; note: string; actions: UnitAction[] }
 /** Per AC: the commands that make its observed setting match the change (one commands.create per changed setting, as
@@ -52,16 +58,16 @@ export function groupPlan(ds: ApiUnitDetail[], ch: GroupChange, i: I18n = EN): P
     if (!cap.control) return skip(t("No remote control on this model"));
     if (d.controlAvailability.state === "blocked") return skip(t("Control blocked ({reason})", { reason: d.controlAvailability.reasonKey.replace(/^errors?\./, "").replaceAll('_', " ") }));
     const restriction = d.effectiveControlPolicy.state === "restricted" ? d.effectiveControlPolicy.policy : null;
-    if (ch.power && restriction?.kind === "power_off") return skip(t("Power-off restriction — stays off"));
+    if (ch.power === true && restriction?.kind === "power_off") return skip(t("Power-off restriction — stays off"));
     const actions: UnitAction[] = [];
     const parts: string[] = [];
     let note = "";
-    if (o.power !== ch.power) {
+    if (ch.power !== null && o.power !== ch.power) {
       actions.push({ kind: "set_power", power: ch.power });
       parts.push(`${o.power === null ? "?" : onOff(o.power)} → ${onOff(ch.power)}`);
     }
-    if (ch.power) {
-      if (cap.temperature) {
+    if (ch.power !== false) {
+      if (ch.celsius !== null && cap.temperature) {
         let c = Math.min(cap.temperature.max, Math.max(cap.temperature.min, ch.celsius));
         if (c !== ch.celsius) note = t("{min}–{max} °C on this model", { min: cap.temperature.min, max: cap.temperature.max });
         if (restriction?.kind === "temperature_limit" && c < restriction.minimumCoolingSetpoint) {
@@ -73,18 +79,22 @@ export function groupPlan(ds: ApiUnitDetail[], ch: GroupChange, i: I18n = EN): P
           parts.push(`${String(o.celsius ?? "?")} → ${String(c)} °C`);
         }
       }
-      if (cap.modeControl && cap.modes.includes(ch.mode) && o.mode !== ch.mode) {
+      if (ch.mode !== null && cap.modeControl && cap.modes.includes(ch.mode) && o.mode !== ch.mode) {
         actions.push({ kind: "set_mode", mode: ch.mode });
         parts.push(t(modeLabel[ch.mode]));
       }
       if (ch.fan && cap.fanControl && cap.fanLevels.includes(ch.fan) && o.fanLevel !== ch.fan) {
         actions.push({ kind: "set_fan", fanLevel: ch.fan });
-        parts.push(t("Fan {level}", { level: t(fanLabel[ch.fan]) }));
+        parts.push(t(FAN_LEVEL, { level: t(fanLabel[ch.fan]) }));
       }
     }
     if (actions.length === 0) return { id: d.id, name: d.displayName, change: t("already set"), result: "No change", note: "", actions };
     return { id: d.id, name: d.displayName, change: parts.join(", "), result: note ? "Clamped" : "Will send", note, actions };
   });
 }
-export const changeText = (ch: GroupChange, t: T = en) =>
-  (ch.power ? t("Power On · {celsius} °C · {mode} · Fan {fan}", { celsius: ch.celsius, mode: t(modeLabel[ch.mode]), fan: t(ch.fan ? fanLabel[ch.fan] : "unchanged") }) : t("Power Off"));
+/** The chosen change in a line: only what is sent, the kept settings left out. */
+export const changeText = (ch: GroupChange, t: T = en): string => {
+  if (ch.power === false) return t("Power Off");
+  const parts = [ch.power === true ? t("Power On") : null, ch.celsius === null ? null : `${String(ch.celsius)} °C`, ch.mode ? t(modeLabel[ch.mode]) : null, ch.fan ? t(FAN_LEVEL, { level: t(fanLabel[ch.fan]) }) : null];
+  return parts.filter((x) => x !== null).join(" · ") || t("No change chosen");
+};

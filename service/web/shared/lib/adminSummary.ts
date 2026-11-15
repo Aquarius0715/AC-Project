@@ -108,21 +108,23 @@ export function forecastView(f: ApiForecast | null | undefined, t: T = en): Fore
   };
 }
 
-export interface AxisRow { label: string; count: number; pct: number; tone: "primary" | "muted" | "warn" | "ok" | "crit"; href: string; key: string }
-/** The power-state and connection cards (SR27): one row per class with its share of the bar and its list link. */
+export interface AxisRow { label: string; count: number; pct: number; tone: "muted" | "ok" | "unknown"; href: string; key: string }
+/** The power-state and connection cards (SR27): one row per class with its share of the bar and its list link. The tones
+are the product's state badges (PowerBadge, ConnBadge): Running and Online green, Stopped gray, power unknown and Offline
+slate, connection unknown / connecting / error light gray beside Offline — a state that is not known is not a warning. */
 const pct = (n: number, of: number) => (of ? (n / of) * 100 : 0);
 export function axisRows(s: AdminSummary, links: ReturnType<typeof overviewLinks>, t: T = en) {
   const conn = s.online + s.offline + s.unknown;
   return {
     power: [
-      { label: t("Running"), key: "powerState=on", count: s.powerOn, pct: pct(s.powerOn, s.total), tone: "primary", href: links.power("on") },
+      { label: t("Running"), key: "powerState=on", count: s.powerOn, pct: pct(s.powerOn, s.total), tone: "ok", href: links.power("on") },
       { label: t("Stopped"), key: "powerState=off", count: s.powerOff, pct: pct(s.powerOff, s.total), tone: "muted", href: links.power("off") },
-      { label: t("Unknown (stale / no valid power signal)"), key: "powerState=unknown", count: s.powerUnknown, pct: pct(s.powerUnknown, s.total), tone: "warn", href: links.power("unknown") },
+      { label: t("Unknown (stale / no valid power signal)"), key: "powerState=unknown", count: s.powerUnknown, pct: pct(s.powerUnknown, s.total), tone: "unknown", href: links.power("unknown") },
     ] as AxisRow[],
     connection: [
       { label: t("Online"), key: "connections=online", count: s.online, pct: pct(s.online, conn), tone: "ok", href: links.connection("online") },
-      { label: t("Offline"), key: "connections=offline", count: s.offline, pct: pct(s.offline, conn), tone: "crit", href: links.connection("offline") },
-      { label: t("Unknown / connecting / error"), key: "connections=connecting,error,unknown", count: s.unknown, pct: pct(s.unknown, conn), tone: "warn", href: links.connection("connecting,error,unknown") },
+      { label: t("Offline"), key: "connections=offline", count: s.offline, pct: pct(s.offline, conn), tone: "unknown", href: links.connection("offline") },
+      { label: t("Unknown / connecting / error"), key: "connections=connecting,error,unknown", count: s.unknown, pct: pct(s.unknown, conn), tone: "muted", href: links.connection("connecting,error,unknown") },
     ] as AxisRow[],
     rateNote: t("Operation rate = Running ÷ (Running + Stopped) = {on} ÷ {known} = {rate}. total {total} = Running + Stopped + unknown. Unknown is never counted as Stopped. Archived units are excluded.", {
       on: s.powerOn, known: s.powerOn + s.powerOff, rate: s.operatingRate === null ? "—" : `${s.operatingRate.toFixed(1)}%`, total: s.total,

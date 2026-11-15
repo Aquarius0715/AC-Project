@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  attentionCard, bucketPoints, bucketTimes, emissionsCard, energyCard, nextRunText, overviewRows, overviewScope, periodNote, periodOf, previousRange, whenText, type OverviewUnit,
+  attentionCard, bucketPoints, bucketTimes, byProperty, emissionsCard, energyCard, nextRunText, overviewRows, overviewScope, periodNote, periodOf, previousRange, whenText, type OverviewUnit,
 } from "@ac/web/lib/customerOverview";
 import type { ApiAlert } from "@ac/web/lib/alerts";
 import type { ApiEnergySummary } from "@ac/web/lib/energy";
@@ -103,5 +103,10 @@ describe("customer overview", () => {
 describe("air card tooltip headings", () => {
   it("gives each hourly point the hour it averages", () => {
     expect(bucketTimes([{ start: "2026-09-14T01:00:00.000Z" }, { start: "2026-09-14T02:00:00.000Z" }])).toStrictEqual(["Mon, 14 Sept, 9:00 – 10:00 am MYT", "Mon, 14 Sept, 10:00 – 11:00 am MYT"]);
+  });
+  // UI/UX loop R17: the overview listed a whole account's units in one run, homes and offices mixed
+  it("groups the unit rows under their property in first-seen order", () => {
+    const rows = overviewRows([unit("a"), unit("b"), unit("c"), unit("d")], (u) => ({ a: "Home A › 1F › Bedroom", b: "Office A", c: "Home A › 1F › Living room", d: "" })[u.id] ?? "");
+    expect(byProperty(rows).map((g) => [g.property, g.rows.map((r) => r.id)])).toStrictEqual([["Home A", ["a", "c"]], ["Office A", ["b"]], ["", ["d"]]]);
   });
 });
