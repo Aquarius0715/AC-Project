@@ -41,6 +41,17 @@ function unitGroups(live: { customers: { id: string; name: string }[]; propertie
     .toSorted((a, b) => a.label.localeCompare(b.label)); // a customer's properties together
 }
 
+/** “Select all (n)” / “Clear” for one customer › property group of the unit picker. */
+function GroupToggle({ ids, chosen, group, onToggle }: Readonly<{ ids: string[]; chosen: string[]; group: string; onToggle: (ids: string[], on: boolean) => void }>) {
+  const t = useT();
+  const isAll = ids.every((id) => chosen.includes(id));
+  return (
+    <Plain type="button" aria-label={t(isAll ? "Clear the units of {group}" : "Select all units of {group}", { group })} className="font-semibold text-primary hover:underline" onClick={() => { onToggle(ids, !isAll); }}>
+      {t(isAll ? "Clear" : "Select all ({n})", { n: ids.length })}
+    </Plain>
+  );
+}
+
 export function AutomationView({ live }: Readonly<{ live: Live }>) {
   const t = useT();
   const nav = useUrlPatch();
@@ -66,6 +77,12 @@ export function AutomationView({ live }: Readonly<{ live: Live }>) {
   const toggleUnit = (id: string, on: boolean) => {
     set({ unitIds: on ? [...d.unitIds, id] : d.unitIds.filter((x) => x !== id) });
     setFacts((f) => (on ? [...f, { unitId: id, value: "", quality: "valid" }] : f.filter((x) => x.unitId !== id)));
+  };
+  // a whole customer › property group in or out at once: a 19-unit fleet was 19 ticks (UI/UX loop R59)
+  const toggleUnits = (ids: string[], on: boolean) => {
+    const added = ids.filter((id) => !d.unitIds.includes(id));
+    set({ unitIds: on ? [...d.unitIds, ...added] : d.unitIds.filter((x) => !ids.includes(x)) });
+    setFacts((f) => (on ? [...f, ...added.map((unitId) => ({ unitId, value: "", quality: "valid" as const }))] : f.filter((x) => !ids.includes(x.unitId))));
   };
   const targets = live.units.filter((u) => d.unitIds.includes(u.id));
   const range = commonRange(targets);
@@ -130,7 +147,9 @@ export function AutomationView({ live }: Readonly<{ live: Live }>) {
                 {/* under their customer › property: one flat run mixed the customers' units */}
                 <div className="flex flex-col gap-3">{unitGroups(live).map((g) => (
                   <fieldset key={g.key}>
-                    <legend className="mb-1 text-[11px] font-semibold text-muted-foreground">{g.label}</legend>
+                    <legend className="mb-1 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-muted-foreground">{g.label}
+                      {g.units.length > 1 && <GroupToggle ids={g.units.map((u) => u.id)} chosen={d.unitIds} group={g.label} onToggle={toggleUnits} />}
+                    </legend>
                     <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-[13px]">{g.units.map((u) => <Check key={u.id} label={u.name} checked={d.unitIds.includes(u.id)} onChange={(on) => { toggleUnit(u.id, on); }} />)}</div>
                   </fieldset>
                 ))}</div>
