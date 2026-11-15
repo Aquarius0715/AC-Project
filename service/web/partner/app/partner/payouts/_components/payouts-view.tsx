@@ -58,8 +58,16 @@ export function PayoutsView({ live }: Readonly<{ live: PayoutsLive }>) {
     a.href = url; a.download = `statement-${sel.statement.period}-${sel.statement.id.slice(0, 8)}.pdf`; a.click();
     URL.revokeObjectURL(url);
   };
+  // before the first statement there is nothing to filter or open: one empty state instead of two and the filters
+  const isFirst = live.statements.length === 0 && !isFiltered;
   return (
     <Page>
+      {isFirst ? (
+        <Card title={t("Statements")}>
+          <EmptyState title={t("No statements yet")}>{t("A statement appears here once HQ approves your first one.")}</EmptyState>
+          <p className="mt-2 text-[11px] text-muted-foreground">{t("A statement is issued on the 1st for jobs whose report was accepted in the previous month. HQ approves it; payment follows on the 15th. Drafts stay with HQ.")}</p>
+        </Card>
+      ) : <>
       <div className="flex flex-wrap items-center gap-2">
         <div className="w-48"><Select value={live.period} onChange={(e) => { nav({ period: e.target.value || null, statementId: null }); }} aria-label={t("Period")}><option value="">{t("Period: {period}", { period: t("All") })}</option>{live.periods.map((p) => <option key={p.value} value={p.value}>{t("Period: {period}", { period: p.text })}</option>)}</Select></div>
         <div className="w-48"><Select value={live.status} onChange={(e) => { nav({ status: e.target.value || null, statementId: null }); }} aria-label={t("Status")}><option value="">{t("Status: All")}</option><option value="approved">{t("Status: {status}", { status: t("Approved") })}</option><option value="paid">{t("Status: {status}", { status: t("Paid") })}</option></Select></div>
@@ -100,6 +108,7 @@ export function PayoutsView({ live }: Readonly<{ live: PayoutsLive }>) {
           </Card>
         ) : <Card title={t("Statement")}><EmptyState title={t("No statement to show")}>{t("Only approved and paid statements are shown; jobs still in review move to the next statement.")}</EmptyState></Card>}
       </div>
+      </>}
       <Modal open={!!ask} onClose={() => { setAsk(null); }} title={t("Ask HQ about this line")} footer={<><Btn onClick={() => { setAsk(null); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={send}>{t("Send")}</Btn></>}>
         <Field label={t("Line")}><Select value={ask?.lineId ?? ""} onChange={(e) => { setAsk({ lineId: e.target.value }); }}>{askable.map((r) => <option key={r.lineId} value={r.lineId}>{r.job} · {r.work} · {r.amount} {sel?.statement.currency}</option>)}</Select></Field>
         <Field label={t("Topic")}><Select value={topic} onChange={(e) => { setTopic(oneOf(live.topics.map((x) => x.id), e.target.value, topic)); }}>{live.topics.map((x) => <option key={x.id} value={x.id}>{x.text}</option>)}</Select></Field>
