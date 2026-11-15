@@ -4982,6 +4982,8 @@ export const id: Record<string, string> = {
   "Reason · e.g. “2nd reminder after due date”": "Alasan · mis. “Pengingat ke-2 setelah jatuh tempo”",
   "Preview · {channel}": "Pratinjau · {channel}",
   "nothing is sent yet": "belum ada yang dikirim",
+  "Enter a reason to preview and send the reminder.": "Masukkan alasan untuk pratinjau dan kirim pengingat.",
+  "Preview the message first: Send uses the previewed text.": "Pratinjau pesan terlebih dahulu: Kirim memakai teks yang dipratinjau.",
   "Send reminder": "Kirim pengingat",
   "Related restriction": "Pembatasan terkait",
   "No restriction cites this invoice.": "Tidak ada pembatasan yang merujuk faktur ini.",

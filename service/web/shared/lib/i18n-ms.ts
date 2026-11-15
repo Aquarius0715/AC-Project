@@ -5099,6 +5099,8 @@ export const ms: Record<string, string> = {
   "Reason · e.g. “2nd reminder after due date”": "Sebab · cth. “Peringatan ke-2 selepas tarikh akhir”",
   "Preview · {channel}": "Pratonton · {channel}",
   "nothing is sent yet": "belum ada apa-apa dihantar",
+  "Enter a reason to preview and send the reminder.": "Masukkan sebab untuk pratonton dan hantar peringatan.",
+  "Preview the message first: Send uses the previewed text.": "Pratonton mesej dahulu: Hantar menggunakan teks yang dipratonton.",
   "Send reminder": "Hantar peringatan",
   "Related restriction": "Sekatan berkaitan",
   "No restriction cites this invoice.": "Tiada sekatan merujuk invois ini.",

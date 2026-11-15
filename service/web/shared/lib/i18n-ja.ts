@@ -4982,6 +4982,8 @@ export const ja: Record<string, string> = {
   "Reason · e.g. “2nd reminder after due date”": "理由 · 例: 「期限後の2回目のお知らせ」",
   "Preview · {channel}": "プレビュー · {channel}",
   "nothing is sent yet": "まだ何も送信されていません",
+  "Enter a reason to preview and send the reminder.": "理由を入力すると、プレビューと送信ができます。",
+  "Preview the message first: Send uses the previewed text.": "先にメッセージをプレビューしてください。送信されるのはプレビューした内容です。",
   "Send reminder": "お知らせを送信",
   "Related restriction": "関連する利用制限",
   "No restriction cites this invoice.": "この請求書を原因とする利用制限はありません。",
