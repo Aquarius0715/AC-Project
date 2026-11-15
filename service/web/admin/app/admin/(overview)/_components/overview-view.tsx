@@ -47,12 +47,12 @@ export function AdminOverviewView({ live }: Readonly<{ live: Live }>) {
         <div className="flex flex-wrap items-center gap-2">
           {live.customers && (
             <Select aria-label={t("Customer")} className="w-auto text-xs font-semibold" value={live.customerId ?? ""} onChange={(e) => { patch({ customerId: e.target.value || null, propertyId: null }); }}>
-              <option value="">{t("Customer: All")}</option>{live.customers.map((c) => <option key={c.id} value={c.id}>{t("Customer: {name}", { name: c.name })}</option>)}
+              <option value="">{t("Customer: All")}</option>{live.customers.toSorted((x, y) => x.name.localeCompare(y.name)).map((c) => <option key={c.id} value={c.id}>{t("Customer: {name}", { name: c.name })}</option>)}
             </Select>
           )}
           {live.customers && (
             <Select aria-label={t("Property")} className="w-auto text-xs font-semibold" disabled={!live.properties} value={live.propertyId ?? ""} onChange={(e) => { patch({ propertyId: e.target.value || null }); }}>
-              <option value="">{t("Property: All")}</option>{(live.properties ?? []).map((p) => <option key={p.id} value={p.id}>{t("Property: {name}", { name: p.name })}</option>)}
+              <option value="">{t("Property: All")}</option>{(live.properties ?? []).toSorted((x, y) => x.name.localeCompare(y.name)).map((p) => <option key={p.id} value={p.id}>{t("Property: {name}", { name: p.name })}</option>)}
             </Select>
           )}
           <Select aria-label={t("Period")} className="w-auto text-xs font-semibold" value={live.period.kind} onChange={(e) => { patch({ period: e.target.value === "today" ? null : e.target.value, ...(e.target.value !== "custom" && { from: null, to: null }) }); }}>
