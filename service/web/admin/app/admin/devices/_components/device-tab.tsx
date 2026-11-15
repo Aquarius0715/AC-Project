@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Badge, Btn, Card, ConnBadge, cx, EmptyState, Field, Input, ListRow, Modal, Search, Select, Textarea, Plain, ScrollX } from "@ac/web/components/ui";
+import { Badge, Btn, Card, ConnBadge, cx, EmptyState, Field, Input, ListRow, Modal, Search, Select, Textarea, Plain, ScrollX, TextLink } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { mqttNodeValue } from "@ac/web/lib/devices";
-import { connectionDot, filterOf, firmwareCardLook, firmwareSub, followFilter, HQ_FILTERS, operationTone, type Filter, metricText } from "@ac/web/lib/techDevices";
+import { connectionDot, filterOf, firmwareCardLook, firmwareSub, followFilter, HQ_FILTERS, operationTone, type EventRow, type Filter, metricText } from "@ac/web/lib/techDevices";
 import { calibrateSensor, checkDevice, deleteDevice, setMqttNode, unbindDevice, updateFirmware } from "../actions";
 import type { DevicesLive } from "./devices-view";
 import { BindDeviceModal } from "./bind-device-modal";
@@ -180,18 +180,7 @@ export function DeviceTab({ live }: Readonly<{ live: DevicesLive }>) {
               </div>
               <div>
                 <div className="mb-2 flex items-baseline gap-2"><h3 className="text-[15px] font-bold">{t("Device events")}</h3><span className="text-xs text-muted-foreground">{t("connection, power and tamper are separate events")}</span></div>
-                {dv.events.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No device events.")}</p> : (
-                  <ScrollX className="rounded-xl border border-line"><table className="w-full min-w-[560px] text-[13px]">
-                    <thead className="bg-surface2 text-left text-[11px] uppercase text-muted-foreground"><tr><th className="px-3 py-2">{t("Time")}</th><th>{t("Event")}</th><th>{t("Detail")}</th><th>{t("Recovery / response")}</th></tr></thead>
-                    <tbody>{dv.events.map((e) => (
-                      <tr key={e.id} className="border-t border-line align-top">
-                        <td className="px-3 py-2 text-xs text-muted-foreground">{e.time}</td><td className="py-2"><Badge tone={e.tone === "muted" ? "muted" : e.tone}>{e.type}</Badge></td>
-                        <td className="py-2">{e.detail}{e.notes.map((n) => <div key={n} className="flex items-center gap-1 text-[11px] text-muted-foreground"><Icon name="edit" />{n}</div>)}</td>
-                        <td className="py-2 pr-3 text-xs">{e.recovery}</td>
-                      </tr>
-                    ))}</tbody>
-                  </table></ScrollX>
-                )}
+                <DeviceEvents events={dv.events} auditHref={live.canAudit ? `/admin/audit?tab=devices&deviceId=${dv.detail.id}` : null} />
               </div>
             </div>
           </Card>
@@ -250,4 +239,35 @@ function useServerSearch(searched = ""): [string, (v: string) => void] {
     return () => { clearTimeout(timer); };
   }, [q, searched, nav]);
   return [q, setQ];
+}
+
+const LATEST = 10;
+/** A device's events, newest first: the latest ten, the rest on request (a flapping link alone fills 50 rows), and the
+whole history in Audit for a role that may read it (UI/UX loop R58). */
+function DeviceEvents({ events, auditHref }: Readonly<{ events: EventRow[]; auditHref: string | null }>) {
+  const t = useT();
+  const [all, setAll] = useState(false);
+  const shown = all ? events : events.slice(0, LATEST);
+  return (
+    <>
+    {events.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No device events.")}</p> : (
+      <ScrollX className="rounded-xl border border-line"><table className="w-full min-w-[560px] text-[13px]">
+        <thead className="bg-surface2 text-left text-[11px] uppercase text-muted-foreground"><tr><th className="px-3 py-2">{t("Time")}</th><th>{t("Event")}</th><th>{t("Detail")}</th><th>{t("Recovery / response")}</th></tr></thead>
+        <tbody>{shown.map((e) => (
+          <tr key={e.id} className="border-t border-line align-top">
+            <td className="px-3 py-2 text-xs text-muted-foreground">{e.time}</td><td className="py-2"><Badge tone={e.tone === "muted" ? "muted" : e.tone}>{e.type}</Badge></td>
+            <td className="py-2">{e.detail}{e.notes.map((n) => <div key={n} className="flex items-center gap-1 text-[11px] text-muted-foreground"><Icon name="edit" />{n}</div>)}</td>
+            <td className="py-2 pr-3 text-xs">{e.recovery}</td>
+          </tr>
+        ))}</tbody>
+      </table></ScrollX>
+    )}
+      {(events.length > LATEST || auditHref) && (
+        <div className="mt-2 flex flex-wrap items-center gap-3 text-xs">
+          {events.length > LATEST && <Btn size="sm" variant="ghost" aria-expanded={all} onClick={() => { setAll((v) => !v); }}>{t(all ? "Show the latest {n}" : "Show all {total}", { n: LATEST, total: events.length })}</Btn>}
+          {auditHref && <TextLink href={auditHref}>{t("Full history in Audit")} <Icon name="arrowRight" /></TextLink>}
+        </div>
+      )}
+    </>
+  );
 }
