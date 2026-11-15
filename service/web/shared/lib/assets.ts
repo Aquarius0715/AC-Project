@@ -137,7 +137,7 @@ export function registerKpis(rows: CustomerRow[], us: ApiUnitRow[], t: T = en) {
   return {
     customers: active.length, inactive: rows.length - active.length, properties: names.length,
     propertyNames: names.length > 3 ? `${names.slice(0, 3).join(" · ")} +${String(names.length - 3)}` : names.join(" · ") || t("none yet"),
-    units: units.length, power: t("Running {on} · Stopped {off} · unknown {unknown}", { on: n("on"), off: n("off"), unknown: n("unknown") }),
+    units: units.length, power: t("Running {on} · Stopped {off} · Unknown {unknown}", { on: n("on"), off: n("off"), unknown: n("unknown") }),
     attention: active.filter((r) => r.alerts > 0 || (r.standing?.overdue ?? 0) > 0 || !!r.standing?.restriction).length,
   };
 }

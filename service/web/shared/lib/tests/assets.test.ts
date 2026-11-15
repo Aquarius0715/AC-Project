@@ -50,7 +50,7 @@ describe("HQ customers & units", () => {
     const rows = customerRows([{ id: "c1", version: 1, name: "Demo Customer A", status: "active", organizationId: "org-a", serviceProfile: "rto", createdAt: "2026-04-01T00:00:00Z" }],
       [{ id: "org-a", version: 2, name: "Customer A Sdn Bhd", kind: "customer", status: "active" }], [], [unit({}), unit({ id: "u2", effectivePowerState: "off" })], () => null);
     expect([rows[0]?.since, rows[0]?.operation, rows[0]?.billingName]).toStrictEqual(["Apr 2026", "50.0%", "Customer A Sdn Bhd"]);
-    expect(registerKpis(rows, [unit({}), unit({ id: "u2", effectivePowerState: "unknown" })])).toMatchObject({ customers: 1, propertyNames: "none yet", power: "Running 1 · Stopped 0 · unknown 1" });
+    expect(registerKpis(rows, [unit({}), unit({ id: "u2", effectivePowerState: "unknown" })])).toMatchObject({ customers: 1, propertyNames: "none yet", power: "Running 1 · Stopped 0 · Unknown 1" });
   });
 
   it("lists units and checks the unit form", () => {
@@ -92,7 +92,7 @@ describe("HQ customers & units", () => {
 describe("HQ customers & units in Malay with the display time zone (IR293)", () => {
   it("words the register, units, conditions and coverage", () => {
     expect(standingMarks("active", standing({ restriction: { id: "r", state: "requested", contractId: "k" } }), MS.t).map((m) => m.label)).toStrictEqual(["Sekatan diminta"]);
-    expect(registerKpis([], [], MS.t)).toMatchObject({ propertyNames: "belum ada", power: "Berjalan 0 · Berhenti 0 · tidak diketahui 0" });
+    expect(registerKpis([], [], MS.t)).toMatchObject({ propertyNames: "belum ada", power: "Berjalan 0 · Berhenti 0 · Tidak diketahui 0" });
     expect(unitRows([unit({ spaceId: null })], [], new Map(), MS.t)[0]).toMatchObject({ location: "Belum ditugaskan", policies: "Lalai" });
     expect(conditionText(policy({ activeWindow: { weekdays: [6, 7], startLocal: "08:00", endLocal: "12:00" } }), MS)).toBe("Suhu ≥ 30 °C selama 60 s, hujung minggu 08:00–12:00 → Peringatan");
     expect(conditionText(withoutSeverity({ durationSeconds: 900, activeWindow: { weekdays: [1, 3], startLocal: "22:00", endLocal: "06:00" } }), MS)).toMatch(/^Suhu ≥ 30 °C selama 15 min, Isn, Rab 22:00–06:00$/);
