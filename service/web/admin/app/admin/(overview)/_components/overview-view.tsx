@@ -85,7 +85,7 @@ function Sections({ s, links, waiting }: Readonly<{ s: AdminSummary; links: Retu
         {/* what waits for HQ whatever the period: requests to book, offers declined or expired, follow-ups to classify (IR611) */}
         {waiting !== null && <Kpi label={t("Waiting for HQ")} value={waiting} tone={waiting ? "warn" : undefined} sub={t("requests to book or reassign · any requested time")} href={links.waiting} link={t("Open requests")} />}
         <Kpi label={t("Active customers")} value={k.customers} sub={t("with Active status")} />
-        <Kpi label={t("Target units")} value={k.units} sub={t("Running {on} · Stopped {off} · unknown {unknown} · archived excluded", { on: k.on, off: k.off, unknown: k.unknown })} href={links.units} link={t(OPEN_UNITS)} />
+        <Kpi label={t("Target units")} value={k.units} sub={t("Running {on} · Stopped {off} · Unknown {unknown} · archived excluded", { on: k.on, off: k.off, unknown: k.unknown })} href={links.units} link={t(OPEN_UNITS)} />
         <Kpi label={t("Operation rate")} value={k.rate} sub={t("Running {on} / known {known} · unknown {unknown} not in denominator", { on: k.on, known: k.on + k.off, unknown: k.unknown })} href={links.power("on")} link={t("Units running")} />
         <Kpi label={t("Unresolved alerts")} value={k.alerts} tone={k.alerts ? "warn" : undefined} sub={t("open or acknowledged · critical and warning")} href={links.alerts} link={t("View alerts")} />
         <Kpi label={t("Energy used (actual)")} value={k.kwh} sub={k.kwhSub} href={links.energy} link={t("Energy analysis")} />
