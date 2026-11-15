@@ -3,6 +3,7 @@ const IN_PROGRESS = "in_progress";
 const REFRIGERANT = "Refrigerant";
 const LOCATION_QR = "location_qr";
 
+import { buttonVariants } from "@ac/web/components/ui/button";
 import Link from "next/link";
 import { useEffect, useRef, useState, useEffectEvent } from "react";
 import { Badge, Banner, Btn, Card, Choice, cx, DataTable, EmptyState, Field, Input, Modal, Page, Select, SummaryList, Tabs, Textarea, UtilizationBar, Plain, ScrollX } from "@ac/web/components/ui";
@@ -305,7 +306,8 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
   }, [draft, dirty, isEditable, pending]);
   const withSaved = (fn: (r: Rep) => void) => { if (dirty || !rep) save(fn); else fn(rep); };
   const photoAdded = (next: Rep) => { setRep(next); edit((d) => ({ ...d, attachmentIds: next.attachmentRefs.map((a) => a.id) })); setDirty(false); };
-  const addPhotos = (files: FileList | null, tag?: PhotoTag) => {
+  // linkTo: the finding the photo was taken for, linked once it is uploaded (no trip to the Photos card and back)
+  const addPhotos = (files: FileList | null, tag?: PhotoTag, linkTo?: string) => {
     const file = files?.[0];
     if (!file) return;
     if (!["image/jpeg", "image/png"].includes(file.type) || file.size > MAX_BYTES || photos.length >= MAX_PHOTOS) {
@@ -317,7 +319,13 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
       const form = new FormData();
       form.set("jobId", job.id); form.set("reportId", r.id); form.set("reportVersion", String(r.version)); form.set("file", file);
       if (tag) form.set("tag", tag);
-      run(() => uploadPhoto(form), t("Photo {name} added — sign-off cleared", { name: file.name }), photoAdded, failed);
+      const known = new Set(photos.map((a) => a.id));
+      const added = (next: Rep) => {
+        photoAdded(next);
+        const fresh = linkTo ? next.attachmentRefs.find((a) => !known.has(a.id)) : undefined;
+        if (linkTo && fresh) edit((d) => linkPhoto(d, linkTo, fresh.id, true));
+      };
+      run(() => uploadPhoto(form), t("Photo {name} added — sign-off cleared", { name: file.name }), added, failed);
     });
   };
   const trySubmit = () => {
@@ -392,9 +400,15 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
           <div className="flex flex-wrap gap-2">
             <Btn size="sm" onClick={() => { addReading(it.componentKey); selectView("readings"); }}><Icon name="add" /> {t("Add reading")}</Btn>
             <Btn size="sm" disabled={ph.free.length === 0} aria-expanded={linking === it.componentKey} onClick={() => { setLinking((k) => (k === it.componentKey ? null : it.componentKey)); }}><Icon name="add" /> {t("Link photo")}</Btn>
+            {photos.length < MAX_PHOTOS && (
+              <label className={cx(buttonVariants({ variant: "outline", size: "sm" }), "cursor-pointer has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-primary", pending && "pointer-events-none opacity-50")}>
+                <Icon name="camera" /> {t("Add photo")}
+                <Input type="file" aria-label={t("Add a photo to {item}", { item: name })} accept="image/jpeg,image/png" disabled={pending} className="sr-only h-px w-px" onChange={(e) => { addPhotos(e.target.files, undefined, it.componentKey); e.target.value = ""; }} />
+              </label>
+            )}
           </div>
         )}
-        {isActions && photos.every((x) => x.status !== "ready") && <p className="text-[11px] text-muted-foreground">{t("Add a photo under Photos first, then link it to this finding.")}</p>}
+        {isActions && photos.every((x) => x.status !== "ready") && <p className="text-[11px] text-muted-foreground">{t("Take or add a photo here: it is linked to this finding.")}</p>}
         {isActions && linking === it.componentKey && ph.free.length > 0 && (
           <div role="group" aria-label={t("Report photos to link to {item}", { item: name })} className="flex flex-wrap gap-1.5 rounded-lg border border-line p-2">
             {ph.free.map((x) => <Btn key={x.id} size="sm" variant="ghost" onClick={() => { edit((d) => linkPhoto(d, it.componentKey, x.id, true)); setLinking(null); }}><Icon name="camera" />{x.name}</Btn>)}
