@@ -4781,6 +4781,8 @@ export const ja: Record<string, string> = {
   "Demo review recorded — version {v}": "デモのレビューを記録しました — バージョン {v}",
   "Demo reviewed": "デモのレビュー済み",
   "Scope 2 reports": "スコープ2レポート",
+  "No reports yet": "レポートはまだありません",
+  "Create the first one with New report.": "「新しいレポート」で最初のレポートを作成してください。",
   "No reports": "レポートなし",
   "No report matches these filters.": "これらのフィルターに一致するレポートはありません。",
   "Every report is a demo — “Demo — unverified”. A demo review is not external certification.": "すべてのレポートはデモです —「デモ — 未検証」。デモのレビューは、外部の認証ではありません。",
