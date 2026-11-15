@@ -617,8 +617,7 @@ export const ms: Record<string, string> = {
   "Notify me by": "Maklumkan saya melalui",
   "In-app (always)": "Dalam aplikasi (sentiasa)",
   "Email": "E-mel",
-  "WhatsApp is only available after you allow it in Preferences. Missing or stale readings never trigger — they show “not measured”.":
-    "WhatsApp hanya tersedia selepas anda membenarkannya dalam Keutamaan. Bacaan yang tiada atau lapuk tidak mencetuskan — ia menunjukkan “tidak diukur”.",
+  "WhatsApp alerts are not available yet. Missing or stale readings never trigger — they show “not measured”.": "Amaran WhatsApp belum tersedia. Bacaan yang tiada atau lapuk tidak sekali-kali mencetuskan amaran — ia dipaparkan sebagai “tidak diukur”.",
   "Summary": "Ringkasan",
   "Attached to": "Dilampirkan pada",
   "Not attached to any AC yet.": "Belum dilampirkan pada mana-mana AC.",
