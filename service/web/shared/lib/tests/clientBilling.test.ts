@@ -67,7 +67,7 @@ describe("customer contracts & payments in the display language (FR-C10–C12, I
   });
 
   it("words the restriction notice per unit in Malay, never released before the unit confirms", () => {
-    expect(restrictionNotice(restriction, unit)).toMatchObject({ label: "Release requested", policy: "Temperature limit — cooling setpoint ≥ 27 °C", units: "2 units in scope · Bedroom AC (Home A › 1F), Bedroom AC (Home A › 1F)" });
+    expect(restrictionNotice(restriction, unit)).toMatchObject({ label: "Release requested", policy: "Temperature limit — cooling setpoint ≥ 27 °C", units: "2 units in scope · Bedroom AC (Home A › 1F), Bedroom AC (Home A › 1F)", unitIds: restriction.unitIds }); // the restricted units by ID too (UI/UX loop R34)
     expect(restrictionNotice(restriction, unit, MS_TOKYO.t)).toMatchObject({ label: "Pelepasan diminta", policy: "Had suhu — suhu tetapan penyejukan ≥ 27 °C", units: "2 unit dalam skop · Bedroom AC (Home A › 1F), Bedroom AC (Home A › 1F)" });
     expect(noticeUnits(restriction, unit, commands, MS_TOKYO.t).map((u) => [u.apply, u.release, u.releaseTone, u.note, u.tone])).toStrictEqual([
       ["Dikenakan", "Pelepasan dihantar", "primary", "menunggu unit mengesahkan", "warn"], ["Keputusan tidak diketahui", "Pelepasan gagal", "crit", "unit di luar talian · arahan terakhir tamat tempoh", "unknown"],

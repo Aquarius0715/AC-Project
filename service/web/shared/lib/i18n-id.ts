@@ -11,6 +11,7 @@ export const id: Record<string, string> = {
   "Membership": "Keanggotaan",
   "Choose a membership": "Pilih keanggotaan",
   "Pick one in the list to see or change its access, or start a New membership.": "Pilih satu di daftar untuk melihat atau mengubah aksesnya, atau mulai Keanggotaan baru.",
+  "Cooling restricted": "Pendinginan dibatasi",
   "Overview": "Ringkasan",
   "Units & locations": "Unit & lokasi",
   "Automations & schedules": "Otomasi & jadwal",

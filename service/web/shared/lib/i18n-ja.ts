@@ -11,6 +11,7 @@ export const ja: Record<string, string> = {
   "Membership": "メンバーシップ",
   "Choose a membership": "メンバーシップを選択",
   "Pick one in the list to see or change its access, or start a New membership.": "一覧から選ぶとアクセス権を確認・変更できます。新しいメンバーシップを作ることもできます。",
+  "Cooling restricted": "冷房制限中",
   "Overview": "概要",
   "Units & locations": "ユニットと設置場所",
   "Automations & schedules": "自動化とスケジュール",

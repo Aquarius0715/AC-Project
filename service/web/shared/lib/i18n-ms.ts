@@ -14,6 +14,7 @@ export const ms: Record<string, string> = {
   "Membership": "Keahlian",
   "Choose a membership": "Pilih keahlian",
   "Pick one in the list to see or change its access, or start a New membership.": "Pilih satu dalam senarai untuk melihat atau mengubah aksesnya, atau mulakan Keahlian baharu.",
+  "Cooling restricted": "Penyejukan dihadkan",
   // shell
   "Overview": "Gambaran keseluruhan",
   "Units & locations": "Unit & lokasi",
