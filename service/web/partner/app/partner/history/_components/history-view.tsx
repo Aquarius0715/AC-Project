@@ -147,6 +147,8 @@ function Compose({ detail, onPreview }: Readonly<{ detail: Extract<DetailRows, {
   const isTooLong = message.trim().length > 2000;
   const lengthError = isTooLong ? t("At most 2000 characters") : undefined;
   const isClosed = mode.kind === "closed";
+  // a closed delegation takes no communication: say so, without a form whose every field is disabled
+  if (isClosed) return <Card title={t("New communication preview")}><Banner>{mode.text}</Banner></Card>;
   const send = () => {
     setTried(true);
     if (!message.trim() || isTooLong || !chosen) return;
@@ -175,21 +177,21 @@ function Compose({ detail, onPreview }: Readonly<{ detail: Extract<DetailRows, {
   return (
     <Card title={t("New communication preview")}>
       <div className="flex flex-col gap-3">
-        {mode.text && <Banner tone={isClosed ? undefined : "warn"}>{mode.text}</Banner>}
+        {mode.text && <Banner tone="warn">{mode.text}</Banner>}
         {result && <Banner tone={result.tone}>{result.text}</Banner>}
-        <Field label={t("Template")}><Select value={template} disabled={isClosed} onChange={(e) => { setTemplate(oneOf(TEMPLATES.map((x) => x.id), e.target.value, template)); }}>{TEMPLATES.map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}</Select></Field>
+        <Field label={t("Template")}><Select value={template} onChange={(e) => { setTemplate(oneOf(TEMPLATES.map((x) => x.id), e.target.value, template)); }}>{TEMPLATES.map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}</Select></Field>
         {mode.kind === "note" && <Field label={t("Visibility")}><Choice value={visibility} onChange={setVisibility} options={[{ id: "internal", label: t("Internal (default)") }, { id: "customer", label: t("Customer-visible") }]} /></Field>}
         <Field label={t("Recipient role")} hint={chosen ? `${t(ROLES.find((x) => x.id === role)?.sub ?? "")} · ${chosen.displayLabel}` : t("Nobody of this role is part of the job.")}>
-          <Select value={role} disabled={isClosed} onChange={(e) => { setRole(e.target.value); setRecipient(detail.recipients.find((p) => p.role === e.target.value)?.id ?? ""); }}>
+          <Select value={role} onChange={(e) => { setRole(e.target.value); setRecipient(detail.recipients.find((p) => p.role === e.target.value)?.id ?? ""); }}>
             {ROLES.map((x) => <option key={x.id} value={x.id} disabled={detail.recipients.every((p) => p.role !== x.id)}>{x.label}</option>)}
           </Select>
         </Field>
         {ofRole.length > 1 && <Field label={t("Recipient")}><Select value={chosen?.id ?? ""} onChange={(e) => { setRecipient(e.target.value); }}>{ofRole.map((p) => <option key={p.id} value={p.id}>{p.displayLabel}</option>)}</Select></Field>}
-        <Field label={t("Channel")}><Select value={channels.some((c) => c.id === channel) ? channel : "inApp"} disabled={isClosed} onChange={(e) => { setChannel(e.target.value); }}>{channels.map((c) => <option key={c.id} value={c.id}>{t("{channel} · preview only", { channel: c.id })}</option>)}</Select></Field>
+        <Field label={t("Channel")}><Select value={channels.some((c) => c.id === channel) ? channel : "inApp"} onChange={(e) => { setChannel(e.target.value); }}>{channels.map((c) => <option key={c.id} value={c.id}>{t("{channel} · preview only", { channel: c.id })}</option>)}</Select></Field>
         <Field label={t("Message (1–2000 chars)")} error={tried && !message.trim() ? t("A message is required — nothing was saved") : lengthError}>
-          <Textarea value={message} disabled={isClosed} onChange={(e) => { setMessage(e.target.value); }} placeholder={t("Schedule moved to 2026-09-22 09:00–11:00 due to technician availability.")} />
+          <Textarea value={message} onChange={(e) => { setMessage(e.target.value); }} placeholder={t("Schedule moved to 2026-09-22 09:00–11:00 due to technician availability.")} />
         </Field>
-        <div className="flex flex-wrap justify-end gap-2"><Btn disabled={pending || isClosed} onClick={() => { setMessage(""); setTried(false); setResult(null); }}>{t("Clear")}</Btn><Btn variant="primary" disabled={pending || isClosed || !chosen} onClick={send} className="h-auto min-h-8 max-w-full whitespace-normal text-left">{mode.add && <Icon name="add" />}{mode.button}</Btn></div>
+        <div className="flex flex-wrap justify-end gap-2"><Btn disabled={pending} onClick={() => { setMessage(""); setTried(false); setResult(null); }}>{t("Clear")}</Btn><Btn variant="primary" disabled={pending || !chosen} onClick={send} className="h-auto min-h-8 max-w-full whitespace-normal text-left">{mode.add && <Icon name="add" />}{mode.button}</Btn></div>
         <p className="text-[11px] text-muted-foreground">{t("No real sending. Only people involved in this job are offered; free-form external recipients and other jobs’ recipients are rejected. Internal notes stay hidden from customers.")}</p>
       </div>
     </Card>

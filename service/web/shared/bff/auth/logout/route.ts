@@ -6,15 +6,17 @@ import { sameOriginRequest } from "@ac/web/lib/securityHeaders";
 // identity provider's session of this sign-in (back-channel, with the session's refresh token, IR357) and drops the
 // cookie. Sign-out always succeeds for the user: when the provider cannot
 // be reached, the cookie is still dropped and the provider's session ends with its own lifetime. A sign-out posted by
-// another site is refused (CSRF, IR358). It returns to /login?reauth=1: /login goes on to the identity provider, and reauth asks
-// for the password again, so a provider session that could not be ended (above) does not sign the person straight back in.
+// another site is refused (CSRF, IR358). It returns to /login?reauth=1&signedOut=1: the sign-in page says the person signed
+// out (instead of going straight on to the provider's form, which gave no sign the sign-out happened), and its Sign in
+// keeps reauth, which asks for the password again, so a provider session that could not be ended (above) does not sign the
+// person straight back in.
 export async function POST(req: NextRequest) {
   if (!sameOriginRequest(req.headers)) return new NextResponse(null, { status: 403 });
   const cookie = req.cookies.get(SESSION_COOKIE)?.value;
   const session = await loadSession(cookie);
   await dropSession(cookie);
   if (session?.refreshToken) await endIdpSession(session.refreshToken);
-  const res = NextResponse.redirect(new URL("/login?reauth=1", oidcConfigFor(req.headers.get("host")).appUrl), 303);
+  const res = NextResponse.redirect(new URL("/login?reauth=1&signedOut=1", oidcConfigFor(req.headers.get("host")).appUrl), 303);
   res.cookies.set(SESSION_COOKIE, "", clearedCookieOptions());
   return res;
 }

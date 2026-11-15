@@ -38,13 +38,13 @@ function TimeControls({ value, onChange, id, disabled, allowEmpty, invalid, lock
   return (
     <>
       <NativeSelect aria-label={t("Hour")} id={id} aria-invalid={invalid} disabled={off} value={hour}
-        onChange={(e) => { onChange(joinTime(e.target.value, minute)); }} className="min-w-0 flex-1">
+        onChange={(e) => { onChange(joinTime(e.target.value, minute)); }} className="min-w-16 flex-1">
         {needsEmpty && <option value="">--</option>}
         {HOURS.map((h) => <option key={h} value={h}>{h}</option>)}
       </NativeSelect>
       <span aria-hidden="true" className="text-sm text-muted-foreground">:</span>
       <NativeSelect aria-label={t("Minute")} aria-invalid={invalid} disabled={off || hour === ""} value={hour === "" ? "" : minute}
-        onChange={(e) => { onChange(joinTime(hour, e.target.value)); }} className="min-w-0 flex-1">
+        onChange={(e) => { onChange(joinTime(hour, e.target.value)); }} className="min-w-16 flex-1">
         {hour === "" && <option value="">--</option>}
         {minuteOptions(minute).map((m) => <option key={m} value={m}>{m}</option>)}
       </NativeSelect>
@@ -76,7 +76,8 @@ export function DateTimeSelect({ value, onChange, id, disabled, min, defaultTime
     <div role={label ? "group" : undefined} aria-label={label} className={cn("flex min-w-0 flex-wrap items-center gap-1.5", className)}>
       <Input type="date" aria-label={t("Date")} id={id} aria-invalid={invalid} disabled={disabled} min={min?.slice(0, 10)} value={date}
         onChange={(e) => { onChange(joinDateTime(e.target.value, time, defaultTime)); }} className="w-auto min-w-0 flex-[2_1_9rem]" />
-      <div className="flex min-w-0 flex-[1_1_8rem] items-center gap-1.5">
+      {/* the hour and the minute keep room for "00" and the arrow: a narrow row wraps them under the date instead of clipping "00" to "0(" */}
+      <div className="flex min-w-[8.5rem] flex-[1_1_8.5rem] items-center gap-1.5">
         <TimeControls value={time} onChange={(v) => { onChange(joinDateTime(date, v, defaultTime)); }} disabled={disabled} invalid={invalid} locked={date === ""} />
       </div>
     </div>

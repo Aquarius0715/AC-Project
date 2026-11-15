@@ -32,7 +32,7 @@ test("the customer screens in Malay keep IDs and units and use the display time 
   await page.goto("/customer/properties");
   await expect(main.getByRole("heading", { name: "Premis saya" })).toBeVisible();
   await main.locator("button[aria-pressed]").first().click(); // the first property of the tree: its summary
-  await expect(main.getByText("Pilih bilik untuk melihat penyaman udaranya")).toBeVisible();
+  await expect(main.getByText(/^Penyaman udara di premis ini \(\d+\)$/)).toBeVisible(); // its ACs, listed at once (UI/UX loop R35)
   await page.goto("/customer/automations");
   await expect(main.getByRole("heading", { name: "Automasi anda" })).toBeVisible();
   await page.goto("/customer/automations?automationId=new");

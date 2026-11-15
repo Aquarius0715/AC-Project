@@ -173,7 +173,8 @@ function Editor({ live, onDone, onCancel }: Readonly<{ live: AutomationsLive; on
   const i18n = useI18n();
   const { t } = i18n;
   const rule = live.editing === "new" ? null : live.rules.find((r) => r.id === live.editing) ?? null;
-  const [draft, setDraft] = useState<Draft>(() => (rule ? draftOf(rule) : blankDraft(live.acs[0]?.id ?? "", live.timezone)));
+  const soleAc = live.acs.length === 1 ? live.acs[0]?.id ?? "" : ""; // a new rule names its AC only when there is one
+  const [draft, setDraft] = useState<Draft>(() => (rule ? draftOf(rule) : blankDraft(soleAc, live.timezone)));
   const [apiError, setApiError] = useState<Record<string, string>>({});
   const [shown, setShown] = useState(false); // client checks shown after the first Save / Test
   const [test, setTest] = useState<TestRow[] | null>(null);
@@ -190,7 +191,7 @@ function Editor({ live, onDone, onCancel }: Readonly<{ live: AutomationsLive; on
   const ac = live.acs.find((u) => u.id === draft.unitId);
   const options = actionOptions(live.caps[draft.unitId] ?? null, t);
   const supported = (k: string) => options.some((g) => g.options.some((o) => o.key === k));
-  const unsupported = (k: string) => (draft.unitId && !supported(k) ? t("Not supported by this AC — choose another action") : undefined);
+  const unsupported = (k: string) => (draft.unitId && k && !supported(k) ? t("Not supported by this AC — choose another action") : undefined);
   const isDirty = !rule || JSON.stringify(saveInput(draft)) !== JSON.stringify(saveInput(draftOf(rule)));
   const runsShown = preview.data.filter((o) => o.phase === "schedule_start").slice(0, 2).map((s) => ({ start: s, end: preview.data.find((o) => o.phase === "schedule_end" && isAfter(o.at, s.at)) }));
   const previewError = preview.error ? apiErrors(preview.error.error.fieldErrors, t) : {};
@@ -241,7 +242,7 @@ function Editor({ live, onDone, onCancel }: Readonly<{ live: AutomationsLive; on
         <div className="@container"><div className="grid grid-cols-1 items-start gap-3 @[22rem]:grid-cols-[minmax(120px,170px)_minmax(0,1fr)]">
           {part(t("Setting"), (
             <Select aria-label={t("{label} — setting", { label })} value={group?.id ?? ""} onChange={(e) => { pick(firstAction(options, e.target.value)); }}>
-              {!group && <option value="">{supported(value) ? t("Choose a setting") : t("{action} (not supported)", { action: actionLabel(actionOf(value), t) })}</option>}
+              {!group && <option value="">{!value || supported(value) ? t("Choose a setting") : t("{action} (not supported)", { action: actionLabel(actionOf(value), t) })}</option>}
               {options.map((g) => <option key={g.id} value={g.id}>{g.group}</option>)}
             </Select>
           ))}
@@ -320,7 +321,8 @@ function Editor({ live, onDone, onCancel }: Readonly<{ live: AutomationsLive; on
             {step(3, t("Then …"), t("Action for one AC"))}
             <Field label={t("Target AC")} error={errors.unitId}>
               <Select value={draft.unitId} onChange={(e) => { set({ unitId: e.target.value }); }}>
-                {live.acs.length === 0 && <option value="">{t("No AC available")}</option>}
+                {/* no AC is chosen for the user (one AC aside): a preselected first AC was easy to save unnoticed */}
+                <option value="" disabled>{t(live.acs.length === 0 ? "No AC available" : "Choose the AC to control…")}</option>
                 {live.acs.map((u) => <option key={u.id} value={u.id}>{u.name} · {u.path}</option>)}
               </Select>
             </Field>
@@ -350,7 +352,8 @@ function Editor({ live, onDone, onCancel }: Readonly<{ live: AutomationsLive; on
             {isSched && (
               <div className="mt-3 grid grid-cols-[90px_1fr] gap-2 border-t border-line pt-2 text-xs">
                 <span className="text-muted-foreground">{t("Next runs")}</span>
-                <span>{nextRuns()}</span>
+                {/* saved off, nothing runs: the times say when it would run once turned on */}
+                <span>{nextRuns()}{!draft.enabled && <span className="mt-0.5 block font-semibold text-warn">{t("Only after you turn it on — it is saved off")}</span>}</span>
               </div>
             )}
             <div className="mt-2 flex items-center justify-between gap-2 border-t border-line pt-2 text-xs">

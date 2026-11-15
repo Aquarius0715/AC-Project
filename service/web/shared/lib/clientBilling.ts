@@ -108,7 +108,8 @@ export const demoReference = (paymentId: string) => `DEMO-PAY-${paymentId.replac
 // ---- cooling restriction notice (FR-C12) ----
 
 const live = new Set<RestrictionState>(["scheduled", "requested", "applied", "release_requested"]);
-export interface RestrictionNotice { id: string; state: RestrictionState; label: string; policy: string; units: string; live: boolean }
+/** unitIds are the restricted units, so a list of units can mark them where they are listed */
+export interface RestrictionNotice { id: string; state: RestrictionState; label: string; policy: string; units: string; unitIds: string[]; live: boolean }
 /** A unit's name with its place in the given brackets, or the start of its ID when it is unknown. */
 function unitLabel(id: string, u: UnitPlace | undefined, around: (place: string) => string): string {
   if (!u) return id.slice(0, 8);
@@ -117,7 +118,7 @@ function unitLabel(id: string, u: UnitPlace | undefined, around: (place: string)
 export function restrictionNotice(r: ApiRestriction, unit: (id: string) => UnitPlace | undefined, t: T = en): RestrictionNotice {
   const names = r.unitIds.map((id) => unitLabel(id, unit(id), (place) => ` (${place})`));
   return {
-    id: r.id, state: r.state, label: t(stateLabel[r.state]), policy: policyText(r.policy, t), live: live.has(r.state),
+    id: r.id, state: r.state, label: t(stateLabel[r.state]), policy: policyText(r.policy, t), live: live.has(r.state), unitIds: r.unitIds,
     units: t(r.unitIds.length === 1 ? "{n} unit in scope · {names}" : "{n} units in scope · {names}", { n: r.unitIds.length, names: names.join(", ") }),
   };
 }

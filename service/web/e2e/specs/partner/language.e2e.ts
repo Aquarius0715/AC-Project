@@ -73,9 +73,8 @@ test("the contractor screens in Malay keep Kuala Lumpur days and show instants i
     await expect(main).toContainText(/GMT\+9/); // the events in the display zone
   }
   await page.goto("/partner/payouts");
-  await expect(main.getByRole("combobox", { name: "Tempoh" })).toContainText("Tempoh: Semua");
-  await expect(main.getByRole("combobox", { name: "Status" })).toContainText("Status: Diluluskan");
   await expect(main.getByRole("heading", { name: "Penyata", exact: true }).first()).toBeVisible();
+  await expect(main.getByRole("heading", { name: "Belum ada penyata" })).toBeVisible(); // the seed has no statement yet
   await setDisplay(page, ENGLISH, zone);
   zoneBefore = null;
   await page.goto("/partner");

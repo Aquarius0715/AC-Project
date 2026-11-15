@@ -45,7 +45,8 @@ export function PaymentsView({ live }: Readonly<{ live: PaymentsLive }>) {
             <h3 className="mb-2 mt-4 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">{t("Contract scope — equipment this contract relates to")}</h3>
             {sel.units.length === 0 ? <p className="text-xs text-muted-foreground">{t("No unit in this contract.")}</p> : (
               <div className="flex flex-col divide-y divide-line">
-                {sel.units.map((u) => <div key={u.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-[13px]"><span><b>{u.name}</b><span className="block text-xs text-muted-foreground">{u.place || "—"}</span></span><TextLink href={`/customer/units/${u.id}`}>{t("View unit")} <Icon name="chevronRight" /></TextLink></div>)}
+                {/* a unit under the cooling restriction says so on its own row, not only in the banner further down */}
+                {sel.units.map((u) => <div key={u.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-[13px]"><span><span className="flex flex-wrap items-center gap-2"><b>{u.name}</b>{live.notice?.live && live.notice.unitIds.includes(u.id) && <Badge tone="warn" icon="warning">{t("Cooling restricted")}</Badge>}</span><span className="block text-xs text-muted-foreground">{u.place || "—"}</span></span><TextLink href={`/customer/units/${u.id}`}>{t("View unit")} <Icon name="chevronRight" /></TextLink></div>)}
               </div>
             )}
           </Card>
