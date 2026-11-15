@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { DICTIONARIES, intlTag, isLocale, showRecent, showSpan, showTime, translate, translator, zonedInstant, zonedParts, type Locale } from "@ac/web/lib/i18n";
+import { DICTIONARIES, i18nOf, intlTag, isLocale, showDate, showRecent, showSpan, showTime, translate, zonedInstant, zonedParts, type Locale } from "@ac/web/lib/i18n";
 import { id } from "@ac/web/lib/i18n-id";
 import { ja } from "@ac/web/lib/i18n-ja";
 import { ms } from "@ac/web/lib/i18n-ms";
@@ -150,8 +150,10 @@ describe("Display language (FR-X01, AT-X01-N, IR258, IR639)", () => {
 
   it("puts the consent line in the display language", () => {
     const c = { id: "c1", version: 2, granted: true, grantedAt: "2026-09-14T01:00:00Z", revokedAt: null };
-    expect([consentNote(c, translator("ms")), consentNote(null, translator("ms"))]).toStrictEqual(["Diberikan 2026-09-14", "Belum diberikan"]);
-    expect([consentNote(c, translator("ja")), consentNote(null, translator("ja"))]).toStrictEqual(["2026-09-14 に同意", "まだ同意していません"]);
+    const inMs = i18nOf({ locale: "ms", timeZone: "Asia/Kuala_Lumpur" }), inJa = i18nOf({ locale: "ja", timeZone: "Asia/Kuala_Lumpur" });
+    // the date as the display language writes dates elsewhere (UI/UX loop R36), not the raw "2026-09-14"
+    expect([consentNote(c, inMs), consentNote(null, inMs)]).toStrictEqual([`Diberikan ${showDate(c.grantedAt, inMs.display)}`, "Belum diberikan"]);
+    expect([consentNote(c, inJa), consentNote(null, inJa)]).toStrictEqual([`${showDate(c.grantedAt, inJa.display)} に同意`, "まだ同意していません"]);
   });
 
   it("speaks Japanese, with the same placeholders and fallbacks as Malay (IR639)", () => {
