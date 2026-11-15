@@ -282,6 +282,8 @@ export const id: Record<string, string> = {
   "Weekdays": "Hari kerja",
   "Weekends": "Akhir pekan",
   "{list} & {last}": "{list} & {last}",
+  "Turn this AC on?": "Nyalakan AC ini?",
+  "Turn this AC off?": "Matikan AC ini?",
   "Power ON": "Daya ON",
   "Power OFF": "Daya OFF",
   "Mode {mode}": "Mode {mode}",

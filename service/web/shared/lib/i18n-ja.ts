@@ -282,6 +282,8 @@ export const ja: Record<string, string> = {
   "Weekdays": "平日",
   "Weekends": "週末",
   "{list} & {last}": "{list}、{last}",
+  "Turn this AC on?": "このエアコンの電源をオンにしますか？",
+  "Turn this AC off?": "このエアコンの電源をオフにしますか？",
   "Power ON": "電源オン",
   "Power OFF": "電源オフ",
   "Mode {mode}": "モード {mode}",

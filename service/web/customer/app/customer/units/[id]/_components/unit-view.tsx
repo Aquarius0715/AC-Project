@@ -123,6 +123,17 @@ interface RemoteControlProps {
   onPower: (on: boolean) => void; onStep: (delta: number) => void; onMode: (mode: ControlMode) => void; onFan: (fan: FanLevel) => void; onReview: () => void;
 }
 
+/** The confirmation of a power switch: the switch only asks, the power goes out after this (client.md FR-C03 rule 1). */
+function PowerConfirm({ power, name, where, onCancel, onSend }: Readonly<{ power: boolean | null; name: string; where: string; onCancel: () => void; onSend: (v: boolean) => void }>) {
+  const t = useT();
+  return (
+    <Modal open={power !== null} onClose={onCancel} title={t(power ? "Turn this AC on?" : "Turn this AC off?")} footer={<><Btn onClick={onCancel}>{t("Cancel")}</Btn><Btn variant="primary" onClick={() => { if (power !== null) onSend(power); }}>{t(power ? "Power ON" : "Power OFF")}</Btn></>}>
+      <SummaryList items={[[t("Target"), where], [t("Change"), t(power ? "Set power ON" : "Set power OFF")]]} />
+      <p className="text-xs text-muted-foreground">{t("Only {name} changes. The result shows after the device acknowledges.", { name })}</p>
+    </Modal>
+  );
+}
+
 /** The remote control card: the power, the setpoint, the mode and the fan, and the review of what will be sent. */
 function RemoteControlCard(p: Readonly<RemoteControlProps>) {
   const t = useT();
@@ -182,6 +193,7 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
   const [fan, setFan] = useState<FanLevel>("mid");
   const [edited, setEdited] = useState<Edits>({}); // settings the user changed since the last report
   const [confirm, setConfirm] = useState(false);
+  const [powerAsk, setPowerAsk] = useState<boolean | null>(null); // the power the user switched to, waiting for the confirmation
   const [renaming, setRenaming] = useState(false); // Rename of the AC (Figma 02e, DD-C03, IR315)
   // API mode: start the controls from the device-reported setting when another unit or a newer report arrives
   // (adjust state during render, React "You might not need an effect")
@@ -278,7 +290,9 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
       router.refresh(); // re-read the unit on the server (observed setting, pending commands)
     }
   };
+  // sends the power once PowerConfirm is confirmed; the switch itself only opens the confirmation
   const togglePower = (v: boolean) => {
+    setPowerAsk(null);
     if (d) { void sendApi([{ kind: "set_power", power: v }]); return; }
     setMockOn(v);
     toast(t(v ? "Power ON sent" : "Power OFF sent"));
@@ -333,7 +347,7 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
             modes={isShowMode ? modes : []} mode={mode} fans={isShowFan ? fans : []} fan={fan}
             review={layout.review ? { count: changeCount, summary: d ? changes().map((item) => changeText(item)).join(" · ") || t("No change yet") : t(SET_TEMPERATURE_FROM_C_TO_C, { from: 26, to: setpoint }), target: unit.name, canSend: d === null || changes().length > 0 } : null}
             repairHref={`/customer/maintenance?new=${d?.id ?? unit.id}`}
-            onPower={togglePower} onStep={(delta) => { setSetpoint((x) => x + delta); setEdited((e) => ({ ...e, temp: true })); }}
+            onPower={setPowerAsk} onStep={(delta) => { setSetpoint((x) => x + delta); setEdited((e) => ({ ...e, temp: true })); }}
             onMode={(m) => { setMode(m); setEdited((e) => ({ ...e, mode: true })); }} onFan={(f) => { setFan(f); setEdited((e) => ({ ...e, fan: true })); }} onReview={() => { setConfirm(true); }}
           />
           <div className="split-even">
@@ -348,6 +362,7 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
         <SummaryList items={[[t("Target"), `${unit.loc} › ${unit.name}`], [t("Change"), d ? changes().map((item) => changeText(item)).join(" · ") : t(SET_TEMPERATURE_FROM_C_TO_C, { from: 26, to: setpoint })], [t("Mode / fan"), `${modeWord(mode)} / ${fanWord(fan)}`]]} />
         <p className="text-xs text-muted-foreground">{t("Only {name} changes. The result shows after the device acknowledges.", { name: unit.name })}</p>
       </Modal>
+      <PowerConfirm power={powerAsk} name={unit.name} where={`${unit.loc} › ${unit.name}`} onCancel={() => { setPowerAsk(null); }} onSend={togglePower} />
       <Modal open={attachOpen} onClose={() => { setAttachOpen(false); }} title={t("Attach a policy to {name}", { name: unit.name })} footer={<><Btn onClick={() => { setAttachOpen(false); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={picked.length === 0} onClick={() => { savePolicies([...attached, ...picked], t(picked.length > 1 ? "{n} policies attached to this AC" : "{n} policy attached to this AC", { n: picked.length })); setAttachOpen(false); }}>{t("Attach")}</Btn></>}>
         <p className="mb-2 text-[13px] text-muted-foreground">{t("Only your account’s policies are listed. The default policy is always attached.")}</p>
         <div className="flex flex-col gap-2">{customerPolicies.filter((pl) => !attached.includes(pl.id)).map((pl) => <Check key={pl.id} label={<span><b>{pl.name}</b> <span className="text-xs text-muted-foreground">{pl.rule}</span></span>} checked={picked.includes(pl.id)} onChange={(v) => { setPicked((x) => (v ? [...x, pl.id] : x.filter((y) => y !== pl.id))); }} />)}</div>
