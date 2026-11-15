@@ -91,6 +91,13 @@ describe("charts", () => {
     expect(new Set(ticks).size).toBe(ticks.length);
   });
 
+  // UI/UX loop R12: the energy page drew a day without readings as a 0 kWh bar; a missing value is no bar and says so
+  it("draws no bar for a missing value and marks a day no series has as no data", () => {
+    const { container } = render(<BarChart labels={["Mon", "Tue", "Wed"]} series={[[1, null, null], [2, 3, null]]} names={["Baseline", "Actual"]} />);
+    expect(container.querySelectorAll(".recharts-bar-rectangle")).toHaveLength(3);
+    expect(container.textContent.match(/no data/g)).toHaveLength(1);
+  });
+
   it("draws no legend for an unnamed series", () => {
     const { container } = render(<BarChart labels={["a", "b"]} series={[[1, 2]]} />);
     expect(container.querySelectorAll(".recharts-legend-wrapper")).toHaveLength(0);
