@@ -1,7 +1,7 @@
 // The page's name in the shell header and the document title (WCAG 2.4.2, IR490): the menu item with the longest matching
 // path, the shared pages, Users and Demo controls, in the display language.
 import { describe, expect, it } from "vitest";
-import { documentTitle, pageLabel, ROLES, SHARED_PAGES } from "@ac/web/lib/nav";
+import { lockedNav, documentTitle, pageLabel, ROLES, SHARED_PAGES } from "@ac/web/lib/nav";
 import { ms } from "@ac/web/lib/i18n-ms";
 
 const TECHNICIAN = "technician";
@@ -30,5 +30,14 @@ describe("page names and document titles (IR490)", () => {
   it("has a Malay name for every menu item and shared page", () => {
     const labels = [...Object.values(ROLES).flatMap((r) => [...r.nav.map((i) => i.label), r.sub]), ...SHARED_PAGES.map((s) => s.label), "Users", "Demo controls"];
     expect(labels.filter((l) => !Object.hasOwn(ms, l))).toStrictEqual([]);
+  });
+});
+
+describe("the HQ menu's locked screens (UI/UX loop R55)", () => {
+  it("locks a screen missing one of its `all` permissions, or every one of its `any`", () => {
+    const all = ["dashboard.read", "asset.read", "alert.read", "alert.policy.read", "restriction.override"];
+    expect(lockedNav(new Set(all))).toStrictEqual([]);
+    expect(lockedNav(new Set(["dashboard.read", "asset.read"]))).toStrictEqual(["/admin/alerts", "/admin/restrictions"]);
+    expect(lockedNav(new Set())).toStrictEqual(["/admin", "/admin/units", "/admin/alerts", "/admin/restrictions"]);
   });
 });

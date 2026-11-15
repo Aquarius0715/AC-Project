@@ -45,6 +45,7 @@ export const ja: Record<string, string> = {
   "Notifications": "通知",
   "Preferences": "設定",
   "Demo controls": "デモ操作",
+  "Your role can’t open this": "このロールでは開けません",
   "Sign out": "ログアウト",
   "Open menu": "メニューを開く",
   "Menu": "メニュー",

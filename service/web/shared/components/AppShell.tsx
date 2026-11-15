@@ -12,7 +12,7 @@ import { QrScan } from "./QrScan";
 import { CURRENT_CLIENT } from "@ac/web/lib/clientUsers";
 import { setStoredValue, useStoredValue } from "@ac/web/lib/urlState";
 import { DEFAULT_DISPLAY, isLocale, LOCALE_KEY, translate, type Display } from "@ac/web/lib/i18n";
-import { I18nProvider } from "./I18n";
+import { I18nProvider, useT } from "./I18n";
 import { useBffSession } from "@ac/web/lib/useOp";
 import { Sheet, SheetContent } from "@ac/web/components/ui/sheet";
 import { Button } from "@ac/web/components/ui/button";
@@ -31,18 +31,21 @@ export function useStoredRole(): Role {
 
 const SHARED = SHARED_PAGES.map((s) => ({ ...s, icon: (s.href === "/notifications" ? "notifications" : "preferences") as IconName }));
 
-function NavLink({ href, label, icon, badge, active }: Readonly<{ href: string; label: string; icon: IconName; badge?: string; active: boolean }>) {
+function NavLink({ href, label, icon, badge, active, locked }: Readonly<{ href: string; label: string; icon: IconName; badge?: string; active: boolean; locked?: boolean }>) {
+  const t = useT();
   return (
-    <Link href={href} aria-current={active ? "page" : undefined} className={cx("flex items-center gap-2.5 rounded-control px-3 py-2 text-[13px] font-semibold", active ? "bg-primary-soft text-primary" : "text-ink hover:bg-surface2")}>
+    <Link href={href} aria-current={active ? "page" : undefined} className={cx("flex items-center gap-2.5 rounded-control px-3 py-2 text-[13px] font-semibold", active ? "bg-primary-soft text-primary" : "text-ink hover:bg-surface2", locked && !active && "text-muted-foreground")}>
       <Icon name={icon} className={cx("text-[15px]", active ? "text-primary" : "text-muted-foreground")} />
       <span className="min-w-0 flex-1 leading-tight">{label}</span>
+      {/* the screen only says which access is missing: marked before the click, not after (UI/UX loop R55) */}
+      {locked && <span title={t("Your role can’t open this")}><Icon name="locked" className="text-[13px] text-muted-foreground" /><span className="sr-only"> · {t("Your role can’t open this")}</span></span>}
       {/* a count, not a severity: red stays for critical and errors (the alert itself carries its severity) */}
       {badge && <span className="grid h-[18px] min-w-[18px] place-items-center rounded-full bg-primary px-1 text-[10px] font-bold text-white">{badge}</span>}
     </Link>
   );
 }
 
-interface NavItem { href: string; label: string; icon: IconName; badge?: string; match?: string[] }
+interface NavItem { href: string; label: string; icon: IconName; badge?: string; match?: string[]; locked?: boolean }
 /** The role's sidebar items with the active one: the longest matching path, where an item whose href carries a query
 (Sidebar › Assigned jobs = /technician?tab=all) wins on its path only when the query matches too. */
 function RoleNav({ items, base, pathname, search }: Readonly<{ items: NavItem[]; base: string; pathname: string; search: string }>) {
@@ -100,7 +103,7 @@ export function AppShell({ appRole: forced, live, children }: Readonly<{ appRole
   const demoBadge = demoUnread > 0 ? String(demoUnread) : undefined; // no badge for 0, like the Core API's counts
   const unreadBadge = (href: string) => (live ? count(href) : demoBadge); // the demo counts its own unread
 
-  const items = (live ? config.nav.map((i) => ({ ...i, badge: count(i.href) })) : config.nav).map((i) => ({ ...i, label: t(i.label) }));
+  const items = (live ? config.nav.map((i) => ({ ...i, badge: count(i.href), locked: live.locked?.includes(i.href) ?? false })) : config.nav).map((i) => ({ ...i, label: t(i.label) }));
   // the page's name: the menu item with the longest matching path (/customer/units/x is "Units & locations")
   const label = pageLabel(role, pathname);
   const title = label ? t(label) : "AC Project";

@@ -15,6 +15,7 @@ vi.mock("@ac/web/lib/dal", () => {
     coreOp: (...a: unknown[]): unknown => coreOp(...a),
     coreIdentity: () => Promise.resolve({ displayName: "Tan Wei", organizationName: "Demo Customer A" }),
     coreDisplay: () => Promise.resolve({ language: "en", timeZone: "Asia/Kuala_Lumpur" }),
+    corePermissions: () => Promise.resolve(new Set(["dashboard.read", "asset.read", "alert.read"])),
   };
 });
 
@@ -55,6 +56,7 @@ describe("loadShell", () => {
       Promise.resolve({ total: op === NOTIFICATIONS_LIST ? 1 : alertTotal(input.filters) }));
     const shell = await loadShell("admin");
     expect(shell?.badges).toStrictEqual({ "/notifications": 1, "/admin/alerts": 2 + 1 + 5 + 5 });
+    expect(shell?.locked).toStrictEqual(["/admin/alerts", "/admin/restrictions"]); // no alert.policy.read, no restriction.* (UI/UX loop R55)
     expect(coreOp.mock.calls.filter(([op]) => op === "alerts.list")).toHaveLength(4);
   });
 
