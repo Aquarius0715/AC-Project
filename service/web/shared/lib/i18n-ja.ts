@@ -5647,6 +5647,7 @@ export const ja: Record<string, string> = {
   "Set-up e-mail sent again to {email}": "セットアップのメールを {email} に再送しました",
   "Resend set-up e-mail": "セットアップのメールを再送",
   "Your customer always keeps one active owner, and you can’t change your own account. A user keeps their e-mail — to change it, remove them and add them again. For a password reset, contact HQ. Only owners see this page.": "顧客には常に有効なオーナーが1人います。ご自身のアカウントは変更できません。ユーザーのメールアドレスは変わりません — 変更するには、削除してから追加し直してください。パスワードの再設定は、本部にご連絡ください。このページが見えるのはオーナーだけです。",
+  "The set-up e-mail comes from the sign-in service.": "セットアップのメールはログインサービスから送られます。",
   "The set-up e-mail comes from the sign-in service; in development it arrives in the local Mailpit inbox.": "セットアップのメールはログインサービスから送られます。開発環境では、ローカルの Mailpit の受信箱に届きます。",
   "Their account is created now and they get an e-mail to set their password. They see only your properties and units; until they sign in they are listed as “Not signed in yet”.": "アカウントが今作成され、パスワードを設定するメールが届きます。見られるのはお客様の物件とユニットだけで、ログインするまでは「未ログイン」と表示されます。",
   "Their account is removed before they signed in.": "ログイン前に、アカウントが削除されます。",

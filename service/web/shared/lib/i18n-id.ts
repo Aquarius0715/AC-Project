@@ -5647,6 +5647,7 @@ export const id: Record<string, string> = {
   "Set-up e-mail sent again to {email}": "Email penyiapan dikirim lagi ke {email}",
   "Resend set-up e-mail": "Kirim ulang email penyiapan",
   "Your customer always keeps one active owner, and you can’t change your own account. A user keeps their e-mail — to change it, remove them and add them again. For a password reset, contact HQ. Only owners see this page.": "Pelanggan Anda selalu memiliki satu pemilik aktif, dan Anda tidak dapat mengubah akun Anda sendiri. Pengguna mempertahankan emailnya — untuk mengubahnya, keluarkan lalu tambahkan lagi. Untuk pengaturan ulang kata sandi, hubungi HQ. Hanya pemilik yang melihat halaman ini.",
+  "The set-up e-mail comes from the sign-in service.": "Email penyiapan dikirim oleh layanan masuk.",
   "The set-up e-mail comes from the sign-in service; in development it arrives in the local Mailpit inbox.": "Email penyiapan berasal dari layanan masuk; pada pengembangan, email tiba di kotak masuk Mailpit lokal.",
   "Their account is created now and they get an e-mail to set their password. They see only your properties and units; until they sign in they are listed as “Not signed in yet”.": "Akun mereka dibuat sekarang dan mereka mendapat email untuk mengatur kata sandi. Mereka hanya melihat properti dan unit Anda; sampai masuk, mereka tercantum sebagai “Belum masuk”.",
   "Their account is removed before they signed in.": "Akun mereka dihapus sebelum mereka masuk.",

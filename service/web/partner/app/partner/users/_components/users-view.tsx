@@ -54,6 +54,12 @@ const API_FIELDS: Record<string, FieldKey> = { displayName: "name", email: "emai
 
 /** Users (FR-P11, IR461): the contractor's company accounts, with the actions each row allows; one dialog at a time
 (add, access end, disable, enable, remove), each change after the adding with a reason. */
+/** Where the set-up e-mail comes from; the local Mailpit inbox is named only in development (it is a development tool). */
+const setupNote = (sends: boolean): string => {
+  if (!sends) return "Nothing is sent in the demo.";
+  return process.env.NODE_ENV === "development" ? "The set-up e-mail comes from the sign-in service; in development it arrives in the local Mailpit inbox." : "The set-up e-mail comes from the sign-in service.";
+};
+
 export function UsersView({ data, ops, onStatus, sends = false }: Readonly<{ data: UsersData | null; ops: UsersOps; onStatus: (s: PartnerStatus | null) => void; sends?: boolean }>) {
   type Dialog =
   | { kind: "invite" }
@@ -164,7 +170,7 @@ export function UsersView({ data, ops, onStatus, sends = false }: Readonly<{ dat
         </div>
       </Card>
       <Banner>{t("A technician you add can be assigned once HQ has verified their certificates. An account keeps its e-mail and role — to change them, remove it and add it again. You can’t change your own account, and your company always keeps one active contractor.")}</Banner>
-      <p className="text-[11px] text-muted-foreground">{t(sends ? "The set-up e-mail comes from the sign-in service; in development it arrives in the local Mailpit inbox." : "Nothing is sent in the demo.")}</p>
+      <p className="text-[11px] text-muted-foreground">{t(setupNote(sends))}</p>
       <Modal open={!!dialog} onClose={close} title={title} finalFocus={() => (gone.current ? document.querySelector("#users-list") : true)} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant={dialog?.kind === "remove" || dialog?.kind === "disable" ? "danger" : "primary"} disabled={pending} onClick={submit}>{action}</Btn></>}>
         {isAdding && <>
           <Field label={t("Name")} error={(tried ? nameProblem : undefined) ?? server.name}><Input id={ids.name} value={name} maxLength={120} onChange={(e) => { setName(e.target.value); edit("name"); }} placeholder="Lim Wei Ming" /></Field>
