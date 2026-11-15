@@ -1276,6 +1276,7 @@ export const ja: Record<string, string> = {
   "Modeled baseline prorated to the period": "期間に合わせて按分したモデルのベースライン",
   "Emission factor missing — emissions cannot be calculated": "排出係数がありません — 排出量を計算できません",
   "Boundary differs from the baseline": "算定範囲がベースラインと異なります",
+  "No valid readings in this period — every expected reading is missing or invalid": "この期間に有効な読み取りがありません — 想定される読み取りがすべて欠けているか無効です",
   "No valid readings": "有効な測定値がありません",
   "No baseline": "ベースラインなし",
   "No value": "値なし",

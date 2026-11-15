@@ -58,6 +58,11 @@ describe("customer energy & cost (FR-C06, FR-C13)", () => {
     expect(v.warnings).toEqual(["Partial coverage — some expected readings are missing or invalid", "Modeled baseline — a demo assumption, not a measurement"]);
   });
 
+  it("says no reading at all is valid instead of calling it partial coverage", () => {
+    const v = summaryView({ ...summary, totals: { ...summary.totals, kWh: null } });
+    expect(v.warnings[0]).toBe("No valid readings in this period — every expected reading is missing or invalid");
+  });
+
   it("words a summary in Malay and keeps the Kuala Lumpur business period named (REV18-035, IR265)", () => {
     const i = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
     const v = summaryView(summary, i);

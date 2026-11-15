@@ -1276,6 +1276,7 @@ export const id: Record<string, string> = {
   "Modeled baseline prorated to the period": "Baseline pemodelan diprorata ke periode",
   "Emission factor missing — emissions cannot be calculated": "Faktor emisi hilang — emisi tidak dapat dihitung",
   "Boundary differs from the baseline": "Batas berbeda dari baseline",
+  "No valid readings in this period — every expected reading is missing or invalid": "Tidak ada bacaan valid dalam periode ini — setiap bacaan yang diharapkan hilang atau tidak valid",
   "No valid readings": "Tidak ada bacaan valid",
   "No baseline": "Tidak ada baseline",
   "No value": "Tidak ada nilai",

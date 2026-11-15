@@ -1322,6 +1322,7 @@ export const ms: Record<string, string> = {
   "Modeled baseline prorated to the period": "Garis dasar dimodelkan diprorata mengikut tempoh",
   "Emission factor missing — emissions cannot be calculated": "Faktor pelepasan tiada — pelepasan tidak dapat dikira",
   "Boundary differs from the baseline": "Sempadan berbeza daripada garis dasar",
+  "No valid readings in this period — every expected reading is missing or invalid": "Tiada bacaan sah dalam tempoh ini — setiap bacaan yang dijangka tiada atau tidak sah",
   "No valid readings": "Tiada bacaan sah",
   "No baseline": "Tiada garis dasar",
   "No value": "Tiada nilai",
