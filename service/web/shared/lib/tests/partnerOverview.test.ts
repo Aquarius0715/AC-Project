@@ -69,6 +69,12 @@ describe("partner overview", () => {
     expect(until(TEXT_2026_09_21T01_00_00Z, now)).toBe("ended");
   });
 
+  it("leaves out an open job whose delegation ended, as the KPI does (UI/UX loop R43)", () => {
+    const ended = partnerJob({ projection: "history", jobId: "h2", type: "preventive", status: "in_progress", completedAt: null, asOf: "2026-09-20T16:00:00Z", ownDecisionEvents: [] }, new Map());
+    expect(bucket(ended, now)).toBe("other");
+    expect(progress([ended], now).total).toBe(0);
+  });
+
   it("builds the KPI tiles from the summary counts and the list", () => {
     const tiles = kpis({ offerCount: 1, activeCount: 5, reviewCount: 1, overdueCount: 1 }, fixture(), now, names, { from: TEXT_2026_09_21, to: TEXT_2026_09_27 });
     expect(tiles.map((t) => [t.label, t.value, t.sub, t.href])).toStrictEqual([
