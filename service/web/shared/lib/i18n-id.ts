@@ -45,6 +45,8 @@ export const id: Record<string, string> = {
   "Notifications": "Notifikasi",
   "Preferences": "Preferensi",
   "Demo controls": "Kontrol demo",
+  "Main menu": "Menu utama",
+  "Account and settings": "Akun dan pengaturan",
   "Sign out": "Keluar",
   "Open menu": "Buka menu",
   "Menu": "Menu",

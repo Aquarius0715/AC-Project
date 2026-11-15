@@ -49,6 +49,8 @@ export const ms: Record<string, string> = {
   "Notifications": "Pemberitahuan",
   "Preferences": "Keutamaan",
   "Demo controls": "Kawalan demo",
+  "Main menu": "Menu utama",
+  "Account and settings": "Akaun dan tetapan",
   "Sign out": "Log keluar",
   "Open menu": "Buka menu",
   "Menu": "Menu",

@@ -45,6 +45,8 @@ export const ja: Record<string, string> = {
   "Notifications": "通知",
   "Preferences": "設定",
   "Demo controls": "デモ操作",
+  "Main menu": "メインメニュー",
+  "Account and settings": "アカウントと設定",
   "Sign out": "ログアウト",
   "Open menu": "メニューを開く",
   "Menu": "メニュー",
