@@ -31,6 +31,7 @@ test("a schedule previews its next runs, is saved off and deleted", async ({ pag
   await page.waitForURL(/automationId=new/);
   const name = `E2E schedule ${String(Date.now())}`;
   await page.getByLabel("Name").fill(name);
+  await page.getByRole("combobox", { name: /^Target AC/ }).selectOption({ index: 1 }); // no AC is preselected (UI/UX loop R10)
   // the default schedule (weekdays 18:00 → 22:00) in the Preferences zone: each run with its end time
   const runs = page.getByText("Next runs", { exact: true }).locator("..");
   await expect(runs).toContainText(/\d{2}:\d{2} MYT · 22:00 MYT/);

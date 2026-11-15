@@ -1214,6 +1214,7 @@ export const id: Record<string, string> = {
   "Then …": "Maka …",
   "Action for one AC": "Aksi untuk satu AC",
   "Target AC": "AC target",
+  "Choose the AC to control…": "Pilih AC yang akan dikontrol…",
   "No AC available": "Tidak ada AC tersedia",
   "Start action (at {time})": "Aksi awal (pukul {time})",
   "End action (at {time}) — required": "Aksi akhir (pukul {time}) — wajib",
