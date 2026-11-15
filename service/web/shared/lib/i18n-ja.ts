@@ -1084,6 +1084,8 @@ export const ja: Record<string, string> = {
   "Saturday": "土曜日",
   "Sunday": "日曜日",
   "Choose the AC": "エアコンを選んでください",
+  "Choose what happens at the end": "終了時の動作を選んでください",
+  "(not chosen yet)": "（未選択）",
   "Choose at least one weekday": "曜日を1つ以上選んでください",
   "Start and end cannot be equal — not 24-hour operation": "開始と終了を同じにはできません — 24時間運転にはなりません",
   "The end is before the start — tick “Ends next day” for an overnight schedule": "終了が開始より前です — 夜をまたぐスケジュールは「翌日に終了」にチェックしてください",

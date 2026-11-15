@@ -1084,6 +1084,8 @@ export const id: Record<string, string> = {
   "Saturday": "Sabtu",
   "Sunday": "Minggu",
   "Choose the AC": "Pilih AC",
+  "Choose what happens at the end": "Pilih apa yang terjadi di akhir",
+  "(not chosen yet)": "(belum dipilih)",
   "Choose at least one weekday": "Pilih setidaknya satu hari kerja",
   "Start and end cannot be equal — not 24-hour operation": "Awal dan akhir tidak boleh sama — bukan operasi 24 jam",
   "The end is before the start — tick “Ends next day” for an overnight schedule": "Akhir lebih awal dari awal — centang “Berakhir hari berikutnya” untuk jadwal semalam",

@@ -1128,6 +1128,8 @@ export const ms: Record<string, string> = {
   "Saturday": "Sabtu",
   "Sunday": "Ahad",
   "Choose the AC": "Pilih AC",
+  "Choose what happens at the end": "Pilih apa yang berlaku pada akhirnya",
+  "(not chosen yet)": "(belum dipilih)",
   "Choose at least one weekday": "Pilih sekurang-kurangnya satu hari",
   "Start and end cannot be equal — not 24-hour operation": "Mula dan tamat tidak boleh sama — bukan operasi 24 jam",
   "The end is before the start — tick “Ends next day” for an overnight schedule": "Tamat sebelum mula — tandakan “Tamat hari berikutnya” untuk jadual semalaman",
