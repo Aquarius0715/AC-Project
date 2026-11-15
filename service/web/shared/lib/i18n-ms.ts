@@ -5172,6 +5172,7 @@ export const ms: Record<string, string> = {
   "Allow cooling restrictions for unpaid invoices": "Benarkan sekatan penyejukan untuk invois yang belum dibayar",
   "Rules version · required when eligible": "Versi peraturan · diperlukan apabila layak",
   "Demo rules — not approved production rules": "Peraturan demo — bukan peraturan pengeluaran yang diluluskan",
+  "Your role can’t open Restrictions": "Peranan anda tidak boleh membuka Sekatan",
   "Open restriction": "Buka sekatan",
   "Save is disabled: {reason}. Cancel the notice or release the restriction first — contract changes never cancel or release restrictions.": "Simpan dilumpuhkan: {reason}. Batalkan notis atau lepaskan sekatan dahulu — perubahan kontrak tidak pernah membatalkan atau melepaskan sekatan.",
   "1 active restriction on this contract": "1 sekatan aktif pada kontrak ini",

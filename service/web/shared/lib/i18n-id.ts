@@ -5053,6 +5053,7 @@ export const id: Record<string, string> = {
   "Allow cooling restrictions for unpaid invoices": "Izinkan pembatasan pendinginan untuk faktur yang belum dibayar",
   "Rules version · required when eligible": "Versi aturan · wajib bila layak",
   "Demo rules — not approved production rules": "Aturan demo — bukan aturan produksi yang disetujui",
+  "Your role can’t open Restrictions": "Peran Anda tidak dapat membuka Pembatasan",
   "Open restriction": "Buka pembatasan",
   "Save is disabled: {reason}. Cancel the notice or release the restriction first — contract changes never cancel or release restrictions.": "Simpan dinonaktifkan: {reason}. Batalkan pemberitahuan atau cabut pembatasan lebih dulu — perubahan kontrak tidak pernah membatalkan atau mencabut pembatasan.",
   "1 active restriction on this contract": "1 pembatasan aktif pada kontrak ini",
