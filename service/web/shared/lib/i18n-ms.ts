@@ -3214,6 +3214,7 @@ export const ms: Record<string, string> = {
   "Power signal": "Isyarat kuasa",
   "ON": "HIDUP",
   "OFF": "MATI",
+  "Choose the target AC first": "Pilih AC sasaran dahulu",
   "Choose a setting": "Pilih tetapan",
   "{label} — setting": "{label} — tetapan",
   "{label} — value": "{label} — nilai",

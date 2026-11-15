@@ -3129,6 +3129,7 @@ export const ja: Record<string, string> = {
   "Power signal": "電力信号",
   "ON": "オン",
   "OFF": "オフ",
+  "Choose the target AC first": "先に対象のエアコンを選んでください",
   "Choose a setting": "設定を選んでください",
   "{label} — setting": "{label} — 設定",
   "{label} — value": "{label} — 値",

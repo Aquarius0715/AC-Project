@@ -3129,6 +3129,7 @@ export const id: Record<string, string> = {
   "Power signal": "Sinyal daya",
   "ON": "ON",
   "OFF": "OFF",
+  "Choose the target AC first": "Pilih AC target terlebih dahulu",
   "Choose a setting": "Pilih pengaturan",
   "{label} — setting": "{label} — pengaturan",
   "{label} — value": "{label} — nilai",
