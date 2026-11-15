@@ -372,6 +372,7 @@ export const id: Record<string, string> = {
   "Property": "Properti",
   "Property: All properties": "Properti: Semua properti",
   "Property: {name}": "Properti: {name}",
+  "Unit no longer in use": "Unit tidak lagi digunakan",
   "Unit": "Unit",
   "Unit: All units ({n})": "Unit: Semua unit ({n})",
   "Unit: {name}": "Unit: {name}",

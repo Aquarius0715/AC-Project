@@ -36,7 +36,8 @@ export async function loadMaintenance(sp: Record<string, string | string[] | und
   const { t } = i;
   const nowMs = now.getTime();
   const place = unitPlaces(units, properties, spaces);
-  const unitOf = (id: string) => place.get(id) ?? { name: t("Unit"), place: "" };
+  // units.list leaves out units taken out of use: their history names that state, not a bare “Unit” (UI/UX loop R48)
+  const unitOf = (id: string) => place.get(id) ?? { name: t("Unit no longer in use"), place: "" };
   const active = units.filter((u) => !u.archived);
   // new=<unitId>: open New request for that unit (an alert's “Request repair”, Figma Client 06g)
   const requestUnitId = active.find((u) => u.id === one(sp.new))?.id ?? null;

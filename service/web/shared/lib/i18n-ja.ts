@@ -372,6 +372,7 @@ export const ja: Record<string, string> = {
   "Property": "物件",
   "Property: All properties": "物件: すべての物件",
   "Property: {name}": "物件: {name}",
+  "Unit no longer in use": "使用停止のユニット",
   "Unit": "ユニット",
   "Unit: All units ({n})": "ユニット: すべてのユニット（{n}）",
   "Unit: {name}": "ユニット: {name}",

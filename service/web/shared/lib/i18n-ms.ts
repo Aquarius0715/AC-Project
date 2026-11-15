@@ -399,6 +399,7 @@ export const ms: Record<string, string> = {
   "Property": "Premis",
   "Property: All properties": "Premis: Semua premis",
   "Property: {name}": "Premis: {name}",
+  "Unit no longer in use": "Unit tidak lagi digunakan",
   "Unit": "Unit",
   "Unit: All units ({n})": "Unit: Semua unit ({n})",
   "Unit: {name}": "Unit: {name}",
