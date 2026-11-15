@@ -1035,7 +1035,6 @@ export const id: Record<string, string> = {
   "Air conditioners": "Pendingin udara",
   "{inRooms} in rooms · {unassigned} unassigned": "{inRooms} di ruangan · {unassigned} belum ditempatkan",
   "Last edited": "Terakhir diubah",
-  "? Unassigned units ({n})": "? Unit yang belum ditempatkan ({n})",
   "Not in any room": "Tidak di ruangan mana pun",
   "Moving a unit into a room is done in HQ’s unit register — contact HQ.": "Memindahkan unit ke ruangan dilakukan di register unit HQ — hubungi HQ.",
   "Unassigned units ({n})": "Unit yang belum ditempatkan ({n})",

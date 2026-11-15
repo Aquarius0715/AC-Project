@@ -1077,7 +1077,6 @@ export const ms: Record<string, string> = {
   "Air conditioners": "Penyaman udara",
   "{inRooms} in rooms · {unassigned} unassigned": "{inRooms} dalam bilik · {unassigned} tanpa bilik",
   "Last edited": "Kali terakhir disunting",
-  "? Unassigned units ({n})": "? Unit tanpa bilik ({n})",
   "Not in any room": "Tidak dalam mana-mana bilik",
   "Moving a unit into a room is done in HQ’s unit register — contact HQ.": "Memindahkan unit ke dalam bilik dilakukan dalam daftar unit HQ — hubungi HQ.",
   "Unassigned units ({n})": "Unit tanpa bilik ({n})",

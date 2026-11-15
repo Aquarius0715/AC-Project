@@ -148,7 +148,7 @@ function Panel({ live, sel, rename, go }: Readonly<{ live: PropertiesLive; sel: 
             <UnitRows units={inRooms} />
           </div> : <p className="my-4 text-[13px] text-muted-foreground">{t("No air conditioner in a room of this property yet.")}</p>}
           {unassigned.length > 0 && <>
-            <div className="mb-2 mt-4 text-[13px] font-bold">{t("? Unassigned units ({n})", { n: unassigned.length })} <span className="text-xs font-normal text-muted-foreground">{t("Not in any room")}</span></div>
+            <div className="mb-2 mt-4 flex flex-wrap items-center gap-1.5 text-[13px] font-bold"><Icon name="unknown" className="text-muted-foreground" />{t("Unassigned units ({n})", { n: unassigned.length })} <span className="text-xs font-normal text-muted-foreground">{t("Not in any room")}</span></div>
             <UnitRows units={unassigned} />
             <p className="mt-2 text-[11px] text-muted-foreground">{t("Moving a unit into a room is done in HQ’s unit register — contact HQ.")}</p>
           </>}
