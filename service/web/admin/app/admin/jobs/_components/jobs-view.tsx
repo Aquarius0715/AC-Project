@@ -221,7 +221,8 @@ function CostsCard({ ctx }: Readonly<{ ctx: DetailCtx }>) {
   const j = d.job;
   return (
     <>
-      <Card title={t("Costs")} action={<Btn size="sm" disabled={pending || j.status === "cancelled"} title={j.status === "cancelled" ? t("A cancelled job’s costs cannot change.") : undefined} onClick={() => { setModal({ kind: "cost" }); }}><Icon name="add" /> {t("Add cost line")}</Btn>}>
+      {/* why Add cost line is off, in words under the title rather than only in a tooltip (UI/UX loop R118) */}
+      <Card title={t("Costs")} sub={j.status === "cancelled" ? t("A cancelled job’s costs cannot change.") : undefined} action={<Btn size="sm" disabled={pending || j.status === "cancelled"} onClick={() => { setModal({ kind: "cost" }); }}><Icon name="add" /> {t("Add cost line")}</Btn>}>
         {d.costs.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No cost lines yet — add estimates before the work and actuals after it.")}</p> : (
           <ScrollX><table className="w-full min-w-[560px] text-[13px]">
             <thead><tr className="text-left text-[11px] uppercase text-muted-foreground"><th className="py-1.5">{t("Kind")}</th><th>{t("Description")}</th><th>{t("Visibility")}</th><th className="text-right">{t("Amount")}</th><th className="w-8"><span className="sr-only">{t("Remove")}</span></th></tr></thead>
