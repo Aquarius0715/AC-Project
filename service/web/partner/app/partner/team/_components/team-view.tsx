@@ -94,6 +94,14 @@ function Team({ live, tab, tabs }: Readonly<{ live: Live; tab: "members" | "cert
             ))}
           </ul>
         )}
+        {/* the members this list leaves out are said under the list itself, with the way to show them */}
+        {live.hidden > 0 && (
+          <p className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+            {t(live.hidden === 1 ? "1 expired member hidden (Active only)." : "{n} expired members hidden (Active only).", { n: live.hidden })}
+            <Btn size="sm" variant="ghost" onClick={() => { patch({ activeOnly: "false" }); }}>{t("Include expired")}</Btn>
+          </p>
+        )}
+        {live.expired.length > 0 && <p className="mt-2 text-[11px] text-muted-foreground">{t("Expired memberships ({names}) are listed but cannot be selected for assignment. A new access end is set in Users.", { names: live.expired.join(", ") })}</p>}
       </Card>
       <p className="text-[11px] text-muted-foreground">{t("Utilization = assigned hours ÷ configured available hours (4 h / 8 h = 50%). Undefined available hours show “—”, not 0%. Accounts are managed in Users.")}</p>
       {!isNone && (
@@ -108,10 +116,7 @@ function Team({ live, tab, tabs }: Readonly<{ live: Live; tab: "members" | "cert
                 </li>
               ))}
             </ul>
-            <p className="mt-2 text-[11px] text-muted-foreground">
-              {live.hidden > 0 && `${t(live.hidden === 1 ? "1 expired member hidden (Active only)." : "{n} expired members hidden (Active only).", { n: live.hidden })} `}
-              {live.expired.length > 0 ? t("Expired memberships ({names}) are listed but cannot be selected for assignment. A new access end is set in Users.", { names: live.expired.join(", ") }) : t("Qualifications are granted by HQ from your technicians’ certificates; accounts are managed in Users.")}
-            </p>
+            <p className="mt-2 text-[11px] text-muted-foreground">{t("Qualifications are granted by HQ from your technicians’ certificates; accounts are managed in Users.")}</p>
           </Card>
         </div>
       )}
