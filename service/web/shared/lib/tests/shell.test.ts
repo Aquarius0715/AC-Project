@@ -56,7 +56,9 @@ describe("loadShell", () => {
       Promise.resolve({ total: op === NOTIFICATIONS_LIST ? 1 : alertTotal(input.filters) }));
     const shell = await loadShell("admin");
     expect(shell?.badges).toStrictEqual({ "/notifications": 1, "/admin/alerts": 2 + 1 + 5 + 5 });
-    expect(shell?.locked).toStrictEqual(["/admin/alerts", "/admin/restrictions"]); // no alert.policy.read, no restriction.* (UI/UX loop R55)
+    expect(shell?.locked).toContain("/admin/alerts"); // no alert.policy.read (UI/UX loop R55)
+    expect(shell?.locked).toContain("/admin/restrictions"); // no restriction.*
+    expect(shell?.locked).not.toContain("/admin"); // dashboard.read is held
     expect(coreOp.mock.calls.filter(([op]) => op === "alerts.list")).toHaveLength(4);
   });
 

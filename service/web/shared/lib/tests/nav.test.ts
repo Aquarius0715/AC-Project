@@ -35,9 +35,13 @@ describe("page names and document titles (IR490)", () => {
 
 describe("the HQ menu's locked screens (UI/UX loop R55)", () => {
   it("locks a screen missing one of its `all` permissions, or every one of its `any`", () => {
-    const all = ["dashboard.read", "asset.read", "alert.read", "alert.policy.read", "restriction.override"];
-    expect(lockedNav(new Set(all))).toStrictEqual([]);
-    expect(lockedNav(new Set(["dashboard.read", "asset.read"]))).toStrictEqual(["/admin/alerts", "/admin/restrictions"]);
-    expect(lockedNav(new Set())).toStrictEqual(["/admin", "/admin/units", "/admin/alerts", "/admin/restrictions"]);
+    const everything = ["dashboard.read", "asset.read", "identity.read", "device.read", "alert.read", "alert.policy.read", "job.read", "contract.read", "billing.read",
+      "restriction.override", "automation.policy.read", "energy.read", "mrv.read", "offset.read", "audit.read"];
+    expect(lockedNav(new Set(everything))).toStrictEqual([]);
+    expect(lockedNav(new Set(everything.filter((p) => p !== "asset.read")))).toStrictEqual([
+      "/admin/units", "/admin/settings/access", "/admin/alerts", "/admin/jobs", "/admin/billing/contracts", "/admin/billing", "/admin/settings/automation", "/admin/energy",
+    ]);
+    expect(lockedNav(new Set(everything.filter((p) => p !== "restriction.override")))).toStrictEqual(["/admin/restrictions"]);
+    expect(lockedNav(new Set())).toHaveLength(14);
   });
 });

@@ -15,13 +15,24 @@ and badges below. */
 /** locked: the menu items whose whole screen needs an access the role lacks (UI/UX loop R55) */
 export interface ShellLive { user: string; organization: string; badges: Record<string, number>; display: Display; locked?: string[] }
 
-/** The HQ screens that show only “your role needs …” without these permissions (their NeedsAccess gates): all of
-`all`, or one of `any`. Screens that show part of themselves with fewer permissions are not listed. */
+const ASSET_READ = "asset.read";
+/** The HQ screens that show only “your role needs …” without these permissions: all of `all`, or one of `any`. They
+mirror each page's gate — its withAccess list or NeedsAccess check — so keep them in step with the pages. */
 const NAV_ACCESS: Readonly<Record<string, { all?: readonly string[]; any?: readonly string[] }>> = {
   "/admin": { all: ["dashboard.read"] },
-  "/admin/units": { all: ["asset.read"] },
-  "/admin/alerts": { all: ["alert.read", "asset.read", "alert.policy.read"] },
+  "/admin/units": { all: [ASSET_READ] },
+  "/admin/settings/access": { all: ["identity.read", ASSET_READ] },
+  "/admin/devices": { all: ["device.read"] },
+  "/admin/alerts": { all: ["alert.read", ASSET_READ, "alert.policy.read"] },
+  "/admin/jobs": { all: ["job.read", ASSET_READ] },
+  "/admin/billing/contracts": { all: ["contract.read", ASSET_READ] },
+  "/admin/billing": { all: ["billing.read", ASSET_READ] },
   "/admin/restrictions": { any: ["restriction.read", "restriction.write", "restriction.override"] },
+  "/admin/settings/automation": { all: ["automation.policy.read", ASSET_READ, "device.read"] },
+  "/admin/energy": { all: ["energy.read", ASSET_READ] },
+  "/admin/mrv": { all: ["mrv.read"] },
+  "/admin/offsets": { all: ["offset.read"] },
+  "/admin/audit": { all: ["audit.read"] },
 };
 /** The menu hrefs this caller cannot open, for a lock on them in the sidebar. */
 export function lockedNav(perms: ReadonlySet<string>): string[] {
