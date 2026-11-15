@@ -42,7 +42,9 @@ const commands = new Map<string, ApiCommand>([["c2", { id: "c2", status: "sent",
 
 describe("customer contracts & payments in the display language (FR-C10–C12, IR267)", () => {
   it("names contracts and keeps their periods and the due dates on Kuala Lumpur business days", () => {
-    expect(contractCards([contract], unit, NOW).map((c) => [c.name, c.sub, c.period, c.plan, c.status])).toStrictEqual([["RTO Plan", "k1aaaaaa · 1 Sept → 1 Sept 2027", "1 Sept 2026 → 1 Sept 2027", "Rent-to-own (RTO)", "Active"]]);
+    expect(contractCards([contract], unit, NOW).map((c) => [c.name, c.sub, c.period, c.plan, c.status])).toStrictEqual([["RTO Plan", "k1aaaaaa · 1 Sept 2026 → 1 Sept 2027", "1 Sept 2026 → 1 Sept 2027", "Rent-to-own (RTO)", "Active"]]);
+    // the short start drops its year only within one year (UI/UX loop R129)
+    expect(contractCards([{ ...contract, endAt: "2026-12-30T16:00:00Z" }], unit, NOW)[0]?.sub).toBe("k1aaaaaa · 1 Sept → 31 Dec 2026");
     const old = { ...contract, id: "k2bbbbbbbb", planType: "general", startAt: "2025-08-31T16:00:00Z", endAt: TEXT_2026_08_31T16_00_00Z };
     expect(contractCards([old, contract], unit, NOW, MS_TOKYO).map((c) => [c.name, c.period, c.status])).toStrictEqual([["Pelan RTO", "1 Sep 2026 → 1 Sep 2027", "Active"], ["Penyelenggaraan am", "1 Sep 2025 → 1 Sep 2026", "Expired"]]);
     expect(clientInvoiceRows([invoice], NOW).map((r) => [r.due, r.status, r.payable])).toStrictEqual([["Due 10 Sept 2026", "Overdue", true]]);

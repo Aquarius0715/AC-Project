@@ -15,6 +15,10 @@ const en = translator("en");
 /** The same day without the year (“1 Sept”), for the start of a range whose end shows the year. */
 const plain = (s: string) => s.replaceAll(/[\u{A0}\u{2009}\u{202F}]/gu, " ");
 const businessDayShort = (iso: string, locale: Locale) => plain(new Date(iso).toLocaleDateString(intlTag(locale), { timeZone: KL, month: "short", day: "numeric" }));
+const klYear = (iso: string) => new Date(iso).toLocaleDateString("en", { timeZone: KL, year: "numeric" });
+/** A business-day range: the start drops its year only when the end is in the same year — “1 Jan → 1 Jan 2027” read
+as one year, so a range across years writes both (UI/UX loop R129). */
+const dayRange = (from: string, to: string, locale: Locale) => `${klYear(from) === klYear(to) ? businessDayShort(from, locale) : businessDay(from, locale)} → ${businessDay(to, locale)}`;
 
 const planName: Record<string, string> = { rto: "RTO Plan", general: "General maintenance", energy: "Energy service", environment: "Environment service" };
 const planLong: Record<string, string> = { rto: "Rent-to-own (RTO)", general: "General maintenance", energy: "Energy service", environment: "Environment service" };
@@ -54,7 +58,7 @@ export function contractCards(cs: ClientContract[], unit: (id: string) => UnitPl
   return [...cs].toSorted((a, b) => rank[status(a)] - rank[status(b)] || b.startAt.localeCompare(a.startAt)).map((k) => {
     return {
       id: k.id, version: k.version, name: textOf(planName, k.planType, t) ?? k.planType,
-      sub: `${k.id.slice(0, 8)} · ${businessDayShort(k.startAt, locale)} → ${businessDay(k.endAt, locale)}`,
+      sub: `${k.id.slice(0, 8)} · ${dayRange(k.startAt, k.endAt, locale)}`,
       period: `${businessDay(k.startAt, locale)} → ${businessDay(k.endAt, locale)}`, plan: textOf(planLong, k.planType, t) ?? k.planType, planType: k.planType, status: status(k),
       units: k.unitIds.map((id) => ({ id, ...(unit(id) ?? { name: id.slice(0, 8), place: "" }) })), restrictionIds: k.activeRestrictionIds ?? [],
     };
