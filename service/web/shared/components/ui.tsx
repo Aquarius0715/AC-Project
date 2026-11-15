@@ -608,7 +608,9 @@ function Cell<T>({ render, row }: { render: ((r: T) => React.ReactNode) | undefi
 record (`onRowClick`) is focusable and opens with Enter or Space as well as a click (keyboard access, IR294). */
 export function DataTable<T extends RowData>({ cols, rows, rowKey, onRowClick, selectedKey }: Readonly<{ cols: Col<T>[]; rows: T[]; rowKey: (r: T) => string; onRowClick?: (r: T) => void; selectedKey?: string }>) {
   const t = useT();
-  const columns = cols.map((c): ColumnDef<typeof tableFx, T> => ({ id: c.key, header: c.label, meta: { className: c.className, hideBelow: c.hideBelow } }));
+  // a column without a heading (a row's arrow or its buttons) still names itself to screen readers (UI/UX loop R72)
+  const actions = t("Actions");
+  const columns = cols.map((c): ColumnDef<typeof tableFx, T> => ({ id: c.key, header: c.label === "" ? () => <span className="sr-only">{actions}</span> : c.label, meta: { className: c.className, hideBelow: c.hideBelow } }));
   const renders = new Map(cols.map((c) => [c.key, c.render]));
   const table = useTable({ features: tableFx, data: rows, getRowId: (r) => rowKey(r), columns });
   return (
