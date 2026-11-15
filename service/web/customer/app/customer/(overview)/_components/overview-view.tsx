@@ -81,7 +81,7 @@ export function OverviewView({ live }: Readonly<{ live: OverviewLive }>) {
         </Card>
         <Card title={live.air ? t("Air quality · {room}", { room: live.air.room }) : t("Air quality")} action={live.air && <Badge tone={live.air.co2.feed.tone} icon={live.air.co2.feed.icon}>{live.air.co2.feed.text}</Badge>}>
           {live.air ? <>
-            <div className="text-[28px] font-bold"><span className="text-xs font-normal text-muted-foreground">CO2 </span>{live.air.co2.value ?? "—"} <span className="text-sm font-medium text-muted-foreground">ppm</span></div>
+            <div className="text-[28px] font-bold"><span className="text-xs font-normal text-muted-foreground">CO2 </span>{live.air.co2.value ?? "—"}{live.air.co2.value !== null && <span className="ml-1 text-sm font-medium text-muted-foreground">ppm</span>}</div>
             {live.air.co2.warn && <div className="my-1"><Badge tone="warn" icon="warning">{t("Ventilation recommended")}</Badge></div>}
             <p className="mb-2 text-[11px] text-muted-foreground">{t("{sub} · {unit} sensor · threshold 1000 ppm", { sub: live.air.co2.sub, unit: live.air.unit })}</p>
             {live.air.points.some((p) => p !== null) ? <LineChart points={live.air.points} name="CO2" unit="ppm" times={live.air.times} min={400} max={Math.max(1200, ...live.air.points.filter((p): p is number => p !== null).map((p) => p + 100))} threshold={1000} height={90} />
