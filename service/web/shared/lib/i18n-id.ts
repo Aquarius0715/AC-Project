@@ -387,6 +387,7 @@ export const id: Record<string, string> = {
   "View stopped units": "Lihat unit yang berhenti",
   "Offline or missing data — counted here, never as running/normal": "Offline atau data hilang — dihitung di sini, tidak pernah sebagai berjalan/normal",
   "View unknown units": "Lihat unit yang tidak diketahui",
+  "Show these": "Tampilkan ini",
   "Needs attention": "Perlu perhatian",
   "Unresolved warnings": "Peringatan belum terselesaikan",
   " · +{n} reminder & info (not counted)": " · +{n} pengingat & info (tidak dihitung)",

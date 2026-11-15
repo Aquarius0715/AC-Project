@@ -113,7 +113,9 @@ function CustomerList({ live }: Readonly<{ live: UnitsLive }>) {
         <Kpi label={t("Customers")} value={k.customers} sub={k.inactive ? t("+{n} inactive (not counted)", { n: k.inactive }) : t("all active")} />
         <Kpi label={t("Properties")} value={k.properties} sub={k.propertyNames} />
         <Kpi label={t("Units")} value={k.units} sub={k.power} />
-        <Kpi label={t("Needs attention")} value={k.attention} tone={k.attention ? "warn" : undefined} sub={t(live.standingKnown ? "overdue billing / restriction / open alert" : "open alerts (billing needs billing.read)")} />
+        <Kpi label={t("Needs attention")} value={k.attention} tone={k.attention ? "warn" : undefined}
+          badge={live.standingKnown && k.attention > 0 && <Plain type="button" touch className="text-xs font-semibold text-primary hover:underline" aria-pressed={contract === "attention"} onClick={() => { setContract(contract === "attention" ? "all" : "attention"); }}>{t(contract === "attention" ? "Clear filter" : "Show these")}</Plain>}
+          sub={t(live.standingKnown ? "overdue billing / restriction / open alert" : "open alerts (billing needs billing.read)")} />
       </div>
       <Card title={t("Customers")} sub={t("Select a customer to manage its properties, spaces and units")} action={live.canWrite && <Btn size="sm" variant="primary" onClick={() => { setOpen(true); }}><Icon name="add" /> {t("New customer")}</Btn>}>
         <div className="mb-3 flex flex-wrap items-center gap-3">
@@ -121,7 +123,7 @@ function CustomerList({ live }: Readonly<{ live: UnitsLive }>) {
           <Select aria-label={t("Status")} className="w-auto" value={status} onChange={(e) => { setStatus(oneOf(["active", "all"] as const, e.target.value, status)); }}><option value="active">{t("Status: Active")}</option><option value="all">{t("Status: All")}</option></Select>
           {live.standingKnown && (
             <Select aria-label={t("Contract")} className="w-auto" value={contract} onChange={(e) => { setContract(oneOf(contractFilters, e.target.value, contract)); }}>
-              <option value="all">{t("Contract: All")}</option><option value="overdue">{t("Overdue")}</option><option value="restricted">{t("Restriction")}</option><option value="good">{t("Good standing")}</option><option value="none">{t("No contract")}</option>
+              <option value="all">{t("Contract: All")}</option><option value="attention">{t("Needs attention")}</option><option value="overdue">{t("Overdue")}</option><option value="restricted">{t("Restriction")}</option><option value="good">{t("Good standing")}</option><option value="none">{t("No contract")}</option>
             </Select>
           )}
         </div>

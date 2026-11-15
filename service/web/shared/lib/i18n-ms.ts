@@ -414,6 +414,7 @@ export const ms: Record<string, string> = {
   "View stopped units": "Lihat unit yang berhenti",
   "Offline or missing data — counted here, never as running/normal": "Luar talian atau data tiada — dikira di sini, tidak sebagai berjalan/normal",
   "View unknown units": "Lihat unit tidak diketahui",
+  "Show these": "Tunjukkan ini",
   "Needs attention": "Perlu perhatian",
   "Unresolved warnings": "Peringatan belum selesai",
   " · +{n} reminder & info (not counted)": " · +{n} peringatan & maklumat (tidak dikira)",
