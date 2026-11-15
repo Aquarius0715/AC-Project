@@ -5,6 +5,9 @@ const BUKA_KERJA = "Buka kerja";
 // company acceptance (REV18-047 in IR74, IR258). Keys are the English texts; a text without an entry is shown in
 // English. Keep {name} placeholders as they are.
 export const ms: Record<string, string> = {
+  "Membership": "Keahlian",
+  "Choose a membership": "Pilih keahlian",
+  "Pick one in the list to see or change its access, or start a New membership.": "Pilih satu dalam senarai untuk melihat atau mengubah aksesnya, atau mulakan Keahlian baharu.",
   // shell
   "Overview": "Gambaran keseluruhan",
   "Units & locations": "Unit & lokasi",

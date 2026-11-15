@@ -2,6 +2,9 @@
 // company acceptance (DEC-108). Keys are the English texts (the same keys, in the same order, as i18n-ms.ts); a text without an
 // entry is shown in English. Keep {name} placeholders as they are.
 export const id: Record<string, string> = {
+  "Membership": "Keanggotaan",
+  "Choose a membership": "Pilih keanggotaan",
+  "Pick one in the list to see or change its access, or start a New membership.": "Pilih satu di daftar untuk melihat atau mengubah aksesnya, atau mulai Keanggotaan baru.",
   "Overview": "Ringkasan",
   "Units & locations": "Unit & lokasi",
   "Automations & schedules": "Otomasi & jadwal",
