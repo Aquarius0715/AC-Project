@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { Badge, Banner, BarChart, Btn, Card, ConnBadge, Kpi, LineChart, Page, PowerBadge, Select, SeverityBadge, Tabs, TextLink } from "@ac/web/components/ui";
+import { Fragment, useEffect, useState } from "react";
+import { Badge, Banner, BarChart, Btn, Card, ConnBadge, Kpi, LineChart, Page, PowerBadge, Select, SeverityBadge, Tabs, TextLink, cx } from "@ac/web/components/ui";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
-import { OVERVIEW_PERIODS, type OverviewPeriod } from "@ac/web/lib/customerOverview";
+import { byProperty, OVERVIEW_PERIODS, type OverviewPeriod } from "@ac/web/lib/customerOverview";
 import { byCount, showClock } from "@ac/web/lib/i18n";
 import { useT } from "@ac/web/components/I18n";
 import type { OverviewLive } from "../_lib/load";
@@ -98,7 +98,9 @@ export function OverviewView({ live }: Readonly<{ live: OverviewLive }>) {
             <div className="hidden grid-cols-[minmax(0,1fr)_72px_72px_72px_120px_14px] gap-2 pb-2 text-[11px] text-muted-foreground lg:grid">
               <span>{t("Unit · location · observed")}</span><span>{t("Room temp")}</span><span>{t("Humidity")}</span><span>{t("Power now")}</span><span>{t("Status")}</span><span />
             </div>
-            {live.rows.map((u) => (
+            {byProperty(live.rows).map((g, gi, groups) => <Fragment key={g.property || "none"}>
+              {groups.length > 1 && <h3 className={cx("flex items-baseline gap-2 pb-1 text-xs font-bold text-muted-foreground", gi > 0 ? "pt-4" : "pt-1")}>{g.property || t("Not in a property")}<span className="font-normal">{t(g.rows.length === 1 ? "{n} unit" : "{n} units", { n: g.rows.length })}</span></h3>}
+              {g.rows.map((u) => (
               <Link key={u.id} href={`/customer/units/${u.id}`} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-2 py-3 hover:bg-surface2/50 lg:grid-cols-[minmax(0,1fr)_72px_72px_72px_120px_14px]">
                 <div className="flex min-w-0 items-center gap-2.5"><span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-primary-soft text-primary"><Icon name="units" /></span><div className="min-w-0"><div className="truncate font-bold">{u.name}</div><div className="truncate text-[11px] text-muted-foreground">{u.place ? `${u.place} · ` : ""}{u.observed}</div></div></div>
                 <div className="col-span-2 row-start-2 flex gap-4 text-xs lg:contents">
@@ -109,7 +111,8 @@ export function OverviewView({ live }: Readonly<{ live: OverviewLive }>) {
                 <div className="col-start-2 row-start-1 flex flex-col items-end gap-1 lg:col-auto lg:row-auto lg:items-start"><PowerBadge s={u.state} /><ConnBadge s={u.conn} /></div>
                 <span className="hidden text-muted-foreground lg:block"><Icon name="chevronRight" /></span>
               </Link>
-            ))}
+              ))}
+            </Fragment>)}
             {live.rows.length === 0 && <p className="py-4 text-center text-xs text-muted-foreground">{t("No units in this selection.")}</p>}
           </div>
         </Card>

@@ -994,6 +994,7 @@ export const ja: Record<string, string> = {
   "Office": "オフィス",
   "Floor": "フロア",
   "Space": "スペース",
+  "Not in a property": "施設に属していない",
   "{n} unit": "{n} ユニット",
   "{n} units": "{n} ユニット",
   "{n} AC": "エアコン {n} 台",
