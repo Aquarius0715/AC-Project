@@ -2,6 +2,7 @@
 // acceptance (IR639). Keys are the English texts (the same keys as i18n-ms.ts); a text without an entry is shown in
 // English. Keep {name} placeholders as they are.
 export const ja: Record<string, string> = {
+  "Cooling restricted": "冷房制限中",
   "Overview": "概要",
   "Units & locations": "ユニットと設置場所",
   "Automations & schedules": "自動化とスケジュール",
