@@ -2616,6 +2616,7 @@ export const id: Record<string, string> = {
   "Not started": "Belum dimulai",
   "past the due date": "lewat tenggat",
   "No overdue jobs": "Tidak ada pekerjaan terlambat",
+  "No jobs waiting to start": "Tidak ada pekerjaan yang menunggu dimulai",
   "unit": "unit",
   "open": "terbuka",
   "acknowledged": "diakui",

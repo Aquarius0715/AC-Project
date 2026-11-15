@@ -2616,6 +2616,7 @@ export const ja: Record<string, string> = {
   "Not started": "未開始",
   "past the due date": "期限を過ぎています",
   "No overdue jobs": "期限を過ぎた作業はありません",
+  "No jobs waiting to start": "着手待ちの作業はありません",
   "unit": "ユニット",
   "open": "未対応",
   "acknowledged": "確認済み",

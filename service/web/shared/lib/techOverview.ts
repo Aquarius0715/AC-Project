@@ -118,7 +118,7 @@ export function kpis(c: ApiTechCounts, rows: TechJobRow[], t: T = en): KpiTile[]
   const notStarted = rows.filter((r) => r.status === "assigned");
   return [
     { label: t("Assigned units"), value: c.total, sub: t("in your assignments") },
-    { label: t("Not started"), value: c.scheduledCount, sub: notStarted.length > 0 ? notStarted.slice(0, 3).map((r) => r.short).join(", ") : "—", tone: c.scheduledCount ? "warn" : undefined },
+    { label: t("Not started"), value: c.scheduledCount, sub: notStarted.length > 0 ? notStarted.slice(0, 3).map((r) => r.short).join(", ") : t("No jobs waiting to start"), tone: c.scheduledCount ? "warn" : undefined },
     { label: t("Overdue"), value: c.overdueCount, sub: t(c.overdueCount ? "past the due date" : "No overdue jobs"), tone: c.overdueCount ? "crit" : "ok" },
   ];
 }
