@@ -411,7 +411,8 @@ export function QrCode({ qr, label, className }: Readonly<{ qr: { size: number; 
 /** A checkbox with its label: the shadcn/ui Checkbox, 20 px so the lists' targets keep 24 px apart (WCAG 2.5.8, IR360). */
 export function Check({ label, checked, onChange, disabled }: Readonly<{ label: React.ReactNode; checked?: boolean; onChange?: (v: boolean) => void; disabled?: boolean }>) {
   return (
-    <label className="inline-flex items-center gap-2 text-[13px]">
+    // a disabled choice reads as one in its label too, not only in its box (UI/UX loop R80)
+    <label className={cx("inline-flex items-center gap-2 text-[13px]", disabled && "cursor-not-allowed text-muted-foreground")}>
       <Checkbox checked={checked} disabled={disabled} onCheckedChange={(v) => onChange?.(v)} className="size-5" />
       {label}
     </label>
