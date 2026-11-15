@@ -33,7 +33,7 @@ export function OverviewView({ live }: Readonly<{ live: OverviewLive }>) {
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-muted-foreground">{t("Viewing")}</span>
           <Select aria-label={t("Property")} className="w-auto text-xs font-semibold" value={live.propertyId ?? ""} onChange={(e) => { patch({ propertyId: e.target.value || null, unitId: null }); }}>
-            <option value="">{t("Property: All properties")}</option>{live.properties.map((p) => <option key={p.id} value={p.id}>{t("Property: {name}", { name: p.name })}</option>)}
+            <option value="">{t("Property: All properties")}</option>{live.properties.toSorted((x, y) => x.name.localeCompare(y.name)).map((p) => <option key={p.id} value={p.id}>{t("Property: {name}", { name: p.name })}</option>)}
           </Select>
           <Select aria-label={t("Unit")} className="w-auto text-xs font-semibold" value={live.unitId ?? ""} onChange={(e) => { patch({ unitId: e.target.value || null }); }}>
             <option value="">{t("Unit: All units ({n})", { n: live.units.length })}</option>{live.units.map((u) => <option key={u.id} value={u.id}>{t("Unit: {name}", { name: u.name })}</option>)}
