@@ -66,7 +66,7 @@ function RoomDevicesCard({ id, d, rows }: Readonly<{ id: string; d: ApiUnitDetai
           {rows.map((s) => (
             <Link key={s.id} href={`/customer/units/${s.id}`} className={cx("rounded-xl border p-3", s.id === id ? "border-primary bg-primary-soft/60" : "border-line hover:bg-surface2/60")}>
               <div className="flex items-center justify-between font-bold">{s.name}{s.id === id && <Badge tone="primary">{t("Selected")}</Badge>}</div>
-              <div className="text-xs text-muted-foreground">{t("{temp}°C room", { temp: s.temp ?? "—" })}{s.power === null ? "" : ` · ${String(s.power)} W`}</div>
+              <div className="text-xs text-muted-foreground">{/* a stale or missing reading is no current value (IR213): say so, as the room list does, not "—°C" (UI/UX loop R109) */}{s.temp === null ? t("no recent reading") : t("{temp}°C room", { temp: s.temp })}{s.power === null ? "" : ` · ${String(s.power)} W`}</div>
             </Link>
           ))}
         </div>
