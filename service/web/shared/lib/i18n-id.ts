@@ -4257,7 +4257,7 @@ export const id: Record<string, string> = {
   "needs billing.read": "memerlukan billing.read",
   "{n} critical": "{n} kritis",
   "{n} warning": "{n} peringatan",
-  "{n} info": "{n} info",
+  "{n} info, not counted": "{n} info, tidak dihitung",
   "none open": "tidak ada yang terbuka",
   "no properties yet": "belum ada properti",
   "{name} owner": "pemilik {name}",

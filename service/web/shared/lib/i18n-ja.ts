@@ -4257,7 +4257,7 @@ export const ja: Record<string, string> = {
   "needs billing.read": "billing.read が必要です",
   "{n} critical": "重大 {n}",
   "{n} warning": "警告 {n}",
-  "{n} info": "情報 {n}",
+  "{n} info, not counted": "{n} 件の情報（件数に含めない）",
   "none open": "未解決なし",
   "no properties yet": "まだ物件がありません",
   "{name} owner": "{name} のオーナー",
