@@ -1,4 +1,5 @@
 "use client";
+const NEW_POLICY_FOR = "New policy for {name}";
 const ADD_PROPERTY = "Add property";
 const VERSION_V = "version {v}";
 const DEFAULT_ALERT = "default_alert";
@@ -6,7 +7,7 @@ const REASON_REQUIRED = "Reason · required";
 const MAINTENANCE_CONTRACT = "Maintenance contract";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Badge, Banner, Btn, Card, Check, Choice, ConnBadge, cx, DataTable, EmptyState, Field, Input, Kpi, LinkButton, Modal, Page, PowerBadge, Search, Select, SummaryList, Tabs, Textarea, TextLink, Toggle, ActionMenu, Plain } from "@ac/web/components/ui";
 import { useI18n, useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
@@ -386,7 +387,10 @@ function UnitEdit({ live, c, x, nav, run, pending }: Readonly<{ live: UnitsLive;
   const [source, setSource] = useState(key);
   const [d, setD] = useState<UnitDraft>(unitDraft(u));
   const [tried, setTried] = useState(false);
-  const [modal, setModal] = useState<null | "relocate" | "delete" | "attach">(null);
+  // back from creating a policy in its Attach dialog (?attach=<policy>): the dialog reopens with it ticked (UI/UX loop R44)
+  const attachId = useSearchParams().get("attach");
+  const [modal, setModal] = useState<null | "relocate" | "delete" | "attach">(attachId && c.canAttach && !u.archived ? "attach" : null);
+  const closeAttach = () => { setModal(null); if (attachId) nav({ attach: null }); };
   if (source !== key) { // the form restarts from each saved unit version (adjust state during render)
     setSource(key);
     setD(unitDraft(u));
@@ -467,8 +471,8 @@ function UnitEdit({ live, c, x, nav, run, pending }: Readonly<{ live: UnitsLive;
       {modal === "delete" && <DeleteUnitModal x={x} pending={pending} onClose={() => { setModal(null); }}
         onArchive={(reason) => { run(() => archiveUnit(u.id, u.version, reason), t("“{name}” taken out of use", { name: u.displayName }), () => { setModal(null); nav({ unitId: null }); }); }}
         onDelete={(reason) => { run(() => deleteUnit(u.id, u.version, reason), t("“{name}” deleted", { name: u.displayName }), () => { setModal(null); nav({ unitId: null }); }); }} />}
-      {modal === "attach" && <AttachModal c={c} unit={u.displayName} attached={attachedIds} pending={pending} onClose={() => { setModal(null); }}
-        onSave={(ids) => { run(() => setUnitPolicies(u.id, u.version, [...attachedIds, ...ids]), count(t, ids.length, "1 policy attached", "{n} policies attached"), () => { setModal(null); }); }} />}
+      {modal === "attach" && <AttachModal c={c} unit={u.displayName} attached={attachedIds} preset={attachId} pending={pending} onClose={closeAttach}
+        onSave={(ids) => { run(() => setUnitPolicies(u.id, u.version, [...attachedIds, ...ids]), count(t, ids.length, "1 policy attached", "{n} policies attached"), closeAttach); }} />}
     </>
   );
 }
@@ -482,7 +486,7 @@ function PoliciesTab({ c, run, pending }: Readonly<{ c: CustomerLive; run: Run; 
   return (
     <>
       <Card title={t("Alert policies of {name}", { name: c.row.name })} sub={t("Policies belong to the customer. Each unit picks which of them it carries (unit edit › Alert policies). Air-quality limits are alert policies too.")}
-        action={<LinkButton size="sm" variant="primary" href={`/admin/alerts?tab=policies&customerId=${c.row.id}&new=${c.row.id}`}><Icon name="add" /> {t("New policy for {name}", { name: c.row.name })}</LinkButton>}>
+        action={<LinkButton size="sm" variant="primary" href={`/admin/alerts?tab=policies&customerId=${c.row.id}&new=${c.row.id}`}><Icon name="add" /> {t(NEW_POLICY_FOR, { name: c.row.name })}</LinkButton>}>
         <DataTable rows={c.policies} rowKey={(p) => p.id} onRowClick={(p) => { router.push(`/admin/alerts?tab=policies&customerId=${c.row.id}&policyId=${p.id}`); }} cols={[
           { key: "n", label: t("Policy"), render: (p) => <><b>{p.name}</b>{!p.enabled && <Badge className="ml-2">{t("Off")}</Badge>}</> },
           { key: "t", label: t("Type"), render: (p) => <Badge tone={p.kind === DEFAULT_ALERT ? "primary" : "muted"}>{p.type}</Badge> },
@@ -694,15 +698,19 @@ function DeleteUnitModal({ x, pending, onClose, onArchive, onDelete }: Readonly<
   );
 }
 
-function AttachModal({ c, unit, attached, pending, onClose, onSave }: Readonly<{ c: CustomerLive; unit: string; attached: string[]; pending: boolean; onClose: () => void; onSave: (ids: string[]) => void }>) {
+function AttachModal({ c, unit, attached, preset, pending, onClose, onSave }: Readonly<{ c: CustomerLive; unit: string; attached: string[]; preset: string | null; pending: boolean; onClose: () => void; onSave: (ids: string[]) => void }>) {
   const t = useT();
-  const [pick, setPick] = useState<string[]>([]);
   const options = (c.policies ?? []).filter((p) => p.kind === "alert");
+  const [pick, setPick] = useState<string[]>(() => (preset && !attached.includes(preset) && options.some((p) => p.id === preset) ? [preset] : []));
+  // a policy made for this customer comes back here, to this unit with its dialog open (no hunting for the unit again)
+  const params = useSearchParams();
+  const here = `${usePathname()}?${new URLSearchParams([...params.entries()].filter(([k]) => k !== "attach")).toString()}`;
+  const policyFormHref = `/admin/alerts?tab=policies&customerId=${encodeURIComponent(c.row.id)}&new=${encodeURIComponent(c.row.id)}&returnTo=${encodeURIComponent(here)}`;
   return (
     <Modal open onClose={onClose} title={t("Attach policies to {unit}", { unit })} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending || pick.length === 0} onClick={() => { onSave(pick); }}>{pick.length > 0 ? count(t, pick.length, "Attach 1 policy", "Attach {n} policies") : t("Attach policy")}</Btn></>}>
       <div className="flex flex-col gap-2">
         <p className="text-[13px] text-muted-foreground">{t("Showing {name}’s policies only. The default policy is always on and not listed.", { name: c.row.name })}</p>
-        {options.length === 0 && <EmptyState title={t("No customer policies yet")}>{t("Create one in Alert policies first.")}</EmptyState>}
+        {options.length === 0 && <EmptyState title={t("No customer policies yet")} action={<LinkButton size="sm" variant="primary" href={policyFormHref}><Icon name="add" /> {t(NEW_POLICY_FOR, { name: c.row.name })}</LinkButton>}>{t("Create one for this customer; you come back here to attach it.")}</EmptyState>}
         {options.map((p) => {
           const isAlready = attached.includes(p.id);
           return (
@@ -712,7 +720,7 @@ function AttachModal({ c, unit, attached, pending, onClose, onSave }: Readonly<{
             </div>
           );
         })}
-        <p className="text-[11px] text-muted-foreground">{t("Disabled policies can be attached; they start alerting once enabled.")} <TextLink href={`/admin/alerts?tab=policies&customerId=${c.row.id}&new=${c.row.id}`}><Icon name="add" /> {t("New policy for {name}", { name: c.row.name })}</TextLink></p>
+        <p className="text-[11px] text-muted-foreground">{t("Disabled policies can be attached; they start alerting once enabled.")} {options.length > 0 && <TextLink href={policyFormHref}><Icon name="add" /> {t(NEW_POLICY_FOR, { name: c.row.name })}</TextLink>}</p>
       </div>
     </Modal>
   );
