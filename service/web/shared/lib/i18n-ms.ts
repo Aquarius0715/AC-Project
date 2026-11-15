@@ -207,6 +207,7 @@ export const ms: Record<string, string> = {
   "Waiting for device…": "Menunggu peranti…",
   "Review & send": "Semak & hantar",
   "Waiting for device response… The result is shown only after the device acknowledges (fails after 30 s).": "Menunggu respons peranti… Keputusan hanya dipaparkan selepas peranti mengesahkan (gagal selepas 30 s).",
+  "Last telemetry": "Telemetri terakhir",
   "Live telemetry": "Telemetri langsung",
   "Power draw": "Penggunaan kuasa",
   "Connection": "Sambungan",

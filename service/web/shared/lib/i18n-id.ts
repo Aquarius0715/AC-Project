@@ -190,6 +190,7 @@ export const id: Record<string, string> = {
   "Waiting for device…": "Menunggu perangkat…",
   "Review & send": "Tinjau & kirim",
   "Waiting for device response… The result is shown only after the device acknowledges (fails after 30 s).": "Menunggu respons perangkat… Hasil hanya ditampilkan setelah perangkat mengonfirmasi (gagal setelah 30 dtk).",
+  "Last telemetry": "Telemetri terakhir",
   "Live telemetry": "Telemetri langsung",
   "Power draw": "Daya terpakai",
   "Connection": "Koneksi",

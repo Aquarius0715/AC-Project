@@ -30,8 +30,10 @@ interface CommandRow { id: string; text: string; when: string; bad?: boolean }
 function TelemetryCard({ d, pow, room, hum }: Readonly<{ d: ApiUnitDetail | null; pow: Reading; room: Reading; hum: Reading }>) {
   const t = useT();
   const display = useDisplay();
+  // "Live" only while a reading is current: with every reading stale or missing the card says it shows the last ones
+  const isLive = d === null || d.latestMeasurements.some((m) => m.quality === "valid" && m.value !== null);
   return (
-    <Card title={t("Live telemetry")}><SummaryList items={d ? [[t("Power draw"), pow ? `${pow.text} · ${pow.at}` : "—"], [t("Connection"), textOf(CONNECTION, d.connection, t) ?? d.connection], [t("Last seen"), showTime(d.lastSeenAt, display)], [t("Room temp"), room ? `${room.text} · ${room.at}` : "—"], [t("Humidity"), hum ? `${hum.text} · ${hum.at}` : "—"]] : [[t("Power draw"), "742 W · 09:12:30"], ["Wi-Fi", "RSSI −52 dBm (strong)"], [t("Last heartbeat"), "2 s ago"], [t("Room temp"), "28.0 °C · 09:12:30"], [t("Humidity"), "60 % · 09:12:30"]]} /></Card>
+    <Card title={t(isLive ? "Live telemetry" : "Last telemetry")} action={isLive ? undefined : <Badge tone="unknown" icon="unknown">{t("Stale")}</Badge>}><SummaryList items={d ? [[t("Power draw"), pow ? `${pow.text} · ${pow.at}` : "—"], [t("Connection"), textOf(CONNECTION, d.connection, t) ?? d.connection], [t("Last seen"), showTime(d.lastSeenAt, display)], [t("Room temp"), room ? `${room.text} · ${room.at}` : "—"], [t("Humidity"), hum ? `${hum.text} · ${hum.at}` : "—"]] : [[t("Power draw"), "742 W · 09:12:30"], ["Wi-Fi", "RSSI −52 dBm (strong)"], [t("Last heartbeat"), "2 s ago"], [t("Room temp"), "28.0 °C · 09:12:30"], [t("Humidity"), "60 % · 09:12:30"]]} /></Card>
   );
 }
 

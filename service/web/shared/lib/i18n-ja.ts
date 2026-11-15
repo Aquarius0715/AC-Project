@@ -190,6 +190,7 @@ export const ja: Record<string, string> = {
   "Waiting for device…": "デバイスの応答を待っています…",
   "Review & send": "確認して送信",
   "Waiting for device response… The result is shown only after the device acknowledges (fails after 30 s).": "デバイスの応答を待っています… 結果はデバイスが受け付けたあとに表示されます（30秒で失敗します）。",
+  "Last telemetry": "最後のテレメトリ",
   "Live telemetry": "リアルタイムのテレメトリ",
   "Power draw": "消費電力",
   "Connection": "接続",
