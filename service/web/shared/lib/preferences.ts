@@ -1,4 +1,4 @@
-import { translator, type T } from "@ac/web/lib/i18n";
+import { EN, showDate, type I18n } from "@ac/web/lib/i18n";
 
 // Preferences screen helpers (FR-X01, FR-X08, DDC-07, IR246): time zone choices with their UTC offset at the demo clock,
 // and the consent line. Offsets come from the numeric wall-clock parts, so the server and the browser render the same
@@ -31,10 +31,11 @@ export function zoneOptions(saved: string, at: Date): { id: string; label: strin
 
 export interface Consent { id: string; version: number; granted: boolean; grantedAt: string | null; revokedAt: string | null }
 
-/** The location consent line: when it was granted or withdrawn (dates as recorded, UTC), or that it never was; `t`
-puts it in the display language (IR258). */
-export function consentNote(c: Consent | null, t: T = translator("en")): string {
-  if (c?.granted) return t("Granted {date}", { date: c.grantedAt?.slice(0, 10) ?? "" }).trim();
-  if (c?.revokedAt) return t("Withdrawn {date}", { date: c.revokedAt.slice(0, 10) });
+/** The location consent line: when it was granted or withdrawn, or that it never was, in the display language and with
+the date written as every other screen writes it ("15 Sept 2026", IR44) — not the raw "2026-09-15" (IR258). */
+export function consentNote(c: Consent | null, i: I18n = EN): string {
+  const { t, display } = i;
+  if (c?.granted) return t("Granted {date}", { date: c.grantedAt ? showDate(c.grantedAt, display) : "" }).trim();
+  if (c?.revokedAt) return t("Withdrawn {date}", { date: showDate(c.revokedAt, display) });
   return t("Not granted yet");
 }
