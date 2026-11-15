@@ -17,6 +17,7 @@ import { KL } from "@ac/web/lib/billing";
 import { amount, money } from "@ac/web/lib/money";
 import { dayInstant, draftErrors, planLabel, planWord, priceMinor, type ContractDraft, type ContractRow, type PlanType, type UnitOption } from "@ac/web/lib/contracts";
 import { saveContract } from "../actions";
+import { GroupToggle } from "@ac/web/components/GroupToggle";
 import { Icon } from "@ac/web/components/Icon";
 import { byCount } from "@ac/web/lib/i18n";
 
@@ -77,6 +78,14 @@ const blankDraft = (customerId = ""): ContractDraft => ({ customerId, unitIds: [
 /** Contract plans (FR-A07). `live` comes from the Server Component in API mode: the scope and the selected contract
 live in the URL, saving is a Server Action that writes a new version and re-renders the route; the demo keeps the
 fixture rows. Texts in the display language; contract dates are Kuala Lumpur days, typed as such (IR300). */
+/** The customer's units under their property (UnitOption.where), in the list's order: a flat run of 23 units hid which
+place each was, and a whole property was one tick per unit (UI/UX loop R60). */
+function byPlace(units: UnitOption[]): [string, UnitOption[]][] {
+  const out = new Map<string, UnitOption[]>();
+  for (const u of units) out.set(u.where, [...(out.get(u.where) ?? []), u]);
+  return [...out];
+}
+
 export function ContractsView({ live }: Readonly<{ live?: Live }>) {
   const t = useT();
   const toast = useToast();
@@ -208,10 +217,17 @@ export function ContractsView({ live }: Readonly<{ live?: Live }>) {
                 <div className="mb-3 max-w-sm"><Field label={t("Customer")} error={tried ? errors.customerId : undefined} hint={t(creating ? "The units below must belong to this customer" : "Fixed after creation — the units below must belong to this customer")}><Select value={d.customerId} disabled={!creating || isBlocked} onChange={(e) => { set({ customerId: e.target.value, unitIds: [] }); }}><option value="">{t("Select…")}</option>{customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field></div>
                 {d.customerId && customerUnits.length === 0 ? <p className="text-xs text-muted-foreground">{t("This customer has no active units.")}</p> : null}
                 {d.customerId && customerUnits.length > 0 ? (
-                  <div className="flex flex-col gap-1.5">{customerUnits.map((u) => {
-                    const others = u.otherContracts.filter((k) => k !== sel?.id || creating);
-                    return <Check key={u.id} checked={d.unitIds.includes(u.id)} disabled={isBlocked} onChange={(on) => { set({ unitIds: on ? [...d.unitIds, u.id] : d.unitIds.filter((x) => x !== u.id) }); }} label={<span>{u.label} <span className="text-xs text-muted-foreground">{u.where}{others.length > 0 ? ` · ${t("also on {list}", { list: others.map((k) => (live ? k.slice(0, 8) : k)).join(", ") })}` : ""}</span></span>} />;
-                  })}</div>
+                  <div className="flex flex-col gap-3">{byPlace(customerUnits).map(([place, us]) => (
+                    <fieldset key={place}>
+                      <legend className="mb-1 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-muted-foreground">{place}
+                        {us.length > 1 && <GroupToggle ids={us.map((u) => u.id)} chosen={d.unitIds} group={place} disabled={isBlocked} onToggle={(ids, on) => { set({ unitIds: on ? [...d.unitIds, ...ids.filter((x) => !d.unitIds.includes(x))] : d.unitIds.filter((x) => !ids.includes(x)) }); }} />}
+                      </legend>
+                      <div className="flex flex-col gap-1.5">{us.map((u) => {
+                        const others = u.otherContracts.filter((k) => k !== sel?.id || creating);
+                        return <Check key={u.id} checked={d.unitIds.includes(u.id)} disabled={isBlocked} onChange={(on) => { set({ unitIds: on ? [...d.unitIds, u.id] : d.unitIds.filter((x) => x !== u.id) }); }} label={<span>{u.label} <span className="text-xs text-muted-foreground">{others.length > 0 ? t("also on {list}", { list: others.map((k) => (live ? k.slice(0, 8) : k)).join(", ") }) : ""}</span></span>} />;
+                      })}</div>
+                    </fieldset>
+                  ))}</div>
                 ) : null}
                 {d.customerId ? null : <p className="text-xs text-muted-foreground">{t("Choose a customer first.")}</p>}
                 {tried && errors.unitIds && <p className="mt-1 text-xs text-crit">{errors.unitIds}</p>}
