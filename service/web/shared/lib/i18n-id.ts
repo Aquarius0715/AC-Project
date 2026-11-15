@@ -433,7 +433,6 @@ export const id: Record<string, string> = {
   "Inspection record": "Catatan inspeksi",
   "Evidence (demo observation)": "Bukti (pengamatan demo)",
   "Evidence": "Bukti",
-  "Read": "Baca",
   "View unit": "Lihat unit",
   "Book cleaning": "Pesan pembersihan",
   "Request repair": "Ajukan perbaikan",
