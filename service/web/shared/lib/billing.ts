@@ -121,6 +121,8 @@ export function invoiceRows(invoices: ApiInvoice[], contracts: ApiContract[], cu
 export function totals(rows: InvoiceRow[], statuses: InvoiceStatus[]): string {
   const by = new Map<string, number>();
   for (const r of rows) if (statuses.includes(r.st)) by.set(r.currency, (by.get(r.currency) ?? 0) + r.amountMinor);
+  // nothing in these statuses: zero in the scope's currencies, so the tile reads like its neighbours (UI/UX loop R81)
+  if (by.size === 0) for (const r of rows) by.set(r.currency, 0);
   return by.size === 0 ? "0.00" : [...by].map(([c, m]) => money(m, c)).join(" · ");
 }
 

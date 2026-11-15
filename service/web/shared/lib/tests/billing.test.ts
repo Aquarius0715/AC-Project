@@ -32,7 +32,8 @@ describe("HQ billing (FR-A08, FR-A23, DD-A08)", () => {
     const [a, b] = invoiceRows([invoice({}), invoice({ id: "i2", contractId: "kx", paymentMethod: "demo_credit_card", paymentStatus: PROCESSING, status: PROCESSING })], contracts, customers, NOW);
     expect(a).toMatchObject({ amt: "120.00 MYR", meta: "Demo Customer A · rto contract v1 · August 2026", method: "Method not selected", methodName: "Method not selected", paymentState: null, st: "Overdue", period: "1 Aug 2026 → 1 Sept 2026", due: "10 Sept 2026" });
     expect(b).toMatchObject({ meta: "customer · kx · August 2026", method: "Credit card · processing", methodName: "Credit card", paymentState: PROCESSING, customerId: "" });
-    expect([totals([must(a), must(b)], ["Overdue", "Processing"]), totals([must(a)], ["Paid"])]).toStrictEqual(["240.00 MYR", "0.00"]);
+    expect([totals([must(a), must(b)], ["Overdue", "Processing"]), totals([must(a)], ["Paid"])]).toStrictEqual(["240.00 MYR", "0.00 MYR"]);
+    expect(totals([], ["Paid"])).toBe("0.00");
   });
 
   it("words the payments of an invoice, inquiries, contracts and payout statements", () => {
