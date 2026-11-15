@@ -6,6 +6,7 @@
 // time (the HQ technicians free and qualified then, IR113), and the latest report (reports.get with up to four ready
 // photos through attachments.getContent). The Plans tab (loadPlans) reads plans.list in the same scope, plans.get for
 // the selected plan and jobs.list (the unit's periodic jobs) for the status of each generated occurrence.
+import { scopeLists } from "@ac/web/lib/scopeLists";
 import "server-only";
 import { evidenceText } from "@ac/web/lib/evidence";
 import { coreAll, coreDisplay, coreNow, coreOp, CoreError, corePermissions, orWhenRefused, coreItems } from "@ac/web/lib/dal";
@@ -52,7 +53,6 @@ async function shared(sp: SP) {
   const unitOrg = new Map(units.map((u) => [u.id, u.customerOrgId]));
   const sq = { customerId: one(sp.customerId), propertyId: one(sp.propertyId), unitId: one(sp.unitId) };
   const scope = filtersOf(sq, hq?.id ?? null, false);
-  const custOrg = customers.find((c) => c.id === sq.customerId)?.organizationId;
   const [jobsInScope, plansInScope] = await Promise.all([
     coreOp<Page<unknown>>("jobs.list", { filters: { ...scope, statuses: LISTED }, limit: 1 }).then((r) => r.total),
     optional(coreOp<Page<unknown>>("plans.list", { filters: scope, limit: 1 }).then((r) => r.total), 0),
@@ -61,11 +61,7 @@ async function shared(sp: SP) {
     now, i, orgs, customers, properties, units, members, hq, contractors, names, unitOrg, scope,
     head: {
       now: now.toISOString(), counts: { jobs: jobsInScope, plans: plansInScope, contractors: contractors.length },
-      scope: {
-        customers: customers.map((c) => ({ id: c.id, name: c.name })),
-        properties: properties.filter((p) => !custOrg || p.customerOrgId === custOrg).map((p) => ({ id: p.id, name: p.name })),
-        units: units.filter((u) => (!custOrg || u.customerOrgId === custOrg) && (!sq.propertyId || u.propertyId === sq.propertyId)).map((u) => ({ id: u.id, name: u.displayName })),
-      },
+      scope: scopeLists(customers, properties, units, sq),
       units: units.map((u) => ({ id: u.id, name: u.displayName, planned: u.installState === "planned", customer: names.customers.get(u.customerOrgId) ?? i.t("customer") })).toSorted((a, b) => a.customer.localeCompare(b.customer) || a.name.localeCompare(b.name)),
     },
   };
