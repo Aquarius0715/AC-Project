@@ -7,6 +7,7 @@ const BUKA_KERJA = "Buka kerja";
 export const ms: Record<string, string> = {
   "On the next page, change the e-mail address (↻) to this service's account.": "Pada halaman seterusnya, tukar alamat e-mel (↻) kepada akaun perkhidmatan ini.",
   "Sign in with another account": "Log masuk dengan akaun lain",
+  "You signed out. Sign in again to continue.": "Anda telah log keluar. Log masuk semula untuk meneruskan.",
   // shell
   "Overview": "Gambaran keseluruhan",
   "Units & locations": "Unit & lokasi",

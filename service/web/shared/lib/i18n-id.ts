@@ -4,6 +4,7 @@
 export const id: Record<string, string> = {
   "On the next page, change the e-mail address (↻) to this service's account.": "Di halaman berikutnya, ubah alamat email (↻) ke akun layanan ini.",
   "Sign in with another account": "Masuk dengan akun lain",
+  "You signed out. Sign in again to continue.": "Anda telah keluar. Masuk lagi untuk melanjutkan.",
   "Overview": "Ringkasan",
   "Units & locations": "Unit & lokasi",
   "Automations & schedules": "Otomasi & jadwal",

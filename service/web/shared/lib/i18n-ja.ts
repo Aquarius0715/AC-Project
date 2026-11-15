@@ -4,6 +4,7 @@
 export const ja: Record<string, string> = {
   "On the next page, change the e-mail address (↻) to this service's account.": "次の画面でメールアドレスを変更（↻）し、このサービスのアカウントでサインインしてください。",
   "Sign in with another account": "別のアカウントでサインイン",
+  "You signed out. Sign in again to continue.": "サインアウトしました。続けるにはもう一度サインインしてください。",
   "Overview": "概要",
   "Units & locations": "ユニットと設置場所",
   "Automations & schedules": "自動化とスケジュール",
