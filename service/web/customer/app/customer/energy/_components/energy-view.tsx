@@ -65,7 +65,8 @@ export function EnergyView({ live }: Readonly<{ live: EnergyLive }>) {
             ) : (
               <DataTable rows={live.daily} rowKey={(d) => d.label} cols={[
                 { key: "d", label: t("Day"), render: (d) => d.label }, { key: "a", label: t("Actual (kWh)"), render: (d) => (d.actual === null ? "—" : one(d.actual)) },
-                { key: "b", label: t("Baseline (kWh)"), render: (d) => (d.baseline === null ? "—" : one(d.baseline)) },
+                // the baseline column only with a baseline, as the chart draws it (a column of dashes said nothing; UI/UX loop R70)
+                ...(raw.baseline === null ? [] : [{ key: "b", label: t("Baseline (kWh)"), render: (d: (typeof live.daily)[number]) => (d.baseline === null ? "—" : one(d.baseline)) }]),
               ]} />
             );
   };
