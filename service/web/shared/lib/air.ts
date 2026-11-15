@@ -94,7 +94,8 @@ export function airSelection(rooms: AirRoom[], unitId?: string, spaceId?: string
 suspect reading is never shown as a current normal value (D07); humidity 0 is a measured zero. */
 export interface MetricCard {
   metric: AirMetric; label: string; unit: string; value: string | null;
-  feed: { text: string; tone: Tone; icon: IconName }; status: { text: string; tone: Tone; icon: IconName }; sub: string; advice: string; warn: boolean;
+  /** status is the reading against its guide; null when there is no current reading (the feed badge says why) */
+  feed: { text: string; tone: Tone; icon: IconName }; status: { text: string; tone: Tone; icon: IconName } | null; sub: string; advice: string; warn: boolean;
 }
 const reasonText: Record<string, string> = { unit_mismatch: "unit mismatch", non_finite: "not a number", out_of_range: "out of range", invalid_time: "invalid time" };
 const originText: Record<string, string> = { estimated: "estimated", inspection: "inspection" };
@@ -125,7 +126,7 @@ export function metricCard(metric: AirMetric, m: ApiMeasurement | undefined, has
   const setpoint = setsTemperature ? "Setpoint is on Unit Control" : "Set on the AC itself";
   const noAdvice = t(noAdviceText(metric, setpoint), { metric: label });
   const unavailable = (sub: string, feed?: MetricCard["feed"]): MetricCard =>
-    ({ metric, label, unit, sub, feed: feed ?? { text: t("Unavailable"), tone: "unknown", icon: "offline" }, value: null, status: { text: t("Not measured"), tone: "muted", icon: "dot" }, advice: noAdvice, warn: false });
+    ({ metric, label, unit, sub, feed: feed ?? { text: t("Unavailable"), tone: "unknown", icon: "offline" }, value: null, status: null, advice: noAdvice, warn: false });
   if (!hasSensor) return unavailable(t("No {metric} sensor on this model", { metric: label }), { text: t("Unsupported"), tone: "muted", icon: UNSUPPORTED });
   if (!m) return unavailable(t("No reading yet"));
   const at = showClock(m.observedAt, display);

@@ -84,7 +84,8 @@ export function AirQualityView({ live }: Readonly<{ live: AirLive | null }>) {
             className={cx("flex min-w-0 flex-col gap-1 rounded-2xl border bg-surface p-4 text-left", live.metrics.includes(m.metric) ? "border-primary ring-1 ring-primary" : "border-line hover:border-primary/50")}>
             <span className="flex items-center justify-between gap-2 text-xs text-muted-foreground">{m.label}<Badge tone={m.feed.tone} icon={m.feed.icon}>{m.feed.text}</Badge></span>
             <span className="text-[28px] font-bold leading-9">{m.value ?? "—"}{m.value !== null && <span className="ml-1 text-sm font-medium text-muted-foreground">{m.unit}</span>}</span>
-            <span><Badge tone={m.status.tone} icon={m.status.icon}>{m.status.text}</Badge></span>
+            {/* no current reading: the feed badge above already says Unavailable / Unknown; a second "Not measured" said it again, wrongly for a stale reading */}
+            {m.status && <span><Badge tone={m.status.tone} icon={m.status.icon}>{m.status.text}</Badge></span>}
             <span className="text-[11px] text-muted-foreground">{m.sub}</span>
             <span className={cx("text-xs font-semibold", m.warn && "text-warn")}>{m.advice}</span>
           </Plain>
