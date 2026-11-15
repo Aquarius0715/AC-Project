@@ -188,6 +188,7 @@ export const ja: Record<string, string> = {
   "Skip to main content": "メインコンテンツへ移動",
   "Controls apply to this AC only; you confirm before sending": "操作はこのエアコンだけに適用されます。送信前に確認します",
   "Power": "電源",
+  "Current power unknown · switching sends that command": "現在の電源は不明 · 切り替えるとそのコマンドを送信します",
   "Sent as its own command": "単独のコマンドとして送信されます",
   "Set temperature": "温度を設定",
   "{min}–{max}°C · step {step}°C · confirmed {confirmed}°C": "{min}～{max}°C · {step}°C 刻み · 確認済み {confirmed}°C",

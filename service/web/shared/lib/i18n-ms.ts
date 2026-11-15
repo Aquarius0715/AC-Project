@@ -205,6 +205,7 @@ export const ms: Record<string, string> = {
   "Skip to main content": "Langkau ke kandungan utama",
   "Controls apply to this AC only; you confirm before sending": "Kawalan hanya untuk AC ini; anda mengesahkan sebelum menghantar",
   "Power": "Kuasa",
+  "Current power unknown · switching sends that command": "Kuasa semasa tidak diketahui · menukar akan menghantar arahan itu",
   "Sent as its own command": "Dihantar sebagai arahan tersendiri",
   "Set temperature": "Tetapkan suhu",
   "{min}–{max}°C · step {step}°C · confirmed {confirmed}°C": "{min}–{max}°C · langkah {step}°C · disahkan {confirmed}°C",
