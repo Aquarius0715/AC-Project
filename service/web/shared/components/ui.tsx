@@ -132,6 +132,9 @@ export function Page({ children, className, narrow }: Readonly<{ children: React
   return <div className={cx("page mx-auto flex w-full flex-col gap-4", narrow ? "max-w-[640px]" : "max-w-[1280px]", className)}>{children}</div>;
 }
 
+/** Whether a component sits inside a Card, whose title is the h2 its own headings go under. */
+const InCard = createContext(false);
+
 /** A card: the shadcn/ui Card. The title stays a level-2 heading; `pad={false}` lets a table reach the edges; the
 overflow stays visible for the menus that still open inside a card. */
 export function Card({ title, sub, action, children, className, pad = true, tone }: Readonly<{ title?: React.ReactNode; sub?: React.ReactNode; action?: React.ReactNode; children?: React.ReactNode; className?: string; pad?: boolean; tone?: "crit" | "warn" | "ok" }>) {
@@ -148,7 +151,7 @@ export function Card({ title, sub, action, children, className, pad = true, tone
           {hasContent(action) && <CardAction className="self-start">{action}</CardAction>}
         </CardHeader>
       )}
-      <CardContent className={cn("min-w-0", !pad && "px-0")}>{children}</CardContent>
+      <CardContent className={cn("min-w-0", !pad && "px-0")}><InCard.Provider value>{children}</InCard.Provider></CardContent>
     </UICard>
   );
 }
@@ -233,11 +236,13 @@ export function Banner({ tone = "primary", icon, children, action }: Readonly<{ 
 
 /** No rows, a failed read, no connection: the shadcn/ui Empty. The title stays a level-3 heading. */
 export function EmptyState({ title, children, action }: Readonly<{ title: string; children?: React.ReactNode; action?: React.ReactNode }>) {
+  // under a card's h2 the title is an h3; on its own below the page heading an h2, so no heading level is skipped (UI/UX loop R73)
+  const Heading = useContext(InCard) ? "h3" : "h2";
   return (
     <Empty className="border bg-card">
       <EmptyHeader>
         <EmptyMedia variant="icon"><Icon name="info" /></EmptyMedia>
-        <EmptyTitle><h3>{title}</h3></EmptyTitle>
+        <EmptyTitle><Heading>{title}</Heading></EmptyTitle>
         {hasContent(children) && <EmptyDescription>{children}</EmptyDescription>}
       </EmptyHeader>
       {hasContent(action) && <EmptyContent>{action}</EmptyContent>}
