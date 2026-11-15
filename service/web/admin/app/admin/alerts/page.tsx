@@ -4,6 +4,7 @@
 // language and display time zone, so the first render matches the browser's (IR292). The Alerts tab's scope (customer →
 // property → unit), severity, status and selected alert live in the URL (DD-A05 item 5, Figma Admin 256:2, IR318); so do
 // the Policies tab's selected policy (`policyId`) and the owner customer of a new one (`new`, DD-A05 item 8, IR345).
+import { scopeLists } from "@ac/web/lib/scopeLists";
 import { connection } from "next/server";
 import { apiMode, coreAll, coreDisplay, coreNow, coreOp, corePermissions, CoreError, orWhenForbidden, coreAllPage } from "@ac/web/lib/dal";
 import { i18nOf } from "@ac/web/lib/i18n";
@@ -69,17 +70,12 @@ export default async function AdminAlertsPage({ searchParams }: Readonly<PagePro
   const [alerts, units, customers, properties, policies, defaults] = [read(alertsRead), read(unitsRead), read(customersRead), read(propertiesRead), read(policiesRead), read(defaultsRead)];
   const scoped = [...defaults.items, ...policies.items.filter((p) => p.kind !== "default_alert")];
   const i = i18nOf(display);
-  const custOrg = customers.items.find((c) => c.id === q.customerId)?.organizationId;
   const custByOrg = new Map(customers.items.map((c) => [c.organizationId, c.id]));
   return (
     <AdminAlertsView
       live={{
         tab: sp.tab === "policies" ? "policies" : "alerts",
-        scope: {
-          customers: customers.items.map((c) => ({ id: c.id, name: c.name })),
-          properties: properties.filter((p) => !custOrg || p.customerOrgId === custOrg).map((p) => ({ id: p.id, name: p.name })),
-          units: units.items.filter((u) => (!custOrg || u.customerOrgId === custOrg) && (!q.propertyId || u.propertyId === q.propertyId)).map((u) => ({ id: u.id, name: u.displayName })),
-        },
+        scope: scopeLists(customers.items, properties, units.items, q),
         scopeName: customers.items.find((c) => c.id === q.customerId)?.name ?? null,
         alerts: adminAlertRows(alerts.items, units.items, customers.items, scoped, now.getTime(), i),
         policies: policyRows(scoped, customers.items, members.items, i.t, units.items),
