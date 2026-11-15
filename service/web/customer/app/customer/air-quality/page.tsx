@@ -73,7 +73,7 @@ export default async function CustomerAirQualityPage({ searchParams }: Readonly<
     cards: (["co2", "pm25", "temperature", "humidity"] as const).map((m) => metricCard(m, latest(m), sensors.has(m), i, setsTemperature(d.capabilities))),
     strip: ventStrip(guidance, latest("co2"), roomName, d.displayName, isFreshAir, i.t),
     clean: cleanNote(guidance, latest("pm25"), roomName, i.t),
-    allergen: allergenView(first?.allergen ?? null, i),
+    allergen: allergenView(first?.allergen ?? null, i, now.getTime()), // an observation of another day keeps its date (UI/UX loop R67)
     chart: {
       title: `${heading} — ${windowTitle(period, i.t)}`, sub: windowSub(w, [...new Set(lines.map((l) => l.unit))].join(" / "), roomName, i), labels: axisLabels(w, i), times: slotHeadings(first?.slots ?? [], w.slotMs, i),
       series: lines, gaps: results.some((r) => r.slots.some((s) => s.avg === null)),
