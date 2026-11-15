@@ -10,6 +10,7 @@ const CONTRACT_RTO_A = "contract-rto-a";
 const INVOICE_OVERDUE_A = "invoice-overdue-a";
 const NO_METHOD = "Method not selected";
 
+import { byName } from "@ac/web/lib/text";
 import { isNone } from "@ac/web/lib/isNone";
 import Link from "next/link";
 import { useState, useTransition } from "react";
@@ -146,12 +147,12 @@ interface NewInvoice { contractId: string; from: string; to: string; dueAt: stri
 /** The scope filters of the invoices tab: customer, property, contract, billing months, overdue only. */
 function ScopeBar({ live, nav }: Readonly<{ live: BillingLive; nav: (patch: Record<string, string | null>) => void }>) {
   const { t } = useI18n();
-  const scopeProps = live.properties.filter((p) => !live.scope.customerId || p.customerId === live.scope.customerId);
+  const scopeProps = live.properties.filter((p) => !live.scope.customerId || p.customerId === live.scope.customerId).toSorted(byName);
   const scopeContracts = live.contractsOfCustomer.filter((k) => !live.scope.customerId || k.customerId === live.scope.customerId);
   const { contracts } = live;
   return (
       <div className="flex flex-wrap items-end gap-3">
-        <Field label={t("Customer")}><Select value={live.scope.customerId ?? ""} onChange={(e) => { nav({ customerId: e.target.value || null, propertyId: null, contractId: null, invoiceId: null }); }}><option value="">{t("All customers")}</option>{live.customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field>
+        <Field label={t("Customer")}><Select value={live.scope.customerId ?? ""} onChange={(e) => { nav({ customerId: e.target.value || null, propertyId: null, contractId: null, invoiceId: null }); }}><option value="">{t("All customers")}</option>{live.customers.toSorted(byName).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field>
         <Field label={t("Property")}><Select value={live.scope.propertyId ?? ""} onChange={(e) => { nav({ propertyId: e.target.value || null, invoiceId: null }); }}><option value="">{t("All properties")}</option>{scopeProps.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></Field>
         <Field label={t("Contract")}><Select value={live.scope.contractId ?? ""} onChange={(e) => { nav({ contractId: e.target.value || null, invoiceId: null }); }}><option value="">{t("All contracts")}</option>{scopeContracts.map((k) => <option key={k.id} value={k.id}>{contracts.find((c) => c.id === k.id)?.label ?? k.id}</option>)}</Select></Field>
         <BillingMonths from={live.scope.from} to={live.scope.to} onChange={(from, to) => { nav({ from, to, invoiceId: null }); }} />

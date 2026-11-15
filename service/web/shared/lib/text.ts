@@ -29,3 +29,6 @@ export const withoutNote = (text: string): string => {
 
 /** withoutYear drops a trailing four-digit year and the space before it (the same as replacing /\s*\d{4}$/). */
 export const withoutYear = (text: string): string => (/^\d{4}$/.test(text.slice(-4)) ? text.slice(0, -4).trimEnd() : text);
+
+/** Name order for scope options (customers, properties) — the order every HQ scope select uses (UI/UX loop R128). */
+export const byName = <T extends { name: string }>(a: T, b: T) => a.name.localeCompare(b.name);

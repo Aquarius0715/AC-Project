@@ -2,6 +2,7 @@
 const DEMO_PURCHASED = "demo_purchased";
 const DEMO_RETIRED = "Demo retired";
 
+import { byName } from "@ac/web/lib/text";
 import Link from "next/link";
 import { useState } from "react";
 import { Badge, Banner, Btn, Card, Check, DemoBadge, EmptyState, Field, Input, ListRow, Modal, Page, Select, Steps, SummaryList, Tabs, Textarea, Timeline, type Tone } from "@ac/web/components/ui";
@@ -68,7 +69,7 @@ export function OffsetsView({ live }: Readonly<{ live: Live }>) {
         <>
         <div className="flex flex-wrap items-end gap-3">
           <span className="pb-2 text-xs font-semibold text-muted-foreground">{t("Filter")}</span>
-          <Field label={t("Customer")}><Select value={live.scope.customerId ?? ""} onChange={(e) => { nav({ customerId: e.target.value || null, recordId: null }); }}><option value="">{t("All customers")}</option>{live.customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field>
+          <Field label={t("Customer")}><Select value={live.scope.customerId ?? ""} onChange={(e) => { nav({ customerId: e.target.value || null, recordId: null }); }}><option value="">{t("All customers")}</option>{live.customers.toSorted(byName).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field>
           <Field label={t("Status")}><Select value={live.scope.status ?? ""} onChange={(e) => { nav({ status: e.target.value || null, recordId: null }); }}><option value="">{t("All statuses")}</option>{(["demo_requested", DEMO_PURCHASED, "demo_retired", "failed"] as const).map((x) => <option key={x} value={x}>{textOf(STATE_WORD, x, t) ?? x}</option>)}</Select></Field>
           <Field label={t("Created")}><Select value={live.scope.created} onChange={(e) => { nav({ created: e.target.value === "30d" ? null : e.target.value, recordId: null }); }}><option value="7d">{t("Last 7 days")}</option><option value="30d">{t("Last 30 days")}</option><option value="90d">{t("Last 90 days")}</option><option value="all">{t("All time")}</option></Select></Field>
         </div>
@@ -110,7 +111,7 @@ export function OffsetsView({ live }: Readonly<{ live: Live }>) {
       )}
       <Modal open={modal} onClose={close} title={t("New demo quote")} wide footer={<><Btn onClick={close}>{t("Cancel")}</Btn>{quote ? <Btn variant="primary" disabled={pending || !confirmed} onClick={request}>{t("Request (demo)")}</Btn> : <Btn variant="primary" disabled={pending} onClick={getQuote}>{t("Get demo quote")}</Btn>}</>}>
         <div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>
-          <Field label={t("Customer")} error={tried ? errors.customerId : undefined}><Select value={d.customerId} onChange={(e) => { set({ customerId: e.target.value, unitIds: [] }); }}><option value="">{t("Select…")}</option>{live.customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field>
+          <Field label={t("Customer")} error={tried ? errors.customerId : undefined}><Select value={d.customerId} onChange={(e) => { set({ customerId: e.target.value, unitIds: [] }); }}><option value="">{t("Select…")}</option>{live.customers.toSorted(byName).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field>
           <Field label={t("Amount (kgCO₂e)")} error={tried ? errors.amountKg : undefined}><Input type="number" min="0" step="0.001" value={d.amountKg} onChange={(e) => { set({ amountKg: e.target.value }); }} /></Field>
           <Field label={t("Period start (Kuala Lumpur)")} error={tried ? errors.period : undefined}><DateTimeSelect value={d.from} onChange={(v) => { set({ from: v }); }} /></Field>
           <Field label={t("Period end")}><DateTimeSelect value={d.to} onChange={(v) => { set({ to: v }); }} /></Field>
