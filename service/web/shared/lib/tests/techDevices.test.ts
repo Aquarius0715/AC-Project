@@ -187,7 +187,7 @@ describe("device events (T12)", () => {
       { ...lost, restoredAt: "2026-09-14T01:10:00Z" }, event({ id: "f", eventType: "operation_failed" }), event({ id: "p", eventType: "power_lost", evidenceSource: "power_signal" }),
     ];
     const rows = eventRows(es, alerts, NOW);
-    expect(rows[0]).toMatchObject({ tone: "ok", detail: "Connection restored · heartbeat", recovery: "recovers communication_lost today 9:00 am MYT", time: "today 9:10 am MYT" });
+    expect(rows[0]).toMatchObject({ tone: "ok", detail: "Connection restored · heartbeat", recovery: "recovers Communication lost today 9:00 am MYT", time: "today 9:10 am MYT" });
     expect(rows[1]).toMatchObject({ tone: "warn", detail: "Cover opened while powered · tamper_signal · 2 alerts", recovery: "open · unacknowledged", notes: ["today 9:02 am MYT — Cover refitted"] });
     expect(rows[1]?.alerts.map((a) => a.id)).toStrictEqual(["al-1"]);
     expect(rows[2]?.recovery).toBe("open · acknowledged");

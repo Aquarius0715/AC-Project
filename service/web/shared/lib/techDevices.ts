@@ -208,16 +208,22 @@ const restoredDetail: Record<NonNullable<ApiDeviceEventFull["recovery"]>["axis"]
 /** What a device event means in words: the fault, or for a recovery the axis that came back. */
 export const eventCause = (e: Pick<ApiDeviceEventFull, "eventType" | "recovery">, t: T = en) => t(e.recovery ? restoredDetail[e.recovery.axis] : eventDetail[e.eventType]);
 /** One device event row (Figma 03 “Device events”): detection, evidence, its alerts and the recovery or response. */
-export interface EventRow { id: string; version: number; time: string; type: ApiDeviceEventFull["eventType"]; tone: "warn" | "crit" | "ok" | "muted"; detail: string; recovery: string; notes: string[]; alerts: ApiAlertLite[] }
+export interface EventRow { id: string; version: number; time: string; /** the event type in words */ type: string; tone: "warn" | "crit" | "ok" | "muted"; detail: string; recovery: string; notes: string[]; alerts: ApiAlertLite[] }
 const EVENT_TONE: Partial<Record<ApiDeviceEventFull["eventType"], EventRow["tone"]>> = { tamper: "warn", restored: "ok", operation_failed: "muted" };
 const alertCount = (n: number, t: T) => {
   if (n === 0) return "";
   return ` · ${n === 1 ? t("1 alert") : t("{n} alerts", { n })}`;
 };
 /** Where an event stands: restored, a recovery of an earlier fault, or open with its alerts' state. */
+/** A device event's type in words for its badge and the recovery line; the wire codes ("communication_lost") read as
+code on screen (UI/UX loop R102). */
+const EVENT_LABEL: Record<ApiDeviceEventFull["eventType"], string> = {
+  communication_lost: "Communication lost", power_lost: "Power lost", tamper: "Tamper", restored: "Restored", operation_failed: "Operation failed",
+};
+const eventLabel = (type: ApiDeviceEventFull["eventType"], t: T) => textOf(EVENT_LABEL, type, t) ?? type;
 function eventRecovery(e: ApiDeviceEventFull, source: ApiDeviceEventFull | undefined, as: ApiAlertLite[], open: number, when: (iso: string) => string, t: T): string {
   if (e.restoredAt) return t("restored {time}", { time: when(e.restoredAt) });
-  if (e.eventType === "restored") return source ? t("recovers {event} {time}", { event: source.eventType, time: when(source.occurredAt) }) : t("recovers an earlier fault");
+  if (e.eventType === "restored") return source ? t("recovers {event} {time}", { event: eventLabel(source.eventType, t), time: when(source.occurredAt) }) : t("recovers an earlier fault");
   if (as.length === 0) return t("open");
   if (open) return t("open · unacknowledged");
   return t(as.every((a) => a.status === "resolved") ? "open · resolved" : "open · acknowledged");
@@ -235,7 +241,7 @@ export function eventRows(es: ApiDeviceEventFull[], alerts: Map<string, ApiAlert
       id: e.id,
       version: e.version,
       time: when(e.occurredAt),
-      type: e.eventType,
+      type: eventLabel(e.eventType, t),
       tone: lookup(EVENT_TONE, e.eventType) ?? "crit",
       detail: `${eventCause(e, t)} · ${e.evidenceSource}${alertCount(e.alertIds.length, t)}`,
       notes: e.responseNotes.map((n) => `${when(n.at)} — ${n.message}`),
