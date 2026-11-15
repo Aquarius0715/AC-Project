@@ -81,7 +81,7 @@ describe("partner overview", () => {
     expect(tiles[1]?.tone).toBe("warn");
     expect(tiles[4]?.tone).toBe("crit");
     const empty = kpis({ offerCount: 0, activeCount: 0, reviewCount: 0, overdueCount: 0 }, [], now, names);
-    expect(empty.map((t) => t.sub)).toStrictEqual(["No open offers", "—", "—", "—", "—"]);
+    expect(empty.map((t) => t.sub)).toStrictEqual(["No open offers", "No jobs waiting for a technician", "No jobs in progress or scheduled", "No reports to review", "No overdue jobs"]);
     expect(empty.every((t) => !t.tone)).toBe(true);
   });
 
