@@ -113,10 +113,15 @@ function plannedChanges({ d, edited, setpoint, mode, fan, isShowMode, isShowFan 
   return actions;
 }
 
+/** what the last send came to: the command history line, and whether the AC took it */
+interface Outcome { text: string; isOk: boolean }
+
 interface RemoteControlProps {
   isControllable: boolean; temperatureRange: { min: number; max: number; step: number } | null; cap: { min: number; max: number; step: number };
   setpoint: number; min: number; max: number; confirmed: number | string;
   isOn: boolean; isDisabled: boolean; isOffline: boolean; waiting: boolean; isPowerOff: boolean;
+  /** the result of the last send, kept next to the controls until the next send or dismiss (a toast alone goes away) */
+  outcome: Outcome | null; onDismissOutcome: () => void;
   /** the modes and fan levels the model offers; an empty list hides the choice */
   modes: readonly (ControlMode)[]; mode: ControlMode; fans: readonly (FanLevel)[]; fan: FanLevel;
   /** the changes to review before sending; null for a model that sends the power at once (Figma 02o) */
@@ -139,7 +144,7 @@ function PowerConfirm({ power, name, where, onCancel, onSend }: Readonly<{ power
 /** The remote control card: the power, the setpoint, the mode and the fan, and the review of what will be sent. */
 function RemoteControlCard(p: Readonly<RemoteControlProps>) {
   const t = useT();
-  const { isControllable, temperatureRange, cap, setpoint, min, max, confirmed, isOn, isDisabled, isOffline, waiting, isPowerOff, modes, mode, fans, fan, review } = p;
+  const { isControllable, temperatureRange, cap, setpoint, min, max, confirmed, isOn, isDisabled, isOffline, waiting, isPowerOff, modes, mode, fans, fan, review, outcome } = p;
   const isPowerLocked = isDisabled || waiting || isPowerOff;
   return (
     <Card title={t("REMOTE CONTROL")} sub={t(isControllable ? "Controls apply to this AC only; you confirm before sending" : "No remote control on this model")}>
@@ -156,6 +161,11 @@ function RemoteControlCard(p: Readonly<RemoteControlProps>) {
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface2 p-3 text-xs"><span><b>{t(review.count === 1 ? "{n} change:" : "{n} changes:", { n: review.count })}</b> {review.summary}<br /><span className="text-muted-foreground">{t("Target: {name} only · you will confirm before sending", { name: review.target })}</span></span><Btn variant="primary" disabled={isDisabled || waiting || !review.canSend} onClick={p.onReview}>{t(waiting ? "Waiting for device…" : "Review & send")}</Btn></div>
         )}
         {waiting && <Banner>{t("Waiting for device response… The result is shown only after the device acknowledges (fails after 30 s).")}</Banner>}
+        {!waiting && outcome && (
+          <Banner tone={outcome.isOk ? "ok" : "warn"} action={<Btn size="sm" variant="ghost" onClick={p.onDismissOutcome}>{t("Dismiss")}</Btn>}>
+            {outcome.text}
+          </Banner>
+        )}
         {isOffline && ( // Figma 02h: nothing is sent to an offline AC; a repair request is the way forward (IR243, IR315)
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface2 p-3 text-xs">
             <span><b>{t("Controls disabled while offline")}</b><br /><span className="text-muted-foreground">{t("Try again when the unit reconnects, or request a repair.")}</span></span>
@@ -220,6 +230,7 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
   const [attachOpen, setAttachOpen] = useState(false);
   const [picked, setPicked] = useState<string[]>([]);
   const [waiting, setWaiting] = useState(false);
+  const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [mockOn, setMockOn] = useState(unit.state === "running");
   const isOn = d ? d.observedState.power === true : mockOn;
   const [sent, setSent] = useState<ApiCommand[]>([]);
@@ -251,7 +262,8 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
   const isDisabled = isOffline || isBlocked || (d !== null && !d.capabilities.control);
   const track = (c: ApiCommand) => { setSent((xs) => [c, ...xs.filter((x) => x.id !== c.id)]); };
   const reason = (key: string, code: string) => (textOf(REASONS, key, t) ?? code);
-  const fail = (e: unknown) => { toast(e instanceof OpError ? t("Not sent: {reason}", { reason: reason(e.error.messageKey, e.error.code) }) : t("Not sent"), "warn"); };
+  const notSentText = (e: unknown) => (e instanceof OpError ? t("Not sent: {reason}", { reason: reason(e.error.messageKey, e.error.code) }) : t("Not sent"));
+  const fail = (e: unknown) => { toast(notSentText(e), "warn"); };
   const modeWord = (m: string | null) => (m === null ? "—" : textOf(MODE_LABEL, m, t) ?? m);
   const fanWord = (f: string | null) => (f === null ? "—" : textOf(FAN_LABEL, f, t) ?? f);
   const changeText = (a: UnitAction) => {
@@ -266,27 +278,37 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
   const sendOne = async (a: UnitAction): Promise<boolean> => {
     const created = await createCommand(id, a); // Server Action
     if (!created.ok) {
-      toast(t("Not sent: {reason}", { reason: reason(created.messageKey, created.code) }), "warn");
+      const text = t("Not sent: {reason}", { reason: reason(created.messageKey, created.code) });
+      toast(text, "warn");
+      setOutcome({ text, isOk: false });
       return false;
     }
     const followed = await followCommand(created.value, track); // polls commands.get through the BFF
     if (!followed.answered) {
       // the command was sent; only its answer could not be read, so it is never "not sent" (IR728)
-      toast(t("{unit}: sent — its answer could not be read. Refresh to see the AC's state before sending again.", { unit: unit.name }), "warn");
+      const text = t("{unit}: sent — its answer could not be read. Refresh to see the AC's state before sending again.", { unit: unit.name });
+      toast(text, "warn");
+      setOutcome({ text, isOk: false });
       return false;
     }
     const c = followed.command;
-    toast(`${unit.name}: ${historyRow(c, t, display).text}`, c.status === "acknowledged" ? undefined : "warn");
-    return c.status === "acknowledged";
+    const isOk = c.status === "acknowledged";
+    const text = `${unit.name}: ${historyRow(c, t, display).text}`;
+    toast(text, isOk ? undefined : "warn");
+    // the device did not take it: say what the AC still does, next to the controls
+    setOutcome({ text: isOk ? text : t("{result}. The AC keeps its confirmed setting; check it and send again.", { result: text }), isOk });
+    return isOk;
   };
   const sendApi = async (actions: UnitAction[]) => {
     setWaiting(true);
+    setOutcome(null);
     try {
       for (const a of actions) {
         if (!(await sendOne(a))) break;
       }
     } catch (error) {
       fail(error);
+      setOutcome({ text: notSentText(error), isOk: false });
     } finally {
       setWaiting(false);
       router.refresh(); // re-read the unit on the server (observed setting, pending commands)
@@ -348,6 +370,7 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
             isOn={isOn} isDisabled={isDisabled} isOffline={isOffline} waiting={waiting} isPowerOff={policy?.kind === "power_off"}
             modes={isShowMode ? modes : []} mode={mode} fans={isShowFan ? fans : []} fan={fan}
             review={layout.review ? { count: changeCount, summary: d ? changes().map((item) => changeText(item)).join(" · ") || t("No change yet") : t(SET_TEMPERATURE_FROM_C_TO_C, { from: 26, to: setpoint }), target: unit.name, canSend: d === null || changes().length > 0 } : null}
+            outcome={outcome} onDismissOutcome={() => { setOutcome(null); }}
             repairHref={`/customer/maintenance?new=${d?.id ?? unit.id}`}
             onPower={setPowerAsk} onStep={(delta) => { setSetpoint((x) => x + delta); setEdited((e) => ({ ...e, temp: true })); }}
             onMode={(m) => { setMode(m); setEdited((e) => ({ ...e, mode: true })); }} onFan={(f) => { setFan(f); setEdited((e) => ({ ...e, fan: true })); }} onReview={() => { setConfirm(true); }}

@@ -151,6 +151,7 @@ export const id: Record<string, string> = {
   "Mid": "Sedang",
   "High": "Tinggi",
   "Not sent: {reason}": "Tidak terkirim: {reason}",
+  "{result}. The AC keeps its confirmed setting; check it and send again.": "{result}. AC tetap pada pengaturan yang dikonfirmasi; periksa lalu kirim lagi.",
   "{unit}: sent — its answer could not be read. Refresh to see the AC's state before sending again.": "{unit}: terkirim — jawabannya tidak dapat dibaca. Muat ulang untuk melihat kondisi AC sebelum mengirim lagi.",
   "Sent — its answer could not be read. Refresh to see the AC's state.": "Terkirim — jawabannya tidak dapat dibaca. Muat ulang untuk melihat kondisi AC.",
   "Not sent": "Tidak terkirim",
