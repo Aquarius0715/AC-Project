@@ -33,6 +33,7 @@ time zone (IR298). */
 export function OffsetsView({ live }: Readonly<{ live: Live }>) {
   const i = useI18n(), { t } = i;
   const nav = useUrlPatch();
+  const isFiltered = Boolean(live.scope.customerId) || Boolean(live.scope.status) || live.scope.created !== "all";
   const [pending, run] = useAction();
   const sel = live.rows.find((r) => r.id === live.selectedId) ?? null;
   const [modal, setModal] = useState(false);
@@ -74,7 +75,8 @@ export function OffsetsView({ live }: Readonly<{ live: Live }>) {
         </div>
         <div className="split-rev">
           <Card title={t("Demo offset records")} action={live.canWrite && <Btn size="sm" variant="primary" onClick={() => { setD(blank); setModal(true); }}><Icon name="add" /> {t("New demo quote")}</Btn>} className="self-start">
-            {live.rows.length === 0 ? <EmptyState title={t("No records")}>{t(live.scope.customerId || live.scope.status || live.scope.created !== "all" ? "No record matches these filters — widen them, or get a demo quote and request it to create a record." : "Get a demo quote and request it to create a record.")}</EmptyState> : <div className="flex flex-col gap-2">{live.rows.map((x) => <ListRow key={x.id} selected={sel?.id === x.id} onClick={() => { setAck(false); nav({ recordId: x.id }); }}><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="text-[13px]">{x.id.slice(0, 8)}</b><Badge tone={tone(x.state)}>{x.stateText}</Badge></div><div className="text-[11px] text-muted-foreground">{x.customer} · {x.amount}</div><div className="text-[11px] text-muted-foreground">{x.next}</div></div></ListRow>)}</div>}
+            {/* "widen them" comes with the way to do it, here, rather than three selects to reset (UI/UX loop R91) */}
+            {live.rows.length === 0 ? <EmptyState title={t("No records")} action={isFiltered && <Btn size="sm" onClick={() => { nav({ customerId: null, status: null, created: "all", recordId: null }); }}>{t("Clear filters")}</Btn>}>{t(isFiltered ? "No record matches these filters — widen them, or get a demo quote and request it to create a record." : "Get a demo quote and request it to create a record.")}</EmptyState> : <div className="flex flex-col gap-2">{live.rows.map((x) => <ListRow key={x.id} selected={sel?.id === x.id} onClick={() => { setAck(false); nav({ recordId: x.id }); }}><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="text-[13px]">{x.id.slice(0, 8)}</b><Badge tone={tone(x.state)}>{x.stateText}</Badge></div><div className="text-[11px] text-muted-foreground">{x.customer} · {x.amount}</div><div className="text-[11px] text-muted-foreground">{x.next}</div></div></ListRow>)}</div>}
             <p className="mt-3 text-[11px] text-muted-foreground">{t("Energy savings and MRV estimates are shown separately and never converted into credits.")} <Link className="text-primary underline" href="/admin/energy">{t("Energy analysis")}</Link> · <Link className="text-primary underline" href="/admin/mrv">MRV</Link></p>
           </Card>
           {sel ? (
