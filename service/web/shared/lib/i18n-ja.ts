@@ -3403,7 +3403,6 @@ export const ja: Record<string, string> = {
   "{period} — clear the requested-time period": "{period} — 希望時刻の期間を解除",
   "Jobs · all customers": "作業 · すべての顧客",
   "Change the scope or the filters.": "範囲またはフィルターを変更してください。",
-  "!! Overdue": "!! 期限超過",
   "Showing {n} of {total}.": "{total} 件中 {n} 件を表示しています。",
   "That job no longer exists in your scope.": "その作業は、あなたの範囲にはもう存在しません。",
   "Pick a job.": "作業を選んでください。",

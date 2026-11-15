@@ -3403,7 +3403,6 @@ export const id: Record<string, string> = {
   "{period} — clear the requested-time period": "{period} — hapus periode waktu diminta",
   "Jobs · all customers": "Pekerjaan · semua pelanggan",
   "Change the scope or the filters.": "Ubah cakupan atau filter.",
-  "!! Overdue": "!! Terlambat",
   "Showing {n} of {total}.": "Menampilkan {n} dari {total}.",
   "That job no longer exists in your scope.": "Pekerjaan itu sudah tidak ada dalam cakupan Anda.",
   "Pick a job.": "Pilih pekerjaan.",
