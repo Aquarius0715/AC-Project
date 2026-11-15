@@ -27,7 +27,7 @@ async function AdminAccessPageContent({ searchParams }: Readonly<PageProps<"/adm
   const sp = await searchParams;
   const one = queryReader(sp);
   const role = oneOf(["admin", "contractor", "technician"] as const, one("role") ?? "", undefined);
-  const status = one("status") === "active" || one("status") === "inactive" ? one("status") : undefined;
+  const status = oneOf(["active", "inactive", "revoked"] as const, one("status") ?? "", undefined);
   const organizationId = one("organizationId");
   const filters = { ...(role && { role }), ...(status === "active" && { activeOnly: true }), ...(organizationId && { organizationId }) };
   const isFiltered = Object.keys(filters).length > 0;
@@ -39,7 +39,12 @@ async function AdminAccessPageContent({ searchParams }: Readonly<PageProps<"/adm
     coreAll<{ id: string; name: string }>("properties.list"),
     coreAll<{ id: string; displayName: string }>("units.list"),
   ]);
-  const rows = memberRows(members, orgs, now, i18nOf(display)).filter((r) => status !== "inactive" || !r.active);
+  // Inactive is access that ended; Revoked, access HQ took back, has its own choice as its own badge does (UI/UX loop R87)
+  const rows = memberRows(members, orgs, now, i18nOf(display)).filter((r) => {
+    if (status === "inactive") return !r.active && !r.revoked;
+    if (status === "revoked") return r.revoked;
+    return true;
+  });
   const users = [...new Map((everyone ?? members).filter((m) => m.role !== "client").map((m) => [m.userId, m.displayName]))].map(([id, name]) => ({ id, name }));
   const wanted = one("membershipId");
   // the asked membership, a new one, or none until one is chosen (the first used to open, its editable access shown for

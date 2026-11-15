@@ -141,7 +141,7 @@ export function AccessView({ live }: Readonly<{ live: Live }>) {
         <SearchSelect className="w-64" label={t("Filter by organization")} value={live.scope.organizationId ?? ""} onChange={(v) => { nav({ organizationId: v || null, membershipId: null }); }}
           options={[{ id: "", label: t("Organization: All") }, ...live.orgs.filter((o) => o.kind !== "customer").toSorted((a, b) => a.name.localeCompare(b.name)).map((o) => ({ id: o.id, label: o.name }))]} />
         <Choice value={live.scope.role ?? "all"} onChange={(v) => { nav({ role: v === "all" ? null : v, membershipId: null }); }} options={[{ id: "all", label: t("All roles") }, ...roles]} />
-        <Choice value={live.scope.status ?? "all"} onChange={(v) => { nav({ status: v === "all" ? null : v, membershipId: null }); }} options={[{ id: "all", label: t("All") }, { id: "active", label: t("Active") }, { id: "inactive", label: t("Inactive") }]} />
+        <Choice value={live.scope.status ?? "all"} onChange={(v) => { nav({ status: v === "all" ? null : v, membershipId: null }); }} options={[{ id: "all", label: t("All") }, { id: "active", label: t("Active") }, { id: "inactive", label: t("Inactive") }, { id: "revoked", label: t("Revoked") }]} />
       </div>
       <div className="split-rev">
         <Card title={t("Memberships")} sub={t("{n} · HQ, contractor and technician", { n: live.rows.length })} action={live.canWrite && <Btn size="sm" variant="primary" onClick={() => { nav({ membershipId: "new" }); }}><Icon name="add" /> {t("New membership")}</Btn>} className="self-start">
