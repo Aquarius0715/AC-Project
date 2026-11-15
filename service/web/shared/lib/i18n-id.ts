@@ -460,6 +460,8 @@ export const id: Record<string, string> = {
   "Nothing in this filter.": "Tidak ada hasil untuk filter ini.",
   "Reminders & information": "Pengingat & informasi",
   "Maintenance reminders, inspection records, notices and resolved alerts": "Pengingat perawatan, catatan inspeksi, pemberitahuan, dan peringatan yang sudah terselesaikan",
+  "Show the first {n}": "Tampilkan {n} pertama",
+  "Show all {total}": "Tampilkan semua {total}",
   "Nothing here.": "Tidak ada apa-apa di sini.",
   "Back to list": "Kembali ke daftar",
   "Where": "Lokasi",
