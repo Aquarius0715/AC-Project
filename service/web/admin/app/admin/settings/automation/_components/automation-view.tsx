@@ -31,6 +31,16 @@ function decisionTone(decision: string): "ok" | "crit" | "warn" {
 /** HQ automation policies (FR-A11) in API mode: the scope and the selected policy live in the URL; saving, simulating
 and firing (demo) are Server Actions. Tier order: capabilities / restrictions → HQ policies → customer rules. Texts
 in the display language (IR303). */
+/** The policy's unit choices by property, labelled "customer › property", sorted by that label (units keep their order). */
+function unitGroups(live: { customers: { id: string; name: string }[]; properties: { id: string; name: string; customerId: string }[]; units: UnitOption[] }) {
+  const customer = new Map(live.customers.map((c) => [c.id, c.name]));
+  const property = new Map(live.properties.map((p) => [p.id, p.name]));
+  const groups = new Map<string, UnitOption[]>();
+  for (const u of live.units) groups.set(u.propertyId, [...(groups.get(u.propertyId) ?? []), u]);
+  return [...groups].map(([key, units]) => ({ key, units, label: [customer.get(units[0]?.customerId ?? ""), property.get(key)].filter(Boolean).join(" › ") }))
+    .toSorted((a, b) => a.label.localeCompare(b.label)); // a customer's properties together
+}
+
 export function AutomationView({ live }: Readonly<{ live: Live }>) {
   const t = useT();
   const nav = useUrlPatch();
@@ -52,6 +62,11 @@ export function AutomationView({ live }: Readonly<{ live: Live }>) {
     setTried(false);
   }
   const set = (patch: Partial<AutoDraft>) => { setD((x) => ({ ...x, ...patch })); };
+  // a unit in or out of the policy, with its simulation fact
+  const toggleUnit = (id: string, on: boolean) => {
+    set({ unitIds: on ? [...d.unitIds, id] : d.unitIds.filter((x) => x !== id) });
+    setFacts((f) => (on ? [...f, { unitId: id, value: "", quality: "valid" }] : f.filter((x) => x.unitId !== id)));
+  };
   const targets = live.units.filter((u) => d.unitIds.includes(u.id));
   const range = commonRange(targets);
   const errors = autoErrors(d, range, t);
@@ -112,7 +127,13 @@ export function AutomationView({ live }: Readonly<{ live: Live }>) {
               </section>
               <section>
                 <h3 className="mb-1 text-[13px] font-bold">{t("Units")}</h3>
-                <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-[13px]">{live.units.map((u) => <Check key={u.id} label={u.name} checked={d.unitIds.includes(u.id)} onChange={(on) => { set({ unitIds: on ? [...d.unitIds, u.id] : d.unitIds.filter((x) => x !== u.id) }); setFacts((f) => (on ? [...f, { unitId: u.id, value: "", quality: "valid" }] : f.filter((x) => x.unitId !== u.id))); }} />)}</div>
+                {/* under their customer › property: one flat run mixed the customers' units */}
+                <div className="flex flex-col gap-3">{unitGroups(live).map((g) => (
+                  <fieldset key={g.key}>
+                    <legend className="mb-1 text-[11px] font-semibold text-muted-foreground">{g.label}</legend>
+                    <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-[13px]">{g.units.map((u) => <Check key={u.id} label={u.name} checked={d.unitIds.includes(u.id)} onChange={(on) => { toggleUnit(u.id, on); }} />)}</div>
+                  </fieldset>
+                ))}</div>
                 {fieldError("unitIds") && <p className="mt-1 text-xs text-crit">{fieldError("unitIds")}</p>}
               </section>
               <section>
