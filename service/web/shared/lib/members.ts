@@ -102,8 +102,13 @@ export function memberRows(ms: ApiMember[], orgs: ApiOrganization[], now: Date, 
       label: `${roleWord(m.role, m.employment, t)} · ${orgName}`,
       m,
     };
-  });
+  }).toSorted((a, b) => standing(a) - standing(b)); // the people who can work now first, ended and revoked access below
 }
+/** The list order of a membership row: active 0, inactive 1, revoked 2 (a stable sort keeps the list's order inside each). */
+const standing = (r: { active: boolean; revoked: boolean }): number => {
+  if (r.active) return 0;
+  return r.revoked ? 2 : 1;
+};
 
 export interface MemberDraft {
   userId: string; organizationId: string; role: Role; employment: "internal" | "external"; permissions: string[]; scopes: ScopeRef[]; validFrom: string; validUntil: string; reason: string;
