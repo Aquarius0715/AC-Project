@@ -9,7 +9,7 @@ import { coreAll, coreDisplay, coreNow, coreOp, orWhenRefused } from "@ac/web/li
 import { i18nOf } from "@ac/web/lib/i18n";
 import type { ApiAlert } from "@ac/web/lib/alerts";
 import { klDay } from "@ac/web/lib/partnerOverview";
-import { alertRows, dayTimeline, kpis, reportRows, SORTS, sortOf, TABS, tabOf, techRow, type ApiTechCounts, type ApiTechJobRow, type TechJobRow } from "@ac/web/lib/techOverview";
+import { alertRows, currentJobOfUnit, dayTimeline, kpis, reportRows, SORTS, sortOf, TABS, tabOf, techRow, type ApiTechCounts, type ApiTechJobRow, type TechJobRow } from "@ac/web/lib/techOverview";
 
 const optional = orWhenRefused;
 // the alerts the overview lists: every one not resolved yet
@@ -34,8 +34,7 @@ export async function loadOverview(sp: { tab?: string; sort?: string }) {
   ]);
   const names = new Map(units.map((u) => [u.id, u.displayName]));
   const rows = jobs.map((j) => techRow(j, nowMs, names, i)).filter((r): r is TechJobRow => !!r);
-  const jobOfUnit = new Map<string, string>();
-  for (const j of jobs) if (j.projection === "summary" && !jobOfUnit.has(j.unitId)) jobOfUnit.set(j.unitId, j.id);
+  const jobOfUnit = currentJobOfUnit(jobs);
   const today = rows.filter((r) => r.today);
   const klToday = new Date(nowMs + 8 * 3_600_000).toISOString().slice(0, 10);
   return {
