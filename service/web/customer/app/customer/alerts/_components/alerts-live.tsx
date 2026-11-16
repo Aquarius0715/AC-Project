@@ -50,7 +50,7 @@ export function AlertsLiveView({ live }: Readonly<{ live: AlertsLive }>) {
   const renderActions = (a: InboxAlert) => (
     <>
       <Link href={`/customer/units/${a.unitId}`} className="rounded-control bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary">{t("View unit")}</Link>
-      {a.type === "maintenance" && a.status.state !== "resolved" && <Link href="/customer/maintenance?tab=filter-care" className="rounded-control bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary">{t("Book cleaning")}</Link>}
+      {a.type === "maintenance" && a.status.state !== "resolved" && <Link href={`/customer/maintenance?tab=filter-care&unitId=${a.unitId}`} className="rounded-control bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary">{t("Book cleaning")}</Link>}
       {a.cause === "quality" && a.status.state !== "resolved" && <Link href="/customer/air-quality" className="rounded-control bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary">{t("Air quality")}</Link>}
       {a.cause === "fault" && a.group === "attn" && <Link href={`/customer/maintenance?new=${a.unitId}`} className="rounded-control bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary">{t("Request repair")}</Link>}
     </>
