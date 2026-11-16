@@ -3,7 +3,7 @@
 // card and the device event rows with their alerts and response notes. Pure code shared by the Server Components and
 // the client view; Vitest covers it. Texts in the display language (`i` / `t`, IR287); instants in the user's display
 // time zone (IR44). Event types, evidence sources and versions stay codes, as in Figma.
-import { EN, relativeTime, showClock, showTime, translator, type I18n, type T, textOf } from "@ac/web/lib/i18n";
+import { EN, relativeTime, showClock, showRecent, showTime, translator, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import type { ApiCalibration, ApiDevice, ApiDeviceDetail, ApiDeviceOperation, Connection, Metric } from "@ac/web/lib/devices";
 import { metricLabel } from "@ac/web/lib/adminAlerts";
 import { lookup } from "@ac/web/lib/lookup";
@@ -120,7 +120,8 @@ const UNKNOWN_POWER = { text: "Unknown", dot: "muted" } as const;
 const POWER = new Map<string, { text: string; dot: "crit" | "primary" | "muted" }>([["on", { text: "ON", dot: "primary" }], ["off", { text: "Lost", dot: "crit" }]]);
 export function deviceTiles(d: ApiDeviceDetail, newer: string | null, now: number, faults: OpenFaults = {}, i: I18n = EN) {
   const { t, display } = i;
-  const clock = (iso: string) => showClock(iso, display);
+  // a fault of another day keeps its date: “lost 10:47 am” days ago is not today (UI/UX loop R68)
+  const clock = (iso: string) => showRecent(iso, now, display);
   const conn = d.connection;
   const lost = conn !== "online" && faults.connection ? t("lost {time}", { time: clock(faults.connection) }) : t("last seen {time}", { time: ago(d.lastSeenAt, now, t) });
   const power = POWER.get(d.powerSignal) ?? UNKNOWN_POWER;
