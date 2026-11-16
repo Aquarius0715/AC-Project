@@ -125,7 +125,8 @@ export function summaryView(s: ApiEnergySummary, i: I18n = EN): SummaryView {
       [tr("Emission factor"), f ? `${f.region} ${String(f.year)} v${String(f.version)} · ${String(f.kgCO2ePerKWh)} kgCO₂e/kWh · ${f.source}` : tr("missing")],
       [tr("Tariff"), s.tariffVersion], [tr("Coverage"), s.coverage === null ? "—" : tr("{pct}% of expected readings", { pct: coveragePct(s.coverage) })],
     ],
-    warnings: s.qualityWarnings.map((w) => warning(w, tr)),
+    // no valid reading at all is not "partial": say so rather than "some readings are missing" (UI/UX loop R90)
+    warnings: s.qualityWarnings.map((w) => (w === "partial_coverage" && t.kWh === null ? tr("No valid readings in this period — every expected reading is missing or invalid") : warning(w, tr))),
   };
 }
 
