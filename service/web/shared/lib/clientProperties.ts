@@ -42,6 +42,8 @@ panel starts with every setting kept, so nothing is sent that the user did not c
 export interface GroupChange { power: boolean | null; celsius: number | null; mode: Mode | null; fan: Fan | null }
 /** Nothing kept back: the change the panel starts from. */
 export const KEEP_ALL: GroupChange = { power: null, celsius: null, mode: null, fan: null };
+/** Power off and nothing else: the change of “Turn off running ACs” (IR798). */
+export const TURN_OFF: GroupChange = { ...KEEP_ALL, power: false };
 /** The user chose at least one setting to send. */
 export const hasChoice = (ch: GroupChange): boolean => ch.power !== null || ch.celsius !== null || ch.mode !== null || ch.fan !== null;
 /** `result` is the plan's outcome (its English word, also the dictionary key); change and note are in the display language. */

@@ -360,6 +360,7 @@ Design: [DD-C13](../02-design/client.md#dd-c13-details). Assess parent AT-C13 us
 - **Business rule BR-C14**: Each selected AC gets its own `commands.create` with the same FR-C03 validation and confirmation; there is no batch command. Offline ACs and ACs whose restriction would clamp the value are listed as Skipped or with the clamped value before sending. Members see Single AC only.
 - **Resulting business state**: One Command per sent AC; each card shows Sending → Confirmed/Failed independently; failed ACs can be retried one by one.
 - **Boundaries/prohibitions**: Selections across rooms/areas, member sessions, and zero online ACs are rejected before sending. Automations (FR-C04) remain the way to schedule changes.
+- **Turn off running ACs (IR798)**: the one exception to one space. On the Running list (Overview › Running › View running units, `/customer/properties?powerState=on`), an owner can choose “Turn off running ACs…”: every running online AC of all properties is selected, the owner unticks those that should keep running, and Review & turn off lists each AC before sending. Power off is the only change, so no setting of a room can mix with another; each AC still gets its own command and confirmation (BR-C14). ACs confirmed off leave the re-read list, and the panel says how many were turned off.
 
 | Acceptance ID | Given / When | Then (observable result) |
 |---|---|---|

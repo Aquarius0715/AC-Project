@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { changeText, groupPlan, hasChoice, KEEP_ALL, roomUnits, type GroupChange } from "@ac/web/lib/clientProperties";
+import { changeText, groupPlan, hasChoice, KEEP_ALL, roomUnits, TURN_OFF, type GroupChange } from "@ac/web/lib/clientProperties";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
 import type { ApiUnitDetail } from "@ac/web/lib/units";
 
@@ -69,5 +69,16 @@ describe("units & locations: the room list and group control (FR-C02, FR-C14, IR
     expect(plan.map((r) => [r.id, r.change, r.actions.map((a) => a.kind)])).toStrictEqual([["dry", "26 → 24 °C", ["set_temperature"]], ["offac", "26 → 24 °C", ["set_temperature"]]]);
     expect(groupPlan([dry], KEEP_ALL).map((r) => r.result)).toStrictEqual(["No change"]);
     expect(groupPlan([dry], { ...KEEP_ALL, power: false, celsius: 20 }).map((r) => r.actions)).toStrictEqual([[{ kind: "set_power", power: false }]]);
+  });
+
+  // IR798: “Turn off running ACs” sends power off and nothing else; an AC already off has nothing to send
+  it("turns running ACs off with power off only", () => {
+    const on = unit("on", { observedState: { power: true, celsius: 24, mode: "cool", fanLevel: "mid", observedAt: null } });
+    const off = unit("off", { observedState: { power: false, celsius: 24, mode: "cool", fanLevel: "mid", observedAt: null } });
+    expect([hasChoice(TURN_OFF), changeText(TURN_OFF)]).toStrictEqual([true, "Power Off"]);
+    expect(groupPlan([on, off], TURN_OFF).map((r) => [r.id, r.result, r.actions])).toStrictEqual([
+      ["on", "Will send", [{ kind: "set_power", power: false }]],
+      ["off", "No change", []],
+    ]);
   });
 });
