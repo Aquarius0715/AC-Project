@@ -3521,7 +3521,6 @@ export const ms: Record<string, string> = {
   "{period} — clear the requested-time period": "{period} — kosongkan tempoh masa yang diminta",
   "Jobs · all customers": "Kerja · semua pelanggan",
   "Change the scope or the filters.": "Tukar skop atau penapis.",
-  "!! Overdue": "!! Tertunggak",
   "Showing {n} of {total}.": "Menunjukkan {n} daripada {total}.",
   "That job no longer exists in your scope.": "Kerja itu tidak lagi wujud dalam skop anda.",
   "Pick a job.": "Pilih kerja.",
