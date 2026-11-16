@@ -123,7 +123,9 @@ export function TechDevicesView({ live }: Readonly<{ live: TechDevicesLive }>) {
           </Plain>
         ))}</div>
         <div className="flex flex-wrap items-center gap-2"><div className="w-64"><Search placeholder={t("Search serial, device or unit…")} value={q} onChange={setQ} /></div>
-          {live.canMaintain && <Btn variant="primary" disabled={live.register.length === 0} title={live.register.length > 0 ? undefined : t("Every assigned unit already has a device")} onClick={() => { setReg(blankRegistration(live.register)); setErrors({}); setModal("register"); }}><Icon name="add" /> {t("Register device")}</Btn>}</div>
+          {live.canMaintain && <Btn variant="primary" disabled={live.register.length === 0} onClick={() => { setReg(blankRegistration(live.register)); setErrors({}); setModal("register"); }}><Icon name="add" /> {t("Register device")}</Btn>}
+          {/* why it is off, in words beside it: a tooltip never shows on a touch screen or on a disabled button (UI/UX loop R117) */}
+          {live.canMaintain && live.register.length === 0 && <span className="text-[11px] text-muted-foreground">{t("Every assigned unit already has a device")}</span>}</div>
       </div>
       {refused && <Banner tone="crit">{refused}</Banner>}
       <div className="split-rev">
