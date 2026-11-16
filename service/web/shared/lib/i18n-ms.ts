@@ -2714,6 +2714,7 @@ export const ms: Record<string, string> = {
   "Not started": "Belum dimulakan",
   "past the due date": "melepasi tarikh akhir",
   "No overdue jobs": "Tiada kerja tertunggak",
+  "No jobs waiting to start": "Tiada kerja menunggu untuk dimulakan",
   "unit": "unit",
   "open": "terbuka",
   "acknowledged": "diakui",

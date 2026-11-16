@@ -83,6 +83,8 @@ describe("technician overview", () => {
     expect(kpis({ total: 2, scheduledCount: 0, inProgressCount: 0, overdueCount: 0, assignedCount: 2 }, [later], translator("ms")).map((k) => [k.label, k.sub])).toStrictEqual([
       ["Unit yang ditugaskan", "dalam tugasan anda"], ["Belum dimulakan", "job-1-aa"], ["Tertunggak", "Tiada kerja tertunggak"],
     ]);
+    // no job waiting: the tile says so in words, as Overdue does, instead of a bare dash (UI/UX loop R124)
+    expect(kpis({ total: 0, scheduledCount: 0, inProgressCount: 0, overdueCount: 0, assignedCount: 0 }, [], translator("ms"))[1]?.sub).toBe("Tiada kerja menunggu untuk dimulakan");
     expect(reportRows([techRowOf(row({ status: "submitted" }), NOW, units, MS)], translator("ms"))).toStrictEqual([{ id: "job-1-aaaa", title: "job-1-aa · Bedroom AC", sub: "menunggu semakan kualiti · baca sahaja", badge: { text: "Dihantar", tone: "primary" } }]);
   });
 });
