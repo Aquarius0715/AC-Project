@@ -125,7 +125,8 @@ export function adminAlertRows(alerts: ApiAdminAlert[], units: ApiUnitName[], cu
         id: a.id, version: a.version, title: alertTitle(a, t), time: when(a.detectedAt), sev: a.severity,
         meta: `${customer} · ${u?.displayName ?? a.unitId} · ${pol}`, state: a.status, st: t(stLabel[a.status]),
         unitId: a.unitId, customerId: (u && custIdByOrg.get(u.customerOrgId)) ?? null, policyless: !a.policyId, inferred: a.evidenceKind === "inferred",
-        unit: `${u?.displayName ?? t("Unit")} · ${a.unitId}`, context: customer,
+        // the unit's short ID, as every other list and detail shows IDs; the full UUID only made the row noisy (UI/UX loop R99)
+        unit: `${u?.displayName ?? t("Unit")} · ${a.unitId.slice(0, 8)}`, context: customer,
         evidence: `${textOf(evidenceKind, a.evidenceKind, t) ?? a.evidenceKind} — “${evidenceText(a.evidenceText, t)}”`,
         cause: a.causeCode === "unknown" ? t("not determined") : t("{cause} (suspected)", { cause: a.causeCode }),
         observed: showTime(a.observedAt, display), detected: showTime(a.detectedAt, display),
