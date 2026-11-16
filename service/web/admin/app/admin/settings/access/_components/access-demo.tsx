@@ -72,8 +72,9 @@ export function AccessDemo() {
               <h3 className="mb-2 text-[13px] font-bold">Identity & role</h3>
               <p className="mb-2 text-xs text-muted-foreground">Choosing a role only pre-checks its typical permissions; every permission below stays editable.</p>
               <div className="grid-fluid" style={{ ["--min"as string]: "220px" }}>
-                <Field label="Organization"><Select defaultValue={current?.org}><option>HQ (tenant)</option><option>contractor-a</option></Select></Field>
-                <Field label="Person (email)"><Input defaultValue={current?.email ?? ""} placeholder="name@example.com" /></Field>
+                {/* keyed by the person: uncontrolled fields start again from each pick (R843) */}
+                <Field label="Organization"><Select key={current?.id ?? "new"} defaultValue={current?.org}><option>HQ (tenant)</option><option>contractor-a</option></Select></Field>
+                <Field label="Person (email)"><Input key={current?.id ?? "new"} defaultValue={current?.email ?? ""} placeholder="name@example.com" /></Field>
               </div>
               <div className="mt-3"><div className="mb-1 text-xs font-semibold">Role</div><Choice value={role} onChange={choose} options={[{ id: "admin", label: "Admin" }, { id: CONTRACTOR, label: "Contractor" }, { id: TECHNICIAN, label: "Technician" }]} /><p className="mt-1 text-[11px] text-muted-foreground">Client role is not offered here (Customers & units › Users).</p></div>
             </section>
