@@ -38,6 +38,7 @@ MIGRATIONS=service/api/internal/migrations
 LIVE=deploy/test/compose.live.yaml # this environment's data (DEC-96); a tag before it has none
 LEFT_OUT=mock-fleet                # the profile compose.live.yaml moves the mock fleet's services to
 MULTIHOST=deploy/test/compose.multihost.yaml # more than one address (IR651); a tag before it has none
+STRIPE=stripe                      # the profile of the Stripe CLI, which forwards test-mode webhooks to the gateway
 
 log() { printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"; }
 
@@ -61,13 +62,32 @@ issuers() {
   printf '%s' "$list"
 }
 
+# Stripe test mode (DEC-68, IR828): on when the environment file sets STRIPE_SECRET_KEY. The lab server is not reachable
+# from the internet, so Stripe's events come through the Stripe CLI of the stripe profile, which forwards them to the
+# gateway; the billing service then talks to api.stripe.com, and the customer app's Pay opens Stripe Checkout, unless
+# the file sets STRIPE_API_BASE or PAYMENT_PROVIDER itself.
+stripe_on() { [ -n "$(setting STRIPE_SECRET_KEY)" ]; }
+
+# a key without its webhook secret would take payments nothing confirms: billing refuses to start, so say why first
+stripe_settings() {
+  if stripe_on && [ -z "$(setting STRIPE_WEBHOOK_SECRET)" ]; then
+    log "STRIPE_SECRET_KEY is set without STRIPE_WEBHOOK_SECRET: take it from the Stripe CLI (listen --print-secret)"
+    return 1
+  fi
+}
+
 # compose for the tag $1, on the tree, with this environment's data on the real clock. When the environment file lists
 # PUBLIC_HOSTS the stack answers on each of those addresses (IR651): Keycloak takes its host from the request behind an
 # nginx that checks it, and the APIs accept the tokens of a sign-in on any of those addresses.
 compose() {
   local tag=$1 files=(-f "$REPO/compose.yaml" -f "$REPO/deploy/test/compose.test.yaml")
-  local env=(IMAGE_TAG="$tag" DEMO_CLOCK_START=now)
+  local env=(IMAGE_TAG="$tag" DEMO_CLOCK_START=now) profiles=(--profile full --profile iot)
   shift
+  if stripe_on; then
+    profiles+=(--profile "$STRIPE")
+    [ -n "$(setting STRIPE_API_BASE)" ] || env+=(STRIPE_API_BASE=https://api.stripe.com)
+    [ -n "$(setting PAYMENT_PROVIDER)" ] || env+=(PAYMENT_PROVIDER=stripe)
+  fi
   if [ -f "$REPO/$LIVE" ]; then
     files+=(-f "$REPO/$LIVE")
   fi
@@ -76,7 +96,7 @@ compose() {
     env+=(API_OIDC_ISSUER="$(issuers)")
   fi
   env "${env[@]}" docker compose -p "$PROJECT" --progress plain --env-file "$SETTINGS" \
-    "${files[@]}" --profile full --profile iot "$@"
+    "${files[@]}" "${profiles[@]}" "$@"
 }
 
 checkout() { git -C "$REPO" checkout --quiet --force --detach "refs/tags/$1"; }
@@ -149,11 +169,11 @@ prepare() {
   return "$result"
 }
 
-# removes the containers of the services this environment leaves out (the mock fleet's): compose keeps a container
-# whose service left the active profiles, even when it removes orphans
+# removes the containers of the services this environment leaves out (the mock fleet's, and the Stripe CLI when Stripe
+# is off): compose keeps a container whose service left the active profiles, even when it removes orphans
 leave_out() {
   local tag=$1 all active service out=()
-  all=$(compose "$tag" --profile "$LEFT_OUT" config --services) || return 1
+  all=$(compose "$tag" --profile "$LEFT_OUT" --profile "$STRIPE" config --services) || return 1
   active=$(compose "$tag" config --services) || return 1
   for service in $all; do
     grep -qxF "$service" <<<"$active" || out+=("$service")
@@ -167,6 +187,7 @@ leave_out() {
 deploy() {
   local tag=$1 fresh=$2
   step "checking out $tag"
+  stripe_settings || return 1
   checkout "$tag" || return 1
   step "writing the realm and the broker logins"
   prepare || return 1
