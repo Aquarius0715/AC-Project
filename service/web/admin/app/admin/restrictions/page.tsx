@@ -6,6 +6,7 @@
 // active restriction and the active clients per customer (IR05). Override-only callers (IR03) see the release
 // projection without billing fields. Writes are Server Actions (actions.ts). Texts in the display language; the times
 // of the first render are formatted here, in the display time zone (IR282, IR301). The Phase 1A demo keeps the fixtures.
+import { planWord } from "@ac/web/lib/billing";
 import { connection } from "next/server";
 import { apiMode, coreAll, coreDisplay, coreNow, coreOp, corePermissions, coreAllPage } from "@ac/web/lib/dal";
 import type { ApiContract, ApiCustomer, ApiInvoice } from "@ac/web/lib/billing";
@@ -53,7 +54,7 @@ export default async function AdminRestrictionsPage({ searchParams }: Readonly<P
   const contractLabel = (id?: string) => {
     const k = contracts.items.find((c) => c.id === id);
     if (!k) return t(isFull ? "contract" : "release view");
-    return `${customerName.get(k.customerId) ?? t("customer")} · ${t("{plan} contract v{version}", { plan: k.planType, version: k.version })}`;
+    return `${customerName.get(k.customerId) ?? t("customer")} · ${t("{plan} contract v{version}", { plan: planWord(k.planType, t), version: k.version })}`;
   };
   const rows = restrictionRows(scoped.items, contractLabel, i);
   const counts: Record<RestrictionState, number> = { scheduled: countOf("scheduled"), requested: countOf("requested"), applied: countOf("applied"), release_requested: countOf("release_requested"), released: countOf("released"), cancelled: countOf("cancelled") };
