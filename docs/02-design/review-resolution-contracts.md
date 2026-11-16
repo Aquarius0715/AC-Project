@@ -10724,6 +10724,14 @@ Found in the UI/UX loop (UX-62, criterion 12; noted in UX-50). Opening Energy & 
 2. **Note.** The Units row then reads "Showing the AC that used the most in this period · up to 4 units".
 3. **Docs.** DD-C06 step 6.
 
+## IR816 On a phone, the Overview says the most severe open alert first — 2026-11-16
+
+Found in the UI/UX loop (UX-64; noted in UX-47). On a phone the customer Overview stacks the KPI tiles one per row. The Needs attention tile is the fourth, about two screens down, under Running, Stopped and Unknown, so an open warning was not on the first screen.
+
+1. **Banner.** Below the `sm` breakpoint, a warning banner under the overdue notice names the most severe open alert from `attentionCard`: its title, unit and when, with "+n more" when there are others and View alerts. With no open warning or fault there is no banner.
+2. **Wider screens.** No change: the tile is in the first row there.
+3. **Docs.** DD-C01.
+
 ## IR817 "Already signed in as another user" says what to do — 2026-11-16
 
 Found in the UI/UX loop (UX-66; seen in UX-54 and UX-63). Signing in to one app while this browser's identity-provider session belongs to another user ended on Keycloak's "You are already authenticated as different user 'customer-a' in this session. Please sign out first." It was a dead end, with no hint where to sign out.

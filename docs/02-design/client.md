@@ -87,6 +87,7 @@ Scope: FR-C01 / Main display pattern: **UI-OVERVIEW**. Service boundary: `units.
    - Show total energy for the period and current power at the latest observation time.
    - As built (IR610, DEC-90): while an invoice is overdue, a notice above the tiles names it — or how many are overdue and their total — with Pay now (or View invoices). It also names the restriction the invoice caused and on how many units, with View restriction details, the restriction's own detail as the unit page links it (IR583). A scheduled restriction says when it starts. The notice reads `invoices.list` (overdue), `contracts.list` and `restrictions.forInvoice`, as the payments page does. A member without billing access, or a customer with nothing overdue, sees no notice (Figma Client 01c).
 3. Viewing does not change business state. Keep filters in the URL and restore them on Back.
+   - As built (IR816): on a phone (below `sm`), the most severe open warning or fault is a banner under the overdue notice, with its unit and time, “+n more” and View alerts. On a phone the Needs attention tile is the fourth card, two screens down. Wider screens keep the tile in the first row and show no banner.
 4. Queries to update: `units / telemetry / alerts (only on subscribed events)`.
 
 **Boundary cases and failures**: If one unit cannot be measured, count it as unknown rather than normal. Do not include another customer's unit in summaries even if its ID is supplied as a filter.
