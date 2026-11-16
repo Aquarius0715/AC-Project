@@ -880,7 +880,9 @@ function WarrantyTab({ live }: Readonly<{ live: UnitsLive }>) {
       <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}>
         <Kpi label={t("Under warranty")} value={k.underWarranty} sub={t("of {units}", { units: units(t, k.total) })} />
         <Kpi label={t("Warranty ends ≤ 90 days")} value={k.within90} tone={k.within90 ? "warn" : undefined} sub={t("{n} within 30 days", { n: k.within30 })} />
-        <Kpi label={t("Out of warranty, no contract")} value={k.noCoverage} tone={k.noCoverage ? "crit" : undefined} sub={t("Offer maintenance")} />
+        {/* the tile's call to act lists its units, where each row has Renewal offer (UI/UX loop R101) */}
+        <Kpi label={t("Out of warranty, no contract")} value={k.noCoverage} tone={k.noCoverage ? "crit" : undefined}
+          sub={k.noCoverage > 0 ? <Plain type="button" touch className="text-xs font-semibold text-primary hover:underline" aria-pressed={f.coverage === "no_coverage"} onClick={() => { setF({ ...f, coverage: f.coverage === "no_coverage" ? "" : "no_coverage" }); }}>{t(f.coverage === "no_coverage" ? "Clear filter" : "Offer maintenance")}</Plain> : t("Offer maintenance")} />
         <Kpi label={t(MAINTENANCE_CONTRACT)} value={k.contract} sub={k.contractNames} />
       </div>
       <Card title={t("Units by coverage end")} sub={t("{n} of {total}", { n: rows.length, total: w.rows.length })} action={<Btn size="sm" disabled={rows.length === 0} onClick={() => { download("warranty-coverage.csv", coverageCsv(rows)); }}>{t("Export CSV")}</Btn>}>
