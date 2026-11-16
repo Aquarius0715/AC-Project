@@ -48,6 +48,7 @@ export const ja: Record<string, string> = {
   "Your role can’t open this": "このロールでは開けません",
   "Main menu": "メインメニュー",
   "Account and settings": "アカウントと設定",
+  "Loading": "読み込み中",
   "Sign out": "ログアウト",
   "Open menu": "メニューを開く",
   "Menu": "メニュー",

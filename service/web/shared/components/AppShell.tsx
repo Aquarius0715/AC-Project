@@ -12,6 +12,7 @@ import { QrScan } from "./QrScan";
 import { CURRENT_CLIENT } from "@ac/web/lib/clientUsers";
 import { setStoredValue, useStoredValue } from "@ac/web/lib/urlState";
 import { DEFAULT_DISPLAY, isLocale, LOCALE_KEY, translate, type Display } from "@ac/web/lib/i18n";
+import { useNavPending } from "@ac/web/lib/navPending";
 import { I18nProvider, useT } from "./I18n";
 import { useBffSession } from "@ac/web/lib/useOp";
 import { Sheet, SheetContent } from "@ac/web/components/ui/sheet";
@@ -85,6 +86,7 @@ export function AppShell({ appRole: forced, live, children }: Readonly<{ appRole
     return badge ? String(badge) : undefined;
   };
   const pathname = usePathname();
+  const isNavPending = useNavPending();
   const session = useBffSession();
   // API mode is the layout's `live` (IR241), known on the first render, or a session that says so (the shared pages pass
   // no `live` without a session); the session read in the browser is null until it answers and the mock session when it
@@ -168,7 +170,9 @@ export function AppShell({ appRole: forced, live, children }: Readonly<{ appRole
               <span className="inline-flex items-center gap-1.5 rounded-control bg-surface2 px-3 py-1.5 text-xs font-semibold"><Icon name="account" /> <span className="max-sm:hidden">{chip}</span><span className="sm:hidden">{chip.split(" — ", 1)[0]}</span></span>
             </div>
           </header>
-          <main id="main" tabIndex={-1} className="min-w-0 flex-1 px-4 py-5 outline-none sm:px-6 lg:px-8">{children}</main>
+          {/* a filter, tab or selection change waits for the server's render: a thin line says it is on its way (UI/UX loop R76) */}
+          {isNavPending && <div role="progressbar" aria-label={t("Loading")} className="pointer-events-none fixed inset-x-0 top-0 z-50 h-0.5 animate-pulse bg-primary" />}
+          <main id="main" tabIndex={-1} aria-busy={isNavPending} className="min-w-0 flex-1 px-4 py-5 outline-none sm:px-6 lg:px-8">{children}</main>
         </div>
       </div>
       {role === "technician" && isApiMode && <QrScan open={qr} onClose={() => { setQr(false); }} />}

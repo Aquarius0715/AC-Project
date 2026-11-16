@@ -52,6 +52,7 @@ export const ms: Record<string, string> = {
   "Your role can’t open this": "Peranan anda tidak boleh membuka ini",
   "Main menu": "Menu utama",
   "Account and settings": "Akaun dan tetapan",
+  "Loading": "Memuatkan",
   "Sign out": "Log keluar",
   "Open menu": "Buka menu",
   "Menu": "Menu",

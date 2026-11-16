@@ -48,6 +48,7 @@ export const id: Record<string, string> = {
   "Your role can’t open this": "Peran Anda tidak dapat membuka ini",
   "Main menu": "Menu utama",
   "Account and settings": "Akun dan pengaturan",
+  "Loading": "Memuat",
   "Sign out": "Keluar",
   "Open menu": "Buka menu",
   "Menu": "Menu",
