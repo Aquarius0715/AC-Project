@@ -10674,3 +10674,11 @@ Found in the UI/UX loop (UX-50: "which AC should I review?"). Energy & cost show
 1. **Ranking.** For the period, the page also runs one `energy.summary` per unit of the customer. `topUsers` (shared/lib/clientEnergy.ts) keeps the five highest and leaves out units without measured energy. Ties go by name. Each unit's share is of the measured total.
 2. **Card.** "Highest use in this period" lists the AC, its kWh, its share of measured and its data coverage, in warning colour under 80%. A note says low coverage means the AC may have used more than shown. Show selects that AC alone. Compare adds it, up to four, and is hidden when the AC is already shown or four are chosen. The card is hidden with fewer than two ranked ACs.
 3. **Docs and tests.** DD-C06 step 5. `energy.test.ts` checks the order, the shares and leaving out units without measured use.
+
+## IR805 A narrow list card names each value — 2026-11-16
+
+Found in the UI/UX loop (UX-52, a contractor coordinator on a phone). Below a breakpoint, the partner Jobs list and the customer Overview's unit list hide their column headings. Each row becomes a card, and the values stand without them. The partner card read "—  history only / —  access closed". The customer row read "— no data" three times, with no sign of which was temperature, humidity or power.
+
+1. **Partner Jobs list.** Below `@3xl`, the Technician and Slot / deadline values carry their heading above them, the same words as the hidden column headings.
+2. **Customer Overview.** Below `lg`, the three readings carry Room temp, Humidity and Power now.
+3. **Wide screens** are unchanged: the labels hide where the headings show. These were the only two lists of the four apps that hide headings this way (searched for `hidden grid-cols-[` headings).
