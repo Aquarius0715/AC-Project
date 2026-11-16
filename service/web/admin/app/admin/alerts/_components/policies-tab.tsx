@@ -276,7 +276,7 @@ function PolicyEditorCard({ draft, p, isNew, errors, tried, canWrite, demo, set,
           title={<span className="inline-flex flex-wrap items-center gap-2">{draft.name.trim() || t(NEW_ALERT_POLICY)}<Badge tone={isNew ? "warn" : "muted"}>{isNew ? t("Not saved") : t("Policy v{n}", { n: draft.version })}</Badge></span>}
           sub={[isNew ? t("new") : draft.id, draft.customerName, draft.madeBy && t("made by {name}", { name: draft.madeBy })].filter(Boolean).join(" · ")}
           action={<div className="flex items-center gap-2 text-xs font-semibold"><span aria-hidden>{t("Enabled")}</span><Toggle on={draft.on} onChange={(v) => { set("on", v); }} label={t("Enabled")} disabled={!canWrite} /></div>}>
-          {!canWrite && <div className="mb-3"><Banner>{t("You can read this policy. Changing it needs alert.policy.write.")}</Banner></div>}
+          {!canWrite && <div className="mb-3"><Banner>{t("You can read this policy. Changing it needs “Edit alert policies”.")}</Banner></div>}
           <fieldset disabled={!canWrite} className="flex min-w-0 flex-col gap-5">
             <section><h3 className="mb-2 text-[13px] font-bold">{t("Basics")}</h3>
               <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}>

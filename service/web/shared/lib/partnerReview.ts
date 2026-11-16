@@ -159,7 +159,7 @@ export function availabilityText(av: ReviewAvailability, status: string, t: T = 
     }
     case "not_submitted": { return notSubmittedText(status, t);
     }
-    default: { return t("Reviewing needs the partner.review permission on this delegated job.");
+    default: { return t("Reviewing needs the “Review technician reports” permission on this delegated job.");
     }
   }
 }

@@ -161,7 +161,7 @@ export function AccessView({ live }: Readonly<{ live: Live }>) {
         ) : (
         <Card title={sel ? sel.name : t("New membership")} sub={sel ? t("{validity} · scope version {scope} · version {v}", { validity: sel.validity, scope: sel.m.scopeVersion, v: sel.version }) : t("For an existing user, or a new person whose account is created with it")}>
           <div className="flex flex-col gap-5">
-            {!live.canWrite && <Banner>{t("Read only — editing needs identity.write.")}</Banner>}
+            {!live.canWrite && <Banner>{t("Read only — editing needs “Edit users & roles”.")}</Banner>}
             {sel?.m.revokedAt && <Banner tone="warn">{t("Access revoked {date}: the sign-in is off, and their company or customer cannot extend or enable it again. Saving a later “Valid until” gives the access back and turns the sign-in on.", { date: showTime(sel.m.revokedAt, i.display) })}</Banner>}
             <section>
               <h3 className="mb-2 text-[13px] font-bold">{t("Identity & role")}</h3>
@@ -199,7 +199,7 @@ export function AccessView({ live }: Readonly<{ live: Live }>) {
                   <td className="pr-3">{r.write ? <Check label={<PermissionName code={r.write} />} checked={has(r.write)} disabled={blocked(r.write)} onChange={(v) => { setWrite(r, v); }} /> : <span className="text-muted-foreground">—</span>}</td>
                   <td><div className="flex flex-wrap gap-x-3 gap-y-2">{(r.actions ?? []).map((a) => <Check key={a} label={<PermissionName code={a} />} checked={has(a)} disabled={blocked(a)} onChange={(v) => { toggle(a, v); }} />)}{!r.actions && <span className="text-muted-foreground">—</span>}</div></td></tr>
               ))}</tbody></table></ScrollX>
-              <p className="mt-2 text-[11px] text-muted-foreground">{t("Write includes Read (Read is locked on while Write is on). Actions are independent of Read/Write — e.g. billing.write issues invoices but confirming payments needs billing.payment; mrv.write drafts reports but recording a review needs mrv.review and changing emission factors needs mrv.factors.")}{isSelf ? ` ${t("identity.write and restriction.override cannot be granted to yourself.")}` : ""}</p>
+              <p className="mt-2 text-[11px] text-muted-foreground">{t("Write includes Read (Read is locked on while Write is on). Actions are independent of Read/Write — e.g. “Edit billing” issues invoices but confirming payments needs “Confirm payments”; “Edit MRV reports” drafts reports but recording a review needs “Review MRV reports” and changing emission factors needs “Change emission factors”.")}{isSelf ? ` ${t("“Edit users & roles” and “Override restrictions” cannot be granted to yourself.")}` : ""}</p>
               {fieldError(PERMISSIONS) && <p className="mt-1 text-xs text-crit">{fieldError(PERMISSIONS)}</p>}
             </section>
             {live.canWrite && <>

@@ -238,7 +238,7 @@ test("the HQ overview in Malay keeps the period in Kuala Lumpur days", async ({ 
   // restrictions (IR301): this account holds no restriction permission, so the screen says so in Malay
   // (restrictions-language.e2e.ts opens them as the restriction manager)
   await page.goto("/admin/restrictions");
-  await expect(main).toContainText("Sekatan memerlukan restriction.read, restriction.write atau restriction.override.");
+  await expect(main).toContainText("memerlukan kebenaran “Lihat sekatan”") // the permission in words (IR821);
   // access & roles (IR302): the memberships, the selected one's valid period in GMT+9 and its form typed in Asia/Tokyo,
   // and the new-membership checks, which stop before any call
   await page.goto("/admin/settings/access");

@@ -18,15 +18,16 @@ test("a page the role may not read names the permission it needs", async ({ brow
   const page = await context.newPage();
   await signIn(page, app, "hq-override-only");
   const pages = [
-    ["/admin", "Overview", "dashboard.read"], ["/admin/units", "Customers & units", "asset.read"], ["/admin/settings/access", "Access & roles", "identity.read"],
-    ["/admin/devices", "Devices & models", "device.read"], ["/admin/alerts", "Alert policies", "alert.read"], ["/admin/jobs", "Maintenance jobs", "job.read"],
-    ["/admin/billing/contracts", "Contracts", "contract.read"], ["/admin/billing", "Billing", "billing.read"], ["/admin/settings/automation", "Automation policies", "automation.policy.read"],
-    ["/admin/energy", "Energy analysis", "energy.read"], ["/admin/mrv", "MRV", "mrv.read"], ["/admin/offsets", "Offsets", "offset.read"], ["/admin/audit", "Audit", "audit.read"],
+    // the permission in words (IR821)
+    ["/admin", "Overview", "View the dashboard"], ["/admin/units", "Customers & units", "View customers & units"], ["/admin/settings/access", "Access & roles", "View users & roles"],
+    ["/admin/devices", "Devices & models", "View devices & models"], ["/admin/alerts", "Alert policies", "View alerts"], ["/admin/jobs", "Maintenance jobs", "View maintenance jobs"],
+    ["/admin/billing/contracts", "Contracts", "View contracts"], ["/admin/billing", "Billing", "View billing"], ["/admin/settings/automation", "Automation policies", "View automation policies"],
+    ["/admin/energy", "Energy analysis", "View energy"], ["/admin/mrv", "MRV", "View MRV reports"], ["/admin/offsets", "Offsets", "View offsets"], ["/admin/audit", "Audit", "View the audit log"],
   ] as const;
   for (const [path, what, permission] of pages) {
     await page.goto(path);
     const main = page.getByRole("main");
-    await expect(main, path).toContainText(`To open ${what}, your role needs ${permission}.`);
+    await expect(main, path).toContainText(`To open ${what}, your role needs the “${permission}” permission.`);
     await expect(main.getByRole("button", { name: "Try again" })).toHaveCount(0);
   }
 });

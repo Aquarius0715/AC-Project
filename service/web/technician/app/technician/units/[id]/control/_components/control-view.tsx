@@ -39,7 +39,7 @@ export function ControlView({ live }: Readonly<{ live: ControlLive }>) {
     return () => { if (timer) clearInterval(timer); };
   }, [live.active, router]);
   const back = <div className="flex flex-wrap items-center gap-2 text-[13px]"><Link href={live.unitHref} className="font-semibold text-primary" aria-label={t("Back")}><Icon name="chevronLeft" /></Link><h1 className="text-base font-bold">{t("Diagnostic control")}</h1><span className="text-muted-foreground">· {live.unit.name}</span></div>;
-  if (!live.canDiagnose) return <Page>{back}<EmptyState title={t("No diagnostic permission")}>{t("Diagnostic control needs control.diagnose on an assigned job. Ask HQ if you should have it.")}</EmptyState></Page>;
+  if (!live.canDiagnose) return <Page>{back}<EmptyState title={t("No diagnostic permission")}>{t("Diagnostic control needs “Run test runs” on an assigned job. Ask HQ if you should have it.")}</EmptyState></Page>;
   if (!live.job) return <Page>{back}<EmptyState title={t("Choose the job first")} action={<Link href={live.unitHref} className="text-xs font-semibold text-primary"><Icon name="arrowLeft" /> {t("Unit and its jobs")}</Link>}>{t("Diagnostic commands and test runs belong to a job you are assigned to, inside its work window — open diagnostic control from the unit or the job.")}</EmptyState></Page>;
   const job = live.job;
   const isBusy = live.active || !!live.unit.blocked;

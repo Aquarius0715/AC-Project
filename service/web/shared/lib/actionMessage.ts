@@ -37,7 +37,7 @@ const keyText: Record<string, string> = {
   "errors.last_owner": "The last active owner can’t be demoted, disabled or removed",
   "errors.last_contractor": "Your company keeps one active contractor — this one can’t be disabled or removed",
   // losing the permission, ending or starting later: the tenant keeps someone who can manage access (IR472)
-  "errors.last_identity_admin": "At least one active membership must keep identity.write — give it to another HQ membership first, then change this one",
+  "errors.last_identity_admin": "At least one active membership must keep “Edit users & roles” — give it to another HQ membership first, then change this one",
   "errors.access_expired": "This account’s access period has ended — set a new access end first",
   // HQ ended the access in Access & roles: no access end, enabling or role change brings it back (IR508)
   "errors.revoked_by_hq": "HQ ended this account's access — only HQ can give it back",
