@@ -19,10 +19,13 @@ import { orUnreachable } from "@ac/web/lib/unreachable";
 /** The customer alert inbox (FR-C08, DD-C08, Figma Client 06a/06b/06g) and the Alert policies tab (FR-C15, 06e/06f) from
 the Core API: filters in the URL, read state from the membership's notifications (opening an alert marks them read; the
 alert itself stays as it is). */
+const INFO_FIRST = 5;
 export function AlertsLiveView({ live }: Readonly<{ live: AlertsLive }>) {
   const t = useT();
   const patch = useUrlPatch();
   const [open, setOpen] = useState<InboxAlert | null>(null);
+  // reminders & info: the first few, the rest on request — 15 filter reminders pushed the rest of the page away (UI/UX loop R69)
+  const [isAllInfo, setIsAllInfo] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
   const [result, setResult] = useState<{ tone: "ok" | "warn" | "crit"; text: string } | null>(null);
   // opening the policy editor starts without the list's last message (adjust state during render, not in an effect)
@@ -37,6 +40,7 @@ export function AlertsLiveView({ live }: Readonly<{ live: AlertsLive }>) {
   const updated = showClock(live.now, live.display);
   const attn = live.rows.filter((a) => a.group === "attn");
   const info = live.rows.filter((a) => a.group === "info");
+  const shownInfo = isAllInfo ? info : info.slice(0, INFO_FIRST);
   const show = (a: InboxAlert) => {
     setOpen(a);
     // a read that gets no answer reads as unavailable (IR718)
@@ -84,7 +88,8 @@ export function AlertsLiveView({ live }: Readonly<{ live: AlertsLive }>) {
             {attn.length > 0 ? attn.map((a) => renderItem(a)) : <p className="text-xs text-muted-foreground">{t(live.unreadOnly || live.severity ? "Nothing in this filter." : "Nothing needs your attention.")}</p>}
           </Card>
           <Card title={t("Reminders & information")} sub={t("Maintenance reminders, inspection records, notices and resolved alerts")} action={<Badge tone="muted">{info.length}</Badge>}>
-            {info.length > 0 ? info.map((a) => renderItem(a)) : <p className="text-xs text-muted-foreground">{t("Nothing here.")}</p>}
+            {info.length > 0 ? shownInfo.map((a) => renderItem(a)) : <p className="text-xs text-muted-foreground">{t("Nothing here.")}</p>}
+            {info.length > INFO_FIRST && <Btn size="sm" variant="ghost" className="mt-2" aria-expanded={isAllInfo} onClick={() => { setIsAllInfo((v) => !v); }}>{t(isAllInfo ? "Show the first {n}" : "Show all {total}", { n: INFO_FIRST, total: info.length })}</Btn>}
           </Card>
         </>
       ) : (

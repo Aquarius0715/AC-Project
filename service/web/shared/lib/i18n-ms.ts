@@ -493,6 +493,8 @@ export const ms: Record<string, string> = {
   "Nothing in this filter.": "Tiada apa-apa dalam penapis ini.",
   "Reminders & information": "Peringatan & maklumat",
   "Maintenance reminders, inspection records, notices and resolved alerts": "Peringatan penyelenggaraan, rekod pemeriksaan, notis dan amaran yang telah diselesaikan",
+  "Show the first {n}": "Tunjukkan {n} yang pertama",
+  "Show all {total}": "Tunjukkan semua {total}",
   "Nothing here.": "Tiada apa-apa di sini.",
   "Back to list": "Kembali ke senarai",
   "Where": "Di mana",

@@ -465,6 +465,8 @@ export const ja: Record<string, string> = {
   "Nothing in this filter.": "このフィルターに該当するものはありません。",
   "Reminders & information": "リマインダーと情報",
   "Maintenance reminders, inspection records, notices and resolved alerts": "メンテナンスのお知らせ、点検記録、通知、解決済みのアラート",
+  "Show the first {n}": "最初の {n} 件だけ表示",
+  "Show all {total}": "すべて表示（{total} 件）",
   "Nothing here.": "ここには何もありません。",
   "Back to list": "一覧に戻る",
   "Where": "場所",
