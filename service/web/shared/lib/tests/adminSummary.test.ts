@@ -60,7 +60,7 @@ describe("HQ overview sections (DD-A01, IR244)", () => {
     expect(a.connection.map((r) => r.count)).toStrictEqual([5, 0, 0]);
     expect(a.rateNote).toMatch(/= 2 ÷ 4 = 50\.0%/);
     const jobs = jobRows(s.jobCounts, overviewLinks({ customerId: null, propertyId: null }));
-    expect([jobs.length, jobs[0], jobs.at(-1)]).toStrictEqual([10, { status: "requested", label: "requested", count: 1, href: "/admin/jobs?stage=requested" }, { status: "cancelled", label: "cancelled", count: 0, href: "/admin/jobs" }]);
+    expect([jobs.length, jobs[0], jobs.at(-1)]).toStrictEqual([10, { status: "requested", label: "Requested", count: 1, href: "/admin/jobs?stage=requested" }, { status: "cancelled", label: "Cancelled", count: 0, href: "/admin/jobs" }]);
     expect(billingView(summary({ amountsByCurrency: [{ amountMinor: 12_000, currency: "MYR" }, { amountMinor: 5000, currency: "USD" }] }))).toStrictEqual({ forbidden: false, overdue: 1, rows: [{ currency: "MYR", text: "120.00 MYR" }, { currency: "USD", text: "50.00 USD" }] });
     expect(billingView(summary({ billingVisibility: "forbidden", amountsByCurrency: null, overdueInvoiceCount: null }))).toStrictEqual({ forbidden: true });
     expect(kpisFrom(s)).toMatchObject({ rate: "50.0%", kwh: "9.0 kWh", billing: "120.00 MYR", jobs: 2, kwhSub: "measured · coverage 40% · cost 3.29 MYR", billingSub: "1 overdue invoice · unpaid, per currency" });
@@ -76,7 +76,7 @@ describe("HQ overview in Malay with the display time zone (IR289)", () => {
     expect(forecastView(null, MS.t)).toMatchObject({ text: "Tidak dapat dikira" });
     const a = axisRows(s, overviewLinks({ customerId: null, propertyId: null }), MS.t);
     expect([a.power[0]?.label, a.connection[1]?.label]).toStrictEqual(["Berjalan", "Luar talian"]);
-    expect(jobRows(s.jobCounts, overviewLinks({ customerId: null, propertyId: null }), MS.t).slice(0, 2).map((j) => j.label)).toStrictEqual(["diminta", "ditawarkan"]);
+    expect(jobRows(s.jobCounts, overviewLinks({ customerId: null, propertyId: null }), MS.t).slice(0, 2).map((j) => j.label)).toStrictEqual(["Diminta", "Ditawarkan"]);
   });
 });
 
