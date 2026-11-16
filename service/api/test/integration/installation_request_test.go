@@ -3,6 +3,7 @@ package integration_test
 import (
 	"net/http"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -269,6 +270,74 @@ func TestInstallationRequests(t *testing.T) {
 	if code != http.StatusOK || data(res)["status"] != "cancelled" {
 		t.Fatalf("cancel: %d %v", code, res)
 	}
+}
+
+// TestInstallationRequestRefusals covers the refusals that TestInstallationRequests does not: the contact window and
+// note rules of create, a stale version on decline, and a job for a unit at another property of the customer.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
+func TestInstallationRequestRefusals(t *testing.T) {
+	srv := server(t)
+	org, prop, model := installBase(t)
+
+	create := func(who *actor, body string) (int, map[string]any) {
+		return write(srv, who, "installationRequests.create", body, 0)
+	}
+
+	withField := func(field, value string) string {
+		return `{"propertyId":"` + prop + `","quantity":1,"modelId":null,"withIot":false,"preferredSlots":` +
+			threeSlots() + `,"` + field + `":"` + value + `"}`
+	}
+
+	code, res := create(customerA(), withField("contactWindow", "call me on 0812 3456 7890"))
+	refusal(t, "a phone number", code, res, "contactWindow=errors.contact_details_forbidden")
+
+	code, res = create(customerA(), withField("contactWindow", strings.Repeat("a", 201)))
+	refusal(t, "a long contact window", code, res, "contactWindow="+apperr.KeyLength)
+
+	code, res = create(customerA(), withField("note", strings.Repeat("n", 2001)))
+	refusal(t, "a long note", code, res, "note="+apperr.KeyLength)
+
+	code, res = create(customerA(), withField("note", "  "+strings.Repeat("n", 2000)+"  "))
+	if code != http.StatusOK {
+		t.Errorf("a note of 2000 characters after trimming: %d %v", code, res)
+	}
+
+	// a stale version is a version conflict, not a state conflict
+	request := create2(t, srv, create, prop)
+
+	code, res = write(
+		srv,
+		hq(),
+		"installationRequests.decline",
+		`{"id":"`+request+`","reason":"No capacity this month"}`,
+		9,
+	)
+	if code != http.StatusConflict || res["messageKey"] != apperr.KeyVersionConflict {
+		t.Errorf("decline with a stale version: %d %v", code, res)
+	}
+
+	// the job's unit must be at the request's property
+	var other string
+
+	ownerScan(
+		t,
+		`SELECT id::text FROM assets.properties WHERE customer_org_id = $1 AND id <> $2 AND NOT archived
+			ORDER BY id LIMIT 1`,
+		[]any{org, prop},
+		&other,
+	)
+
+	code, res = write(
+		srv,
+		hq(),
+		"jobs.create",
+		jobBody(plannedUnit(t, srv, org, other, model), map[string]string{
+			fieldType: installationType, fieldRequestID: `"` + request + `"`,
+		}),
+		0,
+	)
+	refusal(t, "a unit at another property", code, res, "unitId="+apperr.KeyInvalid)
 }
 
 // create2 makes a one-unit request of the owner and answers its ID.
