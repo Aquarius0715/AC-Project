@@ -113,8 +113,11 @@ export function technicianRows(technicians: ApiTechnician[], certs: ApiCertifica
     else if (!soonest || quals.length === 0) badge = { label: t(quals.length > 0 ? "Expired" : "None"), tone: quals.length > 0 ? "crit" : "muted" };
     else if (Date.parse(soonest.validUntil) - now <= 30 * 86_400_000) badge = { label: t("expiring · {date}", { date: dayMonth(soonest.validUntil, i) }), tone: "warn" };
     else badge = { label: t("Valid"), tone: "ok" };
-    return { id: x.id, name: x.displayName, sub, badge };
-  });
+    return { id: x.id, name: x.displayName, sub, badge, ended };
+  })
+    // the technicians who can work first, ended memberships below them in the same order (one active among fifteen ended, UI/UX loop R121)
+    .toSorted((a, b) => Number(a.ended) - Number(b.ended))
+    .map((r) => ({ id: r.id, name: r.name, sub: r.sub, badge: r.badge }));
 }
 
 /** The certificates waiting for HQ (Verify uploads), oldest first. */

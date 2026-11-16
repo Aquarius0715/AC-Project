@@ -70,8 +70,8 @@ describe("HQ contractor register", () => {
       tech({ id: "m-d", displayName: "tech-d" }),
     ], [cert({}), cert({ id: "c2", membershipId: "m-d", status: "pending_verification" })], NOW);
     expect(rows.map((r) => [r.name, r.sub, r.badge.label])).toStrictEqual([
-      ["tech-external-a", "Indoor", "1 expiring · 15 Oct"], ["tech-external-a2", "Indoor", "Valid"], ["tech-external-b", "membership ended 1 Sept", "Expired"],
-      ["tech-c", "Indoor", "expiring · 1 Oct"], ["tech-d", "Indoor", "1 awaiting verification"],
+      ["tech-external-a", "Indoor", "1 expiring · 15 Oct"], ["tech-external-a2", "Indoor", "Valid"],
+      ["tech-c", "Indoor", "expiring · 1 Oct"], ["tech-d", "Indoor", "1 awaiting verification"], ["tech-external-b", "membership ended 1 Sept", "Expired"], // ended last
     ]);
     expect(pendingCertificates([cert({}), cert({ id: "c2", status: "pending_verification" })]).map((c) => c.id)).toStrictEqual(["c2"]);
   });
