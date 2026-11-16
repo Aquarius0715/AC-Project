@@ -7,7 +7,7 @@
 import { EN, relativeTime, showClock, showDate, showDayMonth, showSpan, type I18n, type T, textOf, byCount } from "@ac/web/lib/i18n";
 import { evidenceText, resolutionText } from "@ac/web/lib/evidence";
 import { alertTitle, type ApiAlert } from "@ac/web/lib/alerts";
-import { metricLabel } from "@ac/web/lib/adminAlerts";
+import { metricName } from "@ac/web/lib/adminAlerts";
 import { airNumber } from "@ac/web/lib/air";
 import { toggleSeries, unitAxes } from "@ac/web/lib/chartScale";
 import { bucket, type ApiUnitDetail } from "@ac/web/lib/units";
@@ -62,7 +62,7 @@ export function metricChoices(d: ApiTechUnit, selected: readonly string[], t: T)
   const unit = (m: string) => d.latestMeasurements.find((x) => x.metric === m)?.unit ?? "";
   return d.latestMeasurements.map((x) => ({ metric: x.metric, name: label(x.metric, t), unit: x.unit, on: selected.includes(x.metric), next: toggleSeries(selected, x.metric, unit) }));
 }
-const label = (metric: string, t: T) => (textOf(metricLabel, metric, t) ?? metric.replaceAll('_', " "));
+const label = (metric: string, t: T) => (textOf(metricName, metric, t) ?? metric.replaceAll('_', " "));
 
 const SCOPE: Record<string, string> = { indoor: "Indoor", outdoor: "Outdoor", electrical: "Electrical" };
 const TYPE: Record<string, string> = { split: "Split" };

@@ -79,6 +79,9 @@ export const metricLabel: Record<string, string> = {
   temperature: "Temperature", humidity: "Humidity", co2: "CO₂ (ppm)", pm25: "PM2.5", power: "Power", vibration: "Vibration",
   refrigerant_pressure: "Refrigerant pressure", compressor_cycles: "Compressor cycles", airflow_drop: "Airflow drop", heartbeat_gap: "Heartbeat gap",
 };
+/** The metric's name where its value or the condition writes the unit (chart chips, "CO₂ ≥ 1200 ppm"): metricLabel
+without the "(ppm)" that a metric picker shows (UI/UX loop R135). */
+export const metricName: Record<string, string> = { ...metricLabel, co2: "CO₂" };
 export const metricUnit: Record<string, string> = { temperature: "°C", humidity: "%", co2: "ppm", pm25: "µg/m³", power: "kW", vibration: "mm/s", refrigerant_pressure: "kPa", compressor_cycles: "cycles/h", airflow_drop: "%", heartbeat_gap: "min" };
 export const opSymbol: Record<Operator, string> = { gt: ">", gte: "≥", lt: "<", lte: "≤" };
 /** The metrics an HQ alert policy may watch (IR66 item 3, the Core API's hqMetrics); default rules have their own. */
@@ -147,7 +150,7 @@ export function policyRows(policies: ApiPolicy[], customers: ApiCustomerName[], 
       const rules = p.rules?.length ?? 0;
       const sub = p.kind === DEFAULT_ALERT
         ? byCount(rules, { one: t("1 rule · ventilation (CO₂, PM2.5) + fault causes"), many: t("{n} rules · ventilation (CO₂, PM2.5) + fault causes", { n: rules }) })
-        : `${textOf(metricLabel, metric, t) ?? metric} ${entryOf(opSymbol, op)} ${String(p.threshold ?? "—")} ${lookup(metricUnit, metric) ?? ""} ${t("for {n} s", { n: p.durationSeconds ?? 0 })}`;
+        : `${textOf(metricName, metric, t) ?? metric} ${entryOf(opSymbol, op)} ${String(p.threshold ?? "—")} ${lookup(metricUnit, metric) ?? ""} ${t("for {n} s", { n: p.durationSeconds ?? 0 })}`;
       const recipients = (p.recipientMembershipIds ?? []).map((id) => {
         const m = member.get(id);
         return { id, label: filled(m?.displayName) ?? id, role: m ? recipientRole(m.role, t) : "" };

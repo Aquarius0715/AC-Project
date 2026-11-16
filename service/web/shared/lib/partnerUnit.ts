@@ -6,7 +6,7 @@
 import { EN, showClock, showDate, showSpan, showTime, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import { evidenceText } from "@ac/web/lib/evidence";
 import { alertTitle, type ApiAlert } from "@ac/web/lib/alerts";
-import { metricLabel } from "@ac/web/lib/adminAlerts";
+import { metricName } from "@ac/web/lib/adminAlerts";
 import { airNumber } from "@ac/web/lib/air";
 import { until, type Slot } from "@ac/web/lib/partnerOverview";
 import { statusWord, typeLabel, type ApiHistory } from "@ac/web/lib/partnerJobDetail";
@@ -27,7 +27,7 @@ const QUALITY: Record<string, { text: string; tone?: "warn" | "crit" }> = { vali
 const EVIDENCE: Record<string, string> = { inferred: "Suspected", inspection: "Inspection record", demo_observation: "Observed (demo)" };
 /** The diagnosis metrics a chart shows first, in order (Figma: vibration and refrigerant pressure). */
 const CHART_METRICS: Metric[] = ["vibration", "refrigerant_pressure", "temperature", "humidity", "power"];
-const label = (metric: string, t: T) => (textOf(metricLabel, metric, t) ?? metric.replaceAll('_', " "));
+const label = (metric: string, t: T) => (textOf(metricName, metric, t) ?? metric.replaceAll('_', " "));
 
 /** The unit register (Figma: location, model, maintenance scope; the connection — a badge — and the last seen time). */
 export function registerRows(d: ApiUnitDetail, i: I18n = EN): { connection: ApiUnitDetail["connection"]; rows: [string, string][]; lastSeen: string } {
