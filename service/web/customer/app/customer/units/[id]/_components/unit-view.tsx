@@ -2,12 +2,12 @@
 const SET_TEMPERATURE_FROM_C_TO_C = "Set temperature {from}°C → {to}°C";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Badge, Banner, Btn, Card, Check, ConnBadge, EmptyState, LinkButton, Modal, Page, PowerBadge, Stat, SummaryList, Toggle, cx, useToast, Choice } from "@ac/web/components/ui";
 import { units, unitRowFromApi, type UnitRow } from "@ac/web/lib/client";
 import { OpError } from "@ac/web/lib/ops";
-import { controlLayout, FAN_LABEL, historyRow, latest, MODE_LABEL, type ApiCommand, type ApiUnitDetail, type UnitAction } from "@ac/web/lib/units";
+import { answerSeconds, controlLayout, FAN_LABEL, historyRow, latest, MODE_LABEL, type ApiCommand, type ApiUnitDetail, type UnitAction } from "@ac/web/lib/units";
 import { followCommand } from "@ac/web/lib/unitCommands";
 import { byCount, showRecent, showTime, textOf } from "@ac/web/lib/i18n";
 import { useDisplay, useT } from "@ac/web/components/I18n";
@@ -117,11 +117,28 @@ function plannedChanges({ d, edited, setpoint, mode, fan, isShowMode, isShowFan 
 /** what the last send came to: the command history line, and whether the AC took it */
 interface Outcome { text: string; isOk: boolean }
 
+/** Waiting for the device, with the seconds it has left (IR806): "fails after 30 s" with nothing moving read as a hang,
+and the countdown shows it is still in time. It counts on the browser's clock from the moment it appears, as the
+command's own times are on the scenario clock. At zero it says the answer is being checked. */
+function WaitBanner({ seconds }: Readonly<{ seconds: number }>) {
+  const t = useT();
+  const [left, setLeft] = useState(seconds);
+  useEffect(() => {
+    const started = Date.now();
+    const id = setInterval(() => { setLeft(Math.max(0, seconds - Math.floor((Date.now() - started) / 1000))); }, 1000);
+    return () => { clearInterval(id); };
+  }, [seconds]);
+  // the sentence stays the same for screen readers (the banner is a live region); only the seconds change, unread
+  return <Banner>{left > 0 ? <>{t("Waiting for the AC to confirm… The result shows only after it acknowledges.")} <b aria-hidden="true">{t("{s} s left", { s: left })}</b></> : t("No answer yet — checking the result…")}</Banner>;
+}
+
 interface RemoteControlProps {
   isControllable: boolean; temperatureRange: { min: number; max: number; step: number } | null; cap: { min: number; max: number; step: number };
   setpoint: number; min: number; max: number; confirmed: number | string;
   /** isPowerUnknown: no fresh power signal, so the switch shows off and says so (the header badge reads Power unknown) */
   isOn: boolean; isPowerUnknown: boolean; isDisabled: boolean; isOffline: boolean; waiting: boolean; isPowerOff: boolean;
+  /** the command being waited for and how long the device has to answer it, for the countdown (IR806) */
+  waitFor?: { id: string; seconds: number } | null;
   /** the result of the last send, kept next to the controls until the next send or dismiss (a toast alone goes away) */
   outcome: Outcome | null; onDismissOutcome: () => void;
   /** the modes and fan levels the model offers; an empty list hides the choice */
@@ -146,7 +163,7 @@ function PowerConfirm({ power, name, where, onCancel, onSend }: Readonly<{ power
 /** The remote control card: the power, the setpoint, the mode and the fan, and the review of what will be sent. */
 function RemoteControlCard(p: Readonly<RemoteControlProps>) {
   const t = useT();
-  const { isControllable, temperatureRange, cap, setpoint, min, max, confirmed, isOn, isPowerUnknown, isDisabled, isOffline, waiting, isPowerOff, modes, mode, fans, fan, review, outcome } = p;
+  const { isControllable, temperatureRange, cap, setpoint, min, max, confirmed, isOn, isPowerUnknown, isDisabled, isOffline, waiting, isPowerOff, modes, mode, fans, fan, review, outcome, waitFor } = p;
   const isPowerLocked = isDisabled || waiting || isPowerOff;
   return (
     <Card title={t("REMOTE CONTROL")} sub={t(isControllable ? "Controls apply to this AC only; you confirm before sending" : "No remote control on this model")}>
@@ -162,7 +179,7 @@ function RemoteControlCard(p: Readonly<RemoteControlProps>) {
         {review && ( // a model with the power only sends it at once: nothing to review (Figma 02o)
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface2 p-3 text-xs"><span><b>{t(review.count === 1 ? "{n} change:" : "{n} changes:", { n: review.count })}</b> {review.summary}<br /><span className="text-muted-foreground">{t("Target: {name} only · you will confirm before sending", { name: review.target })}</span></span><Btn variant="primary" disabled={isDisabled || waiting || !review.canSend} onClick={p.onReview}>{t(waiting ? "Waiting for device…" : "Review & send")}</Btn></div>
         )}
-        {waiting && <Banner>{t("Waiting for device response… The result is shown only after the device acknowledges (fails after 30 s).")}</Banner>}
+        {waiting && (waitFor ? <WaitBanner key={waitFor.id} seconds={waitFor.seconds} /> : <Banner>{t("Waiting for device response… The result is shown only after the device acknowledges (fails after 30 s).")}</Banner>)}
         {!waiting && outcome && (
           <Banner tone={outcome.isOk ? "ok" : "warn"} action={<Btn size="sm" variant="ghost" onClick={p.onDismissOutcome}>{t("Dismiss")}</Btn>}>
             {outcome.text}
@@ -250,6 +267,7 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
   const [attachOpen, setAttachOpen] = useState(!!attachId);
   const closeAttach = () => { setAttachOpen(false); if (attachId) router.replace(`/customer/units/${unit.id}`, { scroll: false }); };
   const [waiting, setWaiting] = useState(false);
+  const [waitFor, setWaitFor] = useState<{ id: string; seconds: number } | null>(null);
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [mockOn, setMockOn] = useState(unit.state === "running");
   // the same power state as the header badge: a stale “on” is not shown as on
@@ -305,6 +323,7 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
       setOutcome({ text, isOk: false });
       return false;
     }
+    setWaitFor({ id: created.value.id, seconds: answerSeconds(created.value) });
     const followed = await followCommand(created.value, track); // polls commands.get through the BFF
     if (!followed.answered) {
       // the command was sent; only its answer could not be read, so it is never "not sent" (IR728)
@@ -389,7 +408,7 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
           <RestrictionBanners isBlocked={isBlocked} policy={policy} isRestricted={isRestricted} min={min} href={d ? restrictionHref ?? "/customer/payments" : "/customer/payments/invoice-overdue-a?tab=restriction"} offHref={restrictionHref ?? "/customer/payments"} />
           <RemoteControlCard
             isControllable={isControllable} temperatureRange={temperatureRange} cap={cap} setpoint={setpoint} min={min} max={max} confirmed={confirmed}
-            isOn={isOn} isPowerUnknown={isPowerUnknown} isDisabled={isDisabled} isOffline={isOffline} waiting={waiting} isPowerOff={policy?.kind === "power_off"}
+            isOn={isOn} isPowerUnknown={isPowerUnknown} isDisabled={isDisabled} isOffline={isOffline} waiting={waiting} waitFor={waitFor} isPowerOff={policy?.kind === "power_off"}
             modes={isShowMode ? modes : []} mode={mode} fans={isShowFan ? fans : []} fan={fan}
             review={layout.review ? { count: changeCount, summary: d ? changes().map((item) => changeText(item)).join(" · ") || t("No change yet") : t(SET_TEMPERATURE_FROM_C_TO_C, { from: 26, to: setpoint }), target: unit.name, canSend: d === null || changes().length > 0 } : null}
             outcome={outcome} onDismissOutcome={() => { setOutcome(null); }}
