@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { translator } from "@ac/web/lib/i18n";
 import { unitDetail } from "./unitFixture";
-import { actionText, answerSeconds, controlLayout, coolingHint, historyRow, latest, setsTemperature, type ApiCommand, type ApiUnitDetail } from "@ac/web/lib/units";
+import { actionText, answerSeconds, controlLayout, coolingHint, undoActions, historyRow, latest, setsTemperature, type ApiCommand, type ApiUnitDetail } from "@ac/web/lib/units";
 
 const TEMPERATURE = "temperature";
 
@@ -100,5 +100,16 @@ describe("cooling hint", () => {
   it("speaks only for cooling below 22 °C", () => {
     expect([coolingHint("cool", 18), coolingHint("cool", 22), coolingHint("dry", 18), coolingHint("fan", 16)].map((h) => h?.slice(0, 33) ?? null))
       .toStrictEqual(["18°C is very cold for cooling: a ", null, null, null]);
+  });
+});
+
+// IR810: Undo puts back each sent setting to the confirmed one it replaced, nothing it cannot know or that did not change
+describe("undo", () => {
+  it("reverses the sent settings from the state before", () => {
+    const before = { power: true, celsius: 26, mode: "cool" as const, fanLevel: "mid" as const, observedAt: null };
+    expect(undoActions([{ kind: "set_temperature", celsius: 24 }, { kind: "set_fan", fanLevel: "high" }], before))
+      .toStrictEqual([{ kind: "set_temperature", celsius: 26 }, { kind: "set_fan", fanLevel: "mid" }]);
+    expect(undoActions([{ kind: "set_power", power: false }], before)).toStrictEqual([{ kind: "set_power", power: true }]);
+    expect(undoActions([{ kind: "set_mode", mode: "dry" }, { kind: "set_temperature", celsius: 26 }], { ...before, mode: null })).toStrictEqual([]);
   });
 });

@@ -114,6 +114,18 @@ export function actionText(a: CommandAction, t: T = en): string {
 const statusText: Record<ApiCommand["status"], string> = { requested: "requested", sent: "waiting for device", acknowledged: "acknowledged by device", failed: "failed", expired: "no device response (expired)", cancelled: "cancelled" };
 const sourceText: Record<string, string> = { automation: " · by an automation", restriction: " · by a restriction", diagnostic: " · technician test run" };
 
+/** The commands that put back what `actions` changed (IR810): each sent setting returns to the confirmed one it replaced
+(`before`, the observed state before sending), in the same order. A setting with no confirmed value before cannot be
+put back and is left out; so is one that did not change. Empty when nothing can be undone. */
+export function undoActions(actions: UnitAction[], before: ApiUnitDetail["observedState"]): UnitAction[] {
+  return actions.flatMap((a): UnitAction[] => {
+    if (a.kind === "set_power") return before.power === null || before.power === a.power ? [] : [{ kind: "set_power", power: before.power }];
+    if (a.kind === "set_temperature") return before.celsius === null || before.celsius === a.celsius ? [] : [{ kind: "set_temperature", celsius: before.celsius }];
+    if (a.kind === "set_mode") return before.mode === null || before.mode === a.mode ? [] : [{ kind: "set_mode", mode: before.mode }];
+    return before.fanLevel === null || before.fanLevel === a.fanLevel ? [] : [{ kind: "set_fan", fanLevel: before.fanLevel }];
+  });
+}
+
 /** The setpoint below which cooling gets a hint (IR808). */
 const COOL_HINT_BELOW = 22;
 /** A hint to review a very low cooling setpoint (IR808): setting the AC colder does not cool the room faster, it only
