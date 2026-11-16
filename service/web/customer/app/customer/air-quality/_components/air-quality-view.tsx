@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, ConnBadge, cx, DataTable, EmptyState, Field, LineChart, LinkButton, Modal, Page, Select, SummaryList, Tabs, Plain } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, ConnBadge, cx, DataTable, EmptyState, Field, LineChart, LinkButton, Modal, Page, Select, SummaryList, Tabs, TextLink, Plain } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
@@ -75,6 +75,8 @@ export function AirQualityView({ live }: Readonly<{ live: AirLive | null }>) {
           <Select aria-label={t("Sensor")} className="w-auto py-1.5 font-semibold" value={live.unitId} onChange={(e) => { patch({ unitId: e.target.value }); }}>
             {(room?.units ?? []).map((u) => <option key={u.id} value={u.id}>{t("Sensor: {name}", { name: u.name })}</option>)}
           </Select>
+          {/* the temperature card says the setpoint is on the unit's control: the way there, next to the AC it names (UI/UX loop R82) */}
+          {live.unitId && <TextLink className="inline-flex min-h-6 items-center gap-1" href={`/customer/units/${live.unitId}`}>{t("Open {name}’s control", { name: live.unitName })} <Icon name="arrowRight" /></TextLink>}
         </div>
         <span className="flex items-center gap-2"><b>{t("Updated {time}", { time: live.updated })}</b><ConnBadge s={live.connection} /><Btn size="sm" variant="ghost" onClick={() => { router.refresh(); }}><Icon name="refresh" />{t("Refresh")}</Btn></span>
       </div>
@@ -93,7 +95,7 @@ export function AirQualityView({ live }: Readonly<{ live: AirLive | null }>) {
       </div>
       <Card><div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px]"><b>{live.allergen.title}</b><Badge tone={live.allergen.badge.tone} icon={live.allergen.badge.icon}>{live.allergen.badge.text}</Badge><span className="text-xs text-muted-foreground">{live.allergen.text}</span></div></Card>
       {live.clean && <Banner tone="warn" action={<LinkButton size="sm" href="/customer/maintenance">{t("Maintenance")}</LinkButton>}>{live.clean}</Banner>}
-      <Banner tone={live.strip.tone} action={<Btn size="sm" variant={live.strip.tone === "warn" ? "primary" : "secondary"} disabled={!live.spaceId} title={live.spaceId ? undefined : t("Logs belong to a room — this unit is not in one")} onClick={() => { setOpen(true); }}>{t("Log ventilation")}</Btn>}>
+      <Banner tone={live.strip.tone} action={<span className="flex flex-wrap items-center gap-2"><Btn size="sm" variant={live.strip.tone === "warn" ? "primary" : "secondary"} disabled={!live.spaceId} onClick={() => { setOpen(true); }}>{t("Log ventilation")}</Btn>{!live.spaceId && <span className="text-[11px] text-muted-foreground">{t("Logs belong to a room — this unit is not in one")}</span>}</span>}>
         <b>{live.strip.title}</b><div className="text-xs text-muted-foreground">{live.strip.text}{!live.spaceId && ` ${t("Ventilation logs belong to a room — HQ sets up the rooms, so ask HQ to place this unit in one.")}`}</div>
       </Banner>
       <Card title={c.title} sub={c.sub} action={<div className="flex flex-wrap gap-2">

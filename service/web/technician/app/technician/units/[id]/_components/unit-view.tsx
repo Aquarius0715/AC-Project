@@ -21,7 +21,7 @@ export function TechUnitView({ live }: Readonly<{ live: UnitLive }>) {
   return (
     <Page>
       <div className="flex flex-wrap items-center gap-2 text-[13px]">
-        <Link href={live.back} className="font-semibold text-primary" aria-label={t("Back")}><Icon name="chevronLeft" /></Link><h1 className="text-base font-bold">{live.name}</h1><span className="text-muted-foreground">· {live.short}</span><ConnBadge s={live.connection} />
+        <Link href={live.back} className="font-semibold text-primary" aria-label={t("Back")}><Icon name="chevronLeft" /></Link><h1 className="text-base font-bold">{live.name}</h1><span className="text-muted-foreground">· {live.short}</span><ConnBadge s={live.connection} offlineTone="crit" />
       </div>
       <div><Tabs value={live.tab} onChange={(v) => { patch({ metric: v === "monitoring" ? live.metrics.join(",") : null }); }} tabs={live.tabs} /></div>
       {live.tab === "register" ? (
@@ -49,12 +49,13 @@ export function TechUnitView({ live }: Readonly<{ live: UnitLive }>) {
               <div className="grid-fluid" style={{ ["--min" as string]: "160px" }}>{[live.tiles.temperature, live.tiles.power, live.tiles.connection].map((x) => <TileBox key={x.label} tile={x} />)}</div>
               <div className="mt-3 flex flex-wrap gap-1" role="group" aria-label={t("Metrics in the chart")}>
               {live.choices.map((c) => (
-                <Plain key={c.metric} type="button" aria-pressed={c.on} disabled={c.next === null} title={c.next === null ? t("A chart shows two units at most — take one out first") : undefined} onClick={() => { if (c.next) patch({ metric: c.next.join(",") }); }}
+                <Plain key={c.metric} type="button" aria-pressed={c.on} disabled={c.next === null} onClick={() => { if (c.next) patch({ metric: c.next.join(",") }); }}
                   className={cx("rounded-control border px-3 py-1.5 text-xs font-semibold", c.on ? "border-primary bg-primary-soft text-primary" : "border-line text-muted-foreground hover:bg-surface2", c.next === null && "opacity-50")}>
                   {c.name}
                 </Plain>
               ))}
             </div>
+            {/* why a chip is off, in words: a tooltip never shows on a touch screen (UI/UX loop R119) */}{live.choices.some((c) => c.next === null) && <p className="mt-1 text-[11px] text-muted-foreground">{t("A chart shows two units at most — take one out first")}</p>}
             <Series chart={live.chart} />
             </Card>
             <Card title={t("Maintenance history")}>
@@ -82,12 +83,13 @@ export function TechUnitView({ live }: Readonly<{ live: UnitLive }>) {
             <div className="grid-fluid" style={{ ["--min" as string]: "160px" }}>{[live.tiles.temperature, live.tiles.power, live.tiles.operation, live.tiles.connection].map((x) => <TileBox key={x.label} tile={x} />)}</div>
             <div className="mt-3 flex flex-wrap gap-1" role="group" aria-label={t("Metrics in the chart")}>
               {live.choices.map((c) => (
-                <Plain key={c.metric} type="button" aria-pressed={c.on} disabled={c.next === null} title={c.next === null ? t("A chart shows two units at most — take one out first") : undefined} onClick={() => { if (c.next) patch({ metric: c.next.join(",") }); }}
+                <Plain key={c.metric} type="button" aria-pressed={c.on} disabled={c.next === null} onClick={() => { if (c.next) patch({ metric: c.next.join(",") }); }}
                   className={cx("rounded-control border px-3 py-1.5 text-xs font-semibold", c.on ? "border-primary bg-primary-soft text-primary" : "border-line text-muted-foreground hover:bg-surface2", c.next === null && "opacity-50")}>
                   {c.name}
                 </Plain>
               ))}
             </div>
+            {/* why a chip is off, in words: a tooltip never shows on a touch screen (UI/UX loop R119) */}{live.choices.some((c) => c.next === null) && <p className="mt-1 text-[11px] text-muted-foreground">{t("A chart shows two units at most — take one out first")}</p>}
             <Series chart={live.chart} />
           </Card>
           {live.others.length > 0 && (

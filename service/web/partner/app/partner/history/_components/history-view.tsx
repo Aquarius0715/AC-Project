@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, Choice, EmptyState, Field, Page, Select, Textarea, cx, Plain, ScrollX } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Choice, EmptyState, Field, Page, Select, Tabs, Textarea, cx, Plain, ScrollX } from "@ac/web/components/ui";
 import { OriginBadge } from "@ac/web/components/JobBits";
 import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
@@ -38,9 +38,8 @@ function List({ live }: Readonly<{ live: HistoryLive }>) {
   return (
     <Page>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div role="tablist" className="flex flex-wrap gap-2">
-          {live.tabs.map((x) => <Plain key={x.id} role="tab" aria-selected={live.tab === x.id} onClick={() => { patch({ tab: x.id === "all" ? null : x.id }); }} className={cx("rounded-control border px-3 py-1.5 text-[13px] font-semibold", live.tab === x.id ? "border-primary bg-primary text-white" : "border-line bg-surface text-ink hover:bg-surface2")}>{x.label} ({x.count})</Plain>)}
-        </div>
+        {/* the same tab strip as Jobs, its counts as badges (UI/UX loop R115) */}
+        <Tabs value={live.tab} onChange={(id) => { patch({ tab: id === "all" ? null : id }); }} tabs={live.tabs.map((x) => ({ id: x.id, label: x.label, count: x.count }))} />
         <div className="flex flex-wrap gap-2">
           <Select aria-label={t("Sort")} className="w-auto" value={live.sort} onChange={(e) => { patch({ sort: e.target.value === "latest" ? null : e.target.value }); }}>{live.sorts.map((s) => <option key={s.id} value={s.id}>{s.text}</option>)}</Select>
           <Select aria-label={t("Period")} className="w-auto" value={live.period} onChange={(e) => { patch({ period: e.target.value === "90d" ? null : e.target.value }); }}>{live.periods.map((p) => <option key={p.id} value={p.id}>{p.text}</option>)}</Select>
@@ -191,7 +190,7 @@ function Compose({ detail, onPreview }: Readonly<{ detail: Extract<DetailRows, {
         <Field label={t("Message (1–2000 chars)")} error={tried && !message.trim() ? t("A message is required — nothing was saved") : lengthError}>
           <Textarea value={message} onChange={(e) => { setMessage(e.target.value); }} placeholder={t("Schedule moved to 2026-09-22 09:00–11:00 due to technician availability.")} />
         </Field>
-        <div className="flex flex-wrap justify-end gap-2"><Btn disabled={pending} onClick={() => { setMessage(""); setTried(false); setResult(null); }}>{t("Clear")}</Btn><Btn variant="primary" disabled={pending || !chosen} onClick={send} className="h-auto min-h-8 max-w-full whitespace-normal text-left">{mode.add && <Icon name="add" />}{mode.button}</Btn></div>
+        <div className="flex flex-wrap justify-end gap-2"><Btn disabled={pending || (message === "" && !tried && result === null)} onClick={() => { setMessage(""); setTried(false); setResult(null); }}>{t("Clear")}</Btn><Btn variant="primary" disabled={pending || !chosen} onClick={send} className="h-auto min-h-8 max-w-full whitespace-normal text-left">{mode.add && <Icon name="add" />}{mode.button}</Btn></div>
         <p className="text-[11px] text-muted-foreground">{t("No real sending. Only people involved in this job are offered; free-form external recipients and other jobs’ recipients are rejected. Internal notes stay hidden from customers.")}</p>
       </div>
     </Card>

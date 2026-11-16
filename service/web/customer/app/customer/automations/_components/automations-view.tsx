@@ -97,7 +97,8 @@ function List({ live, notice, setNotice, create, edit }: Readonly<{ live: Automa
   };
   return (
     <Page>
-      <PageHead title={t("Your automations")} sub={t(live.cards.length === 1 ? "{n} automation · {on} on · each rule controls one AC · checked again when it runs" : "{n} automations · {on} on · each rule controls one AC · checked again when it runs", { n: live.cards.length, on })} action={<Btn variant="primary" onClick={create}><Icon name="add" /> {t(CREATE_AUTOMATION)}</Btn>} />
+      <PageHead title={t("Your automations")} sub={t(live.cards.length === 1 ? "{n} automation · {on} on · each rule controls one AC · checked again when it runs" : "{n} automations · {on} on · each rule controls one AC · checked again when it runs", { n: live.cards.length, on })} action={live.cards.length > 0 && <Btn variant="primary" onClick={create}><Icon name="add" /> {t(CREATE_AUTOMATION)}</Btn>} />
+      {/* with no automation the empty state carries the one Create button, not the header as well (UI/UX loop R132) */}
       {notice && <Banner tone="ok" action={<Btn size="sm" variant="ghost" onClick={() => { setNotice(null); }}>{t("Dismiss")}</Btn>}><b>{notice.title}</b><div className="text-xs text-muted-foreground">{notice.text}</div></Banner>}
       <ConsentCard live={live} />
       {live.cards.length === 0 ? <EmptyState title={t("No automations yet")} action={<Btn size="sm" onClick={create}><Icon name="add" /> {t(CREATE_AUTOMATION)}</Btn>}>{t("Create one to pre-cool before you arrive or to stop an empty room. Saving sends no command — the automation runs at its time or event.")}</EmptyState> : (
@@ -227,6 +228,10 @@ function Editor({ live, onDone, onCancel }: Readonly<{ live: AutomationsLive; on
   };
   // the action in two parts, each under its own label: the Setting (power, temperature, mode, fan, ventilation) and its
   // Value — side by side when the box is wide enough, stacked on a narrow screen
+  const settingPrompt = (value: string) => {
+    if (!draft.unitId) return t("Choose the target AC first");
+    return !value || supported(value) ? t("Choose a setting") : t("{action} (not supported)", { action: actionLabel(actionOf(value), t) });
+  };
   const actionSelect = (label: string, key: "startAction" | "endAction" | "action", hint?: string) => {
     const value = draft[key];
     const group = options.find((g) => g.id === actionGroupOf(value));
@@ -241,8 +246,9 @@ function Editor({ live, onDone, onCancel }: Readonly<{ live: AutomationsLive; on
       <Field label={t("Action")} labelHidden hint={hint} error={lookup(errors, key) ?? (shown ? unsupported(value) : undefined)}>
         <div className="@container"><div className="grid grid-cols-1 items-start gap-3 @[22rem]:grid-cols-[minmax(120px,170px)_minmax(0,1fr)]">
           {part(t("Setting"), (
-            <Select aria-label={t("{label} — setting", { label })} value={group?.id ?? ""} onChange={(e) => { pick(firstAction(options, e.target.value)); }}>
-              {!group && <option value="">{!value || supported(value) ? t("Choose a setting") : t("{action} (not supported)", { action: actionLabel(actionOf(value), t) })}</option>}
+            <Select aria-label={t("{label} — setting", { label })} value={group?.id ?? ""} disabled={!draft.unitId} onChange={(e) => { pick(firstAction(options, e.target.value)); }}>
+              {/* the settings follow the AC's model: none is offered, nor called unsupported, before the AC is chosen (UI/UX loop R79) */}
+              {!group && <option value="">{settingPrompt(value)}</option>}
               {options.map((g) => <option key={g.id} value={g.id}>{g.group}</option>)}
             </Select>
           ))}

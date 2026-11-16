@@ -1,5 +1,6 @@
 "use client";
 
+import { zoneOptions } from "@ac/web/lib/preferences";
 import { useState } from "react";
 import { Badge, Banner, Btn, Card, Check, Choice, DataTable, DemoBadge, EmptyState, Field, Input, ListRow, Page, Select, Plain, ScrollX } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
@@ -41,6 +42,17 @@ function unitGroups(live: { customers: { id: string; name: string }[]; propertie
     .toSorted((a, b) => a.label.localeCompare(b.label)); // a customer's properties together
 }
 
+/** “Select all (n)” / “Clear” for one customer › property group of the unit picker. */
+function GroupToggle({ ids, chosen, group, onToggle }: Readonly<{ ids: string[]; chosen: string[]; group: string; onToggle: (ids: string[], on: boolean) => void }>) {
+  const t = useT();
+  const isAll = ids.every((id) => chosen.includes(id));
+  return (
+    <Plain type="button" aria-label={t(isAll ? "Clear the units of {group}" : "Select all units of {group}", { group })} className="font-semibold text-primary hover:underline" onClick={() => { onToggle(ids, !isAll); }}>
+      {t(isAll ? "Clear" : "Select all ({n})", { n: ids.length })}
+    </Plain>
+  );
+}
+
 export function AutomationView({ live }: Readonly<{ live: Live }>) {
   const t = useT();
   const nav = useUrlPatch();
@@ -67,11 +79,17 @@ export function AutomationView({ live }: Readonly<{ live: Live }>) {
     set({ unitIds: on ? [...d.unitIds, id] : d.unitIds.filter((x) => x !== id) });
     setFacts((f) => (on ? [...f, { unitId: id, value: "", quality: "valid" }] : f.filter((x) => x.unitId !== id)));
   };
+  // a whole customer › property group in or out at once: a 19-unit fleet was 19 ticks (UI/UX loop R59)
+  const toggleUnits = (ids: string[], on: boolean) => {
+    const added = ids.filter((id) => !d.unitIds.includes(id));
+    set({ unitIds: on ? [...d.unitIds, ...added] : d.unitIds.filter((x) => !ids.includes(x)) });
+    setFacts((f) => (on ? [...f, ...added.map((unitId) => ({ unitId, value: "", quality: "valid" as const }))] : f.filter((x) => !ids.includes(x.unitId))));
+  };
   const targets = live.units.filter((u) => d.unitIds.includes(u.id));
   const range = commonRange(targets);
   const errors = autoErrors(d, range, t);
   const name = (id: string) => live.units.find((u) => u.id === id)?.name ?? id.slice(0, 8);
-  const scopeProps = live.properties.filter((p) => !live.scope.customerId || p.customerId === live.scope.customerId);
+  const scopeProps = live.properties.filter((p) => !live.scope.customerId || p.customerId === live.scope.customerId).toSorted((a, b) => a.name.localeCompare(b.name));
   const scopeUnits = live.units.filter((u) => (!live.scope.customerId || u.customerId === live.scope.customerId) && (!live.scope.propertyId || u.propertyId === live.scope.propertyId));
   const kinds: { id: AutoCondition["type"]; label: string }[] = [{ id: "occupancy", label: t("Occupancy") }, { id: "tariff", label: t("Tariff") }, { id: "peak", label: t("Peak") }, { id: "solar", label: t("Solar") }, { id: "battery", label: t("Battery") }];
   // a changed fact makes a new evaluation: the next fire gets a new one-time event ID
@@ -103,9 +121,9 @@ export function AutomationView({ live }: Readonly<{ live: Live }>) {
   return (
     <Page>
       <div className="flex flex-wrap items-end gap-3">
-        <Field label={t("Customer")}><Select value={live.scope.customerId ?? ""} onChange={(e) => { nav({ customerId: e.target.value || null, propertyId: null, unitId: null, policyId: null }); }}><option value="">{t("All customers")}</option>{live.customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field>
+        <Field label={t("Customer")}><Select value={live.scope.customerId ?? ""} onChange={(e) => { nav({ customerId: e.target.value || null, propertyId: null, unitId: null, policyId: null }); }}><option value="">{t("All customers")}</option>{live.customers.toSorted((a, b) => a.name.localeCompare(b.name)).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field>
         <Field label={t("Property")}><Select value={live.scope.propertyId ?? ""} onChange={(e) => { nav({ propertyId: e.target.value || null, unitId: null, policyId: null }); }}><option value="">{t("All properties")}</option>{scopeProps.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></Field>
-        <Field label={t("Unit")}><Select value={live.scope.unitId ?? ""} onChange={(e) => { nav({ unitId: e.target.value || null, policyId: null }); }}><option value="">{t("All units")}</option>{scopeUnits.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</Select></Field>
+        <Field label={t("Unit")}><Select value={live.scope.unitId ?? ""} onChange={(e) => { nav({ unitId: e.target.value || null, policyId: null }); }}><option value="">{t("All units")}</option>{/* grouped by customer › property as the policy's Units are, so same-named units stay apart (UI/UX loop R126) */}{unitGroups({ ...live, units: scopeUnits }).map((g) => <optgroup key={g.key} label={g.label}>{g.units.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</optgroup>)}</Select></Field>
         <div className="pb-2"><Check label={t("Show disabled")} checked={showOff} onChange={setShowOff} /></div>
       </div>
       <div className="split-rev">
@@ -122,7 +140,8 @@ export function AutomationView({ live }: Readonly<{ live: Live }>) {
               <section className="grid-fluid" style={{ ["--min" as string]: "160px" }}>
                 <Field label={t("Name")} error={fieldError("name")}><Input value={d.name} maxLength={120} onChange={(e) => { set({ name: e.target.value }); }} /></Field>
                 <Field label={t("Priority")} hint={t("0–100 · higher wins in its tier")} error={fieldError("priority")}><Input type="number" value={d.priority} onChange={(e) => { set({ priority: e.target.value }); }} /></Field>
-                <Field label={t("Timezone")} error={fieldError("timezone")}><Input value={d.timezone} onChange={(e) => { set({ timezone: e.target.value }); }} /></Field>
+                {/* a list of zones, as Preferences offers, instead of free text a typo turns into an error (UI/UX loop R111) */}
+                <Field label={t("Timezone")} error={fieldError("timezone")}><Select value={d.timezone} onChange={(e) => { set({ timezone: e.target.value }); }}>{zoneOptions(d.timezone, new Date(live.now)).map((z) => <option key={z.id} value={z.id}>{z.label}</option>)}</Select></Field>
                 <div className="self-end pb-2"><Check label={t("Enabled")} checked={d.enabled} onChange={(v) => { set({ enabled: v }); }} /></div>
               </section>
               <section>
@@ -130,7 +149,9 @@ export function AutomationView({ live }: Readonly<{ live: Live }>) {
                 {/* under their customer › property: one flat run mixed the customers' units */}
                 <div className="flex flex-col gap-3">{unitGroups(live).map((g) => (
                   <fieldset key={g.key}>
-                    <legend className="mb-1 text-[11px] font-semibold text-muted-foreground">{g.label}</legend>
+                    <legend className="mb-1 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-muted-foreground">{g.label}
+                      {g.units.length > 1 && <GroupToggle ids={g.units.map((u) => u.id)} chosen={d.unitIds} group={g.label} onToggle={toggleUnits} />}
+                    </legend>
                     <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-[13px]">{g.units.map((u) => <Check key={u.id} label={u.name} checked={d.unitIds.includes(u.id)} onChange={(on) => { toggleUnit(u.id, on); }} />)}</div>
                   </fieldset>
                 ))}</div>

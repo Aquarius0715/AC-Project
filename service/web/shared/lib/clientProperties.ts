@@ -3,7 +3,7 @@
 // @ac/web/lib/assets (locationTree, selection). Texts in the display language and times in the user's display time
 // zone (`i`, IR263).
 import { one } from "@ac/web/lib/energy";
-import { EN, showClock, translator, type I18n, type T } from "@ac/web/lib/i18n";
+import { EN, showClock, showRecent, translator, type I18n, type T } from "@ac/web/lib/i18n";
 import { runState, type ApiUnitDetail, type UnitAction } from "@ac/web/lib/units";
 
 type Mode = "cool" | "dry" | "fan";
@@ -20,7 +20,9 @@ export interface RoomUnit {
 }
 /** The latest reading of a metric when it is current (valid, IR213); a stale, suspect or null reading shows “—”. */
 const metric = (d: ApiUnitDetail, m: string) => { const x = d.latestMeasurements.find((r) => r.metric === m); return x?.quality === "valid" ? x.value : null; };
-export function roomUnits(ds: ApiUnitDetail[], i: I18n = EN): RoomUnit[] {
+// with the page's now, a time of another day keeps its date, so “offline since 10:47 am” days ago does not read as today (UI/UX loop R65)
+const clockOrDate = (iso: string, i: I18n, nowMs?: number) => (nowMs === undefined ? showClock(iso, i.display) : showRecent(iso, nowMs, i.display));
+export function roomUnits(ds: ApiUnitDetail[], i: I18n = EN, nowMs?: number): RoomUnit[] {
   const { t } = i;
   return [...ds].toSorted((a, b) => a.displayName.localeCompare(b.displayName)).map((d) => {
     const o = d.observedState;
@@ -30,7 +32,7 @@ export function roomUnits(ds: ApiUnitDetail[], i: I18n = EN): RoomUnit[] {
     return {
       id: d.id, version: d.version, name: d.displayName, set: set || t("No setting reported yet"), temp: temperatureText === null ? "—" : t("{temp} °C room", { temp: one(temperatureText) }),
       watts: kw === null ? "—" : `${String(Math.round(kw * 1000))} W`, power: runState(d.effectivePowerState),
-      conn: d.connection, seen: d.lastSeenAt ? showClock(d.lastSeenAt, i.display) : null, online: d.connection === "online",
+      conn: d.connection, seen: d.lastSeenAt ? clockOrDate(d.lastSeenAt, i, nowMs) : null, online: d.connection === "online",
     };
   });
 }
@@ -47,14 +49,14 @@ export interface PlanRow { id: string; name: string; change: string; result: "Wi
 /** Per AC: the commands that make its observed setting match the change (one commands.create per changed setting, as
 single control sends them), clamped to its capability range and an active temperature restriction (IR46), or the
 reason it is skipped (offline, no remote control, blocked, power-off restriction). */
-export function groupPlan(ds: ApiUnitDetail[], ch: GroupChange, i: I18n = EN): PlanRow[] {
+export function groupPlan(ds: ApiUnitDetail[], ch: GroupChange, i: I18n = EN, nowMs?: number): PlanRow[] {
   const { t } = i;
   const onOff = (v: boolean) => t(v ? "On" : "Off");
   return ds.map((d) => {
     const o = d.observedState;
     const cap = d.capabilities;
     const skip = (note: string): PlanRow => ({ id: d.id, name: d.displayName, change: "—", result: "Skipped", actions: [], note });
-    if (d.connection !== "online") return skip(d.lastSeenAt ? t("Offline since {time} — not sent", { time: showClock(d.lastSeenAt, i.display) }) : t("Offline — not sent"));
+    if (d.connection !== "online") return skip(d.lastSeenAt ? t("Offline since {time} — not sent", { time: clockOrDate(d.lastSeenAt, i, nowMs) }) : t("Offline — not sent"));
     if (!cap.control) return skip(t("No remote control on this model"));
     if (d.controlAvailability.state === "blocked") return skip(t("Control blocked ({reason})", { reason: d.controlAvailability.reasonKey.replace(/^errors?\./, "").replaceAll('_', " ") }));
     const restriction = d.effectiveControlPolicy.state === "restricted" ? d.effectiveControlPolicy.policy : null;

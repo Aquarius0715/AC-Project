@@ -19,10 +19,13 @@ import { orUnreachable } from "@ac/web/lib/unreachable";
 /** The customer alert inbox (FR-C08, DD-C08, Figma Client 06a/06b/06g) and the Alert policies tab (FR-C15, 06e/06f) from
 the Core API: filters in the URL, read state from the membership's notifications (opening an alert marks them read; the
 alert itself stays as it is). */
+const INFO_FIRST = 5;
 export function AlertsLiveView({ live }: Readonly<{ live: AlertsLive }>) {
   const t = useT();
   const patch = useUrlPatch();
   const [open, setOpen] = useState<InboxAlert | null>(null);
+  // reminders & info: the first few, the rest on request — 15 filter reminders pushed the rest of the page away (UI/UX loop R69)
+  const [isAllInfo, setIsAllInfo] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
   const [result, setResult] = useState<{ tone: "ok" | "warn" | "crit"; text: string } | null>(null);
   // opening the policy editor starts without the list's last message (adjust state during render, not in an effect)
@@ -37,11 +40,20 @@ export function AlertsLiveView({ live }: Readonly<{ live: AlertsLive }>) {
   const updated = showClock(live.now, live.display);
   const attn = live.rows.filter((a) => a.group === "attn");
   const info = live.rows.filter((a) => a.group === "info");
+  const shownInfo = isAllInfo ? info : info.slice(0, INFO_FIRST);
   const show = (a: InboxAlert) => {
     setOpen(a);
     // a read that gets no answer reads as unavailable (IR718)
     if (a.unread.length > 0) start(async () => { const f = await orUnreachable(() => readAlert(a.unread.map((n) => n.id)), (failure) => failure); if (f) setFailed(t("Not marked as read: {reason}", { reason: actionMessage(f, t) })); else refreshThen(() => { setFailed(null); }); });
   };
+  // the next steps of an alert, in its row and again in its detail, so opening it never loses them (UI/UX loop R98)
+  const renderActions = (a: InboxAlert) => (
+    <>
+      <Link href={`/customer/units/${a.unitId}`} className="rounded-control bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary">{t("View unit")}</Link>
+      {a.type === "maintenance" && a.status.state !== "resolved" && <Link href="/customer/maintenance?tab=filter-care" className="rounded-control bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary">{t("Book cleaning")}</Link>}
+      {a.cause === "fault" && a.group === "attn" && <Link href={`/customer/maintenance?new=${a.unitId}`} className="rounded-control bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary">{t("Request repair")}</Link>}
+    </>
+  );
   // a function, not a component: a component declared here would be a new type on every render and remount its rows
   const renderItem = (a: InboxAlert) => (
     <div key={a.id} className="flex w-full items-start gap-3 border-t border-line px-1 py-3 first:border-0">
@@ -54,11 +66,7 @@ export function AlertsLiveView({ live }: Readonly<{ live: AlertsLive }>) {
           </span>
           <span className="block text-xs text-muted-foreground">{a.where}</span><span className="mt-1 block text-xs">{a.evidence}</span>
         </Plain>
-        <div className="mt-2 flex flex-wrap gap-2">
-          <Link href={`/customer/units/${a.unitId}`} className="rounded-control bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary">{t("View unit")}</Link>
-          {a.type === "maintenance" && a.status.state !== "resolved" && <Link href="/customer/maintenance?tab=filter-care" className="rounded-control bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary">{t("Book cleaning")}</Link>}
-          {a.cause === "fault" && a.group === "attn" && <Link href={`/customer/maintenance?new=${a.unitId}`} className="rounded-control bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary">{t("Request repair")}</Link>}
-        </div>
+        <div className="mt-2 flex flex-wrap gap-2">{renderActions(a)}</div>
       </div>
       <Plain touch type="button" aria-label={t("Open {title}", { title: a.title })} onClick={() => { show(a); }} className="text-muted-foreground"><Icon name="chevronRight" /></Plain>
     </div>
@@ -71,7 +79,7 @@ export function AlertsLiveView({ live }: Readonly<{ live: AlertsLive }>) {
         <>
           <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
             <Select aria-label={t("Severity")} className="w-auto text-xs" value={live.severity ?? ""} onChange={(e) => { patch({ severity: e.target.value || null }); }}>
-              <option value="">{t("Severity: All")}</option><option value="critical">{t("Severity: Critical")}</option><option value="warning">{t("Severity: Warning")}</option>
+              <option value="">{t("Severity: All")}</option><option value="critical">{t("Severity: Critical")}</option><option value="warning">{t("Severity: Warning")}</option><option value="normal">{t("Severity: Info")}</option>
             </Select>
             <Select aria-label={t("Unit")} className="w-auto text-xs" value={live.unitId ?? ""} onChange={(e) => { patch({ unitId: e.target.value || null }); }}>
               <option value="">{t("Unit: All units")}</option>{live.units.map((u) => <option key={u.id} value={u.id}>{t("Unit: {name}", { name: `${u.name}${u.place ? ` · ${u.place}` : ""}` })}</option>)}
@@ -84,13 +92,14 @@ export function AlertsLiveView({ live }: Readonly<{ live: AlertsLive }>) {
             {attn.length > 0 ? attn.map((a) => renderItem(a)) : <p className="text-xs text-muted-foreground">{t(live.unreadOnly || live.severity ? "Nothing in this filter." : "Nothing needs your attention.")}</p>}
           </Card>
           <Card title={t("Reminders & information")} sub={t("Maintenance reminders, inspection records, notices and resolved alerts")} action={<Badge tone="muted">{info.length}</Badge>}>
-            {info.length > 0 ? info.map((a) => renderItem(a)) : <p className="text-xs text-muted-foreground">{t("Nothing here.")}</p>}
+            {info.length > 0 ? shownInfo.map((a) => renderItem(a)) : <p className="text-xs text-muted-foreground">{t("Nothing here.")}</p>}
+            {info.length > INFO_FIRST && <Btn size="sm" variant="ghost" className="mt-2" aria-expanded={isAllInfo} onClick={() => { setIsAllInfo((v) => !v); }}>{t(isAllInfo ? "Show the first {n}" : "Show all {total}", { n: INFO_FIRST, total: info.length })}</Btn>}
           </Card>
         </>
       ) : (
         <PoliciesLive p={live.policies} onDone={(text) => { setResult({ tone: "ok", text }); }} onFail={(f) => { setResult({ tone: f.code === "CONFLICT" || f.code === "FORBIDDEN" ? "warn" : "crit", text: policyRefusal(f, t) }); }} />
       )}
-      <Modal open={!!open} onClose={() => { setOpen(null); }} title={open?.title ?? ""} footer={<Btn onClick={() => { setOpen(null); }}>{t("Back to list")}</Btn>}>
+      <Modal open={!!open} onClose={() => { setOpen(null); }} title={open?.title ?? ""} footer={<>{open && <span className="mr-auto flex flex-wrap items-center gap-2">{renderActions(open)}</span>}<Btn onClick={() => { setOpen(null); }}>{t("Back to list")}</Btn></>}>
         {open && (
           <>
             <div className="flex flex-wrap gap-2"><SeverityBadge s={open.severity} /><Badge tone={open.status.tone}>{open.status.text}</Badge></div>

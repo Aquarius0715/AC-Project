@@ -4,7 +4,8 @@
 // (actions.ts). Texts in the display language; contract periods are Kuala Lumpur days (IR300). The Phase 1A demo keeps
 // the fixture rows.
 import { connection } from "next/server";
-import { apiMode, coreAll, coreDisplay, coreAllPage } from "@ac/web/lib/dal";
+import { apiMode, coreAll, coreDisplay, coreAllPage, corePermissions } from "@ac/web/lib/dal";
+import { canOpenRestrictions } from "@ac/web/lib/access";
 import { i18nOf } from "@ac/web/lib/i18n";
 import type { ApiCustomer, ApiProperty } from "@ac/web/lib/billing";
 import { contractRows, unitOptions, type ApiContractFull, type ApiUnitBrief, type PlanType } from "@ac/web/lib/contracts";
@@ -29,8 +30,8 @@ async function AdminContractsPageContent({ searchParams }: Readonly<PageProps<"/
   const kind = plans.find((p) => p === one("kind"));
   const scope = { customerId: one("customerId"), unitId: one("unitId"), kind };
   const where = { ...(scope.customerId && { customerId: scope.customerId }), ...(scope.unitId && { unitId: scope.unitId }) };
-  const [display, all, inScope, scoped, customers, properties, units] = await Promise.all([
-    coreDisplay(),
+  const [display, perms, all, inScope, scoped, customers, properties, units] = await Promise.all([
+    coreDisplay(), corePermissions(),
     coreAll<ApiContractFull>(CONTRACTS_LIST),
     Object.keys(where).length > 0 ? coreAll<ApiContractFull>(CONTRACTS_LIST, { filters: where }) : null, // the plan counts of the scope
     kind ? coreAll<ApiContractFull>(CONTRACTS_LIST, { filters: { ...where, kind } }) : null,
@@ -48,6 +49,7 @@ async function AdminContractsPageContent({ searchParams }: Readonly<PageProps<"/
         scope, rows, counts, selectedId: rows.find((r) => r.id === one("contractId"))?.id ?? rows[0]?.id ?? null,
         customers: customers.items.filter((c) => c.status === "active").map((c) => ({ id: c.id, name: c.name })),
         units: unitOptions(units.items, customers.items, properties.items, all),
+        canOpenRestrictions: canOpenRestrictions(perms),
       }}
     />
   );

@@ -1,7 +1,7 @@
 // HQ contracts (FR-A07, DATA_SOURCE=API): contracts.list, customers.list, properties.list and units.list projected for
 // the contract editor. Pure code shared by the Server Component and the client view. Texts in the display language
 // (`t` / `i`, IR300); contract periods are Kuala Lumpur business days, typed as such and written in the user's language.
-import { businessDay, money, type ApiCustomer, type ApiProperty } from "@ac/web/lib/billing";
+import { businessDay, money, planWord, type ApiCustomer, type ApiProperty } from "@ac/web/lib/billing";
 import { EN, translator, type I18n, type T } from "@ac/web/lib/i18n";
 import { codePoints } from "@ac/web/lib/text";
 import { isAfter } from "@ac/web/lib/order";
@@ -20,11 +20,8 @@ export interface ApiContractFull {
 export interface ApiUnitBrief { id: string; customerOrgId: string; propertyId: string; displayName: string; archived: boolean }
 
 export const planLabel: Record<PlanType, string> = { rto: "RTO", general: "General", energy: "Energy", environment: "Environment" };
-/** A plan type as the screen words it. */
-export const planWord = (p: PlanType, t: T = en) => {
-  const words = new Map(Object.entries({ rto: t("RTO"), general: t("General"), energy: t("Energy"), environment: t("Environment") }));
-  return words.get(p) ?? p; // a value the API adds before this table does
-};
+// planWord lives with the billing words (invoices and contract options name the plan too, UI/UX loop R136)
+export { planWord } from "@ac/web/lib/billing";
 
 export interface ContractRow {
   id: string; version: number; planType: PlanType; plan: string; customerId: string; cust: string; unitIds: string[]; units: string;

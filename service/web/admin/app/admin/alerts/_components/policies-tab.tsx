@@ -7,6 +7,7 @@ const HQ_OPERATOR = "hq-operator";
 const UNIT_ONLINE_RTO = "unit-online-rto";
 
 import { useState, useTransition } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Badge, Banner, Btn, Card, Check, Choice, EmptyState, Field, Input, ListRow, Modal, SearchSelect, Select, SeverityBadge, TextLink, Toggle, useToast, cx } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
 import { byCount, type T } from "@ac/web/lib/i18n";
@@ -16,6 +17,7 @@ import { ZONES } from "@ac/web/lib/preferences";
 import {
   blankPolicyDraft, policyChanges, policyErrors, recipientRole,
   type AdminPolicy, type ApiRecipient, type Channel, type DefaultRule, type PolicyRecipient,
+  attachBackHref,
 } from "@ac/web/lib/adminAlerts";
 import { deletePolicy, savePolicy } from "../actions";
 import { DefaultPolicyEditor } from "./default-policy";
@@ -113,6 +115,12 @@ function emptyPolicy(isMissing: boolean, isCreating: boolean, t: T): { title: st
 the selected one. A new policy (`sel.newFor`, started by “+ New policy”) starts as DD-A05 says (display time zone,
 off, priority 50) and is created by Save policy. Recipients are added from notifications.recipients; Delete policy
 detaches it from every unit. The demo keeps its fixture policies and saves nothing. */
+/** The toast after a save: a new policy made from a unit's Attach dialog goes back there to be ticked. */
+function savedText(isNew: boolean, isBack: boolean): string {
+  if (!isNew) return "Policy saved";
+  return isBack ? "Policy created — tick it to attach it to the unit" : "Policy created — attach it to units on each unit’s page";
+}
+
 export function PoliciesTab({ pols, live, sel, select, showOff = true, copyFor, onCopy }: Readonly<{
   pols: AdminPolicy[]; live?: PoliciesLive; sel: PolicySel; select: (policyId: string | null, creatingFor?: string | null) => void; showOff?: boolean;
   /** the scoped customer a default rule is copied for, else the copy asks for the owner (onCopy) */
@@ -120,6 +128,9 @@ export function PoliciesTab({ pols, live, sel, select, showOff = true, copyFor, 
 }>) {
   const t = useT();
   const toast = useToast();
+  const router = useRouter();
+  // opened from a unit's Attach dialog: after creating, back to that unit with the new policy ticked (UI/UX loop R44)
+  const returnTo = attachBackHref(useSearchParams().get("returnTo"));
   const [pending, startTransition] = useTransition();
   const refreshThen = useRefreshThen(pending);
   const canWrite = live?.canWrite ?? true;
@@ -168,9 +179,11 @@ export function PoliciesTab({ pols, live, sel, select, showOff = true, copyFor, 
       const r = await reached(() => savePolicy(draft)); // no answer reads as unavailable (IR718)
       if (!r.ok) { toast(actionMessage(r, t), "crit"); return; }
       refreshThen(() => {
-        toast(t(isNew ? "Policy created — attach it to units on each unit’s page" : "Policy saved"));
+        const back = isNew && r.id ? attachBackHref(returnTo, r.id) : null;
+        toast(t(savedText(isNew, !!back)));
         setTried(false);
-        if (isNew && r.id) select(r.id);
+        if (back) router.push(back);
+        else if (isNew && r.id) select(r.id);
       });
     });
   };
@@ -223,6 +236,7 @@ export function PoliciesTab({ pols, live, sel, select, showOff = true, copyFor, 
         {draft?.kind === DEFAULT_ALERT && p && (
           <DefaultPolicyEditor p={p} customers={customers} units={units} canWrite={canWrite} copyFor={copyFor} onCopy={onCopy} demo={!live} />
         )}
+        {returnTo && isNew && <Banner>{t("After you create it, you go back to the unit with this policy ready to attach.")} <TextLink href={returnTo}>{t("Back to the unit without creating")}</TextLink></Banner>}
         {draft && !(draft.kind === DEFAULT_ALERT && p) && (
           <PolicyEditorCard draft={draft} p={p} isNew={isNew} errors={errors} tried={tried} canWrite={canWrite} demo={!live} set={set} patch={(c) => { setDraft((d) => (d ? { ...d, ...c } : d)); }}
             changes={changes} status={status} problems={problems} pending={pending} previewUnit={previewUnit} testUnit={testUnit}

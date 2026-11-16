@@ -30,9 +30,10 @@ describe("HQ billing (FR-A08, FR-A23, DD-A08)", () => {
     expect([invoiceStatus(invoice({}), NOW), invoiceStatus(invoice({ dueAt: "2026-09-20T16:00:00Z" }), NOW), invoiceStatus(invoice({ status: PROCESSING }), NOW), invoiceStatus(invoice({ status: "paid" }), NOW)])
       .toStrictEqual(["Overdue", "Unpaid", "Processing", "Paid"]);
     const [a, b] = invoiceRows([invoice({}), invoice({ id: "i2", contractId: "kx", paymentMethod: "demo_credit_card", paymentStatus: PROCESSING, status: PROCESSING })], contracts, customers, NOW);
-    expect(a).toMatchObject({ amt: "120.00 MYR", meta: "Demo Customer A · rto contract v1 · August 2026", method: "Method not selected", methodName: "Method not selected", paymentState: null, st: "Overdue", period: "1 Aug 2026 → 1 Sept 2026", due: "10 Sept 2026" });
+    expect(a).toMatchObject({ amt: "120.00 MYR", meta: "Demo Customer A · RTO contract v1 · August 2026", method: "Method not selected", methodName: "Method not selected", paymentState: null, st: "Overdue", period: "1 Aug 2026 → 1 Sept 2026", due: "10 Sept 2026" });
     expect(b).toMatchObject({ meta: "customer · kx · August 2026", method: "Credit card · processing", methodName: "Credit card", paymentState: PROCESSING, customerId: "" });
-    expect([totals([must(a), must(b)], ["Overdue", "Processing"]), totals([must(a)], ["Paid"])]).toStrictEqual(["240.00 MYR", "0.00"]);
+    expect([totals([must(a), must(b)], ["Overdue", "Processing"]), totals([must(a)], ["Paid"])]).toStrictEqual(["240.00 MYR", "0.00 MYR"]);
+    expect(totals([], ["Paid"])).toBe("0.00");
   });
 
   it("words the payments of an invoice, inquiries, contracts and payout statements", () => {
@@ -49,7 +50,7 @@ describe("HQ billing (FR-A08, FR-A23, DD-A08)", () => {
     expect(inquiryRows([{ ...iq, id: "q0", state: "answered", createdAt: "2026-09-15T00:00:00Z", subjectType: "restriction" }, iq], customers).map((r) => [r.id, r.kind, r.at, r.text])).toStrictEqual([
       ["q1", "Payment", "14 Sept 2026, 10:00 am MYT", "“Paid already”"], ["q0", "Cooling restriction", "15 Sept 2026, 8:00 am MYT", "“Paid already”"],
     ]); // received first
-    expect(contractOptions(contracts, [])[0]?.label).toBe("customer · rto · 120.00 MYR");
+    expect(contractOptions(contracts, [])[0]?.label).toBe("customer · RTO · 120.00 MYR");
     expect(statementRows([statement], [{ id: "org-p", name: "CoolFix", kind: "contractor" }])).toStrictEqual([{
       id: "s1", version: 2, contractor: "CoolFix", period: "Aug 2026", status: "Approved", jobs: 2, net: "250.00 MYR", statusText: "Approved · pays 15 Sept 2026", queryCount: 2, openQueries: 1,
     }]);
@@ -84,7 +85,7 @@ describe("HQ billing in Malay with the display time zone (IR299)", () => {
     const t = translator("ms");
     expect([businessDay("2026-09-09T16:00:00Z", "ms"), billingMonth("2026-07-31T16:00:00Z", "ms")]).toStrictEqual(["10 Sep 2026", "Ogos 2026"]); // Kuala Lumpur days, not Tokyo's
     const [r] = invoiceRows([invoice({ paymentMethod: "demo_debit_card", paymentStatus: "failed" })], contracts, [], NOW, MS);
-    expect(r).toMatchObject({ meta: "pelanggan · kontrak rto v1 · Ogos 2026", method: "Kad debit · gagal", period: "1 Ogo 2026 → 1 Sep 2026", due: "10 Sep 2026" });
+    expect(r).toMatchObject({ meta: "pelanggan · kontrak RTO v1 · Ogos 2026", method: "Kad debit · gagal", period: "1 Ogo 2026 → 1 Sep 2026", due: "10 Sep 2026" });
     expect([paymentWord("initiated", t), paymentWord("refunded", t), statementWord("Draft", t), statementWord("Paid", t)]).toStrictEqual(["dimulakan", "refunded", "Draf", "Dibayar"]);
     const iq: ApiInquiry = { id: "q1", version: 1, customerId: "cx", invoiceId: null, restrictionId: "r1", subjectType: "restriction", message: "Why?", state: "received", reply: null, createdAt: "2026-09-14T02:00:00Z" };
     expect(inquiryRows([iq], customers, MS)[0]).toMatchObject({ cust: "pelanggan", kind: "Sekatan penyejukan", at: "14 Sep 2026, 11:00 PG GMT+9" });

@@ -1,6 +1,7 @@
 // Admin dashboard KPIs (FR-A01, IR115): admin.summary projected into the KPI tiles. Pure code shared by the
 // Server Component that reads it and the client view. Texts in the display language (`t` / `i`, IR289); the as-of time
 // in the user's display time zone (IR44), the period in Kuala Lumpur days (named so).
+import { upperFirst } from "@ac/web/lib/text";
 import { isNone } from "@ac/web/lib/isNone";
 import { byCount, EN, showClock, translator, type I18n, type T } from "@ac/web/lib/i18n";
 import { statusWord } from "@ac/web/lib/partnerJobDetail";
@@ -135,7 +136,8 @@ export function axisRows(s: AdminSummary, links: ReturnType<typeof overviewLinks
 /** All ten job statuses in pipeline order, zeros included (DD-A01); each links to the Jobs tab stage when it has one. */
 const JOB_STATUSES = ["requested", "offered", "accepted", "assigned", "in_progress", "submitted", "completed", "rework_requested", "on_hold", "cancelled"] as const;
 export function jobRows(counts: Record<string, number>, links: ReturnType<typeof overviewLinks>, t: T = en) {
-  return JOB_STATUSES.map((st) => ({ status: st, label: statusWord(st, t), count: lookup(counts, st) ?? 0, href: links.jobs(st === "cancelled" ? undefined : st) }));
+  // the status word starts a row label like the power and connection rows beside it ("Running"), not mid-sentence (UI/UX loop R94)
+  return JOB_STATUSES.map((st) => ({ status: st, label: upperFirst(statusWord(st, t)), count: lookup(counts, st) ?? 0, href: links.jobs(st === "cancelled" ? undefined : st) }));
 }
 
 /** The billing card: overdue invoices and one row per currency, never summed across currencies; forbidden without billing.read. */

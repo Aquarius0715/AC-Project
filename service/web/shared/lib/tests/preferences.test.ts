@@ -19,6 +19,6 @@ describe("Preferences (FR-X01, DDC-07, IR246)", () => {
 
   it("states when the location consent was granted or withdrawn", () => {
     const c = { id: "c1", version: 2, granted: true, grantedAt: "2026-09-14T01:00:00Z", revokedAt: null };
-    expect([consentNote(c), consentNote({ ...c, granted: false, revokedAt: "2026-09-15T02:00:00Z" }), consentNote(null)]).toStrictEqual(["Granted 14 Sept 2026", "Withdrawn 15 Sept 2026", "Not granted yet"]); // the dates as other screens write them (UI/UX loop R36)
+    expect([consentNote(c), consentNote({ ...c, granted: false, revokedAt: "2026-09-15T02:00:00Z" }), consentNote(null)]).toStrictEqual(["Granted 14 Sept 2026, 9:00 am MYT", "Withdrawn 15 Sept 2026, 10:00 am MYT", "Not granted yet"]);
   });
 });

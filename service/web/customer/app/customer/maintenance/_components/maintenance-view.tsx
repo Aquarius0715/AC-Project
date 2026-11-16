@@ -1,6 +1,7 @@
 "use client";
 const MY_REQUESTS = "My requests";
 
+import { unitsByProperty } from "@ac/web/lib/clientBilling";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
@@ -135,7 +136,7 @@ function JobDetail({ d, open, onDone, onFail }: Readonly<{ d: Detail; open: (m: 
   const status = j.slotProposal?.status === "pending" ? "time_proposed" : j.status;
   const isClosed = j.status === "completed" || j.status === "cancelled";
   return (
-    <Card title={j.id.slice(0, 8)} sub={`${d.unit.name} — ${j.origin === "periodic_plan" ? t("periodic inspection") : j.symptom.slice(0, 48)}`} className="self-start"
+    <Card title={d.unit.name} sub={`${j.origin === "periodic_plan" ? t("periodic inspection") : j.symptom.slice(0, 48)} · ${j.id.slice(0, 8)}`} className="self-start"
       action={<div className="flex items-center gap-2"><JobStatusBadge s={status} client /><Link href="/customer/maintenance" aria-label={t("Close")} className="rounded px-2 text-muted-foreground hover:bg-surface2"><Icon name="close" /></Link></div>}>
       <SummaryList items={d.facts} />
       {d.preferred.length > 0 && (
@@ -253,7 +254,7 @@ function NewRequest({ live, prefill, onClose, onFail }: ModalProps & { live: Mai
   };
   return (
     <Modal open wide onClose={() => { onClose(); }} title={t("New maintenance request")} footer={<><Btn onClick={() => { onClose(); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={submit}>{t("Submit request")}</Btn></>}>
-      <Field label={t("Unit")} error={tried ? unitError ?? undefined : undefined}><Select id={ids.unit} value={unitId} onChange={(e) => { setUnitId(e.target.value); }}><option value="" disabled>{t("Choose an AC…")}</option>{live.units.map((u) => <option key={u.id} value={u.id}>{u.name}{u.place ? ` · ${u.place}` : ""}</option>)}</Select></Field>
+      <Field label={t("Unit")} error={tried ? unitError ?? undefined : undefined}><Select id={ids.unit} value={unitId} onChange={(e) => { setUnitId(e.target.value); }}><option value="" disabled>{t("Choose an AC…")}</option>{unitsByProperty(live.units).map((g) => <optgroup key={g.property} label={g.property || t("Other")}>{g.units.map((u) => <option key={u.id} value={u.id}>{u.label}</option>)}</optgroup>)}</Select></Field>
       <Field label={t("Type")}><Choice value={type} onChange={setType} options={[{ id: "reactive", label: t("Repair") }, { id: "preventive", label: t("Preventive") }]} /></Field>
       <Field label={t("Symptoms (10–2000 characters)")} error={tried ? symError ?? undefined : undefined} hint={`${String(symptomLength(sym))} / 2000`}><Textarea id={ids.sym} value={sym} onChange={(e) => { setSym(e.target.value); }} placeholder={t("Cold air is weak and there is water dripping from the indoor unit.")} /></Field>
       <TimesInput rows={rows} onChange={setRows} error={tried ? slotError : null} firstId={ids.times} />

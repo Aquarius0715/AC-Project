@@ -123,7 +123,9 @@ export function TechDevicesView({ live }: Readonly<{ live: TechDevicesLive }>) {
           </Plain>
         ))}</div>
         <div className="flex flex-wrap items-center gap-2"><div className="w-64"><Search placeholder={t("Search serial, device or unit…")} value={q} onChange={setQ} /></div>
-          {live.canMaintain && <Btn variant="primary" disabled={live.register.length === 0} title={live.register.length > 0 ? undefined : t("Every assigned unit already has a device")} onClick={() => { setReg(blankRegistration(live.register)); setErrors({}); setModal("register"); }}><Icon name="add" /> {t("Register device")}</Btn>}</div>
+          {live.canMaintain && <Btn variant="primary" disabled={live.register.length === 0} onClick={() => { setReg(blankRegistration(live.register)); setErrors({}); setModal("register"); }}><Icon name="add" /> {t("Register device")}</Btn>}
+          {/* why it is off, in words beside it: a tooltip never shows on a touch screen or on a disabled button (UI/UX loop R117) */}
+          {live.canMaintain && live.register.length === 0 && <span className="text-[11px] text-muted-foreground">{t("Every assigned unit already has a device")}</span>}</div>
       </div>
       {refused && <Banner tone="crit">{refused}</Banner>}
       <div className="split-rev">
@@ -132,7 +134,7 @@ export function TechDevicesView({ live }: Readonly<{ live: TechDevicesLive }>) {
             <div className="flex flex-col gap-2">{shown.map((r) => (
               <ListRow key={r.id} selected={dv?.row.id === r.id} onClick={() => { open(r.id); }}>
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-2"><b className="whitespace-nowrap text-[13px]">{r.serial}</b><span className="flex flex-wrap items-center justify-end gap-1"><ConnBadge s={r.conn} />{r.tamper && <Badge tone="warn">{t("Tamper")}</Badge>}{r.connText && <span className="text-[10px] text-muted-foreground">{r.connText}</span>}</span></div>
+                  <div className="flex items-center justify-between gap-2"><b className="whitespace-nowrap text-[13px]">{r.serial}</b><span className="flex flex-wrap items-center justify-end gap-1"><ConnBadge s={r.conn} offlineTone="crit" />{r.tamper && <Badge tone="warn">{t("Tamper")}</Badge>}{r.connText && <span className="text-[10px] text-muted-foreground">{r.connText}</span>}</span></div>
                   <div className="truncate text-[11px] text-muted-foreground">{r.id.slice(0, 8)}</div>
                   <div className="flex justify-between gap-2 text-[11px] text-muted-foreground"><span className="truncate">{r.unit}</span><span>{t("fw {version}", { version: r.fw })}</span></div>
                 </div>

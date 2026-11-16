@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Badge, Banner, Card, EmptyState, Kpi, LinkButton, Page, Select, SeverityBadge, TextLink, cx, Plain, ScrollX } from "@ac/web/components/ui";
+import { Badge, Banner, Card, EmptyState, Kpi, LinkButton, Page, Select, SeverityBadge, Tabs, TextLink, cx, Plain, ScrollX } from "@ac/web/components/ui";
 import { OriginBadge } from "@ac/web/components/JobBits";
 import { useT } from "@ac/web/components/I18n";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
@@ -31,9 +31,8 @@ export function OverviewView({ live }: Readonly<{ live: OverviewLive }>) {
         </Banner>
       )}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div role="tablist" className="flex flex-wrap gap-2">
-          {live.tabs.map((x) => <Plain key={x.id} role="tab" aria-selected={live.tab === x.id} onClick={() => { patch({ tab: x.id === "today" ? null : x.id }); }} className={cx("rounded-control border px-3 py-1.5 text-[13px] font-semibold", live.tab === x.id ? "border-primary bg-primary text-white" : "border-line bg-surface text-ink hover:bg-surface2")}>{x.label} ({x.count})</Plain>)}
-        </div>
+        {/* the shared tab strip with count badges, as the other apps' lists use (UI/UX loop R116) */}
+        <Tabs value={live.tab} onChange={(id) => { patch({ tab: id === "today" ? null : id }); }} tabs={live.tabs.map((x) => ({ id: x.id, label: x.label, count: x.count }))} />
         <Select aria-label={t("Sort")} className="w-auto" value={live.sort} onChange={(e) => { patch({ sort: e.target.value === "severity" ? null : e.target.value }); }}>{live.sorts.map((s) => <option key={s.id} value={s.id}>{s.text}</option>)}</Select>
       </div>
       <Card title={live.title}>

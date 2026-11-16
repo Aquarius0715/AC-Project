@@ -118,7 +118,7 @@ export function kpis(c: ApiTechCounts, rows: TechJobRow[], t: T = en): KpiTile[]
   const notStarted = rows.filter((r) => r.status === "assigned");
   return [
     { label: t("Assigned units"), value: c.total, sub: t("in your assignments") },
-    { label: t("Not started"), value: c.scheduledCount, sub: notStarted.length > 0 ? notStarted.slice(0, 3).map((r) => r.short).join(", ") : "—", tone: c.scheduledCount ? "warn" : undefined },
+    { label: t("Not started"), value: c.scheduledCount, sub: notStarted.length > 0 ? notStarted.slice(0, 3).map((r) => r.short).join(", ") : t("No jobs waiting to start"), tone: c.scheduledCount ? "warn" : undefined },
     { label: t("Overdue"), value: c.overdueCount, sub: t(c.overdueCount ? "past the due date" : "No overdue jobs"), tone: c.overdueCount ? "crit" : "ok" },
   ];
 }
@@ -139,11 +139,19 @@ export function dayTimeline(rows: TechJobRow[], now: number): { hours: string[];
 
 export interface AlertRow { id: string; title: string; sub: string; severity: ApiAlert["severity"]; href: string }
 const ALERT_STATE: Record<string, string> = { open: "open", acknowledged: "acknowledged", resolved: "resolved" };
-/** Open alerts on the assigned units, worst first; each opens the unit's alerts with its job. */
+/** The current (not completed or cancelled) assigned job of each unit: the units the overview's KPI counts. */
+export function currentJobOfUnit(jobs: ApiTechJobRow[]): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const j of jobs) if (j.projection === "summary" && j.status !== "completed" && j.status !== "cancelled" && !out.has(j.unitId)) out.set(j.unitId, j.id);
+  return out;
+}
+
+/** Open alerts on the assigned units only, worst first; each opens the unit's alerts with its job. alerts.list reads
+every unit the technician may see, which is wider than the assignments (UI/UX loop R49, decided 2026-11-15). */
 export function alertRows(alerts: ApiAlert[], units: Map<string, string>, jobOfUnit: Map<string, string>, i: I18n = EN): AlertRow[] {
   const { t, display } = i;
   const rank = { critical: 0, warning: 1, normal: 2 } as const;
-  return alerts.filter((a) => a.status !== "resolved").toSorted((a, b) => rank[a.severity] - rank[b.severity] || Date.parse(b.detectedAt) - Date.parse(a.detectedAt)).map((a) => {
+  return alerts.filter((a) => a.status !== "resolved" && jobOfUnit.has(a.unitId)).toSorted((a, b) => rank[a.severity] - rank[b.severity] || Date.parse(b.detectedAt) - Date.parse(a.detectedAt)).map((a) => {
     const job = jobOfUnit.get(a.unitId);
     return {
       id: a.id, title: alertTitle(a, t), severity: a.severity, href: `/technician/units/${a.unitId}/alerts?${wrapped(job, "jobId=", "&")}alertId=${a.id}`,

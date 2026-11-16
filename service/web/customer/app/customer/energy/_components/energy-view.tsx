@@ -33,6 +33,12 @@ function savingClass(s: { comparable: boolean; increase: boolean }): string {
   if (!s.comparable) return "text-muted-foreground";
   return s.increase ? "text-warn" : "text-ok";
 }
+/** The chart's title names a baseline only when one is chosen (otherwise only actual energy is drawn). */
+function chartTitle(isMulti: boolean, hasBaseline: boolean): string {
+  if (isMulti) return "Daily actual energy by unit";
+  return hasBaseline ? "Daily energy — Actual vs Baseline" : "Daily energy";
+}
+
 export function EnergyView({ live }: Readonly<{ live: EnergyLive }>) {
   const t = useT();
   const nav = useUrlPatch();
@@ -65,7 +71,8 @@ export function EnergyView({ live }: Readonly<{ live: EnergyLive }>) {
             ) : (
               <DataTable rows={live.daily} rowKey={(d) => d.label} cols={[
                 { key: "d", label: t("Day"), render: (d) => d.label }, { key: "a", label: t("Actual (kWh)"), render: (d) => (d.actual === null ? "—" : one(d.actual)) },
-                { key: "b", label: t("Baseline (kWh)"), render: (d) => (d.baseline === null ? "—" : one(d.baseline)) },
+                // the baseline column only with a baseline, as the chart draws it (a column of dashes said nothing; UI/UX loop R70)
+                ...(raw.baseline === null ? [] : [{ key: "b", label: t("Baseline (kWh)"), render: (d: (typeof live.daily)[number]) => (d.baseline === null ? "—" : one(d.baseline)) }]),
               ]} />
             );
   };
@@ -84,7 +91,8 @@ export function EnergyView({ live }: Readonly<{ live: EnergyLive }>) {
             {/* the periods are Kuala Lumpur days (REV18-035), so the custom range is typed in Kuala Lumpur time and says so */}
             <Field label={t("From")} hint="Asia/Kuala_Lumpur"><DateTimeSelect value={from} onChange={(v) => { setFrom(v); }} /></Field>
             <Field label={t("To")} hint="Asia/Kuala_Lumpur"><DateTimeSelect value={to} onChange={(v) => { setTo(v); }} /></Field>
-            <Btn size="sm" variant="primary" onClick={() => { nav({ period: "custom", from, to }); }}>{t("Apply")}</Btn>
+            {/* off until a bound changes, as MRV's Apply is: applying the period already shown changes nothing (UI/UX loop R122) */}
+            <Btn size="sm" variant="primary" disabled={from === klLocal(live.period.from) && to === klLocal(live.period.to)} onClick={() => { nav({ period: "custom", from, to }); }}>{t("Apply")}</Btn>
             {live.period.error && <span className="text-xs text-crit">{live.period.error}</span>}
           </div>
         )}
@@ -115,7 +123,7 @@ export function EnergyView({ live }: Readonly<{ live: EnergyLive }>) {
             sub={s.comparable ? t("{percent} · {cost} vs {baseline} baseline", { percent: s.percent, cost: s.savedCost, baseline: s.baseline }) : noSavings} />
           <Kpi label={t("Data coverage")} value={s.coverage} sub={t(r.coverage === 1 ? "All expected minutes observed" : "Missing readings are not filled in")} />
         </div>
-        <Card title={t(isMulti ? "Daily actual energy by unit" : "Daily energy — Actual vs Baseline")} sub={isMulti ? t("kWh per day · max 4 units · baselines are compared in the table") : chartSub}
+        <Card title={t(chartTitle(isMulti, live.baselineId !== null))} sub={isMulti ? t("kWh per day · max 4 units · baselines are compared in the table") : chartSub}
           action={<Tabs value={view} onChange={setView} tabs={[{ id: "chart", label: t("Chart") }, { id: "table", label: t("Table") }]} />}>
           {chartBody(s, r)}
           {isMulti && <p className="mt-3 text-[11px] text-muted-foreground">{t("Totals across units are shown only when all units share the same calculation boundary; increases are labelled, never shown as a negative saving.")}</p>}

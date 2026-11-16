@@ -1,4 +1,5 @@
 "use client";
+const NEW_POLICY_FOR = "New policy for {name}";
 const ADD_PROPERTY = "Add property";
 const VERSION_V = "version {v}";
 const DEFAULT_ALERT = "default_alert";
@@ -6,7 +7,7 @@ const REASON_REQUIRED = "Reason · required";
 const MAINTENANCE_CONTRACT = "Maintenance contract";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Badge, Banner, Btn, Card, Check, Choice, ConnBadge, cx, DataTable, EmptyState, Field, Input, Kpi, LinkButton, Modal, Page, PowerBadge, Search, Select, SummaryList, Tabs, Textarea, TextLink, Toggle, ActionMenu, Plain } from "@ac/web/components/ui";
 import { useI18n, useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
@@ -113,7 +114,9 @@ function CustomerList({ live }: Readonly<{ live: UnitsLive }>) {
         <Kpi label={t("Customers")} value={k.customers} sub={k.inactive ? t("+{n} inactive (not counted)", { n: k.inactive }) : t("all active")} />
         <Kpi label={t("Properties")} value={k.properties} sub={k.propertyNames} />
         <Kpi label={t("Units")} value={k.units} sub={k.power} />
-        <Kpi label={t("Needs attention")} value={k.attention} tone={k.attention ? "warn" : undefined} sub={t(live.standingKnown ? "overdue billing / restriction / open alert" : "open alerts (billing needs billing.read)")} />
+        <Kpi label={t("Needs attention")} value={k.attention} tone={k.attention ? "warn" : undefined}
+          badge={live.standingKnown && k.attention > 0 && <Plain type="button" touch className="text-xs font-semibold text-primary hover:underline" aria-pressed={contract === "attention"} onClick={() => { setContract(contract === "attention" ? "all" : "attention"); }}>{t(contract === "attention" ? "Clear filter" : "Show these")}</Plain>}
+          sub={t(live.standingKnown ? "overdue billing / restriction / open alert" : "open alerts (billing needs billing.read)")} />
       </div>
       <Card title={t("Customers")} sub={t("Select a customer to manage its properties, spaces and units")} action={live.canWrite && <Btn size="sm" variant="primary" onClick={() => { setOpen(true); }}><Icon name="add" /> {t("New customer")}</Btn>}>
         <div className="mb-3 flex flex-wrap items-center gap-3">
@@ -121,7 +124,7 @@ function CustomerList({ live }: Readonly<{ live: UnitsLive }>) {
           <Select aria-label={t("Status")} className="w-auto" value={status} onChange={(e) => { setStatus(oneOf(["active", "all"] as const, e.target.value, status)); }}><option value="active">{t("Status: Active")}</option><option value="all">{t("Status: All")}</option></Select>
           {live.standingKnown && (
             <Select aria-label={t("Contract")} className="w-auto" value={contract} onChange={(e) => { setContract(oneOf(contractFilters, e.target.value, contract)); }}>
-              <option value="all">{t("Contract: All")}</option><option value="overdue">{t("Overdue")}</option><option value="restricted">{t("Restriction")}</option><option value="good">{t("Good standing")}</option><option value="none">{t("No contract")}</option>
+              <option value="all">{t("Contract: All")}</option><option value="attention">{t("Needs attention")}</option><option value="overdue">{t("Overdue")}</option><option value="restricted">{t("Restriction")}</option><option value="good">{t("Good standing")}</option><option value="none">{t("No contract")}</option>
             </Select>
           )}
         </div>
@@ -186,6 +189,10 @@ function CustomerScreen({ live, c }: Readonly<{ live: UnitsLive; c: CustomerLive
   const canWrite = live.canWrite;
   const sel = c.selection;
   const selId = selectionId(sel);
+  // one New unit in view: the header's only where the units card (which has its own) is not shown, and never next to the
+  // Users or Alert policies tab's own primary action (UI/UX loop R100)
+  const isUnitsTab = c.tab !== "policies" && c.tab !== "users";
+  const isHeaderNewUnit = isUnitsTab && (Boolean(c.unit) || !sel);
   const addUnitHere = () => { setM({ kind: "unit", propertyId: sel?.property.id ?? c.tree[0]?.id ?? "", spaceId: sel?.kind === "space" ? sel.space.id : "" }); };
   const unitsTotal = c.tree.reduce((n, p) => n + p.units, 0);
   return (
@@ -197,8 +204,10 @@ function CustomerScreen({ live, c }: Readonly<{ live: UnitsLive; c: CustomerLive
         {/* the actions wrap at phone width: three in Malay are wider than 360 px (IR730) */}
         <div className="ml-auto flex flex-wrap justify-end gap-2">
           {canWrite && <Btn size="sm" onClick={() => { setM({ kind: "customer" }); }}>{t("Edit customer")}</Btn>}
-          {canWrite && <Btn size="sm" variant="danger" onClick={() => { setM({ kind: "deleteCustomer" }); }}>{t("Delete customer…")}</Btn>}
-          {canWrite && r.status === "active" && c.tree.length > 0 && <Btn size="sm" variant="primary" onClick={addUnitHere}><Icon name="add" /> {t("New unit")}</Btn>}
+          {/* a customer with units is refused even with force (Units … still stop it): off up front, with the reason (UI/UX loop R134) */}
+          {canWrite && <Btn size="sm" variant="danger" disabled={r.units > 0} onClick={() => { setM({ kind: "deleteCustomer" }); }}>{t("Delete customer…")}</Btn>}
+          {canWrite && r.units > 0 && <span className="self-center text-xs text-muted-foreground">{t("Has units — a customer with units cannot be deleted")}</span>}
+          {canWrite && r.status === "active" && c.tree.length > 0 && isHeaderNewUnit && <Btn size="sm" variant="primary" onClick={addUnitHere}><Icon name="add" /> {t("New unit")}</Btn>}
         </div>
       </div>
       <Card>
@@ -386,7 +395,10 @@ function UnitEdit({ live, c, x, nav, run, pending }: Readonly<{ live: UnitsLive;
   const [source, setSource] = useState(key);
   const [d, setD] = useState<UnitDraft>(unitDraft(u));
   const [tried, setTried] = useState(false);
-  const [modal, setModal] = useState<null | "relocate" | "delete" | "attach">(null);
+  // back from creating a policy in its Attach dialog (?attach=<policy>): the dialog reopens with it ticked (UI/UX loop R44)
+  const attachId = useSearchParams().get("attach");
+  const [modal, setModal] = useState<null | "relocate" | "delete" | "attach">(attachId && c.canAttach && !u.archived ? "attach" : null);
+  const closeAttach = () => { setModal(null); if (attachId) nav({ attach: null }); };
   if (source !== key) { // the form restarts from each saved unit version (adjust state during render)
     setSource(key);
     setD(unitDraft(u));
@@ -467,8 +479,8 @@ function UnitEdit({ live, c, x, nav, run, pending }: Readonly<{ live: UnitsLive;
       {modal === "delete" && <DeleteUnitModal x={x} pending={pending} onClose={() => { setModal(null); }}
         onArchive={(reason) => { run(() => archiveUnit(u.id, u.version, reason), t("“{name}” taken out of use", { name: u.displayName }), () => { setModal(null); nav({ unitId: null }); }); }}
         onDelete={(reason) => { run(() => deleteUnit(u.id, u.version, reason), t("“{name}” deleted", { name: u.displayName }), () => { setModal(null); nav({ unitId: null }); }); }} />}
-      {modal === "attach" && <AttachModal c={c} unit={u.displayName} attached={attachedIds} pending={pending} onClose={() => { setModal(null); }}
-        onSave={(ids) => { run(() => setUnitPolicies(u.id, u.version, [...attachedIds, ...ids]), count(t, ids.length, "1 policy attached", "{n} policies attached"), () => { setModal(null); }); }} />}
+      {modal === "attach" && <AttachModal c={c} unit={u.displayName} attached={attachedIds} preset={attachId} pending={pending} onClose={closeAttach}
+        onSave={(ids) => { run(() => setUnitPolicies(u.id, u.version, [...attachedIds, ...ids]), count(t, ids.length, "1 policy attached", "{n} policies attached"), closeAttach); }} />}
     </>
   );
 }
@@ -482,7 +494,7 @@ function PoliciesTab({ c, run, pending }: Readonly<{ c: CustomerLive; run: Run; 
   return (
     <>
       <Card title={t("Alert policies of {name}", { name: c.row.name })} sub={t("Policies belong to the customer. Each unit picks which of them it carries (unit edit › Alert policies). Air-quality limits are alert policies too.")}
-        action={<LinkButton size="sm" variant="primary" href={`/admin/alerts?tab=policies&customerId=${c.row.id}&new=${c.row.id}`}><Icon name="add" /> {t("New policy for {name}", { name: c.row.name })}</LinkButton>}>
+        action={<LinkButton size="sm" variant="primary" href={`/admin/alerts?tab=policies&customerId=${c.row.id}&new=${c.row.id}`}><Icon name="add" /> {t(NEW_POLICY_FOR, { name: c.row.name })}</LinkButton>}>
         <DataTable rows={c.policies} rowKey={(p) => p.id} onRowClick={(p) => { router.push(`/admin/alerts?tab=policies&customerId=${c.row.id}&policyId=${p.id}`); }} cols={[
           { key: "n", label: t("Policy"), render: (p) => <><b>{p.name}</b>{!p.enabled && <Badge className="ml-2">{t("Off")}</Badge>}</> },
           { key: "t", label: t("Type"), render: (p) => <Badge tone={p.kind === DEFAULT_ALERT ? "primary" : "muted"}>{p.type}</Badge> },
@@ -694,15 +706,19 @@ function DeleteUnitModal({ x, pending, onClose, onArchive, onDelete }: Readonly<
   );
 }
 
-function AttachModal({ c, unit, attached, pending, onClose, onSave }: Readonly<{ c: CustomerLive; unit: string; attached: string[]; pending: boolean; onClose: () => void; onSave: (ids: string[]) => void }>) {
+function AttachModal({ c, unit, attached, preset, pending, onClose, onSave }: Readonly<{ c: CustomerLive; unit: string; attached: string[]; preset: string | null; pending: boolean; onClose: () => void; onSave: (ids: string[]) => void }>) {
   const t = useT();
-  const [pick, setPick] = useState<string[]>([]);
   const options = (c.policies ?? []).filter((p) => p.kind === "alert");
+  const [pick, setPick] = useState<string[]>(() => (preset && !attached.includes(preset) && options.some((p) => p.id === preset) ? [preset] : []));
+  // a policy made for this customer comes back here, to this unit with its dialog open (no hunting for the unit again)
+  const params = useSearchParams();
+  const here = `${usePathname()}?${new URLSearchParams([...params.entries()].filter(([k]) => k !== "attach")).toString()}`;
+  const policyFormHref = `/admin/alerts?tab=policies&customerId=${encodeURIComponent(c.row.id)}&new=${encodeURIComponent(c.row.id)}&returnTo=${encodeURIComponent(here)}`;
   return (
     <Modal open onClose={onClose} title={t("Attach policies to {unit}", { unit })} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending || pick.length === 0} onClick={() => { onSave(pick); }}>{pick.length > 0 ? count(t, pick.length, "Attach 1 policy", "Attach {n} policies") : t("Attach policy")}</Btn></>}>
       <div className="flex flex-col gap-2">
         <p className="text-[13px] text-muted-foreground">{t("Showing {name}’s policies only. The default policy is always on and not listed.", { name: c.row.name })}</p>
-        {options.length === 0 && <EmptyState title={t("No customer policies yet")}>{t("Create one in Alert policies first.")}</EmptyState>}
+        {options.length === 0 && <EmptyState title={t("No customer policies yet")} action={<LinkButton size="sm" variant="primary" href={policyFormHref}><Icon name="add" /> {t(NEW_POLICY_FOR, { name: c.row.name })}</LinkButton>}>{t("Create one for this customer; you come back here to attach it.")}</EmptyState>}
         {options.map((p) => {
           const isAlready = attached.includes(p.id);
           return (
@@ -712,7 +728,7 @@ function AttachModal({ c, unit, attached, pending, onClose, onSave }: Readonly<{
             </div>
           );
         })}
-        <p className="text-[11px] text-muted-foreground">{t("Disabled policies can be attached; they start alerting once enabled.")} <TextLink href={`/admin/alerts?tab=policies&customerId=${c.row.id}&new=${c.row.id}`}><Icon name="add" /> {t("New policy for {name}", { name: c.row.name })}</TextLink></p>
+        <p className="text-[11px] text-muted-foreground">{t("Disabled policies can be attached; they start alerting once enabled.")} {options.length > 0 && <TextLink href={policyFormHref}><Icon name="add" /> {t(NEW_POLICY_FOR, { name: c.row.name })}</TextLink>}</p>
       </div>
     </Modal>
   );
@@ -866,7 +882,9 @@ function WarrantyTab({ live }: Readonly<{ live: UnitsLive }>) {
       <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}>
         <Kpi label={t("Under warranty")} value={k.underWarranty} sub={t("of {units}", { units: units(t, k.total) })} />
         <Kpi label={t("Warranty ends ≤ 90 days")} value={k.within90} tone={k.within90 ? "warn" : undefined} sub={t("{n} within 30 days", { n: k.within30 })} />
-        <Kpi label={t("Out of warranty, no contract")} value={k.noCoverage} tone={k.noCoverage ? "crit" : undefined} sub={t("Offer maintenance")} />
+        {/* the tile's call to act lists its units, where each row has Renewal offer (UI/UX loop R101) */}
+        <Kpi label={t("Out of warranty, no contract")} value={k.noCoverage} tone={k.noCoverage ? "crit" : undefined}
+          sub={k.noCoverage > 0 ? <Plain type="button" touch className="text-xs font-semibold text-primary hover:underline" aria-pressed={f.coverage === "no_coverage"} onClick={() => { setF({ ...f, coverage: f.coverage === "no_coverage" ? "" : "no_coverage" }); }}>{t(f.coverage === "no_coverage" ? "Clear filter" : "Offer maintenance")}</Plain> : t("Offer maintenance")} />
         <Kpi label={t(MAINTENANCE_CONTRACT)} value={k.contract} sub={k.contractNames} />
       </div>
       <Card title={t("Units by coverage end")} sub={t("{n} of {total}", { n: rows.length, total: w.rows.length })} action={<Btn size="sm" disabled={rows.length === 0} onClick={() => { download("warranty-coverage.csv", coverageCsv(rows)); }}>{t("Export CSV")}</Btn>}>

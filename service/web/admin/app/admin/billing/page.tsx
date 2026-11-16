@@ -7,7 +7,8 @@
 // the display language; billing periods, due dates and pay dates are Kuala Lumpur business days, and the inquiry times
 // are formatted here, in the display time zone (IR282, IR299). The Phase 1A demo keeps the fixture rows.
 import { connection } from "next/server";
-import { apiMode, coreAll, coreDisplay, coreNow, coreOp, orWhenRefused, coreAllPage } from "@ac/web/lib/dal";
+import { apiMode, coreAll, coreDisplay, coreNow, coreOp, corePermissions, orWhenRefused, coreAllPage } from "@ac/web/lib/dal";
+import { canOpenRestrictions } from "@ac/web/lib/access";
 import { i18nOf } from "@ac/web/lib/i18n";
 import {
   billingMonths, contractOptions, inquiryRows, invoiceDetail, invoiceRows, lastClosedMonth, monthsText, statementDetail, statementRows,
@@ -44,8 +45,8 @@ async function AdminBillingPageContent({ searchParams }: Readonly<PageProps<"/ad
     ...(scope.customerId && { customerId: scope.customerId }), ...(scope.propertyId && { propertyId: scope.propertyId }), ...(scope.contractId && { contractId: scope.contractId }),
     ...(scope.overdueOnly && { overdueOnly: true }), ...months.filters,
   };
-  const [now, display, invoices, contracts, customers, properties, inquiries] = await Promise.all([
-    coreNow(), coreDisplay(),
+  const [now, display, perms, invoices, contracts, customers, properties, inquiries] = await Promise.all([
+    coreNow(), coreDisplay(), corePermissions(),
     coreOp<Page<ApiInvoice>>("invoices.list", { limit: 100, filters }),
     coreAllPage<ApiContract>("contracts.list"),
     coreAllPage<ApiCustomer>("customers.list"),
@@ -66,6 +67,7 @@ async function AdminBillingPageContent({ searchParams }: Readonly<PageProps<"/ad
     properties: properties.items.filter((p) => !p.archived).map((p) => ({ id: p.id, name: p.name, customerId: orgCustomer.get(p.customerOrgId) ?? "" })),
     contractsOfCustomer: contracts.items.map((k) => ({ id: k.id, customerId: k.customerId })),
     selectedInquiryId: one("inquiryId"),
+    canOpenRestrictions: canOpenRestrictions(perms),
   };
   if (tab === "invoices") {
     const sel = rows.find((r) => r.id === one("invoiceId")) ?? rows.find((r) => r.st === "Overdue") ?? rows[0];

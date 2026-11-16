@@ -25,7 +25,7 @@ export interface PreferencesLive {
 for a client the location consent and the monthly energy report e-mail (BR-C16), two-step verification. */
 export function PreferencesView({ live }: Readonly<{ live: PreferencesLive }>) {
   const t = useT();
-  const i18n = useI18n(); // the consent date in the display language and time zone
+  const i18n = useI18n();
   const [pending, run] = useAction();
   const [locale, setLocale] = useState(live.prefs.locale);
   const [zone, setZone] = useState(live.prefs.timezone);

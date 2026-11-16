@@ -9,6 +9,12 @@ import { isAfter } from "@ac/web/lib/order";
 import { withoutYear } from "@ac/web/lib/text";
 import { entryOf, lookup } from "@ac/web/lib/lookup";
 
+/** A plan type as the screen words it (contracts, invoices, contract options) — never the API code (“rto”). */
+export const planWord = (p: string, t: T = translator("en")) => {
+  const words = new Map(Object.entries({ rto: t("RTO"), general: t("General"), energy: t("Energy"), environment: t("Environment") }));
+  return words.get(p) ?? p; // a value the API adds before this table does
+};
+
 const PROCESSING = "processing";
 
 const en = translator("en");
@@ -104,7 +110,7 @@ export function invoiceRows(invoices: ApiInvoice[], contracts: ApiContract[], cu
       amt: money(i.amountMinor, i.currency),
       amountMinor: i.amountMinor,
       currency: i.currency,
-      meta: `${(k && customer.get(k.customerId)) ?? t("customer")} · ${k ? t("{plan} contract v{version}", { plan: k.planType, version: i.contractVersion }) : i.contractId} · ${billingMonth(i.period.from, locale)}`,
+      meta: `${(k && customer.get(k.customerId)) ?? t("customer")} · ${k ? t("{plan} contract v{version}", { plan: planWord(k.planType, t), version: i.contractVersion }) : i.contractId} · ${billingMonth(i.period.from, locale)}`,
       method: paymentState ? `${name} · ${paymentState}` : name,
       methodName: name,
       customerId: k?.customerId ?? "",
@@ -121,6 +127,8 @@ export function invoiceRows(invoices: ApiInvoice[], contracts: ApiContract[], cu
 export function totals(rows: InvoiceRow[], statuses: InvoiceStatus[]): string {
   const by = new Map<string, number>();
   for (const r of rows) if (statuses.includes(r.st)) by.set(r.currency, (by.get(r.currency) ?? 0) + r.amountMinor);
+  // nothing in these statuses: zero in the scope's currencies, so the tile reads like its neighbours (UI/UX loop R81)
+  if (by.size === 0) for (const r of rows) by.set(r.currency, 0);
   return by.size === 0 ? "0.00" : [...by].map(([c, m]) => money(m, c)).join(" · ");
 }
 
@@ -154,7 +162,7 @@ export function inquiryRows(inquiries: ApiInquiry[], customers: ApiCustomer[], i
 
 export function contractOptions(contracts: ApiContract[], customers: ApiCustomer[], t: T = en): ContractOption[] {
   const customer = new Map(customers.map((c) => [c.id, c.name]));
-  return contracts.map((k) => ({ id: k.id, version: k.version, label: `${customer.get(k.customerId) ?? t("customer")} · ${k.planType} · ${money(k.priceMinor, k.currency)}`, priceMinor: k.priceMinor, currency: k.currency }));
+  return contracts.map((k) => ({ id: k.id, version: k.version, label: `${customer.get(k.customerId) ?? t("customer")} · ${planWord(k.planType, t)} · ${money(k.priceMinor, k.currency)}`, priceMinor: k.priceMinor, currency: k.currency }));
 }
 
 /** PayoutStatement of service-contracts.ts. */

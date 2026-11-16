@@ -48,7 +48,7 @@ describe("air-quality metric cards (FR-C07, IR44, IR99, IR213, IR260)", () => {
   });
 
   it("never shows a stale, suspect, null or unsupported reading as a current value", () => {
-    expect(metricCard("co2", m("co2", 900, { quality: "stale" }), true)).toMatchObject({ value: null, feed: { text: "Unavailable" }, status: null, sub: "No reading since 9:12 am MYT (last 900 ppm)" }); // one badge, not "Unavailable" and "Not measured" (UI/UX loop R19)
+    expect(metricCard("co2", m("co2", 900, { quality: "stale" }), true)).toMatchObject({ value: null, feed: { text: "Unavailable" }, status: null, sub: "No reading since 14 Sept 2026, 9:12 am MYT (last 900 ppm)" }); // with the date (UI/UX loop R42); one badge, not "Unavailable" and "Not measured" (UI/UX loop R19)
     expect(metricCard("co2", m("co2", 5000, { quality: "suspect", qualityReason: "out_of_range" }), true)).toMatchObject({ value: "5000", feed: { text: "Suspect" }, sub: "Observed 9:12 am MYT · out of range", advice: "Not used for advice", warn: false });
     expect(metricCard("humidity", m("humidity", null), true)).toMatchObject({ value: null, feed: { text: "Unknown" }, sub: "No reading (null) — not 0% · 9:12 am MYT", advice: "Not enough data for advice" });
     expect(metricCard("pm25", undefined, false)).toMatchObject({ feed: { text: "Unsupported" }, sub: "No PM2.5 sensor on this model", advice: "Not enough data for PM2.5 advice" });
@@ -97,6 +97,7 @@ describe("the air-quality screen in the display language and time zone (FR-C07, 
     const seen: ApiAllergen = { availability: "available", substance: "Dust mite", value: 12, unit: "ng/m³", sourceLabel: "Lab kit", observedAt: "2026-09-14T01:00:00Z", evidenceText: "Kit #4" };
     expect(allergenView(seen, MS_TOKYO)).toStrictEqual({ title: "Alergen (Dust mite)", badge: { text: "Dikesan", tone: "warn", icon: "warning" }, text: "12 ng/m³ · Sumber: Lab kit · 10:00 PG GMT+9 · Kit #4" });
     expect(allergenView({ ...seen, unit: null }).text).toBe("Value unknown (no unit) · Source: Lab kit · 9:00 am MYT · Kit #4");
+    expect(allergenView({ ...seen, unit: null }, undefined, Date.parse("2026-09-20T03:00:00Z")).text).toBe("Value unknown (no unit) · Source: Lab kit · 14 Sept 2026, 9:00 am MYT · Kit #4"); // dated on a later day (UI/UX loop R67)
     expect([allergenView(null).text, allergenView({ ...seen, evidenceText: null }, MS_TOKYO).badge.text, allergenView({ ...seen, availability: "unsupported" }, MS_TOKYO).text]).toStrictEqual([
       "No observation for this selection — this does not mean “no allergens”.", "Tidak diketahui", "Unit ini tidak dapat memerhati alergen — ini tidak bermaksud “tiada alergen”.",
     ]);

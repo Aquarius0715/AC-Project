@@ -32,7 +32,7 @@ export default async function AdminDevicesPage(props: PageProps<"/admin/devices"
 }
 
 async function AdminDevicesPageContent({ searchParams }: Readonly<PageProps<"/admin/devices">>) {
-  interface Page<T> { items: T[] }
+  interface Page<T> { items: T[]; total: number }
   await connection();
   if (!apiMode()) return <DevicesDemo />;
   const sp = await searchParams;
@@ -41,20 +41,22 @@ async function AdminDevicesPageContent({ searchParams }: Readonly<PageProps<"/ad
   const tab = asked === "devices" || asked === "firmware" || asked === "iot" ? asked : "models";
   // the devices tab pages the registry on the server; the models and firmware tabs count every device of each model and
   // version and offer them to a campaign, so they read them all (IR723)
-  const [now, perms, display, caps, iot, units, registry, all] = await Promise.all([
+  // the Firmware campaigns tab shows its count from every tab, like the others; that tab reads the list itself (UI/UX loop R103)
+  const [now, perms, display, caps, iot, units, registry, all, campaignTotal] = await Promise.all([
     coreNow(), corePermissions(), coreDisplay(),
     coreAllPage<ApiCapability>("capabilities.list"),
     coreAllPage<ApiIoTModel>("iotModels.list"),
     coreAllPage<ApiUnitLite>("units.list"),
     tab === "devices" ? registryPage(one("q")?.trim() ?? "", one("cursor") ?? null, one("deviceId") ?? null) : null,
     tab === "devices" ? Promise.resolve([] as ApiDevice[]) : coreAll<ApiDevice>("devices.list", {}, 10_000),
+    tab === "firmware" ? Promise.resolve(null) : optional(coreOp<Page<ApiCampaign>>("firmwareCampaigns.list", { limit: 1 }).then((r) => r.total), null),
   ]);
   const devices = { items: registry?.items ?? all };
   const i = i18nOf(display);
   const rows = deviceRows(devices.items, units.items, i.t);
   const live: DevicesLive = {
     tab, now: now.toISOString(), canAudit: perms.has("audit.read"), canWrite: perms.has("device.write"),
-    deviceTotal: registry?.total ?? all.length,
+    deviceTotal: registry?.total ?? all.length, campaignTotal,
     ...(registry && { page: { q: one("q")?.trim() ?? "", next: registry.next, cursor: one("cursor") ?? null } }),
     models: modelRows(caps.items, units.items, devices.items, i), iotModels: iotModelRows(iot.items, units.items, devices.items, i), devices: rows,
     units: units.items.filter((u) => !u.archived).map((u) => ({ id: u.id, label: u.displayName, modelId: u.modelId, iotModelId: u.iotModelId ?? null })),

@@ -6,7 +6,7 @@
 // spaceId, unassignedOnly, mode, unitIds, powerState, connections. Texts and times in the user's display language and
 // time zone (IR263). The Phase 1A demo keeps the fixtures.
 import { connection } from "next/server";
-import { apiMode, coreAll, coreDisplay, coreOp, corePrincipal } from "@ac/web/lib/dal";
+import { apiMode, coreAll, coreDisplay, coreNow, coreOp, corePrincipal } from "@ac/web/lib/dal";
 import { i18nOf, showDate } from "@ac/web/lib/i18n";
 import {
   connections, filterUnits, flatten, locationTree, powerStates, selection, spacePath, unitsAt,
@@ -25,8 +25,8 @@ export default async function CustomerPropertiesPage({ searchParams }: Readonly<
   if (!apiMode()) return <PropertiesDemo />;
   const sp = await searchParams;
   const one = queryReader(sp);
-  const [me, properties, spaces, units, display] = await Promise.all([
-    corePrincipal(), coreAll<ApiPropertyRow>("properties.list"), coreAll<ApiSpaceRow>("spaces.list"), coreAll<ApiUnitRow>("units.list"), coreDisplay(),
+  const [me, properties, spaces, units, display, now] = await Promise.all([
+    corePrincipal(), coreAll<ApiPropertyRow>("properties.list"), coreAll<ApiSpaceRow>("spaces.list"), coreAll<ApiUnitRow>("units.list"), coreDisplay(), coreNow(),
   ]);
   const i = i18nOf(display);
   const tree = locationTree(properties, spaces, units, properties[0]?.customerOrgId ?? "");
@@ -55,7 +55,8 @@ export default async function CustomerPropertiesPage({ searchParams }: Readonly<
     selection: sel,
     owner: me.clientRole === "owner",
     filter: isFiltered ? { powerState: powerState ?? null, connections: conns, total: units.length } : null,
-    units: roomUnits(details, i).map((r) => ({ ...r, place: placeOf(r.id) })),
+    units: roomUnits(details, i, now.getTime()).map((r) => ({ ...r, place: placeOf(r.id) })),
+    now: now.toISOString(),
     summary: p ? {
       kind: p.kind, floors: flatten(p.spaces).filter((s) => s.kind === "floor").map((s) => s.name), rooms: p.rooms, inRooms: p.units - p.unassigned, unassigned: p.unassigned,
       edited: i.t("{date} · version {n}", { date: showDate(p.updatedAt, display), n: p.version }),

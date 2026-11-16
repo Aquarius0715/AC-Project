@@ -3,9 +3,9 @@ const MY_PROPERTIES = "My properties";
 
 import Link from "next/link";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Badge, Banner, Btn, Card, Choice, ConnBadge, cx, DataTable, EmptyState, Field, Modal, Page, PowerBadge, SummaryList, useToast, Plain } from "@ac/web/components/ui";
-import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
+import { useUrlPatchPending } from "@ac/web/lib/useUrlPatch";
 import { selectionId, type Connection, type PowerState, type Selection, type TreeProperty, type TreeSpace } from "@ac/web/lib/assets";
 import { changeText, groupPlan, hasChoice, KEEP_ALL, type GroupChange, type PlanRow, type RoomUnit } from "@ac/web/lib/clientProperties";
 import { historyRow, type ApiCommand, type ApiUnitDetail } from "@ac/web/lib/units";
@@ -24,6 +24,8 @@ export interface PropertiesLive {
   tree: TreeProperty[]; selection: Selection | null; owner: boolean;
   filter: { powerState: PowerState | null; connections: Connection[]; total: number } | null;
   units: (RoomUnit & { place: string })[]; details: ApiUnitDetail[];
+  /** the scenario's now: a group plan's “offline since” keeps its date on another day */
+  now: string;
   summary: { kind: "home" | "office"; floors: string[]; rooms: number; inRooms: number; unassigned: number; edited: string } | null;
   mode: "single" | "group"; selectedUnits: string[];
 }
@@ -39,14 +41,27 @@ air conditioners, and owners can send one change to several of them (Group contr
 // a command's state and a group test's result as a badge colour (primary for the others)
 const TRY_TONE = new Map<string, "ok" | "crit" | "warn">([["Confirmed", "ok"], ["Failed", "crit"], ["Waiting", "warn"], ["Unknown", "warn"]]);
 const RESULT_TONE = new Map<string, "unknown" | "warn" | "muted">([["Skipped", "unknown"], ["Clamped", "warn"], ["No change", "muted"]]);
+/** The tree row a navigation patch selects: a space, a property's unassigned units or the property; null for none. */
+function targetOf(patch: Record<string, string | null>): string | null {
+  return patch.unassignedOnly && patch.propertyId ? `unassigned:${patch.propertyId}` : patch.spaceId ?? patch.propertyId ?? null;
+}
+
 export function PropertiesView({ live }: Readonly<{ live: PropertiesLive }>) {
   const t = useT();
-  const nav = useUrlPatch();
+  const [nav, isNavPending] = useUrlPatchPending();
   const [renaming, setRenaming] = useState<Renaming | null>(null);
+  // a location or KPI filter the user chose: on a phone its panel comes above the tree, else a tap showed nothing new on screen
+  const params = useSearchParams();
+  const isChosen = !!live.filter || params.has("spaceId") || params.has("propertyId");
+  // the location just clicked: the tree marks it at once while the server renders its panel (UI/UX loop R75)
+  const [target, setTarget] = useState<string | null>(null);
   if (live.tree.length === 0) return <Page><EmptyState title={t("No properties yet")}>{t("HQ registers your homes and offices with their rooms and air conditioners; they appear here once set up.")}</EmptyState></Page>;
   const sel = live.selection;
   const selId = selectionId(sel);
-  const go = (patch: Record<string, string | null>) => { nav({ propertyId: null, spaceId: null, unassignedOnly: null, mode: null, unitIds: null, powerState: null, connections: null, ...patch }); };
+  const isPendingTarget = isNavPending && target !== null;
+  const isFilterShown = !!live.filter && !isPendingTarget;
+  const shownSel = isPendingTarget ? target : selId;
+  const go = (patch: Record<string, string | null>) => { setTarget(targetOf(patch)); nav({ propertyId: null, spaceId: null, unassignedOnly: null, mode: null, unitIds: null, powerState: null, connections: null, ...patch }); };
   return (
     <Page>
       <div className="split-rev">
@@ -54,17 +69,18 @@ export function PropertiesView({ live }: Readonly<{ live: PropertiesLive }>) {
           <div className="flex flex-col text-[13px]">
             {live.tree.map((p) => (
               <div key={p.id}>
-                <Row depth={0} selected={!live.filter && selId === p.id} onClick={() => { go({ propertyId: p.id }); }} icon="home" name={p.name} tag={kind(t, p.kind)}
+                <Row depth={0} selected={!isFilterShown && shownSel === p.id} onClick={() => { go({ propertyId: p.id }); }} icon="home" name={p.name} tag={kind(t, p.kind)}
                   onRename={() => { setRenaming({ kind: "property", id: p.id, version: p.version, name: p.name, where: t("{name} · {kind} (property)", { name: p.name, kind: kind(t, p.kind) }) }); }} />
-                {p.spaces.map((s) => <SpaceRow key={s.id} s={s} p={p} depth={1} selId={live.filter ? "" : selId} go={go} rename={setRenaming} />)}
-                {p.unassigned > 0 && <Row depth={1} selected={!live.filter && selId === `unassigned:${p.id}`} onClick={() => { go({ propertyId: p.id, unassignedOnly: "true" }); }} icon="unknown" name={t("Unassigned units")} meta={t("· {units} · placed by HQ", { units: unitsText(t, p.unassigned) })} />}
+                {p.spaces.map((s) => <SpaceRow key={s.id} s={s} p={p} depth={1} selId={isFilterShown ? "" : shownSel} go={go} rename={setRenaming} />)}
+                {p.unassigned > 0 && <Row depth={1} selected={!isFilterShown && shownSel === `unassigned:${p.id}`} onClick={() => { go({ propertyId: p.id, unassignedOnly: "true" }); }} icon="unknown" name={t("Unassigned units")} meta={t("· {units} · placed by HQ", { units: unitsText(t, p.unassigned) })} />}
               </div>
             ))}
           </div>
           <p className="mt-3 text-[11px] text-muted-foreground">{t("Read-only — HQ sets up properties, floors, rooms and units. You can rename any location with its edit button or Rename; nothing else here changes the structure.")}</p>
         </Card>
-        <div className="flex min-w-0 flex-col gap-4">
-          {live.filter ? <FilteredUnits live={live} clear={() => { go({}); }} /> : sel && <Panel live={live} sel={sel} rename={setRenaming} go={go} />}
+        {/* the old panel stays until the new one arrives: dimmed and busy, so it does not read as the clicked location's */}
+        <div aria-busy={isPendingTarget} className={cx("flex min-w-0 flex-col gap-4 transition-opacity", isChosen && "order-first @min-[880px]:order-none", isPendingTarget && "opacity-60")}>
+          {live.filter ? <FilteredUnits live={live} clear={() => { go({}); }} /> : sel && <Panel live={live} sel={sel} rename={setRenaming} go={go} isPending={isNavPending} />}
         </div>
       </div>
       {renaming && <RenameModal r={renaming} onClose={() => { setRenaming(null); }} />}
@@ -127,7 +143,9 @@ function FilteredUnits({ live, clear }: Readonly<{ live: PropertiesLive; clear: 
   );
 }
 
-function Panel({ live, sel, rename, go }: Readonly<{ live: PropertiesLive; sel: Selection; rename: (r: Renaming) => void; go: (x: Record<string, string | null>) => void }>) {
+function Panel({ live, sel, rename, go, isPending }: Readonly<{ live: PropertiesLive; sel: Selection; rename: (r: Renaming) => void; go: (x: Record<string, string | null>) => void; isPending: boolean }>) {
+  // the mode the user just chose, shown at once while the server renders it (the switch took a second with no sign)
+  const [chosen, setChosen] = useState<"single" | "group" | null>(null);
   const t = useT();
   const p = sel.property;
   if (sel.kind === "property") {
@@ -148,7 +166,7 @@ function Panel({ live, sel, rename, go }: Readonly<{ live: PropertiesLive; sel: 
             <UnitRows units={inRooms} />
           </div> : <p className="my-4 text-[13px] text-muted-foreground">{t("No air conditioner in a room of this property yet.")}</p>}
           {unassigned.length > 0 && <>
-            <div className="mb-2 mt-4 text-[13px] font-bold">{t("? Unassigned units ({n})", { n: unassigned.length })} <span className="text-xs font-normal text-muted-foreground">{t("Not in any room")}</span></div>
+            <div className="mb-2 mt-4 flex flex-wrap items-center gap-1.5 text-[13px] font-bold"><Icon name="unknown" className="text-muted-foreground" />{t("Unassigned units ({n})", { n: unassigned.length })} <span className="text-xs font-normal text-muted-foreground">{t("Not in any room")}</span></div>
             <UnitRows units={unassigned} />
             <p className="mt-2 text-[11px] text-muted-foreground">{t("Moving a unit into a room is done in HQ’s unit register — contact HQ.")}</p>
           </>}
@@ -169,6 +187,7 @@ function Panel({ live, sel, rename, go }: Readonly<{ live: PropertiesLive; sel: 
   const direct = live.units.filter((u) => live.details.find((d) => d.id === u.id)?.spaceId === s.id);
   const canGroup = live.owner && direct.length >= 2;
   const mode = canGroup ? live.mode : "single";
+  const shownMode = isPending && chosen ? chosen : mode;
   return (
     <>
       <div className="text-[13px] text-muted-foreground">{t(MY_PROPERTIES)} › {sel.path.split(" › ").map((x, i, a) => <span key={i}>{i === a.length - 1 ? <b className="text-ink">{x}</b> : `${x} › `}</span>)}</div>
@@ -178,8 +197,9 @@ function Panel({ live, sel, rename, go }: Readonly<{ live: PropertiesLive; sel: 
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <span className="text-xs text-muted-foreground">{t("{acs} in {space} ·", { acs: acsText(t, direct.length), space: s.name })}</span>
             {(["single", "group"] as const).map((m) => {
-              return <Plain key={m} type="button" aria-pressed={mode === m} onClick={() => { go({ spaceId: s.id, mode: m === "group" ? "group" : null }); }}
-                className={cx("inline-flex items-center gap-1 rounded-control border px-3 py-1 text-xs font-semibold", mode === m ? "border-primary bg-primary-soft text-primary" : "border-line")}>{mode === m && <Icon name="check" />}{t(m === "single" ? "Single AC" : "Group control")}</Plain>;
+              const isLoading = isPending && chosen === m && mode !== m;
+              return <Plain key={m} type="button" aria-pressed={shownMode === m} aria-busy={isLoading} onClick={() => { setChosen(m); go({ spaceId: s.id, mode: m === "group" ? "group" : null }); }}
+                className={cx("inline-flex items-center gap-1 rounded-control border px-3 py-1 text-xs font-semibold", shownMode === m ? "border-primary bg-primary-soft text-primary" : "border-line")}>{isLoading ? <Icon name="refresh" className="animate-spin" /> : shownMode === m && <Icon name="check" />}{t(m === "single" ? "Single AC" : "Group control")}</Plain>;
             })}
           </div>
         )}
@@ -269,11 +289,12 @@ function GroupPanel({ live, space }: Readonly<{ live: PropertiesLive; space: str
     toast(t("Group change finished — results are shown per AC"));
     router.refresh(); // re-read the units (observed settings)
   };
-  const plan = (ids: string[]) => groupPlan(live.details.filter((d) => ids.includes(d.id)), ch, i);
+  const plan = (ids: string[]) => groupPlan(live.details.filter((d) => ids.includes(d.id)), ch, i, Date.parse(live.now));
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface2 px-3 py-2 text-[13px]"><b>{t("{n} selected", { n: sel.length })}</b>
-        <span className="flex gap-2"><Btn size="sm" onClick={() => { setSel(online); }}>{t("Select all online ({n})", { n: online.length })}</Btn><Btn size="sm" variant="ghost" onClick={() => { setSel([]); }}>{t("Clear")}</Btn></span></div>
+        {/* each button is off when it would change nothing: all online already chosen, or nothing to clear (UI/UX loop R96) */}
+        <span className="flex gap-2"><Btn size="sm" disabled={online.every((id) => sel.includes(id))} onClick={() => { setSel(online); }}>{t("Select all online ({n})", { n: online.length })}</Btn><Btn size="sm" variant="ghost" disabled={sel.length === 0} onClick={() => { setSel([]); }}>{t("Clear")}</Btn></span></div>
       <div className="grid-fluid" style={{ ["--min" as string]: "170px" }}>
         {live.units.map((u) => {
           const tr = track[u.id];

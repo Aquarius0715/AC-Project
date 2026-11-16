@@ -46,6 +46,13 @@ describe("units & locations: the room list and group control (FR-C02, FR-C14, IR
     expect([changeText(ch), changeText({ ...ch, power: false }), changeText({ ...ch, fan: null })]).toStrictEqual(["Power On · 24 °C · Dry · Fan high", "Power Off", "Power On · 24 °C · Dry"]);
   });
 
+  it("dates an offline time of another day (UI/UX loop R65)", () => {
+    const off = unit("off", { connection: "offline" });
+    const sameDay = Date.parse("2026-09-14T03:00:00Z"), later = Date.parse("2026-09-17T03:00:00Z");
+    expect([roomUnits([off], undefined, sameDay)[0]?.seen, roomUnits([off], undefined, later)[0]?.seen]).toStrictEqual(["9:10 am MYT", "14 Sept 2026, 9:10 am MYT"]);
+    expect(groupPlan([off], ch, undefined, later)[0]?.note).toBe("Offline since 14 Sept 2026, 9:10 am MYT — not sent");
+  });
+
   it("words the plan in Malay; the result stays the plan's code", () => {
     const [ok, off] = groupPlan([unit("ok"), unit("off", { connection: "offline", lastSeenAt: null })], ch, MS);
     expect([ok?.result, ok?.change, off?.note]).toStrictEqual(["Will send", "26 → 24 °C, Kering, Kipas tinggi", "Luar talian — tidak dihantar"]);

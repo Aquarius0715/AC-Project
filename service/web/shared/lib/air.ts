@@ -8,7 +8,7 @@ import { evidenceText } from "@ac/web/lib/evidence";
 import { roundAway } from "@ac/web/lib/energy";
 import { unitAxes } from "@ac/web/lib/chartScale";
 import { spacePath, type ApiPropertyRow, type ApiSpaceRow, type ApiUnitRow } from "@ac/web/lib/assets";
-import { DEFAULT_DISPLAY, EN, relativeTime, showClock, showDate, showDay, showSpan, translator, type Display, type I18n, type T } from "@ac/web/lib/i18n";
+import { DEFAULT_DISPLAY, EN, relativeTime, showClock, showDate, showDay, showRecent, showSpan, showTime, translator, type Display, type I18n, type T } from "@ac/web/lib/i18n";
 import type { IconName } from "@ac/web/components/Icon";
 import { entryOf, lookup } from "@ac/web/lib/lookup";
 
@@ -130,7 +130,9 @@ export function metricCard(metric: AirMetric, m: ApiMeasurement | undefined, has
   if (!hasSensor) return unavailable(t("No {metric} sensor on this model", { metric: label }), { text: t("Unsupported"), tone: "muted", icon: UNSUPPORTED });
   if (!m) return unavailable(t("No reading yet"));
   const at = showClock(m.observedAt, display);
-  if (m.quality === "stale") return unavailable(m.value === null ? t("No reading since {time}", { time: at }) : t("No reading since {time} (last {value} {unit})", { time: at, value: airNumber(metric, m.value), unit }));
+  // a stale reading is from an earlier hour or day: with the date, so 10:54 pm yesterday does not read as after “Updated 9:56 pm”
+  const since = showTime(m.observedAt, display);
+  if (m.quality === "stale") return unavailable(m.value === null ? t("No reading since {time}", { time: since }) : t("No reading since {time} (last {value} {unit})", { time: since, value: airNumber(metric, m.value), unit }));
   if (m.quality === "suspect") {
     return {
       metric, label, unit, value: m.value === null ? null : airNumber(metric, m.value), feed: { text: t("Suspect"), tone: "warn", icon: "alert" },
@@ -193,7 +195,7 @@ export function cleanNote(g: Guidance[], pm25: ApiMeasurement | undefined, room:
 
 /** The allergen strip (IR98): an observation needs substance, source, time and evidence, a number also its unit; missing
 or unsupported data never reads as “no allergens”, and nothing is derived from PM2.5. */
-export function allergenView(a: ApiAllergen | null, i: I18n = EN): { title: string; badge: { text: string; tone: Tone; icon: IconName }; text: string } {
+export function allergenView(a: ApiAllergen | null, i: I18n = EN, nowMs?: number): { title: string; badge: { text: string; tone: Tone; icon: IconName }; text: string } {
   const { t, display } = i;
   const title = t("Allergen");
   if (!a) return { title, badge: { text: t("Unknown"), tone: "unknown", icon: "unknown" }, text: t("No observation for this selection — this does not mean “no allergens”.") };
@@ -203,7 +205,7 @@ export function allergenView(a: ApiAllergen | null, i: I18n = EN): { title: stri
   const value = a.value === null ? [] : [a.unit ? `${String(a.value)} ${a.unit}` : t("Value unknown (no unit)")];
   return {
     title: t("Allergen ({substance})", { substance: a.substance }), badge: { text: t("Detected"), tone: "warn", icon: "warning" },
-    text: [...value, t("Source: {source}", { source: a.sourceLabel }), showClock(a.observedAt, display), evidenceText(a.evidenceText, t)].join(" · "),
+    text: [...value, t("Source: {source}", { source: a.sourceLabel }), nowMs === undefined ? showClock(a.observedAt, display) : showRecent(a.observedAt, nowMs, display), evidenceText(a.evidenceText, t)].join(" · "),
   };
 }
 

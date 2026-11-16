@@ -78,7 +78,7 @@ function JobsTab({ live, patch, fresh, onFresh }: Readonly<{ live: JobsLive; pat
         <Select aria-label={t("Type")} className="w-auto" value={q.type ?? ""} onChange={(e) => { patch({ type: e.target.value || null }); }}>{TYPES.map((x) => <option key={x.id} value={x.id}>{t("Type: {value}", { value: t(x.label) })}</option>)}</Select>
         <Select aria-label={t("Origin")} className="w-auto" value={q.origin ?? ""} onChange={(e) => { patch({ origin: e.target.value || null }); }}><option value="">{t("Origin: All")}</option><option value="client_request">{t("Origin: Client request")}</option><option value="periodic_plan">{t("Origin: Periodic plan")}</option></Select>
         <Select aria-label={t("Delivery")} className="w-auto" value={q.delivery ?? ""} onChange={(e) => { patch({ delivery: e.target.value || null }); }}><option value="">{t("Delivery: All")}</option>{live.deliveries.map((d) => <option key={d.id} value={d.id}>{t("Delivery: {name}", { name: d.name })}</option>)}</Select>
-        <Select aria-label={t("Assignee")} className="w-auto" value={q.assignee ?? ""} onChange={(e) => { patch({ assignee: e.target.value || null }); }}><option value="">{t("Assignee: All")}</option>{live.assignees.map((a) => <option key={a.id} value={a.id}>{t("Assignee: {name}", { name: a.name })}</option>)}</Select>
+        <Select aria-label={t("Assignee")} className="w-auto" value={q.assignee ?? ""} onChange={(e) => { patch({ assignee: e.target.value || null }); }}><option value="">{t("Assignee: All")}</option>{live.assignees.map((g) => <optgroup key={g.org} label={g.org || t("Other")}>{g.people.map((a) => <option key={a.id} value={a.id}>{t("Assignee: {name}", { name: a.name })}</option>)}</optgroup>)}</Select>
         <Select aria-label={t("Sort")} className="w-auto" value={live.sort} onChange={(e) => { patch({ sort: e.target.value === "status" ? null : e.target.value }); }}>{live.sorts.map((s) => <option key={s.id} value={s.id}>{t("Sort: {sort}", { sort: s.text })}</option>)}</Select>
         <label className="flex items-center gap-1.5 rounded-control border border-line bg-surface px-3 py-1.5 text-[13px]"><Checkbox checked={q.overdue === "1"} onCheckedChange={(v) => { patch({ overdue: v ? "1" : null }); }} /> {t("Overdue only")}</label>
         {live.periodChip && <Plain type="button" touch onClick={() => { patch({ from: null, to: null, jobId: null }); }} className="rounded-full bg-primary-soft px-3 py-1 text-xs font-semibold text-primary" aria-label={t("{period} — clear the requested-time period", { period: live.periodChip })}>{live.periodChip} <Icon name="close" /></Plain>}
@@ -90,7 +90,7 @@ function JobsTab({ live, patch, fresh, onFresh }: Readonly<{ live: JobsLive; pat
               <ListRow key={r.id} selected={!!sel && !("missing" in live) && sel.job.id === r.id} href={`/admin/jobs?${new URLSearchParams({ ...Object.fromEntries(Object.entries(q).filter(([, v]) => typeof v === "string" && v !== "")), ...((live.sort !== "status") && { sort: live.sort }), jobId: r.id })}`}>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-2"><b className="truncate text-[13px]">{r.short} · {r.title}</b><JobStatusBadge s={r.badge.status} /></div>
-                  <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground"><OriginBadge origin={originOf(r.origin)} />{r.customer} · {r.type}{r.badge.overdue && <Badge tone="crit">{t("!! Overdue")}</Badge>}</div>
+                  <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground"><OriginBadge origin={originOf(r.origin)} />{r.customer} · {r.type}{r.badge.overdue && <Badge tone="crit" icon="error">{t("Overdue")}</Badge>}</div>
                   <div className={cx("text-[11px]", r.lineTone === "warn" ? "text-warn" : TEXT_MUTED_FOREGROUND)}>{r.line}</div>
                 </div>
               </ListRow>
@@ -221,7 +221,8 @@ function CostsCard({ ctx }: Readonly<{ ctx: DetailCtx }>) {
   const j = d.job;
   return (
     <>
-      <Card title={t("Costs")} action={<Btn size="sm" disabled={pending || j.status === "cancelled"} title={j.status === "cancelled" ? t("A cancelled job’s costs cannot change.") : undefined} onClick={() => { setModal({ kind: "cost" }); }}><Icon name="add" /> {t("Add cost line")}</Btn>}>
+      {/* why Add cost line is off, in words under the title rather than only in a tooltip (UI/UX loop R118) */}
+      <Card title={t("Costs")} sub={j.status === "cancelled" ? t("A cancelled job’s costs cannot change.") : undefined} action={<Btn size="sm" disabled={pending || j.status === "cancelled"} onClick={() => { setModal({ kind: "cost" }); }}><Icon name="add" /> {t("Add cost line")}</Btn>}>
         {d.costs.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No cost lines yet — add estimates before the work and actuals after it.")}</p> : (
           <ScrollX><table className="w-full min-w-[560px] text-[13px]">
             <thead><tr className="text-left text-[11px] uppercase text-muted-foreground"><th className="py-1.5">{t("Kind")}</th><th>{t("Description")}</th><th>{t("Visibility")}</th><th className="text-right">{t("Amount")}</th><th className="w-8"><span className="sr-only">{t("Remove")}</span></th></tr></thead>

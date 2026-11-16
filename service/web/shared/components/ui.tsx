@@ -75,12 +75,13 @@ export function PowerBadge({ s }: Readonly<{ s: "running" | "stopped" | "unknown
     case "unknown": { return <Badge tone="unknown" icon="unknown">{what}{t("Power unknown")}</Badge>; }
   }
 }
-export function ConnBadge({ s }: Readonly<{ s: "online" | "offline" | "connecting" | "unknown" | "error" }>) {
+// offlineTone: the technician app shows Offline as something to act on (red), like its filter chips and tiles (UI/UX loop R50)
+export function ConnBadge({ s, offlineTone = "unknown" }: Readonly<{ s: "online" | "offline" | "connecting" | "unknown" | "error"; offlineTone?: "unknown" | "crit" }>) {
   const t = useT();
   const what = <span className="sr-only">{t("Connection")}: </span>;
   switch (s) {
     case "online": { return <Badge tone="ok" icon="online">{what}{t("Online")}</Badge>; }
-    case "offline": { return <Badge tone="unknown" icon="offline">{what}{t("Offline")}</Badge>; }
+    case "offline": { return <Badge tone={offlineTone} icon="offline">{what}{t("Offline")}</Badge>; }
     case "error": { return <Badge tone="crit" icon="error">{what}{t("Error")}</Badge>; }
     case "unknown": { return <Badge tone="unknown" icon="unknown">{what}{t("Connection unknown")}</Badge>; }
     case "connecting": { return <Badge tone="primary" icon="refresh">{what}{t("Connecting")}</Badge>; }
@@ -132,6 +133,9 @@ export function Page({ children, className, narrow }: Readonly<{ children: React
   return <div className={cx("page mx-auto flex w-full flex-col gap-4", narrow ? "max-w-[640px]" : "max-w-[1280px]", className)}>{children}</div>;
 }
 
+/** Whether a component sits inside a Card, whose title is the h2 its own headings go under. */
+const InCard = createContext(false);
+
 /** A card: the shadcn/ui Card. The title stays a level-2 heading; `pad={false}` lets a table reach the edges; the
 overflow stays visible for the menus that still open inside a card. */
 export function Card({ title, sub, action, children, className, pad = true, tone }: Readonly<{ title?: React.ReactNode; sub?: React.ReactNode; action?: React.ReactNode; children?: React.ReactNode; className?: string; pad?: boolean; tone?: "crit" | "warn" | "ok" }>) {
@@ -148,7 +152,7 @@ export function Card({ title, sub, action, children, className, pad = true, tone
           {hasContent(action) && <CardAction className="self-start">{action}</CardAction>}
         </CardHeader>
       )}
-      <CardContent className={cn("min-w-0", !pad && "px-0")}>{children}</CardContent>
+      <CardContent className={cn("min-w-0", !pad && "px-0")}><InCard.Provider value>{children}</InCard.Provider></CardContent>
     </UICard>
   );
 }
@@ -233,11 +237,13 @@ export function Banner({ tone = "primary", icon, children, action }: Readonly<{ 
 
 /** No rows, a failed read, no connection: the shadcn/ui Empty. The title stays a level-3 heading. */
 export function EmptyState({ title, children, action }: Readonly<{ title: string; children?: React.ReactNode; action?: React.ReactNode }>) {
+  // under a card's h2 the title is an h3; on its own below the page heading an h2, so no heading level is skipped (UI/UX loop R73)
+  const Heading = useContext(InCard) ? "h3" : "h2";
   return (
     <Empty className="border bg-card">
       <EmptyHeader>
         <EmptyMedia variant="icon"><Icon name="info" /></EmptyMedia>
-        <EmptyTitle><h3>{title}</h3></EmptyTitle>
+        <EmptyTitle><Heading>{title}</Heading></EmptyTitle>
         {hasContent(children) && <EmptyDescription>{children}</EmptyDescription>}
       </EmptyHeader>
       {hasContent(action) && <EmptyContent>{action}</EmptyContent>}
@@ -411,7 +417,8 @@ export function QrCode({ qr, label, className }: Readonly<{ qr: { size: number; 
 /** A checkbox with its label: the shadcn/ui Checkbox, 20 px so the lists' targets keep 24 px apart (WCAG 2.5.8, IR360). */
 export function Check({ label, checked, onChange, disabled }: Readonly<{ label: React.ReactNode; checked?: boolean; onChange?: (v: boolean) => void; disabled?: boolean }>) {
   return (
-    <label className="inline-flex items-center gap-2 text-[13px]">
+    // a disabled choice reads as one in its label too, not only in its box (UI/UX loop R80)
+    <label className={cx("inline-flex items-center gap-2 text-[13px]", disabled && "cursor-not-allowed text-muted-foreground")}>
       <Checkbox checked={checked} disabled={disabled} onCheckedChange={(v) => onChange?.(v)} className="size-5" />
       {label}
     </label>
@@ -608,7 +615,9 @@ function Cell<T>({ render, row }: { render: ((r: T) => React.ReactNode) | undefi
 record (`onRowClick`) is focusable and opens with Enter or Space as well as a click (keyboard access, IR294). */
 export function DataTable<T extends RowData>({ cols, rows, rowKey, onRowClick, selectedKey }: Readonly<{ cols: Col<T>[]; rows: T[]; rowKey: (r: T) => string; onRowClick?: (r: T) => void; selectedKey?: string }>) {
   const t = useT();
-  const columns = cols.map((c): ColumnDef<typeof tableFx, T> => ({ id: c.key, header: c.label, meta: { className: c.className, hideBelow: c.hideBelow } }));
+  // a column without a heading (a row's arrow or its buttons) still names itself to screen readers (UI/UX loop R72)
+  const actions = t("Actions");
+  const columns = cols.map((c): ColumnDef<typeof tableFx, T> => ({ id: c.key, header: c.label === "" ? () => <span className="sr-only">{actions}</span> : c.label, meta: { className: c.className, hideBelow: c.hideBelow } }));
   const renders = new Map(cols.map((c) => [c.key, c.render]));
   const table = useTable({ features: tableFx, data: rows, getRowId: (r) => rowKey(r), columns });
   return (

@@ -58,6 +58,10 @@ describe("customer overview", () => {
   it("shows the measured room temperature, humidity and power — never the AC setting", () => {
     const [r] = overviewRows([unit("u1", { latestMeasurements: [m(TEMPERATURE, 28), m("humidity", 60.04), m("power", 0.68)] })], () => "Home A › Bedroom");
     expect([r?.temp, r?.hum, r?.power, r?.observed, r?.state, r?.place]).toStrictEqual(["28.0", "60.0", "680", "9:12 am MYT", "running", "Home A › Bedroom"]);
+    // with the page's now, the same reading keeps the clock today and gains its date on a later day (UI/UX loop R64)
+    const today = overviewRows([unit("u1", { latestMeasurements: [m(TEMPERATURE, 28)] })], () => "", undefined, Date.parse(TEXT_2026_09_14T01_12_00Z))[0]?.observed;
+    const later = overviewRows([unit("u1", { latestMeasurements: [m(TEMPERATURE, 28)] })], () => "", undefined, Date.parse("2026-09-17T01:00:00Z"))[0]?.observed;
+    expect([today, later]).toStrictEqual(["9:12 am MYT", "14 Sept 2026, 9:12 am MYT"]);
     const [stale] = overviewRows([unit("u2", { latestMeasurements: [m(TEMPERATURE, 30, { quality: "stale" })], connection: "offline", effectivePowerState: "unknown", lastSeenAt: "2026-09-12T10:40:00Z" })], () => "");
     expect([stale?.temp, stale?.hum, stale?.power, stale?.observed, stale?.state, stale?.conn]).toStrictEqual([null, null, null, "last seen 12 Sept 2026, 6:40 pm MYT", "unknown", "offline"]);
     // the user's language and display time zone (IR260)

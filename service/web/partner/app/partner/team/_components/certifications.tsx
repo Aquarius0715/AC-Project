@@ -42,7 +42,11 @@ export function Certifications({ live }: Readonly<{ live: Live }>) {
       <div className="flex flex-wrap items-center gap-2">
         <Select aria-label={t(TECHNICIAN)} className="w-auto" value={q.membershipId ?? ""} onChange={(e) => { patch({ membershipId: e.target.value || null }); }}>
           <option value="">{t("Technician: All")}</option>
-          {c.people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          {/* current members first; those whose access ended (eight "E2E Signer" in a row) in their own group (UI/UX loop R114) */}
+          {([true, false] as const).map((isActive) => {
+            const group = c.people.filter((p) => p.active === isActive).toSorted((x, y) => x.name.localeCompare(y.name));
+            return group.length > 0 && <optgroup key={String(isActive)} label={t(isActive ? "Active" : "Inactive")}>{group.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</optgroup>;
+          })}
         </Select>
         <Select aria-label={t("Status")} className="w-auto" value={q.status ?? ""} onChange={(e) => { patch({ status: e.target.value || null }); }}>
           <option value="">{t("Status: All")}</option>
