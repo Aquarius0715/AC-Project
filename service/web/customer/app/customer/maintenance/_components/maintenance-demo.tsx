@@ -168,11 +168,12 @@ function NewRequest({ open, onClose, onDone }: Readonly<{ open: boolean; onClose
   const [sym, setSym] = useState("");
   const [slots, setSlots] = useState<Slot[]>(blank());
   const [tried, setTried] = useState(false);
-  const symError = tried && (symptomLength(sym) < 10 || symptomLength(sym) > 2000) ? "Symptoms must be 10–2000 characters" : undefined;
+  const isSymBad = symptomLength(sym) < 10 || symptomLength(sym) > 2000; // the same count the form shows
+  const symError = tried && isSymBad ? "Symptoms must be 10–2000 characters" : undefined;
   const slotError = tried ? preferredError(slots) : undefined;
   const submit = () => {
     setTried(true);
-    if (sym.trim().length < 10 || sym.length > 2000 || preferredError(slots)) return;
+    if (isSymBad || preferredError(slots)) return;
     const u = units.find((x) => x.id === unitId);
     if (!u) return;
     const id = jobActions.create({ unitId, type, unit: u.name, loc: u.loc, symptom: sym.trim(), preferred: slots });

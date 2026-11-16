@@ -23,6 +23,10 @@ const seed: Auto[] = [
   { id: "a6", name: "Vacation mode", kind: "Location", icon: "location", when: "Arrival at Home A", steps: then("Set temperature 25°C"), unit: BEDROOM_AC, on: false },
 ];
 
+// a new rule's badge icon and “When” line by trigger, as the seed rules; a schedule's line names its time
+const KIND_ICON = new Map<string, IconName>([["Location", "location"], ["Presence", "presence"], ["Weather", "weather"]]);
+const KIND_WHEN = new Map([["Location", "Arrival at Home A"], ["Presence", "No one detected for 30 min (demo occupancy)"], ["Weather", "Outdoor temperature ≥ 33°C (demo weather)"]]);
+
 /** The Phase 1A demo of the automations screen (fixtures; DATA_SOURCE=API uses AutomationsView). */
 export function AutomationsDemo() {
   const toast = useToast();
@@ -43,7 +47,7 @@ export function AutomationsDemo() {
     setErrorText(e); if (Object.keys(e).length === 0) setStep("review");
   };
   const save = () => {
-    if (edit === "new") setList((l) => [...l, { id: `n${String(Date.now())}`, name: f.name, kind: f.kind, icon: f.kind === "Location" ? "location" : "schedule", when: f.kind === "Schedule" ? "Every day at " + f.time : "Arrival at Home A", steps: f.kind === "Schedule" ? [start(f.time, `Set temperature ${f.temp}°C`), end("22:00")] : then(`Set temperature ${f.temp}°C`), unit: f.unit, on: true }]);
+    if (edit === "new") setList((l) => [...l, { id: `n${String(Date.now())}`, name: f.name, kind: f.kind, icon: KIND_ICON.get(f.kind) ?? "schedule", when: KIND_WHEN.get(f.kind) ?? `Every day at ${f.time}`, steps: f.kind === "Schedule" ? [start(f.time, `Set temperature ${f.temp}°C`), end("22:00")] : then(`Set temperature ${f.temp}°C`), unit: f.unit, on: true }]);
     else if (edit) setList((l) => l.map((x) => (x.id === edit.id ? { ...x, name: f.name, steps: x.steps.map((st, i) => (i === 0 ? { ...st, action: `Set temperature ${f.temp}°C` } : st)), unit: f.unit } : x)));
     toast("Automation saved"); setEdit(null);
   };
