@@ -1176,6 +1176,7 @@ export const ms: Record<string, string> = {
   "Pinned ACs": "AC yang disemat",
   "Pinned on each AC's page · this browser only": "Disemat pada halaman setiap AC · pelayar ini sahaja",
   "Unpin {name}": "Nyahsemat {name}",
+  "Showing the AC that used the most in this period · up to 4 units": "Menunjukkan AC yang paling banyak menggunakan tenaga dalam tempoh ini · sehingga 4 unit",
   "Group change finished — results are shown per AC": "Perubahan kumpulan selesai — keputusan dipaparkan bagi setiap AC",
   "{n} selected": "{n} dipilih",
   "Select all online ({n})": "Pilih semua dalam talian ({n})",

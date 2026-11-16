@@ -103,6 +103,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 0.656.0 (2026-11-16): IR813: an alert's Book cleaning opens Filter care on that AC.
 0.654.0 (2026-11-16): IR811: from Turn off running ACs, one link opens an after-hours rule with the same ACs.
 0.657.0 (2026-11-16): IR814: a customer pins ACs to the Overview from their pages (this browser only).
+0.658.0 (2026-11-16): IR815: Energy & cost opens on the AC that used the most in the period.
 0.653.0 (2026-11-16): IR810: after a confirmed change, the customer unit page offers Undo, which puts back the previous confirmed setting.
 0.652.0 (2026-11-16): IR809: the customer unit page refreshes every 30 s while open (paused while editing), so others' changes appear.
 0.651.0 (2026-11-16): IR808: a cooling setpoint below 22 °C gets a hint that a lower setting only uses more power.

@@ -1135,6 +1135,7 @@ export const ja: Record<string, string> = {
   "Pinned ACs": "ピン留めしたエアコン",
   "Pinned on each AC's page · this browser only": "各エアコンのページでピン留め · このブラウザのみ",
   "Unpin {name}": "{name} のピン留めを外す",
+  "Showing the AC that used the most in this period · up to 4 units": "この期間に最も多く使ったエアコンを表示中 · 最大4台",
   "Group change finished — results are shown per AC": "グループの変更が完了しました — 結果はエアコンごとに表示されます",
   "{n} selected": "{n} 台を選択",
   "Select all online ({n})": "オンラインをすべて選択（{n}）",

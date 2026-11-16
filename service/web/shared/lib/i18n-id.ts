@@ -1135,6 +1135,7 @@ export const id: Record<string, string> = {
   "Pinned ACs": "AC yang disematkan",
   "Pinned on each AC's page · this browser only": "Disematkan di halaman tiap AC · hanya browser ini",
   "Unpin {name}": "Lepas sematan {name}",
+  "Showing the AC that used the most in this period · up to 4 units": "Menampilkan AC yang paling banyak memakai energi dalam periode ini · hingga 4 unit",
   "Group change finished — results are shown per AC": "Perubahan grup selesai — hasil ditampilkan per AC",
   "{n} selected": "{n} dipilih",
   "Select all online ({n})": "Pilih semua yang online ({n})",
