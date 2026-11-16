@@ -280,6 +280,13 @@ export function filterUnits(us: ApiUnitRow[], f: { powerState?: PowerState; conn
   });
 }
 
+/** The units whose name or place (property › floor › room) contains the search, ignoring case (IR801): a complaint
+names a room more often than an AC. An empty search keeps every unit. */
+export function unitsMatching(us: ApiUnitRow[], search: string, place: (u: ApiUnitRow) => string): ApiUnitRow[] {
+  const q = search.trim().toLowerCase();
+  return q ? us.filter((u) => u.displayName.toLowerCase().includes(q) || place(u).toLowerCase().includes(q)) : us;
+}
+
 /** The unit form (DD-A02 fields, warranty end IR209). installedAt and warrantyEnd are Kuala Lumpur dates. */
 /** iotModelId is the unit's planned IoT model; empty is none (DEC-105). */
 export interface UnitDraft { displayName: string; propertyId: string; spaceId: string; modelId: string; iotModelId: string; installState: InstallState; installedAt: string; warrantyEnd: string; serviceScope: Scope[] }

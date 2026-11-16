@@ -10565,6 +10565,17 @@ IR614 matched a history without completion by its as-of, so a job whose delegati
    - `TestContractorAndTechnicianProjections`: the ended delegation is listed with `status: accepted` and left out with `currentOnly: true`. The query catalog test sends the filter.
    - `partnerJobs.test.ts`: the open stages ask with `currentOnly`, Completed and All without.
 
+## IR798 The Running list turns its ACs off, unticking those to keep — 2026-11-16
+
+Found in the UI/UX loop (UX-45). Overview › Running › View running units lists every running AC across properties. Turning them off meant opening each AC's own screen: about 27 clicks for 9 ACs. Group control works on one room or area only (DD-C14), and these ACs were in 8 rooms.
+
+1. **Turn off running ACs.** On the Running list (`/customer/properties?powerState=on`, no connection filter, 2 or more ACs) an owner gets "Turn off running ACs…". It opens the group panel with Power Off as the only change (`TURN_OFF`) and every online AC ticked.
+   - The owner unticks those that should keep running.
+   - Each card shows its place (property › floor › room).
+   - Review & turn off and the sending are those of Group control: one `commands.create` and `commands.get` per AC.
+   - This is the one exception to one space. Power off sets nothing else, so no room's settings can mix.
+2. **After sending.** The list is re-read, and the ACs confirmed off leave it. The panel stays open, says how many were turned off, and Retry covers the failed ACs that are still listed.
+3. **Docs and tests.** FR-C14 and DD-C14 step 5 say so. `clientProperties.test.ts` plans power off only, and an AC already off has nothing to send.
 
 ## IR799 A failed command says why in words, never with its code — 2026-11-16
 
@@ -10585,17 +10596,28 @@ Found in the UI/UX loop (UX-46). A command the AC refused read "Set power OFF �
    - The test-run banners read "Not done: {reason} · no end command is needed." and "Not confirmed: {reason} · the unit may still be running; check it on site."
 3. **Tests.** units, restrictions and techControl tests expect the words, and an unknown code reads "no reason given".
 
-## IR798 The Running list turns its ACs off, unticking those to keep — 2026-11-16
+## IR800 Every unresolved alert says what to do — 2026-11-16
 
-Found in the UI/UX loop (UX-45). Overview › Running › View running units lists every running AC across properties. Turning them off meant opening each AC's own screen: about 27 clicks for 9 ACs. Group control works on one room or area only (DD-C14), and these ACs were in 8 rooms.
+Found in the UI/UX loop (UX-47, the customer's "anomaly response" on a phone). The open "Possible open window" alert showed where, its evidence and "Open — not resolved yet", with View unit as its only action. Nothing said what the customer should do. Faults had Request repair and reminders Book cleaning, but a load cause, a tamper or an air-quality alert left the customer guessing.
 
-1. **Turn off running ACs.** On the Running list (`/customer/properties?powerState=on`, no connection filter, 2 or more ACs) an owner gets "Turn off running ACs…". It opens the group panel with Power Off as the only change (`TURN_OFF`) and every online AC ticked.
-   - The owner unticks those that should keep running.
-   - Each card shows its place (property › floor › room).
-   - Review & turn off and the sending are those of Group control: one `commands.create` and `commands.get` per AC.
-   - This is the one exception to one space. Power off sets nothing else, so no room's settings can mix.
-2. **After sending.** The list is re-read, and the ACs confirmed off leave it. The panel stays open, says how many were turned off, and Retry covers the failed ACs that are still listed.
-3. **Docs and tests.** FR-C14 and DD-C14 step 5 say so. `clientProperties.test.ts` plans power off only, and an AC already off has nothing to send.
+1. **Next step.** `alertNext` (shared/lib/alerts.ts) gives the step of an unresolved alert. It looks at the cause first, then the type, then the kind.
+   - window_open: check that the windows and doors are closed, and turn the AC off if nobody is in the room.
+   - insulation_loss: ask for an inspection.
+   - tamper: check the cover, and request a repair if nobody should have opened it.
+   - reconciliation_required: nothing to do while HQ checks.
+   - The kinds: inspection (nothing to do), maintenance (book a cleaning), quality (air the room, see Air quality), fault (request a repair).
+
+   A resolved alert has none. `InboxAlert.next` carries it.
+2. **Screen.** The customer's Needs attention rows add "What to do: …", and the alert detail adds a What to do row. An air-quality alert gets an Air quality link. DD-C08 step 3 says so.
+3. **Tests.** `notifications.test.ts` checks the step by cause, type and kind, none once resolved, and the Malay text.
+
+## IR801 Find a room or AC by name in Units & locations — 2026-11-16
+
+Found in the UI/UX loop (UX-48, a complaint call: "the director's office is hot"). Units & locations had only the tree: 3 properties, 6 floors, 15 rooms. The customer had to scan it for the room, open it, then the AC. There was no search; `filterUnits` took a search, but the customer page always passed an empty one.
+
+1. **Search.** "Find a room or AC…" sits above the tree. Typing waits 300 ms, then sets the URL key `search`. The page lists the units whose display name or place (property › floor › room) contains the text, case-insensitively, together with any power or connection filter. The filtered list is the one the KPI links use: name, place, readings, power and connection badges, Open control. Its title shows the text in quotes.
+2. **Clearing.** A tree row and Clear filter remove `search`, and the box follows the URL. With no match, the list says no room or AC name contains the text and suggests checking the spelling.
+3. **Docs.** DD-C02 step 3 and SCR-C02's URL keys add `search`.
 
 ## IR802 One automation for several ACs — 2026-11-16
 
@@ -10607,6 +10629,14 @@ Found in the UI/UX loop (UX-49, scheduled operation: "switch Office A off at 19:
 4. **Tests.** `clientAutomations.test.ts`: the common actions of a wide and a narrow AC (power, the shared temperatures, cool), one AC equal to its own options, none for no AC or an AC without capabilities.
 5. **Checked on the dev stack.** A rule for Lobby AC and Meeting room AC (Office A) was saved, listed as "(+1 more AC)", reopened with both, then deleted.
 
+## IR803 Energy & cost ranks the ACs by use — 2026-11-16
+
+Found in the UI/UX loop (UX-50: "which AC should I review?"). Energy & cost showed one AC, the first by name, or up to four that the customer picked. Nothing said which of the 23 ACs used the most, so finding the one to review took 23 selections.
+
+1. **Ranking.** For the period, the page also runs one `energy.summary` per unit of the customer. `topUsers` (shared/lib/clientEnergy.ts) keeps the five highest and leaves out units without measured energy. Ties go by name. Each unit's share is of the measured total.
+2. **Card.** "Highest use in this period" lists the AC, its kWh, its share of measured and its data coverage, in warning colour under 80%. A note says low coverage means the AC may have used more than shown. Show selects that AC alone. Compare adds it, up to four, and is hidden when the AC is already shown or four are chosen. The card is hidden with fewer than two ranked ACs.
+3. **Docs and tests.** DD-C06 step 5. `energy.test.ts` checks the order, the shares and leaving out units without measured use.
+
 ## IR804 The command history says who sent a command: you or someone else — 2026-11-16
 
 Found in the UI/UX loop (UX-51, several users on one account). A customer owner and their family or staff share one account. When an AC's setting changed, its command history said "Set power OFF — acknowledged by device" with no hint of who sent it. Only automations, restrictions and test runs named their source. `commands.list` already returns `actorMembershipId` to the client; IR216 hides only another actor's reason.
@@ -10614,6 +10644,14 @@ Found in the UI/UX loop (UX-51, several users on one account). A customer owner 
 1. **Rows.** `historyRow` takes the reader's membership. A command with no other source (sent by hand) ends "· by you" when its actor is the reader, else "· by someone else". No name is shown, so nothing new is disclosed. Automation, restriction and test-run commands keep "· by an automation" and the others.
 2. **Where.** The customer unit page's command history. The page passes `me.membershipId` from the session.
 3. **Tests.** `units.test.ts`: by you, by someone else, an automation's command, and no reader (unchanged).
+
+## IR805 A narrow list card names each value — 2026-11-16
+
+Found in the UI/UX loop (UX-52, a contractor coordinator on a phone). Below a breakpoint, the partner Jobs list and the customer Overview's unit list hide their column headings. Each row becomes a card, and the values stand without them. The partner card read "—  history only / —  access closed". The customer row read "— no data" three times, with no sign of which was temperature, humidity or power.
+
+1. **Partner Jobs list.** Below `@3xl`, the Technician and Slot / deadline values carry their heading above them, the same words as the hidden column headings.
+2. **Customer Overview.** Below `lg`, the three readings carry Room temp, Humidity and Power now.
+3. **Wide screens** are unchanged: the labels hide where the headings show. These were the only two lists of the four apps that hide headings this way (searched for `hidden grid-cols-[` headings).
 
 ## IR806 Waiting for the AC counts down — 2026-11-16
 
@@ -10627,6 +10665,14 @@ Found in the UI/UX loop (UX-53, the single-AC control on a phone, criterion 9). 
 2. **Accessibility.** The banner is a polite live region, so the sentence stays fixed and the seconds are `aria-hidden`. A screen reader hears the sentence once, not a count every second.
 3. **Tests.** `units.test.ts` covers `answerSeconds`: 30 s, 120 s, a missing expiry, a zero span and an unreadable time.
 
+## IR807 HQ's Unresolved alerts tile opens the alerts it counts — 2026-11-16
+
+Found in the UI/UX loop (UX-54, HQ anomaly response). The Overview tile "Unresolved alerts 4 · open or acknowledged · critical and warning" linked to `/admin/alerts`. That list opened on every open alert, 19 of them: the four warnings plus 15 filter-cleaning reminders (info). The count and the list disagreed, and the dispatcher had to filter by hand.
+
+1. **Filter.** The severity select of the alerts tab adds "Severity: Critical & warning" (`severity=attention`). `alerts.list` takes a single severity, so with this value the page reads without one and leaves out the `normal` rows. The status tiles and the list follow.
+2. **Link.** `overviewLinks().alerts` is `/admin/alerts?severity=attention`, so the tile's 4 is the list's Open 4.
+3. **Docs and tests.** DD-A05 step 5. `adminSummary.test.ts` checks the link.
+
 ## IR808 A very low cooling setpoint gets a hint — 2026-11-16
 
 Found in the UI/UX loop (UX-55, criterion 12: notice the settings worth reviewing). Lowering a cooling setpoint to 16–21 °C went through the control and the confirmation with nothing said. A low setting is a common reason for high use, and it does not cool a room faster. The outdoor temperature is not available to the web apps (no weather operation), so the comparison with outside is left for later.
@@ -10634,6 +10680,15 @@ Found in the UI/UX loop (UX-55, criterion 12: notice the settings worth reviewin
 1. **Hint.** `coolingHint(mode, celsius)` (shared/lib/units.ts) returns a sentence when the mode is Cool and the setpoint is below 22 °C. The sentence: "{celsius}°C is very cold for cooling: a lower setting does not cool the room faster, it runs longer and uses more power. 24–26°C is a common comfortable range." It returns null otherwise.
 2. **Where.** The customer unit page shows it under the temperature row, in warning colour with an info icon, while the user picks the value. It blocks nothing.
 3. **Tests.** `units.test.ts` covers cooling at 18 and 22 °C and the other modes.
+
+## IR809 The unit page shows others' changes without a reload — 2026-11-16
+
+Found in the UI/UX loop (UX-56, criterion 14: several users at once). The customer unit page read its data once, so a change by another user, an automation or the device showed only after a manual reload. No page in the four apps re-read by itself.
+
+1. **Hook.** `useAutoRefresh(enabled, seconds = 30)` (shared/lib/useAutoRefresh.ts) calls `router.refresh()` at the interval while enabled. It skips ticks while the tab is hidden.
+2. **Unit page.** `LiveNote` enables it unless the user is busy: a setting edited and not sent, the confirmation, the power confirmation, rename or attach dialog open, or a command being awaited. A newer device report resets the controls (the "adjust state during render" sync), so re-reading then would lose the user's change. The header card says which state it is in.
+3. **Tests.** `useAutoRefresh.test.tsx` uses fake timers: it refreshes at each interval, never while paused, stops when paused again, and skips hidden ticks.
+4. **Load.** One server render per open unit page every 30 s.
 
 ## IR810 Undo the last change of an AC — 2026-11-16
 

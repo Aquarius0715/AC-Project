@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compareRow, dayRanges, periodRange, pickUnits, previousMonth, selectionQuery } from "@ac/web/lib/clientEnergy";
+import { compareRow, dayRanges, periodRange, pickUnits, previousMonth, selectionQuery, topUsers } from "@ac/web/lib/clientEnergy";
 import { amount, baselineErrors, baselineRows, coveragePct, one, roundAway, saving, summaryView, warning, type ApiEnergySummary, type BaselineDraft } from "@ac/web/lib/energy";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
 import { must } from "./must";
@@ -164,5 +164,18 @@ describe("the month before now", () => {
     expect(previousMonth(new Date("2026-11-30T17:00:00Z"))).toBe("2026-11"); // 2026-12-01 01:00
     expect(previousMonth(new Date("2026-03-31T16:30:00Z"))).toBe("2026-03"); // 2026-04-01 00:30
     expect(previousMonth(new Date("2026-03-31T15:59:00Z"))).toBe("2026-02"); // 2026-03-31 23:59, still March
+  });
+});
+
+// IR803: which AC to review first — the highest measured use, with its share of what was measured
+describe("highest use", () => {
+  it("ranks the units with measured energy, highest first, and gives each its share", () => {
+    const rows = [
+      { unitId: "a", name: "Lobby AC", kWh: 30, coverage: 1 }, { unitId: "b", name: "Bedroom AC", kWh: 10, coverage: 0.5 },
+      { unitId: "c", name: "No readings", kWh: null, coverage: null }, { unitId: "d", name: "Off all week", kWh: 0, coverage: 1 }, { unitId: "e", name: "Atrium AC", kWh: 10, coverage: 1 },
+    ];
+    expect(topUsers(rows).map((r) => [r.unitId, r.share])).toStrictEqual([["a", 0.6], ["e", 0.2], ["b", 0.2]]);
+    expect(topUsers(rows, 1).map((r) => r.unitId)).toStrictEqual(["a"]);
+    expect(topUsers([])).toStrictEqual([]);
   });
 });

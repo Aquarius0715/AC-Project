@@ -29,6 +29,9 @@ export default async function AdminAlertsPage({ searchParams }: Readonly<PagePro
   await connection();
   if (!apiMode()) return <AdminAlertsView />;
   const sp = await searchParams;
+  // "attention" is critical and warning together (IR807): the Overview's Unresolved alerts tile counts those, and its
+  // link opened a list where filter reminders buried them; the API takes one severity, so the info rows are left out here
+  const isAttention = one(sp.severity) === "attention";
   const severity = SEVERITIES.find((s) => s === one(sp.severity)) ?? null;
   const q = {
     customerId: one(sp.customerId),
@@ -36,7 +39,7 @@ export default async function AdminAlertsPage({ searchParams }: Readonly<PagePro
     unitId: one(sp.unitId),
     status: STATES.find((s) => s === one(sp.status)) ?? "open",
     alertId: one(sp.alertId) ?? null,
-    severity,
+    severity: isAttention ? "attention" as const : severity,
   };
   const scope = { ...(q.customerId && { customerId: q.customerId }), ...(q.propertyId && { propertyId: q.propertyId }), ...(q.unitId && { unitId: q.unitId }) };
   const filters = { ...scope, ...(severity && { severity }) };
@@ -77,7 +80,7 @@ export default async function AdminAlertsPage({ searchParams }: Readonly<PagePro
         tab: sp.tab === "policies" ? "policies" : "alerts",
         scope: scopeLists(customers.items, properties, units.items, q),
         scopeName: customers.items.find((c) => c.id === q.customerId)?.name ?? null,
-        alerts: adminAlertRows(alerts.items, units.items, customers.items, scoped, now.getTime(), i),
+        alerts: adminAlertRows(isAttention ? alerts.items.filter((a) => a.severity !== "normal") : alerts.items, units.items, customers.items, scoped, now.getTime(), i),
         policies: policyRows(scoped, customers.items, members.items, i.t, units.items),
         pol: {
           policyId: one(sp.policyId) ?? null, creatingFor: one(sp.new) ?? null, from: one(sp.from) ?? null, canWrite: perms.has("alert.policy.write"), timezone: display.timeZone,

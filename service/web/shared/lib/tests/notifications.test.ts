@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { inboxAlerts, type ApiAlert } from "@ac/web/lib/alerts";
+import { alertNext, inboxAlerts, type ApiAlert } from "@ac/web/lib/alerts";
 import { inboxRow, NOTIFICATION_KEYS, type ApiNotification } from "@ac/web/lib/notifications";
 import { i18nOf } from "@ac/web/lib/i18n";
 import { ms } from "@ac/web/lib/i18n-ms";
@@ -126,5 +126,23 @@ describe("inbox rows and alert rows", () => {
     expect([win?.title, win?.kind, win?.status.text, win?.status.detail, old?.status.detail, old?.where, old?.evidence.split(":", 1)[0]]).toStrictEqual([
       "Kemungkinan tingkap terbuka", "Punca beban (mungkin)", "Diakui", "Diakui 14 Sep 2026, 10:30 PG GMT+9 · masih belum selesai", "Diselesaikan 14 Sep 2026, 11:00 PG GMT+9 · penapis dibersihkan", "Bedroom AC · dikesan 14 Sep 2026, 10:00 PG GMT+9", "Bukti (disimpulkan)",
     ]);
+  });
+
+  // IR800: every unresolved alert names a next step (by cause, then type, then kind); a resolved one needs none
+  it("says what to do about each unresolved alert", () => {
+    const next = (over: Partial<ApiAlert>, status = "open") => alertNext(alert("a", "warning", status, over));
+    expect([
+      next({ causeCode: "window_open" }), next({ type: "maintenance" }), next({ type: "quality" }), next({ type: "tamper" }), next({}), next({ evidenceKind: "inspection" }), next({}, "resolved"),
+    ]).toStrictEqual([
+      "Check that the room's windows and doors are closed. If nobody is in the room, turn the AC off.",
+      "Book a filter cleaning. The AC keeps working, but cools less well until then.",
+      "Air the room or switch on ventilation, then check Air quality for the latest readings.",
+      "Check whether someone opened the AC's cover. If nobody should have, request a repair.",
+      "Request a repair. A technician checks the AC.",
+      "A technician's note. Nothing to do unless the problem comes back.",
+      null,
+    ]);
+    const [win] = inboxAlerts([alert("win", "warning", "open", { causeCode: "window_open" })], [], vi.fn(), i18nOf({ locale: "ms", timeZone: "UTC" }));
+    expect(win?.next).toBe("Pastikan tingkap dan pintu bilik ditutup. Jika tiada orang di dalam bilik, matikan AC.");
   });
 });
