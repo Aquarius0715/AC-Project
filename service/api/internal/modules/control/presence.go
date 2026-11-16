@@ -54,8 +54,12 @@ type PresenceInput struct {
 // Validate implements ops.Validator: a fix on the globe that knows where it is to 100 m.
 func (in *PresenceInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
-	if !(geo.Point{Latitude: in.Latitude, Longitude: in.Longitude}).OnGlobe() {
+	if !(geo.Point{Latitude: in.Latitude, Longitude: 0}).OnGlobe() {
 		fieldErrs["latitude"] = apperr.KeyRange
+	}
+
+	if !(geo.Point{Latitude: 0, Longitude: in.Longitude}).OnGlobe() {
+		fieldErrs["longitude"] = apperr.KeyRange
 	}
 
 	switch {
@@ -171,6 +175,11 @@ func (Automations) settle(
 	)
 	if err != nil {
 		return "", apperr.Wrap(err, "select pg_advisory_xact_lock")
+	}
+
+	err = forgetEndedHousemates(ctx, call, site.PropertyID)
+	if err != nil {
+		return "", err
 	}
 
 	var before, own, known bool
@@ -291,6 +300,48 @@ func (m Automations) fireLocation(
 	})
 
 	return commands, nil
+}
+
+// forgetEndedHousemates drops the inside states of the property's other members whose access ended (disabled, removed,
+// ended by HQ or run out): no event says so, and their stale inside would hold the household home for good.
+func forgetEndedHousemates(ctx context.Context, call *ops.Call, property uuid.UUID) error {
+	rows, err := call.Tx.Query(
+		ctx,
+		`SELECT membership_id FROM control.presence_states WHERE property_id = $1 AND inside
+		AND membership_id <> $2`,
+		property,
+		call.Principal.MembershipID,
+	)
+	if err != nil {
+		return apperr.Wrap(err, "select control.presence_states")
+	}
+
+	housemates, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+	if err != nil {
+		return apperr.Wrap(err, "select control.presence_states")
+	}
+
+	if len(housemates) == 0 { // an empty IDs filter would ask identity for every membership
+		return nil
+	}
+
+	active, err := identity.Members(ctx, call, identity.MembersInput{
+		IDs: housemates, Role: "", OrganizationID: nil, Permission: "", ClientRole: "",
+	})
+	if err != nil {
+		return apperr.Wrap(err, "identity.Members")
+	}
+
+	_, err = call.Tx.Exec(
+		ctx,
+		`DELETE FROM control.presence_states WHERE property_id = $1 AND membership_id = ANY($2) AND NOT membership_id =
+			ANY($3)`,
+		property,
+		housemates,
+		active,
+	)
+
+	return apperr.Wrap(err, "delete control.presence_states")
 }
 
 // forgetPresence deletes a member's presence when their location consent is withdrawn (IR53); it fires nothing.
