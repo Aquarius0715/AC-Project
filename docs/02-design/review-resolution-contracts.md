@@ -10658,3 +10658,11 @@ Found in the UI/UX loop (UX-47, the customer's "anomaly response" on a phone). T
    A resolved alert has none. `InboxAlert.next` carries it.
 2. **Screen.** The customer's Needs attention rows add "What to do: …", and the alert detail adds a What to do row. An air-quality alert gets an Air quality link. DD-C08 step 3 says so.
 3. **Tests.** `notifications.test.ts` checks the step by cause, type and kind, none once resolved, and the Malay text.
+
+## IR801 Find a room or AC by name in Units & locations — 2026-11-16
+
+Found in the UI/UX loop (UX-48, a complaint call: "the director's office is hot"). Units & locations had only the tree: 3 properties, 6 floors, 15 rooms. The customer had to scan it for the room, open it, then the AC. There was no search; `filterUnits` took a search, but the customer page always passed an empty one.
+
+1. **Search.** "Find a room or AC…" sits above the tree. Typing waits 300 ms, then sets the URL key `search`. The page lists the units whose display name or place (property › floor › room) contains the text, case-insensitively, together with any power or connection filter. The filtered list is the one the KPI links use: name, place, readings, power and connection badges, Open control. Its title shows the text in quotes.
+2. **Clearing.** A tree row and Clear filter remove `search`, and the box follows the URL. With no match, the list says no room or AC name contains the text and suggests checking the spelling.
+3. **Docs.** DD-C02 step 3 and SCR-C02's URL keys add `search`.

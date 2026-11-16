@@ -2,9 +2,9 @@
 const MY_PROPERTIES = "My properties";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Badge, Banner, Btn, Card, Choice, ConnBadge, cx, DataTable, EmptyState, Field, Modal, Page, PowerBadge, SummaryList, useToast, Plain } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Choice, ConnBadge, cx, DataTable, EmptyState, Field, Modal, Page, PowerBadge, Search, SummaryList, useToast, Plain } from "@ac/web/components/ui";
 import { useUrlPatchPending } from "@ac/web/lib/useUrlPatch";
 import { selectionId, type Connection, type PowerState, type Selection, type TreeProperty, type TreeSpace } from "@ac/web/lib/assets";
 import { changeText, groupPlan, hasChoice, KEEP_ALL, TURN_OFF, type GroupChange, type PlanRow, type RoomUnit } from "@ac/web/lib/clientProperties";
@@ -22,7 +22,7 @@ import { unreachableFailure } from "@ac/web/lib/unreachable";
 
 export interface PropertiesLive {
   tree: TreeProperty[]; selection: Selection | null; owner: boolean;
-  filter: { powerState: PowerState | null; connections: Connection[]; total: number } | null;
+  filter: { powerState: PowerState | null; connections: Connection[]; search: string; total: number } | null;
   units: (RoomUnit & { place: string })[]; details: ApiUnitDetail[];
   /** the scenario's now: a group plan's “offline since” keeps its date on another day */
   now: string;
@@ -61,11 +61,12 @@ export function PropertiesView({ live }: Readonly<{ live: PropertiesLive }>) {
   const isPendingTarget = isNavPending && target !== null;
   const isFilterShown = !!live.filter && !isPendingTarget;
   const shownSel = isPendingTarget ? target : selId;
-  const go = (patch: Record<string, string | null>) => { setTarget(targetOf(patch)); nav({ propertyId: null, spaceId: null, unassignedOnly: null, mode: null, unitIds: null, powerState: null, connections: null, ...patch }); };
+  const go = (patch: Record<string, string | null>) => { setTarget(targetOf(patch)); nav({ propertyId: null, spaceId: null, unassignedOnly: null, mode: null, unitIds: null, powerState: null, connections: null, search: null, ...patch }); };
   return (
     <Page>
       <div className="split-rev">
         <Card title={t(MY_PROPERTIES)} action={<Badge tone="muted">{live.tree.length}</Badge>} className="self-start">
+          <UnitSearch current={live.filter?.search ?? ""} nav={nav} />
           <div className="flex flex-col text-[13px]">
             {live.tree.map((p) => (
               <div key={p.id}>
@@ -86,6 +87,25 @@ export function PropertiesView({ live }: Readonly<{ live: PropertiesLive }>) {
       {renaming && <RenameModal r={renaming} onClose={() => { setRenaming(null); }} />}
     </Page>
   );
+}
+
+/** Find a room or AC by name (IR801): a complaint names a room ("the director's office is hot"), so the tree need not be
+scanned. The URL's search lists the units whose name or place matches; typing waits a moment before it asks. */
+function UnitSearch({ current, nav }: Readonly<{ current: string; nav: (patch: Record<string, string | null>) => void }>) {
+  const t = useT();
+  const [q, setQ] = useState(current);
+  // another navigation (a tree row, Clear filter) cleared or changed the search: the box follows the URL
+  const [seen, setSeen] = useState(current);
+  if (seen !== current) {
+    setSeen(current);
+    setQ(current);
+  }
+  useEffect(() => {
+    const next = q.trim();
+    const id = next === current ? null : setTimeout(() => { nav({ propertyId: null, spaceId: null, unassignedOnly: null, mode: null, unitIds: null, powerState: null, connections: null, search: next || null }); }, 300);
+    return () => { if (id !== null) clearTimeout(id); };
+  }, [q, current, nav]);
+  return <div className="mb-3"><Search placeholder={t("Find a room or AC…")} value={q} onChange={setQ} /></div>;
 }
 
 function Row({ depth, selected, onClick, icon, name, tag, meta, onRename }: Readonly<{ depth: number; selected: boolean; onClick: () => void; icon: IconName; name: string; tag?: string; meta?: string; onRename?: () => void }>) {
@@ -138,8 +158,8 @@ function FilteredUnits({ live, clear }: Readonly<{ live: PropertiesLive; clear: 
   const [isTurningOff, setIsTurningOff] = useState(false);
   const f = live.filter;
   if (!f) return null;
-  const label = [f.powerState && t("Power: {state}", { state: t(powerLabel[f.powerState]) }), f.connections.length > 0 && t("Connection: {states}", { states: f.connections.map((c) => t(connLabel[c] ?? c)).join(", ") })].filter(Boolean).join(" · ");
-  const isRunningList = live.owner && f.powerState === "on" && f.connections.length === 0;
+  const label = [f.search && t("“{q}”", { q: f.search }), f.powerState && t("Power: {state}", { state: t(powerLabel[f.powerState]) }), f.connections.length > 0 && t("Connection: {states}", { states: f.connections.map((c) => t(connLabel[c] ?? c)).join(", ") })].filter(Boolean).join(" · ");
+  const isRunningList = live.owner && f.powerState === "on" && f.connections.length === 0 && !f.search;
   const canTurnOff = isRunningList && live.units.length >= 2;
   // the panel stays once opened: the ACs it turned off leave the re-read list, and its results must not vanish with them
   const isPanelShown = isRunningList && isTurningOff;
@@ -151,7 +171,7 @@ function FilteredUnits({ live, clear }: Readonly<{ live: PropertiesLive; clear: 
       <Btn size="sm" onClick={clear}>{t("Clear filter")}</Btn>
     </span>
   );
-  const body = live.units.length > 0 ? <UnitRows units={live.units} /> : <EmptyState title={t("No air conditioner matches")}>{t("Clear the filter to see every unit.")}</EmptyState>;
+  const body = live.units.length > 0 ? <UnitRows units={live.units} /> : <EmptyState title={t("No air conditioner matches")}>{t(f.search ? "No room or AC name contains “{q}”. Check the spelling, or clear the filter to see every unit." : "Clear the filter to see every unit.", { q: f.search })}</EmptyState>;
   return (
     <Card title={t("Air conditioners · {filter}", { filter: label })} sub={t("{n} of {total}", { n: live.units.length, total: f.total })} action={action}>
       {isPanelShown ? <GroupPanel live={live} space="" offOnly /> : body}
