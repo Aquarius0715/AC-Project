@@ -28,10 +28,11 @@ const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 export async function loadOverview(sp: Record<string, string | string[] | undefined>) {
   interface Summary { counts: { total: number; powerOn: number; powerOff: number; powerUnknown: number; alertCount: number }; asOf: string }
   const kind = periodOf(one(sp.period));
-  const [now, units, properties, spaces, alerts, automations, baselines, consent, display] = await Promise.all([
+  const [now, units, properties, spaces, alerts, automations, baselines, consent, display, prefs] = await Promise.all([
     coreNow(), coreAll<OverviewUnit>("units.list"), coreAll<ApiPropertyRow>("properties.list"), coreAll<ApiSpaceRow>("spaces.list"),
     coreAll<ApiAlert>("alerts.list"), coreAll<ApiAutomation>("automations.list"), coreAll<ApiBaseline>("baselines.list"),
     orNull(coreOp<ApiConsent>("consents.get", { purpose: "location_automation" })), coreDisplay(),
+    orNull(coreOp<{ pinnedUnitIds?: string[] }>("preferences.get", {})), // the pinned ACs (IR819); none when unreadable
   ]);
   const i = i18nOf(display);
   const { t } = i;
@@ -86,6 +87,7 @@ export async function loadOverview(sp: Record<string, string | string[] | undefi
   const scopeText = scopeTextOf();
   const roomOf = (u: OverviewUnit) => (u.spaceId ? spaces.find((s) => s.id === u.spaceId)?.name : null) ?? properties.find((p) => p.id === u.propertyId)?.name ?? t("Room");
   return {
+    pins: prefs?.pinnedUnitIds ?? [],
     due: dueLines,
     now: now.toISOString(), period: kind, periodLabel: t(entryOf(periodLabel, kind)), note: periodNote(kind, period, i), asOf: summary.asOf, properties: properties.filter((p) => !p.archived).map((p) => ({ id: p.id, name: p.name })), propertyId: sel.propertyId, propertyName: sel.propertyName,
     units: sel.inProperty.map((u) => ({ id: u.id, name: u.displayName })), unitId: sel.unitId,
