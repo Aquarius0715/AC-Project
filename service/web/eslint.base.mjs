@@ -484,6 +484,7 @@ export function webConfig(tsconfigRootDir) {
       "next-env.d.ts",
       "playwright-report/**",
       "test-results/**",
+      "coverage/**",
       "**/*.gen.ts",
     ]),
   ]);
