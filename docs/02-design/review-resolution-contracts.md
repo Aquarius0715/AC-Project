@@ -10716,6 +10716,14 @@ Found in the UI/UX loop (UX-60, principle 15: no searching again after following
 2. **Filter care.** `FilterCareTab` takes `focus`, the `unitId` from the URL. That AC's row is marked (`aria-current`, a tinted background) and scrolled to the middle of the view once, on arrival. An area that folds it opens. Request cleaning and Mark cleaned work as before.
 3. **Docs.** SCR-C09 lists the URL key `unitId`, which is optional.
 
+## IR815 Energy & cost opens on the AC that used the most — 2026-11-16
+
+Found in the UI/UX loop (UX-62, criterion 12; noted in UX-50). Opening Energy & cost showed the first AC by name ("Bedroom AC"), whatever it used, so the first view rarely answered "where does the energy go?".
+
+1. **Default.** When the URL names no AC of the customer, the page waits for the per-unit ranking (IR803) and opens on its first AC. The ranking still runs in parallel with the other reads when ACs are named. With no measured use at all, it falls back to the first by name as before.
+2. **Note.** The Units row then reads "Showing the AC that used the most in this period · up to 4 units".
+3. **Docs.** DD-C06 step 6.
+
 ## IR812 A demo event's evidence names its metric and comparison in words — 2026-11-16
 
 Found in the UI/UX loop (UX-59, HQ anomaly response; noted in UX-54). A policy rule's demo event is stored as "Demo event: heartbeat_gap gte threshold" (monitoring notifier). The alert detail and its activity showed it with the metric code and the comparison code. IR626 had worded the template but kept both values as stored.

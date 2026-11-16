@@ -1130,6 +1130,7 @@ export const id: Record<string, string> = {
   "Undo": "Urungkan",
   "Switch off after hours": "Matikan setelah jam kerja",
   "Turn these off automatically every weekday…": "Matikan ini otomatis setiap hari kerja…",
+  "Showing the AC that used the most in this period · up to 4 units": "Menampilkan AC yang paling banyak memakai energi dalam periode ini · hingga 4 unit",
   "Group change finished — results are shown per AC": "Perubahan grup selesai — hasil ditampilkan per AC",
   "{n} selected": "{n} dipilih",
   "Select all online ({n})": "Pilih semua yang online ({n})",
