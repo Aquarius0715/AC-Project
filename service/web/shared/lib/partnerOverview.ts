@@ -166,15 +166,22 @@ export function kpis(counts: ApiCounts, jobs: PartnerJob[], now: number, names: 
   const active = Math.max(0, counts.activeCount - unassigned.length);
   const who = (id: string | null) => names.get(id ?? "") ?? t("Technician");
   const nextVisit = (j: NonNullable<typeof next>) => t(j.status === IN_PROGRESS ? "{name} on site from {time}" : "{name} starts {time}", { name: who(j.technicianId), time: relativeTime(j.slot.startAt, now, i) });
+  // an empty tile says so in words, as Offers to answer does, instead of a bare dash (UI/UX loop R130)
+  let activeSub = "—"; // jobs are running but none has a visit ahead
+  if (next) activeSub = nextVisit(next);
+  else if (active === 0) activeSub = t("No jobs in progress or scheduled");
+  let reviewSub = "—"; // counted, but not on this page of jobs
+  if (review[0]) reviewSub = t("{job} · awaiting review", { job: label(review[0], t) });
+  else if (counts.reviewCount === 0) reviewSub = t("No reports to review");
   return [
     { label: t("Offers to answer"), value: counts.offerCount, sub: offers[0] ? t("{job} · expires in {left}", { job: offers[0].short, left: until(offers[0].offerExpiresAt, now, t) }) : t("No open offers"), href: list("offered"), link: t("link::Open offers") },
-    { label: t("Awaiting assignment"), value: unassigned.length, sub: unassigned.length > 0 ? t("Accepted, no technician yet") : "—", href: "/partner/schedule", link: t("Assign"), tone: unassigned.length > 0 ? "warn" : undefined },
+    { label: t("Awaiting assignment"), value: unassigned.length, sub: unassigned.length > 0 ? t("Accepted, no technician yet") : t("No jobs waiting for a technician"), href: "/partner/schedule", link: t("Assign"), tone: unassigned.length > 0 ? "warn" : undefined },
     {
       label: t("In progress / scheduled"), value: active, href: list("active"), link: t("View jobs"),
-      sub: next ? nextVisit(next) : "—",
+      sub: activeSub,
     },
-    { label: t("Reports to review"), value: counts.reviewCount, sub: review[0] ? t("{job} · awaiting review", { job: label(review[0], t) }) : "—", href: review.length === 1 ? `/partner/jobs/${review[0]?.id ?? ""}/review` : list("review"), link: t("Review") },
-    { label: t("Overdue"), value: counts.overdueCount, sub: counts.overdueCount ? t("Past the due date or the work window") : "—", href: list("active"), link: t("View"), tone: counts.overdueCount ? "crit" : undefined },
+    { label: t("Reports to review"), value: counts.reviewCount, sub: reviewSub, href: review.length === 1 ? `/partner/jobs/${review[0]?.id ?? ""}/review` : list("review"), link: t("Review") },
+    { label: t("Overdue"), value: counts.overdueCount, sub: counts.overdueCount ? t("Past the due date or the work window") : t("No overdue jobs"), href: list("active"), link: t("View"), tone: counts.overdueCount ? "crit" : undefined },
   ];
 }
 
