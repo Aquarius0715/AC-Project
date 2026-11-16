@@ -13,7 +13,8 @@ test("pages carry the CSP with a fresh nonce and the static security headers", a
   for (const d of ["default-src 'self'", "object-src 'none'", "base-uri 'self'", "frame-ancestors 'none'", "connect-src 'self'"]) expect(csp).toContain(d);
   expect(csp).not.toContain("unsafe-eval"); // a production build
   expect([h["x-content-type-options"], h["referrer-policy"], h["x-frame-options"]]).toEqual(["nosniff", "strict-origin-when-cross-origin", "DENY"]);
-  expect(h["permissions-policy"]).toBe("camera=(), microphone=(), geolocation=(), payment=(), usb=(), display-capture=()"); // IR383
+  const geolocation = app.id === "admin" ? "(self)" : "()"; // Admin's "Use my location" on the property pin (DEC-109, IR824)
+  expect(h["permissions-policy"]).toBe(`camera=(), microphone=(), geolocation=${geolocation}, payment=(), usb=(), display-capture=()`); // IR383
   const html = await must(res).text();
   expect(html, "the framework's scripts carry the nonce").toContain(`nonce="${nonce}"`);
   expect(html.match(/<script(?![^>]*nonce=)[^>]*>/g) ?? [], "scripts without the nonce").toEqual([]);

@@ -105,6 +105,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 0.654.0 (2026-11-16): IR811: from Turn off running ACs, one link opens an after-hours rule with the same ACs.
 0.657.0 (2026-11-16): IR814: a customer pins ACs to the Overview from their pages (this browser only).
 0.658.0 (2026-11-16): IR815: Energy & cost opens on the AC that used the most in the period.
+0.667.0 (2026-11-16): IR824: HQ sets the pin of a Home or Office on a map in Admin (address search, own location, typed coordinates) with its away/home radius (DEC-109, stage 2).
 0.666.0 (2026-11-16): IR823: a Home or Office keeps a map pin and an away/home radius set by HQ, for GPS check-in and location automations (DEC-109, stage 1: API and DB).
 0.665.0 (2026-11-16): IR822: every text that named a permission by its code names it in words, and so does the page shown when a role lacks one.
 0.664.0 (2026-11-16): IR821: permissions are named in words (labels in four languages; Access & roles shows them with the code beside), replacing the rule that kept codes.

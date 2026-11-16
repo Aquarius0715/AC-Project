@@ -1,6 +1,6 @@
 ---
 document_id: DD-A
-version: 0.64.0
+version: 0.65.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -142,7 +142,7 @@ Scope: FR-A02 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 | serviceScope | enum array/required | Target inspection groups | Maintenance scope |
 | changeReason | string/required for relocation and similar changes | 1–1000 characters | Change reason |
 | property.address / accessInstructions | string/optional | 0–500 / 0–1000 characters; fictional values only | Address is siteAddress under IR25 even before acceptance of the company's Offer. Entry instructions are visible only after acceptance within the valid period |
-| property.location / geofenceRadiusMeters | {latitude, longitude}/nullable; integer/nullable | latitude −90..90, longitude −180..180 (WGS 84); radius 50–2000 m, null = 150 m; `location=error.range`, `geofenceRadiusMeters=error.range` | DEC-109 (IR823): HQ sets the map pin; technician check-in and customer away/home automations measure against it. The save replaces both, as it replaces the address; null clears the pin |
+| property.location / geofenceRadiusMeters | {latitude, longitude}/nullable; integer/nullable | latitude −90..90, longitude −180..180 (WGS 84); radius 50–2000 m, null = 150 m; `location=error.range`, `geofenceRadiusMeters=error.range` | DEC-109 (IR823): HQ sets the map pin; technician check-in and customer away/home automations measure against it. The save replaces both, as it replaces the address; null clears the pin. As built (IR824): Edit details / Add property has a map (a click places the pin, a drag moves it), an address search, “Use my location”, typed latitude and longitude (the keyboard way, and the only way when the environment has no map) and the radius; the property's page shows the pin, the radius and a map |
 
 **Steps**
 

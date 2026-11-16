@@ -99,7 +99,7 @@ describe("Display language (FR-X01, AT-X01-N, IR258, IR639)", () => {
   // IR639: a Japanese text is Japanese; only names and formats that read the same in every language stay as written
   it("leaves in English only the Japanese texts that read the same in every language", () => {
     const same = Object.entries(ja).filter(([key, text]) => text === (key.includes("::") ? key.slice(key.indexOf("::") + 2) : key)).map(([key]) => key);
-    expect(same).toStrictEqual(["CO2", "PM2.5", "CO₂", "WhatsApp", "MRV", "{field} — {problem}", "v{version} · {state}", "fw {version}", "RTO", "HH:MM – HH:MM", "{from} – {to}"]);
+    expect(same).toStrictEqual(["CO2", "PM2.5", "CO₂", "WhatsApp", "MRV", "{field} — {problem}", "v{version} · {state}", "fw {version}", "RTO", "HH:MM – HH:MM", "{from} – {to}", "{n} m"]);
   });
   it("writes every Japanese text with Japanese characters unless it is a name or a format", () => {
     const proper = new Set(["CO2", "PM2.5", "CO₂", "WhatsApp", "MRV", "RTO"]);

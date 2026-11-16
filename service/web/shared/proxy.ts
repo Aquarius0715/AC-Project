@@ -6,6 +6,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { clearedCookieOptions, cookieOptions, dropSession, loadSession, needsRefresh, oidcConfigFor, refresh, renewSessionCookie, roleHome, SESSION_COOKIE, type Session } from "@ac/web/lib/session";
 import { contentSecurityPolicy, HSTS, makeNonce as makeNonce, originOf } from "@ac/web/lib/securityHeaders";
 import { entryOf } from "@ac/web/lib/lookup";
+import { mapOrigins } from "@ac/web/lib/mapConfig";
 
 const sharedAreas = ["/notifications", "/settings"]; // shared pages that need a session but no particular role
 
@@ -16,7 +17,7 @@ export async function authProxy(req: NextRequest, appRole: Session["role"]) {
   const isHttps = req.nextUrl.protocol === "https:" || req.headers.get("x-forwarded-proto") === "https";
   const nonce = makeNonce();
   const idp = originOf(oidcConfigFor(req.headers.get("host")).issuer); // the identity provider on the address this request came by (IR651)
-  const csp = contentSecurityPolicy(nonce, { dev: process.env.NODE_ENV === "development", https: isHttps, formActions: idp ? [idp] : [] });
+  const csp = contentSecurityPolicy(nonce, { dev: process.env.NODE_ENV === "development", https: isHttps, formActions: idp ? [idp] : [], mapOrigins: appRole === "admin" ? mapOrigins() : [] });
   const headers = new Headers(req.headers);
   headers.set("x-nonce", nonce);
   headers.set("x-pathname", req.nextUrl.pathname); // the root layout names the page in the document title (IR490)
