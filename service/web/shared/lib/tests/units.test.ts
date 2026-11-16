@@ -30,6 +30,11 @@ describe("unit commands and readings in the display language and time zone (FR-X
       .toStrictEqual({ id: "cmd-1234", text: "Tetapkan suhu 24°C — gagal: AC menolaknya · oleh automasi", when: "14 Sep 2026, 10:00 PG GMT+9", bad: true });
     // IR799: a failure code is never shown as it is; one the web does not know reads as no reason given
     expect(historyRow(deviceCommand({ status: "failed", failureCode: "SOMETHING_NEW" })).text).toBe("Set temperature 24°C — failed: no reason given");
+    // IR804: a command sent by hand says whether the reader sent it; an automation's keeps its source
+    const byHand = (actor: string, source = "ui") => historyRow(deviceCommand({ actorMembershipId: actor, source }), undefined, undefined, "m-me").text;
+    expect([byHand("m-me"), byHand("m-other"), byHand("m-other", "automation"), historyRow(deviceCommand({ actorMembershipId: "m-other" })).text]).toStrictEqual([
+      "Set temperature 24°C — acknowledged by device · by you", "Set temperature 24°C — acknowledged by device · by someone else", "Set temperature 24°C — acknowledged by device · by an automation", "Set temperature 24°C — acknowledged by device",
+    ]);
     expect(historyRow(deviceCommand({ status: "expired" }), undefined, tokyo)).toMatchObject({ text: "Set temperature 24°C — no device response (expired)", when: "14 Sept 2026, 10:00 am GMT+9", bad: true });
     // a command from Unit Control (UI) carries no label
     expect(historyRow(deviceCommand({ source: "ui" })).text).toBe("Set temperature 24°C — acknowledged by device");

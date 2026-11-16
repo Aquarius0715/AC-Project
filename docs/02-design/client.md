@@ -151,6 +151,7 @@ Scope: FR-C03 / Main display pattern: **UI-DETAIL**. Service boundary: `units.ge
    - A power-OFF request does not set measured temperature to 0.
    - Disable new requests to a unit while a request for that unit is pending.
 3. Create one Command and show the requested value separately. Update confirmed settings only after the device returns acknowledged. Keep the request and reason in history even on failure.
+   - As built (IR804): a history row of a command sent by hand (`source` ui) ends “· by you” when the reader sent it (`actorMembershipId` is the reader's membership) and “· by someone else” otherwise. Several people share one customer account, and the AC that “changed by itself” was often changed by another of them. No name is shown. Automation, restriction and test-run commands keep their own source.
 4. Queries to update: `commands / unit detail / telemetry summary / audit`。
 
 **Boundary cases and failures**: For demo capability 16–30 degrees in 1-degree steps, reject 15, 31, and 24.5 degrees. Offline units, other customers' units, restriction violations, and late acknowledgements are not successes. Follow IR46 for actions under restrictions and IR47 for connection/power-signal rejection. An offline AC sends nothing; below the disabled controls the screen offers Request repair, a new repair request for the AC (Figma 02h, IR315).

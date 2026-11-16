@@ -1101,6 +1101,8 @@ export const ja: Record<string, string> = {
   "Also apply to {n} other ACs": "他の {n} 台のエアコンにも適用",
   "All ACs in {property} ({n})": "{property} のすべてのエアコン（{n}）",
   "Every chosen AC gets the same actions; only actions all of them support are offered. Up to {max} ACs per automation.": "選択したすべてのエアコンに同じ操作が行われます。全台が対応する操作だけを表示しています。1つの自動化につき最大 {max} 台です。",
+  " · by you": " · あなたが操作",
+  " · by someone else": " · 他の人が操作",
   "Group change finished — results are shown per AC": "グループの変更が完了しました — 結果はエアコンごとに表示されます",
   "{n} selected": "{n} 台を選択",
   "Select all online ({n})": "オンラインをすべて選択（{n}）",
