@@ -113,6 +113,7 @@ Scope: FR-C02 / Main display pattern: **UI-LIST**. Service boundary: `properties
 1. Show the property list (with type and unit counts) and the selected property's floors/areas and rooms. Selecting a room lists every AC in it with power/connection badges; opening one goes to Unit Control. Unassigned units appear under the property with the note “placed by HQ” (IR62).
 2. The structure is read-only (IR109): no add, move, archive, or delete controls. ✎ / Rename opens a centered modal showing the location, its type, and the new name; saving calls `locations.rename`.
 3. After a rename, update tree and breadcrumbs; IDs and parents never change. For navigation from KPIs, show the unit list filtered by powerState/connections (IR50).
+   - As built (IR801): above the tree, “Find a room or AC…” searches by name. The URL key `search` lists the units whose name or place (property › floor › room) contains the text, case-insensitively, in the same filtered list as the KPI links. Each row has its state and Open control. Typing waits 300 ms before it asks. A tree row or Clear filter clears the search. With no match, the list says no room or AC name contains the text.
 4. Queries to update: `properties / spaces / units / customer summary`.
 
 **Boundary cases and failures**: Empty or 121-character names return VALIDATION with the input kept; a duplicate sibling name is CONFLICT `error.duplicateSiblingName` (IR208) and a stale version CONFLICT `error.versionConflict`, both keeping the input. Direct structural writes from a client session return FORBIDDEN.

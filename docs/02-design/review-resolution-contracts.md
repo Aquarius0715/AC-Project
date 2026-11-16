@@ -10584,3 +10584,11 @@ Found in the UI/UX loop (UX-46). A command the AC refused read "Set power OFF �
    - The technician's command outcome reads "failed: {reason}".
    - The test-run banners read "Not done: {reason} · no end command is needed." and "Not confirmed: {reason} · the unit may still be running; check it on site."
 3. **Tests.** units, restrictions and techControl tests expect the words, and an unknown code reads "no reason given".
+
+## IR801 Find a room or AC by name in Units & locations — 2026-11-16
+
+Found in the UI/UX loop (UX-48, a complaint call: "the director's office is hot"). Units & locations had only the tree: 3 properties, 6 floors, 15 rooms. The customer had to scan it for the room, open it, then the AC. There was no search; `filterUnits` took a search, but the customer page always passed an empty one.
+
+1. **Search.** "Find a room or AC…" sits above the tree. Typing waits 300 ms, then sets the URL key `search`. The page lists the units whose display name or place (property › floor › room) contains the text, case-insensitively, together with any power or connection filter. The filtered list is the one the KPI links use: name, place, readings, power and connection badges, Open control. Its title shows the text in quotes.
+2. **Clearing.** A tree row and Clear filter remove `search`, and the box follows the URL. With no match, the list says no room or AC name contains the text and suggests checking the spelling.
+3. **Docs.** DD-C02 step 3 and SCR-C02's URL keys add `search`.
