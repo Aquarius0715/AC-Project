@@ -26,8 +26,10 @@ describe("unit commands and readings in the display language and time zone (FR-X
 
   it("states a command's outcome and source, with the IR44 time of the request", () => {
     expect(historyRow(deviceCommand({}))).toStrictEqual({ id: "cmd-1234", text: "Set temperature 24°C — acknowledged by device", when: "14 Sept 2026, 9:00 am MYT", bad: false });
-    expect(historyRow(deviceCommand({ status: "failed", failureCode: "device_rejected", source: "automation" }), ms, { locale: "ms", timeZone: "Asia/Tokyo" }))
-      .toStrictEqual({ id: "cmd-1234", text: "Tetapkan suhu 24°C — gagal (device_rejected) · oleh automasi", when: "14 Sep 2026, 10:00 PG GMT+9", bad: true });
+    expect(historyRow(deviceCommand({ status: "failed", failureCode: "DEVICE_REJECTED", source: "automation" }), ms, { locale: "ms", timeZone: "Asia/Tokyo" }))
+      .toStrictEqual({ id: "cmd-1234", text: "Tetapkan suhu 24°C — gagal: AC menolaknya · oleh automasi", when: "14 Sep 2026, 10:00 PG GMT+9", bad: true });
+    // IR799: a failure code is never shown as it is; one the web does not know reads as no reason given
+    expect(historyRow(deviceCommand({ status: "failed", failureCode: "SOMETHING_NEW" })).text).toBe("Set temperature 24°C — failed: no reason given");
     expect(historyRow(deviceCommand({ status: "expired" }), undefined, tokyo)).toMatchObject({ text: "Set temperature 24°C — no device response (expired)", when: "14 Sept 2026, 10:00 am GMT+9", bad: true });
     // a command from Unit Control (UI) carries no label
     expect(historyRow(deviceCommand({ source: "ui" })).text).toBe("Set temperature 24°C — acknowledged by device");
