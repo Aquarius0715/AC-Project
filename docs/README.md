@@ -103,7 +103,9 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 0.656.0 (2026-11-16): IR813: an alert's Book cleaning opens Filter care on that AC.
 0.655.0 (2026-11-16): IR812: a demo alert's evidence names its metric and comparison in words (Heartbeat gap at or above its alert threshold).
 0.654.0 (2026-11-16): IR811: from Turn off running ACs, one link opens an after-hours rule with the same ACs.
+0.657.0 (2026-11-16): IR814: a customer pins ACs to the Overview from their pages (this browser only).
 0.658.0 (2026-11-16): IR815: Energy & cost opens on the AC that used the most in the period.
+0.661.0 (2026-11-16): IR818: customer Users says a forgotten password is reset with Forgot password? on the sign-in page.
 0.660.0 (2026-11-16): IR817: "already signed in as another user" on the sign-in page says where to sign out.
 0.659.0 (2026-11-16): IR816: on a phone the customer Overview names the most severe open alert on the first screen.
 0.653.0 (2026-11-16): IR810: after a confirmed change, the customer unit page offers Undo, which puts back the previous confirmed setting.

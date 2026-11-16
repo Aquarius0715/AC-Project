@@ -71,7 +71,7 @@ export function UsersDemo() {
           )) },
         ]} />
       </Card>
-      <Banner>Your customer always keeps one active owner, and you can’t change your own account. For a password reset, contact HQ. Only owners see this page.</Banner>
+      <Banner>Your customer always keeps one active owner, and you can’t change your own account. A user who forgot their password resets it with “Forgot password?” on the sign-in page. Only owners see this page.</Banner>
       <p className="text-[11px] text-muted-foreground">Nothing is sent in the demo (FR-C19, IR461).</p>
 
       <Modal open={open} onClose={close} title="Add a user to customer-a" footer={<><Btn onClick={close}>Cancel</Btn><Btn variant="primary" onClick={send}>Add user</Btn></>}>

@@ -10750,3 +10750,19 @@ Found in the UI/UX loop (UX-66; seen in UX-54 and UX-63). Signing in to one app 
 1. **Message.** The shared login theme `ac` overrides `differentUserAuthenticated` in en, ms, ja and id: "You are already signed in as {0} in this browser. To use another account here, sign out in the AC Project app you are signed in to (its menu, Sign out), then open this page again." "Sign out" uses each language's word from the apps (Log keluar, ログアウト, Keluar).
 2. **Scope.** This changes the text only. Keycloak's error template is not overridden, since it is tied to its version, so the page still has no button. The apps' own "Sign in with another account" (`prompt=login`) is unchanged.
 3. **Checked.** On the dev stack, with a partner session in the browser, HQ sign-in now shows the Japanese text. The theme is mounted read-only and needs no restart.
+
+## IR814 Pin ACs to the Overview — 2026-11-16
+
+Found in the UI/UX loop (UX-61, criterion 7: find the AC quickly; "favourites"). A customer who checks the same two or three ACs every day had to find them each time: Overview → Units & locations → the property → the room → the AC.
+
+1. **Pins.** The customer unit page's header has "Pin to Overview". It is a toggle button (`aria-pressed`), and once pinned it reads "Pinned to Overview" with a filled star. The pins live in this browser's localStorage (`ac:pinned-units`) as a per-viewer convenience. `parsePins` reads them back through a Zod schema, at most 8 ids. A missing, blocked or broken store reads as no pins. A new pin goes first, and the oldest drops beyond 8.
+2. **Overview.** "Pinned ACs" comes before the unit list. It shows each pinned AC of the current selection with its place, room temperature, and power and connection badges. Each links to the AC's page and has an unpin button. With no pin in the selection the card is not shown.
+3. **Not stored on the server.** Pins do not follow the user to another device. The card says "this browser only".
+4. **Tests.** `pinnedUnits.test.ts` covers valid and invalid stored values, the 8-pin cap, and pin and unpin order.
+
+## IR818 Customer Users says how a forgotten password is reset — 2026-11-16
+
+Found in the UI/UX loop (UX-70, criteria 4 and 10). The customer Users page said "For a password reset, contact HQ." Since IR646, the sign-in page's Forgot password? sends the reset e-mail itself (`resetPasswordAllowed`, SMTP set). An owner asked about a forgotten password was sent to HQ for something the user does alone.
+
+1. **Text.** The note now reads "A user who forgot their password resets it with “Forgot password?” on the sign-in page." In ms, ja and id it uses the sign-in page's own label: Lupa kata laluan? / パスワードをお忘れですか？ / Lupa kata sandi?. The demo view and the page comment say the same.
+2. **Docs.** DD-C19's two lines follow. The DEC-77 entry's "Password resets stay with HQ" is about another user's password: an owner still cannot reset it.
