@@ -1103,6 +1103,8 @@ export const ja: Record<string, string> = {
   "Waiting for the AC to confirm… The result shows only after it acknowledges.": "エアコンの確認を待っています… 結果はエアコンが受け付けてから表示されます。",
   "{s} s left": "残り {s} 秒",
   "No answer yet — checking the result…": "まだ応答がありません — 結果を確認しています…",
+  "Updates every {s} s while this page is open — changes by others show here.": "このページを開いている間は {s} 秒ごとに更新されます — 他の人の変更もここに表示されます。",
+  "Updates paused while you change settings.": "設定を変更している間は更新を止めています。",
   "Group change finished — results are shown per AC": "グループの変更が完了しました — 結果はエアコンごとに表示されます",
   "{n} selected": "{n} 台を選択",
   "Select all online ({n})": "オンラインをすべて選択（{n}）",

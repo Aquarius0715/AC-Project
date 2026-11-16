@@ -10626,3 +10626,12 @@ Found in the UI/UX loop (UX-53, the single-AC control on a phone, criterion 9). 
    - At zero it reads "No answer yet — checking the result…" until the follow-up answers.
 2. **Accessibility.** The banner is a polite live region, so the sentence stays fixed and the seconds are `aria-hidden`. A screen reader hears the sentence once, not a count every second.
 3. **Tests.** `units.test.ts` covers `answerSeconds`: 30 s, 120 s, a missing expiry, a zero span and an unreadable time.
+
+## IR809 The unit page shows others' changes without a reload — 2026-11-16
+
+Found in the UI/UX loop (UX-56, criterion 14: several users at once). The customer unit page read its data once, so a change by another user, an automation or the device showed only after a manual reload. No page in the four apps re-read by itself.
+
+1. **Hook.** `useAutoRefresh(enabled, seconds = 30)` (shared/lib/useAutoRefresh.ts) calls `router.refresh()` at the interval while enabled. It skips ticks while the tab is hidden.
+2. **Unit page.** `LiveNote` enables it unless the user is busy: a setting edited and not sent, the confirmation, the power confirmation, rename or attach dialog open, or a command being awaited. A newer device report resets the controls (the "adjust state during render" sync), so re-reading then would lose the user's change. The header card says which state it is in.
+3. **Tests.** `useAutoRefresh.test.tsx` uses fake timers: it refreshes at each interval, never while paused, stops when paused again, and skips hidden ticks.
+4. **Load.** One server render per open unit page every 30 s.

@@ -1144,6 +1144,8 @@ export const ms: Record<string, string> = {
   "Waiting for the AC to confirm… The result shows only after it acknowledges.": "Menunggu AC mengesahkan… Keputusan dipaparkan hanya selepas ia mengakui.",
   "{s} s left": "tinggal {s} s",
   "No answer yet — checking the result…": "Belum ada jawapan — menyemak keputusan…",
+  "Updates every {s} s while this page is open — changes by others show here.": "Dikemas kini setiap {s} s semasa halaman ini dibuka — perubahan oleh orang lain dipaparkan di sini.",
+  "Updates paused while you change settings.": "Kemas kini dijeda semasa anda menukar tetapan.",
   "Group change finished — results are shown per AC": "Perubahan kumpulan selesai — keputusan dipaparkan bagi setiap AC",
   "{n} selected": "{n} dipilih",
   "Select all online ({n})": "Pilih semua dalam talian ({n})",

@@ -1103,6 +1103,8 @@ export const id: Record<string, string> = {
   "Waiting for the AC to confirm… The result shows only after it acknowledges.": "Menunggu AC mengonfirmasi… Hasil ditampilkan hanya setelah AC menerimanya.",
   "{s} s left": "tersisa {s} dtk",
   "No answer yet — checking the result…": "Belum ada jawaban — memeriksa hasil…",
+  "Updates every {s} s while this page is open — changes by others show here.": "Diperbarui setiap {s} dtk selama halaman ini terbuka — perubahan oleh orang lain tampil di sini.",
+  "Updates paused while you change settings.": "Pembaruan dijeda selama Anda mengubah setelan.",
   "Group change finished — results are shown per AC": "Perubahan grup selesai — hasil ditampilkan per AC",
   "{n} selected": "{n} dipilih",
   "Select all online ({n})": "Pilih semua yang online ({n})",
