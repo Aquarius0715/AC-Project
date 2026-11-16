@@ -40,7 +40,7 @@ export function serviceGroups(env: Env, host: string | null): ServiceGroup[] {
       ...link("keycloak-admin", "Administration console", "Realm, clients, users (Keycloak administrator)", on(s.KEYCLOAK_URL, "/admin/master/console/")),
     ] },
     { id: "api", title: "API", links: s.CORE_API_URL ? [
-      { id: "openapi", name: "OpenAPI (Swagger UI)", note: "The Core API's operations, readable and callable", href: "/docs" },
+      { id: "openapi", name: "OpenAPI (Swagger UI)", note: "The Core API's operations, to read (Try it out works on the gateway's own /docs only)", href: "/docs" },
       { id: "openapi-json", name: "OpenAPI document", note: "swagger.json", href: "/swagger.json" },
     ] : [] },
     { id: "tools", title: "Development tools", links: [
