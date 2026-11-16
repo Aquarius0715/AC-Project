@@ -10565,3 +10565,15 @@ IR614 matched a history without completion by its as-of, so a job whose delegati
    - `TestContractorAndTechnicianProjections`: the ended delegation is listed with `status: accepted` and left out with `currentOnly: true`. The query catalog test sends the filter.
    - `partnerJobs.test.ts`: the open stages ask with `currentOnly`, Completed and All without.
 
+
+## IR798 The Running list turns its ACs off, unticking those to keep — 2026-11-16
+
+Found in the UI/UX loop (UX-45). Overview › Running › View running units lists every running AC across properties. Turning them off meant opening each AC's own screen: about 27 clicks for 9 ACs. Group control works on one room or area only (DD-C14), and these ACs were in 8 rooms.
+
+1. **Turn off running ACs.** On the Running list (`/customer/properties?powerState=on`, no connection filter, 2 or more ACs) an owner gets "Turn off running ACs…". It opens the group panel with Power Off as the only change (`TURN_OFF`) and every online AC ticked.
+   - The owner unticks those that should keep running.
+   - Each card shows its place (property › floor › room).
+   - Review & turn off and the sending are those of Group control: one `commands.create` and `commands.get` per AC.
+   - This is the one exception to one space. Power off sets nothing else, so no room's settings can mix.
+2. **After sending.** The list is re-read, and the ACs confirmed off leave it. The panel stays open, says how many were turned off, and Retry covers the failed ACs that are still listed.
+3. **Docs and tests.** FR-C14 and DD-C14 step 5 say so. `clientProperties.test.ts` plans power off only, and an AC already off has nothing to send.
