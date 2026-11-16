@@ -10566,6 +10566,25 @@ IR614 matched a history without completion by its as-of, so a job whose delegati
    - `partnerJobs.test.ts`: the open stages ask with `currentOnly`, Completed and All without.
 
 
+## IR799 A failed command says why in words, never with its code — 2026-11-16
+
+Found in the UI/UX loop (UX-46). A command the AC refused read "Set power OFF — failed (DEVICE_REJECTED)" in the customer's command history, the group-control cards and the control toast. HQ's restriction rows showed "apply failed (OFFLINE)". The technician's command list and test-run banner showed "rejected by the device (DEVICE_REJECTED)" and "The device reported TIMEOUT". IR626 removed codes from the texts but kept these, because they come from the stored failure code.
+
+1. **Words.** `commandFailure` (shared/lib/commandFailure.ts) turns the stored code into a reason, in the display language:
+   - DEVICE_REJECTED: the AC refused it
+   - TIMEOUT: no answer from the AC in time
+   - OFFLINE: the AC was offline
+   - UNAVAILABLE: the AC reported a fault
+   - CONFLICT: another command was still running
+
+   A code it does not know reads "no reason given". The code is never shown.
+2. **Where.**
+   - The command history row reads "Set power OFF — failed: the AC refused it" (customer unit page, toasts and group control).
+   - HQ's restriction rows read "apply failed (the AC was offline)".
+   - The technician's command outcome reads "failed: {reason}".
+   - The test-run banners read "Not done: {reason} · no end command is needed." and "Not confirmed: {reason} · the unit may still be running; check it on site."
+3. **Tests.** units, restrictions and techControl tests expect the words, and an unknown code reads "no reason given".
+
 ## IR798 The Running list turns its ACs off, unticking those to keep — 2026-11-16
 
 Found in the UI/UX loop (UX-45). Overview › Running › View running units lists every running AC across properties. Turning them off meant opening each AC's own screen: about 27 clicks for 9 ACs. Group control works on one room or area only (DD-C14), and these ACs were in 8 rooms.
