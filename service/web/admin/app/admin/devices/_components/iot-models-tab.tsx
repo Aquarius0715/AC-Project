@@ -120,7 +120,7 @@ export function IoTModelsTab({ live }: Readonly<{ live: DevicesLive }>) {
       </Modal>
       <Modal open={history !== null} onClose={() => { setHistory(null); }} title={t("Version history · {name}", { name: sel?.name ?? "" })} footer={<Btn onClick={() => { setHistory(null); }}>{t("Close")}</Btn>}>
         {history?.length === 0 ? <p className="text-xs text-muted-foreground">{t("No saved versions in the last 12 months.")}</p> : <Timeline items={(history ?? []).map((h) => ({ time: showTime(h.at, i.display), title: `v${String(h.from ?? "—")} → v${String(h.to ?? "—")}${h.reason ? ` — ${h.reason}` : ""}`, detail: `${h.actor}${h.changes.length > 0 ? ` · ${t("changed {fields}", { fields: h.changes.join(", ") })}` : ""}` }))} />}
-        <p className="text-[11px] text-muted-foreground">{t("From the audit log (audit.read); values are masked as recorded.")}</p>
+        <p className="text-[11px] text-muted-foreground">{t("From the audit log (“View the audit log”); values are masked as recorded.")}</p>
       </Modal>
     </div>
   );

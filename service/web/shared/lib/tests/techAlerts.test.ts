@@ -37,9 +37,9 @@ describe("technician alert evidence", () => {
       { kind: "Measured", title: "Latest reading", value: "30.4 °C", sub: "observed today 9:35 am MYT · good" },
     ]);
     expect(v.resolution).toStrictEqual({
-      info: "Automatic resolution needs a remeasurement < 28.0 °C for 60 s — or a reason below with alert.resolve.", done: null,
+      info: "Automatic resolution needs a remeasurement < 28.0 °C for 60 s — or a reason below with “Resolve alerts”.", done: null,
       note: "If it recurs after it is resolved, a new alert is created that links back to this one.",
-      forbidden: "Not resolved — you don’t have alert.resolve. The alert resolves automatically once a remeasurement stays < 28.0 °C for 60 s, or ask a permitted user.",
+      forbidden: "Not resolved — you don’t have “Resolve alerts”. The alert resolves automatically once a remeasurement stays < 28.0 °C for 60 s, or ask a permitted user.",
     });
     expect(v.history).toStrictEqual([{ id: "raised", time: "today 9:12 am MYT", title: "Raised", sub: "temperature 30.4 °C · Temperature ≥ 30.0 °C for 60 s", badge: { text: "Observed (demo)", tone: "primary" } }]);
     expect(v.related).toStrictEqual([
@@ -56,7 +56,7 @@ describe("technician alert evidence", () => {
     expect(v.resolution).toMatchObject({ info: null, done: "Resolved today 9:30 am MYT — Window closed. Acknowledged today 9:25 am MYT.", note: "Completing the job alone never resolves an alert. If the condition returns, a new alert is created that links back to alert alert-wi." });
     expect(v.history.map((h) => h.title)).toStrictEqual(["Resolved", "Acknowledged", "Raised"]);
     expect(v.related.map((r) => r[1])).toStrictEqual(["—", "u1", "No policy", "—", "none", "done today 9:30 am MYT"]);
-    expect(alertView({ ...base, rule: null }, { ...ctx, canResolve: false }, NOW).related[5]?.[1]).toBe("no — ask a user with alert.resolve");
+    expect(alertView({ ...base, rule: null }, { ...ctx, canResolve: false }, NOW).related[5]?.[1]).toBe("no — ask a user with “Resolve alerts”");
     expect(alertView(base, { ...ctx, canResolve: true }, NOW).related[5]?.[1]).toBe("with a reason, or by a remeasurement");
     expect(alertView({ ...base, rule: null }, { ...ctx, canResolve: true }, NOW).related[5]?.[1]).toBe("with a reason");
   });

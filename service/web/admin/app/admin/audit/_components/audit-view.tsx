@@ -16,7 +16,7 @@ import { byText } from "@ac/web/lib/order";
 
 /** Why a related command could not be read: not permitted, out of scope or gone, or anything else. */
 function commandFailure(code: string, t: T): string {
-  if (code === "FORBIDDEN") return t("You may not read this command — it needs control.execute, restriction.read, restriction.override or automation.policy.read.");
+  if (code === "FORBIDDEN") return t("You may not read this command — it needs “Control ACs”, “View restrictions”, “Override restrictions” or “View automation policies”.");
   return t(code === "NOT_FOUND" ? "This command is outside your scope or no longer exists." : "The command could not be loaded — try again.");
 }
 const seed: AuditRow[] = [
@@ -292,7 +292,7 @@ function DeviceEvents({ device, f, periodErr, zone, live, onDate, onDevice, onEv
               ]} />
               <h3 className="mt-4 mb-2 text-[13px] font-bold">{t("Response notes (read-only here)")}</h3>
               {event.notes.length === 0 ? <p className="text-xs text-muted-foreground">{t("No response notes.")}</p> : <ul className="flex flex-col gap-2">{event.notes.map((n, k) => <li key={k} className="rounded-lg border border-line px-3 py-2 text-[13px]">“{n.text}”<div className="text-[11px] text-muted-foreground">{n.by}</div></li>)}</ul>}
-              <p className="mt-2 rounded-lg bg-primary-soft/50 px-3 py-2 text-[11px] text-muted-foreground">{t("Notes are added from Devices & models (device.write), not here.")}</p>
+              <p className="mt-2 rounded-lg bg-primary-soft/50 px-3 py-2 text-[11px] text-muted-foreground">{t("Notes are added from Devices & models (“Edit devices & models”), not here.")}</p>
             </Card>
           )}
         </div>

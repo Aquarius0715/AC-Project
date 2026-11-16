@@ -405,8 +405,8 @@ function RelatedRestrictions({ ids, canOpen }: Readonly<{ ids: string[]; canOpen
         <div className="flex flex-col gap-1.5">{ids.map((id) => (
             <p key={id} className="flex flex-wrap items-center justify-between gap-2 text-[13px]"><span className="font-mono font-semibold">{shortId(id)}</span>{canOpen ? <Link className="text-xs font-semibold text-primary" href={`/admin/restrictions?restrictionId=${id}`}>{t("Open restriction")} <Icon name="arrowRight" /></Link> : <span className="text-xs text-muted-foreground"><Icon name="locked" /> {t("Your role can’t open Restrictions")}</span>}</p>
           ))}
-          <p className="text-xs text-muted-foreground">{t(ids.length > 1 ? "This invoice is a cause of these restrictions. Once all cause invoices of a restriction are paid, it moves to “release requested”. Their states and units are on the Restrictions screen (restriction.read)."
-            : "This invoice is a cause of this restriction. Once all of its cause invoices are paid, it moves to “release requested”. Its state and units are on the Restrictions screen (restriction.read).")}</p>
+          <p className="text-xs text-muted-foreground">{t(ids.length > 1 ? "This invoice is a cause of these restrictions. Once all cause invoices of a restriction are paid, it moves to “release requested”. Their states and units are on the Restrictions screen (“View restrictions”)."
+            : "This invoice is a cause of this restriction. Once all of its cause invoices are paid, it moves to “release requested”. Its state and units are on the Restrictions screen (“View restrictions”).")}</p>
         </div>
       )}
     </Card>
@@ -482,7 +482,7 @@ function PayoutsTab({ live, nav, act, pending }: Readonly<{ live: BillingLive; n
               [t("Jobs"), String(st.jobs)], [t("Gross"), st.gross], [t("Deductions"), st.deductions], [t("Net"), st.net], [t("Status"), st.statusText],
               ...(st.approvedBy ? [[t("Approved by"), st.approvedBy] as [string, string]] : []),
             ]} />
-            {st.status === "Approved" && !st.payable && <p className="mt-2 text-[11px] text-muted-foreground">{t("Mark paid unlocks on the pay date ({date}). Payouts need billing.payment; every action is audited.", { date: st.payDate })}</p>}
+            {st.status === "Approved" && !st.payable && <p className="mt-2 text-[11px] text-muted-foreground">{t("Mark paid unlocks on the pay date ({date}). Payouts need “Confirm payments”; every action is audited.", { date: st.payDate })}</p>}
             {st.lines.length > 0 && <div className="mt-3"><DataTable rows={st.lines} rowKey={(r) => r.id} cols={[{ key: "j", label: t("Job"), render: (r) => <span className="font-mono text-xs">{r.job}</span> }, { key: "w", label: t("Work"), render: (r) => r.work }, { key: "k", label: t("Kind"), render: (r) => r.kind }, { key: "a", label: t("Amount"), render: (r) => r.amount }, { key: "n", label: t("Note"), render: (r) => r.note }]} /></div>}
             {st.queries.map((q) => (
               <div key={q.id} className="mt-3 rounded-xl bg-surface2 p-3 text-[13px]">

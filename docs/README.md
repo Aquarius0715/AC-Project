@@ -105,6 +105,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 0.654.0 (2026-11-16): IR811: from Turn off running ACs, one link opens an after-hours rule with the same ACs.
 0.657.0 (2026-11-16): IR814: a customer pins ACs to the Overview from their pages (this browser only).
 0.658.0 (2026-11-16): IR815: Energy & cost opens on the AC that used the most in the period.
+0.665.0 (2026-11-16): IR822: every text that named a permission by its code names it in words, and so does the page shown when a role lacks one.
 0.664.0 (2026-11-16): IR821: permissions are named in words (labels in four languages; Access & roles shows them with the code beside), replacing the rule that kept codes.
 0.663.0 (2026-11-16): IR820: pinned ACs are kept with the user's account, so they follow the user to another device.
 0.662.0 (2026-11-16): IR819: the user's pinned ACs are stored with their preferences (preferences.pinnedUnitIds), stage 1 of server-side pins.

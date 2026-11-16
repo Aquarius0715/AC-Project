@@ -428,7 +428,7 @@ function reviewNote(status: string, av: ApiWorkReport["reviewAvailability"], mod
       : "You did not contribute to this report, so you can review it (self-approval is rejected).";
   }
   if (av.reason === "self_authored") return "You submitted this report version, so you cannot accept or return it (self-approval is rejected).";
-  return av.reason === "not_current" ? "A newer report version exists — reload to review it." : "Reviewing needs the job.write permission.";
+  return av.reason === "not_current" ? "A newer report version exists — reload to review it." : "Reviewing needs the “Edit maintenance jobs” permission.";
 }
 /** The card's colour: a decision HQ may take (warn when it is an escalation), or the outcome. */
 function cardTone(isDecide: boolean, mode: ReportCard["mode"], status: string): ReportCard["tone"] {

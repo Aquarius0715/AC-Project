@@ -10794,3 +10794,11 @@ The user decided on 2026-11-16 that the screens name a permission by what it all
 2. **Access & roles.** Each Read, Write and Action checkbox reads its label, with the code small beside it, so an administrator can still match the screen to a permission they were told about.
 3. **Tests.** `permissionLabels.test.ts` checks that every permission of the matrix has a label in every language, that a known one is worded, and that an unknown one is kept.
 4. **Stage 2.** The texts that name a permission use these labels instead of codes.
+
+## IR822 Texts name permissions in words (stage 2) — 2026-11-16
+
+Stage 2 of IR821. Every displayed text that named a permission by its code now names it by its label.
+
+1. **35 texts** in the HQ, partner and technician apps and the shared libraries. Examples: "Not resolved — you don't have “Resolve alerts”." "Needs “View devices & models”". "Coverage needs “View customers & units” or “View contracts”". "Diagnostic control needs “Run test runs” on an assigned job." In ms, ja and id the code became that language's label, in “ ” (ms, id) or 「」 (ja). The change was made by a script (scratchpad perm_texts.py), which rewrote the key in the source, the tests and each dictionary together.
+2. **Page unavailable.** `NeedsAccess` reads "To open {what}, your role needs the “{permission}” permission." with the label. It is what every HQ page shows when a read is refused (IR581), for example Restrictions for hq-operator.
+3. **Tests.** The unit tests that pinned the codes (techAlerts, partnerReview, actionMessage) and three E2E expectations (admin overview, audit, language) now expect the labels.

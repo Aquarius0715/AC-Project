@@ -116,7 +116,7 @@ function CustomerList({ live }: Readonly<{ live: UnitsLive }>) {
         <Kpi label={t("Units")} value={k.units} sub={k.power} />
         <Kpi label={t("Needs attention")} value={k.attention} tone={k.attention ? "warn" : undefined}
           badge={live.standingKnown && k.attention > 0 && <Plain type="button" touch className="text-xs font-semibold text-primary hover:underline" aria-pressed={contract === "attention"} onClick={() => { setContract(contract === "attention" ? "all" : "attention"); }}>{t(contract === "attention" ? "Clear filter" : "Show these")}</Plain>}
-          sub={t(live.standingKnown ? "overdue billing / restriction / open alert" : "open alerts (billing needs billing.read)")} />
+          sub={t(live.standingKnown ? "overdue billing / restriction / open alert" : "open alerts (billing needs “View billing”)")} />
       </div>
       <Card title={t("Customers")} sub={t("Select a customer to manage its properties, spaces and units")} action={live.canWrite && <Btn size="sm" variant="primary" onClick={() => { setOpen(true); }}><Icon name="add" /> {t("New customer")}</Btn>}>
         <div className="mb-3 flex flex-wrap items-center gap-3">
@@ -223,10 +223,10 @@ function CustomerScreen({ live, c }: Readonly<{ live: UnitsLive; c: CustomerLive
       <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}>
         <Kpi label={t("Units")} value={unitsTotal} sub={c.perProperty} />
         <Kpi label={t("Operation")} value={r.operation} sub={t("Running {on} / known {known}", { on: r.running, known: r.known })} />
-        <Kpi label={t("Open alerts")} value={r.alerts} tone={r.alerts ? "warn" : undefined} sub={c.alertsSub ?? t("severity needs alert.read")} href="/admin/alerts" link={t("Alerts")} />
+        <Kpi label={t("Open alerts")} value={r.alerts} tone={r.alerts ? "warn" : undefined} sub={c.alertsSub ?? t("severity needs “View alerts”")} href="/admin/alerts" link={t("Alerts")} />
         {s ? <Kpi label={t("Overdue billing")} value={s.overdueAmount ?? t("None")} tone={s.overdue ? "crit" : undefined}
           {...standingLine(s, r.id, t)} />
-          : <Kpi label={t("Overdue billing")} value="—" sub={t("needs billing.read")} />}
+          : <Kpi label={t("Overdue billing")} value="—" sub={t("needs “View billing”")} />}
       </div>
       <Tabs value={c.tab} onChange={(v) => { nav({ tab: v === "overview" ? null : v, unitId: null }); }} tabs={[
         { id: "overview" as const, label: t("Units & locations"), count: unitsTotal }, { id: "users" as const, label: t("Users"), count: c.users.length },
@@ -432,7 +432,7 @@ function UnitEdit({ live, c, x, nav, run, pending }: Readonly<{ live: UnitsLive;
               {c.places.map((p) => <option key={`${p.propertyId}|${p.spaceId}`} value={`${p.propertyId}|${p.spaceId}`}>{p.label}</option>)}
             </Select>
           </Field>
-          <Field label={t("Aircon model")} hint={t(c.models.length > 0 ? "Which controls the unit has · type split (fixed)" : "Models need device.read — the current model stays")} error={fieldError("modelId")}>
+          <Field label={t("Aircon model")} hint={t(c.models.length > 0 ? "Which controls the unit has · type split (fixed)" : "Models need “View devices & models” — the current model stays")} error={fieldError("modelId")}>
             <Select value={d.modelId} disabled={isRo || c.models.length === 0} onChange={(e) => { set({ modelId: e.target.value }); }}>
               {c.models.every((k) => k.id !== d.modelId) && <option value={d.modelId}>{x.model}</option>}
               {c.models.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}
@@ -458,7 +458,7 @@ function UnitEdit({ live, c, x, nav, run, pending }: Readonly<{ live: UnitsLive;
       </Card>
       <Card title={t("Alert policies on this unit")} sub={t("Only {name}’s policies can be attached. The unit carries the policies, not the other way round.", { name: c.row.name })}
         action={c.canAttach && !u.archived && <Btn size="sm" onClick={() => { setModal("attach"); }}><Icon name="add" /> {t("Attach policy")}</Btn>}>
-        {c.policies === null ? <p className="text-[13px] text-muted-foreground">{t("Policies need alert.policy.read.")}</p> : (
+        {c.policies === null ? <p className="text-[13px] text-muted-foreground">{t("Policies need “View alert policies”.")}</p> : (
           <div className="flex flex-col">
             {x.attached.map((p) => (
               <div key={p.id} className="flex flex-wrap items-center gap-2 border-t border-line py-2.5 text-[13px] first:border-0">
@@ -490,7 +490,7 @@ function UnitEdit({ live, c, x, nav, run, pending }: Readonly<{ live: UnitsLive;
 function PoliciesTab({ c, run, pending }: Readonly<{ c: CustomerLive; run: Run; pending: boolean }>) {
   const t = useT();
   const router = useRouter();
-  if (!c.policies) return <EmptyState title={t("Alert policies need alert.policy.read")}>{t("Ask an identity administrator for Alert policies access.")}</EmptyState>;
+  if (!c.policies) return <EmptyState title={t("Alert policies need “View alert policies”")}>{t("Ask an identity administrator for Alert policies access.")}</EmptyState>;
   return (
     <>
       <Card title={t("Alert policies of {name}", { name: c.row.name })} sub={t("Policies belong to the customer. Each unit picks which of them it carries (unit edit › Alert policies). Air-quality limits are alert policies too.")}
@@ -515,7 +515,7 @@ function PoliciesTab({ c, run, pending }: Readonly<{ c: CustomerLive; run: Run; 
               </div>
             ))}
           </div>
-          {!c.canRules && <p className="mt-2 text-[11px] text-muted-foreground">{t("Switching rules needs alert.policy.write.")}</p>}
+          {!c.canRules && <p className="mt-2 text-[11px] text-muted-foreground">{t("Switching rules needs “Edit alert policies”.")}</p>}
         </Card>
       )}
     </>
@@ -642,7 +642,7 @@ function NewUnitModal({ live, c, init, pending, onClose, onSave }: Readonly<{ li
         <Field label={t("Room / space · optional")} hint={t("Same property only. Leave empty for no room or floor.")}>
           <Select value={d.spaceId} onChange={(x) => { set({ spaceId: x.target.value }); }}><option value="">{t("— not assigned —")}</option>{(p ? flatten(p.spaces) : []).map((x) => <option key={x.id} value={x.id}>{x.name} ({(textOf(kindLabel, x.kind, t) ?? x.kind)})</option>)}</Select>
         </Field>
-        <Field label={t("Aircon model · required")} hint={t(c.models.length > 0 ? "Which controls the unit has" : "Models need device.read")} error={fieldError("modelId")}>
+        <Field label={t("Aircon model · required")} hint={t(c.models.length > 0 ? "Which controls the unit has" : "Models need “View devices & models”")} error={fieldError("modelId")}>
           <Select value={d.modelId} onChange={(x) => { set({ modelId: x.target.value }); }}>{c.models.length === 0 && <option value="">{t("no model available")}</option>}{c.models.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}</Select>
         </Field>
         <Field label={t("Display name · required")} hint={t("1–120 characters, unique in its room")} error={fieldError("displayName")}><Input value={d.displayName} onChange={(x) => { set({ displayName: x.target.value }); }} /></Field>
@@ -863,7 +863,7 @@ function WarrantyTab({ live }: Readonly<{ live: UnitsLive }>) {
   const [f, setF] = useState<CoverageFilter>({ customerId: "", coverage: "", within: "" });
   const [claim, setClaim] = useState<ClaimCandidate | null>(null);
   const w = live.warranty;
-  if (!w) return <EmptyState title={t("Coverage needs asset.read or contract.read")}>{t("Ask an identity administrator for Customers & units or Contracts access.")}</EmptyState>;
+  if (!w) return <EmptyState title={t("Coverage needs “View customers & units” or “View contracts”")}>{t("Ask an identity administrator for Customers & units or Contracts access.")}</EmptyState>;
   const rows = w.rows.filter((r) => coverageMatch(r, f));
   const k = w.kpis;
   return (
@@ -905,7 +905,7 @@ function WarrantyTab({ live }: Readonly<{ live: UnitsLive }>) {
         <p className="mt-2 text-[11px] text-muted-foreground">{t("The warranty end is set on the unit (unit edit › Warranty end) or by the CSV import. Coverage = an active maintenance contract, otherwise the warranty; fewer than 90 days left counts as ending.")}</p>
       </Card>
       <Card title={t("Warranty on jobs")} sub={t("Jobs completed while the unit’s warranty ran whose accepted report lists replaced parts — the parts cost is claimable from the manufacturer until a claim is filed.")}>
-        {w.claims === null && <p className="text-[13px] text-muted-foreground">{t("Claimable jobs need job.read.")}</p>}{w.claims?.length === 0 && <p className="text-[13px] text-muted-foreground">{t("No claimable job right now.")}</p>}{w.claims && w.claims.length > 0 && (
+        {w.claims === null && <p className="text-[13px] text-muted-foreground">{t("Claimable jobs need “View maintenance jobs”.")}</p>}{w.claims?.length === 0 && <p className="text-[13px] text-muted-foreground">{t("No claimable job right now.")}</p>}{w.claims && w.claims.length > 0 && (
           <div className="flex flex-col">
             {w.claims.map((x) => (
               <div key={x.jobId} className="flex flex-wrap items-center gap-3 border-t border-line py-2.5 text-[13px] first:border-0">

@@ -115,7 +115,7 @@ test("device events load only for a picked device and link the event's audit tra
     const detail = card(page, /./).filter({ has: page.getByRole("heading", { name: "Linked alerts and audit", exact: true }) });
     for (const label of ["Event type", "Evidence", "Sequence", "Unit at the time", "Occurred", "Recovery"]) await expect(detail.locator("dt", { hasText: new RegExp(`^${label}$`) })).toBeVisible();
     await expect(detail.getByRole("link", { name: "Filter log" })).toHaveAttribute("href", `/admin/audit?targetKind=device_event&targetId=${eventId}`);
-    await expect(detail).toContainText("Notes are added from Devices & models (device.write), not here.");
+    await expect(detail).toContainText("Notes are added from Devices & models (“Edit devices & models”), not here.");
   } else {
     await expect(main.getByRole("heading", { name: "No device events in this period" })).toBeVisible();
   }

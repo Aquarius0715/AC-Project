@@ -60,7 +60,7 @@ export function ExceptionView({ live }: Readonly<{ live: Live }>) {
   };
   // IR96: override-only callers see reconcile / release retry only for an override release intent or unresolved recovery
   const isFollowUp = live.canWrite || (live.canOverride && (r.releaseIntent?.source === "override" || r.recoveryCases.some((c) => c.state !== "resolved")));
-  const needs = (k: string) => t(k === "override" ? "Needs restriction.override" : "Needs restriction.write");
+  const needs = (k: string) => t(k === "override" ? "Needs “Override restrictions”" : "Needs “Edit restrictions”");
   return (
     <Page>
       <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground"><Link href={`/admin/restrictions?restrictionId=${r.id}`} className="font-semibold text-primary"><Icon name="arrowLeft" /> {t("Restrictions")}</Link>/ <b className="text-ink">{r.id.slice(0, 8)}</b> <Badge tone={stateTone(r.state)}>{stateWord(r.state, t)}</Badge></div>
@@ -89,7 +89,7 @@ export function ExceptionView({ live }: Readonly<{ live: Live }>) {
         </div>
         <div className="flex min-w-0 flex-col gap-4">
           <Card title={t("Summary")}>
-            {isRelease && <Banner>{t("Release view (restriction.override only): billing fields are not shown.")}</Banner>}
+            {isRelease && <Banner>{t("Release view (“Override restrictions” only): billing fields are not shown.")}</Banner>}
             <SummaryList items={[
               [t("Policy"), policyText(r.policy, t)], [t("Units"), live.units.map((u) => `${u.name} · ${u.apply}/${u.release}`).join(", ") || "—"],
               ...(isRelease ? [] : [[t("Cause invoices"), String(r.causeInvoiceIds?.length ?? 0)] as [string, string]]),
