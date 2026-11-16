@@ -27,6 +27,11 @@ const alert = (id: string, status: string, severity: ApiAlert["severity"]): ApiA
 const server = [...Array.from({ length: 50 }, (_, n) => alert(`resolved-${String(n)}`, "resolved", "critical")), alert("open-1", "open", "warning")];
 interface Query { limit?: number; filters?: { status?: string } }
 const matching = (q: Query = {}) => server.filter((a) => !q.filters?.status || a.status === q.filters.status);
+// the alerts as above, and today's job, so unit-1 is one of the current assignments
+const withAssignment = (operation: string, q: Query) => {
+  if (operation === "alerts.list") return matching(q);
+  return operation === "jobs.list" ? [todayJob] : [];
+};
 
 describe("technician overview", () => {
   it("keeps today's job that the list returns after its first page (IR702)", async () => {
@@ -48,8 +53,12 @@ describe("technician overview", () => {
     dal.coreDisplay.mockResolvedValue({ locale: "en", timeZone: "Asia/Kuala_Lumpur" });
     dal.coreOp.mockResolvedValue({ counts: { total: 0, scheduledCount: 0, inProgressCount: 0, overdueCount: 0, assignedCount: 0 } });
     dal.coreItems.mockImplementation((operation: string, q: Query) => Promise.resolve(operation === "alerts.list" ? matching(q).slice(0, q.limit ?? 25) : []));
-    dal.coreAll.mockImplementation((operation: string, q: Query) => Promise.resolve(operation === "alerts.list" ? matching(q) : []));
+    // unit-1 is assigned (todayJob): the card lists only the alerts of the current assignments (UI/UX loop R49)
+    dal.coreAll.mockImplementation((operation: string, q: Query) => Promise.resolve(withAssignment(operation, q)));
     const live = await loadOverview({});
     expect(live.alerts.map((a) => a.id)).toStrictEqual(["open-1"]);
+    dal.coreAll.mockImplementation((operation: string, q: Query) => Promise.resolve(operation === "alerts.list" ? matching(q) : []));
+    const unassigned = await loadOverview({});
+    expect(unassigned.alerts).toStrictEqual([]); // readable, but no unit of an assignment
   });
 });

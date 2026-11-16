@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { alertRows, dayTimeline, isToday, kpis, reportRows, sortOf, tabOf, techRow, type ApiTechJobRow } from "@ac/web/lib/techOverview";
+import { alertRows, currentJobOfUnit, dayTimeline, isToday, kpis, reportRows, sortOf, tabOf, techRow, type ApiTechJobRow } from "@ac/web/lib/techOverview";
 import type { ApiAlert } from "@ac/web/lib/alerts";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
 import { must } from "./must";
@@ -67,10 +67,13 @@ describe("technician overview", () => {
       { id: "a2", unitId: "u1", type: "maintenance", severity: "critical", status: "acknowledged", causeCode: "unknown", evidenceKind: "inferred", evidenceText: "", detectedAt: "2026-09-20T01:00:00Z" },
       { id: "a3", unitId: "u1", type: "sensor", severity: "warning", status: "resolved", causeCode: "unknown", evidenceKind: "inferred", evidenceText: "", detectedAt: "2026-09-20T01:00:00Z" },
     ] as ApiAlert[];
+    // only the units of the current assignments: u2 is readable but not assigned (UI/UX loop R49)
     expect(alertRows(alerts, units, new Map([["u1", "job-a"]]))).toStrictEqual([
       { id: "a2", title: "Filter cleaning reminder", sub: "Bedroom AC · acknowledged · 20 Sept 2026, 9:00 am MYT", severity: "critical", href: "/technician/units/u1/alerts?jobId=job-a&alertId=a2" },
-      { id: "a1", title: "Possible open window", sub: "Server room AC · open · 21 Sept 2026, 9:12 am MYT", severity: "warning", href: "/technician/units/u2/alerts?alertId=a1" },
     ]);
+    expect(alertRows(alerts, units, new Map([["u1", "job-a"], ["u2", "job-b"]])).map((r) => r.id)).toStrictEqual(["a2", "a1"]);
+    const job = (id: string, unitId: string, status: string) => ({ id, unitId, status, projection: "summary", version: 1, type: "reactive", severity: "normal", dueAt: "2026-09-21T03:45:00Z", requestedSlot: slot("2026-09-21T03:45:00Z", "2026-09-21T05:45:00Z"), scheduledSlot: null }) satisfies ApiTechJobRow;
+    expect([...currentJobOfUnit([job("j1", "u1", "completed"), job("j2", "u1", "assigned"), job("j3", "u2", "cancelled")])]).toStrictEqual([["u1", "j2"]]);
     expect(reportRows(rows).map((r) => [r.title, r.badge.text])).toStrictEqual([["job-a · Bedroom AC", "Draft"], ["job-c · Bedroom AC", "Submitted"]]);
   });
 
