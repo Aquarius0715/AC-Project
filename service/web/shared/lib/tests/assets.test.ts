@@ -68,7 +68,7 @@ describe("HQ customers & units", () => {
   it("words the policies' conditions and the default rules", () => {
     expect(conditionText(policy({ activeWindow: { weekdays: [1, 2, 3, 4, 5], startLocal: "08:00", endLocal: "19:00" } }))).toBe("Temperature ≥ 30 °C for 60 s, weekdays 08:00–19:00 → Warning");
     expect(conditionText(withoutSeverity({ metric: "heartbeat_gap", threshold: 10, activeWindow: { weekdays: [1, 3], startLocal: "22:00", endLocal: "06:00" } }))).toBe("No heartbeat for 10 min, Mon, Wed 22:00–06:00");
-    expect(defaultRules(defaults)[0]).toMatchObject({ condition: "CO₂ (ppm) ≥ 1200 ppm for 15 min", enabled: false, note: "Off since 10 Sept 2026 · office closed" });
+    expect(defaultRules(defaults)[0]).toMatchObject({ condition: "CO₂ ≥ 1200 ppm for 15 min", enabled: false, note: "Off since 10 Sept 2026 · office closed" });
     expect(policyLines([policy({}), defaults], ["u1"], () => CUSTOMER_A).map((p) => [p.name, p.type, p.condition, p.madeBy])).toStrictEqual([
       ["Default policy", "Default", "1 rule · 0 on for this customer", "HQ (template)"], [BEDROOM_TOO_HOT, "Temperature", "Temperature ≥ 30 °C for 60 s → Warning", CUSTOMER_A],
     ]);
