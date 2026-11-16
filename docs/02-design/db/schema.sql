@@ -250,6 +250,7 @@ CREATE TABLE identity.preferences (
   currency              char(3) NOT NULL DEFAULT 'MYR' CHECK (currency = 'MYR'),
   monthly_report_email  boolean NOT NULL DEFAULT false,
   channels              text[] NOT NULL DEFAULT '{inApp}',
+  pinned_unit_ids       uuid[] NOT NULL DEFAULT '{}' CHECK (cardinality(pinned_unit_ids) <= 8), -- IR819: ACs pinned to the Overview
   version               int NOT NULL DEFAULT 1,
   updated_at            timestamptz NOT NULL DEFAULT platform.app_now()
 );

@@ -1078,6 +1078,7 @@
  "preferences.update": [
   "locale",
   "monthlyReportEmail",
+  "pinnedUnitIds",
   "timezone"
  ],
  "properties.archive": [
