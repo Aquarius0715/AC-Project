@@ -40,6 +40,20 @@ export function unitPlaces(us: { id: string; displayName: string; propertyId: st
   };
   return new Map(us.map((u) => [u.id, { name: u.displayName, place: [property.get(u.propertyId) ?? "", ...path(u.spaceId)].filter(Boolean).join(" › ") }]));
 }
+/** A unit picker's options: one group per property by name, its units by room then name, each named with the rest of
+its path; 23 units in one run hid which home or office each was in (UI/UX loop R89). */
+export function unitsByProperty(us: readonly (UnitPlace & { id: string })[]): { property: string; units: { id: string; label: string }[] }[] {
+  const groups = new Map<string, { id: string; label: string; where: string }[]>();
+  for (const u of us) {
+    const [property = "", ...rest] = u.place.split(" › ");
+    const where = rest.join(" › ");
+    groups.set(property, [...(groups.get(property) ?? []), { id: u.id, label: where ? `${u.name} · ${where}` : u.name, where }]);
+  }
+  return [...groups].toSorted(([a], [b]) => a.localeCompare(b)).map(([property, list]) => ({
+    property,
+    units: list.toSorted((a, b) => a.where.localeCompare(b.where) || a.label.localeCompare(b.label)).map(({ id, label }) => ({ id, label })),
+  }));
+}
 export type ClientContract = ApiContract & { activeRestrictionIds?: string[] };
 export interface ContractCard {
   id: string; version: number; name: string; sub: string; period: string; plan: string; planType: string; status: "Active" | "Expired" | "Upcoming";

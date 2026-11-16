@@ -1,6 +1,7 @@
 "use client";
 const MY_REQUESTS = "My requests";
 
+import { unitsByProperty } from "@ac/web/lib/clientBilling";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
@@ -253,7 +254,7 @@ function NewRequest({ live, prefill, onClose, onFail }: ModalProps & { live: Mai
   };
   return (
     <Modal open wide onClose={() => { onClose(); }} title={t("New maintenance request")} footer={<><Btn onClick={() => { onClose(); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={submit}>{t("Submit request")}</Btn></>}>
-      <Field label={t("Unit")} error={tried ? unitError ?? undefined : undefined}><Select id={ids.unit} value={unitId} onChange={(e) => { setUnitId(e.target.value); }}><option value="" disabled>{t("Choose an AC…")}</option>{live.units.map((u) => <option key={u.id} value={u.id}>{u.name}{u.place ? ` · ${u.place}` : ""}</option>)}</Select></Field>
+      <Field label={t("Unit")} error={tried ? unitError ?? undefined : undefined}><Select id={ids.unit} value={unitId} onChange={(e) => { setUnitId(e.target.value); }}><option value="" disabled>{t("Choose an AC…")}</option>{unitsByProperty(live.units).map((g) => <optgroup key={g.property} label={g.property || t("Other")}>{g.units.map((u) => <option key={u.id} value={u.id}>{u.label}</option>)}</optgroup>)}</Select></Field>
       <Field label={t("Type")}><Choice value={type} onChange={setType} options={[{ id: "reactive", label: t("Repair") }, { id: "preventive", label: t("Preventive") }]} /></Field>
       <Field label={t("Symptoms (10–2000 characters)")} error={tried ? symError ?? undefined : undefined} hint={`${String(symptomLength(sym))} / 2000`}><Textarea id={ids.sym} value={sym} onChange={(e) => { setSym(e.target.value); }} placeholder={t("Cold air is weak and there is water dripping from the indoor unit.")} /></Field>
       <TimesInput rows={rows} onChange={setRows} error={tried ? slotError : null} firstId={ids.times} />
