@@ -22,6 +22,9 @@ describe("evidence texts and resolution reasons in the display language (IR480, 
     expect(evidenceText(CLEANING_DUE_54_DAYS_SINCE_THE_LAST_CLEA, malay)).toContain("54");
     expect(evidenceText(CLEANING_DUE_54_DAYS_SINCE_THE_LAST_CLEA, en)).toBe(CLEANING_DUE_54_DAYS_SINCE_THE_LAST_CLEA);
     expect(evidenceText("Cleaning due (310 h of run time since the last cleaning). Not a fault.", malay)).toContain("310");
+    const NO_CLEANING = "Cleaning due (420 h of run time, no cleaning recorded). Not a fault.";
+    expect(evidenceText(NO_CLEANING, en)).toBe(NO_CLEANING);
+    expect(evidenceText(NO_CLEANING, malay)).toBe(ms["Cleaning due ({hours} h of run time, no cleaning recorded). Not a fault."]?.replace("{hours}", "420"));
     expect(evidenceText("Device SN-0042 reported its cover opened while powered (tamper_signal)", malay)).toContain("SN-0042");
     // the stored text keeps the server's event name; the screen says it in words (IR626)
     expect(evidenceText("Device SN-0042 reported its cover opened while powered (tamper_signal)", en)).toBe("Device SN-0042 reported its cover opened while powered");
@@ -36,9 +39,11 @@ describe("evidence texts and resolution reasons in the display language (IR480, 
   it("words the resolution reasons the system writes and keeps a person's own (IR481)", () => {
     expect(resolutionText("filter cleaned", malay)).toBe("penapis dibersihkan");
     expect(resolutionText("recovery resolved", en)).toBe("recovery resolved");
-    expect(resolutionText("Recovered: temperature 24.5 < 26 for 300 s (D08)", malay)).toBe("Pulih: temperature 24.5 < 26 selama 300 s");
-    // the stored reason keeps the server's "(D08)"; the screen shows it without the spec ID, in English too (IR626)
-    expect(resolutionText("Recovered: temperature 24.5 < 26 for 300 s (D08)", en)).toBe("Recovered: temperature 24.5 < 26 for 300 s");
+    expect(resolutionText("Recovered: temperature 24.5 < 26 for 300 s (D08)", malay)).toBe("Pulih: Suhu 24.5 < 26 selama 300 s");
+    // the stored reason keeps the server's "(D08)" and metric code; the screen shows neither, in English too (IR626)
+    expect(resolutionText("Recovered: temperature 24.5 < 26 for 300 s (D08)", en)).toBe("Recovered: Temperature 24.5 < 26 for 300 s");
+    expect(resolutionText("Recovered: refrigerant_pressure 1.9 > 1.5 for 300 s (D08)", en)).toBe("Recovered: Refrigerant pressure 1.9 > 1.5 for 300 s");
+    expect(resolutionText("Recovered: unknown_metric 3 > 1 for 60 s (D08)", en)).toBe("Recovered: unknown_metric 3 > 1 for 60 s"); // a metric with no word stays as sent
     expect(resolutionText("Customer confirmed the window was shut", malay)).toBe("Customer confirmed the window was shut");
     expect(resolutionText("Cleaning due. Not a fault.", malay)).toBe("Cleaning due. Not a fault."); // an evidence text is not a reason
   });

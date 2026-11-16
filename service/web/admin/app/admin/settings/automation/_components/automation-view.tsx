@@ -14,7 +14,7 @@ import {
 import { oneOf } from "@ac/web/lib/oneOf";
 import { fireAuto, saveAutoPolicy, simulateAuto } from "../actions";
 import { Icon } from "@ac/web/components/Icon";
-import { commonRange } from "@ac/web/lib/temperatureRange";
+import { commonRange, sharesNoSetpoint } from "@ac/web/lib/temperatureRange";
 
 interface UnitOption { id: string; name: string; customerId: string; propertyId: string; temperature: { min: number; max: number; step: number } | null; ventilation: boolean }
 interface Live {
@@ -171,7 +171,7 @@ export function AutomationView({ live }: Readonly<{ live: Live }>) {
                 <p className="mb-2 text-xs text-muted-foreground">{t("Only actions every target unit supports, and that no active restriction blocks, can run.")}</p>
                 <div className="flex flex-wrap items-end gap-2 text-[13px]">
                   <Select aria-label={t("Action")} className="w-auto" value={d.actionKind} onChange={(e) => { set({ actionKind: oneOf(actionKinds, e.target.value, d.actionKind) }); }}><option value="set_temperature">{t("Set the temperature")}</option><option value="set_power">{t("Set the power")}</option><option value="set_mode">{t("Set the mode")}</option><option value="set_fan">{t("Set the fan")}</option><option value="ventilate">{t("Ventilate")}</option></Select>
-                  {d.actionKind === "set_temperature" && <><div className="w-24"><Field label="" error={fieldError("celsius")}><Input aria-label={t("Temperature (°C)")} type="number" value={d.celsius} onChange={(e) => { set({ celsius: e.target.value }); }} /></Field></div><span className="pb-2">°C {range ? t("(targets allow {min}–{max} °C)", { min: range.min, max: range.max }) : ""}</span></>}
+                  {d.actionKind === "set_temperature" && <><div className="w-24"><Field label="" error={fieldError("celsius")}><Input aria-label={t("Temperature (°C)")} type="number" value={d.celsius} onChange={(e) => { set({ celsius: e.target.value }); }} /></Field></div><span className="pb-2">°C {range && !sharesNoSetpoint(range) ? t("(targets allow {min}–{max} °C)", { min: range.min, max: range.max }) : ""}</span></>}
                   {d.actionKind === "set_power" && <Select aria-label={t("Power")} className="w-auto" value={String(d.power)} onChange={(e) => { set({ power: e.target.value === "true" }); }}><option value="false">{t("off")}</option><option value="true">{t("on")}</option></Select>}
                   {d.actionKind === "set_mode" && <Select aria-label={t("Mode")} className="w-auto" value={d.mode} onChange={(e) => { set({ mode: oneOf(acModes, e.target.value, d.mode) }); }}><option value="cool">{t("cool")}</option><option value="dry">{t("dry")}</option><option value="fan">{t("fan")}</option></Select>}
                   {(d.actionKind === "set_fan" || d.actionKind === "ventilate") && <Select aria-label={t("Level")} className="w-auto" value={d.level} onChange={(e) => { set({ level: oneOf(fanLevels, e.target.value, d.level) }); }}><option value="low">{t("low")}</option><option value="mid">{t("mid")}</option><option value="high">{t("high")}</option></Select>}

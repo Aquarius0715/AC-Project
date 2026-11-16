@@ -1,7 +1,8 @@
 // An alert's or observation's evidence text, and the resolution reasons the system writes, in the display language (IR480). The API keeps the evidence as English text,
 // written by the seed (the fixture's demo observations), the filter-care reminders, the policy rules and the tamper and
 // reconciliation alerts. The texts those sources write are shown in the user's language; any other text (a future source,
-// or one a device sends) stays as stored. Names, serials, metrics and numbers inside a text are kept as they are.
+// or one a device sends) stays as stored. Names, serials and numbers inside a text are kept as they are; a metric code
+// is shown in words (IR626, IR812, IR833).
 import type { Params, T } from "@ac/web/lib/i18n";
 import { metricName } from "@ac/web/lib/metricLabels";
 import { lookup } from "@ac/web/lib/lookup";
@@ -36,7 +37,7 @@ const TEMPLATES: [RegExp, string, (m: RegExpMatchArray, t: T) => Params][] = [
 (D08). A reason a person typed when resolving stays as written. */
 const REASONS = new Set(["filter cleaned", "recovery resolved"]);
 const REASON_TEMPLATES: typeof TEMPLATES = [
-  [/^Recovered: (\S+) (\S+) ([<>]) (\S+) for (\d+) s \(D08\)$/, "Recovered: {metric} {value} {dir} {threshold} for {seconds} s", (m) => ({ metric: m[1] ?? "", value: m[2] ?? "", dir: m[3] ?? "", threshold: m[4] ?? "", seconds: m[5] ?? "" })],
+  [/^Recovered: (\S+) (\S+) ([<>]) (\S+) for (\d+) s \(D08\)$/, "Recovered: {metric} {value} {dir} {threshold} for {seconds} s", (m, t) => ({ metric: t(lookup(metricName, m[1] ?? "") ?? m[1] ?? ""), value: m[2] ?? "", dir: m[3] ?? "", threshold: m[4] ?? "", seconds: m[5] ?? "" })],
 ];
 
 function known(stored: string, t: T, fixed: Set<string>, templates: typeof TEMPLATES): string {

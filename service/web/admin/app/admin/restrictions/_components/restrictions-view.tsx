@@ -19,7 +19,7 @@ import { Icon } from "@ac/web/components/Icon";
 import { NeedsAccess } from "@ac/web/components/NeedsAccess";
 import { oneOf } from "@ac/web/lib/oneOf";
 import type { RestrictionRecoveryCase } from "@ac/web/lib/contracts.gen";
-import { commonRange } from "@ac/web/lib/temperatureRange";
+import { commonRange, sharesNoSetpoint } from "@ac/web/lib/temperatureRange";
 import { DateTimeSelect } from "@ac/web/components/TimeSelect";
 
 interface ScheduleContract {
@@ -163,7 +163,11 @@ function ScheduleModal({ open, onClose, contracts, now, onDone }: Readonly<{ ope
   else if (k.invoices.length === 0) errors.contractId = t("This contract has no overdue unpaid invoice");
   else if (k.recipients === 0) errors.contractId = t("No active client can receive the notice");
   if (unitIds.length === 0) errors.unitIds = t("Choose at least one unit");
-  if (kind === TEMPERATURE_LIMIT && (!range || !(sp >= range.min && sp <= range.max))) errors.setpoint = range ? t("Within {min}–{max} °C for the chosen units", { min: range.min, max: range.max }) : t("The chosen units need a temperature range");
+  if (kind === TEMPERATURE_LIMIT) {
+    if (!range) errors.setpoint = t("The chosen units need a temperature range");
+    else if (sharesNoSetpoint(range)) errors.setpoint = t("The chosen units share no temperature setting");
+    else if (!(sp >= range.min && sp <= range.max)) errors.setpoint = t("Within {min}–{max} °C for the chosen units", { min: range.min, max: range.max });
+  }
   if (!at || Date.parse(at) < now.getTime() + 24 * 3600 * 1000) errors.executeAfter = t("At least 24 hours from now");
   if (reason.trim().length === 0 || reason.length > 1000) errors.reason = t("1–1000 characters, shown to the customer");
   const save = () => {
