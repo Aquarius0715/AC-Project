@@ -45,6 +45,7 @@ export const id: Record<string, string> = {
   "Notifications": "Notifikasi",
   "Preferences": "Preferensi",
   "Demo controls": "Kontrol demo",
+  "Your role can’t open this": "Peran Anda tidak dapat membuka ini",
   "Sign out": "Keluar",
   "Open menu": "Buka menu",
   "Menu": "Menu",
