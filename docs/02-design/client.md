@@ -189,6 +189,10 @@ Scope: FR-C04 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 3. Save timezone, start/end actions, and enabled in Automation. Creation alone does not send a Command. The equipment scheduler job evaluates demo-clock start/end occurrences internally, rechecks owner permissions at trigger time, and creates Commands, once per occurrence (IR214). When another schedule of the AC starts in the same minute as one ends and its start would run, the end is not sent; the ended rule's last run says it was superseded (IR504). Screens do not call automations.fire for these triggers (IR54). The editor previews an unsaved schedule with automations.nextRuns draft; Delete (⋯ menu, confirmation) is automations.delete and keeps the rule's Commands (IR214).
 4. Queries to update: `automations / next-run preview / audit`。
 5. Delete (`automations.delete`, Figma 03g–03i): the owner confirms in a dialog; the rule leaves the list and the screen shows the removed state. As with disabling, its scheduled events create no new Commands.
+6. Several ACs in one rule (IR802). The API already took 1–50 `unitIds`, but the editor offered one Target AC only, so "the office off at 19:00" took one rule per AC.
+   - Under Target AC, a folded "Also apply to other ACs" lists the other ACs with their place, with "All ACs in {property}" and Clear. It opens by itself when the rule already has more.
+   - The setting and value lists offer only the actions every chosen AC supports (`commonActionOptions`). An action that one of them does not take reads "Not supported by every chosen AC".
+   - Step 3 says "Action for {n} ACs". The card keeps "(+n more ACs)". The list header no longer says "each rule controls one AC".
 
 **Boundary cases and failures**: Reject zero weekdays, missing end actions, and ambiguous or nonexistent times (such as daylight-saving changes). After disabling a rule, its scheduled events must not create new requests.
 
