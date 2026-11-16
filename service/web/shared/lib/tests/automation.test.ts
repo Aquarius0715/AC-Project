@@ -44,6 +44,8 @@ describe("HQ automation policies (FR-A11, DD-A11)", () => {
       name: "1–120 characters", priority: "An integer 0–100", timezone: "Required", unitIds: "Choose at least one unit", value: "A value ≥ 0", celsius: "Within 16–30 °C on every target unit",
     });
     expect(autoErrors(d({ celsius: "x" }), null).celsius).toBe("A temperature");
+    // targets whose ranges do not overlap (16–20 and 22–30) accept no setpoint at all; the message says so, not "22–20"
+    expect(autoErrors(d({ celsius: "21" }), { min: 22, max: 20 }).celsius).toBe("The target units share no temperature setting");
     expect(autoInput(d({ type: "peak", flag: true, actionKind: "ventilate", level: "mid" }), "p1")).toStrictEqual({
       id: "p1", kind: "automation", name: PEAK_SAVER, unitIds: ["u1"], timezone: "Asia/Kuala_Lumpur", enabled: false, priority: 50, condition: { type: "peak", active: true }, action: { kind: "ventilate", level: "mid" },
     });

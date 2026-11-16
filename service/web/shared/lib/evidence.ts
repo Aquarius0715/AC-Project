@@ -36,7 +36,7 @@ const TEMPLATES: [RegExp, string, (m: RegExpMatchArray, t: T) => Params][] = [
 (D08). A reason a person typed when resolving stays as written. */
 const REASONS = new Set(["filter cleaned", "recovery resolved"]);
 const REASON_TEMPLATES: typeof TEMPLATES = [
-  [/^Recovered: (\S+) (\S+) ([<>]) (\S+) for (\d+) s \(D08\)$/, "Recovered: {metric} {value} {dir} {threshold} for {seconds} s", (m) => ({ metric: m[1] ?? "", value: m[2] ?? "", dir: m[3] ?? "", threshold: m[4] ?? "", seconds: m[5] ?? "" })],
+  [/^Recovered: (\S+) (\S+) ([<>]) (\S+) for (\d+) s \(D08\)$/, "Recovered: {metric} {value} {dir} {threshold} for {seconds} s", (m, t) => ({ metric: t(lookup(metricName, m[1] ?? "") ?? m[1] ?? ""), value: m[2] ?? "", dir: m[3] ?? "", threshold: m[4] ?? "", seconds: m[5] ?? "" })],
 ];
 
 function known(stored: string, t: T, fixed: Set<string>, templates: typeof TEMPLATES): string {
