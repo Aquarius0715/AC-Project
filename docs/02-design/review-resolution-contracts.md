@@ -10707,3 +10707,11 @@ Found in the UI/UX loop (UX-58, criterion 11: fewer manual steps; principle 15: 
 2. **Preset.** `afterHoursDraft(unitIds, timezone, name)` (shared/lib/clientAutomations.ts) builds a schedule rule named "Switch off after hours". It runs on weekdays, starts at 19:00 with Power OFF and ends at 23:00. The end action stays empty, since DD-C04 never assumes it. The first AC is the target and the rest are `others`, up to 49. The rule is saved off, like every new one. The page reads `preset` and `unitIds` only with `automationId=new` and keeps only the customer's own unarchived ACs.
 3. **Leaving.** Done, Cancel and Create clear `preset` and `unitIds`, so the next new rule starts blank.
 4. **Tests.** `clientAutomations.test.ts` checks the filled fields, the empty end action and the 50-AC cap.
+
+## IR813 Book cleaning from an alert opens on that AC — 2026-11-16
+
+Found in the UI/UX loop (UX-60, principle 15: no searching again after following a link). A filter-cleaning reminder's Book cleaning opened Filter care (`tab=filter-care`), which lists every AC: 15 overdue in the demo. The customer had to find again the AC the reminder was about.
+
+1. **Link.** The alert row and detail link to `/customer/maintenance?tab=filter-care&unitId=<the alert's unit>`.
+2. **Filter care.** `FilterCareTab` takes `focus`, the `unitId` from the URL. That AC's row is marked (`aria-current`, a tinted background) and scrolled to the middle of the view once, on arrival. An area that folds it opens. Request cleaning and Mark cleaned work as before.
+3. **Docs.** SCR-C09 lists the URL key `unitId`, which is optional.

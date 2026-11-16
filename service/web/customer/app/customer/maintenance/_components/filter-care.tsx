@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Fragment, useState } from "react";
+import { Fragment, useRef, useState } from "react";
 import { Badge, Banner, Btn, Card, Check, Choice, Field, Input, Modal, SummaryList, UtilizationBar, cx, Plain, ScrollX } from "@ac/web/components/ui";
 import { useAction } from "@ac/web/lib/useAction";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
@@ -13,18 +13,28 @@ import type { MaintenanceLive } from "../_lib/load";
 type Filters = NonNullable<MaintenanceLive["filters"]>;
 /** The New request modal opened from a row: the unit, type preventive and a symptom line. */
 export interface CleaningPrefill { unitId: string; symptom: string; type?: "reactive" | "preventive" }
-interface Props { f: Filters; owner: boolean; onRequest: (p: CleaningPrefill) => void; onDone: (text: string) => void; onFail: (f: ActionFailure) => void }
+/** focus: the AC a link came for (`unitId`, IR813): its row is marked, in view and its folded area open */
+interface Props { f: Filters; owner: boolean; focus?: string | null; onRequest: (p: CleaningPrefill) => void; onDone: (text: string) => void; onFail: (f: ActionFailure) => void }
 
 /** Filter care (FR-C18, DD-C18, Figma Client 07j) from the Core API: run time since the cleaning per AC, areas with many
 ACs folded into a summary row, Request cleaning / Mark cleaned and the owner's reminder settings. */
-export function FilterCareTab({ f, owner, onRequest, onDone, onFail }: Readonly<Props>) {
+export function FilterCareTab({ f, owner, focus = null, onRequest, onDone, onFail }: Readonly<Props>) {
   const t = useT();
-  const [open, setOpen] = useState<string[]>([]);
+  // an alert's Book cleaning names its AC: the area holding it starts open, so its row can be shown
+  const [open, setOpen] = useState<string[]>(() => f.lines.filter((l) => l.kind === "group" && l.group.rows.some((r) => r.unitId === focus)).map((l) => (l.kind === "group" ? l.group.key : "")));
   const [edit, setEdit] = useState(false);
   const [pending, run] = useAction();
+  // brought into view once, on arrival; later re-renders (a Mark cleaned elsewhere) must not pull the page back
+  const isScrolled = useRef(false);
+  const bringIntoView = (el: HTMLTableRowElement | null) => {
+    if (!el || isScrolled.current) return;
+    isScrolled.current = true;
+    el.scrollIntoView({ block: "center" });
+  };
   const mark = (r: FilterRow) => { run(() => markCleaned(r.unitId), t("Marked cleaned"), () => { onDone(t("{unit}: marked cleaned — the counter restarts at 0 h and your technician sees it.", { unit: r.unit })); }, onFail); };
   const unitRow = (r: FilterRow, inner = false) => (
-    <tr key={r.unitId} className="border-t border-line">
+    <tr key={r.unitId} aria-current={r.unitId === focus ? "true" : undefined} ref={r.unitId === focus ? bringIntoView : undefined}
+      className={cx("border-t border-line", r.unitId === focus && "bg-primary-soft/60")}>
       <td className={cx("px-3 py-2.5 align-middle", inner && "pl-8")}>
         <b>{r.unit}</b>
         <div className="text-[11px] text-muted-foreground">{r.place ? `${r.place} · ` : ""}{r.last}{r.jobId && <> (<Link className="text-primary hover:underline" href={`/customer/maintenance?jobId=${r.jobId}`}>{r.jobId.slice(0, 8)}</Link>)</>}</div>
