@@ -140,7 +140,7 @@ export function UsersView({ live }: Readonly<{ live: { customerId: string; custo
         ]} />
         </div>
       </Card>
-      <Banner>{t("Your customer always keeps one active owner, and you can’t change your own account. A user keeps their e-mail — to change it, remove them and add them again. For a password reset, contact HQ. Only owners see this page.")}</Banner>
+      <Banner>{t("Your customer always keeps one active owner, and you can’t change your own account. A user keeps their e-mail — to change it, remove them and add them again. A user who forgot their password resets it with “Forgot password?” on the sign-in page. Only owners see this page.")}</Banner>
       {/* the Mailpit inbox is a development tool: customers only read where the e-mail comes from */}
       <p className="text-[11px] text-muted-foreground">{t(process.env.NODE_ENV === "development" ? "The set-up e-mail comes from the sign-in service; in development it arrives in the local Mailpit inbox." : "The set-up e-mail comes from the sign-in service.")}</p>
       <Modal open={!!dialog} onClose={close} title={title} finalFocus={() => (gone.current ? document.querySelector("#users-list") : true)} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant={dialog?.kind === "remove" || dialog?.kind === "disable" ? "danger" : "primary"} disabled={pending} onClick={submit}>{action}</Btn></>}>
