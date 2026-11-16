@@ -10596,3 +10596,11 @@ Found in the UI/UX loop (UX-45). Overview › Running › View running units lis
    - This is the one exception to one space. Power off sets nothing else, so no room's settings can mix.
 2. **After sending.** The list is re-read, and the ACs confirmed off leave it. The panel stays open, says how many were turned off, and Retry covers the failed ACs that are still listed.
 3. **Docs and tests.** FR-C14 and DD-C14 step 5 say so. `clientProperties.test.ts` plans power off only, and an AC already off has nothing to send.
+
+## IR803 Energy & cost ranks the ACs by use — 2026-11-16
+
+Found in the UI/UX loop (UX-50: "which AC should I review?"). Energy & cost showed one AC, the first by name, or up to four that the customer picked. Nothing said which of the 23 ACs used the most, so finding the one to review took 23 selections.
+
+1. **Ranking.** For the period, the page also runs one `energy.summary` per unit of the customer. `topUsers` (shared/lib/clientEnergy.ts) keeps the five highest and leaves out units without measured energy. Ties go by name. Each unit's share is of the measured total.
+2. **Card.** "Highest use in this period" lists the AC, its kWh, its share of measured and its data coverage, in warning colour under 80%. A note says low coverage means the AC may have used more than shown. Show selects that AC alone. Compare adds it, up to four, and is hidden when the AC is already shown or four are chosen. The card is hidden with fewer than two ranked ACs.
+3. **Docs and tests.** DD-C06 step 5. `energy.test.ts` checks the order, the shares and leaving out units without measured use.
