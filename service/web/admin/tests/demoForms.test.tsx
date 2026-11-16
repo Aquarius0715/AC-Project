@@ -48,6 +48,9 @@ describe("Admin demo forms", () => {
     expect(screen.getByText("Execute-after must be at least 24 h after the notice")).toBeTruthy();
     expect(screen.queryByText("restriction-new-1")).toBeNull();
     fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Cancel" }));
+    fireEvent.click(screen.getByRole("button", { name: /Schedule restriction/ }));
+    expect(screen.queryByText("Execute-after must be at least 24 h after the notice")).toBeNull(); // Cancel cleared the try
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Cancel" }));
     schedule("2099-01-01");
     schedule("2099-01-02");
     expect(screen.getByText("restriction-new-1")).toBeTruthy();
