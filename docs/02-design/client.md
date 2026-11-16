@@ -151,6 +151,7 @@ Scope: FR-C03 / Main display pattern: **UI-DETAIL**. Service boundary: `units.ge
    - A power-OFF request does not set measured temperature to 0.
    - Disable new requests to a unit while a request for that unit is pending.
 3. Create one Command and show the requested value separately. Update confirmed settings only after the device returns acknowledged. Keep the request and reason in history even on failure.
+   - As built (IR806): while a command waits for the device, the banner counts down the seconds it has left. The count runs from its request to its expiry, 30 s when unknown, and on the browser's clock from the moment it appears. At zero it reads “No answer yet — checking the result…”. The sentence stays the same for screen readers, and only the seconds, which are not read out, change.
    - As built (IR804): a history row of a command sent by hand (`source` ui) ends “· by you” when the reader sent it (`actorMembershipId` is the reader's membership) and “· by someone else” otherwise. Several people share one customer account, and the AC that “changed by itself” was often changed by another of them. No name is shown. Automation, restriction and test-run commands keep their own source.
 4. Queries to update: `commands / unit detail / telemetry summary / audit`。
 
