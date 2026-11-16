@@ -2,7 +2,7 @@
 
 import { Btn, Check, Field, Input, LineChart, Select, cx, Plain } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
-import { windowText } from "@ac/web/lib/customerPolicies";
+import { durationText, windowText } from "@ac/web/lib/customerPolicies";
 import { HQ_METRICS, metricLabel, metricUnit, opSymbol, type ApiPolicy, type Operator } from "@ac/web/lib/adminAlerts";
 import { Icon } from "@ac/web/components/Icon";
 import { byNumber } from "@ac/web/lib/order";
@@ -24,6 +24,7 @@ whether the recovery lies on the safe side. A default rule's metric is fixed (`f
 export function ConditionFields({ c, onChange, errors, tried, fixedMetric }: Readonly<{ c: Condition; onChange: (p: Partial<Condition>) => void; errors: Record<string, string>; tried: boolean; fixedMetric?: boolean }>) {
   const t = useT();
   const unit = metricUnit[c.metric] ?? "";
+  // seconds as typed read like the rule list ("for 10 min"), and the recovery has the threshold's unit (UI/UX loop R88)
   return (
     <>
       <div className="grid-fluid" style={{ ["--min" as string]: "130px" }}>
@@ -32,8 +33,8 @@ export function ConditionFields({ c, onChange, errors, tried, fixedMetric }: Rea
           : <Field label={t("Metric")}><Select value={c.metric} onChange={(e) => { onChange({ metric: e.target.value }); }}>{HQ_METRICS.map((k) => <option key={k} value={k}>{(textOf(metricLabel, k, t) ?? k)}</option>)}</Select></Field>}
         <Field label={t("Comparison")}><Select value={c.operator} onChange={(e) => { onChange({ operator: oneOf(OPERATORS, e.target.value, c.operator) }); }}>{OPERATORS.map((o) => <option key={o} value={o}>{opSymbol[o]}</option>)}</Select></Field>
         <Field label={t("Alert when {op}", { op: opSymbol[c.operator] })} error={tried ? errors.threshold : undefined}><Input type="number" value={c.threshold} onChange={(e) => { onChange({ threshold: Number(e.target.value) }); }} /></Field>
-        <Field label={t("For (s)")} error={tried ? errors.duration : undefined}><Input type="number" value={c.duration} onChange={(e) => { onChange({ duration: Number(e.target.value) }); }} /></Field>
-        <Field label={t("Recover")} error={errors.recovery}><Input type="number" value={c.recovery} onChange={(e) => { onChange({ recovery: Number(e.target.value) }); }} /></Field>
+        <Field label={t("For (s)")} hint={c.duration >= 60 ? `= ${durationText(c.duration)}` : undefined} error={tried ? errors.duration : undefined}><Input type="number" value={c.duration} onChange={(e) => { onChange({ duration: Number(e.target.value) }); }} /></Field>
+        <Field label={t("Recover")} hint={unit || undefined} error={errors.recovery}><Input type="number" value={c.recovery} onChange={(e) => { onChange({ recovery: Number(e.target.value) }); }} /></Field>
       </div>
       {/* an illustrative curve that crosses the threshold and comes back (not real readings) */}
       <div className="mt-2"><LineChart points={(c.operator === "lt" || c.operator === "lte" ? FALL : RISE).map((k) => Math.round(k * c.threshold * 10) / 10)} name={t("Illustration (not readings)")} threshold={c.threshold} height={90} /></div>
