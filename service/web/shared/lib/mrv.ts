@@ -94,7 +94,7 @@ export function mrvDraftErrors(d: MRVDraft, t: T = en): Record<string, string> {
   if (period) e.period = period;
   if (!d.baseline) e.baseline = t("Choose a baseline version");
   if (!d.factor) e.factor = t("Choose an emission factor version");
-  if (codePoints(d.boundary.trim()) === 0 || d.boundary.length > 500) e.boundary = t("1–500 characters");
+  if (codePoints(d.boundary.trim()) === 0 || codePoints(d.boundary.trim()) > 500) e.boundary = t("1–500 characters");
   return e;
 }
 
