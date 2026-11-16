@@ -1,5 +1,6 @@
 "use client";
 
+import { zoneOptions } from "@ac/web/lib/preferences";
 import { useState } from "react";
 import { Badge, Banner, Btn, Card, Check, Choice, DataTable, DemoBadge, EmptyState, Field, Input, ListRow, Page, Select, Plain, ScrollX } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
@@ -139,7 +140,8 @@ export function AutomationView({ live }: Readonly<{ live: Live }>) {
               <section className="grid-fluid" style={{ ["--min" as string]: "160px" }}>
                 <Field label={t("Name")} error={fieldError("name")}><Input value={d.name} maxLength={120} onChange={(e) => { set({ name: e.target.value }); }} /></Field>
                 <Field label={t("Priority")} hint={t("0–100 · higher wins in its tier")} error={fieldError("priority")}><Input type="number" value={d.priority} onChange={(e) => { set({ priority: e.target.value }); }} /></Field>
-                <Field label={t("Timezone")} error={fieldError("timezone")}><Input value={d.timezone} onChange={(e) => { set({ timezone: e.target.value }); }} /></Field>
+                {/* a list of zones, as Preferences offers, instead of free text a typo turns into an error (UI/UX loop R111) */}
+                <Field label={t("Timezone")} error={fieldError("timezone")}><Select value={d.timezone} onChange={(e) => { set({ timezone: e.target.value }); }}>{zoneOptions(d.timezone, new Date(live.now)).map((z) => <option key={z.id} value={z.id}>{z.label}</option>)}</Select></Field>
                 <div className="self-end pb-2"><Check label={t("Enabled")} checked={d.enabled} onChange={(v) => { set({ enabled: v }); }} /></div>
               </section>
               <section>
