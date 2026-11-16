@@ -3,8 +3,8 @@
 // the action availability. Pure code shared by the Server Components and the client views. Texts in the display
 // language and instants in the display time zone (`t` / `i`, IR301); the customer's notice uses the same words (IR267).
 import { EN, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
-import { wrapped } from "@ac/web/lib/text";
 import { lookup } from "@ac/web/lib/lookup";
+import { commandFailure } from "@ac/web/lib/commandFailure";
 
 const RELEASE_REQUESTED = "release_requested";
 
@@ -100,7 +100,7 @@ export function unitRows(r: ApiRestriction, names: Map<string, string>, commands
     const last = (ids: string[]) => { const id = ids.at(-1); return id ? commands.get(id) : undefined; };
     const a = last(u.applyCommandIds);
     const releaseId = last(u.releaseCommandIds);
-    const status = (c: ApiCommand) => `${lookup(command, c.status) ?? c.status}${wrapped(c.failureCode, " (", ")")}`;
+    const status = (c: ApiCommand) => `${lookup(command, c.status) ?? c.status}${c.failureCode ? ` (${commandFailure(c.failureCode, t)})` : ""}`;
     return {
       unitId: u.unitId, name: names.get(u.unitId) ?? u.unitId.slice(0, 8), apply: lookup(apply, u.applyState) ?? u.applyState, release: lookup(release, u.releaseState) ?? u.releaseState, pending: pending(u.pendingReason),
       observed: observedText(u, r.id, i),
