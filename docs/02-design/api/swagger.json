@@ -34656,6 +34656,13 @@
                 "monthlyReportEmail": {
                     "type": "boolean"
                 },
+                "pinnedUnitIds": {
+                    "description": "PinnedUnitIDs are the ACs the user pinned to their Overview (IR819), newest first; ids only, the screen shows\nthose the user can still read.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
                 "timezone": {
                     "type": "string"
                 },
@@ -34672,6 +34679,13 @@
                 },
                 "monthlyReportEmail": {
                     "type": "boolean"
+                },
+                "pinnedUnitIds": {
+                    "description": "PinnedUnitIDs replaces the pins when given (IR819); left out, they stay as they are.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 },
                 "timezone": {
                     "type": "string"

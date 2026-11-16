@@ -10766,3 +10766,13 @@ Found in the UI/UX loop (UX-70, criteria 4 and 10). The customer Users page said
 
 1. **Text.** The note now reads "A user who forgot their password resets it with “Forgot password?” on the sign-in page." In ms, ja and id it uses the sign-in page's own label: Lupa kata laluan? / パスワードをお忘れですか？ / Lupa kata sandi?. The demo view and the page comment say the same.
 2. **Docs.** DD-C19's two lines follow. The DEC-77 entry's "Password resets stay with HQ" is about another user's password: an owner still cannot reset it.
+
+## IR819 Pinned ACs are kept per user on the server (stage 1: API and DB) — 2026-11-16
+
+IR814 kept a customer's pinned ACs in the browser, so they did not follow the user to another device. This first stage stores them with the user's preferences. Stage 2 moves the web to it.
+
+1. **Data.** `identity.preferences.pinned_unit_ids uuid[] NOT NULL DEFAULT '{}'`, with at most eight. The change is migration 000008 with `IF NOT EXISTS` (000001 stays frozen, IR785), and `schema.sql` has the same column.
+2. **Contract.** `Preferences.pinnedUnitIds: ID[]`, newest first. `preferences.update` takes an optional `pinnedUnitIds?: ID[]`, which replaces the pins when given. When it is left out the pins stay as they were, so the existing language and time-zone saves are unaffected. At most eight distinct non-nil ids; else VALIDATION `pinnedUnitIds=error.invalid`. Only ids are kept: the screen shows those the user can still read, so a pin to another customer's AC shows nothing and discloses nothing.
+3. **Generated.** catalog_gen.go, contracts.gen.ts, contractInputs.gen.json and Swagger.
+4. **Tests.** `TestPreferencesAndConsents` covers saving two pins and reading them back in order. The pins are kept by an update that leaves them out. Nine, repeated or nil ids are refused, and an empty list clears them.
+5. **Dev DB.** The column was added by hand (ALTER), as with every migration.

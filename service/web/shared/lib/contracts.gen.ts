@@ -23,7 +23,7 @@ export type Money = {amountMinor:number;currency:Currency};
 /** IR107: 39 values (IR690 adds data.forceDelete) = Read/Write per resource + independent actions. Write implies Read. */
 export type Permission = 'dashboard.read'|'asset.read'|'asset.write'|'identity.read'|'identity.write'|'device.read'|'device.write'|'device.maintain'|'control.execute'|'control.diagnose'|'alert.read'|'alert.resolve'|'alert.policy.read'|'alert.policy.write'|'job.read'|'job.write'|'contract.read'|'contract.write'|'billing.read'|'billing.write'|'billing.payment'|'restriction.read'|'restriction.write'|'restriction.override'|'automation.policy.read'|'automation.policy.write'|'energy.read'|'energy.write'|'mrv.read'|'mrv.write'|'mrv.review'|'mrv.factors'|'offset.read'|'offset.write'|'audit.read'|'partner.accept'|'partner.assign'|'partner.review'|'data.forceDelete';
 export type Session = Context & {userId:ID;role:Role;clientRole:ClientRole|null;displayName:string;organizationName:string;organizationId:ID;customerId:ID|null;permissions:Permission[];generation:number;viewEpoch:number;issuedAt:Instant;expiresAt:Instant};
-export type Preferences = {locale:Locale;timezone:string;currency:'MYR';monthlyReportEmail:boolean;twoFactorEnabled:boolean};
+export type Preferences = {locale:Locale;timezone:string;currency:'MYR';monthlyReportEmail:boolean;twoFactorEnabled:boolean;pinnedUnitIds:ID[]};
 export type User = {id:ID;displayName:string};
 /** revokedAt (IR508): HQ ended the access in Access & roles — the sign-in is off, and only HQ gives the access back (a later validUntil clears it). */
 export type Membership = Entity & {userId:ID;displayName:string;organizationId:ID;role:Role;employment:'internal'|'external'|null;permissions:Permission[];scopes:ScopeRef[];scopeVersion:number;qualifications:QualificationGrant[];validFrom:Instant;validUntil:Instant|null;clientRole:ClientRole|null;revokedAt:Instant|null};
@@ -393,7 +393,7 @@ export type OperationContracts = {
   'policies.list': {input:Query;result:Page<Policy>;mode:'read'};
   'policies.save': {input:PolicyInput;result:Policy;mode:'write'};
   'preferences.get': {input:Record<string,never>;result:Preferences;mode:'read'};
-  'preferences.update': {input:{locale:Locale;timezone:string;monthlyReportEmail?:boolean};result:Preferences;mode:'write'};
+  'preferences.update': {input:{locale:Locale;timezone:string;monthlyReportEmail?:boolean;pinnedUnitIds?:ID[]};result:Preferences;mode:'write'};
   'properties.archive': {input:{id:ID;reason:string};result:ArchivedResource;mode:'write'};
   'properties.list': {input:Query;result:Page<Property>;mode:'read'};
   'properties.save': {input:{id?:ID;customerOrgId:ID;kind:'home'|'office';name:string;address:string|null;accessInstructions:string|null};result:Property;mode:'write'};
