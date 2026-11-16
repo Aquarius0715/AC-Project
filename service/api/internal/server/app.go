@@ -34,6 +34,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/platform/db"
 	"github.com/pradita/ac-project/service/api/internal/platform/democlock"
 	"github.com/pradita/ac-project/service/api/internal/platform/events"
+	"github.com/pradita/ac-project/service/api/internal/platform/geo"
 	"github.com/pradita/ac-project/service/api/internal/platform/ratelimit"
 )
 
@@ -347,6 +348,7 @@ func (w *wiring) registerControl() {
 		Units:    controlTargets{w.assets},
 		Cmd:      cmds,
 		Notifier: monitoring.Notifier{Notify: notify.Store{}},
+		Sites:    controlTargets{w.assets},
 	}
 	control.RegisterAutomations(w.reg, automations)
 	w.demo.notify = automations.Notify // demo.trigger automation: a gateway's facts against the alert policies (IR529)
@@ -742,4 +744,38 @@ func (t controlTargets) Target(
 		Version:    version,
 		Caps:       caps,
 	}, true, apperr.Wrap(err, "devices.Models.Caps")
+}
+
+// PinnedSites implements control.Sites: the customer's pinned properties with their radius (default 150 m) and
+// installed units (DEC-109).
+func (t controlTargets) PinnedSites(
+	ctx context.Context,
+	call *ops.Call,
+	org uuid.UUID,
+) ([]control.Site, error) {
+	pinned, err := t.am.PinnedProperties(ctx, call, org)
+	if err != nil {
+		return nil, apperr.Wrap(err, "assets.Module.PinnedProperties")
+	}
+
+	sites := make([]control.Site, 0, len(pinned))
+
+	for _, property := range pinned {
+		radius := control.DefaultGeofenceRadius
+		if property.RadiusMeters != nil {
+			radius = *property.RadiusMeters
+		}
+
+		sites = append(sites, control.Site{
+			PropertyID: property.ID,
+			Pin: geo.Point{
+				Latitude:  property.Pin.Latitude,
+				Longitude: property.Pin.Longitude,
+			},
+			RadiusMeters: radius,
+			UnitIDs:      property.UnitIDs,
+		})
+	}
+
+	return sites, nil
 }

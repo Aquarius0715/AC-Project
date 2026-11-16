@@ -34,3 +34,11 @@ export function parseRadius(text: string): { ok: true; radius: number | null } |
   const r = Number(s);
   return r >= 50 && r <= 2000 ? { ok: true, radius: r } : { ok: false };
 }
+
+/** The great-circle distance between two points in metres (the mean Earth sphere), for deciding when the browser
+reports again; the Core API measures the distances that decide (internal/platform/geo). */
+export function haversine(a: GeoPoint, b: GeoPoint): number {
+  const rad = Math.PI / 180;
+  const h = Math.sin(((b.latitude - a.latitude) * rad) / 2) ** 2 + Math.cos(a.latitude * rad) * Math.cos(b.latitude * rad) * Math.sin(((b.longitude - a.longitude) * rad) / 2) ** 2;
+  return 2 * 6_371_008.8 * Math.asin(Math.min(1, Math.sqrt(h)));
+}

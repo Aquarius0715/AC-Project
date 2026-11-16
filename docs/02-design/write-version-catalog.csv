@@ -137,6 +137,7 @@ policies.save,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; mis
 policies.save,id present,policies,policies.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 policies.setDefaultRule,all,policies,policies.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 preferences.update,all,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+presence.report,all,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 properties.archive,all,properties,properties.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 properties.save,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 properties.save,id present,properties,properties.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects

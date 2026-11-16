@@ -4157,6 +4157,12 @@
   ],
   "items": null
  },
+ "presence.report": {
+  "fields": [
+   "transitions"
+  ],
+  "items": null
+ },
  "properties.archive": {
   "fields": [
    "archived",

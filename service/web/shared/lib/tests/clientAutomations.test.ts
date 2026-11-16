@@ -77,7 +77,7 @@ describe("customer automation sentences (FR-C04, FR-C05, IR260)", () => {
     expect(warned.tone).toBe("warn");
     expect(warned.text).toMatch(/^Withdrawn 20 Sept 2026, 9:49 am MYT · 2 location automations were turned off/);
     expect(consentCard(revoked, 0, 0, MS).text).toMatch(/^Ditarik balik .* automasi lokasi tidak boleh berjalan/);
-    expect(consentCard({ id: "c", version: 2, granted: true, grantedAt: "2026-09-10T02:00:00Z", revokedAt: null }, 1, 0, MS)).toMatchObject({ title: "Diberikan", text: "Diberikan 10 Sep 2026, 11:00 PG GMT+9 · digunakan hanya oleh 1 automasi lokasi · peristiwa lokasi demo (tiada sejarah GPS sebenar)." });
+    expect(consentCard({ id: "c", version: 2, granted: true, grantedAt: "2026-09-10T02:00:00Z", revokedAt: null }, 1, 0, MS)).toMatchObject({ title: "Diberikan", text: "Diberikan 10 Sep 2026, 11:00 PG GMT+9 · digunakan hanya oleh 1 automasi lokasi · hanya di rumah atau keluar disimpan, bukan kedudukan anda." });
     expect([runClock(TEXT_2026_09_14T14_00_00Z), runClock(TEXT_2026_09_14T14_00_00Z, "Asia/Tokyo")]).toStrictEqual(["22:00 MYT", "23:00 GMT+9"]);
   });
 });

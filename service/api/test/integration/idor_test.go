@@ -1123,6 +1123,7 @@ func TestForeignTargets(t *testing.T) {
 		"twoFactor.disable":           ownSession,
 		"consents.get":                "own membership",
 		"consents.update":             "own membership",
+		"presence.report":             "own membership and own customer's pinned properties; no target (TestPresenceReport)",
 		"filterCare.getSettings":      "own customer; no target",
 		"filterCare.saveSettings":     "own customer; no target",
 		"notifications.list":          "recipient only; no filter names a recipient",

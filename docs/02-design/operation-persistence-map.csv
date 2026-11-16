@@ -185,6 +185,7 @@ policies.save,write,Monitoring & alerts,monitoring.alert_policies,monitoring.ale
 policies.setDefaultRule,write,Monitoring & alerts,monitoring.alert_policies,monitoring.default_rule_settings,Assets,audit.audit_log;platform.idempotency_keys;platform.outbox,
 preferences.get,read,Identity & access,identity.preferences,,,,
 preferences.update,write,Identity & access,identity.preferences,identity.preferences,,audit.audit_log;platform.idempotency_keys;platform.outbox,
+presence.report,write,Control,control.presence_states;control.automations;control.commands,control.presence_states;control.commands;control.automation_runs,Assets;Identity & access,audit.audit_log;platform.idempotency_keys;platform.outbox,pinned properties and units read through the assets interface; the consent through identity; the fix itself is not stored (DEC-109)
 properties.archive,write,Assets,assets.properties,assets.properties,,audit.audit_log;platform.idempotency_keys;platform.outbox,
 properties.list,read,Assets,assets.properties,,,,
 properties.save,write,Assets,assets.properties,assets.properties,,audit.audit_log;platform.idempotency_keys;platform.outbox,

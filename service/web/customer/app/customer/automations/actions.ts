@@ -7,6 +7,8 @@ import { coreNow, coreOp } from "@ac/web/lib/dal";
 import { actionFailure } from "@ac/web/lib/actionFailure";
 import type { ApiAutomation, ApiConsent, ApiDecision } from "@ac/web/lib/clientAutomations";
 import type { OpInput } from "@ac/web/lib/opTypes";
+import { parsePresenceResult, type PresenceResult } from "@ac/web/lib/presence";
+import { z } from "zod";
 
 export type ActionResult<T = null> = { ok: true; value: T } | { ok: false; messageKey: string; code: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null };
 
@@ -44,3 +46,11 @@ export async function testEvent(unitId: string, facts: Omit<OpInput<"automations
     return { at, decision: r.results.find((d) => d.unitId === unitId) ?? null };
   }, false);
 }
+/** presence.report (DEC-109, IR826): this device's position against the pins of the customer's homes and offices; only home or away is kept, and the household's arrival or departure runs the location automations. The argument comes from the network, so its shape is checked here (the ranges by the Core API); nothing on the page changes, so no refresh. */
+export async function reportPresence(fix: unknown): Promise<ActionResult<PresenceResult | null>> {
+  const input = z.object({ latitude: z.number(), longitude: z.number(), accuracyMeters: z.number() }).safeParse(fix);
+  return input.success
+    ? run(async () => parsePresenceResult(await coreOp<unknown>("presence.report", input.data, { write: true })), false)
+    : { ok: false, code: "VALIDATION", messageKey: "error.validation", fieldErrors: { latitude: "error.invalid" } };
+}
+

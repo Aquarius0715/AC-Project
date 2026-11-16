@@ -149,7 +149,7 @@ func (in *EvaluationInput) Validate() map[string]string {
 func validFact(fact Fact) bool {
 	spec, ok := factSpecs()[fact.Metric]
 	if !ok || fact.Unit != spec.unit ||
-		!slices.Contains([]string{"valid", "missing", qualityStale, "suspect"}, fact.Quality) {
+		!slices.Contains([]string{qualityValid, "missing", qualityStale, "suspect"}, fact.Quality) {
 		return false
 	}
 
@@ -285,7 +285,7 @@ func factState(
 ) (json.RawMessage, string) {
 	fact, ok := facts[unit.String()+"/"+metric]
 	if !ok || string(fact.Value) == jsonNull || fact.ObservedAt.After(now) ||
-		(fact.Quality != "valid" && fact.Quality != qualityStale) {
+		(fact.Quality != qualityValid && fact.Quality != qualityStale) {
 		return nil, reasonMissingData
 	}
 

@@ -1,6 +1,6 @@
 ---
 document_id: DD-DATABASE
-version: 0.40.0
+version: 0.41.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent, operations]
@@ -23,7 +23,7 @@ The source of truth for fields and states is [service-contracts.ts](service-cont
 | identity | Identity & access | users, organizations, memberships, membership_permissions, membership_scopes, qualification_grants, permissions (39), preferences, two_factor, consents, client_users (the customer owners' user lists, IR417), partner_users (the contractors' user lists, IR416) |
 | assets | Assets | customers, properties, spaces, units, unit_alert_policies, unit_imports, unit_import_previews (30-minute CSV validation results written outside the read transaction of `units.importPreview`, purged after expiry), warranty_reminders (the BR-A19 reminders sent, IR340), unit_offer_access and unit_assignment_access (projections of accepted Offers and of Assignments with an `active` flag for the unit scope and the diagnostic-run scope, fed by change-capture events, IR186, IR187) |
 | devices | Devices | capabilities (versioned; the aircon models), iot_models (versioned; the IoT models, DEC-105, migration 000002), devices, sensors, device_bindings, device_operations, device_events, device_event_notes, calibration_records, firmware_campaigns, firmware_campaign_devices |
-| control | Control | commands, diagnostic_runs, automations, automation_units, automation_policies, automation_policy_units, automation_runs, evaluation_events, schedule_watermarks |
+| control | Control | commands, diagnostic_runs, automations, automation_units, automation_policies, automation_policy_units, automation_runs, evaluation_events, schedule_watermarks, presence_states |
 | monitoring | Monitoring & alerts | alert_policies, default_rule_settings, alerts, ventilation_logs, allergen_observations, measurements (partitioned), measurements_15m, measurements_1h, alert_notifications (requested alert notifications for the cooldown, IR191) |
 | maintenance | Maintenance | plans, jobs, job_alerts, slot_proposals, offers, partner_slot_proposals, assignments, work_reports (versioned), report_reviews, attachments, job_notes, job_events, job_history_snapshots, contractors, rate_cards, certificates, certificate_reminders (the BR-P09 expiry reminders sent, IR336), unavailability, sla_targets, filter_care_settings, filter_cleanings, filter_reminders, filter_reminder_watermarks, parts_catalog, ref_memberships reference copy (IR192) |
 | billing | Billing | contracts (versioned), contract_units, invoices, payments, stripe_events, inquiries, payout_statements, payout_lines, payout_queries, payout_runs (the scheduler's monthly draft runs, IR341), ref_customers and ref_units reference copies (IR194, IR199) |
@@ -72,6 +72,7 @@ Mapping of notable TypeScript types:
 | `ACUnit.installState` | `assets.units.install_state` `planned`/`installed` (DEC-106, IR789, migration 000005): a planned unit has no `installed_at`; the `UnitInstalled` event from an accepted installation report sets `installed` and `installed_at` (the warranty end is set in the unit edit) |
 | `MaintenanceJob.type = 'installation'`, `origin = 'hq_request'` | `maintenance.jobs` CHECK lists widened; a partial unique index allows one unfinished installation job per unit; `work_reports.installation` and `attachments.tag` (migration 000005) |
 | `InstallationRequest` | `maintenance.installation_requests` (DEC-107, IR794, migration 000006): a customer owner's request for 1–10 new aircons with 3 preferred slots; `maintenance.jobs.installation_request_id` links the installation jobs HQ creates for it, and the first such job sets the request `approved` in the same transaction |
+| `PresenceState` | `control.presence_states` (DEC-109, IR826, migration 000010): per member and pinned property, whether the member's device is inside the property's away/home radius, when that last changed and when it was last reported. No position is stored; a withdrawn location consent deletes the member's rows |
 | `ACUnit.observedState`, `observedRestriction` | `jsonb` read-model columns on `assets.units`, written only from device events (IR47) |
 | `ACUnit.alertPolicyIds` | `assets.unit_alert_policies`; the HQ default policy is implicit and never stored per unit (IR108) |
 | `Policy` (`automation` / `alert` / `default_alert`) | `control.automation_policies` and `monitoring.alert_policies` (kind alert or default_alert); `policies.*` operations dispatch on kind |

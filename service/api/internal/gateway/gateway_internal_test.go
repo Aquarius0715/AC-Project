@@ -16,7 +16,7 @@ import (
 )
 
 // catalogRoutes is the number of REST routes in the operation catalog (IR222).
-const catalogRoutes = 254
+const catalogRoutes = 255 // IR826 POST /v1/presence
 
 // upstreams starts one service per domain, each answering with handler(domain), and returns their targets.
 func upstreams(t *testing.T, handler func(domain string) http.HandlerFunc) Targets {

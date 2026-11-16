@@ -1081,6 +1081,11 @@
   "pinnedUnitIds",
   "timezone"
  ],
+ "presence.report": [
+  "accuracyMeters",
+  "latitude",
+  "longitude"
+ ],
  "properties.archive": [
   "id",
   "reason"

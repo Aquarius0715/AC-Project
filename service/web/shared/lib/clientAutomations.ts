@@ -531,7 +531,7 @@ export function consentCard(c: ApiConsent | null, locationRules: number, disable
   const { t } = i;
   if (!c) return { granted: false, title: t("Not recorded"), text: t("No location consent record exists for your account — location automations cannot be used."), tone: "muted" };
   if (c.granted) {
-    return { granted: true, title: t("Granted"), tone: "ok", text: t(locationRules === 1 ? "Granted {when} · used only by {n} location automation · demo location events (no real GPS history)." : "Granted {when} · used only by {n} location automations · demo location events (no real GPS history).", { when: showTime(c.grantedAt, i.display), n: locationRules }) };
+    return { granted: true, title: t("Granted"), tone: "ok", text: t(locationRules === 1 ? "Granted {when} · used only by {n} location automation · only home or away is kept, never your position." : "Granted {when} · used only by {n} location automations · only home or away is kept, never your position.", { when: showTime(c.grantedAt, i.display), n: locationRules }) };
   }
   if (disabledByConsent === 0 && c.revokedAt) { // a choice, not a fault: nothing was turned off (IR619)
     return { granted: false, title: t("Revoked"), tone: "muted", text: t("Withdrawn {when} · location automations cannot run until you grant it again. Manual control and schedules are unaffected.", { when: showTime(c.revokedAt, i.display) }) };
@@ -539,5 +539,5 @@ export function consentCard(c: ApiConsent | null, locationRules: number, disable
   if (c.revokedAt) {
     return { granted: false, title: t("Revoked"), tone: "warn", text: t(disabledByConsent === 1 ? "Withdrawn {when} · {n} location automation was turned off and will not run. Granting consent again does NOT turn them back on automatically — you re-enable each one. Manual control is unaffected." : "Withdrawn {when} · {n} location automations were turned off and will not run. Granting consent again does NOT turn them back on automatically — you re-enable each one. Manual control is unaffected.", { when: showTime(c.revokedAt, i.display), n: disabledByConsent }) };
   }
-  return { granted: false, title: t("Not granted"), tone: "muted", text: t("Location automations need your consent. It is used only for arrival/departure automations — demo location events, no real GPS history.") };
+  return { granted: false, title: t("Not granted"), tone: "muted", text: t("Location automations need your consent. It is used only for arrival/departure automations: your device’s location is compared with the map pins of your homes and offices, and only home or away is kept.") };
 }

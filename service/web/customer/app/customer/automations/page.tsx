@@ -59,6 +59,7 @@ export default async function CustomerAutomationsPage({ searchParams }: Readonly
     consent: consent ? { version: consent.version, ...consentCard(consent, location.length, location.filter((r) => r.disabledReason === "consent_revoked").length, i) } : { version: null, ...consentCard(null, 0, 0, i) },
     nextRuns: Object.fromEntries(nextRuns),
     preset: presetIds.filter((id) => ac.has(id)),
+    places: Object.fromEntries(propertyName), // the away/home switch names the home it saw you arrive at (DEC-109)
   };
   return <AutomationsView live={live} />;
 }

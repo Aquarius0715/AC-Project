@@ -2,7 +2,7 @@
 const BORDER_LINE_BG_SURFACE = "border-line bg-surface";
 const CREATE_AUTOMATION = "Create automation";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useEffectEvent, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Badge, Banner, Btn, Card, Choice, cx, EmptyState, Field, Input, Modal, Page, PageHead, Select, Toggle, Plain } from "@ac/web/components/ui";
 import { useAction } from "@ac/web/lib/useAction";
 import { useOp } from "@ac/web/lib/useOp";
@@ -14,7 +14,8 @@ import {
 } from "@ac/web/lib/clientAutomations";
 import { useI18n, useT } from "@ac/web/components/I18n";
 import type { T } from "@ac/web/lib/i18n";
-import { deleteAutomation, saveAutomation, testEvent, updateConsent } from "../actions";
+import { deleteAutomation, reportPresence, saveAutomation, testEvent, updateConsent } from "../actions";
+import { presenceStored, presenceText, shouldReport, storePresence, subscribePresence, type Fix } from "@ac/web/lib/presence";
 import { Icon } from "@ac/web/components/Icon";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@ac/web/components/ui/dropdown-menu";
 import { Button } from "@ac/web/components/ui/button";
@@ -30,6 +31,8 @@ export interface AutomationsLive {
   consent: { version: number | null; granted: boolean; title: string; text: string; tone: "ok" | "warn" | "muted" }; nextRuns: Record<string, string | null>;
   /** the ACs of a new after-hours rule opened from the Running list (IR811); empty otherwise */
   preset: string[];
+  /** the customer's property names by id, for the away/home switch's line (DEC-109) */
+  places: Record<string, string>;
 }
 interface Notice { title: string; text: string }
 
@@ -76,7 +79,46 @@ function ConsentCard({ live, compact }: Readonly<{ live: AutomationsLive; compac
         <div className="flex flex-wrap items-center gap-2 text-[13px]"><b className="inline-flex items-center gap-1.5">{!compact && <Icon name="location" />}{t(compact ? "Location consent" : "Location consent — for arrival/departure automations only")}</b>{badge}</div>
         {action}
       </div>
-      <p className="mt-1.5 text-xs text-muted-foreground">{compact ? t("Required for this automation. Used only for arrival/departure automations; phase 1A uses predefined demo events — no real GPS history is collected.") : c.text}</p>
+      <p className="mt-1.5 text-xs text-muted-foreground">{compact ? t("Required for this automation. Used only for arrival/departure automations: your device’s location is compared with the map pin of your home or office, and only home or away is kept.") : c.text}</p>
+      {!compact && c.granted && <PresenceSwitch places={live.places} />}
+    </div>
+  );
+}
+
+/** "Use this device's location" (DEC-109, IR826): while this page is open and the switch is on, the browser's position is
+reported when it moved 50 m or every 5 minutes; the Core API keeps only home or away. A browser does not report in the
+background, so the line says so. The choice is this device's. */
+function PresenceSwitch({ places }: Readonly<{ places: Record<string, string> }>) {
+  const t = useT();
+  const on = useSyncExternalStore(subscribePresence, presenceStored, () => false); // the browser's choice; off on the server
+  const [line, setLine] = useState<string | null>(null);
+  const report = useEffectEvent((fix: Fix) => {
+    void reportPresence({ latitude: fix.latitude, longitude: fix.longitude, accuracyMeters: fix.accuracyMeters }).then((r) => {
+      if (!r.ok) { setLine(t("This device’s location could not be sent — the next one is tried in a moment.")); return; }
+      setLine(r.value ? presenceText(r.value, new Map(Object.entries(places)), t) ?? t("Location sent · nothing changed.") : t("Location sent · nothing changed."));
+    });
+  });
+  const unavailable = useEffectEvent(() => { setLine(t("This browser did not share its location — allow it for this site, or switch this off.")); });
+  useEffect(() => {
+    let last: Fix | null = null;
+    const watch = on && "geolocation" in navigator ? navigator.geolocation.watchPosition(
+      (p) => {
+        const fix = { latitude: p.coords.latitude, longitude: p.coords.longitude, accuracyMeters: p.coords.accuracy, at: Date.now() };
+        if (!shouldReport(last, fix)) return;
+        last = fix;
+        report(fix);
+      },
+      () => { unavailable(); },
+      { enableHighAccuracy: true, maximumAge: 60_000, timeout: 30_000 },
+    ) : null;
+    return () => { if (watch !== null) navigator.geolocation.clearWatch(watch); };
+  }, [on]);
+  const flip = (next: boolean) => { storePresence(next); setLine(null); };
+  return (
+    <div className="mt-3 flex flex-col gap-1 border-t pt-3">
+      <div className="flex items-center gap-2 text-[13px]"><Toggle on={on} onChange={flip} label={t("Use this device’s location")} /><span>{t("Use this device’s location")}</span></div>
+      <p className="text-xs text-muted-foreground">{t("While this page is open, your position is compared with the map pins of your homes and offices; only home or away is kept. A browser does not report in the background.")}</p>
+      {on && line && <p className="text-xs" role="status">{line}</p>}
     </div>
   );
 }
