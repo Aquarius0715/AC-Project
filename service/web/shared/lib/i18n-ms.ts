@@ -1171,6 +1171,7 @@ export const ms: Record<string, string> = {
   "Undo": "Buat asal",
   "Switch off after hours": "Matikan selepas waktu kerja",
   "Turn these off automatically every weekday…": "Matikan ini secara automatik setiap hari bekerja…",
+  "Showing the AC that used the most in this period · up to 4 units": "Menunjukkan AC yang paling banyak menggunakan tenaga dalam tempoh ini · sehingga 4 unit",
   "Group change finished — results are shown per AC": "Perubahan kumpulan selesai — keputusan dipaparkan bagi setiap AC",
   "{n} selected": "{n} dipilih",
   "Select all online ({n})": "Pilih semua dalam talian ({n})",

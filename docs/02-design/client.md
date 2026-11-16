@@ -267,6 +267,7 @@ Scope: FR-C06 / Main display pattern: **UI-ANALYSIS**. Service boundary: `energy
 3. Changing conditions updates the URL and Query key. This screen only displays data; it does not change contract tariffs or emission factors.
 4. Queries to update: `energy (only when search conditions change)`.
 5. Highest use (IR803). Below the daily chart, "Highest use in this period" ranks the customer's ACs by measured energy. The page runs one `energy.summary` per unit for the period and keeps the five highest; units without measured energy are left out. Each row gives kWh, its share of the measured total and its data coverage, which reads as a warning under 80%. Show opens that AC in the charts above, and Compare adds it to the selection (up to four). The card shows only when two or more ACs have measured energy.
+6. Default AC (IR815). With no AC in the URL, the page opens on the period's highest-use AC from the same ranking, instead of the first by name, and the Units row says so. A link or a choice that names ACs is kept as it is.
 
 **Boundary cases and failures**: A 100kWh baseline, 80kWh actual use, and 0.5MYR unit price produce 10MYR savings. Do not show a reduction rate for baseline 0. For actual use 120kWh, the DTO has reduction -20kWh and reduction rate -20; display “Increase 20.0 kWh” and “Increase 20.0%” (IR68/IR80). Show missing data with coverage.
 

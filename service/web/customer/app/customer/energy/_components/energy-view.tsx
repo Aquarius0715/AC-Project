@@ -17,7 +17,9 @@ import { DateTimeSelect } from "@ac/web/components/TimeSelect";
 export interface EnergyLive {
   units: { id: string; name: string }[]; unitIds: string[]; period: Period; baselines: { id: string; label: string }[]; baselineId: string | null;
   summary: SummaryView | null; raw?: { kWh: number | null; baseline: number | null; tariff: string; factor: string | null; coverage: number | null };
-  daily: { label: string; actual: number | null; baseline: number | null }[]; top: UseRow[]; compare: { rows: CompareRow[]; series: number[][] | null } | null;
+  daily: { label: string; actual: number | null; baseline: number | null }[]; top: UseRow[];
+  /** the page opened on the period's highest-use AC, as none was chosen (IR815) */
+  isTopDefault: boolean; compare: { rows: CompareRow[]; series: number[][] | null } | null;
   properties: { id: string; name: string }[]; prefs: { locale: string; timezone: string; monthlyReportEmail: boolean } | null; lastMonth: string; query: string; error?: string;
 }
 const colors = ["#005bea", "#f59e0b", "#10b981", "#8b5cf6"];
@@ -111,7 +113,7 @@ export function EnergyView({ live }: Readonly<{ live: EnergyLive }>) {
               <option value="">{t("Add a unit to compare")}</option>{live.units.filter((u) => !live.unitIds.includes(u.id)).map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
             </Select>
           )}
-          <span className="text-[11px] text-muted-foreground">{t("up to 4 units")}</span>
+          <span className="text-[11px] text-muted-foreground">{t(live.isTopDefault ? "Showing the AC that used the most in this period · up to 4 units" : "up to 4 units")}</span>
         </div>
       </Card>
       {live.error && <Banner tone="warn">{live.error}</Banner>}
