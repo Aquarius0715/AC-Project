@@ -5554,6 +5554,7 @@ export const ms: Record<string, string> = {
   "exception until {time}": "pengecualian hingga {time}",
   "{state} — as this entry recorded it": "{state} — seperti direkodkan oleh entri ini",
   "version {from} → {to}": "versi {from} → {to}",
+  "This entry": "Entri ini",
   "Correlation trace": "Jejak korelasi",
   "Pending is shown on its own; the final result is a new entry with the same correlation ID. Earlier entries are never edited.": "Belum selesai ditunjukkan tersendiri; keputusan akhir ialah entri baharu dengan ID korelasi yang sama. Entri terdahulu tidak pernah disunting.",
   "Load more": "Muat lagi",
