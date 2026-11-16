@@ -135,7 +135,7 @@ function JobDetail({ d, open, onDone, onFail }: Readonly<{ d: Detail; open: (m: 
   const status = j.slotProposal?.status === "pending" ? "time_proposed" : j.status;
   const isClosed = j.status === "completed" || j.status === "cancelled";
   return (
-    <Card title={j.id.slice(0, 8)} sub={`${d.unit.name} — ${j.origin === "periodic_plan" ? t("periodic inspection") : j.symptom.slice(0, 48)}`} className="self-start"
+    <Card title={d.unit.name} sub={`${j.origin === "periodic_plan" ? t("periodic inspection") : j.symptom.slice(0, 48)} · ${j.id.slice(0, 8)}`} className="self-start"
       action={<div className="flex items-center gap-2"><JobStatusBadge s={status} client /><Link href="/customer/maintenance" aria-label={t("Close")} className="rounded px-2 text-muted-foreground hover:bg-surface2"><Icon name="close" /></Link></div>}>
       <SummaryList items={d.facts} />
       {d.preferred.length > 0 && (
