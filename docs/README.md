@@ -100,13 +100,8 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
-0.642.0 (2026-11-16): IR798: on the Running list an owner turns the running ACs off at once, unticking those that should keep running.
-0.645.0 (2026-11-16): IR802: one automation can switch several ACs (Also apply to other ACs, All ACs in a property), offering only the actions all of them take.
-0.647.0 (2026-11-16): IR804: the customer's command history says whether you or someone else sent each command.
-0.649.0 (2026-11-16): IR806: waiting for the AC to confirm a command counts down the seconds it has left.
-0.651.0 (2026-11-16): IR808: a cooling setpoint below 22 °C gets a hint that a lower setting only uses more power.
-0.655.0 (2026-11-16): IR812: a demo alert's evidence names its metric and comparison in words (Heartbeat gap at or above its alert threshold).
 0.656.0 (2026-11-16): IR813: an alert's Book cleaning opens Filter care on that AC.
+0.655.0 (2026-11-16): IR812: a demo alert's evidence names its metric and comparison in words (Heartbeat gap at or above its alert threshold).
 0.654.0 (2026-11-16): IR811: from Turn off running ACs, one link opens an after-hours rule with the same ACs.
 0.653.0 (2026-11-16): IR810: after a confirmed change, the customer unit page offers Undo, which puts back the previous confirmed setting.
 0.652.0 (2026-11-16): IR809: the customer unit page refreshes every 30 s while open (paused while editing), so others' changes appear.
