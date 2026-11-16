@@ -1,6 +1,7 @@
 "use client";
 const DEMO_REVIEWED = "demo_reviewed";
 
+import { byName } from "@ac/web/lib/text";
 import { useState } from "react";
 import { Badge, Banner, Btn, Card, Check, DemoBadge, EmptyState, Field, Input, ListRow, Modal, Page, Select, SummaryList, Tabs, Textarea, Timeline } from "@ac/web/components/ui";
 import { useI18n, useT } from "@ac/web/components/I18n";
@@ -103,7 +104,7 @@ function Reports({ live, r }: Readonly<{ live: MRVLive; r: NonNullable<MRVLive["
   return (
     <>
       <div className="flex flex-wrap items-end gap-3">
-        <Field label={t("Customer")}><Select value={r.scope.organizationId ?? ""} onChange={(e) => { nav({ organizationId: e.target.value || null, unitId: null, reportId: null, reportVersion: null }); }}><option value="">{t("All customers")}</option>{live.orgs.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}</Select></Field>
+        <Field label={t("Customer")}><Select value={r.scope.organizationId ?? ""} onChange={(e) => { nav({ organizationId: e.target.value || null, unitId: null, reportId: null, reportVersion: null }); }}><option value="">{t("All customers")}</option>{live.orgs.toSorted(byName).map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}</Select></Field>
         <Field label={t("Unit")}><Select value={r.scope.unitId ?? ""} onChange={(e) => { nav({ unitId: e.target.value || null, reportId: null, reportVersion: null }); }}><option value="">{t("All units")}</option>{scopeUnits.map((u) => <option key={u.id} value={u.id}>{u.label}</option>)}</Select></Field>
         <Field label={t("Status")}><Select value={r.scope.status ?? ""} onChange={(e) => { nav({ status: e.target.value || null, reportId: null, reportVersion: null }); }}><option value="">{t("All")}</option><option value="draft">{t("Draft")}</option><option value="demo_reviewed">{t("Demo reviewed")}</option></Select></Field>
         <Field label={t("Period starts from (Kuala Lumpur)")}><DateTimeSelect value={from} onChange={(v) => { setFrom(v); }} /></Field>
@@ -138,7 +139,7 @@ function Reports({ live, r }: Readonly<{ live: MRVLive; r: NonNullable<MRVLive["
       <Modal open={!!draft} onClose={() => { setDraft(null); }} title={t(draft?.id ? "New report version" : "New Scope 2 report")} wide footer={<><Btn onClick={() => { setDraft(null); }}>{t("Cancel")}</Btn><Btn disabled={pending} onClick={doPreview}>{t("Preview")}</Btn><Btn variant="primary" disabled={pending || !preview} onClick={doSave}>{t("Save draft")}</Btn></>}>
         {d && <>
           <div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>
-            <Field label={t("Customer organization")} error={tried ? errors.organizationId : undefined}><Select value={d.organizationId} onChange={(e) => { setD({ organizationId: e.target.value, unitIds: [] }); }}><option value="">{t("Select…")}</option>{live.orgs.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}</Select></Field>
+            <Field label={t("Customer organization")} error={tried ? errors.organizationId : undefined}><Select value={d.organizationId} onChange={(e) => { setD({ organizationId: e.target.value, unitIds: [] }); }}><option value="">{t("Select…")}</option>{live.orgs.toSorted(byName).map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}</Select></Field>
             <Field label={t("Start (Kuala Lumpur)")} error={tried ? errors.period : undefined}><DateTimeSelect value={d.from} onChange={(v) => { setD({ from: v }); }} /></Field>
             <Field label={t("End")}><DateTimeSelect value={d.to} onChange={(v) => { setD({ to: v }); }} /></Field>
             <Field label={t("Baseline version")} error={tried ? errors.baseline : undefined}><Select value={d.baseline} onChange={(e) => { setD({ baseline: e.target.value }); }}><option value="">{t("Select…")}</option>{live.baselines.map((b) => <option key={b.id} value={versionKey(b.id, b.version)}>{b.id.slice(0, 8)} v{b.version} · {b.value} · {b.units}</option>)}</Select></Field>

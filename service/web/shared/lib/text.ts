@@ -32,3 +32,6 @@ export const withoutYear = (text: string): string => (/^\d{4}$/.test(text.slice(
 
 /** The text with its first letter upper-cased, for a word used as a label ("in progress" → "In progress"); scripts without case stay as they are. */
 export const upperFirst = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1);
+
+/** Name order for scope options (customers, properties) — the order every HQ scope select uses (UI/UX loop R128). */
+export const byName = <T extends { name: string }>(a: T, b: T) => a.name.localeCompare(b.name);
