@@ -171,6 +171,7 @@ export const ms: Record<string, string> = {
 
   // the customer's unit screen
   "Not sent: {reason}": "Tidak dihantar: {reason}",
+  "{result}. The AC keeps its confirmed setting; check it and send again.": "{result}. AC kekal pada tetapan yang disahkan; semak dan hantar semula.",
   "{unit}: sent — its answer could not be read. Refresh to see the AC's state before sending again.": "{unit}: dihantar — jawapannya tidak dapat dibaca. Muat semula untuk melihat keadaan AC sebelum menghantar lagi.",
   "Sent — its answer could not be read. Refresh to see the AC's state.": "Dihantar — jawapannya tidak dapat dibaca. Muat semula untuk melihat keadaan AC.",
   "Not sent": "Tidak dihantar",

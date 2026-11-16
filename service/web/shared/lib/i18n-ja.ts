@@ -155,6 +155,7 @@ export const ja: Record<string, string> = {
   "Mid": "中",
   "High": "強",
   "Not sent: {reason}": "送信できませんでした: {reason}",
+  "{result}. The AC keeps its confirmed setting; check it and send again.": "{result}。エアコンは確定済みの設定のままです。確認してからもう一度送ってください。",
   "{unit}: sent — its answer could not be read. Refresh to see the AC's state before sending again.": "{unit}: 送信しましたが、応答を読み取れませんでした。もう一度送る前に、更新してエアコンの状態を確認してください。",
   "Sent — its answer could not be read. Refresh to see the AC's state.": "送信しましたが、応答を読み取れませんでした。更新してエアコンの状態を確認してください。",
   "Not sent": "送信できませんでした",
