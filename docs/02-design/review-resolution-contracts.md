@@ -10634,3 +10634,12 @@ Found in the UI/UX loop (UX-55, criterion 12: notice the settings worth reviewin
 1. **Hint.** `coolingHint(mode, celsius)` (shared/lib/units.ts) returns a sentence when the mode is Cool and the setpoint is below 22 °C. The sentence: "{celsius}°C is very cold for cooling: a lower setting does not cool the room faster, it runs longer and uses more power. 24–26°C is a common comfortable range." It returns null otherwise.
 2. **Where.** The customer unit page shows it under the temperature row, in warning colour with an info icon, while the user picks the value. It blocks nothing.
 3. **Tests.** `units.test.ts` covers cooling at 18 and 22 °C and the other modes.
+
+## IR810 Undo the last change of an AC — 2026-11-16
+
+Found in the UI/UX loop (UX-57, criterion 14: undo of the last operation). A change sent by mistake had to be put back by hand: remember the old values, set them, review and send again.
+
+1. **What is undone.** `undoActions(actions, before)` (shared/lib/units.ts) maps each sent setting back to the confirmed value it replaced. That value comes from the observed state read before the send, and the commands keep the order of the send. Power, temperature, mode and fan are covered. A setting without a confirmed value before, or one that did not change, is left out.
+2. **Where.** On the customer unit page, when every command of a send is acknowledged, the result banner shows Undo beside Dismiss. Undo sends those commands through the same path as any send: own idempotency key, version check, waiting with the countdown, and a result. The user's click is the confirmation, since the commands restore what was confirmed a moment before. The undo itself offers no further Undo, and a send that failed part-way offers none.
+3. **Tests.** `units.test.ts` covers a temperature and fan send undone in order, a power send undone, and settings with no confirmed value before (nothing to undo).
+4. **Not checked live.** The mock fleet did not acknowledge commands on the dev stack (scenario clock), so the banner's Undo was not seen in the browser. Real devices were not used.

@@ -7,7 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Badge, Banner, Btn, Card, Check, ConnBadge, EmptyState, LinkButton, Modal, Page, PowerBadge, Stat, SummaryList, Toggle, cx, useToast, Choice } from "@ac/web/components/ui";
 import { units, unitRowFromApi, type UnitRow } from "@ac/web/lib/client";
 import { OpError } from "@ac/web/lib/ops";
-import { answerSeconds, controlLayout, coolingHint, FAN_LABEL, historyRow, latest, MODE_LABEL, type ApiCommand, type ApiUnitDetail, type UnitAction } from "@ac/web/lib/units";
+import { answerSeconds, controlLayout, coolingHint, undoActions, FAN_LABEL, historyRow, latest, MODE_LABEL, type ApiCommand, type ApiUnitDetail, type UnitAction } from "@ac/web/lib/units";
 import { followCommand } from "@ac/web/lib/unitCommands";
 import { byCount, showRecent, showTime, textOf } from "@ac/web/lib/i18n";
 import { useDisplay, useT } from "@ac/web/components/I18n";
@@ -115,7 +115,8 @@ function plannedChanges({ d, edited, setpoint, mode, fan, isShowMode, isShowFan 
 }
 
 /** what the last send came to: the command history line, and whether the AC took it */
-interface Outcome { text: string; isOk: boolean }
+/** undo: the commands that put back the last send (IR810), offered once it was fully confirmed */
+interface Outcome { text: string; isOk: boolean; undo?: UnitAction[] }
 
 /** Waiting for the device, with the seconds it has left (IR806): "fails after 30 s" with nothing moving read as a hang,
 and the countdown shows it is still in time. It counts on the browser's clock from the moment it appears, as the
@@ -140,7 +141,7 @@ interface RemoteControlProps {
   /** the command being waited for and how long the device has to answer it, for the countdown (IR806) */
   waitFor?: { id: string; seconds: number } | null;
   /** the result of the last send, kept next to the controls until the next send or dismiss (a toast alone goes away) */
-  outcome: Outcome | null; onDismissOutcome: () => void;
+  outcome: Outcome | null; onDismissOutcome: () => void; onUndo: (undo: UnitAction[]) => void;
   /** the modes and fan levels the model offers; an empty list hides the choice */
   modes: readonly (ControlMode)[]; mode: ControlMode; fans: readonly (FanLevel)[]; fan: FanLevel;
   /** the changes to review before sending; null for a model that sends the power at once (Figma 02o) */
@@ -183,7 +184,7 @@ function RemoteControlCard(p: Readonly<RemoteControlProps>) {
         )}
         {waiting && (waitFor ? <WaitBanner key={waitFor.id} seconds={waitFor.seconds} /> : <Banner>{t("Waiting for device response… The result is shown only after the device acknowledges (fails after 30 s).")}</Banner>)}
         {!waiting && outcome && (
-          <Banner tone={outcome.isOk ? "ok" : "warn"} action={<Btn size="sm" variant="ghost" onClick={p.onDismissOutcome}>{t("Dismiss")}</Btn>}>
+          <Banner tone={outcome.isOk ? "ok" : "warn"} action={<span className="flex gap-2">{outcome.undo && outcome.undo.length > 0 && <Btn size="sm" onClick={() => { if (outcome.undo) p.onUndo(outcome.undo); }}><Icon name="undo" />{t("Undo")}</Btn>}<Btn size="sm" variant="ghost" onClick={p.onDismissOutcome}>{t("Dismiss")}</Btn></span>}>
             {outcome.text}
           </Banner>
         )}
@@ -342,13 +343,18 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
     setOutcome({ text: isOk ? text : t("{result}. The AC keeps its confirmed setting; check it and send again.", { result: text }), isOk });
     return isOk;
   };
-  const sendApi = async (actions: UnitAction[]) => {
+  // isUndo: the send puts back the previous one, so it offers no Undo of its own
+  const sendApi = async (actions: UnitAction[], isUndo = false) => {
     setWaiting(true);
     setOutcome(null);
+    const before = d?.observedState ?? null; // the confirmed setting the send replaces (IR810)
     try {
+      let isAllOk = true;
       for (const a of actions) {
-        if (!(await sendOne(a))) break;
+        if (!(await sendOne(a))) { isAllOk = false; break; }
       }
+      const undo = isAllOk && !isUndo && before ? undoActions(actions, before) : [];
+      if (undo.length > 0) setOutcome((o) => (o ? { ...o, undo } : o));
     } catch (error) {
       fail(error);
       setOutcome({ text: notSentText(error), isOk: false });
@@ -413,7 +419,7 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
             isOn={isOn} isPowerUnknown={isPowerUnknown} isDisabled={isDisabled} isOffline={isOffline} waiting={waiting} waitFor={waitFor} isPowerOff={policy?.kind === "power_off"}
             modes={isShowMode ? modes : []} mode={mode} fans={isShowFan ? fans : []} fan={fan}
             review={layout.review ? { count: changeCount, summary: d ? changes().map((item) => changeText(item)).join(" · ") || t("No change yet") : t(SET_TEMPERATURE_FROM_C_TO_C, { from: 26, to: setpoint }), target: unit.name, canSend: d === null || changes().length > 0 } : null}
-            outcome={outcome} onDismissOutcome={() => { setOutcome(null); }}
+            outcome={outcome} onDismissOutcome={() => { setOutcome(null); }} onUndo={(undo) => { void sendApi(undo, true); }}
             repairHref={`/customer/maintenance?new=${d?.id ?? unit.id}`}
             onPower={setPowerAsk} onStep={(delta) => { setSetpoint((x) => x + delta); setEdited((e) => ({ ...e, temp: true })); }}
             onMode={(m) => { setMode(m); setEdited((e) => ({ ...e, mode: true })); }} onFan={(f) => { setFan(f); setEdited((e) => ({ ...e, fan: true })); }} onReview={() => { setConfirm(true); }}
