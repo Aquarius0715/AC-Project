@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { translator } from "@ac/web/lib/i18n";
 import { unitDetail } from "./unitFixture";
-import { actionText, answerSeconds, controlLayout, historyRow, latest, setsTemperature, type ApiCommand, type ApiUnitDetail } from "@ac/web/lib/units";
+import { actionText, answerSeconds, controlLayout, coolingHint, historyRow, latest, setsTemperature, type ApiCommand, type ApiUnitDetail } from "@ac/web/lib/units";
 
 const TEMPERATURE = "temperature";
 
@@ -92,5 +92,13 @@ describe("answer window", () => {
       answerSeconds({ requestedAt: "2026-09-22T13:31:40Z", expiresAt: "2026-09-22T13:31:40Z" }),
       answerSeconds({ requestedAt: "bad", expiresAt: "2026-09-22T13:31:40Z" }),
     ]).toStrictEqual([30, 120, 30, 30, 30]);
+  });
+});
+
+// IR808: a very low cooling setpoint gets a hint; other modes and 22 °C and above do not
+describe("cooling hint", () => {
+  it("speaks only for cooling below 22 °C", () => {
+    expect([coolingHint("cool", 18), coolingHint("cool", 22), coolingHint("dry", 18), coolingHint("fan", 16)].map((h) => h?.slice(0, 33) ?? null))
+      .toStrictEqual(["18°C is very cold for cooling: a ", null, null, null]);
   });
 });
