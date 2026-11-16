@@ -10606,3 +10606,11 @@ Found in the UI/UX loop (UX-49, scheduled operation: "switch Office A off at 19:
 3. **Texts.** Step 3 reads "Action for {n} ACs". The list header drops "each rule controls one AC". The card still names the first AC "(+n more ACs)".
 4. **Tests.** `clientAutomations.test.ts`: the common actions of a wide and a narrow AC (power, the shared temperatures, cool), one AC equal to its own options, none for no AC or an AC without capabilities.
 5. **Checked on the dev stack.** A rule for Lobby AC and Meeting room AC (Office A) was saved, listed as "(+1 more AC)", reopened with both, then deleted.
+
+## IR805 A narrow list card names each value — 2026-11-16
+
+Found in the UI/UX loop (UX-52, a contractor coordinator on a phone). Below a breakpoint, the partner Jobs list and the customer Overview's unit list hide their column headings. Each row becomes a card, and the values stand without them. The partner card read "—  history only / —  access closed". The customer row read "— no data" three times, with no sign of which was temperature, humidity or power.
+
+1. **Partner Jobs list.** Below `@3xl`, the Technician and Slot / deadline values carry their heading above them, the same words as the hidden column headings.
+2. **Customer Overview.** Below `lg`, the three readings carry Room temp, Humidity and Power now.
+3. **Wide screens** are unchanged: the labels hide where the headings show. These were the only two lists of the four apps that hide headings this way (searched for `hidden grid-cols-[` headings).
