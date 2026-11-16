@@ -89,6 +89,7 @@ Scope: FR-C01 / Main display pattern: **UI-OVERVIEW**. Service boundary: `units.
 3. Viewing does not change business state. Keep filters in the URL and restore them on Back.
    - As built (IR816): on a phone (below `sm`), the most severe open warning or fault is a banner under the overdue notice, with its unit and time, “+n more” and View alerts. On a phone the Needs attention tile is the fourth card, two screens down. Wider screens keep the tile in the first row and show no banner.
 4. Queries to update: `units / telemetry / alerts (only on subscribed events)`.
+   - As built (IR814): ACs pinned on their own pages (“Pin to Overview”, kept in this browser) appear first as “Pinned ACs” with place, room temperature and power and connection badges, each with Unpin.
 
 **Boundary cases and failures**: If one unit cannot be measured, count it as unknown rather than normal. Do not include another customer's unit in summaries even if its ID is supplied as a filter.
 
