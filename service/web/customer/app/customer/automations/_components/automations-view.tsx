@@ -227,6 +227,10 @@ function Editor({ live, onDone, onCancel }: Readonly<{ live: AutomationsLive; on
   };
   // the action in two parts, each under its own label: the Setting (power, temperature, mode, fan, ventilation) and its
   // Value — side by side when the box is wide enough, stacked on a narrow screen
+  const settingPrompt = (value: string) => {
+    if (!draft.unitId) return t("Choose the target AC first");
+    return !value || supported(value) ? t("Choose a setting") : t("{action} (not supported)", { action: actionLabel(actionOf(value), t) });
+  };
   const actionSelect = (label: string, key: "startAction" | "endAction" | "action", hint?: string) => {
     const value = draft[key];
     const group = options.find((g) => g.id === actionGroupOf(value));
@@ -241,8 +245,9 @@ function Editor({ live, onDone, onCancel }: Readonly<{ live: AutomationsLive; on
       <Field label={t("Action")} labelHidden hint={hint} error={lookup(errors, key) ?? (shown ? unsupported(value) : undefined)}>
         <div className="@container"><div className="grid grid-cols-1 items-start gap-3 @[22rem]:grid-cols-[minmax(120px,170px)_minmax(0,1fr)]">
           {part(t("Setting"), (
-            <Select aria-label={t("{label} — setting", { label })} value={group?.id ?? ""} onChange={(e) => { pick(firstAction(options, e.target.value)); }}>
-              {!group && <option value="">{!value || supported(value) ? t("Choose a setting") : t("{action} (not supported)", { action: actionLabel(actionOf(value), t) })}</option>}
+            <Select aria-label={t("{label} — setting", { label })} value={group?.id ?? ""} disabled={!draft.unitId} onChange={(e) => { pick(firstAction(options, e.target.value)); }}>
+              {/* the settings follow the AC's model: none is offered, nor called unsupported, before the AC is chosen (UI/UX loop R79) */}
+              {!group && <option value="">{settingPrompt(value)}</option>}
               {options.map((g) => <option key={g.id} value={g.id}>{g.group}</option>)}
             </Select>
           ))}
