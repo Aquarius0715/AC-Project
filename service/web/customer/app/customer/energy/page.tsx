@@ -31,9 +31,16 @@ export default async function CustomerEnergyPage({ searchParams }: Readonly<Page
   ]);
   const i = i18nOf(display);
   const own = units.map((u) => ({ id: u.id, name: u.displayName })).toSorted((a, b) => a.name.localeCompare(b.name));
-  const unitIds = pickUnits(units, one("unitIds"));
   const kind = periodKinds.find((k) => k === one("period")) ?? "7d";
   const period = periodRange(kind, now, { from: one("from"), to: one("to") }, i);
+  const sum = (u: string[], from: string, to: string, b?: string) => coreOp<ApiEnergySummary>("energy.summary", { from, to, unitIds: u, ...(b && { baselineId: b }) });
+  // which AC used the most in the period (IR803): one summary per unit, alongside the others; a unit whose summary
+  // fails is only left out of the ranking
+  const ranking = period.error ? Promise.resolve([]) : Promise.all(own.map(async (u) => { const s = await orNull(sum([u.id], period.from, period.to)); return { unitId: u.id, name: u.name, kWh: s?.totals.kWh ?? null, coverage: s?.coverage ?? null }; }));
+  // with no AC chosen, the page opens on the one that used the most rather than the first by name (IR815)
+  const isChosen = (one("unitIds") ?? "").split(",").some((id) => units.some((u) => u.id === id));
+  const topId = isChosen ? null : topUsers(await ranking)[0]?.unitId ?? null;
+  const unitIds = topId ? [topId] : pickUnits(units, one("unitIds"));
   const options = baselinesFor(baselines, unitIds);
   const baseline = one("baselineId") === "none" ? undefined : options.find((b) => b.id === one("baselineId")) ?? options[0];
   const name = new Map(own.map((u) => [u.id, u.name]));
@@ -45,6 +52,7 @@ export default async function CustomerEnergyPage({ searchParams }: Readonly<Page
     daily: [],
     compare: null,
     top: [],
+    isTopDefault: topId !== null,
     query: selectionQuery({ unitIds, period: kind, from: one("from"), to: one("to"), baselineId: baseline?.id }),
     lastMonth: previousMonth(now),
     unitIds,
@@ -55,10 +63,6 @@ export default async function CustomerEnergyPage({ searchParams }: Readonly<Page
   if (unitIds.length > 0 && !period.error) {
     try {
       const days = dayRanges(period.from, period.to, display.locale);
-      const sum = (u: string[], from: string, to: string, b?: string) => coreOp<ApiEnergySummary>("energy.summary", { from, to, unitIds: u, ...(b && { baselineId: b }) });
-      // which AC used the most in the period (IR803): one summary per unit, alongside the others; a unit whose summary
-      // fails is only left out of the ranking
-      const ranking = Promise.all(own.map(async (u) => { const s = await orNull(sum([u.id], period.from, period.to)); return { unitId: u.id, name: u.name, kWh: s?.totals.kWh ?? null, coverage: s?.coverage ?? null }; }));
       const [total, perDay, each] = await Promise.all([sum(unitIds, period.from, period.to, baseline?.id), Promise.all(days.map((d) => sum(unitIds, d.from, d.to))), ranking]);
       const minutes = (Date.parse(period.to) - Date.parse(period.from)) / 60_000;
       // a comparable baseline is shown as an even daily share of its value (display only; savings come from the API)
