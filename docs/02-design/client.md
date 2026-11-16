@@ -528,7 +528,9 @@ Scope: FR-C14 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
    - As built (IR380): a command refused by the member's write limit (RATE_LIMITED, IR375) changed nothing, so it waits the advised seconds and is sent again, up to five times. Meanwhile its card shows Waiting with the seconds. Any other refusal shows the shared wording on the card.
 4. Queries to update: `units / commands`.
 
-**Boundary cases and failures**: Mixed spaces → VALIDATION before sending. A failure of one AC never rolls back others.
+5. Turn off running ACs (IR798): on the Running list (`powerState=on`, no connection filter, 2 or more ACs) an owner gets “Turn off running ACs…”. The same panel opens with Power Off as the only change and every online AC selected; each card also shows its place (property › floor › room), as the list spans properties. Review & turn off and the sending follow steps 2–3. The panel stays open after the list is re-read: ACs confirmed off are gone from it, and one line says how many were turned off; failed ones keep their card and Retry. “Back to the list” returns to the rows.
+
+**Boundary cases and failures**: Mixed spaces → VALIDATION before sending, except Turn off running ACs (power off only). A failure of one AC never rolls back others.
 
 **Verification**: Check the traceability entries under AT-C14 (N/E/B).
 
