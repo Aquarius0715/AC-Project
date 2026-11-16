@@ -113,6 +113,7 @@ Scope: FR-C02 / Main display pattern: **UI-LIST**. Service boundary: `properties
 1. Show the property list (with type and unit counts) and the selected property's floors/areas and rooms. Selecting a room lists every AC in it with power/connection badges; opening one goes to Unit Control. Unassigned units appear under the property with the note “placed by HQ” (IR62).
 2. The structure is read-only (IR109): no add, move, archive, or delete controls. ✎ / Rename opens a centered modal showing the location, its type, and the new name; saving calls `locations.rename`.
 3. After a rename, update tree and breadcrumbs; IDs and parents never change. For navigation from KPIs, show the unit list filtered by powerState/connections (IR50).
+   - As built (IR801): above the tree, “Find a room or AC…” searches by name. The URL key `search` lists the units whose name or place (property › floor › room) contains the text, case-insensitively, in the same filtered list as the KPI links. Each row has its state and Open control. Typing waits 300 ms before it asks. A tree row or Clear filter clears the search. With no match, the list says no room or AC name contains the text.
 4. Queries to update: `properties / spaces / units / customer summary`.
 
 **Boundary cases and failures**: Empty or 121-character names return VALIDATION with the input kept; a duplicate sibling name is CONFLICT `error.duplicateSiblingName` (IR208) and a stale version CONFLICT `error.versionConflict`, both keeping the input. Direct structural writes from a client session return FORBIDDEN.
@@ -151,6 +152,7 @@ Scope: FR-C03 / Main display pattern: **UI-DETAIL**. Service boundary: `units.ge
    - Disable new requests to a unit while a request for that unit is pending.
 3. Create one Command and show the requested value separately. Update confirmed settings only after the device returns acknowledged. Keep the request and reason in history even on failure.
    - As built (IR810): once every command of a send is acknowledged, its result banner offers Undo beside Dismiss. Undo sends, at once and without a second confirmation, the commands that put each changed setting back to the confirmed value it replaced. That value is the observed state before the send; a setting without one is left out. The undo itself offers no Undo, and a send that failed part-way offers none.
+   - As built (IR809): the unit page re-reads its data every 30 s while the tab is shown, so a change made by another user, an automation or the device appears without a reload. The header says “Updates every 30 s while this page is open”. Re-reading pauses (“Updates paused while you change settings”) while a setting is edited, a confirmation or the rename or attach dialog is open, or a command is awaited, because a newer report resets the controls.
    - As built (IR808): in Cool, a setpoint below 22 °C shows a hint under the temperature control, before Review & send. A lower setting does not cool the room faster; the AC runs longer and uses more power, and 24–26 °C is a common comfortable range. Nothing is blocked, and other modes show no hint. The outdoor temperature is not available to the web apps, so the hint uses the setpoint alone.
    - As built (IR806): while a command waits for the device, the banner counts down the seconds it has left. The count runs from its request to its expiry, 30 s when unknown, and on the browser's clock from the moment it appears. At zero it reads “No answer yet — checking the result…”. The sentence stays the same for screen readers, and only the seconds, which are not read out, change.
    - As built (IR804): a history row of a command sent by hand (`source` ui) ends “· by you” when the reader sent it (`actorMembershipId` is the reader's membership) and “· by someone else” otherwise. Several people share one customer account, and the AC that “changed by itself” was often changed by another of them. No name is shown. Automation, restriction and test-run commands keep their own source.
@@ -264,6 +266,7 @@ Scope: FR-C06 / Main display pattern: **UI-ANALYSIS**. Service boundary: `energy
    - Round money to the currency's decimal places only at the end.
 3. Changing conditions updates the URL and Query key. This screen only displays data; it does not change contract tariffs or emission factors.
 4. Queries to update: `energy (only when search conditions change)`.
+5. Highest use (IR803). Below the daily chart, "Highest use in this period" ranks the customer's ACs by measured energy. The page runs one `energy.summary` per unit for the period and keeps the five highest; units without measured energy are left out. Each row gives kWh, its share of the measured total and its data coverage, which reads as a warning under 80%. Show opens that AC in the charts above, and Compare adds it to the selection (up to four). The card shows only when two or more ACs have measured energy.
 
 **Boundary cases and failures**: A 100kWh baseline, 80kWh actual use, and 0.5MYR unit price produce 10MYR savings. Do not show a reduction rate for baseline 0. For actual use 120kWh, the DTO has reduction -20kWh and reduction rate -20; display “Increase 20.0 kWh” and “Increase 20.0%” (IR68/IR80). Show missing data with coverage.
 
@@ -339,6 +342,7 @@ Scope: FR-C08 / Main display pattern: **UI-LIST**. Service boundary: `alerts.lis
    - normal is a health notice, not an unresolved problem.
    - Use type to distinguish cleaning/replacement reminders from problem alerts.
 3. Save read time on Notification. Do not change Alert.status. Restore filters and page position when returning from another screen.
+   - As built (IR800): every unresolved alert names what to do, as a "What to do" line in its Needs attention row and a row of its detail. The step depends on the suspected cause: an open window says check the windows and doors, and turn the AC off if nobody is in the room. Then it depends on the type: tamper, or the restriction check (nothing to do). Last comes the kind: cleaning, air quality, inspection record or fault (request a repair). A resolved alert shows none. An air-quality alert also links to Air quality.
 4. Queries to update: `notifications / unread count`。
 
 **Boundary cases and failures**: Do not show zero alerts after a fetch failure. If the referenced unit is unavailable, show only “Unavailable” without details.
