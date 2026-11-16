@@ -330,6 +330,7 @@ Scope: FR-C08 / Main display pattern: **UI-LIST**. Service boundary: `alerts.lis
    - normal is a health notice, not an unresolved problem.
    - Use type to distinguish cleaning/replacement reminders from problem alerts.
 3. Save read time on Notification. Do not change Alert.status. Restore filters and page position when returning from another screen.
+   - As built (IR800): every unresolved alert names what to do, as a "What to do" line in its Needs attention row and a row of its detail. The step depends on the suspected cause: an open window says check the windows and doors, and turn the AC off if nobody is in the room. Then it depends on the type: tamper, or the restriction check (nothing to do). Last comes the kind: cleaning, air quality, inspection record or fault (request a repair). A resolved alert shows none. An air-quality alert also links to Air quality.
 4. Queries to update: `notifications / unread count`。
 
 **Boundary cases and failures**: Do not show zero alerts after a fetch failure. If the referenced unit is unavailable, show only “Unavailable” without details.
