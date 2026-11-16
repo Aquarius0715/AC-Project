@@ -13,6 +13,8 @@ import (
 )
 
 const (
+	eventID    = "evt_1"
+	invoiceID  = "inv-1"
 	testSecret = "whsec_test_only" //nolint:gosec // G101: a signing secret of a test fixture, not a credential
 	testBody   = `{"id":"evt_1","object":"event","api_version":"` + sdk.APIVersion +
 		`","type":"checkout.session.completed","data":{"object":{}},"livemode":false}`
@@ -42,7 +44,7 @@ func TestVerifyEventAcceptsValidSignature(t *testing.T) {
 		t.Fatalf("VerifyEvent: %v", err)
 	}
 
-	if event.ID != "evt_1" || event.Type != "checkout.session.completed" {
+	if event.ID != eventID || event.Type != "checkout.session.completed" {
 		t.Fatalf("event = %s %s, want evt_1 checkout.session.completed", event.ID, event.Type)
 	}
 }
@@ -65,7 +67,7 @@ func TestVerifyEventAcceptsAnotherAPIVersion(t *testing.T) {
 		t.Fatalf("VerifyEvent: %v", err)
 	}
 
-	if event.ID != "evt_1" {
+	if event.ID != eventID {
 		t.Fatalf("event = %s, want evt_1", event.ID)
 	}
 }
