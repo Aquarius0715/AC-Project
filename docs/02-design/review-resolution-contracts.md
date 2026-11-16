@@ -10742,3 +10742,11 @@ Found in the UI/UX loop (UX-59, HQ anomaly response; noted in UX-54). A policy r
    - All three are in the display language. An unknown metric or comparison keeps its stored form.
 2. **Shared names.** The metric names moved from adminAlerts.ts to `metricLabels.ts`. evidence.ts reads them there, because adminAlerts imports evidence. adminAlerts re-exports them, so nothing else changes.
 3. **Tests.** `evidence.test.ts` checks the Malay text for temperature and the English one for heartbeat_gap.
+
+## IR817 "Already signed in as another user" says what to do — 2026-11-16
+
+Found in the UI/UX loop (UX-66; seen in UX-54 and UX-63). Signing in to one app while this browser's identity-provider session belongs to another user ended on Keycloak's "You are already authenticated as different user 'customer-a' in this session. Please sign out first." It was a dead end, with no hint where to sign out.
+
+1. **Message.** The shared login theme `ac` overrides `differentUserAuthenticated` in en, ms, ja and id: "You are already signed in as {0} in this browser. To use another account here, sign out in the AC Project app you are signed in to (its menu, Sign out), then open this page again." "Sign out" uses each language's word from the apps (Log keluar, ログアウト, Keluar).
+2. **Scope.** This changes the text only. Keycloak's error template is not overridden, since it is tied to its version, so the page still has no button. The apps' own "Sign in with another account" (`prompt=login`) is unchanged.
+3. **Checked.** On the dev stack, with a partner session in the browser, HQ sign-in now shows the Japanese text. The theme is mounted read-only and needs no restart.
