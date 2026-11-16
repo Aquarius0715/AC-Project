@@ -1082,6 +1082,7 @@ export const ms: Record<string, string> = {
   "Rename {name}": "Namakan semula {name}",
   "{name} · {kind} in {property}": "{name} · {kind} di {property}",
   "seen {time}": "dilihat {time}",
+  "Open {name}’s control": "Buka kawalan {name}",
   "Open control": "Buka kawalan",
   "Power: {state}": "Kuasa: {state}",
   "Connection: {states}": "Sambungan: {states}",
