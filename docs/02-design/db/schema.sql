@@ -825,6 +825,17 @@ CREATE TABLE control.schedule_watermarks (       -- schedule automations evaluat
   evaluated_until timestamptz NOT NULL
 );
 
+CREATE TABLE control.presence_states (          -- DEC-109/IR826: a member's device inside a property's away/home radius; no position is kept
+  tenant_id     uuid NOT NULL,
+  membership_id uuid NOT NULL,                   -- the reporting client member (identity; consent location_automation)
+  property_id   uuid NOT NULL,                   -- assets.properties with a pin (read through Assets, no cross-schema FK)
+  inside        boolean NOT NULL,
+  changed_at    timestamptz NOT NULL,            -- when inside last changed
+  reported_at   timestamptz NOT NULL,            -- the last report that kept or changed it
+  PRIMARY KEY (tenant_id, membership_id, property_id)
+);
+CREATE INDEX presence_states_property ON control.presence_states (tenant_id, property_id) WHERE inside;
+
 -- ---------------------------------------------------------------------------------------------
 -- monitoring
 -- ---------------------------------------------------------------------------------------------

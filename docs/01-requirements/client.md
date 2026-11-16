@@ -1,6 +1,6 @@
 ---
 document_id: REQ-C
-version: 0.30.0
+version: 0.31.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -33,7 +33,7 @@ P0 means the core foundational flow. P1 is also required for completion in phase
 | FR-C02 | P0 | Company original SRC-06 + added design details / BIZ-07 | Location hierarchy (read-only) | View own properties, floors, rooms, and spaces read-only and navigate property→floor→room→unit; clearly show units with no space. Clients may only rename locations and units; HQ creates, moves, and deletes the structure (FR-A02). |
 | FR-C03 | P0 | Company original SRC-06 + added design details / BIZ-13 | Remote control | Change power, set temperature, supported modes, and fan speed. Show requested→sent→response or failure. Unsupported/offline devices do not succeed. |
 | FR-C04 | P1 | Company original SRC-06 + added design details / BIZ-14 | Schedules/pre-arrival cooling | Create/edit/disable weekday and time slots. View next execution and test results. |
-| FR-C05 | P1 | Company original SRC-06 + added design details / BIZ-14, BIZ-15, BIZ-17 | Automation with consent | Choose demo occupancy/location/routine/weather conditions. Withdrawing location consent stops location rules. |
+| FR-C05 | P1 | Company original SRC-06 + added design details / BIZ-14, BIZ-15, BIZ-17 | Automation with consent | Choose demo occupancy/location/routine/weather conditions (location: the device's own position against the property's pin while the page is open, DEC-109/IR826). Withdrawing location consent stops location rules. |
 | FR-C06 | P1 | Company original SRC-06 + added design details / BIZ-16, BIZ-23 | Power/cost comparison | Show kWh, estimated cost, baseline differences, and conditions by period/unit. Do not calculate savings percentage with a zero baseline. |
 | FR-C07 | P1 | Company original SRC-06 + added design details / BIZ-18, BIZ-19 | Air quality | Show CO₂ ppm, temperature/humidity, dust, units, values, and sources. Show ventilation guidance and let the user log a manual ventilation; no device command is sent. |
 | FR-C08 | P0 | Company original SRC-06 + added design details / BIZ-08, BIZ-09, BIZ-17 | Fault/inspection notifications | Show urgent/caution/normal clearly with text/icons. Link to unit/request screens. Reading a notification does not clear the alert. |

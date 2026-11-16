@@ -31,6 +31,7 @@ export type Organization = Entity & {name:string;kind:'customer'|'contractor'|'o
 export type Customer = Entity & {name:string;status:'active'|'inactive';organizationId:ID;serviceProfile:'rto'|'general'|'energy'|'environment'};
 export type GeoPoint = {latitude:number;longitude:number};
 export type CheckInPosition = GeoPoint & {accuracyMeters:number};
+export type PresenceResult = {transitions:{propertyId:ID;event:'arrival'|'departure';commandIds:ID[]}[]};
 export type Property = Entity & {customerOrgId:ID;kind:'home'|'office';name:string;address:string|null;accessInstructions:string|null;location:GeoPoint|null;geofenceRadiusMeters:number|null;archived:boolean};
 export type Space = Entity & {propertyId:ID;parentSpaceId:ID|null;kind:'area'|'floor'|'room'|'space';name:string;archived:boolean};
 export type Metric = 'temperature'|'humidity'|'co2'|'pm25'|'power'|'vibration'|'refrigerant_pressure'|'compressor_cycles'|'airflow_drop'|'heartbeat_gap';
@@ -396,6 +397,7 @@ export type OperationContracts = {
   'policies.save': {input:PolicyInput;result:Policy;mode:'write'};
   'preferences.get': {input:Record<string,never>;result:Preferences;mode:'read'};
   'preferences.update': {input:{locale:Locale;timezone:string;monthlyReportEmail?:boolean;pinnedUnitIds?:ID[]};result:Preferences;mode:'write'};
+  'presence.report': {input:{latitude:number;longitude:number;accuracyMeters:number};result:PresenceResult;mode:'write'};
   'properties.archive': {input:{id:ID;reason:string};result:ArchivedResource;mode:'write'};
   'properties.list': {input:Query;result:Page<Property>;mode:'read'};
   'properties.save': {input:{id?:ID;customerOrgId:ID;kind:'home'|'office';name:string;address:string|null;accessInstructions:string|null;location:GeoPoint|null;geofenceRadiusMeters:number|null};result:Property;mode:'write'};

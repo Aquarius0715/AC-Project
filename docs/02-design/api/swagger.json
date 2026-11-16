@@ -24496,6 +24496,113 @@
                 }
             }
         },
+        "/v1/presence": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Authorization: client:own-membership\nValidation: D01; input constraints in the corresponding DD; DEC-109 the member's location_automation consent (else CONFLICT); accuracy at most 100 m; only inside/outside per pinned property is kept\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-C05",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "presence"
+                ],
+                "summary": "presence.report (write)",
+                "operationId": "presence.report",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "D04: the same key replays the stored response; another body for the same key is CONFLICT",
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "input",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/control.PresenceInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ops.Envelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/control.PresenceResult"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "403": {
+                        "description": "FORBIDDEN",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "409": {
+                        "description": "CONFLICT / OFFLINE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "422": {
+                        "description": "VALIDATION (fieldErrors)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "429": {
+                        "description": "RATE_LIMITED (retryAfterSeconds)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "503": {
+                        "description": "UNAVAILABLE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "504": {
+                        "description": "TIMEOUT",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    }
+                }
+            }
+        },
         "/v1/properties": {
             "get": {
                 "security": [
@@ -32054,6 +32161,48 @@
                 },
                 "draft": {
                     "$ref": "#/definitions/control.ScheduleDraft"
+                }
+            }
+        },
+        "control.PresenceInput": {
+            "type": "object",
+            "properties": {
+                "accuracyMeters": {
+                    "type": "number"
+                },
+                "latitude": {
+                    "type": "number"
+                },
+                "longitude": {
+                    "type": "number"
+                }
+            }
+        },
+        "control.PresenceResult": {
+            "type": "object",
+            "properties": {
+                "transitions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/control.PresenceTransition"
+                    }
+                }
+            }
+        },
+        "control.PresenceTransition": {
+            "type": "object",
+            "properties": {
+                "commandIds": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "event": {
+                    "type": "string"
+                },
+                "propertyId": {
+                    "type": "string"
                 }
             }
         },
