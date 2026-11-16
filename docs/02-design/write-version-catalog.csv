@@ -124,6 +124,7 @@ payments.confirm,all,payment,invoices.get,required,none,D01; version mismatch CO
 payments.recordManual,all,invoice,invoices.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 payments.simulate,event=initiate|instructions,invoice,invoices.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 payments.simulate,event=processing|confirm|fail,payment,invoices.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+payments.startCheckout,all,invoice,invoices.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 payouts.generate,all,none,payouts.list,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 payouts.query,all,payout_statement,payouts.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 payouts.resolveQuery,all,payout_statement,payouts.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects

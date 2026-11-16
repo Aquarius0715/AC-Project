@@ -111,7 +111,10 @@ export type MaintenancePlan = Entity & {unitId:ID;recurrence:{kind:'monthly';int
 export type Contract = Entity & {activeRestrictionIds:ID[];hasUnresolvedRecovery:boolean;customerId:ID;customerOrgId:ID;unitIds:ID[];planType:'rto'|'general'|'energy'|'environment';startAt:Instant;endAt:Instant;priceMinor:number;currency:Currency;restrictionEligible:boolean;rulesVersion:ID|null};
 export type Invoice = Entity & Money & {number:string;contractId:ID;contractVersion:number;period:Range;dueAt:Instant;status:'unpaid'|'processing'|'paid';paymentMethod:PaymentMethod|null;paymentStatus:Payment['status']|null;paidAt:Instant|null};
 export type PaymentMethod = 'demo_credit_card'|'demo_debit_card';
-export type Payment = Entity & Money & {invoiceId:ID;method:PaymentMethod|null;status:'initiated'|'processing'|'confirmed'|'failed';paymentReference:string|null;confirmedAt:Instant|null;confirmationReason:string|null;eventIds:ID[]};
+/** channel: how the payment is taken (stripe_checkout since IR827, DEC-68); expired: a Checkout Session that ended unpaid. */
+export type Payment = Entity & Money & {invoiceId:ID;method:PaymentMethod|null;channel:'demo'|'stripe_checkout'|'manual';status:'initiated'|'processing'|'confirmed'|'failed'|'expired';paymentReference:string|null;confirmedAt:Instant|null;confirmationReason:string|null;eventIds:ID[]};
+/** payments.startCheckout (DEC-68): the payment in flight and the hosted Stripe Checkout page the payer goes to. */
+export type CheckoutStart = {paymentId:ID;checkoutUrl:string};
 export type InvoiceDetail = Invoice & {paymentRefs:Payment[];restrictionIds:ID[]};
 export type RestrictionUnit = {unitId:ID;applyState:'not_sent'|'sent_unknown'|'applied'|'not_applied';releaseState:'none'|'waiting_reconcile'|'requested'|'released'|'not_required'|'failed';applyCommandIds:ID[];releaseCommandIds:ID[];observedRestriction:ObservedRestriction;observedAt:Instant|null;evidenceId:ID|null;pendingReason:string|null};
 export type Restriction = Entity & {recoveryCases:RestrictionRecoveryCase[];noticeNotificationIds:ID[];contractId:ID;contractVersion:number;causeInvoiceIds:ID[];unitIds:ID[];rulesVersion:ID;noticeAt:Instant;executeAfter:Instant;reason:string;policy:RestrictionPolicy;state:'scheduled'|'requested'|'applied'|'release_requested'|'released'|'cancelled';exception:{until:Instant;reason:string|null}|null;graceUntil:Instant|null;perUnit:RestrictionUnit[];events:AuditView[];releaseIntent:ReleaseIntent|null};
@@ -387,6 +390,7 @@ export type OperationContracts = {
   'payments.confirm': {input:{paymentId:ID;paymentReference:string;confirmedAmountMinor:number;currency:Currency;reason:string};result:Payment;mode:'write'};
   'payments.recordManual': {input:{invoiceId:ID;paymentReference:string;confirmedAmountMinor:number;currency:Currency;reason:string};result:Payment;mode:'write'};
   'payments.simulate': {input:{event:'initiate';invoiceId:ID;method:PaymentMethod;demoConfirmed:true}|{event:'instructions';invoiceId:ID;demoConfirmed:true}|{event:'processing'|'confirm'|'fail';paymentId:ID;eventId:ID;paymentReference:string};result:Payment|NotificationPreview;mode:'write'};
+  'payments.startCheckout': {input:{invoiceId:ID};result:CheckoutStart;mode:'write'};
   'plans.get': {input:{id:ID};result:MaintenancePlan;mode:'read'};
   'plans.list': {input:Query;result:Page<MaintenancePlan>;mode:'read'};
   'plans.generateNext': {input:{id:ID;occurrenceDate:Instant};result:MaintenanceJob;mode:'write'};

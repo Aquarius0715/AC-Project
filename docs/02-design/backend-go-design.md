@@ -266,7 +266,7 @@ All workers share `internal/platform/events` (SNS FIFO publish, SQS long-poll co
 
 As built (2026-10-14): the `scheduler`, `notification` and `outbox` roles run (see their rows). The `iot`, `telemetry`, `rollup`, `automation` and `importexport` roles start and idle in the compose stack: locally the IoT bridge (`cmd/iotbridge`) carries commands, acknowledgements and readings between the broker and the API over HTTP, schedule automations run in the scheduler (IR54), unit imports run inside the API operations, and the 15-minute and hourly rollups are not built yet.
 
-The webhook receiver (`cmd/webhook`, planned: not built yet, compose profile `planned`, IR197) is a separate Echo service: `/stripe` verifies `Stripe-Signature` with a 5-minute tolerance, stores the event in `billing.stripe_events` (primary key = Stripe event ID, so replays are no-ops), retrieves the PaymentIntent, and then runs the billing confirmation in one transaction that emits PaymentConfirmed. It answers 2xx only after the event is stored.
+As designed, the webhook receiver (`cmd/webhook`, compose profile `planned`, IR197) is a separate Echo service; as built (IR827) the Stripe receiver is mounted on the billing service and reached through the gateway, with the same rules: `/stripe` verifies `Stripe-Signature` with a 5-minute tolerance, stores the event in `billing.stripe_events` (primary key = Stripe event ID, so replays are no-ops), retrieves the PaymentIntent, and then runs the billing confirmation in one transaction that emits PaymentConfirmed. It answers 2xx only after the event is stored.
 
 ## 8. Security in the code
 

@@ -6,7 +6,12 @@ const PAYMENTS_SIMULATE = "payments.simulate";
 import { refresh } from "next/cache";
 import { coreOp, corePrincipal } from "@ac/web/lib/dal";
 import { actionFailure } from "@ac/web/lib/actionFailure";
+import { z } from "zod";
 import { demoReference, type ClientPayment, type PreviewParams } from "@ac/web/lib/clientBilling";
+
+// payments.startCheckout answers the payment in flight and the hosted Stripe Checkout page (DEC-68); the Core API's
+// answer is checked at this boundary, not trusted.
+const checkoutStartSchema = z.object({ paymentId: z.string().min(1), checkoutUrl: z.url() });
 
 export type ActionResult<T = null> = { ok: true; value: T } | { ok: false; messageKey: string; code: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null };
 
@@ -30,6 +35,18 @@ export async function startPayment(invoiceId: string, version: number, method: "
     return p.id;
   });
 }
+/** Stripe Checkout (DEC-68): starts the payment of the whole invoice and returns the hosted page the payer goes to. The
+invoice is paid only by Stripe's webhook, never by this return. */
+export async function startCheckout(invoiceId: string, version: number) {
+  return run(async () => {
+    const started = checkoutStartSchema.parse(
+      await coreOp<unknown>("payments.startCheckout", { invoiceId }, write(version)),
+    );
+
+    return started.checkoutUrl;
+  });
+}
+
 /** A demo PSP event for an open payment: processing, confirm (marks the invoice paid) or fail (stays unpaid). */
 export async function demoOutcome(paymentId: string, version: number, event: "processing" | "confirm" | "fail") {
   return run(async () => { const p = await coreOp<ClientPayment>(PAYMENTS_SIMULATE, { event, paymentId, eventId: crypto.randomUUID(), paymentReference: demoReference(paymentId) }, write(version)); return p.status; });

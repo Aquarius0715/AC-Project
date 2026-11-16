@@ -219,6 +219,7 @@ const (
 	statusSent             = "sent"
 	stateSucceeded         = "succeeded"
 	statusUnpaid           = "unpaid"
+	statusProcessing       = "processing"
 	statusWithdrawn        = "withdrawn"
 	decisionDecline        = "decline" // Offer.decision of a declined offer
 )

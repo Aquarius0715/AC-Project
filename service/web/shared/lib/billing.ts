@@ -20,7 +20,7 @@ const PROCESSING = "processing";
 const en = translator("en");
 interface Range { from: string; to: string }
 export interface ApiInvoice { id: string; version: number; number: string; amountMinor: number; currency: Currency; contractId: string; contractVersion: number; period: Range; dueAt: string; status: "unpaid" | "processing" | "paid"; paymentMethod: string | null; paymentStatus: string | null; paidAt: string | null }
-export interface ApiPayment { id: string; version: number; amountMinor: number; currency: Currency; invoiceId: string; method: string | null; status: "initiated" | "processing" | "confirmed" | "failed"; paymentReference: string | null; confirmedAt: string | null; confirmationReason: string | null }
+export interface ApiPayment { id: string; version: number; amountMinor: number; currency: Currency; invoiceId: string; method: string | null; channel: "demo" | "stripe_checkout" | "manual"; status: "initiated" | "processing" | "confirmed" | "failed" | "expired"; paymentReference: string | null; confirmedAt: string | null; confirmationReason: string | null }
 export type ApiInvoiceDetail = ApiInvoice & { paymentRefs: ApiPayment[]; restrictionIds: string[] };
 export interface ApiContract { id: string; version: number; customerId: string; customerOrgId: string; unitIds: string[]; planType: string; startAt: string; endAt: string; priceMinor: number; currency: Currency; restrictionEligible: boolean }
 export interface ApiCustomer { id: string; name: string; organizationId: string; status: string }
@@ -80,9 +80,11 @@ const methodName = (m: string | null, t: T) => {
   if (m === "demo_debit_card") return t("Debit card");
   return m;
 };
+/** The channel of a payment taken on Stripe's hosted page (DEC-68). */
+const STRIPE_CHECKOUT = "stripe_checkout";
 /** A payment's status as the screen words it; another code stays as it is. */
 export const paymentWord = (s: string, t: T = en) => {
-  const words = new Map(Object.entries({ initiated: t("initiated"), processing: t(PROCESSING), confirmed: t("confirmed"), failed: t("failed") }));
+  const words = new Map(Object.entries({ initiated: t("initiated"), processing: t(PROCESSING), confirmed: t("confirmed"), failed: t("failed"), expired: t("expired") }));
   return words.get(s) ?? s; // a value the API adds before this table does
 };
 
@@ -133,12 +135,13 @@ export function totals(rows: InvoiceRow[], statuses: InvoiceStatus[]): string {
 }
 
 export function invoiceDetail(d: ApiInvoiceDetail, t: T = en): InvoiceDetail {
-  const processing = d.paymentRefs.find((p) => p.status === PROCESSING);
+  // HQ confirms a processing demo payment by hand; a Stripe one is confirmed only by its webhook (DEC-68, IR827)
+  const processing = d.paymentRefs.find((p) => p.status === PROCESSING && p.channel !== STRIPE_CHECKOUT);
   return {
     id: d.id, version: d.version, processingPaymentId: processing?.id ?? null, processingPaymentVersion: processing?.version ?? null,
     payments: d.paymentRefs.map((p) => {
       return [
-        methodName(p.method, t) ?? t("No method (recorded by HQ)"), paymentWord(p.status, t), p.paymentReference && t("ref {ref}", { ref: p.paymentReference }),
+        methodName(p.method, t) ?? t(p.channel === STRIPE_CHECKOUT ? "Stripe Checkout" : "No method (recorded by HQ)"), paymentWord(p.status, t), p.paymentReference && t("ref {ref}", { ref: p.paymentReference }),
         p.confirmationReason && t("reason “{reason}”", { reason: p.confirmationReason }),
       ].filter(Boolean).join(" · ");
     }),

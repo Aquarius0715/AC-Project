@@ -72,6 +72,12 @@ type Config struct {
 	AccountsPerDay int
 	// tests only: wraps each operation's transaction to inject database failures; nil = none
 	WrapTx func(pgx.Tx) pgx.Tx
+	// Stripe Checkout for payments.startCheckout (DEC-68); nil = Stripe not configured
+	Checkout billing.Checkout
+	// the signing secret of the Stripe webhook (POST /stripe on the billing service); empty = no webhook route
+	StripeWebhookSecret string
+	// the customer app's origin, where Stripe sends the payer back after Checkout
+	CustomerAppURL string
 }
 
 // Server is the assembled Core API.
@@ -103,7 +109,14 @@ func New(ctx context.Context, cfg Config, verifier auth.Verifier) (*Server, erro
 		return nil, err
 	}
 
-	registerModules(reg, txm, demo, identity.Accounts{PerOrgPerDay: cfg.AccountsPerDay})
+	bill := registerModules(
+		reg,
+		txm,
+		demo,
+		identity.Accounts{PerOrgPerDay: cfg.AccountsPerDay},
+		cfg.Checkout,
+		cfg.CustomerAppURL,
+	)
 
 	servesIdentity := len(cfg.Domains) == 0 || slices.Contains(cfg.Domains, ops.DomainIdentity)
 
@@ -120,6 +133,13 @@ func New(ctx context.Context, cfg Config, verifier auth.Verifier) (*Server, erro
 		txm.Close()
 
 		return nil, err
+	}
+
+	// the Stripe webhook is mounted on the billing service: it applies the payments it confirms (DEC-68)
+	servesBilling := len(cfg.Domains) == 0 || slices.Contains(cfg.Domains, ops.DomainBilling)
+	if servesBilling && cfg.StripeWebhookSecret != "" {
+		//nolint:contextcheck // the handler runs on each request's own context, not on the one the server starts with
+		app.POST("/stripe", stripeWebhook(reg, txm, bill, cfg.StripeWebhookSecret))
 	}
 
 	srv := &Server{
@@ -193,6 +213,9 @@ type wiring struct {
 	jobs      maintenance.Jobs
 	delivery  maintenance.Delivery
 	accounts  identity.Accounts // the daily cap on the accounts a contractor or customer owner adds (IR464)
+	checkout  billing.Checkout  // Stripe Checkout (DEC-68); nil = not configured
+	customer  string            // the customer app's origin (Checkout return pages)
+	bill      *billing.Billing  // the billing module the Stripe webhook applies deliveries with (set by registerBilling)
 }
 
 // registerModules registers every module's operations, queries and scheduler jobs. The steps keep their order: the
@@ -202,7 +225,9 @@ func registerModules(
 	txm *db.TxManager,
 	demo *demoOps,
 	accounts identity.Accounts,
-) {
+	checkout billing.Checkout,
+	customerURL string,
+) billing.Billing {
 	registerDemo(reg, demo)
 	identity.Register(reg)
 	identity.RegisterMembers(reg)
@@ -219,12 +244,17 @@ func registerModules(
 		jobs:      jobs,
 		delivery:  delivery,
 		accounts:  accounts,
+		checkout:  checkout,
+		customer:  customerURL,
+		bill:      nil,
 	}
 	wired.registerControl()
 	wired.registerReads()
 	wired.registerBilling()
 	wired.registerCare()
 	wired.registerDevices()
+
+	return *wired.bill
 }
 
 // registerEquipment registers the units and their devices and alerts, and returns the assets module with the view
@@ -403,7 +433,10 @@ func (w *wiring) registerBilling() {
 		Restrictions: restrictions.Busy{},
 		Recipients:   identity.Directory{},
 		Releases:     restrictionsModule, Notify: notify.Store{},
+		Checkout:     w.checkout,
+		CustomerBase: w.customer,
 	}
+	w.bill = &bill
 	billing.Register(w.reg, bill)
 	billing.RegisterPayments(w.reg, bill)
 	billing.RegisterInquiries(w.reg, bill)

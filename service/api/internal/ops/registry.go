@@ -97,6 +97,22 @@ type AuditEntry struct {
 	Before, After map[string]*string
 }
 
+// idempotencyKeyCtx keys the write's Idempotency-Key in a handler's context.
+type idempotencyKeyCtx struct{}
+
+// WithIdempotencyKey carries a write's Idempotency-Key to its handler: a handler that calls an external provider
+// passes it on, so the provider answers a repeated request with the same result (D04).
+func WithIdempotencyKey(ctx context.Context, key string) context.Context {
+	return context.WithValue(ctx, idempotencyKeyCtx{}, key)
+}
+
+// IdempotencyKeyOf is the write's Idempotency-Key, empty outside a write.
+func IdempotencyKeyOf(ctx context.Context) string {
+	key, _ := ctx.Value(idempotencyKeyCtx{}).(string)
+
+	return key
+}
+
 // Call carries everything a handler needs for one operation.
 type Call struct {
 	Tx            pgx.Tx
@@ -879,6 +895,8 @@ func (r *Registry) execute(
 	write bool,
 	key string,
 ) (any, int64, json.RawMessage, error) {
+	ctx = WithIdempotencyKey(ctx, key)
+
 	if operation.OwnTx {
 		out, err := operation.Handle(ctx, call, input)
 

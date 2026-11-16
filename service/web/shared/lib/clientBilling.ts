@@ -104,13 +104,18 @@ export function statusQuery(f: StatusFilter): { overdueOnly?: true; status?: Exc
 // ---- one invoice (FR-C11) ----
 
 export type ClientPayment = ApiPayment & { createdAt: string; updatedAt: string };
-export const methodLabel: Record<string, string> = { demo_credit_card: "Credit card (demo)", demo_debit_card: "Debit card (demo)" };
+const methodLabel: Record<string, string> = { demo_credit_card: "Credit card (demo)", demo_debit_card: "Debit card (demo)" };
+/** How a payment was taken, in words: the demo card, Stripe Checkout (DEC-68) or a transfer HQ recorded. */
+export function paymentWay(p: { method: string | null; channel: string }, t: T = en): string {
+  if (p.method) return textOf(methodLabel, p.method, t) ?? p.method;
+  return t(p.channel === "stripe_checkout" ? "Stripe Checkout" : "Bank transfer (recorded by HQ)");
+}
 export interface PaymentLine { id: string; version: number; label: string; at: string; status: ClientPayment["status"]; reference: string | null }
 export function paymentLines(ps: ClientPayment[], i: I18n = EN): PaymentLine[] {
   const { t, display } = i;
   return [...ps].toSorted((a, b) => b.createdAt.localeCompare(a.createdAt)).map((p) => {
     return {
-      id: p.id, version: p.version, label: `${p.id.slice(0, 8)} · ${p.method ? (textOf(methodLabel, p.method, t) ?? p.method) : t("Bank transfer (recorded by HQ)")}`,
+      id: p.id, version: p.version, label: `${p.id.slice(0, 8)} · ${paymentWay(p, t)}`,
       at: showTime(p.confirmedAt ?? p.updatedAt, display), status: p.status, reference: p.paymentReference,
     };
   });

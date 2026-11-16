@@ -38,14 +38,18 @@ describe("HQ billing (FR-A08, FR-A23, DD-A08)", () => {
 
   it("words the payments of an invoice, inquiries, contracts and payout statements", () => {
     const d = invoiceDetail({ ...invoice({}), restrictionIds: ["r1"], paymentRefs: [
-      { id: "p1", version: 1, amountMinor: 12_000, currency: "MYR", invoiceId: "i1", method: null, status: "confirmed", paymentReference: "BANK-1", confirmationReason: "Bank transfer", confirmedAt: "2026-09-12T02:00:00Z" },
-      { id: "p2", version: 3, amountMinor: 12_000, currency: "MYR", invoiceId: "i1", method: "demo_debit_card", status: PROCESSING, paymentReference: null, confirmationReason: null, confirmedAt: null },
+      { id: "p1", version: 1, amountMinor: 12_000, currency: "MYR", invoiceId: "i1", method: null, channel: "manual", status: "confirmed", paymentReference: "BANK-1", confirmationReason: "Bank transfer", confirmedAt: "2026-09-12T02:00:00Z" },
+      { id: "p2", version: 3, amountMinor: 12_000, currency: "MYR", invoiceId: "i1", method: "demo_debit_card", channel: "demo", status: PROCESSING, paymentReference: null, confirmationReason: null, confirmedAt: null },
     ] });
     expect(d).toStrictEqual({ id: "i1", version: 1, processingPaymentId: "p2", processingPaymentVersion: 3, restrictionIds: ["r1"], manualAllowed: false, payments: ["No method (recorded by HQ) · confirmed · ref BANK-1 · reason “Bank transfer”", "Debit card · processing"] });
     // IR447: only a failed (or expired) card payment leaves the invoice open to a manual payment
-    const failed = { id: "p3", version: 2, amountMinor: 12_000, currency: "MYR" as const, invoiceId: "i1", method: "demo_credit_card" as const, status: "failed" as const, paymentReference: null, confirmationReason: null, confirmedAt: null };
+    const failed = { id: "p3", version: 2, amountMinor: 12_000, currency: "MYR" as const, invoiceId: "i1", method: "demo_credit_card" as const, channel: "demo" as const, status: "failed" as const, paymentReference: null, confirmationReason: null, confirmedAt: null };
     expect([invoiceDetail({ ...invoice({}), restrictionIds: [], paymentRefs: [failed] }).manualAllowed, invoiceDetail({ ...invoice({}), restrictionIds: [], paymentRefs: [] }).manualAllowed,
       invoiceDetail({ ...invoice({}), restrictionIds: [], paymentRefs: [{ ...failed, status: "initiated" }] }).manualAllowed]).toStrictEqual([true, true, false]);
+    // IR827: a Stripe payment is named as such, an expired one in words, and a processing one is not HQ's to confirm
+    const stripe = { ...failed, id: "p4", method: null, channel: "stripe_checkout" as const, status: "processing" as const, paymentReference: "pi_1" };
+    const viaStripe = invoiceDetail({ ...invoice({}), restrictionIds: [], paymentRefs: [stripe, { ...stripe, id: "p5", status: "expired" as const, paymentReference: null }] });
+    expect([viaStripe.processingPaymentId, viaStripe.payments]).toStrictEqual([null, ["Stripe Checkout · processing · ref pi_1", "Stripe Checkout · expired"]]);
     const iq: ApiInquiry = { id: "q1", version: 1, customerId: "c1", invoiceId: "i1", restrictionId: null, subjectType: "payment", message: "Paid already", state: "received", reply: null, createdAt: "2026-09-14T02:00:00Z" };
     expect(inquiryRows([{ ...iq, id: "q0", state: "answered", createdAt: "2026-09-15T00:00:00Z", subjectType: "restriction" }, iq], customers).map((r) => [r.id, r.kind, r.at, r.text])).toStrictEqual([
       ["q1", "Payment", "14 Sept 2026, 10:00 am MYT", "“Paid already”"], ["q0", "Cooling restriction", "15 Sept 2026, 8:00 am MYT", "“Paid already”"],
