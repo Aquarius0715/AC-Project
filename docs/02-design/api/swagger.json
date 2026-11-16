@@ -30097,6 +30097,17 @@
                 }
             }
         },
+        "assets.GeoPoint": {
+            "type": "object",
+            "properties": {
+                "latitude": {
+                    "type": "number"
+                },
+                "longitude": {
+                    "type": "number"
+                }
+            }
+        },
         "assets.ImportCommitInput": {
             "type": "object",
             "properties": {
@@ -30264,11 +30275,23 @@
                 "customerOrgId": {
                     "type": "string"
                 },
+                "geofenceRadiusMeters": {
+                    "description": "GeofenceRadiusMeters is the away/home radius around Location; nil means the default (150 m).",
+                    "type": "integer"
+                },
                 "id": {
                     "type": "string"
                 },
                 "kind": {
                     "type": "string"
+                },
+                "location": {
+                    "description": "Location is the map pin HQ set (DEC-109); nil until one is set.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/assets.GeoPoint"
+                        }
+                    ]
                 },
                 "name": {
                     "type": "string"
@@ -30316,11 +30339,22 @@
                 "customerOrgId": {
                     "type": "string"
                 },
+                "geofenceRadiusMeters": {
+                    "type": "integer"
+                },
                 "id": {
                     "type": "string"
                 },
                 "kind": {
                     "type": "string"
+                },
+                "location": {
+                    "description": "Location is the map pin (DEC-109); null clears it. The save replaces it, as it replaces the address.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/assets.GeoPoint"
+                        }
+                    ]
                 },
                 "name": {
                     "type": "string"

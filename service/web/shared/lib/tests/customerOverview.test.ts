@@ -26,8 +26,8 @@ const unit = (id: string, over: Partial<OverviewUnit> = {}): OverviewUnit => {
     archived: false, capabilityVersion: 1, connection: "online", lastSeenAt: TEXT_2026_09_14T01_12_00Z, warrantyEndsAt: null, effectivePowerState: "on", activeAlertCount: 0, latestMeasurements: [], ...over,
   };
 };
-const props = [{ id: "home", version: 1, customerOrgId: "o", kind: "home" as const, name: "Home A", address: null, accessInstructions: null, archived: false, updatedAt: "" },
-  { id: "office", version: 1, customerOrgId: "o", kind: "office" as const, name: "Office A", address: null, accessInstructions: null, archived: false, updatedAt: "" }];
+const props = [{ id: "home", version: 1, customerOrgId: "o", kind: "home" as const, name: "Home A", address: null, accessInstructions: null, location: null, geofenceRadiusMeters: null, archived: false, updatedAt: "" },
+  { id: "office", version: 1, customerOrgId: "o", kind: "office" as const, name: "Office A", address: null, accessInstructions: null, location: null, geofenceRadiusMeters: null, archived: false, updatedAt: "" }];
 const sum = (kWh: number | null, over: Partial<ApiEnergySummary["totals"]> = {}, factor = true) => {
   return ({
     period: { from: "", to: "" }, unitIds: [], currency: "MYR", baselineRef: null, factorRef: null, baselineSnapshot: null, tariffVersion: "t", boundaryId: "ac_input_electricity", boundary: "", coverage: 1, qualityWarnings: [],

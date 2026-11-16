@@ -62,7 +62,7 @@ describe("HQ customers & units", () => {
       displayName: "1–120 characters", installedAt: "An installation date cannot be in the future", serviceScope: "Choose at least one inspection group",
     });
     expect(changedFields(unit({}), { ...d, displayName: "Bedroom AC 2", spaceId: "" })).toStrictEqual(["Name", "Location"]);
-    expect(placeOptions([{ id: "p1", version: 1, kind: "home", name: "Home A", address: null, accessInstructions: null, updatedAt: "", units: 0, unassigned: 0, floors: 0, rooms: 0, spaces: [] }], [])[0]?.label).toBe("Home A (no space)");
+    expect(placeOptions([{ id: "p1", version: 1, kind: "home", name: "Home A", address: null, accessInstructions: null, location: null, geofenceRadiusMeters: null, updatedAt: "", units: 0, unassigned: 0, floors: 0, rooms: 0, spaces: [] }], [])[0]?.label).toBe("Home A (no space)");
   });
 
   it("words the policies' conditions and the default rules", () => {

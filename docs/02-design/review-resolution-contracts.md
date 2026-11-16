@@ -10802,3 +10802,14 @@ Stage 2 of IR821. Every displayed text that named a permission by its code now n
 1. **35 texts** in the HQ, partner and technician apps and the shared libraries. Examples: "Not resolved — you don't have “Resolve alerts”." "Needs “View devices & models”". "Coverage needs “View customers & units” or “View contracts”". "Diagnostic control needs “Run test runs” on an assigned job." In ms, ja and id the code became that language's label, in “ ” (ms, id) or 「」 (ja). The change was made by a script (scratchpad perm_texts.py), which rewrote the key in the source, the tests and each dictionary together.
 2. **Page unavailable.** `NeedsAccess` reads "To open {what}, your role needs the “{permission}” permission." with the label. It is what every HQ page shows when a read is refused (IR581), for example Restrictions for hq-operator.
 3. **Tests.** The unit tests that pinned the codes (techAlerts, partnerReview, actionMessage) and three E2E expectations (admin overview, audit, language) now expect the labels.
+
+## IR823 A property keeps a map pin (DEC-109, stage 1: API and DB) — 2026-11-16
+
+DEC-109: HQ sets a Home or Office's position with a pin on a map in Admin, and the position is used with GPS: a technician's site check-in is measured against it, and a customer's away/home automations use it as a geofence. This first stage stores the pin. Later stages add the Admin map, the GPS check-in and the geofence.
+
+1. **Data.** `assets.properties` gets `latitude` and `longitude` (double precision, WGS 84, set or cleared together) and `geofence_radius_m` (50–2000; NULL means 150 m). The change is migration 000009 with `IF NOT EXISTS` (000001 stays frozen, IR785), and `schema.sql` has the same columns.
+2. **Contract.** `GeoPoint = {latitude, longitude}`. `Property` carries `location: GeoPoint|null` and `geofenceRadiusMeters: number|null`, and `properties.save` takes both. The save replaces them as it replaces the address, so the Admin web passes the current values through a rename or an edit of the other fields. A point off the globe is VALIDATION `location=error.range`, and a radius outside 50–2000 is `geofenceRadiusMeters=error.range`.
+3. **Who reads it.** `properties.list` already answers HQ and the customer's own users, so a customer sees the pin of their own Home or Office. Contractors and technicians do not get the coordinates: the check-in distance will be measured on the server.
+4. **Generated.** catalog_gen.go, contracts.gen.ts, contractInputs.gen.json, contractResults.gen.json and Swagger.
+5. **Tests.** `TestPropertyLocation` covers saving a pin with a radius, reading it back from `properties.list`, moving it, clearing it, and the four range refusals.
+6. **Dev DB.** The columns were added by hand (ALTER), as with every migration.

@@ -34,6 +34,13 @@ const (
 	maxText     = 1000 // access instructions and reasons
 )
 
+// The geofence radius a property may have, in metres (DEC-109): wide enough for a GPS fix's error, small enough
+// that a neighbour's house is outside.
+const (
+	minGeofenceRadius = 50
+	maxGeofenceRadius = 2000
+)
+
 func strLen(s string, lo, hi int) bool {
 	n := utf8.RuneCountInString(s)
 
@@ -84,14 +91,33 @@ type Property struct {
 	Name               string    `json:"name"`
 	Address            *string   `json:"address"`
 	AccessInstructions *string   `json:"accessInstructions"`
-	Archived           bool      `json:"archived"`
+	// Location is the map pin HQ set (DEC-109); nil until one is set.
+	Location *GeoPoint `json:"location"`
+	// GeofenceRadiusMeters is the away/home radius around Location; nil means the default (150 m).
+	GeofenceRadiusMeters *int `json:"geofenceRadiusMeters"`
+	Archived             bool `json:"archived"`
+}
+
+// GeoPoint is GeoPoint of service-contracts.ts: WGS 84 degrees.
+type GeoPoint struct {
+	Latitude  float64 `json:"latitude"`
+	Longitude float64 `json:"longitude"`
+}
+
+// valid reports whether the point is on the globe (latitude −90..90, longitude −180..180).
+func (g GeoPoint) valid() bool {
+	return g.Latitude >= -90 && g.Latitude <= 90 && g.Longitude >= -180 && g.Longitude <= 180
 }
 
 const propertyCols = `id, tenant_id, version, created_at, updated_at, customer_org_id, kind, name, address, ` +
-	`access_instructions, archived`
+	`access_instructions, latitude, longitude, geofence_radius_m, archived`
 
 func scanProperty(row pgx.Row) (Property, error) {
-	var property Property
+	var (
+		property  Property
+		latitude  *float64
+		longitude *float64
+	)
 
 	err := row.Scan(
 		&property.ID,
@@ -104,10 +130,20 @@ func scanProperty(row pgx.Row) (Property, error) {
 		&property.Name,
 		&property.Address,
 		&property.AccessInstructions,
+		&latitude,
+		&longitude,
+		&property.GeofenceRadiusMeters,
 		&property.Archived,
 	)
+	if err != nil {
+		return property, apperr.Wrap(err, "scan (scanProperty)")
+	}
 
-	return property, apperr.Wrap(err, "scan (scanProperty)")
+	if latitude != nil && longitude != nil { // the table's CHECK keeps the two together
+		property.Location = &GeoPoint{Latitude: *latitude, Longitude: *longitude}
+	}
+
+	return property, nil
 }
 
 // PropertySave is properties.save input.
@@ -118,6 +154,9 @@ type PropertySave struct {
 	Name               string     `json:"name"`
 	Address            *string    `json:"address"`
 	AccessInstructions *string    `json:"accessInstructions"`
+	// Location is the map pin (DEC-109); null clears it. The save replaces it, as it replaces the address.
+	Location             *GeoPoint `json:"location"`
+	GeofenceRadiusMeters *int      `json:"geofenceRadiusMeters"`
 }
 
 // Validate implements ops.Validator (DD-A02 field table).
@@ -145,7 +184,25 @@ func (in *PropertySave) Validate() map[string]string {
 		fieldErrs["accessInstructions"] = apperr.KeyLength
 	}
 
+	if in.Location != nil && !in.Location.valid() {
+		fieldErrs["location"] = apperr.KeyRange
+	}
+
+	if r := in.GeofenceRadiusMeters; r != nil &&
+		(*r < minGeofenceRadius || *r > maxGeofenceRadius) {
+		fieldErrs["geofenceRadiusMeters"] = apperr.KeyRange
+	}
+
 	return fieldErrs
+}
+
+// latLng splits the pin into the two nullable columns.
+func (in *PropertySave) latLng() (*float64, *float64) {
+	if in.Location == nil {
+		return nil, nil
+	}
+
+	return &in.Location.Latitude, &in.Location.Longitude
 }
 
 // dupSibling maps the properties_name / spaces_name unique indexes (lower(name) per parent) to the sibling-name
@@ -1202,18 +1259,23 @@ func (m *Module) propertiesSave(
 		}
 
 		propertyID := uuid.Must(uuid.NewV7())
+		latitude, longitude := input.latLng()
 
 		property, err := scanProperty(
 			call.Tx.QueryRow(
 				ctx,
-				`INSERT INTO assets.properties (id, tenant_id, customer_org_id, kind, name, address, access_instructions)
-			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6) RETURNING `+propertyCols,
+				`INSERT INTO assets.properties (id, tenant_id, customer_org_id, kind, name, address, access_instructions,
+			latitude, longitude, geofence_radius_m)
+			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING `+propertyCols,
 				propertyID,
 				input.CustomerOrgID,
 				input.Kind,
 				input.Name,
 				input.Address,
 				input.AccessInstructions,
+				latitude,
+				longitude,
+				input.GeofenceRadiusMeters,
 			),
 		)
 		if err != nil {
@@ -1236,11 +1298,13 @@ func (m *Module) propertiesSave(
 		return property, nil
 	}
 
+	latitude, longitude := input.latLng()
+
 	updated, err := scanProperty(
 		call.Tx.QueryRow(
 			ctx,
 			`UPDATE assets.properties SET kind=$3, name=$4, address=$5, access_instructions=$6,
-		version = version + 1, updated_at = platform.app_now()
+		latitude=$8, longitude=$9, geofence_radius_m=$10, version = version + 1, updated_at = platform.app_now()
 		WHERE id = $1 AND version = $2 AND customer_org_id = $7 AND NOT archived RETURNING `+propertyCols,
 			*input.ID,
 			*call.ExpectedVersion,
@@ -1249,6 +1313,9 @@ func (m *Module) propertiesSave(
 			input.Address,
 			input.AccessInstructions,
 			input.CustomerOrgID,
+			latitude,
+			longitude,
+			input.GeofenceRadiusMeters,
 		),
 	)
 	if err != nil {

@@ -7,7 +7,7 @@ import { refresh } from "next/cache";
 import { coreAll, coreOp, CoreError } from "@ac/web/lib/dal";
 import { actionFailure } from "@ac/web/lib/actionFailure";
 import { deleteAccounts } from "@ac/web/lib/forceDelete";
-import type { ApiCustomerRow, ApiImportPreview, ApiOrgRow, ApiUnitImport, Profile, Scope } from "@ac/web/lib/assets";
+import type { ApiCustomerRow, ApiImportPreview, ApiOrgRow, ApiUnitImport, GeoPoint, Profile, Scope } from "@ac/web/lib/assets";
 import type { Metric } from "@ac/web/lib/devices";
 import type { OpInput } from "@ac/web/lib/opTypes";
 
@@ -72,7 +72,7 @@ export async function deleteCustomer(id: string, version: number, org: { id: str
   });
 }
 
-export interface PropertyInput { id?: string; customerOrgId: string; kind: "home" | "office"; name: string; address: string | null; accessInstructions: string | null }
+export interface PropertyInput { id?: string; customerOrgId: string; kind: "home" | "office"; name: string; address: string | null; accessInstructions: string | null; location: GeoPoint | null; geofenceRadiusMeters: number | null }
 export async function saveProperty(input: PropertyInput, version?: number) {
   return run(async () => { const p = await coreOp<{ id: string }>("properties.save", input, write(version)); return p.id; });
 }

@@ -29,7 +29,8 @@ export type User = {id:ID;displayName:string};
 export type Membership = Entity & {userId:ID;displayName:string;organizationId:ID;role:Role;employment:'internal'|'external'|null;permissions:Permission[];scopes:ScopeRef[];scopeVersion:number;qualifications:QualificationGrant[];validFrom:Instant;validUntil:Instant|null;clientRole:ClientRole|null;revokedAt:Instant|null};
 export type Organization = Entity & {name:string;kind:'customer'|'contractor'|'operator';status:'active'|'inactive'};
 export type Customer = Entity & {name:string;status:'active'|'inactive';organizationId:ID;serviceProfile:'rto'|'general'|'energy'|'environment'};
-export type Property = Entity & {customerOrgId:ID;kind:'home'|'office';name:string;address:string|null;accessInstructions:string|null;archived:boolean};
+export type GeoPoint = {latitude:number;longitude:number};
+export type Property = Entity & {customerOrgId:ID;kind:'home'|'office';name:string;address:string|null;accessInstructions:string|null;location:GeoPoint|null;geofenceRadiusMeters:number|null;archived:boolean};
 export type Space = Entity & {propertyId:ID;parentSpaceId:ID|null;kind:'area'|'floor'|'room'|'space';name:string;archived:boolean};
 export type Metric = 'temperature'|'humidity'|'co2'|'pm25'|'power'|'vibration'|'refrigerant_pressure'|'compressor_cycles'|'airflow_drop'|'heartbeat_gap';
 export type UnitSymbol = '°C'|'%'|'ppm'|'µg/m³'|'kW'|'mm/s'|'kPa'|'cycles/h'|'min';
@@ -396,7 +397,7 @@ export type OperationContracts = {
   'preferences.update': {input:{locale:Locale;timezone:string;monthlyReportEmail?:boolean;pinnedUnitIds?:ID[]};result:Preferences;mode:'write'};
   'properties.archive': {input:{id:ID;reason:string};result:ArchivedResource;mode:'write'};
   'properties.list': {input:Query;result:Page<Property>;mode:'read'};
-  'properties.save': {input:{id?:ID;customerOrgId:ID;kind:'home'|'office';name:string;address:string|null;accessInstructions:string|null};result:Property;mode:'write'};
+  'properties.save': {input:{id?:ID;customerOrgId:ID;kind:'home'|'office';name:string;address:string|null;accessInstructions:string|null;location:GeoPoint|null;geofenceRadiusMeters:number|null};result:Property;mode:'write'};
   'reports.get': {input:{jobId:ID;reportId:ID;reportVersion:number};result:WorkReport;mode:'read'};
   'restrictions.cancel': {input:{restrictionId:ID;reason:string};result:Restriction;mode:'write'};
   'restrictions.defer': {input:{restrictionId:ID;until:Instant;reason:string};result:Restriction;mode:'write'};
