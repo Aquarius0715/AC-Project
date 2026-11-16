@@ -1057,7 +1057,6 @@ export const ja: Record<string, string> = {
   "Air conditioners": "エアコン",
   "{inRooms} in rooms · {unassigned} unassigned": "部屋に {inRooms} 台 · 未割り当て {unassigned} 台",
   "Last edited": "最終編集",
-  "? Unassigned units ({n})": "? 未割り当てのユニット（{n}）",
   "Not in any room": "どの部屋にもありません",
   "Moving a unit into a room is done in HQ’s unit register — contact HQ.": "ユニットを部屋に移す作業は、本部のユニット台帳で行います — 本部にご連絡ください。",
   "Unassigned units ({n})": "未割り当てのユニット（{n}）",
