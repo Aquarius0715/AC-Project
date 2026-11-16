@@ -87,6 +87,15 @@ export function compareRow(unitId: string, name: string, s: ApiEnergySummary, tr
 }
 /** The URL's units (up to 4 of the customer's), else the first unit by name — the same default on Energy & cost and
 Offsets (IR265). */
+/** One unit's use in the period, for the "Highest use" ranking (IR803). */
+export interface UseRow { unitId: string; name: string; kWh: number; share: number; coverage: number | null }
+/** The units that used the most energy in the period, highest first (IR803): which AC to look at first. A unit
+without measured energy is left out; share is of all the units' measured total, so it reads "of what was measured". */
+export function topUsers(rows: { unitId: string; name: string; kWh: number | null; coverage: number | null }[], n = 5): UseRow[] {
+  const measured = rows.filter((r): r is typeof r & { kWh: number } => r.kWh !== null && r.kWh > 0);
+  const total = measured.reduce((sum, r) => sum + r.kWh, 0);
+  return measured.toSorted((a, b) => b.kWh - a.kWh || a.name.localeCompare(b.name)).slice(0, n).map((r) => ({ ...r, share: total > 0 ? r.kWh / total : 0 }));
+}
 export function pickUnits(units: { id: string; displayName: string }[], parameter: string | undefined = ""): string[] {
   const picked = [...new Set(parameter.split(","))].filter((id) => units.some((u) => u.id === id)).slice(0, 4);
   return picked.length > 0 ? picked : [...units].toSorted((a, b) => a.displayName.localeCompare(b.displayName)).slice(0, 1).map((u) => u.id);

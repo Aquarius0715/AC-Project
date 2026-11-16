@@ -103,6 +103,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 0.643.0 (2026-11-16): IR800: every unresolved customer alert says what to do (close the windows, book a cleaning, request a repair …).
 0.644.0 (2026-11-16): IR801: Units & locations finds a room or AC by name or place.
 0.642.0 (2026-11-16): IR798: on the Running list an owner turns the running ACs off at once, unticking those that should keep running.
+0.646.0 (2026-11-16): IR803: Energy & cost ranks the ACs by measured use (Highest use in this period), each with Show and Compare.
 0.645.0 (2026-11-16): IR802: one automation can switch several ACs (Also apply to other ACs, All ACs in a property), offering only the actions all of them take.
 0.647.0 (2026-11-16): IR804: the customer's command history says whether you or someone else sent each command.
 0.649.0 (2026-11-16): IR806: waiting for the AC to confirm a command counts down the seconds it has left.

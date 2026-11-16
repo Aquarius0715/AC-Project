@@ -10666,3 +10666,11 @@ Found in the UI/UX loop (UX-48, a complaint call: "the director's office is hot"
 1. **Search.** "Find a room or AC…" sits above the tree. Typing waits 300 ms, then sets the URL key `search`. The page lists the units whose display name or place (property › floor › room) contains the text, case-insensitively, together with any power or connection filter. The filtered list is the one the KPI links use: name, place, readings, power and connection badges, Open control. Its title shows the text in quotes.
 2. **Clearing.** A tree row and Clear filter remove `search`, and the box follows the URL. With no match, the list says no room or AC name contains the text and suggests checking the spelling.
 3. **Docs.** DD-C02 step 3 and SCR-C02's URL keys add `search`.
+
+## IR803 Energy & cost ranks the ACs by use — 2026-11-16
+
+Found in the UI/UX loop (UX-50: "which AC should I review?"). Energy & cost showed one AC, the first by name, or up to four that the customer picked. Nothing said which of the 23 ACs used the most, so finding the one to review took 23 selections.
+
+1. **Ranking.** For the period, the page also runs one `energy.summary` per unit of the customer. `topUsers` (shared/lib/clientEnergy.ts) keeps the five highest and leaves out units without measured energy. Ties go by name. Each unit's share is of the measured total.
+2. **Card.** "Highest use in this period" lists the AC, its kWh, its share of measured and its data coverage, in warning colour under 80%. A note says low coverage means the AC may have used more than shown. Show selects that AC alone. Compare adds it, up to four, and is hidden when the AC is already shown or four are chosen. The card is hidden with fewer than two ranked ACs.
+3. **Docs and tests.** DD-C06 step 5. `energy.test.ts` checks the order, the shares and leaving out units without measured use.
