@@ -47,6 +47,20 @@ describe("HQ restrictions (FR-A09, FR-A10)", () => {
     expect(unitRows(releasing, new Map(), new Map()).map((u) => u.retryRelease)).toStrictEqual([true, true]);
   });
 
+  it("offers a retry only where the Core API accepts it (retryAllowed, retryRelease)", () => {
+    // causes paid or a grace period/exception active: the API refuses an apply retry (errors.restriction_not_applicable)
+    const requested = restriction({ state: "requested", perUnit: [unit({ applyState: "not_sent" }), unit({ unitId: "u2", applyState: "not_applied" })] });
+    expect([true, false].map((wanted) => unitRows(requested, new Map(), new Map(), EN, wanted).map((u) => u.retryApply))).toStrictEqual([[true, true], [false, false]]);
+    // a failed release is retried only on a unit that applied the restriction; any other needs reconciling first (errors.reconcile_required)
+    const releasing = restriction({ state: RELEASE_REQUESTED, perUnit: [
+      unit({ releaseState: "failed" }), unit({ unitId: "u2", applyState: "sent_unknown", releaseState: "failed" }), unit({ unitId: "u3", applyState: "not_applied", releaseState: "failed" }),
+      unit({ unitId: "u4", applyState: "not_applied", releaseState: "none" }), unit({ unitId: "u5", releaseState: "waiting_reconcile" }), unit({ unitId: "u6", releaseState: "requested" }),
+    ] });
+    expect(unitRows(releasing, new Map(), new Map()).map((u) => [u.unitId, u.retryRelease, u.reconcile])).toStrictEqual([
+      ["u1", true, false], ["u2", false, true], ["u3", false, false], ["u4", false, false], ["u5", false, false], ["u6", false, false],
+    ]);
+  });
+
   it("says why execute or release is not possible, and what each exception action does (IR35, IR96, IR140)", () => {
     expect([
       executeBlocker(restriction({}), NOW), executeBlocker(restriction({ state: "scheduled", executeAfter: "2026-09-16T00:00:00Z" }), NOW),
