@@ -46,6 +46,14 @@ export function AlertsLiveView({ live }: Readonly<{ live: AlertsLive }>) {
     // a read that gets no answer reads as unavailable (IR718)
     if (a.unread.length > 0) start(async () => { const f = await orUnreachable(() => readAlert(a.unread.map((n) => n.id)), (failure) => failure); if (f) setFailed(t("Not marked as read: {reason}", { reason: actionMessage(f, t) })); else refreshThen(() => { setFailed(null); }); });
   };
+  // the next steps of an alert, in its row and again in its detail, so opening it never loses them (UI/UX loop R98)
+  const renderActions = (a: InboxAlert) => (
+    <>
+      <Link href={`/customer/units/${a.unitId}`} className="rounded-control bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary">{t("View unit")}</Link>
+      {a.type === "maintenance" && a.status.state !== "resolved" && <Link href="/customer/maintenance?tab=filter-care" className="rounded-control bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary">{t("Book cleaning")}</Link>}
+      {a.cause === "fault" && a.group === "attn" && <Link href={`/customer/maintenance?new=${a.unitId}`} className="rounded-control bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary">{t("Request repair")}</Link>}
+    </>
+  );
   // a function, not a component: a component declared here would be a new type on every render and remount its rows
   const renderItem = (a: InboxAlert) => (
     <div key={a.id} className="flex w-full items-start gap-3 border-t border-line px-1 py-3 first:border-0">
@@ -58,11 +66,7 @@ export function AlertsLiveView({ live }: Readonly<{ live: AlertsLive }>) {
           </span>
           <span className="block text-xs text-muted-foreground">{a.where}</span><span className="mt-1 block text-xs">{a.evidence}</span>
         </Plain>
-        <div className="mt-2 flex flex-wrap gap-2">
-          <Link href={`/customer/units/${a.unitId}`} className="rounded-control bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary">{t("View unit")}</Link>
-          {a.type === "maintenance" && a.status.state !== "resolved" && <Link href="/customer/maintenance?tab=filter-care" className="rounded-control bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary">{t("Book cleaning")}</Link>}
-          {a.cause === "fault" && a.group === "attn" && <Link href={`/customer/maintenance?new=${a.unitId}`} className="rounded-control bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary">{t("Request repair")}</Link>}
-        </div>
+        <div className="mt-2 flex flex-wrap gap-2">{renderActions(a)}</div>
       </div>
       <Plain touch type="button" aria-label={t("Open {title}", { title: a.title })} onClick={() => { show(a); }} className="text-muted-foreground"><Icon name="chevronRight" /></Plain>
     </div>
@@ -95,7 +99,7 @@ export function AlertsLiveView({ live }: Readonly<{ live: AlertsLive }>) {
       ) : (
         <PoliciesLive p={live.policies} onDone={(text) => { setResult({ tone: "ok", text }); }} onFail={(f) => { setResult({ tone: f.code === "CONFLICT" || f.code === "FORBIDDEN" ? "warn" : "crit", text: policyRefusal(f, t) }); }} />
       )}
-      <Modal open={!!open} onClose={() => { setOpen(null); }} title={open?.title ?? ""} footer={<Btn onClick={() => { setOpen(null); }}>{t("Back to list")}</Btn>}>
+      <Modal open={!!open} onClose={() => { setOpen(null); }} title={open?.title ?? ""} footer={<>{open && <span className="mr-auto flex flex-wrap items-center gap-2">{renderActions(open)}</span>}<Btn onClick={() => { setOpen(null); }}>{t("Back to list")}</Btn></>}>
         {open && (
           <>
             <div className="flex flex-wrap gap-2"><SeverityBadge s={open.severity} /><Badge tone={open.status.tone}>{open.status.text}</Badge></div>
