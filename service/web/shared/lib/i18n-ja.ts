@@ -5883,6 +5883,8 @@ export const ja: Record<string, string> = {
   "No aircon models": "エアコン機種はありません",
   "Register the first aircon model.": "最初のエアコン機種を登録してください。",
   "Delete {name}? A model that units use cannot be deleted.": "{name} を削除しますか？ユニットが使っている機種は削除できません。",
+  "In use — a model that units use cannot be deleted": "使用中 — ユニットが使っている機種は削除できません",
+  "In use — an IoT model that units or devices use cannot be deleted": "使用中 — ユニットまたはデバイスが使っている IoT 機種は削除できません",
   // IoT models are a register of their own (DEC-105)
   "IoT device · optional": "IoTデバイス · 任意",
   "Unit “{name}” registered with its device": "ユニット「{name}」をデバイスと一緒に登録しました",

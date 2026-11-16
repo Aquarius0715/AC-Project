@@ -5882,6 +5882,8 @@ export const id: Record<string, string> = {
   "No aircon models": "Tidak ada model AC",
   "Register the first aircon model.": "Daftarkan model AC pertama.",
   "Delete {name}? A model that units use cannot be deleted.": "Hapus {name}? Model yang dipakai unit tidak dapat dihapus.",
+  "In use — a model that units use cannot be deleted": "Sedang digunakan — model yang digunakan unit tidak dapat dihapus",
+  "In use — an IoT model that units or devices use cannot be deleted": "Sedang digunakan — model IoT yang digunakan unit atau perangkat tidak dapat dihapus",
   "IoT device · optional": "Perangkat IoT · opsional",
   "Unit “{name}” registered with its device": "Unit “{name}” didaftarkan beserta perangkatnya",
   "IoT model": "Model IoT",

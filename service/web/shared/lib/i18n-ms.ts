@@ -6033,6 +6033,8 @@ export const ms: Record<string, string> = {
   "No aircon models": "Tiada model penyaman udara",
   "Register the first aircon model.": "Daftarkan model penyaman udara pertama.",
   "Delete {name}? A model that units use cannot be deleted.": "Padam {name}? Model yang digunakan oleh unit tidak boleh dipadam.",
+  "In use — a model that units use cannot be deleted": "Sedang digunakan — model yang digunakan oleh unit tidak boleh dipadam",
+  "In use — an IoT model that units or devices use cannot be deleted": "Sedang digunakan — model IoT yang digunakan oleh unit atau peranti tidak boleh dipadam",
   // IoT models are a register of their own (DEC-105)
   "IoT device · optional": "Peranti IoT · pilihan",
   "Unit “{name}” registered with its device": "Unit “{name}” didaftarkan bersama perantinya",
