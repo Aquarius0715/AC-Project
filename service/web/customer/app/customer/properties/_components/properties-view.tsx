@@ -293,7 +293,8 @@ function GroupPanel({ live, space }: Readonly<{ live: PropertiesLive; space: str
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface2 px-3 py-2 text-[13px]"><b>{t("{n} selected", { n: sel.length })}</b>
-        <span className="flex gap-2"><Btn size="sm" onClick={() => { setSel(online); }}>{t("Select all online ({n})", { n: online.length })}</Btn><Btn size="sm" variant="ghost" onClick={() => { setSel([]); }}>{t("Clear")}</Btn></span></div>
+        {/* each button is off when it would change nothing: all online already chosen, or nothing to clear (UI/UX loop R96) */}
+        <span className="flex gap-2"><Btn size="sm" disabled={online.every((id) => sel.includes(id))} onClick={() => { setSel(online); }}>{t("Select all online ({n})", { n: online.length })}</Btn><Btn size="sm" variant="ghost" disabled={sel.length === 0} onClick={() => { setSel([]); }}>{t("Clear")}</Btn></span></div>
       <div className="grid-fluid" style={{ ["--min" as string]: "170px" }}>
         {live.units.map((u) => {
           const tr = track[u.id];
