@@ -9,7 +9,7 @@ import { useOp } from "@ac/web/lib/useOp";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import {
   actionGroupOf, actionLabel, actionOf, apiErrors, commonActionOptions, compares, compareText, dayLong, dayShort, draftErrors, draftOf, eventTest, extraChoices, extraLabel, firstAction, fitExtras, blankDraft, blankExtra, runClock, runText,
-  saveInput, scheduleDraft, scheduleTest, summaryNote, summaryText, testFact, triggerInfo, triggers,
+  afterHoursDraft, saveInput, scheduleDraft, scheduleTest, summaryNote, summaryText, testFact, triggerInfo, triggers,
   type ApiAutomation, type ApiOccurrence, type Caps, type Draft, type ExtraDraft, type RuleCard, type TestRow,
 } from "@ac/web/lib/clientAutomations";
 import { useI18n, useT } from "@ac/web/components/I18n";
@@ -28,6 +28,8 @@ interface Ac { id: string; name: string; property: string; path: string }
 export interface AutomationsLive {
   rules: ApiAutomation[]; cards: RuleCard[]; acs: Ac[]; caps: Record<string, Caps | null>; timezone: string; editing: string | null;
   consent: { version: number | null; granted: boolean; title: string; text: string; tone: "ok" | "warn" | "muted" }; nextRuns: Record<string, string | null>;
+  /** the ACs of a new after-hours rule opened from the Running list (IR811); empty otherwise */
+  preset: string[];
 }
 interface Notice { title: string; text: string }
 
@@ -37,9 +39,9 @@ export function AutomationsView({ live }: Readonly<{ live: AutomationsLive }>) {
   const patch = useUrlPatch();
   const [notice, setNotice] = useState<Notice | null>(null);
   if (live.editing) {
-    return <Editor key={live.editing} live={live} onDone={(n) => { setNotice(n); patch({ automationId: null }); }} onCancel={() => { patch({ automationId: null }); }} />;
+    return <Editor key={live.editing} live={live} onDone={(n) => { setNotice(n); patch({ automationId: null, preset: null, unitIds: null }); }} onCancel={() => { patch({ automationId: null, preset: null, unitIds: null }); }} />;
   }
-  return <List live={live} notice={notice} setNotice={setNotice} create={() => { setNotice(null); patch({ automationId: "new" }); }} edit={(id) => { setNotice(null); patch({ automationId: id }); }} />;
+  return <List live={live} notice={notice} setNotice={setNotice} create={() => { setNotice(null); patch({ automationId: "new", preset: null, unitIds: null }); }} edit={(id) => { setNotice(null); patch({ automationId: id }); }} />;
 }
 
 // a card's or a status's badge icon per tone (dot for the others)
@@ -175,7 +177,10 @@ function Editor({ live, onDone, onCancel }: Readonly<{ live: AutomationsLive; on
   const { t } = i18n;
   const rule = live.editing === "new" ? null : live.rules.find((r) => r.id === live.editing) ?? null;
   const soleAc = live.acs.length === 1 ? live.acs[0]?.id ?? "" : ""; // a new rule names its AC only when there is one
-  const [draft, setDraft] = useState<Draft>(() => (rule ? draftOf(rule) : blankDraft(soleAc, live.timezone)));
+  const [draft, setDraft] = useState<Draft>(() => {
+    if (rule) return draftOf(rule);
+    return live.preset.length > 0 ? afterHoursDraft(live.preset, live.timezone, t("Switch off after hours")) : blankDraft(soleAc, live.timezone);
+  });
   const [apiError, setApiError] = useState<Record<string, string>>({});
   const [shown, setShown] = useState(false); // client checks shown after the first Save / Test
   const [test, setTest] = useState<TestRow[] | null>(null);

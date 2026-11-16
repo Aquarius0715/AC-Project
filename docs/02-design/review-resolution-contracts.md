@@ -10644,6 +10644,15 @@ Found in the UI/UX loop (UX-57, criterion 14: undo of the last operation). A cha
 3. **Tests.** `units.test.ts` covers a temperature and fan send undone in order, a power send undone, and settings with no confirmed value before (nothing to undo).
 4. **Not checked live.** The mock fleet did not acknowledge commands on the dev stack (scenario clock), so the banner's Undo was not seen in the browser. Real devices were not used.
 
+## IR811 From turning the running ACs off to doing it every weekday — 2026-11-16
+
+Found in the UI/UX loop (UX-58, criterion 11: fewer manual steps; principle 15: fewer trips to other screens). After "Turn off running ACs" (IR798), the customer who does this every evening had to go to Automations, create a rule, pick the same ACs again and set Power OFF.
+
+1. **Link.** The Turn off panel on the Running list offers "Turn these off automatically every weekday…". It goes to `/customer/automations?automationId=new&preset=off&unitIds=<the ticked ACs>`, up to 50.
+2. **Preset.** `afterHoursDraft(unitIds, timezone, name)` (shared/lib/clientAutomations.ts) builds a schedule rule named "Switch off after hours". It runs on weekdays, starts at 19:00 with Power OFF and ends at 23:00. The end action stays empty, since DD-C04 never assumes it. The first AC is the target and the rest are `others`, up to 49. The rule is saved off, like every new one. The page reads `preset` and `unitIds` only with `automationId=new` and keeps only the customer's own unarchived ACs.
+3. **Leaving.** Done, Cancel and Create clear `preset` and `unitIds`, so the next new rule starts blank.
+4. **Tests.** `clientAutomations.test.ts` checks the filled fields, the empty end action and the 50-AC cap.
+
 ## IR812 A demo event's evidence names its metric and comparison in words — 2026-11-16
 
 Found in the UI/UX loop (UX-59, HQ anomaly response; noted in UX-54). A policy rule's demo event is stored as "Demo event: heartbeat_gap gte threshold" (monitoring notifier). The alert detail and its activity showed it with the metric code and the comparison code. IR626 had worded the template but kept both values as stored.

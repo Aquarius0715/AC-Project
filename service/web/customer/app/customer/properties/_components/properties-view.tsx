@@ -348,6 +348,8 @@ function GroupPanel({ live, space, offOnly = false }: Readonly<{ live: Propertie
           {live.units.length === 0 && <p className="mb-2 text-[13px] text-muted-foreground">{t("No AC is running any more.")}</p>}
           <Btn variant="primary" disabled={sel.length === 0 || sending} onClick={() => { setReview(plan(sel)); }}>{t("Review & turn off")}</Btn>
           <p className="mt-2 text-[11px] text-muted-foreground">{t("Untick the ACs that should keep running. Each AC gets its own command and confirmation (same as single control); offline ACs are skipped. Owner role only.")}</p>
+          {/* the same ACs every weekday evening, without setting it up from scratch on another screen (IR811) */}
+          {sel.length > 0 && <Link className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-primary" href={`/customer/automations?automationId=new&preset=off&unitIds=${sel.slice(0, 50).join(",")}`}><Icon name="time" />{t("Turn these off automatically every weekday…")}</Link>}
         </> : <>
           <div className="flex flex-wrap items-center gap-4">
             <Field label={t("Power")}><Choice value={powerChoice(ch.power)} onChange={(v: string) => { setCh({ ...ch, power: v === "keep" ? null : v === "on" }); }} options={[{ id: "keep", label: t("Keep") }, { id: "on", label: t("On") }, { id: "off", label: t("Off") }]} /></Field>

@@ -258,6 +258,13 @@ export function actionOf(key: string): UnitAction {
   if (k === "vent") return { kind: "ventilate", level: oneOf(fanLevels, v ?? "", "mid") };
   return { kind: "set_fan", fanLevel: oneOf(fanLevels, v ?? "", "mid") };
 }
+/** A new rule that switches the given ACs off on weekday evenings (IR811), opened from the Running list's "Turn off
+running ACs": the ACs and Power OFF at 19:00 are filled in; the end action stays for the customer to choose (it is
+never assumed, DD-C04), and the rule is saved off like any new one. The first AC is the target, the rest `others`. */
+export function afterHoursDraft(unitIds: string[], timezone: string, name: string): Draft {
+  const [first = "", ...rest] = unitIds;
+  return { ...blankDraft(first, timezone), name, others: rest.slice(0, 49), startLocal: "19:00", endLocal: "23:00", startAction: "power:off" };
+}
 export function blankDraft(unitId: string, timezone: string): Draft {
   return {
     id: null,
