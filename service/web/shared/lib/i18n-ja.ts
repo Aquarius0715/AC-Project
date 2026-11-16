@@ -1105,6 +1105,8 @@ export const ja: Record<string, string> = {
   "No answer yet — checking the result…": "まだ応答がありません — 結果を確認しています…",
   "{celsius}°C is very cold for cooling: a lower setting does not cool the room faster, it runs longer and uses more power. 24–26°C is a common comfortable range.": "冷房の {celsius}°C はかなり低い設定です。低くしても早くは冷えず、運転が長くなり電力が増えます。24〜26°C が一般的な快適範囲です。",
   "Undo": "元に戻す",
+  "Switch off after hours": "営業時間後に停止",
+  "Turn these off automatically every weekday…": "平日は毎日これらを自動で停止…",
   "Group change finished — results are shown per AC": "グループの変更が完了しました — 結果はエアコンごとに表示されます",
   "{n} selected": "{n} 台を選択",
   "Select all online ({n})": "オンラインをすべて選択（{n}）",
