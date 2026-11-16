@@ -95,7 +95,7 @@ export function AirQualityView({ live }: Readonly<{ live: AirLive | null }>) {
       </div>
       <Card><div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px]"><b>{live.allergen.title}</b><Badge tone={live.allergen.badge.tone} icon={live.allergen.badge.icon}>{live.allergen.badge.text}</Badge><span className="text-xs text-muted-foreground">{live.allergen.text}</span></div></Card>
       {live.clean && <Banner tone="warn" action={<LinkButton size="sm" href="/customer/maintenance">{t("Maintenance")}</LinkButton>}>{live.clean}</Banner>}
-      <Banner tone={live.strip.tone} action={<Btn size="sm" variant={live.strip.tone === "warn" ? "primary" : "secondary"} disabled={!live.spaceId} title={live.spaceId ? undefined : t("Logs belong to a room — this unit is not in one")} onClick={() => { setOpen(true); }}>{t("Log ventilation")}</Btn>}>
+      <Banner tone={live.strip.tone} action={<span className="flex flex-wrap items-center gap-2"><Btn size="sm" variant={live.strip.tone === "warn" ? "primary" : "secondary"} disabled={!live.spaceId} onClick={() => { setOpen(true); }}>{t("Log ventilation")}</Btn>{!live.spaceId && <span className="text-[11px] text-muted-foreground">{t("Logs belong to a room — this unit is not in one")}</span>}</span>}>
         <b>{live.strip.title}</b><div className="text-xs text-muted-foreground">{live.strip.text}{!live.spaceId && ` ${t("Ventilation logs belong to a room — HQ sets up the rooms, so ask HQ to place this unit in one.")}`}</div>
       </Banner>
       <Card title={c.title} sub={c.sub} action={<div className="flex flex-wrap gap-2">
