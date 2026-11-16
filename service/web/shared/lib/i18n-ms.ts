@@ -4121,10 +4121,12 @@ export const ms: Record<string, string> = {
   "Temperature (°C)": "Suhu (°C)",
   "Level": "Tahap",
   // Photos linked to an inspection finding (IR352)
+  "Take or add a photo here: it is linked to this finding.": "Ambil atau tambah foto di sini: ia dipautkan pada dapatan ini.",
+  "Add photo": "Tambah foto",
+  "Add a photo to {item}": "Tambah foto pada {item}",
   "Link photo": "Pautkan foto",
   "Linked photos: {names}": "Foto yang dipautkan: {names}",
   "Unlink {photo} from {item}": "Nyahpaut {photo} daripada {item}",
-  "Add a photo under Photos first, then link it to this finding.": "Tambah foto di bawah Foto dahulu, kemudian pautkannya pada penemuan ini.",
   "Report photos to link to {item}": "Foto laporan untuk dipautkan pada {item}",
   // Mark all as read; the diagnostic end retry (IR351)
   "{n} marked as read · {skipped} skipped — read meanwhile or no longer available": "{n} ditanda sebagai dibaca · {skipped} dilangkau — sudah dibaca sementara itu atau tidak lagi tersedia",
