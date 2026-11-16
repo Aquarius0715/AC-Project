@@ -10607,6 +10607,14 @@ Found in the UI/UX loop (UX-49, scheduled operation: "switch Office A off at 19:
 4. **Tests.** `clientAutomations.test.ts`: the common actions of a wide and a narrow AC (power, the shared temperatures, cool), one AC equal to its own options, none for no AC or an AC without capabilities.
 5. **Checked on the dev stack.** A rule for Lobby AC and Meeting room AC (Office A) was saved, listed as "(+1 more AC)", reopened with both, then deleted.
 
+## IR804 The command history says who sent a command: you or someone else — 2026-11-16
+
+Found in the UI/UX loop (UX-51, several users on one account). A customer owner and their family or staff share one account. When an AC's setting changed, its command history said "Set power OFF — acknowledged by device" with no hint of who sent it. Only automations, restrictions and test runs named their source. `commands.list` already returns `actorMembershipId` to the client; IR216 hides only another actor's reason.
+
+1. **Rows.** `historyRow` takes the reader's membership. A command with no other source (sent by hand) ends "· by you" when its actor is the reader, else "· by someone else". No name is shown, so nothing new is disclosed. Automation, restriction and test-run commands keep "· by an automation" and the others.
+2. **Where.** The customer unit page's command history. The page passes `me.membershipId` from the session.
+3. **Tests.** `units.test.ts`: by you, by someone else, an automation's command, and no reader (unchanged).
+
 ## IR803 Energy & cost ranks the ACs by use — 2026-11-16
 
 Found in the UI/UX loop (UX-50: "which AC should I review?"). Energy & cost showed one AC, the first by name, or up to four that the customer picked. Nothing said which of the 23 ACs used the most, so finding the one to review took 23 selections.
