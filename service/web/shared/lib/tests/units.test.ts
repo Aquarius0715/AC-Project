@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { translator } from "@ac/web/lib/i18n";
 import { unitDetail } from "./unitFixture";
-import { actionText, controlLayout, historyRow, latest, setsTemperature, type ApiCommand, type ApiUnitDetail } from "@ac/web/lib/units";
+import { actionText, answerSeconds, controlLayout, historyRow, latest, setsTemperature, type ApiCommand, type ApiUnitDetail } from "@ac/web/lib/units";
 
 const TEMPERATURE = "temperature";
 
@@ -79,5 +79,18 @@ describe("the remote control a model offers (deterministic contracts, AT-X06; IR
     expect(controlLayout(model({ control: false }))).toStrictEqual({ control: false, temperature: null, modes: [], fans: [], review: false });
     // other screens point a temperature to Unit Control only when its temperature row is there (IR544)
     expect([setsTemperature(model({})), setsTemperature(model({ temperature: null })), setsTemperature(model({ control: false })), setsTemperature(null)]).toStrictEqual([true, false, false, true]);
+  });
+});
+
+// IR806: the countdown while waiting for the AC starts from the command's own answer window
+describe("answer window", () => {
+  it("is the span from request to expiry, else 30 s", () => {
+    expect([
+      answerSeconds({ requestedAt: "2026-09-22T13:31:40Z", expiresAt: "2026-09-22T13:32:10Z" }),
+      answerSeconds({ requestedAt: "2026-09-22T13:31:40Z", expiresAt: "2026-09-22T13:33:40Z" }),
+      answerSeconds({ requestedAt: "2026-09-22T13:31:40Z" }),
+      answerSeconds({ requestedAt: "2026-09-22T13:31:40Z", expiresAt: "2026-09-22T13:31:40Z" }),
+      answerSeconds({ requestedAt: "bad", expiresAt: "2026-09-22T13:31:40Z" }),
+    ]).toStrictEqual([30, 120, 30, 30, 30]);
   });
 });
