@@ -48,6 +48,8 @@ describe("customer energy & cost (FR-C06, FR-C13)", () => {
 
   it("shows the figures and the calculation conditions of a summary", () => {
     const v = summaryView(summary);
+    expect(v.rate).toBe("0.50 MYR/kWh"); // 60.12 MYR ÷ 120.25 kWh (UI/UX loop R137)
+    expect(summaryView(empty).rate).toBeNull();
     expect([v.actual, v.baseline, v.difference, v.percent, v.cost, v.savedCost, v.emissions, v.savedEmissions, v.coverage, v.comparable, v.increase])
       .toEqual(["120.3 kWh", "135.0 kWh", "Reduction 14.8 kWh", "Reduction 10.9%", "60.12 MYR", "Reduction 7.38 MYR", "71.0 kgCO₂e", "Reduction 8.7 kgCO₂e", "98.8%", true, false]);
     expect(v.conditions).toEqual([

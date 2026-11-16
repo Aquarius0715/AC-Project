@@ -110,7 +110,7 @@ export function EnergyView({ live }: Readonly<{ live: EnergyLive }>) {
       {s && r && <>
         <div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>
           <Kpi label={t("Actual energy")} value={r.kWh === null ? "—" : one(r.kWh)} unit={r.kWh === null ? undefined : "kWh"} sub={t("{subject} · {days} · coverage {coverage}", { subject, days, coverage: s.coverage })} />
-          <Kpi label={t("Estimated cost")} value={s.cost.split(" ", 1)[0]} unit={s.cost === "—" ? undefined : s.cost.split(" ", 2)[1]} sub={t("{tariff} · taxes excluded", { tariff: r.tariff })} />
+          <Kpi label={t("Estimated cost")} value={s.cost.split(" ", 1)[0]} unit={s.cost === "—" ? undefined : s.cost.split(" ", 2)[1]} sub={s.rate ? t("avg {rate} · {tariff} · taxes excluded", { rate: s.rate, tariff: r.tariff }) : t("{tariff} · taxes excluded", { tariff: r.tariff })} />
           <Kpi label={t("Savings vs baseline")} value={s.comparable ? s.difference : "—"} tone={savingTone(s)}
             sub={s.comparable ? t("{percent} · {cost} vs {baseline} baseline", { percent: s.percent, cost: s.savedCost, baseline: s.baseline }) : noSavings} />
           <Kpi label={t("Data coverage")} value={s.coverage} sub={t(r.coverage === 1 ? "All expected minutes observed" : "Missing readings are not filled in")} />

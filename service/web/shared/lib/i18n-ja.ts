@@ -1305,6 +1305,7 @@ export const ja: Record<string, string> = {
   "{subject} · {days} · coverage {coverage}": "{subject} · {days} · カバー率 {coverage}",
   "Estimated cost": "推定コスト",
   "{tariff} · taxes excluded": "{tariff} · 税抜き",
+  "avg {rate} · {tariff} · taxes excluded": "平均 {rate} · {tariff} · 税抜き",
   "Savings vs baseline": "ベースラインとの比較による削減量",
   "{percent} · {cost} vs {baseline} baseline": "{percent} · {cost}（ベースライン {baseline} 比）",
   "Cannot calculate — baseline not comparable for this period": "計算できません — この期間ではベースラインを比較できません",
