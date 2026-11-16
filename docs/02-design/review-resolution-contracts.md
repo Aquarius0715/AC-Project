@@ -10759,3 +10759,10 @@ Found in the UI/UX loop (UX-61, criterion 7: find the AC quickly; "favourites").
 2. **Overview.** "Pinned ACs" comes before the unit list. It shows each pinned AC of the current selection with its place, room temperature, and power and connection badges. Each links to the AC's page and has an unpin button. With no pin in the selection the card is not shown.
 3. **Not stored on the server.** Pins do not follow the user to another device. The card says "this browser only".
 4. **Tests.** `pinnedUnits.test.ts` covers valid and invalid stored values, the 8-pin cap, and pin and unpin order.
+
+## IR818 Customer Users says how a forgotten password is reset — 2026-11-16
+
+Found in the UI/UX loop (UX-70, criteria 4 and 10). The customer Users page said "For a password reset, contact HQ." Since IR646, the sign-in page's Forgot password? sends the reset e-mail itself (`resetPasswordAllowed`, SMTP set). An owner asked about a forgotten password was sent to HQ for something the user does alone.
+
+1. **Text.** The note now reads "A user who forgot their password resets it with “Forgot password?” on the sign-in page." In ms, ja and id it uses the sign-in page's own label: Lupa kata laluan? / パスワードをお忘れですか？ / Lupa kata sandi?. The demo view and the page comment say the same.
+2. **Docs.** DD-C19's two lines follow. The DEC-77 entry's "Password resets stay with HQ" is about another user's password: an owner still cannot reset it.
