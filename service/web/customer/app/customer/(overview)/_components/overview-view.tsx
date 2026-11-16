@@ -13,6 +13,9 @@ import { Icon } from "@ac/web/components/Icon";
 
 /** Customer overview (FR-C01, DD-C01, Figma Client 01a) from the Core API: the scope and period live in the URL; the
 texts and times follow the user's display language and time zone (IR260). */
+/** Units a property shows before "Show all" on the overview. */
+const UNITS_FIRST = 5;
+
 export function OverviewView({ live }: Readonly<{ live: OverviewLive }>) {
   const t = useT();
   const router = useRouter();
@@ -22,6 +25,9 @@ export function OverviewView({ live }: Readonly<{ live: OverviewLive }>) {
   const a = live.attention;
   // the values were read when the page rendered: two minutes later they read as stale until a refresh (DD-C01)
   const [staleFor, setStaleFor] = useState<string | null>(null);
+  // a property with many units shows its first ones; the rest open on request — the Mock fleet's 19 rows pushed the
+  // overview's other cards far down (UI/UX loop R141)
+  const [allOf, setAllOf] = useState<string[]>([]);
   useEffect(() => {
     const timer = setTimeout(() => { setStaleFor(live.asOf); }, 120_000);
     return () => { clearTimeout(timer); };
@@ -100,7 +106,7 @@ export function OverviewView({ live }: Readonly<{ live: OverviewLive }>) {
             </div>
             {byProperty(live.rows).map((g, gi, groups) => <Fragment key={g.property || "none"}>
               {groups.length > 1 && <h3 className={cx("flex items-baseline gap-2 pb-1 text-xs font-bold text-muted-foreground", gi > 0 ? "pt-4" : "pt-1")}>{g.property || t("Not in a property")}<span className="font-normal">{t(g.rows.length === 1 ? "{n} unit" : "{n} units", { n: g.rows.length })}</span></h3>}
-              {g.rows.map((u) => (
+              {(allOf.includes(g.property) ? g.rows : g.rows.slice(0, UNITS_FIRST)).map((u) => (
               <Link key={u.id} href={`/customer/units/${u.id}`} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-2 py-3 hover:bg-surface2/50 lg:grid-cols-[minmax(0,1fr)_72px_72px_72px_120px_14px]">
                 <div className="flex min-w-0 items-center gap-2.5"><span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-primary-soft text-primary"><Icon name="units" /></span><div className="min-w-0"><div className="truncate font-bold">{u.name}</div><div className="truncate text-[11px] text-muted-foreground">{u.place ? `${u.place} · ` : ""}{u.observed}</div></div></div>
                 <div className="col-span-2 row-start-2 flex gap-4 text-xs lg:contents">
@@ -112,6 +118,7 @@ export function OverviewView({ live }: Readonly<{ live: OverviewLive }>) {
                 <span className="hidden text-muted-foreground lg:block"><Icon name="chevronRight" /></span>
               </Link>
               ))}
+              {g.rows.length > UNITS_FIRST && <div className="py-2"><Btn size="sm" variant="ghost" aria-expanded={allOf.includes(g.property)} onClick={() => { setAllOf((x) => (x.includes(g.property) ? x.filter((p) => p !== g.property) : [...x, g.property])); }}>{t(allOf.includes(g.property) ? "Show the first {n}" : "Show all {total}", { n: UNITS_FIRST, total: g.rows.length })}</Btn></div>}
             </Fragment>)}
             {live.rows.length === 0 && <p className="py-4 text-center text-xs text-muted-foreground">{t("No units in this selection.")}</p>}
           </div>
