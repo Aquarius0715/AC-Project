@@ -42,13 +42,18 @@ function treeIcon(n: Node): IconName {
   if (n.children) return "chevronDown";
   return n.unassigned ? "unknown" : "chevronRight";
 }
-/** The selected space's path: a group space, the home, the unassigned units or a room of the home. */
-function spaceTitle(sel: string, isRoom: boolean): string {
-  if (sel === "ws") return "Office A › Open office › Workstations";
-  if (sel === "meeting") return "Office A › 3F › Meeting room";
-  if (sel === "home-a") return "Home A";
-  if (!isRoom) return sel === UNASSIGNED ? "Unassigned units (1)" : "Home A";
-  return `Home A › 1F › ${sel.charAt(0).toUpperCase()}${sel.slice(1)}`;
+/** The tree rows from a property down to the space with this id, or null when no row has it. */
+function pathTo(nodes: readonly Node[], id: string): Node[] | null {
+  for (const n of nodes) {
+    if (n.id === id) return [n];
+    const below = n.children ? pathTo(n.children, id) : null;
+    if (below) return [n, ...below];
+  }
+  return null;
+}
+/** The selected space's path (Office A › 3F › Meeting room); the unassigned units are not in a room. */
+function spaceTitle(sel: string): string {
+  return sel === UNASSIGNED ? "Unassigned units (1)" : (pathTo(tree, sel) ?? [tree[0]]).map((n) => n.name).join(" › ");
 }
 const GROUP_SPACE = new Map([["ws", "Workstations"], ["meeting", "Meeting room"]]);
 function TreeRow({ n, depth, sel, onSel, onRename }: Readonly<{ n: Node; depth: number; sel: string; onSel: (id: string) => void; onRename: (n: Node) => void }>) {
@@ -90,7 +95,7 @@ export function PropertiesDemo() {
           <div className="flex flex-col text-[13px]">{tree.map((n) => <TreeRow key={n.id} n={n} depth={0} sel={sel} onSel={(id) => { setSel(id); setMode("single"); }} onRename={startRename} />)}</div>
           <p className="mt-3 text-[11px] text-muted-foreground">Read-only — HQ sets up properties, floors, rooms and units. You can rename any location with its edit button or Rename; nothing else here changes the structure.</p>
         </Card>
-        <Card title={spaceTitle(sel, Object.hasOwn(roomUnits, sel))} sub={sel === "home-a" ? "Home A · Home" : undefined} action={sel !== UNASSIGNED && <Btn size="sm" onClick={() => { startRename(tree[0]); }}><Icon name="edit" />Rename</Btn>}>
+        <Card title={spaceTitle(sel)} sub={sel === "home-a" ? "Home A · Home" : undefined} action={sel !== UNASSIGNED && <Btn size="sm" onClick={() => { startRename(pathTo(tree, sel)?.at(-1) ?? tree[0]); }}><Icon name="edit" />Rename</Btn>}>
           {sel === "home-a" && (
             <>
               <SummaryList cols={2} items={[["Type", "Home"], ["Floors", "2 (1F, 2F)"], ["Rooms", "4"], ["Air conditioners", "5 in rooms · 1 unassigned"], ["Last edited", "Sep 12 · version 3"]]} />
