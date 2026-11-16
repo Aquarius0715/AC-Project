@@ -5818,6 +5818,7 @@ export const ja: Record<string, string> = {
   "Delete this campaign? Its device results are removed with it; the devices and their history stay.": "この配信を削除しますか？ デバイスごとの結果も一緒に削除されます。デバイスとその履歴は残ります。",
   "This campaign has not ended — abort it first": "この配信はまだ終わっていません。先に中止してください",
   "Delete customer…": "お客様を削除…",
+  "Has units — a customer with units cannot be deleted": "ユニットあり — ユニットを持つ顧客は削除できません",
   "Delete customer": "お客様を削除",
   "Customer deleted": "お客様を削除しました",
   "Delete {name}? Its locations (properties and spaces) are removed with it. A customer with units, jobs, contracts, invoices or users cannot be deleted.": "{name} を削除しますか？ 場所（物件とスペース）も一緒に削除されます。ユニット・案件・契約・請求・ユーザーがあるお客様は削除できません。",

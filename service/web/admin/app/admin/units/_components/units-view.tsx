@@ -204,7 +204,9 @@ function CustomerScreen({ live, c }: Readonly<{ live: UnitsLive; c: CustomerLive
         {/* the actions wrap at phone width: three in Malay are wider than 360 px (IR730) */}
         <div className="ml-auto flex flex-wrap justify-end gap-2">
           {canWrite && <Btn size="sm" onClick={() => { setM({ kind: "customer" }); }}>{t("Edit customer")}</Btn>}
-          {canWrite && <Btn size="sm" variant="danger" onClick={() => { setM({ kind: "deleteCustomer" }); }}>{t("Delete customer…")}</Btn>}
+          {/* a customer with units is refused even with force (Units … still stop it): off up front, with the reason (UI/UX loop R134) */}
+          {canWrite && <Btn size="sm" variant="danger" disabled={r.units > 0} onClick={() => { setM({ kind: "deleteCustomer" }); }}>{t("Delete customer…")}</Btn>}
+          {canWrite && r.units > 0 && <span className="self-center text-xs text-muted-foreground">{t("Has units — a customer with units cannot be deleted")}</span>}
           {canWrite && r.status === "active" && c.tree.length > 0 && isHeaderNewUnit && <Btn size="sm" variant="primary" onClick={addUnitHere}><Icon name="add" /> {t("New unit")}</Btn>}
         </div>
       </div>

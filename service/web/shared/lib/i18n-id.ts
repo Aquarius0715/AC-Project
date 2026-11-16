@@ -5818,6 +5818,7 @@ export const id: Record<string, string> = {
   "Delete this campaign? Its device results are removed with it; the devices and their history stay.": "Hapus kampanye ini? Hasil perangkatnya ikut dihapus; perangkat dan riwayatnya tetap ada.",
   "This campaign has not ended — abort it first": "Kampanye ini belum berakhir — batalkan lebih dulu",
   "Delete customer…": "Hapus pelanggan…",
+  "Has units — a customer with units cannot be deleted": "Memiliki unit — pelanggan yang memiliki unit tidak dapat dihapus",
   "Delete customer": "Hapus pelanggan",
   "Customer deleted": "Pelanggan dihapus",
   "Delete {name}? Its locations (properties and spaces) are removed with it. A customer with units, jobs, contracts, invoices or users cannot be deleted.": "Hapus {name}? Lokasinya (properti dan ruang) ikut dihapus. Pelanggan yang memiliki unit, pekerjaan, kontrak, faktur, atau pengguna tidak dapat dihapus.",
