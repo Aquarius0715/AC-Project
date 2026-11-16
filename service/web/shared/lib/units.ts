@@ -114,6 +114,14 @@ export function actionText(a: CommandAction, t: T = en): string {
 const statusText: Record<ApiCommand["status"], string> = { requested: "requested", sent: "waiting for device", acknowledged: "acknowledged by device", failed: "failed", expired: "no device response (expired)", cancelled: "cancelled" };
 const sourceText: Record<string, string> = { automation: " · by an automation", restriction: " · by a restriction", diagnostic: " · technician test run" };
 
+/** The setpoint below which cooling gets a hint (IR808). */
+const COOL_HINT_BELOW = 22;
+/** A hint to review a very low cooling setpoint (IR808): setting the AC colder does not cool the room faster, it only
+runs longer and uses more power. Null when the mode is not cooling or the setpoint is at or above COOL_HINT_BELOW. */
+export function coolingHint(mode: string, celsius: number, t: T = en): string | null {
+  return mode === "cool" && celsius < COOL_HINT_BELOW ? t("{celsius}°C is very cold for cooling: a lower setting does not cool the room faster, it runs longer and uses more power. 24–26°C is a common comfortable range.", { celsius }) : null;
+}
+
 /** The seconds a command's device has to answer it (IR806): from its request to its expiry, 30 when either is missing
 or the span is not a positive number. */
 export function answerSeconds(c: Pick<ApiCommand, "requestedAt" | "expiresAt">): number {
