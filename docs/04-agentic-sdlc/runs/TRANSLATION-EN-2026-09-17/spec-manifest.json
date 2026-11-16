@@ -1,12 +1,12 @@
 {
   "version": "0.210.0",
-  "spec_baseline_id": "c1b0e8d31da7b67c0eec4706b58a729659046259212184c8202e204261981413",
+  "spec_baseline_id": "8dd94cf15bc64bfbdad8fbe44796da81050430db39a6cbb09617c7afa600a8a2",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
     {
       "path": "00-prepare/PrepareDocument.md",
-      "sha256": "91b545a8f0e082f6dff007eae4b3ab58dde35f32541649c16496d62862e1c62b"
+      "sha256": "8ab45ba6dd7a103009aaaef3f146b4b9cd9db036746f13d5ca8fdc625304ba9f"
     },
     {
       "path": "00-prepare/company-requirement-map.csv",
@@ -98,11 +98,11 @@
     },
     {
       "path": "02-design/admin.md",
-      "sha256": "3bc54f009254583b989a0f14add0d54c320e277bfb62dd2f299830ddfa7adf81"
+      "sha256": "3a428ee34d1740fe566ecd16247ae3f3424e56548cf1f21b9c9d1fb5f38343fd"
     },
     {
       "path": "02-design/api/swagger.json",
-      "sha256": "64f6f06edb82211dde43d63a14ffd27684a1164f3e126f45a933c89366af5a2a"
+      "sha256": "0fd0fe6dcaaa9e21df71db09abcd866cd0330e3d1daa061a1ddff4b5eb31ae17"
     },
     {
       "path": "02-design/backend-architecture.md",
@@ -158,7 +158,7 @@
     },
     {
       "path": "02-design/operation-catalog.csv",
-      "sha256": "30cb873a724b38ecc66583467ea50431764e4ec9e333a2736ed6d2b00535feea"
+      "sha256": "a000a350147a35b867ea1fdde102d0bc2defec392a3852e0b28fe410e90daff2"
     },
     {
       "path": "02-design/operation-persistence-map.csv",
@@ -170,11 +170,11 @@
     },
     {
       "path": "02-design/review-resolution-contracts.md",
-      "sha256": "fdc3116229c7d2900aed649baa8a9f5f901868244e889b85d36e6f29f7b830f6"
+      "sha256": "ae7cd1311fba0b682318675e9bee242e59f67abf6f8ce39b39455a1de281e50a"
     },
     {
       "path": "02-design/service-contracts.ts",
-      "sha256": "138b47458b9d29661cb946104b679e6883859e431cf8493af2c94227c7ea075f"
+      "sha256": "f2fd5f009c1d264ef7228b60d6f106224c2aa45e754a36b87b0bbf408b4b4756"
     },
     {
       "path": "02-design/strict-review-contracts.md",
@@ -298,7 +298,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "def4c607288dd4dc851a47161a261eb6d0a1824a78f99cf5272610e41287c8be"
+      "sha256": "cc692a0c8711d8f1d2d5f75efa18c7dd72a982a53189f267ea3df78d5aabe593"
     },
     {
       "path": "tools/check_review_regressions.py",

@@ -9,7 +9,7 @@ const request: InstallationRequest = {
   status: "submitted", declineReason: null, decidedAt: null, jobIds: [],
 };
 const names = {
-  properties: [{ id: "p1", version: 1, customerOrgId: "org", kind: "office" as const, name: "HQ tower", address: null, accessInstructions: null, archived: false, updatedAt: "" }],
+  properties: [{ id: "p1", version: 1, customerOrgId: "org", kind: "office" as const, name: "HQ tower", address: null, accessInstructions: null, location: null, geofenceRadiusMeters: null, archived: false, updatedAt: "" }],
   spaces: [
     { id: "s1", version: 1, propertyId: "p1", parentSpaceId: null, kind: "floor" as const, name: "Level 2", archived: false },
     { id: "s2", version: 1, propertyId: "p1", parentSpaceId: "s1", kind: "room" as const, name: "Room 2.1", archived: false },

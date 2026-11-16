@@ -1095,8 +1095,10 @@
   "accessInstructions",
   "address",
   "customerOrgId",
+  "geofenceRadiusMeters",
   "id",
   "kind",
+  "location",
   "name"
  ],
  "rateCards.delete": [

@@ -341,10 +341,14 @@ CREATE TABLE assets.properties (
   name                text NOT NULL CHECK (length(name) BETWEEN 1 AND 120),
   address             text,
   access_instructions text,
+  latitude            double precision CHECK (latitude BETWEEN -90 AND 90),     -- DEC-109: HQ's map pin (WGS 84)
+  longitude           double precision CHECK (longitude BETWEEN -180 AND 180),
+  geofence_radius_m   int CHECK (geofence_radius_m BETWEEN 50 AND 2000),        -- away/home radius; NULL = 150 m
   archived            boolean NOT NULL DEFAULT false,
   version             int NOT NULL DEFAULT 1,
   created_at          timestamptz NOT NULL DEFAULT platform.app_now(),
   updated_at          timestamptz NOT NULL DEFAULT platform.app_now(),
+  CONSTRAINT properties_location_pair CHECK ((latitude IS NULL) = (longitude IS NULL)),
   UNIQUE (tenant_id, id)
 );
 CREATE INDEX properties_customer ON assets.properties (tenant_id, customer_org_id) WHERE NOT archived;

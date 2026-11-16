@@ -26,8 +26,11 @@ export type Scope = "indoor" | "outdoor" | "electrical";
 
 export interface ApiOrgRow { id: string; version: number; name: string; kind: "customer" | "contractor" | "operator"; status: "active" | "inactive" }
 export interface ApiCustomerRow { id: string; version: number; name: string; status: "active" | "inactive"; organizationId: string; serviceProfile: Profile; createdAt: string }
+/** GeoPoint of service-contracts.ts: WGS 84 degrees (DEC-109). */
+export interface GeoPoint { latitude: number; longitude: number }
 export interface ApiPropertyRow {
-  id: string; version: number; customerOrgId: string; kind: "home" | "office"; name: string; address: string | null; accessInstructions: string | null; archived: boolean; updatedAt: string;
+  id: string; version: number; customerOrgId: string; kind: "home" | "office"; name: string; address: string | null; accessInstructions: string | null;
+  location: GeoPoint | null; geofenceRadiusMeters: number | null; archived: boolean; updatedAt: string;
 }
 export interface ApiSpaceRow { id: string; version: number; propertyId: string; parentSpaceId: string | null; kind: "area" | "floor" | "room" | "space"; name: string; archived: boolean }
 /** planned until an accepted installation report installs the unit (DEC-106) */
@@ -160,7 +163,8 @@ const hasLength = (s: string, max: number) => codePoints(s.trim()) >= 1 && codeP
 
 export interface TreeSpace { id: string; version: number; kind: ApiSpaceRow["kind"]; name: string; propertyId: string; parentSpaceId: string | null; direct: number; units: number; children: TreeSpace[] }
 export interface TreeProperty {
-  id: string; version: number; kind: "home" | "office"; name: string; address: string | null; accessInstructions: string | null; updatedAt: string;
+  id: string; version: number; kind: "home" | "office"; name: string; address: string | null; accessInstructions: string | null;
+  location: GeoPoint | null; geofenceRadiusMeters: number | null; updatedAt: string;
   units: number; unassigned: number; floors: number; rooms: number; spaces: TreeSpace[];
 }
 export const flatten = (xs: TreeSpace[]): TreeSpace[] => xs.flatMap((x) => [x, ...flatten(x.children)]);
@@ -178,7 +182,8 @@ export function locationTree(ps: ApiPropertyRow[], ss: ApiSpaceRow[], us: ApiUni
     const spaces = build(p.id, null);
     const all = flatten(spaces);
     return {
-      id: p.id, version: p.version, kind: p.kind, name: p.name, address: p.address, accessInstructions: p.accessInstructions, updatedAt: p.updatedAt,
+      id: p.id, version: p.version, kind: p.kind, name: p.name, address: p.address, accessInstructions: p.accessInstructions,
+      location: p.location, geofenceRadiusMeters: p.geofenceRadiusMeters, updatedAt: p.updatedAt,
       units: us.filter((u) => u.propertyId === p.id).length, unassigned: us.filter((u) => u.propertyId === p.id && u.spaceId === null).length,
       floors: all.filter((s) => s.kind === "floor").length, rooms: all.filter((s) => s.kind === "room").length, spaces,
     };
@@ -235,8 +240,11 @@ export function placeOptions(tree: TreeProperty[], ss: ApiSpaceRow[], t: T = en)
   });
 }
 
-export interface PropertyDraft { kind: "home" | "office"; name: string; address: string; accessInstructions: string }
-export const propertyDraft = (p?: TreeProperty): PropertyDraft => ({ kind: p?.kind ?? "home", name: p?.name ?? "", address: p?.address ?? "", accessInstructions: p?.accessInstructions ?? "" });
+/** The property form; location and geofenceRadiusMeters ride along unchanged until the map pin is edited (DEC-109). */
+export interface PropertyDraft { kind: "home" | "office"; name: string; address: string; accessInstructions: string; location: GeoPoint | null; geofenceRadiusMeters: number | null }
+export const propertyDraft = (p?: TreeProperty): PropertyDraft => ({
+  kind: p?.kind ?? "home", name: p?.name ?? "", address: p?.address ?? "", accessInstructions: p?.accessInstructions ?? "", location: p?.location ?? null, geofenceRadiusMeters: p?.geofenceRadiusMeters ?? null,
+});
 export function propertyErrors(d: PropertyDraft, t: T = en): Record<string, string> {
   const e: Record<string, string> = {};
   if (!hasLength(d.name, 120)) e.name = t(TEXT_1_120_CHARACTERS);
@@ -247,6 +255,7 @@ export function propertyErrors(d: PropertyDraft, t: T = en): Record<string, stri
 export const propertyInput = (d: PropertyDraft, orgId: string, id?: string) => {
   return {
     ...(id && { id }), customerOrgId: orgId, kind: d.kind, name: d.name.trim(), address: d.address.trim() || null, accessInstructions: d.accessInstructions.trim() || null,
+    location: d.location, geofenceRadiusMeters: d.geofenceRadiusMeters,
   };
 };
 export const nameError = (name: string, t: T = translator("en")) => (hasLength(name, 120) ? undefined : t(TEXT_1_120_CHARACTERS));
