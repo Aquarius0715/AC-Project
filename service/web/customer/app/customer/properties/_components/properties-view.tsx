@@ -41,6 +41,11 @@ air conditioners, and owners can send one change to several of them (Group contr
 // a command's state and a group test's result as a badge colour (primary for the others)
 const TRY_TONE = new Map<string, "ok" | "crit" | "warn">([["Confirmed", "ok"], ["Failed", "crit"], ["Waiting", "warn"], ["Unknown", "warn"]]);
 const RESULT_TONE = new Map<string, "unknown" | "warn" | "muted">([["Skipped", "unknown"], ["Clamped", "warn"], ["No change", "muted"]]);
+/** The tree row a navigation patch selects: a space, a property's unassigned units or the property; null for none. */
+function targetOf(patch: Record<string, string | null>): string | null {
+  return patch.unassignedOnly && patch.propertyId ? `unassigned:${patch.propertyId}` : patch.spaceId ?? patch.propertyId ?? null;
+}
+
 export function PropertiesView({ live }: Readonly<{ live: PropertiesLive }>) {
   const t = useT();
   const [nav, isNavPending] = useUrlPatchPending();
@@ -48,10 +53,15 @@ export function PropertiesView({ live }: Readonly<{ live: PropertiesLive }>) {
   // a location or KPI filter the user chose: on a phone its panel comes above the tree, else a tap showed nothing new on screen
   const params = useSearchParams();
   const isChosen = !!live.filter || params.has("spaceId") || params.has("propertyId");
+  // the location just clicked: the tree marks it at once while the server renders its panel (UI/UX loop R75)
+  const [target, setTarget] = useState<string | null>(null);
   if (live.tree.length === 0) return <Page><EmptyState title={t("No properties yet")}>{t("HQ registers your homes and offices with their rooms and air conditioners; they appear here once set up.")}</EmptyState></Page>;
   const sel = live.selection;
   const selId = selectionId(sel);
-  const go = (patch: Record<string, string | null>) => { nav({ propertyId: null, spaceId: null, unassignedOnly: null, mode: null, unitIds: null, powerState: null, connections: null, ...patch }); };
+  const isPendingTarget = isNavPending && target !== null;
+  const isFilterShown = !!live.filter && !isPendingTarget;
+  const shownSel = isPendingTarget ? target : selId;
+  const go = (patch: Record<string, string | null>) => { setTarget(targetOf(patch)); nav({ propertyId: null, spaceId: null, unassignedOnly: null, mode: null, unitIds: null, powerState: null, connections: null, ...patch }); };
   return (
     <Page>
       <div className="split-rev">
@@ -59,16 +69,17 @@ export function PropertiesView({ live }: Readonly<{ live: PropertiesLive }>) {
           <div className="flex flex-col text-[13px]">
             {live.tree.map((p) => (
               <div key={p.id}>
-                <Row depth={0} selected={!live.filter && selId === p.id} onClick={() => { go({ propertyId: p.id }); }} icon="home" name={p.name} tag={kind(t, p.kind)}
+                <Row depth={0} selected={!isFilterShown && shownSel === p.id} onClick={() => { go({ propertyId: p.id }); }} icon="home" name={p.name} tag={kind(t, p.kind)}
                   onRename={() => { setRenaming({ kind: "property", id: p.id, version: p.version, name: p.name, where: t("{name} · {kind} (property)", { name: p.name, kind: kind(t, p.kind) }) }); }} />
-                {p.spaces.map((s) => <SpaceRow key={s.id} s={s} p={p} depth={1} selId={live.filter ? "" : selId} go={go} rename={setRenaming} />)}
-                {p.unassigned > 0 && <Row depth={1} selected={!live.filter && selId === `unassigned:${p.id}`} onClick={() => { go({ propertyId: p.id, unassignedOnly: "true" }); }} icon="unknown" name={t("Unassigned units")} meta={t("· {units} · placed by HQ", { units: unitsText(t, p.unassigned) })} />}
+                {p.spaces.map((s) => <SpaceRow key={s.id} s={s} p={p} depth={1} selId={isFilterShown ? "" : shownSel} go={go} rename={setRenaming} />)}
+                {p.unassigned > 0 && <Row depth={1} selected={!isFilterShown && shownSel === `unassigned:${p.id}`} onClick={() => { go({ propertyId: p.id, unassignedOnly: "true" }); }} icon="unknown" name={t("Unassigned units")} meta={t("· {units} · placed by HQ", { units: unitsText(t, p.unassigned) })} />}
               </div>
             ))}
           </div>
           <p className="mt-3 text-[11px] text-muted-foreground">{t("Read-only — HQ sets up properties, floors, rooms and units. You can rename any location with its edit button or Rename; nothing else here changes the structure.")}</p>
         </Card>
-        <div className={cx("flex min-w-0 flex-col gap-4", isChosen && "order-first @min-[880px]:order-none")}>
+        {/* the old panel stays until the new one arrives: dimmed and busy, so it does not read as the clicked location's */}
+        <div aria-busy={isPendingTarget} className={cx("flex min-w-0 flex-col gap-4 transition-opacity", isChosen && "order-first @min-[880px]:order-none", isPendingTarget && "opacity-60")}>
           {live.filter ? <FilteredUnits live={live} clear={() => { go({}); }} /> : sel && <Panel live={live} sel={sel} rename={setRenaming} go={go} isPending={isNavPending} />}
         </div>
       </div>

@@ -3327,7 +3327,6 @@ export const ms: Record<string, string> = {
   "Device events open while you have an assignment on {unit}. Ask HQ or your coordinator if you need them now.": "Peristiwa peranti dibuka semasa anda mempunyai tugasan pada {unit}. Tanya HQ atau penyelaras anda jika anda memerlukannya sekarang.",
   "this unit": "unit ini",
   "Show the latest {n}": "Tunjukkan {n} terkini",
-  "Show all {total}": "Tunjukkan semua {total}",
   "Full history in Audit": "Sejarah penuh dalam Audit",
   "Device events": "Peristiwa peranti",
   "connection, power and tamper are separate events": "sambungan, kuasa dan gangguan ialah peristiwa berasingan",

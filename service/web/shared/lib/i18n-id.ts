@@ -3243,7 +3243,6 @@ export const id: Record<string, string> = {
   "Device events open while you have an assignment on {unit}. Ask HQ or your coordinator if you need them now.": "Peristiwa perangkat terbuka selama Anda memiliki penugasan pada {unit}. Tanyakan HQ atau koordinator Anda jika memerlukannya sekarang.",
   "this unit": "unit ini",
   "Show the latest {n}": "Tampilkan {n} terbaru",
-  "Show all {total}": "Tampilkan semua {total}",
   "Full history in Audit": "Riwayat lengkap di Audit",
   "Device events": "Peristiwa perangkat",
   "connection, power and tamper are separate events": "koneksi, daya, dan perusakan adalah peristiwa terpisah",

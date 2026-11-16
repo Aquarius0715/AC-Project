@@ -3243,7 +3243,6 @@ export const ja: Record<string, string> = {
   "Device events open while you have an assignment on {unit}. Ask HQ or your coordinator if you need them now.": "デバイスのイベントは、{unit} に割り当てがある間に開きます。今すぐ必要な場合は、本部または担当者にご相談ください。",
   "this unit": "このユニット",
   "Show the latest {n}": "最新の {n} 件だけ表示",
-  "Show all {total}": "すべて表示（{total} 件）",
   "Full history in Audit": "全履歴は Audit で見る",
   "Device events": "デバイスのイベント",
   "connection, power and tamper are separate events": "接続、電力、不正開封は別々のイベントです",
