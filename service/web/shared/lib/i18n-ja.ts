@@ -591,7 +591,7 @@ export const ja: Record<string, string> = {
   "Notify me by": "通知方法",
   "In-app (always)": "アプリ内（常に）",
   "Email": "メール",
-  "WhatsApp is only available after you allow it in Preferences. Missing or stale readings never trigger — they show “not measured”.": "WhatsApp は、設定で許可したあとでのみ使えます。測定値がない、または古いときは発動せず、「未測定」と表示します。",
+  "WhatsApp alerts are not available yet. Missing or stale readings never trigger — they show “not measured”.": "WhatsApp でのアラートはまだ使えません。測定値がない・古い場合は発報せず、「未測定」と表示されます。",
   "Summary": "概要",
   "Attached to": "適用先",
   "Not attached to any AC yet.": "まだどのエアコンにも適用されていません。",

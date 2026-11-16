@@ -591,7 +591,7 @@ export const id: Record<string, string> = {
   "Notify me by": "Beri tahu saya lewat",
   "In-app (always)": "Dalam aplikasi (selalu)",
   "Email": "Email",
-  "WhatsApp is only available after you allow it in Preferences. Missing or stale readings never trigger — they show “not measured”.": "WhatsApp hanya tersedia setelah Anda mengizinkannya di Preferensi. Bacaan yang hilang atau usang tidak pernah memicu — tampil sebagai “tidak diukur”.",
+  "WhatsApp alerts are not available yet. Missing or stale readings never trigger — they show “not measured”.": "Peringatan WhatsApp belum tersedia. Pembacaan yang hilang atau usang tidak pernah memicu — ditampilkan sebagai “tidak diukur”.",
   "Summary": "Ringkasan",
   "Attached to": "Terpasang pada",
   "Not attached to any AC yet.": "Belum terpasang pada AC mana pun.",

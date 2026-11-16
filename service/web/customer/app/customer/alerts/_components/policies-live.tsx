@@ -218,8 +218,9 @@ function PolicyEditor({ p, editor, onDone, onFail }: Props & { editor: NonNullab
         <h3 className="mt-4 text-[13px] font-bold">{t("3 · Then …")} <span className="font-normal text-muted-foreground">{t("How loud the alert is and who hears about it")}</span></h3>
         <div className="mt-2 flex flex-col gap-2 text-[13px]">
           <div className="flex flex-wrap items-center gap-3">{t("Severity")} <Choice value={f.severity} onChange={(v: Severity) => { set({ severity: v }); }} options={[{ id: "normal", label: t("Info") }, { id: "warning", label: t("Warning") }, { id: "critical", label: t("Critical") }]} /></div>
-          <div className="flex flex-wrap items-center gap-3">{t("Notify me by")} <Check label={t("In-app (always)")} checked disabled /><Check label={t("Email")} checked={f.email} onChange={(v) => { set({ email: v }); }} /><Check label="WhatsApp" checked={false} disabled /></div>
-          <p className="text-[11px] text-muted-foreground">{t("WhatsApp is only available after you allow it in Preferences. Missing or stale readings never trigger — they show “not measured”.")}</p>
+          <div className="flex flex-wrap items-center gap-3">{t("Notify me by")} <Check label={t("In-app (always)")} checked disabled /><Check label={t("Email")} checked={f.email} onChange={(v) => { set({ email: v }); }} /><Check label={<span>WhatsApp <span className="ml-1 rounded-full bg-surface2 px-1.5 text-[11px] font-medium text-muted-foreground">{t("Coming soon")}</span></span>} checked={false} disabled /></div>
+          {/* no setting anywhere turns WhatsApp on yet, so the hint sends no one to Preferences for it (UI/UX loop R47) */}
+          <p className="text-[11px] text-muted-foreground">{t("WhatsApp alerts are not available yet. Missing or stale readings never trigger — they show “not measured”.")}</p>
         </div>
       </Card>
       <div className="flex flex-col gap-4">
