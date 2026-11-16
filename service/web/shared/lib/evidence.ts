@@ -1,7 +1,8 @@
 // An alert's or observation's evidence text, and the resolution reasons the system writes, in the display language (IR480). The API keeps the evidence as English text,
 // written by the seed (the fixture's demo observations), the filter-care reminders, the policy rules and the tamper and
 // reconciliation alerts. The texts those sources write are shown in the user's language; any other text (a future source,
-// or one a device sends) stays as stored. Names, serials, metrics and numbers inside a text are kept as they are.
+// or one a device sends) stays as stored. Names, serials and numbers inside a text are kept as they are; a metric code
+// is shown in words (IR626, IR812, IR833).
 import type { Params, T } from "@ac/web/lib/i18n";
 import { metricName } from "@ac/web/lib/metricLabels";
 import { lookup } from "@ac/web/lib/lookup";
