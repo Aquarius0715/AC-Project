@@ -10627,6 +10627,14 @@ Found in the UI/UX loop (UX-53, the single-AC control on a phone, criterion 9). 
 2. **Accessibility.** The banner is a polite live region, so the sentence stays fixed and the seconds are `aria-hidden`. A screen reader hears the sentence once, not a count every second.
 3. **Tests.** `units.test.ts` covers `answerSeconds`: 30 s, 120 s, a missing expiry, a zero span and an unreadable time.
 
+## IR808 A very low cooling setpoint gets a hint — 2026-11-16
+
+Found in the UI/UX loop (UX-55, criterion 12: notice the settings worth reviewing). Lowering a cooling setpoint to 16–21 °C went through the control and the confirmation with nothing said. A low setting is a common reason for high use, and it does not cool a room faster. The outdoor temperature is not available to the web apps (no weather operation), so the comparison with outside is left for later.
+
+1. **Hint.** `coolingHint(mode, celsius)` (shared/lib/units.ts) returns a sentence when the mode is Cool and the setpoint is below 22 °C. The sentence: "{celsius}°C is very cold for cooling: a lower setting does not cool the room faster, it runs longer and uses more power. 24–26°C is a common comfortable range." It returns null otherwise.
+2. **Where.** The customer unit page shows it under the temperature row, in warning colour with an info icon, while the user picks the value. It blocks nothing.
+3. **Tests.** `units.test.ts` covers cooling at 18 and 22 °C and the other modes.
+
 ## IR801 Find a room or AC by name in Units & locations — 2026-11-16
 
 Found in the UI/UX loop (UX-48, a complaint call: "the director's office is hot"). Units & locations had only the tree: 3 properties, 6 floors, 15 rooms. The customer had to scan it for the room, open it, then the AC. There was no search; `filterUnits` took a search, but the customer page always passed an empty one.

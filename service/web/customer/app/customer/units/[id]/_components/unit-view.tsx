@@ -7,7 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Badge, Banner, Btn, Card, Check, ConnBadge, EmptyState, LinkButton, Modal, Page, PowerBadge, Stat, SummaryList, Toggle, cx, useToast, Choice } from "@ac/web/components/ui";
 import { units, unitRowFromApi, type UnitRow } from "@ac/web/lib/client";
 import { OpError } from "@ac/web/lib/ops";
-import { answerSeconds, controlLayout, FAN_LABEL, historyRow, latest, MODE_LABEL, type ApiCommand, type ApiUnitDetail, type UnitAction } from "@ac/web/lib/units";
+import { answerSeconds, controlLayout, coolingHint, FAN_LABEL, historyRow, latest, MODE_LABEL, type ApiCommand, type ApiUnitDetail, type UnitAction } from "@ac/web/lib/units";
 import { followCommand } from "@ac/web/lib/unitCommands";
 import { byCount, showRecent, showTime, textOf } from "@ac/web/lib/i18n";
 import { useDisplay, useT } from "@ac/web/components/I18n";
@@ -174,6 +174,8 @@ function RemoteControlCard(p: Readonly<RemoteControlProps>) {
           <div><div className="font-semibold">{t("Set temperature")}</div><div className="text-xs text-muted-foreground">{t("{min}–{max}°C · step {step}°C · confirmed {confirmed}°C", { min, max, confirmed, step: cap.step })}</div></div>
           <div className="flex items-center gap-2"><Btn disabled={isDisabled || setpoint - cap.step < min} onClick={() => { p.onStep(-cap.step); }} aria-label={t("Lower the temperature")}><Icon name="remove" /></Btn><span className="w-14 text-center text-lg font-bold">{setpoint}°C</span><Btn disabled={isDisabled || setpoint + cap.step > max} onClick={() => { p.onStep(cap.step); }} aria-label={t("Raise the temperature")}><Icon name="add" /></Btn></div>
         </div>}
+        {/* a very low cooling setpoint is worth a second look (IR808): next to the control, before Review & send */}
+        {temperatureRange && coolingHint(mode, setpoint, t) && <p className="flex items-start gap-1.5 text-xs text-warn"><Icon name="info" className="mt-0.5 shrink-0" />{coolingHint(mode, setpoint, t)}</p>}
         {modes.length > 0 && <div><div className="mb-1 font-semibold">{t("Mode")}</div><Choice value={mode} disabled={isDisabled} onChange={p.onMode} options={modes.map((m) => ({ id: m, label: t(MODE_LABEL[m]) }))} /></div>}
         {fans.length > 0 && <div><div className="mb-1 font-semibold">{t("Fan speed")}</div><Choice value={fan} disabled={isDisabled} onChange={p.onFan} options={fans.map((f) => ({ id: f, label: t(FAN_LABEL[f]) }))} /></div>}
         {review && ( // a model with the power only sends it at once: nothing to review (Figma 02o)
