@@ -10723,3 +10723,11 @@ Found in the UI/UX loop (UX-62, criterion 12; noted in UX-50). Opening Energy & 
 1. **Default.** When the URL names no AC of the customer, the page waits for the per-unit ranking (IR803) and opens on its first AC. The ranking still runs in parallel with the other reads when ACs are named. With no measured use at all, it falls back to the first by name as before.
 2. **Note.** The Units row then reads "Showing the AC that used the most in this period · up to 4 units".
 3. **Docs.** DD-C06 step 6.
+
+## IR817 "Already signed in as another user" says what to do — 2026-11-16
+
+Found in the UI/UX loop (UX-66; seen in UX-54 and UX-63). Signing in to one app while this browser's identity-provider session belongs to another user ended on Keycloak's "You are already authenticated as different user 'customer-a' in this session. Please sign out first." It was a dead end, with no hint where to sign out.
+
+1. **Message.** The shared login theme `ac` overrides `differentUserAuthenticated` in en, ms, ja and id: "You are already signed in as {0} in this browser. To use another account here, sign out in the AC Project app you are signed in to (its menu, Sign out), then open this page again." "Sign out" uses each language's word from the apps (Log keluar, ログアウト, Keluar).
+2. **Scope.** This changes the text only. Keycloak's error template is not overridden, since it is tied to its version, so the page still has no button. The apps' own "Sign in with another account" (`prompt=login`) is unchanged.
+3. **Checked.** On the dev stack, with a partner session in the browser, HQ sign-in now shows the Japanese text. The theme is mounted read-only and needs no restart.
