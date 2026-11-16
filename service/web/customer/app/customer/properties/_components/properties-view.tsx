@@ -24,6 +24,8 @@ export interface PropertiesLive {
   tree: TreeProperty[]; selection: Selection | null; owner: boolean;
   filter: { powerState: PowerState | null; connections: Connection[]; total: number } | null;
   units: (RoomUnit & { place: string })[]; details: ApiUnitDetail[];
+  /** the scenario's now: a group plan's “offline since” keeps its date on another day */
+  now: string;
   summary: { kind: "home" | "office"; floors: string[]; rooms: number; inRooms: number; unassigned: number; edited: string } | null;
   mode: "single" | "group"; selectedUnits: string[];
 }
@@ -272,7 +274,7 @@ function GroupPanel({ live, space }: Readonly<{ live: PropertiesLive; space: str
     toast(t("Group change finished — results are shown per AC"));
     router.refresh(); // re-read the units (observed settings)
   };
-  const plan = (ids: string[]) => groupPlan(live.details.filter((d) => ids.includes(d.id)), ch, i);
+  const plan = (ids: string[]) => groupPlan(live.details.filter((d) => ids.includes(d.id)), ch, i, Date.parse(live.now));
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface2 px-3 py-2 text-[13px]"><b>{t("{n} selected", { n: sel.length })}</b>
