@@ -100,6 +100,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.643.0 (2026-11-16): IR800: every unresolved customer alert says what to do (close the windows, book a cleaning, request a repair …).
 0.642.0 (2026-11-16): IR798: on the Running list an owner turns the running ACs off at once, unticking those that should keep running.
 0.645.0 (2026-11-16): IR802: one automation can switch several ACs (Also apply to other ACs, All ACs in a property), offering only the actions all of them take.
 0.647.0 (2026-11-16): IR804: the customer's command history says whether you or someone else sent each command.

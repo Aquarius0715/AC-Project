@@ -10643,3 +10643,18 @@ Found in the UI/UX loop (UX-57, criterion 14: undo of the last operation). A cha
 2. **Where.** On the customer unit page, when every command of a send is acknowledged, the result banner shows Undo beside Dismiss. Undo sends those commands through the same path as any send: own idempotency key, version check, waiting with the countdown, and a result. The user's click is the confirmation, since the commands restore what was confirmed a moment before. The undo itself offers no further Undo, and a send that failed part-way offers none.
 3. **Tests.** `units.test.ts` covers a temperature and fan send undone in order, a power send undone, and settings with no confirmed value before (nothing to undo).
 4. **Not checked live.** The mock fleet did not acknowledge commands on the dev stack (scenario clock), so the banner's Undo was not seen in the browser. Real devices were not used.
+
+## IR800 Every unresolved alert says what to do — 2026-11-16
+
+Found in the UI/UX loop (UX-47, the customer's "anomaly response" on a phone). The open "Possible open window" alert showed where, its evidence and "Open — not resolved yet", with View unit as its only action. Nothing said what the customer should do. Faults had Request repair and reminders Book cleaning, but a load cause, a tamper or an air-quality alert left the customer guessing.
+
+1. **Next step.** `alertNext` (shared/lib/alerts.ts) gives the step of an unresolved alert. It looks at the cause first, then the type, then the kind.
+   - window_open: check that the windows and doors are closed, and turn the AC off if nobody is in the room.
+   - insulation_loss: ask for an inspection.
+   - tamper: check the cover, and request a repair if nobody should have opened it.
+   - reconciliation_required: nothing to do while HQ checks.
+   - The kinds: inspection (nothing to do), maintenance (book a cleaning), quality (air the room, see Air quality), fault (request a repair).
+
+   A resolved alert has none. `InboxAlert.next` carries it.
+2. **Screen.** The customer's Needs attention rows add "What to do: …", and the alert detail adds a What to do row. An air-quality alert gets an Air quality link. DD-C08 step 3 says so.
+3. **Tests.** `notifications.test.ts` checks the step by cause, type and kind, none once resolved, and the Malay text.
