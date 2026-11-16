@@ -10615,6 +10615,18 @@ Found in the UI/UX loop (UX-51, several users on one account). A customer owner 
 2. **Where.** The customer unit page's command history. The page passes `me.membershipId` from the session.
 3. **Tests.** `units.test.ts`: by you, by someone else, an automation's command, and no reader (unchanged).
 
+## IR806 Waiting for the AC counts down — 2026-11-16
+
+Found in the UI/UX loop (UX-53, the single-AC control on a phone, criterion 9). After Send, the panel said "Waiting for device response… (fails after 30 s)". The button was disabled, so double sends were already prevented, but nothing moved for up to 30 s, which reads as a hang.
+
+1. **Countdown.** `WaitBanner` on the customer unit page reads "Waiting for the AC to confirm… The result shows only after it acknowledges." followed by "{s} s left".
+   - The seconds come from `answerSeconds` (shared/lib/units.ts): request to expiry, else 30.
+   - It counts on the browser's clock from when the command was created. The command's own times are on the scenario clock.
+   - Each command of a multi-setting send restarts it (keyed by command id).
+   - At zero it reads "No answer yet — checking the result…" until the follow-up answers.
+2. **Accessibility.** The banner is a polite live region, so the sentence stays fixed and the seconds are `aria-hidden`. A screen reader hears the sentence once, not a count every second.
+3. **Tests.** `units.test.ts` covers `answerSeconds`: 30 s, 120 s, a missing expiry, a zero span and an unreadable time.
+
 ## IR807 HQ's Unresolved alerts tile opens the alerts it counts — 2026-11-16
 
 Found in the UI/UX loop (UX-54, HQ anomaly response). The Overview tile "Unresolved alerts 4 · open or acknowledged · critical and warning" linked to `/admin/alerts`. That list opened on every open alert, 19 of them: the four warnings plus 15 filter-cleaning reminders (info). The count and the list disagreed, and the dispatcher had to filter by hand.
