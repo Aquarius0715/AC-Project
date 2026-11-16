@@ -75,12 +75,13 @@ export function PowerBadge({ s }: Readonly<{ s: "running" | "stopped" | "unknown
     case "unknown": { return <Badge tone="unknown" icon="unknown">{what}{t("Power unknown")}</Badge>; }
   }
 }
-export function ConnBadge({ s }: Readonly<{ s: "online" | "offline" | "connecting" | "unknown" | "error" }>) {
+// offlineTone: the technician app shows Offline as something to act on (red), like its filter chips and tiles (UI/UX loop R50)
+export function ConnBadge({ s, offlineTone = "unknown" }: Readonly<{ s: "online" | "offline" | "connecting" | "unknown" | "error"; offlineTone?: "unknown" | "crit" }>) {
   const t = useT();
   const what = <span className="sr-only">{t("Connection")}: </span>;
   switch (s) {
     case "online": { return <Badge tone="ok" icon="online">{what}{t("Online")}</Badge>; }
-    case "offline": { return <Badge tone="unknown" icon="offline">{what}{t("Offline")}</Badge>; }
+    case "offline": { return <Badge tone={offlineTone} icon="offline">{what}{t("Offline")}</Badge>; }
     case "error": { return <Badge tone="crit" icon="error">{what}{t("Error")}</Badge>; }
     case "unknown": { return <Badge tone="unknown" icon="unknown">{what}{t("Connection unknown")}</Badge>; }
     case "connecting": { return <Badge tone="primary" icon="refresh">{what}{t("Connecting")}</Badge>; }

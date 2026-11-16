@@ -21,7 +21,7 @@ export function TechUnitDemo({ id }: Readonly<{ id: string }>) {
   const setpoint = [26, 26, 25, 25, null, null, 26, 27, 28, 29, 30, 30.4];
   return (
     <Page>
-      <div className="flex flex-wrap items-center justify-between gap-2"><div><h1 className="text-lg font-bold">Bedroom AC · {id}</h1><div className="mt-1 flex gap-2"><ConnBadge s={lost ? "offline" : "online"} /></div></div><Tabs value={tab} onChange={setTab} tabs={[{ id: "register", label: "Register" }, { id: "monitoring", label: "Monitoring" }]} /></div>
+      <div className="flex flex-wrap items-center justify-between gap-2"><div><h1 className="text-lg font-bold">Bedroom AC · {id}</h1><div className="mt-1 flex gap-2"><ConnBadge s={lost ? "offline" : "online"} offlineTone="crit" /></div></div><Tabs value={tab} onChange={setTab} tabs={[{ id: "register", label: "Register" }, { id: "monitoring", label: "Monitoring" }]} /></div>
       {lost && <Banner tone="warn">Communication lost — updates stopped. Showing last known values.</Banner>}
       {tab === "register" ? (
         <div className="split">
