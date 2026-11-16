@@ -89,15 +89,17 @@ export function overviewRows(units: OverviewUnit[], place: (u: OverviewUnit) => 
   });
 }
 
-/** The overview's unit rows under their property (the first part of the place, "" for a unit not in a property), in the
-order the properties first appear: a flat list of a whole account mixed the homes and offices. */
+/** The overview's unit rows under their property (the first part of the place, "" for a unit not in a property): a flat
+list of a whole account mixed the homes and offices. Properties go in name order, as the Property select lists them,
+with the units outside a property last (UI/UX loop R142). */
 export function byProperty(rows: OverviewRow[]): { property: string; rows: OverviewRow[] }[] {
   const groups = new Map<string, OverviewRow[]>();
   for (const r of rows) {
     const property = r.place.split(" › ", 1)[0] ?? "";
     groups.set(property, [...(groups.get(property) ?? []), r]);
   }
-  return [...groups].map(([property, list]) => ({ property, rows: list }));
+  return [...groups].map(([property, list]) => ({ property, rows: list }))
+    .toSorted((x, y) => Number(x.property === "") - Number(y.property === "") || x.property.localeCompare(y.property));
 }
 
 export interface EnergyCard { sub: string; total: string | null; delta: { text: string; icon: IconName; tone: "ok" | "warn" } | null; labels: string[]; series: number[][]; gaps: boolean }

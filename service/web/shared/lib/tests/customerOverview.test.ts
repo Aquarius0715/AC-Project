@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { must } from "./must";
 import {
   attentionCard, bucketPoints, bucketTimes, byProperty, emissionsCard, energyCard, nextRunText, overviewRows, overviewScope, periodNote, periodOf, previousRange, whenText, type OverviewUnit,
 } from "@ac/web/lib/customerOverview";
@@ -109,8 +110,10 @@ describe("air card tooltip headings", () => {
     expect(bucketTimes([{ start: "2026-09-14T01:00:00.000Z" }, { start: "2026-09-14T02:00:00.000Z" }])).toStrictEqual(["Mon, 14 Sept, 9:00 – 10:00 am MYT", "Mon, 14 Sept, 10:00 – 11:00 am MYT"]);
   });
   // UI/UX loop R17: the overview listed a whole account's units in one run, homes and offices mixed
-  it("groups the unit rows under their property in first-seen order", () => {
+  it("groups the unit rows under their property in name order", () => {
     const rows = overviewRows([unit("a"), unit("b"), unit("c"), unit("d")], (u) => ({ a: "Home A › 1F › Bedroom", b: "Office A", c: "Home A › 1F › Living room", d: "" })[u.id] ?? "");
     expect(byProperty(rows).map((g) => [g.property, g.rows.map((r) => r.id)])).toStrictEqual([["Home A", ["a", "c"]], ["Office A", ["b"]], ["", ["d"]]]);
+    // name order, not first appearance: "Mock fleet" before "Office A" though its unit comes later (UI/UX loop R142)
+    expect(byProperty([...rows.slice(0, 2), { ...must(rows[0]), id: "m", place: "Mock fleet › 1F" }]).map((g) => g.property)).toStrictEqual(["Home A", "Mock fleet", "Office A"]);
   });
 });
