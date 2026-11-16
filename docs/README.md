@@ -102,6 +102,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.644.0 (2026-11-16): IR801: Units & locations finds a room or AC by name or place.
 0.642.0 (2026-11-16): IR798: on the Running list an owner turns the running ACs off at once, unticking those that should keep running.
+0.645.0 (2026-11-16): IR802: one automation can switch several ACs (Also apply to other ACs, All ACs in a property), offering only the actions all of them take.
 0.641.0 (2026-11-16): IR799: a failed command says why in words (the AC refused it, no answer in time, offline …), never with its failure code, for customers, HQ and technicians.
 0.640.0 (2026-11-16): IR797: `jobs.list` `currentOnly` leaves out the history rows of ended access; the partner Jobs list's Offered, Active and Review tabs ask with it, so a delegation that ended unfinished no longer counts under Active. Phase 1A unchanged.
 0.639.0 (2026-11-15): IR796: auto-merge pull requests keep moving into `main`: every five minutes `keep-prs-current.yml` brings the oldest behind one up to date and starts its CI (and CI on `main` when a merge started none). Phase 1A unchanged.
