@@ -10596,3 +10596,13 @@ Found in the UI/UX loop (UX-45). Overview › Running › View running units lis
    - This is the one exception to one space. Power off sets nothing else, so no room's settings can mix.
 2. **After sending.** The list is re-read, and the ACs confirmed off leave it. The panel stays open, says how many were turned off, and Retry covers the failed ACs that are still listed.
 3. **Docs and tests.** FR-C14 and DD-C14 step 5 say so. `clientProperties.test.ts` plans power off only, and an AC already off has nothing to send.
+
+## IR802 One automation for several ACs — 2026-11-16
+
+Found in the UI/UX loop (UX-49, scheduled operation: "switch Office A off at 19:00 on weekdays"). The list header said "each rule controls one AC" and the editor offered one Target AC. Turning a 21-AC office off after hours therefore took 21 rules, each filled in by hand. `automations.save` already took 1–50 `unitIds`, the scheduler (`schedules.go`) fires each rule for all its units, and the editor kept extra units of rules saved elsewhere (`Draft.others`) without showing them.
+
+1. **Editor.** Under Target AC, "Also apply to other ACs" is folded by default, so a one-AC rule stays as before. It lists every other AC with its place, and offers "All ACs in {property}" (the target's property) and Clear. A rule with more ACs opens it with them ticked. A rule holds up to 50 ACs, and the boxes lock at 50.
+2. **Actions.** `commonActionOptions` (shared/lib/clientAutomations.ts) keeps only the actions every chosen AC supports. The API refuses any other with `unitIds: unsupported_action`. An action that does not fit reads "Not supported by every chosen AC — choose another action".
+3. **Texts.** Step 3 reads "Action for {n} ACs". The list header drops "each rule controls one AC". The card still names the first AC "(+n more ACs)".
+4. **Tests.** `clientAutomations.test.ts`: the common actions of a wide and a narrow AC (power, the shared temperatures, cool), one AC equal to its own options, none for no AC or an AC without capabilities.
+5. **Checked on the dev stack.** A rule for Lobby AC and Meeting room AC (Office A) was saved, listed as "(+1 more AC)", reopened with both, then deleted.
