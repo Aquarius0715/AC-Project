@@ -189,6 +189,10 @@ function CustomerScreen({ live, c }: Readonly<{ live: UnitsLive; c: CustomerLive
   const canWrite = live.canWrite;
   const sel = c.selection;
   const selId = selectionId(sel);
+  // one New unit in view: the header's only where the units card (which has its own) is not shown, and never next to the
+  // Users or Alert policies tab's own primary action (UI/UX loop R100)
+  const isUnitsTab = c.tab !== "policies" && c.tab !== "users";
+  const isHeaderNewUnit = isUnitsTab && (Boolean(c.unit) || !sel);
   const addUnitHere = () => { setM({ kind: "unit", propertyId: sel?.property.id ?? c.tree[0]?.id ?? "", spaceId: sel?.kind === "space" ? sel.space.id : "" }); };
   const unitsTotal = c.tree.reduce((n, p) => n + p.units, 0);
   return (
@@ -201,7 +205,7 @@ function CustomerScreen({ live, c }: Readonly<{ live: UnitsLive; c: CustomerLive
         <div className="ml-auto flex flex-wrap justify-end gap-2">
           {canWrite && <Btn size="sm" onClick={() => { setM({ kind: "customer" }); }}>{t("Edit customer")}</Btn>}
           {canWrite && <Btn size="sm" variant="danger" onClick={() => { setM({ kind: "deleteCustomer" }); }}>{t("Delete customer…")}</Btn>}
-          {canWrite && r.status === "active" && c.tree.length > 0 && <Btn size="sm" variant="primary" onClick={addUnitHere}><Icon name="add" /> {t("New unit")}</Btn>}
+          {canWrite && r.status === "active" && c.tree.length > 0 && isHeaderNewUnit && <Btn size="sm" variant="primary" onClick={addUnitHere}><Icon name="add" /> {t("New unit")}</Btn>}
         </div>
       </div>
       <Card>
