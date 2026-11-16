@@ -6,6 +6,7 @@ import type { Metric, RestrictionAction, UnitAction as AnyUnitAction, UnitSymbol
 import { policyText } from "@ac/web/lib/restrictions";
 import { DEFAULT_DISPLAY, showClock, showRecent, showTime, translator, type Display, type T, textOf } from "@ac/web/lib/i18n";
 import { lookup } from "@ac/web/lib/lookup";
+import { commandFailure } from "@ac/web/lib/commandFailure";
 
 type Mode = "cool" | "dry" | "fan";
 type Fan = "low" | "mid" | "high";
@@ -117,7 +118,7 @@ const sourceText: Record<string, string> = { automation: " · by an automation",
 export function historyRow(c: ApiCommand, t: T = en, display: Display = DEFAULT_DISPLAY) {
   const isBad = c.status === "failed" || c.status === "expired";
   const by = (c.source ? textOf(sourceText, c.source, t) : undefined) ?? "";
-  return { id: c.id.slice(0, 8), text: `${actionText(c.action, t)} — ${t(statusText[c.status])}${c.failureCode && c.status === "failed" ? ` (${c.failureCode})` : ""}${by}`, when: showTime(c.requestedAt, display), bad: isBad };
+  return { id: c.id.slice(0, 8), text: `${actionText(c.action, t)} — ${t(statusText[c.status])}${c.failureCode && c.status === "failed" ? `: ${commandFailure(c.failureCode, t)}` : ""}${by}`, when: showTime(c.requestedAt, display), bad: isBad };
 }
 
 const qualityText: Record<string, string> = { missing: "missing", stale: "stale", suspect: "suspect" };
