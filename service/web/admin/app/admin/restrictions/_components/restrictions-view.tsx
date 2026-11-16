@@ -1,6 +1,7 @@
 "use client";
 const TEMPERATURE_LIMIT = "temperature_limit";
 
+import { anySet } from "@ac/web/lib/filters";
 import Link from "next/link";
 import { useState } from "react";
 import { Badge, Banner, Btn, Card, Check, DataTable, EmptyState, Field, Input, ListRow, Modal, Page, Select, Steps, SummaryList, Textarea, Plain } from "@ac/web/components/ui";
@@ -88,7 +89,7 @@ function Manager({ live }: Readonly<{ live: NonNullable<RestrictionsLive> }>) {
       {!live.full && <Banner>{t("Release view (restriction.override only): billing fields are not shown.")}</Banner>}
       <div className="split-rev">
         <Card title={t("Restrictions")} sub={t("newest first")} className="self-start">
-          {live.rows.length === 0 ? <EmptyState title={t("No restrictions")}>{t("No restriction matches this scope.")}</EmptyState> : <div className="flex flex-col gap-2">{live.rows.map((x) => <ListRow key={x.id} selected={r?.id === x.id} onClick={() => { setConfirmRules(false); nav({ restrictionId: x.id }); }}><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="truncate text-[13px]">{x.id.slice(0, 8)}</b><Badge tone={stateTone(x.state)}>{stateWord(x.state, t)}</Badge></div><div className="text-[11px] text-muted-foreground">{x.label}</div><div className="text-[11px] text-muted-foreground">{x.policy} · {t(x.units === 1 ? "1 unit" : "{n} units", { n: x.units })} · {x.progress}</div></div></ListRow>)}</div>}
+          {live.rows.length === 0 ? <EmptyState title={t("No restrictions")}>{t(anySet(live.scope.contractId, live.scope.invoiceId, live.scope.status) ? "No restriction matches this scope." : "No restriction has been applied yet.")}</EmptyState> : <div className="flex flex-col gap-2">{live.rows.map((x) => <ListRow key={x.id} selected={r?.id === x.id} onClick={() => { setConfirmRules(false); nav({ restrictionId: x.id }); }}><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="truncate text-[13px]">{x.id.slice(0, 8)}</b><Badge tone={stateTone(x.state)}>{stateWord(x.state, t)}</Badge></div><div className="text-[11px] text-muted-foreground">{x.label}</div><div className="text-[11px] text-muted-foreground">{x.policy} · {t(x.units === 1 ? "1 unit" : "{n} units", { n: x.units })} · {x.progress}</div></div></ListRow>)}</div>}
         </Card>
         {r ? (
           <div className="flex min-w-0 flex-col gap-4">
