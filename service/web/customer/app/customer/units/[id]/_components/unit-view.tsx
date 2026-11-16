@@ -3,8 +3,8 @@ const SET_TEMPERATURE_FROM_C_TO_C = "Set temperature {from}°C → {to}°C";
 
 import Link from "next/link";
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { Badge, Banner, Btn, Card, Check, ConnBadge, Modal, Page, PowerBadge, Stat, SummaryList, Toggle, cx, useToast, Choice } from "@ac/web/components/ui";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Badge, Banner, Btn, Card, Check, ConnBadge, EmptyState, LinkButton, Modal, Page, PowerBadge, Stat, SummaryList, Toggle, cx, useToast, Choice } from "@ac/web/components/ui";
 import { units, unitRowFromApi, type UnitRow } from "@ac/web/lib/client";
 import { OpError } from "@ac/web/lib/ops";
 import { controlLayout, FAN_LABEL, historyRow, latest, MODE_LABEL, type ApiCommand, type ApiUnitDetail, type UnitAction } from "@ac/web/lib/units";
@@ -175,6 +175,22 @@ const NO_COMMANDS: ApiCommand[] = [];
 /** Unit detail and remote control. In API mode the Server Component passes the unit, its room, the policies and the
 scenario's now; the texts and times follow the user's display language and time zone (FR-X01, IR44, IR259), and a
 time of another day keeps its date (IR613). */
+/** Attaching the account's policies to this AC; with none to attach it links to a new one that comes back here ticked. */
+function AttachPolicyModal({ unitId, name, available, preset, onClose, onAttach }: Readonly<{ unitId: string; name: string; available: PolicyOption[]; preset: string | null; onClose: () => void; onAttach: (ids: string[]) => void }>) {
+  const t = useT();
+  const [picked, setPicked] = useState<string[]>(preset ? [preset] : []);
+  const chosen = picked.filter((x) => available.some((pl) => pl.id === x)); // a policy still loading or gone is not sent
+  const policyFormHref = `/customer/alerts?tab=policies&policyId=new&returnTo=${encodeURIComponent(`/customer/units/${unitId}`)}`;
+  return (
+    <Modal open onClose={onClose} title={t("Attach a policy to {name}", { name })} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={chosen.length === 0} onClick={() => { onAttach(chosen); }}>{t("Attach")}</Btn></>}>
+      <p className="mb-2 text-[13px] text-muted-foreground">{t("Only your account’s policies are listed. The default policy is always attached.")}</p>
+      {available.length === 0 && <EmptyState title={t("No policy to attach yet")} action={<LinkButton size="sm" variant="primary" href={policyFormHref}><Icon name="add" /> {t("Create policy")}</LinkButton>}>{t("Create one; you come back here to attach it.")}</EmptyState>}
+      <div className="flex flex-col gap-2">{available.map((pl) => <Check key={pl.id} label={<span><b>{pl.name}</b> <span className="text-xs text-muted-foreground">{pl.rule}</span></span>} checked={picked.includes(pl.id)} onChange={(v) => { setPicked((x) => (v ? [...x, pl.id] : x.filter((y) => y !== pl.id))); }} />)}</div>
+      {available.length > 0 && <Link href={policyFormHref} className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-primary"><Icon name="add" /> {t("Create policy")}</Link>}
+    </Modal>
+  );
+}
+
 export function UnitView({ id, detail, room: roomRows, policies, defaults = null, history = NO_COMMANDS, restrictionHref = null, nowMs = 0 }: Readonly<{ id: string; detail?: ApiUnitDetail; room?: UnitRow[]; policies?: PolicyOption[]; defaults?: { on: number; n: number } | null; history?: ApiCommand[]; restrictionHref?: string | null; nowMs?: number }>) {
   const t = useT();
   const display = useDisplay();
@@ -219,8 +235,10 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
   const customerPolicies = apiPolicies.data ?? mockPolicies;
   const [mockAttached, setMockAttached] = useState<string[]>(["policy-temp-a"]);
   const attached = d ? d.alertPolicyIds : mockAttached;
-  const [attachOpen, setAttachOpen] = useState(false);
-  const [picked, setPicked] = useState<string[]>([]);
+  // back from a policy made in the Attach dialog (?attach=<policy>): the dialog reopens with it ticked (UI/UX loop R46)
+  const attachId = useSearchParams().get("attach");
+  const [attachOpen, setAttachOpen] = useState(!!attachId);
+  const closeAttach = () => { setAttachOpen(false); if (attachId) router.replace(`/customer/units/${unit.id}`, { scroll: false }); };
   const [waiting, setWaiting] = useState(false);
   const [mockOn, setMockOn] = useState(unit.state === "running");
   // the same power state as the header badge: a stale “on” is not shown as on
@@ -360,7 +378,7 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
             <TelemetryCard d={d} pow={pow} room={room} hum={hum} />
             <DeviceInfoCard d={d} temperatureRange={temperatureRange} />
           </div>
-          <AlertPoliciesCard defaults={defaults} policies={customerPolicies} attached={attached} onDetach={(policyId) => { savePolicies(attached.filter((y) => y !== policyId), t("Detached from this AC only"), "warn"); }} onAttach={() => { setPicked([]); setAttachOpen(true); }} />
+          <AlertPoliciesCard defaults={defaults} policies={customerPolicies} attached={attached} onDetach={(policyId) => { savePolicies(attached.filter((y) => y !== policyId), t("Detached from this AC only"), "warn"); }} onAttach={() => { setAttachOpen(true); }} />
           <CommandHistoryCard hist={hist} />
         </div>
       </div>
@@ -369,10 +387,8 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
         <p className="text-xs text-muted-foreground">{t("Only {name} changes. The result shows after the device acknowledges.", { name: unit.name })}</p>
       </Modal>
       <PowerConfirm power={powerAsk} name={unit.name} where={`${unit.loc} › ${unit.name}`} onCancel={() => { setPowerAsk(null); }} onSend={togglePower} />
-      <Modal open={attachOpen} onClose={() => { setAttachOpen(false); }} title={t("Attach a policy to {name}", { name: unit.name })} footer={<><Btn onClick={() => { setAttachOpen(false); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={picked.length === 0} onClick={() => { savePolicies([...attached, ...picked], t(picked.length > 1 ? "{n} policies attached to this AC" : "{n} policy attached to this AC", { n: picked.length })); setAttachOpen(false); }}>{t("Attach")}</Btn></>}>
-        <p className="mb-2 text-[13px] text-muted-foreground">{t("Only your account’s policies are listed. The default policy is always attached.")}</p>
-        <div className="flex flex-col gap-2">{customerPolicies.filter((pl) => !attached.includes(pl.id)).map((pl) => <Check key={pl.id} label={<span><b>{pl.name}</b> <span className="text-xs text-muted-foreground">{pl.rule}</span></span>} checked={picked.includes(pl.id)} onChange={(v) => { setPicked((x) => (v ? [...x, pl.id] : x.filter((y) => y !== pl.id))); }} />)}</div>
-      </Modal>
+      {attachOpen && <AttachPolicyModal unitId={unit.id} name={unit.name} available={customerPolicies.filter((pl) => !attached.includes(pl.id))} preset={attachId} onClose={closeAttach}
+        onAttach={(ids) => { savePolicies([...attached, ...ids], t(ids.length > 1 ? "{n} policies attached to this AC" : "{n} policy attached to this AC", { n: ids.length })); closeAttach(); }} />}
       {renaming && <RenameModal demo={!isApi} r={{ kind: "unit", id: d?.id ?? unit.id, version: d?.version ?? 1, name: unit.name, where: `${unit.loc} › ${unit.name}` }} onClose={() => { setRenaming(false); }} />}
     </Page>
   );
