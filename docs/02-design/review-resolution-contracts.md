@@ -10776,3 +10776,12 @@ IR814 kept a customer's pinned ACs in the browser, so they did not follow the us
 3. **Generated.** catalog_gen.go, contracts.gen.ts, contractInputs.gen.json and Swagger.
 4. **Tests.** `TestPreferencesAndConsents` covers saving two pins and reading them back in order. The pins are kept by an update that leaves them out. Nine, repeated or nil ids are refused, and an empty list clears them.
 5. **Dev DB.** The column was added by hand (ALTER), as with every migration.
+
+## IR820 Pinned ACs follow the user: the web keeps them on the server (stage 2) — 2026-11-16
+
+Stage 2 of IR819. The customer web reads and writes the pins through preferences instead of localStorage. A pin made on one device shows on the others.
+
+1. **Reading.** The Overview loader and the unit page read `preferences.get` alongside their other reads. A failed read means no pins, never a failed page.
+2. **Writing.** `togglePinned` (customer/_lib/pins.ts, a Server Action) reads the stored language and time zone and sends `preferences.update` with them and the new pins. The new pin goes first, and the oldest drops beyond eight. `usePins` shows the change at once. A refused save puts the pins back and shows "The pin was not saved — try again.".
+3. **Text.** The Overview card says "kept with your account" instead of "this browser only". The browser store from IR814 is no longer read; its old key is simply left unused.
+4. **Checked on the dev stack** with identity-api rebuilt with IR819. Pinning Bedroom AC stored its id in `identity.preferences.pinned_unit_ids`, and the Overview showed it. Unpinning cleared it.

@@ -10,7 +10,7 @@ import { byCount, showClock } from "@ac/web/lib/i18n";
 import { useT } from "@ac/web/components/I18n";
 import type { OverviewLive } from "../_lib/load";
 import { Icon } from "@ac/web/components/Icon";
-import { usePinnedUnits } from "@ac/web/lib/pinnedUnits";
+import { usePins } from "../../_lib/usePins";
 
 /** Customer overview (FR-C01, DD-C01, Figma Client 01a) from the Core API: the scope and period live in the URL; the
 texts and times follow the user's display language and time zone (IR260). */
@@ -19,13 +19,13 @@ const UNITS_FIRST = 5;
 
 /** The ACs pinned on their own pages (IR814), first on the Overview with their reading and state; none pinned, no card.
 A pin for an AC outside the selection (another property) is not shown here. */
-function PinnedUnits({ rows }: Readonly<{ rows: OverviewLive["rows"] }>) {
+function PinnedUnits({ rows, initial }: Readonly<{ rows: OverviewLive["rows"]; initial: string[] }>) {
   const t = useT();
-  const [pins, toggle] = usePinnedUnits();
+  const [pins, toggle] = usePins(initial);
   const pinned = pins.flatMap((id) => rows.filter((r) => r.id === id));
   if (pinned.length === 0) return null;
   return (
-    <Card title={t("Pinned ACs")} sub={t("Pinned on each AC's page · this browser only")} className="xl:col-span-2">
+    <Card title={t("Pinned ACs")} sub={t("Pinned on each AC's page · kept with your account")} className="xl:col-span-2">
       <div className="grid-fluid" style={{ ["--min" as string]: "220px" }}>
         {pinned.map((u) => (
           <div key={u.id} className="flex items-start justify-between gap-2 rounded-xl border border-line p-3">
@@ -131,7 +131,7 @@ export function OverviewView({ live }: Readonly<{ live: OverviewLive }>) {
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(0,1fr)]">
-        <PinnedUnits rows={live.rows} />
+        <PinnedUnits rows={live.rows} initial={live.pins} />
         <Card title={live.propertyName ? t("Units in {property}", { property: live.propertyName }) : t("Units in all properties")} sub={t("Latest value per unit — no averaged temperature across rooms")} action={<TextLink href="/customer/properties">{t("View all")} <Icon name="arrowRight" /></TextLink>}>
           <div className="flex flex-col divide-y divide-line">
             <div className="hidden grid-cols-[minmax(0,1fr)_72px_72px_72px_120px_14px] gap-2 pb-2 text-[11px] text-muted-foreground lg:grid">
