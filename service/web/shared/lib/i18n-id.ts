@@ -1105,6 +1105,7 @@ export const id: Record<string, string> = {
   "No answer yet — checking the result…": "Belum ada jawaban — memeriksa hasil…",
   "Updates every {s} s while this page is open — changes by others show here.": "Diperbarui setiap {s} dtk selama halaman ini terbuka — perubahan oleh orang lain tampil di sini.",
   "Updates paused while you change settings.": "Pembaruan dijeda selama Anda mengubah setelan.",
+  "{celsius}°C is very cold for cooling: a lower setting does not cool the room faster, it runs longer and uses more power. 24–26°C is a common comfortable range.": "{celsius}°C sangat dingin untuk pendinginan: setelan lebih rendah tidak mendinginkan ruangan lebih cepat, AC berjalan lebih lama dan memakai lebih banyak daya. 24–26°C adalah rentang nyaman yang umum.",
   "Group change finished — results are shown per AC": "Perubahan grup selesai — hasil ditampilkan per AC",
   "{n} selected": "{n} dipilih",
   "Select all online ({n})": "Pilih semua yang online ({n})",
