@@ -27,11 +27,15 @@ export function WorkspaceDemo({ id }: { id: string }) {
   return live ? <LiveAssignment j={live} /> : <Workspace id={id} />;
 }
 
+const reasonIds = ["training", "overrun", "sick", "other"] as const;
+type Reason = (typeof reasonIds)[number];
+const reasonLabel: Record<Reason, string> = { training: "Training / course", overrun: "Another job runs over", sick: "Sick", other: "Other" };
+
 /** Assignment from the shared store (IR113): accept (受領) or “can’t make this time”. */
 function LiveAssignment({ j }: Readonly<{ j: Job }>) {
   const toast = useToast();
   const [cant, setCant] = useState(false);
-  const [reason, setReason] = useState<"training" | "overrun" | "sick" | "other">("other");
+  const [reason, setReason] = useState<Reason>("other");
   const [comment, setComment] = useState("");
   const [alt, setAlt] = useState("Fri 10-02 14:00–16:00");
   const [tried, setTried] = useState(false);
@@ -55,9 +59,9 @@ function LiveAssignment({ j }: Readonly<{ j: Job }>) {
         </Card>
       </div>
       <Modal open={cant} onClose={() => { setCant(false); }} title="Can’t make this time" footer={<><Btn onClick={() => { setCant(false); }}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!comment.trim()) { return; }
-    jobActions.techCantMake(j.id, comment.trim(), alt); setCant(false); toast(`Sent to ${coord ?? "—"}`, "warn"); }}>Send to {coord}</Btn></>}>
+    jobActions.techCantMake(j.id, `${reasonLabel[reason]} · ${comment.trim()}`, alt); setCant(false); toast(`Sent to ${coord ?? "—"}`, "warn"); }}>Send to {coord}</Btn></>}>
         <p className="text-xs text-muted-foreground">{j.id} · {fmt(j.scheduled)} · assigned by {coord}</p>
-        <Field label="Reason"><Choice value={reason} onChange={setReason} options={[{ id: "training", label: "Training / course" }, { id: "overrun", label: "Another job runs over" }, { id: "sick", label: "Sick" }, { id: "other", label: "Other" }]} /></Field>
+        <Field label="Reason"><Choice value={reason} onChange={setReason} options={reasonIds.map((id) => ({ id, label: reasonLabel[id] }))} /></Field>
         <Field label="Comment (required)" error={tried && !comment.trim() ? "Tell your coordinator why" : undefined}><Input value={comment} onChange={(e) => { setComment(e.target.value); }} placeholder="Medical appointment on 10-01 morning." /></Field>
         <Field label="A time you could do instead (optional)"><Select value={alt} onChange={(e) => { setAlt(e.target.value); }}><option>Fri 10-02 14:00–16:00</option><option>Mon 10-05 10:00–12:00</option><option value="">—</option></Select></Field>
         <Banner>{coord} reassigns the job or proposes a new time — the client must approve any change. Until then the job stays on your list as “Can’t make it”.</Banner>
@@ -93,7 +97,7 @@ function Workspace({ id }: Readonly<{ id: string }>) {
   const [errs, setErrs] = useState<string[]>([]);
   const [confirm, setConfirm] = useState(false);
   const [view, setView] = useState<"readings" | "parts" | "time">("readings");
-  const [parts, setParts] = useState([{ p: "Air filter (standard)", c: "AF-STD-2.5 · replaces Filter (Attention)", src: "Van stock", q: 1, lot: "lot 2609A" }, { p: "Drain pan tablet", c: "DP-TAB-10", src: "Van stock", q: 2, lot: "—" }]);
+  const [parts, setParts] = useState([{ id: 1, p: "Air filter (standard)", c: "AF-STD-2.5 · replaces Filter (Attention)", src: "Van stock", q: 1, lot: "lot 2609A" }, { id: 2, p: "Drain pan tablet", c: "DP-TAB-10", src: "Van stock", q: 2, lot: "—" }]);
   const [partModal, setPartModal] = useState(false);
   const [signModal, setSignModal] = useState(false);
   const [signed, setSigned] = useState<string | null>(null);
@@ -161,7 +165,7 @@ function Workspace({ id }: Readonly<{ id: string }>) {
         </div>
       </div>
       <Modal open={confirm} onClose={() => { setConfirm(false); }} title="Submit report v2?" footer={<><Btn onClick={() => { setConfirm(false); }}>Cancel</Btn><Btn variant="primary" onClick={() => { setStatus("Submitted"); setConfirm(false); toast("Report v2 submitted"); }}>Submit</Btn></>}><p className="text-[13px]">Submitted versions become read-only. HQ/contractor quality review follows.</p>{!signed && <Banner tone="warn">No customer sign-off yet — the report can still be submitted; HQ sees “not signed”.</Banner>}</Modal>
-      <Modal open={partModal} onClose={() => { setPartModal(false); }} title="Add part" footer={<><Btn onClick={() => { setPartModal(false); }}>Cancel</Btn><Btn variant="primary" onClick={() => { setParts((p) => [...p, { p: "Capacitor 35 µF", c: "CAP-35", src: "Van stock", q: 1, lot: "lot 2608C" }]); setPartModal(false); toast("Part added — van stock is deducted when the report is accepted"); }}>Add</Btn></>}>
+      <Modal open={partModal} onClose={() => { setPartModal(false); }} title="Add part" footer={<><Btn onClick={() => { setPartModal(false); }}>Cancel</Btn><Btn variant="primary" onClick={() => { setParts((p) => [...p, { id: Math.max(0, ...p.map((x) => x.id)) + 1, p: "Capacitor 35 µF", c: "CAP-35", src: "Van stock", q: 1, lot: "lot 2608C" }]); setPartModal(false); toast("Part added — van stock is deducted when the report is accepted"); }}>Add</Btn></>}>
         <Field label="Part (van stock)"><Select><option>Capacitor 35 µF · CAP-35 · 3 in van</option><option>Air filter (standard) · AF-STD-2.5 · 1 in van</option></Select></Field>
         <div className="grid-fluid" style={{ ["--min" as string]: "140px" }}><Field label="Qty"><Input type="number" defaultValue={1} /></Field><Field label="Lot / serial"><Input defaultValue="lot 2608C" /></Field></div>
         <Field label="Replaces checklist item (optional)"><Select><option>—</option><option>Filter (Attention)</option></Select></Field>
@@ -181,10 +185,10 @@ function Workspace({ id }: Readonly<{ id: string }>) {
   );
 }
 
-function PartsView({ parts, readOnly, onRemove }: Readonly<{ parts: { p: string; c: string; src: string; q: number; lot: string }[]; readOnly: boolean; onRemove: (i: number) => void }>) {
+function PartsView({ parts, readOnly, onRemove }: Readonly<{ parts: { id: number; p: string; c: string; src: string; q: number; lot: string }[]; readOnly: boolean; onRemove: (i: number) => void }>) {
   return (
     <div className="flex flex-col gap-3">
-      <DataTable rowKey={(r) => r.p} rows={parts} cols={[{ key: "p", label: "Part", render: (r) => <div><b>{r.p}</b><div className="text-[11px] text-muted-foreground">{r.c}</div></div> }, { key: "s", label: "Source", render: (r) => r.src }, { key: "q", label: "Qty", render: (r) => r.q }, { key: "l", label: "Lot / serial", render: (r) => r.lot }, { key: "x", label: "", render: (r) => <Plain disabled={readOnly} className="text-xs font-semibold text-primary" onClick={() => { onRemove(parts.indexOf(r)); }}>Remove</Plain> }]} />
+      <DataTable rowKey={(r) => String(r.id)} rows={parts} cols={[{ key: "p", label: "Part", render: (r) => <div><b>{r.p}</b><div className="text-[11px] text-muted-foreground">{r.c}</div></div> }, { key: "s", label: "Source", render: (r) => r.src }, { key: "q", label: "Qty", render: (r) => r.q }, { key: "l", label: "Lot / serial", render: (r) => r.lot }, { key: "x", label: "", render: (r) => <Plain disabled={readOnly} className="text-xs font-semibold text-primary" onClick={() => { onRemove(parts.indexOf(r)); }}>Remove</Plain> }]} />
       <b className="text-[13px]">Refrigerant (R32) — cylinder CYL-R32-0182</b>
       <div className="grid-fluid" style={{ ["--min" as string]: "120px" }}>{[["Recovered", "0.40 kg"], ["Charged", "0.65 kg"], ["Net added", "+0.25 kg"], ["Leak check", "Pass · electronic detector"]].map(([k, v]) => <div key={k} className="rounded-xl bg-surface2 p-3"><div className="text-[11px] text-muted-foreground">{k}</div><div className="font-bold">{v}</div></div>)}</div>
       <p className="text-[11px] text-muted-foreground">Stock is deducted from your van when the report is accepted. Refrigerant amounts are kept per unit for leak-check logs.</p>
