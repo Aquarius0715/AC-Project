@@ -130,6 +130,7 @@ services:
       APP_URL: ${CUSTOMER_WEB_URL:-http://localhost:3000}
       OIDC_APP_CLIENT_ID: ac-customer-web
       OIDC_APP_CLIENT_SECRET: ${AC_WEB_CLIENT_SECRET:-local-ac-web-secret}
+      PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-demo}   # stripe: Pay opens Stripe Checkout and demo payment events are off (DEC-68)
     networks: [edge, app]
     profiles: [full]
     depends_on: { gateway: { condition: service_started }, keycloak: { condition: service_healthy }, valkey: { condition: service_started } }
@@ -315,6 +316,11 @@ services:
       <<: *backend-env
       DATABASE_URL: postgres://ac_billing_login:local@postgres:5432/ac?sslmode=disable
       DATABASE_READER_URL: postgres://ac_billing_login:local@postgres:5432/ac?sslmode=disable
+      # Stripe Checkout and its webhook (DEC-68): no key = demo payments only; a key needs its webhook secret too
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      # stripe-mock by default; https://api.stripe.com in .env.local for a real test-mode run with the Stripe CLI
+      STRIPE_API_BASE: ${STRIPE_API_BASE:-http://stripe-mock:12111}
     healthcheck: { test: ["CMD", "/app/server", "healthcheck"], interval: 10s, timeout: 3s, retries: 5 }
 
   energy-api:        # energy, MRV, offsets (internal; reached through the gateway)
@@ -545,7 +551,9 @@ services:
 
   stripe-cli:
     image: stripe/stripe-cli:v1.55.8@sha256:c8e5a48108fb4c1e83583912c85810e9ac3bc8db91070da3f915ac369ceecf31   # pinned (IR373)
-    command: ["listen", "--forward-to", "webhook:8080/stripe", "--api-key", "${STRIPE_TEST_SECRET_KEY:-}"]
+    # through the gateway, as Stripe reaches it: the gateway passes /stripe to the billing service unchanged (IR827)
+    # the events billing acts on (billing/stripe_events.go); this CLI version asks for them by name
+    command: ["listen", "--forward-to", "http://gateway:8080/stripe", "--events", "checkout.session.completed,checkout.session.expired,checkout.session.async_payment_succeeded,checkout.session.async_payment_failed,payment_intent.succeeded,payment_intent.payment_failed", "--api-key", "${STRIPE_TEST_SECRET_KEY:-${STRIPE_SECRET_KEY:-}}"]
     networks: [edge]
     profiles: [stripe]
 

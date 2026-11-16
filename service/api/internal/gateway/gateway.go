@@ -134,6 +134,13 @@ func New(targets Targets, logger *slog.Logger) *echo.Echo {
 		}
 	}
 
+	// Stripe's signed deliveries go to the billing service as they arrive: the signature covers the raw body and the
+	// Stripe-Signature header, so neither is changed on the way (DEC-68)
+	app.POST(
+		"/stripe",
+		func(c *echo.Context) error { return forward(c, proxies[ops.DomainBilling]) },
+	)
+
 	return app
 }
 

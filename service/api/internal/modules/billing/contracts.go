@@ -54,6 +54,10 @@ type Billing struct {
 	Recipients   Recipients
 	Notify       notify.Store
 	Releases     Releases
+	// Checkout starts Stripe payments; nil when Stripe is not configured (DEC-68).
+	Checkout Checkout
+	// CustomerBase is the customer app's origin; the Checkout return pages are built on it.
+	CustomerBase string
 }
 
 // The caller roles billing tells apart.
@@ -750,15 +754,17 @@ func (k Contract) fields() map[string]any {
 
 // Payment is Payment of service-contracts.ts.
 type Payment struct {
-	ID               uuid.UUID  `json:"id"`
-	TenantID         uuid.UUID  `json:"tenantId"`
-	Version          int        `json:"version"`
-	CreatedAt        time.Time  `json:"createdAt"`
-	UpdatedAt        time.Time  `json:"updatedAt"`
-	AmountMinor      int64      `json:"amountMinor"`
-	Currency         string     `json:"currency"`
-	InvoiceID        uuid.UUID  `json:"invoiceId"`
-	Method           *string    `json:"method"`
+	ID          uuid.UUID `json:"id"`
+	TenantID    uuid.UUID `json:"tenantId"`
+	Version     int       `json:"version"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
+	AmountMinor int64     `json:"amountMinor"`
+	Currency    string    `json:"currency"`
+	InvoiceID   uuid.UUID `json:"invoiceId"`
+	Method      *string   `json:"method"`
+	// Channel is how the payment is taken: demo, stripe_checkout (DEC-68) or manual (recorded by HQ).
+	Channel          string     `json:"channel"`
 	Status           string     `json:"status"`
 	PaymentReference *string    `json:"paymentReference"`
 	ConfirmedAt      *time.Time `json:"confirmedAt"`
@@ -791,8 +797,9 @@ type Invoice struct {
 const invoiceCols = `i.id, i.tenant_id, i.version, i.created_at, i.updated_at, i.amount_minor, i.currency, i.number, ` +
 	`i.contract_id, i.contract_version, lower(i.period), upper(i.period),
 	i.due_at, i.status, i.paid_at, (SELECT p.method FROM billing.payments p WHERE p.invoice_id = i.id ORDER BY ` +
-	`p.created_at DESC LIMIT 1),
-	(SELECT p.status FROM billing.payments p WHERE p.invoice_id = i.id ORDER BY p.created_at DESC LIMIT 1),
+	`p.created_at DESC, p.status IN ('initiated','processing','confirmed') DESC LIMIT 1),
+	(SELECT p.status FROM billing.payments p WHERE p.invoice_id = i.id
+		ORDER BY p.created_at DESC, p.status IN ('initiated','processing','confirmed') DESC LIMIT 1),
 	(SELECT k.customer_org_id FROM billing.contracts k WHERE k.id = i.contract_id AND k.version = i.contract_version)`
 
 func scanInvoice(r pgx.Row) (Invoice, error) {
@@ -1099,8 +1106,8 @@ func (m Billing) getInvoice(
 func paymentRefs(ctx context.Context, call *ops.Call, invoiceID uuid.UUID) ([]Payment, error) {
 	rows, err := call.Tx.Query(
 		ctx,
-		`SELECT id, tenant_id, version, created_at, updated_at, amount_minor, currency, invoice_id, method, status,
-			payment_reference, confirmed_at, confirmation_reason
+		`SELECT id, tenant_id, version, created_at, updated_at, amount_minor, currency, invoice_id, method, channel,
+			status, payment_reference, confirmed_at, confirmation_reason
 		FROM billing.payments WHERE invoice_id = $1 ORDER BY created_at DESC, id`,
 		invoiceID,
 	)
@@ -1123,6 +1130,7 @@ func paymentRefs(ctx context.Context, call *ops.Call, invoiceID uuid.UUID) ([]Pa
 			&payment.Currency,
 			&payment.InvoiceID,
 			&payment.Method,
+			&payment.Channel,
 			&payment.Status,
 			&payment.PaymentReference,
 			&payment.ConfirmedAt,

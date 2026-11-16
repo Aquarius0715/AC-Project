@@ -21759,6 +21759,120 @@
                 }
             }
         },
+        "/v1/payments/checkout": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Authorization: client:self\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR474 full amount and one attempt in flight (CONFLICT errors.invoice_has_payment); DEC-68 hosted Stripe Checkout in MYR; paid only by the signed webhook\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-C11, DD-A08",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "payments"
+                ],
+                "summary": "payments.startCheckout (write)",
+                "operationId": "payments.startCheckout",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "D04: the same key replays the stored response; another body for the same key is CONFLICT",
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "all: required (target invoice, read invoices.get)",
+                        "name": "X-Expected-Version",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "input",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/billing.StartCheckoutInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ops.Envelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/billing.CheckoutStart"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "403": {
+                        "description": "FORBIDDEN",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "409": {
+                        "description": "CONFLICT / OFFLINE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "422": {
+                        "description": "VALIDATION (fieldErrors)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "429": {
+                        "description": "RATE_LIMITED (retryAfterSeconds)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "503": {
+                        "description": "UNAVAILABLE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "504": {
+                        "description": "TIMEOUT",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    }
+                }
+            }
+        },
         "/v1/payments/confirm": {
             "post": {
                 "security": [
@@ -31071,6 +31185,17 @@
                 }
             }
         },
+        "billing.CheckoutStart": {
+            "type": "object",
+            "properties": {
+                "checkoutUrl": {
+                    "type": "string"
+                },
+                "paymentId": {
+                    "type": "string"
+                }
+            }
+        },
         "billing.ConfirmInput": {
             "type": "object",
             "properties": {
@@ -31484,6 +31609,10 @@
                 "amountMinor": {
                     "type": "integer"
                 },
+                "channel": {
+                    "description": "Channel is how the payment is taken: demo, stripe_checkout (DEC-68) or manual (recorded by HQ).",
+                    "type": "string"
+                },
                 "confirmationReason": {
                     "description": "ConfirmationReason is the reason HQ gave when confirming or recording the payment; HQ callers only.",
                     "type": "string"
@@ -31679,6 +31808,14 @@
                     "type": "string"
                 },
                 "paymentReference": {
+                    "type": "string"
+                }
+            }
+        },
+        "billing.StartCheckoutInput": {
+            "type": "object",
+            "properties": {
+                "invoiceId": {
                     "type": "string"
                 }
             }

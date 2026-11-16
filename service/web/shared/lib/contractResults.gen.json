@@ -3699,6 +3699,7 @@
  "payments.confirm": {
   "fields": [
    "amountMinor",
+   "channel",
    "confirmationReason",
    "confirmedAt",
    "createdAt",
@@ -3718,6 +3719,7 @@
  "payments.recordManual": {
   "fields": [
    "amountMinor",
+   "channel",
    "confirmationReason",
    "confirmedAt",
    "createdAt",
@@ -3763,6 +3765,13 @@
    "type",
    "updatedAt",
    "version"
+  ],
+  "items": null
+ },
+ "payments.startCheckout": {
+  "fields": [
+   "checkoutUrl",
+   "paymentId"
   ],
   "items": null
  },

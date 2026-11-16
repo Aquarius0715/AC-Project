@@ -54,7 +54,7 @@ describe("customer contracts & payments in the display language (FR-C10–C12, I
 
   it("times payments, restriction events and inquiries in the display time zone", () => {
     const p: ClientPayment = {
-      id: "p1aaaaaaaa", version: 2, amountMinor: 12_000, currency: "MYR", invoiceId: "i1", method: "demo_credit_card", status: "confirmed", paymentReference: "DEMO-PAY-1",
+      id: "p1aaaaaaaa", version: 2, amountMinor: 12_000, currency: "MYR", invoiceId: "i1", method: "demo_credit_card", channel: "demo", status: "confirmed", paymentReference: "DEMO-PAY-1",
       confirmedAt: TEXT_2026_09_13T02_05_00Z, confirmationReason: null, createdAt: "2026-09-13T02:00:00Z", updatedAt: TEXT_2026_09_13T02_05_00Z,
     };
     expect(paymentLines([p]).map((l) => [l.label, l.at])).toStrictEqual([["p1aaaaaa · Credit card (demo)", "13 Sept 2026, 10:05 am MYT"]]);

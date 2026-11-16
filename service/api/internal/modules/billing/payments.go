@@ -34,7 +34,7 @@ const (
 )
 
 const paymentCols = `id, tenant_id, version, created_at, updated_at, amount_minor, currency, invoice_id, method, ` +
-	`status, payment_reference, confirmed_at, confirmation_reason, event_ids`
+	`channel, status, payment_reference, confirmed_at, confirmation_reason, event_ids`
 
 func scanPayment(r pgx.Row) (Payment, error) {
 	var payment Payment
@@ -49,6 +49,7 @@ func scanPayment(r pgx.Row) (Payment, error) {
 		&payment.Currency,
 		&payment.InvoiceID,
 		&payment.Method,
+		&payment.Channel,
 		&payment.Status,
 		&payment.PaymentReference,
 		&payment.ConfirmedAt,
@@ -309,6 +310,12 @@ func (in *SimulateInput) checkPaymentEvent(fieldErrs map[string]string) {
 //	@Security		BearerAuth
 //	@Router			/v1/payments/simulate [post]
 func (m Billing) simulate(ctx context.Context, call *ops.Call, input *SimulateInput) (any, error) {
+	// with Stripe configured, a customer's demo events would mark an invoice paid without any money moving: they are
+	// refused, and the payment goes through Stripe Checkout and its webhook only (DEC-68). Instructions change nothing.
+	if m.Checkout != nil && input.Event != simulateInstructions {
+		return nil, apperr.E(apperr.Forbidden, apperr.KeyForbidden)
+	}
+
 	if input.Event == simulateInitiate || input.Event == simulateInstructions {
 		return m.simulateInvoiceEvent(ctx, call, input)
 	}
@@ -630,7 +637,9 @@ func (m Billing) confirm(
 		return payment, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
-	if payment.Status != paymentProcessing {
+	// a Stripe payment is confirmed by its signed webhook only (DEC-68): HQ confirming one that Stripe still processes
+	// could mark paid a bank payment that then fails
+	if payment.Status != paymentProcessing || payment.Channel == channelStripeCheckout {
 		return payment, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
@@ -779,4 +788,5 @@ func RegisterPayments(r *ops.Registry, m Billing) {
 	ops.Register(r, "payments.simulate", m.simulate)
 	ops.Register(r, "payments.confirm", m.confirm)
 	ops.Register(r, "payments.recordManual", m.recordManual)
+	ops.Register(r, "payments.startCheckout", m.startCheckout)
 }

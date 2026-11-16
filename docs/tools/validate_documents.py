@@ -346,6 +346,7 @@ trace = rows('00-prepare/traceability.csv')
 # 0.27.0 (2026-10-07): IR117 AWS / Stripe / HQ network restriction / retention / capacity (production target only); counts unchanged.
 # 0.26.0 (2026-10-07): IR116 Next.js stack + backend-architecture.md / network-architecture.md (production target, not 1A inputs); counts unchanged.
 # 0.25.0 (2026-10-07): IR115 consistency fixes (tabs, permissions, owner-only default rules); counts unchanged.
+# 0.670.0 (2026-11-16): IR827 adds payments.startCheckout and the Stripe webhook (POST /stripe, DEC-68, DD-C11); 86 requirement IDs, 70 role rows, 234 operations.
 # 0.639.0 (2026-11-15): IR796 auto-merge pull requests are brought up to date one at a time; counts unchanged.
 # 0.638.0 (2026-11-13): IR794 adds FR-C20 (installation request, DD-C20, SCR-C20); 86 requirement IDs, 70 role rows, 232 operations.
 # 0.637.0 (2026-11-13): IR793 air quality shows all four metrics at once; counts unchanged.
@@ -384,8 +385,8 @@ opnames = unique(operations, 'operation', 'operation')
 opmap = {row['operation']: row for row in operations}
 types = (ROOT / '02-design/service-contracts.ts').read_text()
 typed = {name:(input_, result, mode) for name,input_,result,mode in re.findall(r"^  '([^']+)': \{input:(.*);result:(.*);mode:'(read|write)'\};$", types, re.M)}
-if set(typed) != opnames or len(operations) != 233:  # IR826 presence.report, IR794 installationRequests.create + list + cancel + decline, IR657 members.delete, IR656 baselines.delete + factors.delete + mrv.deleteDraft, IR655 plans.delete + rateCards.delete, IR654 customers.delete + contractors.delete + organizations.delete, IR653 firmwareCampaigns.delete, IR652 devices.unbind + devices.delete + capabilities.delete, IR648 voice.resolveIntent removed, IR635 devices.setMqttNode, IR612 members.unavailability + members.clearUnavailability, IR437 jobs.getAttachment, IR436 certificates.getContent, IR214 automations.delete, IR216 commands.list, IR238 filterCare.getSettings, IR327 alerts.evidence, IR349 attachments.list, IR379 notifications.markAllRead, IR384 members.revokeSessions
-    fail('233 operation/TypeScript contract keys differ')
+if set(typed) != opnames or len(operations) != 234:  # IR827 payments.startCheckout, IR826 presence.report, IR794 installationRequests.create + list + cancel + decline, IR657 members.delete, IR656 baselines.delete + factors.delete + mrv.deleteDraft, IR655 plans.delete + rateCards.delete, IR654 customers.delete + contractors.delete + organizations.delete, IR653 firmwareCampaigns.delete, IR652 devices.unbind + devices.delete + capabilities.delete, IR648 voice.resolveIntent removed, IR635 devices.setMqttNode, IR612 members.unavailability + members.clearUnavailability, IR437 jobs.getAttachment, IR436 certificates.getContent, IR214 automations.delete, IR216 commands.list, IR238 filterCare.getSettings, IR327 alerts.evidence, IR349 attachments.list, IR379 notifications.markAllRead, IR384 members.revokeSessions
+    fail('234 operation/TypeScript contract keys differ')
 for row in operations:
     name = row['operation']
     if typed.get(name) != (row['input_contract'], row['result_contract'], row['mode']):

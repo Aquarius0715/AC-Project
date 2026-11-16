@@ -979,6 +979,9 @@
   "paymentId",
   "paymentReference"
  ],
+ "payments.startCheckout": [
+  "invoiceId"
+ ],
  "payouts.generate": [
   "period"
  ],

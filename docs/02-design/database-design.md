@@ -32,9 +32,8 @@ The source of truth for fields and states is [service-contracts.ts](service-cont
 | notify | Notifications | notifications, deliveries, templates, reference copies of other domains' rows kept from RowChanged events (IR188): ref_units, ref_customers, ref_properties, ref_jobs, ref_offers, ref_assignments, ref_invoices, ref_inquiries, ref_restrictions, ref_restriction_units, ref_devices, ref_certificates, ref_job_histories (IR601) |
 | audit | Audit | audit_log (append-only, partitioned) |
 
-As built (IR335), six tables are created but not used yet:
+As built (IR335), five tables are created but not used yet (`billing.stripe_events` is used since IR827: the billing service stores each Stripe delivery there):
 
-- `billing.stripe_events`: the webhook service is planned (IR197);
 - `monitoring.measurements_15m` and `monitoring.measurements_1h`: the rollup worker is not built. `telemetry.series` reads the raw measurements, and the energy figures integrate the minute power samples copied to `energy.ref_power_samples`;
 - `notify.templates`: the notification texts come from the code. `notify.deliveries` is used since IR418: the notification worker records each e-mail delivery there;
 - `platform.scheduled_items`: the schedulers update the domain tables directly (backend architecture §10);
@@ -85,7 +84,7 @@ Mapping of notable TypeScript types:
 | `Measurement` | `monitoring.measurements` (hot, 35 days) + aggregates; raw history in S3 Parquet |
 | `TwoFactorStatus`, passwords, sessions | Not stored here: two-step verification and credentials live in Amazon Cognito; server sessions in ElastiCache (as built, the BFF's session store, IR382) (`twoFactor.*`, `auth.*`, `demoSession.*` call Cognito / the session store) |
 
-Production-only enumeration values (not in the Phase 1A contract; add them to service-contracts.ts when the API adapter is built): `billing.payments.status` adds `expired` (Stripe Checkout Session expiry) and `method` / `channel` describe real methods instead of the demo `PaymentMethod`; `notify.notifications.template_key` adds `invite` (FR-C19 e-mail invites); `energy.baselines.method` adds `measured_period`; `energy.mrv_reports.status` adds `reviewed`; `energy.offset_records.state` adds `requested` / `purchased` / `retired` for a future real registry. All other CHECK lists equal the TypeScript unions, and every write operation that requires an expected version in the write version catalog has a `version` column on its target table (checked 2026-10-07).
+Production-only enumeration values (not in the Phase 1A contract; add them to service-contracts.ts when the API adapter is built): `notify.notifications.template_key` adds `invite` (FR-C19 e-mail invites); `energy.baselines.method` adds `measured_period`; `energy.mrv_reports.status` adds `reviewed`; `energy.offset_records.state` adds `requested` / `purchased` / `retired` for a future real registry. Since IR827 `Payment` carries `channel` (`demo`, `stripe_checkout`, `manual`) and the status `expired` (a Stripe Checkout Session that ended unpaid), as the CHECK lists of `billing.payments` have them. All other CHECK lists equal the TypeScript unions, and every write operation that requires an expected version in the write version catalog has a `version` column on its target table (checked 2026-10-07).
 
 ## 4. Entity relationships (per schema)
 

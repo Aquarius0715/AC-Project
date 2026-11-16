@@ -113,6 +113,8 @@ linters:
             - github.com/jackc/pgx/v5
             - github.com/labstack/echo/v5
             - github.com/redis/go-redis/v9
+            # Stripe Checkout and webhook verification (DEC-68, backend-go-design §payments)
+            - github.com/stripe/stripe-go/v85
             - golang.org/x/time
     wrapcheck:
       # the DomainError constructors start an error, as errors.New does; From converts one and keeps its cause.

@@ -261,6 +261,7 @@ func TestForeignTargets(t *testing.T) {
 			`{"event":"initiate","invoiceId":"` + invA + `","method":"demo_credit_card","demoConfirmed":true}`,
 			1,
 		},
+		{customerB(), "payments.startCheckout", `{"invoiceId":"` + invA + `"}`, 1},
 		{customerB(), opJobsGet, `{"jobId":"` + jobA + `"}`, 0},
 		{
 			customerB(),

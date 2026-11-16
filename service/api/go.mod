@@ -13,6 +13,7 @@ require (
 	github.com/jackc/pgx/v5 v5.12.0
 	github.com/labstack/echo/v5 v5.4.4
 	github.com/redis/go-redis/v9 v9.23.0
+	github.com/stripe/stripe-go/v85 v85.2.0
 	golang.org/x/time v0.16.0
 )
 
