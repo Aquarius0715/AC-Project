@@ -1361,6 +1361,7 @@ export const ms: Record<string, string> = {
   "All expected minutes observed": "Semua minit yang dijangka diperhatikan",
   "Missing readings are not filled in": "Bacaan yang tiada tidak diisi",
   "Daily actual energy by unit": "Tenaga sebenar harian mengikut unit",
+  "Daily energy": "Tenaga harian",
   "Daily energy — Actual vs Baseline": "Tenaga harian — Sebenar berbanding Garis dasar",
   "kWh per day · max 4 units · baselines are compared in the table": "kWh sehari · maks 4 unit · garis dasar dibandingkan dalam jadual",
   "kWh per day · {subject} · baseline shown as an even daily share": "kWh sehari · {subject} · garis dasar ditunjukkan sebagai bahagian harian yang sama rata",

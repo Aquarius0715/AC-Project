@@ -33,6 +33,12 @@ function savingClass(s: { comparable: boolean; increase: boolean }): string {
   if (!s.comparable) return "text-muted-foreground";
   return s.increase ? "text-warn" : "text-ok";
 }
+/** The chart's title names a baseline only when one is chosen (otherwise only actual energy is drawn). */
+function chartTitle(isMulti: boolean, hasBaseline: boolean): string {
+  if (isMulti) return "Daily actual energy by unit";
+  return hasBaseline ? "Daily energy — Actual vs Baseline" : "Daily energy";
+}
+
 export function EnergyView({ live }: Readonly<{ live: EnergyLive }>) {
   const t = useT();
   const nav = useUrlPatch();
@@ -115,7 +121,7 @@ export function EnergyView({ live }: Readonly<{ live: EnergyLive }>) {
             sub={s.comparable ? t("{percent} · {cost} vs {baseline} baseline", { percent: s.percent, cost: s.savedCost, baseline: s.baseline }) : noSavings} />
           <Kpi label={t("Data coverage")} value={s.coverage} sub={t(r.coverage === 1 ? "All expected minutes observed" : "Missing readings are not filled in")} />
         </div>
-        <Card title={t(isMulti ? "Daily actual energy by unit" : "Daily energy — Actual vs Baseline")} sub={isMulti ? t("kWh per day · max 4 units · baselines are compared in the table") : chartSub}
+        <Card title={t(chartTitle(isMulti, live.baselineId !== null))} sub={isMulti ? t("kWh per day · max 4 units · baselines are compared in the table") : chartSub}
           action={<Tabs value={view} onChange={setView} tabs={[{ id: "chart", label: t("Chart") }, { id: "table", label: t("Table") }]} />}>
           {chartBody(s, r)}
           {isMulti && <p className="mt-3 text-[11px] text-muted-foreground">{t("Totals across units are shown only when all units share the same calculation boundary; increases are labelled, never shown as a negative saving.")}</p>}

@@ -1315,6 +1315,7 @@ export const ja: Record<string, string> = {
   "All expected minutes observed": "想定される分のデータをすべて観測しました",
   "Missing readings are not filled in": "欠けている測定値は補完しません",
   "Daily actual energy by unit": "ユニット別の日次の実績エネルギー",
+  "Daily energy": "日次エネルギー",
   "Daily energy — Actual vs Baseline": "日次エネルギー — 実績とベースライン",
   "kWh per day · max 4 units · baselines are compared in the table": "1日あたりの kWh · 最大4ユニット · ベースラインは表で比較します",
   "kWh per day · {subject} · baseline shown as an even daily share": "1日あたりの kWh · {subject} · ベースラインは1日あたりの均等割りで表示",
