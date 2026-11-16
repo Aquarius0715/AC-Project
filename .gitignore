@@ -13,6 +13,8 @@ service/.cover/
 service/api/coverage.out
 service/api/.cover/
 service/api/.test-all/
+# Vitest coverage reports (`vitest run --coverage` in service/web/shared)
+service/web/shared/coverage/
 # the binaries `go build ./cmd/<name>/` (one package) leaves in service/api; three were committed by mistake in 8d3080a0
 service/api/billing-api
 service/api/devicesim
