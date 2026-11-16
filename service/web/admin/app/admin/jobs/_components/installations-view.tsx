@@ -28,7 +28,10 @@ export function InstallationsView({ live }: Readonly<{ live: InstallationsLive }
   const i = useI18n(), { t } = i;
   const patch = useUrlPatch();
   const [dialog, setDialog] = useState<{ kind: "approve" | "decline"; row: Row } | null>(null);
+  // a refusal while making units closes the dialog (R835): the made pairs stay, and reopening counts the rest from the refreshed row
+  const [refusal, setRefusal] = useState<string | null>(null);
   const close = () => { setDialog(null); };
+  const openDialog = (kind: "approve" | "decline", row: Row) => { setRefusal(null); setDialog({ kind, row }); };
   return (
     <Page className="max-w-[1440px]">
       <JobsTabs tab="installations" counts={live.counts} q={{}} />
@@ -46,15 +49,16 @@ export function InstallationsView({ live }: Readonly<{ live: InstallationsLive }
             { key: "j", label: t("Jobs"), render: (r) => (r.jobIds.length === 0 ? "—" : <div className="flex flex-wrap gap-1">{r.jobIds.map((id) => <Link key={id} className="text-primary underline" href={`/admin/jobs?jobId=${id}`}>{id.slice(0, 8)}</Link>)}</div>) },
             { key: "a", label: t("Actions"), render: (r) => (
               <div className="flex flex-wrap gap-1">
-                {live.canApprove && (r.status === "submitted" || r.status === "approved") && remaining(r) > 0 && <Btn size="sm" variant="ghost" onClick={() => { setDialog({ kind: "approve", row: r }); }}><Icon name="check" />{t("Make units and jobs")}</Btn>}
-                {live.canDecline && r.status === "submitted" && <Btn size="sm" variant="ghost" onClick={() => { setDialog({ kind: "decline", row: r }); }}><Icon name="close" />{t("Decline")}</Btn>}
+                {live.canApprove && (r.status === "submitted" || r.status === "approved") && remaining(r) > 0 && <Btn size="sm" variant="ghost" onClick={() => { openDialog("approve", r); }}><Icon name="check" />{t("Make units and jobs")}</Btn>}
+                {live.canDecline && r.status === "submitted" && <Btn size="sm" variant="ghost" onClick={() => { openDialog("decline", r); }}><Icon name="close" />{t("Decline")}</Btn>}
               </div>
             ) },
           ]} />
         )}
       </Card>
       <Banner>{t("Making units creates a planned unit and an installation job for each aircon; the job follows the usual offer, booking and report flow. Declining needs a reason the owner sees.")}</Banner>
-      {dialog?.kind === "approve" && <ApproveDialog live={live} row={dialog.row} count={remaining(dialog.row)} onClose={close} />}
+      {refusal && <Banner tone="crit">{refusal}</Banner>}
+      {dialog?.kind === "approve" && <ApproveDialog live={live} row={dialog.row} count={remaining(dialog.row)} onClose={close} onRefused={(text) => { setRefusal(text); close(); }} />}
       {dialog?.kind === "decline" && <DeclineDialog row={dialog.row} onClose={close} />}
     </Page>
   );
@@ -65,14 +69,13 @@ function refusalText(f: ActionFailure, t: T): string {
   return Object.values(fieldErrorTexts(f, { preferredSlots: "x", alternativeSlots: "x", unitId: "x" }, t))[0] ?? t("The units could not be made; what was made stays in the list.");
 }
 
-function ApproveDialog({ live, row, count, onClose }: Readonly<{ live: InstallationsLive; row: Row; count: number; onClose: () => void }>) {
+function ApproveDialog({ live, row, count, onClose, onRefused }: Readonly<{ live: InstallationsLive; row: Row; count: number; onClose: () => void; onRefused: (text: string) => void }>) {
   const { t } = useI18n();
   const [pending, run] = useAction();
   const [modelId, setModelId] = useState(row.modelId ?? live.models[0]?.id ?? "");
   const [names, setNames] = useState(Array.from({ length: count }, (_, n) => `${row.place.split(" › ").at(-1) ?? "AC"} · ${String(row.jobIds.length + n + 1)}`));
   const [symptom, setSymptom] = useState(t("Install a new air conditioner (request {number})", { number: row.number }));
   const [tried, setTried] = useState(false);
-  const [server, setServer] = useState<string | undefined>();
   const ids = { model: useId(), names: useId(), symptom: useId() };
   const namesError = names.some((n) => n.trim() === "" || codePoints(n.trim()) > 120) ? t("A name of 1–120 characters for each unit") : null;
   const symptomError = codePoints(symptom.trim()) < 10 || codePoints(symptom.trim()) > 2000 ? t("Symptoms must be 10–2000 characters") : null;
@@ -81,7 +84,7 @@ function ApproveDialog({ live, row, count, onClose }: Readonly<{ live: Installat
     if (!modelId) { focusField(ids.model); return; }
     if (namesError) { focusField(ids.names); return; }
     if (symptomError) { focusField(ids.symptom); return; }
-    run(() => approveInstallationRequest({ modelId, names, symptom, customerOrgId: row.customerOrgId, propertyId: row.propertyId, requestId: row.id, slots: row.slots, spaceId: live.spaceOf[row.id] ?? null, contactWindow: row.contactWindow ?? "" }), (v) => t("{n} units and installation jobs made for request {number}", { n: v.made, number: row.number }), onClose, (f) => { setServer(refusalText(f, t)); });
+    run(() => approveInstallationRequest({ modelId, names, symptom, customerOrgId: row.customerOrgId, propertyId: row.propertyId, requestId: row.id, slots: row.slots, spaceId: live.spaceOf[row.id] ?? null, contactWindow: row.contactWindow ?? "" }), (v) => t("{n} units and installation jobs made for request {number}", { n: v.made, number: row.number }), onClose, (f) => { onRefused(refusalText(f, t)); });
   };
   return (
     <Modal open wide onClose={onClose} title={t("Make units and jobs for request {number}", { number: row.number })} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={submit}>{t("Make {n} units", { n: count })}</Btn></>}>
@@ -92,7 +95,6 @@ function ApproveDialog({ live, row, count, onClose }: Readonly<{ live: Installat
       </Field>
       <Field label={t("Work description (10–2000 characters)")} error={tried ? symptomError ?? undefined : undefined}><Textarea id={ids.symptom} value={symptom} onChange={(e) => { setSymptom(e.target.value); }} /></Field>
       <Banner>{t("Each job takes the owner's preferred times: {times}.", { times: row.slots.map((s) => s.startAt.slice(0, 10)).join(", ") })}</Banner>
-      {server && <Banner tone="crit">{server}</Banner>}
     </Modal>
   );
 }

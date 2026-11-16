@@ -56,11 +56,15 @@ describe("HQ contractor register", () => {
       { id: "rc-3", version: 3, contractorOrgId: "org-a", effectiveFrom: "2026-06-01T00:00:00Z", currency: "MYR", lines: [{ workType: "rework_deduction", amountMinor: 12_000, note: "2nd return" }, { workType: "periodic_inspection", amountMinor: 38_000, note: "per unit visit" }] },
     ];
     const v = rateCardView(cards, "rc-3", NOW);
-    expect(v.current).toStrictEqual({ title: "Rate card v3 (from 1 Jun 2026)", since: "v3 (from 1 Jun 2026)", currency: "MYR", lines: [{ workType: "periodic_inspection", label: "Periodic inspection (per unit)", amount: "380.00", note: "per unit visit" }, { workType: "rework_deduction", label: "Rework deduction (2nd return)", amount: "− 120.00", note: "2nd return" }] });
+    expect(v.current).toStrictEqual({ title: "Rate card v3 (from 1 Jun 2026)", since: "v3 (from 1 Jun 2026)", currency: "MYR", lines: [{ workType: "periodic_inspection", label: "Periodic inspection (per unit)", amount: "380.00", entry: "380.00", note: "per unit visit" }, { workType: "rework_deduction", label: "Rework deduction (2nd return)", amount: "− 120.00", entry: "120.00", note: "2nd return" }] });
     expect(v.scheduled.map((s) => s.title)).toStrictEqual(["v4 from 1 Oct 2026 · scheduled"]);
     expect(v.nextVersion).toBe(5);
     expect(rateCardView([], null, NOW)).toStrictEqual({ current: null, scheduled: [], nextVersion: 1 });
     expect(rateAmount({ workType: "emergency", amountMinor: 65_000 })).toBe("650.00");
+    // R835: a line of 1,000 or more pre-fills the form without the thousands separator, so it saves again as it is.
+    const big = rateCardView([{ id: "rc-5", version: 5, contractorOrgId: "org-a", effectiveFrom: "2026-06-01T00:00:00Z", currency: "MYR", lines: [{ workType: "emergency", amountMinor: 150_050, note: null }] }], "rc-5", NOW);
+    expect(big.current?.lines.map((l) => [l.amount, l.entry])).toStrictEqual([["1,500.50", "1500.50"]]);
+    expect(rateCardErrors({ effectiveFrom: TEXT_2026_10_01T00_00_00Z, lines: (big.current?.lines ?? []).map((l) => ({ workType: l.workType, amount: l.entry, note: "" })) }, NOW)).toStrictEqual({});
   });
 
   it("names each technician's certificate state", () => {
