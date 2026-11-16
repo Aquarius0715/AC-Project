@@ -10707,3 +10707,12 @@ Found in the UI/UX loop (UX-58, criterion 11: fewer manual steps; principle 15: 
 2. **Preset.** `afterHoursDraft(unitIds, timezone, name)` (shared/lib/clientAutomations.ts) builds a schedule rule named "Switch off after hours". It runs on weekdays, starts at 19:00 with Power OFF and ends at 23:00. The end action stays empty, since DD-C04 never assumes it. The first AC is the target and the rest are `others`, up to 49. The rule is saved off, like every new one. The page reads `preset` and `unitIds` only with `automationId=new` and keeps only the customer's own unarchived ACs.
 3. **Leaving.** Done, Cancel and Create clear `preset` and `unitIds`, so the next new rule starts blank.
 4. **Tests.** `clientAutomations.test.ts` checks the filled fields, the empty end action and the 50-AC cap.
+
+## IR814 Pin ACs to the Overview — 2026-11-16
+
+Found in the UI/UX loop (UX-61, criterion 7: find the AC quickly; "favourites"). A customer who checks the same two or three ACs every day had to find them each time: Overview → Units & locations → the property → the room → the AC.
+
+1. **Pins.** The customer unit page's header has "Pin to Overview". It is a toggle button (`aria-pressed`), and once pinned it reads "Pinned to Overview" with a filled star. The pins live in this browser's localStorage (`ac:pinned-units`) as a per-viewer convenience. `parsePins` reads them back through a Zod schema, at most 8 ids. A missing, blocked or broken store reads as no pins. A new pin goes first, and the oldest drops beyond 8.
+2. **Overview.** "Pinned ACs" comes before the unit list. It shows each pinned AC of the current selection with its place, room temperature, and power and connection badges. Each links to the AC's page and has an unpin button. With no pin in the selection the card is not shown.
+3. **Not stored on the server.** Pins do not follow the user to another device. The card says "this browser only".
+4. **Tests.** `pinnedUnits.test.ts` covers valid and invalid stored values, the 8-pin cap, and pin and unpin order.
