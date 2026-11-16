@@ -10585,6 +10585,18 @@ Found in the UI/UX loop (UX-46). A command the AC refused read "Set power OFF �
    - The test-run banners read "Not done: {reason} · no end command is needed." and "Not confirmed: {reason} · the unit may still be running; check it on site."
 3. **Tests.** units, restrictions and techControl tests expect the words, and an unknown code reads "no reason given".
 
+## IR798 The Running list turns its ACs off, unticking those to keep — 2026-11-16
+
+Found in the UI/UX loop (UX-45). Overview › Running › View running units lists every running AC across properties. Turning them off meant opening each AC's own screen: about 27 clicks for 9 ACs. Group control works on one room or area only (DD-C14), and these ACs were in 8 rooms.
+
+1. **Turn off running ACs.** On the Running list (`/customer/properties?powerState=on`, no connection filter, 2 or more ACs) an owner gets "Turn off running ACs…". It opens the group panel with Power Off as the only change (`TURN_OFF`) and every online AC ticked.
+   - The owner unticks those that should keep running.
+   - Each card shows its place (property › floor › room).
+   - Review & turn off and the sending are those of Group control: one `commands.create` and `commands.get` per AC.
+   - This is the one exception to one space. Power off sets nothing else, so no room's settings can mix.
+2. **After sending.** The list is re-read, and the ACs confirmed off leave it. The panel stays open, says how many were turned off, and Retry covers the failed ACs that are still listed.
+3. **Docs and tests.** FR-C14 and DD-C14 step 5 say so. `clientProperties.test.ts` plans power off only, and an AC already off has nothing to send.
+
 ## IR800 Every unresolved alert says what to do — 2026-11-16
 
 Found in the UI/UX loop (UX-47, the customer's "anomaly response" on a phone). The open "Possible open window" alert showed where, its evidence and "Open — not resolved yet", with View unit as its only action. Nothing said what the customer should do. Faults had Request repair and reminders Book cleaning, but a load cause, a tamper or an air-quality alert left the customer guessing.
