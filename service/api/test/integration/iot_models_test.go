@@ -86,6 +86,8 @@ func TestIoTModels(t *testing.T) {
 			iotBody("", "x11", ""), `["v1"]`, `["`+strings.Repeat("v", 33)+`"]`, 1),
 		"firmware blank":    strings.Replace(iotBody("", "x12", ""), `["v1"]`, `[" "]`, 1),
 		"firmware dup trim": strings.Replace(iotBody("", "x13", ""), `["v1"]`, `["v1"," v1 "]`, 1),
+		"no manufacturer":   strings.Replace(iotBody("", "x14", ""), `"TestNode"`, `""`, 1),
+		"blank reason":      iotBody("", "x15", `,"changeReason":"  "`),
 	}
 	want := map[string]string{
 		fieldBoundary:       "sensors[0].boundaryId=error.invalid",
@@ -96,6 +98,8 @@ func TestIoTModels(t *testing.T) {
 		caseEmptyName:       "model=error.length",
 		"stale too low":     "sensors[0].staleAfterSeconds=error.range",
 		caseUnitMismatch:    "sensors[0].unit=error.unitMismatch",
+		"no manufacturer":   "manufacturer=error.length",
+		"blank reason":      "changeReason=error.length",
 	}
 
 	for name, b := range bad {
@@ -234,7 +238,7 @@ func TestIoTModels(t *testing.T) {
 		"iotModels.delete",
 		`{"id":"`+modelID+`","reason":"cleanup"}`,
 		2,
-	); code != 409 {
+	); code != 409 || res["messageKey"] != "error.modelInUse" {
 		t.Errorf("an IoT model in use is refused: %d %v", code, res)
 	}
 
@@ -247,6 +251,97 @@ func TestIoTModels(t *testing.T) {
 		1,
 	); code != 200 {
 		t.Errorf("an unused IoT model is deleted: %d %v", code, res)
+	}
+}
+
+// DEC-105: an update or delete of an unknown IoT model is NOT_FOUND, a delete on a stale version is a version
+// conflict, and a model no unit or device uses any more is still kept while a firmware campaign names it.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
+func TestIoTModelWriteRefusals(t *testing.T) {
+	srv := server(t)
+	unknown := uuid.NewString()
+
+	code, res := write(
+		srv,
+		hq(),
+		"iotModels.save",
+		iotBody(unknown, "IM-"+uuid.NewString()[:8], `,"changeReason":"rename"`),
+		1,
+	)
+	if code != 404 || res["messageKey"] != apperr.KeyNotFound {
+		t.Errorf("update of an unknown IoT model: %d %v", code, res)
+	}
+
+	code, res = write(srv, hq(), "iotModels.delete", `{"id":"`+unknown+`","reason":"cleanup"}`, 1)
+	if code != 404 || res["messageKey"] != apperr.KeyNotFound {
+		t.Errorf("delete of an unknown IoT model: %d %v", code, res)
+	}
+
+	stale := asStr(t, data(createIoT(t, srv))["id"])
+
+	code, res = write(srv, hq(), "iotModels.delete", `{"id":"`+stale+`","reason":"cleanup"}`, 2)
+	if code != 409 || res["messageKey"] != apperr.KeyVersionConflict {
+		t.Errorf("delete on a stale version: %d %v", code, res)
+	}
+
+	_, created := write(
+		srv,
+		hq(),
+		"iotModels.save",
+		strings.Replace(iotBody("", "IM-"+uuid.NewString()[:8], ""), `["v1"]`, `["v1","v2"]`, 1),
+		0,
+	)
+	modelID := asStr(t, data(created)["id"])
+	_, savedUnit := write(
+		srv,
+		hq(),
+		"units.save",
+		`{"customerOrgId":"`+seed.ID("org-customer-b").String()+`","propertyId":"`+
+			seed.ID("property-home-b").
+				String()+
+			`","spaceId":null,"displayName":"IoT AC `+uuid.NewString()[:4]+
+			`","modelId":"`+seed.ID("ventilation-demo").String()+`","iotModelId":"`+modelID+
+			`","type":"split","installedAt":null,"serviceScope":["indoor"]}`,
+		0,
+	)
+	unit := asStr(t, data(savedUnit)["id"])
+	_, reg := write(
+		srv,
+		hq(),
+		"devices.register",
+		`{"serial":"IMC-`+uuid.NewString()[:8]+`","sensorTypes":["temperature"],"unitId":"`+unit+`"}`,
+		0,
+	)
+	dev := asStr(t, data(reg)["id"])
+
+	code, res = write(
+		srv,
+		hq(),
+		"firmwareCampaigns.schedule",
+		`{"modelId":"`+modelID+`","targetVersion":"v2","deviceIds":["`+dev+`"],`+
+			`"waves":[{"label":"All","percent":100}],"window":{"startLocal":"01:00","endLocal":"05:00"},`+
+			`"autoPauseFailurePercent":5,"startAt":"`+clock().Add(48*time.Hour).Format(time.RFC3339)+`"}`,
+		0,
+	)
+	if code != 200 {
+		t.Fatalf("schedule: %d %v", code, res)
+	}
+	// the unit and the device leave the model; only the campaign still names it
+	owner(
+		t,
+		`UPDATE assets.units SET iot_model_id = NULL, iot_model_version = NULL WHERE id = $1`,
+		unit,
+	)
+	owner(
+		t,
+		`UPDATE devices.devices SET iot_model_id = NULL, iot_model_version = NULL WHERE id = $1`,
+		dev,
+	)
+
+	code, res = write(srv, hq(), "iotModels.delete", `{"id":"`+modelID+`","reason":"cleanup"}`, 1)
+	if code != 409 || res["messageKey"] != "error.modelInCampaign" {
+		t.Errorf("an IoT model a campaign targets is refused: %d %v", code, res)
 	}
 }
 
