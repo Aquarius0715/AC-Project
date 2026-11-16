@@ -10893,3 +10893,11 @@ Review round 851 found that `control.presence_states` kept the inside state of a
 3. **Tests.** `TestPresenceReport`: the second member at home is now a real membership of the customer; its access ends while it is inside, and the next report of the other member is the household's departure and deletes the ended member's state (no departure before the change). A longitude of 181 is `longitude=error.range` (`latitude` before the change).
 4. **Not done.** A member whose phone stops reporting still stays as they were (IR826 §5).
 
+
+## IR831 One approval event per installation request; the healthcheck takes a host in ADDR (DEC-107) — 2026-11-17
+
+Review round 853 found that every installation job linked to a request emitted `InstallationRequestApproved`, also when the request was approved already and nothing changed (the second job of a request for two units), and that the event did not name the customer as the cancel and decline events do. The same round found that the container healthcheck built `http://127.0.0.1` + `ADDR`, so an `ADDR` with a host (`0.0.0.0:8080`) gave a broken address and an unhealthy container.
+
+1. **Rule.** The request moves from `submitted` to `approved` with the first job only, and only that change emits `InstallationRequestApproved`, with `customerOrgId`. The count that limits the jobs of a request is its non-cancelled jobs, completed ones included (the comment said "unfinished").
+2. **Healthcheck.** `health.Check` takes the port of `ADDR` (`:8080` or `host:port`) and asks `127.0.0.1` at that port; an `ADDR` without a port is unhealthy.
+3. **Tests.** `TestInstallationRequests`: after two jobs there is one approval event and it names the customer (two events and none named before the change). `TestCheck` (new): 200 is healthy with `:port` and `host:port` (`host:port` was unhealthy before the change), 503, a connection closed before the answer and an `ADDR` without a port are not. `TestInstallationRequestRefusals` (new, review coverage): a phone number or more than 200 characters in the contact window, a note over 2000 characters (2000 after trimming is accepted), a stale version on decline of a submitted request (`error.versionConflict`), and a job for a unit at another property of the customer (`unitId=error.invalid`).

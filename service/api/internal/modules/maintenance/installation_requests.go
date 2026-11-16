@@ -730,8 +730,8 @@ func (m InstallationRequests) decide(
 // ---- the link of jobs.create ----
 
 // checkRequestLink applies DEC-107 to a new installation job made for a request: only HQ links a request, the request
-// is submitted or approved and of the unit's customer, and fewer unfinished jobs than its quantity belong to it. The
-// request row is locked so two jobs made at once cannot pass the count together.
+// is submitted or approved and of the unit's customer, and fewer non-cancelled jobs (completed ones count) than its
+// quantity belong to it. The request row is locked so two jobs made at once cannot pass the count together.
 func checkRequestLink(
 	ctx context.Context,
 	call *ops.Call,
@@ -797,11 +797,19 @@ func checkRequestLink(
 	return nil
 }
 
-// approveRequest sets the request approved once a job is made for it.
+// approveRequest sets a submitted request approved once its first job is made; the event is emitted only for that
+// change, not for the later jobs of a request that is approved already.
 func approveRequest(ctx context.Context, call *ops.Call, request uuid.UUID) error {
-	_, err := call.Tx.Exec(ctx, `UPDATE maintenance.installation_requests SET status = 'approved',
+	var customer uuid.UUID
+
+	err := call.Tx.QueryRow(ctx, `UPDATE maintenance.installation_requests SET status = 'approved',
 		decided_by = COALESCE(decided_by, $2), decided_at = COALESCE(decided_at, $3), version = version + 1,
-		updated_at = $3 WHERE id = $1 AND status = 'submitted'`, request, call.Principal.UserID, call.Now)
+		updated_at = $3 WHERE id = $1 AND status = 'submitted' RETURNING customer_org_id`,
+		request, call.Principal.UserID, call.Now).Scan(&customer)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+
 	if err != nil {
 		return apperr.Wrap(err, "update maintenance.installation_requests")
 	}
@@ -811,7 +819,7 @@ func approveRequest(ctx context.Context, call *ops.Call, request uuid.UUID) erro
 			"installation_request",
 			request,
 			"InstallationRequestApproved",
-			map[string]any{},
+			map[string]any{fieldCustOrgID: customer},
 		),
 	)
 
