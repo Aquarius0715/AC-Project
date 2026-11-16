@@ -3,6 +3,7 @@ package integration_test
 import (
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -105,8 +106,17 @@ func TestPresenceReport(t *testing.T) {
 		refusal(t, name, code, res, example.want)
 	}
 
-	// a location rule on the unit: arrival → power on
 	code, res := write(
+		srv,
+		customerB(),
+		"presence.report",
+		`{"latitude":3.1579,"longitude":181,"accuracyMeters":10}`,
+		0,
+	)
+	refusal(t, "longitude off the globe", code, res, "longitude=error.range")
+
+	// a location rule on the unit: arrival → power on
+	code, res = write(
 		srv,
 		customerB(),
 		"automations.save",
@@ -160,8 +170,29 @@ func TestPresenceReport(t *testing.T) {
 		t.Fatal("the band keeps the member inside")
 	}
 
-	// a second member at home: leaving is not the household's departure, and coming back is no arrival
-	other := uuid.New()
+	// a second member of the customer at home: leaving is not the household's departure, and coming back is no arrival
+	otherUser, other := uuid.New(), uuid.New()
+	owner(
+		t,
+		`INSERT INTO identity.users (id, email, display_name, sign_in_membership_id) VALUES ($1, $2, 'Housemate', $3)`,
+		otherUser,
+		"housemate-"+uuid.NewString()[:8]+"@example.com",
+		other,
+	)
+	owner(
+		t,
+		`INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, client_role, valid_from)
+			SELECT $1, tenant_id, $2, organization_id, 'client', 'member', $3 FROM identity.memberships WHERE id = $4`,
+		other,
+		otherUser,
+		clock().Add(-48*time.Hour),
+		seed.ID(membershipCustomerB),
+	)
+	t.Cleanup(func() {
+		owner(t, `DELETE FROM control.presence_states WHERE membership_id = $1`, other)
+		owner(t, `DELETE FROM identity.memberships WHERE id = $1`, other)
+		owner(t, `DELETE FROM identity.users WHERE id = $1`, otherUser)
+	})
 	owner(
 		t,
 		`INSERT INTO control.presence_states (tenant_id, membership_id, property_id, inside, changed_at,
@@ -178,12 +209,32 @@ func TestPresenceReport(t *testing.T) {
 		t.Fatalf("someone was home already: %v", got)
 	}
 
-	owner(t, `DELETE FROM control.presence_states WHERE membership_id = $1`, other)
+	// the housemate's access ends (the owner disables them, HQ ends it or it runs out) while their state says inside:
+	// the household no longer waits for them, and their state goes
+	owner(
+		t,
+		`UPDATE identity.memberships SET valid_until = $2 WHERE id = $1`,
+		other,
+		clock().Add(-time.Hour),
+	)
 
 	got = transitions(3.1700)
 	if len(got) != 1 || asObj(t, got[0])["event"] != "departure" ||
 		len(asArr(t, asObj(t, got[0])["commandIds"])) != 0 {
 		t.Fatalf("the last one left (no departure rule): %v", got)
+	}
+
+	var stale int
+
+	ownerScan(
+		t,
+		`SELECT count(*) FROM control.presence_states WHERE membership_id = $1`,
+		[]any{other},
+		&stale,
+	)
+
+	if stale != 0 {
+		t.Fatalf("%d presence rows of the ended membership", stale)
 	}
 
 	// IR53: a withdrawn consent forgets the member's states
