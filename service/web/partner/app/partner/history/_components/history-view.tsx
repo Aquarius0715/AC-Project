@@ -191,7 +191,7 @@ function Compose({ detail, onPreview }: Readonly<{ detail: Extract<DetailRows, {
         <Field label={t("Message (1–2000 chars)")} error={tried && !message.trim() ? t("A message is required — nothing was saved") : lengthError}>
           <Textarea value={message} onChange={(e) => { setMessage(e.target.value); }} placeholder={t("Schedule moved to 2026-09-22 09:00–11:00 due to technician availability.")} />
         </Field>
-        <div className="flex flex-wrap justify-end gap-2"><Btn disabled={pending} onClick={() => { setMessage(""); setTried(false); setResult(null); }}>{t("Clear")}</Btn><Btn variant="primary" disabled={pending || !chosen} onClick={send} className="h-auto min-h-8 max-w-full whitespace-normal text-left">{mode.add && <Icon name="add" />}{mode.button}</Btn></div>
+        <div className="flex flex-wrap justify-end gap-2"><Btn disabled={pending || (message === "" && !tried && result === null)} onClick={() => { setMessage(""); setTried(false); setResult(null); }}>{t("Clear")}</Btn><Btn variant="primary" disabled={pending || !chosen} onClick={send} className="h-auto min-h-8 max-w-full whitespace-normal text-left">{mode.add && <Icon name="add" />}{mode.button}</Btn></div>
         <p className="text-[11px] text-muted-foreground">{t("No real sending. Only people involved in this job are offered; free-form external recipients and other jobs’ recipients are rejected. Internal notes stay hidden from customers.")}</p>
       </div>
     </Card>

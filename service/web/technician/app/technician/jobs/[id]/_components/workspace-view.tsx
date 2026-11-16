@@ -687,7 +687,7 @@ function SignModal({ open, pending, summary, onClose, onSign }: Readonly<{ open:
             onPointerDown={(e) => { drawing.current = true; const c = e.currentTarget.getContext("2d"); if (!c) { return; } const [x, y] = point(e); c.lineWidth = 2.5; c.lineCap = "round"; c.strokeStyle = "#0f172a"; c.beginPath(); c.moveTo(x, y); e.currentTarget.setPointerCapture(e.pointerId); }}
             onPointerMove={(e) => { const c = e.currentTarget.getContext("2d"); if (!c || !drawing.current) { return; } const [x, y] = point(e); c.lineTo(x, y); c.stroke(); setDrawn(true); }}
             onPointerUp={() => { drawing.current = false; }} />
-          <div className="mt-1 flex justify-between text-[11px] text-muted-foreground"><span className="flex items-center gap-1"><Icon name="signature" />{t("Sign here")}</span><Plain type="button" className="font-semibold text-primary" onClick={clear}>{t("Clear")}</Plain></div>
+          <div className="mt-1 flex justify-between text-[11px] text-muted-foreground"><span className="flex items-center gap-1"><Icon name="signature" />{t("Sign here")}</span><Plain type="button" disabled={!drawn} className="font-semibold text-primary disabled:text-muted-foreground" onClick={clear}>{t("Clear")}</Plain></div>
         </div>
       )}
       {error && <Banner tone="crit">{error}</Banner>}
