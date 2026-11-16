@@ -114,6 +114,13 @@ export function actionText(a: CommandAction, t: T = en): string {
 const statusText: Record<ApiCommand["status"], string> = { requested: "requested", sent: "waiting for device", acknowledged: "acknowledged by device", failed: "failed", expired: "no device response (expired)", cancelled: "cancelled" };
 const sourceText: Record<string, string> = { automation: " · by an automation", restriction: " · by a restriction", diagnostic: " · technician test run" };
 
+/** The seconds a command's device has to answer it (IR806): from its request to its expiry, 30 when either is missing
+or the span is not a positive number. */
+export function answerSeconds(c: Pick<ApiCommand, "requestedAt" | "expiresAt">): number {
+  const span = c.expiresAt ? Math.round((Date.parse(c.expiresAt) - Date.parse(c.requestedAt)) / 1000) : NaN;
+  return Number.isFinite(span) && span > 0 ? span : 30;
+}
+
 /** One command history row: the sentence, its state and who sent it, and when it was requested (IR44 time). With the
 reader's membership (`me`), a command sent by hand says "by you" or "by someone else" (IR804): several people use one
 account, and the AC that changed by itself was often changed by another of them. No name is shown. */
