@@ -213,7 +213,7 @@ func TestStartCheckoutCreatesSessionForInvoice(t *testing.T) {
 
 	// the payment is in flight: the invoice shows it, and nothing is paid yet
 	_, res = post(srv, hq(), "invoices.get", `{"id":"`+inv+`"}`)
-	if data(res)["paymentStatus"] != "initiated" || data(res)["status"] != statusUnpaid {
+	if data(res)["paymentStatus"] != statusInitiated || data(res)["status"] != statusUnpaid {
 		t.Fatalf("invoice after start: %v", res)
 	}
 }
@@ -330,7 +330,7 @@ func TestStartCheckoutRefusals(t *testing.T) {
 	provider.setFail(true)
 
 	code, res := write(srv, customerB(), "payments.startCheckout", body, version)
-	if code != 503 || res["messageKey"] != "error.unavailable" {
+	if code != 503 || res["messageKey"] != keyUnavailable {
 		t.Fatalf("provider down: %d %v, want 503 error.unavailable", code, res)
 	}
 
@@ -354,13 +354,13 @@ func TestStartCheckoutRefusals(t *testing.T) {
 	provider.setFail(true)
 
 	code, res = write(srv, customerB(), "payments.startCheckout", body, invoiceVersion(t, srv, inv))
-	if code != 503 || res["messageKey"] != "error.unavailable" {
+	if code != 503 || res["messageKey"] != keyUnavailable {
 		t.Fatalf("release while provider down: %d %v, want 503 error.unavailable", code, res)
 	}
 
 	provider.setFail(false)
 
-	if _, paymentStatus := invoiceState(t, srv, inv); paymentStatus != "initiated" {
+	if _, paymentStatus := invoiceState(t, srv, inv); paymentStatus != statusInitiated {
 		t.Fatalf("after a refused release: payment %s, want initiated", paymentStatus)
 	}
 
@@ -382,7 +382,7 @@ func TestStartCheckoutNeedsStripeConfigured(t *testing.T) {
 		body,
 		invoiceVersion(t, srv, inv),
 	)
-	if code != 503 || res["messageKey"] != "error.unavailable" {
+	if code != 503 || res["messageKey"] != keyUnavailable {
 		t.Fatalf("no provider: %d %v, want 503 error.unavailable", code, res)
 	}
 }

@@ -17,6 +17,8 @@ import (
 
 const (
 	statusConfirmed = "confirmed"
+	statusInitiated = "initiated"
+	keyUnavailable  = "error.unavailable"
 	// the refusal of a second payment while one is in flight or confirmed (IR474).
 	keyInvoiceHasPayment = "errors.invoice_has_payment"
 )
@@ -120,7 +122,7 @@ func TestPaymentSimulation(t *testing.T) {
 		`{"event":"initiate","invoiceId":"`+inv+`","method":"demo_debit_card","demoConfirmed":true}`,
 		1,
 	)
-	if code != 200 || data(resp)["status"] != "initiated" ||
+	if code != 200 || data(resp)["status"] != statusInitiated ||
 		data(resp)["method"] != "demo_debit_card" {
 		t.Fatalf("initiate: %d %v", code, resp)
 	}
