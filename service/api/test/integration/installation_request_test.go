@@ -176,6 +176,22 @@ func TestInstallationRequests(t *testing.T) {
 		t.Fatalf("the second job: %d %v", code, res)
 	}
 
+	// the second job finds the request approved already: one approval event, which names the customer
+	var approvals, named int
+
+	ownerScan(
+		t,
+		`SELECT count(*), count(*) FILTER (WHERE payload->>'customerOrgId' = $2) FROM platform.outbox
+			WHERE aggregate_id = $1 AND event_type = 'InstallationRequestApproved'`,
+		[]any{request, org},
+		&approvals,
+		&named,
+	)
+
+	if approvals != 1 || named != 1 {
+		t.Errorf("approval events after two jobs: %d (with the customer: %d)", approvals, named)
+	}
+
 	code, res = link(plannedUnit(t, srv, org, prop, model), request)
 	if code != http.StatusConflict {
 		t.Errorf("a third job for two units: %d %v", code, res)

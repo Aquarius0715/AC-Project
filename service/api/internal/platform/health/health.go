@@ -3,6 +3,7 @@ package health
 
 import (
 	"context"
+	"net"
 	"net/http"
 	"time"
 )
@@ -10,16 +11,21 @@ import (
 // timeout bounds the healthcheck's request (compose.yaml gives the healthcheck 3 s).
 const timeout = 3 * time.Second
 
-// Check asks the process's own /healthz on 127.0.0.1 at the port of addr (":8080", as ADDR sets it) and returns the
-// exit code: 0 when the answer is 200 OK, 1 otherwise.
+// Check asks the process's own /healthz on 127.0.0.1 at the port of addr (":8080" as ADDR sets it, or a host and port
+// such as "0.0.0.0:8080") and returns the exit code: 0 when the answer is 200 OK, 1 otherwise.
 func Check(addr string) int {
+	_, port, err := net.SplitHostPort(addr)
+	if err != nil || port == "" {
+		return 1
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(
 		ctx,
 		http.MethodGet,
-		"http://127.0.0.1"+addr+"/healthz",
+		"http://"+net.JoinHostPort("127.0.0.1", port)+"/healthz",
 		http.NoBody,
 	)
 	if err != nil {
