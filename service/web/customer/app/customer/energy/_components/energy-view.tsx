@@ -91,7 +91,8 @@ export function EnergyView({ live }: Readonly<{ live: EnergyLive }>) {
             {/* the periods are Kuala Lumpur days (REV18-035), so the custom range is typed in Kuala Lumpur time and says so */}
             <Field label={t("From")} hint="Asia/Kuala_Lumpur"><DateTimeSelect value={from} onChange={(v) => { setFrom(v); }} /></Field>
             <Field label={t("To")} hint="Asia/Kuala_Lumpur"><DateTimeSelect value={to} onChange={(v) => { setTo(v); }} /></Field>
-            <Btn size="sm" variant="primary" onClick={() => { nav({ period: "custom", from, to }); }}>{t("Apply")}</Btn>
+            {/* off until a bound changes, as MRV's Apply is: applying the period already shown changes nothing (UI/UX loop R122) */}
+            <Btn size="sm" variant="primary" disabled={from === klLocal(live.period.from) && to === klLocal(live.period.to)} onClick={() => { nav({ period: "custom", from, to }); }}>{t("Apply")}</Btn>
             {live.period.error && <span className="text-xs text-crit">{live.period.error}</span>}
           </div>
         )}
