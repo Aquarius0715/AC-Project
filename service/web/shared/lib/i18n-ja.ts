@@ -460,6 +460,7 @@ export const ja: Record<string, string> = {
   "Open {title}": "{title} を開く",
   "Severity": "重大度",
   "Severity: All": "重大度: すべて",
+  "Severity: Critical & warning": "重大度: 重大と警告",
   "Severity: Critical": "重大度: 重大",
   "Severity: Warning": "重大度: 警告",
   "Unit: All units": "ユニット: すべてのユニット",

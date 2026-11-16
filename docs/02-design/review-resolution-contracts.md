@@ -10614,3 +10614,11 @@ Found in the UI/UX loop (UX-51, several users on one account). A customer owner 
 1. **Rows.** `historyRow` takes the reader's membership. A command with no other source (sent by hand) ends "· by you" when its actor is the reader, else "· by someone else". No name is shown, so nothing new is disclosed. Automation, restriction and test-run commands keep "· by an automation" and the others.
 2. **Where.** The customer unit page's command history. The page passes `me.membershipId` from the session.
 3. **Tests.** `units.test.ts`: by you, by someone else, an automation's command, and no reader (unchanged).
+
+## IR807 HQ's Unresolved alerts tile opens the alerts it counts — 2026-11-16
+
+Found in the UI/UX loop (UX-54, HQ anomaly response). The Overview tile "Unresolved alerts 4 · open or acknowledged · critical and warning" linked to `/admin/alerts`. That list opened on every open alert, 19 of them: the four warnings plus 15 filter-cleaning reminders (info). The count and the list disagreed, and the dispatcher had to filter by hand.
+
+1. **Filter.** The severity select of the alerts tab adds "Severity: Critical & warning" (`severity=attention`). `alerts.list` takes a single severity, so with this value the page reads without one and leaves out the `normal` rows. The status tiles and the list follow.
+2. **Link.** `overviewLinks().alerts` is `/admin/alerts?severity=attention`, so the tile's 4 is the list's Open 4.
+3. **Docs and tests.** DD-A05 step 5. `adminSummary.test.ts` checks the link.

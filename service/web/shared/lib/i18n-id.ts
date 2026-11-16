@@ -460,6 +460,7 @@ export const id: Record<string, string> = {
   "Open {title}": "Buka {title}",
   "Severity": "Tingkat keparahan",
   "Severity: All": "Tingkat keparahan: Semua",
+  "Severity: Critical & warning": "Tingkat keparahan: Kritis & peringatan",
   "Severity: Critical": "Tingkat keparahan: Kritis",
   "Severity: Warning": "Tingkat keparahan: Peringatan",
   "Unit: All units": "Unit: Semua unit",
