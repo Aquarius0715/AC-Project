@@ -3595,6 +3595,7 @@ export const ja: Record<string, string> = {
   "Access extended to {time}. The contractor keeps the site details until then.": "アクセスを {time} まで延長しました。それまで、協力会社は現場の情報を見られます。",
   "Extend contractor access": "協力会社のアクセスを延長",
   "Extend": "延長",
+  "{name} (access ended)": "{name}（アクセス終了）",
   "access ended {time}": "アクセスは {time} に終了しました",
   "access now ends {time}": "アクセスは現在 {time} に終了します",
   "New end · required": "新しい終了 · 必須",

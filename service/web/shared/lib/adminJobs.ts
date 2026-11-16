@@ -477,3 +477,24 @@ export function reportCard(j: ApiHqJob, r: ApiWorkReport, byUser: Map<string, st
   };
 }
 export { returnReason } from "@ac/web/lib/partnerReview"; // the HQ dialog's reason, shared with the contractor's (IR609)
+
+/** A technician as the Assignee filter of the Jobs tab reads it from members.list. */
+export interface AssigneeMember { id: string; displayName: string; organizationId: string; validUntil: string | null; revokedAt?: string | null }
+
+/** The Assignee filter of the Jobs tab: one group per company by name, since technicians of several companies can share
+a name; in a group the people with access first by name, then those whose access ended or was revoked, marked so
+(their past jobs stay findable). UI/UX loop R78. */
+export function assigneeGroups(ms: readonly AssigneeMember[], orgs: ReadonlyMap<string, string>, nowMs: number, t: T = EN.t): { org: string; people: { id: string; name: string }[] }[] {
+  const isEnded = (m: AssigneeMember) => Boolean(m.revokedAt) || (m.validUntil !== null && Date.parse(m.validUntil) <= nowMs);
+  const groups = new Map<string, AssigneeMember[]>();
+  for (const m of ms) {
+    const org = orgs.get(m.organizationId) ?? "";
+    groups.set(org, [...(groups.get(org) ?? []), m]);
+  }
+  return [...groups].toSorted(([a], [b]) => a.localeCompare(b)).map(([org, people]) => ({
+    org,
+    people: people.map((m) => ({ m, ended: isEnded(m) }))
+      .toSorted((a, b) => Number(a.ended) - Number(b.ended) || a.m.displayName.localeCompare(b.m.displayName))
+      .map(({ m, ended }) => ({ id: m.id, name: ended ? t("{name} (access ended)", { name: m.displayName }) : m.displayName })),
+  }));
+}
