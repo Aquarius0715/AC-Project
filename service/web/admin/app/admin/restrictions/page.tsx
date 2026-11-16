@@ -94,7 +94,7 @@ export default async function AdminRestrictionsPage({ searchParams }: Readonly<P
       causes: causeRows,
       contract: contractLabel(r.contractId),
       allPaid: isAllPaid,
-      units: unitRows(r, names, new Map(commands.filter((c): c is ApiCommand => !!c).map((c) => [c.id, c])), i),
+      units: unitRows(r, names, new Map(commands.filter((c): c is ApiCommand => !!c).map((c) => [c.id, c])), i, !isAllPaid && !activePeriod(r, now, i)),
       texts: {
         notice: t(notices === 1 ? "{time} · 1 client notice" : "{time} · {n} client notices", { time: showTime(r.noticeAt, display), n: notices }),
         executeAfter: showTime(r.executeAfter, display), period: activePeriod(r, now, i), intent: intentText(r, i),
