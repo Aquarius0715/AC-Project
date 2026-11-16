@@ -42,6 +42,19 @@ describe("POST /bff/ops/<operation>", () => {
     }
     expect(fetch).not.toHaveBeenCalled();
   });
+  it("refuses input that is not JSON and answers UNAVAILABLE when the Core API cannot be reached", async () => {
+    vi.stubEnv(DATA_SOURCE_2, "api");
+    const fetch = vi.fn(() => Promise.reject(new TypeError("fetch failed")));
+    vi.stubGlobal("fetch", fetch);
+    const init = { method: "POST", headers: SAME_ORIGIN, body: "{not json" };
+    const malformed = await POST(new NextRequest("http://localhost:3000/bff/ops/units.get", init), { params: Promise.resolve({ operation: "units.get" }) });
+    const malformedBody: unknown = await malformed.json();
+    expect([malformed.status, malformedBody]).toMatchObject([422, { code: "VALIDATION", fieldErrors: { _: "error.malformedInput" } }]);
+    expect(fetch).not.toHaveBeenCalled();
+    const res = await relay("units.get", { id: TEXT_00000000_0000_4000_8000_000000000001 });
+    const body: unknown = await res.json();
+    expect([res.status, body]).toMatchObject([503, { code: "UNAVAILABLE", messageKey: "error.unavailable" }]);
+  });
   it("refuses another site's read or write without calling the Core API", async () => {
     vi.stubEnv(DATA_SOURCE_2, "api");
     const fetch = vi.fn();
