@@ -301,6 +301,7 @@ const (
 	fieldWorkText       = "workText"
 	fieldOrganizationID = "organizationId"
 	fieldReason         = "reason"
+	fieldPosition       = "position"
 	fieldRefrigerant    = "refrigerant"
 	fieldReportVersion  = "reportVersion"
 	fieldSlot           = "slot"

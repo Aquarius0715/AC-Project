@@ -99,6 +99,11 @@ type siteOut struct {
 	Scope   []string `json:"scope"`
 }
 
+type siteLocationOut struct {
+	Location maintenance.SitePoint `json:"location"`
+	Found    bool                  `json:"found"`
+}
+
 type targetOut struct {
 	Caps  restrictions.UnitCaps `json:"caps"`
 	Found bool                  `json:"found"`
@@ -122,6 +127,7 @@ const (
 	qUnitService       = "assets.unitService"
 	qCustomerProfiles  = "assets.customerProfiles"
 	qSiteAddress       = "assets.siteAddress"
+	qSiteLocation      = "assets.siteLocation"
 	qWarrantyEnd       = "assets.warrantyEnd"
 	qBriefUnits        = "assets.briefUnits"
 	qCustomerOfOrg     = "assets.customerOfOrg"
@@ -212,6 +218,17 @@ func (v equipmentView) CustomerProfiles(
 	out, err := ops.Delegate(ctx, c, qCustomerProfiles, orgsIn{orgs}, v.customerProfiles)
 
 	return out, apperr.Wrap(err, "delegate assets.customerProfiles")
+}
+
+// SiteLocation implements maintenance.SiteAddresses: the pin of the unit's property (DEC-109).
+func (v equipmentView) SiteLocation(
+	ctx context.Context,
+	c *ops.Call,
+	unit uuid.UUID,
+) (maintenance.SitePoint, bool, error) {
+	r, err := ops.Delegate(ctx, c, qSiteLocation, unitIn{unit}, v.siteLocation)
+
+	return r.Location, r.Found, apperr.Wrap(err, "delegate assets.siteLocation")
 }
 
 func (v equipmentView) SiteAddress(
@@ -442,6 +459,19 @@ func (v equipmentView) customerProfiles(
 	return out, apperr.Wrap(err, "assets.Module.CustomerProfiles")
 }
 
+func (v equipmentView) siteLocation(
+	ctx context.Context,
+	c *ops.Call,
+	in *unitIn,
+) (siteLocationOut, error) {
+	pin, found, err := v.am.SiteLocation(ctx, c, in.UnitID)
+
+	return siteLocationOut{
+		Location: maintenance.SitePoint{Latitude: pin.Latitude, Longitude: pin.Longitude},
+		Found:    found,
+	}, apperr.Wrap(err, "assets.Module.SiteLocation")
+}
+
 func (v equipmentView) siteAddress(ctx context.Context, c *ops.Call, in *unitIn) (siteOut, error) {
 	addr, scope, err := v.am.SiteAddress(ctx, c, in.UnitID)
 
@@ -654,6 +684,7 @@ func registerCrossDomain(
 	ops.RegisterQuery(reg, equipmentDomain, qUnitService, equipment.unitService)
 	ops.RegisterQuery(reg, equipmentDomain, qCustomerProfiles, equipment.customerProfiles)
 	ops.RegisterQuery(reg, equipmentDomain, qSiteAddress, equipment.siteAddress)
+	ops.RegisterQuery(reg, equipmentDomain, qSiteLocation, equipment.siteLocation)
 	ops.RegisterQuery(reg, equipmentDomain, qWarrantyEnd, equipment.warrantyEnd)
 	ops.RegisterQuery(reg, equipmentDomain, qBriefUnits, equipment.briefUnits)
 	ops.RegisterQuery(reg, equipmentDomain, qCustomerOfOrg, equipment.customerOfOrg)

@@ -181,22 +181,27 @@ describe("the server's formatting and Malay (IR282)", () => {
   });
 });
 
-// IR620: Check in at site names the field to fix, so the form shows the error there and focuses it
+// IR620: Check in at site names the field to fix, so the form shows the error there and focuses it. IR825: the
+// device's fix replaces the typed distance; how far it is from the site's pin is the server's to say.
+const fix = (accuracyMeters: number) => ({ latitude: 3.1579, longitude: 101.7116, accuracyMeters });
 describe("check-in checks", () => {
-  it("asks for the site within 200 m and the scanned label, or a reason for a manual check-in", () => {
-    expect(checkInErrors(LOCATION_QR, "40", "ac-unit:u-1", "")).toStrictEqual({});
-    expect(checkInErrors(LOCATION_QR, "250", "", "")).toStrictEqual({
-      distance: "Location check-in needs you within 200 m of the site — check in manually with a reason otherwise",
+  it("asks for a fix good enough to tell 200 m and the scanned label, or a reason for a manual check-in", () => {
+    expect(checkInErrors(LOCATION_QR, fix(12), "ac-unit:u-1", "")).toStrictEqual({});
+    expect(checkInErrors(LOCATION_QR, fix(100), "ac-unit:u-1", "")).toStrictEqual({});
+    expect(checkInErrors(LOCATION_QR, null, "", "")).toStrictEqual({
+      position: "Get your location first — or check in manually with a reason",
       qr: "Scan the unit’s QR label",
     });
-    expect(Object.keys(checkInErrors(LOCATION_QR, "-1", "x", ""))).toStrictEqual(["distance"]);
-    expect(checkInErrors("manual", "250", "", "  ")).toStrictEqual({ reason: "A reason is required for a manual check-in (1–1000 characters)" });
-    expect(checkInErrors("manual", "", "", "No GPS in the plant room")).toStrictEqual({});
-    expect(checkInErrors("manual", "", "", "x".repeat(1001))).toHaveProperty("reason");
+    expect(checkInErrors(LOCATION_QR, fix(140.4), "x", "")).toStrictEqual({
+      position: "Your location is only known to ±140 m — move into the open and try again, or check in manually with a reason",
+    });
+    expect(checkInErrors("manual", null, "", "  ")).toStrictEqual({ reason: "A reason is required for a manual check-in (1–1000 characters)" });
+    expect(checkInErrors("manual", fix(500), "", "No GPS in the plant room")).toStrictEqual({});
+    expect(checkInErrors("manual", null, "", "x".repeat(1001))).toHaveProperty("reason");
   });
   it("words them in Malay and maps the Core API's fields onto the form's", () => {
-    expect(checkInErrors("manual", "", "", "", translator("ms")).reason).not.toBe("A reason is required for a manual check-in (1–1000 characters)");
-    expect(CHECK_IN_API_FIELDS).toStrictEqual({ distanceMeters: "distance", qrUnitId: "qr", reason: "reason" });
+    expect(checkInErrors("manual", null, "", "", translator("ms")).reason).not.toBe("A reason is required for a manual check-in (1–1000 characters)");
+    expect(CHECK_IN_API_FIELDS).toStrictEqual({ position: "position", qrUnitId: "qr", reason: "reason" });
   });
 });
 

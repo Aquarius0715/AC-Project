@@ -30,6 +30,7 @@ export type Membership = Entity & {userId:ID;displayName:string;organizationId:I
 export type Organization = Entity & {name:string;kind:'customer'|'contractor'|'operator';status:'active'|'inactive'};
 export type Customer = Entity & {name:string;status:'active'|'inactive';organizationId:ID;serviceProfile:'rto'|'general'|'energy'|'environment'};
 export type GeoPoint = {latitude:number;longitude:number};
+export type CheckInPosition = GeoPoint & {accuracyMeters:number};
 export type Property = Entity & {customerOrgId:ID;kind:'home'|'office';name:string;address:string|null;accessInstructions:string|null;location:GeoPoint|null;geofenceRadiusMeters:number|null;archived:boolean};
 export type Space = Entity & {propertyId:ID;parentSpaceId:ID|null;kind:'area'|'floor'|'room'|'space';name:string;archived:boolean};
 export type Metric = 'temperature'|'humidity'|'co2'|'pm25'|'power'|'vibration'|'refrigerant_pressure'|'compressor_cycles'|'airflow_drop'|'heartbeat_gap';
@@ -486,7 +487,7 @@ export type OperationContracts = {
   'filterCare.saveSettings': {input:{thresholdHours:number|null;fallbackDays:number;recipients:FilterCareSettings['recipients'];channels:FilterCareChannel[]};result:FilterCareSettings;mode:'write'};
   'energy.exportReport': {input:{month:string;propertyIds:ID[];sections:('energy_cost'|'month_comparison'|'co2_offsets'|'alerts_maintenance')[];format:'pdf'|'csv'};result:ReportFile;mode:'read'};
   'units.resolveQr': {input:{code:string};result:QrResolution;mode:'read'};
-  'jobs.checkIn': {input:{jobId:ID;method:'location_qr'|'manual';distanceMeters:number|null;qrUnitId:ID|null;reason?:string};result:MaintenanceJob;mode:'write'};
+  'jobs.checkIn': {input:{jobId:ID;method:'location_qr'|'manual';position:CheckInPosition|null;qrUnitId:ID|null;reason?:string};result:MaintenanceJob;mode:'write'};
   'jobs.pauseWork': {input:{jobId:ID;paused:boolean};result:MaintenanceJob;mode:'write'};
   'reports.signOff': {input:{jobId:ID;reportId:ID;reportVersion:number;signerName:string;signature:BlobInput|null;absentReason?:string;sitePhoto?:BlobInput};result:WorkReport;mode:'write'};
   'parts.list': {input:Query;result:Page<PartCatalogItem>;mode:'read'};
