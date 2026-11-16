@@ -126,6 +126,14 @@ interface ReminderCardProps {
   onPreview: () => void; onSend: () => void;
 }
 
+/** Why Preview / Send reminder cannot be pressed yet, said beside them (UI/UX loop R56): a reason first, then (in API
+mode) a preview, since Send uses the previewed text. Null once Send can be pressed. */
+const hintText = (hint: string | null, t: (s: string) => string) => (hint ? t(hint) : null);
+function reminderHint(live: boolean, reminder: { reason: string; preview: string }): string | null {
+  if (!reminder.reason.trim()) return "Enter a reason to preview and send the reminder.";
+  return live && !reminder.preview ? "Preview the message first: Send uses the previewed text." : null;
+}
+
 /** The payment reminder of an overdue invoice: recipient, channel, reason, the preview and the buttons. */
 function ReminderCard({ live, recipients, recipient, reminder, setReminder, channel, channels, channelName, message, pending, onPreview, onSend }: Readonly<ReminderCardProps>) {
   const { t } = useI18n();
@@ -135,7 +143,7 @@ function ReminderCard({ live, recipients, recipient, reminder, setReminder, chan
           <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}><Field label={t("Recipient")}>{live ? <Select value={recipient?.id ?? ""} onChange={(e) => { setReminder({ ...reminder, recipient: e.target.value, preview: "" }); }}>{recipients.map((r) => <option key={r.id} value={r.id}>{r.displayLabel} · {t(ROLE_WORD[r.role] ?? r.role)}</option>)}</Select> : <Select><option>customer-a · Client</option></Select>}</Field><Field label={t("Channel")}><Select value={channel} onChange={(e) => { setReminder({ ...reminder, channel: e.target.value, preview: "" }); }}>{channels.map((c) => <option key={c} value={c}>{channelName(c)}</option>)}</Select></Field></div>
           <Field label={t("Reason · e.g. “2nd reminder after due date”")}><Input value={reminder.reason} onChange={(e) => { setReminder({ ...reminder, reason: e.target.value, preview: "" }); }} /></Field>
           {message && <div className="my-3 rounded-xl bg-surface2 p-3 text-xs"><b>{t("Preview · {channel}", { channel: channelName(channel) })}</b> <span className="text-muted-foreground">{t("nothing is sent yet")}</span><br />{message.subject && <><b>{message.subject}</b><br /></>}{message.body}</div>}
-          <div className="mt-3 flex justify-end gap-2">{live && <Btn disabled={pending || !reminder.reason.trim()} onClick={onPreview}>{t("Preview")}</Btn>}<Btn variant="primary" disabled={pending || !reminder.reason.trim() || (live && !reminder.preview)} onClick={onSend}>{t("Send reminder")}</Btn></div>
+          <div className="mt-3 flex flex-wrap items-center justify-end gap-2"><p aria-live="polite" className="mr-auto text-xs text-muted-foreground">{hintText(reminderHint(!!live, reminder), t)}</p>{live && <Btn disabled={pending || !reminder.reason.trim()} onClick={onPreview}>{t("Preview")}</Btn>}<Btn variant="primary" disabled={pending || !reminder.reason.trim() || (live && !reminder.preview)} onClick={onSend}>{t("Send reminder")}</Btn></div>
         </>}
       </Card>
   );
