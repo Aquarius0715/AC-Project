@@ -10,6 +10,7 @@ const CONTRACT_RTO_A = "contract-rto-a";
 const INVOICE_OVERDUE_A = "invoice-overdue-a";
 const NO_METHOD = "Method not selected";
 
+import { anySet } from "@ac/web/lib/filters";
 import { isNone } from "@ac/web/lib/isNone";
 import Link from "next/link";
 import { useState, useTransition } from "react";
@@ -376,7 +377,7 @@ export function BillingView({ live }: Readonly<{ live?: BillingLive }>) {
                 </Card>
               </div>
             </div>
-          ) : <Card title={t("Invoices")}><EmptyState title={t("No invoices")}>{t("No invoice matches this scope.")}</EmptyState></Card>}
+          ) : <Card title={t("Invoices")}><EmptyState title={t("No invoices")}>{t(!live || anySet(live.scope.customerId, live.scope.propertyId, live.scope.contractId, live.scope.overdueOnly, live.scope.from, live.scope.to) ? "No invoice matches this scope." : "No invoice has been issued yet.")}</EmptyState></Card>}
         </>
       )}{tab === "inquiries" && <InquiriesPanel inquiries={inquiries} iqState={iqState} setIqState={setIqState} iqShown={iqShown} iq={iq} iqInvoice={iqInvoice} openInquiry={openInquiry} openInvoice={openInvoice} reply={reply} setReply={setReply} tried={tried} setTried={setTried} pending={pending} act={act} invoiceLabel={invoiceLabel} live={live} toast={toast} />}
       <PaymentModal modal={modal} close={close} onRecord={modal === "confirm" ? confirm : record} pending={pending} tried={tried} live={live} sel={sel} m={m} setM={setM} />

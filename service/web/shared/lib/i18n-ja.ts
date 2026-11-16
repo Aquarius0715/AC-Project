@@ -4982,6 +4982,7 @@ export const ja: Record<string, string> = {
   "in this scope": "この範囲内",
   "Totals per currency — never converted": "通貨ごとの合計 — 換算はしません",
   "Billing periods and due dates are Kuala Lumpur dates ({zone}).": "請求期間と支払い期限は、クアラルンプールの日付です（{zone}）。",
+  "No invoice has been issued yet.": "請求書はまだ発行されていません。",
   "No invoices": "請求書なし",
   "No invoice matches this scope.": "この範囲に一致する請求書はありません。",
   "No {status} invoices": "{status} の請求書はありません",
