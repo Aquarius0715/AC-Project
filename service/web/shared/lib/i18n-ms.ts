@@ -4375,7 +4375,7 @@ export const ms: Record<string, string> = {
   "needs billing.read": "memerlukan billing.read",
   "{n} critical": "{n} kritikal",
   "{n} warning": "{n} peringatan",
-  "{n} info": "{n} maklumat",
+  "{n} info, not counted": "{n} maklumat, tidak dikira",
   "none open": "tiada yang terbuka",
   "no properties yet": "belum ada premis",
   "{name} owner": "pemilik {name}",

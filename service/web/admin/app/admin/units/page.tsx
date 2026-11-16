@@ -136,7 +136,8 @@ export default async function AdminUnitsPage({ searchParams }: Readonly<PageProp
     iotModels: iotModels.map((k) => ({ id: k.id, label: `${k.manufacturer} ${k.model}`, sensors: k.sensors.map((s) => s.metric) })).toSorted((a, b) => a.label.localeCompare(b.label)),
     canRegisterDevice: has("device.write"),
     perProperty: tree.map((p) => `${p.name} ${String(p.units)}`).join(" · ") || t("no properties yet"),
-    alertsSub: openAlerts ? ([["{n} critical", sev("critical")], ["{n} warning", sev("warning")], ["{n} info", sev("normal")]] as const).filter(([, n]) => n > 0).map(([l, n]) => t(l, { n })).join(" · ") || t("none open") : null,
+    // the KPI counts critical and warning alerts (activeAlertCount); info ones are named apart, so “1” beside “15 info” adds up (UI/UX loop R52)
+    alertsSub: openAlerts ? ([["{n} critical", sev("critical")], ["{n} warning", sev("warning")], ["{n} info, not counted", sev("normal")]] as const).filter(([, n]) => n > 0).map(([l, n]) => t(l, { n })).join(" · ") || t("none open") : null,
     filter: { powerState, connections: conns, search: one("search") ?? "" },
     total: at.length,
     units: unitRows(filterUnits(at, { powerState, connections: conns, search: "" }), spaces, models, t),
