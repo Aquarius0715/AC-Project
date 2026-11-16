@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { csvShape,
   changedFields, claimCandidate, conditionText, coverageCsv, coverageKpis, coverageRows, customerRows, defaultRules, errorReportCsv, importMessage, placeOptions, policyLines,
-  registerKpis, standing as standingOf, standingMarks, unitDraft, unitErrors, unitRows, type ApiCoverage, type ApiCustomerPolicy, type ApiImportRow, type ApiUnitRow, type Standing,
+  registerKpis, standing as standingOf, standingMarks, unitDraft, unitErrors, unitRows, unitsMatching, type ApiCoverage, type ApiCustomerPolicy, type ApiImportRow, type ApiUnitRow, type Standing,
 } from "@ac/web/lib/assets";
 import { i18nOf } from "@ac/web/lib/i18n";
 import { without } from "@ac/web/lib/omit";
@@ -110,5 +110,15 @@ describe("csvShape", () => {
   it("reads quoted cells and every line ending", () => {
     expect(csvShape('\u{FEFF}a,"b,c","d""e"\r\n1,2,3\n\n4,5,6\n')).toStrictEqual({ header: ["a", "b,c", 'd"e'], rows: 2 });
     expect([csvShape("x\ry\r\nz"), csvShape(""), csvShape('"q\nr",s\n1,2')]).toStrictEqual([{ header: ["x"], rows: 2 }, { header: [], rows: 0 }, { header: ["q\nr", "s"], rows: 1 }]);
+  });
+});
+
+const placeOf = (u: ApiUnitRow) => (u.spaceId === "s2" ? "Mock fleet › 3F › Director's office" : "Home A › 1F › Bedroom");
+// IR801: a complaint names a room ("the director's office is hot"), so the search matches the place as well as the name
+describe("units & locations search", () => {
+  it("finds units by name or place, ignoring case", () => {
+    const us = [unit({ id: "a", displayName: BEDROOM_AC, spaceId: "s1" }), unit({ id: "b", displayName: "Mock · rejects commands", spaceId: "s2" })];
+    expect([unitsMatching(us, "DIRECTOR", placeOf), unitsMatching(us, " bedroom ", placeOf), unitsMatching(us, "xyz", placeOf), unitsMatching(us, "", placeOf)].map((r) => r.map((u) => u.id)))
+      .toStrictEqual([["b"], ["a"], [], ["a", "b"]]);
   });
 });

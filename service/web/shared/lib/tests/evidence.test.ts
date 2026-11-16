@@ -25,7 +25,8 @@ describe("evidence texts and resolution reasons in the display language (IR480, 
     expect(evidenceText("Device SN-0042 reported its cover opened while powered (tamper_signal)", malay)).toContain("SN-0042");
     // the stored text keeps the server's event name; the screen says it in words (IR626)
     expect(evidenceText("Device SN-0042 reported its cover opened while powered (tamper_signal)", en)).toBe("Device SN-0042 reported its cover opened while powered");
-    expect(evidenceText("Demo event: temperature gte threshold", malay)).toContain("temperature gte");
+    expect(evidenceText("Demo event: temperature gte threshold", malay)).toBe("Peristiwa demo: Suhu pada atau melebihi ambang amarannya"); // IR812: the metric and the comparison in words
+    expect(evidenceText("Demo event: heartbeat_gap gte threshold", en)).toBe("Demo event: Heartbeat gap at or above its alert threshold");
   });
 
   it("leaves a text no source writes as stored", () => {

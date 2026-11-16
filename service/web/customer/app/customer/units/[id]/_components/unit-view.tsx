@@ -2,12 +2,14 @@
 const SET_TEMPERATURE_FROM_C_TO_C = "Set temperature {from}°C → {to}°C";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Badge, Banner, Btn, Card, Check, ConnBadge, EmptyState, LinkButton, Modal, Page, PowerBadge, Stat, SummaryList, Toggle, cx, useToast, Choice } from "@ac/web/components/ui";
 import { units, unitRowFromApi, type UnitRow } from "@ac/web/lib/client";
 import { OpError } from "@ac/web/lib/ops";
-import { controlLayout, FAN_LABEL, historyRow, latest, MODE_LABEL, type ApiCommand, type ApiUnitDetail, type UnitAction } from "@ac/web/lib/units";
+import { AUTO_REFRESH_SECONDS, useAutoRefresh } from "@ac/web/lib/useAutoRefresh";
+import { usePinnedUnits } from "@ac/web/lib/pinnedUnits";
+import { answerSeconds, controlLayout, coolingHint, undoActions, FAN_LABEL, historyRow, latest, MODE_LABEL, type ApiCommand, type ApiUnitDetail, type UnitAction } from "@ac/web/lib/units";
 import { followCommand } from "@ac/web/lib/unitCommands";
 import { byCount, showRecent, showTime, textOf } from "@ac/web/lib/i18n";
 import { useDisplay, useT } from "@ac/web/components/I18n";
@@ -115,15 +117,51 @@ function plannedChanges({ d, edited, setpoint, mode, fan, isShowMode, isShowFan 
 }
 
 /** what the last send came to: the command history line, and whether the AC took it */
-interface Outcome { text: string; isOk: boolean }
+/** undo: the commands that put back the last send (IR810), offered once it was fully confirmed */
+interface Outcome { text: string; isOk: boolean; undo?: UnitAction[] }
+
+/** Pins this AC to the Overview (IR814): an AC checked often is one tap from the first screen. */
+function PinButton({ id }: Readonly<{ id: string }>) {
+  const t = useT();
+  const [pins, toggle] = usePinnedUnits();
+  const isPinned = pins.includes(id);
+  return <Btn size="sm" variant="ghost" aria-pressed={isPinned} onClick={() => { toggle(id); }}><Icon name="star" className={isPinned ? "fill-current text-warn" : undefined} />{t(isPinned ? "Pinned to Overview" : "Pin to Overview")}</Btn>;
+}
+
+/** Others' changes (another user, an automation, the device) appear without a reload (IR809): the page re-reads every
+30 s, except while the user edits, has a dialog open or waits for a command (`busy`), as a newer report resets the
+controls. The note says which of the two it is doing. */
+function LiveNote({ busy }: Readonly<{ busy: boolean[] }>) {
+  const t = useT();
+  const isIdle = !busy.some(Boolean);
+  useAutoRefresh(isIdle);
+  return <p className="mt-2 text-[11px] text-muted-foreground">{t(isIdle ? "Updates every {s} s while this page is open — changes by others show here." : "Updates paused while you change settings.", { s: AUTO_REFRESH_SECONDS })}</p>;
+}
+
+/** Waiting for the device, with the seconds it has left (IR806): "fails after 30 s" with nothing moving read as a hang,
+and the countdown shows it is still in time. It counts on the browser's clock from the moment it appears, as the
+command's own times are on the scenario clock. At zero it says the answer is being checked. */
+function WaitBanner({ seconds }: Readonly<{ seconds: number }>) {
+  const t = useT();
+  const [left, setLeft] = useState(seconds);
+  useEffect(() => {
+    const started = Date.now();
+    const id = setInterval(() => { setLeft(Math.max(0, seconds - Math.floor((Date.now() - started) / 1000))); }, 1000);
+    return () => { clearInterval(id); };
+  }, [seconds]);
+  // the sentence stays the same for screen readers (the banner is a live region); only the seconds change, unread
+  return <Banner>{left > 0 ? <>{t("Waiting for the AC to confirm… The result shows only after it acknowledges.")} <b aria-hidden="true">{t("{s} s left", { s: left })}</b></> : t("No answer yet — checking the result…")}</Banner>;
+}
 
 interface RemoteControlProps {
   isControllable: boolean; temperatureRange: { min: number; max: number; step: number } | null; cap: { min: number; max: number; step: number };
   setpoint: number; min: number; max: number; confirmed: number | string;
   /** isPowerUnknown: no fresh power signal, so the switch shows off and says so (the header badge reads Power unknown) */
   isOn: boolean; isPowerUnknown: boolean; isDisabled: boolean; isOffline: boolean; waiting: boolean; isPowerOff: boolean;
+  /** the command being waited for and how long the device has to answer it, for the countdown (IR806) */
+  waitFor?: { id: string; seconds: number } | null;
   /** the result of the last send, kept next to the controls until the next send or dismiss (a toast alone goes away) */
-  outcome: Outcome | null; onDismissOutcome: () => void;
+  outcome: Outcome | null; onDismissOutcome: () => void; onUndo: (undo: UnitAction[]) => void;
   /** the modes and fan levels the model offers; an empty list hides the choice */
   modes: readonly (ControlMode)[]; mode: ControlMode; fans: readonly (FanLevel)[]; fan: FanLevel;
   /** the changes to review before sending; null for a model that sends the power at once (Figma 02o) */
@@ -146,7 +184,7 @@ function PowerConfirm({ power, name, where, onCancel, onSend }: Readonly<{ power
 /** The remote control card: the power, the setpoint, the mode and the fan, and the review of what will be sent. */
 function RemoteControlCard(p: Readonly<RemoteControlProps>) {
   const t = useT();
-  const { isControllable, temperatureRange, cap, setpoint, min, max, confirmed, isOn, isPowerUnknown, isDisabled, isOffline, waiting, isPowerOff, modes, mode, fans, fan, review, outcome } = p;
+  const { isControllable, temperatureRange, cap, setpoint, min, max, confirmed, isOn, isPowerUnknown, isDisabled, isOffline, waiting, isPowerOff, modes, mode, fans, fan, review, outcome, waitFor } = p;
   const isPowerLocked = isDisabled || waiting || isPowerOff;
   return (
     <Card title={t("REMOTE CONTROL")} sub={t(isControllable ? "Controls apply to this AC only; you confirm before sending" : "No remote control on this model")}>
@@ -157,14 +195,16 @@ function RemoteControlCard(p: Readonly<RemoteControlProps>) {
           <div><div className="font-semibold">{t("Set temperature")}</div><div className="text-xs text-muted-foreground">{t("{min}–{max}°C · step {step}°C · confirmed {confirmed}°C", { min, max, confirmed, step: cap.step })}</div></div>
           <div className="flex items-center gap-2"><Btn disabled={isDisabled || setpoint - cap.step < min} onClick={() => { p.onStep(-cap.step); }} aria-label={t("Lower the temperature")}><Icon name="remove" /></Btn><span className="w-14 text-center text-lg font-bold">{setpoint}°C</span><Btn disabled={isDisabled || setpoint + cap.step > max} onClick={() => { p.onStep(cap.step); }} aria-label={t("Raise the temperature")}><Icon name="add" /></Btn></div>
         </div>}
+        {/* a very low cooling setpoint is worth a second look (IR808): next to the control, before Review & send */}
+        {temperatureRange && coolingHint(mode, setpoint, t) && <p className="flex items-start gap-1.5 text-xs text-warn"><Icon name="info" className="mt-0.5 shrink-0" />{coolingHint(mode, setpoint, t)}</p>}
         {modes.length > 0 && <div><div className="mb-1 font-semibold">{t("Mode")}</div><Choice value={mode} disabled={isDisabled} onChange={p.onMode} options={modes.map((m) => ({ id: m, label: t(MODE_LABEL[m]) }))} /></div>}
         {fans.length > 0 && <div><div className="mb-1 font-semibold">{t("Fan speed")}</div><Choice value={fan} disabled={isDisabled} onChange={p.onFan} options={fans.map((f) => ({ id: f, label: t(FAN_LABEL[f]) }))} /></div>}
         {review && ( // a model with the power only sends it at once: nothing to review (Figma 02o)
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface2 p-3 text-xs"><span><b>{t(review.count === 1 ? "{n} change:" : "{n} changes:", { n: review.count })}</b> {review.summary}<br /><span className="text-muted-foreground">{t("Target: {name} only · you will confirm before sending", { name: review.target })}</span></span><Btn variant="primary" disabled={isDisabled || waiting || !review.canSend} onClick={p.onReview}>{t(waiting ? "Waiting for device…" : "Review & send")}</Btn></div>
         )}
-        {waiting && <Banner>{t("Waiting for device response… The result is shown only after the device acknowledges (fails after 30 s).")}</Banner>}
+        {waiting && (waitFor ? <WaitBanner key={waitFor.id} seconds={waitFor.seconds} /> : <Banner>{t("Waiting for device response… The result is shown only after the device acknowledges (fails after 30 s).")}</Banner>)}
         {!waiting && outcome && (
-          <Banner tone={outcome.isOk ? "ok" : "warn"} action={<Btn size="sm" variant="ghost" onClick={p.onDismissOutcome}>{t("Dismiss")}</Btn>}>
+          <Banner tone={outcome.isOk ? "ok" : "warn"} action={<span className="flex gap-2">{outcome.undo && outcome.undo.length > 0 && <Btn size="sm" onClick={() => { if (outcome.undo) p.onUndo(outcome.undo); }}><Icon name="undo" />{t("Undo")}</Btn>}<Btn size="sm" variant="ghost" onClick={p.onDismissOutcome}>{t("Dismiss")}</Btn></span>}>
             {outcome.text}
           </Banner>
         )}
@@ -201,7 +241,7 @@ function AttachPolicyModal({ unitId, name, available, preset, onClose, onAttach 
   );
 }
 
-export function UnitView({ id, detail, room: roomRows, policies, defaults = null, history = NO_COMMANDS, restrictionHref = null, nowMs = 0 }: Readonly<{ id: string; detail?: ApiUnitDetail; room?: UnitRow[]; policies?: PolicyOption[]; defaults?: { on: number; n: number } | null; history?: ApiCommand[]; restrictionHref?: string | null; nowMs?: number }>) {
+export function UnitView({ id, detail, room: roomRows, policies, defaults = null, history = NO_COMMANDS, restrictionHref = null, nowMs = 0, me }: Readonly<{ id: string; detail?: ApiUnitDetail; room?: UnitRow[]; policies?: PolicyOption[]; defaults?: { on: number; n: number } | null; history?: ApiCommand[]; restrictionHref?: string | null; nowMs?: number; me?: string }>) {
   const t = useT();
   const display = useDisplay();
   const toast = useToast();
@@ -250,6 +290,7 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
   const [attachOpen, setAttachOpen] = useState(!!attachId);
   const closeAttach = () => { setAttachOpen(false); if (attachId) router.replace(`/customer/units/${unit.id}`, { scroll: false }); };
   const [waiting, setWaiting] = useState(false);
+  const [waitFor, setWaitFor] = useState<{ id: string; seconds: number } | null>(null);
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [mockOn, setMockOn] = useState(unit.state === "running");
   // the same power state as the header badge: a stale “on” is not shown as on
@@ -264,7 +305,7 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
   ]);
   // this screen's sends (live status) over the stored history (commands.list, IR216), newest first
   const hist: CommandRow[] = d ? [...sent, ...[...history, ...d.pendingCommands].filter((p, i, all) => sent.every((x) => x.id !== p.id) && all.findIndex((x) => x.id === p.id) === i)]
-    .toSorted((a, b) => b.requestedAt.localeCompare(a.requestedAt)).map((c) => historyRow(c, t, display)) : mockHist;
+    .toSorted((a, b) => b.requestedAt.localeCompare(a.requestedAt)).map((c) => historyRow(c, t, display, me)) : mockHist;
   // the model's capabilities decide what can be set (deterministic contracts: control=false forbids ordinary actions,
   // temperature=null temperature changes; AT-X06); the demo screen shows a full model
   const layout = controlLayout(d?.capabilities ?? null);
@@ -305,6 +346,7 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
       setOutcome({ text, isOk: false });
       return false;
     }
+    setWaitFor({ id: created.value.id, seconds: answerSeconds(created.value) });
     const followed = await followCommand(created.value, track); // polls commands.get through the BFF
     if (!followed.answered) {
       // the command was sent; only its answer could not be read, so it is never "not sent" (IR728)
@@ -321,13 +363,18 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
     setOutcome({ text: isOk ? text : t("{result}. The AC keeps its confirmed setting; check it and send again.", { result: text }), isOk });
     return isOk;
   };
-  const sendApi = async (actions: UnitAction[]) => {
+  // isUndo: the send puts back the previous one, so it offers no Undo of its own
+  const sendApi = async (actions: UnitAction[], isUndo = false) => {
     setWaiting(true);
     setOutcome(null);
+    const before = d?.observedState ?? null; // the confirmed setting the send replaces (IR810)
     try {
+      let isAllOk = true;
       for (const a of actions) {
-        if (!(await sendOne(a))) break;
+        if (!(await sendOne(a))) { isAllOk = false; break; }
       }
+      const undo = isAllOk && !isUndo && before ? undoActions(actions, before) : [];
+      if (undo.length > 0) setOutcome((o) => (o ? { ...o, undo } : o));
     } catch (error) {
       fail(error);
       setOutcome({ text: notSentText(error), isOk: false });
@@ -377,7 +424,7 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
         <RoomDevicesCard id={id} d={d} rows={isApi ? roomUnits.data : siblings} />
 
         <div className="flex min-w-0 flex-col gap-4">
-          <Card title={unit.name} sub={isApi ? unit.loc : `${unit.loc} · ${unit.id}`} action={<span className="flex flex-wrap items-center justify-end gap-2"><Btn size="sm" variant="ghost" onClick={() => { setRenaming(true); }}><Icon name="edit" />{t("Rename")}</Btn><PowerBadge s={unit.state} /><ConnBadge s={unit.conn} /></span>}>
+          <Card title={unit.name} sub={isApi ? unit.loc : `${unit.loc} · ${unit.id}`} action={<span className="flex flex-wrap items-center justify-end gap-2"><PinButton id={unit.id} /><Btn size="sm" variant="ghost" onClick={() => { setRenaming(true); }}><Icon name="edit" />{t("Rename")}</Btn><PowerBadge s={unit.state} /><ConnBadge s={unit.conn} /></span>}>
             {isOffline ? <Banner tone="warn">{t("This AC is offline. Remote actions are disabled until the connection returns. Last seen {when}.", { when: unit.obs })}</Banner> : (
               <div className="grid-fluid" style={{ ["--min" as string]: "160px" }}>
                 <Stat label={t("Room temperature (measured)")} value={room?.text ?? "—"} sub={room ? t("observed {at}", { at: room.at }) : t("no recent measurement")} />
@@ -385,14 +432,15 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
                 <Stat label={t("Humidity")} value={hum?.text ?? "—"} sub={hum ? t("observed {at}", { at: hum.at }) : t("no recent measurement")} />
               </div>
             )}
+            {d && <LiveNote busy={[Object.keys(edited).length > 0, confirm, powerAsk !== null, waiting, renaming, attachOpen]} />}
           </Card>
           <RestrictionBanners isBlocked={isBlocked} policy={policy} isRestricted={isRestricted} min={min} href={d ? restrictionHref ?? "/customer/payments" : "/customer/payments/invoice-overdue-a?tab=restriction"} offHref={restrictionHref ?? "/customer/payments"} />
           <RemoteControlCard
             isControllable={isControllable} temperatureRange={temperatureRange} cap={cap} setpoint={setpoint} min={min} max={max} confirmed={confirmed}
-            isOn={isOn} isPowerUnknown={isPowerUnknown} isDisabled={isDisabled} isOffline={isOffline} waiting={waiting} isPowerOff={policy?.kind === "power_off"}
+            isOn={isOn} isPowerUnknown={isPowerUnknown} isDisabled={isDisabled} isOffline={isOffline} waiting={waiting} waitFor={waitFor} isPowerOff={policy?.kind === "power_off"}
             modes={isShowMode ? modes : []} mode={mode} fans={isShowFan ? fans : []} fan={fan}
             review={layout.review ? { count: changeCount, summary: d ? changes().map((item) => changeText(item)).join(" · ") || t("No change yet") : t(SET_TEMPERATURE_FROM_C_TO_C, { from: 26, to: setpoint }), target: unit.name, canSend: d === null || changes().length > 0 } : null}
-            outcome={outcome} onDismissOutcome={() => { setOutcome(null); }}
+            outcome={outcome} onDismissOutcome={() => { setOutcome(null); }} onUndo={(undo) => { void sendApi(undo, true); }}
             repairHref={`/customer/maintenance?new=${d?.id ?? unit.id}`}
             onPower={setPowerAsk} onStep={(delta) => { setSetpoint((x) => x + delta); setEdited((e) => ({ ...e, temp: true })); }}
             onMode={(m) => { setMode(m); setEdited((e) => ({ ...e, mode: true })); }} onFan={(f) => { setFan(f); setEdited((e) => ({ ...e, fan: true })); }} onReview={() => { setConfirm(true); }}

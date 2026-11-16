@@ -30,6 +30,27 @@ const kindOf = (a: Pick<ApiAlert, "type" | "causeCode" | "evidenceKind">): Alert
 const kindLabel: Record<AlertKind, string> = { inspection: "Inspection record", load: "Load cause (possible)", maintenance: "Maintenance reminder", quality: "Air quality", fault: "Fault" };
 const kindIcon: Record<AlertKind, IconName> = { inspection: "edit", load: "home", maintenance: "time", quality: "airQuality", fault: "error" };
 
+// what to do next, by suspected cause, then by type, then by kind (IR800): every unresolved alert names a next step
+const causeNext: Record<string, string> = {
+  window_open: "Check that the room's windows and doors are closed. If nobody is in the room, turn the AC off.",
+  insulation_loss: "The AC works but needs more power. Ask for an inspection when it suits you.",
+};
+const typeNext: Record<string, string> = {
+  tamper: "Check whether someone opened the AC's cover. If nobody should have, request a repair.",
+  reconciliation_required: "HQ is checking this AC's restriction. Nothing to do; remote control may pause meanwhile.",
+};
+const kindNext: Record<AlertKind, string> = {
+  inspection: "A technician's note. Nothing to do unless the problem comes back.",
+  load: "Check the room for what makes the AC work harder.",
+  maintenance: "Book a filter cleaning. The AC keeps working, but cools less well until then.",
+  quality: "Air the room or switch on ventilation, then check Air quality for the latest readings.",
+  fault: "Request a repair. A technician checks the AC.",
+};
+/** The next step of an unresolved alert; null once it is resolved (IR800). */
+export function alertNext(a: Pick<ApiAlert, "causeCode" | "type" | "evidenceKind" | "status">, t: T = translator("en")): string | null {
+  return a.status === "resolved" ? null : t(lookup(causeNext, a.causeCode) ?? lookup(typeNext, a.type) ?? kindNext[kindOf(a)]);
+}
+
 /** The display title of an alert: its suspected cause, else its type — in the display language (IR260). */
 export function alertTitle(a: Pick<ApiAlert, "causeCode" | "type">, t: T = translator("en")): string {
   return t(lookup(causeTitle, a.causeCode) ?? lookup(typeTitle, a.type) ?? "Alert");
@@ -47,6 +68,8 @@ export interface InboxAlert {
   status: { state: "open" | "acknowledged" | "resolved"; text: string; tone: "warn" | "primary" | "ok" | "muted"; detail: string };
   /** the signed-in membership's notifications about the alert: unread ones (marked read on opening) and how many exist */
   unread: { id: string; version: number }[]; notes: number;
+  /** what the customer can do about it, in the display language; null once resolved (IR800) */
+  next: string | null;
 }
 const rank = { critical: 0, warning: 1, normal: 2 };
 /** One row per alert: the unit and its place, the status with its time and resolution, Needs attention for unresolved
@@ -81,6 +104,7 @@ export function inboxAlerts(alerts: ApiAlert[], notes: AlertNote[], unit: (id: s
       group: attn(a) ? "attn" : "info",
       unread: mine.filter((n) => n.readAt === null).map((n) => ({ id: n.id, version: n.version })),
       notes: mine.length,
+      next: alertNext(a, t),
       status,
     };
   });

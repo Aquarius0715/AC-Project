@@ -3,7 +3,7 @@ const MY_REQUESTS = "My requests";
 
 import { unitsByProperty } from "@ac/web/lib/clientBilling";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useId, useState, useTransition } from "react";
 import { Badge, Banner, Btn, Card, Check, Choice, Field, Input, ListRow, Modal, Page, PageHead, Select, SummaryList, Tabs, Textarea, Timeline, cx, Plain } from "@ac/web/components/ui";
 import { JobStatusBadge, OriginBadge } from "@ac/web/components/JobBits";
@@ -35,6 +35,7 @@ filter-care): the server reads only what the shown tab needs. */
 export function MaintenanceView({ live }: Readonly<{ live: MaintenanceLive }>) {
   const t = useT();
   const router = useRouter();
+  const params = useSearchParams(); // unitId: the AC a link came for on Filter care (IR813)
   const [going, startGo] = useTransition();
   const [target, setTarget] = useState<"requests" | "filters">(live.page);
   const page = going ? target : live.page;
@@ -58,7 +59,7 @@ export function MaintenanceView({ live }: Readonly<{ live: MaintenanceLive }>) {
   };
   // the shown tab's body: filter care once loaded, or the requests with the selected one beside them
   const filtersBody = () => (live.filters && !going ? (
-      <FilterCareTab f={live.filters} owner={live.owner} onRequest={(p) => { setPrefill(p); setModal("new"); }} onRequestAll={(b) => { setBatch(b); setModal("batch"); }}
+      <FilterCareTab f={live.filters} owner={live.owner} focus={params.get("unitId")} onRequest={(p) => { setPrefill(p); setModal("new"); }} onRequestAll={(b) => { setBatch(b); setModal("batch"); }}
         onDone={(text) => { setResult({ tone: "ok", text }); }} onFail={(f) => { setResult({ tone: f.code === "FORBIDDEN" ? "warn" : "crit", text: filterRefusal(f, t) }); }} />
   ) : <Card title={t("Filters by AC")}><p className="text-[13px] text-muted-foreground">{t("Loading filter care…")}</p></Card>);
   const requestsBody = () => {

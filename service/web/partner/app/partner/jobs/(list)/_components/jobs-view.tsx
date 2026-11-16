@@ -14,6 +14,7 @@ const toneText = { warn: "text-warn", crit: "text-crit", ok: "text-ok", primary:
 /** The contractor job list (FR-P01, Figma Contractor 02-1…02-6) from the Core API: status tabs with counts, sort and
 period in the URL (the overview's period, so the KPI counts match), one row per job and cursor paging. Texts in the
 user's display language (IR271). */
+const CARD_LABEL = "text-[10px] font-semibold uppercase tracking-wide text-muted-foreground @3xl:hidden";
 export function JobsView({ live }: Readonly<{ live: JobsLive }>) {
   const t = useT();
   const patch = useUrlPatch();
@@ -44,8 +45,9 @@ export function JobsView({ live }: Readonly<{ live: JobsLive }>) {
             {live.rows.map((j) => (
               <Link key={j.id} href={j.href} className="grid grid-cols-1 gap-2 border-b border-line px-1 py-3 last:border-0 hover:bg-surface2/60 @3xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_120px_16px] @3xl:items-center @3xl:gap-3">
                 <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><b className="text-[13px]">{j.title}</b>{j.origin && <OriginBadge origin={j.origin === "periodic_plan" ? "plan" : "request"} />}</div><div className="text-xs text-muted-foreground">{j.line}</div></div>
-                <div className="text-xs"><b className={cx(j.tech.tone && toneText[j.tech.tone])}>{j.tech.name}</b><div className={cx("text-muted-foreground", j.tech.subTone && toneText[j.tech.subTone])}>{j.tech.sub}</div></div>
-                <div className="text-xs"><b className={cx(j.slot.tone && toneText[j.slot.tone])}>{j.slot.main}</b><div className="text-muted-foreground">{j.slot.sub}</div></div>
+                {/* on a narrow card the column headings are hidden, so each value names itself (UI/UX loop R8) */}
+                <div className="text-xs"><div className={CARD_LABEL}>{t("Technician")}</div><b className={cx(j.tech.tone && toneText[j.tech.tone])}>{j.tech.name}</b><div className={cx("text-muted-foreground", j.tech.subTone && toneText[j.tech.subTone])}>{j.tech.sub}</div></div>
+                <div className="text-xs"><div className={CARD_LABEL}>{t("Slot / deadline")}</div><b className={cx(j.slot.tone && toneText[j.slot.tone])}>{j.slot.main}</b><div className="text-muted-foreground">{j.slot.sub}</div></div>
                 <div><Badge tone={j.badge.tone}>{j.badge.text}</Badge></div>
                 <span className="hidden text-muted-foreground @3xl:block"><Icon name="chevronRight" /></span>
               </Link>
