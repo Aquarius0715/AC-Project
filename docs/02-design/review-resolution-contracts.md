@@ -10643,3 +10643,14 @@ Found in the UI/UX loop (UX-57, criterion 14: undo of the last operation). A cha
 2. **Where.** On the customer unit page, when every command of a send is acknowledged, the result banner shows Undo beside Dismiss. Undo sends those commands through the same path as any send: own idempotency key, version check, waiting with the countdown, and a result. The user's click is the confirmation, since the commands restore what was confirmed a moment before. The undo itself offers no further Undo, and a send that failed part-way offers none.
 3. **Tests.** `units.test.ts` covers a temperature and fan send undone in order, a power send undone, and settings with no confirmed value before (nothing to undo).
 4. **Not checked live.** The mock fleet did not acknowledge commands on the dev stack (scenario clock), so the banner's Undo was not seen in the browser. Real devices were not used.
+
+## IR812 A demo event's evidence names its metric and comparison in words — 2026-11-16
+
+Found in the UI/UX loop (UX-59, HQ anomaly response; noted in UX-54). A policy rule's demo event is stored as "Demo event: heartbeat_gap gte threshold" (monitoring notifier). The alert detail and its activity showed it with the metric code and the comparison code. IR626 had worded the template but kept both values as stored.
+
+1. **Words.** `evidenceText` (shared/lib/evidence.ts) now reads the template as "Demo event: {metric} {operator} its alert threshold".
+   - The metric uses its alert name, for example Heartbeat gap or Temperature.
+   - The comparison reads above, at or above, below or at or below.
+   - All three are in the display language. An unknown metric or comparison keeps its stored form.
+2. **Shared names.** The metric names moved from adminAlerts.ts to `metricLabels.ts`. evidence.ts reads them there, because adminAlerts imports evidence. adminAlerts re-exports them, so nothing else changes.
+3. **Tests.** `evidence.test.ts` checks the Malay text for temperature and the English one for heartbeat_gap.

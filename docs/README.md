@@ -105,6 +105,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 0.647.0 (2026-11-16): IR804: the customer's command history says whether you or someone else sent each command.
 0.649.0 (2026-11-16): IR806: waiting for the AC to confirm a command counts down the seconds it has left.
 0.651.0 (2026-11-16): IR808: a cooling setpoint below 22 °C gets a hint that a lower setting only uses more power.
+0.655.0 (2026-11-16): IR812: a demo alert's evidence names its metric and comparison in words (Heartbeat gap at or above its alert threshold).
 0.653.0 (2026-11-16): IR810: after a confirmed change, the customer unit page offers Undo, which puts back the previous confirmed setting.
 0.641.0 (2026-11-16): IR799: a failed command says why in words (the AC refused it, no answer in time, offline …), never with its failure code, for customers, HQ and technicians.
 0.640.0 (2026-11-16): IR797: `jobs.list` `currentOnly` leaves out the history rows of ended access; the partner Jobs list's Offered, Active and Review tabs ask with it, so a delegation that ended unfinished no longer counts under Active. Phase 1A unchanged.
