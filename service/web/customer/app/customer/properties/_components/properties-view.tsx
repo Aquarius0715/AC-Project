@@ -3,7 +3,7 @@ const MY_PROPERTIES = "My properties";
 
 import Link from "next/link";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Badge, Banner, Btn, Card, Choice, ConnBadge, cx, DataTable, EmptyState, Field, Modal, Page, PowerBadge, SummaryList, useToast, Plain } from "@ac/web/components/ui";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { selectionId, type Connection, type PowerState, type Selection, type TreeProperty, type TreeSpace } from "@ac/web/lib/assets";
@@ -43,6 +43,9 @@ export function PropertiesView({ live }: Readonly<{ live: PropertiesLive }>) {
   const t = useT();
   const nav = useUrlPatch();
   const [renaming, setRenaming] = useState<Renaming | null>(null);
+  // a location or KPI filter the user chose: on a phone its panel comes above the tree, else a tap showed nothing new on screen
+  const params = useSearchParams();
+  const isChosen = !!live.filter || params.has("spaceId") || params.has("propertyId");
   if (live.tree.length === 0) return <Page><EmptyState title={t("No properties yet")}>{t("HQ registers your homes and offices with their rooms and air conditioners; they appear here once set up.")}</EmptyState></Page>;
   const sel = live.selection;
   const selId = selectionId(sel);
@@ -63,7 +66,7 @@ export function PropertiesView({ live }: Readonly<{ live: PropertiesLive }>) {
           </div>
           <p className="mt-3 text-[11px] text-muted-foreground">{t("Read-only — HQ sets up properties, floors, rooms and units. You can rename any location with its edit button or Rename; nothing else here changes the structure.")}</p>
         </Card>
-        <div className="flex min-w-0 flex-col gap-4">
+        <div className={cx("flex min-w-0 flex-col gap-4", isChosen && "order-first @min-[880px]:order-none")}>
           {live.filter ? <FilteredUnits live={live} clear={() => { go({}); }} /> : sel && <Panel live={live} sel={sel} rename={setRenaming} go={go} />}
         </div>
       </div>
