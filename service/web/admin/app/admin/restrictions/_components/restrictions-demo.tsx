@@ -26,6 +26,7 @@ export function RestrictionsDemo() {
   const [modal, setModal] = useState(false);
   const [f, setF] = useState({ contract: "", policy: "Temperature limit", exec: "", notice: "" });
   const [tried, setTried] = useState(false);
+  const [scheduled, setScheduled] = useState(0); // numbers the scheduled rows, so each has its own id and React key (R843)
   const setSt = (st: R["st"]) => { setList((l) => l.map((x) => (x.id === sel.id ? { ...x, st } : x))); setSel({ ...sel, st }); };
   const currentRow = flow.indexOf(sel.st);
   const openedAt = useOpenedAt(); // reference time for the 24 h rule (render stays pure)
@@ -48,7 +49,7 @@ export function RestrictionsDemo() {
             <p className="mt-2 text-[11px] text-muted-foreground">Retry and Reconcile become available for units that are pending, failed or waiting for reconciliation. Release is only possible after payment, a grace period or exception, or an override. The cause invoice is still unpaid.</p></Card>
         </div>
       </div>
-      <Modal open={modal} onClose={() => { setModal(false); setTried(false); }} title="Schedule restriction" footer={<><Btn onClick={() => { setModal(false); }}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!f.contract || !f.exec || execError) { return; } setList((l) => [...l, { id: "restriction-new", meta: `${f.contract} · customer-a`, policy: f.policy + " · 1 unit", st: "Scheduled", prog: "scheduled", tone: "primary" }]); toast("Restriction scheduled; notice sent"); setModal(false); setTried(false); }}>Schedule</Btn></>}>
+      <Modal open={modal} onClose={() => { setModal(false); setTried(false); }} title="Schedule restriction" footer={<><Btn onClick={() => { setModal(false); }}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!f.contract || execProblem) { return; } setList((l) => [...l, { id: `restriction-new-${String(scheduled + 1)}`, meta: `${f.contract} · customer-a`, policy: f.policy + " · 1 unit", st: "Scheduled", prog: "scheduled", tone: "primary" }]); toast("Restriction scheduled; notice sent"); setScheduled((n) => n + 1); setF({ contract: "", policy: "Temperature limit", exec: "", notice: "" }); setModal(false); setTried(false); }}>Schedule</Btn></>}>
         <Field label="Contract" error={tried && !f.contract ? "No client can view every unit (IR05) — pick an eligible contract" : undefined}><Select value={f.contract} onChange={(e) => { setF({ ...f, contract: e.target.value }); }}><option value="">Select eligible contract…</option><option>contract-rto-a</option><option>contract-rto-b</option></Select></Field>
         <Field label="Policy"><Select value={f.policy} onChange={(e) => { setF({ ...f, policy: e.target.value }); }}><option>Temperature limit</option><option>Power off</option></Select></Field>
         <Field label="Execute after (≥ 24 h from notice)" error={execError}><DateTimeSelect value={f.exec} onChange={(v) => { setF({ ...f, exec: v }); }} /></Field>
