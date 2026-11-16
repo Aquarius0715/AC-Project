@@ -396,6 +396,7 @@ export const ja: Record<string, string> = {
   "View stopped units": "停止中のユニットを表示",
   "Offline or missing data — counted here, never as running/normal": "オフライン、またはデータなし — ここでは数えますが、稼働中・正常とは見なしません",
   "View unknown units": "不明なユニットを表示",
+  "Show these": "該当を表示",
   "Needs attention": "要対応",
   "Unresolved warnings": "未解決の警告",
   " · +{n} reminder & info (not counted)": " · ほかにリマインダーと情報 {n} 件（集計外）",

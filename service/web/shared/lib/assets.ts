@@ -114,10 +114,12 @@ export function customerRows(cs: ApiCustomerRow[], orgs: ApiOrgRow[], ps: ApiPro
     };
   });
 }
-export const contractFilters = ["all", "overdue", "restricted", "good", "none"] as const;
+export const contractFilters = ["all", "attention", "overdue", "restricted", "good", "none"] as const;
 export type ContractFilter = (typeof contractFilters)[number];
 export function contractMatch(f: ContractFilter, r: CustomerRow): boolean {
   if (f === "all") return true;
+  // the customers the Needs attention tile counts: an open alert, overdue billing or an active restriction (UI/UX loop R84)
+  if (f === "attention") return r.status === "active" && (r.alerts > 0 || (r.standing?.overdue ?? 0) > 0 || !!r.standing?.restriction);
   const s = r.standing;
   if (!s || r.status === "inactive") return false;
   if (f === "overdue") return s.overdue > 0;
