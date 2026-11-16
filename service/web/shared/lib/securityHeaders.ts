@@ -7,16 +7,19 @@
 import { STYLE_HASHES } from "./styleHashes.gen";
 
 /** The Content-Security-Policy of one page response. `dev` adds what `next dev` needs (eval, inline styles); `https`
-upgrades subresource requests once the app is served over HTTPS. */
-export function contentSecurityPolicy(nonce: string, o: { dev: boolean; https: boolean; formActions: string[] }): string {
+upgrades subresource requests once the app is served over HTTPS. `mapOrigins` are the map style's origins (DEC-109,
+mapConfig.ts): its tiles are images and fetches, and MapLibre runs its worker from the app's own worker file. */
+export function contentSecurityPolicy(nonce: string, o: { dev: boolean; https: boolean; formActions: string[]; mapOrigins?: string[] }): string {
+  const map = o.mapOrigins ?? [];
   return [
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${o.dev ? " 'unsafe-eval'" : ""}`,
     `style-src 'self' ${o.dev ? "'unsafe-inline'" : [`'nonce-${nonce}'`, ...STYLE_HASHES].join(" ")}`,
     "style-src-attr 'unsafe-inline'",
-    "img-src 'self' blob: data:",
+    ["img-src 'self' blob: data:", ...map].join(" "),
     "font-src 'self'",
-    "connect-src 'self'",
+    ["connect-src 'self'", ...map].join(" "),
+    ...(map.length > 0 ? ["worker-src 'self'"] : []),
     "object-src 'none'",
     "base-uri 'self'",
     ["form-action 'self'", ...o.formActions].join(" "),

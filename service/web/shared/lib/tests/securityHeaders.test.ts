@@ -31,6 +31,11 @@ describe("the page Content-Security-Policy", () => {
     expect([development["script-src"], development["style-src"], development["form-action"]]).toStrictEqual(["'self' 'nonce-n' 'strict-dynamic' 'unsafe-eval'", "'self' 'unsafe-inline'", "'self'"]);
     expect(contentSecurityPolicy("n", { dev: false, https: true, formActions: [] }).endsWith("; upgrade-insecure-requests")).toBe(true);
   });
+  it("lets the map style's origin serve images and fetches, and MapLibre run its worker from the app (DEC-109, IR824)", () => {
+    const d = directives(contentSecurityPolicy("n", { dev: false, https: false, formActions: [], mapOrigins: ["https://tiles.openfreemap.org"] }));
+    expect([d["img-src"], d["connect-src"], d["worker-src"]]).toStrictEqual(["'self' blob: data: https://tiles.openfreemap.org", "'self' https://tiles.openfreemap.org", "'self'"]);
+    expect(directives(contentSecurityPolicy("n", { dev: false, https: false, formActions: [], mapOrigins: [] }))["worker-src"]).toBeUndefined();
+  });
   it("makes a fresh nonce each time and reads origins", () => {
     const [a, b] = [makeNonce(), makeNonce()];
     expect(a).not.toBe(b);

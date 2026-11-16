@@ -24,6 +24,8 @@ import {
   type ApiClientUser, type ApiCoverage, type ApiSpaceRow, type ApiUnitDetail, type ApiUnitRow, type ClaimCandidate, type Connection,
 } from "@ac/web/lib/assets";
 import { UnitsDemo } from "./_components/units-demo";
+import "maplibre-gl/dist/maplibre-gl.css"; // the property pin's map (DEC-109)
+import { mapConfig } from "@ac/web/lib/mapConfig";
 import { UnitsView, type CustomerLive, type UnitLive, type UnitsLive } from "./_components/units-view";
 import { queryReader } from "@ac/web/lib/searchParams";
 
@@ -80,6 +82,7 @@ export default async function AdminUnitsPage({ searchParams }: Readonly<PageProp
     top: one("tab") === "warranty" ? "warranty" : "customers",
     activeCustomers: rows.filter((r) => r.status === "active").map((r) => ({ id: r.id, name: r.name })),
     coverageAttention: null,
+    map: mapConfig(),
     rows,
   };
   // a unit link without its customer (the audit's related records, IR320) goes to the unit under its customer

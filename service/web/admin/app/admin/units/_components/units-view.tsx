@@ -26,8 +26,11 @@ import { nameError as personNameError } from "@ac/web/lib/partnerUsers";
 import type { Metric } from "@ac/web/lib/devices";
 import { amount } from "@ac/web/lib/energy";
 import { typeLabel } from "@ac/web/lib/partnerJobDetail";
-import { type NewUnitDevice, archiveLocation, archiveUnit, createCustomer, deleteCustomer, deleteUnit, importCommit, importPreview, importUndo, inviteClientUser, previewPasswordReset, recordWarrantyClaim, removeClientUser, resendInvite, saveProperty, saveSpace, saveUnit, saveUnitWithDevice, setDefaultRule, setUnitPolicies, updateClientUser, updateCustomer, signOutEverywhere } from "../actions";
+import { type NewUnitDevice, archiveLocation, archiveUnit, createCustomer, deleteCustomer, deleteUnit, importCommit, importPreview, importUndo, inviteClientUser, previewPasswordReset, recordWarrantyClaim, removeClientUser, resendInvite, saveProperty, saveSpace, searchAddress, saveUnit, saveUnitWithDevice, setDefaultRule, setUnitPolicies, updateClientUser, updateCustomer, signOutEverywhere } from "../actions";
 import { NewUnitDeviceSection, UnitDevicePanel, type UnitDevice } from "./unit-device";
+import { LocationPicker, PinMap } from "@ac/web/components/LocationPicker";
+import type { MapConfig } from "@ac/web/lib/mapConfig";
+import { DEFAULT_GEOFENCE_RADIUS, parseRadius, showPoint } from "@ac/web/lib/geoPoint";
 import { Icon, type IconName } from "@ac/web/components/Icon";
 import { NeedsAccess } from "@ac/web/components/NeedsAccess";
 import { ForceDeleteField, forceReady, noForce } from "@ac/web/components/DeleteDialog";
@@ -48,6 +51,8 @@ interface WarrantyLive { rows: CoverageRow[]; kpis: ReturnType<typeof coverageKp
 export interface UnitsLive {
   now: string; todayKL: string; canWrite: boolean; canForce: boolean; standingKnown: boolean; rows: CustomerRow[]; kpis: ReturnType<typeof registerKpis>; search: string; missing: boolean;
   top: "customers" | "warranty"; activeCustomers: { id: string; name: string }[]; coverageAttention: number | null; warranty?: WarrantyLive | null; customer?: CustomerLive;
+  /** the property pin's map and address search (DEC-109) */
+  map: MapConfig;
 }
 type Nav = ReturnType<typeof useUrlPatch>;
 type Run = ReturnType<typeof useAction>[1];
@@ -253,7 +258,7 @@ function CustomerScreen({ live, c }: Readonly<{ live: UnitsLive; c: CustomerLive
           <div className="flex min-w-0 flex-col gap-4">
             {c.unitMissing && <Banner tone="warn" action={<Btn size="sm" onClick={() => { nav(clearUnit); }}>{t("Close")}</Btn>}>{t("This unit no longer exists or belongs to another customer.")}</Banner>}
             {c.unit ? <UnitEdit key={c.unit.u.id} live={live} c={c} x={c.unit} nav={nav} run={run} pending={pending} /> : sel && <>
-              <LocationCard c={c} sel={sel} canWrite={canWrite} active={r.status === "active"} setM={setM} />
+              <LocationCard mapStyle={live.map.styleUrl} c={c} sel={sel} canWrite={canWrite} active={r.status === "active"} setM={setM} />
               <UnitsCard key={selId} c={c} sel={sel} nav={nav} canWrite={canWrite && r.status === "active"} onNew={addUnitHere} />
             </>}
           </div>
@@ -262,7 +267,7 @@ function CustomerScreen({ live, c }: Readonly<{ live: UnitsLive; c: CustomerLive
       {m?.kind === "customer" && <CustomerModal row={r} pending={pending} onClose={close} onSave={(d) => { run(() => updateCustomer(r.id, r.version, { id: r.orgId, version: r.orgVersion ?? 1, name: r.billingName, status: r.orgStatus }, { billingName: d.billingName, name: d.name, serviceProfile: d.profile, status: d.status }), t("Customer saved"), close); }} />}
       {m?.kind === "deleteCustomer" && <DeleteCustomerModal name={r.name} canForce={live.canForce} pending={pending} onClose={close}
         onSave={(reason, force) => { run(() => deleteCustomer(r.id, r.version, { id: r.orgId, version: r.orgVersion ?? 1 }, reason, force), t("Customer deleted"), () => { close(); nav({ customerId: null, tab: null, locationId: null, propertyId: null, unitId: null, powerState: null, connections: null, search: null }); }); }} />}
-      {m?.kind === "property" && <PropertyModal p={m.p} pending={pending} onClose={close} onSave={(d) => { run(() => saveProperty(propertyInput(d, r.orgId, m.p?.id), m.p?.version), t(m.p ? "Property saved" : "Property added"), (id) => { close(); nav({ locationId: id, ...clearUnit }); }); }} />}
+      {m?.kind === "property" && <PropertyModal map={live.map} p={m.p} pending={pending} onClose={close} onSave={(d) => { run(() => saveProperty(propertyInput(d, r.orgId, m.p?.id), m.p?.version), t(m.p ? "Property saved" : "Property added"), (id) => { close(); nav({ locationId: id, ...clearUnit }); }); }} />}
       {m?.kind === "space" && <SpaceModal c={c} init={m} pending={pending} onClose={close} onSave={(x) => { run(() => saveSpace(x), t("{kind} “{name}” added", { kind: (textOf(kindLabel, x.kind, t) ?? x.kind), name: x.name }), (id) => { close(); nav({ locationId: id, ...clearUnit }); }); }} />}
       {m?.kind === "rename" && <RenameModal name={m.p?.name ?? m.s?.name ?? ""} where={m.p ? t("{kind} · property", { kind: (textOf(kindLabel, m.p.kind, t) ?? m.p.kind) }) : (textOf(kindLabel, m.s.kind, t) ?? m.s.kind)} pending={pending} onClose={close}
         onSave={(name) => {
@@ -316,7 +321,7 @@ function LocationMenu({ onRename, onDelete }: Readonly<{ onRename: () => void; o
   );
 }
 
-function LocationCard({ c, sel, canWrite, active, setM }: Readonly<{ c: CustomerLive; sel: Selection; canWrite: boolean; active: boolean; setM: (m: ModalState) => void }>) {
+function LocationCard({ mapStyle, c, sel, canWrite, active, setM }: Readonly<{ mapStyle: string | null; c: CustomerLive; sel: Selection; canWrite: boolean; active: boolean; setM: (m: ModalState) => void }>) {
   const t = useT();
   if (sel.kind === "unassigned") {
     return <Card title={t("Unassigned")} sub={t("{property} · units without a room or floor", { property: sel.property.name })}><p className="text-[13px] text-muted-foreground">{t("These units belong to the property but no floor or room. Open a unit and pick its space under Location.")}</p></Card>;
@@ -327,7 +332,9 @@ function LocationCard({ c, sel, canWrite, active, setM }: Readonly<{ c: Customer
       <Card title={p.name} sub={[t("{kind} · property", { kind: (textOf(kindLabel, p.kind, t) ?? p.kind) }), p.address, count(t, p.floors, "1 floor", "{n} floors"), count(t, p.rooms, "1 room", "{n} rooms"), units(t, p.units)].filter(Boolean).join(" · ")}
         action={canWrite && <div className="flex flex-wrap gap-2"><Btn size="sm" onClick={() => { setM({ kind: "rename", p }); }}>{t("Rename")}</Btn><Btn size="sm" onClick={() => { setM({ kind: "property", p }); }}>{t("Edit details")}</Btn>
           <Btn size="sm" onClick={() => { setM({ kind: "space", propertyId: p.id, parentSpaceId: null, spaceKind: p.kind === "office" ? "area" : "floor" }); }}><Icon name="add" /> {t(p.kind === "office" ? "Add floor / area" : "Add floor")}</Btn><Btn size="sm" variant="danger" onClick={() => { setM({ kind: "archive", p }); }}>{t("Delete")}</Btn></div>}>
-        <SummaryList cols={2} items={[[t("Type"), (textOf(kindLabel, p.kind, t) ?? p.kind)], [t("Address"), p.address ?? "—"], [t("Access instructions"), p.accessInstructions ?? "—"], [t("Time zone"), "Asia/Kuala_Lumpur"], [t("Last edited"), c.lastEdit ?? "—"]]} />
+        <SummaryList cols={2} items={[[t("Type"), (textOf(kindLabel, p.kind, t) ?? p.kind)], [t("Address"), p.address ?? "—"], [t("Access instructions"), p.accessInstructions ?? "—"],
+          [t("Location on the map"), p.location ? showPoint(p.location) : t("No pin yet")], [t("Away/home radius"), t("{n} m", { n: p.geofenceRadiusMeters ?? DEFAULT_GEOFENCE_RADIUS })], [t("Time zone"), "Asia/Kuala_Lumpur"], [t("Last edited"), c.lastEdit ?? "—"]]} />
+        {mapStyle && p.location && <PinMap key={p.id} styleUrl={mapStyle} point={p.location} label={t("Map of {name} with its pin", { name: p.name })} className="mt-3 h-56 w-full overflow-hidden rounded-md border" />}
       </Card>
     );
   }
@@ -524,19 +531,29 @@ function PoliciesTab({ c, run, pending }: Readonly<{ c: CustomerLive; run: Run; 
 
 // ---- modals ----
 
-function PropertyModal({ p, pending, onClose, onSave }: Readonly<{ p?: TreeProperty; pending: boolean; onClose: () => void; onSave: (d: PropertyDraft) => void }>) {
+function PropertyModal({ map, p, pending, onClose, onSave }: Readonly<{ map: MapConfig; p?: TreeProperty; pending: boolean; onClose: () => void; onSave: (d: PropertyDraft) => void }>) {
   const t = useT();
   const [d, setD] = useState<PropertyDraft>(propertyDraft(p));
   const [tried, setTried] = useState(false);
-  const e = propertyErrors(d, t);
+  const [pinValid, setPinValid] = useState(true);
+  const [radius, setRadius] = useState(p?.geofenceRadiusMeters === null || p?.geofenceRadiusMeters === undefined ? "" : String(p.geofenceRadiusMeters));
+  const parsedRadius = parseRadius(radius);
+  const e: Record<string, string> = { ...propertyErrors(d, t), ...(!pinValid && { location: t("Latitude −90 to 90 and longitude −180 to 180, in degrees") }), ...(!parsedRadius.ok && { geofenceRadiusMeters: t("A whole number of metres, 50–2000") }) };
   const fieldError = (k: string) => (tried ? e[k] : undefined);
   return (
-    <Modal open onClose={onClose} title={p ? t("Edit {name}", { name: p.name }) : t(ADD_PROPERTY)} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (Object.keys(e).length === 0) onSave(d); }}>{t(p ? "Save property" : ADD_PROPERTY)}</Btn></>}>
+    <Modal wide open onClose={onClose} title={p ? t("Edit {name}", { name: p.name }) : t(ADD_PROPERTY)} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (Object.keys(e).length === 0) onSave({ ...d, geofenceRadiusMeters: parsedRadius.ok ? parsedRadius.radius : null }); }}>{t(p ? "Save property" : ADD_PROPERTY)}</Btn></>}>
       <div className="flex flex-col gap-3">
         <Field label={t("Kind · required")}><Choice value={d.kind} onChange={(v: "home" | "office") => { setD({ ...d, kind: v }); }} options={[{ id: "home", label: t("Home") }, { id: "office", label: t("Office") }]} /></Field>
         <Field label={t("Name · required")} hint={t("1–120 characters, unique among the customer’s properties")} error={fieldError("name")}><Input value={d.name} onChange={(x) => { setD({ ...d, name: x.target.value }); }} /></Field>
         <Field label={t("Address")} hint={t("0–500 characters · fictional values only; shown as the site address")} error={fieldError("address")}><Input value={d.address} onChange={(x) => { setD({ ...d, address: x.target.value }); }} /></Field>
         <Field label={t("Access instructions")} hint={t("0–1000 characters · visible to a contractor only after acceptance, within the valid period")} error={fieldError("accessInstructions")}><Textarea rows={3} value={d.accessInstructions} onChange={(x) => { setD({ ...d, accessInstructions: x.target.value }); }} /></Field>
+        <Field label={t("Location on the map")} hint={t("Used for the technician’s site check-in and the customer’s away/home automations. Click the map, search the address or type the coordinates.")} error={fieldError("location")}>
+          <LocationPicker value={d.location} styleUrl={map.styleUrl} onSearch={map.search ? searchAddress : null} address={d.address}
+            onChange={(location, valid) => { setPinValid(valid); setD((x) => ({ ...x, location })); }} />
+        </Field>
+        <Field label={t("Away/home radius (m)")} hint={t("50–2000 m around the pin; empty uses {n} m", { n: DEFAULT_GEOFENCE_RADIUS })} error={fieldError("geofenceRadiusMeters")}>
+          <Input inputMode="numeric" value={radius} placeholder={String(DEFAULT_GEOFENCE_RADIUS)} onChange={(x) => { setRadius(x.target.value); }} />
+        </Field>
       </div>
     </Modal>
   );

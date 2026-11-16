@@ -199,6 +199,12 @@ services:
       APP_URL: ${ADMIN_WEB_URL:-http://localhost:3003}
       OIDC_APP_CLIENT_ID: ac-admin-web
       OIDC_APP_CLIENT_SECRET: ${AC_ADMIN_WEB_CLIENT_SECRET:-local-ac-admin-secret}
+      # the property pin (DEC-109): key-free OpenFreeMap tiles and the Nominatim search outside production;
+      # production sets an Amazon Location style and GEOCODER=aws with AWS_LOCATION_REGION / AWS_LOCATION_API_KEY
+      MAP_STYLE_URL: ${MAP_STYLE_URL:-https://tiles.openfreemap.org/styles/liberty}
+      GEOCODER: ${GEOCODER:-nominatim}
+      AWS_LOCATION_REGION: ${AWS_LOCATION_REGION:-}
+      AWS_LOCATION_API_KEY: ${AWS_LOCATION_API_KEY:-}
     networks: [edge, app]
     profiles: [full]
     depends_on: { gateway: { condition: service_started }, keycloak: { condition: service_healthy }, valkey: { condition: service_started } }

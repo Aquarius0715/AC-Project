@@ -4,7 +4,8 @@
 // session and the Core API authorizes it (asset.write; alert.policy.write for default rules) and checks the version of
 // the record it changes.
 import { refresh } from "next/cache";
-import { coreAll, coreOp, CoreError } from "@ac/web/lib/dal";
+import { coreAll, coreOp, corePermissions, CoreError, verifySession } from "@ac/web/lib/dal";
+import { searchPlaces, type SearchResult } from "@ac/web/lib/geocode";
 import { actionFailure } from "@ac/web/lib/actionFailure";
 import { deleteAccounts } from "@ac/web/lib/forceDelete";
 import type { ApiCustomerRow, ApiImportPreview, ApiOrgRow, ApiUnitImport, GeoPoint, Profile, Scope } from "@ac/web/lib/assets";
@@ -75,6 +76,13 @@ export async function deleteCustomer(id: string, version: number, org: { id: str
 export interface PropertyInput { id?: string; customerOrgId: string; kind: "home" | "office"; name: string; address: string | null; accessInstructions: string | null; location: GeoPoint | null; geofenceRadiusMeters: number | null }
 export async function saveProperty(input: PropertyInput, version?: number) {
   return run(async () => { const p = await coreOp<{ id: string }>("properties.save", input, write(version)); return p.id; });
+}
+/** The address search of the property pin (DEC-109, IR824). It calls no Core API operation, so it checks here what
+properties.save needs: an Admin session with asset.write. The query alone goes to the provider. */
+export async function searchAddress(query: string): Promise<SearchResult> {
+  const session = await verifySession();
+  const permissions = await corePermissions();
+  return session.role === "admin" && permissions.has("asset.write") ? searchPlaces(query) : { ok: false, reason: "off" };
 }
 export interface SpaceInput { id?: string; propertyId: string; parentSpaceId: string | null; kind: "area" | "floor" | "room" | "space"; name: string }
 export async function saveSpace(input: SpaceInput, version?: number) {
