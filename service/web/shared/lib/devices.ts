@@ -73,9 +73,9 @@ export interface ApiCampaign {
 export const klTime = (iso: string) =>
   new Date(iso).toLocaleString("en-CA", { timeZone: KL, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).replace(",", "");
 
-export interface ModelRow { id: string; version: number; name: string; used: string; ventilation: boolean; updated: string; cap: ApiCapability }
+export interface ModelRow { id: string; version: number; name: string; used: string; inUse: boolean; ventilation: boolean; updated: string; cap: ApiCapability }
 /** A row of the IoT model list: the model and how many units and devices use it. */
-export interface IoTModelRow { id: string; version: number; name: string; used: string; updated: string; model: ApiIoTModel }
+export interface IoTModelRow { id: string; version: number; name: string; used: string; inUse: boolean; updated: string; model: ApiIoTModel }
 
 export function modelRows(caps: ApiCapability[], units: ApiUnitLite[], devices: ApiDevice[], i: I18n = EN): ModelRow[] {
   const { t } = i;
@@ -85,6 +85,7 @@ export function modelRows(caps: ApiCapability[], units: ApiUnitLite[], devices: 
     const devs = devices.filter((d) => !!d.unitId && ids.has(d.unitId)).length;
     return {
       id: k.id, version: k.version, name: `${k.manufacturer} ${k.model}`, ventilation: k.ventilation, updated: showTime(k.updatedAt, i.display), cap: k,
+      inUse: mine.length > 0, // the server refuses to delete it (error.modelInUse); Delete is off up front (UI/UX loop R133)
       used: `${t(mine.length === 1 ? "1 unit" : "{n} units", { n: mine.length })} · ${t(devs === 1 ? "1 device" : "{n} devices", { n: devs })}`,
     };
   });
@@ -97,6 +98,7 @@ export function iotModelRows(models: ApiIoTModel[], units: ApiUnitLite[], device
     const devs = devices.filter((d) => d.iotModelId === k.id).length;
     return {
       id: k.id, version: k.version, name: `${k.manufacturer} ${k.model}`, updated: showTime(k.updatedAt, i.display), model: k,
+      inUse: mine > 0 || devs > 0, // units or devices on it: the server refuses the delete (UI/UX loop R133)
       used: `${t(mine === 1 ? "1 unit" : "{n} units", { n: mine })} · ${t(devs === 1 ? "1 device" : "{n} devices", { n: devs })}`,
     };
   });
