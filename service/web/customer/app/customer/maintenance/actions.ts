@@ -47,6 +47,19 @@ export async function createRequest(input: { unitId: string; type: "reactive" | 
   });
 }
 
+/** Filter care's batch Request cleaning: one jobs.create per AC with the same 3 preferred times, in order. A refusal stops
+the batch; the requests sent before it stay and are counted, so the screen says how many went (UI/UX loop R140). */
+export async function createCleaningRequests(input: { units: { unitId: string; symptom: string }[]; slots: Slot[]; contactWindow: string }): Promise<Result<{ ids: string[]; stopped: ActionFailure | null }>> {
+  const ids: string[] = [];
+  for (const u of input.units) {
+    // eslint-disable-next-line no-await-in-loop -- one after another on purpose: the first refusal stops the batch, so no request after it is sent
+    const r = await createRequest({ unitId: u.unitId, type: "preventive", symptom: u.symptom, slots: input.slots, contactWindow: input.contactWindow });
+    if (!r.ok) return { ok: true, value: { ids, stopped: { code: r.code, messageKey: r.messageKey, fieldErrors: r.fieldErrors, retryAfterSeconds: r.retryAfterSeconds } } };
+    ids.push(r.value.id);
+  }
+  return { ok: true, value: { ids, stopped: null } };
+}
+
 /** jobs.respondProposal: accept books the time; decline gives a reason, an optional comment and 0 or 3 new times. */
 export async function respondProposal(jobId: string, version: number, proposalId: string, answer: { decision: "accept" } | { decision: "decline"; declineReason: "not_home" | "too_late" | "other"; comment: string; slots: Slot[] }) {
   return run(async () => {
