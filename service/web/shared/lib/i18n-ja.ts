@@ -5069,6 +5069,7 @@ export const ja: Record<string, string> = {
   "Allow cooling restrictions for unpaid invoices": "未払いの請求書に対して、冷房の利用制限を許可",
   "Rules version · required when eligible": "ルールのバージョン · 対象の場合は必須",
   "Demo rules — not approved production rules": "デモのルールです — 承認された本番のルールではありません",
+  "Your role can’t open Restrictions": "このロールでは Restrictions を開けません",
   "Open restriction": "利用制限を開く",
   "Save is disabled: {reason}. Cancel the notice or release the restriction first — contract changes never cancel or release restrictions.": "保存できません: {reason}。先に通知を取り消すか、利用制限を解除してください — 契約の変更で、利用制限が取り消されたり解除されたりすることはありません。",
   "1 active restriction on this contract": "この契約に有効な利用制限 1 件",
