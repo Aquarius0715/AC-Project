@@ -232,7 +232,7 @@ function RatesModal({ d, now, onClose, onFail }: ModalProps & { d: Detail; now: 
   const [lines, setLines] = useState(() => {
     return WORK_TYPES.map((w) => {
       const l = base?.lines.find((x) => x.workType === w.id);
-      return { workType: w.id, on: !!l || !base, amount: l ? l.amount.replace("− ", "") : "", note: l?.note ?? "" };
+      return { workType: w.id, on: !!l || !base, amount: l?.entry ?? "", note: l?.note ?? "" };
     });
   });
   const [tried, setTried] = useState(false);

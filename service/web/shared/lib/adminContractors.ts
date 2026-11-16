@@ -85,7 +85,7 @@ export function rateCardView(cards: ApiRateCard[], rateCardId: string | null, no
   const { t } = i;
   const day = (iso: string) => businessDay(iso, i.display.locale);
   const current = cards.find((c) => c.id === rateCardId) ?? null;
-  const lines = (c: ApiRateCard) => WORK_TYPES.flatMap((w) => c.lines.filter((l) => l.workType === w.id).map((l) => ({ workType: w.id, label: t(w.label), amount: rateAmount(l), note: l.note })));
+  const lines = (c: ApiRateCard) => WORK_TYPES.flatMap((w) => c.lines.filter((l) => l.workType === w.id).map((l) => ({ workType: w.id, label: t(w.label), amount: rateAmount(l), entry: (l.amountMinor / 100).toFixed(2), note: l.note })));
   return {
     current: current ? { title: t("Rate card v{v} (from {date})", { v: current.version, date: day(current.effectiveFrom) }), since: t("v{v} (from {date})", { v: current.version, date: day(current.effectiveFrom) }), currency: current.currency, lines: lines(current) } : null,
     scheduled: cards.filter((c) => Date.parse(c.effectiveFrom) > now).toSorted((a, b) => Date.parse(a.effectiveFrom) - Date.parse(b.effectiveFrom)).map((c) => ({ id: c.id, title: t("v{v} from {date} · scheduled", { v: c.version, date: day(c.effectiveFrom) }), currency: c.currency, lines: lines(c) })),
