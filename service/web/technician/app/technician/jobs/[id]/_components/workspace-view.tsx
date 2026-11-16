@@ -17,7 +17,7 @@ import { typeLabel } from "@ac/web/lib/partnerJobDetail";
 import { actionMessage, fieldErrorTexts, type ActionFailure } from "@ac/web/lib/actionMessage";
 import {
   CHECK_IN_API_FIELDS, CHECK_IN_FIELDS, checkInErrors, checkResults, componentLabel, PART_FIELDS, partErrors, REFRIGERANT_FIELDS, refrigerantErrors, draftFrom, draftInput, fmtOf, followUpText, groupLabel, itemPhotos, linkPhoto, progress, readingMetrics, submitIssues, timeRows, versionRows, windowState,
-  type ApiTechReport, type PhotoTag, type CheckInField, type Draft, type DraftPart, type DraftRefrigerant, type Group, type Issue, type Known, type Result, type TimeOnSite,
+  type ApiTechReport, type PhotoTag, type CheckInField, type CheckInPosition, type Draft, type DraftPart, type DraftRefrigerant, type Group, type Issue, type Known, type Result, type TimeOnSite,
 } from "@ac/web/lib/techJob";
 import { acknowledge, checkIn, pauseWork, resumeRework, saveDraft, signOff, submitReport, uploadPhoto } from "../actions";
 import { Icon } from "@ac/web/components/Icon";
@@ -513,30 +513,47 @@ type View = "readings" | "parts" | "time";
 const openTab = new Map<string, Group>();
 const openView = new Map<string, View>();
 /** The check-in form's fields by id: one dialog per page, and a refusal from the Core API focuses its field. */
-const CHECK_IN_IDS: Record<CheckInField, string> = { distance: "check-in-distance", qr: "check-in-qr", reason: "check-in-reason" };
+const CHECK_IN_IDS: Record<CheckInField, string> = { position: "check-in-position", qr: "check-in-qr", reason: "check-in-reason" };
 
-function CheckInModal({ open, unitId, pending, errors, setErrors, onClose, onCheckIn }: Readonly<{ open: boolean; unitId: string; pending: boolean; errors: CheckInErrors; setErrors: (e: CheckInErrors) => void; onClose: () => void; onCheckIn: (method: "location_qr" | "manual", distance: number | null, qr: string | null, reason: string | null) => void }>) {
+function CheckInModal({ open, unitId, pending, errors, setErrors, onClose, onCheckIn }: Readonly<{ open: boolean; unitId: string; pending: boolean; errors: CheckInErrors; setErrors: (e: CheckInErrors) => void; onClose: () => void; onCheckIn: (method: "location_qr" | "manual", position: CheckInPosition | null, qr: string | null, reason: string | null) => void }>) {
   const t = useT();
   const [method, setMethod] = useState<"location_qr" | "manual">(LOCATION_QR);
-  const [distance, setDistance] = useState("40");
+  const [position, setPosition] = useState<CheckInPosition | null>(null);
+  const [locating, setLocating] = useState(false);
   const [qr, setQr] = useState(`ac-unit:${unitId}`);
   const [reason, setReason] = useState("");
   const clear = (k: CheckInField) => { if (lookup(errors, k)) setErrors(without(errors, k)); };
+  // the device's own fix (DEC-109, IR825): the server measures it against the site's pin; nothing else is sent or kept
+  const locate = () => {
+    clear("position");
+    if (!("geolocation" in navigator)) { setErrors({ ...errors, position: t("This device cannot share its location — check in manually with a reason") }); return; }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (fix) => { setLocating(false); setPosition({ latitude: fix.coords.latitude, longitude: fix.coords.longitude, accuracyMeters: fix.coords.accuracy }); },
+      () => { setLocating(false); setErrors({ ...errors, position: t("The location could not be read — allow location for this app, or check in manually with a reason") }); },
+      { enableHighAccuracy: true, timeout: 15_000, maximumAge: 0 }, // a fresh fix: "Locate again" must not answer the last one
+    );
+  };
+  let locateLabel = t("Get my location");
+  if (position) locateLabel = t("Locate again");
+  if (locating) locateLabel = t("Locating…");
   const go = () => {
-    const e = checkInErrors(method, distance, qr, reason, t);
+    const e = checkInErrors(method, position, qr, reason, t);
     setErrors(e);
     // a refused check-in takes the focus to the first field to fix, top to bottom (IR586, IR621)
     const bad = CHECK_IN_FIELDS.find((k) => e[k]);
     if (bad) { focusField(CHECK_IN_IDS[bad]); return; }
-    if (method === "manual") onCheckIn("manual", null, null, reason.trim());
-    else onCheckIn(LOCATION_QR, Number(distance), qr.trim(), null);
+    if (method === "manual") onCheckIn("manual", position, null, reason.trim());
+    else onCheckIn(LOCATION_QR, position, qr.trim(), null);
   };
   return (
     <Modal open={open} onClose={onClose} title={t("Check in at site")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={go}>{t("Check in & start")}</Btn></>}>
       <Field label={t("How")}><Choice value={method} onChange={(v) => { setMethod(v); setErrors({}); }} options={[{ id: LOCATION_QR, label: t("Location + unit QR") }, { id: "manual", label: t("Manual (reason)") }]} /></Field>
       {method === LOCATION_QR ? (
         <div className="grid-fluid" style={{ ["--min" as string]: "160px" }}>
-          <Field label={t("Distance to the site (m)")} hint={t("Demo: the device's location service fills this; within 200 m")} error={errors.distance}><Input id={CHECK_IN_IDS.distance} inputMode="numeric" value={distance} onChange={(e) => { setDistance(e.target.value); clear("distance"); }} /></Field>
+          <Field label={t("Your location")} hint={position ? t("Found, accurate to ±{n} m — the server checks you are within 200 m of the site", { n: Math.round(position.accuracyMeters) }) : t("Within 200 m of the site, as HQ set it on the map")} error={errors.position}>
+            <Btn id={CHECK_IN_IDS.position} disabled={locating} onClick={locate}><Icon name="location" /> {locateLabel}</Btn>
+          </Field>
           <Field label={t("Scanned unit QR")} hint={t("Demo: the camera scan fills this")} error={errors.qr}><Input id={CHECK_IN_IDS.qr} value={qr} onChange={(e) => { setQr(e.target.value); clear("qr"); }} /></Field>
         </div>
       ) : <Field label={t("Reason (required)")} error={errors.reason}><Textarea id={CHECK_IN_IDS.reason} value={reason} maxLength={1000} placeholder={t("No GPS signal in the basement plant room")} onChange={(e) => { setReason(e.target.value); clear("reason"); }} /></Field>}

@@ -212,8 +212,11 @@ func TestRequiredInputs(t *testing.T) {
 		{opJobsAcknowledgeAssignment, `{"decision":"cant_make","reason":"busy",` +
 			`"alternativeSlot":{"startAt":"2026-09-20T03:00:00Z",` +
 			`"endAt":"2026-09-20T01:00:00Z"}}`, map[string]string{"alternativeSlot": rng}},
-		{opJobsCheckIn, `{"method":"manual",` +
-			`"distanceMeters":-1}`, map[string]string{fieldReason: req, "distanceMeters": rng}},
+		{
+			opJobsCheckIn, `{"method":"manual",` +
+				`"position":{"latitude":91,"longitude":0,"accuracyMeters":5}}`,
+			map[string]string{fieldReason: req, "position": rng},
+		},
 		{opJobsSaveDraft, `{"items":[],"measurements":[],"parts":[],"refrigerant":[],"attachmentIds":[],` +
 			`"nextAction":{"kind":"follow_up"}}`, map[string]string{fieldNextAction: inv}},
 		{opReportsSignOff, `{"signerName":"Tan","absentReason":"not at home","sitePhoto":{"name":"p.png",` +

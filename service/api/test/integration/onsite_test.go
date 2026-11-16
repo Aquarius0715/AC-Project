@@ -1,6 +1,7 @@
 package integration_test
 
 import (
+	"strconv"
 	"testing"
 	"time"
 
@@ -206,21 +207,46 @@ func TestOnSiteOperations(t *testing.T) {
 		t.Error("start twice")
 	}
 
+	// DEC-109, IR825: the server measures the device's fix against the pin of the unit's property. The seed's
+	// property has no pin yet, so a location check-in is refused for it and points to the manual one.
+	near := func(lat float64, accuracy int) string {
+		return `{"latitude":` + strconv.FormatFloat(
+			lat,
+			'f',
+			-1,
+			64,
+		) + `,"longitude":101.7116,"accuracyMeters":` +
+			strconv.Itoa(
+				accuracy,
+			) + `}`
+	}
+	located := func(position, qr string) string {
+		return `{"jobId":"` + job + `","method":"location_qr","position":` + position + `,"qrUnitId":` + qr + `}`
+	}
+	scanned := `"` + unit + `"`
+
+	code, m := write(srv, techInt(), "jobs.checkIn", located(near(3.1597, 5), scanned), 4)
+	refusal(t, "no pin", code, m, "position=errors.site_location_missing")
+	sitePin(t, "unit-non-rto", 3.1579, 101.7116)
+
 	want := map[string]string{ // the field each case is refused for
 		caseBadMethod:   refusedMethodInvalid,
 		"manual reason": refusedReasonLength,
 		"no qr":         "qrUnitId=error.required",
+		"no position":   "position=error.required",
+		"coarse fix":    "position=errors.position_inaccurate",
 		"qr mismatch":   "qrUnitId=errors.qr_unit_mismatch",
-		"too far":       "distanceMeters=errors.too_far",
+		"too far":       "position=errors.too_far",
 	}
 
 	for name, body := range map[string]string{
-		"too far":       `{"jobId":"` + job + `","method":"location_qr","distanceMeters":201,"qrUnitId":"` + unit + `"}`,
-		"no qr":         `{"jobId":"` + job + `","method":"location_qr","distanceMeters":10,"qrUnitId":null}`,
-		"manual reason": `{"jobId":"` + job + `","method":"manual","distanceMeters":null,"qrUnitId":null,"reason":"  "}`,
-		caseBadMethod:   `{"jobId":"` + job + `","method":"gps","distanceMeters":null,"qrUnitId":null}`,
-		"qr mismatch": `{"jobId":"` + job + `","method":"location_qr","distanceMeters":10,` +
-			`"qrUnitId":"` + uuid.NewString() + `"}`,
+		"too far":       located(near(3.16, 10), scanned), // 233 m less 10 m of accuracy
+		"no qr":         located(near(3.1579, 5), "null"),
+		"no position":   located("null", scanned),
+		"coarse fix":    located(near(3.1579, 150), scanned),
+		"manual reason": `{"jobId":"` + job + `","method":"manual","position":null,"qrUnitId":null,"reason":"  "}`,
+		caseBadMethod:   `{"jobId":"` + job + `","method":"gps","position":null,"qrUnitId":null}`,
+		"qr mismatch":   located(near(3.1579, 5), `"`+uuid.NewString()+`"`),
 	} {
 		code, m := write(srv, techInt(), "jobs.checkIn", body, 4)
 		refusal(t, name, code, m, want[name])
@@ -230,9 +256,9 @@ func TestOnSiteOperations(t *testing.T) {
 		srv,
 		techInt(),
 		"jobs.checkIn",
-		`{"jobId":"`+job+`","method":"location_qr","distanceMeters":200,"qrUnitId":"`+unit+`"}`,
+		located(near(3.1597, 0), scanned),
 		4,
-	)
+	) // 0.0018° north: 200 m
 
 	tos, _ := data(resp)["timeOnSite"].(map[string]any)
 	if code != 200 || tos["arrivedAt"] == nil || tos["checkInMethod"] != "location_qr" ||
@@ -244,7 +270,7 @@ func TestOnSiteOperations(t *testing.T) {
 		srv,
 		techInt(),
 		"jobs.checkIn",
-		`{"jobId":"`+job+`","method":"manual","distanceMeters":null,"qrUnitId":null,"reason":"again"}`,
+		`{"jobId":"`+job+`","method":"manual","position":null,"qrUnitId":null,"reason":"again"}`,
 		5,
 	); code != 409 {
 		t.Error("check in twice")
@@ -309,11 +335,16 @@ func TestOnSiteOperations(t *testing.T) {
 		srv,
 		techInt(),
 		"jobs.checkIn",
-		`{"jobId":"`+j2+`","method":"manual","distanceMeters":null,"qrUnitId":null,"reason":"QR label damaged"}`,
+		`{"jobId":"`+j2+`","method":"manual","position":{"latitude":3.1579,"longitude":101.7206,`+
+			`"accuracyMeters":20},"qrUnitId":null,"reason":"QR label damaged"}`,
 		2,
 	); code != 200 ||
 		data(res)["status"] != statusInProgress ||
-		asObj(t, data(res)["timeOnSite"])["checkInReason"] != "QR label damaged" {
+		asObj(t, data(res)["timeOnSite"])["checkInReason"] != "QR label damaged" ||
+		asNum(
+			t,
+			asObj(t, data(res)["timeOnSite"])["distanceMeters"],
+		) != 999 { // recorded, never refused: 0.009° east
 		t.Fatalf("manual checkIn: %d %v", code, res)
 	}
 
@@ -403,4 +434,15 @@ func TestOnSiteOperations(t *testing.T) {
 		data(res)["acknowledgement"] != "cant_make" {
 		t.Fatalf("cant_make: %d %v", code, res)
 	}
+}
+
+// sitePin sets the map pin of a seeded unit's property for the test and removes it after (DEC-109).
+func sitePin(t *testing.T, unitSeed string, latitude, longitude float64) {
+	t.Helper()
+
+	const set = `UPDATE assets.properties SET latitude = $2, longitude = $3
+		WHERE id = (SELECT property_id FROM assets.units WHERE id = $1)`
+
+	owner(t, set, seed.ID(unitSeed), latitude, longitude)
+	t.Cleanup(func() { owner(t, set, seed.ID(unitSeed), nil, nil) })
 }

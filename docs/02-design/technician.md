@@ -1,6 +1,6 @@
 ---
 document_id: DD-T
-version: 0.46.0
+version: 0.47.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -35,7 +35,7 @@ Treat route parameters as untrusted input and always validate them. Service name
 | DD-T10 / FR-T10 | `/technician/units/:id/control` / `DiagnosticControl` | `commands.create`, `commands.get`, `diagnosticRuns.create`, `diagnosticRuns.get`, `units.get`, `jobs.get`, `diagnosticRuns.list`, `commands.list` | Check `control.diagnose` permission, unit capabilities, reason, and test-run duration (1–15 minutes, provisional) | Do not use test runs to bypass contract restrictions. Do not automatically resend after expiry |
 | DD-T11 / FR-T11 | `/technician/devices` / `DeviceMaintenance` | `devices.list`, `devices.register`, `devices.bind`, `devices.check`, `devices.calibrate`, `devices.updateFirmware`, `devices.get`, `units.list`, `units.get`, `jobs.list`, `devices.calibrations`, `devices.operations` | Serial numbers must be unique. Set unitId and sensor types. Enter unit, reference value, and date/time for calibration. Choose supported firmware versions | Do not start updates offline. Do not show the new version as applied after update failure |
 | DD-T12 / FR-T12 | `/technician/devices/:id` / `DeviceEvents` | `devices.get`, `devices.events`, `alerts.get`, `alerts.acknowledge`, `devices.addResponseNote`, `devices.list`, `units.list`, `units.get`, `jobs.list` | Show eventType and detection evidence. Use a dedicated simulated event for removal | Restored communication does not automatically clear removal alerts |
-| DD-T13 / FR-T13 | `/technician` (Scan QR), `/technician/jobs/:id` (Check in) / `QrScan`, `SiteCheckIn` | `units.resolveQr`, `jobs.checkIn`, `jobs.get`, `units.get`, `units.list`, `jobs.list` | Assigned units only; location ≤ 200 m, QR match, inside the window; manual reason 1–1000 | Unassigned label → Page unavailable; outside window rejected as jobs.start |
+| DD-T13 / FR-T13 | `/technician` (Scan QR), `/technician/jobs/:id` (Check in) / `QrScan`, `SiteCheckIn` | `units.resolveQr`, `jobs.checkIn`, `jobs.get`, `units.get`, `units.list`, `jobs.list` | Assigned units only; device fix ≤ 200 m from the property pin (server-measured, IR825), QR match, inside the window; manual reason 1–1000 | Unassigned label → Page unavailable; outside window rejected as jobs.start |
 | DD-T14 / FR-T14 | `/technician/jobs/:id` / `PartsAndTime` | `jobs.saveDraft`, `jobs.pauseWork`, `parts.list` | Parts qty > 0, receipt for bought-locally; refrigerant kg ≥ 0 | Read-only after submit |
 | DD-T15 / FR-T15 | `/technician/jobs/:id` / `CustomerSignOff` | `reports.signOff`, `reports.get` | Signature or absence reason with site photo; bound to report version | Editing the draft clears the sign-off |
 | DD-T16 / FR-T16 | `/technician/jobs/:id` / `InstallationWorkspace` | `jobs.get`, `jobs.saveDraft`, `jobs.submit`, `devices.register`, `devices.bind` | Every checklist item has a result or a reason; model equals the unit's model; serial; name plate, indoor and outdoor photos; sign-off | VALIDATION names the field; a returned report keeps the unit planned |
@@ -421,7 +421,7 @@ Scope: FR-T13 / Main display pattern: **UI-FORM**. Service boundary: `units.reso
 |---|---|---|---|
 | code | string/required | Label code or unit ID | QR scan |
 | method | enum/required | location_qr or manual | Check-in method |
-| distanceMeters | number/null | ≤ 200 for location_qr | Location check |
+| position | {latitude, longitude, accuracyMeters}/null | Required for location_qr, accuracy ≤ 100 m; optional for manual (records the distance only). IR825: the server measures it against the pin of the unit's property and records `timeOnSite.distanceMeters`; the fix itself is not kept | Location check |
 | reason | string/optional | Required for manual, 1–1000 | Manual check-in |
 
 **Steps**
@@ -432,7 +432,7 @@ Scope: FR-T13 / Main display pattern: **UI-FORM**. Service boundary: `units.reso
 
 **Scan dialog in API mode (IR230)**: the camera is simulated — the label code (`ac-unit:<id>`), a bound device serial or the unit ID is typed, or one of the user's units (`units.list`) is scanned with one tap. `units.resolveQr` (through the BFF) answers the unit and the user's next open job on it; the matched card shows the label and scan time, the unit with its location and model (`units.get`), and “Your job today” or “Your next job” with its window, type, status and linked alerts (`jobs.get`). Before the work window `units.get` is FORBIDDEN (IR94), so the card names the unit from the list and says its details open with the window. Open unit → the unit register with the job; Open job → the workspace; Enter ID manually focuses the field. An empty scan asks for a label.
 
-**Boundary cases and failures**: Unassigned or unknown label → shared Page unavailable without unit data. Outside the window → same error and disabled state as `jobs.start`. A refused check-in shows its message under the field it concerns and focuses it: a distance over 200 m, a label of another unit (`errors.qr_unit_mismatch`), a manual check-in without a reason. After the check-in the focus goes to the job's title, which then reads in progress (IR620).
+**Boundary cases and failures**: Unassigned or unknown label → shared Page unavailable without unit data. Outside the window → same error and disabled state as `jobs.start`. A refused check-in shows its message under the field it concerns and focuses it: a fix more than 200 m from the site's pin (`errors.too_far`; the fix's accuracy counts in the technician's favour), a fix coarser than 100 m (`errors.position_inaccurate`), a site whose property has no pin yet (`errors.site_location_missing`, check in manually), a label of another unit (`errors.qr_unit_mismatch`), a manual check-in without a reason. The location is the device's (“Get my location”, the technician app allows `geolocation=(self)`). After the check-in the focus goes to the job's title, which then reads in progress (IR620).
 
 **Verification**: Check the traceability entries under AT-T13 (N/E/B).
 

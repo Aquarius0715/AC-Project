@@ -31,6 +31,9 @@ type Pause struct {
 	To   *time.Time `json:"to"`
 }
 
+// methodLocationQR is the check-in by the device's position and the unit's QR label (IR111).
+const methodLocationQR = "location_qr"
+
 // OnSite is the technician on-site operation set (IR125).
 type OnSite struct {
 	Jobs   Jobs
@@ -216,16 +219,18 @@ func (m OnSite) startJob(ctx context.Context, call *ops.Call, input *StartInput)
 	)
 }
 
-// CheckInInput is jobs.checkIn input.
+// CheckInInput is jobs.checkIn input. Position is the device's GPS fix (DEC-109, IR825): the server measures it against
+// the property's pin; the fix itself is not kept, only the distance.
 type CheckInInput struct {
-	JobID          uuid.UUID  `json:"jobId"`
-	Method         string     `json:"method"`
-	DistanceMeters *float64   `json:"distanceMeters"`
-	QRUnitID       *uuid.UUID `json:"qrUnitId"`
-	Reason         *string    `json:"reason,omitempty"`
+	JobID    uuid.UUID  `json:"jobId"`
+	Method   string     `json:"method"`
+	Position *Position  `json:"position"`
+	QRUnitID *uuid.UUID `json:"qrUnitId"`
+	Reason   *string    `json:"reason,omitempty"`
 }
 
-// Validate implements ops.Validator (IR111: location_qr within 200 m, manual needs a reason).
+// Validate implements ops.Validator (IR111: location_qr with a fix and the scanned unit, manual needs a reason; the
+// distance is checked in checkInJob, against the site's pin).
 func (in *CheckInInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil {
@@ -233,7 +238,7 @@ func (in *CheckInInput) Validate() map[string]string {
 	}
 
 	switch in.Method {
-	case "location_qr":
+	case methodLocationQR:
 		in.checkLocation(fieldErrs)
 	case "manual":
 		in.checkManual(fieldErrs)
@@ -244,10 +249,16 @@ func (in *CheckInInput) Validate() map[string]string {
 	return fieldErrs
 }
 
-// checkLocation applies IR111 to a location_qr check-in: within 200 m, with the unit whose QR code was scanned.
+// checkLocation applies IR111 to a location_qr check-in: a fix good enough to tell 200 m, and the unit whose QR code
+// was scanned.
 func (in *CheckInInput) checkLocation(fieldErrs map[string]string) {
-	if in.DistanceMeters == nil || *in.DistanceMeters < 0 || *in.DistanceMeters > 200 {
-		fieldErrs["distanceMeters"] = "errors.too_far"
+	switch {
+	case in.Position == nil:
+		fieldErrs[fieldPosition] = apperr.KeyRequired
+	case !in.Position.onGlobe():
+		fieldErrs[fieldPosition] = apperr.KeyRange
+	case in.Position.AccuracyMeters > maxAccuracy:
+		fieldErrs[fieldPosition] = "errors.position_inaccurate"
 	}
 
 	if in.QRUnitID == nil {
@@ -255,7 +266,7 @@ func (in *CheckInInput) checkLocation(fieldErrs map[string]string) {
 	}
 }
 
-// checkManual applies IR111 to a manual check-in: a reason, and no negative distance.
+// checkManual applies IR111 to a manual check-in: a reason; a fix is optional and only recorded as the distance.
 func (in *CheckInInput) checkManual(fieldErrs map[string]string) {
 	if in.Reason == nil {
 		fieldErrs[fieldReason] = apperr.KeyRequired
@@ -263,8 +274,8 @@ func (in *CheckInInput) checkManual(fieldErrs map[string]string) {
 		trimmedReason(in.Reason, maxReasonLength, fieldReason, fieldErrs)
 	}
 
-	if in.DistanceMeters != nil && *in.DistanceMeters < 0 {
-		fieldErrs["distanceMeters"] = apperr.KeyRange
+	if in.Position != nil && !in.Position.onGlobe() {
+		fieldErrs[fieldPosition] = apperr.KeyRange
 	}
 }
 
@@ -274,8 +285,8 @@ func (in *CheckInInput) checkManual(fieldErrs map[string]string) {
 //	@ID				jobs.checkIn
 //	@Description	Authorization: technician:assigned-valid-job
 //	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
-//	@Description	IR111 within the work window; manual method requires reason 1–1000; location within 200 m for \
-//	@Description	location_qr
+//	@Description	IR111 within the work window; manual method requires reason 1–1000; location_qr: the device's fix \
+//	@Description	within 200 m of the property's pin measured on the server (accuracy counts; at most 100 m)
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-T13
 //	@Tags			jobs
@@ -311,18 +322,21 @@ func (m OnSite) checkInJob(ctx context.Context, call *ops.Call, input *CheckInIn
 		return Job{}, err
 	}
 
-	if input.Method == "location_qr" {
-		var unit uuid.UUID
+	var unit uuid.UUID
 
-		err := call.Tx.QueryRow(ctx, `SELECT unit_id FROM maintenance.jobs WHERE id = $1`, input.JobID).
-			Scan(&unit)
-		if err != nil {
-			return Job{}, apperr.Wrap(err, "select maintenance.jobs")
-		}
+	err = call.Tx.QueryRow(ctx, `SELECT unit_id FROM maintenance.jobs WHERE id = $1`, input.JobID).
+		Scan(&unit)
+	if err != nil {
+		return Job{}, apperr.Wrap(err, "select maintenance.jobs")
+	}
 
-		if *input.QRUnitID != unit {
-			return Job{}, apperr.Fields(map[string]string{"qrUnitId": "errors.qr_unit_mismatch"})
-		}
+	if input.Method == methodLocationQR && *input.QRUnitID != unit {
+		return Job{}, apperr.Fields(map[string]string{"qrUnitId": "errors.qr_unit_mismatch"})
+	}
+
+	distance, measured, err := m.siteDistance(ctx, call, unit, input)
+	if err != nil {
+		return Job{}, err
 	}
 
 	if status != statusAssigned && (status != statusInProgress || timeOnSite.ArrivedAt != nil) {
@@ -332,7 +346,12 @@ func (m OnSite) checkInJob(ctx context.Context, call *ops.Call, input *CheckInIn
 	now := call.Now
 	method := input.Method
 
-	timeOnSite.ArrivedAt, timeOnSite.CheckInMethod, timeOnSite.Distance = &now, &method, input.DistanceMeters
+	timeOnSite.ArrivedAt, timeOnSite.CheckInMethod, timeOnSite.Distance = &now, &method, nil
+
+	if measured {
+		timeOnSite.Distance = &distance
+	}
+
 	if input.Method == "manual" {
 		timeOnSite.CheckInReason = input.Reason
 	}
@@ -660,4 +679,41 @@ func RegisterOnSite(r *ops.Registry, m OnSite) {
 	ops.Register(r, "jobs.checkIn", m.checkIn)
 	ops.Register(r, "jobs.pauseWork", m.pause)
 	ops.Register(r, "jobs.acknowledgeAssignment", m.acknowledge)
+}
+
+// siteDistance measures the check-in's fix against the pin of the job unit's property (DEC-109, IR825). A location
+// check-in needs a pin and a fix near it; a manual one records the distance when both are there and never fails on it.
+// It answers the distance in metres, and false when there is none to record.
+func (m OnSite) siteDistance(
+	ctx context.Context,
+	call *ops.Call,
+	unit uuid.UUID,
+	input *CheckInInput,
+) (float64, bool, error) {
+	if input.Position == nil {
+		return 0, false, nil
+	}
+
+	pin, found, err := m.Jobs.Sites.SiteLocation(ctx, call, unit)
+	if err != nil {
+		return 0, false, apperr.Wrap(err, "maintenance.SiteAddresses.SiteLocation")
+	}
+
+	location := input.Method == methodLocationQR
+	if !found && location {
+		return 0, false, apperr.Fields(
+			map[string]string{fieldPosition: "errors.site_location_missing"},
+		)
+	}
+
+	if !found {
+		return 0, false, nil
+	}
+
+	distance := input.Position.distanceTo(pin)
+	if location && !near(distance, input.Position.AccuracyMeters) {
+		return 0, false, apperr.Fields(map[string]string{fieldPosition: "errors.too_far"})
+	}
+
+	return distance, true, nil
 }

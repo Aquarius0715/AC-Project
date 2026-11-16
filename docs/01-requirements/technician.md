@@ -1,6 +1,6 @@
 ---
 document_id: REQ-T
-version: 0.30.0
+version: 0.31.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -320,7 +320,7 @@ Design: [DD-T12](../02-design/technician.md#dd-t12-details). Assess parent AT-T1
 - **Company request basis**: SRC-06 BIZ-12, BIZ-20; Figma-confirmed Technician 01-6 and 02-32 (2026-10-01).
 - **Entry conditions**: Technician with an active assignment; the QR label encodes the unit.
 - **Main flow**: Overview › Scan QR → matched unit and today's job → Open job / Open unit (read-only register) / Enter ID manually. In the job, Start job on site opens Check in: location (within 200 m), unit QR matched, arrival inside the work window → Check in & start.
-- **Business rule BR-T13**: `units.resolveQr` returns only assigned units; others show the shared “Page unavailable” with no unit data (same as AT-T02-E②). `jobs.checkIn` records arrival time, method, and distance, then moves the job to in_progress (same rules as `jobs.start`, IR76/IR94). If location or QR is unavailable, a manual check-in needs a reason (1–1000) and HQ sees “manual check-in”. Arrival inside the window counts toward SLA (FR-A22).
+- **Business rule BR-T13**: `units.resolveQr` returns only assigned units; others show the shared “Page unavailable” with no unit data (same as AT-T02-E②). `jobs.checkIn` records arrival time, method, and distance (measured on the server from the device's location to the pin HQ set for the property, DEC-109/IR825), then moves the job to in_progress (same rules as `jobs.start`, IR76/IR94). If location or QR is unavailable, a manual check-in needs a reason (1–1000) and HQ sees “manual check-in”. Arrival inside the window counts toward SLA (FR-A22).
 - **Resulting business state**: MaintenanceJob.timeOnSite.arrivedAt/startedAt set; status in_progress.
 - **Boundaries/prohibitions**: Before the window opens or after it ends, check-in is rejected like `jobs.start` (FORBIDDEN/CONFLICT per IR76/IR89).
 

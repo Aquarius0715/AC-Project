@@ -622,7 +622,7 @@ func TestForeignTargets(t *testing.T) {
 		{
 			techB(),
 			opJobsCheckIn,
-			`{"jobId":"` + jobW + `","method":"manual","distanceMeters":null,"qrUnitId":null,"reason":"No QR label"}`,
+			`{"jobId":"` + jobW + `","method":"manual","position":null,"qrUnitId":null,"reason":"No QR label"}`,
 			3,
 		},
 		{techB(), "jobs.pauseWork", `{"jobId":"` + jobW + `","paused":true}`, 3},

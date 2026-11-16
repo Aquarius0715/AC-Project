@@ -207,20 +207,25 @@ export function progress(d: Draft, issues: Issue[], t: T = en) {
 Work window line — while open, the range with the warning and discard times (Figma Technician 02); notice is the
 warning banner of the last 15 minutes. */
 /** The fields of Check in at site (FR-T13, DD-T13). */
-export type CheckInField = "distance" | "qr" | "reason";
-export const CHECK_IN_FIELDS: CheckInField[] = ["distance", "qr", "reason"];
+export type CheckInField = "position" | "qr" | "reason";
+export const CHECK_IN_FIELDS: CheckInField[] = ["position", "qr", "reason"];
 /** The Core API's jobs.checkIn fields on the form's fields: a refusal shows under the field it names (IR620). */
-export const CHECK_IN_API_FIELDS: Record<string, CheckInField> = { distanceMeters: "distance", qrUnitId: "qr", reason: "reason" };
-/** Check in at site's own checks: a location check-in within 200 m with the scanned label, or a manual one with a
-reason of 1–1000 characters. Each error belongs to its field, so the form shows it there and focuses it (IR620). */
-export function checkInErrors(method: "location_qr" | "manual", distance: string, qr: string, reason: string, t: T = en): Partial<Record<CheckInField, string>> {
+export const CHECK_IN_API_FIELDS: Record<string, CheckInField> = { position: "position", qrUnitId: "qr", reason: "reason" };
+/** The device's GPS fix that jobs.checkIn takes (DEC-109, IR825): the server measures it against the site's pin. */
+export interface CheckInPosition { latitude: number; longitude: number; accuracyMeters: number }
+/** The coarsest fix a location check-in takes, in metres (the server's limit). */
+const MAX_FIX_ACCURACY = 100;
+/** Check in at site's own checks: a location check-in with a fix good enough to tell 200 m and the scanned label, or a
+manual one with a reason of 1–1000 characters. How far the fix is from the site is the server's to say. Each error
+belongs to its field, so the form shows it there and focuses it (IR620). */
+export function checkInErrors(method: "location_qr" | "manual", position: CheckInPosition | null, qr: string, reason: string, t: T = en): Partial<Record<CheckInField, string>> {
   if (method === "manual") {
     const n = reason.trim().length;
     return n < 1 || n > 1000 ? { reason: t("A reason is required for a manual check-in (1–1000 characters)") } : {};
   }
   const e: Partial<Record<CheckInField, string>> = {};
-  const d = Number(distance);
-  if (!Number.isFinite(d) || d < 0 || d > 200) e.distance = t("Location check-in needs you within 200 m of the site — check in manually with a reason otherwise");
+  if (!position) e.position = t("Get your location first — or check in manually with a reason");
+  else if (position.accuracyMeters > MAX_FIX_ACCURACY) e.position = t("Your location is only known to ±{n} m — move into the open and try again, or check in manually with a reason", { n: Math.round(position.accuracyMeters) });
   if (!qr.trim()) e.qr = t("Scan the unit’s QR label");
   return e;
 }

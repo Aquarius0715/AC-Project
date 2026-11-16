@@ -1084,6 +1084,36 @@ func (*Module) SiteAddress(
 	return addr, scope, apperr.Wrap(err, "select assets.units")
 }
 
+// SiteLocation returns the map pin of a unit's property (DEC-109); found is false when HQ set none, or for a unit
+// that does not exist.
+func (*Module) SiteLocation(
+	ctx context.Context,
+	call *ops.Call,
+	unit uuid.UUID,
+) (GeoPoint, bool, error) {
+	var (
+		none                GeoPoint
+		latitude, longitude *float64
+	)
+
+	err := call.Tx.QueryRow(ctx, `SELECT p.latitude, p.longitude FROM assets.units u JOIN assets.properties p ON p.id =
+		u.property_id WHERE u.id = $1`, unit).
+		Scan(&latitude, &longitude)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return none, false, nil
+	}
+
+	if err != nil {
+		return none, false, apperr.Wrap(err, "select assets.units")
+	}
+
+	if latitude == nil || longitude == nil {
+		return none, false, nil
+	}
+
+	return GeoPoint{Latitude: *latitude, Longitude: *longitude}, true, nil
+}
+
 // WarrantyEnd returns a unit's warrantyEndsAt (Maintenance warranty claims).
 func (*Module) WarrantyEnd(ctx context.Context, c *ops.Call, unit uuid.UUID) (*time.Time, error) {
 	var t *time.Time

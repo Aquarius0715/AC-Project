@@ -598,9 +598,9 @@
   "jobId"
  ],
  "jobs.checkIn": [
-  "distanceMeters",
   "jobId",
   "method",
+  "position",
   "qrUnitId",
   "reason"
  ],
