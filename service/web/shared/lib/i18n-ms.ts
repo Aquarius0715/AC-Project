@@ -1351,6 +1351,7 @@ export const ms: Record<string, string> = {
   "{subject} · {days} · coverage {coverage}": "{subject} · {days} · liputan {coverage}",
   "Estimated cost": "Anggaran kos",
   "{tariff} · taxes excluded": "{tariff} · tidak termasuk cukai",
+  "avg {rate} · {tariff} · taxes excluded": "purata {rate} · {tariff} · tidak termasuk cukai",
   "Savings vs baseline": "Penjimatan berbanding garis dasar",
   "{percent} · {cost} vs {baseline} baseline": "{percent} · {cost} berbanding garis dasar {baseline}",
   "Cannot calculate — baseline not comparable for this period": "Tidak dapat dikira — garis dasar tidak setanding untuk tempoh ini",

@@ -1305,6 +1305,7 @@ export const id: Record<string, string> = {
   "{subject} · {days} · coverage {coverage}": "{subject} · {days} · cakupan {coverage}",
   "Estimated cost": "Perkiraan biaya",
   "{tariff} · taxes excluded": "{tariff} · belum termasuk pajak",
+  "avg {rate} · {tariff} · taxes excluded": "rata-rata {rate} · {tariff} · belum termasuk pajak",
   "Savings vs baseline": "Penghematan dibanding baseline",
   "{percent} · {cost} vs {baseline} baseline": "{percent} · {cost} dibanding baseline {baseline}",
   "Cannot calculate — baseline not comparable for this period": "Tidak dapat dihitung — baseline tidak sebanding untuk periode ini",
