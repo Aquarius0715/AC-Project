@@ -26,7 +26,7 @@ import { reached } from "@ac/web/lib/unreachable";
 
 const ST: Record<AlertState, string> = { open: "Open", acknowledged: ACKNOWLEDGED, resolved: "Resolved" };
 const LIST: Record<AlertState, string> = { open: "Open alerts", acknowledged: "Acknowledged alerts", resolved: "Resolved alerts" };
-const SEVERITY: [Severity, string][] = [["critical", "Severity: Critical"], ["warning", "Severity: Warning"], ["normal", "Severity: Info"]];
+const SEVERITY: [Severity | "attention", string][] = [["attention", "Severity: Critical & warning"], ["critical", "Severity: Critical"], ["warning", "Severity: Warning"], ["normal", "Severity: Info"]];
 // the Phase 1A demo's fixture rows (their data stays English, as the other demo screens)
 const STATE_TITLE = new Map([["resolved", "Resolved"], [ACKNOWLEDGED_2, "Acknowledged — waiting for resolution"]]);
 const demoTimeline = (time: string, st: AlertState): AdminAlert["timeline"] => {
@@ -73,7 +73,7 @@ const demoEvidence: ApiEvidenceCandidate[] = [
   { id: "measurement-0920", kind: "remeasurement", observedAt: "2026-09-14T01:20:00Z", metric: "temperature", value: 26.4, unit: "°C", origin: "measured", quality: "valid", eventType: null },
   { id: "measurement-0910", kind: "remeasurement", observedAt: "2026-09-14T01:10:00Z", metric: "temperature", value: 26.9, unit: "°C", origin: "measured", quality: "valid", eventType: null },
 ];
-interface Query { customerId?: string; propertyId?: string; unitId?: string; severity: Severity | null; status: AlertState; alertId: string | null }
+interface Query { customerId?: string; propertyId?: string; unitId?: string; severity: Severity | "attention" | null; status: AlertState; alertId: string | null }
 interface Live { tab: "alerts" | "policies"; q: Query; scope: ScopeLists; scopeName: string | null; alerts: AdminAlert[]; policies: AdminPolicy[]; pol: PoliciesLive }
 
 /** HQ alerts and alert policies. `live` comes from the Server Component in API mode (writes are Server Actions that

@@ -258,6 +258,13 @@ export function actionOf(key: string): UnitAction {
   if (k === "vent") return { kind: "ventilate", level: oneOf(fanLevels, v ?? "", "mid") };
   return { kind: "set_fan", fanLevel: oneOf(fanLevels, v ?? "", "mid") };
 }
+/** A new rule that switches the given ACs off on weekday evenings (IR811), opened from the Running list's "Turn off
+running ACs": the ACs and Power OFF at 19:00 are filled in; the end action stays for the customer to choose (it is
+never assumed, DD-C04), and the rule is saved off like any new one. The first AC is the target, the rest `others`. */
+export function afterHoursDraft(unitIds: string[], timezone: string, name: string): Draft {
+  const [first = "", ...rest] = unitIds;
+  return { ...blankDraft(first, timezone), name, others: rest.slice(0, 49), startLocal: "19:00", endLocal: "23:00", startAction: "power:off" };
+}
 export function blankDraft(unitId: string, timezone: string): Draft {
   return {
     id: null,
@@ -383,6 +390,14 @@ export interface ActionGroup { id: "power" | "temp" | "mode" | "fan" | "vent"; g
 /** The actions a unit takes (DD-C05 “within unit capabilities”, the API's rule): the AC settings with control, and
 ventilation on a model with a fresh-air function (IR314). Grouped by the setting they change: the editor picks the
 setting first, then its value (`short` is the value alone, `label` the whole action). */
+/** The actions every chosen AC takes (IR802): one rule may control several ACs, and the API refuses an action one of
+them does not support, so only the actions all of them offer are listed. */
+export function commonActionOptions(cs: (Caps | null)[], t: T = en): ActionGroup[] {
+  const [first, ...rest] = cs.map((c) => actionOptions(c, t));
+  if (!first) return [];
+  const has = (groups: ActionGroup[], key: string) => groups.some((g) => g.options.some((o) => o.key === key));
+  return first.map((g) => ({ ...g, options: g.options.filter((o) => rest.every((r) => has(r, o.key))) })).filter((g) => g.options.length > 0);
+}
 export function actionOptions(c: Caps | null, t: T = en): ActionGroup[] {
   if (!c) return [];
   const temps: ActionGroup["options"] = [];

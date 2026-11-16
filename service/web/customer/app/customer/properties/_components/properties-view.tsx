@@ -2,12 +2,12 @@
 const MY_PROPERTIES = "My properties";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Badge, Banner, Btn, Card, Choice, ConnBadge, cx, DataTable, EmptyState, Field, Modal, Page, PowerBadge, SummaryList, useToast, Plain } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Choice, ConnBadge, cx, DataTable, EmptyState, Field, Modal, Page, PowerBadge, Search, SummaryList, useToast, Plain } from "@ac/web/components/ui";
 import { useUrlPatchPending } from "@ac/web/lib/useUrlPatch";
 import { selectionId, type Connection, type PowerState, type Selection, type TreeProperty, type TreeSpace } from "@ac/web/lib/assets";
-import { changeText, groupPlan, hasChoice, KEEP_ALL, type GroupChange, type PlanRow, type RoomUnit } from "@ac/web/lib/clientProperties";
+import { changeText, groupPlan, hasChoice, KEEP_ALL, TURN_OFF, type GroupChange, type PlanRow, type RoomUnit } from "@ac/web/lib/clientProperties";
 import { historyRow, type ApiCommand, type ApiUnitDetail } from "@ac/web/lib/units";
 import { followCommand } from "@ac/web/lib/unitCommands";
 import { sendPaced } from "@ac/web/lib/writeLimit";
@@ -22,7 +22,7 @@ import { unreachableFailure } from "@ac/web/lib/unreachable";
 
 export interface PropertiesLive {
   tree: TreeProperty[]; selection: Selection | null; owner: boolean;
-  filter: { powerState: PowerState | null; connections: Connection[]; total: number } | null;
+  filter: { powerState: PowerState | null; connections: Connection[]; search: string; total: number } | null;
   units: (RoomUnit & { place: string })[]; details: ApiUnitDetail[];
   /** the scenario's now: a group plan's “offline since” keeps its date on another day */
   now: string;
@@ -61,11 +61,12 @@ export function PropertiesView({ live }: Readonly<{ live: PropertiesLive }>) {
   const isPendingTarget = isNavPending && target !== null;
   const isFilterShown = !!live.filter && !isPendingTarget;
   const shownSel = isPendingTarget ? target : selId;
-  const go = (patch: Record<string, string | null>) => { setTarget(targetOf(patch)); nav({ propertyId: null, spaceId: null, unassignedOnly: null, mode: null, unitIds: null, powerState: null, connections: null, ...patch }); };
+  const go = (patch: Record<string, string | null>) => { setTarget(targetOf(patch)); nav({ propertyId: null, spaceId: null, unassignedOnly: null, mode: null, unitIds: null, powerState: null, connections: null, search: null, ...patch }); };
   return (
     <Page>
       <div className="split-rev">
         <Card title={t(MY_PROPERTIES)} action={<Badge tone="muted">{live.tree.length}</Badge>} className="self-start">
+          <UnitSearch current={live.filter?.search ?? ""} nav={nav} />
           <div className="flex flex-col text-[13px]">
             {live.tree.map((p) => (
               <div key={p.id}>
@@ -86,6 +87,25 @@ export function PropertiesView({ live }: Readonly<{ live: PropertiesLive }>) {
       {renaming && <RenameModal r={renaming} onClose={() => { setRenaming(null); }} />}
     </Page>
   );
+}
+
+/** Find a room or AC by name (IR801): a complaint names a room ("the director's office is hot"), so the tree need not be
+scanned. The URL's search lists the units whose name or place matches; typing waits a moment before it asks. */
+function UnitSearch({ current, nav }: Readonly<{ current: string; nav: (patch: Record<string, string | null>) => void }>) {
+  const t = useT();
+  const [q, setQ] = useState(current);
+  // another navigation (a tree row, Clear filter) cleared or changed the search: the box follows the URL
+  const [seen, setSeen] = useState(current);
+  if (seen !== current) {
+    setSeen(current);
+    setQ(current);
+  }
+  useEffect(() => {
+    const next = q.trim();
+    const id = next === current ? null : setTimeout(() => { nav({ propertyId: null, spaceId: null, unassignedOnly: null, mode: null, unitIds: null, powerState: null, connections: null, search: next || null }); }, 300);
+    return () => { if (id !== null) clearTimeout(id); };
+  }, [q, current, nav]);
+  return <div className="mb-3"><Search placeholder={t("Find a room or AC…")} value={q} onChange={setQ} /></div>;
 }
 
 function Row({ depth, selected, onClick, icon, name, tag, meta, onRename }: Readonly<{ depth: number; selected: boolean; onClick: () => void; icon: IconName; name: string; tag?: string; meta?: string; onRename?: () => void }>) {
@@ -133,12 +153,28 @@ function UnitRows({ units }: Readonly<{ units: (RoomUnit & { place: string })[] 
 const connLabel: Record<string, string> = { online: "Online", offline: "Offline", unknown: "Unknown", connecting: "Connecting", error: "Error" };
 function FilteredUnits({ live, clear }: Readonly<{ live: PropertiesLive; clear: () => void }>) {
   const t = useT();
+  // “left on” check (IR798): an owner turns the running ACs off from this list, unticking those that should keep running,
+  // instead of opening each AC's own screen
+  const [isTurningOff, setIsTurningOff] = useState(false);
   const f = live.filter;
   if (!f) return null;
-  const label = [f.powerState && t("Power: {state}", { state: t(powerLabel[f.powerState]) }), f.connections.length > 0 && t("Connection: {states}", { states: f.connections.map((c) => t(connLabel[c] ?? c)).join(", ") })].filter(Boolean).join(" · ");
+  const label = [f.search && t("“{q}”", { q: f.search }), f.powerState && t("Power: {state}", { state: t(powerLabel[f.powerState]) }), f.connections.length > 0 && t("Connection: {states}", { states: f.connections.map((c) => t(connLabel[c] ?? c)).join(", ") })].filter(Boolean).join(" · ");
+  const isRunningList = live.owner && f.powerState === "on" && f.connections.length === 0 && !f.search;
+  const canTurnOff = isRunningList && live.units.length >= 2;
+  // the panel stays once opened: the ACs it turned off leave the re-read list, and its results must not vanish with them
+  const isPanelShown = isRunningList && isTurningOff;
+  const action = (
+    <span className="flex flex-wrap gap-2">
+      {(canTurnOff || isPanelShown) && (isTurningOff
+        ? <Btn size="sm" onClick={() => { setIsTurningOff(false); }}>{t("Back to the list")}</Btn>
+        : <Btn size="sm" variant="primary" onClick={() => { setIsTurningOff(true); }}><Icon name="power" />{t("Turn off running ACs…")}</Btn>)}
+      <Btn size="sm" onClick={clear}>{t("Clear filter")}</Btn>
+    </span>
+  );
+  const body = live.units.length > 0 ? <UnitRows units={live.units} /> : <EmptyState title={t("No air conditioner matches")}>{t(f.search ? "No room or AC name contains “{q}”. Check the spelling, or clear the filter to see every unit." : "Clear the filter to see every unit.", { q: f.search })}</EmptyState>;
   return (
-    <Card title={t("Air conditioners · {filter}", { filter: label })} sub={t("{n} of {total}", { n: live.units.length, total: f.total })} action={<Btn size="sm" onClick={clear}>{t("Clear filter")}</Btn>}>
-      {live.units.length > 0 ? <UnitRows units={live.units} /> : <EmptyState title={t("No air conditioner matches")}>{t("Clear the filter to see every unit.")}</EmptyState>}
+    <Card title={t("Air conditioners · {filter}", { filter: label })} sub={t("{n} of {total}", { n: live.units.length, total: f.total })} action={action}>
+      {isPanelShown ? <GroupPanel live={live} space="" offOnly /> : body}
     </Card>
   );
 }
@@ -246,21 +282,24 @@ function TemperatureStep({ celsius, lo, hi, onChange }: Readonly<{ celsius: numb
 
 /** Unknown: the command was sent but its answer could not be read, so it is neither failed nor retried (IR728). */
 interface Track { status: "Sending" | "Waiting" | "Confirmed" | "Failed" | "Unknown"; note: string }
-function GroupPanel({ live, space }: Readonly<{ live: PropertiesLive; space: string }>) {
+/** offOnly: “Turn off running ACs” (IR798) — power off is the only change, across the properties of the Running list. */
+function GroupPanel({ live, space, offOnly = false }: Readonly<{ live: PropertiesLive; space: string; offOnly?: boolean }>) {
   const i = useI18n();
   const { t } = i;
   const toast = useToast();
   const router = useRouter();
   const online = live.units.filter((u) => u.online).map((u) => u.id);
-  const [sel, setSel] = useState<string[]>(live.selectedUnits.length > 0 ? live.selectedUnits.filter((id) => online.includes(id)) : online);
-  const [ch, setCh] = useState<GroupChange>(KEEP_ALL); // every setting kept until the user chooses one
+  const [chosen, setChosen] = useState<string[]>(live.selectedUnits.length > 0 ? live.selectedUnits.filter((id) => online.includes(id)) : online);
+  // an AC that left the list (turned off, re-read after sending) is no longer selected
+  const sel = chosen.filter((id) => live.units.some((u) => u.id === id));
+  const [ch, setCh] = useState<GroupChange>(offOnly ? TURN_OFF : KEEP_ALL); // every setting kept until the user chooses one
   const [review, setReview] = useState<PlanRow[] | null>(null);
   const [track, setTrack] = useState<Record<string, Track>>({});
   const [sending, setSending] = useState(false);
   const caps = live.details.filter((d) => sel.includes(d.id)).map((d) => d.capabilities.temperature).filter((cap): cap is NonNullable<typeof cap> => !!cap);
   const lo = caps.length > 0 ? Math.min(...caps.map((cap) => cap.min)) : 16;
   const hi = caps.length > 0 ? Math.max(...caps.map((cap) => cap.max)) : 30;
-  const toggle = (id: string) => { setSel((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id])); };
+  const toggle = (id: string) => { setChosen((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id])); };
   const send = async (rows: PlanRow[]) => {
     setSending(true);
     setReview(null);
@@ -289,12 +328,25 @@ function GroupPanel({ live, space }: Readonly<{ live: PropertiesLive; space: str
     toast(t("Group change finished — results are shown per AC"));
     router.refresh(); // re-read the units (observed settings)
   };
+  // the failed ACs the list still holds: one turned off meanwhile has nothing left to retry
+  const failed = Object.entries(track).filter(([id, x]) => x.status === "Failed" && live.units.some((u) => u.id === id)).map(([id]) => id);
+  // confirmed ACs that the re-read list no longer holds: said in one line, as their cards are gone (IR798)
+  const turnedOff = Object.entries(track).filter(([id, x]) => x.status === "Confirmed" && live.units.every((u) => u.id !== id)).length;
+  const cardTitle = () => {
+    const n = sel.length;
+    if (offOnly) return t(n === 1 ? "Turn off {n} selected AC" : "Turn off {n} selected ACs", { n });
+    return t(n === 1 ? "Apply to {n} selected AC" : "Apply to {n} selected ACs", { n });
+  };
+  const reviewTitle = (n: number) => {
+    if (offOnly) return t(n === 1 ? "Turn off {n} selected AC?" : "Turn off {n} selected ACs?", { n });
+    return t(n === 1 ? "Send to {n} selected AC in {space}?" : "Send to {n} selected ACs in {space}?", { n, space });
+  };
   const plan = (ids: string[]) => groupPlan(live.details.filter((d) => ids.includes(d.id)), ch, i, Date.parse(live.now));
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface2 px-3 py-2 text-[13px]"><b>{t("{n} selected", { n: sel.length })}</b>
         {/* each button is off when it would change nothing: all online already chosen, or nothing to clear (UI/UX loop R96) */}
-        <span className="flex gap-2"><Btn size="sm" disabled={online.every((id) => sel.includes(id))} onClick={() => { setSel(online); }}>{t("Select all online ({n})", { n: online.length })}</Btn><Btn size="sm" variant="ghost" disabled={sel.length === 0} onClick={() => { setSel([]); }}>{t("Clear")}</Btn></span></div>
+        <span className="flex gap-2"><Btn size="sm" disabled={online.every((id) => sel.includes(id))} onClick={() => { setChosen(online); }}>{t("Select all online ({n})", { n: online.length })}</Btn><Btn size="sm" variant="ghost" disabled={sel.length === 0} onClick={() => { setChosen([]); }}>{t("Clear")}</Btn></span></div>
       <div className="grid-fluid" style={{ ["--min" as string]: "170px" }}>
         {live.units.map((u) => {
           const tr = track[u.id];
@@ -302,6 +354,7 @@ function GroupPanel({ live, space }: Readonly<{ live: PropertiesLive; space: str
             <Plain key={u.id} type="button" disabled={sending} onClick={() => { toggle(u.id); }} aria-pressed={sel.includes(u.id)}
               className={cx("rounded-xl border p-3 text-left disabled:opacity-60", sel.includes(u.id) ? "border-2 border-primary bg-primary-soft/50" : "border-line bg-surface")}>
               <div className="flex items-center justify-between"><b className="text-[13px]">{u.name}</b><Icon name={sel.includes(u.id) ? "checked" : "unchecked"} className="text-sm" /></div>
+              {offOnly && <div className="text-[11px] text-muted-foreground">{u.place}</div>}
               <div className="text-[11px] text-muted-foreground">{u.online && <Readings temp={u.temp} watts={u.watts} />}{!u.online && u.seen && t("last seen {when}", { when: u.seen })}{!u.online && !u.seen && t("no connection yet")}</div>
               <div className="mt-1 flex flex-wrap gap-1"><PowerBadge s={u.power} /><ConnBadge s={u.conn} />{tr && <Badge tone={TRY_TONE.get(tr.status) ?? "primary"}>{t(tr.status)}</Badge>}</div>
               {(tr?.status === "Failed" || tr?.status === "Waiting" || tr?.status === "Unknown") && <div className={cx("mt-1 text-[11px]", tr.status === "Failed" ? "text-crit" : "text-warn")}>{tr.note}</div>}
@@ -309,24 +362,33 @@ function GroupPanel({ live, space }: Readonly<{ live: PropertiesLive; space: str
           );
         })}
       </div>
-      <Card title={t(sel.length === 1 ? "Apply to {n} selected AC" : "Apply to {n} selected ACs", { n: sel.length })}>
-        <div className="flex flex-wrap items-center gap-4">
-          <Field label={t("Power")}><Choice value={powerChoice(ch.power)} onChange={(v: string) => { setCh({ ...ch, power: v === "keep" ? null : v === "on" }); }} options={[{ id: "keep", label: t("Keep") }, { id: "on", label: t("On") }, { id: "off", label: t("Off") }]} /></Field>
-          {ch.power !== false && <>
-            <TemperatureStep celsius={ch.celsius} lo={lo} hi={hi} onChange={(celsius) => { setCh({ ...ch, celsius }); }} />
-            <Field label={t("Mode")}><Choice value={ch.mode ?? "keep"} onChange={(v: string) => { setCh({ ...ch, mode: oneOf(["cool", "dry", "fan"] as const, v, null) }); }} options={[{ id: "keep", label: t("Keep") }, { id: "cool", label: t("Cool") }, { id: "dry", label: t("Dry") }, { id: "fan", label: t("Fan") }]} /></Field>
-            <Field label={t("Fan")}><Choice value={ch.fan ?? "keep"} onChange={(v: string) => { setCh({ ...ch, fan: oneOf(["low", "mid", "high"] as const, v, null) }); }} options={[{ id: "keep", label: t("Keep") }, { id: "low", label: t("Low") }, { id: "mid", label: t("Mid") }, { id: "high", label: t("High") }]} /></Field>
-          </>}
-          <Btn variant="primary" disabled={sel.length === 0 || sending || !hasChoice(ch)} onClick={() => { setReview(plan(sel)); }}>{t("Review & send")}</Btn>
-        </div>
-        {!hasChoice(ch) && <p className="mt-2 text-xs text-muted-foreground">{t("Every setting is kept — choose what to change.")}</p>}
-        <p className="mt-2 text-[11px] text-muted-foreground">{t("Each AC gets its own command and confirmation (same as single control). Offline ACs are skipped; restrictions such as a minimum temperature still apply per AC. One space only · owner role only.")}</p>
-        {Object.values(track).some((x) => x.status === "Failed") && !sending && (
-          <div className="mt-2"><Btn size="sm" onClick={() => { const ids = Object.entries(track).filter(([, x]) => x.status === "Failed").map(([id]) => id); setReview(plan(ids)); }}>{t("Retry failed ACs")}</Btn></div>
+      <Card title={cardTitle()}>
+        {offOnly ? <>
+          {turnedOff > 0 && <p className="mb-2 flex items-center gap-1.5 text-[13px] font-semibold text-ok"><Icon name="check" />{t(turnedOff === 1 ? "{n} AC turned off — it has left the Running list" : "{n} ACs turned off — they have left the Running list", { n: turnedOff })}</p>}
+          {live.units.length === 0 && <p className="mb-2 text-[13px] text-muted-foreground">{t("No AC is running any more.")}</p>}
+          <Btn variant="primary" disabled={sel.length === 0 || sending} onClick={() => { setReview(plan(sel)); }}>{t("Review & turn off")}</Btn>
+          <p className="mt-2 text-[11px] text-muted-foreground">{t("Untick the ACs that should keep running. Each AC gets its own command and confirmation (same as single control); offline ACs are skipped. Owner role only.")}</p>
+          {/* the same ACs every weekday evening, without setting it up from scratch on another screen (IR811) */}
+          {sel.length > 0 && <Link className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-primary" href={`/customer/automations?automationId=new&preset=off&unitIds=${sel.slice(0, 50).join(",")}`}><Icon name="time" />{t("Turn these off automatically every weekday…")}</Link>}
+        </> : <>
+          <div className="flex flex-wrap items-center gap-4">
+            <Field label={t("Power")}><Choice value={powerChoice(ch.power)} onChange={(v: string) => { setCh({ ...ch, power: v === "keep" ? null : v === "on" }); }} options={[{ id: "keep", label: t("Keep") }, { id: "on", label: t("On") }, { id: "off", label: t("Off") }]} /></Field>
+            {ch.power !== false && <>
+              <TemperatureStep celsius={ch.celsius} lo={lo} hi={hi} onChange={(celsius) => { setCh({ ...ch, celsius }); }} />
+              <Field label={t("Mode")}><Choice value={ch.mode ?? "keep"} onChange={(v: string) => { setCh({ ...ch, mode: oneOf(["cool", "dry", "fan"] as const, v, null) }); }} options={[{ id: "keep", label: t("Keep") }, { id: "cool", label: t("Cool") }, { id: "dry", label: t("Dry") }, { id: "fan", label: t("Fan") }]} /></Field>
+              <Field label={t("Fan")}><Choice value={ch.fan ?? "keep"} onChange={(v: string) => { setCh({ ...ch, fan: oneOf(["low", "mid", "high"] as const, v, null) }); }} options={[{ id: "keep", label: t("Keep") }, { id: "low", label: t("Low") }, { id: "mid", label: t("Mid") }, { id: "high", label: t("High") }]} /></Field>
+            </>}
+            <Btn variant="primary" disabled={sel.length === 0 || sending || !hasChoice(ch)} onClick={() => { setReview(plan(sel)); }}>{t("Review & send")}</Btn>
+          </div>
+          {!hasChoice(ch) && <p className="mt-2 text-xs text-muted-foreground">{t("Every setting is kept — choose what to change.")}</p>}
+          <p className="mt-2 text-[11px] text-muted-foreground">{t("Each AC gets its own command and confirmation (same as single control). Offline ACs are skipped; restrictions such as a minimum temperature still apply per AC. One space only · owner role only.")}</p>
+        </>}
+        {failed.length > 0 && !sending && (
+          <div className="mt-2"><Btn size="sm" onClick={() => { setReview(plan(failed)); }}>{t("Retry failed ACs")}</Btn></div>
         )}
       </Card>
       {review && (
-        <Modal open wide onClose={() => { setReview(null); }} title={t(review.length === 1 ? "Send to {n} selected AC in {space}?" : "Send to {n} selected ACs in {space}?", { n: review.length, space })}
+        <Modal open wide onClose={() => { setReview(null); }} title={reviewTitle(review.length)}
           footer={<><Btn onClick={() => { setReview(null); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={review.every((r) => r.actions.length === 0)} onClick={() => { void send(review.filter((r) => r.actions.length)); }}>{t(review.filter((r) => r.actions.length).length === 1 ? "Send to {n} AC" : "Send to {n} ACs", { n: review.filter((r) => r.actions.length).length })}</Btn></>}>
           <p className="mb-2 text-[13px] font-semibold">{changeText(ch, t)}</p>
           <DataTable rowKey={(r) => r.id} rows={review} cols={[

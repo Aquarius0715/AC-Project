@@ -100,6 +100,27 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.656.0 (2026-11-16): IR813: an alert's Book cleaning opens Filter care on that AC.
+0.655.0 (2026-11-16): IR812: a demo alert's evidence names its metric and comparison in words (Heartbeat gap at or above its alert threshold).
+0.654.0 (2026-11-16): IR811: from Turn off running ACs, one link opens an after-hours rule with the same ACs.
+0.657.0 (2026-11-16): IR814: a customer pins ACs to the Overview from their pages (this browser only).
+0.658.0 (2026-11-16): IR815: Energy & cost opens on the AC that used the most in the period.
+0.661.0 (2026-11-16): IR818: customer Users says a forgotten password is reset with Forgot password? on the sign-in page.
+0.660.0 (2026-11-16): IR817: "already signed in as another user" on the sign-in page says where to sign out.
+0.659.0 (2026-11-16): IR816: on a phone the customer Overview names the most severe open alert on the first screen.
+0.653.0 (2026-11-16): IR810: after a confirmed change, the customer unit page offers Undo, which puts back the previous confirmed setting.
+0.652.0 (2026-11-16): IR809: the customer unit page refreshes every 30 s while open (paused while editing), so others' changes appear.
+0.651.0 (2026-11-16): IR808: a cooling setpoint below 22 °C gets a hint that a lower setting only uses more power.
+0.650.0 (2026-11-16): IR807: HQ's Unresolved alerts tile opens its list on critical and warning alerts, so the counts agree.
+0.649.0 (2026-11-16): IR806: waiting for the AC to confirm a command counts down the seconds it has left.
+0.648.0 (2026-11-16): IR805: on a phone, the partner Jobs cards and the customer Overview rows name each value.
+0.647.0 (2026-11-16): IR804: the customer's command history says whether you or someone else sent each command.
+0.646.0 (2026-11-16): IR803: Energy & cost ranks the ACs by measured use (Highest use in this period), each with Show and Compare.
+0.645.0 (2026-11-16): IR802: one automation can switch several ACs (Also apply to other ACs, All ACs in a property), offering only the actions all of them take.
+0.644.0 (2026-11-16): IR801: Units & locations finds a room or AC by name or place.
+0.643.0 (2026-11-16): IR800: every unresolved customer alert says what to do (close the windows, book a cleaning, request a repair …).
+0.642.0 (2026-11-16): IR798: on the Running list an owner turns the running ACs off at once, unticking those that should keep running.
+0.641.0 (2026-11-16): IR799: a failed command says why in words (the AC refused it, no answer in time, offline …), never with its failure code, for customers, HQ and technicians.
 0.640.0 (2026-11-16): IR797: `jobs.list` `currentOnly` leaves out the history rows of ended access; the partner Jobs list's Offered, Active and Review tabs ask with it, so a delegation that ended unfinished no longer counts under Active. Phase 1A unchanged.
 0.639.0 (2026-11-15): IR796: auto-merge pull requests keep moving into `main`: every five minutes `keep-prs-current.yml` brings the oldest behind one up to date and starts its CI (and CI on `main` when a merge started none). Phase 1A unchanged.
 0.638.0 (2026-11-13): client installation requests (DEC-107, IR794): FR-C20 and DD-C20, the customer owner asks HQ to install 1–10 new aircons (property, model or not decided, IoT device yes/no, 3 preferred times); HQ approves into planned units and installation jobs (`jobs.create` with `installationRequestId`, origin `client_request`) or declines with a reason; `installationRequests.create/list/cancel/decline` (232 operations), `maintenance.installation_requests` (migration 000006). Replaces the DEC-106 rule that a client cannot ask for an installation; a client still cannot create the job itself. Figma not updated (open item).

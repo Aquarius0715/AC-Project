@@ -39,7 +39,7 @@ describe("HQ restrictions (FR-A09, FR-A10)", () => {
       unit({ unitId: "u3", observedRestriction: { restrictionId: "other", rulesVersion: "v0" }, releaseCommandIds: ["c2"] }),
     ] });
     expect(unitRows(r, new Map([["u1", "Lobby AC"]]), commands).map((u) => [u.name, u.apply, u.release, u.observed, u.commands, u.retryApply, u.reconcile])).toStrictEqual([
-      ["Lobby AC", "not applied", "none", "none observed", "apply failed (OFFLINE)", true, false],
+      ["Lobby AC", "not applied", "none", "none observed", "apply failed (the AC was offline)", true, false],
       ["u2", "sent, result unknown", "none", "this restriction · 14 Sept 2026, 10:00 am MYT", "—", false, true],
       ["u3", "applied", "none", "another restriction", "remove acknowledged", false, false],
     ]);

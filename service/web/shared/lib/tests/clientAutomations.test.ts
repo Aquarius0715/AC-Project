@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  actionGroupOf, actionLabel, actionOptions, apiErrors, blankDraft, consentCard, firstAction, draftErrors, draftOf, eventTest, ruleCard, runClock, runText, saveInput, scheduleTest, summaryText, weekdaysText, whenText, type ApiAutomation, type Caps,
+  actionGroupOf, actionLabel, actionOptions, afterHoursDraft, apiErrors, blankDraft, commonActionOptions, consentCard, firstAction, draftErrors, draftOf, eventTest, ruleCard, runClock, runText, saveInput, scheduleTest, summaryText, weekdaysText, whenText, type ApiAutomation, type Caps,
 } from "@ac/web/lib/clientAutomations";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
 
@@ -118,5 +118,27 @@ describe("runText / runClock with a value that does not format", () => {
   });
   it("still falls back to Kuala Lumpur for a zone the runtime does not know", () => {
     expect([runText(TEXT_2026_09_14T10_00_00Z, "No/Such_Zone"), runClock(TEXT_2026_09_14T14_00_00Z, "No/Such_Zone")]).toStrictEqual(["Mon, 14 Sept, 18:00 MYT", "22:00 MYT"]);
+  });
+});
+
+// IR802: one rule may control several ACs, so the editor offers only the actions every chosen AC takes
+describe("actions of several ACs", () => {
+  it("keeps the actions all chosen ACs support", () => {
+    const wide: Caps = { control: true, modeControl: true, fanControl: true, temperature: { min: 16, max: 30, step: 1 }, modes: ["cool", "dry"], fanLevels: ["low", "high"] };
+    const narrow: Caps = { control: true, modeControl: true, fanControl: false, temperature: { min: 24, max: 26, step: 1 }, modes: ["cool"], fanLevels: [] };
+    const both = commonActionOptions([wide, narrow]);
+    expect(both.map((g) => [g.id, g.options.map((o) => o.short)])).toStrictEqual([["power", ["ON", "OFF"]], ["temp", ["24°C", "25°C", "26°C"]], ["mode", ["Cool"]]]);
+    expect(commonActionOptions([wide])).toStrictEqual(actionOptions(wide));
+    expect([commonActionOptions([]), commonActionOptions([wide, null])]).toStrictEqual([[], []]);
+  });
+});
+
+// IR811: the Running list opens a new after-hours rule with its ACs and Power OFF at 19:00; the end is left to choose
+describe("after-hours preset", () => {
+  it("fills the ACs and the start, never the end", () => {
+    const d = afterHoursDraft(["a", "b", "c"], "Asia/Kuala_Lumpur", "Switch off after hours");
+    expect([d.unitId, d.others, d.trigger, d.weekdays, d.startLocal, d.startAction, d.endAction, d.enabled, d.name])
+      .toStrictEqual(["a", ["b", "c"], "schedule", [1, 2, 3, 4, 5], "19:00", "power:off", "", false, "Switch off after hours"]);
+    expect(afterHoursDraft(Array.from({ length: 60 }, (_, i) => `u${String(i)}`), "UTC", "x").others).toHaveLength(49);
   });
 });

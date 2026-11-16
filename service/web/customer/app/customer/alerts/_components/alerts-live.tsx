@@ -50,7 +50,8 @@ export function AlertsLiveView({ live }: Readonly<{ live: AlertsLive }>) {
   const renderActions = (a: InboxAlert) => (
     <>
       <Link href={`/customer/units/${a.unitId}`} className="rounded-control bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary">{t("View unit")}</Link>
-      {a.type === "maintenance" && a.status.state !== "resolved" && <Link href="/customer/maintenance?tab=filter-care" className="rounded-control bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary">{t("Book cleaning")}</Link>}
+      {a.type === "maintenance" && a.status.state !== "resolved" && <Link href={`/customer/maintenance?tab=filter-care&unitId=${a.unitId}`} className="rounded-control bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary">{t("Book cleaning")}</Link>}
+      {a.cause === "quality" && a.status.state !== "resolved" && <Link href="/customer/air-quality" className="rounded-control bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary">{t("Air quality")}</Link>}
       {a.cause === "fault" && a.group === "attn" && <Link href={`/customer/maintenance?new=${a.unitId}`} className="rounded-control bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary">{t("Request repair")}</Link>}
     </>
   );
@@ -65,6 +66,8 @@ export function AlertsLiveView({ live }: Readonly<{ live: AlertsLive }>) {
             <Badge tone={a.status.tone}>{a.status.text}</Badge>{a.unread.length > 0 && <Badge tone="primary">{t("Unread")}</Badge>}
           </span>
           <span className="block text-xs text-muted-foreground">{a.where}</span><span className="mt-1 block text-xs">{a.evidence}</span>
+          {/* the next step where the problem is read, not only in the detail (IR800) */}
+          {a.group === "attn" && a.next && <span className="mt-1 flex items-start gap-1 text-xs font-semibold"><Icon name="arrowRight" className="mt-0.5 shrink-0 text-primary" />{t("What to do: {step}", { step: a.next })}</span>}
         </Plain>
         <div className="mt-2 flex flex-wrap gap-2">{renderActions(a)}</div>
       </div>
@@ -103,7 +106,7 @@ export function AlertsLiveView({ live }: Readonly<{ live: AlertsLive }>) {
         {open && (
           <>
             <div className="flex flex-wrap gap-2"><SeverityBadge s={open.severity} /><Badge tone={open.status.tone}>{open.status.text}</Badge></div>
-            <SummaryList items={[[t("Where"), open.where], [t("Evidence"), open.evidence], [t("Status"), open.status.detail]]} />
+            <SummaryList items={[[t("Where"), open.where], [t("Evidence"), open.evidence], [t("Status"), open.status.detail], ...(open.next ? [[t("What to do"), open.next] satisfies [string, string]] : [])]} />
             <p className="text-xs text-muted-foreground">{t(open.status.state === "resolved" ? "This alert is resolved. It stays in the list as a record." : "Reading an alert does not resolve it. It stays under “Needs attention” until the cause is resolved.")}</p>
           </>
         )}

@@ -9,6 +9,7 @@ import type { UnitAction } from "@ac/web/lib/contracts.gen";
 import { FAN_LABEL, MODE_LABEL, type ApiUnitDetail, type CommandAction } from "@ac/web/lib/units";
 import { airNumber } from "@ac/web/lib/air";
 import { lookup } from "@ac/web/lib/lookup";
+import { commandFailure } from "@ac/web/lib/commandFailure";
 import type { ActionGroup } from "@ac/web/lib/clientAutomations";
 
 const en = translator("en");
@@ -69,7 +70,7 @@ function commandOutcome(c: ApiCommandRow, i: I18n): string {
   const { t } = i;
   switch (c.status) {
     case "acknowledged": { return t("acknowledged {time}", { time: clock(c.acknowledgedAt, i) }); }
-    case "failed": { return c.failureCode ? t("rejected by the device ({code})", { code: c.failureCode }) : t("rejected by the device"); }
+    case "failed": { return c.failureCode ? t("failed: {reason}", { reason: commandFailure(c.failureCode, t) }) : t("rejected by the device"); }
     case "expired": { return t("no device response (expired)"); }
     case "cancelled": { return t("cancelled"); }
     default: { return t("waiting for the device"); }
@@ -116,9 +117,9 @@ export function runBanner(r: ApiRun | null, i: I18n = EN): { tone: "primary" | "
     }
     case "completed": { return { tone: "ok", title: t("End acknowledged — test run completed"), text: t("The device confirmed {action}.", { action: end }) };
     }
-    case "start_failed": { return { tone: "crit", title: t("Start not acknowledged — the test run did not start"), text: r.failureCode ? t("The device reported {code} · no end command is needed.", { code: r.failureCode }) : t("No end command is needed.") };
+    case "start_failed": { return { tone: "crit", title: t("Start not acknowledged — the test run did not start"), text: r.failureCode ? t("Not done: {reason} · no end command is needed.", { reason: commandFailure(r.failureCode, t) }) : t("No end command is needed.") };
     }
-    case "end_failed": { return { tone: "crit", title: t("No end response — the end was not confirmed"), text: r.failureCode ? t("The device reported {code} · the unit may still be running; check it on site.", { code: r.failureCode }) : t("The unit may still be running; check it on site.") };
+    case "end_failed": { return { tone: "crit", title: t("No end response — the end was not confirmed"), text: r.failureCode ? t("Not confirmed: {reason} · the unit may still be running; check it on site.", { reason: commandFailure(r.failureCode, t) }) : t("The unit may still be running; check it on site.") };
     }
     default: { return { tone: "crit", title: t("End blocked — authorization ended before the end time"), text: t("No end command was sent; the unit may still be running.") };
     }
