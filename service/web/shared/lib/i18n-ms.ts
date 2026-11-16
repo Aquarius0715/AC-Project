@@ -4911,6 +4911,8 @@ export const ms: Record<string, string> = {
   "Demo review recorded — version {v}": "Semakan demo direkodkan — versi {v}",
   "Demo reviewed": "Disemak (demo)",
   "Scope 2 reports": "Laporan Skop 2",
+  "No reports yet": "Belum ada laporan",
+  "Create the first one with New report.": "Cipta yang pertama dengan Laporan baharu.",
   "No reports": "Tiada laporan",
   "No report matches these filters.": "Tiada laporan sepadan dengan penapis ini.",
   "Every report is a demo — “Demo — unverified”. A demo review is not external certification.": "Setiap laporan ialah demo — “Demo — belum disahkan”. Semakan demo bukan pensijilan luar.",

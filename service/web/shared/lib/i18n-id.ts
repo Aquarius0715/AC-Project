@@ -4801,6 +4801,8 @@ export const id: Record<string, string> = {
   "Demo review recorded — version {v}": "Tinjauan demo dicatat — versi {v}",
   "Demo reviewed": "Ditinjau demo",
   "Scope 2 reports": "Laporan Cakupan 2",
+  "No reports yet": "Belum ada laporan",
+  "Create the first one with New report.": "Buat yang pertama dengan Laporan baru.",
   "No reports": "Tidak ada laporan",
   "No report matches these filters.": "Tidak ada laporan yang cocok dengan filter ini.",
   "Every report is a demo — “Demo — unverified”. A demo review is not external certification.": "Setiap laporan adalah demo — “Demo — belum diverifikasi”. Tinjauan demo bukan sertifikasi eksternal.",
