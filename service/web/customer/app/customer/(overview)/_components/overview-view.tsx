@@ -85,6 +85,12 @@ export function OverviewView({ live }: Readonly<{ live: OverviewLive }>) {
             ))}</div>
         </Banner>
       )}
+      {/* on a phone the Needs attention tile is the fourth, two screens down: the most severe open alert is said first (IR816) */}
+      {a.items[0] && <div className="sm:hidden">
+        <Banner tone="warn" action={<TextLink href="/customer/alerts">{t("View alerts")} <Icon name="arrowRight" /></TextLink>}>
+          <b>{a.items[0].title}</b> · {a.items[0].where}{a.more + a.items.length > 1 && <> · {t("+{n} more", { n: a.more + a.items.length - 1 })}</>}
+        </Banner>
+      </div>}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))]">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Kpi label={t("Running")} badge={<PowerBadge s="running" />} value={c.powerOn} sub={live.propertyName ? t("{units} in {property} · latest observation", { units: units(c.total), property: live.propertyName }) : t("{units} · latest observation", { units: units(c.total) })} href="/customer/properties?powerState=on" link={t("View running units")} />
