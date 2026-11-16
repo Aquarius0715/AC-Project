@@ -10565,6 +10565,17 @@ IR614 matched a history without completion by its as-of, so a job whose delegati
    - `TestContractorAndTechnicianProjections`: the ended delegation is listed with `status: accepted` and left out with `currentOnly: true`. The query catalog test sends the filter.
    - `partnerJobs.test.ts`: the open stages ask with `currentOnly`, Completed and All without.
 
+## IR798 The Running list turns its ACs off, unticking those to keep — 2026-11-16
+
+Found in the UI/UX loop (UX-45). Overview › Running › View running units lists every running AC across properties. Turning them off meant opening each AC's own screen: about 27 clicks for 9 ACs. Group control works on one room or area only (DD-C14), and these ACs were in 8 rooms.
+
+1. **Turn off running ACs.** On the Running list (`/customer/properties?powerState=on`, no connection filter, 2 or more ACs) an owner gets "Turn off running ACs…". It opens the group panel with Power Off as the only change (`TURN_OFF`) and every online AC ticked.
+   - The owner unticks those that should keep running.
+   - Each card shows its place (property › floor › room).
+   - Review & turn off and the sending are those of Group control: one `commands.create` and `commands.get` per AC.
+   - This is the one exception to one space. Power off sets nothing else, so no room's settings can mix.
+2. **After sending.** The list is re-read, and the ACs confirmed off leave it. The panel stays open, says how many were turned off, and Retry covers the failed ACs that are still listed.
+3. **Docs and tests.** FR-C14 and DD-C14 step 5 say so. `clientProperties.test.ts` plans power off only, and an AC already off has nothing to send.
 
 ## IR799 A failed command says why in words, never with its code — 2026-11-16
 
@@ -10584,65 +10595,6 @@ Found in the UI/UX loop (UX-46). A command the AC refused read "Set power OFF �
    - The technician's command outcome reads "failed: {reason}".
    - The test-run banners read "Not done: {reason} · no end command is needed." and "Not confirmed: {reason} · the unit may still be running; check it on site."
 3. **Tests.** units, restrictions and techControl tests expect the words, and an unknown code reads "no reason given".
-
-## IR798 The Running list turns its ACs off, unticking those to keep — 2026-11-16
-
-Found in the UI/UX loop (UX-45). Overview › Running › View running units lists every running AC across properties. Turning them off meant opening each AC's own screen: about 27 clicks for 9 ACs. Group control works on one room or area only (DD-C14), and these ACs were in 8 rooms.
-
-1. **Turn off running ACs.** On the Running list (`/customer/properties?powerState=on`, no connection filter, 2 or more ACs) an owner gets "Turn off running ACs…". It opens the group panel with Power Off as the only change (`TURN_OFF`) and every online AC ticked.
-   - The owner unticks those that should keep running.
-   - Each card shows its place (property › floor › room).
-   - Review & turn off and the sending are those of Group control: one `commands.create` and `commands.get` per AC.
-   - This is the one exception to one space. Power off sets nothing else, so no room's settings can mix.
-2. **After sending.** The list is re-read, and the ACs confirmed off leave it. The panel stays open, says how many were turned off, and Retry covers the failed ACs that are still listed.
-3. **Docs and tests.** FR-C14 and DD-C14 step 5 say so. `clientProperties.test.ts` plans power off only, and an AC already off has nothing to send.
-
-## IR802 One automation for several ACs — 2026-11-16
-
-Found in the UI/UX loop (UX-49, scheduled operation: "switch Office A off at 19:00 on weekdays"). The list header said "each rule controls one AC" and the editor offered one Target AC. Turning a 21-AC office off after hours therefore took 21 rules, each filled in by hand. `automations.save` already took 1–50 `unitIds`, the scheduler (`schedules.go`) fires each rule for all its units, and the editor kept extra units of rules saved elsewhere (`Draft.others`) without showing them.
-
-1. **Editor.** Under Target AC, "Also apply to other ACs" is folded by default, so a one-AC rule stays as before. It lists every other AC with its place, and offers "All ACs in {property}" (the target's property) and Clear. A rule with more ACs opens it with them ticked. A rule holds up to 50 ACs, and the boxes lock at 50.
-2. **Actions.** `commonActionOptions` (shared/lib/clientAutomations.ts) keeps only the actions every chosen AC supports. The API refuses any other with `unitIds: unsupported_action`. An action that does not fit reads "Not supported by every chosen AC — choose another action".
-3. **Texts.** Step 3 reads "Action for {n} ACs". The list header drops "each rule controls one AC". The card still names the first AC "(+n more ACs)".
-4. **Tests.** `clientAutomations.test.ts`: the common actions of a wide and a narrow AC (power, the shared temperatures, cool), one AC equal to its own options, none for no AC or an AC without capabilities.
-5. **Checked on the dev stack.** A rule for Lobby AC and Meeting room AC (Office A) was saved, listed as "(+1 more AC)", reopened with both, then deleted.
-
-## IR804 The command history says who sent a command: you or someone else — 2026-11-16
-
-Found in the UI/UX loop (UX-51, several users on one account). A customer owner and their family or staff share one account. When an AC's setting changed, its command history said "Set power OFF — acknowledged by device" with no hint of who sent it. Only automations, restrictions and test runs named their source. `commands.list` already returns `actorMembershipId` to the client; IR216 hides only another actor's reason.
-
-1. **Rows.** `historyRow` takes the reader's membership. A command with no other source (sent by hand) ends "· by you" when its actor is the reader, else "· by someone else". No name is shown, so nothing new is disclosed. Automation, restriction and test-run commands keep "· by an automation" and the others.
-2. **Where.** The customer unit page's command history. The page passes `me.membershipId` from the session.
-3. **Tests.** `units.test.ts`: by you, by someone else, an automation's command, and no reader (unchanged).
-
-## IR806 Waiting for the AC counts down — 2026-11-16
-
-Found in the UI/UX loop (UX-53, the single-AC control on a phone, criterion 9). After Send, the panel said "Waiting for device response… (fails after 30 s)". The button was disabled, so double sends were already prevented, but nothing moved for up to 30 s, which reads as a hang.
-
-1. **Countdown.** `WaitBanner` on the customer unit page reads "Waiting for the AC to confirm… The result shows only after it acknowledges." followed by "{s} s left".
-   - The seconds come from `answerSeconds` (shared/lib/units.ts): request to expiry, else 30.
-   - It counts on the browser's clock from when the command was created. The command's own times are on the scenario clock.
-   - Each command of a multi-setting send restarts it (keyed by command id).
-   - At zero it reads "No answer yet — checking the result…" until the follow-up answers.
-2. **Accessibility.** The banner is a polite live region, so the sentence stays fixed and the seconds are `aria-hidden`. A screen reader hears the sentence once, not a count every second.
-3. **Tests.** `units.test.ts` covers `answerSeconds`: 30 s, 120 s, a missing expiry, a zero span and an unreadable time.
-
-## IR808 A very low cooling setpoint gets a hint — 2026-11-16
-
-Found in the UI/UX loop (UX-55, criterion 12: notice the settings worth reviewing). Lowering a cooling setpoint to 16–21 °C went through the control and the confirmation with nothing said. A low setting is a common reason for high use, and it does not cool a room faster. The outdoor temperature is not available to the web apps (no weather operation), so the comparison with outside is left for later.
-
-1. **Hint.** `coolingHint(mode, celsius)` (shared/lib/units.ts) returns a sentence when the mode is Cool and the setpoint is below 22 °C. The sentence: "{celsius}°C is very cold for cooling: a lower setting does not cool the room faster, it runs longer and uses more power. 24–26°C is a common comfortable range." It returns null otherwise.
-2. **Where.** The customer unit page shows it under the temperature row, in warning colour with an info icon, while the user picks the value. It blocks nothing.
-3. **Tests.** `units.test.ts` covers cooling at 18 and 22 °C and the other modes.
-
-## IR810 Undo the last change of an AC — 2026-11-16
-
-Found in the UI/UX loop (UX-57, criterion 14: undo of the last operation). A change sent by mistake had to be put back by hand: remember the old values, set them, review and send again.
-
-1. **What is undone.** `undoActions(actions, before)` (shared/lib/units.ts) maps each sent setting back to the confirmed value it replaced. That value comes from the observed state read before the send, and the commands keep the order of the send. Power, temperature, mode and fan are covered. A setting without a confirmed value before, or one that did not change, is left out.
-2. **Where.** On the customer unit page, when every command of a send is acknowledged, the result banner shows Undo beside Dismiss. Undo sends those commands through the same path as any send: own idempotency key, version check, waiting with the countdown, and a result. The user's click is the confirmation, since the commands restore what was confirmed a moment before. The undo itself offers no further Undo, and a send that failed part-way offers none.
-3. **Tests.** `units.test.ts` covers a temperature and fan send undone in order, a power send undone, and settings with no confirmed value before (nothing to undo).
-4. **Not checked live.** The mock fleet did not acknowledge commands on the dev stack (scenario clock), so the banner's Undo was not seen in the browser. Real devices were not used.
 
 ## IR800 Every unresolved alert says what to do — 2026-11-16
 
@@ -10667,6 +10619,16 @@ Found in the UI/UX loop (UX-48, a complaint call: "the director's office is hot"
 2. **Clearing.** A tree row and Clear filter remove `search`, and the box follows the URL. With no match, the list says no room or AC name contains the text and suggests checking the spelling.
 3. **Docs.** DD-C02 step 3 and SCR-C02's URL keys add `search`.
 
+## IR802 One automation for several ACs — 2026-11-16
+
+Found in the UI/UX loop (UX-49, scheduled operation: "switch Office A off at 19:00 on weekdays"). The list header said "each rule controls one AC" and the editor offered one Target AC. Turning a 21-AC office off after hours therefore took 21 rules, each filled in by hand. `automations.save` already took 1–50 `unitIds`, the scheduler (`schedules.go`) fires each rule for all its units, and the editor kept extra units of rules saved elsewhere (`Draft.others`) without showing them.
+
+1. **Editor.** Under Target AC, "Also apply to other ACs" is folded by default, so a one-AC rule stays as before. It lists every other AC with its place, and offers "All ACs in {property}" (the target's property) and Clear. A rule with more ACs opens it with them ticked. A rule holds up to 50 ACs, and the boxes lock at 50.
+2. **Actions.** `commonActionOptions` (shared/lib/clientAutomations.ts) keeps only the actions every chosen AC supports. The API refuses any other with `unitIds: unsupported_action`. An action that does not fit reads "Not supported by every chosen AC — choose another action".
+3. **Texts.** Step 3 reads "Action for {n} ACs". The list header drops "each rule controls one AC". The card still names the first AC "(+n more ACs)".
+4. **Tests.** `clientAutomations.test.ts`: the common actions of a wide and a narrow AC (power, the shared temperatures, cool), one AC equal to its own options, none for no AC or an AC without capabilities.
+5. **Checked on the dev stack.** A rule for Lobby AC and Meeting room AC (Office A) was saved, listed as "(+1 more AC)", reopened with both, then deleted.
+
 ## IR803 Energy & cost ranks the ACs by use — 2026-11-16
 
 Found in the UI/UX loop (UX-50: "which AC should I review?"). Energy & cost showed one AC, the first by name, or up to four that the customer picked. Nothing said which of the 23 ACs used the most, so finding the one to review took 23 selections.
@@ -10674,6 +10636,14 @@ Found in the UI/UX loop (UX-50: "which AC should I review?"). Energy & cost show
 1. **Ranking.** For the period, the page also runs one `energy.summary` per unit of the customer. `topUsers` (shared/lib/clientEnergy.ts) keeps the five highest and leaves out units without measured energy. Ties go by name. Each unit's share is of the measured total.
 2. **Card.** "Highest use in this period" lists the AC, its kWh, its share of measured and its data coverage, in warning colour under 80%. A note says low coverage means the AC may have used more than shown. Show selects that AC alone. Compare adds it, up to four, and is hidden when the AC is already shown or four are chosen. The card is hidden with fewer than two ranked ACs.
 3. **Docs and tests.** DD-C06 step 5. `energy.test.ts` checks the order, the shares and leaving out units without measured use.
+
+## IR804 The command history says who sent a command: you or someone else — 2026-11-16
+
+Found in the UI/UX loop (UX-51, several users on one account). A customer owner and their family or staff share one account. When an AC's setting changed, its command history said "Set power OFF — acknowledged by device" with no hint of who sent it. Only automations, restrictions and test runs named their source. `commands.list` already returns `actorMembershipId` to the client; IR216 hides only another actor's reason.
+
+1. **Rows.** `historyRow` takes the reader's membership. A command with no other source (sent by hand) ends "· by you" when its actor is the reader, else "· by someone else". No name is shown, so nothing new is disclosed. Automation, restriction and test-run commands keep "· by an automation" and the others.
+2. **Where.** The customer unit page's command history. The page passes `me.membershipId` from the session.
+3. **Tests.** `units.test.ts`: by you, by someone else, an automation's command, and no reader (unchanged).
 
 ## IR805 A narrow list card names each value — 2026-11-16
 
@@ -10683,6 +10653,18 @@ Found in the UI/UX loop (UX-52, a contractor coordinator on a phone). Below a br
 2. **Customer Overview.** Below `lg`, the three readings carry Room temp, Humidity and Power now.
 3. **Wide screens** are unchanged: the labels hide where the headings show. These were the only two lists of the four apps that hide headings this way (searched for `hidden grid-cols-[` headings).
 
+## IR806 Waiting for the AC counts down — 2026-11-16
+
+Found in the UI/UX loop (UX-53, the single-AC control on a phone, criterion 9). After Send, the panel said "Waiting for device response… (fails after 30 s)". The button was disabled, so double sends were already prevented, but nothing moved for up to 30 s, which reads as a hang.
+
+1. **Countdown.** `WaitBanner` on the customer unit page reads "Waiting for the AC to confirm… The result shows only after it acknowledges." followed by "{s} s left".
+   - The seconds come from `answerSeconds` (shared/lib/units.ts): request to expiry, else 30.
+   - It counts on the browser's clock from when the command was created. The command's own times are on the scenario clock.
+   - Each command of a multi-setting send restarts it (keyed by command id).
+   - At zero it reads "No answer yet — checking the result…" until the follow-up answers.
+2. **Accessibility.** The banner is a polite live region, so the sentence stays fixed and the seconds are `aria-hidden`. A screen reader hears the sentence once, not a count every second.
+3. **Tests.** `units.test.ts` covers `answerSeconds`: 30 s, 120 s, a missing expiry, a zero span and an unreadable time.
+
 ## IR807 HQ's Unresolved alerts tile opens the alerts it counts — 2026-11-16
 
 Found in the UI/UX loop (UX-54, HQ anomaly response). The Overview tile "Unresolved alerts 4 · open or acknowledged · critical and warning" linked to `/admin/alerts`. That list opened on every open alert, 19 of them: the four warnings plus 15 filter-cleaning reminders (info). The count and the list disagreed, and the dispatcher had to filter by hand.
@@ -10690,6 +10672,14 @@ Found in the UI/UX loop (UX-54, HQ anomaly response). The Overview tile "Unresol
 1. **Filter.** The severity select of the alerts tab adds "Severity: Critical & warning" (`severity=attention`). `alerts.list` takes a single severity, so with this value the page reads without one and leaves out the `normal` rows. The status tiles and the list follow.
 2. **Link.** `overviewLinks().alerts` is `/admin/alerts?severity=attention`, so the tile's 4 is the list's Open 4.
 3. **Docs and tests.** DD-A05 step 5. `adminSummary.test.ts` checks the link.
+
+## IR808 A very low cooling setpoint gets a hint — 2026-11-16
+
+Found in the UI/UX loop (UX-55, criterion 12: notice the settings worth reviewing). Lowering a cooling setpoint to 16–21 °C went through the control and the confirmation with nothing said. A low setting is a common reason for high use, and it does not cool a room faster. The outdoor temperature is not available to the web apps (no weather operation), so the comparison with outside is left for later.
+
+1. **Hint.** `coolingHint(mode, celsius)` (shared/lib/units.ts) returns a sentence when the mode is Cool and the setpoint is below 22 °C. The sentence: "{celsius}°C is very cold for cooling: a lower setting does not cool the room faster, it runs longer and uses more power. 24–26°C is a common comfortable range." It returns null otherwise.
+2. **Where.** The customer unit page shows it under the temperature row, in warning colour with an info icon, while the user picks the value. It blocks nothing.
+3. **Tests.** `units.test.ts` covers cooling at 18 and 22 °C and the other modes.
 
 ## IR809 The unit page shows others' changes without a reload — 2026-11-16
 
@@ -10699,3 +10689,12 @@ Found in the UI/UX loop (UX-56, criterion 14: several users at once). The custom
 2. **Unit page.** `LiveNote` enables it unless the user is busy: a setting edited and not sent, the confirmation, the power confirmation, rename or attach dialog open, or a command being awaited. A newer device report resets the controls (the "adjust state during render" sync), so re-reading then would lose the user's change. The header card says which state it is in.
 3. **Tests.** `useAutoRefresh.test.tsx` uses fake timers: it refreshes at each interval, never while paused, stops when paused again, and skips hidden ticks.
 4. **Load.** One server render per open unit page every 30 s.
+
+## IR810 Undo the last change of an AC — 2026-11-16
+
+Found in the UI/UX loop (UX-57, criterion 14: undo of the last operation). A change sent by mistake had to be put back by hand: remember the old values, set them, review and send again.
+
+1. **What is undone.** `undoActions(actions, before)` (shared/lib/units.ts) maps each sent setting back to the confirmed value it replaced. That value comes from the observed state read before the send, and the commands keep the order of the send. Power, temperature, mode and fan are covered. A setting without a confirmed value before, or one that did not change, is left out.
+2. **Where.** On the customer unit page, when every command of a send is acknowledged, the result banner shows Undo beside Dismiss. Undo sends those commands through the same path as any send: own idempotency key, version check, waiting with the countdown, and a result. The user's click is the confirmation, since the commands restore what was confirmed a moment before. The undo itself offers no further Undo, and a send that failed part-way offers none.
+3. **Tests.** `units.test.ts` covers a temperature and fan send undone in order, a power send undone, and settings with no confirmed value before (nothing to undo).
+4. **Not checked live.** The mock fleet did not acknowledge commands on the dev stack (scenario clock), so the banner's Undo was not seen in the browser. Real devices were not used.
