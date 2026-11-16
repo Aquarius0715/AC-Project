@@ -48,7 +48,7 @@ describe("air-quality metric cards (FR-C07, IR44, IR99, IR213, IR260)", () => {
   });
 
   it("never shows a stale, suspect, null or unsupported reading as a current value", () => {
-    expect(metricCard("co2", m("co2", 900, { quality: "stale" }), true)).toMatchObject({ value: null, feed: { text: "Unavailable" }, status: null, sub: "No reading since 9:12 am MYT (last 900 ppm)" }); // one badge, not "Unavailable" and "Not measured" (UI/UX loop R19)
+    expect(metricCard("co2", m("co2", 900, { quality: "stale" }), true)).toMatchObject({ value: null, feed: { text: "Unavailable" }, status: null, sub: "No reading since 14 Sept 2026, 9:12 am MYT (last 900 ppm)" }); // with the date (UI/UX loop R42); one badge, not "Unavailable" and "Not measured" (UI/UX loop R19)
     expect(metricCard("co2", m("co2", 5000, { quality: "suspect", qualityReason: "out_of_range" }), true)).toMatchObject({ value: "5000", feed: { text: "Suspect" }, sub: "Observed 9:12 am MYT · out of range", advice: "Not used for advice", warn: false });
     expect(metricCard("humidity", m("humidity", null), true)).toMatchObject({ value: null, feed: { text: "Unknown" }, sub: "No reading (null) — not 0% · 9:12 am MYT", advice: "Not enough data for advice" });
     expect(metricCard("pm25", undefined, false)).toMatchObject({ feed: { text: "Unsupported" }, sub: "No PM2.5 sensor on this model", advice: "Not enough data for PM2.5 advice" });
