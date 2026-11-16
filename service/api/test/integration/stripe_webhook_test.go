@@ -262,6 +262,60 @@ func TestStripeWebhookExpiryFreesTheInvoice(t *testing.T) {
 	startedPayment(t, srv, provider, inv)
 }
 
+// TestStripeWebhookDeclinedCardKeepsTheSessionOpen: a declined card leaves the Checkout Session open and the payer
+// retries on the same page, so payment_intent.payment_failed changes nothing and the retry's success pays the invoice
+// (IR829, DEC-68).
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
+func TestStripeWebhookDeclinedCardKeepsTheSessionOpen(t *testing.T) {
+	if clusterMode() {
+		t.Skip(clusterSkip)
+	}
+
+	provider := newFakeCheckout()
+	srv := webhookServer(t, provider)
+	_, inv := newInvoice(t, srv)
+	pay, session := startedPayment(t, srv, provider, inv)
+	before, beforePayment := invoiceState(t, srv, inv)
+
+	declined := `{"id":"pi_retry_` + eventSalt + `","object":"payment_intent","status":"requires_payment_method",` +
+		`"amount":5000,"currency":"myr","metadata":{"tenant_id":"` + seed.ID("tenant-a").
+		String() +
+		`","invoice_id":"` + inv + `","payment_id":"` + pay + `"}}`
+	if code := deliver(
+		t, srv, webhookSecret, eventID("evt_declined"), "payment_intent.payment_failed", declined,
+	); code != 200 {
+		t.Fatalf("declined: %d", code)
+	}
+
+	status, paymentStatus := invoiceState(t, srv, inv)
+	if status != before || paymentStatus != beforePayment {
+		t.Fatalf(
+			"after decline: invoice %s, payment %s; want %s, %s (the session is still open)",
+			status, paymentStatus, before, beforePayment,
+		)
+	}
+
+	if code := deliver(
+		t, srv, webhookSecret, eventID("evt_retry_paid"), "checkout.session.completed",
+		strings.Replace(
+			sessionObject(session, statusPaid, 5000, inv, pay),
+			`"payment_intent":"pi_`, `"payment_intent":"pi_retry_`, 1,
+		),
+	); code != 200 {
+		t.Fatalf("retry completed: %d", code)
+	}
+
+	status, paymentStatus = invoiceState(t, srv, inv)
+	if status != statusPaid || paymentStatus != statusConfirmed {
+		t.Fatalf(
+			"after retry: invoice %s, payment %s; want paid, confirmed",
+			status,
+			paymentStatus,
+		)
+	}
+}
+
 // TestStripeWebhookSettlesABankPaymentLater: a session completed with a method that settles later (unpaid) makes
 // the payment and the invoice processing, not paid; the session's async success then pays the invoice (DEC-68).
 //

@@ -20,7 +20,6 @@ const (
 	stripeAsyncFailed      = "checkout.session.async_payment_failed"
 	stripeAsyncSucceeded   = "checkout.session.async_payment_succeeded"
 	stripeIntentSucceeded  = "payment_intent.succeeded"
-	stripeIntentFailed     = "payment_intent.payment_failed"
 	stripePaid             = "paid"
 	stripeUnpaid           = "unpaid"  // a completed session whose payment method settles later (a bank payment)
 	statusExpired          = "expired" // billing.payments.status of a Checkout Session the payer let lapse
@@ -184,7 +183,9 @@ func (m Billing) applyPaymentEvent(
 			invoiceProcessing,
 			delivery,
 		)
-	case delivery.Type == stripeIntentFailed, delivery.Type == stripeAsyncFailed:
+	case delivery.Type == stripeAsyncFailed:
+		// payment_intent.payment_failed is not here: a declined card leaves the Checkout Session open and the payer
+		// may retry on the same page, so only the session's own end (async failure or expiry) ends the attempt (IR829)
 		return m.settleStripe(ctx, call, payment, inv, paymentFailed, invoiceUnpaid, delivery)
 	case delivery.Type == stripeSessionExpired:
 		return m.settleStripe(ctx, call, payment, inv, statusExpired, invoiceUnpaid, delivery)
