@@ -6,7 +6,7 @@ const PERMISSIONS = "permissions";
 
 import { useRef, useState } from "react";
 import { Badge, Banner, Btn, Card, Check, Choice, EmptyState, Field, Input, ListRow, Modal, Page, Search, SearchSelect, Select, Textarea, Plain, ScrollX, type Tone } from "@ac/web/components/ui";
-import { useI18n } from "@ac/web/components/I18n";
+import { useI18n, useT } from "@ac/web/components/I18n";
 import { showTime } from "@ac/web/lib/i18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
@@ -18,6 +18,7 @@ import {
 import { deleteMember, revokeMember, saveMember, signOutEverywhere } from "../actions";
 import { DeleteDialog } from "@ac/web/components/DeleteDialog";
 import { oneOf } from "@ac/web/lib/oneOf";
+import { permissionLabel } from "@ac/web/lib/permissionLabels";
 import { Icon } from "@ac/web/components/Icon";
 import { DateTimeSelect } from "@ac/web/components/TimeSelect";
 
@@ -48,6 +49,12 @@ function NoMembership({ missing, scope, onClear }: Readonly<{ missing: boolean; 
       {t("It does not exist, or the organization, role or status filter hides it.")}
     </EmptyState>
   );
+}
+
+/** A permission in words, its code small beside it so an administrator can match the two (IR821). */
+function PermissionName({ code }: Readonly<{ code: string }>) {
+  const t = useT();
+  return <span className="text-xs">{permissionLabel(code, t)} <span className="font-mono text-[10px] text-muted-foreground">{code}</span></span>;
 }
 
 export function AccessView({ live }: Readonly<{ live: Live }>) {
@@ -188,9 +195,9 @@ export function AccessView({ live }: Readonly<{ live: Live }>) {
               <h3 className="mb-2 text-[13px] font-bold">{t("Permissions · {n} of {total}", { n: d.permissions.length, total: allPermissions.length })}</h3>
               <ScrollX><table id={memberFieldId(PERMISSIONS)} className="w-full min-w-[560px] text-left text-[13px]"><thead className="text-[11px] uppercase text-muted-foreground"><tr><th className="py-1.5 pr-3">{t("Resource")}</th><th className="pr-3">{t("permission::Read")}</th><th className="pr-3">{t("Write")}</th><th>{t("Actions")}</th></tr></thead><tbody>{permissionRows.map((r) => (
                 <tr key={r.res} className="border-t border-line"><td className="py-2 pr-3 font-semibold">{resourceWord(r.res, t)}</td>
-                  <td className="pr-3">{r.read ? <Check label={<span className="font-mono text-xs">{r.read}</span>} checked={has(r.read)} disabled={blocked(r.read) || has(r.write)} onChange={(v) => { if (r.read) toggle(r.read, v); }} /> : <span className="text-muted-foreground">—</span>}</td>
-                  <td className="pr-3">{r.write ? <Check label={<span className="font-mono text-xs">{r.write}</span>} checked={has(r.write)} disabled={blocked(r.write)} onChange={(v) => { setWrite(r, v); }} /> : <span className="text-muted-foreground">—</span>}</td>
-                  <td><div className="flex flex-wrap gap-x-3 gap-y-2">{(r.actions ?? []).map((a) => <Check key={a} label={<span className="font-mono text-xs">{a}</span>} checked={has(a)} disabled={blocked(a)} onChange={(v) => { toggle(a, v); }} />)}{!r.actions && <span className="text-muted-foreground">—</span>}</div></td></tr>
+                  <td className="pr-3">{r.read ? <Check label={<PermissionName code={r.read} />} checked={has(r.read)} disabled={blocked(r.read) || has(r.write)} onChange={(v) => { if (r.read) toggle(r.read, v); }} /> : <span className="text-muted-foreground">—</span>}</td>
+                  <td className="pr-3">{r.write ? <Check label={<PermissionName code={r.write} />} checked={has(r.write)} disabled={blocked(r.write)} onChange={(v) => { setWrite(r, v); }} /> : <span className="text-muted-foreground">—</span>}</td>
+                  <td><div className="flex flex-wrap gap-x-3 gap-y-2">{(r.actions ?? []).map((a) => <Check key={a} label={<PermissionName code={a} />} checked={has(a)} disabled={blocked(a)} onChange={(v) => { toggle(a, v); }} />)}{!r.actions && <span className="text-muted-foreground">—</span>}</div></td></tr>
               ))}</tbody></table></ScrollX>
               <p className="mt-2 text-[11px] text-muted-foreground">{t("Write includes Read (Read is locked on while Write is on). Actions are independent of Read/Write — e.g. billing.write issues invoices but confirming payments needs billing.payment; mrv.write drafts reports but recording a review needs mrv.review and changing emission factors needs mrv.factors.")}{isSelf ? ` ${t("identity.write and restriction.override cannot be granted to yourself.")}` : ""}</p>
               {fieldError(PERMISSIONS) && <p className="mt-1 text-xs text-crit">{fieldError(PERMISSIONS)}</p>}

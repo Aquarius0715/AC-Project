@@ -10776,3 +10776,12 @@ IR814 kept a customer's pinned ACs in the browser, so they did not follow the us
 3. **Generated.** catalog_gen.go, contracts.gen.ts, contractInputs.gen.json and Swagger.
 4. **Tests.** `TestPreferencesAndConsents` covers saving two pins and reading them back in order. The pins are kept by an update that leaves them out. Nine, repeated or nil ids are refused, and an empty list clears them.
 5. **Dev DB.** The column was added by hand (ALTER), as with every migration.
+
+## IR821 Permissions are named in words (stage 1: the labels and Access & roles) — 2026-11-16
+
+The user decided on 2026-11-16 that the screens name a permission by what it allows, not by its code. This replaces the earlier rule, in the translation rounds and IR626, that kept permission codes as they are. The codes were shown in about 30 texts (for example "Not resolved — you don't have alert.resolve.") and in every checkbox of Access & roles. People outside HQ's administrators do not read them.
+
+1. **Labels.** `permissionLabel(code, t)` (shared/lib/permissionLabels.ts) gives each of the 39 permissions a label, for example "Resolve alerts", "View billing", "Run test runs" or "Force-delete data", in en, ms, ja and id. A code it does not know stays as it is.
+2. **Access & roles.** Each Read, Write and Action checkbox reads its label, with the code small beside it, so an administrator can still match the screen to a permission they were told about.
+3. **Tests.** `permissionLabels.test.ts` checks that every permission of the matrix has a label in every language, that a known one is worded, and that an unknown one is kept.
+4. **Stage 2.** The texts that name a permission use these labels instead of codes.
