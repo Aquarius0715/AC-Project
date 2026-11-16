@@ -8,7 +8,7 @@ import { Badge, Banner, Btn, Card, Check, ConnBadge, EmptyState, LinkButton, Mod
 import { units, unitRowFromApi, type UnitRow } from "@ac/web/lib/client";
 import { OpError } from "@ac/web/lib/ops";
 import { AUTO_REFRESH_SECONDS, useAutoRefresh } from "@ac/web/lib/useAutoRefresh";
-import { usePinnedUnits } from "@ac/web/lib/pinnedUnits";
+import { usePins } from "../../../_lib/usePins";
 import { answerSeconds, controlLayout, coolingHint, undoActions, FAN_LABEL, historyRow, latest, MODE_LABEL, type ApiCommand, type ApiUnitDetail, type UnitAction } from "@ac/web/lib/units";
 import { followCommand } from "@ac/web/lib/unitCommands";
 import { byCount, showRecent, showTime, textOf } from "@ac/web/lib/i18n";
@@ -121,9 +121,9 @@ function plannedChanges({ d, edited, setpoint, mode, fan, isShowMode, isShowFan 
 interface Outcome { text: string; isOk: boolean; undo?: UnitAction[] }
 
 /** Pins this AC to the Overview (IR814): an AC checked often is one tap from the first screen. */
-function PinButton({ id }: Readonly<{ id: string }>) {
+function PinButton({ id, initial }: Readonly<{ id: string; initial: string[] }>) {
   const t = useT();
-  const [pins, toggle] = usePinnedUnits();
+  const [pins, toggle] = usePins(initial);
   const isPinned = pins.includes(id);
   return <Btn size="sm" variant="ghost" aria-pressed={isPinned} onClick={() => { toggle(id); }}><Icon name="star" className={isPinned ? "fill-current text-warn" : undefined} />{t(isPinned ? "Pinned to Overview" : "Pin to Overview")}</Btn>;
 }
@@ -241,7 +241,8 @@ function AttachPolicyModal({ unitId, name, available, preset, onClose, onAttach 
   );
 }
 
-export function UnitView({ id, detail, room: roomRows, policies, defaults = null, history = NO_COMMANDS, restrictionHref = null, nowMs = 0, me }: Readonly<{ id: string; detail?: ApiUnitDetail; room?: UnitRow[]; policies?: PolicyOption[]; defaults?: { on: number; n: number } | null; history?: ApiCommand[]; restrictionHref?: string | null; nowMs?: number; me?: string }>) {
+const NO_PINS: string[] = [];
+export function UnitView({ id, detail, room: roomRows, policies, defaults = null, history = NO_COMMANDS, restrictionHref = null, nowMs = 0, me, pins = NO_PINS }: Readonly<{ id: string; detail?: ApiUnitDetail; room?: UnitRow[]; policies?: PolicyOption[]; defaults?: { on: number; n: number } | null; history?: ApiCommand[]; restrictionHref?: string | null; nowMs?: number; me?: string; pins?: string[] }>) {
   const t = useT();
   const display = useDisplay();
   const toast = useToast();
@@ -424,7 +425,7 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
         <RoomDevicesCard id={id} d={d} rows={isApi ? roomUnits.data : siblings} />
 
         <div className="flex min-w-0 flex-col gap-4">
-          <Card title={unit.name} sub={isApi ? unit.loc : `${unit.loc} · ${unit.id}`} action={<span className="flex flex-wrap items-center justify-end gap-2"><PinButton id={unit.id} /><Btn size="sm" variant="ghost" onClick={() => { setRenaming(true); }}><Icon name="edit" />{t("Rename")}</Btn><PowerBadge s={unit.state} /><ConnBadge s={unit.conn} /></span>}>
+          <Card title={unit.name} sub={isApi ? unit.loc : `${unit.loc} · ${unit.id}`} action={<span className="flex flex-wrap items-center justify-end gap-2"><PinButton id={unit.id} initial={pins} /><Btn size="sm" variant="ghost" onClick={() => { setRenaming(true); }}><Icon name="edit" />{t("Rename")}</Btn><PowerBadge s={unit.state} /><ConnBadge s={unit.conn} /></span>}>
             {isOffline ? <Banner tone="warn">{t("This AC is offline. Remote actions are disabled until the connection returns. Last seen {when}.", { when: unit.obs })}</Banner> : (
               <div className="grid-fluid" style={{ ["--min" as string]: "160px" }}>
                 <Stat label={t("Room temperature (measured)")} value={room?.text ?? "—"} sub={room ? t("observed {at}", { at: room.at }) : t("no recent measurement")} />
