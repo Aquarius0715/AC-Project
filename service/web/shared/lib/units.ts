@@ -76,7 +76,7 @@ export function setsTemperature(cap: ApiUnitDetail["capabilities"] | null): bool
   return controlLayout(cap).temperature !== null;
 }
 
-export interface ApiCommand { id: string; action: CommandAction; status: "requested" | "sent" | "acknowledged" | "failed" | "expired" | "cancelled"; requestedAt: string; acknowledgedAt?: string | null; expiresAt?: string; failureCode: string | null; source?: string }
+export interface ApiCommand { id: string; action: CommandAction; status: "requested" | "sent" | "acknowledged" | "failed" | "expired" | "cancelled"; requestedAt: string; acknowledgedAt?: string | null; expiresAt?: string; failureCode: string | null; source?: string; actorMembershipId?: string }
 
 const en = translator("en");
 
@@ -114,10 +114,15 @@ export function actionText(a: CommandAction, t: T = en): string {
 const statusText: Record<ApiCommand["status"], string> = { requested: "requested", sent: "waiting for device", acknowledged: "acknowledged by device", failed: "failed", expired: "no device response (expired)", cancelled: "cancelled" };
 const sourceText: Record<string, string> = { automation: " · by an automation", restriction: " · by a restriction", diagnostic: " · technician test run" };
 
-/** One command history row: the sentence, its state and who sent it, and when it was requested (IR44 time). */
-export function historyRow(c: ApiCommand, t: T = en, display: Display = DEFAULT_DISPLAY) {
+/** One command history row: the sentence, its state and who sent it, and when it was requested (IR44 time). With the
+reader's membership (`me`), a command sent by hand says "by you" or "by someone else" (IR804): several people use one
+account, and the AC that changed by itself was often changed by another of them. No name is shown. */
+export function historyRow(c: ApiCommand, t: T = en, display: Display = DEFAULT_DISPLAY, me?: string) {
   const isBad = c.status === "failed" || c.status === "expired";
-  const by = (c.source ? textOf(sourceText, c.source, t) : undefined) ?? "";
+  const bySource = c.source ? textOf(sourceText, c.source, t) : undefined;
+  const who = c.actorMembershipId === me ? " · by you" : " · by someone else";
+  const byHand = me && c.actorMembershipId ? t(who) : "";
+  const by = bySource ?? byHand;
   return { id: c.id.slice(0, 8), text: `${actionText(c.action, t)} — ${t(statusText[c.status])}${c.failureCode && c.status === "failed" ? `: ${commandFailure(c.failureCode, t)}` : ""}${by}`, when: showTime(c.requestedAt, display), bad: isBad };
 }
 

@@ -1150,6 +1150,8 @@ export const ms: Record<string, string> = {
   "Also apply to {n} other ACs": "Gunakan juga pada {n} AC lain",
   "All ACs in {property} ({n})": "Semua AC di {property} ({n})",
   "Every chosen AC gets the same actions; only actions all of them support are offered. Up to {max} ACs per automation.": "Setiap AC yang dipilih mendapat tindakan yang sama; hanya tindakan yang disokong oleh semuanya ditawarkan. Sehingga {max} AC bagi setiap automasi.",
+  " · by you": " · oleh anda",
+  " · by someone else": " · oleh orang lain",
   "Group change finished — results are shown per AC": "Perubahan kumpulan selesai — keputusan dipaparkan bagi setiap AC",
   "{n} selected": "{n} dipilih",
   "Select all online ({n})": "Pilih semua dalam talian ({n})",
