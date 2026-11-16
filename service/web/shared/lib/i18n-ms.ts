@@ -1144,6 +1144,7 @@ export const ms: Record<string, string> = {
   "Waiting for the AC to confirm… The result shows only after it acknowledges.": "Menunggu AC mengesahkan… Keputusan dipaparkan hanya selepas ia mengakui.",
   "{s} s left": "tinggal {s} s",
   "No answer yet — checking the result…": "Belum ada jawapan — menyemak keputusan…",
+  "{celsius}°C is very cold for cooling: a lower setting does not cool the room faster, it runs longer and uses more power. 24–26°C is a common comfortable range.": "{celsius}°C sangat sejuk untuk penyejukan: tetapan lebih rendah tidak menyejukkan bilik lebih cepat, ia berjalan lebih lama dan menggunakan lebih banyak kuasa. 24–26°C ialah julat selesa yang biasa.",
   "Group change finished — results are shown per AC": "Perubahan kumpulan selesai — keputusan dipaparkan bagi setiap AC",
   "{n} selected": "{n} dipilih",
   "Select all online ({n})": "Pilih semua dalam talian ({n})",
