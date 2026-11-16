@@ -10690,3 +10690,12 @@ Found in the UI/UX loop (UX-54, HQ anomaly response). The Overview tile "Unresol
 1. **Filter.** The severity select of the alerts tab adds "Severity: Critical & warning" (`severity=attention`). `alerts.list` takes a single severity, so with this value the page reads without one and leaves out the `normal` rows. The status tiles and the list follow.
 2. **Link.** `overviewLinks().alerts` is `/admin/alerts?severity=attention`, so the tile's 4 is the list's Open 4.
 3. **Docs and tests.** DD-A05 step 5. `adminSummary.test.ts` checks the link.
+
+## IR809 The unit page shows others' changes without a reload — 2026-11-16
+
+Found in the UI/UX loop (UX-56, criterion 14: several users at once). The customer unit page read its data once, so a change by another user, an automation or the device showed only after a manual reload. No page in the four apps re-read by itself.
+
+1. **Hook.** `useAutoRefresh(enabled, seconds = 30)` (shared/lib/useAutoRefresh.ts) calls `router.refresh()` at the interval while enabled. It skips ticks while the tab is hidden.
+2. **Unit page.** `LiveNote` enables it unless the user is busy: a setting edited and not sent, the confirmation, the power confirmation, rename or attach dialog open, or a command being awaited. A newer device report resets the controls (the "adjust state during render" sync), so re-reading then would lose the user's change. The header card says which state it is in.
+3. **Tests.** `useAutoRefresh.test.tsx` uses fake timers: it refreshes at each interval, never while paused, stops when paused again, and skips hidden ticks.
+4. **Load.** One server render per open unit page every 30 s.
