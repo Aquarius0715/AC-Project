@@ -1128,6 +1128,8 @@ export const id: Record<string, string> = {
   "Updates paused while you change settings.": "Pembaruan dijeda selama Anda mengubah setelan.",
   "{celsius}°C is very cold for cooling: a lower setting does not cool the room faster, it runs longer and uses more power. 24–26°C is a common comfortable range.": "{celsius}°C sangat dingin untuk pendinginan: setelan lebih rendah tidak mendinginkan ruangan lebih cepat, AC berjalan lebih lama dan memakai lebih banyak daya. 24–26°C adalah rentang nyaman yang umum.",
   "Undo": "Urungkan",
+  "Switch off after hours": "Matikan setelah jam kerja",
+  "Turn these off automatically every weekday…": "Matikan ini otomatis setiap hari kerja…",
   "Group change finished — results are shown per AC": "Perubahan grup selesai — hasil ditampilkan per AC",
   "{n} selected": "{n} dipilih",
   "Select all online ({n})": "Pilih semua yang online ({n})",
