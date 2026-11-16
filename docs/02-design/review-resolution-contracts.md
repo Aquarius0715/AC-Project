@@ -10864,3 +10864,15 @@ The payment of an invoice was the demo provider only (`payments.simulate`). DEC-
 11. **Demo events closed with Stripe.** `payments.simulate` carried `client:self:demo-event-only`, but the authorization engine never enforced that qualifier: any customer could start and confirm a demo payment of an own invoice, and the invoice was paid with no money moving. With a Stripe key configured the core now refuses the customer's demo events (initiate, processing, confirm, fail: FORBIDDEN); instructions still show. Without a key the demo path is unchanged, for the demo environment only.
 12. **Customer app.** `PAYMENT_PROVIDER=stripe` (compose, `.env.local.example`; default `demo`, any case) makes Pay call `payments.startCheckout` and open the hosted page; the demo banner and the demo provider buttons are off in that mode. While a Stripe payment waits for its webhook the page re-reads itself every 5 seconds and offers to start again; a cancelled return says nothing was charged; history and results name the way as Stripe Checkout and an expired attempt as Expired. Texts in ms, ja and id.
 13. **Not done.** The endpoint registration in Stripe's dashboard for the deployed environments (the six events, its own signing secret), the review of the new ms/ja/id texts (drafts), the Figma boards (the payment states of SCR-C11 and the operation count on boards 01/02/03/06/08), and the deployment (no deploy was made).
+
+## IR828 Stripe test mode in the shared test environment (DEC-68, DEC-93) — 2026-11-17
+
+IR827 left the shared test environment on the demo payments: its environment file has no Stripe values, and the lab server cannot be reached from the internet, so Stripe could not deliver its webhooks there.
+
+1. **Switch.** `deploy/test/deploy.sh` turns Stripe on when the environment file sets `STRIPE_SECRET_KEY`: it adds the compose profile `stripe` (the Stripe CLI, `restart: unless-stopped` in `compose.test.yaml`), which forwards the six events billing handles to `gateway:8080/stripe`. It sets `STRIPE_API_BASE=https://api.stripe.com` and `PAYMENT_PROVIDER=stripe` unless the file names them.
+2. **Refusal first.** A key without `STRIPE_WEBHOOK_SECRET` stops the deployment at its first step with the reason (the billing service would refuse to start anyway).
+3. **Off again.** Without the key, `leave_out` removes a Stripe CLI container left from an earlier deployment, as it does for the mock fleet.
+4. **Secrets.** The workflow masks both values by name (`*_KEY`, `*SECRET`, IR733).
+5. **Checked.** `compose()` and the refusal were run with a stub `docker` for four files: none (demo), key and secret, key alone (refused), and a file that names its own API base and provider; the merged compose configuration gives the CLI its restart policy and the edge network.
+6. **Not done.** Setting the values in the Environment `test` secret or `~/ac-test/env`, and a deployment: both are the user's step.
+
