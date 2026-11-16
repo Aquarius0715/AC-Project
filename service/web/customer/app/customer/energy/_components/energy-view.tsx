@@ -5,7 +5,7 @@ import { Badge, BarChart, Banner, Btn, Card, Check, Choice, DataTable, DemoBadge
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { klLocal, one, type SummaryView } from "@ac/web/lib/energy";
-import type { CompareRow, Period, PeriodKind } from "@ac/web/lib/clientEnergy";
+import type { CompareRow, Period, PeriodKind, UseRow } from "@ac/web/lib/clientEnergy";
 import { intlTag, LOCALES } from "@ac/web/lib/i18n";
 import { useLocale, useT } from "@ac/web/components/I18n";
 import { exportReport, type ReportFile, type ReportInput } from "../actions";
@@ -17,7 +17,7 @@ import { DateTimeSelect } from "@ac/web/components/TimeSelect";
 export interface EnergyLive {
   units: { id: string; name: string }[]; unitIds: string[]; period: Period; baselines: { id: string; label: string }[]; baselineId: string | null;
   summary: SummaryView | null; raw?: { kWh: number | null; baseline: number | null; tariff: string; factor: string | null; coverage: number | null };
-  daily: { label: string; actual: number | null; baseline: number | null }[]; compare: { rows: CompareRow[]; series: number[][] | null } | null;
+  daily: { label: string; actual: number | null; baseline: number | null }[]; top: UseRow[]; compare: { rows: CompareRow[]; series: number[][] | null } | null;
   properties: { id: string; name: string }[]; prefs: { locale: string; timezone: string; monthlyReportEmail: boolean } | null; lastMonth: string; query: string; error?: string;
 }
 const colors = ["#005bea", "#f59e0b", "#10b981", "#8b5cf6"];
@@ -130,6 +130,7 @@ export function EnergyView({ live }: Readonly<{ live: EnergyLive }>) {
           {s.warnings.length > 0 && <div className="mt-3"><Banner tone="warn">{s.warnings.join(" · ")}</Banner></div>}
           <details className="mt-3 text-[12px]"><summary className="cursor-pointer font-semibold text-muted-foreground">{t("Calculation conditions")}</summary><div className="mt-2"><SummaryList items={s.conditions} /></div></details>
         </Card>
+        <TopUsers live={live} show={(id) => { setUnits([id]); }} add={(id) => { setUnits([...live.unitIds, id]); }} />
         <Card title={t("Carbon impact")} sub={t("Same period & units as above · {factor}", { factor: r.factor ?? t("emission factor missing") })} action={<LinkButton size="sm" href={`/customer/energy/offsets?${live.query}`}>{t("Offset these emissions")}<Icon name="arrowRight" /></LinkButton>}>
           <div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>
             <div><div className="text-xs text-muted-foreground">{t("Estimated emissions")}</div><div className="text-2xl font-bold">{s.emissions}</div><div className="text-[11px] text-muted-foreground">{r.kWh === null ? t("no valid readings") : t("{kWh} kWh actual × factor", { kWh: one(r.kWh) })}</div></div>
@@ -141,6 +142,33 @@ export function EnergyView({ live }: Readonly<{ live: EnergyLive }>) {
       </>}
       {exporting && <ExportModal live={live} onClose={() => { setExporting(false); }} />}
     </Page>
+  );
+}
+
+const percent = (x: number | null) => (x === null ? "—" : `${String(Math.round(x * 100))}%`);
+/** The ACs that used the most in the period (IR803): where to look first when energy or cost is high. Show opens one AC
+in the charts above; Compare adds it to the selection (up to four). */
+function TopUsers({ live, show, add }: Readonly<{ live: EnergyLive; show: (id: string) => void; add: (id: string) => void }>) {
+  const t = useT();
+  if (live.top.length < 2) return null;
+  const isFull = live.unitIds.length >= 4;
+  return (
+    <Card title={t("Highest use in this period")} sub={t("All your ACs, by measured energy — start a review with the top ones")}>
+      <DataTable<UseRow> rowKey={(r) => r.unitId} rows={live.top} cols={[
+        { key: "n", label: t("AC"), render: (r) => <b>{r.name}</b> },
+        { key: "k", label: t("Energy"), render: (r) => `${one(r.kWh)} kWh` },
+        { key: "s", label: t("Share of measured"), render: (r) => percent(r.share) },
+        { key: "c", label: t("Data coverage"), render: (r) => <span className={r.coverage !== null && r.coverage < 0.8 ? "text-warn" : undefined}>{percent(r.coverage)}</span> },
+        { key: "a", label: "", render: (r) => {
+          const isShown = live.unitIds.includes(r.unitId);
+          return <span className="flex gap-2">
+            <Btn size="sm" disabled={isShown && live.unitIds.length === 1} onClick={() => { show(r.unitId); }}>{t("Show")}</Btn>
+            {!isShown && !isFull && <Btn size="sm" variant="ghost" onClick={() => { add(r.unitId); }}>{t("Compare")}</Btn>}
+          </span>;
+        } },
+      ]} />
+      <p className="mt-2 text-[11px] text-muted-foreground">{t("Low coverage means missing readings: that AC may have used more than shown.")}</p>
+    </Card>
   );
 }
 

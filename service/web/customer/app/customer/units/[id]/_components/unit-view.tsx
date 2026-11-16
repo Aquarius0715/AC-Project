@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Badge, Banner, Btn, Card, Check, ConnBadge, EmptyState, LinkButton, Modal, Page, PowerBadge, Stat, SummaryList, Toggle, cx, useToast, Choice } from "@ac/web/components/ui";
 import { units, unitRowFromApi, type UnitRow } from "@ac/web/lib/client";
 import { OpError } from "@ac/web/lib/ops";
+import { AUTO_REFRESH_SECONDS, useAutoRefresh } from "@ac/web/lib/useAutoRefresh";
 import { answerSeconds, controlLayout, coolingHint, undoActions, FAN_LABEL, historyRow, latest, MODE_LABEL, type ApiCommand, type ApiUnitDetail, type UnitAction } from "@ac/web/lib/units";
 import { followCommand } from "@ac/web/lib/unitCommands";
 import { byCount, showRecent, showTime, textOf } from "@ac/web/lib/i18n";
@@ -117,6 +118,16 @@ function plannedChanges({ d, edited, setpoint, mode, fan, isShowMode, isShowFan 
 /** what the last send came to: the command history line, and whether the AC took it */
 /** undo: the commands that put back the last send (IR810), offered once it was fully confirmed */
 interface Outcome { text: string; isOk: boolean; undo?: UnitAction[] }
+
+/** Others' changes (another user, an automation, the device) appear without a reload (IR809): the page re-reads every
+30 s, except while the user edits, has a dialog open or waits for a command (`busy`), as a newer report resets the
+controls. The note says which of the two it is doing. */
+function LiveNote({ busy }: Readonly<{ busy: boolean[] }>) {
+  const t = useT();
+  const isIdle = !busy.some(Boolean);
+  useAutoRefresh(isIdle);
+  return <p className="mt-2 text-[11px] text-muted-foreground">{t(isIdle ? "Updates every {s} s while this page is open — changes by others show here." : "Updates paused while you change settings.", { s: AUTO_REFRESH_SECONDS })}</p>;
+}
 
 /** Waiting for the device, with the seconds it has left (IR806): "fails after 30 s" with nothing moving read as a hang,
 and the countdown shows it is still in time. It counts on the browser's clock from the moment it appears, as the
@@ -412,6 +423,7 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
                 <Stat label={t("Humidity")} value={hum?.text ?? "—"} sub={hum ? t("observed {at}", { at: hum.at }) : t("no recent measurement")} />
               </div>
             )}
+            {d && <LiveNote busy={[Object.keys(edited).length > 0, confirm, powerAsk !== null, waiting, renaming, attachOpen]} />}
           </Card>
           <RestrictionBanners isBlocked={isBlocked} policy={policy} isRestricted={isRestricted} min={min} href={d ? restrictionHref ?? "/customer/payments" : "/customer/payments/invoice-overdue-a?tab=restriction"} offHref={restrictionHref ?? "/customer/payments"} />
           <RemoteControlCard

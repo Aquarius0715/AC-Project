@@ -1,6 +1,6 @@
 {
   "version": "0.210.0",
-  "spec_baseline_id": "c00cb71ce30a0568c5fcf9570d38eb012c23e13f1360851bd0a7f02c02baddaa",
+  "spec_baseline_id": "58cc541bc1aa29826daa8db8e7d376ad28cb204c99a2d132926a0627bba4d4ce",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
@@ -98,7 +98,7 @@
     },
     {
       "path": "02-design/admin.md",
-      "sha256": "455e31088c9c3cd4a1eedc591ff4303433ba626939aa0ff004518af504cbc452"
+      "sha256": "3bc54f009254583b989a0f14add0d54c320e277bfb62dd2f299830ddfa7adf81"
     },
     {
       "path": "02-design/api/swagger.json",
@@ -114,7 +114,7 @@
     },
     {
       "path": "02-design/client.md",
-      "sha256": "57920df906a2f032718bf77d40fbd9c5348c92978116c2a10e32f47979210af5"
+      "sha256": "1d36440751b509ec472a97c5ff863432f4bc624003a9bcf9ab34fbb390f9375c"
     },
     {
       "path": "02-design/common.md",
@@ -170,7 +170,7 @@
     },
     {
       "path": "02-design/review-resolution-contracts.md",
-      "sha256": "834f508164eeeb7edcde275af4e1ce5c8306628f2353a7a529105716ba942c34"
+      "sha256": "388563283c210c468ae27fe342057629a9271585376e6f7a10807e0ddc7047a9"
     },
     {
       "path": "02-design/service-contracts.ts",
@@ -190,7 +190,7 @@
     },
     {
       "path": "03-uiux/UIUXSpecification.md",
-      "sha256": "9d1d8a2cd4909d36c713538be799815117a6038691752a47b5b47cf17169df70"
+      "sha256": "8efdced13ab26ae200b05be878f281ef6748515d1276a7df56ec8578929bf18f"
     },
     {
       "path": "03-uiux/component-contracts.csv",
@@ -198,7 +198,7 @@
     },
     {
       "path": "03-uiux/screen-catalog.csv",
-      "sha256": "2693d675548c82ca281ec91b31cb0859cc4c1d00f0ee903a571969e515b29726"
+      "sha256": "974b766684bc76214309022d75869a5e95477fb8be52bf60a3c80d703f331a13"
     },
     {
       "path": "04-agentic-sdlc/README.md",
@@ -298,7 +298,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "e55d3de01677c1e42f39c6ec6d70dfff69e75ebcc1e55325e26b7a93053991dc"
+      "sha256": "8e7731038b7e5813eb86e15b8ffc98c85e1346df3091333c70df34a556a6af04"
     },
     {
       "path": "tools/check_review_regressions.py",

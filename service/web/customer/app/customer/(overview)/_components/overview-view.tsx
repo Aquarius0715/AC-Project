@@ -110,8 +110,9 @@ export function OverviewView({ live }: Readonly<{ live: OverviewLive }>) {
               <Link key={u.id} href={`/customer/units/${u.id}`} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-2 py-3 hover:bg-surface2/50 lg:grid-cols-[minmax(0,1fr)_72px_72px_72px_120px_14px]">
                 <div className="flex min-w-0 items-center gap-2.5"><span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-primary-soft text-primary"><Icon name="units" /></span><div className="min-w-0"><div className="truncate font-bold">{u.name}</div><div className="truncate text-[11px] text-muted-foreground">{u.place ? `${u.place} · ` : ""}{u.observed}</div></div></div>
                 <div className="col-span-2 row-start-2 flex gap-4 text-xs lg:contents">
-                  {([[u.temp, "°C"], [u.hum, "%"], [u.power, "W"]] as const).map(([v, unit], i) => (
-                      <div key={i}><span className="text-[13px] font-bold">{v ?? "—"}</span> <span className="text-[11px] text-muted-foreground">{v === null ? t("no data") : unit}</span></div>
+                  {/* below lg the column headings are hidden, so each reading names itself ("— no data" three times said nothing; UI/UX loop R8) */}
+                  {([[u.temp, "°C", "Room temp"], [u.hum, "%", "Humidity"], [u.power, "W", "Power now"]] as const).map(([v, unit, label]) => (
+                      <div key={label}><span className="block text-[10px] text-muted-foreground lg:hidden">{t(label)}</span><span className="text-[13px] font-bold">{v ?? "—"}</span> <span className="text-[11px] text-muted-foreground">{v === null ? t("no data") : unit}</span></div>
                     ))}
                 </div>
                 <div className="col-start-2 row-start-1 flex flex-col items-end gap-1 lg:col-auto lg:row-auto lg:items-start"><PowerBadge s={u.state} /><ConnBadge s={u.conn} /></div>
