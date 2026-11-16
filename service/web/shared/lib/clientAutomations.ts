@@ -383,6 +383,14 @@ export interface ActionGroup { id: "power" | "temp" | "mode" | "fan" | "vent"; g
 /** The actions a unit takes (DD-C05 “within unit capabilities”, the API's rule): the AC settings with control, and
 ventilation on a model with a fresh-air function (IR314). Grouped by the setting they change: the editor picks the
 setting first, then its value (`short` is the value alone, `label` the whole action). */
+/** The actions every chosen AC takes (IR802): one rule may control several ACs, and the API refuses an action one of
+them does not support, so only the actions all of them offer are listed. */
+export function commonActionOptions(cs: (Caps | null)[], t: T = en): ActionGroup[] {
+  const [first, ...rest] = cs.map((c) => actionOptions(c, t));
+  if (!first) return [];
+  const has = (groups: ActionGroup[], key: string) => groups.some((g) => g.options.some((o) => o.key === key));
+  return first.map((g) => ({ ...g, options: g.options.filter((o) => rest.every((r) => has(r, o.key))) })).filter((g) => g.options.length > 0);
+}
 export function actionOptions(c: Caps | null, t: T = en): ActionGroup[] {
   if (!c) return [];
   const temps: ActionGroup["options"] = [];
