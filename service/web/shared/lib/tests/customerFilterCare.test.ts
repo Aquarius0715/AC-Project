@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  cleaningSymptom, filterLines, filterRefusal, filterRow, reminderErrors, reminderForm, reminderInput, reminderLines,
+  cleaningSymptom, filterLines, filterRefusal, filterRow, overdueRows, reminderErrors, reminderForm, reminderInput, reminderLines,
   type ApiFilterSettings, type ApiFilterStatus, type FilterUnit,
 } from "@ac/web/lib/customerFilterCare";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
@@ -62,6 +62,10 @@ describe("customer filter care", () => {
     expect([sum?.title, sum?.place, sum?.run, sum?.pct, sum?.progress, sum?.badge, sum?.rows.length]).toStrictEqual([
       "Open office · 4 ACs", "Office A › Open office", "2 due soon · 1 offline", 72, "72 % of 250 h (average)", { label: "2 due", tone: "warn" }, 4,
     ]);
+    // the batch Request cleaning takes every overdue AC, folded groups included (UI/UX loop R140)
+    expect(overdueRows(lines).map((r) => r.unitId)).toStrictEqual(["m1"]);
+    const late = filterLines(items.map((x) => ({ ...x, status: "overdue" as const })), [unit("m1", { spaceId: "s-meet" }), unit("b1", { spaceId: null }), ...g.map((x) => x[1])], NOW);
+    expect(overdueRows(late).map((r) => r.unitId)).toStrictEqual(["m1", "o1", "o2", "o3", "o4", "b1"]);
   });
 
   it("writes the reminders and checks the dialog (AT-C18-E)", () => {

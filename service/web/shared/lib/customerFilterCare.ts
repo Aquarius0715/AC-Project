@@ -153,6 +153,10 @@ export function filterLines(items: ApiFilterStatus[], units: FilterUnit[], nowMs
 
 /** The symptom line of a cleaning request opened from the tab (New request prefilled, type preventive), in the
 display language — the client still edits it before sending. */
+/** Every AC whose filter is overdue, folded groups included, in the list's order: the batch Request cleaning (UI/UX loop
+R140, user decision 2026-11-16). */
+export const overdueRows = (lines: FilterLine[]): FilterRow[] => lines.flatMap((l) => (l.kind === "unit" ? [l.row] : l.group.rows)).filter((r) => r.state === "overdue");
+
 export const cleaningSymptom = (r: FilterRow, t: T = en) => {
   if (r.hours !== null) return t("Filter cleaning: {n} h of running since the last cleaning (reminder at {threshold} h).", { n: Math.round(r.hours), threshold: r.threshold });
   return r.days === null ? t("Filter cleaning: the filter is due for cleaning.") : t("Filter cleaning: {n} days since the last cleaning (reminder every {days} days).", { n: r.days, days: r.fallbackDays });
