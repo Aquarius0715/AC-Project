@@ -10732,6 +10732,17 @@ Found in the UI/UX loop (UX-64; noted in UX-47). On a phone the customer Overvie
 2. **Wider screens.** No change: the tile is in the first row there.
 3. **Docs.** DD-C01.
 
+## IR812 A demo event's evidence names its metric and comparison in words — 2026-11-16
+
+Found in the UI/UX loop (UX-59, HQ anomaly response; noted in UX-54). A policy rule's demo event is stored as "Demo event: heartbeat_gap gte threshold" (monitoring notifier). The alert detail and its activity showed it with the metric code and the comparison code. IR626 had worded the template but kept both values as stored.
+
+1. **Words.** `evidenceText` (shared/lib/evidence.ts) now reads the template as "Demo event: {metric} {operator} its alert threshold".
+   - The metric uses its alert name, for example Heartbeat gap or Temperature.
+   - The comparison reads above, at or above, below or at or below.
+   - All three are in the display language. An unknown metric or comparison keeps its stored form.
+2. **Shared names.** The metric names moved from adminAlerts.ts to `metricLabels.ts`. evidence.ts reads them there, because adminAlerts imports evidence. adminAlerts re-exports them, so nothing else changes.
+3. **Tests.** `evidence.test.ts` checks the Malay text for temperature and the English one for heartbeat_gap.
+
 ## IR814 Pin ACs to the Overview — 2026-11-16
 
 Found in the UI/UX loop (UX-61, criterion 7: find the AC quickly; "favourites"). A customer who checks the same two or three ACs every day had to find them each time: Overview → Units & locations → the property → the room → the AC.

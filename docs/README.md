@@ -101,6 +101,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
 0.656.0 (2026-11-16): IR813: an alert's Book cleaning opens Filter care on that AC.
+0.655.0 (2026-11-16): IR812: a demo alert's evidence names its metric and comparison in words (Heartbeat gap at or above its alert threshold).
 0.654.0 (2026-11-16): IR811: from Turn off running ACs, one link opens an after-hours rule with the same ACs.
 0.657.0 (2026-11-16): IR814: a customer pins ACs to the Overview from their pages (this browser only).
 0.658.0 (2026-11-16): IR815: Energy & cost opens on the AC that used the most in the period.

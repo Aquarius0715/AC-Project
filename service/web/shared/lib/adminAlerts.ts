@@ -12,6 +12,7 @@ import { byNumber, byText } from "@ac/web/lib/order";
 import { filled } from "@ac/web/lib/filled";
 import { wrapped } from "@ac/web/lib/text";
 import { entryOf, lookup } from "@ac/web/lib/lookup";
+import { metricName } from "@ac/web/lib/metricLabels";
 
 const TEMPERATURE = "temperature";
 const DEFAULT_ALERT = "default_alert";
@@ -75,13 +76,7 @@ export interface AdminPolicy {
   rules: DefaultRule[]; settings: RuleSettingRow[];
 }
 
-export const metricLabel: Record<string, string> = {
-  temperature: "Temperature", humidity: "Humidity", co2: "CO₂ (ppm)", pm25: "PM2.5", power: "Power", vibration: "Vibration",
-  refrigerant_pressure: "Refrigerant pressure", compressor_cycles: "Compressor cycles", airflow_drop: "Airflow drop", heartbeat_gap: "Heartbeat gap",
-};
-/** The metric's name where its value or the condition writes the unit (chart chips, "CO₂ ≥ 1200 ppm"): metricLabel
-without the "(ppm)" that a metric picker shows (UI/UX loop R135). */
-export const metricName: Record<string, string> = { ...metricLabel, co2: "CO₂" };
+export { metricLabel, metricName } from "@ac/web/lib/metricLabels";
 export const metricUnit: Record<string, string> = { temperature: "°C", humidity: "%", co2: "ppm", pm25: "µg/m³", power: "kW", vibration: "mm/s", refrigerant_pressure: "kPa", compressor_cycles: "cycles/h", airflow_drop: "%", heartbeat_gap: "min" };
 export const opSymbol: Record<Operator, string> = { gt: ">", gte: "≥", lt: "<", lte: "≤" };
 /** The metrics an HQ alert policy may watch (IR66 item 3, the Core API's hqMetrics); default rules have their own. */
