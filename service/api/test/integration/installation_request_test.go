@@ -134,7 +134,7 @@ func TestInstallationRequests(t *testing.T) {
 		t.Error("another customer sees the request")
 	}
 
-	// HQ links jobs: a client cannot, and a request takes at most quantity unfinished jobs
+	// HQ links jobs: a client cannot, and a request takes at most quantity non-cancelled jobs
 	code, res = write(
 		srv,
 		customerA(),

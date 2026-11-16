@@ -731,8 +731,7 @@ func (m InstallationRequests) decide(
 
 // checkRequestLink applies DEC-107 to a new installation job made for a request: only HQ links a request, the request
 // is submitted or approved and of the unit's customer, and fewer non-cancelled jobs (completed ones count) than its
-// quantity belong to it. The
-// request row is locked so two jobs made at once cannot pass the count together.
+// quantity belong to it. The request row is locked so two jobs made at once cannot pass the count together.
 func checkRequestLink(
 	ctx context.Context,
 	call *ops.Call,

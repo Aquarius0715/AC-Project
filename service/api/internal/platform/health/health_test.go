@@ -33,8 +33,9 @@ func serve(t *testing.T, status int) string {
 	return parsed.Port()
 }
 
-// freePort returns a port that nothing listens on.
-func freePort(t *testing.T) string {
+// hangUp returns the port of a listener that closes every connection before answering (the port stays taken for the
+// test, so no other process can answer on it).
+func hangUp(t *testing.T) string {
 	t.Helper()
 
 	var config net.ListenConfig
@@ -44,12 +45,20 @@ func freePort(t *testing.T) string {
 		t.Fatal(err)
 	}
 
-	_, port, err := net.SplitHostPort(listener.Addr().String())
-	if err != nil {
-		t.Fatal(err)
-	}
+	t.Cleanup(func() { _ = listener.Close() })
 
-	err = listener.Close()
+	go func() {
+		for {
+			conn, acceptErr := listener.Accept()
+			if acceptErr != nil {
+				return
+			}
+
+			_ = conn.Close()
+		}
+	}()
+
+	_, port, err := net.SplitHostPort(listener.Addr().String())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,7 +71,7 @@ func TestCheck(t *testing.T) {
 
 	healthy := serve(t, http.StatusOK)
 	failing := serve(t, http.StatusServiceUnavailable)
-	gone := freePort(t)
+	gone := hangUp(t)
 
 	cases := []struct {
 		name string
@@ -72,7 +81,7 @@ func TestCheck(t *testing.T) {
 		{"port only, 200", ":" + healthy, 0},
 		{"host and port, 200", "0.0.0.0:" + healthy, 0},
 		{"503", ":" + failing, 1},
-		{"nothing listening", ":" + gone, 1},
+		{"no answer", ":" + gone, 1},
 		{"no port", "8080", 1},
 		{"empty port", "localhost:", 1},
 	}
