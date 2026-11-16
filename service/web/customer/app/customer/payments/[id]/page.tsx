@@ -17,6 +17,7 @@ import {
   type ClientContract, type ClientPayment,
 } from "@ac/web/lib/clientBilling";
 import { InvoiceDemo } from "./_components/invoice-demo";
+import { demoInvoice } from "../_lib/demo-contracts";
 import { InvoiceView, type InvoiceLive } from "./_components/invoice-view";
 import { queryReader } from "@ac/web/lib/searchParams";
 import { orNull } from "@ac/web/lib/promises";
@@ -35,7 +36,11 @@ export default async function CustomerInvoicePage({ params, searchParams }: Read
   const sp = await searchParams;
   const one = queryReader(sp);
   await connection();
-  if (!apiMode()) return <InvoiceDemo id={id} tab={one("tab")} />;
+  if (!apiMode()) {
+    const demo = demoInvoice(id);
+    if (!demo) notFound();
+    return <InvoiceDemo invoice={demo.invoice} contract={demo.contract} tab={one("tab")} />;
+  }
   let inv: ApiInvoiceDetail & { createdAt: string; paymentRefs: ClientPayment[] };
   try {
     inv = await coreOp("invoices.get", { id });
