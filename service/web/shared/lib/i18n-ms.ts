@@ -488,6 +488,7 @@ export const ms: Record<string, string> = {
   "Open {title}": "Buka {title}",
   "Severity": "Tahap",
   "Severity: All": "Tahap: Semua",
+  "Severity: Critical & warning": "Tahap: Kritikal & peringatan",
   "Severity: Critical": "Tahap: Kritikal",
   "Severity: Warning": "Tahap: Peringatan",
   "Unit: All units": "Unit: Semua unit",

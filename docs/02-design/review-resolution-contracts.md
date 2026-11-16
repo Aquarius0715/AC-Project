@@ -10682,3 +10682,11 @@ Found in the UI/UX loop (UX-52, a contractor coordinator on a phone). Below a br
 1. **Partner Jobs list.** Below `@3xl`, the Technician and Slot / deadline values carry their heading above them, the same words as the hidden column headings.
 2. **Customer Overview.** Below `lg`, the three readings carry Room temp, Humidity and Power now.
 3. **Wide screens** are unchanged: the labels hide where the headings show. These were the only two lists of the four apps that hide headings this way (searched for `hidden grid-cols-[` headings).
+
+## IR807 HQ's Unresolved alerts tile opens the alerts it counts — 2026-11-16
+
+Found in the UI/UX loop (UX-54, HQ anomaly response). The Overview tile "Unresolved alerts 4 · open or acknowledged · critical and warning" linked to `/admin/alerts`. That list opened on every open alert, 19 of them: the four warnings plus 15 filter-cleaning reminders (info). The count and the list disagreed, and the dispatcher had to filter by hand.
+
+1. **Filter.** The severity select of the alerts tab adds "Severity: Critical & warning" (`severity=attention`). `alerts.list` takes a single severity, so with this value the page reads without one and leaves out the `normal` rows. The status tiles and the list follow.
+2. **Link.** `overviewLinks().alerts` is `/admin/alerts?severity=attention`, so the tile's 4 is the list's Open 4.
+3. **Docs and tests.** DD-A05 step 5. `adminSummary.test.ts` checks the link.

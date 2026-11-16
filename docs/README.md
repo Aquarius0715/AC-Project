@@ -107,6 +107,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 0.645.0 (2026-11-16): IR802: one automation can switch several ACs (Also apply to other ACs, All ACs in a property), offering only the actions all of them take.
 0.648.0 (2026-11-16): IR805: on a phone, the partner Jobs cards and the customer Overview rows name each value.
 0.647.0 (2026-11-16): IR804: the customer's command history says whether you or someone else sent each command.
+0.650.0 (2026-11-16): IR807: HQ's Unresolved alerts tile opens its list on critical and warning alerts, so the counts agree.
 0.649.0 (2026-11-16): IR806: waiting for the AC to confirm a command counts down the seconds it has left.
 0.651.0 (2026-11-16): IR808: a cooling setpoint below 22 °C gets a hint that a lower setting only uses more power.
 0.653.0 (2026-11-16): IR810: after a confirmed change, the customer unit page offers Undo, which puts back the previous confirmed setting.
