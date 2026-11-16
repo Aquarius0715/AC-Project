@@ -117,7 +117,8 @@ function plannedChanges({ d, edited, setpoint, mode, fan, isShowMode, isShowFan 
 interface RemoteControlProps {
   isControllable: boolean; temperatureRange: { min: number; max: number; step: number } | null; cap: { min: number; max: number; step: number };
   setpoint: number; min: number; max: number; confirmed: number | string;
-  isOn: boolean; isDisabled: boolean; isOffline: boolean; waiting: boolean; isPowerOff: boolean;
+  /** isPowerUnknown: no fresh power signal, so the switch shows off and says so (the header badge reads Power unknown) */
+  isOn: boolean; isPowerUnknown: boolean; isDisabled: boolean; isOffline: boolean; waiting: boolean; isPowerOff: boolean;
   /** the modes and fan levels the model offers; an empty list hides the choice */
   modes: readonly (ControlMode)[]; mode: ControlMode; fans: readonly (FanLevel)[]; fan: FanLevel;
   /** the changes to review before sending; null for a model that sends the power at once (Figma 02o) */
@@ -140,13 +141,13 @@ function PowerConfirm({ power, name, where, onCancel, onSend }: Readonly<{ power
 /** The remote control card: the power, the setpoint, the mode and the fan, and the review of what will be sent. */
 function RemoteControlCard(p: Readonly<RemoteControlProps>) {
   const t = useT();
-  const { isControllable, temperatureRange, cap, setpoint, min, max, confirmed, isOn, isDisabled, isOffline, waiting, isPowerOff, modes, mode, fans, fan, review } = p;
+  const { isControllable, temperatureRange, cap, setpoint, min, max, confirmed, isOn, isPowerUnknown, isDisabled, isOffline, waiting, isPowerOff, modes, mode, fans, fan, review } = p;
   const isPowerLocked = isDisabled || waiting || isPowerOff;
   return (
     <Card title={t("REMOTE CONTROL")} sub={t(isControllable ? "Controls apply to this AC only; you confirm before sending" : "No remote control on this model")}>
       {isControllable ? (
       <div className="flex flex-col gap-4">
-        <div className="flex flex-wrap items-center justify-between gap-2"><div><div className="font-semibold">{t("Power")}</div><div className="text-xs text-muted-foreground">{t("Sent as its own command")}</div></div><Toggle on={isOn} disabled={isPowerLocked} onChange={(v) => { if (!isPowerLocked) p.onPower(v); }} label={t("Power")} /></div>
+        <div className="flex flex-wrap items-center justify-between gap-2"><div><div className="font-semibold">{t("Power")}</div><div className="text-xs text-muted-foreground">{t(isPowerUnknown ? "Current power unknown · switching sends that command" : "Sent as its own command")}</div></div><Toggle on={isOn} disabled={isPowerLocked} onChange={(v) => { if (!isPowerLocked) p.onPower(v); }} label={t("Power")} /></div>
         {temperatureRange && <div className="flex flex-wrap items-center justify-between gap-2">
           <div><div className="font-semibold">{t("Set temperature")}</div><div className="text-xs text-muted-foreground">{t("{min}–{max}°C · step {step}°C · confirmed {confirmed}°C", { min, max, confirmed, step: cap.step })}</div></div>
           <div className="flex items-center gap-2"><Btn disabled={isDisabled || setpoint - cap.step < min} onClick={() => { p.onStep(-cap.step); }} aria-label={t("Lower the temperature")}><Icon name="remove" /></Btn><span className="w-14 text-center text-lg font-bold">{setpoint}°C</span><Btn disabled={isDisabled || setpoint + cap.step > max} onClick={() => { p.onStep(cap.step); }} aria-label={t("Raise the temperature")}><Icon name="add" /></Btn></div>
@@ -222,7 +223,9 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
   const [picked, setPicked] = useState<string[]>([]);
   const [waiting, setWaiting] = useState(false);
   const [mockOn, setMockOn] = useState(unit.state === "running");
-  const isOn = d ? d.observedState.power === true : mockOn;
+  // the same power state as the header badge: a stale “on” is not shown as on
+  const isOn = d ? d.effectivePowerState === "on" : mockOn;
+  const isPowerUnknown = d?.effectivePowerState === "unknown";
   const [sent, setSent] = useState<ApiCommand[]>([]);
   const [mockHist, setMockHist] = useState<CommandRow[]>([
     { id: "cmd-0230", text: "Set power ON", when: "09:15" },
@@ -346,7 +349,7 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
           <RestrictionBanners isBlocked={isBlocked} policy={policy} isRestricted={isRestricted} min={min} href={d ? restrictionHref ?? "/customer/payments" : "/customer/payments/invoice-overdue-a?tab=restriction"} offHref={restrictionHref ?? "/customer/payments"} />
           <RemoteControlCard
             isControllable={isControllable} temperatureRange={temperatureRange} cap={cap} setpoint={setpoint} min={min} max={max} confirmed={confirmed}
-            isOn={isOn} isDisabled={isDisabled} isOffline={isOffline} waiting={waiting} isPowerOff={policy?.kind === "power_off"}
+            isOn={isOn} isPowerUnknown={isPowerUnknown} isDisabled={isDisabled} isOffline={isOffline} waiting={waiting} isPowerOff={policy?.kind === "power_off"}
             modes={isShowMode ? modes : []} mode={mode} fans={isShowFan ? fans : []} fan={fan}
             review={layout.review ? { count: changeCount, summary: d ? changes().map((item) => changeText(item)).join(" · ") || t("No change yet") : t(SET_TEMPERATURE_FROM_C_TO_C, { from: 26, to: setpoint }), target: unit.name, canSend: d === null || changes().length > 0 } : null}
             repairHref={`/customer/maintenance?new=${d?.id ?? unit.id}`}

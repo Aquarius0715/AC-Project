@@ -188,6 +188,7 @@ export const id: Record<string, string> = {
   "Skip to main content": "Lompat ke konten utama",
   "Controls apply to this AC only; you confirm before sending": "Kontrol hanya berlaku untuk AC ini; Anda mengonfirmasi sebelum mengirim",
   "Power": "Daya",
+  "Current power unknown · switching sends that command": "Daya saat ini tidak diketahui · mengubahnya akan mengirim perintah itu",
   "Sent as its own command": "Dikirim sebagai perintah tersendiri",
   "Set temperature": "Atur suhu",
   "{min}–{max}°C · step {step}°C · confirmed {confirmed}°C": "{min}–{max}°C · langkah {step}°C · terkonfirmasi {confirmed}°C",
