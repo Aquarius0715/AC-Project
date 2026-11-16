@@ -36,6 +36,8 @@ export interface ApiJobEvent { id: string; jobId: string; actorUserId: string | 
 export interface PartnerJob {
   id: string; short: string; status: string; type: string; unit: string | null; address: string | null;
   slot: Slot | null; dueAt: string | null; offerExpiresAt: string | null; assignmentId: string | null; technicianId: string | null;
+  /** the delegation ended (a history row): only the company’s own decisions stay, the job is no longer its work */
+  isEnded?: boolean;
 }
 
 const KL_OFFSET = 8 * 3_600_000; // Asia/Kuala_Lumpur, no daylight saving
@@ -97,7 +99,7 @@ export function partnerJob(j: ApiPartnerJob, units: Map<string, string>): Partne
     return { id: j.jobId, short: j.jobId.slice(0, 8), status: j.status, type: j.type, unit: null, address: j.siteAddress, slot: firstSlot(j.candidateSlots), dueAt: j.dueAt, offerExpiresAt: j.status === "offered" ? j.offerExpiresAt : null, assignmentId: null, technicianId: null };
   }
   if (j.projection === "history") {
-    return { id: j.jobId, short: j.jobId.slice(0, 8), status: j.status, type: j.type, unit: null, address: null, slot: null, dueAt: null, offerExpiresAt: null, assignmentId: null, technicianId: null };
+    return { id: j.jobId, short: j.jobId.slice(0, 8), status: j.status, type: j.type, unit: null, address: null, slot: null, dueAt: null, offerExpiresAt: null, assignmentId: null, technicianId: null, isEnded: true };
   }
   return {
     id: j.id, short: j.id.slice(0, 8), status: j.status, type: j.type, unit: units.get(j.unitId) ?? null, address: null,
@@ -108,6 +110,8 @@ export function partnerJob(j: ApiPartnerJob, units: Map<string, string>): Partne
 export type Bucket = "offered" | "unassigned" | "active" | "overdue" | "review" | "completed" | "other";
 /** The progress bucket of a job: overdue is an assigned or started job whose work window has ended (IR89). */
 export function bucket(j: PartnerJob, now: number): Bucket {
+  // an open job whose delegation ended is not the company's work any more, as in summaries.activeCount (UI/UX loop R43)
+  if (j.isEnded && j.status !== "completed") return "other";
   switch (j.status) {
     case "offered": {
       return "offered";
