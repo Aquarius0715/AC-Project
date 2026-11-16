@@ -1391,6 +1391,9 @@ type listFilters struct {
 	ProposalPending *bool        `json:"proposalPending,omitempty"`
 	// MaintenanceJob.type; offer and history rows match their public type (IR290)
 	Type *string `json:"type,omitempty"`
+	// CurrentOnly leaves out the history rows of jobs whose access ended, so a stage tab lists only the work the caller
+	// still holds (IR797)
+	CurrentOnly *bool `json:"currentOnly,omitempty"`
 }
 
 // Summary is JobSummary of service-contracts.ts.
@@ -1483,7 +1486,8 @@ func severityRank() map[string]int {
 //	@Description	Design: DD-A06, DD-C09, DD-P01, DD-P03, DD-P06, DD-T01, DD-T11, DD-T12, DD-P10, DD-P07, DD-T13, \
 //	@Description	DD-T02 · Query: filters \
 //	@Description	unitId,unitIds,status,severity,from,to,organizationId,membershipId,customerId,propertyId,statuses,\
-//	@Description	overdueOnly,origin,proposalPending,type · sort id,severity,dueAt,status (default status asc;id asc)
+//	@Description	overdueOnly,origin,proposalPending,type,currentOnly · sort id,severity,dueAt,status (default status \
+//	@Description	asc;id asc)
 //	@Tags			jobs
 //	@Accept			json
 //	@Produce		json
@@ -1505,6 +1509,7 @@ func severityRank() map[string]int {
 //	@Param			origin			query		string		false	"filter"
 //	@Param			proposalPending	query		boolean		false	"filter"
 //	@Param			type			query		string		false	"filter"
+//	@Param			currentOnly		query		boolean		false	"filter"
 //	@Success		200				{object}	ops.Envelope{data=anyPage}
 //	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
 //	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"

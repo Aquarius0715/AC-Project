@@ -10554,3 +10554,14 @@ The user asked for Indonesian to be selectable as a language, as Japanese was ad
 3. **Which pull requests.** The ones `auto-merge.yml` turns auto-merge on for: open, not draft, the owner's, from a branch of this repository, auto-merge on. A conflicting one (`dirty`) gets a warning in the run and is left for its own merge of `main`.
 4. **Kept.** The strict rule stays: each pull request is tested on the `main` it merges into. A merge queue would do the same but is for organisation repositories only.
 5. **Tests.** `test_keep_prs_current.py` (other-lint) covers the order of the steps: the oldest behind one, waiting for one that runs or merges, the grace for a fresh push, and failed or conflicting ones not holding the others.
+
+## IR797 The partner's open-stage tabs list only the work the company still holds — 2026-11-16
+
+IR614 matched a history without completion by its as-of, so a job whose delegation ended unfinished lists in the partner Jobs list of that week. It keeps its frozen status and so also counted under Active, while the Overview's Active KPI counts only the jobs the company still holds (UX proposal from IR614 item 4; the user took the recommendation on 2026-11-16).
+
+1. **Filter.** `jobs.list` takes `currentOnly` (boolean). With `true`, the history rows of a contractor or technician (JobHistorySnapshot) are left out; offers and summaries are unchanged. The query catalog lists it for `jobs.list`; `service-contracts.ts`'s Query filters have it.
+2. **Screen.** The partner Jobs list's Offered, Active and Review tabs, and their counts, ask with `currentOnly: true`. Completed and All keep the histories, since a completed job is one. DD-P01 says so.
+3. **Tests.**
+   - `TestContractorAndTechnicianProjections`: the ended delegation is listed with `status: accepted` and left out with `currentOnly: true`. The query catalog test sends the filter.
+   - `partnerJobs.test.ts`: the open stages ask with `currentOnly`, Completed and All without.
+
