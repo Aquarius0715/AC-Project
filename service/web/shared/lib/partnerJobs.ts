@@ -19,7 +19,11 @@ export const tabOf = (v?: string): TabId => (TABS.find((t) => t.id === v)?.id ??
 /** The jobs.list filters of a tab within the period. */
 export function tabFilters(tab: TabId, fromAt: string, toAt: string): NonNullable<OpInput<"jobs.list">["filters"]> {
   const statuses = (TABS.find((t) => t.id === tab) ?? TABS[0]).statuses;
-  return { from: fromAt, to: toAt, ...(statuses && { statuses: [...statuses] }) };
+  // the open stages list only the work the company still holds: a delegation that ended unfinished keeps its frozen
+  // status, so without currentOnly it showed under Active as well as in History. Completed and All keep the histories:
+  // a completed job is one (IR797)
+  const isOpenStage = tab === "offered" || tab === "active" || tab === "review";
+  return { from: fromAt, to: toAt, ...(statuses && { statuses: [...statuses] }), ...(isOpenStage && { currentOnly: true }) };
 }
 
 export const SORTS = [

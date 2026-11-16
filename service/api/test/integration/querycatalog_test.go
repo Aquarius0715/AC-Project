@@ -134,6 +134,7 @@ func TestQueryCatalogFilters(t *testing.T) {
 		"bound":              jsonTrue,
 		"withoutDevice":      jsonTrue,
 		"proposalPending":    jsonTrue,
+		"currentOnly":        jsonTrue,
 		fieldEnabled:         jsonTrue,
 	}
 	perOp := map[string]map[string]string{

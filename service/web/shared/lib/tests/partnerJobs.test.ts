@@ -25,7 +25,9 @@ describe("partner job list", () => {
     expect(tabOf("review")).toBe("review");
     expect(tabOf("nope")).toBe("all");
     expect(tabFilters("all", "F", "T")).toEqual({ from: "F", to: "T" });
-    expect(tabFilters("active", "F", "T")).toEqual({ from: "F", to: "T", statuses: ["accepted", "assigned", IN_PROGRESS, "on_hold", "rework_requested"] });
+    expect(tabFilters("active", "F", "T")).toEqual({ from: "F", to: "T", statuses: ["accepted", "assigned", IN_PROGRESS, "on_hold", "rework_requested"], currentOnly: true });
+    // an ended delegation stays in Completed and All, not in the open stages (IR797)
+    expect([tabFilters("offered", "F", "T").currentOnly, tabFilters("review", "F", "T").currentOnly, tabFilters("completed", "F", "T").currentOnly, tabFilters("all", "F", "T").currentOnly]).toStrictEqual([true, true, undefined, undefined]);
     expect(sortOf("dueAt:desc")).toBe("dueAt:desc");
     expect(sortOf("x")).toBe("status:asc");
     expect(sortSpec("severity:desc")).toEqual({ field: "severity", direction: "desc" });

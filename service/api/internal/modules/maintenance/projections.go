@@ -419,6 +419,10 @@ func (m Jobs) extraProjections(
 		}
 	}
 
+	if filters.CurrentOnly != nil && *filters.CurrentOnly {
+		return out, nil // only the jobs the caller still holds: no history rows (IR797)
+	}
+
 	hs, err := m.histories(ctx, call, nil)
 	if err != nil {
 		return nil, err
