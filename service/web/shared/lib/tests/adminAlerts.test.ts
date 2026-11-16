@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  attachBackHref,
   adminAlertRows, alertPolicyInput, conditionErrors, copyable, defaultRulesInput, HQ_METRICS, blankPolicyDraft as blankPolicyDraft, policyChanges, policyErrors, policyRows, recoveryError, ruleChanges, settingText,
   testOutcome, type ApiAdminAlert, type ApiPolicy, type NotificationDecision,
 } from "@ac/web/lib/adminAlerts";
@@ -193,5 +194,17 @@ describe("Test with demo data (DD-A05 item 7, IR348)", () => {
     expect(testOutcome(d(SUPPRESSED, "cooldown"), p, 30, BEDROOM_AC).text).toBe("No new notice: one about Bedroom AC already went out — within the cooldown, or for its alert that is still open.");
     expect(testOutcome(null, p, 30, BEDROOM_AC)).toStrictEqual({ tone: "warn", text: "The policy did not run on Bedroom AC — it is no longer attached to it." });
     expect(testOutcome(d(SUPPRESSED, "not_due"), { metric: REFRIGERANT_PRESSURE, operator: "lte", threshold: 350 }, 351, "AC", MS.t).text).toBe("Tiada amaran: 351 kPa tidak memenuhi ≤ 350 kPa.");
+  });
+});
+
+describe("the way back from a new policy to its unit (UI/UX loop R44)", () => {
+  it("goes back only inside /admin/units, with the new policy to tick", () => {
+    expect(attachBackHref("/admin/units?customerId=c1&unitId=u1", "p1")).toBe("/admin/units?customerId=c1&unitId=u1&attach=p1");
+    expect(attachBackHref("/admin/units", "p1")).toBe("/admin/units?attach=p1");
+    expect(attachBackHref("/admin/units?unitId=u1")).toBe("/admin/units?unitId=u1");
+    expect(attachBackHref("https://example.com/admin/units", "p1")).toBeNull();
+    expect(attachBackHref("//example.com/admin/units", "p1")).toBeNull();
+    expect(attachBackHref("/admin/unitsx", "p1")).toBeNull();
+    expect(attachBackHref(null, "p1")).toBeNull();
   });
 });

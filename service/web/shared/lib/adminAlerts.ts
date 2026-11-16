@@ -359,3 +359,11 @@ export function testOutcome(d: NotificationDecision | null, p: Pick<AdminPolicy,
     }
   }
 }
+
+/** Where a new policy hands back to the unit it was made for (UI/UX loop R44): `returnTo` from the unit's Attach
+dialog, kept only inside /admin/units, with the new policy to tick there; null for any other address. */
+export function attachBackHref(returnTo: string | null, policyId?: string): string | null {
+  if (!returnTo || !/^\/admin\/units(?:\?|$)/.test(returnTo)) return null;
+  if (!policyId) return returnTo;
+  return `${returnTo}${returnTo.includes("?") ? "&" : "?"}attach=${encodeURIComponent(policyId)}`;
+}
