@@ -48,7 +48,7 @@ function NavLink({ href, label, icon, badge, active, locked }: Readonly<{ href: 
 interface NavItem { href: string; label: string; icon: IconName; badge?: string; match?: string[]; locked?: boolean }
 /** The role's sidebar items with the active one: the longest matching path, where an item whose href carries a query
 (Sidebar › Assigned jobs = /technician?tab=all) wins on its path only when the query matches too. */
-function RoleNav({ items, base, pathname, search }: Readonly<{ items: NavItem[]; base: string; pathname: string; search: string }>) {
+function RoleNav({ items, base, pathname, search, label }: Readonly<{ items: NavItem[]; base: string; pathname: string; search: string; label: string }>) {
   const query = new URLSearchParams(search);
   const score = (href: string, match?: string[]) => {
     const hits = [href, ...(match ?? [])].filter((h) => {
@@ -60,9 +60,10 @@ function RoleNav({ items, base, pathname, search }: Readonly<{ items: NavItem[];
   };
   const best = Math.max(0, ...items.map((i) => score(i.href, i.match)));
   const activeHref = best ? items.find((i) => score(i.href, i.match) === best)?.href : undefined;
-  return <nav className="flex flex-col gap-0.5">{items.map((i) => <NavLink key={i.href} {...i} active={i.href === activeHref} />)}</nav>;
+  // two navigation landmarks in the sidebar: each is named, so a screen reader can tell them apart (UI/UX loop R71)
+  return <nav aria-label={label} className="flex flex-col gap-0.5">{items.map((i) => <NavLink key={i.href} {...i} active={i.href === activeHref} />)}</nav>;
 }
-function RoleNavWithQuery(props: Readonly<{ items: NavItem[]; base: string; pathname: string }>) {
+function RoleNavWithQuery(props: Readonly<{ items: NavItem[]; base: string; pathname: string; label: string }>) {
   return <RoleNav {...props} search={useSearchParams().toString()} />; // the search params need a Suspense boundary (static routes)
 }
 
@@ -118,9 +119,9 @@ export function AppShell({ appRole: forced, live, children }: Readonly<{ appRole
             <span className="leading-tight"><span className="block text-[15px] font-bold">{config.app}</span><span className="block text-[11px] text-muted-foreground">{t(config.sub)}</span></span>
           </Link>
           <div className="px-3 pb-1 text-[10px] font-bold tracking-wider text-muted-foreground">{scope}</div>
-          <Suspense fallback={<RoleNav items={items} base={config.base} pathname={pathname} search="" />}><RoleNavWithQuery items={items} base={config.base} pathname={pathname} /></Suspense>
+          <Suspense fallback={<RoleNav items={items} base={config.base} pathname={pathname} search="" label={t("Main menu")} />}><RoleNavWithQuery items={items} base={config.base} pathname={pathname} label={t("Main menu")} /></Suspense>
           <div className="my-2 border-t border-line" />
-          <nav className="flex flex-col gap-0.5">
+          <nav aria-label={t("Account and settings")} className="flex flex-col gap-0.5">
             {role === "client" && isOwner && <NavLink href="/customer/installations" label={t("Installations")} icon="maintenance" active={pathname === "/customer/installations"} />}
             {role === "client" && isOwner && <NavLink href="/customer/users" label={t("Users")} icon="users" active={pathname === "/customer/users"} />}
             {role === "contractor" && <NavLink href="/partner/users" label={t("Users")} icon="users" active={pathname === "/partner/users"} />}

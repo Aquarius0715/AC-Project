@@ -46,6 +46,8 @@ export const ja: Record<string, string> = {
   "Preferences": "設定",
   "Demo controls": "デモ操作",
   "Your role can’t open this": "このロールでは開けません",
+  "Main menu": "メインメニュー",
+  "Account and settings": "アカウントと設定",
   "Sign out": "ログアウト",
   "Open menu": "メニューを開く",
   "Menu": "メニュー",

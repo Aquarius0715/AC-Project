@@ -50,6 +50,8 @@ export const ms: Record<string, string> = {
   "Preferences": "Keutamaan",
   "Demo controls": "Kawalan demo",
   "Your role can’t open this": "Peranan anda tidak boleh membuka ini",
+  "Main menu": "Menu utama",
+  "Account and settings": "Akaun dan tetapan",
   "Sign out": "Log keluar",
   "Open menu": "Buka menu",
   "Menu": "Menu",
