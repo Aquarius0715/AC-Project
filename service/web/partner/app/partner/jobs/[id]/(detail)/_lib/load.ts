@@ -7,7 +7,7 @@
 // translates fixed texts.
 import "server-only";
 import { coreAll, coreDisplay, coreNow, coreOp, CoreError, orWhenRefused, coreItems } from "@ac/web/lib/dal";
-import { i18nOf, showClock, showSpan, showTime, zonedParts } from "@ac/web/lib/i18n";
+import { i18nOf, showRecent, showSpan, showTime, zonedParts } from "@ac/web/lib/i18n";
 import type { ApiAlert } from "@ac/web/lib/alerts";
 import type { ApiUnitDetail } from "@ac/web/lib/units";
 import { delegationLeft, detailBanner, eventRows, fits, ordinal, qualified, requiredFor, timeline, type ApiPartnerJobDetail } from "@ac/web/lib/partnerJobDetail";
@@ -88,7 +88,8 @@ export async function loadJobDetail(jobId: string) {
       visit: job.assignment || job.scheduledSlot || !job.offer ? showSpan(visit.startAt, visit.endAt, display) : job.offer.candidateSlots.map((s) => showSpan(s.startAt, s.endAt, display)).join(" / "),
       access: job.offer ? showSpan(job.offer.accessValidFrom, job.offer.accessValidUntil, display) : null,
       scheduled: job.assignment ? showSpan(job.assignment.scheduledStart, job.assignment.scheduledEnd, display) : null,
-      seen: unit?.lastSeenAt ? showClock(unit.lastSeenAt, display) : null,
+      // a contact of another day keeps its date: “seen 10:47 am” days ago is not today (UI/UX loop R66)
+      seen: unit?.lastSeenAt ? showRecent(unit.lastSeenAt, nowAt.getTime(), display) : null,
       raised: Object.fromEntries(linked.map((a) => [a.id, showTime(a.detectedAt, display)])),
       delegation: job.offer ? { left: delegationLeft(job.offer.accessValidUntil, ms, false, i), toSchedule: delegationLeft(job.offer.accessValidUntil, ms, true, i) } : null,
     },
