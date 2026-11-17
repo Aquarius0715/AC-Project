@@ -100,6 +100,10 @@ func TestAutomationPolicies(t *testing.T) {
 		"weather not in DD-A11": {
 			fieldCondition: `{"type":"weather","metric":"temperature","operator":"gt","value":30}`,
 		},
+		// a well-formed comparison of a type outside DD-A11 (it would pass as solar or battery)
+		"humidity in kW": {
+			fieldCondition: `{"type":"humidity","operator":"gte","value":1,"unit":"kW"}`,
+		},
 		"tariff wrong unit": {
 			fieldCondition: `{"type":"tariff","operator":"gte","value":0.5,"unit":"kW"}`,
 		},
@@ -131,6 +135,7 @@ func TestAutomationPolicies(t *testing.T) {
 		"bad action kind":         refusedActionInvalid,
 		caseBadMode:               refusedActionInvalid,
 		caseDuplicateUnit:         refusedUnitIDsInvalid,
+		"humidity in kW":          refusedConditionInvalid,
 		"name blank":              refusedNameLength,
 		"no action":               refusedActionInvalid,
 		"no condition":            refusedConditionInvalid,

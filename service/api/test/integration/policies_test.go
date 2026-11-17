@@ -452,6 +452,7 @@ func TestPolicies(t *testing.T) {
 	wrongMetric := jsonBytes(t, rules)
 	want = map[string]string{ // the field each case is refused for
 		"five rules":     "rules=error.fixedRules",
+		"one rule more":  "rules=error.fixedRules",
 		"metric changed": "rules.1.metric=error.invalid",
 		"reordered keys": "rules=error.fixedRules",
 	}
@@ -459,6 +460,8 @@ func TestPolicies(t *testing.T) {
 	for name, body := range map[string]string{
 		"reordered keys": swapped, "five rules": "[" + strings.Join(strings.SplitN(string(raw)[1:], "},", 6)[:5], "},") +
 			"}]",
+		// a rule past the fixed list is refused, not read past the end of the fixed list
+		"one rule more":  strings.TrimSuffix(string(raw), "]") + "," + string(jsonBytes(t, rules[0])) + "]",
 		"metric changed": string(wrongMetric),
 	} {
 		code, res := write(

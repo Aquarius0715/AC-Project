@@ -95,13 +95,15 @@ func TestAlerts(t *testing.T) {
 		bodyInfoSeverity:          "filters.severity=error.invalid",
 		bodyUnknownStatus:         refusedFilterStatusInvalid,
 		"{\"filters\":{\"z\":1}}": "z=error.notAllowed",
+		// a known filter of the wrong type is refused as filters, not read as no filter
+		"{\"filters\":{\"unitId\":\"not-a-uuid\"}}":              refusedFiltersInvalid,
 		"{\"sort\":{\"field\":\"title\",\"direction\":\"asc\"}}": refusedSortFieldInvalid,
 	}
 
 	for _, body := range []string{
 		bodyInfoSeverity, bodyUnknownStatus,
 		bodyReversedPeriod, `{"filters":{"z":1}}`,
-		`{"sort":{"field":"title","direction":"asc"}}`,
+		`{"sort":{"field":"title","direction":"asc"}}`, `{"filters":{"unitId":"not-a-uuid"}}`,
 	} {
 		code, m := post(srv, hq(), "alerts.list", body)
 		refusal(t, body, code, m, want[body])
