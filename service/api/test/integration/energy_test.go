@@ -423,6 +423,12 @@ func TestEnergySummary(t *testing.T) {
 		asNum(t, tot["savingPercentage"]) != -25 {
 		t.Errorf("increase: %v", tot)
 	}
+	// a zero baseline compares, but a percentage of zero is unknown, never 0 % or a division error
+	_, resp = post(srv, hq(), "energy.summary", body(end, `,"baselineId":"`+fixed("0", 5)+`"`))
+	if tot := asObj(t, data(resp)["totals"]); asNum(t, tot["savedKWh"]) != -5 ||
+		tot["savingPercentage"] != nil {
+		t.Errorf("zero baseline: %v", tot)
+	}
 	// partial coverage or another minute count: actuals only
 	_, resp = post(
 		srv,
@@ -484,6 +490,21 @@ func TestEnergySummary(t *testing.T) {
 		body(end, `,"baselineId":"`+uuid.NewString()+`"`),
 	); code != 404 {
 		t.Error("unknown baseline")
+	}
+	// HQ is not scoped to a customer, so an unknown or archived unit is refused by the second count
+	archived := newUnit(t, srv, "Archived summary AC")
+	owner(t, `UPDATE assets.units SET archived = true WHERE id = $1`, archived)
+
+	for name, id := range map[string]string{"unknown": uuid.NewString(), "archived": archived} {
+		code, _ := post(
+			srv,
+			hq(),
+			"energy.summary",
+			`{"from":"2026-09-01T00:00:00Z","to":"2026-09-01T00:10:00Z","unitIds":["`+unit+`","`+id+`"]}`,
+		)
+		if code != 404 {
+			t.Errorf("%s unit: %d, want 404", name, code)
+		}
 	}
 }
 
