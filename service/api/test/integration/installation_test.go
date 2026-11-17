@@ -137,13 +137,8 @@ func TestInstallationFlow(t *testing.T) {
 		srv,
 		hq(),
 		"units.save",
-		strings.Replace(
-			`{"customerOrgId":"`+unitOrg+`","propertyId":"`+prop+`","spaceId":null,"displayName":"`+name+
-				` 2","modelId":"`+model+`","type":"split","installedAt":null,"serviceScope":["indoor"]}`,
-			prop,
-			uuid.NewString(),
-			1,
-		),
+		`{"customerOrgId":"`+unitOrg+`","propertyId":"`+uuid.NewString()+`","spaceId":null,"displayName":"`+name+
+			` 2","modelId":"`+model+`","type":"split","installedAt":null,"serviceScope":["indoor"]}`,
 		0,
 	)
 	if code != 404 || res["messageKey"] != apperr.KeyNotFound {
