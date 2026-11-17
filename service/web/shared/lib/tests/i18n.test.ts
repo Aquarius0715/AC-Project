@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { DICTIONARIES, i18nOf, intlTag, isLocale, showRecent, showSpan, showTime, translate, zonedInstant, zonedParts, type Locale } from "@ac/web/lib/i18n";
+import { DICTIONARIES, i18nOf, intlTag, isLocale, languageOptions, LOCALES, showClock, showDate, showDayMonth, showRecent, showSpan, showTime, translate, translator, zonedInstant, zonedParts, type Locale } from "@ac/web/lib/i18n";
 import { id } from "@ac/web/lib/i18n-id";
 import { ja } from "@ac/web/lib/i18n-ja";
 import { ms } from "@ac/web/lib/i18n-ms";
@@ -60,6 +60,20 @@ describe("Display language (FR-X01, AT-X01-N, IR258, IR639)", () => {
   it("has the same English keys, in the same order, in every dictionary", () => {
     expect(Object.keys(ja)).toStrictEqual(Object.keys(ms));
     expect(Object.keys(id)).toStrictEqual(Object.keys(ms));
+  });
+
+  it("offers English first as the default, in the reader's language, and every other language by its own name", () => {
+    const own = ["Bahasa Melayu", "日本語", "Bahasa Indonesia"];
+    expect(languageOptions(translator("en"))).toStrictEqual([
+      { id: "en", label: "English (default)" }, { id: "ms", label: "Bahasa Melayu" }, { id: "ja", label: "日本語" }, { id: "id", label: "Bahasa Indonesia" },
+    ]);
+    expect(LOCALES.map((l) => must(languageOptions(translator(l))[0]).label)).toStrictEqual(["English (default)", "Bahasa Inggeris (lalai)", "英語（既定）", "Bahasa Inggris (default)"]);
+    expect(LOCALES.map((l) => languageOptions(translator(l)).slice(1).map((o) => o.label))).toStrictEqual(LOCALES.map(() => own));
+  });
+
+  it("shows “—” for a missing time in every date and time format", () => {
+    expect([showTime(null), showClock(null), showDate(null), showDayMonth(null), showRecent(null, 0)]).toStrictEqual(["—", "—", "—", "—", "—"]);
+    expect([showTime(""), showDate(""), showDayMonth("")]).toStrictEqual(["—", "—", "—"]);
   });
 
   describe.each(LANGUAGES)("the %s dictionary (%s)", (locale, _name, dictionary) => {

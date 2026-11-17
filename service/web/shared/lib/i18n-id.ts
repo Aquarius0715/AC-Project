@@ -64,7 +64,7 @@ export const id: Record<string, string> = {
   "HQ Admin": "Admin HQ",
   "Display language": "Bahasa tampilan",
   "Affects the screens, notifications and date/time display. Stored data stays UTC. Malay, Japanese and Indonesian text is a draft under review; text not translated yet stays in English.": "Memengaruhi layar, notifikasi, dan tampilan tanggal/waktu. Data tersimpan tetap dalam UTC. Teks bahasa Melayu, Jepang, dan Indonesia masih berupa draf yang sedang ditinjau; teks yang belum diterjemahkan tetap dalam bahasa Inggris.",
-  "English (default)": "English (default)",
+  "English (default)": "Bahasa Inggris (default)",
   "Display timezone": "Zona waktu tampilan",
   "Booked times keep their meaning across timezone changes.": "Waktu yang dipesan tetap bermakna sama saat zona waktu berubah.",
   "Currency": "Mata uang",
