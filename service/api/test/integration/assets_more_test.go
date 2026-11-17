@@ -197,6 +197,18 @@ func TestUnitsSetAlertPoliciesAndDelete(t *testing.T) {
 		t.Error("customer-b cannot touch customer-a's unit")
 	}
 
+	// a unit that does not exist is NOT_FOUND for HQ too
+	code, resp = write(
+		srv,
+		hq(),
+		"units.setAlertPolicies",
+		`{"unitId":"`+uuid.NewString()+`","alertPolicyIds":[]}`,
+		1,
+	)
+	if code != 404 || resp["messageKey"] != apperr.KeyNotFound {
+		t.Errorf("an unknown unit: %d %v", code, resp)
+	}
+
 	if code, _ := set(customerA(), ``, unitVersion-1); code != 409 {
 		t.Error("stale version")
 	}
