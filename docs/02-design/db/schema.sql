@@ -1103,6 +1103,7 @@ CREATE INDEX jobs_unit ON maintenance.jobs (tenant_id, unit_id, created_at DESC)
 CREATE INDEX jobs_customer ON maintenance.jobs (tenant_id, customer_org_id, created_at DESC);
 CREATE INDEX jobs_contractor ON maintenance.jobs (tenant_id, contractor_org_id, status) WHERE contractor_org_id IS NOT NULL;
 CREATE INDEX jobs_follow_up_pending ON maintenance.jobs (tenant_id, created_at) WHERE follow_up_class = 'pending';
+CREATE INDEX jobs_installation_request ON maintenance.jobs (installation_request_id) WHERE installation_request_id IS NOT NULL;  -- IR839: the request's jobs
 
 CREATE TABLE maintenance.job_alerts (
   tenant_id uuid NOT NULL,

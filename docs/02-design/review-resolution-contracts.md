@@ -10951,3 +10951,10 @@ Review round 902 found that `restrictions.retry` with `phase=apply` (`retryAllow
 
 1. **Rule.** An apply retry refuses with CONFLICT `errors.notice_invalid` unless the contract is still at the version the restriction was scheduled on and identity stored every notice notification for the restriction at notice time, the same check as execute. The time conditions are not rechecked: state `requested` means execute already passed them. A release retry is unchanged.
 2. **Tests.** `TestRestrictionExceptionReleaseRetry` moves the stored notice's time and expects `errors.notice_invalid` from an apply retry; it failed (200, commands resent) before the fix.
+
+## IR839 The jobs of an installation request are found through an index (DEC-107) — 2026-11-17
+
+Review round 913 found that `maintenance.jobs.installation_request_id` (migration 000006) had a foreign key but no index; PostgreSQL does not index the referencing columns of a foreign key. `installationRequests.list` looks up each request's linked jobs in a subquery per row, and creating an installation job for a request counts the request's open jobs, so both read the whole jobs table, a cost that grows with every job of the tenant.
+
+1. **Rule.** Migration 000011 adds `jobs_installation_request` on `maintenance.jobs (installation_request_id) WHERE installation_request_id IS NOT NULL`, and [schema.sql](db/schema.sql) has the same index. No query changes.
+2. **Tests.** `TestForeignKeysHaveIndexes` (new, integration) lists every foreign key without an index whose leading columns hold the key's columns other than `tenant_id`; it failed on this key before the migration. The 26 other keys it found are listed in the test for the decision of B-52, so a new foreign key without an index fails it.
