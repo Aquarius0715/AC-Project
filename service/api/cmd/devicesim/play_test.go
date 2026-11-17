@@ -288,20 +288,24 @@ type message struct {
 
 func (m message) Payload() []byte { return m.payload }
 
-// TestSubscribeRestoresTheKeptStateThenAnswers: each module first subscribes to its kept topic, which restores the
-// setpoint, then to its command topic, which answers; a command after a restart keeps the restored setpoint (IR613).
+// TestSubscribeRestoresTheKeptStateThenAnswers: every module first subscribes to its kept topic, which restores the
+// setpoint, and only then do the modules hear their command topics, which answer; a command after a restart keeps the
+// restored setpoint (IR613).
 func TestSubscribeRestoresTheKeptStateThenAnswers(t *testing.T) {
 	t.Parallel()
 
 	module := devicesim.NewModule("t", "d", "v1", 1)
+	other := devicesim.NewModule("t", "e", "v1", 2)
 	broker := new(subscribingBroker)
 	broker.handlers = map[string]mqtt.MessageHandler{}
 
-	subscribe(broker, []*devicesim.Module{module})
+	subscribe(broker, []*devicesim.Module{module, other})
 
 	if want := []string{
 		module.KeptTopic(),
+		other.KeptTopic(),
 		module.CommandTopic(),
+		other.CommandTopic(),
 	}; !slices.Equal(
 		broker.order,
 		want,
