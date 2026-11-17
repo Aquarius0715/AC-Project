@@ -179,21 +179,13 @@ func checkForceAndLogins(t *testing.T, conn *pgx.Conn) {
 		t.Fatalf("Seeded = %t, %v", ok, seededErr)
 	}
 
-	ensureLoginErr := EnsureLogin(ctx, conn, "ac_app_login", "it's-local", "ac_app")
-	if ensureLoginErr != nil {
-		t.Fatal(ensureLoginErr)
-	}
-
-	ensureLoginErr = EnsureLogin(ctx, conn, "ac_app_login", "local", "ac_app")
-	if ensureLoginErr != nil {
-		t.Fatal("EnsureLogin must be idempotent:", ensureLoginErr)
-	}
-
 	checkNewLogin(t, conn)
 }
 
-// checkNewLogin creates a role that does not exist yet (ac_app_login already exists on a reused cluster, so the
-// CREATE ROLE branch needs its own name), then checks it can log in with the quoted password and is in the group.
+// checkNewLogin creates a role that does not exist yet, runs EnsureLogin on it again (the existing-role branch), then
+// checks it can log in with the second, quoted password and is in the group. Roles belong to the whole cluster, so
+// the test never touches ac_app_login: the other packages' tests log in as it at the same time, and changing its
+// password, even for a moment, failed their connections (28P01, TestMiddleware 503 in CI on PR #515).
 func checkNewLogin(t *testing.T, conn *pgx.Conn) {
 	t.Helper()
 
@@ -207,9 +199,14 @@ func checkNewLogin(t *testing.T, conn *pgx.Conn) {
 	drop()
 	t.Cleanup(drop)
 
-	ensureErr := EnsureLogin(ctx, conn, login, "it's-new", "ac_app")
+	ensureErr := EnsureLogin(ctx, conn, login, "first", "ac_app")
 	if ensureErr != nil {
 		t.Fatal(ensureErr)
+	}
+
+	ensureErr = EnsureLogin(ctx, conn, login, "it's-new", "ac_app")
+	if ensureErr != nil {
+		t.Fatal("EnsureLogin must be idempotent:", ensureErr)
 	}
 
 	var member bool
