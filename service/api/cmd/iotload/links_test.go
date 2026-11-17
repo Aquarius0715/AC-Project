@@ -43,12 +43,17 @@ func TestReadLinksSplitsDevicesAndProbes(t *testing.T) {
 		t.Fatalf("got %d devices and %d probes, want 1 and 1", len(devices), len(probes))
 	}
 
-	if got, want := devices[0].module.DeviceID, seed.ID("dev-1").String(); got != want || devices[0].sensors != 2 {
-		t.Fatalf("device %s with %d sensors, want %s with 2", got, devices[0].sensors, want)
+	device := devices[0]
+	if device.module.DeviceID != seed.ID("dev-1").String() || device.sensors != 2 {
+		t.Fatalf(
+			"device %s with %d sensors, want dev-1's ID with 2",
+			device.module.DeviceID,
+			device.sensors,
+		)
 	}
 
-	if got, want := probes[0].sensor, seed.ID("s-2t").String(); got != want {
-		t.Fatalf("probe sensor %s, want %s (its temperature sensor)", got, want)
+	if probes[0].sensor != seed.ID("s-2t").String() {
+		t.Fatalf("probe sensor %s, want its temperature sensor s-2t's ID", probes[0].sensor)
 	}
 
 	// a probe batch has its temperature reading only, so a probe adds one expected reading
@@ -67,7 +72,11 @@ func TestReadLinksRefuses(t *testing.T) {
 		name, body string
 		want       error
 	}{
-		{"no device", `{"links":[{"device":"p","sensors":{"temperature":"s"},"probe":true}]}`, errNoDevices},
+		{
+			"no device",
+			`{"links":[{"device":"p","sensors":{"temperature":"s"},"probe":true}]}`,
+			errNoDevices,
+		},
 		{"no probe", `{"links":[{"device":"d","sensors":{"temperature":"s"}}]}`, errNoProbes},
 		{
 			"probe without its temperature sensor",
@@ -76,13 +85,13 @@ func TestReadLinksRefuses(t *testing.T) {
 		},
 	}
 
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
+	for _, entry := range cases {
+		t.Run(entry.name, func(t *testing.T) {
 			t.Parallel()
 
-			_, _, err := readLinks(linksFile(t, tc.body))
-			if !errors.Is(err, tc.want) {
-				t.Fatalf("readLinks() = %v, want %v", err, tc.want)
+			_, _, err := readLinks(linksFile(t, entry.body))
+			if !errors.Is(err, entry.want) {
+				t.Fatalf("readLinks() = %v, want %v", err, entry.want)
 			}
 		})
 	}
@@ -109,13 +118,13 @@ func TestFirstSequence(t *testing.T) {
 		{"telemetry failed", `{"measurements":[{"sequence":7}]}`, errNoDevices, 0, false},
 	}
 
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
+	for _, entry := range cases {
+		t.Run(entry.name, func(t *testing.T) {
 			t.Parallel()
 
-			seq, ok := firstSequence([]byte(tc.raw), tc.err)
-			if seq != tc.seq || ok != tc.ok {
-				t.Fatalf("firstSequence() = %d, %v, want %d, %v", seq, ok, tc.seq, tc.ok)
+			seq, ok := firstSequence([]byte(entry.raw), entry.err)
+			if seq != entry.seq || ok != entry.ok {
+				t.Fatalf("firstSequence() = %d, %v, want %d, %v", seq, ok, entry.seq, entry.ok)
 			}
 		})
 	}

@@ -30,8 +30,16 @@ func TestConfigValidate(t *testing.T) {
 		ok   bool
 	}{
 		{"defaults", func(*config) {}, true},
-		{"until a signal and no drain", func(cfg *config) { cfg.duration, cfg.drainBy = 0, 0 }, true},
-		{"probe period of exactly a minute", func(cfg *config) { cfg.probePeriod = time.Minute }, true},
+		{
+			"until a signal and no drain",
+			func(cfg *config) { cfg.duration, cfg.drainBy = 0, 0 },
+			true,
+		},
+		{
+			"probe period of exactly a minute",
+			func(cfg *config) { cfg.probePeriod = time.Minute },
+			true,
+		},
 		{"no links file", func(cfg *config) { cfg.links = "" }, false},
 		{"no database", func(cfg *config) { cfg.db = " " }, false},
 		{"no broker", func(cfg *config) { cfg.broker = "" }, false},
@@ -42,24 +50,28 @@ func TestConfigValidate(t *testing.T) {
 		// NewTicker panics on a non-positive period
 		{"zero probe period", func(cfg *config) { cfg.probePeriod = 0 }, false},
 		// a sensor keeps one reading a minute, so a second probe of the minute is never stored
-		{"probe period under a minute", func(cfg *config) { cfg.probePeriod = 59 * time.Second }, false},
+		{
+			"probe period under a minute",
+			func(cfg *config) { cfg.probePeriod = 59 * time.Second },
+			false,
+		},
 		{"negative duration", func(cfg *config) { cfg.duration = -time.Second }, false},
 		{"negative drain", func(cfg *config) { cfg.drainBy = -time.Second }, false},
 	}
 
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
+	for _, entry := range cases {
+		t.Run(entry.name, func(t *testing.T) {
 			t.Parallel()
 
 			cfg := validConfig()
-			tc.edit(&cfg)
+			entry.edit(&cfg)
 
 			err := cfg.Validate()
-			if tc.ok && err != nil {
+			if entry.ok && err != nil {
 				t.Fatalf("Validate() = %v, want nil", err)
 			}
 
-			if !tc.ok && !errors.Is(err, errConfig) {
+			if !entry.ok && !errors.Is(err, errConfig) {
 				t.Fatalf("Validate() = %v, want errConfig", err)
 			}
 		})

@@ -58,8 +58,8 @@ const (
 )
 
 var (
-	errNoDevices = errors.New("the links file names no device to play")
-	errNoProbes  = errors.New("the links file names no probe device")
+	errNoDevices   = errors.New("the links file names no device to play")
+	errNoProbes    = errors.New("the links file names no probe device")
 	errConfig      = errors.New("invalid flag")
 	errProbeSensor = errors.New("a probe device has no temperature sensor")
 )
@@ -70,7 +70,7 @@ type config struct {
 }
 
 // Validate refuses flags the run cannot use: a non-positive period stops a loop or panics in its ticker, and a probe
-// period under a minute sends a second probe in a minute, which the platform never stores and the report counts as lost.
+// period under a minute sends a second probe in a minute, which the platform never stores (the report counts it lost).
 func (c config) Validate() error {
 	for flagName, value := range map[string]string{
 		"broker": c.broker, "tenant": c.tenant, "links": c.links, "db": c.db, "out": c.out,
@@ -291,7 +291,12 @@ func readLinks(cfg config) ([]*sim, []*probe, error) {
 		if link.Probe {
 			// without its sensor every probe would be waited for in vain and reported as lost
 			if strings.TrimSpace(link.Sensors["temperature"]) == "" {
-				return nil, nil, fmt.Errorf("%s: probe %q: %w", cfg.links, link.Device, errProbeSensor)
+				return nil, nil, fmt.Errorf(
+					"%s: probe %q: %w",
+					cfg.links,
+					link.Device,
+					errProbeSensor,
+				)
 			}
 
 			// a probe reports its temperature only, which is what it looks up
