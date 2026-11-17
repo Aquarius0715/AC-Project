@@ -249,6 +249,125 @@ func TestUnitScopeExternalTechnicianAndContractor(t *testing.T) {
 	}
 }
 
+// The window edges of IR49 / IR152 the test above does not reach: a contractor's accepted Offer whose access window
+// has not started yet, an external technician's Assignment whose Offer access window has ended, and one whose
+// scheduled window has ended. Each hides the unit from units.list.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
+func TestUnitScopeWindowEdges(t *testing.T) {
+	srv := server(t)
+	unit := seed.ID("unit-other-customer").String()
+
+	listed := func(a *actor) bool {
+		drainEvents(t)
+
+		_, m := post(srv, a, "units.list", `{"limit":100,"filters":{"unitIds":["`+unit+`"]}}`)
+
+		return len(items(t, m)) == 1
+	}
+	// work window [now+1h, now+3h), viewing window opened 4 hours ago
+	job := assign(
+		t,
+		unit,
+		"tech-external-b",
+		clock().Add(time.Hour),
+		clock().Add(3*time.Hour),
+		"active",
+	)
+	owner(
+		t,
+		`UPDATE maintenance.assignments SET created_at = $2 WHERE job_id = $1`,
+		job,
+		clock().Add(-4*time.Hour),
+	)
+	// accepted Offer whose access window opens in 30 minutes
+	owner(
+		t,
+		`INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, candidate_slots, offered_at,
+			offer_expires_at, access_valid_from, access_valid_until, decision, decided_at)
+		VALUES ($1,$2,$3,'v1',`+oneSlotSQL(
+			"$4",
+			"$5",
+		)+`,$6,$5,$7,$5,'accept',$6)`,
+		seed.ID("tenant-a"),
+		job,
+		seed.ID("org-contractor-a"),
+		clock().Add(time.Hour),
+		clock().Add(3*time.Hour),
+		clock().Add(-2*time.Hour),
+		clock().Add(30*time.Minute),
+	)
+	t.Cleanup(func() { // a failed run must not leave the unit visible to the tests after it
+		owner(t, `UPDATE maintenance.assignments SET status = 'revoked' WHERE job_id = $1`, job)
+		owner(
+			t,
+			`UPDATE maintenance.offers SET access_valid_until = $2 WHERE job_id = $1`,
+			job,
+			clock().Add(-time.Minute),
+		)
+	})
+
+	if listed(contrA()) || listed(techB()) {
+		t.Fatal(
+			"before the Offer's access window opens the unit is hidden from the contractor and the technician",
+		)
+	}
+
+	owner(
+		t,
+		`UPDATE maintenance.offers SET access_valid_from = $2 WHERE job_id = $1`,
+		job,
+		clock().Add(-2*time.Hour),
+	)
+
+	if !listed(contrA()) || !listed(techB()) {
+		t.Fatal("inside the access window both see the unit")
+	}
+
+	owner(
+		t,
+		`UPDATE maintenance.offers SET access_valid_until = $2 WHERE job_id = $1`,
+		job,
+		clock().Add(-time.Minute),
+	)
+
+	if listed(techB()) {
+		t.Fatal("ended access window hides the unit from the external technician")
+	}
+
+	owner(
+		t,
+		`UPDATE maintenance.offers SET access_valid_until = $2 WHERE job_id = $1`,
+		job,
+		clock().Add(3*time.Hour),
+	)
+	// the scheduled window [now-3h, now-1m) has ended; free the slot of assignments other tests left in it
+	owner(
+		t,
+		`UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = $1 AND status = 'active' AND
+			job_id <> $2 AND scheduled && tstzrange($3, $4)`,
+		seed.ID("tech-external-b"),
+		job,
+		clock().Add(-3*time.Hour),
+		clock().Add(-time.Minute),
+	)
+	owner(
+		t,
+		`UPDATE maintenance.assignments SET scheduled = tstzrange($2, $3) WHERE job_id = $1`,
+		job,
+		clock().Add(-3*time.Hour),
+		clock().Add(-time.Minute),
+	)
+
+	if listed(techB()) {
+		t.Fatal("ended scheduled window hides the unit from the external technician")
+	}
+
+	if !listed(contrA()) {
+		t.Fatal("the contractor still sees it inside the access window")
+	}
+}
+
 // IR186: equipment's copy of maintenance access follows every change of the Offer and the Assignment rows (row
 // triggers → outbox → assets consumer), including changes made outside the operations.
 //
