@@ -451,10 +451,10 @@ func TestPolicies(t *testing.T) {
 	asObj(t, rules[1])["metric"] = metricTemperature
 	wrongMetric := jsonBytes(t, rules)
 	want = map[string]string{ // the field each case is refused for
-		"five rules":     "rules=error.fixedRules",
-		"one rule more":  "rules=error.fixedRules",
+		"five rules":     refusedFixedRules,
+		"one rule more":  refusedFixedRules,
 		"metric changed": "rules.1.metric=error.invalid",
-		"reordered keys": "rules=error.fixedRules",
+		"reordered keys": refusedFixedRules,
 	}
 
 	for name, body := range map[string]string{
