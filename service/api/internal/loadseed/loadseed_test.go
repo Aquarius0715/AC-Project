@@ -2,6 +2,8 @@ package loadseed_test
 
 import (
 	"errors"
+	"fmt"
+	"slices"
 	"testing"
 	"time"
 
@@ -186,6 +188,214 @@ func TestBuildIsDeterministicAndConsistent(t *testing.T) {
 
 		if user.Password != "pw" || user.TenantID == "" || user.OrgID == "" {
 			t.Errorf("account %s is incomplete: %+v", user.Username, user)
+		}
+	}
+}
+
+// smallConfig has an odd number of customers, so the offers (every second customer) and the technicians' four
+// customers each (wrapping past the last customer) both reach the end of the list.
+func smallConfig() loadseed.Config {
+	return loadseed.Config{
+		Customers:        9,
+		UnitsPerCustomer: 3,
+		Contractors:      3,
+		CustomerUsers:    2,
+		PartnerUsers:     3,
+		TechnicianUsers:  3,
+		HQUsers:          0,
+		Probes:           0,
+		Password:         "pw",
+		Now:              time.Date(2026, time.November, 9, 3, 0, 0, 0, time.UTC),
+	}
+}
+
+// A partner account's jobs are exactly the offered jobs of its own company: the load scripts open them as that
+// company, so a job of another company there would be refused and one left out would never be measured.
+func TestBuildPartnerJobsAreTheirCompanysOffers(t *testing.T) {
+	t.Parallel()
+
+	result, err := loadseed.Build(smallConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	offered := map[string]map[string]bool{} // contractor org UUID → offered job UUIDs
+
+	for _, offer := range result.Fixture.DemoSeed.Offers {
+		jobID, jobOK := offer["jobId"].(string)
+		orgID, orgOK := offer["contractorOrgId"].(string)
+
+		if !jobOK || !orgOK {
+			t.Fatalf("offer %v has no job or contractor", offer)
+		}
+
+		org := seed.ID(orgID).String()
+		if offered[org] == nil {
+			offered[org] = map[string]bool{}
+		}
+
+		offered[org][seed.ID(jobID).String()] = true
+	}
+
+	for _, job := range result.Fixture.DemoSeed.Jobs {
+		if job["status"] != "offered" {
+			continue
+		}
+
+		jobID, jobOK := job["id"].(string)
+		orgID, orgOK := job["contractorOrgId"].(string)
+
+		if !jobOK || !orgOK || !offered[seed.ID(orgID).String()][seed.ID(jobID).String()] {
+			t.Errorf("offered job %v has no offer to its contractor", job)
+		}
+	}
+
+	total := 0
+	partners := 0
+
+	for _, user := range result.Manifest.Users {
+		if user.Group != "partner" {
+			continue
+		}
+
+		partners++
+
+		want := offered[user.OrgID]
+		got := map[string]bool{}
+
+		for _, id := range user.JobIDs {
+			got[id] = true
+
+			if !want[id] {
+				t.Errorf(
+					"partner %s lists job %s, which is not offered to its company",
+					user.Username,
+					id,
+				)
+			}
+		}
+
+		if len(got) != len(want) || len(user.JobIDs) != len(want) {
+			t.Errorf(
+				"partner %s lists %d jobs, its company has %d offers",
+				user.Username,
+				len(user.JobIDs),
+				len(want),
+			)
+		}
+
+		total += len(user.JobIDs)
+	}
+
+	// customers 1, 3, 5, 7 and 9 each have their first job offered, and the 3 partners are one per company
+	if partners != 3 || total != 5 || len(result.Fixture.DemoSeed.Offers) != 5 {
+		t.Errorf("partners %d with %d jobs, offers %d, want 3 partners sharing all 5 offers",
+			partners, total, len(result.Fixture.DemoSeed.Offers))
+	}
+}
+
+// A technician's units are the units of four customers, counted on past the last customer, and each is a real unit.
+func TestBuildTechnicianUnitsWrapAround(t *testing.T) {
+	t.Parallel()
+
+	cfg := smallConfig()
+
+	result, err := loadseed.Build(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	units := map[string]bool{}
+	for _, unit := range result.Fixture.DemoSeed.Units {
+		units[seed.ID(unit.ID).String()] = true
+	}
+
+	customerUnits := func(n int) []string {
+		out := make([]string, 0, cfg.UnitsPerCustomer)
+		for j := range cfg.UnitsPerCustomer {
+			out = append(out, seed.ID(fmt.Sprintf("load-unit-%04d-%d", n, j+1)).String())
+		}
+
+		return out
+	}
+
+	technicians := 0
+
+	for _, user := range result.Manifest.Users {
+		if user.Group != "technician" {
+			continue
+		}
+
+		technicians++
+
+		if len(user.UnitIDs) != 4*cfg.UnitsPerCustomer {
+			t.Errorf(
+				"technician %s has %d units, want %d",
+				user.Username,
+				len(user.UnitIDs),
+				4*cfg.UnitsPerCustomer,
+			)
+		}
+
+		for _, id := range user.UnitIDs {
+			if !units[id] {
+				t.Errorf(
+					"technician %s names unit %s, which the seed does not have",
+					user.Username,
+					id,
+				)
+			}
+		}
+
+		// the third technician has customers 9, 1, 2 and 3 (numbered from 1): the list wraps after the last customer
+		if user.Username == "load-technician-0003" {
+			want := append(customerUnits(9), customerUnits(1)...)
+			if !slices.Equal(user.UnitIDs[:len(want)], want) {
+				t.Errorf(
+					"technician %s units start %v, want customers 9 then 1: %v",
+					user.Username,
+					user.UnitIDs,
+					want,
+				)
+			}
+		}
+	}
+
+	if technicians != cfg.TechnicianUsers {
+		t.Errorf("technicians = %d, want %d", technicians, cfg.TechnicianUsers)
+	}
+}
+
+// With no probes every link is an ordinary device; with probes only the last units' links are.
+func TestBuildProbesAreTheLastUnits(t *testing.T) {
+	t.Parallel()
+
+	for _, probes := range []int{0, 2} {
+		cfg := smallConfig()
+		cfg.Probes = probes
+
+		result, err := loadseed.Build(cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		links := result.Links.Links
+		if len(links) != cfg.Customers*cfg.UnitsPerCustomer {
+			t.Fatalf("probes %d: links = %d, want one per unit", probes, len(links))
+		}
+
+		for i, link := range links {
+			wantProbe := i >= len(links)-probes
+			if link.Probe != wantProbe {
+				t.Errorf(
+					"probes %d: link %d (%s) probe = %v, want %v",
+					probes,
+					i,
+					link.Unit,
+					link.Probe,
+					wantProbe,
+				)
+			}
 		}
 	}
 }
