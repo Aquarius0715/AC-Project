@@ -158,6 +158,7 @@ const (
 	refusedEnergyRange           = "from=errors.energy_range"
 	refusedFileInvalid           = "file=" + apperr.KeyInvalidFile
 	refusedFilterKindInvalid     = "filters.kind=" + apperr.KeyInvalid
+	refusedFixedRules            = "rules=" + apperr.KeyFixedRules
 	refusedFilterStatusInvalid   = "filters.status=" + apperr.KeyInvalid
 	refusedFilterStatusesInvalid = "filters.statuses=" + apperr.KeyInvalid
 	refusedFilterToRange         = "filters.to=" + apperr.KeyRange
