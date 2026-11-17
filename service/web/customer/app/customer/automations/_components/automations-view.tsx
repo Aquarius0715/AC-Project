@@ -15,7 +15,7 @@ import {
 import { useI18n, useT } from "@ac/web/components/I18n";
 import type { T } from "@ac/web/lib/i18n";
 import { deleteAutomation, reportPresence, saveAutomation, testEvent, updateConsent } from "../actions";
-import { presenceStored, presenceText, shouldReport, storePresence, subscribePresence, type Fix } from "@ac/web/lib/presence";
+import { presenceReporter, presenceStored, presenceText, storePresence, subscribePresence, type Fix } from "@ac/web/lib/presence";
 import { Icon } from "@ac/web/components/Icon";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@ac/web/components/ui/dropdown-menu";
 import { Button } from "@ac/web/components/ui/button";
@@ -92,22 +92,18 @@ function PresenceSwitch({ places }: Readonly<{ places: Record<string, string> }>
   const t = useT();
   const on = useSyncExternalStore(subscribePresence, presenceStored, () => false); // the browser's choice; off on the server
   const [line, setLine] = useState<string | null>(null);
-  const report = useEffectEvent((fix: Fix) => {
-    void reportPresence({ latitude: fix.latitude, longitude: fix.longitude, accuracyMeters: fix.accuracyMeters }).then((r) => {
-      if (!r.ok) { setLine(t("This device’s location could not be sent — the next one is tried in a moment.")); return; }
-      setLine(r.value ? presenceText(r.value, new Map(Object.entries(places)), t) ?? t("Location sent · nothing changed.") : t("Location sent · nothing changed."));
-    });
+  const report = useEffectEvent(async (fix: Fix): Promise<boolean> => {
+    // a server action rejects when the network is down: the same line as a refused report
+    const r = await reportPresence({ latitude: fix.latitude, longitude: fix.longitude, accuracyMeters: fix.accuracyMeters }).catch(() => null);
+    if (!r?.ok) { setLine(t("This device’s location could not be sent — the next one is tried in a moment.")); return false; }
+    setLine(r.value ? presenceText(r.value, new Map(Object.entries(places)), t) ?? t("Location sent · nothing changed.") : t("Location sent · nothing changed."));
+    return true;
   });
   const unavailable = useEffectEvent(() => { setLine(t("This browser did not share its location — allow it for this site, or switch this off.")); });
   useEffect(() => {
-    let last: Fix | null = null;
+    const offer = presenceReporter((fix) => report(fix));
     const watch = on && "geolocation" in navigator ? navigator.geolocation.watchPosition(
-      (p) => {
-        const fix = { latitude: p.coords.latitude, longitude: p.coords.longitude, accuracyMeters: p.coords.accuracy, at: Date.now() };
-        if (!shouldReport(last, fix)) return;
-        last = fix;
-        report(fix);
-      },
+      (p) => { offer({ latitude: p.coords.latitude, longitude: p.coords.longitude, accuracyMeters: p.coords.accuracy, at: Date.now() }); },
       () => { unavailable(); },
       { enableHighAccuracy: true, maximumAge: 60_000, timeout: 30_000 },
     ) : null;

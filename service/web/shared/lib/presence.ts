@@ -22,6 +22,22 @@ export function shouldReport(last: Fix | null, fix: Fix): boolean {
   return haversine(last, fix) >= MOVED || fix.at - last.at >= AGAIN_MS;
 }
 
+/** The fixes of one watch, sent one at a time: a fix is compared with the last one that was sent, so a failed report
+(network, 503, a refusal) is tried again with the next fix instead of waiting for 50 m or 5 minutes. `send` answers
+whether the report was sent. */
+export function presenceReporter(send: (fix: Fix) => Promise<boolean>): (fix: Fix) => void {
+  let last: Fix | null = null;
+  let inFlight = false;
+  return (fix) => {
+    if (inFlight || !shouldReport(last, fix)) return;
+    inFlight = true;
+    // a send that threw (a server action rejects when the network is down) was not sent either
+    void send(fix).catch(() => false).then((sent) => {
+      if (sent) last = fix;
+    }).finally(() => { inFlight = false; });
+  };
+}
+
 /** PresenceResult of service-contracts.ts, checked where it enters the browser. */
 const transition = z.object({ propertyId: z.string(), event: z.enum(["arrival", "departure"]), commandIds: z.array(z.string()) });
 const presenceResult = z.object({ transitions: z.array(transition) });
