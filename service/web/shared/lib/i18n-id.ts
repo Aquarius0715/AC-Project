@@ -4207,6 +4207,7 @@ export const id: Record<string, string> = {
   "The attachments could not be loaded — try again.": "Lampiran tidak dapat dimuat — coba lagi.",
   "No photos of accepted work reports on these units in this period.": "Tidak ada foto laporan pekerjaan yang diterima pada unit-unit ini dalam periode ini.",
   "Photos of accepted work reports on these units, uploaded in the period (attachments.list). Up to 20.": "Foto laporan pekerjaan yang diterima pada unit-unit ini, diunggah dalam periode (attachments.list). Maksimal 20.",
+  "The newest {shown} of {total} photos are listed: narrow the units or the period to find older ones.": "{shown} foto terbaru dari {total} ditampilkan: persempit unit atau periode untuk menemukan foto yang lebih lama.",
   "The policy did not run on {name} — it is no longer attached to it.": "Kebijakan tidak berjalan pada {name} — tidak lagi terpasang padanya.",
   "{value} {unit} on {name} raises an alert and notifies the recipients — simulated, nothing is stored.": "{value} {unit} pada {name} memunculkan peringatan dan memberi tahu penerima — simulasi, tidak ada yang disimpan.",
   "An alert, but nobody is notified: no recipient may read {name}.": "Ada peringatan, tetapi tidak ada yang diberi tahu: tidak ada penerima yang boleh membaca {name}.",

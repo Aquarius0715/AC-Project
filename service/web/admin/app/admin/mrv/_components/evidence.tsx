@@ -4,16 +4,17 @@ import { useState } from "react";
 import { Btn, Check, Plain } from "@ac/web/components/ui";
 import { useI18n } from "@ac/web/components/I18n";
 import { useOp } from "@ac/web/lib/useOp";
-import { evidenceRows, MAX_EVIDENCE, type ApiEvidenceAttachment } from "@ac/web/lib/mrv";
+import { evidenceMore, evidenceRows, MAX_EVIDENCE, type ApiEvidencePage } from "@ac/web/lib/mrv";
 import { Icon } from "@ac/web/components/Icon";
 import { isBefore } from "@ac/web/lib/order";
 
+const NO_CANDIDATES: ApiEvidencePage = { items: [], total: 0 };
 type Units = { id: string; label: string }[];
 interface Period { unitIds: string[]; from: string; to: string }
 
 /** The candidates of attachments.list for the units and period (IR349), read only while `enabled`. */
 function useCandidates({ unitIds, from, to }: Period, enabled: boolean) {
-  return useOp<{ items: ApiEvidenceAttachment[] }, ApiEvidenceAttachment[]>("attachments.list", { unitIds, from, to, query: { limit: 100 } }, [], (d) => d.items, enabled);
+  return useOp<ApiEvidencePage, ApiEvidencePage>("attachments.list", { unitIds, from, to, query: { limit: 100 } }, NO_CANDIDATES, (d) => d, enabled);
 }
 
 /** “Evidence to attach” of a new report or version (DD-A14 item 6, Figma Admin 324:2, IR349): the chosen attachments as
@@ -25,7 +26,8 @@ export function EvidencePicker({ ids, onChange, period, units }: Readonly<{ ids:
   const [open, setOpen] = useState(false);
   const isReady = period.unitIds.length > 0 && !!period.from && !!period.to && isBefore(period.from, period.to);
   const cands = useCandidates(period, isReady && (open || ids.length > 0));
-  const rows = evidenceRows(cands.data, units, i);
+  const rows = evidenceRows(cands.data.items, units, i);
+  const more = evidenceMore(cands.data, t);
   const byId = new Map(rows.map((r) => [r.id, r]));
   return (
     <div role="group" aria-label={t("Evidence to attach")}>
@@ -47,6 +49,7 @@ export function EvidencePicker({ ids, onChange, period, units }: Readonly<{ ids:
         <div className="mt-2 flex flex-col gap-1.5 rounded-xl border border-line p-3">
           {cands.loading ? <p className="text-xs text-muted-foreground">{t("Loading the attachments…")}</p> : null}
           {!cands.loading && cands.error ? <p className="text-xs text-crit">{t("The attachments could not be loaded — try again.")}</p> : null}
+          {!cands.loading && !cands.error && more ? <p className="text-xs text-muted-foreground">{more}</p> : null}
           {!cands.loading && !cands.error && rows.length === 0 ? <p className="text-xs text-muted-foreground">{t("No photos of accepted work reports on these units in this period.")}</p> : null}
           {!cands.loading && !cands.error && rows.map((r) => {
               return (
@@ -67,7 +70,7 @@ export function EvidenceList({ ids, period, units }: Readonly<{ ids: string[]; p
   const { t } = i;
   const cands = useCandidates(period, ids.length > 0);
   if (ids.length === 0) return <p className="text-xs text-muted-foreground">{t("No evidence attached.")}</p>;
-  const byId = new Map(evidenceRows(cands.data, units, i).map((r) => [r.id, r]));
+  const byId = new Map(evidenceRows(cands.data.items, units, i).map((r) => [r.id, r]));
   return (
     <ul className="flex flex-col gap-1 text-[13px]">
       {ids.map((id) => {
