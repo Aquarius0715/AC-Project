@@ -150,6 +150,5 @@ export interface ApiEvidencePage { items: ApiEvidenceAttachment[]; total: number
 /** The note under the candidates when the units and period hold more than the page read: the older ones are not
 listed, so the picker says how many it shows instead of dropping them silently (R878). */
 export function evidenceMore(p: ApiEvidencePage, t: T = en): string | null {
-  if (p.total <= p.items.length) return null;
-  return t("The newest {shown} of {total} photos are listed: narrow the units or the period to find older ones.", { shown: String(p.items.length), total: String(p.total) });
+  return p.total <= p.items.length ? null : t("The newest {shown} of {total} photos are listed: narrow the units or the period to find older ones.", { shown: String(p.items.length), total: String(p.total) });
 }
