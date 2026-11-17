@@ -113,12 +113,19 @@ export function LocationPicker({ value, onChange, styleUrl, onSearch, address }:
       { enableHighAccuracy: true, timeout: 10_000 },
     );
   };
+  const canSearch = !busy && query.trim().length >= 2; // the button and Enter alike (IR835)
   const search = async () => {
-    if (!onSearch) return;
+    if (!onSearch || !canSearch) return;
     setBusy(true);
     setNote(null);
-    const r = await onSearch(query);
-    setBusy(false);
+    let r: SearchResult;
+    try {
+      r = await onSearch(query);
+    } catch {
+      r = { ok: false, reason: "unavailable" }; // the Server Action call itself failed (network, server error)
+    } finally {
+      setBusy(false);
+    }
     if (r.ok) {
       setPlaces(r.places);
       if (r.places.length === 0) setNote(t("No place found for this address."));
@@ -139,7 +146,7 @@ export function LocationPicker({ value, onChange, styleUrl, onSearch, address }:
                 x.preventDefault();
                 void search();
               }} />
-            <Btn disabled={busy || query.trim().length < 2} onClick={() => { void search(); }}><Icon name="search" /> {t("Search")}</Btn>
+            <Btn disabled={!canSearch} onClick={() => { void search(); }}><Icon name="search" /> {t("Search")}</Btn>
           </div>
           {places && places.length > 0 && (
             <ul className="flex flex-col rounded-md border" aria-label={t("Places found")}>
