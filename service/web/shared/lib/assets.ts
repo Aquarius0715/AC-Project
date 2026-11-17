@@ -442,7 +442,7 @@ export function clientUserRows(us: ApiClientUser[], who: (membershipId: string) 
     };
   });
 }
-/** A plain address up to 254 bytes (as clientUsers.invite counts), not yet a user of this customer (case-insensitive). */
+/** A plain address up to 254 bytes (as clientUsers.save counts), not yet a user of this customer (case-insensitive). */
 export function inviteError(email: string, us: { email: string }[], t: T = translator("en")): string | undefined {
   const e = email.trim();
   if (utf8Length(e) > 254 || !isEmail(e)) return t("A valid email address (up to 254 characters)");
