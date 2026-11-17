@@ -6,10 +6,10 @@ import { useT } from "@ac/web/components/I18n";
 import { presenceReporter, presenceStored, presenceText, storePresence, subscribePresence, type Fix } from "@ac/web/lib/presence";
 import { reportPresence } from "../actions";
 
-/** Whether the browser has geolocation does not change while the page is open. */
 const unsubscribe = (): void => {
   // nothing was subscribed
 };
+/** Whether the browser has geolocation does not change while the page is open: nothing to subscribe to. */
 const noChange = (): (() => void) => unsubscribe;
 
 /** "Use this device's location" (DEC-109, IR826): while this page is open and the switch is on, the browser's position is
