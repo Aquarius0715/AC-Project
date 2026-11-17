@@ -206,7 +206,8 @@ func TestAnswerKeepsTheStateThenAnswersAsThePatternDoes(t *testing.T) {
 			module := devicesim.NewModule("t", pattern, "v1", 1).Behave("normal", pattern, false)
 			broker := new(fakeBroker)
 
-			answer(broker, module, command(t, 50*time.Millisecond))
+			// far enough ahead that a loaded runner does not reach the expiry before answer reads the clock
+			answer(broker, module, command(t, 500*time.Millisecond))
 
 			kept, ok := broker.message(module.KeptTopic())
 			if !ok || !kept.retained {
@@ -227,7 +228,8 @@ func TestAnswerKeepsTheStateThenAnswersAsThePatternDoes(t *testing.T) {
 				return
 			}
 
-			deadline := time.Now().Add(5 * time.Second)
+			// the late answer comes 2 s after the expiry
+			deadline := time.Now().Add(10 * time.Second)
 			for !acked && time.Now().Before(deadline) {
 				time.Sleep(50 * time.Millisecond)
 
