@@ -98,6 +98,18 @@ func TestContractorPicksCandidateTime(t *testing.T) {
 		)
 	}
 
+	// a stale version is refused after the scope check, before the slot is looked at (IR366)
+	if code, res := write(
+		srv,
+		contrA(),
+		"jobs.assign",
+		`{"jobId":"`+job+`","technicianMembershipId":"`+seed.ID("tech-external-a").String()+
+			`","startAt":"`+stamp(25)+`","endAt":"`+stamp(27)+`"}`,
+		version()-1,
+	); code != 409 || res["messageKey"] != "error.versionConflict" {
+		t.Fatalf("assign with a stale version: %d %v", code, res)
+	}
+
 	// the contractor settles the first candidate; the client hears of the confirmed time
 	if code, res := assign(slotJSON(25, 2)); code != 200 || data(res)["status"] != statusAssigned {
 		t.Fatalf("assign the first candidate: %d %v", code, res)
@@ -134,6 +146,43 @@ func TestContractorPicksCandidateTime(t *testing.T) {
 			"the client is told the new time: %d",
 			countNotes(t, job, "customer-a", "schedule_change"),
 		)
+	}
+}
+
+// TestOfferAccessCoversEarliestCandidate (IR636 item 2): the client ranks a later time first, so the access window
+// must start by the earliest candidate, not by the first-ranked one.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
+func TestOfferAccessCoversEarliestCandidate(t *testing.T) {
+	srv := server(t)
+	stamp := func(h int) string { return clock().Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+
+	_, resp := write(
+		srv,
+		customerA(),
+		"jobs.create",
+		jobBody(
+			seed.ID("unit-non-rto").String(),
+			map[string]string{
+				fieldAlternativeSlots: "[" + slotJSON(49, 2) + "," + slotJSON(16, 2) + "]",
+			},
+		),
+		0,
+	)
+	job := asStr(t, data(resp)["id"])
+	_, detail := post(srv, hq(), "jobs.get", `{"jobId":"`+job+`"}`)
+
+	code, res := write(
+		srv,
+		hq(),
+		"jobs.offer",
+		`{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").String()+
+			`","offerExpiresAt":"`+stamp(12)+`","accessValidFrom":"`+stamp(20)+`","accessValidUntil":"`+stamp(100)+
+			`","termsVersion":"t"}`,
+		int(asNum(t, data(detail)["version"])),
+	)
+	if code != 422 || fields(res) != refusedAccessCover {
+		t.Errorf("access from +20 h misses the +16 h candidate: %d %s", code, fields(res))
 	}
 }
 
