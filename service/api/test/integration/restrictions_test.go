@@ -24,6 +24,7 @@ const (
 	fieldPolicy            = "policy"
 	projectionRelease      = "release"
 	statusNotApplied       = "not_applied"
+	statusNotRequired      = "not_required"
 	statusSentUnknown      = "sent_unknown"
 	statusWaitingReconcile = "waiting_reconcile"
 )
@@ -515,7 +516,7 @@ func TestRestrictionLifecycle(t *testing.T) {
 	if onlineState["releaseState"] != statusRequested ||
 		len(asArr(t, onlineState["releaseCommandIds"])) != 1 ||
 		off["applyState"] != statusNotApplied ||
-		off["releaseState"] != "not_required" {
+		off["releaseState"] != statusNotRequired {
 		t.Fatalf("release eval: %v %v", onlineState, off)
 	}
 
@@ -1368,7 +1369,7 @@ func TestRestrictionReconcileNotApplied(t *testing.T) {
 		ver(t, get()),
 	)
 	if code != 200 || data(resp)["state"] != statusReleased ||
-		unitState(t, resp, unit)["releaseState"] != "not_required" ||
+		unitState(t, resp, unit)["releaseState"] != statusNotRequired ||
 		unitState(t, resp, unit)["applyState"] != statusNotApplied {
 		t.Fatalf("reconcile not applied: %d %v", code, resp)
 	}
@@ -1703,6 +1704,76 @@ func TestRestrictionExplicitRelease(t *testing.T) {
 	)
 	if len(items(t, res)) != 1 {
 		t.Errorf("audit of the release: %v", items(t, res))
+	}
+}
+
+// rejectApply reports a restriction command as rejected by the device: the Command fails and CommandsEnded reaches
+// restrictions (D03), the restriction part of demo.trigger command_fail (no audit entry, no diagnostic run).
+func rejectApply(t *testing.T, commandID string, when time.Time) {
+	t.Helper()
+
+	ctx := context.Background()
+
+	conn, err := pgx.Connect(ctx, testDB("postgres"))
+	if err != nil {
+		t.Skip(err)
+	}
+	defer func() { _ = conn.Close(ctx) }()
+
+	id := uuid.MustParse(commandID)
+
+	beginErr := pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
+		_, execErr := tx.Exec(
+			ctx,
+			`UPDATE control.commands SET status = 'failed', failure_code = $2 WHERE id = $1 AND status IN ('requested','sent')`,
+			id,
+			codeDeviceRejected,
+		)
+		if execErr != nil {
+			return apperr.Wrap(execErr, "update control.commands")
+		}
+
+		return control.EndRestrictionCommands(ctx, tx, []uuid.UUID{id}, when)
+	})
+	if beginErr != nil {
+		t.Fatal(beginErr)
+	}
+
+	drainEvents(
+		t,
+	) // the device path is not an operation: apply the resulting events as the consumers would (IR185)
+}
+
+// TestRestrictionReleaseAfterRejectedApply (D03): a device that rejects the apply leaves the unit not_applied, and a
+// release then needs nothing from it: releaseState=not_required, no remove command, and the restriction is released.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
+func TestRestrictionReleaseAfterRejectedApply(t *testing.T) {
+	srv := server(t)
+	unit := boundUnit(t, srv, "online")
+	key, inv := overdueContract(t, srv, unit)
+	restrictionID, res := executed(t, srv, key, inv, []string{unit})
+
+	rejectApply(t, cmdOf(t, res, unit, "applyCommandIds"), clock())
+
+	_, got := post(srv, restrMgr(), "restrictions.get", `{"id":"`+restrictionID+`"}`)
+	if unitState(t, got, unit)["applyState"] != statusNotApplied {
+		t.Fatalf("rejected apply: %v", got)
+	}
+
+	owner(t, `UPDATE billing.invoices SET status = 'paid' WHERE id = $1`, inv)
+
+	code, resp := write(
+		srv,
+		restrMgr(),
+		"restrictions.release",
+		`{"restrictionId":"`+restrictionID+`"}`,
+		ver(t, got),
+	)
+	if code != 200 || data(resp)["state"] != statusReleased ||
+		unitState(t, resp, unit)["releaseState"] != statusNotRequired ||
+		len(asArr(t, unitState(t, resp, unit)["releaseCommandIds"])) != 0 {
+		t.Fatalf("release of a not-applied unit: %d %v", code, resp)
 	}
 }
 
