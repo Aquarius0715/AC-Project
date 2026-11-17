@@ -58,7 +58,7 @@ job "go" "cd service/api && { test -z \"\$(gofmt -l .)\" || { gofmt -l .; exit 1
 # uses the workspace's TypeScript, as CI's validator job does
 job "docs" "sh docker/mosquitto/passwd.test.sh && python3 docs/tools/validate_documents.py --tsc service/web/node_modules/typescript/lib/tsc.js \
   && python3 docs/tools/check_review_regressions.py \
-  && python3 -m unittest deploy/test/test_realm.py deploy/load/test_realm.py"   # the realm copies, as CI's other-lint job
+  && python3 -m unittest deploy/test/test_realm.py deploy/load/test_realm.py deploy/load/test_iot_check.py"   # the realm copies and the IoT run judge, as CI's other-lint job
 
 [ "${CHECK_SERIAL:-}" = 1 ] || { step "waiting for $count jobs"; wait; }
 
