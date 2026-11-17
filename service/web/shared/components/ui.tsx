@@ -810,8 +810,8 @@ export function LineChart({ points = noPoints, series, times, min, max, threshol
 }
 
 const BAR_CLS = new Map<Tone, string>([["ok", "**:data-[slot=progress-indicator]:bg-ok"], ["warn", "**:data-[slot=progress-indicator]:bg-warn"], ["crit", "**:data-[slot=progress-indicator]:bg-crit"]]);
-/** A progress bar (shadcn/ui's Progress); `label` names it for assistive technology (WCAG 4.1.2, IR359). */
-export function UtilizationBar({ pct, tone = "primary", label }: Readonly<{ pct: number | null; tone?: Tone; label?: string }>) {
+/** A progress bar (shadcn/ui's Progress); `label` names it for assistive technology (WCAG 4.1.2, IR359), so every bar must have one. */
+export function UtilizationBar({ pct, tone = "primary", label }: Readonly<{ pct: number | null; tone?: Tone; label: string }>) {
   return (
     <Progress value={pct} aria-label={label}
       className={cx("*:data-[slot=progress-track]:h-2", BAR_CLS.get(tone))} />

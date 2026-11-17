@@ -50,7 +50,7 @@ export function OverviewDemo() {
         </div>
         <div className="flex min-w-0 flex-col gap-4">
           <Card title="Team capacity — this week" action={<TextLink href="/partner/team">Team <Icon name="arrowRight" /></TextLink>}>
-            {capacity.map(({ id: n, pct: p, text: l }) => <div key={n} className="mb-3"><div className="mb-1 flex justify-between text-xs"><b>{n}</b><span className="text-muted-foreground">{l}</span></div><UtilizationBar pct={p} /></div>)}
+            {capacity.map(({ id: n, pct: p, text: l }) => <div key={n} className="mb-3"><div className="mb-1 flex justify-between text-xs"><b>{n}</b><span className="text-muted-foreground">{l}</span></div><UtilizationBar pct={p} label={`${n}: ${l}`} /></div>)}
             <p className="text-[11px] text-muted-foreground">Utilization = assigned hours ÷ available hours. Undefined hours show “—”.</p>
           </Card>
           <Card title="Recent activity" action={<TextLink href="/partner/history">History <Icon name="arrowRight" /></TextLink>}>
