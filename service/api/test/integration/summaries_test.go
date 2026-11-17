@@ -113,17 +113,30 @@ func TestSummariesCustomer(t *testing.T) {
 		t.Error("empty unitIds")
 	}
 
+	periodEqual := `{"kind":"customer","filters":{"from":"2026-09-13T12:00:00Z","to":"2026-09-13T12:00:00Z"}}`
+	periodReversed := `{"kind":"customer","filters":{"from":"2026-09-14T00:00:00Z","to":"2026-09-13T00:00:00Z"}}`
 	want := map[string]string{ // the field each case is refused for
 		"{\"kind\":\"customer\",\"filters\":{\"overdueOnly\":true}}":    refusedFiltersInvalid,
 		"{\"kind\":\"customer\",\"filters\":{\"status\":\"assigned\"}}": refusedFiltersInvalid,
 		"{\"kind\":\"shop\",\"filters\":{}}":                            refusedKindInvalid,
+		periodEqual:                                                     refusedFilterToRange, // from == to is empty
+		periodReversed:                                                  refusedFilterToRange,
 	}
 
 	for _, b := range []string{`{"kind":"customer",` +
 		`"filters":{"status":"assigned"}}`, `{"kind":"customer",` +
-		`"filters":{"overdueOnly":true}}`, `{"kind":"shop","filters":{}}`} {
+		`"filters":{"overdueOnly":true}}`, `{"kind":"shop","filters":{}}`, periodEqual, periodReversed} {
 		code, m := post(srv, customerA(), "summaries.get", b)
 		refusal(t, b, code, m, want[b])
+	}
+
+	if code, res := post(
+		srv,
+		customerA(),
+		"summaries.get",
+		`{"kind":"customer","filters":{"from":"2026-09-13T00:00:00Z","to":"2026-09-14T00:00:00Z"}}`,
+	); code != 200 || count(t, res, "total") != count(t, resp, "total") {
+		t.Errorf("an ordered period is accepted: %d %v", code, res)
 	}
 
 	if code, _ := post(
@@ -142,6 +155,72 @@ func TestSummariesCustomer(t *testing.T) {
 		`{"kind":"customer","filters":{}}`,
 	); code != 403 {
 		t.Error("HQ summaries.get")
+	}
+}
+
+// TestAdminSummaryBillingAndActiveCustomers: the billing fields need billing.read (IR115), and customerCount counts
+// a customer only while both the Customer and its Organization are active (IR40).
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
+func TestAdminSummaryBillingAndActiveCustomers(t *testing.T) {
+	srv := server(t)
+	body := `{"from":"` + clock().Add(-24*time.Hour).Truncate(time.Minute).Format(time.RFC3339) +
+		`","to":"` + clock().Truncate(time.Minute).Format(time.RFC3339) +
+		`","customerId":"` + seed.ID("cust-b").String() + `"}`
+
+	code, res := post(srv, hq(), opAdminSummary, body)
+	if code != 200 || data(res)["billingVisibility"] != "allowed" ||
+		data(res)["overdueInvoiceCount"] == nil ||
+		data(res)["amountsByCurrency"] == nil ||
+		asNum(t, data(res)["customerCount"]) != 1 {
+		t.Fatalf("with billing.read: %d %v", code, res)
+	}
+
+	owner(
+		t,
+		`DELETE FROM identity.membership_permissions WHERE membership_id = $1 AND permission = 'billing.read'`,
+		seed.ID(membershipHQOperator),
+	)
+	t.Cleanup(func() {
+		owner(
+			t,
+			`INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission) VALUES ($1, $2,
+				'billing.read') ON CONFLICT DO NOTHING`,
+			seed.ID("tenant-a"),
+			seed.ID(membershipHQOperator),
+		)
+	})
+
+	code, res = post(srv, hq(), opAdminSummary, body)
+	if code != 200 || data(res)["billingVisibility"] != "forbidden" ||
+		data(res)["overdueInvoiceCount"] != nil ||
+		data(res)["amountsByCurrency"] != nil {
+		t.Errorf("without billing.read: %d %v", code, res)
+	}
+
+	for _, inactive := range []struct{ name, set, reset string }{
+		{
+			"assets.customers",
+			`UPDATE assets.customers SET status = 'inactive' WHERE id = $1`,
+			`UPDATE assets.customers SET status = 'active' WHERE id = $1`,
+		},
+		{
+			"identity.organizations",
+			`UPDATE identity.organizations SET status = 'inactive' WHERE id = (SELECT organization_id FROM assets.customers
+				WHERE id = $1)`,
+			`UPDATE identity.organizations SET status = 'active' WHERE id = (SELECT organization_id FROM assets.customers
+				WHERE id = $1)`,
+		},
+	} {
+		owner(t, inactive.set, seed.ID("cust-b"))
+
+		code, res = post(srv, hq(), opAdminSummary, body)
+
+		owner(t, inactive.reset, seed.ID("cust-b"))
+
+		if code != 200 || asNum(t, data(res)["customerCount"]) != 0 {
+			t.Errorf("inactive %s counted: %d %v", inactive.name, code, res)
+		}
 	}
 }
 
