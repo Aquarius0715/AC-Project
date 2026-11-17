@@ -309,7 +309,7 @@ function FilterCare({ onRequest }: Readonly<{ onRequest: () => void }>) {
         <DataTable rowKey={(r) => r.unit} rows={rows} cols={[
           { key: "u", label: "AC", render: (r) => <div><b>{r.unit}</b><div className="text-[11px] text-muted-foreground">{r.loc}</div></div> },
           { key: "h", label: "Run time", render: (r) => `${String(r.h)} h since cleaning` },
-          { key: "p", label: "Progress", render: (r) => <div className="w-28"><UtilizationBar pct={Math.min(100, (r.h / 250) * 100)} tone={filterTone(r.st)} /></div>, hideBelow: "sm" },
+          { key: "p", label: "Progress", render: (r) => <div className="w-28"><UtilizationBar pct={Math.min(100, (r.h / 250) * 100)} tone={filterTone(r.st)} label={`${r.unit}: ${String(r.h)} h since cleaning`} /></div>, hideBelow: "sm" },
           { key: "s", label: "Status", render: (r) => <Badge tone={filterTone(r.st)}>{r.st}</Badge> },
           { key: "a", label: "", render: (r) => r.st === "Overdue" ? <Btn size="sm" variant="primary" onClick={onRequest}>Request cleaning</Btn> : <Btn size="sm" onClick={() => { setRows((s) => s.map((x) => (x.unit === r.unit ? { ...x, h: 0, st: "OK", loc: `${x.loc.split(" · ", 1)[0] ?? x.loc} · cleaned by you just now` } : x))); toast("Marked cleaned — counter reset"); }}>Mark cleaned</Btn> },
         ]} />
