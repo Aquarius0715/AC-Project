@@ -6,6 +6,7 @@
 import type { Page } from "@playwright/test";
 import { test, expect } from "../../fixtures/test";
 import { expectAccessible } from "../../fixtures/a11y";
+import { must } from "../../fixtures/must";
 
 const CUSTOMER_A = "d67d153b-fa85-57be-aa40-c8aa09e3d02c"; // the customer record of Demo Customer A
 const MEETING_ROOM = "971554c4-e36b-5d0b-a8fe-c61445c649c5";
@@ -17,6 +18,7 @@ test("HQ plans a unit and creates its installation job", async ({ page }) => {
   const main = page.getByRole("main");
   const name = `E2E planned AC ${String(Date.now())}`;
   let jobId = "";
+  const unit = { registered: false }; // an object: a plain let would stay narrowed to false (set inside a step callback)
 
   try {
     await test.step("HQ registers the unit as installation planned", async () => {
@@ -32,6 +34,7 @@ test("HQ plans a unit and creates its installation job", async ({ page }) => {
       await expectAccessible(page, '[role="dialog"]');
       await dialog.getByRole("button", { name: "Register unit" }).click();
       await expect(page.getByText(`Unit “${name}” registered`).first()).toBeVisible();
+      unit.registered = true;
       await expect(main).toContainText("Installation planned: the installation date is set when HQ accepts");
       await expect(main.getByLabel("Installed at")).toBeDisabled();
     });
@@ -57,7 +60,11 @@ test("HQ plans a unit and creates its installation job", async ({ page }) => {
       await page.goto("/admin/jobs");
       await main.getByRole("button", { name: /^New job/ }).first().click();
       const dialog = page.getByRole("dialog");
-      await unitSelect(page).selectOption({ index: 0 });
+      // an installed unit by name, not index 0: a planned E2E unit (this run's, or one a failed run left) can come first
+      const units = unitSelect(page);
+      const labels = await units.locator("option").allInnerTexts();
+      const installed = must(labels.map((l) => l.trim()).find((l) => l !== "" && !l.includes("E2E planned AC")));
+      await units.selectOption({ label: installed });
       await expect(dialog.getByRole("button", { name: "Repair" })).toBeVisible();
       await expect(dialog.getByRole("button", { name: "Installation", exact: true })).toHaveCount(0);
       await dialog.getByRole("button", { name: "Cancel" }).click();
@@ -70,13 +77,17 @@ test("HQ plans a unit and creates its installation job", async ({ page }) => {
       await page.getByRole("button", { name: "Confirm" }).click();
       await expect(page.getByText("Job cancelled.").first()).toBeVisible();
     }
-    await page.goto(`/admin/units?customerId=${CUSTOMER_A}&locationId=${MEETING_ROOM}`);
-    const row = main.getByText(name).first();
-    if (await row.isVisible()) {
+    // Wait for the row and for the result: a unit left in the meeting room breaks units-delete.e2e.ts ("1 unit")
+    // and the next run's installed-unit step. isVisible() never waits, so it would skip the delete silently.
+    if (unit.registered) {
+      await page.goto(`/admin/units?customerId=${CUSTOMER_A}&locationId=${MEETING_ROOM}`);
+      const row = main.getByText(name).first();
+      await expect(row).toBeVisible();
       await row.click();
       await main.getByRole("button", { name: "Delete unit…" }).click();
       await page.getByRole("dialog").getByLabel(/Reason · required/).fill("E2E installation finished.");
       await page.getByRole("dialog").getByRole("button", { name: "Delete unit" }).click();
+      await expect(page.getByText(`“${name}” taken out of use`).first()).toBeVisible();
     }
   }
 });
