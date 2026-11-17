@@ -41,7 +41,7 @@ func TestInputValidate(t *testing.T) {
 		{"blank organization", func(in *bootstrap.Input) { in.Organization = "" }, "organization"},
 		{
 			"long organization",
-			func(in *bootstrap.Input) { in.Organization = strings.Repeat("o", 121) },
+			func(in *bootstrap.Input) { in.Organization = strings.Repeat("あ", 121) },
 			"organization",
 		},
 		{
@@ -68,8 +68,15 @@ func TestInputValidate(t *testing.T) {
 		{"blank name", func(in *bootstrap.Input) { in.Name = "\t" }, "name"},
 		{
 			"long name",
-			func(in *bootstrap.Input) { in.Name = strings.Repeat("n", 121) },
+			func(in *bootstrap.Input) { in.Name = strings.Repeat("あ", 121) },
 			"name",
+		},
+		{
+			"120-character organization and name",
+			func(in *bootstrap.Input) {
+				in.Organization, in.Name = strings.Repeat("あ", 120), strings.Repeat("あ", 120)
+			},
+			"",
 		},
 	}
 
