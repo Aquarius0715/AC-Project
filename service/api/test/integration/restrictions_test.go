@@ -1601,6 +1601,34 @@ func TestRestrictionReconcilePaths(t *testing.T) {
 		`{"restrictionId":"`+id3+`","rulesVersion":"rules-1"}`,
 	)
 
+	// a device operation running on the unit holds the remove back (D04): the reconcile is refused, nothing is recorded
+	var device3 string
+	ownerScan(t, `SELECT id::text FROM devices.devices WHERE unit_id = $1`, []any{unit3}, &device3)
+
+	busyOp := uuid.NewString()
+	owner(
+		t,
+		`INSERT INTO devices.device_operations (id, tenant_id, device_id, unit_id, kind, status, expires_at)
+		VALUES ($1,$2,$3,$4,'check','running',$5)`,
+		busyOp,
+		seed.ID("tenant-a"),
+		device3,
+		unit3,
+		clock().Add(time.Hour),
+	)
+
+	if code, res := reconcile(id3, unit3, ver(t, get3())); code != 409 ||
+		res["messageKey"] != "errors.unit_busy" {
+		t.Fatalf("reconcile while a device operation runs: %d %v", code, res)
+	}
+
+	if state := unitState(t, get3(), unit3); state["releaseState"] != statusWaitingReconcile ||
+		state["applyState"] == statusApplied {
+		t.Errorf("a refused reconcile recorded the unit: %v", state)
+	}
+
+	owner(t, `DELETE FROM devices.device_operations WHERE id = $1`, busyOp)
+
 	code, resp := reconcile(id3, unit3, ver(t, get3()))
 	if code != 200 || unitState(t, resp, unit3)["applyState"] != statusApplied ||
 		unitState(t, resp, unit3)["releaseState"] != statusRequested ||
