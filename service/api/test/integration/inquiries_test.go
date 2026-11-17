@@ -30,7 +30,10 @@ func TestInquiries(t *testing.T) {
 		0,
 	)
 	rid := asStr(t, data(resp)["id"])
+	// the customer's own invoice that the restriction does not cite
+	_, uncited := newInvoice(t, srv)
 	refused := map[string]string{ // the field each VALIDATION case is refused for
+		"uncited invoice":          "invoiceId=errors.not_a_cause_invoice",
 		"bad subject":              "subjectType=error.invalid",
 		"blank message":            refusedMessageLength,
 		"payment with restriction": "restrictionId=error.notAllowed",
@@ -53,6 +56,8 @@ func TestInquiries(t *testing.T) {
 			`"restrictionId":"` + uuid.NewString() + `","message":"why"}`, 404},
 		"unknown cited invoice": {`{"subjectType":"restriction",` +
 			`"restrictionId":"` + rid + `","invoiceId":"` + uuid.NewString() + `","message":"why"}`, 404},
+		"uncited invoice": {`{"subjectType":"restriction",` +
+			`"restrictionId":"` + rid + `","invoiceId":"` + uncited + `","message":"why"}`, 422},
 	} {
 		code, m := write(srv, customerB(), "inquiries.create", testCase.body, 0)
 		if w, ok := refused[name]; ok {

@@ -78,7 +78,21 @@ func TestContractsAndInvoices(t *testing.T) {
 		t.Error("unknown customer")
 	}
 
+	// a customer that is no longer active gets no contract
+	owner(t, `UPDATE assets.customers SET status = 'inactive' WHERE id = $1`, seed.ID("cust-b"))
+
 	code, resp := write(srv, hq(), "contracts.save", body(nil), 0)
+
+	owner(t, `UPDATE assets.customers SET status = 'active' WHERE id = $1`, seed.ID("cust-b"))
+	refusal(t, "inactive customer", code, resp, "customerId=error.inactiveCustomer")
+
+	// a nil invoice or statement id is refused for its field, not looked up
+	for _, op := range []string{"invoices.get", "payouts.get"} {
+		code, resp = post(srv, hq(), op, `{"id":"`+uuid.Nil.String()+`"}`)
+		refusal(t, op+" nil id", code, resp, "id=error.required")
+	}
+
+	code, resp = write(srv, hq(), "contracts.save", body(nil), 0)
 	if code != 200 || asNum(t, data(resp)["version"]) != 1 ||
 		len(asArr(t, data(resp)["unitIds"])) != 1 ||
 		data(resp)["customerOrgId"] != seed.ID("org-customer-b").String() {
