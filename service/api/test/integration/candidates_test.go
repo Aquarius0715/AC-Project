@@ -4,6 +4,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
@@ -132,5 +134,169 @@ func TestContractorPicksCandidateTime(t *testing.T) {
 			"the client is told the new time: %d",
 			countNotes(t, job, "customer-a", "schedule_change"),
 		)
+	}
+}
+
+// TestOfferCandidateSources (IR636): besides the client's preferred times, an offer's candidates are the slots of the
+// job's accepted proposals, and a periodic job with no preferred time offers its plan occurrence.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
+func TestOfferCandidateSources(t *testing.T) {
+	srv := server(t)
+	stamp := func(h int) string { return clock().Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	contractor := seed.ID("org-contractor-a").String()
+	version := func(job string) int {
+		t.Helper()
+
+		_, res := post(srv, hq(), "jobs.get", `{"jobId":"`+job+`"}`)
+
+		return int(asNum(t, data(res)["version"]))
+	}
+	offer := func(job string) []any {
+		t.Helper()
+
+		if code, res := write(
+			srv,
+			hq(),
+			"jobs.offer",
+			`{"jobId":"`+job+`","contractorOrgId":"`+contractor+`","offerExpiresAt":"`+stamp(12)+
+				`","accessValidFrom":"`+stamp(0)+`","accessValidUntil":"`+stamp(200)+`","termsVersion":"t"}`,
+			version(job),
+		); code != 200 {
+			t.Fatalf("offer %s: %d %v", job, code, res)
+		}
+
+		_, detail := post(srv, hq(), "jobs.get", `{"jobId":"`+job+`"}`)
+
+		candidates, _ := asObj(t, data(detail)["offer"])["candidateSlots"].([]any)
+
+		return candidates
+	}
+	openOffer := func(job string) string {
+		var id string
+		ownerScan(
+			t,
+			`SELECT id::text FROM maintenance.offers WHERE job_id = $1 AND decision IS NULL`,
+			[]any{job},
+			&id,
+		)
+
+		return id
+	}
+
+	// the client accepts HQ's contractor-held time, the contractor declines that offer: HQ's next offer holds the
+	// three preferred times and then the accepted one
+	_, resp := write(
+		srv,
+		customerA(),
+		"jobs.create",
+		jobBody(seed.ID("unit-non-rto").String(), nil),
+		0,
+	)
+	job := asStr(t, data(resp)["id"])
+
+	if code, res := write(
+		srv,
+		hq(),
+		"jobs.proposeSlot",
+		`{"jobId":"`+job+`","slot":`+slotJSON(
+			98,
+			2,
+		)+`,"hold":{"kind":"contractor","contractorOrgId":"`+contractor+
+			`","technicianMembershipId":null},"message":"Can we come then?","replyBy":"`+stamp(
+			48,
+		)+`"}`,
+		version(job),
+	); code != 200 {
+		t.Fatalf("propose: %d %v", code, res)
+	}
+
+	var proposal string
+	ownerScan(
+		t,
+		`SELECT id::text FROM maintenance.slot_proposals WHERE job_id = $1 AND status = 'pending'`,
+		[]any{job},
+		&proposal,
+	)
+
+	if code, res := write(
+		srv,
+		customerA(),
+		"jobs.respondProposal",
+		`{"jobId":"`+job+`","proposalId":"`+proposal+`","decision":"accept"}`,
+		version(job),
+	); code != 200 || data(res)["status"] != statusOffered {
+		t.Fatalf("accept the proposal: %d %v", code, res)
+	}
+
+	if code, res := write(
+		srv,
+		contrA(),
+		opJobsDecline,
+		`{"jobId":"`+job+`","offerId":"`+openOffer(job)+`","reason":"no capacity"}`,
+		version(job),
+	); code != 200 {
+		t.Fatalf("decline: %d %v", code, res)
+	}
+
+	candidates := offer(job)
+	if len(candidates) != 4 || asObj(t, candidates[3])["startAt"] != stamp(98) {
+		t.Errorf("the preferred times and then the accepted proposal: %v", candidates)
+	}
+
+	// a periodic job without preferred times offers its plan occurrence, at the requested length
+	plan, planJob := uuid.NewString(), uuid.NewString()
+	owner(
+		t,
+		`INSERT INTO maintenance.plans (id, tenant_id, unit_id, interval_months, anchor_day, next_due_at) VALUES ($1,$2,$3,3,
+			8,$4)`,
+		plan,
+		seed.ID("tenant-a"),
+		seed.ID("unit-non-rto"),
+		clock(),
+	)
+	owner(
+		t,
+		`INSERT INTO maintenance.jobs (id, tenant_id, unit_id, customer_org_id, plan_id, occurrence_at, type, status, origin,
+			requested_slot, due_at)
+		VALUES ($1,$2,$3,$4,$5,$6,'periodic','requested','periodic_plan',tstzrange($6,$7),$7)`,
+		planJob,
+		seed.ID("tenant-a"),
+		seed.ID("unit-non-rto"),
+		seed.ID("org-customer-a"),
+		plan,
+		clock().Add(60*time.Hour),
+		clock().Add(62*time.Hour),
+	)
+
+	candidates = offer(planJob)
+	if len(candidates) != 1 || asObj(t, candidates[0])["startAt"] != stamp(60) ||
+		asObj(t, candidates[0])["endAt"] != stamp(62) {
+		t.Errorf("the plan occurrence: %v", candidates)
+	}
+}
+
+// TestInstallationRequestStatusFilter: installationRequests.list refuses a status outside the four request states as
+// VALIDATION naming the filter, and lists by a known one (an unknown filter is refused earlier, by the REST binding).
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
+func TestInstallationRequestStatusFilter(t *testing.T) {
+	srv := server(t)
+
+	code, res := post(
+		srv,
+		customerA(),
+		"installationRequests.list",
+		`{"filters":{"status":"lost"},"limit":10}`,
+	)
+	refusal(t, "an unknown status", code, res, "filters.status=error.invalid")
+
+	if code, res := post(
+		srv,
+		customerA(),
+		"installationRequests.list",
+		`{"filters":{"status":"submitted"},"limit":10}`,
+	); code != 200 {
+		t.Errorf("a known status: %d %v", code, res)
 	}
 }
