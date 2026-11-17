@@ -498,6 +498,28 @@ func TestPartnerProposalsAndReschedule(t *testing.T) {
 		t.Errorf("partner proposal of a candidate time: %d %s", code, fields(res))
 	}
 
+	// the proposed technician must be qualified for the slot: revoke the grants for the check, then restore them
+	revokedMark := time.Date(2001, 2, 3, 4, 5, 6, 0, time.UTC)
+	owner(
+		t,
+		`UPDATE identity.qualification_grants SET revoked_at = $2 WHERE membership_id = $1 AND revoked_at IS NULL`,
+		seed.ID("tech-external-a"),
+		revokedMark,
+	)
+
+	code, res := proposePartner(contrA(), slotJSON(101, 2), "tech-external-a", "busy", 2)
+
+	owner(
+		t,
+		`UPDATE identity.qualification_grants SET revoked_at = NULL WHERE membership_id = $1 AND revoked_at = $2`,
+		seed.ID("tech-external-a"),
+		revokedMark,
+	)
+
+	if code != 403 || res["messageKey"] != "errors.qualification_missing" {
+		t.Errorf("partner proposal of an unqualified technician: %d %v", code, res)
+	}
+
 	if code, res := proposePartner(
 		contrA(),
 		slotJSON(101, 2),
