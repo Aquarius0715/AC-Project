@@ -106,6 +106,22 @@ func TestAlerts(t *testing.T) {
 		code, m := post(srv, hq(), "alerts.list", body)
 		refusal(t, body, code, m, want[body])
 	}
+	// the nil UUID is a UUID, so the route passes it on and Validate refuses it by name
+	if code, m := post(srv, hq(), "alerts.get", `{"id":"`+uuid.Nil.String()+`"}`); code != 422 ||
+		fields(m) != refusedIDRequired {
+		t.Errorf("alerts.get nil id: %d %s", code, fields(m))
+	}
+
+	if code, nilAck := write(
+		srv,
+		hq(),
+		"alerts.acknowledge",
+		`{"alertId":"`+uuid.Nil.String()+`"}`,
+		1,
+	); code != 422 ||
+		fields(nilAck) != "alertId=error.required" {
+		t.Errorf("alerts.acknowledge nil id: %d %s", code, fields(nilAck))
+	}
 	// scope: customer-b sees, customer-a does not; units.list shows the active count
 	if code, _ := post(srv, customerB(), "alerts.get", `{"id":"`+crit+`"}`); code != 200 {
 		t.Error("customer-b reads its alert")

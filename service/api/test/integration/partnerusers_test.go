@@ -896,12 +896,12 @@ func TestPartnerUserInputs(t *testing.T) {
 		op, body, want string
 	}{
 		"remove without id": {opPartnerUsersRemove, `{"id":"00000000-0000-0000-0000-000000000000",` +
-			`"reason":"x"}`, "id=error.required"},
+			`"reason":"x"}`, refusedIDRequired},
 		"remove long reason": {opPartnerUsersRemove, `{"id":"` + uuid.NewString() + `","reason":"` +
 			strings.Repeat("x", 1001) + `"}`, refusedReasonLength},
 		"resend without id": {
 			opPartnerUsersResendInvite, `{"id":"00000000-0000-0000-0000-000000000000"}`,
-			"id=error.required",
+			refusedIDRequired,
 		},
 		"reason on an invite": {opPartnerUsersSave, `{"email":"x-` + uuid.NewString()[:8] + `@example.com",` +
 			`"partnerRole":"contractor","displayName":"X","reason":"why"}`, "reason=error.notAllowed"},

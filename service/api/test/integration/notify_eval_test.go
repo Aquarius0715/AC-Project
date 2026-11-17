@@ -292,6 +292,97 @@ func TestAutomationNotifications(t *testing.T) {
 	)
 }
 
+// SR12: an alert policy without recipients notifies nobody — not every client of the customer, which an empty member
+// filter would return — and records a no_recipient DeliveryFailure; the same event delivered again adds none and
+// answers the failure it recorded.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
+func TestAlertPolicyWithoutRecipients(t *testing.T) {
+	srv := server(t)
+	owner(t, `DELETE FROM control.evaluation_events`)
+	unitID := newUnit(t, srv, "Unaddressed AC")
+	policyID := uuid.NewString()
+	cond := jsonBytes(t,
+		map[string]any{
+			fieldMetric:            metricCO2,
+			fieldOperator:          operatorAtLeast,
+			fieldThreshold:         1000,
+			fieldRecoveryThreshold: 900,
+			fieldDurationSeconds:   60,
+			fieldActiveWindow:      nil,
+			fieldSeverity:          severityWarning,
+		},
+	)
+	owner(
+		t,
+		`INSERT INTO monitoring.alert_policies (id, tenant_id, kind, customer_id, name, owner_membership_id,
+			created_by_user_id, timezone, enabled, priority, condition,
+		recipient_membership_ids, channels, escalate_after_minutes, cooldown_minutes) VALUES ($1,$2,'alert',$3,'CO2 high',$4,
+		$5,'Asia/Kuala_Lumpur',true,50,$6,'{}','{inApp,email}',60,30)`,
+		policyID,
+		seed.ID("tenant-a"),
+		seed.ID("cust-b"),
+		seed.ID("customer-b"),
+		seed.ID("user-customer-b"),
+		cond,
+	)
+	owner(
+		t,
+		`INSERT INTO assets.unit_alert_policies (tenant_id, unit_id, policy_id) VALUES ($1,$2,$3)`,
+		seed.ID("tenant-a"),
+		unitID,
+		policyID,
+	)
+
+	body := `{"eventId":"` + uuid.NewString() + `","occurredAt":"` + clock().Format(
+		time.RFC3339,
+	) + `","unitIds":["` + unitID + `"],"facts":[{"unitId":"` + unitID +
+		`","metric":"co2","value":1200,"unit":"ppm","observedAt":"` + clock().Format(time.RFC3339) +
+		`","quality":"valid"}],"phase":"condition"}`
+	outcome := func(m map[string]any) map[string]any {
+		for _, n := range asArr(t, data(m)["notifications"]) {
+			if x := asObj(t, n); x["unitId"] == unitID && x["policyId"] == policyID {
+				return x
+			}
+		}
+
+		return nil
+	}
+
+	code, resp := write(srv, customerB(), "automations.fire", body, 0)
+
+	first := outcome(resp)
+	if code != 200 || first["decision"] != statusFailed || first["reason"] != "no_recipient" ||
+		len(asArr(t, first["notificationIds"])) != 0 || len(asArr(t, first["failureIds"])) != 1 {
+		t.Fatalf("fire: %d %v", code, resp)
+	}
+
+	owner(t, `DELETE FROM control.evaluation_events`) // let the same event be fired again
+
+	code, resp = write(srv, customerB(), "automations.fire", body, 0)
+
+	again := outcome(resp)
+	if code != 200 || again["decision"] != statusFailed ||
+		len(asArr(t, again["failureIds"])) != 1 ||
+		asArr(t, again["failureIds"])[0] != asArr(t, first["failureIds"])[0] {
+		t.Fatalf("same event again: %d %v, first %v", code, resp, first)
+	}
+
+	var alerts, failures int
+	ownerScan(
+		t,
+		`SELECT count(*), COALESCE(sum(jsonb_array_length(delivery_failures)), 0) FROM monitoring.alerts WHERE unit_id = $1
+			AND policy_id = $2`,
+		[]any{unitID, policyID},
+		&alerts,
+		&failures,
+	)
+
+	if alerts != 1 || failures != 1 {
+		t.Errorf("one alert with one failure: %d %d", alerts, failures)
+	}
+}
+
 // D08 / IR66: fired facts past the recovery threshold resolve the open policy alerts of the unit — the attached
 // policy's and the default rule's — with the recovery as evidence; a fact between the thresholds, a suspect one and a
 // simulation change nothing, an alert without a policy stays open, and the next breach opens a new alert linked to the
