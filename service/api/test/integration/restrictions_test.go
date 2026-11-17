@@ -468,7 +468,7 @@ func TestRestrictionLifecycle(t *testing.T) {
 	}
 
 	for _, e := range asArr(t, items(t, resp)[0]["events"]) {
-		if ev := asObj(t, e); ev["actorId"] != "masked" || ev["actorName"] != nil ||
+		if ev := asObj(t, e); ev["actorId"] != valueMasked || ev["actorName"] != nil ||
 			ev["reason"] != nil {
 			t.Errorf("unmasked event %v", ev)
 		}
@@ -916,7 +916,7 @@ func TestRestrictionExceptionReleaseRetry(t *testing.T) {
 	if code, res := write(
 		srv,
 		restrMgr(),
-		"restrictions.defer",
+		opRestrictionsDefer,
 		deferBody(clock().Add(-time.Hour)),
 		ver(t, get()),
 	); code != 422 ||
@@ -927,7 +927,7 @@ func TestRestrictionExceptionReleaseRetry(t *testing.T) {
 	if code, res := write(
 		srv,
 		restrMgr(),
-		"restrictions.defer",
+		opRestrictionsDefer,
 		deferBody(clock().Add(100*24*time.Hour)),
 		ver(t, get()),
 	); code != 422 ||
@@ -938,7 +938,7 @@ func TestRestrictionExceptionReleaseRetry(t *testing.T) {
 	code, resp = write(
 		srv,
 		restrMgr(),
-		"restrictions.defer",
+		opRestrictionsDefer,
 		deferBody(clock().Add(48*time.Hour)),
 		ver(t, get()),
 	)
@@ -948,6 +948,29 @@ func TestRestrictionExceptionReleaseRetry(t *testing.T) {
 		unitState(t, resp, online)["releaseState"] != statusRequested ||
 		unitState(t, resp, offline)["releaseState"] != statusRequested {
 		t.Fatalf("defer: %d %v", code, resp)
+	}
+	// the grace is a state change the client sees (IR42), with the reason and the actor masked
+	_, clientView := post(
+		srv,
+		customerB(),
+		opRestrictionsForInvoice,
+		`{"invoiceId":"`+inv+`","query":{}}`,
+	)
+
+	deferEvents := 0
+
+	for _, item := range items(t, clientView) {
+		for _, raw := range asArr(t, item["events"]) {
+			event := asObj(t, raw)
+			if event["action"] == opRestrictionsDefer && event["reason"] == nil &&
+				event["actorId"] == valueMasked {
+				deferEvents++
+			}
+		}
+	}
+
+	if deferEvents != 1 {
+		t.Errorf("client sees the grace once: %v", clientView)
 	}
 
 	if code, again := write(
@@ -1033,7 +1056,7 @@ func TestRestrictionExceptionReleaseRetry(t *testing.T) {
 		t.Fatal("released after retry")
 	}
 
-	for _, operation := range []string{"restrictions.defer", "restrictions.exempt"} {
+	for _, operation := range []string{opRestrictionsDefer, "restrictions.exempt"} {
 		if code, _ := write(
 			srv,
 			restrMgr(),
@@ -1250,7 +1273,7 @@ func TestRestrictionReconcileNotApplied(t *testing.T) {
 		`{"invoiceId":"`+inv+`","query":{"filters":{"status":"release_requested"}}}`,
 	); len(items(t, res)) != 1 ||
 		asObj(t, items(t, res)[0]["exception"])["reason"] != nil ||
-		asObj(t, items(t, res)[0]["releaseIntent"])["actorMembershipId"] != "masked" {
+		asObj(t, items(t, res)[0]["releaseIntent"])["actorMembershipId"] != valueMasked {
 		t.Fatalf("client mask: %v", res)
 	}
 	// query catalog: contractId => contractId, status => state; the invoice is the path, not a filter

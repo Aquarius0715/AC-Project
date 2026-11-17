@@ -9,6 +9,9 @@ const tableEmissionFactors = "energy.emission_factors"
 // opFactorsSave saves an emission factor.
 const opFactorsSave = "factors.save"
 
+// valueMasked replaces an actor or membership id the client projection hides (IR42).
+const valueMasked = "masked"
+
 const (
 	opAlertsList                  = "alerts.list"
 	opAutomationsNextRuns         = "automations.nextRuns"
@@ -57,6 +60,7 @@ const (
 	opPreferencesUpdate           = "preferences.update"
 	opReportsGet                  = "reports.get"
 	opReportsSignOff              = "reports.signOff"
+	opRestrictionsDefer           = "restrictions.defer"
 	opRestrictionsForInvoice      = "restrictions.forInvoice"
 	opRestrictionsRetry           = "restrictions.retry"
 	opSessionGet                  = "session.get"
