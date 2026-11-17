@@ -161,6 +161,7 @@ const (
 	refusedFilterStatusesInvalid = "filters.statuses=" + apperr.KeyInvalid
 	refusedFilterToRange         = "filters.to=" + apperr.KeyRange
 	refusedFiltersInvalid        = "filters=" + apperr.KeyInvalid
+	refusedIDRequired            = "id=" + apperr.KeyRequired
 	refusedInvoiceIDRequired     = "invoiceId=" + apperr.KeyRequired
 	refusedKindFixed             = "kind=" + apperr.KeyKindFixed
 	refusedKindInvalid           = "kind=" + apperr.KeyInvalid
