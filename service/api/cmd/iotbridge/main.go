@@ -232,11 +232,7 @@ func subscribeDemo(
 	// t/<tenantId>/d/<deviceId>/telemetry, every tenant and device
 	sub("t/+/d/+/telemetry", func(_ mqtt.Client, msg mqtt.Message) {
 		var batch devicesim.Batch
-
-		err := json.Unmarshal(msg.Payload(), &batch)
-		if err != nil {
-			log.Printf("telemetry on %s: %v", msg.Topic(), err)
-
+		if !ownPayload(msg, "telemetry", &batch, func() string { return batch.DeviceID }) {
 			return
 		}
 		// stamp a little in the past: the offset is an estimate, and the API refuses a reading received after its clock
@@ -259,11 +255,7 @@ func subscribeDemo(
 	// not is heard all the same (IR613)
 	sub("t/+/d/+/heartbeat", func(_ mqtt.Client, msg mqtt.Message) {
 		var heartbeat devicesim.Heartbeat
-
-		err := json.Unmarshal(msg.Payload(), &heartbeat)
-		if err != nil {
-			log.Printf("heartbeat on %s: %v", msg.Topic(), err)
-
+		if !ownPayload(msg, "heartbeat", &heartbeat, func() string { return heartbeat.DeviceID }) {
 			return
 		}
 
@@ -285,11 +277,7 @@ func subscribeDemo(
 	// t/<tenantId>/d/<deviceId>/cmd/ack: a module's answer to a command the API sent
 	sub("t/+/d/+/cmd/ack", func(_ mqtt.Client, msg mqtt.Message) {
 		var ack devicesim.Ack
-
-		err := json.Unmarshal(msg.Payload(), &ack)
-		if err != nil {
-			log.Printf("ack on %s: %v", msg.Topic(), err)
-
+		if !ownPayload(msg, "ack", &ack, func() string { return ack.DeviceID }) {
 			return
 		}
 
@@ -315,6 +303,34 @@ func subscribeDemo(
 			log.Printf("trigger %s: %v", trigger.EventID, sendErr)
 		}
 	})
+}
+
+// modulePayload is what a simulated module publishes up: telemetry, heartbeats and command answers.
+type modulePayload interface {
+	devicesim.Batch | devicesim.Heartbeat | devicesim.Ack
+}
+
+// ownPayload decodes a simulated module's message into payload and takes it only when the device it names (device, read
+// after the decode) is its topic's (iotbridge.OwnTopic); a message that fails either is logged with what it is and
+// dropped.
+func ownPayload[T modulePayload](
+	msg mqtt.Message,
+	what string,
+	payload *T,
+	device func() string,
+) bool {
+	err := json.Unmarshal(msg.Payload(), payload)
+	if err == nil {
+		err = iotbridge.OwnTopic(msg.Topic(), device())
+	}
+
+	if err != nil {
+		log.Printf("%s on %s: %v", what, msg.Topic(), err)
+
+		return false
+	}
+
+	return true
 }
 
 // deviceKey is the device of a topic t/<tenant>/d/<device>/…, which decides the worker of its messages; a topic of any

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -75,6 +76,33 @@ func SentTrigger(w Waiting, when time.Time) Trigger {
 // CommandTopic is the downward topic of a device's commands for a tenant (backend-architecture §9).
 func CommandTopic(tenant, device uuid.UUID) string {
 	return devicesim.Topic(tenant.String(), device.String(), "cmd")
+}
+
+// errNotOwnTopic refuses a module's message whose payload names another device than its topic.
+var errNotOwnTopic = errors.New("not the device of its topic")
+
+// OwnTopic accepts a module's message only on its own device's topic t/<tenant>/d/<deviceId>/…: the broker limits a
+// module to its own deviceId's topics (network-architecture F09), so the device the payload names must be that one,
+// or a module could report readings, states and command answers for another tenant's device.
+func OwnTopic(topic, device string) error {
+	const minParts = 5 // t, <tenant>, d, <device>, kind…
+
+	parts := strings.SplitN(topic, "/", minParts)
+	if len(parts) < minParts || parts[0] != "t" || parts[2] != "d" {
+		return fmt.Errorf("topic %q: %w", topic, errNotOwnTopic)
+	}
+
+	onTopic, err := uuid.Parse(parts[3])
+	if err != nil {
+		return fmt.Errorf("topic %q: %w", topic, err)
+	}
+
+	named, err := uuid.Parse(device)
+	if err != nil || named != onTopic {
+		return fmt.Errorf("device %q on %q: %w", device, topic, errNotOwnTopic)
+	}
+
+	return nil
 }
 
 // StateTrigger turns a heartbeat into the device's state report (DemoTrigger state) at the given scenario time. A
