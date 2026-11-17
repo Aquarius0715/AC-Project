@@ -787,7 +787,7 @@ func cancelPaid(ctx context.Context, call *ops.Call, restriction Restriction) (R
 		ops.Event{
 			AggregateType: kindRestriction,
 			AggregateID:   restriction.ID,
-			Type:          "RestrictionCancelled",
+			Type:          eventRestrictionCancelled,
 			Payload:       map[string]any{keySource: "payment"},
 		},
 	)
@@ -1048,7 +1048,7 @@ func (m Restrictions) cancel(
 			ops.Event{
 				AggregateType: kindRestriction,
 				AggregateID:   restriction.ID,
-				Type:          "RestrictionCancelled",
+				Type:          eventRestrictionCancelled,
 				Payload:       map[string]any{keySource: "cancel"},
 			},
 		)

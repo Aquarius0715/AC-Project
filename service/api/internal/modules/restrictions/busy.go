@@ -228,23 +228,28 @@ func (m Restrictions) OnInvoicePaid(
 		  $1)
 		  AND NOT EXISTS (SELECT 1 FROM restrictions.restriction_invoices ri JOIN billing.invoices i ON i.id = ri.invoice_id
 			WHERE ri.restriction_id = r.id AND i.status <> 'paid')
-		RETURNING r.id`, invoice, call.Now, call.Principal.MembershipID)
+		RETURNING r.id, r.state`, invoice, call.Now, call.Principal.MembershipID)
 	if err != nil {
 		return nil, apperr.Wrap(err, "update restrictions.restrictions")
 	}
 	defer rows.Close()
 
 	out := []uuid.UUID{}
+	cancelled := map[uuid.UUID]bool{}
 
 	for rows.Next() {
-		var restrictionID uuid.UUID
+		var (
+			restrictionID uuid.UUID
+			state         string
+		)
 
-		err := rows.Scan(&restrictionID)
+		err := rows.Scan(&restrictionID, &state)
 		if err != nil {
 			return nil, apperr.Wrap(err, "update restrictions.restrictions")
 		}
 
 		out = append(out, restrictionID)
+		cancelled[restrictionID] = state == stateCancelled
 	}
 
 	rowsErr := rows.Err()
@@ -253,22 +258,31 @@ func (m Restrictions) OnInvoicePaid(
 	}
 
 	for _, restrictionID := range out {
+		// a scheduled restriction sent nothing: cancelled as HQ's cancel and the execute-time check do (DD-A09), its units
+		// untouched and no release to evaluate (R897)
+		eventType := "RestrictionReleaseRequested"
+		if cancelled[restrictionID] {
+			eventType = eventRestrictionCancelled
+		}
+
 		call.Emit(
 			ops.Event{
 				AggregateType: kindRestriction,
 				AggregateID:   restrictionID,
-				Type:          "RestrictionReleaseRequested",
+				Type:          eventType,
 				Payload:       map[string]any{keySource: "payment", "invoiceId": invoice},
 			},
 		)
 
-		err := m.evaluateRelease(
-			ctx,
-			call,
-			restrictionID,
-		)
-		if err != nil { // D03 release evaluation in the same transition (IR35 ①)
-			return nil, err
+		if !cancelled[restrictionID] {
+			err := m.evaluateRelease(
+				ctx,
+				call,
+				restrictionID,
+			)
+			if err != nil { // D03 release evaluation in the same transition (IR35 ①)
+				return nil, err
+			}
 		}
 
 		call.Audit(

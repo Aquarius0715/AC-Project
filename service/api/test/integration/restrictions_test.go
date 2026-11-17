@@ -1750,6 +1750,70 @@ func TestRestrictionEndsWhenItsInvoicesArePaidAtOnce(t *testing.T) {
 	}
 }
 
+// R897: paying the cause invoice of a scheduled restriction cancels it as HQ's cancel and the execute-time check do
+// (RestrictionCancelled, units untouched): before, the payment published RestrictionReleaseRequested for a restriction
+// that was never applied and a RestrictionCommandsCancelled per unit for commands that never existed.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
+func TestScheduledRestrictionCancelledByPayment(t *testing.T) {
+	srv := server(t)
+	unit := boundUnit(t, srv, "online")
+	key, inv := overdueContract(t, srv, unit)
+
+	code, res := write(
+		srv,
+		restrMgr(),
+		"restrictions.schedule",
+		scheduleBody(key, inv, []string{unit}, nil),
+		0,
+	)
+	if code != 200 {
+		t.Fatalf("schedule: %d %v", code, res)
+	}
+
+	restrictionID := asStr(t, data(res)["id"])
+	_, invoice := post(srv, hq(), "invoices.get", `{"id":"`+inv+`"}`)
+
+	code, res = write(
+		srv,
+		hq(),
+		"payments.recordManual",
+		`{"invoiceId":"`+inv+`","paymentReference":"BANK-`+inv[:8]+`","confirmedAmountMinor":5000,"currency":"MYR",`+
+			`"reason":"bank transfer seen"}`,
+		ver(t, invoice),
+	)
+	if code != 200 {
+		t.Fatalf("payment: %d %v", code, res)
+	}
+
+	var state, applied, released, published string
+
+	ownerScan(
+		t,
+		`SELECT r.state, ru.apply_state, ru.release_state, (SELECT string_agg(o.event_type, ',' ORDER BY o.event_type)
+			FROM platform.outbox o WHERE o.aggregate_id = r.id AND o.event_type NOT LIKE 'RowChanged:%')
+		FROM restrictions.restrictions r JOIN restrictions.restriction_units ru ON ru.restriction_id = r.id WHERE r.id = $1`,
+		[]any{restrictionID},
+		&state,
+		&applied,
+		&released,
+		&published,
+	)
+
+	if state != statusCancelled || applied != "not_sent" || released != "none" {
+		t.Errorf(
+			"paid scheduled restriction: state %s, unit apply %s / release %s",
+			state,
+			applied,
+			released,
+		)
+	}
+
+	if published != "RestrictionCancelled,RestrictionScheduled" {
+		t.Errorf("events of the paid scheduled restriction: %s", published)
+	}
+}
+
 // IR477: the apply answers of two units of one restriction, written at once — HQ's reconcile beside a device's answer,
 // or two answers — make it applied. The restriction row was locked only after the unit's update, so the second writer
 // waited and then judged "every unit applied" on what it had read before the first committed: its own unit applied,
