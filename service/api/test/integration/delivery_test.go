@@ -15,6 +15,7 @@ import (
 const (
 	fieldOfferExpiresAt  = "offerExpiresAt"
 	refusedSlotNotAgreed = "startAt=errors.slot_not_agreed"
+	refusedAccessCover   = "accessValidFrom=error.accessMustCoverVisit"
 )
 
 //nolint:paralleltest // the integration tests share one server and the seeded test database
@@ -63,11 +64,11 @@ func TestOfferAcceptAssign(t *testing.T) {
 		return out + "}"
 	}
 	refused := map[string]string{ // the field each VALIDATION case is refused for
-		"access does not cover": "accessValidFrom=error.accessMustCoverVisit",
+		"access does not cover": refusedAccessCover,
 		"blank terms":           "termsVersion=error.length",
 		"expiry after access":   "offerExpiresAt=error.afterAccess",
 		"expiry in the past":    "offerExpiresAt=error.past",
-		"access starts late":    "accessValidFrom=error.accessMustCoverVisit",
+		"access starts late":    refusedAccessCover,
 	}
 
 	for name, testCase := range map[string]struct {
