@@ -323,7 +323,7 @@ export const ja: Record<string, string> = {
   "no one is home": "誰も在宅していない",
   "outdoor {op} {value}°C": "外気温 {op} {value}°C",
   " · Only if: {conditions}": " · 条件: {conditions}",
-  " and ": " かつ",
+  " and ": " かつ ",
   "{start} · at {end} → {endAction} (end action)": "{start} · {end} に {endAction}（終了時の動作）",
   "the AC's property": "このエアコンの物件",
   " (+{n} more AC)": "（ほか {n} 台）",

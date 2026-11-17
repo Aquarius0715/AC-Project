@@ -2,17 +2,24 @@
 // aircon (the form refuses a bad number of units first), HQ finds the request in Jobs › Installation requests and
 // declines it with a reason, and the owner's list then shows the request declined with HQ's reason. Making the units
 // and jobs is covered by the API's integration test; a run leaves one declined request.
-import type { Browser, Page } from "@playwright/test";
+import type { Browser, BrowserContext, Page } from "@playwright/test";
 import { test, expect } from "../../fixtures/test";
 import { expectAccessible } from "../../fixtures/a11y";
 import { APPS, type App } from "../../fixtures/apps";
 import { must } from "../../fixtures/must";
 
 const app = (id: App["id"]) => must(APPS.find((a) => a.id === id));
+// every context the test opens, closed after it whether it passed or failed
+const opened: BrowserContext[] = [];
 const open = async (browser: Browser, a: App): Promise<Page> => {
   const context = await browser.newContext({ baseURL: a.url, viewport: { width: 1920, height: 1080 }, storageState: a.state });
+  opened.push(context);
   return context.newPage();
 };
+
+test.afterEach(async () => {
+  await Promise.all(opened.splice(0).map((c) => c.close()));
+});
 
 test("the owner asks for an installation and HQ declines it with a reason", async ({ browser }) => {
   test.setTimeout(180_000);
