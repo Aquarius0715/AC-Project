@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { clientUserRows, inviteError, type ApiClientUser } from "@ac/web/lib/assets";
 import type { ApiInvoice } from "@ac/web/lib/billing";
 import {
-  dueNotice,
+  checkoutStartSchema, dueNotice, paymentPhase, paymentWay, statusFilters, statusQuery,
   clientInvoiceRows, contractCards, inquiryLines, noticeTimeline, noticeUnits, paymentLines, previewText, restrictionNotice, type ClientContract, type ClientPayment,
 } from "@ac/web/lib/clientBilling";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
@@ -38,6 +38,11 @@ const restriction = {
     { action: "payments.release", occurredAt: TEXT_2026_09_13T02_05_00Z, actorId: "", actorRoleAtTime: "", reason: null, result: "" },
   ],
 } as ApiRestriction;
+const checkoutPayment = (id: string, status: ClientPayment["status"], createdAt: string): ClientPayment => ({
+  id, createdAt, status, version: 1, amountMinor: 12_000, currency: "MYR", invoiceId: "i1", method: null, channel: "stripe_checkout", paymentReference: null,
+  confirmedAt: null, confirmationReason: null, updatedAt: createdAt,
+});
+const checkoutStarts = (checkoutUrl: string) => checkoutStartSchema.safeParse({ checkoutUrl, paymentId: "p1" }).success;
 const commands = new Map<string, ApiCommand>([["c2", { id: "c2", status: "sent", delivery: "", requestedAt: "", failureCode: null }], ["c3", { id: "c3", status: "expired", delivery: "", requestedAt: "", failureCode: null }]]);
 
 describe("customer contracts & payments in the display language (FR-C10–C12, IR267)", () => {
@@ -77,6 +82,34 @@ describe("customer contracts & payments in the display language (FR-C10–C12, I
     const busy = { ...restriction, perUnit: [{ ...must(restriction.perUnit[0]), releaseState: "none" as const, releaseCommandIds: [], applyCommandIds: [], pendingReason: "device_operation_running" }] };
     expect([noticeUnits(busy, unit, commands)[0]?.note, noticeUnits(busy, unit, commands, MS_TOKYO.t)[0]?.note]).toStrictEqual(["the unit is busy with a device update", "unit sedang sibuk dengan kemas kini peranti"]);
     expect([policyText({ kind: "power_off" }), policyText({ kind: "power_off" }, MS_TOKYO.t)]).toStrictEqual(["Power off", "Matikan kuasa"]);
+  });
+
+  it("names how a payment was taken: the demo card, Stripe Checkout or HQ's recorded transfer (DEC-68)", () => {
+    expect([
+      paymentWay({ method: "demo_debit_card", channel: "demo" }),
+      paymentWay({ method: null, channel: "stripe_checkout" }),
+      paymentWay({ method: null, channel: "manual" }),
+    ]).toStrictEqual(["Debit card (demo)", "Stripe Checkout", "Bank transfer (recorded by HQ)"]);
+  });
+
+  it("finds the open payment, and gives Pay back once the last attempt expired or failed (DEC-68)", () => {
+    const failed = checkoutPayment("p1", "failed", "2026-09-13T01:00:00Z");
+    const expired = checkoutPayment("p2", "expired", "2026-09-13T02:00:00Z");
+    const open = checkoutPayment("p3", "initiated", "2026-09-13T03:00:00Z");
+    expect(paymentPhase([])).toStrictEqual({ open: null, last: null });
+    expect(paymentPhase([failed, expired])).toStrictEqual({ open: null, last: expired });
+    expect(paymentPhase([open, failed, expired])).toStrictEqual({ open, last: open });
+    expect(paymentPhase([failed, { ...open, status: "processing" }]).open?.id).toBe("p3");
+  });
+
+  it("maps the URL's status filter to invoices.list (overdue = overdueOnly, all = none)", () => {
+    expect(statusFilters.map((f) => statusQuery(f))).toStrictEqual([{}, { status: "unpaid" }, { overdueOnly: true }, { status: "processing" }, { status: "paid" }]);
+  });
+
+  it("takes only an HTTPS Stripe Checkout address from the Core API (IR840)", () => {
+    expect(checkoutStarts("https://checkout.stripe.com/c/pay/cs_test_a1")).toBe(true);
+    // the address goes straight to location.assign, so a script, data or plain-http address never passes
+    expect(["javascript:alert(1)", "data:text/html,x", "http://evil.example/x", "JAVASCRIPT:alert(1)", ""].map((u) => checkoutStarts(u))).toStrictEqual([false, false, false, false, false]);
   });
 
   it("writes the payment message preview in the recipient's language", () => {

@@ -10958,3 +10958,10 @@ Review round 913 found that `maintenance.jobs.installation_request_id` (migratio
 
 1. **Rule.** Migration 000011 adds `jobs_installation_request` on `maintenance.jobs (installation_request_id) WHERE installation_request_id IS NOT NULL`, and [schema.sql](db/schema.sql) has the same index. No query changes.
 2. **Tests.** `TestForeignKeysHaveIndexes` (new, integration) lists every foreign key without an index whose leading columns hold the key's columns other than `tenant_id`; it failed on this key before the migration. The 26 other keys it found are listed in the test for the decision of B-52, so a new foreign key without an index fails it.
+
+## IR840 The customer app follows only an HTTPS Stripe Checkout address (IR827, DEC-68) — 2026-11-17
+
+Review round 914 found that the customer invoice page's `startCheckout` action checked the `checkoutUrl` of `payments.startCheckout` with `z.url()` alone, which also accepts `javascript:`, `data:` and plain `http:` addresses, and the page passes the address straight to `location.assign`. The Core API forwards the URL of the Stripe session without checking it, so the boundary check was the only guard and did not hold.
+
+1. **Rule.** `checkoutStartSchema` (now in `service/web/shared/lib/clientBilling.ts`) takes `checkoutUrl` only with the `https` scheme; any other answer fails the action as UNAVAILABLE (`error.unavailable`), and the payer stays on the invoice page.
+2. **Tests.** `clientBilling.test.ts` refuses a `javascript:`, `data:`, `http:`, upper-case `JAVASCRIPT:` and empty address and accepts a `https://checkout.stripe.com` one; it failed on the first four before the fix. The same round adds the untested branches of `paymentWay` (Stripe Checkout), `paymentPhase` (expired and failed attempts are not open) and `statusQuery`.
