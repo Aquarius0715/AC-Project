@@ -13,6 +13,7 @@ const opFactorsSave = "factors.save"
 const valueMasked = "masked"
 
 const (
+	opAdminSummary                = "admin.summary"
 	opAlertsList                  = "alerts.list"
 	opAutomationsNextRuns         = "automations.nextRuns"
 	opAutomationsSave             = "automations.save"
