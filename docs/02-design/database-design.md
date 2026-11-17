@@ -188,6 +188,7 @@ At the design capacity (20,000 units, about 120,000 measurements per minute) the
 | Alerts inbox (`alerts.list`) | open alerts by customer and severity | `alerts_open` |
 | Jobs lists (HQ / partner / technician) | by status, contractor, assigned technician | `jobs_status`, `jobs_contractor`, `assignments_technician` |
 | Follow-ups to classify (IR114) | `follow_up_class = 'pending'` | `jobs_follow_up_pending` |
+| Installation requests (`installationRequests.list`, installation `jobs.create`) | the jobs of a request | `jobs_installation_request` (IR839, migration 000011) |
 | Invoices & payments | by customer and due date, overdue | `invoices_customer`, `invoices_overdue`, `payments_invoice` |
 | Audit search (`audit.list`) | by target, correlation ID, actor | `audit_target`, `audit_correlation`, `audit_actor` |
 | Notifications | inbox by recipient, unread count | `notifications_inbox`, `notifications_unread` |
