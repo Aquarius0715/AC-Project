@@ -4,6 +4,8 @@ import playwright from "eslint-plugin-playwright";
 import { webConfig } from "../eslint.base.mjs";
 
 const config = [
+  // what a local run writes (Git ignores it, ESLint does not read .gitignore): its bundled trace viewer failed the lint
+  { ignores: ["**/playwright-report/**", "**/test-results/**"] },
   ...webConfig(import.meta.dirname),
   { files: ["**/*.ts"], ...playwright.configs["flat/recommended"] },
   // a Playwright fixture hands its value on with use(), which is not React's use hook; the specs are no Next.js app

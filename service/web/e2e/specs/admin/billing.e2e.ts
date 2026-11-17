@@ -38,6 +38,48 @@ test("billing months filter the invoices and the related restriction opens on th
   expect(new URL(page.url()).searchParams.has("to")).toBe(false);
 });
 
+// Record manual payment (FR-A08, IR447): the seed invoice has no payment started, so HQ may record one received
+// outside the app. The dialog takes only the full invoice amount, a reference and a reason; it refuses before any call
+// otherwise and stays open. Nothing is recorded: the dialog is cancelled.
+test("a manual payment takes only the full amount, a reference and a reason", async ({ page }) => {
+  let sent = false;
+  page.on("request", (r) => {
+    if (r.method() === "POST" && r.url().includes("/admin/billing")) sent = true;
+  });
+  await page.goto("/admin/billing?from=2026-08&to=2026-08");
+  const main = page.getByRole("main");
+  await main.getByRole("button", { name: /INV-202608-0001/ }).click();
+  await expect(main).toContainText("The customer has not started a payment.");
+  await main.getByRole("button", { name: "Record manual payment…" }).click();
+
+  const dialog = page.getByRole("dialog", { name: "Record manual payment" });
+  await expectAccessible(page, '[role="dialog"]');
+  const amount = dialog.getByLabel("Amount (must equal invoice — full payment only)");
+  const full = await amount.inputValue();
+  expect(full).toMatch(/^\d+\.\d{2}$/);
+
+  // nothing filled in: the reference and the reason are asked for, the prefilled amount is the invoice's
+  await dialog.getByRole("button", { name: "Record payment" }).click();
+  await expect(dialog).toContainText("Reference is required");
+  await expect(dialog).toContainText("A reason is required");
+  await expect(dialog).not.toContainText("Must equal");
+
+  // a part payment is refused even with a reference and a reason
+  await dialog.getByLabel("Reference").fill("e2e-manual-not-sent");
+  await dialog.getByLabel("Reason").fill("E2E: must not be sent");
+  await amount.fill((Number(full) - 1).toFixed(2));
+  await dialog.getByRole("button", { name: "Record payment" }).click();
+  await expect(dialog).toContainText("Must equal");
+  await expect(dialog).not.toContainText("Reference is required");
+  await expect(dialog).toBeVisible();
+  expect(sent).toBe(false);
+
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(main).toContainText("Overdue");
+  expect(sent).toBe(false);
+});
+
 // Contractor payouts (FR-A23, DD-A23, Figma Admin 699:22119, IR322): the period, contractor and status filters live in
 // the URL; Generate drafts takes only a month that has ended (the seed has no statements). Nothing is generated.
 test("the payouts filters live in the URL and Generate drafts takes only an ended month", async ({ page }) => {
