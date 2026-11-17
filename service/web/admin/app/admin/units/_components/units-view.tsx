@@ -494,7 +494,7 @@ function UnitEdit({ live, c, x, nav, run, pending }: Readonly<{ live: UnitsLive;
 
 // ---- alert policies tab ----
 
-function PoliciesTab({ c, run, pending }: Readonly<{ c: CustomerLive; run: Run; pending: boolean }>) {
+export function PoliciesTab({ c, run, pending }: Readonly<{ c: CustomerLive; run: Run; pending: boolean }>) {
   const t = useT();
   const router = useRouter();
   if (!c.policies) return <EmptyState title={t("Alert policies need “View alert policies”")}>{t("Ask an identity administrator for Alert policies access.")}</EmptyState>;
@@ -517,7 +517,7 @@ function PoliciesTab({ c, run, pending }: Readonly<{ c: CustomerLive; run: Run; 
             {c.rules.items.map((r) => (
               <div key={r.ruleKey} className="flex flex-wrap items-center gap-3 border-t border-line py-2.5 text-[13px] first:border-0">
                 <div className="min-w-0 flex-1"><b>{r.name}</b><div className="text-xs text-muted-foreground">{r.condition}{r.note ? ` · ${r.note}` : ""}</div></div>
-                <Toggle on={r.enabled} label={t(r.enabled ? "On" : "Off")} disabled={!c.canRules || pending}
+                <Toggle on={r.enabled} label={t("{rule} for {name}", { rule: r.name, name: c.row.name })} disabled={!c.canRules || pending}
                   onChange={(on) => { const { rules } = c; if (!rules) { return; } run(() => setDefaultRule(rules.policyId, r.ruleKey, c.row.id, on, r.version), t(on ? "{rule} switched on for {name}" : "{rule} switched off for {name}", { rule: r.name, name: c.row.name })); }} />
               </div>
             ))}

@@ -424,8 +424,9 @@ export function Check({ label, checked, onChange, disabled }: Readonly<{ label: 
     </label>
   );
 }
-/** An on/off switch: the shadcn/ui Switch, named by `label`. */
-export function Toggle({ on, onChange, label, disabled }: Readonly<{ on: boolean; onChange: (v: boolean) => void; label?: string; disabled?: boolean }>) {
+/** An on/off switch: the shadcn/ui Switch, named by `label`: what it switches (the switch announces its
+state itself), so a list of switches can be told apart (R910). */
+export function Toggle({ on, onChange, label, disabled }: Readonly<{ on: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean }>) {
   return <Switch checked={on} onCheckedChange={(v) => { onChange(v); }} aria-label={label} disabled={disabled} />;
 }
 // One choice of a few, shown as pressed buttons: the shadcn/ui ToggleGroup. The chosen one stays chosen when pressed again.
