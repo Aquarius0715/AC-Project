@@ -75,6 +75,15 @@ func TestLiveTopic(t *testing.T) {
 		"/sensors":                           {"", ""},
 		"command/result":                     {"", ""},
 		"smarthome/ac/node_1/sensors/extra":  {"", ""},
+		// only smarthome/ac/<node>/<kind>: a deeper topic, or one outside smarthome/ac, names no node, even when its
+		// last segments look like one of a node's topics (the subscription is smarthome/ac/#)
+		"smarthome/ac/x/node_1/sensors":         {"", ""},
+		"smarthome/ac/x/node_1/state":           {"", ""},
+		"smarthome/ac/x/node_1/command/result":  {"", ""},
+		"smarthome/ac/sensors":                  {"", ""},
+		"smarthome/ac//sensors":                 {"", ""},
+		"other/ac/node_1/sensors":               {"", ""},
+		"smarthome/other/node_1/command/result": {"", ""},
 	} {
 		node, kind, ok := iotbridge.LiveTopic(topic)
 		if node != want[0] || kind != want[1] || ok != (want[0] != "") {
