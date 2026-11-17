@@ -366,7 +366,7 @@ func TestPartnerUserAccess(t *testing.T) {
 			`leave"}`,
 		bookedVersion,
 	); code != 409 ||
-		res["messageKey"] != "errors.technician_booked" {
+		res["messageKey"] != keyTechnicianBooked {
 		t.Errorf("disable a booked technician: %d %v", code, res)
 	}
 
@@ -377,7 +377,7 @@ func TestPartnerUserAccess(t *testing.T) {
 		`{"id":"`+booked+`","reason":"left"}`,
 		bookedVersion,
 	); code != 409 ||
-		res["messageKey"] != "errors.technician_booked" {
+		res["messageKey"] != keyTechnicianBooked {
 		t.Errorf("remove a booked technician: %d %v", code, res)
 	}
 	// a technician without assignments
