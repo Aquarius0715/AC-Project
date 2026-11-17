@@ -78,8 +78,8 @@ func CommandTopic(tenant, device uuid.UUID) string {
 	return devicesim.Topic(tenant.String(), device.String(), "cmd")
 }
 
-// errNotOwnTopic refuses a module's message whose payload names another device than its topic.
-var errNotOwnTopic = errors.New("not the device of its topic")
+// ErrNotOwnTopic refuses a module's message whose payload names another device than its topic.
+var ErrNotOwnTopic = errors.New("not the device of its topic")
 
 // OwnTopic accepts a module's message only on its own device's topic t/<tenant>/d/<deviceId>/…: the broker limits a
 // module to its own deviceId's topics (network-architecture F09), so the device the payload names must be that one,
@@ -89,17 +89,17 @@ func OwnTopic(topic, device string) error {
 
 	parts := strings.SplitN(topic, "/", minParts)
 	if len(parts) < minParts || parts[0] != "t" || parts[2] != "d" {
-		return fmt.Errorf("topic %q: %w", topic, errNotOwnTopic)
+		return fmt.Errorf("topic %q: %w", topic, ErrNotOwnTopic)
 	}
 
 	onTopic, err := uuid.Parse(parts[3])
 	if err != nil {
-		return fmt.Errorf("topic %q: %w", topic, err)
+		return fmt.Errorf("topic %q: %w: %w", topic, ErrNotOwnTopic, err)
 	}
 
 	named, err := uuid.Parse(device)
 	if err != nil || named != onTopic {
-		return fmt.Errorf("device %q on %q: %w", device, topic, errNotOwnTopic)
+		return fmt.Errorf("device %q on %q: %w", device, topic, ErrNotOwnTopic)
 	}
 
 	return nil

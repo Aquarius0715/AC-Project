@@ -1,6 +1,7 @@
 package iotbridge_test
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/pradita/ac-project/service/api/internal/iotbridge"
@@ -38,7 +39,7 @@ func TestOwnTopic(t *testing.T) {
 
 	for _, tc := range cases {
 		err := iotbridge.OwnTopic(tc.topic, tc.device)
-		if (err == nil) != tc.ok {
+		if (err == nil) != tc.ok || err != nil && !errors.Is(err, iotbridge.ErrNotOwnTopic) {
 			t.Errorf("OwnTopic(%q, %q) = %v, want ok %v", tc.topic, tc.device, err, tc.ok)
 		}
 	}
