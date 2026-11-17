@@ -1229,7 +1229,7 @@ func TestRestrictionOverrideReconcile(t *testing.T) {
 		`{"restrictionId":"`+restrictionID+`","reason":"hardship"}`,
 		ver(t, get())-1,
 	); code != 409 ||
-		stale["messageKey"] != "error.versionConflict" {
+		stale["messageKey"] != apperr.KeyVersionConflict {
 		t.Errorf("override with a stale version: %d %v", code, stale)
 	}
 

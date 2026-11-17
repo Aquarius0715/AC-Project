@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
@@ -106,7 +107,7 @@ func TestContractorPicksCandidateTime(t *testing.T) {
 		`{"jobId":"`+job+`","technicianMembershipId":"`+seed.ID("tech-external-a").String()+
 			`","startAt":"`+stamp(25)+`","endAt":"`+stamp(27)+`"}`,
 		version()-1,
-	); code != 409 || res["messageKey"] != "error.versionConflict" {
+	); code != 409 || res["messageKey"] != apperr.KeyVersionConflict {
 		t.Fatalf("assign with a stale version: %d %v", code, res)
 	}
 
