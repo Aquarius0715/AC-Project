@@ -129,3 +129,19 @@ func TestNoFilters(t *testing.T) {
 		}
 	}
 }
+
+func TestSortSliceWithoutAnIDKey(t *testing.T) {
+	t.Parallel()
+
+	rows := []sortRow{{"c", 1}, {"a", 1}, {"b", 0}}
+	keys := map[string]func(a, b sortRow) int{keyRank: sortKeys()[keyRank]}
+
+	err := paging.SortSlice(rows, &paging.SortSpec{Field: keyRank, Direction: sortAsc}, keys)
+	if err != nil {
+		t.Fatalf("sort: %v", err)
+	}
+
+	if got := sortIDs(rows); !slices.Equal(got, []string{"b", "c", "a"}) {
+		t.Fatalf("ties keep their order without an id key: %v", got)
+	}
+}
