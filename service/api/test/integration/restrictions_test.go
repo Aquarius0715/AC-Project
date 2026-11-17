@@ -1707,8 +1707,8 @@ func TestRestrictionExplicitRelease(t *testing.T) {
 	}
 }
 
-// rejectApply reports a restriction command as rejected by the device, the way demo.trigger command_fail does: the
-// Command fails and CommandsEnded reaches restrictions (D03).
+// rejectApply reports a restriction command as rejected by the device: the Command fails and CommandsEnded reaches
+// restrictions (D03), the restriction part of demo.trigger command_fail (no audit entry, no diagnostic run).
 func rejectApply(t *testing.T, commandID string, when time.Time) {
 	t.Helper()
 
@@ -1725,8 +1725,9 @@ func rejectApply(t *testing.T, commandID string, when time.Time) {
 	beginErr := pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
 		_, execErr := tx.Exec(
 			ctx,
-			`UPDATE control.commands SET status = 'failed', failure_code = 'DEVICE_REJECTED' WHERE id = $1`,
+			`UPDATE control.commands SET status = 'failed', failure_code = $2 WHERE id = $1 AND status IN ('requested','sent')`,
 			id,
+			codeDeviceRejected,
 		)
 		if execErr != nil {
 			return apperr.Wrap(execErr, "update control.commands")
