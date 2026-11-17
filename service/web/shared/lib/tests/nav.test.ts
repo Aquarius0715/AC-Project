@@ -20,6 +20,9 @@ describe("page names and document titles (IR490)", () => {
   it("names the shared pages, Users and Demo controls, and nothing off the menu", () => {
     expect([pageLabel("client", "/notifications"), pageLabel("admin", "/settings/preferences"), pageLabel("client", "/customer/users"), pageLabel("contractor", "/partner/users"), pageLabel(TECHNICIAN, "/demo"), pageLabel("client", "/login")])
       .toStrictEqual(["Notifications", "Preferences", "Users", "Users", "Demo controls", null]);
+    // the installation requests page (FR-C20) has no menu item but is named by its exact path
+    expect([pageLabel("client", "/customer/installations"), pageLabel("client", "/customer/installation")]).toStrictEqual(["Installations", null]);
+    expect(Object.hasOwn(ms, "Installations")).toBe(true);
   });
 
   it("titles the document in the display language", () => {

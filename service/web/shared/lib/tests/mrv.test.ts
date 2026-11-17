@@ -70,6 +70,9 @@ describe("HQ digital MRV (FR-A14, DD-A14)", () => {
       organizationId: "Choose a customer organization", unitIds: "Choose 1–100 units", period: "The end must be after the start",
       baseline: "Choose a baseline version", factor: "Choose an emission factor version", boundary: "1–500 characters",
     });
+    // the boundary is counted as mrv.saveDraft counts it: trimmed, in code points (mrv.go), so padding and characters beyond U+FFFF fit
+    expect([mrvDraftErrors(draft({ boundary: `${"a".repeat(500)}  ` })), mrvDraftErrors(draft({ boundary: "😀".repeat(500) }))]).toStrictEqual([{}, {}]);
+    expect(mrvDraftErrors(draft({ boundary: "😀".repeat(501) }))).toStrictEqual({ boundary: "1–500 characters" });
     const c = mrvConditions(draft({}));
     expect([c.from, c.to, c.baselineId, c.baselineVersion, c.factorId, c.factorVersion, c.boundary]).toStrictEqual(["2026-08-31T16:00:00.000Z", "2026-09-07T16:00:00.000Z", "b1", 2, "f1", 1, "AC input"]);
     expect(mrvDraftOf(report.conditions)).toStrictEqual(draft({ boundary: "AC input", unitIds: ["u1", "u2"] }));
