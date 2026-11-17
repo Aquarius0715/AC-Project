@@ -186,7 +186,7 @@ func TestOrderBy(t *testing.T) {
 	}
 
 	_, err := paging.OrderBy(
-		&paging.SortSpec{Field: "evil; drop", Direction: "asc"},
+		&paging.SortSpec{Field: "evil; drop", Direction: sortAsc},
 		allowed,
 		"",
 	)
