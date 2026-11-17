@@ -3,6 +3,7 @@
 // users than accounts the accounts are shared, and one membership may write 60 times a minute, so a refusal could not be
 // told from a slowdown.
 import { iteration, watched } from "../lib/run.ts";
+import { minutes, vus } from "../lib/scale.ts";
 
 export const options = {
   scenarios: {
@@ -10,17 +11,17 @@ export const options = {
       executor: "ramping-vus",
       startVUs: 0,
       stages: [
-        { duration: "1m", target: 100 },
-        { duration: "3m", target: 100 },
-        { duration: "1m", target: 300 },
-        { duration: "3m", target: 300 },
-        { duration: "1m", target: 600 },
-        { duration: "3m", target: 600 },
-        { duration: "1m", target: 1000 },
-        { duration: "3m", target: 1000 },
-        { duration: "1m", target: 1500 },
-        { duration: "3m", target: 1500 },
-        { duration: "1m", target: 0 },
+        { duration: minutes(1), target: vus(100) },
+        { duration: minutes(3), target: vus(100) },
+        { duration: minutes(1), target: vus(300) },
+        { duration: minutes(3), target: vus(300) },
+        { duration: minutes(1), target: vus(600) },
+        { duration: minutes(3), target: vus(600) },
+        { duration: minutes(1), target: vus(1000) },
+        { duration: minutes(3), target: vus(1000) },
+        { duration: minutes(1), target: vus(1500) },
+        { duration: minutes(3), target: vus(1500) },
+        { duration: minutes(1), target: 0 },
       ],
       gracefulRampDown: "30s",
     },

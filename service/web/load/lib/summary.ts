@@ -60,8 +60,8 @@ function windows(data: unknown): string[] {
   return lines;
 }
 
-/** The text report of a run. */
-export function report(data: unknown): string {
+/** The text report of a run. `scales` is false for a scenario of fixed size (the smoke checks ignore TIME_SCALE and VU_SCALE). */
+export function report(data: unknown, scales: boolean): string {
   const lines = ["", "kind    requests  errors%   p50 ms   p95 ms   p99 ms   max ms"];
   for (const kind of KINDS) {
     const trend = TRENDS[kind];
@@ -85,7 +85,7 @@ export function report(data: unknown): string {
     lines.push(`  ${name.padEnd(20)} p50 ${show(metricValue(data, t, "med"), 1)} ms   p95 ${show(metricValue(data, t, "p(95)"), 1)} ms`);
   }
   lines.push(...windows(data));
-  if (env.timeScale !== 1 || env.vuScale !== 1) {
+  if (scales && (env.timeScale !== 1 || env.vuScale !== 1)) {
     lines.push("", `SHORTENED RUN (TIME_SCALE ${String(env.timeScale)}, VU_SCALE ${String(env.vuScale)}): not a measurement of the stated scenario`);
   }
   lines.push(
