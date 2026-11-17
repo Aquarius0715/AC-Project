@@ -3,7 +3,10 @@ package notify
 import (
 	"bufio"
 	"context"
+	"crypto/tls"
 	"net"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -250,6 +253,83 @@ func TestSMTPSends(t *testing.T) {
 		!strings.Contains(message, "Body line\r\nsecond") ||
 		strings.Contains(message, "\r\r\n") {
 		t.Errorf("received: %q", message)
+	}
+}
+
+// TestSMTPVerifiesTheStartTLSCertificate: a server that offers STARTTLS with a certificate no trusted authority signed
+// gets no message: the handshake fails verification and Send reports it (the certificate is checked against the
+// host name, at TLS 1.2 or later).
+func TestSMTPVerifiesTheStartTLSCertificate(t *testing.T) {
+	t.Parallel()
+
+	cfg := tlsConfig("mail.example.com")
+	if cfg.MinVersion != tls.VersionTLS12 || cfg.ServerName != "mail.example.com" ||
+		cfg.InsecureSkipVerify {
+		t.Errorf("tls config: min %x, server name %q, skip verify %v",
+			cfg.MinVersion, cfg.ServerName, cfg.InsecureSkipVerify)
+	}
+
+	// only for its self-signed certificate
+	untrusted := httptest.NewTLSServer(http.NotFoundHandler())
+	defer untrusted.Close()
+
+	var listenConfig net.ListenConfig
+
+	listener, err := listenConfig.Listen(t.Context(), "tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = listener.Close() }()
+
+	handshake := make(chan error, 1)
+
+	go func() { // an SMTP server that offers STARTTLS and switches to TLS when asked
+		conn, err := listener.Accept()
+		if err != nil {
+			handshake <- err
+
+			return
+		}
+		defer func() { _ = conn.Close() }()
+
+		reader := bufio.NewReader(conn)
+		reply := func(s string) { _, _ = conn.Write([]byte(s + "\r\n")) }
+		reply("220 test")
+
+		for {
+			line, err := reader.ReadString('\n')
+			if err != nil {
+				handshake <- err
+
+				return
+			}
+
+			switch cmd := strings.ToUpper(strings.TrimSpace(line)); {
+			case strings.HasPrefix(cmd, "EHLO"):
+				reply("250-test\r\n250 STARTTLS")
+			case cmd == "STARTTLS":
+				reply("220 go ahead")
+
+				handshake <- tls.Server(conn, untrusted.TLS).HandshakeContext(t.Context())
+
+				return
+			default:
+				reply("250 ok")
+			}
+		}
+	}()
+
+	s := SMTP{Addr: listener.Addr().String(), From: "no-reply@ac-project.local"}
+
+	_, sendErr := s.Send(t.Context(), "tan@example.com", "Hello", "body")
+	if sendErr == nil || !strings.Contains(sendErr.Error(), "starttls:") ||
+		!strings.Contains(sendErr.Error(), "certificate") {
+		t.Errorf("send to an untrusted server: %v", sendErr)
+	}
+
+	serverErr := <-handshake
+	if serverErr == nil {
+		t.Error("the TLS handshake with an untrusted certificate succeeded")
 	}
 }
 
