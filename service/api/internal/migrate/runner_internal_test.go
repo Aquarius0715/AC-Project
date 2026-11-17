@@ -188,6 +188,47 @@ func checkForceAndLogins(t *testing.T, conn *pgx.Conn) {
 	if ensureLoginErr != nil {
 		t.Fatal("EnsureLogin must be idempotent:", ensureLoginErr)
 	}
+
+	checkNewLogin(t, conn)
+}
+
+// checkNewLogin creates a role that does not exist yet (ac_app_login already exists on a reused cluster, so the
+// CREATE ROLE branch needs its own name), then checks it can log in with the quoted password and is in the group.
+func checkNewLogin(t *testing.T, conn *pgx.Conn) {
+	t.Helper()
+
+	ctx := context.Background()
+
+	const login = "ac_migrate_test_login"
+
+	drop := func() {
+		_, _ = conn.Exec(ctx, "DROP ROLE IF EXISTS "+login)
+	}
+	drop()
+	t.Cleanup(drop)
+
+	ensureErr := EnsureLogin(ctx, conn, login, "it's-new", "ac_app")
+	if ensureErr != nil {
+		t.Fatal(ensureErr)
+	}
+
+	var member bool
+
+	scanErr := conn.QueryRow(ctx, `SELECT pg_has_role($1, 'ac_app', 'MEMBER')`, login).Scan(&member)
+	if scanErr != nil || !member {
+		t.Fatalf("new login in ac_app = %t, %v", member, scanErr)
+	}
+
+	cfg := conn.Config().Copy()
+	cfg.User = login
+	cfg.Password = "it's-new"
+
+	loginConn, connectErr := pgx.ConnectConfig(ctx, cfg)
+	if connectErr != nil {
+		t.Fatal("new login cannot connect:", connectErr)
+	}
+
+	_ = loginConn.Close(ctx)
 }
 
 //nolint:paralleltest // every test rebuilds the same scratch database ac_migrate_test
