@@ -338,6 +338,41 @@ func TestInstallationRequestRefusals(t *testing.T) {
 		0,
 	)
 	refusal(t, "a unit at another property", code, res, "unitId="+apperr.KeyInvalid)
+
+	// the site: an unknown property, or a space that is not a live space of the property, is NOT_FOUND
+	var (
+		ownSpace   string
+		otherSpace string
+	)
+
+	ownerScan(
+		t,
+		`SELECT id::text FROM assets.spaces WHERE property_id = $1 AND NOT archived ORDER BY id LIMIT 1`,
+		[]any{prop},
+		&ownSpace,
+	)
+	ownerScan(
+		t,
+		`SELECT id::text FROM assets.spaces WHERE property_id = $1 AND NOT archived ORDER BY id LIMIT 1`,
+		[]any{other},
+		&otherSpace,
+	)
+
+	for name, body := range map[string]string{
+		"an unknown property":         requestBody(uuid.NewString(), 1, threeSlots()),
+		"a space of another property": withField("spaceId", otherSpace),
+		"a space that does not exist": withField("spaceId", uuid.NewString()),
+	} {
+		code, res = create(customerA(), body)
+		if code != http.StatusNotFound || res["messageKey"] != apperr.KeyNotFound {
+			t.Errorf("%s: %d %v", name, code, res)
+		}
+	}
+
+	code, res = create(customerA(), withField("spaceId", ownSpace))
+	if code != http.StatusOK || data(res)["spaceId"] != ownSpace {
+		t.Errorf("a space of the property: %d %v", code, res)
+	}
 }
 
 // create2 makes a one-unit request of the owner and answers its ID.
