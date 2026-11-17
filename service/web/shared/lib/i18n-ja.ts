@@ -6189,6 +6189,7 @@ export const ja: Record<string, string> = {
   "This device’s location could not be sent — the next one is tried in a moment.": "この端末の位置を送れませんでした。少ししてから次の位置で再試行します。",
   "Location sent · nothing changed.": "位置を送信しました · 変化はありません。",
   "This browser did not share its location — allow it for this site, or switch this off.": "このブラウザーは位置情報を共有しませんでした。このサイトに許可するか、この設定をオフにしてください。",
+  "This browser cannot share a location — switch this off, or use another browser.": "このブラウザーは位置情報を共有できません。この設定をオフにするか、別のブラウザーを使ってください。",
   "Use this device’s location": "この端末の位置を使う",
   "While this page is open, your position is compared with the map pins of your homes and offices; only home or away is kept. A browser does not report in the background.": "このページを開いている間、あなたの位置を自宅やオフィスの地図ピンと比べます。保存するのは在宅か外出かだけです。ブラウザーはバックグラウンドでは報告しません。",
 };
