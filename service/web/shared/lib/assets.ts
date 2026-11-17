@@ -12,7 +12,7 @@ import { metricLabel, metricName, metricUnit, opSymbol, type Operator, type Seve
 import { csvCell } from "@ac/web/lib/csv";
 import type { IconName } from "@ac/web/components/Icon";
 import { byText, isAfter, isBefore } from "@ac/web/lib/order";
-import { codePoints, isEmail, wrapped } from "@ac/web/lib/text";
+import { codePoints, isEmail, utf8Length, wrapped } from "@ac/web/lib/text";
 import { entryOf, lookup } from "@ac/web/lib/lookup";
 
 const TEXT_1_120_CHARACTERS = "1–120 characters";
@@ -442,10 +442,10 @@ export function clientUserRows(us: ApiClientUser[], who: (membershipId: string) 
     };
   });
 }
-/** A plain address up to 254 characters, not yet a user of this customer (case-insensitive). */
+/** A plain address up to 254 bytes (as clientUsers.invite counts), not yet a user of this customer (case-insensitive). */
 export function inviteError(email: string, us: { email: string }[], t: T = translator("en")): string | undefined {
   const e = email.trim();
-  if (e.length > 254 || !isEmail(e)) return t("A valid email address (up to 254 characters)");
+  if (utf8Length(e) > 254 || !isEmail(e)) return t("A valid email address (up to 254 characters)");
   if (us.some((u) => u.email.toLowerCase() === e.toLowerCase())) return t("Already a user of this customer");
   return undefined;
 }

@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { byName, isEmail, withoutNote, withoutYear } from "@ac/web/lib/text";
+import { byName, isEmail, utf8Length, withoutNote, withoutYear } from "@ac/web/lib/text";
+
+describe("utf8Length", () => {
+  it("counts UTF-8 bytes, as Go's len counts an address", () => {
+    expect(["", "a@b.c", "é", "日", "😀"].map((s) => utf8Length(s))).toStrictEqual([0, 5, 2, 3, 4]);
+  });
+});
 
 describe("isEmail", () => {
   it("accepts one @, a local part and a dot inside the domain", () => {

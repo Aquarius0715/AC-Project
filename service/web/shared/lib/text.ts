@@ -9,6 +9,10 @@ export const characters = (text: string): string[] => Array.from(text.matchAll(/
 /** codePoints is the length of `text` in Unicode code points, as the Core API counts a text's length. */
 export const codePoints = (text: string): number => characters(text).length;
 
+const utf8 = new TextEncoder();
+/** utf8Length is the length of `text` in UTF-8 bytes, as the Core API counts an e-mail address (len in Go, at most 254). */
+export const utf8Length = (text: string): number => utf8.encode(text).length;
+
 /** wrapped is `value` between `before` and `after`, or nothing when there is no value (an optional part of a sentence). */
 export const wrapped = (value: string | null | undefined, before: string, after = ""): string => (value ? `${before}${value}${after}` : "");
 
