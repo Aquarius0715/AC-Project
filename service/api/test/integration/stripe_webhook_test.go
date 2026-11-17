@@ -17,9 +17,11 @@ import (
 )
 
 const (
-	webhookSecret = "whsec_integration_only" //nolint:gosec // G101: a signing secret of a test fixture, not a credential
-	statusPaid    = "paid"
-	statusExpire  = "expired"
+	webhookSecret  = "whsec_integration_only" //nolint:gosec // G101: a signing secret of a test fixture, not a credential
+	statusPaid     = "paid"
+	statusExpire   = "expired"
+	eventCompleted = "checkout.session.completed"
+	sessionUnpaid  = "unpaid" // the payment_status of a completed session that settles later
 )
 
 // webhookServer is a server with the Stripe provider and the webhook secret of the tests.
@@ -418,6 +420,96 @@ func TestStripeWebhookSettlesABankPaymentLater(t *testing.T) {
 			"confirmed payment %v, want reference pi_async_%s on channel stripe_checkout",
 			refs[0],
 			eventSalt,
+		)
+	}
+}
+
+// TestStripeWebhookIgnoresWhatDoesNotSettleThePayment: a completed session whose amount or currency is not the
+// invoice's, a paid session in another currency and an event type billing does not act on are stored and change
+// neither the payment nor its version; a second completed-unpaid session on a payment already processing changes
+// nothing either (DEC-68).
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
+func TestStripeWebhookIgnoresWhatDoesNotSettleThePayment(t *testing.T) {
+	if clusterMode() {
+		t.Skip(clusterSkip)
+	}
+
+	provider := newFakeCheckout()
+	srv := webhookServer(t, provider)
+	_, inv := newInvoice(t, srv)
+	pay, session := startedPayment(t, srv, provider, inv)
+	before, beforePayment := invoiceState(t, srv, inv)
+	beforeVersion := paymentVersion(t, srv, inv, pay)
+
+	inUSD := func(object string) string {
+		return strings.Replace(object, `"currency":"myr"`, `"currency":"usd"`, 1)
+	}
+
+	ignored := []struct {
+		name, eventType, object string
+	}{
+		{
+			"evt_unpaid_amount",
+			eventCompleted,
+			sessionObject(session, sessionUnpaid, 4999, inv, pay),
+		},
+		{
+			"evt_unpaid_currency",
+			eventCompleted,
+			inUSD(sessionObject(session, sessionUnpaid, 5000, inv, pay)),
+		},
+		{
+			"evt_paid_currency",
+			eventCompleted,
+			inUSD(sessionObject(session, statusPaid, 5000, inv, pay)),
+		},
+		{"evt_refunded", "charge.refunded", sessionObject(session, statusPaid, 5000, inv, pay)},
+	}
+
+	for _, event := range ignored {
+		code := deliver(t, srv, webhookSecret, eventID(event.name), event.eventType, event.object)
+		if code != 200 {
+			t.Fatalf("%s: %d, want 200", event.name, code)
+		}
+
+		status, paymentStatus := invoiceState(t, srv, inv)
+		if status != before || paymentStatus != beforePayment ||
+			paymentVersion(t, srv, inv, pay) != beforeVersion {
+			t.Fatalf(
+				"after %s: invoice %s, payment %s (version %d); want %s, %s (version %d)",
+				event.name, status, paymentStatus, paymentVersion(t, srv, inv, pay),
+				before, beforePayment, beforeVersion,
+			)
+		}
+	}
+
+	if code := deliver(
+		t, srv, webhookSecret, eventID("evt_unpaid_first"), eventCompleted,
+		sessionObject(session, sessionUnpaid, 5000, inv, pay),
+	); code != 200 {
+		t.Fatalf("completed unpaid: %d", code)
+	}
+
+	processing := paymentVersion(t, srv, inv, pay)
+
+	// another delivery of the session's completion (a new event ID) finds the payment processing, not initiated
+	if code := deliver(
+		t, srv, webhookSecret, eventID("evt_unpaid_again"), eventCompleted,
+		sessionObject(session, sessionUnpaid, 5000, inv, pay),
+	); code != 200 {
+		t.Fatalf("completed unpaid again: %d", code)
+	}
+
+	status, paymentStatus := invoiceState(t, srv, inv)
+	if status != statusProcessing || paymentStatus != statusProcessing ||
+		paymentVersion(t, srv, inv, pay) != processing {
+		t.Fatalf(
+			"after the second completion: invoice %s, payment %s (version %d); want processing, processing (version %d)",
+			status,
+			paymentStatus,
+			paymentVersion(t, srv, inv, pay),
+			processing,
 		)
 	}
 }
