@@ -205,3 +205,61 @@ func TestRestrictionRecoveryCases(t *testing.T) {
 		t.Error("schedule after every case is resolved")
 	}
 }
+
+// TestRestrictionRecoveryCaseSuccessor (SR26): a device that still reports a released restriction after a newer one
+// was scheduled for its unit opens a recovery case that names the newer restriction as its successor.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
+func TestRestrictionRecoveryCaseSuccessor(t *testing.T) {
+	srv := serverWith(t, true)
+	unit := boundUnit(t, srv, "online")
+	key, inv := overdueContract(t, srv, unit)
+	restrictionID, res := executed(t, srv, key, inv, []string{unit})
+	ackCommand(t, cmdOf(t, res, unit, "applyCommandIds"), clock().Add(time.Second))
+
+	get := func() map[string]any {
+		_, m := post(srv, restrMgr(), "restrictions.get", `{"id":"`+restrictionID+`"}`)
+
+		return m
+	}
+	_, res = write(
+		srv,
+		restrMgr(),
+		"restrictions.cancel",
+		`{"restrictionId":"`+restrictionID+`","reason":"plan agreed"}`,
+		ver(t, get()),
+	)
+	ackCommand(t, cmdOf(t, res, unit, "releaseCommandIds"), clock().Add(2*time.Second))
+
+	code, res := write(
+		srv,
+		restrMgr(),
+		"restrictions.schedule",
+		scheduleBody(key, inv, []string{unit}, nil),
+		0,
+	)
+	if code != 200 || data(get())["state"] != statusReleased {
+		t.Fatalf("successor schedule: %d %v", code, res)
+	}
+
+	successor := asStr(t, data(res)["id"])
+
+	if code, resp := write(
+		srv,
+		customerB(),
+		"demo.trigger",
+		`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+clock().Format(time.RFC3339)+
+			`","eventType":"restriction_observation","restrictionId":"`+restrictionID+`","unitId":"`+unit+
+			`","observed":{"restrictionId":"`+restrictionID+`","rulesVersion":"rules-1","policy":{"kind":`+
+			`"temperature_limit","minimumCoolingSetpoint":24},"observedAt":"`+clock().Format(time.RFC3339)+
+			`"}}`,
+		0,
+	); code != 200 {
+		t.Fatalf("observation: %d %v", code, resp)
+	}
+
+	cases := asArr(t, data(get())["recoveryCases"])
+	if len(cases) != 1 || asObj(t, cases[0])["successorRestrictionId"] != successor {
+		t.Fatalf("recovery case successor %s: %v", successor, cases)
+	}
+}
