@@ -4308,6 +4308,7 @@ export const ms: Record<string, string> = {
   "The attachments could not be loaded — try again.": "Lampiran tidak dapat dimuatkan — cuba lagi.",
   "No photos of accepted work reports on these units in this period.": "Tiada foto laporan kerja yang diterima pada unit ini dalam tempoh ini.",
   "Photos of accepted work reports on these units, uploaded in the period (attachments.list). Up to 20.": "Foto laporan kerja yang diterima pada unit ini, dimuat naik dalam tempoh tersebut (attachments.list). Sehingga 20.",
+  "The newest {shown} of {total} photos are listed: narrow the units or the period to find older ones.": "{shown} foto terbaharu daripada {total} disenaraikan: kecilkan unit atau tempoh untuk mencari foto yang lebih lama.",
   // the HQ policy preview and demo test (IR348)
   "The policy did not run on {name} — it is no longer attached to it.": "Polisi tidak berjalan pada {name} — ia tidak lagi dilampirkan padanya.",
   "{value} {unit} on {name} raises an alert and notifies the recipients — simulated, nothing is stored.": "{value} {unit} pada {name} menimbulkan amaran dan memaklumkan penerima — disimulasikan, tiada yang disimpan.",

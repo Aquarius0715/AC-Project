@@ -4207,6 +4207,7 @@ export const ja: Record<string, string> = {
   "The attachments could not be loaded — try again.": "添付ファイルを読み込めませんでした — もう一度お試しください。",
   "No photos of accepted work reports on these units in this period.": "この期間に、これらのユニットで承諾された作業報告書の写真はありません。",
   "Photos of accepted work reports on these units, uploaded in the period (attachments.list). Up to 20.": "この期間にアップロードされた、これらのユニットで承諾された作業報告書の写真です（attachments.list）。20 枚まで。",
+  "The newest {shown} of {total} photos are listed: narrow the units or the period to find older ones.": "{total} 枚のうち新しい {shown} 枚を表示しています。古い写真を探すにはユニットか期間を絞ってください。",
   "The policy did not run on {name} — it is no longer attached to it.": "ポリシーは {name} では動作しませんでした — もう適用されていません。",
   "{value} {unit} on {name} raises an alert and notifies the recipients — simulated, nothing is stored.": "{name} で {value} {unit} になると、アラートを出して宛先に通知します — シミュレーションで、何も保存されません。",
   "An alert, but nobody is notified: no recipient may read {name}.": "アラートは出ますが、通知される人はいません: {name} を読める宛先がありません。",
