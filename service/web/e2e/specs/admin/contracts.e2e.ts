@@ -1,8 +1,8 @@
 // HQ contracts (FR-A07, DD-A07, SCR-A07, Figma Admin 106:4, IR322): the scope with its contract count, the plan tabs
 // with their counts, the eligibility of each row, and the editor of the seed's RTO contract — its customer & units,
-// plan and eligibility sections, and Save disabled while its restriction is active (SR19) with a link to that
-// restriction. The seed has two contracts of Demo Customer A: RTO (eligible, demo-v1, restricted) and General. Nothing
-// is saved.
+// plan and eligibility sections, and Save disabled while its restriction is active (SR19), without a link to that
+// restriction for hq-operator (no restriction.* permission). The seed has two contracts of Demo Customer A: RTO
+// (eligible, demo-v1, restricted) and General. Nothing is saved.
 import { test, expect } from "../../fixtures/test";
 
 test("the contract scope, plan counts, eligibility and the restricted contract's editor", async ({ page }) => {
@@ -21,8 +21,9 @@ test("the contract scope, plan counts, eligibility and the restricted contract's
   for (const name of ["Customer & units", "Plan", "Restriction eligibility"]) await expect(main.getByRole("heading", { name, exact: true })).toBeVisible();
   await expect(main).toContainText("1 active restriction");
   await expect(main).toContainText("Save is disabled:");
-  await expect(main.getByRole("link", { name: "Open restriction" })).toHaveAttribute("href", /^\/admin\/restrictions\?restrictionId=[0-9a-f-]{36}$/);
   await expect(main.getByRole("button", { name: "Save as version 2" })).toBeDisabled();
+  // hq-operator has no restriction.* permission: the banner has no link to the restriction
+  await expect(main.getByRole("link", { name: "Open restriction" })).toHaveCount(0);
 
   // a scope without contracts
   await main.getByLabel("Customer").first().selectOption({ label: "Demo Customer B" });

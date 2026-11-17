@@ -44,11 +44,14 @@ jobs:
           for key in MQTT_DEVICE_SIM_KEY MQTT_IOT_BRIDGE_KEY; do
             sed -i "s/^$key=.*/$key=$(openssl rand -hex 24)/" "$SETTINGS"
           done
+          # every published port differs from the shared test environment's 3200–3204 on the same server: the portal's
+          # default in compose.test.yaml is ac-test's 3204, which failed compose up while ac-test ran (R935)
           cat >>"$SETTINGS" <<EOF
           CUSTOMER_WEB_PORT=3300
           PARTNER_WEB_PORT=3301
           TECHNICIAN_WEB_PORT=3302
           ADMIN_WEB_PORT=3303
+          PORTAL_WEB_PORT=3304
           CUSTOMER_WEB_URL=http://localhost:3300
           PARTNER_WEB_URL=http://localhost:3301
           TECHNICIAN_WEB_URL=http://localhost:3302
