@@ -160,6 +160,7 @@ describe("Display language (FR-X01, AT-X01-N, IR258, IR639)", () => {
     expect([translate("ja", "tamper::Clear"), translate("ja", "Clear")]).toStrictEqual(["解除", "クリア"]);
     expect(translate("ja", "A text nobody translated yet")).toBe("A text nobody translated yet");
     expect(translate("ja", "nobody::Untranslated")).toBe("Untranslated");
+    expect(["A", "B"].join(translate("ja", " and "))).toBe("A かつ B"); // the join keeps a space on both sides
   });
 
   it("speaks Indonesian, with the same placeholders and fallbacks as Malay (DEC-108)", () => {

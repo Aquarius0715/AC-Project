@@ -1,16 +1,23 @@
 // HQ's revoke of a contractor's technician (IR508, DEC-83): contractor-a adds a technician; HQ revokes the access in
 // Access & roles; contractor-a's Users list then shows "Access ended by HQ" with only Remove, and once removed the
 // address cannot come back as a new account. Each run leaves one revoked person under a name of its own.
-import type { Browser, Page } from "@playwright/test";
+import type { Browser, BrowserContext, Page } from "@playwright/test";
 import { test, expect } from "../../fixtures/test";
 import { APPS, type App } from "../../fixtures/apps";
 import { must } from "../../fixtures/must";
 
 const app = (id: App["id"]) => must(APPS.find((a) => a.id === id));
+// every context the test opens, closed after it whether it passed or failed
+const opened: BrowserContext[] = [];
 const open = async (browser: Browser, a: App): Promise<Page> => {
   const context = await browser.newContext({ baseURL: a.url, viewport: { width: 1920, height: 1080 }, storageState: a.state });
+  opened.push(context);
   return context.newPage();
 };
+
+test.afterEach(async () => {
+  await Promise.all(opened.splice(0).map((c) => c.close()));
+});
 
 test("HQ revokes a contractor's technician, who then stays out: the contractor cannot bring them back", async ({ browser }) => {
   test.setTimeout(180_000);
