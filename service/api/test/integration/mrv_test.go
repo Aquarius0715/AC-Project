@@ -211,6 +211,24 @@ func TestMRV(t *testing.T) {
 		t.Error("unknown report")
 	}
 
+	if code, res := post(
+		srv,
+		hq(),
+		"mrv.get",
+		`{"id":"`+reportID+`","reportVersion":99}`,
+	); code != 404 ||
+		res["messageKey"] != "error.notFound" {
+		t.Errorf("unknown version of a known report: %d %v", code, res)
+	}
+
+	for name, ids := range map[string]string{
+		"duplicate unit": `["` + unit + `","` + unit + `"]`,
+		"nil unit":       `["` + uuid.Nil.String() + `"]`,
+	} {
+		code, m := post(srv, hq(), "mrv.preview", cond(map[string]string{fieldUnitIDs: ids}))
+		refusal(t, name, code, m, "unitIds=error.invalid")
+	}
+
 	if _, res := post(
 		srv,
 		hq(),
