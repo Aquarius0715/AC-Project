@@ -6,12 +6,7 @@ const PAYMENTS_SIMULATE = "payments.simulate";
 import { refresh } from "next/cache";
 import { coreOp, corePrincipal } from "@ac/web/lib/dal";
 import { actionFailure } from "@ac/web/lib/actionFailure";
-import { z } from "zod";
-import { demoReference, type ClientPayment, type PreviewParams } from "@ac/web/lib/clientBilling";
-
-// payments.startCheckout answers the payment in flight and the hosted Stripe Checkout page (DEC-68); the Core API's
-// answer is checked at this boundary, not trusted.
-const checkoutStartSchema = z.object({ paymentId: z.string().min(1), checkoutUrl: z.url() });
+import { checkoutStartSchema, demoReference, type ClientPayment, type PreviewParams } from "@ac/web/lib/clientBilling";
 
 export type ActionResult<T = null> = { ok: true; value: T } | { ok: false; messageKey: string; code: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null };
 
@@ -36,7 +31,8 @@ export async function startPayment(invoiceId: string, version: number, method: "
   });
 }
 /** Stripe Checkout (DEC-68): starts the payment of the whole invoice and returns the hosted page the payer goes to. The
-invoice is paid only by Stripe's webhook, never by this return. */
+invoice is paid only by Stripe's webhook, never by this return. The Core API's answer is checked here, not trusted: only
+an HTTPS address passes (IR840). */
 export async function startCheckout(invoiceId: string, version: number) {
   return run(async () => {
     const started = checkoutStartSchema.parse(

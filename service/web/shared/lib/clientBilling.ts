@@ -3,6 +3,7 @@
 // and the client views. Texts in the display language (`t` / `i`, IR267). Contract periods, due dates and billing months
 // are Kuala Lumpur business days (REV18-035) written in the user's language; payments, inquiries, restriction events and
 // reminders are instants in the user's display time zone (IR44).
+import { z } from "zod";
 import { amount } from "@ac/web/lib/energy";
 import {  businessDay, invoiceStatus, KL, type ApiContract, type ApiInquiry, type ApiInvoice, type ApiPayment, type InvoiceStatus } from "@ac/web/lib/billing";
 import { policyText, stateLabel, type ApiCommand, type ApiRestriction, type RestrictionState } from "@ac/web/lib/restrictions";
@@ -125,6 +126,9 @@ export function paymentPhase(ps: ClientPayment[]): { open: ClientPayment | null;
   const sorted = [...ps].toSorted((a, b) => b.createdAt.localeCompare(a.createdAt));
   return { open: sorted.find((p) => p.status === "initiated" || p.status === "processing") ?? null, last: sorted[0] ?? null };
 }
+/** payments.startCheckout's answer: the payment in flight and the hosted Stripe Checkout page (DEC-68). The page goes
+straight to location.assign, so only an HTTPS address passes (IR840): z.url() alone also takes script, data and plain-http addresses. */
+export const checkoutStartSchema = z.object({ paymentId: z.string().min(1), checkoutUrl: z.url({ protocol: /^https$/ }) });
 /** The demo PSP reference of a payment (unique per payment, as payments.simulate requires for confirm). */
 export const demoReference = (paymentId: string) => `DEMO-PAY-${paymentId.replaceAll('-', "").slice(-8).toUpperCase()}`;
 
