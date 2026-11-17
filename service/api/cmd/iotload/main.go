@@ -60,11 +60,40 @@ const (
 var (
 	errNoDevices = errors.New("the links file names no device to play")
 	errNoProbes  = errors.New("the links file names no probe device")
+	errConfig      = errors.New("invalid flag")
+	errProbeSensor = errors.New("a probe device has no temperature sensor")
 )
 
 type config struct {
 	broker, tenant, links, db, out                      string
 	interval, heartbeat, probePeriod, duration, drainBy time.Duration
+}
+
+// Validate refuses flags the run cannot use: a non-positive period stops a loop or panics in its ticker, and a probe
+// period under a minute sends a second probe in a minute, which the platform never stores and the report counts as lost.
+func (c config) Validate() error {
+	for flagName, value := range map[string]string{
+		"broker": c.broker, "tenant": c.tenant, "links": c.links, "db": c.db, "out": c.out,
+	} {
+		if strings.TrimSpace(value) == "" {
+			return fmt.Errorf("%w: -%s is empty", errConfig, flagName)
+		}
+	}
+
+	switch {
+	case c.interval <= 0:
+		return fmt.Errorf("%w: -interval %s is not positive", errConfig, c.interval)
+	case c.heartbeat <= 0:
+		return fmt.Errorf("%w: -heartbeat %s is not positive", errConfig, c.heartbeat)
+	case c.probePeriod < time.Minute:
+		return fmt.Errorf("%w: -probe-period %s is under a minute", errConfig, c.probePeriod)
+	case c.duration < 0:
+		return fmt.Errorf("%w: -duration %s is negative", errConfig, c.duration)
+	case c.drainBy < 0:
+		return fmt.Errorf("%w: -drain %s is negative", errConfig, c.drainBy)
+	}
+
+	return nil
 }
 
 // linkRecord is an entry of the links file loadseed writes.
@@ -159,7 +188,12 @@ func main() {
 }
 
 func run(cfg config) error {
-	err := loadseed.Guard(cfg.db)
+	err := cfg.Validate()
+	if err != nil {
+		return err
+	}
+
+	err = loadseed.Guard(cfg.db)
 	if err != nil {
 		return apperr.Wrap(err, "loadseed.Guard")
 	}
@@ -255,6 +289,11 @@ func readLinks(cfg config) ([]*sim, []*probe, error) {
 		}
 
 		if link.Probe {
+			// without its sensor every probe would be waited for in vain and reported as lost
+			if strings.TrimSpace(link.Sensors["temperature"]) == "" {
+				return nil, nil, fmt.Errorf("%s: probe %q: %w", cfg.links, link.Device, errProbeSensor)
+			}
+
 			// a probe reports its temperature only, which is what it looks up
 			module := devicesim.NewModule(cfg.tenant, id, "v1", seedOf(id)).Only("temperature")
 			probes = append(
