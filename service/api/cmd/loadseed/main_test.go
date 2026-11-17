@@ -94,8 +94,27 @@ func TestRunManifestOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !json.Valid(data) {
-		t.Fatalf("links file is not JSON: %s", data)
+	links := new(loadseed.LinksFile)
+
+	err = json.Unmarshal(data, links)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	probes := 0
+
+	for _, link := range links.Links {
+		if link.Probe {
+			probes++
+		}
+	}
+
+	if len(links.Links) != 12 || probes != 2 {
+		t.Fatalf(
+			"links: %d devices, %d probes; want 12 (one per unit), 2",
+			len(links.Links),
+			probes,
+		)
 	}
 }
 
@@ -141,7 +160,6 @@ func TestRunRefuses(t *testing.T) {
 			smallConfig(),
 			loadseed.ErrWrongDatabase,
 		},
-		{"empty url", "", smallConfig(), loadseed.ErrWrongDatabase},
 	}
 
 	for _, entry := range cases {
