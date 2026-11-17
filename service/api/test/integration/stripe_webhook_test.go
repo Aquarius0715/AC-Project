@@ -514,6 +514,47 @@ func TestStripeWebhookIgnoresWhatDoesNotSettleThePayment(t *testing.T) {
 	}
 }
 
+// TestStripeWebhookFailedBankPaymentFreesTheInvoice: a bank payment that Stripe fails after the session completed
+// (async_payment_failed) fails the payment and puts the invoice back to unpaid, so the payer can start again (DEC-68).
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
+func TestStripeWebhookFailedBankPaymentFreesTheInvoice(t *testing.T) {
+	if clusterMode() {
+		t.Skip(clusterSkip)
+	}
+
+	provider := newFakeCheckout()
+	srv := webhookServer(t, provider)
+	_, inv := newInvoice(t, srv)
+	pay, session := startedPayment(t, srv, provider, inv)
+
+	if code := deliver(
+		t, srv, webhookSecret, eventID("evt_bank_completed"), eventCompleted,
+		sessionObject(session, sessionUnpaid, 5000, inv, pay),
+	); code != 200 {
+		t.Fatalf("completed unpaid: %d", code)
+	}
+
+	if code := deliver(
+		t, srv, webhookSecret, eventID("evt_bank_failed"), "checkout.session.async_payment_failed",
+		sessionObject(session, sessionUnpaid, 5000, inv, pay),
+	); code != 200 {
+		t.Fatalf("async failed: %d", code)
+	}
+
+	status, paymentStatus := invoiceState(t, srv, inv)
+	if status != statusUnpaid || paymentStatus != statusFailed {
+		t.Fatalf(
+			"after async failure: invoice %s, payment %s; want unpaid, failed",
+			status,
+			paymentStatus,
+		)
+	}
+
+	// a new attempt starts after a failed one
+	startedPayment(t, srv, provider, inv)
+}
+
 // TestStripeWebhookAcceptsEventsOfNoCheckout: an event of the Stripe account that no checkout here started (no
 // tenant in its metadata) is answered 2xx, so Stripe does not resend it, and changes nothing.
 //
