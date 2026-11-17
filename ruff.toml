@@ -1,4 +1,4 @@
-# Python of the repository (docs/tools, service/api/scripts, deploy/test): pyflakes (F), the import, syntax and runtime error
+# Python of the repository (docs/tools, service/api/scripts, deploy/test, deploy/load): pyflakes (F), the import, syntax and runtime error
 # checks of pycodestyle (E4, E7, E9) and nothing about layout. The tool scripts keep their compact style (an `if` and its
 # statement on one line, several statements joined by `;`), so E701 and E702 are off; they are layout, not a defect.
 target-version = "py312"
