@@ -738,6 +738,15 @@ func TestEnergyReportFigures(t *testing.T) {
 		"month_comparison,previous_kWh,n/a\nmonth_comparison,current_kWh,5.0\n" +
 		"alerts_maintenance,alerts,0\nalerts_maintenance,completed_jobs,0\n" + "%%EOF\n"
 
+	// the offsets section states the month's emissions beside the offsets retired in it (none in August)
+	if got, want := int(
+		asNum(t, exportFile("2026-08", `"co2_offsets"`, "csv")["size"]),
+	), header+len(
+		"co2_offsets,emissions_kg,2.5\nco2_offsets,demo_retired_kg,0.0\n",
+	); got != want {
+		t.Errorf("CO2 offsets section: %d bytes, want %d", got, want)
+	}
+
 	pdf := exportFile("2026-08", `"month_comparison","alerts_maintenance"`, "pdf")
 
 	got, want := int(asNum(t, pdf["size"])), len(content)

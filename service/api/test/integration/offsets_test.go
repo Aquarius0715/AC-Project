@@ -54,6 +54,11 @@ func TestOffsets(t *testing.T) {
 		t.Errorf("HQ quote without customerId: %d %s", code, fields(m))
 	}
 
+	if code, m := quote(hq(), `,"customerId":"`+uuid.NewString()+`"`); code != 404 ||
+		m["messageKey"] != apperr.KeyNotFound {
+		t.Errorf("HQ quote for an unknown customer: %d %v", code, m)
+	}
+
 	code, resp := quote(customerB(), "")
 	if code != 200 || data(resp)["provider"] != "unselected" ||
 		data(resp)["estimatedAmountMinor"] != nil ||
