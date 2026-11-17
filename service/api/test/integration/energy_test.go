@@ -713,21 +713,14 @@ func TestEnergyReportFigures(t *testing.T) {
 
 	// the comparison states July (no readings) beside August, the counts are the unit's own (none), and a PDF wraps
 	// the same rows
-	rows := "month_comparison,previous_kWh,n/a\nmonth_comparison,current_kWh,5.0\n" +
-		"alerts_maintenance,alerts,0\nalerts_maintenance,completed_jobs,0\n"
+	content := "%PDF-1.4\n% Demo energy report 2026-08 (fictional values)\n" + "section,metric,value\n" +
+		"month_comparison,previous_kWh,n/a\nmonth_comparison,current_kWh,5.0\n" +
+		"alerts_maintenance,alerts,0\nalerts_maintenance,completed_jobs,0\n" + "%%EOF\n"
 
 	pdf := exportFile("2026-08", `"month_comparison","alerts_maintenance"`, "pdf")
-	if got, want := int(
-		asNum(t, pdf["size"]),
-	), len(
-		"%PDF-1.4\n% Demo energy report 2026-08 (fictional values)\n",
-	)+
-		header+len(
-		rows,
-	)+len(
-		"%%EOF\n",
-	); got != want ||
-		pdf["mime"] != "application/pdf" ||
+
+	got, want := int(asNum(t, pdf["size"])), len(content)
+	if got != want || pdf["mime"] != "application/pdf" ||
 		pdf["fileName"] != "energy-report-2026-08.pdf" {
 		t.Errorf("PDF report: %v, want %d bytes", pdf, want)
 	}
