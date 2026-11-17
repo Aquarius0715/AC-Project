@@ -49,6 +49,15 @@ describe("charts", () => {
     expect(container.textContent).toContain("°C");
   });
 
+  // the lines and bars draw var(--color-<key>): the container's style attribute carries the colours (no <style>, CSP)
+  it("gives each series its colour as a custom property on the chart", () => {
+    const { container } = render(<LineChart labels={["a", "b"]} series={[{ name: "A", points: [1, 2] }, { name: "B", points: [2, 3], color: "#123456" }]} />);
+    const chart = container.querySelector<HTMLElement>("[data-slot=chart]");
+    expect(chart?.style.getPropertyValue("--color-v0")).toBe("var(--color-primary)");
+    expect(chart?.style.getPropertyValue("--color-v1")).toBe("#123456");
+    expect(container.querySelector("style")).toBeNull();
+  });
+
   it("shows the time, the name and the value with its unit in the tooltip", () => {
     const { container } = render(<LineChart height={200} times={["Mon 9 Nov, 15:00–15:05", "Mon 9 Nov, 15:05–15:10", "Mon 9 Nov, 15:10–15:15"]} series={[
       { name: "CO₂", unit: "ppm", points: [500, 800, 1200], format: (v) => String(Math.round(v)) },
