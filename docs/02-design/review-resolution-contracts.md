@@ -10936,3 +10936,10 @@ Review round 871 found that a web virtual user of the k6 load test (`service/web
 
 1. **Rule.** A sign-in whose start already lands on the app's home page with 200 is a sign-in (the form is skipped). A failed page drops the session only when it ended on a sign-in page (`/login`, where the DAL sends a lost session) or answered 401; any other failure is recorded and the session is kept. A token answer that is not JSON is a refusal, recorded like any other.
 2. **Tests.** None: the load library runs only inside k6 (its `k6/http` module has no Node runtime) and is checked by the load workspace's lint and typecheck and by the load workflow's smoke run.
+
+## IR837 The load test's `load` and `stress` scenarios honour TIME_SCALE and VU_SCALE, and the smoke checks are never called shortened (IR691) — 2026-11-17
+
+Review round 873 found that `load` and `stress` (`service/web/load/scenarios`) wrote their stages as literal durations and virtual users, while the web scenarios used `minutes()` and `vus()`. A run of them with `TIME_SCALE` or `VU_SCALE` other than 1, which [load-test.md](load-test.md#running-it) documents as shortening a scenario, still ran full length and size, yet the report printed "SHORTENED RUN … not a measurement of the stated scenario". `smoke` and `web-smoke` had the same mismatch. Only the measurement's label was affected; the product is unchanged.
+
+1. **Rule.** `load` and `stress` scale every stage with `minutes()` and `vus()` (the last stage of `stress` still goes to 0 users). `smoke` and `web-smoke` keep their fixed size and use `fixedSummary`, whose report never prints the SHORTENED line; every other scenario's report prints it when either setting is not 1.
+2. **Tests.** None: the load library runs only inside k6 and is checked by the load workspace's lint and typecheck, as in IR836.
