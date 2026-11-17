@@ -210,15 +210,16 @@ func TestRestrictionLifecycle(t *testing.T) {
 	units := []string{online, offline}
 	key, inv := overdueContract(t, srv, online, offline)
 	refused := map[string]string{ // the field each VALIDATION case is refused for
-		caseBlankReason:      refusedReasonLength,
-		caseDuplicateUnit:    refusedUnitIDsInvalid,
-		"missing cause":      "causeInvoiceIds=errors.cause_invoices_mismatch",
-		"notice under 24h":   "executeAfter=errors.notice_24h",
-		"power off setpoint": "policy=error.invalid",
-		"rules mismatch":     "rulesVersion=errors.rules_version_mismatch",
-		"setpoint off step":  "policy=errors.setpoint_out_of_range",
-		"setpoint too low":   "policy=errors.setpoint_out_of_range",
-		"unit not in deal":   "unitIds=errors.unit_not_in_contract",
+		caseBlankReason:       refusedReasonLength,
+		caseDuplicateUnit:     refusedUnitIDsInvalid,
+		"missing cause":       "causeInvoiceIds=errors.cause_invoices_mismatch",
+		"notice under 24h":    "executeAfter=errors.notice_24h",
+		"power off setpoint":  "policy=error.invalid",
+		"unknown policy kind": "policy=error.invalid",
+		"rules mismatch":      "rulesVersion=errors.rules_version_mismatch",
+		"setpoint off step":   "policy=errors.setpoint_out_of_range",
+		"setpoint too low":    "policy=errors.setpoint_out_of_range",
+		"unit not in deal":    "unitIds=errors.unit_not_in_contract",
 	}
 
 	for name, testCase := range map[string]struct {
@@ -234,12 +235,13 @@ func TestRestrictionLifecycle(t *testing.T) {
 		"setpoint too low": {map[string]string{fieldPolicy: `{"kind":"temperature_limit","minimumCoolingSetpoint":15}`}, 422},
 		"setpoint off step": {map[string]string{fieldPolicy: `{"kind":"temperature_limit",` +
 			`"minimumCoolingSetpoint":24.5}`}, 422},
-		"power off setpoint": {map[string]string{fieldPolicy: `{"kind":"power_off","minimumCoolingSetpoint":24}`}, 422},
-		"unit not in deal":   {map[string]string{fieldUnitIDs: `["` + seed.ID("unit-online-rto").String() + `"]`}, 422},
-		caseDuplicateUnit:    {map[string]string{fieldUnitIDs: `["` + online + `","` + online + `"]`}, 422},
-		caseBlankReason:      {map[string]string{fieldReason: `"  "`}, 422},
-		"stale contract":     {map[string]string{fieldExpectedContractVersion: "2"}, 409},
-		"unknown contract":   {map[string]string{fieldContractID: `"` + uuid.NewString() + `"`}, 404},
+		"power off setpoint":  {map[string]string{fieldPolicy: `{"kind":"power_off","minimumCoolingSetpoint":24}`}, 422},
+		"unknown policy kind": {map[string]string{fieldPolicy: `{"kind":"shutdown"}`}, 422},
+		"unit not in deal":    {map[string]string{fieldUnitIDs: `["` + seed.ID("unit-online-rto").String() + `"]`}, 422},
+		caseDuplicateUnit:     {map[string]string{fieldUnitIDs: `["` + online + `","` + online + `"]`}, 422},
+		caseBlankReason:       {map[string]string{fieldReason: `"  "`}, 422},
+		"stale contract":      {map[string]string{fieldExpectedContractVersion: "2"}, 409},
+		"unknown contract":    {map[string]string{fieldContractID: `"` + uuid.NewString() + `"`}, 404},
 	} {
 		code, res := write(
 			srv,
@@ -567,13 +569,26 @@ func TestRestrictionCancelAndPayment(t *testing.T) {
 	)
 
 	restrictionID := asStr(t, data(resp)["id"])
-	if code, res := write(
+	// a stale version is refused and leaves the restriction scheduled
+	code, res := write(
+		srv,
+		restrMgr(),
+		"restrictions.cancel",
+		`{"restrictionId":"`+restrictionID+`","reason":"mistake"}`,
+		2,
+	)
+	if code != 409 || res["messageKey"] != apperr.KeyVersionConflict {
+		t.Fatalf("cancel stale version: %d %v", code, res)
+	}
+
+	code, res = write(
 		srv,
 		restrMgr(),
 		"restrictions.cancel",
 		`{"restrictionId":"`+restrictionID+`","reason":"mistake"}`,
 		1,
-	); code != 200 ||
+	)
+	if code != 200 ||
 		data(res)["state"] != statusCancelled {
 		t.Fatalf("cancel scheduled: %d %v", code, res)
 	}
@@ -683,7 +698,7 @@ func TestRestrictionCancelAndPayment(t *testing.T) {
 		t.Fatalf("applied: %v", resp)
 	}
 	// payment of all causes → release_requested with a remove command (IR35 ①); expiry → release failed
-	code, resp := write(
+	code, resp = write(
 		srv,
 		restrMgr(),
 		"payments.recordManual",
