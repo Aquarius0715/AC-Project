@@ -130,7 +130,7 @@ func TestRestrictionInputValidation(t *testing.T) {
 			"restrictions.override", `{"restrictionId":"` + nilID + `","reason":"hardship"}`,
 			fieldRestrictionID,
 		},
-		"defer without until": {"restrictions.defer", `{"restrictionId":"` + nilID + `","reason":"plan"}`, "until"},
+		"defer without until": {opRestrictionsDefer, `{"restrictionId":"` + nilID + `","reason":"plan"}`, "until"},
 		"reconcile duplicates": {"restrictions.reconcile", `{"restrictionId":"` + nilID + `","unitIds":["` + dup + `","` +
 			dup + `"]}`, fieldUnitIDs},
 		"retry bad phase": {opRestrictionsRetry, `{"restrictionId":"` + dup + `","unitIds":["` + dup +
@@ -151,4 +151,15 @@ func TestRestrictionInputValidation(t *testing.T) {
 			t.Errorf("%s: %d %v", name, code, res)
 		}
 	}
+	// the reads refuse a missing id before any lookup
+	code, res := post(srv, restrMgr(), "restrictions.get", `{"id":"`+nilID+`"}`)
+	refusal(t, "get without id", code, res, "id=error.required")
+
+	code, res = post(
+		srv,
+		customerB(),
+		opRestrictionsForInvoice,
+		`{"invoiceId":"`+nilID+`","query":{}}`,
+	)
+	refusal(t, "forInvoice without invoice", code, res, "invoiceId=error.required")
 }
