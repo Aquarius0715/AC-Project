@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/platform/stripe"
 	apiserver "github.com/pradita/ac-project/service/api/internal/server"
 )
@@ -384,5 +385,85 @@ func TestStartCheckoutNeedsStripeConfigured(t *testing.T) {
 	)
 	if code != 503 || res["messageKey"] != keyUnavailable {
 		t.Fatalf("no provider: %d %v, want 503 error.unavailable", code, res)
+	}
+}
+
+// TestStartCheckoutRefusesPaidOrDemoInFlight: a paid invoice is not paid again (invalid state), and a demo payment in
+// flight is not a Stripe session the payer left, so it is not ended and the start is refused without calling Stripe.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
+func TestStartCheckoutRefusesPaidOrDemoInFlight(t *testing.T) {
+	if clusterMode() {
+		t.Skip(clusterSkip)
+	}
+
+	provider := newFakeCheckout()
+	srv := checkoutServer(t, provider)
+
+	// the demo attempt began before Stripe was configured: with Stripe on, payments.simulate refuses to initiate
+	demoSrv := server(t)
+	_, demo := newInvoice(t, demoSrv)
+
+	code, res := write(
+		demoSrv,
+		customerB(),
+		"payments.simulate",
+		`{"event":"initiate","invoiceId":"`+demo+`","method":"demo_debit_card","demoConfirmed":true}`,
+		invoiceVersion(t, demoSrv, demo),
+	)
+	if code != 200 {
+		t.Fatalf("demo initiate: %d %v", code, res)
+	}
+
+	code, res = write(
+		srv,
+		customerB(),
+		"payments.startCheckout",
+		`{"invoiceId":"`+demo+`"}`,
+		invoiceVersion(t, srv, demo),
+	)
+	if code != 409 || res["messageKey"] != keyInvoiceHasPayment {
+		t.Fatalf(
+			"start with a demo payment in flight: %d %v, want 409 errors.invoice_has_payment",
+			code,
+			res,
+		)
+	}
+
+	if _, paymentStatus := invoiceState(t, srv, demo); paymentStatus != statusInitiated {
+		t.Fatalf("the demo payment is %s, want still initiated", paymentStatus)
+	}
+
+	_, paid := newInvoice(t, srv)
+
+	code, res = write(
+		srv,
+		hq(),
+		"payments.recordManual",
+		`{"invoiceId":"`+paid+`","paymentReference":"BANK-`+uuid.NewString()[:8]+
+			`","confirmedAmountMinor":5000,"currency":"MYR","reason":"bank transfer seen"}`,
+		invoiceVersion(t, srv, paid),
+	)
+	if code != 200 {
+		t.Fatalf("record manual: %d %v", code, res)
+	}
+
+	code, res = write(
+		srv,
+		customerB(),
+		"payments.startCheckout",
+		`{"invoiceId":"`+paid+`"}`,
+		invoiceVersion(t, srv, paid),
+	)
+	if code != 409 || res["messageKey"] != apperr.KeyInvalidState {
+		t.Fatalf("start on a paid invoice: %d %v, want 409 %s", code, res, apperr.KeyInvalidState)
+	}
+
+	if provider.count() != 0 || len(provider.releasedSessions()) != 0 {
+		t.Fatalf(
+			"Stripe was called: %d sessions, released %v",
+			provider.count(),
+			provider.releasedSessions(),
+		)
 	}
 }
