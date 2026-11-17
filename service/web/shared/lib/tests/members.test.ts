@@ -81,6 +81,8 @@ describe("HQ access & roles (FR-A03, BR-A03, IR107)", () => {
       "newUser.email": "A valid email address (up to 254 characters)", "newUser.displayName": "A name of 1–120 characters",
     });
     expect(memberErrors(draft({ userId: "", creatingUser: true, inviteEmail: "new@example.com", inviteName: "New Colleague" }), { selfUserId: "me" })).toStrictEqual({});
+    // 254 bytes, as members.create counts newUser.email (len in Go)
+    expect(memberErrors(draft({ userId: "", creatingUser: true, inviteEmail: `${"é".repeat(130)}@x.com`, inviteName: "New Colleague" }), { selfUserId: "me" })).toStrictEqual({ "newUser.email": "A valid email address (up to 254 characters)" });
     expect(memberInput(draft({ userId: "", creatingUser: true, inviteEmail: " new@example.com ", inviteName: " New Colleague " }))).toMatchObject({
       userId: "00000000-0000-0000-0000-000000000000", "newUser": { email: "new@example.com", displayName: "New Colleague" },
     });

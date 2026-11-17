@@ -83,6 +83,8 @@ describe("HQ contractor register", () => {
   it("checks the profile and rate card forms", () => {
     expect(profileErrors({ registrationNo: "SSM 1", serviceAreas: "Penang, Kedah", contactEmail: "ops@b.example" })).toStrictEqual({});
     expect(profileErrors({ registrationNo: " ", serviceAreas: "Penang, penang", contactEmail: "nope" })).toStrictEqual({ registrationNo: "1–64 characters.", serviceAreas: "1–20 different areas, comma-separated.", contactEmail: "A valid e-mail address." });
+    // 254 bytes, as the contractor profile save counts (len in Go)
+    expect(profileErrors({ registrationNo: "SSM 1", serviceAreas: "Penang", contactEmail: `${"é".repeat(130)}@b.example` })).toStrictEqual({ contactEmail: "A valid e-mail address." });
     const lines = [{ workType: REPAIR_BASE, amount: "450", note: "" }];
     expect(rateCardErrors({ effectiveFrom: TEXT_2026_10_01T00_00_00Z, lines }, NOW)).toStrictEqual({});
     expect(rateCardErrors({ effectiveFrom: TEXT_2026_09_01T00_00_00Z, lines: [...lines, ...lines] }, NOW)).toStrictEqual({ effectiveFrom: "Effective from a future date.", lines: "Each work type once." });

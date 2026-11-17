@@ -102,6 +102,8 @@ describe("the customer's users in the display language (FR-C19, IR267)", () => {
 
   it("checks an invite address in either language", () => {
     expect([inviteError("bad", []), inviteError("lim@x.com", [{ email: "LIM@x.com" }], translator("ms")), inviteError("new@x.com", [])]).toStrictEqual(["A valid email address (up to 254 characters)", "Sudah menjadi pengguna pelanggan ini", undefined]);
+    // 254 bytes, as clientUsers.save counts (len in Go)
+    expect([inviteError(`${"a".repeat(248)}@x.com`, []), inviteError(`${"é".repeat(130)}@x.com`, [])]).toStrictEqual([undefined, "A valid email address (up to 254 characters)"]);
   });
 });
 
