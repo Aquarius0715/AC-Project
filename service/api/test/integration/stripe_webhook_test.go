@@ -424,6 +424,47 @@ func TestStripeWebhookSettlesABankPaymentLater(t *testing.T) {
 	}
 }
 
+// TestStripeWebhookAsyncFailureFreesTheInvoice: a session that settles later and then fails ends the attempt: the
+// payment is failed, the invoice is unpaid again and the payer can start a new attempt (IR829, DEC-68).
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
+func TestStripeWebhookAsyncFailureFreesTheInvoice(t *testing.T) {
+	if clusterMode() {
+		t.Skip(clusterSkip)
+	}
+
+	provider := newFakeCheckout()
+	srv := webhookServer(t, provider)
+	_, inv := newInvoice(t, srv)
+	pay, session := startedPayment(t, srv, provider, inv)
+
+	if code := deliver(
+		t, srv, webhookSecret, eventID("evt_async_fail_completed"), eventCompleted,
+		sessionObject(session, sessionUnpaid, 5000, inv, pay),
+	); code != 200 {
+		t.Fatalf("completed unpaid: %d", code)
+	}
+
+	if code := deliver(
+		t, srv, webhookSecret, eventID("evt_async_failed"), "checkout.session.async_payment_failed",
+		sessionObject(session, sessionUnpaid, 5000, inv, pay),
+	); code != 200 {
+		t.Fatalf("async failed: %d", code)
+	}
+
+	status, paymentStatus := invoiceState(t, srv, inv)
+	if status != statusUnpaid || paymentStatus != statusFailed {
+		t.Fatalf(
+			"after async failure: invoice %s, payment %s; want unpaid, failed",
+			status,
+			paymentStatus,
+		)
+	}
+
+	// a new attempt starts after a failed one
+	startedPayment(t, srv, provider, inv)
+}
+
 // TestStripeWebhookIgnoresWhatDoesNotSettleThePayment: a completed session whose amount or currency is not the
 // invoice's, a paid session in another currency and an event type billing does not act on are stored and change
 // neither the payment nor its version; a second completed-unpaid session on a payment already processing changes
