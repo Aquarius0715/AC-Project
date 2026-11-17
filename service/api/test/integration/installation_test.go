@@ -12,7 +12,10 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
-const installationType = `"installation"`
+const (
+	installationType = `"installation"`
+	statePlanned     = "planned"
+)
 
 // installDraft builds the draft of an installation report: the seven checklist items with the result, the confirmed
 // equipment and the photos named.
@@ -80,11 +83,72 @@ func TestInstallationFlow(t *testing.T) {
 	refusal(t, "unknown state", code, res, "installState="+apperr.KeyInvalid)
 
 	code, res = save(`,"installState":"planned","installedAt":null`)
-	if code != 200 || data(res)["installState"] != "planned" || data(res)["installedAt"] != nil {
+	if code != 200 || data(res)["installState"] != statePlanned || data(res)["installedAt"] != nil {
 		t.Fatalf("plan a unit: %d %v", code, res)
 	}
 
 	unit := asStr(t, data(res)["id"])
+
+	// the update path keeps the stored state: the form cannot install the unit, nor give a planned unit an
+	// installation date or a warranty end (DEC-106); only an accepted installation report does
+	update := func(extra string) (int, map[string]any) {
+		return write(
+			srv,
+			hq(),
+			"units.save",
+			`{"id":"`+unit+`","customerOrgId":"`+unitOrg+`","propertyId":"`+prop+`","spaceId":null,"displayName":"`+
+				name+`","modelId":"`+model+`","type":"split","serviceScope":["indoor","outdoor"]`+extra+`}`,
+			1,
+		)
+	}
+	past := clock().Add(-time.Hour).Format(time.RFC3339)
+
+	code, res = update(`,"installState":"installed","installedAt":null`)
+	refusal(
+		t,
+		"install a planned unit by the form",
+		code,
+		res,
+		"installState="+apperr.KeyNotAllowed,
+	)
+
+	code, res = update(`,"installedAt":"` + past + `"`)
+	refusal(
+		t,
+		"installation date on a planned unit",
+		code,
+		res,
+		"installedAt="+apperr.KeyNotAllowed,
+	)
+
+	code, res = update(
+		`,"installedAt":null,"warrantyEndsAt":"` + clock().Add(24*time.Hour).
+			Format(time.RFC3339) +
+			`"`,
+	)
+	refusal(t, "warranty end on a planned unit", code, res, "warrantyEndsAt="+apperr.KeyNotAllowed)
+
+	if got := installState(t, unit); got != statePlanned {
+		t.Errorf("unit after refused updates: %s", got)
+	}
+
+	// the place is checked first: an unknown property is not found, an unknown IoT model is the field's error
+	code, res = write(
+		srv,
+		hq(),
+		"units.save",
+		`{"customerOrgId":"`+unitOrg+`","propertyId":"`+uuid.NewString()+`","spaceId":null,"displayName":"`+name+
+			` 2","modelId":"`+model+`","type":"split","installedAt":null,"serviceScope":["indoor"]}`,
+		0,
+	)
+	if code != 404 || res["messageKey"] != apperr.KeyNotFound {
+		t.Errorf("unit on an unknown property: %d %v", code, res)
+	}
+
+	code, res = save(
+		`,"installState":"planned","installedAt":null,"iotModelId":"` + uuid.NewString() + `"`,
+	)
+	refusal(t, "unknown IoT model", code, res, "iotModelId=error.unknownModel")
 
 	create := func(who *actor, unitID, kind string) (int, map[string]any) {
 		return write(srv, who, "jobs.create", jobBody(unitID, map[string]string{
@@ -301,7 +365,7 @@ func TestInstallationFlow(t *testing.T) {
 		t.Fatalf("submit: %d %v", code, res)
 	}
 
-	if got := installState(t, unit); got != "planned" {
+	if got := installState(t, unit); got != statePlanned {
 		t.Errorf("unit state before acceptance: %s", got)
 	}
 
