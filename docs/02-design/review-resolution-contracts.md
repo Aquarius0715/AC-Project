@@ -10972,3 +10972,10 @@ Review round 952 found that the customer's "Use this device's location" switch r
 
 1. **Rule.** `presenceReporter` (`service/web/shared/lib/presence.ts`) sends one report at a time and compares each position with the last one that was *sent*; a failed or rejected report leaves it unchanged, so the next position of the watch is sent. Positions that come while a report is in flight are dropped. A rejected report shows the same "could not be sent" line as a refused one.
 2. **Tests.** `presence.test.ts` sends again after a failed and after a rejected report in the same place, holds positions while one is in flight, and covers the per-device choice (localStorage `"1"` only, the in-memory fallback when storage is blocked, subscribers told until they unsubscribe); the retry test failed with the position remembered before the answer.
+
+## IR842 The presence switch ignores answers of an ended watch and says when the browser has no location (DEC-109, IR826) — 2026-11-17
+
+Review rounds 954–955 found two gaps in the customer's "Use this device's location" switch. When the member turned it off and on again while a report was in flight, the old watch's answer still set the line, so a "could not be sent" or "Arrived at …" line of the earlier watch showed under the new one. And in a browser without geolocation the switch could be turned on but no watch started and no line was shown, so it looked on while nothing was ever reported.
+
+1. **Rule.** The switch (now `service/web/customer/app/customer/automations/_components/presence-switch.tsx`) ends a watch's reports when the switch changes: the answer to a report of an ended watch changes no line. A browser without `navigator.geolocation` shows "This browser cannot share a location — switch this off, or use another browser." while the switch is on (en, ms, ja, id).
+2. **Tests.** `customer/tests/presenceSwitch.test.tsx` (jsdom, a fake geolocation and a deferred `reportPresence`): the line of a sent and of a refused report, no line from the answer of a report sent before the switch was turned off and on again, and the no-geolocation line; the last two failed before the fix.

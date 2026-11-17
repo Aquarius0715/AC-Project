@@ -2,7 +2,7 @@
 const BORDER_LINE_BG_SURFACE = "border-line bg-surface";
 const CREATE_AUTOMATION = "Create automation";
 
-import { useEffect, useEffectEvent, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Badge, Banner, Btn, Card, Choice, cx, EmptyState, Field, Input, Modal, Page, PageHead, Select, Toggle, Plain } from "@ac/web/components/ui";
 import { useAction } from "@ac/web/lib/useAction";
 import { useOp } from "@ac/web/lib/useOp";
@@ -14,8 +14,8 @@ import {
 } from "@ac/web/lib/clientAutomations";
 import { useI18n, useT } from "@ac/web/components/I18n";
 import type { T } from "@ac/web/lib/i18n";
-import { deleteAutomation, reportPresence, saveAutomation, testEvent, updateConsent } from "../actions";
-import { presenceReporter, presenceStored, presenceText, storePresence, subscribePresence, type Fix } from "@ac/web/lib/presence";
+import { deleteAutomation, saveAutomation, testEvent, updateConsent } from "../actions";
+import { PresenceSwitch } from "./presence-switch";
 import { Icon } from "@ac/web/components/Icon";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@ac/web/components/ui/dropdown-menu";
 import { Button } from "@ac/web/components/ui/button";
@@ -81,40 +81,6 @@ function ConsentCard({ live, compact }: Readonly<{ live: AutomationsLive; compac
       </div>
       <p className="mt-1.5 text-xs text-muted-foreground">{compact ? t("Required for this automation. Used only for arrival/departure automations: your device’s location is compared with the map pin of your home or office, and only home or away is kept.") : c.text}</p>
       {!compact && c.granted && <PresenceSwitch places={live.places} />}
-    </div>
-  );
-}
-
-/** "Use this device's location" (DEC-109, IR826): while this page is open and the switch is on, the browser's position is
-reported when it moved 50 m or every 5 minutes; the Core API keeps only home or away. A browser does not report in the
-background, so the line says so. The choice is this device's. */
-function PresenceSwitch({ places }: Readonly<{ places: Record<string, string> }>) {
-  const t = useT();
-  const on = useSyncExternalStore(subscribePresence, presenceStored, () => false); // the browser's choice; off on the server
-  const [line, setLine] = useState<string | null>(null);
-  const report = useEffectEvent(async (fix: Fix): Promise<boolean> => {
-    // a server action rejects when the network is down: the same line as a refused report
-    const r = await reportPresence({ latitude: fix.latitude, longitude: fix.longitude, accuracyMeters: fix.accuracyMeters }).catch(() => null);
-    if (!r?.ok) { setLine(t("This device’s location could not be sent — the next one is tried in a moment.")); return false; }
-    setLine(r.value ? presenceText(r.value, new Map(Object.entries(places)), t) ?? t("Location sent · nothing changed.") : t("Location sent · nothing changed."));
-    return true;
-  });
-  const unavailable = useEffectEvent(() => { setLine(t("This browser did not share its location — allow it for this site, or switch this off.")); });
-  useEffect(() => {
-    const offer = presenceReporter((fix) => report(fix));
-    const watch = on && "geolocation" in navigator ? navigator.geolocation.watchPosition(
-      (p) => { offer({ latitude: p.coords.latitude, longitude: p.coords.longitude, accuracyMeters: p.coords.accuracy, at: Date.now() }); },
-      () => { unavailable(); },
-      { enableHighAccuracy: true, maximumAge: 60_000, timeout: 30_000 },
-    ) : null;
-    return () => { if (watch !== null) navigator.geolocation.clearWatch(watch); };
-  }, [on]);
-  const flip = (next: boolean) => { storePresence(next); setLine(null); };
-  return (
-    <div className="mt-3 flex flex-col gap-1 border-t pt-3">
-      <div className="flex items-center gap-2 text-[13px]"><Toggle on={on} onChange={flip} label={t("Use this device’s location")} /><span>{t("Use this device’s location")}</span></div>
-      <p className="text-xs text-muted-foreground">{t("While this page is open, your position is compared with the map pins of your homes and offices; only home or away is kept. A browser does not report in the background.")}</p>
-      {on && line && <p className="text-xs" role="status">{line}</p>}
     </div>
   );
 }

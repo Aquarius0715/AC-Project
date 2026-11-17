@@ -6187,6 +6187,7 @@ export const id: Record<string, string> = {
   "This device’s location could not be sent — the next one is tried in a moment.": "Lokasi perangkat ini tidak dapat dikirim — berikutnya dicoba sebentar lagi.",
   "Location sent · nothing changed.": "Lokasi dikirim · tidak ada perubahan.",
   "This browser did not share its location — allow it for this site, or switch this off.": "Browser ini tidak membagikan lokasinya — izinkan untuk situs ini, atau matikan ini.",
+  "This browser cannot share a location — switch this off, or use another browser.": "Browser ini tidak dapat membagikan lokasi — matikan ini, atau gunakan browser lain.",
   "Use this device’s location": "Gunakan lokasi perangkat ini",
   "While this page is open, your position is compared with the map pins of your homes and offices; only home or away is kept. A browser does not report in the background.": "Selama halaman ini terbuka, posisi Anda dibandingkan dengan pin peta rumah dan kantor Anda; hanya di rumah atau pergi yang disimpan. Browser tidak melapor di latar belakang.",
 };

@@ -6339,6 +6339,7 @@ export const ms: Record<string, string> = {
   "This device’s location could not be sent — the next one is tried in a moment.": "Lokasi peranti ini tidak dapat dihantar — yang seterusnya dicuba sebentar lagi.",
   "Location sent · nothing changed.": "Lokasi dihantar · tiada perubahan.",
   "This browser did not share its location — allow it for this site, or switch this off.": "Pelayar ini tidak berkongsi lokasinya — benarkan untuk laman ini, atau matikan ini.",
+  "This browser cannot share a location — switch this off, or use another browser.": "Pelayar ini tidak boleh berkongsi lokasi — matikan ini, atau gunakan pelayar lain.",
   "Use this device’s location": "Guna lokasi peranti ini",
   "While this page is open, your position is compared with the map pins of your homes and offices; only home or away is kept. A browser does not report in the background.": "Semasa halaman ini dibuka, kedudukan anda dibandingkan dengan pin peta rumah dan pejabat anda; hanya di rumah atau keluar disimpan. Pelayar tidak melapor di latar belakang.",
 };
