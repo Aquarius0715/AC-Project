@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"slices"
 	"sync"
@@ -252,5 +253,137 @@ func TestAnswerDropsABrokenCommand(t *testing.T) {
 
 	if got := broker.topics(); len(got) != 0 {
 		t.Errorf("published %v", got)
+	}
+}
+
+// subscribingBroker also records the subscriptions, in order, and their handlers.
+type subscribingBroker struct {
+	fakeBroker
+
+	order    []string
+	handlers map[string]mqtt.MessageHandler
+}
+
+//nolint:ireturn // mqtt.Client's Subscribe returns the Token interface, which the fake implements
+func (b *subscribingBroker) Subscribe(
+	topic string,
+	_ byte,
+	callback mqtt.MessageHandler,
+) mqtt.Token {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	b.order = append(b.order, topic)
+	b.handlers[topic] = callback
+
+	return doneToken{}
+}
+
+// message is a delivered message; only its payload is read.
+type message struct {
+	mqtt.Message
+
+	payload []byte
+}
+
+func (m message) Payload() []byte { return m.payload }
+
+// TestSubscribeRestoresTheKeptStateThenAnswers: each module first subscribes to its kept topic, which restores the
+// setpoint, then to its command topic, which answers; a command after a restart keeps the restored setpoint (IR613).
+func TestSubscribeRestoresTheKeptStateThenAnswers(t *testing.T) {
+	t.Parallel()
+
+	module := devicesim.NewModule("t", "d", "v1", 1)
+	broker := new(subscribingBroker)
+	broker.handlers = map[string]mqtt.MessageHandler{}
+
+	subscribe(broker, []*devicesim.Module{module})
+
+	if want := []string{
+		module.KeptTopic(),
+		module.CommandTopic(),
+	}; !slices.Equal(
+		broker.order,
+		want,
+	) {
+		t.Fatalf("subscribed %v, want %v", broker.order, want)
+	}
+
+	broker.handlers[module.KeptTopic()](
+		broker,
+		message{Message: nil, payload: []byte(`{"setpointCelsius":19}`)},
+	)
+
+	// a command that changes no setpoint: the kept state it publishes is the restored one
+	raw, err := json.Marshal(devicesim.Command{
+		CommandID: "c1",
+		Kind:      "power",
+		Setpoint:  nil,
+		ExpiresAt: time.Now().Add(time.Minute),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	broker.handlers[module.CommandTopic()](broker, message{Message: nil, payload: raw})
+
+	kept, ok := broker.message(module.KeptTopic())
+	if !ok || string(kept.payload) != `{"setpointCelsius":19}` {
+		t.Errorf("kept %s %v, want the restored setpoint 19", kept.payload, ok)
+	}
+
+	if _, acked := broker.message(module.AckTopic()); !acked {
+		t.Error("the command was not answered")
+	}
+}
+
+// TestPlaySendsOnItsTickersUntilTheContextEnds: play sends heartbeats and telemetry on their tickers and returns when
+// the context ends.
+func TestPlaySendsOnItsTickersUntilTheContextEnds(t *testing.T) {
+	t.Parallel()
+
+	module := devicesim.NewModule("t", "d", "v1", 1)
+	broker := new(fakeBroker)
+	ctx, cancel := context.WithCancel(t.Context())
+	stopped := make(chan struct{})
+
+	go func() {
+		defer close(stopped)
+
+		play(
+			ctx,
+			broker,
+			[]*devicesim.Module{module},
+			map[*devicesim.Module]bool{module: true},
+			config{
+				broker: "", tenant: "", names: "", firmware: "",
+				interval: time.Millisecond, beat: time.Millisecond, withFleet: false,
+			},
+		)
+	}()
+
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		got := broker.topics()
+		if slices.Contains(got, module.TelemetryTopic()) &&
+			slices.Contains(got, module.HeartbeatTopic()) {
+			break
+		}
+
+		time.Sleep(5 * time.Millisecond)
+	}
+
+	cancel()
+
+	select {
+	case <-stopped:
+	case <-time.After(10 * time.Second):
+		t.Fatal("play did not stop when the context ended")
+	}
+
+	got := broker.topics()
+	if !slices.Contains(got, module.TelemetryTopic()) ||
+		!slices.Contains(got, module.HeartbeatTopic()) {
+		t.Errorf("published %v, want telemetry and heartbeats", got)
 	}
 }
