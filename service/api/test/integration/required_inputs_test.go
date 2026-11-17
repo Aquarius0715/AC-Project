@@ -5,12 +5,15 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/uuid"
+
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
 
 const (
 	fieldDecision      = "decision"
+	fieldDisplayName   = "displayName"
 	fieldInvoiceID     = "invoiceId"
 	fieldProposalID    = "proposalId"
 	fieldReportVersion = "reportVersion"
@@ -207,6 +210,17 @@ func TestRequiredInputs(t *testing.T) {
 		{"mrv.saveDraft", `{}`, map[string]string{"evidenceIds": inv}},
 		{"energy.summary", `{"unitIds":["00000000-0000-0000-0000-000000000000"]}`, map[string]string{fieldUnitIDs: inv}},
 		{opClientUsersSave, `{}`, map[string]string{fieldCustomerID: req}},
+		// identity: a new user is named within 120 characters; an existing user's name is not changed here
+		{opClientUsersSave, `{"displayName":" "}`, map[string]string{fieldDisplayName: length}},
+		{opClientUsersSave, `{"id":"` + uuid.NewString() + `","displayName":"X"}`, map[string]string{
+			fieldDisplayName: apperr.KeyNotAllowed,
+		}},
+		{opPartnerUsersSave, `{"displayName":` + long(121) + `}`, map[string]string{fieldDisplayName: length}},
+		{opPartnerUsersSave, `{"id":"` + uuid.NewString() + `","displayName":"X"}`, map[string]string{
+			fieldDisplayName: apperr.KeyNotAllowed,
+		}},
+		{"organizations.delete", `{"reason":" "}`, map[string]string{"id": req, fieldReason: length}},
+		{opConsentsUpdate, `{"purpose":"marketing"}`, map[string]string{"purpose": inv}},
 		{"members.save", `{"role":"technician","scopes":[{"kind":"tenant",` +
 			`"id":"00000000-0000-0000-0000-000000000001"}]}`, map[string]string{fieldScopes: inv}},
 		{opJobsAcknowledgeAssignment, `{"decision":"cant_make","reason":"busy",` +

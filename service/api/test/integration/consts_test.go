@@ -23,6 +23,7 @@ const (
 	opCommandsCreate              = "commands.create"
 	opCommandsGet                 = "commands.get"
 	opCommandsList                = "commands.list"
+	opConsentsUpdate              = "consents.update"
 	opContractorsList             = "contractors.list"
 	opDemoSessionExtend           = "demoSession.extend"
 	opDemoSessionSignIn           = "demoSession.signIn"
@@ -188,6 +189,7 @@ const (
 	keyAssignmentNotStarted = "errors.assignment_not_started"
 	keyOwnAccount           = "errors.own_account"
 	keyAccessExpired        = "errors.access_expired"
+	keyTechnicianBooked     = "errors.technician_booked"
 	keyUnitBusy             = "errors.unit_busy"
 )
 
