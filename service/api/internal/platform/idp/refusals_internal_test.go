@@ -3,8 +3,10 @@ package idp
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -36,14 +38,13 @@ func (f *scriptedRealm) ServeHTTP(writer http.ResponseWriter, req *http.Request)
 		return
 	}
 
-	buf := make([]byte, 4096)
-	read, _ := req.Body.Read(buf)
+	body, _ := io.ReadAll(req.Body)
 
 	f.mu.Lock()
 	f.calls++
 
 	if req.Method == http.MethodPut {
-		f.lastPut = string(buf[:read])
+		f.lastPut = string(body)
 	}
 	f.mu.Unlock()
 
@@ -110,14 +111,15 @@ func wantStatusError(t *testing.T, err error, what string, code int) {
 		return
 	}
 
-	if !strings.Contains(err.Error(), what) {
-		t.Errorf("%s: the message does not name the call: %q", what, err.Error())
+	if !strings.Contains(err.Error(), strconv.Itoa(code)) {
+		t.Errorf("%s: the message does not name the status: %q", what, err.Error())
 	}
 }
 
 // TestKeycloakRefusedAnswers: an answer the call does not expect is an error naming the call and the status, never a
-// success: a refused create, enable, delete, set-up e-mail or read of the user; a created user without a Location is no
-// subject; an account without an e-mail is refused before any call.
+// success: a refused create, enable, delete, set-up e-mail or read of the user; a user or credentials answered with no
+// JSON; an HQ account's set-up e-mail does not go out when its devices cannot be read; an account without an e-mail is
+// refused before any call.
 func TestKeycloakRefusedAnswers(t *testing.T) {
 	t.Parallel()
 
@@ -152,14 +154,9 @@ func TestKeycloakRefusedAnswers(t *testing.T) {
 			body:     "",
 			location: "",
 		},
-		"GET /users/u4/credentials": {
+		"GET /users/u4/credentials": { // an object, not the list: the set-up e-mail (204 by default) must not go out
 			status:   http.StatusOK,
 			body:     `{"type":"otp"}`,
-			location: "",
-		},
-		"PUT /users/u4/execute-actions-email": {
-			status:   http.StatusNoContent,
-			body:     "",
 			location: "",
 		},
 		"GET /users/u5": {
@@ -289,7 +286,7 @@ func TestKeycloakUpdateWrite(t *testing.T) {
 	keycloak, realm := newScriptedKeycloak(t, map[string]reply{
 		"GET /users/bare": {
 			status:   http.StatusOK,
-			body:     `{"id":"bare","email":"tech@contractor.example"}`,
+			body:     `{"id":"bare","email":"own@contractor.example"}`,
 			location: "",
 		},
 		"GET /users/lost":   {status: http.StatusOK, body: `{"id":"lost"}`, location: ""},
@@ -310,7 +307,8 @@ func TestKeycloakUpdateWrite(t *testing.T) {
 	}
 
 	err = json.Unmarshal([]byte(realm.put()), &written)
-	if err != nil || written.Email != account.Email || len(written.Attributes["role"]) != 1 ||
+	if err != nil || written.Email != "own@contractor.example" ||
+		len(written.Attributes["role"]) != 1 ||
 		written.Attributes["role"][0] != account.Role {
 		t.Errorf("a user without attributes was written as %s", realm.put())
 	}
