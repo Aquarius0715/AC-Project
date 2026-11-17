@@ -133,6 +133,34 @@ func TestMailLinksAtTheSignInAddress(t *testing.T) {
 	}
 }
 
+// TestAppsOnKeepsSchemeAndPort: a listed host replaces only the host name of the app address (no port added when the
+// canonical address has none, compared case-insensitively); an address that does not parse stays the canonical one.
+func TestAppsOnKeepsSchemeAndPort(t *testing.T) {
+	t.Parallel()
+
+	const listed = "x.ts.net"
+
+	apps := Apps{
+		Customer:   "https://app.example",
+		Partner:    "https://partner.example:8443/",
+		Technician: "://bad",
+		Admin:      "",
+		Hosts:      []string{listed},
+	}
+
+	for _, check := range []struct{ role, host, want string }{
+		{authz.RoleClient, listed, "https://" + listed},
+		{authz.RoleClient, "X.TS.NET", "https://" + listed},
+		{authz.RoleContractor, listed, "https://" + listed + ":8443"},
+		{authz.RoleTechnician, listed, "://bad"},
+		{authz.RoleClient, "y.ts.net", "https://app.example"},
+	} {
+		if got := apps.on(check.role, check.host); got != check.want {
+			t.Errorf("on(%q, %q) = %q, want %q", check.role, check.host, got, check.want)
+		}
+	}
+}
+
 // TestSMTPRefusesHeaderBreaks: an address or subject with a line break never reaches the SMTP server.
 func TestSMTPRefusesHeaderBreaks(t *testing.T) {
 	t.Parallel()
