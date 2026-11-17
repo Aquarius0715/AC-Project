@@ -10965,3 +10965,10 @@ Review round 914 found that the customer invoice page's `startCheckout` action c
 
 1. **Rule.** `checkoutStartSchema` (now in `service/web/shared/lib/clientBilling.ts`) takes `checkoutUrl` only with the `https` scheme; any other answer fails the action as UNAVAILABLE (`error.unavailable`), and the payer stays on the invoice page.
 2. **Tests.** `clientBilling.test.ts` refuses a `javascript:`, `data:`, `http:`, upper-case `JAVASCRIPT:` and empty address and accepts a `https://checkout.stripe.com` one; it failed on the first four before the fix. The same round adds the untested branches of `paymentWay` (Stripe Checkout), `paymentPhase` (expired and failed attempts are not open) and `statusQuery`.
+
+## IR841 A failed presence report is tried again with the next position (DEC-109, IR826) — 2026-11-17
+
+Review round 952 found that the customer's "Use this device's location" switch remembered a position as reported before `presence.report` answered. When the report failed (the network, a 503, a refusal), the next position was compared with the one that was never sent, so the next try waited until the device moved 50 m or 5 minutes passed, although the line says "the next one is tried in a moment". A server action that rejects (the network down) also left an unhandled rejection and no line.
+
+1. **Rule.** `presenceReporter` (`service/web/shared/lib/presence.ts`) sends one report at a time and compares each position with the last one that was *sent*; a failed or rejected report leaves it unchanged, so the next position of the watch is sent. Positions that come while a report is in flight are dropped. A rejected report shows the same "could not be sent" line as a refused one.
+2. **Tests.** `presence.test.ts` sends again after a failed and after a rejected report in the same place, holds positions while one is in flight, and covers the per-device choice (localStorage `"1"` only, the in-memory fallback when storage is blocked, subscribers told until they unsubscribe); the retry test failed with the position remembered before the answer.
