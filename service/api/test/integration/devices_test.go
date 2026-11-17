@@ -154,7 +154,7 @@ func TestDevicesRegisterListGet(t *testing.T) {
 		body("X-"+uuid.NewString()[:6], newUnit(t, srv, "Cap"), `["vibration"]`, ""),
 		0,
 	); code != 422 ||
-		fields(res) != "sensorTypes=error.notInCapability" {
+		fields(res) != refusedSensorNotInCapability {
 		t.Errorf("sensor not in capability (IR43): %d %s", code, fields(res))
 	}
 

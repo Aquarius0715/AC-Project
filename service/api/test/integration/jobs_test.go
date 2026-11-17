@@ -517,7 +517,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 	for body, want := range map[string]string{
 		`{"jobId":"` + job + `","query":{"filters":{"x":1}}}`: refusedUnknownFieldX,
 		`{"jobId":"` + job + `","query":{"filters":{"from":"2026-09-15T00:00:00Z",` +
-			`"to":"2026-09-14T00:00:00Z"}}}`: "query.filters.to=error.range",
+			`"to":"2026-09-14T00:00:00Z"}}}`: refusedFiltersToRange,
 		bodyEmptyQuery: "jobId=error.invalid",
 	} {
 		code, m := post(srv, hq(), "jobs.events", body)

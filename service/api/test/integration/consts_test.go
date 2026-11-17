@@ -177,6 +177,8 @@ const (
 	refusedSortFieldInvalid      = "sort.field=" + apperr.KeyInvalid
 	refusedStatusNotAllowed      = "status=" + apperr.KeyNotAllowed
 	refusedTimezoneInvalid       = "timezone=" + apperr.KeyInvalid
+	refusedFiltersToRange        = "query.filters.to=" + apperr.KeyRange
+	refusedSensorNotInCapability = "sensorTypes=error.notInCapability"
 	refusedToRange               = "to=" + apperr.KeyRange
 	refusedUnitArchived          = "unitId=" + apperr.KeyUnitArchived
 	refusedUnitIDsInvalid        = "unitIds=" + apperr.KeyInvalid

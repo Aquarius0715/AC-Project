@@ -88,6 +88,14 @@ func TestIoTModels(t *testing.T) {
 		"firmware dup trim": strings.Replace(iotBody("", "x13", ""), `["v1"]`, `["v1"," v1 "]`, 1),
 		"no manufacturer":   strings.Replace(iotBody("", "x14", ""), `"TestNode"`, `""`, 1),
 		"blank reason":      iotBody("", "x15", `,"changeReason":"  "`),
+		"unknown metric": strings.Replace(
+			iotBody("", "x16", ""), `"metric":"temperature"`, `"metric":"pressure"`, 1),
+		"dup metric": strings.Replace(
+			iotBody("", "x17", ""),
+			`"metric":"power"`,
+			`"metric":"temperature"`,
+			1,
+		),
 	}
 	want := map[string]string{
 		fieldBoundary:       "sensors[0].boundaryId=error.invalid",
@@ -100,6 +108,8 @@ func TestIoTModels(t *testing.T) {
 		caseUnitMismatch:    "sensors[0].unit=error.unitMismatch",
 		"no manufacturer":   "manufacturer=error.length",
 		"blank reason":      "changeReason=error.length",
+		"unknown metric":    "sensors[0].metric=error.invalid",
+		"dup metric":        "sensors[1].metric=error.invalid",
 	}
 
 	for name, b := range bad {
@@ -140,8 +150,18 @@ func TestIoTModels(t *testing.T) {
 		"devices.register",
 		`{"serial":"IM-`+uuid.NewString()[:8]+`","sensorTypes":["humidity"],"unitId":"`+unit+`"}`,
 		0,
-	); code != 422 || fields(res) != "sensorTypes=error.notInCapability" {
+	); code != 422 || fields(res) != refusedSensorNotInCapability {
 		t.Errorf("a sensor the IoT model lacks: %d %v", code, res)
+	}
+
+	for name, body := range map[string]string{
+		// neither the input nor a planned unit names an IoT model, so no sensor is allowed
+		refusedSensorNotInCapability: `{"serial":"IM-` + uuid.NewString()[:8] + `","sensorTypes":["temperature"]}`,
+		"iotModelId=error.unknownModel": `{"serial":"IM-` + uuid.NewString()[:8] + `","sensorTypes":[],"iotModelId":"` +
+			uuid.NewString() + `"}`,
+	} {
+		code, res := write(srv, hq(), "devices.register", body, 0)
+		refusal(t, name, code, res, name)
 	}
 
 	if code, res := write(
