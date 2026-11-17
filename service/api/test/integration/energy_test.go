@@ -277,6 +277,18 @@ func TestBaselines(t *testing.T) {
 		t.Errorf("bad baseline filter: %d %s", code, fields(res))
 	}
 
+	// an empty or reversed period filter is refused on filters.to, not answered with an empty list
+	at := start.Format(time.RFC3339)
+	if code, res := post(
+		srv,
+		hq(),
+		"baselines.list",
+		`{"filters":{"from":"`+at+`","to":"`+at+`"}}`,
+	); code != 422 ||
+		fields(res) != "filters.to=error.range" {
+		t.Errorf("empty period filter: %d %s", code, fields(res))
+	}
+
 	if code, _ := write(
 		srv,
 		customerB(),
@@ -661,18 +673,21 @@ func TestEnergyReportFigures(t *testing.T) {
 		new(float64(60)),
 	)
 
-	size := func(month string) int {
+	exportFile := func(month, sections, format string) map[string]any {
 		code, res := post(
 			srv,
 			customerB(),
 			"energy.exportReport",
-			`{"month":"`+month+`","propertyIds":["`+prop+`"],"sections":["energy_cost"],"format":"csv"}`,
+			`{"month":"`+month+`","propertyIds":["`+prop+`"],"sections":[`+sections+`],"format":"`+format+`"}`,
 		)
 		if code != 200 {
-			t.Fatalf("export %s: %d %v", month, code, res)
+			t.Fatalf("export %s %s: %d %v", month, sections, code, res)
 		}
 
-		return int(asNum(t, data(res)["size"]))
+		return data(res)
+	}
+	size := func(month string) int {
+		return int(asNum(t, exportFile(month, `"energy_cost"`, "csv")["size"]))
 	}
 
 	header := len("section,metric,value\n")
@@ -694,5 +709,50 @@ func TestEnergyReportFigures(t *testing.T) {
 		"energy_cost,cost,n/a\n",
 	); got != want {
 		t.Errorf("July without readings: %d bytes, want %d", got, want)
+	}
+
+	// the comparison states July (no readings) beside August, the counts are the unit's own (none), and a PDF wraps
+	// the same rows
+	rows := "month_comparison,previous_kWh,n/a\nmonth_comparison,current_kWh,5.0\n" +
+		"alerts_maintenance,alerts,0\nalerts_maintenance,completed_jobs,0\n"
+
+	pdf := exportFile("2026-08", `"month_comparison","alerts_maintenance"`, "pdf")
+	if got, want := int(
+		asNum(t, pdf["size"]),
+	), len(
+		"%PDF-1.4\n% Demo energy report 2026-08 (fictional values)\n",
+	)+
+		header+len(
+		rows,
+	)+len(
+		"%%EOF\n",
+	); got != want ||
+		pdf["mime"] != "application/pdf" ||
+		pdf["fileName"] != "energy-report-2026-08.pdf" {
+		t.Errorf("PDF report: %v, want %d bytes", pdf, want)
+	}
+}
+
+// A report covers only the caller's own properties (another customer's is NOT_FOUND, IDOR) and only a month that has
+// ended in the caller's timezone (IR110): the test clock's month, September 2026, is refused on its field.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
+func TestEnergyReportRefusals(t *testing.T) {
+	srv := server(t)
+	_, prop := isolatedUnit(t, srv) // customer-b's
+	body := func(month string) string {
+		return `{"month":"` + month + `","propertyIds":["` + prop + `"],"sections":["energy_cost"],"format":"csv"}`
+	}
+
+	if code, res := post(srv, customerA(), "energy.exportReport", body("2026-08")); code != 404 ||
+		res["code"] != "NOT_FOUND" {
+		t.Errorf("another customer's property: %d %v", code, res)
+	}
+
+	code, res := post(srv, customerB(), "energy.exportReport", body(clock().Format("2006-01")))
+	refusal(t, "month not ended", code, res, "month=errors.month_not_ended")
+
+	if code, res := post(srv, customerB(), "energy.exportReport", body("2026-08")); code != 200 {
+		t.Errorf("own property, ended month: %d %v", code, res)
 	}
 }
