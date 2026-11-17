@@ -842,7 +842,8 @@ func (m Restrictions) retry(ctx context.Context, call *ops.Call, input *RetryInp
 }
 
 // retryAllowed checks the restriction's state for a retry: an apply retry needs a requested restriction whose causes
-// are unpaid and that exempts no one now, a release retry a restriction being released.
+// are unpaid, that exempts no one now and whose notice evidence still holds, a release retry a restriction being
+// released.
 func retryAllowed(
 	ctx context.Context,
 	call *ops.Call,
@@ -870,7 +871,7 @@ func retryAllowed(
 		return apperr.E(apperr.Conflict, "errors.restriction_not_applicable")
 	}
 
-	return nil
+	return checkNotice(ctx, call, restriction) // the notice still holds, as for execute (IR191)
 }
 
 // commandAction is the command of a phase: the restriction to apply with its policy, or its removal.

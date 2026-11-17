@@ -181,6 +181,10 @@ func TestRestrictionRecoveryCases(t *testing.T) {
 		fields(m) != "unitIds=errors.reconcile_not_needed" {
 		t.Errorf("nothing left to reconcile: %d %s", code, fields(m))
 	}
+	// IR03: override-only reaches a terminal restriction only while one of its cases is unresolved
+	if code, _ := reconcile(overrider()); code != 403 {
+		t.Errorf("override-only reconcile with every case resolved: %d", code)
+	}
 
 	if _, m := post(
 		srv,

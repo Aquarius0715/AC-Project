@@ -889,6 +889,28 @@ func TestRestrictionExceptionReleaseRetry(t *testing.T) {
 	}
 
 	owner(t, `UPDATE billing.invoices SET status = 'unpaid' WHERE id = $1`, inv)
+	// an apply retry rechecks the notice evidence like execute (IR191)
+	owner(
+		t,
+		`UPDATE notify.notifications SET occurred_at = occurred_at - interval '1 hour' WHERE target->>'id' = $1`,
+		restrictionID,
+	)
+
+	if code, res := retry(
+		restrMgr(),
+		"apply",
+		"rules-1",
+		offline,
+	); code != 409 ||
+		res["messageKey"] != "errors.notice_invalid" {
+		t.Errorf("apply retry with altered notice evidence: %d %v", code, res)
+	}
+
+	owner(
+		t,
+		`UPDATE notify.notifications SET occurred_at = occurred_at + interval '1 hour' WHERE target->>'id' = $1`,
+		restrictionID,
+	)
 	owner(t, `UPDATE devices.devices SET connection = 'online' WHERE unit_id = $1`, offline)
 
 	code, resp := retry(restrMgr(), "apply", "rules-1", offline)
@@ -1197,6 +1219,17 @@ func TestRestrictionOverrideReconcile(t *testing.T) {
 		ver(t, get()),
 	); code != 403 {
 		t.Error("override without permission")
+	}
+
+	if code, stale := write(
+		srv,
+		overrider(),
+		"restrictions.override",
+		`{"restrictionId":"`+restrictionID+`","reason":"hardship"}`,
+		ver(t, get())-1,
+	); code != 409 ||
+		stale["messageKey"] != "error.versionConflict" {
+		t.Errorf("override with a stale version: %d %v", code, stale)
 	}
 
 	code, res = write(

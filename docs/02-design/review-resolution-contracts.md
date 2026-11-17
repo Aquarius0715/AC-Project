@@ -4540,6 +4540,7 @@ No UI kit, icon set, or form, schema, query or translation library is added. Rea
 3. **Report review (IR31).** The same user acting through another membership is still the report's author, so review availability says `self_authored`.
 4. **Restriction retry (SR26).**
    - An apply retry is not applicable once every cause invoice is paid (`errors.restriction_not_applicable`), and it is refused once the restriction is applied (`errors.restriction_state`).
+   - An apply retry whose notice evidence no longer holds is refused like execute (`errors.notice_invalid`, IR838).
    - A release retry needs reconciliation for a unit waiting for reconciliation, or one never confirmed applied (`errors.reconcile_required`).
 5. **Energy (SR09).** Without a current default emission factor, the emissions are null and `factor_missing` is reported. They are never shown as zero.
 6. **Alert policies (D02, IR115).**
@@ -10943,3 +10944,10 @@ Review round 873 found that `load` and `stress` (`service/web/load/scenarios`) w
 
 1. **Rule.** `load` and `stress` scale every stage with `minutes()` and `vus()` (the last stage of `stress` still goes to 0 users). `smoke` and `web-smoke` keep their fixed size and use `fixedSummary`, whose report never prints the SHORTENED line; every other scenario's report prints it when either setting is not 1.
 2. **Tests.** None: the load library runs only inside k6 and is checked by the load workspace's lint and typecheck, as in IR836.
+
+## IR838 An apply retry rechecks the restriction's notice evidence, as execute does (IR191, SR26) — 2026-11-17
+
+Review round 902 found that `restrictions.retry` with `phase=apply` (`retryAllowed` in `service/api/internal/modules/restrictions/actions.go`) checked only the state, unpaid causes and exemptions. It never called `checkNotice`, which `restrictions.execute` uses, although this document (IR191) and the operation's comment say that an apply retry rechecks the notice evidence. A restriction whose contract changed after the notice, or whose stored notice notifications no longer matched, still had its apply commands sent again under the old notice.
+
+1. **Rule.** An apply retry refuses with CONFLICT `errors.notice_invalid` unless the contract is still at the version the restriction was scheduled on and identity stored every notice notification for the restriction at notice time, the same check as execute. The time conditions are not rechecked: state `requested` means execute already passed them. A release retry is unchanged.
+2. **Tests.** `TestRestrictionExceptionReleaseRetry` moves the stored notice's time and expects `errors.notice_invalid` from an apply retry; it failed (200, commands resent) before the fix.
