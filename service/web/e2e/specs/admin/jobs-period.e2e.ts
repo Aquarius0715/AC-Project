@@ -8,7 +8,9 @@ test("a job-status row opens the Jobs tab for that period", async ({ page }) => 
   const rows = page.locator("main a[href^='/admin/jobs?'][href*='stage=']");
   await expect(rows.first()).toBeVisible();
   const texts = await rows.allInnerTexts();
-  const i = Math.max(0, texts.findIndex((t) => /\s[1-9]\d*$/.test(t.replaceAll(/\s+/g, " ").trim())));
+  // a row with a non-zero count, or the stage-total check below ("0" in any number) would prove nothing
+  const i = texts.findIndex((t) => /\s[1-9]\d*$/.test(t.replaceAll(/\s+/g, " ").trim()));
+  expect(i, `a job-status row with a non-zero count in ${JSON.stringify(texts)}`).toBeGreaterThanOrEqual(0);
   const count = Number((/(\d+)$/.exec(must(texts.at(i)).replaceAll(/\s+/g, " ").trim()))?.[1] ?? 0);
   const href = must((await rows.nth(i).getAttribute("href")));
   expect(href).toMatch(/[?&]from=.+&to=.+/);
