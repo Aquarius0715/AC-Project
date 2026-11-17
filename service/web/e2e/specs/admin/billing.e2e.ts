@@ -1,11 +1,11 @@
 // HQ billing (FR-A08, DD-A08, SCR-A08, Figma Admin 38:7, IR321): the billing months are a URL filter (from / to,
-// Kuala Lumpur months) and the paid tile then counts the period; the invoice's related restriction links the
-// restriction on the Restrictions screen. The seed has one invoice, INV-202608-0001 (August 2026, overdue), the cause of
-// Demo Customer A's applied restriction. Nothing is paid, reminded or created.
+// Kuala Lumpur months) and the paid tile then counts the period; the invoice's related restriction is named, without a
+// link for hq-operator (no restriction.* permission). The seed has one invoice, INV-202608-0001 (August 2026,
+// overdue), the cause of Demo Customer A's applied restriction. Nothing is paid, reminded or created.
 import { test, expect } from "../../fixtures/test";
 import { expectAccessible } from "../../fixtures/a11y";
 
-test("billing months filter the invoices and the related restriction opens on the Restrictions screen", async ({ page }) => {
+test("billing months filter the invoices and the related restriction is locked for a role without Restrictions", async ({ page }) => {
   await page.goto("/admin/billing?from=2026-08&to=2026-08");
   const main = page.getByRole("main");
   await expect(main).toContainText("Paid in period");
@@ -13,10 +13,12 @@ test("billing months filter the invoices and the related restriction opens on th
   await expect(main.getByRole("button", { name: /INV-202608-0001/ })).toBeVisible();
   await expect(main.getByLabel("Billing months from")).toHaveValue("2026-08");
 
-  // the related restriction: its short ID and a link to it on the Restrictions screen
+  // the related restriction: hq-operator has no restriction.* permission, so the card names the restriction and says
+  // the role can't open Restrictions instead of linking it (the link for a restriction role: access.test.ts)
   const related = main.locator('section, [data-slot="card"]').filter({ has: page.getByRole("heading", { name: "Related restriction", exact: true }) });
-  await expect(related.getByRole("link", { name: "Open restriction" })).toHaveAttribute("href", /^\/admin\/restrictions\?restrictionId=[0-9a-f-]{36}$/);
   await expect(related).toContainText("This invoice is a cause of this restriction.");
+  await expect(related).toContainText("Your role can’t open Restrictions");
+  await expect(related.getByRole("link", { name: "Open restriction" })).toHaveCount(0);
 
   // a month without invoices, then all months again
   await page.goto("/admin/billing?from=2026-09&to=2026-09");
