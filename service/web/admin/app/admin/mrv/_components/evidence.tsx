@@ -9,7 +9,7 @@ import { Icon } from "@ac/web/components/Icon";
 import { isBefore } from "@ac/web/lib/order";
 
 const NO_CANDIDATES: ApiEvidencePage = { items: [], total: 0 };
-type Units ={ id: string; label: string }[];
+type Units = { id: string; label: string }[];
 interface Period { unitIds: string[]; from: string; to: string }
 
 /** The candidates of attachments.list for the units and period (IR349), read only while `enabled`. */
