@@ -134,6 +134,26 @@ func TestPresenceReport(t *testing.T) {
 		func() { _, _ = write(srv, customerB(), "automations.delete", `{"id":"`+ruleID+`"}`, ruleVersion) },
 	)
 
+	// 233 m with no state yet: inside the 50 m band past the radius, so neither inside nor outside is kept
+	owner(t, `DELETE FROM control.presence_states WHERE property_id = $1`, property)
+
+	if got := transitions(3.1600); len(got) != 0 {
+		t.Fatalf("in the band with no state: %v", got)
+	}
+
+	var unsettled int
+
+	ownerScan(
+		t,
+		`SELECT count(*) FROM control.presence_states WHERE property_id = $1`,
+		[]any{property},
+		&unsettled,
+	)
+
+	if unsettled != 0 {
+		t.Fatalf("%d presence rows from a fix in the band", unsettled)
+	}
+
 	if got := transitions(3.1700); len(got) != 0 { // 1.3 km away: outside, and nobody was home
 		t.Fatalf("far: %v", got)
 	}

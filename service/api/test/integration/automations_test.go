@@ -95,6 +95,30 @@ func TestAutomationSchedules(t *testing.T) {
 	); code != 404 {
 		t.Error("another customer's unit")
 	}
+	// an archived unit of the customer's own takes no new rule: it is out of the client's scope, so NOT_FOUND
+	// (review-resolution-contracts.md: the 409 errors.unit_archived shows only while a cached scope still holds it)
+	archivedUnit := newUnit(t, srv, "Auto archived")
+	_, detail := post(srv, hq(), "units.get", `{"id":"`+archivedUnit+`"}`)
+
+	if code, archived := write(
+		srv,
+		hq(),
+		"units.archive",
+		`{"id":"`+archivedUnit+`","reason":"decommission"}`,
+		ver(t, detail),
+	); code != 200 {
+		t.Fatalf("archive: %d %v", code, archived)
+	}
+
+	if code, refused := write(
+		srv,
+		customerB(),
+		"automations.save",
+		scheduleRule(archivedUnit, nil),
+		0,
+	); code != 404 || refused["code"] != string(apperr.NotFound) {
+		t.Errorf("an archived unit: %d %v", code, refused)
+	}
 	// nonexistent local time (America/New_York 2027-03-14 02:30) and ambiguous (2026-11-01 01:30)
 	want = map[string]string{ // the field each case is refused for
 		"\"01:30\"": "startLocal=errors.local_time_invalid",

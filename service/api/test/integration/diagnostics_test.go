@@ -431,6 +431,14 @@ func TestDiagnosticRuns(t *testing.T) {
 		t.Error("unknown run")
 	}
 
+	code, res := post(
+		srv,
+		hq(),
+		"diagnosticRuns.get",
+		`{"diagnosticRunId":"`+uuid.Nil.String()+`"}`,
+	)
+	refusal(t, "the nil run id", code, res, "diagnosticRunId=error.required")
+
 	if code, res := post(
 		srv,
 		hq(),
