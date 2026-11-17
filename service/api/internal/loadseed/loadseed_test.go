@@ -349,10 +349,15 @@ func TestBuildTechnicianUnitsWrapAround(t *testing.T) {
 
 		// the third technician has customers 9, 1, 2 and 3 (numbered from 1): the list wraps after the last customer
 		if user.Username == "load-technician-0003" {
-			want := append(customerUnits(9), customerUnits(1)...)
-			if !slices.Equal(user.UnitIDs[:len(want)], want) {
+			want := slices.Concat(
+				customerUnits(9),
+				customerUnits(1),
+				customerUnits(2),
+				customerUnits(3),
+			)
+			if !slices.Equal(user.UnitIDs, want) {
 				t.Errorf(
-					"technician %s units start %v, want customers 9 then 1: %v",
+					"technician %s units = %v, want customers 9, 1, 2 and 3: %v",
 					user.Username,
 					user.UnitIDs,
 					want,
