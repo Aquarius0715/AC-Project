@@ -53,6 +53,10 @@ function think(): void {
   sleep(2 + Math.random() * 3);
 }
 
+function atHome(status: number, url: string, base: string, group: WebGroup): boolean {
+  return status === 200 && url.startsWith(`${base}${HOME[group]}`);
+}
+
 /** Signs in as the user through the app and the identity provider; true when the app's home page came back. */
 function signIn(user: User, group: WebGroup): boolean {
   const base = baseOf(group);
@@ -65,13 +69,17 @@ function signIn(user: User, group: WebGroup): boolean {
       responseType: "text",
       tags: { name: "sign-in start", kind: "signin" },
     });
-    const back = login.submitForm({
-      formSelector: "#kc-form-login",
-      fields: { username: email, password: user.password },
-      params: { responseType: "text", tags: { name: "sign-in password", kind: "signin" } },
-    });
+    // The identity provider still holds this browser's single sign-on cookie (the cookies survive the iterations), so
+    // it can send the person straight back to the app without its form: that is a sign-in too.
+    const back = atHome(login.status, login.url, base, group)
+      ? login
+      : login.submitForm({
+          formSelector: "#kc-form-login",
+          fields: { username: email, password: user.password },
+          params: { responseType: "text", tags: { name: "sign-in password", kind: "signin" } },
+        });
     status = back.status;
-    ok = back.status === 200 && back.url.startsWith(`${base}${HOME[group]}`);
+    ok = atHome(back.status, back.url, base, group);
   } catch {
     ok = false; // the identity provider's form was not there
   }
@@ -93,11 +101,13 @@ function openPages(user: User, group: WebGroup, seed: number): void {
     const res = http.get(`${base}${path}`, { responseType: "text", tags: { name: path.replaceAll(/[0-9a-f-]{36}/g, ":id"), kind: "page" } });
     const name = path.replaceAll(/[0-9a-f-]{36}/g, ":id");
     // a page that sends the person back to sign in is a failure: the session is gone
-    const ok = res.status === 200 && !res.url.includes("/login");
+    const lost = res.status === 401 || res.url.includes("/login");
+    const ok = res.status === 200 && !lost;
     record("page", name, res.status, res.timings.duration, ok);
     if (!ok) {
       complain(`page ${path} as ${user.group} -> ${String(res.status)} at ${res.url}`);
-      signedIn = false;
+      // a single failed page (an error, a timeout) leaves the session as it was; only a sign-in page or a 401 means it is gone
+      if (lost) signedIn = false;
       return;
     }
     think();

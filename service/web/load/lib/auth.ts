@@ -23,9 +23,18 @@ function tokenOf(body: unknown): Token | null {
     : null;
 }
 
+// a 200 whose body is not JSON (a proxy's page, a cut-off answer) is a refusal, not an exception out of the iteration
+function parsed(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
 function request(form: Record<string, string>, name: string): Token | null {
   const res = http.post(env.tokenUrl, form, { tags: { name, kind: "auth" }, responseType: "text" });
-  const token = res.status === 200 ? tokenOf(JSON.parse(res.body)) : null;
+  const token = res.status === 200 ? tokenOf(parsed(res.body)) : null;
   record("auth", name, res.status, res.timings.duration, token !== null);
   return token;
 }

@@ -42,7 +42,7 @@ function dataOf(text: string): unknown {
 const MAX_LOGGED = 5;
 let failures = 0;
 
-/** Makes the call as the user and records it; `data` is the envelope's data, or undefined when there is none. */
+/** Makes the call as the user and records it; `data` is the envelope's data, or null when there is none. */
 export function call(user: User, c: Call): Answer {
   const kind: Kind = c.method === "GET" ? "read" : "write";
   const access = accessTokenOf(user);
