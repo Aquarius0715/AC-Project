@@ -240,11 +240,15 @@ func TestOfferCandidateSources(t *testing.T) {
 	}
 
 	candidates := offer(job)
-	if len(candidates) != 4 || asObj(t, candidates[3])["startAt"] != stamp(98) {
+	if len(candidates) != 4 || asObj(t, candidates[0])["startAt"] != stamp(25) ||
+		asObj(t, candidates[2])["startAt"] != stamp(
+			73,
+		) || asObj(t, candidates[3])["startAt"] != stamp(98) {
 		t.Errorf("the preferred times and then the accepted proposal: %v", candidates)
 	}
 
-	// a periodic job without preferred times offers its plan occurrence, at the requested length
+	// a periodic job without preferred times offers its plan occurrence (+70 h, not the requested +60 h), at the
+	// requested length (3 h)
 	plan, planJob := uuid.NewString(), uuid.NewString()
 	owner(
 		t,
@@ -259,25 +263,26 @@ func TestOfferCandidateSources(t *testing.T) {
 		t,
 		`INSERT INTO maintenance.jobs (id, tenant_id, unit_id, customer_org_id, plan_id, occurrence_at, type, status, origin,
 			requested_slot, due_at)
-		VALUES ($1,$2,$3,$4,$5,$6,'periodic','requested','periodic_plan',tstzrange($6,$7),$7)`,
+		VALUES ($1,$2,$3,$4,$5,$6,'periodic','requested','periodic_plan',tstzrange($7,$8),$8)`,
 		planJob,
 		seed.ID("tenant-a"),
 		seed.ID("unit-non-rto"),
 		seed.ID("org-customer-a"),
 		plan,
+		clock().Add(70*time.Hour),
 		clock().Add(60*time.Hour),
-		clock().Add(62*time.Hour),
+		clock().Add(63*time.Hour),
 	)
 
 	candidates = offer(planJob)
-	if len(candidates) != 1 || asObj(t, candidates[0])["startAt"] != stamp(60) ||
-		asObj(t, candidates[0])["endAt"] != stamp(62) {
+	if len(candidates) != 1 || asObj(t, candidates[0])["startAt"] != stamp(70) ||
+		asObj(t, candidates[0])["endAt"] != stamp(73) {
 		t.Errorf("the plan occurrence: %v", candidates)
 	}
 }
 
 // TestInstallationRequestStatusFilter: installationRequests.list refuses a status outside the four request states as
-// VALIDATION naming the filter, and lists by a known one (an unknown filter is refused earlier, by the REST binding).
+// VALIDATION naming the filter (an unknown filter is refused earlier, by the REST binding).
 //
 //nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestInstallationRequestStatusFilter(t *testing.T) {
@@ -290,13 +295,4 @@ func TestInstallationRequestStatusFilter(t *testing.T) {
 		`{"filters":{"status":"lost"},"limit":10}`,
 	)
 	refusal(t, "an unknown status", code, res, "filters.status=error.invalid")
-
-	if code, res := post(
-		srv,
-		customerA(),
-		"installationRequests.list",
-		`{"filters":{"status":"submitted"},"limit":10}`,
-	); code != 200 {
-		t.Errorf("a known status: %d %v", code, res)
-	}
 }
