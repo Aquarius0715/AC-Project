@@ -20,7 +20,7 @@ vi.mock("@ac/web/lib/useAction", () => ({
 import { PayoutsView, type PayoutsLive } from "../app/partner/payouts/_components/payouts-view";
 
 beforeEach(() => { actions.askHq.mockReset(); nav.mockReset(); });
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 const statement: ApiPayoutStatement = {
   id: "0193a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b", version: 4, contractorOrgId: "org-p", period: "2026-10", status: "approved", currency: "MYR",
@@ -176,14 +176,13 @@ describe("Payouts view", () => {
     const create = vi.fn(() => "blob:pdf");
     const revoke = vi.fn();
     const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => { /* jsdom does not follow the download */ });
-    vi.stubGlobal("URL", Object.assign(URL, { createObjectURL: create, revokeObjectURL: revoke }));
+    // a subclass, so the real URL stays untouched; afterEach restores the global and the click spy
+    vi.stubGlobal("URL", class extends URL { static override readonly createObjectURL = create; static override readonly revokeObjectURL = revoke; });
     render(<PayoutsView live={live()} />);
     fireEvent.click(screen.getByRole("button", { name: "Download PDF" }));
     expect(create).toHaveBeenCalledOnce();
     expect(click).toHaveBeenCalledOnce();
     expect(click.mock.contexts[0]).toMatchObject({ download: "statement-2026-10-0193a1b2.pdf" });
     expect(revoke).toHaveBeenCalledWith("blob:pdf");
-    click.mockRestore();
-    vi.unstubAllGlobals();
   });
 });
