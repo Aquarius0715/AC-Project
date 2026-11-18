@@ -8,6 +8,10 @@
 #        MAX_ROUNDS  stop after this many rounds (default: 0 = no limit)
 #        MAX_FAILS   stop after this many failed rounds in a row (default: 3)
 #        BUDGET_USD  per-round spend cap passed to claude (default: 15)
+#        MODEL       model for each round, e.g. claude-fable-5-2 (default: unset = the account's default model)
+#        EFFORT      reasoning effort for each round, e.g. high (default: unset = Claude Code's default); sent as
+#                    CLAUDE_CODE_EFFORT_LEVEL. Fable 5.2 costs twice as much per token as Opus 5.5, so raise BUDGET_USD
+#                    with MODEL=claude-fable-5-2 or a round may stop at the cap.
 #
 # Note: in -p mode nobody can answer a permission prompt, so a command that is not allowed fails the round.
 # acceptEdits allows file edits only. The prompt runs git, make, npm, gh, docker, so either allow those in
@@ -57,7 +61,14 @@ while :; do
   log="$LOG_DIR/round-$(date +%Y%m%d-%H%M%S).log"
   echo "[$(date '+%F %T')] round $n -> $log"
   read_prompt
-  claude -p "$PROMPT" --permission-mode "$PERM_MODE" --max-budget-usd "$BUDGET_USD" >"$log" 2>&1
+  # without MODEL and EFFORT this is the same command as before
+  set -- -p "$PROMPT" --permission-mode "$PERM_MODE" --max-budget-usd "$BUDGET_USD"
+  if [ -n "${MODEL:-}" ]; then set -- "$@" --model "$MODEL"; fi
+  if [ -n "${EFFORT:-}" ]; then
+    CLAUDE_CODE_EFFORT_LEVEL="$EFFORT" claude "$@" >"$log" 2>&1
+  else
+    claude "$@" >"$log" 2>&1
+  fi
   rc=$?
   echo "[$(date '+%F %T')] round $n rc=$rc"
   if [ "$rc" -eq 0 ]; then
