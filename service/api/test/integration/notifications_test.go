@@ -504,7 +504,7 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 
 	if code, m := alertPreview(
 		`,"severity":"critical"`,
-	); code != 200 || data(m)["severity"] != "critical" ||
+	); code != 200 || data(m)["severity"] != severityCritical ||
 		data(m)["deliveryState"] != deliveryPreview {
 		t.Errorf("critical alert preview: %d %v", code, m)
 	}

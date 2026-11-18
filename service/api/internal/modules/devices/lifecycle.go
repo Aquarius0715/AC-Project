@@ -30,6 +30,14 @@ type AlertOpener interface {
 		text string,
 		at time.Time,
 	) (uuid.UUID, error)
+	// BypassAlert opens the unit's restriction_bypass Alert (DEC-110, IR844).
+	BypassAlert(
+		ctx context.Context,
+		tx pgx.Tx,
+		unit, org uuid.UUID,
+		text string,
+		at time.Time,
+	) (uuid.UUID, error)
 }
 
 // operationStart is the delay from creating a check / firmware operation to its start tick (IR67).
@@ -705,7 +713,82 @@ func signalEvidence(
 		alertIDs = []uuid.UUID{alertID}
 	}
 
+	if FaultAxis(signal.Kind) != "" && device.unit != nil && device.binding != nil {
+		alertID, opened, err := openBypassAlert(
+			ctx,
+			txn,
+			alerts,
+			*device.binding,
+			*device.unit,
+			device.serial,
+			signal,
+		)
+		if err != nil {
+			return "", nil, err
+		}
+
+		if opened {
+			alertIDs = append(alertIDs, alertID)
+		}
+	}
+
 	return evidence, alertIDs, nil
+}
+
+// bypassFault is how the restriction_bypass Alert names a fault kind.
+func bypassFault(kind string) string {
+	switch kind {
+	case signalCommunicationLost:
+		return "stopped reporting"
+	case signalPowerLost:
+		return "lost power"
+	}
+
+	return "reported its cover opened"
+}
+
+// openBypassAlert opens the unit's restriction_bypass Alert for a fault while the unit observes a restriction (its
+// observedRestriction, set when the restriction is applied and cleared when it is released; DEC-110, IR844): the
+// restriction is infrared from this device, so the fault may mean it no longer holds. opened is false for a unit that
+// observes no restriction.
+func openBypassAlert(
+	ctx context.Context,
+	txn pgx.Tx,
+	alerts AlertOpener,
+	binding, unit uuid.UUID,
+	serial string,
+	signal Signal,
+) (uuid.UUID, bool, error) {
+	var (
+		policy *string
+		org    uuid.UUID
+	)
+
+	err := txn.QueryRow(ctx, `SELECT u.observed_restriction->'policy'->>'kind', b.customer_org_id FROM assets.units u,
+		devices.device_bindings b WHERE u.id = $1 AND b.id = $2`, unit, binding).
+		Scan(&policy, &org)
+	if err != nil {
+		return uuid.Nil, false, apperr.Wrap(err, "select assets.units")
+	}
+
+	if policy == nil {
+		return uuid.Nil, false, nil
+	}
+
+	alertID, err := alerts.BypassAlert(
+		ctx,
+		txn,
+		unit,
+		org,
+		"Device "+serial+" "+bypassFault(signal.Kind)+" while the unit is under a "+*policy+
+			" restriction: the restriction may no longer hold",
+		signal.OccurredAt,
+	)
+	if err != nil {
+		return uuid.Nil, false, apperr.Wrap(err, "devices.AlertOpener.BypassAlert")
+	}
+
+	return alertID, true, nil
 }
 
 // restoreFault gives the current unresolved fault of the axis its restoredAt (CONFLICT unless the restored signal

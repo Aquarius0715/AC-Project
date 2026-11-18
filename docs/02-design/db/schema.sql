@@ -889,7 +889,7 @@ CREATE TABLE monitoring.alerts (
   customer_org_id     uuid NOT NULL,
   policy_id           uuid,
   rule_key            text,
-  type                text NOT NULL CHECK (type IN ('sensor','quality','maintenance','tamper','reconciliation_required')),
+  type                text NOT NULL CHECK (type IN ('sensor','quality','maintenance','tamper','reconciliation_required','restriction_bypass')),  -- restriction_bypass: DEC-110, IR844
   severity            text NOT NULL CHECK (severity IN ('critical','warning','normal')),
   status              text NOT NULL CHECK (status IN ('open','acknowledged','resolved')),
   cause_code          text NOT NULL CHECK (cause_code IN ('window_open','insulation_loss','unknown')),

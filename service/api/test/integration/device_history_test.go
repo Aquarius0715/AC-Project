@@ -67,7 +67,7 @@ func TestDeviceHistory(t *testing.T) {
 	}
 
 	code, resp := post(srv, hq(), "devices.events", `{"id":"`+dev+`","query":{"limit":10}}`)
-	if code != 200 || len(items(t, resp)) != 1 || items(t, resp)[0]["eventType"] != "tamper" {
+	if code != 200 || len(items(t, resp)) != 1 || items(t, resp)[0]["eventType"] != kindTamper {
 		t.Fatalf("events: %d %v", code, resp)
 	}
 
