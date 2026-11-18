@@ -4,7 +4,7 @@ const TECH_EXTERNAL_A = "tech-external-a";
 
 import Link from "next/link";
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, EmptyState, Field, ListRow, Page, Select, Textarea, cx, useToast, type Tone } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Field, ListRow, Page, Select, Textarea, cx, useToast, type Tone } from "@ac/web/components/ui";
 import { OriginBadge } from "@ac/web/components/JobBits";
 import { fmt, jobActions, longDate, useJobs } from "@ac/web/lib/jobs";
 import { Icon } from "@ac/web/components/Icon";
@@ -12,11 +12,13 @@ import { orDash } from "@ac/web/lib/text";
 import { nonEmpty } from "@ac/web/lib/lists";
 import { DateTimeSelect } from "@ac/web/components/TimeSelect";
 
-const staticJobs = nonEmpty([
-  { id: "job-p02", unit: "Rooftop unit", st: ACCEPTED_AWAITING_ASSIGNMENT, win: "09-14 01:00 → 09-22 00:00", left: "14 h left" },
-  { id: "job-p12", unit: "Lobby AC", st: ACCEPTED_AWAITING_ASSIGNMENT, win: "09-19 09:00 → 09-24 18:00", left: "3 d 8 h left" },
-  { id: "job-contractor-a", unit: "Bedroom AC", st: "In progress · tech-external-a", win: "09-18 08:00 → 09-23 00:00", left: "1 d 14 h left" },
-  { id: "job-p07", unit: "Server room AC", st: "Work window ended · reassignment required", win: "09-15 08:00 → 09-20 17:00", left: "Ended" },
+// end: the latest work end the demo accepts, the delegation window's end; none for a job whose work window ended
+// (reassigning it extends the window, IR89)
+const staticJobs = nonEmpty<{ id: string; unit: string; st: string; win: string; end: string | null; left: string }>([
+  { id: "job-p02", unit: "Rooftop unit", st: ACCEPTED_AWAITING_ASSIGNMENT, win: "09-14 01:00 → 09-22 00:00", end: "2026-09-22T00:00", left: "14 h left" },
+  { id: "job-p12", unit: "Lobby AC", st: ACCEPTED_AWAITING_ASSIGNMENT, win: "09-19 09:00 → 09-24 18:00", end: "2026-09-24T18:00", left: "3 d 8 h left" },
+  { id: "job-contractor-a", unit: "Bedroom AC", st: "In progress · tech-external-a", win: "09-18 08:00 → 09-23 00:00", end: "2026-09-23T00:00", left: "1 d 14 h left" },
+  { id: "job-p07", unit: "Server room AC", st: "Work window ended · reassignment required", win: "09-15 08:00 → 09-20 17:00", end: null, left: "Ended" },
 ]);
 const grid: [string, string, string[]][] = [[TECH_EXTERNAL_A, "Refrigerant · 32 h avail.", ["10–12 job-p02", "09–13 job-contractor-a", "free", "13–17 job-c11", "free", "no hours", "no hours"]], ["tech-external-a2", "General · 40 h avail.", ["free", "free", "10–15 job-c09", "09–17 Leave", "09–12 job-c12", "no hours", "no hours"]]];
 // the technician's answer and its banner tone; no answer yet is awaiting acceptance in the primary tone
@@ -35,8 +37,8 @@ export function ScheduleDemo({ jobId }: Readonly<{ jobId?: string }>) {
   const toast = useToast();
   const store = useJobs();
   const live = store.filter((j) => j.contractor === "contractor-a" && (j.status === "accepted" || j.status === "assigned") && staticJobs.every((s) => s.id !== j.id));
-  const jobs = [...live.map((j) => ({ id: j.id, unit: j.unit, st: j.status === "accepted" ? ACCEPTED_AWAITING_ASSIGNMENT : `Assigned · ${orDash(j.technician)} · ${ACK_WORD.get(j.techAck?.status ?? "") ?? "awaiting acceptance"}`, win: `${orDash(j.scheduled?.date.slice(5))} 00:00 → ${orDash(j.scheduled?.date.slice(5))} 23:59`, left: "fixed time", live: true })), ...staticJobs.map((j) => ({ ...j, live: false }))];
-  const fallback = { ...staticJobs[0], live: false }; // the first fixture job when nothing is picked
+  const jobs = [...live.map((j) => ({ id: j.id, unit: j.unit, st: j.status === "accepted" ? ACCEPTED_AWAITING_ASSIGNMENT : `Assigned · ${orDash(j.technician)} · ${ACK_WORD.get(j.techAck?.status ?? "") ?? "awaiting acceptance"}`, win: `${orDash(j.scheduled?.date.slice(5))} 00:00 → ${orDash(j.scheduled?.date.slice(5))} 23:59`, end: null, left: "fixed time", live: true, origin: j.origin })), ...staticJobs.map((j) => ({ ...j, live: false, origin: null }))];
+  const fallback = { ...staticJobs[0], live: false, origin: null }; // the first fixture job when nothing is picked
   const [selId, setSelId] = useState(jobId ?? fallback.id);
   const sel = jobs.find((j) => j.id === selId) ?? fallback;
   const setSel = (j: (typeof jobs)[number]) => { setSelId(j.id); };
@@ -51,19 +53,17 @@ export function ScheduleDemo({ jobId }: Readonly<{ jobId?: string }>) {
   const save = () => {
     if (lj) { jobActions.partnerAssign(lj.id, tech); setMessage({ tone: "ok", t: `Assigned ${tech} to ${lj.id} for ${fmt(lj.scheduled)}. The technician must accept.` }); toast("Technician assigned — waiting for acceptance"); return; }
     if (isInProg && !reason.trim()) { setMessage({ tone: "crit", t: "Reason required when reassigning a job already in progress (VALIDATION)." }); return; }
-    const we = new Date(sel.id === "job-p02" ? "2026-09-22T00:00" : "2026-09-24T18:00");
     if (new Date(start) >= new Date(end)) { setMessage({ tone: "crit", t: "Start must be before end." }); return; }
-    if (new Date(end) > we) { setMessage({ tone: "crit", t: "Slot is outside the delegation period (VALIDATION)." }); return; }
+    if (sel.end !== null && new Date(end) > new Date(sel.end)) { setMessage({ tone: "crit", t: "Slot is outside the delegation period (VALIDATION)." }); return; }
     if (tech === TECH_EXTERNAL_A && start.startsWith("2026-09-21T09")) { setMessage({ tone: "warn", t: "Overlaps a confirmed schedule for tech-external-a (CONFLICT)." }); return; }
     setAssigned((a) => [...a, sel.id]); setMessage({ tone: "ok", t: `Assigned ${tech} to ${sel.id}. Notifications sent (preview).` }); toast("Technician assigned");
   };
   return (
     <Page>
-      {jobs.length === 0 && <EmptyState title="No accepted jobs" />}
       <div className="split-rev">
         <div className="flex min-w-0 flex-col gap-4 self-start">
           <Card title="Accepted jobs" sub="status, earliest stage first">
-            <div className="flex flex-col gap-2">{jobs.map((j) => <ListRow key={j.id} selected={sel.id === j.id} onClick={() => { setSel(j); setMessage(null); }}><div className="min-w-0"><div className="flex flex-wrap items-center gap-1.5"><b className="text-[13px]">{j.id} · {j.unit}</b>{j.live && <OriginBadge origin={store.find((x) => x.id === j.id)?.origin ?? "request"} />}</div><div className="text-xs text-muted-foreground">{assigned.includes(j.id) ? "Assigned · awaiting technician acceptance" : j.st}</div></div></ListRow>)}</div>
+            <div className="flex flex-col gap-2">{jobs.map((j) => <ListRow key={j.id} selected={sel.id === j.id} onClick={() => { setSel(j); setMessage(null); }}><div className="min-w-0"><div className="flex flex-wrap items-center gap-1.5"><b className="text-[13px]">{j.id} · {j.unit}</b>{j.origin && <OriginBadge origin={j.origin} />}</div><div className="text-xs text-muted-foreground">{assigned.includes(j.id) ? "Assigned · awaiting technician acceptance" : j.st}</div></div></ListRow>)}</div>
           </Card>
           <Card title="Delegation windows" sub="Work must fit inside each window. Access ends automatically at the end time.">
             {jobs.map((j) => <div key={j.id} className="flex flex-wrap justify-between gap-1 border-t border-line py-2 text-xs first:border-0"><span><b>{j.id}</b><span className="block text-muted-foreground">{j.win}</span></span><Badge tone={j.left === "Ended" ? "crit" : "muted"}>{j.left}</Badge></div>)}
