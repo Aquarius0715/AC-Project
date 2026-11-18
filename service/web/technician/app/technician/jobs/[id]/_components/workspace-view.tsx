@@ -5,7 +5,7 @@ const LOCATION_QR = "location_qr";
 
 import { buttonVariants } from "@ac/web/components/ui/button";
 import Link from "next/link";
-import { useEffect, useState, useEffectEvent } from "react";
+import { useEffect, useRef, useState, useEffectEvent } from "react";
 import { Badge, Banner, Btn, Card, Choice, cx, DataTable, EmptyState, Field, Input, Modal, Page, Select, SummaryList, Tabs, Textarea, UtilizationBar, Plain, ScrollX } from "@ac/web/components/ui";
 import { useI18n, useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
@@ -195,7 +195,7 @@ function WorkReportCard({ versionText, issues, isEditable, notice, isInWork, has
               <div>
                 <p className="mb-1 text-xs font-semibold">{t("Photos (JPEG/PNG, ≤5 MiB, ≤{max})", { max: MAX_PHOTOS })}</p>
                 <div className="flex flex-wrap gap-2">
-                  {photos.map((a) => <Photo key={a.id} src={photoUrl(a)} name={a.name} />)}
+                  {photos.map((a) => <Photo key={photoUrl(a)} src={photoUrl(a)} name={a.name} />)}
                   {isEditable && photos.length < MAX_PHOTOS && (
                     <label className={cx("grid h-16 w-20 cursor-pointer place-items-center rounded-lg border border-dashed border-line text-xl text-muted-foreground hover:bg-surface2 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-primary", pending && "pointer-events-none opacity-50")}>
                       +<Input type="file" aria-label={t("Add photos")} accept="image/jpeg,image/png" className="sr-only h-px w-px" onChange={(e) => { addPhotos(e.target.files); e.target.value = ""; }} />
@@ -284,7 +284,10 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
   // returned for rework (IR94, IR283; Figma Technician 423:604)
   const isUnitOpen = ["assigned", IN_PROGRESS, "rework_requested"].includes(job.status) && win.phase !== "ended" && win.phase !== "before";
   const failed = (x: ActionFailure) => { setRefused(refusal(x, t)); };
-  const edit = (fn: (d: Draft) => Draft) => { setDraft(fn); setDirty(true); };
+  // counts the edits, so a save or an upload that lands clears "Unsaved changes" only if nothing was typed meanwhile
+  const edits = useRef(0);
+  const edit = (fn: (d: Draft) => Draft) => { setDraft(fn); setDirty(true); edits.current += 1; };
+  const savedUpTo = (at: number) => { setDirty(edits.current !== at); };
   const photos = (rep ?? live.report)?.attachmentRefs.filter((a) => a.id !== (rep ?? live.report)?.signOff?.signatureAttachmentId) ?? [];
   const signedOff = !!(rep ?? live.report)?.signOff;
   const issues: Issue[] | null = checked ? submitIssues(draft, photos, now, t, signedOff) : null;
@@ -293,9 +296,10 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
     return r ? `/technician/jobs/${job.id}/photos/${a.id}?reportId=${r.id}&reportVersion=${String(r.version)}` : "";
   };
 
-  const save = (after?: (r: Rep) => void) => {
+  const save = (after?: (r: Rep, at: number) => void) => {
+    const at = edits.current;
     run(() => saveDraft(draftInput(job.id, rep?.id ?? null, draft, live.unit?.modelId ?? null), rep?.version ?? null), t("Draft saved"), (r) => {
-      setRep(r); setDirty(false); setSavedAt(new Date(now).toISOString()); setRefused(null); after?.(r);
+      setRep(r); savedUpTo(at); setSavedAt(new Date(now).toISOString()); setRefused(null); after?.(r, at);
     }, failed);
   };
   // autosave 20 s after the last edit while the work window is open (the API keeps every saved version)
@@ -305,8 +309,10 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
     const timer = dirty && isEditable && !pending ? setTimeout(() => { autosave(); }, 20_000) : null;
     return () => { if (timer) clearTimeout(timer); };
   }, [draft, dirty, isEditable, pending]);
-  const withSaved = (fn: (r: Rep) => void) => { if (dirty || !rep) save(fn); else fn(rep); };
-  const photoAdded = (next: Rep) => { setRep(next); edit((d) => ({ ...d, attachmentIds: next.attachmentRefs.map((a) => a.id) })); setDirty(false); };
+  // `at`: the edits the saved draft holds, so an upload that follows clears "Unsaved changes" only up to them
+  const withSaved = (fn: (r: Rep, at: number) => void) => { if (dirty || !rep) save(fn); else fn(rep, edits.current); };
+  // the upload changed the saved draft's photos only: the photo list follows it without counting as an edit
+  const photoAdded = (next: Rep, at: number) => { setRep(next); setDraft((d) => ({ ...d, attachmentIds: next.attachmentRefs.map((a) => a.id) })); savedUpTo(at); };
   // linkTo: the finding the photo was taken for, linked once it is uploaded (no trip to the Photos card and back)
   const addPhotos = (files: FileList | null, tag?: PhotoTag, linkTo?: string) => {
     const file = files?.[0];
@@ -316,13 +322,13 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
       return;
     }
     setPhotoError(null);
-    withSaved((r) => {
+    withSaved((r, at) => {
       const form = new FormData();
       form.set("jobId", job.id); form.set("reportId", r.id); form.set("reportVersion", String(r.version)); form.set("file", file);
       if (tag) form.set("tag", tag);
       const known = new Set(photos.map((a) => a.id));
       const added = (next: Rep) => {
-        photoAdded(next);
+        photoAdded(next, at);
         const fresh = linkTo ? next.attachmentRefs.find((a) => !known.has(a.id)) : undefined;
         if (linkTo && fresh) edit((d) => linkPhoto(d, linkTo, fresh.id, true));
       };
