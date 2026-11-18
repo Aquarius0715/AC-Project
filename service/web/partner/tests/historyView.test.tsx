@@ -80,6 +80,8 @@ describe("History list", () => {
     expect(screen.getByText("No jobs yet")).toBeTruthy();
     view.rerender(<HistoryView live={live({ rows: [], tab: "active" })} />);
     expect(screen.getByText("No jobs in this view")).toBeTruthy();
+    view.rerender(<HistoryView live={live({ rows: [], tabs: tabs(2).slice(1), tab: "active" })} />); // no All tab: counted as none
+    expect(screen.getByText("No jobs yet")).toBeTruthy();
   });
 
   it("keeps the filters in the job links and drops the defaults from the URL", () => {
@@ -88,10 +90,25 @@ describe("History list", () => {
     expect(screen.getByText("Work window ended")).toBeTruthy();
     fireEvent.change(screen.getByRole("combobox", { name: "Sort" }), { target: { value: "latest" } });
     expect(nav).toHaveBeenLastCalledWith({ sort: null });
+    fireEvent.change(screen.getByRole("combobox", { name: "Sort" }), { target: { value: "status" } });
+    expect(nav).toHaveBeenLastCalledWith({ sort: "status" });
     fireEvent.change(screen.getByRole("combobox", { name: "Period" }), { target: { value: "90d" } });
     expect(nav).toHaveBeenLastCalledWith({ period: null });
     fireEvent.change(screen.getByRole("combobox", { name: "Period" }), { target: { value: "all" } });
     expect(nav).toHaveBeenLastCalledWith({ period: "all" });
+  });
+
+  it("puts the tab in the URL, drops it for All, and marks a client request without a last event", () => {
+    const quiet = row({ id: "job-c", short: "job-c", origin: "client_request", last: null });
+    const view = render(<HistoryView live={live({ rows: [quiet], total: 1 })} />);
+    fireEvent.click(screen.getByRole("tab", { name: /^Active/ }));
+    expect(nav).toHaveBeenLastCalledWith({ tab: "active" });
+    view.rerender(<HistoryView live={live({ rows: [quiet], total: 1, tab: "active" })} />);
+    fireEvent.click(screen.getByRole("tab", { name: /^All/ }));
+    expect(nav).toHaveBeenLastCalledWith({ tab: null });
+    expect(screen.getByText("Client request")).toBeTruthy();
+    const cells = screen.getByRole("link", { name: "Open the history of job-c" }).closest("tr")?.querySelectorAll("td");
+    expect(cells?.[2]?.textContent).toBe("—");
   });
 });
 
@@ -110,6 +127,18 @@ describe("History detail", () => {
     expect(screen.getByText("hello · today")).toBeTruthy();
     fireEvent.change(screen.getByRole("combobox", { name: "Job" }), { target: { value: "job-b" } });
     expect(nav).toHaveBeenCalledWith({ jobId: "job-b" });
+  });
+
+  it("colours an ok or a crit status, falls back to the job title without a unit, and marks each event's tone", () => {
+    const warn: TimelineItem = { id: "e3", title: "Rework requested", detail: "", at: "now", badge: "internal", tone: "warn" };
+    const view = render(<HistoryView live={detail({ row: row({ unit: null, badge: { text: "Completed", tone: "ok" } }), items: [...items, warn] })} />);
+    expect(screen.getByText("Completed").className).toContain("text-ok");
+    expect(screen.getByText("Periodic inspection").previousElementSibling?.textContent).toBe("Unit");
+    const dots = [...document.querySelectorAll("ol > li > span[aria-hidden]")].map((s) => s.className);
+    expect(dots.map((c) => ["bg-primary/10", "bg-ok/15", "bg-warn/15"].find((x) => c.includes(x)))).toStrictEqual(["bg-primary/10", "bg-ok/15", "bg-warn/15"]);
+    view.rerender(<HistoryView live={detail({ row: row({ badge: { text: "Cancelled", tone: "crit" } }) })} />);
+    expect(screen.getByText("Cancelled").className).toContain("text-crit");
+    expect(screen.getByText("Living AC").className).not.toMatch(/text-(ok|crit)/);
   });
 
   it("shows only the banner, no form, once the delegation has ended", () => {
@@ -157,6 +186,32 @@ describe("History communication", () => {
     expect(actions.communicate).toHaveBeenCalledWith(expect.objectContaining({ saveNote: false, recipientMembershipId: "m-t2", channel: "inApp" }));
     expect(await screen.findByText("Created the in-app preview for Lee. Nothing was sent.")).toBeTruthy();
     expect(value()).toBe("On my way");
+  });
+
+  it("falls back to in-app when the next recipient lacks the chosen channel", async () => {
+    actions.communicate.mockResolvedValue({ ok: true, value: { noteSaved: false, preview } });
+    render(<HistoryView live={detail()} />);
+    const channel = screen.getByRole("combobox", { name: "Channel" });
+    fireEvent.change(channel, { target: { value: "email" } });
+    fireEvent.change(screen.getByRole("combobox", { name: /^Recipient role/ }), { target: { value: "technician" } }); // Tan: in-app only
+    expect(channel instanceof HTMLSelectElement && channel.value).toBe("inApp");
+    fireEvent.change(screen.getByRole("combobox", { name: "Template" }), { target: { value: "completion" } });
+    fireEvent.change(message(), { target: { value: "Hi" } });
+    send();
+    expect(actions.communicate).toHaveBeenCalledWith(expect.objectContaining({ recipientMembershipId: "m-t1", channel: "inApp", templateKey: "completion" }));
+    expect(await screen.findByText("Created the in-app preview for Tan. Nothing was sent.")).toBeTruthy();
+  });
+
+  it("says nobody of the role takes part and blocks sending when the job has no such recipient", () => {
+    const view = render(<HistoryView live={detail({ recipients: [] })} />);
+    expect(screen.getByText("Nobody of this role is part of the job.")).toBeTruthy();
+    const roles = screen.getAllByRole("option").filter((o) => ["hq", "assigned_technician", "customer_contact"].includes(o.textContent));
+    expect(roles.map((o) => o.hasAttribute("disabled"))).toStrictEqual([true, true, true]);
+    expect(screen.getByRole("button", { name: "Save note & create preview" }).hasAttribute("disabled")).toBe(true);
+    view.rerender(<HistoryView live={detail({ recipients: recipients.slice(0, 1) })} />);
+    fireEvent.change(screen.getByRole("combobox", { name: /^Recipient role/ }), { target: { value: "client" } });
+    expect(screen.getByText("Nobody of this role is part of the job.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Save note & create preview" }).hasAttribute("disabled")).toBe(true);
   });
 
   it("says whether the note was kept when the communication fails", async () => {

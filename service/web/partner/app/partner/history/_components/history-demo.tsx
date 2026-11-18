@@ -42,7 +42,6 @@ export function HistoryDemo() {
           <Card><div className="grid-fluid text-[13px]" style={{ ["--min"as string]: "150px" }}>{[["UNIT", "Office AC · customer-a"], ["TECHNICIAN", "tech-external-a"], ["STATUS", "Completed"], ["DELEGATION", "ended 09-22 00:00"]].map(([a, b]) => <div key={a}><div className="text-[10px] font-bold tracking-wide text-muted-foreground">{a}</div><b>{b}</b></div>)}</div></Card>
           <div className="split">
             <Card title={`Job history — ${job}`} action={<Tabs value={f} onChange={setF} tabs={[{ id: "all", label: "All events", count: events.length }, { id: "customer", label: "Customer-visible", count: events.filter((e) => e.c).length }, { id: "internal", label: "Internal", count: events.filter((e) => !e.c).length }]} />}>
-              {shown.length === 0 && <p className="text-[13px] text-muted-foreground">No events in this view.</p>}
               <Timeline items={shown.map((e) => ({ time: e.t.slice(5), title: e.title, detail: e.d, tone: eventTone(e.title) }))} />
             </Card>
             <div className="flex min-w-0 flex-col gap-4">
