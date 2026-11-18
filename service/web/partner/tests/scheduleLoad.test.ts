@@ -202,4 +202,24 @@ describe("partner schedule loader", () => {
       expect(live.selected?.text.end).toBe("2026-11-20T14:00"); // 05:00 UTC
     });
   });
+
+  it("names the rows' units, and for a job with no agreed time shows the blocked form on this week without a candidate search", async () => {
+    const lists = new Map<string, unknown[]>([["jobs.list", jobs], ["units.list", [{ id: "unit-1", displayName: "Lobby AC" }]]]);
+    dal.coreAll.mockImplementation((operation: string) => Promise.resolve(lists.get(operation) ?? []));
+    get = (id) => Promise.resolve({ ...detail(id), offer: null });
+    const live = await loadSchedule({});
+    expect(live.rows.map((r) => r.title)).toStrictEqual(["Lobby AC", "Lobby AC"]);
+    expect(live.selected?.mode.kind).toBe("blocked");
+    expect([live.selected?.candidates, live.selected?.times, live.selected?.moved]).toStrictEqual([[], [], false]);
+    expect(live.selected?.text).toStrictEqual({ window: null, slot: null, start: null, end: "", alternative: null });
+    expect(live.week?.from).toBe("2026-11-16"); // the week of now (Wednesday 18 November)
+    expect(eligibleSlots).toStrictEqual([]);
+  });
+
+  it("gives the selected job's delegation window as text", async () => {
+    jobs = [{ ...summary("job-1111aaaa"), accessValidFrom: "2026-11-17T00:00:00Z", accessValidUntil: "2026-11-30T00:00:00Z" }];
+    const live = await loadSchedule({});
+    expect(live.selected?.window).toStrictEqual({ from: "2026-11-17T00:00:00Z", until: "2026-11-30T00:00:00Z" });
+    expect(live.selected?.text.window).toMatch(/^17 Nov.*30 Nov/);
+  });
 });
