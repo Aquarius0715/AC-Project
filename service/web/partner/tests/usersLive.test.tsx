@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { partnerUserRows, type ApiPartnerUser } from "@ac/web/lib/partnerUsers";
 
@@ -16,6 +16,7 @@ vi.mock("@ac/web/lib/useAction", () => ({
 
 import { UsersLive } from "../app/partner/users/_components/users-live";
 
+beforeEach(() => { for (const fn of [...Object.values(actions), patch]) fn.mockReset(); });
 afterEach(cleanup);
 
 const user = (id: string, over: Partial<ApiPartnerUser> = {}): ApiPartnerUser => ({
@@ -58,7 +59,9 @@ describe("Users live", () => {
     fireEvent.change(screen.getByRole("textbox", { name: /^Name/ }), { target: { value: "Lim" } });
     fireEvent.change(screen.getByRole("textbox", { name: /^Email/ }), { target: { value: "lim@example.com" } });
     fireEvent.change(screen.getByRole("combobox", { name: /^Role/ }), { target: { value: "contractor" } });
-    fireEvent.click(within(screen.getByRole("dialog")).getAllByRole("button", { name: "Add user" }).at(-1) ?? document.body);
+    const add = within(screen.getByRole("dialog")).getAllByRole("button", { name: "Add user" }).at(-1);
+    if (!add) throw new TypeError("no Add user");
+    fireEvent.click(add);
     await waitFor(() => { expect(actions.invitePartnerUser).toHaveBeenCalledWith("lim@example.com", "contractor", "Lim", null); });
   });
 });

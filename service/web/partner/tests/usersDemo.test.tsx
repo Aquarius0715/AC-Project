@@ -41,7 +41,7 @@ const addLim = () => {
 };
 
 describe("Users demo", () => {
-  it("lists the seed, filters by status, and adds, re-sends, disables and removes in the store", async () => {
+  it("lists the seed, filters by status, and adds, disables, moves the access of and removes in the store, and re-sends without sending", async () => {
     render(<UsersDemo />);
     expect(screen.getByRole("heading", { name: "Users of contractor-a" })).toBeTruthy();
     expect(rowOf("contractor-a@ac.local").getByText("contractor-a (you)")).toBeTruthy();

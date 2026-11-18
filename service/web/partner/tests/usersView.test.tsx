@@ -156,8 +156,7 @@ describe("Users view", () => {
     type(box(/^Email/), "tan@example.com");
     submit("Add user");
     await waitFor(() => { expect(document.activeElement).toBe(box(/^Email/)); });
-    const refusal = box(/^Email/).getAttribute("aria-invalid");
-    expect(refusal).toBe("true");
+    expect(box(/^Email/).getAttribute("aria-invalid")).toBe("true");
     type(box(/^Name/), "Tan Ah");
     expect(box(/^Email/).getAttribute("aria-invalid")).toBe("true");
     type(box(/^Email/), "tan2@example.com");
@@ -206,7 +205,9 @@ describe("Users view", () => {
     expect(o.setStatus).toHaveBeenLastCalledWith(expect.objectContaining({ id: "amy" }), "disabled", "on leave");
     fireEvent.click(rowOf("cal@").getByRole("button", { name: "Enable" }));
     expect(screen.getByRole("dialog", { name: "Enable cal" })).toBeTruthy();
-    expect(box(/^Reason/).getAttribute("value") ?? "").toBe("");
+    // the reason of the earlier dialog is cleared
+    const reasonBox = box(/^Reason/);
+    expect(reasonBox instanceof HTMLTextAreaElement && reasonBox.value).toBe("");
     type(box(/^Reason/), "back");
     submit("Enable");
     await waitFor(() => { expect(screen.queryByRole("dialog")).toBeNull(); });
