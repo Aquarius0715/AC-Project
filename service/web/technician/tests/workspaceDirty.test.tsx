@@ -66,8 +66,8 @@ describe("WorkspaceView unsaved changes", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save draft" }));
     type("Cleaned the filters and the coil, drain flushed");
     calls.save[0]?.resolve({ ok: true, value: state(report(3)) });
-    await waitFor(() => { expect(calls.save).toHaveLength(1); });
-    await waitFor(() => { expect(unsaved()).not.toBeNull(); });
+    await screen.findByText("Work report — draft v3"); // the save has landed
+    expect(unsaved()).not.toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Save draft" }));
     expect(sentText(1)).toBe("Cleaned the filters and the coil, drain flushed");
     expect(vi.mocked(saveDraft).mock.calls[1]?.[1]).toBe(3);
