@@ -12,7 +12,7 @@ import { Icon } from "@ac/web/components/Icon";
 import { DateTimeSelect } from "@ac/web/components/TimeSelect";
 
 interface Live {
-  now: string; r: ApiRestriction; units: UnitRow[]; canWrite: boolean; canOverride: boolean; canAudit: boolean;
+  now: string; r: ApiRestriction; units: UnitRow[]; bypass: string[]; canWrite: boolean; canOverride: boolean; canAudit: boolean;
   /** formatted on the server in the display language and time zone (IR282) */
   period: string | null; intent: string; audit: { time: string; title: string; detail: string }[];
 }
@@ -64,6 +64,11 @@ export function ExceptionView({ live }: Readonly<{ live: Live }>) {
   return (
     <Page>
       <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground"><Link href={`/admin/restrictions?restrictionId=${r.id}`} className="font-semibold text-primary"><Icon name="arrowLeft" /> {t("Restrictions")}</Link>/ <b className="text-ink">{r.id.slice(0, 8)}</b> <Badge tone={stateTone(r.state)}>{stateWord(r.state, t)}</Badge></div>
+      {live.bypass.length > 0 && (
+        <Banner tone="crit" action={<Link href="/admin/alerts" className="font-semibold text-primary">{t("Open Alerts")}</Link>}>
+          {t("Restriction may be bypassed on {units}: its device went silent, lost power or was opened, or the unit draws power under power off. Check the unit.", { units: live.bypass.join(", ") })}
+        </Banner>
+      )}
       <div className="split">
         <div className="flex min-w-0 flex-col gap-4">
           <Card title={t("Choose an action")} sub={t("Version {v} · the result for the current state is shown before saving", { v: r.version })}>
