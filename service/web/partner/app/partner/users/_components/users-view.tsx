@@ -112,7 +112,8 @@ export function UsersView({ data, ops, onStatus, sends = false }: Readonly<{ dat
       const first = FIELDS.find((k) => fields[k]);
       if (first) focusField(ids[first]);
     };
-    const who = dialog.kind === "invite" ? name.trim() || email.trim() : dialog.row.name ?? dialog.row.email;
+    // a new user has a name by now (nameError above)
+    const who = dialog.kind === "invite" ? name.trim() : dialog.row.name ?? dialog.row.email;
     if (dialog.kind === "invite") run(() => ops.invite(email, role, name, role === TECHNICIAN ? accessEnd(until) : null), sends ? t("{name} added — a set-up e-mail is on its way to {email}", { name: who, email: email.trim() }) : t("{name} added — nothing is sent in the demo", { name: who }), close, refused);
     else if (dialog.kind === "access") run(() => ops.access(dialog.row, accessEnd(until), reason), t("Access of {name} now ends {date}", { name: who, date: until }), close, refused);
     else if (dialog.kind === "remove") run(() => ops.remove(dialog.row, reason), t("{name} removed", { name: who }), () => { gone.current = true; close(); }, refused);
