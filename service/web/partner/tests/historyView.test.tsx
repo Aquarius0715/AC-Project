@@ -129,7 +129,7 @@ describe("History detail", () => {
     expect(nav).toHaveBeenCalledWith({ jobId: "job-b" });
   });
 
-  it("colours a completed or failed status, falls back to the job title without a unit, and marks each event's tone", () => {
+  it("colours an ok or a crit status, falls back to the job title without a unit, and marks each event's tone", () => {
     const warn: TimelineItem = { id: "e3", title: "Rework requested", detail: "", at: "now", badge: "internal", tone: "warn" };
     const view = render(<HistoryView live={detail({ row: row({ unit: null, badge: { text: "Completed", tone: "ok" } }), items: [...items, warn] })} />);
     expect(screen.getByText("Completed").className).toContain("text-ok");
@@ -205,7 +205,8 @@ describe("History communication", () => {
   it("says nobody of the role takes part and blocks sending when the job has no such recipient", () => {
     const view = render(<HistoryView live={detail({ recipients: [] })} />);
     expect(screen.getByText("Nobody of this role is part of the job.")).toBeTruthy();
-    expect(screen.getAllByRole("option").filter((o) => ["hq", "assigned_technician", "customer_contact"].includes(o.textContent)).every((o) => o.hasAttribute("disabled"))).toBe(true);
+    const roles = screen.getAllByRole("option").filter((o) => ["hq", "assigned_technician", "customer_contact"].includes(o.textContent));
+    expect(roles.map((o) => o.hasAttribute("disabled"))).toStrictEqual([true, true, true]);
     expect(screen.getByRole("button", { name: "Save note & create preview" }).hasAttribute("disabled")).toBe(true);
     view.rerender(<HistoryView live={detail({ recipients: recipients.slice(0, 1) })} />);
     fireEvent.change(screen.getByRole("combobox", { name: /^Recipient role/ }), { target: { value: "client" } });

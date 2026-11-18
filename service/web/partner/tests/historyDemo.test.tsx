@@ -25,8 +25,7 @@ describe("History demo", () => {
     tab(/^Customer-visible/);
     expect(titles()).toStrictEqual(["Report accepted", "Work started (checked in)", "Schedule changed"]);
     tab(/^Internal/);
-    expect(titles()).toHaveLength(6);
-    expect(titles()).not.toContain("Report accepted");
+    expect(titles()).toStrictEqual(["Report v2 submitted", "Rework requested — missing evidence", "Report v1 submitted", "Technician assigned", "Job accepted", "Offer received from HQ"]);
   });
 
   it("asks for a job when none is chosen", () => {
