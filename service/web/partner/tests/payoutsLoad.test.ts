@@ -69,6 +69,65 @@ describe("partner payouts loader", () => {
     expect(unknown.periods.map((p) => p.value)).toStrictEqual(["2026-10", "2026-09"]);
   });
 
+  it("labels each line by its job: the unit while open, closed details after the window, the work type when unread", async () => {
+    const line = (id: string, jobId: string) => ({ id, jobId, workType: "repair_base" as const, acceptedAt: "2026-10-05T02:00:00Z", amountMinor: 5000, kind: "charge" as const, note: null });
+    dal.coreAll.mockResolvedValue([{ ...october, lines: [line("ln-1", "job-open-01"), line("ln-2", "job-open-01"), line("ln-3", "job-bare-01"), line("ln-4", "job-hist-01"), { ...line("ln-5", "job-gone-01"), workType: "periodic_inspection" as const }] }]);
+    const units: Record<string, { displayName: string; location: { pathLabels: string[] } }> = {
+      "unit-a": { displayName: "Lobby AC", location: { pathLabels: ["Tower A", "Floor 1"] } },
+      "unit-b": { displayName: "Store AC", location: { pathLabels: [] } },
+    };
+    const jobs = new Map<string, object>(Object.entries({
+      "job-open-01": { projection: "detail", type: "reactive", status: "completed", unitId: "unit-a" },
+      "job-bare-01": { projection: "detail", type: "reactive", status: "completed", unitId: "unit-b" },
+      "job-hist-01": { projection: "history", type: "reactive", status: "completed" },
+    }));
+    const reviewing = { projection: "summary", id: "job-rev-001", type: "reactive", status: "submitted", unitId: "unit-a" };
+    dal.coreOp.mockImplementation((operation: string, input: { jobId?: string; id?: string }) => {
+      if (operation === "jobs.get") {
+        const found = jobs.get(input.jobId ?? "");
+        return found ? Promise.resolve(found) : Promise.reject(new dal.CoreError("NOT_FOUND"));
+      }
+      if (operation === "units.get") return Promise.resolve(units[input.id ?? ""]);
+      if (operation === "jobs.list") {
+        return Promise.resolve({ items: [
+          reviewing, { projection: "history", jobId: "job-rev-hist", type: "reactive", status: "submitted" },
+          { projection: "detail", jobId: "job-rev-002", type: "reactive", status: "submitted" }, { projection: "detail", id: "job-open-01", type: "reactive", status: "submitted", unitId: "unit-a" },
+        ] });
+      }
+      return Promise.resolve({ items: [] });
+    });
+    const live = await loadPayouts({});
+    expect(live.selected?.rows.map((r) => [r.key, r.work, r.sub])).toStrictEqual([
+      ["ln-1", "Repair · Lobby AC", "Tower A"],
+      ["ln-2", "Repair · Lobby AC", "Tower A"],
+      ["ln-3", "Repair · Store AC", null],
+      ["ln-4", "Repair", "customer details closed with the delegation"],
+      ["ln-5", "Periodic inspection", null],
+      ["review-job-rev-001", "Repair · Lobby AC", "awaiting quality review"],
+      ["review-job-rev-002", "Repair", "awaiting quality review"],
+    ]);
+    // the in-review history row is left out, and job-open-01 is not repeated as in review: it is on the statement;
+    // one jobs.get per job and one units.get per unit, shared by the lines and the in-review rows
+    expect(dal.coreOp.mock.calls.filter(([operation]) => operation === "jobs.get")).toHaveLength(4);
+    expect(dal.coreOp.mock.calls.filter(([operation]) => operation === "units.get")).toHaveLength(2);
+  });
+
+  it("shows no in-review rows when that read is refused, at most 10, and the fallbacks for a refused unit and an unnamed company", async () => {
+    dal.coreOp.mockImplementation((operation: string) => (operation === "jobs.list" ? Promise.reject(new dal.CoreError("FORBIDDEN")) : Promise.resolve({ items: [] })));
+    const refused = await loadPayouts({});
+    expect(refused.selected?.rows).toStrictEqual([]);
+    // a unit the company may no longer read gives no unit name; a company without a name is "your company"
+    dal.coreIdentity.mockResolvedValue({ displayName: "Owner", organizationName: "" });
+    const many = Array.from({ length: 12 }, (_, n) => ({ projection: "detail", id: `job-many-${String(n).padStart(2, "0")}`, type: "reactive", status: "submitted", unitId: "unit-gone" }));
+    dal.coreOp.mockImplementation((operation: string) => {
+      if (operation === "units.get") return Promise.reject(new dal.CoreError("NOT_FOUND"));
+      return Promise.resolve({ items: operation === "jobs.list" ? many : [] });
+    });
+    const live = await loadPayouts({});
+    expect(live.company).toBe("your company");
+    expect(live.selected?.rows.map((r) => r.work)).toStrictEqual(Array.from({ length: 10 }, () => "Repair"));
+  });
+
   it("selects nothing and reads no card when no statement is shown", async () => {
     const live = await loadPayouts({ period: "2025-01" });
     expect(live.selected).toBeNull();
