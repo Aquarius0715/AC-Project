@@ -164,6 +164,7 @@ describe("offer before acceptance", () => {
     expect(screen.getByText("A reason is required to decline (1–1000 characters)")).toBeTruthy();
     expect(screen.queryByRole("dialog")).toBeNull();
     fireEvent.change(screen.getByPlaceholderText("No qualified technician available in this window."), { target: { value: "  no one free  " } });
+    expect(screen.queryByText("A reason is required to decline (1–1000 characters)")).toBeNull();
     click("Decline");
     expect(screen.getByText("The job returns to HQ with your reason: “no one free”. A new offer would get a new offer ID.")).toBeTruthy();
     click("Cancel");
@@ -234,6 +235,7 @@ describe("offer with a proposed time", () => {
       render(<JobDetailView live={offer({ partnerSlotProposal: proposal(status) })} />);
       expect(text(), status).toContain("Your time change was not taken — the agreed time stays 16 Sep 10:00 am–12:00 pm.");
       expect(text(), status).not.toContain("approved your proposed time");
+      expect(isDisabled("Accept job"), status).toBe(false);
     }
     cleanup();
     render(<JobDetailView live={offer({ partnerSlotProposal: proposal("withdrawn") })} />);
@@ -312,6 +314,7 @@ describe("job detail inside the delegation period", () => {
     expect(screen.getAllByText("job-p02- · Rooftop unit")).toHaveLength(2); // the breadcrumb and the job card
     expect(screen.getByText("Aina visits 16 Sep")).toBeTruthy();
     expect(screen.getByText("Assigned", { selector: "span" }).className).toContain("bg-primary-soft"); // the primary badge
+    expect(screen.getByText("Request")).toBeTruthy();
     expect(text()).toContain("“noise”");
     expect(href("front.jpg")).toStrictEqual(["/partner/jobs/job-p02-aaaa-bbbb/photos/ph-1"]);
     expect(screen.queryByText("back.jpg")).toBeNull();
@@ -354,7 +357,7 @@ describe("job detail inside the delegation period", () => {
     expect(text()).toContain("Last reading—");
     expect(href("Assign technician")).toStrictEqual(["/partner/schedule?jobId=job-p02-aaaa-bbbb"]);
     expect(text()).not.toContain("Client’s photos");
-    expect(text()).not.toContain("Request");
+    expect(screen.queryByText("Request")).toBeNull(); // no symptom: no Request row
     expect(text()).toContain("No technicians in your company yet.");
     expect(text()).not.toContain("delegation left");
   });
