@@ -14,7 +14,7 @@ export interface ApiAlert {
 }
 
 const causeTitle: Record<string, string> = { window_open: "Possible open window", insulation_loss: "Poor insulation suspected" };
-const typeTitle: Record<string, string> = { maintenance: "Filter cleaning reminder", quality: "Air quality alert", tamper: "Device tamper", reconciliation_required: "Restriction check needed", sensor: "Sensor alert" };
+const typeTitle: Record<string, string> = { maintenance: "Filter cleaning reminder", quality: "Air quality alert", tamper: "Device tamper", reconciliation_required: "Restriction check needed", restriction_bypass: "Restriction may be bypassed", sensor: "Sensor alert" };
 const evidenceLabel: Record<string, string> = { inferred: "Evidence (inferred)", inspection: "Inspection record", demo_observation: "Evidence (demo observation)" };
 /** The kind of an alert (Figma Client 06a, DD-C08): an inspection record; a load cause — an open window or poor
 insulation — that is only suspected, never a fault (BIZ-17, IR315); a maintenance reminder; an air-quality alert;
@@ -38,6 +38,7 @@ const causeNext: Record<string, string> = {
 const typeNext: Record<string, string> = {
   tamper: "Check whether someone opened the AC's cover. If nobody should have, request a repair.",
   reconciliation_required: "HQ is checking this AC's restriction. Nothing to do; remote control may pause meanwhile.",
+  restriction_bypass: "The AC's restriction device stopped working while a restriction is on. Reconnect it and keep it in sight of the AC; HQ checks the unit.",
 };
 const kindNext: Record<AlertKind, string> = {
   inspection: "A technician's note. Nothing to do unless the problem comes back.",

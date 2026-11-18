@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { alertNext, inboxAlerts, type ApiAlert } from "@ac/web/lib/alerts";
+import { alertNext, alertTitle, inboxAlerts, type ApiAlert } from "@ac/web/lib/alerts";
 import { inboxRow, NOTIFICATION_KEYS, type ApiNotification } from "@ac/web/lib/notifications";
-import { i18nOf } from "@ac/web/lib/i18n";
+import { i18nOf, translator } from "@ac/web/lib/i18n";
 import { ms } from "@ac/web/lib/i18n-ms";
 import { must } from "./must";
 
@@ -144,5 +144,16 @@ describe("inbox rows and alert rows", () => {
     ]);
     const [win] = inboxAlerts([alert("win", "warning", "open", { causeCode: "window_open" })], [], vi.fn(), i18nOf({ locale: "ms", timeZone: "UTC" }));
     expect(win?.next).toBe("Pastikan tingkap dan pintu bilik ditutup. Jika tiada orang di dalam bilik, matikan AC.");
+  });
+
+  // DEC-110, IR844: a device fault under a restriction is a suspected bypass, titled and explained as such
+  it("names a suspected restriction bypass and what to do about it", () => {
+    const bypass = alert("b", "critical", "open", { type: "restriction_bypass" });
+    expect([alertTitle(bypass), alertNext(bypass), alertTitle(bypass, translator("ja")), alertNext(bypass, translator("id"))]).toStrictEqual([
+      "Restriction may be bypassed",
+      "The AC's restriction device stopped working while a restriction is on. Reconnect it and keep it in sight of the AC; HQ checks the unit.",
+      "制限が回避された可能性",
+      "Perangkat pembatasan AC berhenti bekerja saat pembatasan aktif. Sambungkan kembali dan letakkan menghadap AC; HQ akan memeriksa unit ini.",
+    ]);
   });
 });
