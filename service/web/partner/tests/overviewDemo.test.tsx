@@ -28,11 +28,11 @@ const base = () => {
 const job = (over: Partial<Job>): Job => ({ ...base(), contractor: "contractor-a", partnerProposal: null, techAck: null, ...over });
 
 describe("Overview demo", () => {
-  it("lists the store's open offer before the fixed rows, and counts it in the offers tile and the card title", () => {
+  it("lists the store's open offer before the fixed rows, counts it in the offers tile and the card title, and shows the fixed timeline", () => {
     render(<OverviewDemo />);
     expect(actionRows()).toStrictEqual([["job-a11 · Rooftop unit · customer-b", "/partner/jobs/job-a11"], ...FIXED]);
     expect(screen.getByText("Needs your action (6)")).toBeTruthy();
-    expect(screen.getByText("Open offers").closest("[data-slot=card]")?.textContent).toMatch(/Offers to answer2/);
+    expect(screen.getByText("Open offers").closest("[data-slot=card]")?.textContent).toMatch(/^Offers to answer2job-p09/);
     expect(screen.getByText("10–12").style.left).toBe("16.6%");
     expect(screen.getAllByText("Free all day")).toHaveLength(1);
   });
@@ -55,6 +55,6 @@ describe("Overview demo", () => {
     expect(screen.getByText(/^tech-external-a can’t make .* — reassign$/)).toBeTruthy();
     expect(screen.getByText(/^— can’t make .* — reassign$/)).toBeTruthy();
     // the pending-proposal offer still counts as an offer to answer
-    expect(screen.getByText("Open offers").closest("[data-slot=card]")?.textContent).toMatch(/Offers to answer2/);
+    expect(screen.getByText("Open offers").closest("[data-slot=card]")?.textContent).toMatch(/^Offers to answer2job-p09/);
   });
 });

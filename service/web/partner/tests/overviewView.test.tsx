@@ -53,13 +53,13 @@ describe("Overview view", () => {
     // a custom value without its end reads as an open end
     view.rerender(<OverviewView live={live({ period: { value: "2026-09-01", custom: true, text: "1 Sep", label: "1 Sep –" } })} />);
     expect(within(period()).getAllByRole("option").map((o) => o.textContent)).toStrictEqual(["1 Sep –", "Last week", "This week"]);
-    fireEvent.change(period(), { target: { value: "2026-09-14|2026-09-20" } });
+    fireEvent.change(period(), { target: { value: "2026-09-14|2026-09-20" } }); // away from the custom value, so choosing it again fires a change
     fireEvent.change(period(), { target: { value: "2026-09-01" } });
     expect(nav).toHaveBeenLastCalledWith({ from: "2026-09-01", to: "" });
     expect(screen.getByText("Updated 09:30 · your company’s jobs only")).toBeTruthy();
   });
 
-  it("draws only the non-empty statuses, sized by their share, and counts every status in the legend", () => {
+  it("draws only the non-empty statuses, sized by their share, counts every status in the legend, and links the KPI tiles", () => {
     render(<OverviewView live={live()} />);
     expect(screen.getByText("8 jobs · 4 completed (50%) · counts use the same period as the Jobs list")).toBeTruthy();
     const bar = screen.getByRole("img", { name: "Jobs by status" });
@@ -85,6 +85,7 @@ describe("Overview view", () => {
     expect(actions.getByRole("link", { name: "overdue button" }).getAttribute("href")).toBe("/partner/schedule?jobId=job-2");
     expect(actions.getByText("overdue badge").className).toMatch(/crit/);
     expect(actions.getByText("offer badge").className).not.toMatch(/crit|warn/);
+    expect(actions.getAllByText("unassigned badge").map((b) => /crit|warn/.test(b.className))).toStrictEqual([false, false]);
     expect(actions.getByText("offer detail")).toBeTruthy();
     expect(screen.getByRole("status").textContent).toContain("2 accepted jobs still have no technician — assign them before the delegation period ends.");
   });
@@ -100,7 +101,11 @@ describe("Overview view", () => {
     const view = render(<OverviewView live={live()} />);
     const bars = screen.getAllByRole("progressbar");
     expect(bars.map((b) => b.getAttribute("aria-label"))).toStrictEqual(["Tech 1: 95%", "Tech 2: 40%", "Tech 3: —"]);
-    const tone = (label: string) => screen.getByRole("progressbar", { name: label }).closest("[data-slot=progress]")?.className ?? "";
+    const tone = (label: string) => {
+      const bar = screen.getByRole("progressbar", { name: label }).closest("[data-slot=progress]");
+      if (!bar) throw new TypeError(`no progress element for ${label}`);
+      return bar.className;
+    };
     expect(tone("Tech 1: 95%")).toMatch(/bg-warn/);
     expect(tone("Tech 2: 40%")).not.toMatch(/bg-warn/);
     expect(tone("Tech 3: —")).not.toMatch(/bg-warn/);
