@@ -46,7 +46,8 @@ export async function loadControl(unitId: string, jobId: string | null) {
     options: actionOptions(d.capabilities, t), capabilityText: `${capabilityText(d, t)} ${connectionText(d.connection, t)}`, restriction: restrictionText(d, t), blocked: blockedText(d, t), current: stateTiles(d, t).slice(0, 4).map((x) => x.value).join(" · "),
   };
   const base = { kind: "live" as const, canDiagnose: perms.has("control.diagnose"), unitHref, unit };
-  if (!jobId) return { ...base, job: null, run: null, banner: null, active: false, history: [] };
+  // without control.diagnose the job's runs and commands are refused: the view says so instead of the error page (R1028)
+  if (!jobId || !base.canDiagnose) return { ...base, job: null, run: null, banner: null, active: false, history: [] };
   const read = await recover(coreOp<JobRead>("jobs.get", { jobId }), (error: unknown) => { if (gone(error)) { return null; } throw error; });
   const job = read?.projection === "detail" ? read : null;
   if (!job) return null; // a refused job, or one whose window ended (a history snapshot): not the technician's to control
