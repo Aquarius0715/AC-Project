@@ -87,11 +87,12 @@ describe("loadWorkspace: the job read", () => {
     expect(called("units.get")).toHaveLength(0);
   });
 
-  it("any other refusal fails the page", async () => {
-    setup({ job: new dal.CoreError("UNAVAILABLE") });
-    await expect(loadWorkspace("job-1")).rejects.toThrow("UNAVAILABLE");
-    setup({ job: new dal.CoreError("VALIDATION", "errors.x", { other: "invalid" }) });
-    await expect(loadWorkspace("job-1")).rejects.toThrow("VALIDATION");
+  it.each([
+    ["UNAVAILABLE", new dal.CoreError("UNAVAILABLE")],
+    ["VALIDATION", new dal.CoreError("VALIDATION", "errors.x", { other: "invalid" })], // a field error on another field
+  ])("any other refusal (%s) fails the page", async (code, error) => {
+    setup({ job: error });
+    await expect(loadWorkspace("job-1")).rejects.toThrow(code);
   });
 
   it("an offer projection (a contractor's) reads as not found", async () => {
@@ -162,8 +163,20 @@ describe("loadWorkspace: the workspace", () => {
     expect(live.unitName).toBeNull();
   });
 
-  it("a unit read failing for another reason fails the page", async () => {
-    setup({ unit: new dal.CoreError("UNAVAILABLE") });
+  it("a readable unit without a service scope gets the default checklist", async () => {
+    setup({ unit: Object.fromEntries(Object.entries(unit).filter(([key]) => key !== "serviceScope")) });
+    const live = await loadWorkspace("job-1");
+    if (live === "not_found" || "kind" in live) throw new Error("expected the workspace");
+    expect(live.components).toStrictEqual(componentsFor(["indoor", "outdoor", "electrical"]));
+  });
+
+  it.each([
+    ["units.get", { unit: new dal.CoreError("UNAVAILABLE") }],
+    ["units.list", { unit: new dal.CoreError("FORBIDDEN"), listed: new dal.CoreError("UNAVAILABLE") }],
+    ["reports.get", { report: new dal.CoreError("UNAVAILABLE") }],
+    ["parts.list", { parts: new dal.CoreError("UNAVAILABLE") }],
+  ])("%s failing for another reason than a refusal fails the page", async (_operation, s) => {
+    setup(s);
     await expect(loadWorkspace("job-1")).rejects.toThrow("UNAVAILABLE");
   });
 
