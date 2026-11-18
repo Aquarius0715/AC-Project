@@ -11030,3 +11030,11 @@ The evidence text IR844 writes ("Device <serial> stopped reporting | lost power 
 
 1. **Rule.** `shared/lib/evidence.ts` words the three fault texts in the display language, keeping the serial, and names the restriction kind in words ("Power off", "Temperature limit"); a kind with no word stays as sent. The stored English text does not change.
 2. **Tests.** `evidence.test.ts` checks one fault per kind in en, ja and ms and an unknown kind, and that ja and id have every evidence key (before, only ms was checked). `TestBypassFault` (devices) pins the three fault texts the templates read; it fails when a text changes.
+
+## IR849 Admin and the customer see a suspected restriction bypass on the restriction (DEC-110, IR844–IR846) — 2026-11-18
+
+1. **Admin.** The restriction detail (`/admin/restrictions/[id]`, FR-A10) reads the unresolved Alerts (`open` and `acknowledged`) of the restriction's units with `alerts.list` (`unitIds`), for `alert.read` holders only. When any unit has an unresolved `restriction_bypass` Alert, a critical banner names those units — "Restriction may be bypassed on {units}: its device went silent, lost power or was opened, or the unit draws power under power off. Check the unit." — with a link to Alerts, where the Alert is acknowledged and resolved. `shared/lib/restrictions.ts` `bypassNames` picks the units.
+2. **Customer.** While the restriction is `requested`, `applied` or `release_requested`, the restriction tab of the invoice (FR-C12) says: "Keep the AC's control device plugged in and in sight of the AC while the restriction lasts. If it goes silent, loses power or is opened, or the AC runs under power off, HQ is told." The customer also sees the `restriction_bypass` Alert itself in their alert inbox (IR844).
+3. **Texts.** en, ms, ja, id.
+4. **Tests.** `restrictions.test.ts` `bypassNames`: an open and an acknowledged `restriction_bypass` Alert name their units; a resolved one, a tamper Alert and another unit's Alert do not; no Alerts name none. i18n tests keep the four dictionaries in step.
+
