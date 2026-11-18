@@ -66,6 +66,7 @@ describe("Jobs view", () => {
     render(<JobsView live={live({ period: { value: "2026-09-01", custom: true, text: "1 Sep –", label: "1 Sep –" } })} />);
     const period = screen.getByRole("combobox", { name: "Period" });
     expect(within(period).getAllByRole("option").map((o) => o.textContent)).toStrictEqual(["Period: 1 Sep –", "Period: Last week", "Period: This week"]);
+    // away from the custom value first: a change to the value the select already shows fires no event
     fireEvent.change(period, { target: { value: "2026-09-07|2026-09-13" } });
     fireEvent.change(period, { target: { value: "2026-09-01" } });
     expect(nav).toHaveBeenLastCalledWith({ from: "2026-09-01", to: "", ...RESET });

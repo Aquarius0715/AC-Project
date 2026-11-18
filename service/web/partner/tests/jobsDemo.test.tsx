@@ -96,7 +96,7 @@ describe("Jobs demo", () => {
     fireEvent.click(screen.getByRole("tab", { name: /All/ }));
     expect(ids()).toStrictEqual(["job-p09"]);
     fireEvent.change(origin, { target: { value: "request" } });
-    expect(ids()).not.toContain("job-p09");
+    expect(ids()).toStrictEqual(["job-c05", "job-a11", "job-contractor-a", "job-p05", "job-p02", "job-p12", "job-p07", "job-p03", "job-p04"]);
     fireEvent.change(origin, { target: { value: "bogus" } }); // not an option: the filter stays
     expect(within(view.container).getByRole("combobox", { name: "Origin" })).toHaveProperty("value", "request");
   });
