@@ -36,9 +36,14 @@ export interface ApiAlertLite { id: string; version: number; status: "open" | "a
 export interface TechJob { id: string; unitId: string; status: string }
 
 const rank: Record<string, number> = { in_progress: 0, assigned: 1, rework_requested: 2 };
+/** The jobs a device write on the unit can run under (IR94), in progress first, then assigned, then rework; ended jobs
+are left out, so the register form never offers one the server's technician gate refuses. */
+export function jobsFor(unitId: string | null, jobs: TechJob[]): TechJob[] {
+  return unitId ? jobs.filter((j) => j.unitId === unitId && Object.hasOwn(rank, j.status)).toSorted((a, b) => (lookup(rank, a.status) ?? 9) - (lookup(rank, b.status) ?? 9)) : [];
+}
 /** The job a device write on the unit runs under (IR94): in progress first, else assigned or rework; null without one. */
 export function jobFor(unitId: string | null, jobs: TechJob[]): string | null {
-  return unitId ? jobs.filter((j) => j.unitId === unitId && Object.hasOwn(rank, j.status)).toSorted((a, b) => (lookup(rank, a.status) ?? 9) - (lookup(rank, b.status) ?? 9))[0]?.id ?? null : null;
+  return jobsFor(unitId, jobs)[0]?.id ?? null;
 }
 
 /** The register form as it opens (FR-T11): the first assigned unit still without a device and its first job, no serial
