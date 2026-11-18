@@ -61,7 +61,9 @@ export async function loadPayouts(options: { statementId?: string; period?: stri
       };
     })),
   ]);
-  const card = cards?.items.find((c) => Date.parse(c.effectiveFrom) <= Date.parse(selected.payDate)) ?? cards?.items[0] ?? null;
+  // the card in effect at the pay date; billing prices a line at the card in effect when its job was accepted (before
+  // the pay date), so with none in effect then no card priced a line and the header says HQ sets it
+  const card = cards?.items.find((c) => Date.parse(c.effectiveFrom) <= Date.parse(selected.payDate)) ?? null;
   const rows = lineRows(selected, new Map(labels.filter((l): l is [string, JobLabel] => !!l)), inReview, i);
   const s = selected;
   const paidDate = s.paidAt ? showDate(s.paidAt, display) : "—";

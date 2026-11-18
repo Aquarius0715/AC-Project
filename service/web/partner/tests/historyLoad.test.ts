@@ -1,0 +1,79 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+// the contractor's job history (FR-P07): the latest 100 jobs of the 90-day period; an empty period says how many lie
+// outside it, and a job in the URL that is older than the period is looked up without it — with one read of the
+// wider list, not two
+const dal = vi.hoisted(() => {
+  class CoreError extends Error {
+    readonly error: { code: string };
+    constructor(code: string, options?: ErrorOptions) { super(code, options); this.name = "CoreError"; this.error = { code }; }
+  }
+  return {
+    CoreError, coreNow: vi.fn(), coreDisplay: vi.fn(), coreIdentity: vi.fn(), corePrincipal: vi.fn(), coreOp: vi.fn(), coreAll: vi.fn(), coreItems: vi.fn(),
+    orWhenRefused: async <T, F>(read: Promise<T>, fallback: F): Promise<T | F> => {
+      try { return await read; } catch (error) {
+        if (error instanceof CoreError && error.error.code !== "UNAVAILABLE" && error.error.code !== "TIMEOUT") return fallback;
+        throw error;
+      }
+    },
+  };
+});
+vi.mock("server-only", () => ({}));
+vi.mock("@ac/web/lib/dal", () => dal);
+
+import { loadHistory } from "../app/partner/history/_lib/load";
+import type { ApiPartnerJob } from "@ac/web/lib/partnerOverview";
+
+const old: ApiPartnerJob = { projection: "history", jobId: "job-old-0001", type: "maintenance", status: "completed", completedAt: "2026-05-01T03:00:00Z", asOf: "2026-05-02T00:00:00Z", ownDecisionEvents: [] };
+const listCalls = () => dal.coreOp.mock.calls.filter(([operation]) => operation === "jobs.list");
+const withPeriod = (call: unknown[] | undefined) => {
+  const input: unknown = call?.[1];
+  return typeof input === "object" && input !== null && "filters" in input && typeof input.filters === "object" && input.filters !== null && "from" in input.filters;
+};
+
+describe("partner history loader", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    dal.coreNow.mockResolvedValue(new Date("2026-11-18T02:00:00Z"));
+    dal.coreDisplay.mockResolvedValue({ locale: "en", timeZone: "Asia/Kuala_Lumpur" });
+    dal.coreIdentity.mockResolvedValue({ displayName: "Owner", organizationName: "Contractor A" });
+    dal.corePrincipal.mockResolvedValue({ userId: "u-owner" });
+    dal.coreAll.mockResolvedValue([]);
+    dal.coreItems.mockResolvedValue([]);
+    // the period holds no job; without the period the old one is there
+    dal.coreOp.mockImplementation((operation: string, input: unknown) => {
+      if (operation !== "jobs.list") return Promise.resolve({ items: [], total: 0 });
+      const scoped = withPeriod([operation, input]);
+      return Promise.resolve(scoped ? { items: [], total: 0 } : { items: [old], total: 1 });
+    });
+  });
+
+  it("finds a job older than an empty period with one read of the list without the period", async () => {
+    const live = await loadHistory({ period: "90d", jobId: "job-old-0001" });
+    expect(live.outside).toBe(1);
+    expect(live.rows).toStrictEqual([]);
+    expect(live.detail?.missing).toBe(false);
+    expect(live.detail && !live.detail.missing ? live.detail.mode.kind : null).toBe("closed");
+    expect(listCalls().map((c) => withPeriod(c))).toStrictEqual([true, false]);
+    expect(dal.coreOp).not.toHaveBeenCalledWith("notifications.recipients", expect.anything());
+  });
+
+  it("reads the list without the period once for a job older than a period that has jobs", async () => {
+    const recent: ApiPartnerJob = { ...old, jobId: "job-new-0001", completedAt: "2026-11-10T03:00:00Z" };
+    dal.coreOp.mockImplementation((operation: string, input: unknown) => {
+      if (operation !== "jobs.list") return Promise.resolve({ items: [], total: 0 });
+      return Promise.resolve(withPeriod([operation, input]) ? { items: [recent], total: 1 } : { items: [recent, old], total: 2 });
+    });
+    const live = await loadHistory({ period: "90d", jobId: "job-old-0001" });
+    expect(live.outside).toBe(0);
+    expect(live.rows.map((r) => r.id)).toStrictEqual(["job-new-0001"]);
+    expect(live.detail && !live.detail.missing ? live.detail.row.id : null).toBe("job-old-0001");
+    expect(listCalls().map((c) => withPeriod(c))).toStrictEqual([true, false]);
+  });
+
+  it("says a job is missing when it is in neither list", async () => {
+    const live = await loadHistory({ period: "90d", jobId: "job-gone-001" });
+    expect(live.detail).toStrictEqual({ missing: true, id: "job-gone-001" });
+    expect(listCalls()).toHaveLength(2);
+  });
+});

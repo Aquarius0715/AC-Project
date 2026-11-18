@@ -53,7 +53,7 @@ export async function loadHistory(sp: { jobId?: string; tab?: string; sort?: str
   if (!sp.jobId) return { ...base, detail: null };
   let hit = listed.rows.find((r) => r.id === sp.jobId);
   if (!hit && period === "90d") {
-    const all = await collect(false);
+    const all = wider ?? await collect(false); // an empty period already read the list without it
     hit = all.rows.find((r) => r.id === sp.jobId); // older than the period
   }
   if (!hit) return { ...base, detail: { missing: true as const, id: sp.jobId } };
