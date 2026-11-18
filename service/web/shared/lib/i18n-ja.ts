@@ -6198,4 +6198,6 @@ export const ja: Record<string, string> = {
   "This browser cannot share a location — switch this off, or use another browser.": "このブラウザーは位置情報を共有できません。この設定をオフにするか、別のブラウザーを使ってください。",
   "Use this device’s location": "この端末の位置を使う",
   "While this page is open, your position is compared with the map pins of your homes and offices; only home or away is kept. A browser does not report in the background.": "このページを開いている間、あなたの位置を自宅やオフィスの地図ピンと比べます。保存するのは在宅か外出かだけです。ブラウザーはバックグラウンドでは報告しません。",
+  "Reload page": "ページを再読み込み",
+  "A new version of the app is available. Reload the page to use it; save what you are entering first.": "新しいバージョンのアプリがあります。ページを再読み込みすると使えます。入力中の内容は先に保存してください。",
 };

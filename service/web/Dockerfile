@@ -21,6 +21,10 @@ ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=deps /src ./
 COPY shared shared
 COPY ${APP} ${APP}
+# the build the app names (IR856): the deployed tag in the shared test environment (compose passes IMAGE_TAG), so an
+# open page can see that the app was deployed since it loaded; declared here so the layers above stay cached
+ARG APP_VERSION=dev
+ENV APP_VERSION=${APP_VERSION}
 RUN npm run typecheck -w ${APP} && npm run build -w ${APP}
 
 # The runtime is the official Node image, not distroless: distroless's Node 22 line stopped at 22.22.0 without the fixes

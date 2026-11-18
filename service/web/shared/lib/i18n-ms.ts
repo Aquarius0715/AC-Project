@@ -6348,4 +6348,6 @@ export const ms: Record<string, string> = {
   "This browser cannot share a location — switch this off, or use another browser.": "Pelayar ini tidak boleh berkongsi lokasi — matikan ini, atau gunakan pelayar lain.",
   "Use this device’s location": "Guna lokasi peranti ini",
   "While this page is open, your position is compared with the map pins of your homes and offices; only home or away is kept. A browser does not report in the background.": "Semasa halaman ini dibuka, kedudukan anda dibandingkan dengan pin peta rumah dan pejabat anda; hanya di rumah atau keluar disimpan. Pelayar tidak melapor di latar belakang.",
+  "Reload page": "Muat semula halaman",
+  "A new version of the app is available. Reload the page to use it; save what you are entering first.": "Versi baharu aplikasi ini tersedia. Muat semula halaman untuk menggunakannya; simpan apa yang sedang anda masukkan dahulu.",
 };

@@ -5,7 +5,10 @@ import type { NextConfig } from "next";
 // package (Next.js docs: transpilePackages for monorepo packages); tracing starts at the workspace root so the
 // standalone server includes it.
 const nextConfig: NextConfig = {
-  env: { AC_APP_ROLE: "technician" }, // this app's role (session cookie name, sign-in checks)
+  env: {
+    AC_APP_ROLE: "technician", // this app's role (session cookie name, sign-in checks)
+    AC_APP_VERSION: process.env.APP_VERSION ?? "dev", // the build (the image's APP_VERSION argument): the reload offer after a deployment (IR856)
+  },
   output: "standalone", // self-contained server bundle for the Docker image (container design §3)
   poweredByHeader: false, // no X-Powered-By: Next.js on responses (it names the framework to attackers)
   transpilePackages: ["@ac/web"],
