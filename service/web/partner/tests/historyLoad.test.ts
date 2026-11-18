@@ -76,4 +76,62 @@ describe("partner history loader", () => {
     expect(live.detail).toStrictEqual({ missing: true, id: "job-gone-001" });
     expect(listCalls()).toHaveLength(2);
   });
+
+  it("reads all time once, names the units, and has no detail without a job in the URL", async () => {
+    dal.coreIdentity.mockResolvedValue({ displayName: "Owner", organizationName: "" });
+    dal.coreAll.mockImplementation((operation: string) => Promise.resolve(operation === "units.list" ? [{ id: "unit-1", displayName: "Lobby AC" }] : []));
+    dal.coreOp.mockResolvedValue({ items: [open, { projection: "offer", jobId: "job-offer-01" }, old], total: 3 });
+    const live = await loadHistory({ period: "all" });
+    expect(listCalls().map((c) => withPeriod(c))).toStrictEqual([false]);
+    expect([live.period, live.outside, live.total, live.company, live.detail]).toStrictEqual(["all", 0, 3, "your company", null]);
+    // the offer drops out; the open job is named by its unit
+    expect(live.options).toStrictEqual([{ id: "job-open-001", label: "job-open · Lobby AC" }, { id: "job-old-0001", label: "job-old- · maintenance" }]);
+    expect(dal.coreItems).not.toHaveBeenCalled();
+  });
+
+  it("shows an open job's timeline newest first and who may get a preview, without the contractor", async () => {
+    dal.coreAll.mockImplementation((operation: string) => Promise.resolve(operation === "members.list" ? [{ id: "mem-1", userId: "u-tech", displayName: "Tech One" }] : []));
+    const recipients = { items: [recipient("r-hq", "hq"), recipient("r-own", "contractor"), recipient("r-cust", "customer_contact")], total: 3 };
+    dal.coreOp.mockImplementation((operation: string) => Promise.resolve(operation === "jobs.list" ? { items: [open], total: 1 } : recipients));
+    // two events at the same time are ordered by ID; the API's order is not trusted
+    dal.coreItems.mockResolvedValue([event("ev-1", "2026-11-10T01:00:00Z", null), event("ev-2", "2026-11-12T01:00:00Z", "u-tech"), event("ev-3", "2026-11-12T01:00:00Z", "u-owner")]);
+    const live = await loadHistory({ jobId: "job-open-001" });
+    const d = live.detail;
+    if (!d || d.missing) throw new Error("expected the job");
+    expect(d.items.map((x) => [x.id, x.detail])).toStrictEqual([["ev-3", "by you"], ["ev-2", "by Tech One"], ["ev-1", "by system"]]);
+    expect(dal.coreItems).toHaveBeenCalledWith("jobs.events", { jobId: "job-open-001", query: { limit: 100, sort: { field: "occurredAt", direction: "desc" } } });
+    expect(d.mode.kind).toBe("note");
+    expect(d.recipients.map((r) => r.id)).toStrictEqual(["r-hq", "r-cust"]);
+    expect(listCalls()).toHaveLength(1);
+  });
+
+  it("keeps a completed job without a timeline or recipients when they are refused, and fails when a read is unavailable", async () => {
+    let refusal = "FORBIDDEN";
+    dal.coreAll.mockRejectedValue(new dal.CoreError("FORBIDDEN"));
+    dal.coreItems.mockImplementation(() => Promise.reject(new dal.CoreError(refusal)));
+    dal.coreOp.mockImplementation((operation: string) => (operation === "jobs.list" ? Promise.resolve({ items: [{ ...open, status: "completed" }], total: 1 }) : Promise.reject(new dal.CoreError(refusal))));
+    const live = await loadHistory({ jobId: "job-open-001" });
+    const d = live.detail;
+    if (!d || d.missing) throw new Error("expected the job");
+    // a completed job still gets a preview, so its recipients are read
+    expect([d.mode.kind, d.items, d.recipients]).toStrictEqual(["preview", [], []]);
+    expect(dal.coreOp).toHaveBeenCalledWith("notifications.recipients", expect.objectContaining({ target: { kind: "job", id: "job-open-001" } }));
+    expect(d.row.title).toBe("maintenance");
+    // an unavailable timeline or recipient list is not a refusal: the page fails
+    refusal = "UNAVAILABLE";
+    await expect(loadHistory({ jobId: "job-open-001" })).rejects.toThrow("UNAVAILABLE");
+    dal.coreItems.mockResolvedValue([]);
+    await expect(loadHistory({ jobId: "job-open-001" })).rejects.toThrow("UNAVAILABLE");
+    expect(dal.coreOp).toHaveBeenLastCalledWith("notifications.recipients", expect.anything());
+    dal.coreOp.mockRejectedValue(new dal.CoreError("UNAVAILABLE"));
+    await expect(loadHistory({})).rejects.toThrow("UNAVAILABLE");
+  });
 });
+
+const open: ApiPartnerJob = {
+  projection: "summary", id: "job-open-001", version: 2, unitId: "unit-1", type: "maintenance", status: "assigned", dueAt: "2026-11-20T00:00:00Z",
+  requestedSlot: { startAt: "2026-11-19T02:00:00Z", endAt: "2026-11-19T04:00:00Z" }, scheduledSlot: null, assignmentId: "as-1", displayStatus: "assigned", technicianMembershipId: "mem-1",
+  eventSummary: { count: 3, customerVisible: 1, notes: 0, latest: { action: "job.assigned", occurredAt: "2026-11-12T01:00:00Z" } },
+};
+const event = (id: string, occurredAt: string, actorUserId: string | null) => ({ id, actorUserId, occurredAt, jobId: "job-open-001", action: "job.assigned", note: null });
+const recipient = (id: string, role: string) => ({ id, role, displayLabel: id, allowedChannels: ["inApp"] });
