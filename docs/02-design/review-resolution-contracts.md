@@ -11024,6 +11024,13 @@ IR844 catches a node that is hidden, unplugged or opened. A node that stays onli
 4. **HQ.** BypassNotices (IR845) tells HQ at the same tick, as for any `restriction_bypass` Alert.
 5. **Tests.** `TestRestrictionBypassPower`: power drawn the whole window under `power_off` → one Alert with its text, none more at the next tick; one reading of 20 W, readings of the last two minutes only, a restriction observed two minutes before the tick, and a temperature limit → none. It fails with the threshold raised to 500 W and with the observed-before-the-window condition removed.
 
+## IR847 The restriction-bypass Alert's evidence is shown in the display language (DEC-110, IR844, IR480) — 2026-11-18
+
+The evidence text IR844 writes ("Device <serial> stopped reporting | lost power | reported its cover opened while the unit is under a <kind> restriction: the restriction may no longer hold") had no entry in the web's evidence templates, so ms, ja and id users saw this critical Alert in English with the policy code (`power_off`) in it, against IR480. Review round 1007 found it.
+
+1. **Rule.** `shared/lib/evidence.ts` words the three fault texts in the display language, keeping the serial, and names the restriction kind in words ("Power off", "Temperature limit"); a kind with no word stays as sent. The stored English text does not change.
+2. **Tests.** `evidence.test.ts` checks one fault per kind in en, ja and ms and an unknown kind, and that ja and id have every evidence key (before, only ms was checked). `TestBypassFault` (devices) pins the three fault texts the templates read; it fails when a text changes.
+
 ## IR849 Admin and the customer see a suspected restriction bypass on the restriction (DEC-110, IR844–IR846) — 2026-11-18
 
 1. **Admin.** The restriction detail (`/admin/restrictions/[id]`, FR-A10) reads the unresolved Alerts (`open` and `acknowledged`) of the restriction's units with `alerts.list` (`unitIds`), for `alert.read` holders only. When any unit has an unresolved `restriction_bypass` Alert, a critical banner names those units — "Restriction may be bypassed on {units}: its device went silent, lost power or was opened, or the unit draws power under power off. Check the unit." — with a link to Alerts, where the Alert is acknowledged and resolved. `shared/lib/restrictions.ts` `bypassNames` picks the units.

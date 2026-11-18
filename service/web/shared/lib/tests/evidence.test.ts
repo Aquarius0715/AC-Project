@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { translator } from "@ac/web/lib/i18n";
 import { ms } from "@ac/web/lib/i18n-ms";
+import { ja } from "@ac/web/lib/i18n-ja";
+import { id } from "@ac/web/lib/i18n-id";
 import { EVIDENCE_KEYS, evidenceText, resolutionText } from "@ac/web/lib/evidence";
 
 const DEMO_COOLING_LOAD_ROSE_WHILE_THE_OUTDOOR = "Demo: cooling load rose while the outdoor temperature was stable.";
@@ -30,6 +32,21 @@ describe("evidence texts and resolution reasons in the display language (IR480, 
     expect(evidenceText("Device SN-0042 reported its cover opened while powered (tamper_signal)", en)).toBe("Device SN-0042 reported its cover opened while powered");
     expect(evidenceText("Demo event: temperature gte threshold", malay)).toBe("Peristiwa demo: Suhu pada atau melebihi ambang amarannya"); // IR812: the metric and the comparison in words
     expect(evidenceText("Demo event: heartbeat_gap gte threshold", en)).toBe("Demo event: Heartbeat gap at or above its alert threshold");
+  });
+
+  it("has a Japanese and an Indonesian text for every evidence text the sources write", () => {
+    expect(EVIDENCE_KEYS.filter((key) => !Object.hasOwn(ja, key))).toStrictEqual([]);
+    expect(EVIDENCE_KEYS.filter((key) => !Object.hasOwn(id, key))).toStrictEqual([]);
+  });
+
+  it("words the restriction-bypass alert for each fault and names the restriction in words (DEC-110, IR847)", () => {
+    const japanese = translator("ja");
+    const tail = " while the unit is under a power_off restriction: the restriction may no longer hold";
+    expect(evidenceText(`Device SN-0042 stopped reporting${tail}`, en)).toBe("Device SN-0042 stopped reporting while the unit is under a restriction (Power off): the restriction may no longer hold");
+    expect(evidenceText(`Device SN-0042 lost power${tail}`, japanese)).toBe("デバイス SN-0042 の電源が切れました。ユニットに制限（電源オフ）がかかっているため、制限が保たれていないおそれがあります");
+    expect(evidenceText("Device SN-0042 reported its cover opened while the unit is under a temperature_limit restriction: the restriction may no longer hold", malay)).toBe("Peranti SN-0042 melaporkan penutupnya dibuka semasa unit di bawah sekatan (Had suhu): sekatan itu mungkin tidak lagi berkuat kuasa");
+    // a restriction kind with no word stays as sent
+    expect(evidenceText("Device SN-0042 lost power while the unit is under a new_kind restriction: the restriction may no longer hold", en)).toBe("Device SN-0042 lost power while the unit is under a restriction (new_kind): the restriction may no longer hold");
   });
 
   it("leaves a text no source writes as stored", () => {
