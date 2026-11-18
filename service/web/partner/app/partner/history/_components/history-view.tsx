@@ -64,7 +64,8 @@ function List({ live }: Readonly<{ live: HistoryLive }>) {
             </table>
           </ScrollX>
         )}
-        <p className="mt-3 text-[11px] text-muted-foreground">{t(live.total > 100 ? "Showing {shown} of {total} (the latest 100) · own company only · offers appear here after acceptance." : "Showing {shown} of {total} · own company only · offers appear here after acceptance.", { shown: live.rows.length, total: all })}</p>
+        {/* over 100 jobs, only the latest 100 were read: the total is the API's, not the count of those read */}
+        <p className="mt-3 text-[11px] text-muted-foreground">{t(live.total > 100 ? "Showing {shown} of {total} (the latest 100) · own company only · offers appear here after acceptance." : "Showing {shown} of {total} · own company only · offers appear here after acceptance.", { shown: live.rows.length, total: live.total > 100 ? live.total : all })}</p>
       </Card>
     </Page>
   );
