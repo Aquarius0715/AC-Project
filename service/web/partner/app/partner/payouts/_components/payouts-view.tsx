@@ -77,7 +77,8 @@ export function PayoutsView({ live }: Readonly<{ live: PayoutsLive }>) {
       {sel && <div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>{sel.kpis.map((k) => <Kpi key={k.label} label={k.label} value={k.value} sub={k.badge ? <Badge tone={k.badge.tone}>{k.badge.label}</Badge> : k.sub} />)}</div>}
       <div className="split-rev">
         <Card title={t("Statements")} className="self-start">
-          {live.statements.length === 0 ? <EmptyState title={t(isFiltered ? "No statements" : "No statements yet")}>{t(isFiltered ? "No statement matches these filters." : "A statement appears here once HQ approves your first one.")}</EmptyState> : (
+          {/* an empty list here is always a filtered one: unfiltered, isFirst shows the first-statement state instead */}
+          {live.statements.length === 0 ? <EmptyState title={t("No statements")}>{t("No statement matches these filters.")}</EmptyState> : (
             <div className="flex flex-col gap-2">{live.statements.map((s) => (
                 <ListRow key={s.id} selected={sel?.statement.id === s.id} onClick={() => { nav({ statementId: s.id }); }}><div className="min-w-0 flex-1"><b className="text-[13px]">{s.label}</b><div className="text-[11px] text-muted-foreground">{s.sub}</div></div><Badge tone={s.badge.tone}>{s.badge.label}</Badge></ListRow>
               ))}</div>
