@@ -2,6 +2,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 
+// recharts draws nothing at jsdom's zero size: the chart shows what it was given
+vi.mock("@ac/web/components/ui", async (importOriginal) => ({
+  ...await importOriginal<Record<string, unknown>>(),
+  BarChart: ({ labels, series }: Readonly<{ labels: string[]; series: (number | null)[][] }>) => <figure>{`${labels.join(",")}=${series.map((s) => s.join(",")).join(";")}`}</figure>,
+}));
+
 // The contractor's unit view (FR-P04, FR-P08): the history snapshot after the delegation, and the live view — the
 // register, the job context with its technician and access window, past work, alert evidence, readings and charts —
 // with their empty states; and the Phase 1A demo view's delegation-ended preview
@@ -85,7 +91,7 @@ describe("Partner unit view", () => {
   it("shows the access bar in the primary tone below 80 %, crit from 80 %, and none without a window", () => {
     const bar = () => screen.queryByRole("progressbar", { name: "Access ends in 14 h" });
     let view = renderAt(79);
-    expect(bar()?.className.includes("bg-crit")).toBe(false);
+    expect(bar()?.className.includes("progress-indicator]:bg-")).toBe(false); // primary: no tone class
     view.unmount();
     view = renderAt(80);
     expect(bar()?.className.includes("bg-crit")).toBe(true);
@@ -121,6 +127,7 @@ describe("Partner unit view", () => {
     expect(charts.getByText("13 Sep 09:35 → 14 Sep 09:35")).toBeDefined();
     expect(charts.getByText("Vibration amplitude")).toBeDefined();
     expect(charts.getByText("now 2.1")).toBeDefined();
+    expect(charts.getByRole("figure").textContent).toBe("a,b=1,2.1");
   });
 
   it("shows the empty states of past work, alerts, readings and charts", () => {
@@ -141,6 +148,7 @@ describe("Partner unit demo view", () => {
     expect(screen.getByText(/Delegation ended while open/)).toBeDefined();
     expect(screen.queryByText("Readings (diagnosis only)")).toBeNull();
     expect(screen.queryByText("Readings — last 24 h")).toBeNull();
+    for (const kept of ["Unit register", "Alert evidence", "Job context", "Our past work on this unit"]) expect(screen.getByText(kept)).toBeDefined();
     fireEvent.click(screen.getByRole("button", { name: "show live" }));
     expect(screen.queryByText(/Delegation ended while open/)).toBeNull();
     expect(screen.getByText("Readings — last 24 h")).toBeDefined();
