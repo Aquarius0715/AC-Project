@@ -51,11 +51,11 @@ export function PayoutsView({ live }: Readonly<{ live: PayoutsLive }>) {
     run(() => askHq(sel.statement.id, sel.statement.version, ask.lineId, topic, m), t("Question sent — HQ answers on the statement"), () => { setAsk(null); setNotice(""); setRefused(null); },
       (f) => { setRefused(refusal(f, t)); if (f.fieldErrors.message) setError(questionError); });
   };
-  const download = () => {
-    if (!sel) return;
-    const url = URL.createObjectURL(new Blob([payoutPdf(sel.statement, sel.rows, live.company, t, locale)], { type: "application/pdf" }));
+  // the button is only shown with a statement open, so the caller passes it
+  const download = (shown: NonNullable<PayoutsLive["selected"]>) => {
+    const url = URL.createObjectURL(new Blob([payoutPdf(shown.statement, shown.rows, live.company, t, locale)], { type: "application/pdf" }));
     const a = document.createElement("a");
-    a.href = url; a.download = `statement-${sel.statement.period}-${sel.statement.id.slice(0, 8)}.pdf`; a.click();
+    a.href = url; a.download = `statement-${shown.statement.period}-${shown.statement.id.slice(0, 8)}.pdf`; a.click();
     URL.revokeObjectURL(url);
   };
   // before the first statement there is nothing to filter or open: one empty state instead of two and the filters
@@ -87,7 +87,7 @@ export function PayoutsView({ live }: Readonly<{ live: PayoutsLive }>) {
         </Card>
         {sel ? (
           <Card title={sel.title} sub={sel.sub}
-            action={<div className="flex items-center gap-2"><Badge tone={sel.statement.status === "paid" ? "ok" : "primary"}>{t(sel.statement.status === "paid" ? "Paid" : "Approved")}</Badge><Btn size="sm" onClick={download}>{t("Download PDF")}</Btn></div>}>
+            action={<div className="flex items-center gap-2"><Badge tone={sel.statement.status === "paid" ? "ok" : "primary"}>{t(sel.statement.status === "paid" ? "Paid" : "Approved")}</Badge><Btn size="sm" onClick={() => { download(sel); }}>{t("Download PDF")}</Btn></div>}>
             <DataTable rowKey={(r) => r.key} rows={sel.rows} cols={[
               { key: "job", label: t("Job"), render: (r) => <b>{r.job}</b> },
               { key: "work", label: t("Work"), render: (r) => <><div>{r.work}</div>{r.sub && <div className="text-[11px] text-muted-foreground">{r.sub}</div>}</> },
