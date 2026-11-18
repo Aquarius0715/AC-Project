@@ -309,7 +309,7 @@ Design: [DD-C11](../02-design/client.md#dd-c11-details). Assess parent AT-C11 us
 
 - **Entry conditions**: Restriction information for own contract; no restrictions is a valid empty state.
 - **Main flow**: Check notice/reason/units/scheduled date → view grace/exception/release conditions → proceed to payment or coordination inquiry.
-- **Business rule BR-C12**: Separately show scheduled restriction, application requested, per-unit application, release requested, and released. For partial application, show each unit's state, not only an aggregate badge.
+- **Business rule BR-C12**: Separately show scheduled restriction, application requested, per-unit application, release requested, and released. For partial application, show each unit's state, not only an aggregate badge. While a restriction is requested, applied or release requested, the restriction tab asks the customer to keep the AC's control device plugged in and in sight of the AC, and says that HQ is told when it goes silent, loses power or is opened, or when the AC runs under power off (DEC-110, IR849).
 - **Resulting business state**: Do not change restrictions on this screen. Pass related IDs to payment/inquiry screens. Inquiries are received only as in-app demos; no external sending.
 - **Boundaries/prohibitions**: Do not show overall released while offline units have unknown application results. D03 not_required is allowed with zero-delivery or confirmed-nonapplication evidence. Customers cannot override through direct URLs/services.
 

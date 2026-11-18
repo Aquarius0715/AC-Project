@@ -11023,3 +11023,11 @@ IR844 catches a node that is hidden, unplugged or opened. A node that stays onli
 3. **Not checked.** A temperature limit lets the air conditioner run, so its power is not compared. A unit without power readings (no power meter wired, `parts.pzem:false`) is not checked; DEC-110 makes the meter a required part of an RTO installation in the firmware phase.
 4. **HQ.** BypassNotices (IR845) tells HQ at the same tick, as for any `restriction_bypass` Alert.
 5. **Tests.** `TestRestrictionBypassPower`: power drawn the whole window under `power_off` → one Alert with its text, none more at the next tick; one reading of 20 W, readings of the last two minutes only, a restriction observed two minutes before the tick, and a temperature limit → none. It fails with the threshold raised to 500 W and with the observed-before-the-window condition removed.
+
+## IR849 Admin and the customer see a suspected restriction bypass on the restriction (DEC-110, IR844–IR846) — 2026-11-18
+
+1. **Admin.** The restriction detail (`/admin/restrictions/[id]`, FR-A10) reads the unresolved Alerts (`open` and `acknowledged`) of the restriction's units with `alerts.list` (`unitIds`), for `alert.read` holders only. When any unit has an unresolved `restriction_bypass` Alert, a critical banner names those units — "Restriction may be bypassed on {units}: its device went silent, lost power or was opened, or the unit draws power under power off. Check the unit." — with a link to Alerts, where the Alert is acknowledged and resolved. `shared/lib/restrictions.ts` `bypassNames` picks the units.
+2. **Customer.** While the restriction is `requested`, `applied` or `release_requested`, the restriction tab of the invoice (FR-C12) says: "Keep the AC's control device plugged in and in sight of the AC while the restriction lasts. If it goes silent, loses power or is opened, or the AC runs under power off, HQ is told." The customer also sees the `restriction_bypass` Alert itself in their alert inbox (IR844).
+3. **Texts.** en, ms, ja, id.
+4. **Tests.** `restrictions.test.ts` `bypassNames`: an open and an acknowledged `restriction_bypass` Alert name their units; a resolved one, a tamper Alert and another unit's Alert do not; no Alerts name none. i18n tests keep the four dictionaries in step.
+
