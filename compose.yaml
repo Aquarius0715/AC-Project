@@ -550,7 +550,7 @@ services:
     profiles: [infra, backend, full]
 
   stripe-cli:
-    image: stripe/stripe-cli:v1.55.8@sha256:c8e5a48108fb4c1e83583912c85810e9ac3bc8db91070da3f915ac369ceecf31   # pinned (IR373)
+    image: stripe/stripe-cli:v1.55.11@sha256:b72ef98b2c4e0d1ad81f7a0183c0506c63663fa3f8645226b954a9aca3046552   # pinned (IR373)
     # through the gateway, as Stripe reaches it: the gateway passes /stripe to the billing service unchanged (IR827)
     # the events billing acts on (billing/stripe_events.go); this CLI version asks for them by name
     command: ["listen", "--forward-to", "http://gateway:8080/stripe", "--events", "checkout.session.completed,checkout.session.expired,checkout.session.async_payment_succeeded,checkout.session.async_payment_failed,payment_intent.succeeded,payment_intent.payment_failed", "--api-key", "${STRIPE_TEST_SECRET_KEY:-${STRIPE_SECRET_KEY:-}}"]
