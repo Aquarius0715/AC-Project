@@ -175,7 +175,7 @@ function AssignCard({ sel, choice, zone, otherZone }: Readonly<{ sel: Selected; 
                 className={cx("flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left", tech === c.id ? "border-primary bg-primary-soft/60" : "border-line bg-surface", !c.eligible && "cursor-not-allowed opacity-70")}>
                 {/* the name keeps at least 10rem; a long reason (the missing qualifications) goes below it and wraps */}
                 <span className="min-w-0 flex-[1_1_10rem]"><b className={cx("block text-[13px]", tech === c.id && TEXT_PRIMARY)}>{c.name}</b><span className="block text-[11px] text-muted-foreground">{c.sub}</span></span>
-                <Badge tone={c.badge.tone === "muted" ? "muted" : c.badge.tone} className="h-auto min-h-5 max-w-full whitespace-normal text-left">{c.badge.text}</Badge>
+                <Badge tone={c.badge.tone} className="h-auto min-h-5 max-w-full whitespace-normal text-left">{c.badge.text}</Badge>
               </Plain>
             ))}
           </div>
@@ -208,7 +208,8 @@ function AssignCard({ sel, choice, zone, otherZone }: Readonly<{ sel: Selected; 
 function WeekCard({ week, members, sel, choice, zone }: Readonly<{ week: NonNullable<ScheduleLive["week"]>; members: ScheduleLive["members"]; sel: Selected; choice: Choice; zone: string }>) {
   const t = useT();
   const slot = proposed(sel, choice.end, zone);
-  const isUnchanged = choice.tech === sel.currentId && !!slot && !!sel.mode.slot && sameInstant(slot.endAt, sel.mode.slot.endAt); // the current booking, not a proposal
+  // the current booking, not a proposal; another agreed time with the same technician is one (IR636)
+  const isUnchanged = choice.tech === sel.currentId && !sel.moved && !!slot && !!sel.mode.slot && sameInstant(slot.endAt, sel.mode.slot.endAt);
   const proposal = slot && sel.mode.kind !== "blocked" && choice.tech && !isUnchanged ? { technicianId: choice.tech, short: sel.short, slot } : null;
   const rows = weekGrid(week.dates, members, week.capacity, new Map(Object.entries(week.jobsOf)), proposal, t);
   return (
