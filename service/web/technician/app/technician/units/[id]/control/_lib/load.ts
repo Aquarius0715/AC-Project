@@ -29,7 +29,7 @@ export async function loadControl(unitId: string, jobId: string | null) {
     throw error;
   });
   if (d === null) return null; // not in the technician's assignments: not found (IR169)
-  const unitHref = `/technician/units/${unitId}${jobId ? `?jobId=${jobId}` : ""}`;
+  const unitHref = `/technician/units/${unitId}${jobId ? `?jobId=${encodeURIComponent(jobId)}` : ""}`;
   if (d === NOT_STARTED) { // IR76: the start time from the URL's job
     const job = jobId ? await orNull(coreOp<JobRead>("jobs.get", { jobId })) : null;
     const start = job?.projection === "detail" ? job.assignment?.scheduledStart ?? null : null;

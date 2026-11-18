@@ -27,7 +27,7 @@ export async function loadAlerts(unitId: string, sp: { jobId?: string; alertId?:
   const i = i18nOf(display);
   const { t } = i;
   const nowMs = now.getTime();
-  const unitHref = `/technician/units/${unitId}${sp.jobId ? `?jobId=${sp.jobId}` : ""}`;
+  const unitHref = `/technician/units/${unitId}${sp.jobId ? `?jobId=${encodeURIComponent(sp.jobId)}` : ""}`;
   const alerts = await recover(unitAlerts<ApiTechAlert>(unitId, 50), (error: unknown) => { // every unresolved one, then the latest resolved (IR712)
     if (error instanceof CoreError && error.status < 500) return error.error;
     throw error; // error.tsx
