@@ -11060,4 +11060,5 @@ The evidence text IR844 writes ("Device <serial> stopped reporting | lost power 
 
 1. **The fault.** `compose.rolling.yaml` published the portal on `${PORTAL_WEB_PORT:-3004}`, while `compose.test.yaml` had published it on `${PORTAL_WEB_PORT:-3204}`. The lab server's environment file predates the portal and names no `PORTAL_WEB_PORT`, so after test1.0.1r5 the portal answered on 3004 and no longer on 3204.
 2. **The fix.** web-edge takes compose.test.yaml's default, 3204. The next deployment recreates web-edge for the changed port, so the apps' ports close for the second or so web-edge takes to start.
+3. **Checked at each deployment.** `deploy.sh` waits for the portal too: `PORTAL_WEB_URL`, or, in an environment file without it, the customer app's host on `PORTAL_WEB_PORT` (3204 by default). Before, a file without the URL left the portal out of the check, so its move went unnoticed. The environment file is a write-only secret, so the file itself is not changed.
 
