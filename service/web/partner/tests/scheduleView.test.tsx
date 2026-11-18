@@ -125,15 +125,15 @@ describe("ScheduleView assign", () => {
   });
 
   it("shows each refusal in its tone, refuses saving without eligible technicians, and asks for a technician that came back", async () => {
-    actions.assignTechnician.mockResolvedValueOnce({ ok: false, code: "CONFLICT", messageKey: "errors.assignment_overlap", fieldErrors: {} });
-    actions.assignTechnician.mockResolvedValueOnce({ ok: false, code: "FORBIDDEN", messageKey: "error.forbidden", fieldErrors: {} });
+    actions.assignTechnician.mockResolvedValueOnce({ ok: false, code: "CONFLICT", messageKey: "errors.assignment_overlap", fieldErrors: {}, retryAfterSeconds: null });
+    actions.assignTechnician.mockResolvedValueOnce({ ok: false, code: "FORBIDDEN", messageKey: "error.forbidden", fieldErrors: {}, retryAfterSeconds: null });
     render(<ScheduleView live={live({ otherZone: true })} />);
     expect(screen.getByText(/Free hours are in Kuala Lumpur time/u)).toBeTruthy();
     save("Confirm assignment");
     const overlap = await screen.findByText("Overlaps a confirmed schedule for Aina — choose another technician.");
     expect(overlap.closest("[role='status']")).toBeTruthy(); // a conflict is a warning, not an alert
     save("Confirm assignment");
-    const forbidden = assignRefusal({ code: "FORBIDDEN", messageKey: "error.forbidden", fieldErrors: {} }, "Aina");
+    const forbidden = assignRefusal({ code: "FORBIDDEN", messageKey: "error.forbidden", fieldErrors: {}, retryAfterSeconds: null }, "Aina");
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toBe(forbidden);
     expect(screen.queryByText("Overlaps a confirmed schedule for Aina — choose another technician.")).toBeNull();
@@ -174,6 +174,7 @@ describe("ScheduleView reassign and extend", () => {
     expect(document.querySelector("textarea")?.getAttribute("placeholder")).toBe("");
     save("Confirm reassignment");
     expect(screen.getByText("Choose another technician or another time")).toBeTruthy();
+    expect(document.querySelector(".border-2")).toBeNull(); // the booking as it is: no proposal in the week
     expect(actions.assignTechnician).not.toHaveBeenCalled();
     cleanup();
     // another agreed time with the same technician is a change, and the week shows it as the proposal
@@ -198,9 +199,7 @@ describe("ScheduleView reassign and extend", () => {
     save("Save new slot");
     expect(screen.getByText("A reason is required while the work is under way")).toBeTruthy();
     expect(screen.getByText("Choose another technician or a later end")).toBeTruthy();
-    const reason = document.querySelector("textarea");
-    expect(reason).toBeTruthy();
-    if (reason) fireEvent.change(reason, { target: { value: "Parts arrive late" } });
+    fireEvent.change(screen.getByPlaceholderText("tech-external-a is on sick leave from today."), { target: { value: "Parts arrive late" } });
     fireEvent.change(screen.getByRole("textbox", { name: "Work end" }), { target: { value: "2026-09-21T11:00" } });
     save("Save new slot");
     expect(screen.getByText("The end must be at or after the current end")).toBeTruthy();
