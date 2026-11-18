@@ -67,6 +67,17 @@ func (Alerts) BypassAlert(
 	text string,
 	when time.Time,
 ) (uuid.UUID, error) {
+	return openBypass(ctx, txn, unit, org, text, when)
+}
+
+// openBypass opens or keeps the unit's restriction_bypass Alert (BypassAlert; BypassPower, IR846).
+func openBypass(
+	ctx context.Context,
+	txn pgx.Tx,
+	unit, org uuid.UUID,
+	text string,
+	when time.Time,
+) (uuid.UUID, error) {
 	const current = `SELECT id FROM monitoring.alerts WHERE unit_id = $1 AND policy_id IS NULL
 		AND type = 'restriction_bypass' AND status <> 'resolved'`
 

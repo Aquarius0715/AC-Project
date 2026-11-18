@@ -11014,6 +11014,16 @@ A `restriction_bypass` Alert (IR844) has no policy, so no policy recipients and 
 3. **Web.** The notice's detail line says "Restriction may be bypassed — HQ checks the unit" (en, ms, ja, id).
 4. **Tests.** `TestRestrictionBypassAlert`: one notice to hq-restriction-manager at the next tick, none more at the following tick with a second fault; it fails with the job's query broken. `notifications.test.ts` checks the detail line in English and Japanese.
 
+## IR846 A unit that keeps drawing power under a power_off restriction opens a restriction_bypass Alert (DEC-110) — 2026-11-18
+
+IR844 catches a node that is hidden, unplugged or opened. A node that stays online while the air conditioner is switched on with its original remote reports nothing wrong: the node's `state` is what the node last sent, not the air conditioner's (device-firmware.md §4). Where a power meter (PZEM, DEV-33) is wired into the air conditioner's supply, its readings show whether the air conditioner runs.
+
+1. **Rule.** The equipment scheduler runs `monitoring.BypassPower` before `monitoring.BypassNotices`. A unit gets a `restriction_bypass` Alert (IR844's incident key, evidence `inferred`, the text naming the threshold, the lowest reading and the time) when all hold: its `observedRestriction` is a `power_off` policy observed at or before the window's start; it has no unresolved `restriction_bypass` Alert; its valid power readings in the last 5 minutes, `(tick − 5 min, tick]`, all exceed **50 W**; and they cover the window (the first at most 1 minute after its start, the last at most 1 minute before the tick).
+2. **Values.** 50 W is above an indoor unit's standby and below any cooling; 5 minutes are five of the live nodes' minute readings (IR529). Both are constants of the job (`bypassPowerWatts`, `bypassPowerFor`), the initial values recommended in DEC-110.
+3. **Not checked.** A temperature limit lets the air conditioner run, so its power is not compared. A unit without power readings (no power meter wired, `parts.pzem:false`) is not checked; DEC-110 makes the meter a required part of an RTO installation in the firmware phase.
+4. **HQ.** BypassNotices (IR845) tells HQ at the same tick, as for any `restriction_bypass` Alert.
+5. **Tests.** `TestRestrictionBypassPower`: power drawn the whole window under `power_off` → one Alert with its text, none more at the next tick; one reading of 20 W, readings of the last two minutes only, a restriction observed two minutes before the tick, and a temperature limit → none. It fails with the threshold raised to 500 W and with the observed-before-the-window condition removed.
+
 ## IR847 The restriction-bypass Alert's evidence is shown in the display language (DEC-110, IR844, IR480) — 2026-11-18
 
 The evidence text IR844 writes ("Device <serial> stopped reporting | lost power | reported its cover opened while the unit is under a <kind> restriction: the restriction may no longer hold") had no entry in the web's evidence templates, so ms, ja and id users saw this critical Alert in English with the policy code (`power_off`) in it, against IR480. Review round 1007 found it.
