@@ -30,7 +30,8 @@ const calls = (): unknown[] => dal.coreOp.mock.calls.map((call: unknown[]) => ca
 
 beforeEach(() => {
   vi.clearAllMocks();
-  dal.coreDisplay.mockResolvedValue({ locale: "en", timeZone: "Asia/Kuala_Lumpur" });
+  // Tokyo (UTC+9), not the default Kuala Lumpur (UTC+8), so the user's own zone shows in the preview's time
+  dal.coreDisplay.mockResolvedValue({ locale: "en", timeZone: "Asia/Tokyo" });
   dal.coreOp.mockImplementation((operation: string) => Promise.resolve(operation === "notifications.preview" ? preview : {}));
 });
 
@@ -40,8 +41,8 @@ describe("communicate", () => {
     expect(dal.coreOp).toHaveBeenNthCalledWith(1, "jobs.addNote", { jobId: "job-1", visibility: "internal", message: "Moved to Friday." }, { write: true, expectedVersion: 3 });
     expect(dal.coreOp).toHaveBeenNthCalledWith(2, "notifications.preview", { target: { kind: "job", id: "job-1" }, templateKey: "schedule_change", channel: "inApp", recipientMembershipId: "mem-hq", message: "Moved to Friday." });
     expect(result.ok && result.value.noteSaved).toBe(true);
-    // the preview's time in the user's display time zone (UTC+8)
-    expect(result.ok ? result.value.preview.at : null).toContain("10:00");
+    // 02:00 UTC is 11:00 in the user's display time zone
+    expect(result.ok ? result.value.preview.at : null).toContain("2026, 11:00");
     expect(cache.refresh).toHaveBeenCalledOnce();
   });
 
