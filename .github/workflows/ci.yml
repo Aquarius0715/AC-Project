@@ -246,6 +246,7 @@ jobs:
       - run: python3 -m unittest deploy/test/test_realm.py # the test environment's realm takes its own demo password (IR720)
       - run: python3 -m unittest deploy/load/test_realm.py # the load test's realm: its client, accounts and secrets, and the refusals
       - run: python3 -m unittest deploy/load/test_iot_check.py # the IoT run's judge: each check fails the run on its own
+      - run: python3 -m unittest docker/keycloak/test_themes.py # every sign-in and e-mail theme offers the realm's languages, each login text in all of them
       - run: python3 .github/scripts/test_keep_prs_current.py # one pull request at a time is brought up to date with main
       - run: actionlint -config-file .github/actionlint.yaml
       - run: zizmor --offline .github/workflows # the workflows' security (IR732): triggers, credentials, permissions, injection
