@@ -7,14 +7,33 @@ import { Badge, Banner, Btn, Card, Field, Input, Modal, Page, Select, SummaryLis
 import { JobStatusBadge, OriginBadge, WINDOWS } from "@ac/web/components/JobBits";
 import { type Job, fmt, jobActions, longDate, useJobs } from "@ac/web/lib/jobs";
 import { Icon } from "@ac/web/components/Icon";
+import { type PJob, pjobs } from "@ac/web/lib/partner";
 
 const cap = [[TECH_EXTERNAL_A, "Refrigerant handling · valid to 2027-03-31", ["4 h", "4 h", "8 h", "—", "—"]], ["tech-external-a2", "No refrigerant qualification", ["—", "—", "—", "—", "—"]]] as const;
 
-/** The Phase 1A demo offer / job detail (DATA_SOURCE=mock): the shared job store and the seeded offer job-p09. */
+/** The Phase 1A demo offer / job detail (DATA_SOURCE=mock): contractor-a's jobs in the shared job store, the seeded
+offer job-p09, a summary of the other fixed jobs of the list, and "not available" for any other id (another company's
+job, as the API's not found). */
 export function JobDemo({ id }: Readonly<{ id: string }>) {
   const live = useJobs().find((j) => j.id === id && j.contractor === "contractor-a" && j.id !== "job-p09");
-  if (id === "job-b-offer") return <Page className="max-w-xl"><Card title="This page isn’t available" sub="The page doesn’t exist, or your account can’t open it." /></Page>;
-  return live ? <LiveOffer j={live} /> : <StaticOffer id={id} />;
+  if (live) return <LiveOffer j={live} />;
+  if (id === "job-p09") return <StaticOffer id={id} />;
+  const fixed = pjobs.find((p) => p.id === id);
+  return fixed ? <FixedJob j={fixed} /> : <Page className="max-w-xl"><Card title="This page isn’t available" sub="The page doesn’t exist, or your account can’t open it." /></Page>;
+}
+
+/** A fixed job of the demo list that is past the offer: its list row, and where to act on it. */
+function FixedJob({ j }: Readonly<{ j: PJob }>) {
+  const next = new Map<string, [string, string]>([["Unassigned", ["Assign technician", `/partner/schedule?jobId=${j.id}`]], ["Overdue", ["Reassign technician", `/partner/schedule?jobId=${j.id}`]], ["In review", ["Review report", `/partner/jobs/${j.id}/review`]]]).get(j.label);
+  return (
+    <Page narrow>
+      <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground"><Link href="/partner/jobs" className="font-semibold text-primary"><Icon name="arrowLeft" /> Jobs</Link> › {j.id} · {j.unit}</div>
+      <Card title={`${j.id} · ${j.unit}`} action={<Badge tone={j.tone}>{j.label}</Badge>}>
+        <SummaryList items={[["Customer", j.cust], ["Status", j.line], ["Technician", `${j.tech ?? "—"} · ${j.techSub}`], ["Schedule", `${j.slot} · ${j.deadline}`]]} />
+        {next && <div className="mt-4"><LinkButton variant="primary" href={next[1]}>{next[0]} <Icon name="arrowRight" /></LinkButton></div>}
+      </Card>
+    </Page>
+  );
 }
 
 /** Offer backed by the shared job store (e.g. job-c07 after the client accepted HQ’s proposal). */
