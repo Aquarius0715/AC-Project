@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 // every text colour reads at 4.5:1 or more on every light surface, and each "on" colour on the fill it is made for. A
 // new colour token has to be named in one of the lists below, so a text colour is never added without this check.
 const css = readFileSync(fileURLToPath(new URL("../../globals.css", import.meta.url)), "utf8");
-const tokens = new Map([...css.matchAll(/--([a-z0-9-]+):\s*(#[0-9a-f]{6})\s*;/giu)].map((m) => [m[1] ?? "", m[2] ?? ""]));
+const tokens = new Map(css.matchAll(/--([a-z0-9-]+):\s*(#[0-9a-f]{6})\s*;/giu).map((m) => [m[1] ?? "", m[2] ?? ""]));
 
 const TEXT = [
   "foreground", "card-foreground", "popover-foreground", "secondary-foreground", "muted-foreground", "accent-foreground",
@@ -30,14 +30,14 @@ const NO_TEXT = ["border", "input", "ring", "sidebar-border", "sidebar-ring", "c
 function luminance(hex: string): number {
   const [r = 0, g = 0, b = 0] = [1, 3, 5].map((i) => {
     const v = Number.parseInt(hex.slice(i, i + 2), 16) / 255;
-    return v <= 0.039_28 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
   });
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
 function ratio(a: string, b: string): number {
-  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
-  return ((hi ?? 0) + 0.05) / ((lo ?? 0) + 0.05);
+  const [x, y] = [luminance(a), luminance(b)];
+  return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
 }
 
 function colour(name: string): string {
@@ -49,7 +49,7 @@ function colour(name: string): string {
 describe("theme contrast (globals.css)", () => {
   it("names every colour token in one of the lists", () => {
     const named = new Set([...TEXT, ...SURFACES, ...ON.flat(), ...NO_TEXT]);
-    expect([...tokens.keys()].filter((name) => !named.has(name))).toStrictEqual([]);
+    expect(tokens.keys().filter((name) => !named.has(name)).toArray()).toStrictEqual([]);
   });
 
   it("reads every text colour at 4.5:1 or more on every light surface", () => {
