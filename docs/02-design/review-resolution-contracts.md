@@ -11055,3 +11055,10 @@ The evidence text IR844 writes ("Device <serial> stopped reporting | lost power 
 3. **The offer.** Every page of the app shell (`UpdateNotice`, under the header) asks `/bff/version` every 60 s while the page is in view and when it comes back into view (focus, visibility); a page that has just loaded does not ask. When the server answers another build, a banner says "A new version of the app is available. Reload the page to use it; save what you are entering first." with **Reload page**, and the page asks no more. An answer that cannot be read (offline, an error, another shape) shows nothing. The page keeps working until the person reloads, so nothing being entered is lost.
 4. **Texts.** en, ms, ja, id.
 5. **Tests.** `updateNotice.test.tsx`: the banner appears after another build answers and stops asking; the same build, a non-string version, a 502 and a failed request show nothing; a hidden page does not ask and asks on focus; `/bff/version` answers its build, never stored.
+
+## IR857 The portal keeps port 3204 behind web-edge (IR855, IR791) — 2026-11-18
+
+1. **The fault.** `compose.rolling.yaml` published the portal on `${PORTAL_WEB_PORT:-3004}`, while `compose.test.yaml` had published it on `${PORTAL_WEB_PORT:-3204}`. The lab server's environment file predates the portal and names no `PORTAL_WEB_PORT`, so after test1.0.1r5 the portal answered on 3004 and no longer on 3204.
+2. **The fix.** web-edge takes compose.test.yaml's default, 3204. The next deployment recreates web-edge for the changed port, so the apps' ports close for the second or so web-edge takes to start.
+3. **Checked at each deployment.** `deploy.sh` waits for the portal too: `PORTAL_WEB_URL`, or, in an environment file without it, the customer app's host on `PORTAL_WEB_PORT` (3204 by default). Before, a file without the URL left the portal out of the check, so its move went unnoticed. The environment file is a write-only secret, so the file itself is not changed.
+
