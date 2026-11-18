@@ -27,7 +27,8 @@ export function MockTeam() {
   const [modal, setModal] = useState<null | "unavail" | "upload">(null);
   const [activeOnly, setActiveOnly] = useState(true);
   const [q, setQ] = useState("");
-  const list = techs.filter((t) => (!activeOnly || t.active) && (!q || t.quals.some((x) => x.toLowerCase().includes(q.toLowerCase())) || t.id.includes(q)));
+  const needle = q.toLowerCase(); // qualification and technician ID alike, in any letter case
+  const list = techs.filter((t) => (!activeOnly || t.active) && (!q || t.quals.some((x) => x.toLowerCase().includes(needle)) || t.id.includes(needle)));
   return (
     <Page>
       <div className="flex flex-wrap items-center justify-between gap-2"><Tabs value={tab} onChange={setTab} tabs={[{ id: "members", label: "Members" }, { id: "certs", label: "Certifications", count: 1 }]} /><div className="flex gap-2"><Btn size="sm" onClick={() => { setModal("unavail"); }}><Icon name="add" /> Unavailable days</Btn></div></div>
