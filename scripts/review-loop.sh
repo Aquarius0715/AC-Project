@@ -27,11 +27,20 @@ PROMPT_FILE=review-loop-prompt.md
 [ -f "$PROMPT_FILE" ] || { echo "missing $PROMPT_FILE" >&2; exit 1; }
 mkdir -p "$LOG_DIR"
 
+# The prompt is read again for every round from origin/main (after a fetch), so a merged change to it takes effect
+# from the next round even while a round's branch is checked out in this tree; the local file is the fallback.
 # The file starts with "/loop "; a one-shot session needs the body only, and must not self-schedule.
-PROMPT=$(sed '1s|^/loop ||' "$PROMPT_FILE")
-PROMPT="$PROMPT
+read_prompt() {
+  body=""
+  if git fetch -q origin main 2>/dev/null; then
+    body=$(git show "origin/main:$PROMPT_FILE" 2>/dev/null) || body=""
+  fi
+  [ -n "$body" ] || body=$(cat "$PROMPT_FILE")
+  PROMPT=$(printf '%s\n' "$body" | sed '1s|^/loop ||')
+  PROMPT="$PROMPT
 
 【この実行について】外側のシェルループが回を繰り返す。この会話では 1 回（1 PR）だけ行い、記録を書いたら終了する。ScheduleWakeup は使わない。"
+}
 
 n=0
 fails=0
@@ -47,6 +56,7 @@ while :; do
   n=$((n + 1))
   log="$LOG_DIR/round-$(date +%Y%m%d-%H%M%S).log"
   echo "[$(date '+%F %T')] round $n -> $log"
+  read_prompt
   claude -p "$PROMPT" --permission-mode "$PERM_MODE" --max-budget-usd "$BUDGET_USD" >"$log" 2>&1
   rc=$?
   echo "[$(date '+%F %T')] round $n rc=$rc"
