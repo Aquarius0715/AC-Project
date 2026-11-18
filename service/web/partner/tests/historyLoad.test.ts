@@ -69,12 +69,25 @@ describe("partner history loader", () => {
     expect(live.rows.map((r) => r.id)).toStrictEqual(["job-new-0001"]);
     expect(live.detail && !live.detail.missing ? live.detail.row.id : null).toBe("job-old-0001");
     expect(listCalls().map((c) => withPeriod(c))).toStrictEqual([true, false]);
+    // the job dropdown holds the open job, or the browser shows another job selected and choosing it does nothing
+    expect(live.options.map((o) => o.id)).toStrictEqual(["job-new-0001", "job-old-0001"]);
+  });
+
+  it("adds a job older than an empty period to the job dropdown once", async () => {
+    const live = await loadHistory({ period: "90d", jobId: "job-old-0001" });
+    expect(live.options).toStrictEqual([{ id: "job-old-0001", label: "job-old- · maintenance" }]);
+    const inPeriod = await loadHistory({ period: "all", jobId: "job-old-0001" });
+    expect(inPeriod.options.map((o) => o.id)).toStrictEqual(["job-old-0001"]);
   });
 
   it("says a job is missing when it is in neither list", async () => {
     const live = await loadHistory({ period: "90d", jobId: "job-gone-001" });
     expect(live.detail).toStrictEqual({ missing: true, id: "job-gone-001" });
     expect(listCalls()).toHaveLength(2);
+    // under all time the one list already is the wider one
+    const allTime = await loadHistory({ period: "all", jobId: "job-gone-001" });
+    expect([allTime.detail, allTime.options.map((o) => o.id)]).toStrictEqual([{ missing: true, id: "job-gone-001" }, ["job-old-0001"]]);
+    expect(listCalls()).toHaveLength(3);
   });
 
   it("reads all time once, names the units, and has no detail without a job in the URL", async () => {
