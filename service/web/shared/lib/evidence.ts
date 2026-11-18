@@ -1,6 +1,6 @@
 // An alert's or observation's evidence text, and the resolution reasons the system writes, in the display language (IR480). The API keeps the evidence as English text,
-// written by the seed (the fixture's demo observations), the filter-care reminders, the policy rules and the tamper and
-// reconciliation alerts. The texts those sources write are shown in the user's language; any other text (a future source,
+// written by the seed (the fixture's demo observations), the filter-care reminders, the policy rules and the tamper,
+// reconciliation and restriction-bypass alerts (IR847). The texts those sources write are shown in the user's language; any other text (a future source,
 // or one a device sends) stays as stored. Names, serials and numbers inside a text are kept as they are; a metric code
 // is shown in words (IR626, IR812, IR833).
 import type { Params, T } from "@ac/web/lib/i18n";
@@ -25,11 +25,17 @@ const FIXED = new Set([
 /** Texts written with values in them: the stored form, the dictionary key and its values. */
 /** The comparison of a policy rule in words (IR812): a demo event named it by its code ("gte"). */
 const OPERATOR: Record<string, string> = { gt: "above", gte: "at or above", lt: "below", lte: "at or below" };
+/** A restriction kind in words: the restriction_bypass alert names it by its code ("power_off", DEC-110). */
+const RESTRICTION: Record<string, string> = { power_off: "Power off", temperature_limit: "Temperature limit" };
+const restriction = (m: RegExpMatchArray, t: T): Params => ({ serial: m[1] ?? "", restriction: t(lookup(RESTRICTION, m[2] ?? "") ?? m[2] ?? "") });
 const TEMPLATES: [RegExp, string, (m: RegExpMatchArray, t: T) => Params][] = [
   [/^Cleaning due \((\d+) h of run time since the last cleaning\)\. Not a fault\.$/, "Cleaning due ({hours} h of run time since the last cleaning). Not a fault.", (m) => ({ hours: m[1] ?? "" })],
   [/^Cleaning due \((\d+) h of run time, no cleaning recorded\)\. Not a fault\.$/, "Cleaning due ({hours} h of run time, no cleaning recorded). Not a fault.", (m) => ({ hours: m[1] ?? "" })],
   [/^Cleaning due \((\d+) days since the last cleaning, run time unknown\)\. Not a fault\.$/, "Cleaning due ({days} days since the last cleaning, run time unknown). Not a fault.", (m) => ({ days: m[1] ?? "" })],
   [/^Device (\S+) reported its cover opened while powered \(tamper_signal\)$/, "Device {serial} reported its cover opened while powered", (m) => ({ serial: m[1] ?? "" })],
+  [/^Device (\S+) stopped reporting while the unit is under a (\S+) restriction: the restriction may no longer hold$/, "Device {serial} stopped reporting while the unit is under a restriction ({restriction}): the restriction may no longer hold", restriction],
+  [/^Device (\S+) lost power while the unit is under a (\S+) restriction: the restriction may no longer hold$/, "Device {serial} lost power while the unit is under a restriction ({restriction}): the restriction may no longer hold", restriction],
+  [/^Device (\S+) reported its cover opened while the unit is under a (\S+) restriction: the restriction may no longer hold$/, "Device {serial} reported its cover opened while the unit is under a restriction ({restriction}): the restriction may no longer hold", restriction],
   [/^Demo event: (\S+) (\S+) threshold$/, "Demo event: {metric} {operator} its alert threshold", (m, t) => ({ metric: t(lookup(metricName, m[1] ?? "") ?? m[1] ?? ""), operator: t(lookup(OPERATOR, m[2] ?? "") ?? m[2] ?? "") })],
 ];
 
@@ -56,4 +62,4 @@ export const evidenceText = (stored: string, t: T): string => known(stored, t, F
 export const resolutionText = (stored: string, t: T): string => known(stored, t, REASONS, REASON_TEMPLATES);
 
 /** The dictionary keys this module uses (the key check of the tests). */
-export const EVIDENCE_KEYS = [...FIXED, ...TEMPLATES.map(([, key]) => key), ...REASONS, ...REASON_TEMPLATES.map(([, key]) => key), ...Object.values(OPERATOR)];
+export const EVIDENCE_KEYS = [...FIXED, ...TEMPLATES.map(([, key]) => key), ...REASONS, ...REASON_TEMPLATES.map(([, key]) => key), ...Object.values(OPERATOR), ...Object.values(RESTRICTION)];

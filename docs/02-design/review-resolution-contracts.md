@@ -11013,3 +11013,10 @@ A `restriction_bypass` Alert (IR844) has no policy, so no policy recipients and 
 2. **Once per incident.** Later faults name the same Alert (IR844 item 2), which is already marked, so HQ is told once per Alert. An Alert acknowledged or resolved before the next tick is not told. The notice is readable by the members who read the unit (IR142: alert.read for an alert notice).
 3. **Web.** The notice's detail line says "Restriction may be bypassed — HQ checks the unit" (en, ms, ja, id).
 4. **Tests.** `TestRestrictionBypassAlert`: one notice to hq-restriction-manager at the next tick, none more at the following tick with a second fault; it fails with the job's query broken. `notifications.test.ts` checks the detail line in English and Japanese.
+
+## IR847 The restriction-bypass Alert's evidence is shown in the display language (DEC-110, IR844, IR480) — 2026-11-18
+
+The evidence text IR844 writes ("Device <serial> stopped reporting | lost power | reported its cover opened while the unit is under a <kind> restriction: the restriction may no longer hold") had no entry in the web's evidence templates, so ms, ja and id users saw this critical Alert in English with the policy code (`power_off`) in it, against IR480. Review round 1007 found it.
+
+1. **Rule.** `shared/lib/evidence.ts` words the three fault texts in the display language, keeping the serial, and names the restriction kind in words ("Power off", "Temperature limit"); a kind with no word stays as sent. The stored English text does not change.
+2. **Tests.** `evidence.test.ts` checks one fault per kind in en, ja and ms and an unknown kind, and that ja and id have every evidence key (before, only ms was checked). `TestBypassFault` (devices) pins the three fault texts the templates read; it fails when a text changes.
