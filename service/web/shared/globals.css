@@ -91,7 +91,6 @@
 @theme {
   --color-primary-soft: #e6f0ff;
   --color-ink: #0d2238;
-  --color-subtle: #64788e; /* placeholders and chart labels on white: 4.55:1 */
   --color-line: #d6e4f5;
   --color-surface: #ffffff;
   --color-surface2: #edf6ff;
