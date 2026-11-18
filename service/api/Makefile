@@ -91,11 +91,15 @@ testdb-exists:
 
 test-fresh: test
 
-# coverage of internal/... from every test package (unit + integration), merged into coverage.out
-cover: testdb-exists
+# coverage of internal/... from every test package (unit + integration), merged into coverage.out. The packages run on a
+# fresh ac_test; the integration suite runs on a fresh database of its own (ac_test_s1, as its first shard does), because
+# it expects the seed only and the package tests leave their rows behind (on one database it fails with 404s).
+cover: testdb
 	rm -rf .cover && mkdir -p .cover
-	for p in $$($(GO) list -f '{{if or .TestGoFiles .XTestGoFiles}}{{.ImportPath}}{{end}}' ./...); do \
+	for p in $$($(GO) list -f '{{if or .TestGoFiles .XTestGoFiles}}{{.ImportPath}}{{end}}' ./... | grep -v /test/integration); do \
 		$(GO) test -count=1 -coverpkg=./internal/... -coverprofile=.cover/$$(echo $$p | tr / _).out $$p >.cover/last.log 2>&1 || { cat .cover/last.log; exit 1; }; done
+	DB=ac_test_s1 sh scripts/resetdb.sh >.cover/last.log 2>&1 || { cat .cover/last.log; exit 1; }
+	AC_TEST_DB=ac_test_s1 $(GO) test -count=1 -timeout $(TEST_TIMEOUT) -coverpkg=./internal/... -coverprofile=.cover/integration.out ./test/integration >.cover/last.log 2>&1 || { cat .cover/last.log; exit 1; }
 	python3 scripts/covermerge.py coverage.out .cover/*.out
 
 # vuln checks the modules against the Go vulnerability database (govulncheck reports only what the code reaches;
