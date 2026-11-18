@@ -2,10 +2,22 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // the team screen reads the own company's technicians through the DAL (FR-P06); another company's id in the URL reads
 // as not found before anything else is read (AT-P06-E item 1)
-const dal = vi.hoisted(() => ({
-  coreNow: vi.fn(), coreDisplay: vi.fn(), coreIdentity: vi.fn(), corePrincipal: vi.fn(), coreOp: vi.fn(), coreAll: vi.fn(), coreItems: vi.fn(),
-  orWhenRefused: async <T, F>(read: Promise<T>, fallback: F): Promise<T | F> => read.catch(() => fallback),
-}));
+// orWhenRefused as the DAL's: the fallback for a refusal, but UNAVAILABLE and TIMEOUT still fail the page
+const dal = vi.hoisted(() => {
+  class CoreError extends Error {
+    readonly error: { code: string };
+    constructor(code: string, options?: ErrorOptions) { super(code, options); this.name = "CoreError"; this.error = { code }; }
+  }
+  return {
+    CoreError, coreNow: vi.fn(), coreDisplay: vi.fn(), coreIdentity: vi.fn(), corePrincipal: vi.fn(), coreOp: vi.fn(), coreAll: vi.fn(), coreItems: vi.fn(),
+    orWhenRefused: async <T, F>(read: Promise<T>, fallback: F): Promise<T | F> => {
+      try { return await read; } catch (error) {
+        if (error instanceof CoreError && error.error.code !== "UNAVAILABLE" && error.error.code !== "TIMEOUT") return fallback;
+        throw error;
+      }
+    },
+  };
+});
 vi.mock("server-only", () => ({}));
 vi.mock("@ac/web/lib/dal", () => dal);
 
@@ -39,6 +51,15 @@ describe("partner team loader", () => {
       expect(live.notFound).toBe(false);
       expect(live.notFound ? [] : live.technicians).toStrictEqual([{ id: "m-1", name: "Aiman" }]);
     }
+  });
+
+  it("still shows the team when an optional read is refused, and fails the page when one is unavailable", async () => {
+    const failing = (code: string) => (operation: string) => (operation === "members.list" ? Promise.resolve([technician]) : Promise.reject(new dal.CoreError(code)));
+    dal.coreAll.mockImplementation(failing("FORBIDDEN"));
+    const live = await loadTeam({ date: "2026-11-18" });
+    expect(live.notFound ? [] : live.technicians).toStrictEqual([{ id: "m-1", name: "Aiman" }]);
+    dal.coreAll.mockImplementation(failing("UNAVAILABLE"));
+    await expect(loadTeam({ date: "2026-11-18" })).rejects.toThrow("UNAVAILABLE");
   });
 
   it("names the company by default when the session has no organization name", async () => {
