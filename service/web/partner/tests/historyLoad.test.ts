@@ -105,10 +105,11 @@ describe("partner history loader", () => {
     expect(listCalls()).toHaveLength(1);
   });
 
-  it("keeps an open job without a timeline or recipients when they are refused, and fails when the API is down", async () => {
+  it("keeps a completed job without a timeline or recipients when they are refused, and fails when a read is unavailable", async () => {
+    let refusal = "FORBIDDEN";
     dal.coreAll.mockRejectedValue(new dal.CoreError("FORBIDDEN"));
-    dal.coreItems.mockRejectedValue(new dal.CoreError("FORBIDDEN"));
-    dal.coreOp.mockImplementation((operation: string) => (operation === "jobs.list" ? Promise.resolve({ items: [{ ...open, status: "completed" }], total: 1 }) : Promise.reject(new dal.CoreError("FORBIDDEN"))));
+    dal.coreItems.mockImplementation(() => Promise.reject(new dal.CoreError(refusal)));
+    dal.coreOp.mockImplementation((operation: string) => (operation === "jobs.list" ? Promise.resolve({ items: [{ ...open, status: "completed" }], total: 1 }) : Promise.reject(new dal.CoreError(refusal))));
     const live = await loadHistory({ jobId: "job-open-001" });
     const d = live.detail;
     if (!d || d.missing) throw new Error("expected the job");
@@ -116,6 +117,12 @@ describe("partner history loader", () => {
     expect([d.mode.kind, d.items, d.recipients]).toStrictEqual(["preview", [], []]);
     expect(dal.coreOp).toHaveBeenCalledWith("notifications.recipients", expect.objectContaining({ target: { kind: "job", id: "job-open-001" } }));
     expect(d.row.title).toBe("maintenance");
+    // an unavailable timeline or recipient list is not a refusal: the page fails
+    refusal = "UNAVAILABLE";
+    await expect(loadHistory({ jobId: "job-open-001" })).rejects.toThrow("UNAVAILABLE");
+    dal.coreItems.mockResolvedValue([]);
+    await expect(loadHistory({ jobId: "job-open-001" })).rejects.toThrow("UNAVAILABLE");
+    expect(dal.coreOp).toHaveBeenLastCalledWith("notifications.recipients", expect.anything());
     dal.coreOp.mockRejectedValue(new dal.CoreError("UNAVAILABLE"));
     await expect(loadHistory({})).rejects.toThrow("UNAVAILABLE");
   });
