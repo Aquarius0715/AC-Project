@@ -250,3 +250,143 @@ func TestRestrictionBypassAlert(t *testing.T) {
 		t.Errorf("bypass alerts of a unit without a restriction: %d", total)
 	}
 }
+
+// TestRestrictionBypassPower (DEC-110, IR846): a unit under a power_off restriction whose valid power readings of the
+// last five minutes all exceed 50 W and cover the window gets a restriction_bypass Alert at the scheduler tick, once;
+// one low reading, readings that do not cover the window, a restriction observed within the window (the AC ran before
+// it), or a temperature limit (the AC may run) open none.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
+func TestRestrictionBypassPower(t *testing.T) {
+	srv := server(t)
+	ctx := context.Background()
+	powerOff := map[string]string{fieldPolicy: `{"kind":"power_off"}`}
+	applied := func(policy map[string]string) string {
+		t.Helper()
+
+		unit := boundUnit(t, srv, "online")
+		k, inv := overdueContract(t, srv, unit)
+
+		code, res := write(
+			srv,
+			restrMgr(),
+			"restrictions.schedule",
+			scheduleBody(k, inv, []string{unit}, policy),
+			0,
+		)
+		if code != 200 {
+			t.Fatalf("schedule: %d %v", code, res)
+		}
+
+		restrictionID := asStr(t, data(res)["id"])
+		due(t, restrictionID)
+
+		code, res = write(srv, restrMgr(), "restrictions.execute",
+			`{"restrictionId":"`+restrictionID+`","confirmedRulesVersion":"rules-1"}`, 1)
+		if code != 200 {
+			t.Fatalf("execute: %d %v", code, res)
+		}
+
+		if !ackCommand(t, cmdOf(t, res, unit, "applyCommandIds"), clock().Add(time.Second)) {
+			t.Fatal("the restriction command was not acknowledged")
+		}
+
+		return unit
+	}
+	tick := clock().Add(time.Hour)
+	readings := func(unit string, watts ...float64) { // one a minute, the last at the tick
+		t.Helper()
+
+		sensor := uuid.NewString()
+
+		for i, value := range watts {
+			observed := tick.Add(-time.Duration(len(watts)-1-i) * time.Minute)
+			owner(
+				t,
+				`INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence,
+				value, unit, origin, quality, received_at, event_id)
+				VALUES ($1, $2, $3, 'power', $4, $5, $6, 'W', 'measured', 'valid', $4, $7)`,
+				seed.ID("tenant-a"),
+				unit,
+				sensor,
+				observed,
+				i+1,
+				value,
+				uuid.NewString(),
+			)
+		}
+	}
+	bypass := func(unit string) (int, string) {
+		t.Helper()
+
+		var (
+			total int
+			text  string
+		)
+		ownerScan(
+			t,
+			`SELECT count(*), coalesce(max(evidence_text), '') FROM monitoring.alerts WHERE unit_id = $1
+			AND type = 'restriction_bypass'`,
+			[]any{unit},
+			&total,
+			&text,
+		)
+
+		return total, text
+	}
+
+	running, dipped, short, limited := applied(
+		powerOff,
+	), applied(
+		powerOff,
+	), applied(
+		powerOff,
+	), applied(
+		nil,
+	)
+	recent := applied(powerOff)
+
+	readings(running, 320, 315, 330, 318, 322, 321)
+	readings(dipped, 320, 315, 20, 318, 322, 321)
+	readings(short, 320, 321)
+	readings(limited, 320, 315, 330, 318, 322, 321)
+	readings(recent, 320, 315, 330, 318, 322, 321)
+	owner(
+		t,
+		`UPDATE assets.units SET observed_restriction = jsonb_set(observed_restriction, '{observedAt}',
+		to_jsonb($2::timestamptz)) WHERE id = $1`,
+		recent,
+		tick.Add(-2*time.Minute),
+	)
+
+	_, err := schedTick(ctx, srv, tick)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if total, text := bypass(
+		running,
+	); total != 1 ||
+		text != "The unit drew more than 50 W (at least 315 W) for 5 "+
+			"minutes while it is under a power_off restriction: the air conditioner runs although the restriction says off" {
+		t.Fatalf("power drawn under power_off: %d %q", total, text)
+	}
+
+	for name, unit := range map[string]string{
+		"one low reading": dipped, "readings not covering the window": short,
+		"a temperature limit": limited, "a restriction observed within the window": recent,
+	} {
+		if total, _ := bypass(unit); total != 0 {
+			t.Errorf("%s: %d bypass alerts, want 0", name, total)
+		}
+	}
+
+	_, err = schedTick(ctx, srv, tick.Add(time.Minute))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if total, _ := bypass(running); total != 1 {
+		t.Errorf("bypass alerts after a second tick: %d, want 1", total)
+	}
+}
