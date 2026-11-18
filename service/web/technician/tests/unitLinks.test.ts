@@ -15,7 +15,14 @@ const dal = vi.hoisted(() => {
   }
   return {
     CoreError, coreNow: vi.fn(), coreDisplay: vi.fn(), corePermissions: vi.fn(), coreOp: vi.fn(), coreAll: vi.fn(), coreItems: vi.fn(),
-    orWhenRefused: async <T, F>(read: Promise<T>, fallback: F): Promise<T | F> => read.catch(() => fallback),
+    orWhenRefused: async <T, F>(read: Promise<T>, fallback: F): Promise<T | F> => { // as the DAL: UNAVAILABLE and TIMEOUT still fail
+      try {
+        return await read;
+      } catch (error) {
+        if (error instanceof CoreError && error.error.code !== "UNAVAILABLE" && error.error.code !== "TIMEOUT") return fallback;
+        throw error;
+      }
+    },
   };
 });
 vi.mock("server-only", () => ({}));
