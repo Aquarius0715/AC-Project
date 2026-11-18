@@ -21,7 +21,7 @@ const (
 //
 //nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestRestrictionBypassAlert(t *testing.T) {
-	srv := server(t)
+	srv := serverWith(t, true) // demo.trigger carries the device faults
 	unit := boundUnit(t, srv, "online")
 	plain := boundUnit(t, srv, "online") // under no restriction
 	k, inv := overdueContract(t, srv, unit)
