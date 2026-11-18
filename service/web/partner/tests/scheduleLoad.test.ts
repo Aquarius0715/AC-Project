@@ -22,7 +22,7 @@ vi.mock("@ac/web/lib/dal", () => dal);
 
 import { loadSchedule } from "../app/partner/schedule/_lib/load";
 import type { ApiPartnerJob } from "@ac/web/lib/partnerOverview";
-import type { ApiDetail } from "@ac/web/lib/partnerJobDetail";
+import type { ApiDetail, ApiOffer } from "@ac/web/lib/partnerJobDetail";
 
 const slotA = { startAt: "2026-11-20T01:00:00Z", endAt: "2026-11-20T05:00:00Z" };
 const slotB = { startAt: "2026-11-21T01:00:00Z", endAt: "2026-11-21T05:00:00Z" };
@@ -38,6 +38,19 @@ const detail = (id: string): ApiDetail => ({
   scheduledSlot: null, dueAt: "2026-11-25T00:00:00Z", startedAt: null, completedAt: null, assignmentId: null, partnerSlotProposal: null, reportRefs: [], assignment: null,
   offer: { id: "offer-1", termsVersion: "v1", candidateSlots: [past, slotB, slotA], offeredAt: "2026-11-01T00:00:00Z", accessValidFrom: "2026-11-01T00:00:00Z", accessValidUntil: "2026-11-30T00:00:00Z", decision: "accepted", decidedAt: "2026-11-02T00:00:00Z" },
 });
+// an assigned job whose technician can't make the booked time A and offered B instead
+const assigned = (id: string): ApiDetail => ({
+  ...detail(id), status: "assigned", assignmentId: "as-1",
+  assignment: { technicianMembershipId: "m-1", scheduledStart: slotA.startAt, scheduledEnd: slotA.endAt, status: "active", acknowledgement: "cant_make", cantMakeReason: "car broke down", alternativeSlot: slotB },
+});
+// an accepted offer whose delegation period has not started yet
+const offer = (id: string): ApiOffer => ({
+  projection: "offer", status: "accepted", jobId: id, jobVersion: 7, offerId: "offer-1", type: "maintenance", siteAddress: null, requiredQualifications: ["demo_indoor"],
+  requestedSlot: slotA, dueAt: "2026-11-25T00:00:00Z", offerExpiresAt: "2026-11-19T00:00:00Z", termsVersion: "v1", origin: "hq", candidateSlots: [slotA],
+  offeredAt: "2026-11-17T00:00:00Z", accessValidFrom: "2026-11-19T00:00:00Z", accessValidUntil: "2026-11-30T00:00:00Z", partnerSlotProposal: null,
+});
+const noScope = () => Promise.resolve({ serviceScope: [] });
+const requiredOf = async (sp: { slot?: string }) => { const live = await loadSchedule(sp); return live.selected?.required; };
 
 let jobs: ApiPartnerJob[] = [];
 let get: (id: string) => Promise<unknown> = (id) => Promise.resolve(detail(id));
@@ -114,5 +127,79 @@ describe("partner schedule loader", () => {
   it("fails the page when the job cannot be read now", async () => {
     get = () => Promise.reject(new dal.CoreError("UNAVAILABLE"));
     await expect(loadSchedule({})).rejects.toThrow("UNAVAILABLE");
+  });
+
+  describe("the selected job's form", () => {
+    const member = { id: "m-1", userId: "u-1", displayName: "Aiman", role: "technician", revokedAt: null, validUntil: null };
+    let unit: () => Promise<unknown> = noScope;
+    let eligible: string[] = [];
+    const capacityDates: string[] = [];
+    beforeEach(() => {
+      unit = noScope;
+      eligible = [];
+      capacityDates.length = 0;
+      const lists = new Map<string, unknown[]>([["jobs.list", jobs], ["members.list", [member]]]);
+      dal.coreAll.mockImplementation((operation: string) => Promise.resolve(lists.get(operation) ?? []));
+      dal.coreItems.mockImplementation((_operation: string, input: { date: string }) => { capacityDates.push(input.date); return Promise.resolve([]); });
+      dal.coreOp.mockImplementation((operation: string, input: { jobId: string; startAt?: string; endAt?: string }) => {
+        if (operation === "jobs.get") return get(input.jobId);
+        if (operation === "units.get") return unit();
+        if (operation === "members.eligible") {
+          eligibleSlots.push({ startAt: input.startAt, endAt: input.endAt });
+          return Promise.resolve({ items: eligible.map((id) => ({ ...member, id })), total: eligible.length });
+        }
+        return Promise.resolve({ items: [], total: 0 });
+      });
+    });
+
+    it("shows the current assignment, the technician's answer and the booking on the booked time's day", async () => {
+      get = (id) => Promise.resolve(assigned(id));
+      // the booked time's day (Friday 20 Nov in Kuala Lumpur) has the technician busy then; the other days are empty
+      dal.coreItems.mockImplementation((_operation: string, input: { date: string }) => {
+        capacityDates.push(input.date);
+        return Promise.resolve(input.date === "2026-11-20"
+          ? [{ membershipId: "m-1", date: input.date, availableSlots: [slotA], assignedSlots: [slotA], availableMinutes: 240, assignedMinutes: 240, unavailability: null }] : []);
+      });
+      const live = await loadSchedule({});
+      expect(capacityDates).toStrictEqual(["2026-11-16", "2026-11-17", "2026-11-18", "2026-11-19", "2026-11-20", "2026-11-21", "2026-11-22"]);
+      expect(live.selected).toMatchObject({ currentId: "m-1", moved: false, ack: { status: "cant_make", reason: "car broke down", alternative: slotB }, mode: { kind: "reassign", slot: slotA } });
+      expect(live.selected?.text.alternative).not.toBeNull();
+      expect(live.selected?.candidates.map((c) => [c.id, c.badge.text, c.eligible])).toStrictEqual([["m-1", "Current · booked here", false]]);
+      expect(live.week?.from).toBe("2026-11-16");
+    });
+
+    it("marks a picked time other than the booked one as moved, and badges the eligible current technician", async () => {
+      get = (id) => Promise.resolve(assigned(id));
+      eligible = ["m-1"];
+      const live = await loadSchedule({ slot: "1" });
+      expect(live.selected).toMatchObject({ moved: true, mode: { slot: slotB } });
+      expect(live.selected?.times.map((x) => x.on)).toStrictEqual([false, true]);
+      expect(live.selected?.candidates.map((c) => [c.badge.text, c.eligible])).toStrictEqual([["Current", true]]);
+      expect(eligibleSlots).toStrictEqual([slotB]);
+    });
+
+    it("takes an accepted offer's version and required qualifications, searches no candidates before the delegation starts, and reads no unit", async () => {
+      get = (id) => Promise.resolve(offer(id));
+      const live = await loadSchedule({});
+      expect(live.selected).toMatchObject({ version: 7, required: ["demo_indoor"], ack: null, moved: false, currentId: null, times: [], mode: { kind: "blocked" } });
+      expect(eligibleSlots).toStrictEqual([]);
+      expect(dal.coreOp).not.toHaveBeenCalledWith("units.get", expect.anything());
+    });
+
+    it("requires a qualification per entry of the unit's scope, and none when the unit cannot be read", async () => {
+      unit = () => Promise.resolve({ serviceScope: ["indoor", "electrical"] });
+      expect(await requiredOf({})).toStrictEqual(["demo_indoor", "demo_electrical"]);
+      unit = () => Promise.reject(new dal.CoreError("FORBIDDEN"));
+      expect(await requiredOf({})).toStrictEqual([]);
+    });
+
+    it("gives the end time in the user's zone and flags a zone other than Kuala Lumpur", async () => {
+      const inKl = await loadSchedule({});
+      expect(inKl.otherZone).toBe(false);
+      dal.coreDisplay.mockResolvedValue({ locale: "en", timeZone: "Asia/Tokyo" });
+      const live = await loadSchedule({});
+      expect(live.otherZone).toBe(true);
+      expect(live.selected?.text.end).toBe("2026-11-20T14:00"); // 05:00 UTC
+    });
   });
 });
