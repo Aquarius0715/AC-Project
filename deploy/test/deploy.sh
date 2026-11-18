@@ -13,6 +13,13 @@
 # seed only when a migration the deployed tag had was edited or removed, or compose.live.yaml changed. A deployment
 # that fails brings back the tag before it (a migration it applied stays: they only add).
 #
+# Without downtime (DEC-111, IR855): after a tag with deploy/test/compose.rolling.yaml, a deployment starts the
+# services that are not replaced one by one (the stores, Keycloak, migrate, the workers, the IoT bridge), then replaces
+# the API services and the apps one container at a time in ROLLING's order: the new container starts next to the old
+# one, the old one stops once the new one is healthy, and the apps' ports stay open on web-edge. The whole stack
+# restarts instead when the data is built again from the seed, when a new migration says it breaks the code before it
+# (-- migrate:breaking), and at the first deployment with the file.
+#
 #   deploy.sh deploy TAG   deploys the tag (the workflow; by hand, from a checkout that has the tag)
 #   deploy.sh boot         after a reboot: the stack again, then the API services once Keycloak answers, as they load
 #                          its token keys at start (IR419); the unit ac-test-boot runs it
@@ -39,6 +46,14 @@ LIVE=deploy/test/compose.live.yaml # this environment's data (DEC-96); a tag bef
 LEFT_OUT=mock-fleet                # the profile compose.live.yaml moves the mock fleet's services to
 MULTIHOST=deploy/test/compose.multihost.yaml # more than one address (IR651); a tag before it has none
 STRIPE=stripe                      # the profile of the Stripe CLI, which forwards test-mode webhooks to the gateway
+ROLLING_FILE=deploy/test/compose.rolling.yaml # replacing one container at a time (IR855); a tag before it has none
+EDGE=$ROOT/web-edge                # web-edge's nginx configuration, outside the checkout (its path changes with the runner)
+# replaced one container at a time, in this order: the domain services before the gateway that calls them, the gateway
+# before the apps; the apps are behind web-edge
+ROLLING=(identity-api equipment-api maintenance-api billing-api energy-api gateway
+  customer-web-api partner-web-api technician-web-api admin-web-api portal-web)
+WEB_APPS=(customer-web-api partner-web-api technician-web-api admin-web-api portal-web)
+BREAKING_MARKER='-- migrate:breaking' # a migration the code before it cannot run on (internal/migrate, IR855)
 
 log() { printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"; }
 
@@ -81,7 +96,7 @@ stripe_settings() {
 # nginx that checks it, and the APIs accept the tokens of a sign-in on any of those addresses.
 compose() {
   local tag=$1 files=(-f "$REPO/compose.yaml" -f "$REPO/deploy/test/compose.test.yaml")
-  local env=(IMAGE_TAG="$tag" DEMO_CLOCK_START=now) profiles=(--profile full --profile iot)
+  local env=(IMAGE_TAG="$tag" DEMO_CLOCK_START=now WEB_EDGE_DIR="$EDGE") profiles=(--profile full --profile iot)
   shift
   if stripe_on; then
     profiles+=(--profile "$STRIPE")
@@ -94,6 +109,9 @@ compose() {
   if [ -n "$(setting PUBLIC_HOSTS)" ] && [ -f "$REPO/$MULTIHOST" ]; then
     files+=(-f "$REPO/$MULTIHOST")
     env+=(API_OIDC_ISSUER="$(issuers)")
+  fi
+  if [ -f "$REPO/$ROLLING_FILE" ]; then
+    files+=(-f "$REPO/$ROLLING_FILE")
   fi
   env "${env[@]}" docker compose -p "$PROJECT" --progress plain --env-file "$SETTINGS" \
     "${files[@]}" "${profiles[@]}" "$@"
@@ -183,9 +201,10 @@ leave_out() {
   fi
 }
 
-# checks out the tag $1, builds and starts it; $2 is 1 when the data is built again from the seed
+# checks out the tag $1, builds and starts it; $2 is 1 when the data is built again from the seed, $3 is 1 when the
+# services are replaced one container at a time
 deploy() {
-  local tag=$1 fresh=$2
+  local tag=$1 fresh=$2 rolling=${3:-0}
   step "checking out $tag"
   stripe_settings || return 1
   checkout "$tag" || return 1
@@ -198,12 +217,159 @@ deploy() {
     step "removing the data"
     compose "$tag" down --volumes --remove-orphans || return 1
   fi
-  step "starting the stack"
-  compose "$tag" up -d --remove-orphans || return 1
+  start "$tag" "$rolling" || return 1
   step "waiting for the apps and Keycloak"
   ready 900 || return 1
   end_step
   STEP=
+}
+
+# starts the tag $1 from its checkout: the whole stack at once, or, when $2 is 1, the services that are not replaced
+# and then each of ROLLING one container at a time (IR855)
+start() {
+  local tag=$1 rolling=$2 others
+  edge_files "$tag" || return 1
+  if [ "$rolling" != 1 ]; then
+    step "starting the stack"
+    compose "$tag" up -d --remove-orphans || return 1
+    edge_reload || return 1
+    return 0
+  fi
+  others=$(compose "$tag" config --services | grep -vxF -f <(printf '%s\n' "${ROLLING[@]}")) || return 1
+  step "starting the services that are not replaced one by one (the stores, migrate, the workers)"
+  # --no-deps: the replaced services stay as they are; the started ones still wait for each other (migrate first)
+  # shellcheck disable=SC2086 # one word per service
+  compose "$tag" up -d --remove-orphans --no-deps $others || return 1
+  edge_reload || return 1
+  local service
+  for service in "${ROLLING[@]}"; do
+    step "replacing $service"
+    roll "$tag" "$service" || return 1
+  done
+}
+
+# the containers of the service $1, by ID
+containers() {
+  docker ps -aq --no-trunc --filter "label=com.docker.compose.project=$PROJECT" \
+    --filter "label=com.docker.compose.service=$1"
+}
+
+# whether the service $1 is one of the apps behind web-edge
+is_app() { grep -qxF -e "$1" <<<"$(printf '%s\n' "${WEB_APPS[@]}")"; }
+
+# web-edge's configuration for the tag $1: its nginx file, and the upstreams by service name. A tag without
+# compose.rolling.yaml has no web-edge.
+edge_files() {
+  [ -f "$REPO/$ROLLING_FILE" ] || return 0
+  install -d -m 755 "$EDGE" || return 1
+  install -m 644 "$REPO/deploy/test/web-edge.conf" "$EDGE/edge.conf" || return 1
+  upstreams
+}
+
+# writes the upstreams: each app by its service name, which Docker's DNS gives every container of; with $1 and the
+# container IDs $2, the app $1 by those containers alone (the old ones while the new one starts, then the new one while
+# the old ones stop), so no request reaches a container that is not ready or about to stop
+upstreams() {
+  local app id servers
+  for app in "${WEB_APPS[@]}"; do
+    servers="server $app:3000 resolve; "
+    if [ "$app" = "${1:-}" ]; then
+      servers=
+      for id in $2; do
+        servers+="server $(docker inspect -f '{{.Name}}' "$id" | sed 's#^/##'):3000 resolve; "
+      done
+    fi
+    printf 'upstream %s-pool { zone %s-pool 64k; %s}\n' "$app" "$app" "$servers"
+  done >"$EDGE/00-upstreams.conf.new" || return 1
+  mv "$EDGE/00-upstreams.conf.new" "$EDGE/00-upstreams.conf"
+}
+
+# web-edge reads its configuration again; the requests in flight finish on the old worker processes, which this waits
+# for (up to a minute), so that the containers they reach may stop. Nothing to do without web-edge.
+edge_reload() {
+  local id deadline=$((SECONDS + 60))
+  id=$(containers web-edge | head -n 1)
+  [ -n "$id" ] || return 0
+  docker exec "$id" nginx -t -q || return 1
+  docker exec "$id" nginx -s reload || return 1
+  sleep 1
+  # grep reads all of ps (no -q): under pipefail an early exit would fail ps on SIGPIPE
+  while docker exec "$id" ps | grep -F 'worker process is shutting down' >/dev/null; do
+    if [ "$SECONDS" -ge "$deadline" ]; then
+      log "web-edge: old worker processes still serve after a minute; going on"
+      return 0
+    fi
+    sleep 1
+  done
+}
+
+# whether every container of $1 (IDs, one per line) is healthy within $2 seconds
+healthy() {
+  local deadline=$((SECONDS + $2)) id state
+  for id in $1; do
+    until state=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$id") &&
+      { [ "$state" = healthy ] || [ "$state" = running ]; }; do
+      if [ "$state" = unhealthy ] || [ "$state" = exited ] || [ "$SECONDS" -ge "$deadline" ]; then
+        log "not healthy ($state): $(docker inspect -f '{{.Name}}' "$id")"
+        docker logs --tail 40 "$id" 2>&1 || true
+        return 1
+      fi
+      sleep 2
+    done
+  done
+}
+
+# replaces the containers of the service $1 for the tag $2 one at a time: the new container starts next to the old
+# ones, and they stop when it is healthy (a Go service finishes its requests in flight; an app's are sent to the new
+# container first). A service whose containers already run this configuration is left alone (the way back to a tag
+# that did not change it); a new container that is not healthy is removed and the old ones keep serving.
+roll() {
+  local tag=$1 service=$2 want old new count
+  want=$(compose "$tag" config --hash "$service" | awk '{ print $2 }') || return 1
+  old=$(containers "$service")
+  if [ -n "$old" ] && [ "$(xargs docker inspect -f '{{index .Config.Labels "com.docker.compose.config-hash"}}' <<<"$old" |
+    sort -u)" = "$want" ]; then
+    log "$service: already this configuration"
+    return 0
+  fi
+  count=$(grep -c . <<<"$old")
+  if [ -n "$old" ] && is_app "$service"; then
+    { upstreams "$service" "$old" && edge_reload; } || return 1
+  fi
+  compose "$tag" up -d --no-deps --no-recreate --scale "$service=$((count + 1))" "$service" || return 1
+  new=$(containers "$service" | grep -vxF -f <(printf '%s\n' "$old"))
+  if [ -z "$new" ] || ! healthy "$new" 300; then
+    log "$service: the new container is not healthy; the old one keeps serving"
+    [ -z "$new" ] || xargs docker rm -f <<<"$new" >/dev/null
+    is_app "$service" && upstreams && edge_reload
+    return 1
+  fi
+  if [ -n "$old" ]; then
+    if is_app "$service"; then
+      { upstreams "$service" "$new" && edge_reload; } || return 1
+    fi
+    { xargs docker stop -t 30 <<<"$old" >/dev/null && xargs docker rm <<<"$old" >/dev/null; } || return 1
+  fi
+  if is_app "$service"; then
+    { upstreams && edge_reload; } || return 1
+  fi
+  log "$service: replaced by $(docker inspect -f '{{.Name}}' "$new" | sed 's#^/##')"
+}
+
+# whether the tag $2 can follow the deployed tag $1 one container at a time: $1 has compose.rolling.yaml (web-edge holds
+# the ports) and no migration $2 adds says it breaks the code before it
+rolls_after() {
+  local path
+  [ -n "$1" ] && git -C "$REPO" rev-parse --quiet --verify "refs/tags/$1:$ROLLING_FILE" >/dev/null || return 1
+  while read -r path; do
+    case $path in *.sql) ;; *) continue ;; esac
+    git -C "$REPO" rev-parse --quiet --verify "refs/tags/$1:$path" >/dev/null && continue
+    if grep -qF -e "$BREAKING_MARKER" <<<"$(git -C "$REPO" show "refs/tags/$2:$path")"; then
+      log "$path says it breaks the code before it: the whole stack restarts"
+      return 1
+    fi
+  done < <(git -C "$REPO" ls-tree -r --name-only "refs/tags/$2" -- "$MIGRATIONS")
+  return 0
 }
 
 # keeps the images of the last KEEP deployed tags, for a quick way back; then removes the untagged images (the
@@ -242,7 +408,7 @@ migrations_kept() {
 # deploys the tag $1: from the seed again when what the data are built from changed since the deployed tag; back to
 # that tag when it fails. A deployment that works leaves the tree and this script for the boot unit.
 release() {
-  local tag=$1 data fresh=0 previous
+  local tag=$1 data fresh=0 previous rolling=0 back=0
   if ! git -C "$REPO" rev-parse --quiet --verify "refs/tags/$tag" >/dev/null; then
     log "$tag is not a tag of $REPO"
     return 1
@@ -254,8 +420,12 @@ release() {
     fresh=1
     log "$tag: a migration of $previous was changed, or the data settings changed; the data is built again from the seed"
   fi
-  log "deploying $tag ($(git -C "$REPO" rev-parse --short "refs/tags/$tag^{commit}")) after ${previous:-nothing}"
-  if deploy "$tag" "$fresh"; then # each step returns its own failure
+  if [ "$fresh" = 0 ] && rolls_after "$previous" "$tag"; then
+    rolling=1
+  fi
+  log "deploying $tag ($(git -C "$REPO" rev-parse --short "refs/tags/$tag^{commit}")) after ${previous:-nothing}$(
+    [ "$rolling" = 1 ] && printf ', one container at a time' || printf ', the whole stack')"
+  if deploy "$tag" "$fresh" "$rolling"; then # each step returns its own failure
     printf '%s\n' "$tag" >"$STATE/deployed"
     printf '%s\n' "$data" >"$STATE/data"
     rm -f "$STATE/schema" # the migrations alone, the record before DEC-96
@@ -272,9 +442,12 @@ release() {
   fi
   log "$tag failed while $STEP"
   if [ -n "$previous" ]; then
+    # one container at a time again when the failed tag ran with web-edge and the tag before it has it too
+    [ -f "$REPO/$ROLLING_FILE" ] && git -C "$REPO" rev-parse --quiet --verify "refs/tags/$previous:$ROLLING_FILE" \
+      >/dev/null && back=1
     log "back to $previous"
-    { checkout "$previous" && prepare && compose "$previous" up -d --remove-orphans; } ||
-      log "$previous did not start again"
+    { checkout "$previous" && prepare && start "$previous" "$back"; } || log "$previous did not start again"
+    end_step
   fi
   return 1
 }
@@ -288,6 +461,7 @@ boot() {
   fi
   log "after the boot: starting $deployed"
   checkout "$deployed" || return 1
+  edge_files "$deployed" || return 1
   compose "$deployed" up -d --remove-orphans || return 1
   ready 900 || return 1
   compose "$deployed" restart "${API_SERVICES[@]}" || return 1

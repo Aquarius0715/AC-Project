@@ -6199,4 +6199,6 @@ export const id: Record<string, string> = {
   "This browser cannot share a location — switch this off, or use another browser.": "Browser ini tidak dapat membagikan lokasi — matikan ini, atau gunakan browser lain.",
   "Use this device’s location": "Gunakan lokasi perangkat ini",
   "While this page is open, your position is compared with the map pins of your homes and offices; only home or away is kept. A browser does not report in the background.": "Selama halaman ini terbuka, posisi Anda dibandingkan dengan pin peta rumah dan kantor Anda; hanya di rumah atau pergi yang disimpan. Browser tidak melapor di latar belakang.",
+  "Reload page": "Muat ulang halaman",
+  "A new version of the app is available. Reload the page to use it; save what you are entering first.": "Versi baru aplikasi ini tersedia. Muat ulang halaman untuk menggunakannya; simpan dulu yang sedang Anda isi.",
 };
