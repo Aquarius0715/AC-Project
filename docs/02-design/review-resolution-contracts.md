@@ -11004,3 +11004,12 @@ The API contract says a write carries an Idempotency-Key of 8–128 characters, 
 
 1. **Rule.** The registry counts the key in characters (`utf8.RuneCountInString`) and refuses a key that is not valid UTF-8; both refusals are `VALIDATION` with `fieldErrors {"Idempotency-Key": "error.required"}`, as for a missing key. `writes.getResult` already counted its `idempotencyKey` in characters.
 2. **Tests.** `TestIdempotencyKeyLength` (7 ASCII, 3 and 7 three-byte characters, invalid UTF-8 and 129 ASCII are refused with the field; 8 and 128 three-byte characters and 128 ASCII pass). It failed on four cases before the fix. `TestWriteLimit` covers the write limit of the same step (IR375): over the limit → `RATE_LIMITED` with `Retry-After` and nothing runs or claims its key, reads are not counted, and a limit store that does not answer lets the write through.
+
+## IR846 HQ's restriction managers hear of a suspected restriction bypass (DEC-110, IR844) — 2026-11-18
+
+A `restriction_bypass` Alert (IR844) has no policy, so no policy recipients and no escalation time (IR784) reached anyone: HQ saw it only by opening the Alerts list.
+
+1. **Rule.** The equipment scheduler runs `monitoring.BypassNotices`: a `restriction_bypass` Alert with status `open` and no `escalated_at` is marked (`escalated_at` = the tick, no version bump, as IR784) and each HQ member who holds `restriction.write` gets one critical `alert` notice (type `fault`) about the unit, with the Alert as its source and the status `restriction_bypass`. One audit entry `alerts.escalate` per Alert with the reason `restriction_bypass`.
+2. **Once per incident.** Later faults name the same Alert (IR844 item 2), which is already marked, so HQ is told once per Alert. An Alert acknowledged or resolved before the next tick is not told. The notice is readable by the members who read the unit (IR142: alert.read for an alert notice).
+3. **Web.** The notice's detail line says "Restriction may be bypassed — HQ checks the unit" (en, ms, ja, id).
+4. **Tests.** `TestRestrictionBypassAlert`: one notice to hq-restriction-manager at the next tick, none more at the following tick with a second fault; it fails with the job's query broken. `notifications.test.ts` checks the detail line in English and Japanese.

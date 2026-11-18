@@ -37,6 +37,11 @@ describe("inbox rows and alert rows", () => {
     expect(inboxRow(note({ channel: "email" }), "client", { locale: "ms", timeZone: "UTC" }).d).toBe("Diminta · e-mel"); // the channel in words too (IR488)
     expect(inboxRow(note({ type: "fault", templateKey: "alert", sourceAlertId: "a1", target: { kind: "unit", id: "u1" }, params: { ...note({}).params, targetName: BEDROOM_AC, status: "open" } }), "client"))
       .toMatchObject({ t: "Alert on Bedroom AC", href: "/customer/alerts" });
+    // DEC-110, IR846: HQ's notice of a suspected restriction bypass says so, in the display language
+    const bypass = note({ type: "fault", templateKey: "alert", sourceAlertId: "a2", target: { kind: "unit", id: "u1" }, params: { ...note({}).params, targetName: BEDROOM_AC, status: "restriction_bypass" } });
+    expect([inboxRow(bypass, "admin").d, inboxRow(bypass, "admin", { locale: "ja", timeZone: "UTC" }).d]).toStrictEqual([
+      "Restriction may be bypassed — HQ checks the unit", "制限が回避された可能性 — HQ がユニットを確認します",
+    ]);
   });
 
   it("does not link a notice whose page no longer opens for the reader (IR602)", () => {

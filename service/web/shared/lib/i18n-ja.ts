@@ -621,6 +621,7 @@ export const ja: Record<string, string> = {
   "Time change not accepted": "時間の変更は見送り",
   "Can’t make the visit": "訪問できません",
   "Escalated — nobody acknowledged it": "エスカレーション — 誰も確認していません",
+  "Restriction may be bypassed — HQ checks the unit": "制限が回避された可能性 — HQ がユニットを確認します",
   "Time proposed": "時間を提案済み",
   "Offered": "オファー済み",
   "Accepted": "承諾済み",

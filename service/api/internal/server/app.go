@@ -511,6 +511,10 @@ func (w *wiring) registerDevices() {
 	) // IR784: an alert nobody acknowledged in the policy's escalation time goes to HQ (DD-A05)
 	w.reg.AddJob(
 		ops.DomainEquipment,
+		monitoring.BypassNotices{Notify: notify.Store{}}.Run,
+	) // IR846: HQ's restriction managers hear of a suspected restriction bypass (DEC-110)
+	w.reg.AddJob(
+		ops.DomainEquipment,
 		devices.Lifecycle{Guard: control.Busy{}}.Advance,
 	) // IR67: operations start and time out on the w.equipment scheduler
 	w.reg.AddJob(
