@@ -52,15 +52,14 @@ ACCOUNTS = [
 def run(settings: str, accounts: list[dict]) -> tuple[subprocess.CompletedProcess, dict | None]:
     """realm.py's exit and stderr for the settings and the manifest's accounts, and the realm it wrote (None if none)."""
     with tempfile.TemporaryDirectory() as work:
-        settings_path = os.path.join(work, "settings.env")
         manifest_path = os.path.join(work, "manifest.json")
         target = os.path.join(work, "realm-load.json")
-        with open(settings_path, "w", encoding="utf-8") as f:
-            f.write(settings)
         with open(manifest_path, "w", encoding="utf-8") as f:
             json.dump({"customers": 1, "units": 1, "jobs": 1, "users": accounts}, f)
+        # the settings (secrets, even test ones) go through a pipe, never into a file
         done = subprocess.run(
-            [sys.executable, os.path.join(HERE, "realm.py"), REALM, target, settings_path, manifest_path],
+            [sys.executable, os.path.join(HERE, "realm.py"), REALM, target, "/dev/stdin", manifest_path],
+            input=settings,
             capture_output=True,
             text=True,
             check=False,
