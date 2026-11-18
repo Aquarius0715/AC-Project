@@ -71,7 +71,7 @@ export async function loadTechUnit(id: string, sp: { jobId?: string; metric?: st
     return {
       kind: "not_started" as const, title: t("Not started yet"),
       text: start ? t("You can see this AC from {time}, when your work window starts.", { time: showTime(start, display) }) : t("Available from the work start time of your assigned job."),
-      job: start && sp.jobId ? { href: `/technician/jobs/${sp.jobId}`, label: t("Open the job") } : null,
+      job: start && sp.jobId ? { href: `/technician/jobs/${encodeURIComponent(sp.jobId)}`, label: t("Open the job") } : null,
     };
   }
   const tab = sp.metric ? "monitoring" as const : "register" as const;
@@ -94,8 +94,9 @@ export async function loadTechUnit(id: string, sp: { jobId?: string; metric?: st
   const events = eventLists.flat();
   const control = controlJob(jobs, sp.jobId);
   const job = control ?? sp.jobId ?? null; // the job the alert evidence opens with
-  const back = sp.jobId ? `/technician/jobs/${sp.jobId}` : "/technician";
-  const alertsHref = `/technician/units/${id}/alerts${job ? `?jobId=${job}` : ""}`;
+  // the URL's jobId is encoded, so "x&alertId=…" stays one value instead of adding a parameter to the links
+  const back = sp.jobId ? `/technician/jobs/${encodeURIComponent(sp.jobId)}` : "/technician";
+  const alertsHref = `/technician/units/${id}/alerts${job ? `?jobId=${encodeURIComponent(job)}` : ""}`;
   return {
     kind: "live" as const,
     short: id.slice(0, 8),
@@ -113,8 +114,8 @@ export async function loadTechUnit(id: string, sp: { jobId?: string; metric?: st
       Object.fromEntries(others.map((m, k) => [m, more.at(k)?.complete ? 0 : more.at(k)?.total ?? 0]))),
     events: windowEvents(alerts, events, period, nowMs, i),
     history: jobRows(jobs, i),
-    alerts: openAlerts(alerts, nowMs, i).map((a) => ({ ...a, href: `${alertsHref}${job ? "&" : "?"}alertId=${a.id}` })),
-    controlHref: control ? `/technician/units/${id}/control?jobId=${control}` : null,
+    alerts: openAlerts(alerts, nowMs, i).map((a) => ({ ...a, href: `${alertsHref}${job ? "&" : "?"}alertId=${encodeURIComponent(a.id)}` })),
+    controlHref: control ? `/technician/units/${id}/control?jobId=${encodeURIComponent(control)}` : null,
     metric: metrics[0] ?? "temperature",
     choices: metricChoices(d, metrics, t),
     id,
