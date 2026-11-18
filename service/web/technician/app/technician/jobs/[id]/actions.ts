@@ -69,9 +69,11 @@ export async function uploadPhoto(form: FormData) {
   const jobId = formText(form, "jobId"), reportId = formText(form, "reportId"), version = Number(form.get("reportVersion"));
   const file = form.get("file");
   if (!(file instanceof File)) return { ok: false as const, code: "VALIDATION", messageKey: "error.validation", fieldErrors: { file: "error.required" } };
-  const tag = form.has("tag") ? formValue(z.enum(photoTags), form.get("tag"), "tag") : null; // what an installation report photo shows (DEC-106)
   const buffer = Buffer.from(await file.arrayBuffer());
   return run(async () => {
+    // what an installation report photo shows (DEC-106); checked inside run, so a tag the contract does not know is
+    // returned as a VALIDATION failure naming the field instead of being thrown out of the action (R1030)
+    const tag = form.has("tag") ? formValue(z.enum(photoTags), form.get("tag"), "tag") : null;
     await coreOp("attachments.add", { jobId, reportId, file: { name: uploadName(file.name), mime: formValue(imageMime, uploadType(buffer, file.type), "file"), size: file.size, bytes: buffer.toString("base64") }, ...(tag && { tag }) }, { write: true, expectedVersion: version });
     return reportState(await coreOp<ApiTechReport>("reports.get", { jobId, reportId, reportVersion: version + 1 }));
   });
