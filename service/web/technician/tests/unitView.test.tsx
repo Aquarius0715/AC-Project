@@ -127,8 +127,9 @@ describe("TechUnitView", () => {
       events: [{ id: "e1", at: "x", time: "09:12", title: "Alert raised", sub: "temp ≥ 30", badge: { text: "Alert", tone: "warn" } }, { id: "e2", at: "y", time: "05:10", title: "Data resumed", sub: "", badge: { text: "Connectivity", tone: "primary" } }],
     })} />);
     expect(screen.getByText("Earlier readings are not loaded")).toBeTruthy();
-    const supply = screen.getByText("Supply air").closest("[data-slot=card]") ?? document.body;
-    expect(within(supply instanceof HTMLElement ? supply : document.body).getByText("No valid readings in this period.")).toBeTruthy();
+    const supply = screen.getByText("Supply air").closest("[data-slot=card]");
+    if (!(supply instanceof HTMLElement)) throw new TypeError("the Supply air card is missing");
+    expect(within(supply).getByText("No valid readings in this period.")).toBeTruthy();
     const charts = screen.getAllByRole("button", { name: /Chart/ });
     fireEvent.click(charts[0] ?? document.body);
     expect(patch).toHaveBeenLastCalledWith({ metric: "temperature,humidity" });
