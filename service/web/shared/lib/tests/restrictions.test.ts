@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { EN, i18nOf, translator } from "@ac/web/lib/i18n";
 import {
-  actionOutcome, activePeriod, executeBlocker, intentText, policyText, progressText, releaseBlocker, restrictionRows, stateWord, unitRows,
+  actionOutcome, activePeriod, bypassNames, executeBlocker, intentText, policyText, progressText, releaseBlocker, restrictionRows, stateWord, unitRows,
   type ApiCommand, type ApiRestriction, type PerUnit,
 } from "@ac/web/lib/restrictions";
 
@@ -100,5 +100,21 @@ describe("HQ restrictions in Malay with the display time zone (IR301)", () => {
       .toStrictEqual(["Dilaksanakan selepas 16 Sep 2026, 9:00 PG GMT+9", "Hanya sekatan yang diminta atau dikenakan boleh dilepaskan"]);
     expect([actionOutcome("override", "requested", t).result, actionOutcome("cancel", "cancelled", t).result]).toStrictEqual(["Diminta → Pelepasan diminta (sumber: pelepasan manual); invois kekal belum dibayar", "Tidak boleh — sekatan ini dibatalkan"]);
     expect([stateWord("scheduled", t), intentText(restriction({ releaseIntent: { source: "payment", at: TEXT_2026_09_14T02_00_00Z } }), MS)]).toStrictEqual(["Dijadualkan", "pembayaran · 14 Sep 2026, 11:00 PG GMT+9"]);
+  });
+});
+
+// DEC-110, IR849: the detail names the units whose restriction may be bypassed — an unresolved restriction_bypass
+// Alert of one of its own units; a resolved one, another type, or another unit's Alert does not count
+describe("bypassNames", () => {
+  it("names the units with an unresolved restriction_bypass alert", () => {
+    const units = [{ unitId: "u1", name: "Bedroom AC" }, { unitId: "u2", name: "Lobby AC" }, { unitId: "u3", name: "Office AC" }];
+    expect(bypassNames(units, [
+      { unitId: "u1", type: "restriction_bypass", status: "open" },
+      { unitId: "u2", type: "restriction_bypass", status: "resolved" },
+      { unitId: "u3", type: "tamper", status: "open" },
+      { unitId: "u3", type: "restriction_bypass", status: "acknowledged" },
+      { unitId: "u9", type: "restriction_bypass", status: "open" },
+    ])).toStrictEqual(["Bedroom AC", "Office AC"]);
+    expect(bypassNames(units, [])).toStrictEqual([]);
   });
 });

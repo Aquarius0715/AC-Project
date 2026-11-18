@@ -220,6 +220,7 @@ function RestrictionTab({ live }: Readonly<{ live: InvoiceLive }>) {
             </div>
           ))}
         </div>
+        {["requested", "applied", RELEASE_REQUESTED].includes(r.notice.state) && <div className="mt-3"><Banner tone="warn">{t("Keep the AC's control device plugged in and in sight of the AC while the restriction lasts. If it goes silent, loses power or is opened, or the AC runs under power off, HQ is told.")}</Banner></div>}
         <h3 className="mb-2 mt-4 text-[13px] font-bold">{t("Timeline")}</h3>
         <Timeline items={r.timeline} />
         {r.notice.state === RELEASE_REQUESTED && <div className="mt-3"><Banner>{t("Status stays “Release requested” until every unit confirms. It is never shown as Released while a device result is unknown.")}</Banner></div>}

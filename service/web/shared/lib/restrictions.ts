@@ -89,6 +89,13 @@ export function restrictionRows(rs: ApiRestriction[], contractLabel: (id?: strin
 accept them (IR832). `applyWanted` is false when all causes are paid or a grace period or exception is active: the API
 refuses an apply retry then (errors.restriction_not_applicable). */
 export interface UnitRow { unitId: string; name: string; apply: string; release: string; observed: string; pending: string | null; retryApply: boolean; retryRelease: boolean; reconcile: boolean; commands: string }
+/** The names of the restriction's units with an unresolved restriction_bypass Alert (DEC-110, IR849): the node went
+silent, lost power or was opened, or the unit draws power under power off, so the restriction may no longer hold. */
+export function bypassNames(units: readonly Pick<UnitRow, "unitId" | "name">[], alerts: readonly { unitId: string; type: string; status: string }[]): string[] {
+  const suspected = new Set(alerts.filter((a) => a.type === "restriction_bypass" && a.status !== "resolved").map((a) => a.unitId));
+  return units.filter((u) => suspected.has(u.unitId)).map((u) => u.name);
+}
+
 export function unitRows(r: ApiRestriction, names: Map<string, string>, commands: Map<string, ApiCommand>, i: I18n = EN, applyWanted = true): UnitRow[] {
   const { t } = i;
   const apply: Partial<Record<PerUnit["applyState"], string>> = { not_sent: t("not sent"), sent_unknown: t("sent, result unknown"), applied: t("applied"), not_applied: t("not applied") };
