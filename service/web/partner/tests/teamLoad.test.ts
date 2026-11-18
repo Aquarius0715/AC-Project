@@ -88,6 +88,26 @@ describe("partner team loader", () => {
     expect(dal.coreOp.mock.calls.map((c: unknown[]) => c[1])).toStrictEqual([{ filters: { membershipId: "m-1" }, limit: 100 }, { filters: { membershipId: "m-2" }, limit: 100 }]);
   });
 
+  it("orders two technicians of the same name without e-mail by their membership", async () => {
+    const second: ApiTeamMember = { ...technician, id: "m-2", userId: "u-2" };
+    dal.coreAll.mockImplementation((operation: string) => Promise.resolve(operation === "members.list" ? [second, technician] : []));
+    const live = await loadTeam({ date: "2026-11-18" });
+    if (live.notFound) throw new Error("expected the team");
+    expect(live.technicians).toStrictEqual([{ id: "m-1", name: "Aiman" }, { id: "m-2", name: "Aiman" }]);
+  });
+
+  it("needs no qualification for a booking on a unit that is not listed or has no service scope", async () => {
+    for (const units of [[], [{ id: "unit-1", displayName: "Living room" }]]) {
+      const lists = new Map<string, unknown[]>([["members.list", [technician]], ["units.list", units]]);
+      dal.coreAll.mockImplementation((operation: string) => Promise.resolve(lists.get(operation) ?? []));
+      dal.coreOp.mockResolvedValue({ items: [job("job-1111aaaa", "assigned", slot)], total: 1 });
+      const live = await loadTeam({ date: "2026-11-18" });
+      if (live.notFound) throw new Error("expected the team");
+      expect(live.jobs.map((j) => j.jobId)).toStrictEqual(["job-1111aaaa"]);
+      expect([live.certificates.rows, live.certificates.impact]).toStrictEqual([[], null]);
+    }
+  });
+
   describe("a booked job whose unit needs a qualification the technician does not hold", () => {
     beforeEach(() => {
       const lists = new Map<string, unknown[]>([["members.list", [technician]], ["units.list", [{ id: "unit-1", displayName: "Living room", serviceScope: ["indoor"] }]]]);

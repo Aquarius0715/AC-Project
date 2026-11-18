@@ -56,4 +56,22 @@ describe("partner jobs list loader", () => {
     dal.coreOp.mockRejectedValue(new dal.CoreError("UNAVAILABLE"));
     await expect(loadJobs({ cursor: "c-old" })).rejects.toThrow("UNAVAILABLE");
   });
+
+  it("names each row's unit and technician, counts every tab, and leaves unknown ones generic", async () => {
+    const slot = { startAt: "2026-11-20T01:00:00Z", endAt: "2026-11-20T03:00:00Z" };
+    const row = (id: string, unitId: string, technicianMembershipId: string) => ({
+      id, unitId, technicianMembershipId, status: "assigned", dueAt: "2026-11-20T08:00:00Z", projection: "summary", version: 1, type: "reactive", requestedSlot: slot, scheduledSlot: slot,
+      assignmentId: `a-${id}`, displayStatus: "assigned", eventSummary: { count: 0, customerVisible: 0, notes: 0, latest: null },
+    });
+    dal.coreOp.mockImplementation((_operation: string, input: { limit: number }) => Promise.resolve(input.limit === 1
+      ? { items: [], nextCursor: null, total: 4 }
+      : { items: [row("job-aaaa-1", "unit-1", "m-1"), row("job-bbbb-2", "unit-x", "m-x")], nextCursor: "c-2", total: 2 }));
+    dal.coreAll.mockImplementation((operation: string) => Promise.resolve(operation === "units.list"
+      ? [{ id: "unit-1", displayName: "Lobby AC" }]
+      : [{ id: "m-1", userId: "u-1", displayName: "Aiman", role: "technician" }]));
+    const live = await loadJobs({});
+    expect(live.rows.map((r) => [r.title, r.tech.name])).toStrictEqual([["job-aaaa · Lobby AC", "Aiman"], ["job-bbbb · Repair", "Technician"]]);
+    expect(live.tabs.every((tb) => tb.count === 4)).toBe(true);
+    expect([live.nextCursor, live.total]).toStrictEqual(["c-2", 2]);
+  });
 });

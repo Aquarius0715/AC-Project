@@ -30,7 +30,8 @@ const summary = (id: string, status: string, dueAt: string): ApiPartnerJob => ({
 });
 const history = (jobId: string): ApiPartnerJob => ({ jobId, projection: "history", type: "maintenance", status: "completed", completedAt: null, asOf: "2026-11-15T00:00:00Z", ownDecisionEvents: [] });
 const jobIdOf = (input: unknown) => (typeof input === "object" && input !== null && "jobId" in input && typeof input.jobId === "string" ? input.jobId : null);
-const eventReads = () => dal.coreItems.mock.calls.filter(([operation]) => operation === "jobs.events").map(([, input]) => jobIdOf(input));
+const dateOf = (input: unknown) => (typeof input === "object" && input !== null && "date" in input && typeof input.date === "string" ? input.date : null);
+const eventReads =() => dal.coreItems.mock.calls.filter(([operation]) => operation === "jobs.events").map(([, input]) => jobIdOf(input));
 
 describe("partner overview loader", () => {
   beforeEach(() => {
@@ -58,5 +59,21 @@ describe("partner overview loader", () => {
     await loadOverview({});
     expect(eventReads().slice(0, 2)).toStrictEqual(["done-1", "done-2"]);
     expect(eventReads()).toHaveLength(8);
+  });
+
+  it("reads today's capacity on its own for a period without today, and names units and technicians", async () => {
+    const job = { ...summary("job-1", "assigned", "2026-11-03T08:00:00Z"), technicianMembershipId: "m-1", scheduledSlot: { startAt: "2026-11-03T01:00:00Z", endAt: "2026-11-03T03:00:00Z" } };
+    const member = { id: "m-1", userId: "u-1", displayName: "Aiman", role: "technician" };
+    const lists = new Map<string, unknown[]>([["jobs.list", [job]], ["members.list", [member]], ["units.list", [{ id: "unit-1", displayName: "Lobby AC" }]]]);
+    dal.coreAll.mockImplementation((operation: string) => Promise.resolve(lists.get(operation) ?? []));
+    const todaySlot = { startAt: "2026-11-18T01:00:00Z", endAt: "2026-11-18T03:00:00Z" };
+    dal.coreItems.mockImplementation((operation: string, input: { date?: string }) => Promise.resolve(operation === "members.capacity" && input.date === "2026-11-18"
+      ? [{ membershipId: "m-1", date: "2026-11-18", availableSlots: [], assignedSlots: [todaySlot], availableMinutes: 480, assignedMinutes: 120, unavailability: null }]
+      : []));
+    const live = await loadOverview({ from: "2026-11-02", to: "2026-11-04" });
+    const capacityDays = dal.coreItems.mock.calls.filter(([operation]) => operation === "members.capacity").map(([, input]) => dateOf(input));
+    expect(capacityDays).toStrictEqual(["2026-11-02", "2026-11-03", "2026-11-04", "2026-11-18"]);
+    expect(live.timeline.map((r) => [r.name, r.blocks.map((b) => b.text)])).toStrictEqual([["Aiman", ["09:00–11:00"]]]);
+    expect(JSON.stringify(live)).toContain("Lobby AC");
   });
 });
