@@ -1,5 +1,5 @@
 """Test of the identity provider's themes (IR646, IR789, IR795): every login and e-mail theme offers each language the
-realm turns on, and each login theme has every product text in each of them with the same placeholders as English.
+realm turns on (DEC-108: the e-mails too), and each login theme has every product text in each of them with the same placeholders as English.
 
 usage: python3 -m unittest docker/keycloak/test_themes.py
 """
