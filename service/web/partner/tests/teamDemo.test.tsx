@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 
 // The Phase 1A demo of Team & capacity: the search by qualification or technician, Active only, the Certifications
 // tab and the two demo dialogs with their toasts
@@ -38,7 +38,10 @@ describe("Team demo", () => {
     fireEvent.click(screen.getByRole("checkbox", { name: "Active only" }));
     expect(cards()).toStrictEqual(["tech-external-a", "tech-external-a2", "tech-external-old"]);
     expect(screen.queryByText(/expired member hidden/)).toBeNull();
-    expect(screen.getAllByText("—").length).toBeGreaterThan(0);
+    const old = screen.getByText("tech-external-old", { selector: "h2" }).closest("[data-slot='card']");
+    if (!(old instanceof HTMLElement)) throw new TypeError("no card of tech-external-old");
+    expect(within(old).getByText("—", { selector: ".text-xl" })).toBeTruthy(); // utilization undefined, not 0%
+    expect(within(old).getByText("0 h / 0 h", { exact: false })).toBeTruthy();
   });
 
   it("saves the demo unavailable days and uploads a renewal from the Certifications tab", () => {
@@ -47,6 +50,7 @@ describe("Team demo", () => {
     expect(screen.getByText(/Conflicts with 1 confirmed assignment \(job-c07/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     expect(toast).toHaveBeenCalledWith("Unavailable days saved — available hours set to 0");
+    expect(screen.queryByRole("dialog")).toBeNull();
     fireEvent.click(screen.getByRole("tab", { name: /Certifications/ }));
     expect(screen.getAllByText(/^(Valid|Expiring · 14 d|Expired)$/, { selector: "[data-slot='badge']" }).map((x) => x.textContent)).toStrictEqual(["Valid", "Expiring · 14 d", "Valid", "Expired"]);
     expect(screen.getAllByRole("button", { name: "Upload renewal" })).toHaveLength(1); // only the expiring row

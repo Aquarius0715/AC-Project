@@ -19,12 +19,14 @@ const actions = vi.hoisted(() => ({ setUnavailability: vi.fn(), clearUnavailabil
 vi.mock("../app/partner/team/actions", () => actions);
 const nav = vi.hoisted(() => vi.fn());
 vi.mock("@ac/web/lib/useUrlPatch", () => ({ useUrlPatch: () => nav }));
+// the success toasts, and the codes of the refusals once the view's failure handler has run
 const toasts = vi.hoisted((): string[] => []);
+const failures = vi.hoisted((): string[] => []);
 type Result = { ok: true; value: never } | ({ ok: false } & ActionFailure);
 vi.mock("@ac/web/lib/useAction", () => ({
   useAction: () => [false, (fn: () => Promise<Result>, ok: string | ((v: never) => string), after?: (v: never) => void, failed?: (f: ActionFailure) => void) => {
     void fn().then((r) => {
-      if (r.ok) { toasts.push(typeof ok === "string" ? ok : ok(r.value)); after?.(r.value); } else failed?.(r);
+      if (r.ok) { toasts.push(typeof ok === "string" ? ok : ok(r.value)); after?.(r.value); } else { failed?.(r); failures.push(r.code); }
     });
   }] as const,
 }));
@@ -67,8 +69,9 @@ const technicianRow = (name: string) => {
 };
 
 beforeEach(() => {
-  vi.clearAllMocks();
+  vi.resetAllMocks(); // results too, so no test inherits another's action result
   toasts.length = 0;
+  failures.length = 0;
   vi.stubGlobal("ResizeObserver", class { observe = vi.fn(); unobserve = vi.fn(); disconnect = vi.fn(); }); // jsdom has none; the week's scroll box uses it
   history.replaceState(null, "", "/partner/team");
   dal.coreNow.mockResolvedValue(new Date("2026-11-18T02:00:00Z"));
@@ -285,11 +288,11 @@ describe("Remove unavailable days", () => {
     expect(within(d).getByLabelText("Remove from")).toHaveProperty("value", "2026-11-18");
     expect(within(d).getByText("Still unavailable: Mon 16 – Tue 17 Nov; the days from Wed, 18 Nov on are removed. Days before today stay recorded.")).toBeTruthy();
     fireEvent.click(within(d).getByRole("button", { name: "Remove" }));
-    await waitFor(() => { expect(actions.clearUnavailability).toHaveBeenCalledOnce(); });
+    await waitFor(() => { expect(failures).toStrictEqual(["VALIDATION"]); }); // the view's failure handler has run
     expect(screen.getByRole("dialog")).toBeTruthy();
     actions.clearUnavailability.mockResolvedValue({ ok: false, code: "CONFLICT", fieldErrors: {} });
     fireEvent.click(within(d).getByRole("button", { name: "Remove" }));
     await waitFor(() => { expect(screen.queryByRole("dialog")).toBeNull(); });
-    expect(toasts).toStrictEqual([]);
+    expect(failures).toStrictEqual(["VALIDATION", "CONFLICT"]);
   });
 });
