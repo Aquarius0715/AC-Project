@@ -152,7 +152,6 @@ describe("partner schedule loader", () => {
       });
     });
 
-
     it("shows the current assignment, the technician's answer and the booking on the booked time's day", async () => {
       get = (id) => Promise.resolve(assigned(id));
       // the booked time's day (Friday 20 Nov in Kuala Lumpur) has the technician busy then; the other days are empty
@@ -179,7 +178,7 @@ describe("partner schedule loader", () => {
       expect(eligibleSlots).toStrictEqual([slotB]);
     });
 
-    it("takes an accepted offer's version and required qualifications, and searches no candidates before the delegation starts", async () => {
+    it("takes an accepted offer's version and required qualifications, searches no candidates before the delegation starts, and reads no unit", async () => {
       get = (id) => Promise.resolve(offer(id));
       const live = await loadSchedule({});
       expect(live.selected).toMatchObject({ version: 7, required: ["demo_indoor"], ack: null, moved: false, currentId: null, times: [], mode: { kind: "blocked" } });
