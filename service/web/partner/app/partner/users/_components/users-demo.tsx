@@ -19,7 +19,8 @@ const ops: UsersOps = {
   access: (r, until) => done(partnerUserDemo.setAccess(r.id, until)),
   setStatus: (r, status) => done(partnerUserDemo.setStatus(r.id, status)),
   remove: (r) => done(partnerUserDemo.remove(r.id)),
-  resend: (r) => done(r.status === "invited" ? null : "errors.invite_not_pending"),
+  // the row offers Resend only while the account is not signed in yet (partnerUserRows), and nothing is sent
+  resend: () => done(null),
 };
 
 /** Phase 1A demo of Users (FR-P11): contractor-a's accounts in the tab's store, the same rules as the API. */
