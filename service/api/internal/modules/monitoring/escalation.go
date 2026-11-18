@@ -47,7 +47,7 @@ type hqNotice struct {
 
 // tellHQ marks the due Alerts and gives each HQ member who holds the permission one alert notice per Alert about its
 // unit (type fault, the Alert as its source), with one audit entry alerts.escalate per Alert; it returns how many
-// Alerts it told about (IR784, IR845).
+// Alerts it told about (IR784, IR846).
 func tellHQ(ctx context.Context, call *ops.Call, store notify.Store, notice hqNotice) (int, error) {
 	rows, err := call.Tx.Query(ctx, notice.marking, call.Now)
 	if err != nil {

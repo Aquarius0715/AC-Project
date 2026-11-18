@@ -7,10 +7,10 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/ops"
 )
 
-// statusRestrictionBypass is the status word of a suspected restriction bypass notice (DEC-110, IR845).
+// statusRestrictionBypass is the status word of a suspected restriction bypass notice (DEC-110, IR846).
 const statusRestrictionBypass = "restriction_bypass"
 
-// BypassNotices is the equipment scheduler job that tells HQ about a suspected restriction bypass (DEC-110, IR845): a
+// BypassNotices is the equipment scheduler job that tells HQ about a suspected restriction bypass (DEC-110, IR846): a
 // restriction_bypass Alert (IR844) that HQ has not been told about gives each HQ member who holds restriction.write one
 // critical alert notice about the unit, at the next tick after it opened. escalated_at records that HQ was told (no
 // version bump, as for IR784), so it is told once per Alert however many faults the incident has; an Alert already

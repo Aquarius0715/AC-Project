@@ -17,6 +17,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -807,7 +808,9 @@ func (r *Registry) claim(
 		return nil, nil
 	}
 
-	if len(key) < 8 || len(key) > 128 { // platform.idempotency_keys CHECK (8–128)
+	// platform.idempotency_keys CHECK (length(key) BETWEEN 8 AND 128) counts characters, and a key that is not UTF-8
+	// fails the text column: both are refused here with the field named, not by the database (as writes.getResult)
+	if n := utf8.RuneCountInString(key); !utf8.ValidString(key) || n < 8 || n > 128 {
 		return nil, apperr.Fields(map[string]string{"Idempotency-Key": apperr.KeyRequired})
 	}
 

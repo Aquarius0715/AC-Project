@@ -142,7 +142,7 @@ func TestRestrictionBypassAlert(t *testing.T) {
 		t.Fatalf("bypass alert: %s %s %s %q %v", typ, severity, status, text, previous)
 	}
 
-	// HQ's restriction managers hear of it once, at the next tick (IR845), however many faults the incident has
+	// HQ's restriction managers hear of it once, at the next tick (IR846), however many faults the incident has
 	notices := func() (int, int) {
 		t.Helper()
 		drainEvents(t)

@@ -10998,7 +10998,14 @@ A restriction (power off or a temperature limit) reaches the air conditioner as 
 5. **Tests.** `TestRestrictionBypassAlert` (applied power-off restriction acknowledged through control: silent node → one critical Alert; power lost → the same Alert; tamper → its tamper Alert and the same one; restored leaves it open; a fault after it was resolved opens a new one linking it; a unit under no restriction gets none). `notifications.test.ts` checks the title and next step.
 
 
-## IR845 HQ's restriction managers hear of a suspected restriction bypass (DEC-110, IR844) — 2026-11-18
+## IR845 The Idempotency-Key is counted in characters, as the API contract and the database say (D04) — 2026-11-18
+
+The API contract says a write carries an Idempotency-Key of 8–128 characters, and `platform.idempotency_keys` checks `length(key) BETWEEN 8 AND 128` (characters, migration 000001). The registry counted bytes (`len(key)`), so a key of three to seven multi-byte characters (three CJK characters are nine bytes) passed the registry and failed the database CHECK, which answered a status-only `VALIDATION error.validation` without the field (against IR331); a key of more than 42 three-byte characters was refused although it is within 128 characters; and a key that is not UTF-8 (Go's server accepts such header bytes) failed the text column with an error the API answers as `UNAVAILABLE`. Review rounds 1003–1004 found it.
+
+1. **Rule.** The registry counts the key in characters (`utf8.RuneCountInString`) and refuses a key that is not valid UTF-8; both refusals are `VALIDATION` with `fieldErrors {"Idempotency-Key": "error.required"}`, as for a missing key. `writes.getResult` already counted its `idempotencyKey` in characters.
+2. **Tests.** `TestIdempotencyKeyLength` (7 ASCII, 3 and 7 three-byte characters, invalid UTF-8 and 129 ASCII are refused with the field; 8 and 128 three-byte characters and 128 ASCII pass). It failed on four cases before the fix. `TestWriteLimit` covers the write limit of the same step (IR375): over the limit → `RATE_LIMITED` with `Retry-After` and nothing runs or claims its key, reads are not counted, and a limit store that does not answer lets the write through.
+
+## IR846 HQ's restriction managers hear of a suspected restriction bypass (DEC-110, IR844) — 2026-11-18
 
 A `restriction_bypass` Alert (IR844) has no policy, so no policy recipients and no escalation time (IR784) reached anyone: HQ saw it only by opening the Alerts list.
 

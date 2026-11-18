@@ -83,7 +83,7 @@ const statusWords: Record<string, string> = {
   // the time proposals and the technician's answer (IR113 item 9, IR783)
   escalated: "Escalated — nobody acknowledged it", expired: "Expired", reschedule_requested: "Reschedule requested", time_change_proposed: "Time change proposed",
   time_change_kept: "Time change not accepted", cant_make: "Can’t make the visit",
-  restriction_bypass: "Restriction may be bypassed — HQ checks the unit", // a device fault under a restriction (DEC-110, IR845)
+  restriction_bypass: "Restriction may be bypassed — HQ checks the unit", // a device fault under a restriction (DEC-110, IR846)
 };
 /** Why an assignment was released (the access-release notice, IR439). */
 const reasonWords: Record<string, string> = {

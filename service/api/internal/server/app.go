@@ -512,7 +512,7 @@ func (w *wiring) registerDevices() {
 	w.reg.AddJob(
 		ops.DomainEquipment,
 		monitoring.BypassNotices{Notify: notify.Store{}}.Run,
-	) // IR845: HQ's restriction managers hear of a suspected restriction bypass (DEC-110)
+	) // IR846: HQ's restriction managers hear of a suspected restriction bypass (DEC-110)
 	w.reg.AddJob(
 		ops.DomainEquipment,
 		devices.Lifecycle{Guard: control.Busy{}}.Advance,
