@@ -125,7 +125,7 @@ describe("Review view with a submitted report", () => {
     expect(screen.getByText("1017 / 1000 characters with the ticked items")).toBeTruthy();
     expect(actions.reviewReport).not.toHaveBeenCalled();
     click("Cancel");
-    expect(screen.queryByRole("button", { name: "Return report" })).toBeNull();
+    await waitFor(() => { expect(screen.queryByRole("button", { name: "Return report" })).toBeNull(); });
     click("Return for rework…");
     fireEvent.keyDown(reasonBox(), { key: "Escape" });
     await waitFor(() => { expect(screen.queryByRole("button", { name: "Return report" })).toBeNull(); });
@@ -143,7 +143,8 @@ describe("Review view with a submitted report", () => {
     expect(toasts.texts).toStrictEqual([]);
   });
 
-  it("shows no banner for another failure, and puts a refused reason on the reason field", async () => {
+  it("shows no banner for another failure (clearing an earlier one), and puts a refused reason on the reason field", async () => {
+    const banner = () => screen.queryByText(/already accepted or returned|your company does not hold|^This job is outside/);
     actions.reviewReport.mockResolvedValue(failure("VALIDATION", { reason: "too long" }));
     render(<ReviewView live={live()} />);
     click("Return for rework…");
@@ -151,11 +152,15 @@ describe("Review view with a submitted report", () => {
     click("Return report");
     expect(await screen.findByText("A reason is required (1–1000 characters)")).toBeTruthy();
     await waitFor(() => { expect(document.activeElement).toBe(reasonBox()); });
-    expect(screen.queryByText(/already accepted or returned|your company does not hold|^This job is outside/)).toBeNull();
+    expect(banner()).toBeNull();
+    actions.reviewReport.mockResolvedValue(failure("CONFLICT"));
+    click("Return report");
+    await waitFor(() => { expect(banner()).not.toBeNull(); });
     actions.reviewReport.mockResolvedValue(failure("UNAVAILABLE"));
     click("Return report");
-    await waitFor(() => { expect(actions.reviewReport).toHaveBeenCalledTimes(2); });
-    expect(screen.getByRole("button", { name: "Return report" })).toBeTruthy();
+    await waitFor(() => { expect(banner()).toBeNull(); });
+    expect(actions.reviewReport).toHaveBeenCalledTimes(3);
+    expect(screen.getByRole("button", { name: "Return report" })).toBeTruthy(); // the dialog stays open to retry
   });
 });
 

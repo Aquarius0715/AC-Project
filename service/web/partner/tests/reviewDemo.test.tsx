@@ -22,8 +22,8 @@ describe("Review demo", () => {
     expect(screen.getAllByText(/^Photo \d$/)).toHaveLength(3);
     click("Accept report");
     expect(screen.getByText(/^Accepted → completed \(receipt\)\. Report v1/)).toBeTruthy();
-    expect(toast).toHaveBeenCalledWith("Report accepted");
-    expect(decisions()).toStrictEqual([]);
+    expect(toast.mock.calls).toStrictEqual([["Report accepted"]]);
+    expect(decisions()).toStrictEqual([]); // no second decision
   });
 
   it("asks for a reason before returning, Cancel or Escape keep the report pending, and a reason returns it", async () => {
@@ -47,7 +47,7 @@ describe("Review demo", () => {
     expect(screen.queryByText("A reason is required")).toBeNull();
     click("Return report");
     expect(screen.getByText("Returned for rework. tech-external-a can resume as v2.")).toBeTruthy();
-    expect(toast).toHaveBeenCalledWith("Returned for rework", "warn");
+    expect(toast.mock.calls).toStrictEqual([["Returned for rework", "warn"]]);
     expect(decisions()).toStrictEqual([]);
   });
 });
