@@ -2,10 +2,24 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // the technician device screen (FR-T11) through the DAL; a device registered on site is reserved for its planned unit
 // and stays unbound until devices.bind (D05, IR467)
-const dal = vi.hoisted(() => ({
-  coreNow: vi.fn(), coreDisplay: vi.fn(), corePermissions: vi.fn(), coreAll: vi.fn(), coreOp: vi.fn(),
-  orAbsent: async <T,>(read: Promise<T>): Promise<T | null> => read.catch(() => null),
-}));
+// CoreError and orAbsent copy the DAL's: only FORBIDDEN and NOT_FOUND read as absent, anything else is thrown
+const dal = vi.hoisted(() => {
+  class CoreError extends Error {
+    readonly error: { code: string };
+    constructor(code: string, options?: ErrorOptions) {
+      super(code, options);
+      this.name = "CoreError";
+      this.error = { code };
+    }
+  }
+  return {
+    CoreError, coreNow: vi.fn(), coreDisplay: vi.fn(), corePermissions: vi.fn(), coreAll: vi.fn(), coreOp: vi.fn(),
+    orAbsent: async <T,>(read: Promise<T>): Promise<T | null> => read.catch((error: unknown) => {
+      if (error instanceof CoreError && (error.error.code === "FORBIDDEN" || error.error.code === "NOT_FOUND")) return null;
+      throw error;
+    }),
+  };
+});
 vi.mock("server-only", () => ({}));
 vi.mock("@ac/web/lib/dal", () => dal);
 
@@ -37,6 +51,7 @@ interface Setup {
   calibrations?: ApiCalibration[];
   events?: ApiDeviceEventFull[] | "refused";
   alerts?: ApiAlertLite[];
+  unitError?: string;
 }
 
 const alertReads: string[] = [];
@@ -57,14 +72,14 @@ function setup(s: Setup): void {
     if (operation === "devices.get") return Promise.resolve(devices.find((d) => d.id === input.id));
     if (operation === "units.get") {
       const u = input.id ? s.details?.get(input.id) : undefined;
-      return u ? Promise.resolve(u) : Promise.reject(new Error("not read")); // the unit reads as absent
+      return u ? Promise.resolve(u) : Promise.reject(new dal.CoreError(s.unitError ?? "FORBIDDEN")); // before the work window: absent
     }
     if (operation === "devices.calibrations") return Promise.resolve({ items: s.calibrations ?? [] });
-    if (operation === "devices.events") return s.events === "refused" ? Promise.reject(new Error("FORBIDDEN")) : Promise.resolve({ items: s.events ?? [] });
+    if (operation === "devices.events") return s.events === "refused" ? Promise.reject(new dal.CoreError("FORBIDDEN")) : Promise.resolve({ items: s.events ?? [] });
     if (operation === "alerts.get") {
       alertReads.push(input.id ?? "");
       const a = input.id ? alerts.get(input.id) : undefined;
-      return a ? Promise.resolve(a) : Promise.reject(new Error("gone"));
+      return a ? Promise.resolve(a) : Promise.reject(new dal.CoreError("NOT_FOUND"));
     }
     return Promise.resolve({ items: [] });
   });
@@ -100,6 +115,7 @@ describe("technician devices", () => {
       devices: [],
       units: [{ id: "unit-2", displayName: "Living AC", archived: false }],
       jobs: [
+        { projection: "summary", id: "job-rwk00000", unitId: "unit-2", status: "rework_requested" },
         { projection: "summary", id: "job-done0000", unitId: "unit-2", status: "completed" },
         { projection: "summary", id: "job-asg00000", unitId: "unit-2", status: "assigned" },
         { projection: "summary", id: "job-run00000", unitId: "unit-2", status: "in_progress" },
@@ -110,7 +126,7 @@ describe("technician devices", () => {
     const live = await loadDevices({ events: false });
     expect(live.register).toStrictEqual([{
       unitId: "unit-2", label: "Living AC · Site A › Floor 2", model: "Daikin FTKM", sensors: ["temperature"],
-      jobs: [{ id: "job-run00000", label: "job-run0 · in progress" }, { id: "job-asg00000", label: "job-asg0 · assigned" }],
+      jobs: [{ id: "job-run00000", label: "job-run0 · in progress" }, { id: "job-asg00000", label: "job-asg0 · assigned" }, { id: "job-rwk00000", label: "job-rwk0 · rework requested" }],
     }]);
     expect(live.device).toBeNull();
   });
@@ -215,6 +231,11 @@ describe("technician devices", () => {
     expect(live.device?.jobId).toBeNull();
     expect(called("units.get")).toHaveLength(0);
     expect(live.rebind).toStrictEqual([]); // a job without a status is not one a device write runs under
+  });
+
+  it("fails the page when a unit read fails for another reason than absence", async () => {
+    setup({ unitError: "UNAVAILABLE" });
+    await expect(loadDevices({ events: false })).rejects.toThrow("UNAVAILABLE");
   });
 
   it("marks the events as locked when the events read is refused (no assignment on the unit)", async () => {
