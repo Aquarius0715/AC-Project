@@ -41,12 +41,14 @@ services:
     image: nginx:1.29-alpine@sha256:5616878291a2eed594aee8db4dade5878cf7edcb475e59193904b198d9b830de   # pinned by digest (IR373), as keycloak-edge
     restart: unless-stopped
     environment: { NGINX_ENTRYPOINT_QUIET_LOGS: "1" }
+    # the defaults are compose.test.yaml's: an environment file from before the portal names no PORTAL_WEB_PORT, and the
+    # portal stays on 3204 (IR857)
     ports:
       - "${PUBLISH_ADDR:-127.0.0.1}:${CUSTOMER_WEB_PORT:-3000}:3000"
       - "${PUBLISH_ADDR:-127.0.0.1}:${PARTNER_WEB_PORT:-3001}:3001"
       - "${PUBLISH_ADDR:-127.0.0.1}:${TECHNICIAN_WEB_PORT:-3002}:3002"
       - "${PUBLISH_ADDR:-127.0.0.1}:${ADMIN_WEB_PORT:-3003}:3003"
-      - "${PUBLISH_ADDR:-127.0.0.1}:${PORTAL_WEB_PORT:-3004}:3004"
+      - "${PUBLISH_ADDR:-127.0.0.1}:${PORTAL_WEB_PORT:-3204}:3004"
     # outside the checkout, whose path changes with the runner that deploys (a changed path would recreate web-edge)
     volumes: ["${WEB_EDGE_DIR:?deploy.sh names the directory of edge.conf and 00-upstreams.conf}:/etc/nginx/conf.d:ro"]
     # the first deployment with this file: the apps give up their ports before web-edge takes them

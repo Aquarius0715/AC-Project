@@ -136,13 +136,24 @@ end_step() {
   fi
 }
 
+# the portal's address (IR791): the environment file's, or, in a file from before the portal, the customer app's host
+# on PORTAL_WEB_PORT (3204 by default, as compose.test.yaml and compose.rolling.yaml publish it; IR857)
+portal_url() {
+  local url port
+  url=$(setting PORTAL_WEB_URL)
+  if [ -z "$url" ]; then
+    port=$(setting PORTAL_WEB_PORT)
+    url=$(setting CUSTOMER_WEB_URL | sed -E "s#^(https?://[^:/]+)(:[0-9]+)?#\1:${port:-3204}#")
+  fi
+  printf '%s' "$url"
+}
+
 # the apps and the identity provider answer on the addresses people open, within $1 seconds
 ready() {
   local deadline=$((SECONDS + $1)) url
   for url in "$(setting KEYCLOAK_URL)/realms/ac/.well-known/openid-configuration" \
     "$(setting CUSTOMER_WEB_URL)/login" "$(setting PARTNER_WEB_URL)/login" \
-    "$(setting TECHNICIAN_WEB_URL)/login" "$(setting ADMIN_WEB_URL)/login" \
-    $(setting PORTAL_WEB_URL); do   # an environment file from before the portal (IR791) has none: then it is left out
+    "$(setting TECHNICIAN_WEB_URL)/login" "$(setting ADMIN_WEB_URL)/login" "$(portal_url)"; do
     # /login of an app answers 307 to the identity provider (IR790): up is any answer below 400
     until code=$(curl -s -o /dev/null --max-time 10 -w '%{http_code}' "$url") && [ "$code" -ge 200 ] && [ "$code" -lt 400 ]; do
       if [ "$SECONDS" -ge "$deadline" ]; then
