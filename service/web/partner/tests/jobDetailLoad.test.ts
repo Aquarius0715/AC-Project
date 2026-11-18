@@ -120,7 +120,8 @@ describe("partner job detail loader", () => {
     expect(d.required).toStrictEqual(["demo_indoor", "demo_electrical"]);
     expect(d.alerts.map((a) => a.id)).toStrictEqual(["al-1"]);
     expect(Object.keys(d.text.raised)).toStrictEqual(["al-1"]);
-    expect([d.text.visit, d.text.scheduled]).toStrictEqual([d.text.scheduled, "15 Sept, 10:00 am – 12:00 pm MYT"]);
+    expect(d.text.scheduled).toBe("15 Sept, 10:00 am – 12:00 pm MYT");
+    expect(d.text.visit).toBe(d.text.scheduled);
     expect(d.text.access).not.toBeNull();
     expect(d.text.delegation).not.toBeNull();
     expect(d.text.seen).toBeNull();
@@ -132,14 +133,15 @@ describe("partner job detail loader", () => {
     expect(unknown?.kind === "detail" ? unknown.text.tech : null).toBe("Technician");
     job = { ...detail, assignment: null, alertIds: [] };
     dal.coreOp.mockImplementation((operation: string) => (operation === "jobs.get" ? Promise.resolve(job) : Promise.resolve({ id: "unit-p-01", serviceScope: ["indoor"], lastSeenAt: "2026-09-14T01:00:00Z" })));
+    dal.coreItems.mockClear();
     const open = await loadJobDetail("job-p02-aaaa");
     if (open?.kind !== "detail") throw new Error("expected the detail");
     expect(open.text.tech).toBeNull();
     expect(open.text.scheduled).toBeNull();
-    expect(open.text.visit.split(" / ")).toHaveLength(2);
+    expect(open.text.visit).toBe("16 Sept, 10:00 am – 12:00 pm MYT / 15 Sept, 1:00 – 3:00 am MYT");
     expect(open.text.seen).not.toBeNull();
-    const dates = capacityDates();
-    expect(dates.at(-5)).toBe("2026-09-15");
+    // the earliest candidate time sets the capacity days
+    expect(capacityDates()).toStrictEqual(["2026-09-15", "2026-09-16", "2026-09-17", "2026-09-18", "2026-09-19"]);
   });
 
   it("uses the scheduled time, or the requested time without an offer, and no unit scope when the unit is refused", async () => {

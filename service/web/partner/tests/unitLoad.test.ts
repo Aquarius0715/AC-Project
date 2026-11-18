@@ -45,7 +45,7 @@ describe("partner unit loader", () => {
     dal.coreOp.mockImplementation((operation: string, input: { metric?: string }) => {
       if (operation === "units.get") return Promise.resolve(unit);
       if (operation === "telemetry.series") {
-        return Promise.resolve({ items: [], buckets: input.metric === "vibration" ? [{ start: "2026-09-14T00:00:00Z", value: 2.5, count: 4 }, { start: "2026-09-14T01:00:00Z", value: null, count: 0 }] : null });
+        return Promise.resolve({ items: [], buckets: input.metric === "vibration" ? [{ start: "2026-09-14T00:00:00Z", value: 2.5, count: 4 }, { start: "2026-09-14T01:00:00Z", value: 9, count: 0 }] : null });
       }
       return Promise.reject(new dal.CoreError("NOT_FOUND"));
     });
@@ -71,8 +71,15 @@ describe("partner unit loader", () => {
     expect([live.context, live.alerts, live.past]).toStrictEqual([null, [], []]);
     expect(live.banner).toBe("Diagnosis-scoped view for your accepted job — no billing, payments, or other contracts.");
     expect(live.charts.map((c) => c.now)).toStrictEqual(["no reading", "no reading"]);
+    // each evidence read fails the page on its own when the Core API is unavailable
     dal.coreItems.mockRejectedValue(new dal.CoreError("UNAVAILABLE"));
     await expect(loadUnit("unit-p-01")).rejects.toThrow("UNAVAILABLE");
+    dal.coreItems.mockResolvedValue([]);
+    dal.coreAll.mockRejectedValue(new dal.CoreError("UNAVAILABLE"));
+    await expect(loadUnit("unit-p-01")).rejects.toThrow("UNAVAILABLE");
+    dal.coreAll.mockResolvedValue([]);
+    dal.coreOp.mockImplementation((operation: string) => (operation === "units.get" ? Promise.resolve(unit) : Promise.reject(new dal.CoreError("TIMEOUT"))));
+    await expect(loadUnit("unit-p-01")).rejects.toThrow("TIMEOUT");
   });
 
   it("charts only the metrics the unit reports, with their measurement unit", async () => {

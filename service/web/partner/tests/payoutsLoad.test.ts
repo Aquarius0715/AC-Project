@@ -106,12 +106,13 @@ describe("partner payouts loader", () => {
       ["review-job-rev-001", "Repair · Lobby AC", "awaiting quality review"],
       ["review-job-rev-002", "Repair", "awaiting quality review"],
     ]);
+    // the in-review history row is left out, and job-open-01 is not repeated as in review: it is on the statement;
     // one jobs.get per job and one units.get per unit, shared by the lines and the in-review rows
     expect(dal.coreOp.mock.calls.filter(([operation]) => operation === "jobs.get")).toHaveLength(4);
     expect(dal.coreOp.mock.calls.filter(([operation]) => operation === "units.get")).toHaveLength(2);
   });
 
-  it("shows no in-review rows when that read is refused, and at most 10", async () => {
+  it("shows no in-review rows when that read is refused, at most 10, and the fallbacks for a refused unit and an unnamed company", async () => {
     dal.coreOp.mockImplementation((operation: string) => (operation === "jobs.list" ? Promise.reject(new dal.CoreError("FORBIDDEN")) : Promise.resolve({ items: [] })));
     const refused = await loadPayouts({});
     expect(refused.selected?.rows).toStrictEqual([]);
