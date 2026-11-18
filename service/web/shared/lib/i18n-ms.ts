@@ -661,6 +661,7 @@ export const ms: Record<string, string> = {
   "Time change not accepted": "Perubahan masa tidak diterima",
   "Can’t make the visit": "Tidak dapat hadir",
   "Escalated — nobody acknowledged it": "Dinaikkan — tiada yang mengakuinya",
+  "Restriction may be bypassed — HQ checks the unit": "Sekatan mungkin dipintas — HQ menyemak unit",
   "Time proposed": "Masa dicadangkan",
   "Offered": "Ditawarkan",
   "Accepted": "Diterima",

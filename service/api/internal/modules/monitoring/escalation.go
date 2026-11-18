@@ -27,14 +27,29 @@ type Escalation struct {
 // version bump, so a person acknowledging it at the same time is not refused), so that it is escalated once however
 // many ticks follow; an alert acknowledged or resolved before its time is never escalated.
 func (escalation Escalation) Run(ctx context.Context, call *ops.Call) (int, error) {
-	rows, err := call.Tx.Query(
-		ctx,
-		`UPDATE monitoring.alerts a SET escalated_at = $1 FROM monitoring.alert_policies p
+	return tellHQ(ctx, call, escalation.Notify, hqNotice{
+		marking: `UPDATE monitoring.alerts a SET escalated_at = $1 FROM monitoring.alert_policies p
 		WHERE p.id = a.policy_id AND a.status = 'open' AND a.escalated_at IS NULL AND p.escalate_after_minutes > 0
 		AND a.detected_at + make_interval(mins => p.escalate_after_minutes) <= $1
 		RETURNING a.id, a.unit_id, a.severity`,
-		call.Now,
-	)
+		permission: "alert.policy.write",
+		status:     statusEscalated,
+		reason:     "",
+	})
+}
+
+// hqNotice is what tellHQ tells HQ about: the statement that marks the Alerts as told (escalated_at = $1, the tick)
+// and returns their id, unit and severity; the permission of the HQ members told; the notice's status word; the
+// reason of the audit entry.
+type hqNotice struct {
+	marking, permission, status, reason string
+}
+
+// tellHQ marks the due Alerts and gives each HQ member who holds the permission one alert notice per Alert about its
+// unit (type fault, the Alert as its source), with one audit entry alerts.escalate per Alert; it returns how many
+// Alerts it told about (IR784, IR845).
+func tellHQ(ctx context.Context, call *ops.Call, store notify.Store, notice hqNotice) (int, error) {
+	rows, err := call.Tx.Query(ctx, notice.marking, call.Now)
 	if err != nil {
 		return 0, apperr.Wrap(err, "update monitoring.alerts")
 	}
@@ -58,7 +73,7 @@ func (escalation Escalation) Run(ctx context.Context, call *ops.Call) (int, erro
 		call,
 		identity.MembersInput{
 			Role:           authz.RoleAdmin,
-			Permission:     "alert.policy.write",
+			Permission:     notice.permission,
 			IDs:            nil,
 			OrganizationID: nil,
 			ClientRole:     "",
@@ -70,7 +85,7 @@ func (escalation Escalation) Run(ctx context.Context, call *ops.Call) (int, erro
 
 	for _, alert := range list {
 		for _, recipient := range recipients {
-			_, err := escalation.Notify.Create(ctx, call, notify.New{
+			_, err := store.Create(ctx, call, notify.New{
 				RecipientMembershipID: recipient,
 				Type:                  "fault",
 				TemplateKey:           kindAlert,
@@ -78,7 +93,7 @@ func (escalation Escalation) Run(ctx context.Context, call *ops.Call) (int, erro
 				TargetID:              alert.unit,
 				Severity:              alert.severity,
 				SourceAlertID:         &alert.id,
-				Params:                map[string]any{"status": statusEscalated},
+				Params:                map[string]any{"status": notice.status},
 				Channel:               "",
 			})
 			if err != nil {
@@ -93,7 +108,7 @@ func (escalation Escalation) Run(ctx context.Context, call *ops.Call) (int, erro
 				TargetID:        alert.id.String(),
 				PreviousVersion: nil,
 				NextVersion:     nil,
-				Reason:          "",
+				Reason:          notice.reason,
 				Result:          "",
 				Before:          nil,
 				After:           nil,

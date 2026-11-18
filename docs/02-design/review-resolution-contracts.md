@@ -10997,3 +10997,12 @@ A restriction (power off or a temperature limit) reaches the air conditioner as 
 4. **Not in this round.** HQ notification of the Alert, the power reading against the restriction (50 W for 5 minutes by default), sending the restriction again at intervals, and an Admin badge on the restriction's units follow as separate changes (DEC-110). Firmware and an enforcing means need hardware and a business decision.
 5. **Tests.** `TestRestrictionBypassAlert` (applied power-off restriction acknowledged through control: silent node → one critical Alert; power lost → the same Alert; tamper → its tamper Alert and the same one; restored leaves it open; a fault after it was resolved opens a new one linking it; a unit under no restriction gets none). `notifications.test.ts` checks the title and next step.
 
+
+## IR845 HQ's restriction managers hear of a suspected restriction bypass (DEC-110, IR844) — 2026-11-18
+
+A `restriction_bypass` Alert (IR844) has no policy, so no policy recipients and no escalation time (IR784) reached anyone: HQ saw it only by opening the Alerts list.
+
+1. **Rule.** The equipment scheduler runs `monitoring.BypassNotices`: a `restriction_bypass` Alert with status `open` and no `escalated_at` is marked (`escalated_at` = the tick, no version bump, as IR784) and each HQ member who holds `restriction.write` gets one critical `alert` notice (type `fault`) about the unit, with the Alert as its source and the status `restriction_bypass`. One audit entry `alerts.escalate` per Alert with the reason `restriction_bypass`.
+2. **Once per incident.** Later faults name the same Alert (IR844 item 2), which is already marked, so HQ is told once per Alert. An Alert acknowledged or resolved before the next tick is not told. The notice is readable by the members who read the unit (IR142: alert.read for an alert notice).
+3. **Web.** The notice's detail line says "Restriction may be bypassed — HQ checks the unit" (en, ms, ja, id).
+4. **Tests.** `TestRestrictionBypassAlert`: one notice to hq-restriction-manager at the next tick, none more at the following tick with a second fault; it fails with the job's query broken. `notifications.test.ts` checks the detail line in English and Japanese.

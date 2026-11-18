@@ -1,10 +1,13 @@
 package integration_test
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
 const (
@@ -139,9 +142,50 @@ func TestRestrictionBypassAlert(t *testing.T) {
 		t.Fatalf("bypass alert: %s %s %s %q %v", typ, severity, status, text, previous)
 	}
 
+	// HQ's restriction managers hear of it once, at the next tick (IR845), however many faults the incident has
+	notices := func() (int, int) {
+		t.Helper()
+		drainEvents(t)
+
+		var total, manager int
+		ownerScan(
+			t,
+			`SELECT count(*), count(*) FILTER (WHERE recipient_membership_id = $2) FROM notify.notifications
+			WHERE source_alert_id = $1 AND params->>'status' = 'restriction_bypass' AND severity = 'critical'`,
+			[]any{bypass, seed.ID("hq-restriction-manager")},
+			&total,
+			&manager,
+		)
+
+		return total, manager
+	}
+
+	_, err := schedTick(context.Background(), srv, clock().Add(15*time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	told, manager := notices()
+	if told == 0 || manager != 1 {
+		t.Fatalf(
+			"HQ notices of the bypass alert: %d, restriction manager %d, want at least one and one",
+			told,
+			manager,
+		)
+	}
+
 	// ② power lost in the same incident: the same Alert, no second one
 	if power := signal(unit, "power_lost", 20, ""); len(power) != 1 || power[0] != bypass {
 		t.Errorf("power_lost while the bypass alert is open: %v, want [%s]", power, bypass)
+	}
+
+	_, err = schedTick(context.Background(), srv, clock().Add(25*time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if again, _ := notices(); again != told {
+		t.Errorf("HQ told again in the same incident: %d, then %d", told, again)
 	}
 
 	// ③ a tamper opens its own tamper Alert beside the same bypass Alert
