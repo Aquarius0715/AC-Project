@@ -10979,3 +10979,10 @@ Review rounds 954–955 found two gaps in the customer's "Use this device's loca
 
 1. **Rule.** The switch (now `service/web/customer/app/customer/automations/_components/presence-switch.tsx`) ends a watch's reports when the switch changes: the answer to a report of an ended watch changes no line. A browser without `navigator.geolocation` shows "This browser cannot share a location — switch this off, or use another browser." while the switch is on (en, ms, ja, id).
 2. **Tests.** `customer/tests/presenceSwitch.test.tsx` (jsdom, a fake geolocation and a deferred `reportPresence`): the line of a sent and of a refused report, no line from the answer of a report sent before the switch was turned off and on again, and the no-geolocation line; the last two failed before the fix.
+
+## IR843 Placeholders use the secondary text colour; the unused lighter text colour is gone (IR359, IR403) — 2026-11-18
+
+Review round 999 found that the UI/UX specification said input placeholders on white use `text-subtle` (#64788E, 4.55:1), but since the shadcn/ui inputs (DEC-75) every placeholder uses `placeholder:text-muted-foreground` (#5B6E84), and no screen used `--color-subtle` any more. The token stayed in `shared/globals.css` with its old comment, at 4.16:1 to 4.38:1 on the page background and the tinted surfaces, so a label or placeholder given that colour would fall below WCAG 2.2 AA 1.4.3.
+
+1. **Rule.** The web palette has one secondary text colour, `--muted-foreground` (#5B6E84), for secondary text, placeholders and chart labels; `--color-subtle` is removed. The Figma variable `color/text-subtle` is not changed in this round (the Figma connection is not available to the loop).
+2. **Tests.** `shared/lib/tests/themeContrast.test.ts` reads `globals.css`: every colour token is named as a text colour, a surface, an on-colour pair or a non-text colour; every text colour reads at 4.5:1 or more on every light surface; and each on-colour on its fill. It failed before the fix on the unnamed `color-subtle`, and, with `color-subtle` counted as a text colour, on eight surfaces.
