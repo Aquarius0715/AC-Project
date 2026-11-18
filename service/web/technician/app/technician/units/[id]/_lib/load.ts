@@ -82,8 +82,9 @@ export async function loadTechUnit(id: string, sp: { jobId?: string; metric?: st
   const [alerts, jobs, pointsList, more, devices] = await Promise.all([
     optional(unitAlerts<ApiAlert>(id, 50), [] as ApiAlert[]), // every unresolved one, then the latest resolved (IR712)
     optional(coreItems<ApiTechJobRow>("jobs.list", { limit: 20, filters: { unitId: id } }), [] as ApiTechJobRow[]),
-    Promise.all(metrics.map((m) => optional(series(id, m, from, to, period, 4), NONE))),
-    Promise.all(others.map((m) => optional(series(id, m, from, to, period, 1), NONE))),
+    // each metric with its own readings, so the chart and the other metrics never look a series up by position
+    Promise.all(metrics.map(async (m) => ({ metric: m, unit: unitOf(m), ...(await optional(series(id, m, from, to, period, 4), NONE)) }))),
+    Promise.all(others.map(async (m) => ({ metric: m, ...(await optional(series(id, m, from, to, period, 1), NONE)) }))),
     tab === MONITORING ? optional(coreItems<{ id: string }>("devices.list", { limit: 5, filters: { unitId: id } }), []) : Promise.resolve([]),
   ]);
   const eventLists = await Promise.all(devices.map((x) => {
@@ -109,14 +110,14 @@ export async function loadTechUnit(id: string, sp: { jobId?: string; metric?: st
     components: componentCards(d, i),
     componentCount: d.components.length,
     tiles: liveTiles(d, nowMs, i),
-    chart: seriesCharts(metrics.map((m, k) => ({ metric: m, unit: unitOf(m), items: pointsList.at(k)?.items ?? [], total: pointsList.at(k)?.total ?? 0, complete: pointsList.at(k)?.complete ?? false })), period, nowMs, i),
-    others: otherMetrics(d, metrics, Object.fromEntries(others.map((m, k) => [m, more.at(k)?.items ?? []])), period, nowMs, i,
-      Object.fromEntries(others.map((m, k) => [m, more.at(k)?.complete ? 0 : more.at(k)?.total ?? 0]))),
+    chart: seriesCharts(pointsList, period, nowMs, i),
+    others: otherMetrics(d, metrics, Object.fromEntries(more.map((s) => [s.metric, s.items])), period, nowMs, i,
+      Object.fromEntries(more.map((s) => [s.metric, s.complete ? 0 : s.total]))),
     events: windowEvents(alerts, events, period, nowMs, i),
     history: jobRows(jobs, i),
     alerts: openAlerts(alerts, nowMs, i).map((a) => ({ ...a, href: `${alertsHref}${job ? "&" : "?"}alertId=${encodeURIComponent(a.id)}` })),
     controlHref: control ? `/technician/units/${id}/control?jobId=${encodeURIComponent(control)}` : null,
-    metric: metrics[0] ?? "temperature",
+    metric: metrics[0],
     choices: metricChoices(d, metrics, t),
     id,
     back,

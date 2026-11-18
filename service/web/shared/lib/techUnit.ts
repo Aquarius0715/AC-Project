@@ -48,14 +48,14 @@ export function metricOf(d: ApiTechUnit, v?: string): Metric {
 }
 /** The metrics of the URL's `metric` ("temperature,humidity"; one name is the old link): those the unit measures, each
 once, in two units at most (a chart has a left and a right axis, IR689); the one metric `metricOf` gives when none is left. */
-export function metricsOf(d: ApiTechUnit, text = ""): Metric[] {
+export function metricsOf(d: ApiTechUnit, text = ""): [Metric, ...Metric[]] {
   const unit = (m: string) => d.latestMeasurements.find((x) => x.metric === m)?.unit ?? "";
   const measured = new Set<string>(d.latestMeasurements.map((x) => x.metric));
   const isMeasured = (m: string): m is Metric => measured.has(m);
   const named = [...new Set(text.split(","))].filter((m) => isMeasured(m));
   const axes = unitAxes(named.map((m) => unit(m)));
-  const fits = named.filter((m) => axes.has(unit(m)));
-  return fits.length > 0 ? fits : [metricOf(d)];
+  const [first, ...rest] = named.filter((m) => axes.has(unit(m)));
+  return first === undefined ? [metricOf(d)] : [first, ...rest];
 }
 /** The metrics the unit measures, for the chart's choice: each with its name and unit, and the selection after it is pressed (null when its unit would be a third one). */
 export function metricChoices(d: ApiTechUnit, selected: readonly string[], t: T): { metric: string; name: string; unit: string; next: string[] | null; on: boolean }[] {

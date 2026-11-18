@@ -203,6 +203,19 @@ describe("technician unit: the live page", () => {
     })));
   });
 
+  it("gives each other metric its own readings, cut only when an hour holds more than its one page (IR598)", async () => {
+    const observedAt = "2026-09-14T01:30:00Z";
+    const values: Record<string, number> = { temperature: 1, humidity: 61, power: 2, co2: 700 };
+    serve({ series: (input) => {
+      const value = values[String(input.metric)] ?? 0;
+      return { total: input.metric === "humidity" ? 300 : 1, nextCursor: null, buckets: [{ start: observedAt, count: 1, value }], items: [{ observedAt, value }] };
+    } });
+    const hour = await live({ metric: "temperature", period: "1h" });
+    expect(hour.others.map((m) => [m.metric, m.cut, m.points.filter((p) => p !== null)])).toStrictEqual([["humidity", true, [61]], ["power", false, [2]], ["co2", false, [700]]]);
+    const day = await live({ metric: "temperature", period: "24h" }); // averages come whole: never cut
+    expect(day.others.map((m) => m.cut)).toStrictEqual([false, false, false]);
+  });
+
   it("shows an empty series when one is refused, and fails the page when the series cannot be read now", async () => {
     serve({});
     dal.coreOp.mockImplementation((operation: string) => (operation === "units.get" ? Promise.resolve(unit) : Promise.reject(new dal.CoreError("FORBIDDEN"))));
