@@ -1,7 +1,7 @@
 // The reads of the technician device screens (FR-T11 /technician/devices, FR-T12 /technician/devices/[id]) through the
 // DAL: devices.list, units.list and jobs.list of the technician's scope, the selected device (devices.get) with its unit
 // (units.get: place, capability sensors and firmware candidates), and either its operations and calibrations (T11) or
-// its events with their alerts (T12). Register candidates are assigned units without a bound device. Texts in the
+// its events with their alerts (T12). Register candidates are assigned units with no device, bound or planned. Texts in the
 // user's display language; every time is formatted here (IR287).
 import "server-only";
 import { coreAll, coreDisplay, coreNow, coreOp, corePermissions, orAbsent } from "@ac/web/lib/dal";
@@ -10,7 +10,7 @@ import { statusWord } from "@ac/web/lib/partnerJobDetail";
 import type { ApiCalibration, ApiDevice, ApiDeviceDetail, ApiDeviceOperation } from "@ac/web/lib/devices";
 import type { ApiUnitDetail } from "@ac/web/lib/units";
 import {
-  calibrationText, deviceTiles, eventRows, firmwareCard, jobFor, newerFirmware, newerVersions, openFaults, operationRows, sensorRows, techDeviceRows,
+  calibrationText, deviceTiles, eventRows, firmwareCard, jobFor, jobsFor, newerFirmware, newerVersions, openFaults, operationRows, sensorRows, techDeviceRows,
   type ApiAlertLite, type ApiDeviceEventFull, type TechJob,
 } from "@ac/web/lib/techDevices";
 import type { TechDevicesLive } from "../_components/devices-view";
@@ -30,7 +30,8 @@ export async function loadDevices(options: { selected?: string; unitId?: string;
   const myJobs: TechJob[] = jobs.filter((j): j is typeof j & { id: string; unitId: string } => j.projection === "summary" && !!j.id && !!j.unitId).map((j) => ({ id: j.id, unitId: j.unitId, status: j.status ?? "" }));
   const names = new Map(units.map((u) => [u.id, u.displayName]));
   const rows = techDeviceRows(devices, names, now.getTime(), t);
-  const bound = new Set(devices.map((d) => d.unitId).filter(Boolean));
+  // a registered device not bound yet already holds its planned unit (IR722)
+  const bound = new Set(devices.map((d) => d.unitId ?? d.targetUnitId).filter(Boolean));
   const free = units.filter((u) => !u.archived && !bound.has(u.id) && Boolean(jobFor(u.id, myJobs)));
   const freeDetails = await Promise.all(free.map((u) => quiet(coreOp<Unit>("units.get", { id: u.id }))));
   const live: TechDevicesLive = {
@@ -38,11 +39,11 @@ export async function loadDevices(options: { selected?: string; unitId?: string;
     register: free.flatMap((u, index) => {
       const d = freeDetails.at(index);
       return d ? { unitId: u.id, label: `${d.displayName} · ${d.location.pathLabels.join(" › ")}`, model: `${d.capabilities.manufacturer} ${d.capabilities.model}`,
-        sensors: (d.iotModel?.sensors ?? []).map((s) => s.metric), jobs: myJobs.filter((j) => j.unitId === u.id).map((j) => ({ id: j.id, label: `${j.id.slice(0, 8)} · ${statusWord(j.status, t)}` })) } : [];
+        sensors: (d.iotModel?.sensors ?? []).map((s) => s.metric), jobs: jobsFor(u.id, myJobs).map((j) => ({ id: j.id, label: `${j.id.slice(0, 8)} · ${statusWord(j.status, t)}` })) } : [];
     }),
     rebind: units.filter((u) => !u.archived).map((u) => ({ unitId: u.id, label: u.displayName, jobId: jobFor(u.id, myJobs) })).filter((r): r is typeof r & { jobId: string } => !!r.jobId),
   };
-  const row = rows.find((r) => r.id === options.selected) ?? rows.find((r) => !!options.unitId && r.unitId === options.unitId) ?? rows.at(0);
+  const row = rows.find((r) => r.id === options.selected) ?? rows.find((r) => !!options.unitId && (r.unitId ?? r.targetUnitId) === options.unitId) ?? rows.at(0);
   if (!row) return live;
   const { id } = row;
   const d = await coreOp<ApiDeviceDetail & { activeOperation: (ApiDeviceOperation & { startedAt?: string | null; expiresAt?: string }) | null }>("devices.get", { id });
