@@ -105,6 +105,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 0.654.0 (2026-11-16): IR811: from Turn off running ACs, one link opens an after-hours rule with the same ACs.
 0.657.0 (2026-11-16): IR814: a customer pins ACs to the Overview from their pages (this browser only).
 0.658.0 (2026-11-16): IR815: Energy & cost opens on the AC that used the most in the period.
+0.673.0 (2026-11-18): IR857: the portal keeps port 3204 behind web-edge (the server's environment file names no PORTAL_WEB_PORT).
 0.672.0 (2026-11-18): IR855, IR856 (DEC-111): the shared test environment deploys without downtime (API services and apps replaced one container at a time behind web-edge; migrations only add unless marked -- migrate:breaking), and an open page offers a reload after a deployment.
 0.671.0 (2026-11-17): IR828: the shared test environment runs Stripe test mode when its environment file sets STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET (deploy.sh adds the Stripe CLI, forwarding to the gateway); otherwise demo payments as before.
 0.670.0 (2026-11-16): IR827: Stripe Checkout for invoice payments (DEC-68): `payments.startCheckout` (DD-C11) creates one hosted MYR Checkout Session for the whole unpaid invoice; the payment is stored first (channel `stripe_checkout`) and paid only by the signed webhook, which `POST /stripe` on the billing service receives through the gateway (signature checked, stored once, applied in one transaction). Operations 234, routes 256. Phase 1A unchanged.
