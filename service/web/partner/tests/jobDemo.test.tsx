@@ -59,7 +59,9 @@ describe("Job detail demo: which view an id gets", () => {
     const cases: [string, string[][]][] = [
       ["job-p07", [back, ["Reassign technician", "/partner/schedule?jobId=job-p07"]]],
       ["job-p05", [back, ["Review report", "/partner/jobs/job-p05/review"]]],
+      ["job-p12", [back, ["Assign technician", "/partner/schedule?jobId=job-p12"]]],
       ["job-p03", [back]],
+      ["job-p04", [back]],
       ["job-contractor-a", [back]],
     ];
     for (const [id, links] of cases) {
@@ -67,6 +69,17 @@ describe("Job detail demo: which view an id gets", () => {
       expect(screen.getAllByRole("link").map((a) => [a.textContent.trim(), a.getAttribute("href")]), id).toStrictEqual(links);
       cleanup();
     }
+  });
+
+  it("prefers contractor-a's store job to a fixed job, except the seeded offer job-p09", () => {
+    store.jobs = [job({ id: "job-p02" }), job({ id: "job-p09", status: "submitted" })];
+    render(<JobDemo id="job-p02" />);
+    expect(screen.getByText("job-p02 · Offer from HQ")).toBeDefined();
+    expect(screen.getByText("Expires 2026-09-25 12:00")).toBeDefined();
+    cleanup();
+    render(<JobDemo id="job-p09" />);
+    expect(screen.getByText("2026-09-16 10:00–12:00 · from the periodic plan")).toBeDefined();
+    expect(screen.queryByText("Expires 2026-09-25 12:00")).toBeNull();
   });
 });
 
