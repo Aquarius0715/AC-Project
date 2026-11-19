@@ -57,6 +57,8 @@ const live = (over: Partial<AirLive> = {}): AirLive => ({
 const logged = (co2: number | null): ApiVentilationLog => ({
   id: "v-2", spaceId: "s-bed", unitId: "u-1", method: "door_opened", durationMinutes: 30, co2AtLog: co2 === null ? null : { value: co2, unit: "ppm", observedAt: "2026-09-15T01:12:00Z" }, loggedByMembershipId: "m-1", loggedAt: "2026-09-15T01:13:00Z",
 });
+/** the charts drawn: each LineChart keeps a Recharts container, laid out or not */
+const charts = () => document.querySelectorAll(".recharts-responsive-container").length;
 const chips = () => within(screen.getByRole("group", { name: "Metrics in the chart" }));
 
 beforeEach(() => {
@@ -151,6 +153,7 @@ describe("AirQualityView", () => {
     expect(screen.getByText("CO2 (ppm)")).toBeDefined();
     expect(screen.getByText("PM2.5 (µg/m³)")).toBeDefined();
     expect(screen.getByText("- - 35 µg/m³ cleaning guide")).toBeDefined();
+    expect(charts()).toBe(3);
     expect(screen.queryByText("— CO2 (ppm)")).toBeNull(); // the stacked charts carry headings, not the legend line
     expect(screen.getByText("No data (gap, not joined)")).toBeDefined();
     fireEvent.click(screen.getByRole("tab", { name: "Table" }));
@@ -160,6 +163,7 @@ describe("AirQualityView", () => {
   it("two units share one chart without a legend line", () => {
     const series = [line("co2", "CO2", "ppm"), line("humidity", "Humidity", "%", { axis: "right" })];
     render(<AirQualityView live={live({ metrics: ["co2", "humidity"], chart: { ...live().chart, series } })} />);
+    expect(charts()).toBe(1);
     expect(screen.queryByText("— CO2 (ppm)")).toBeNull();
     expect(screen.queryByText("CO2 (ppm)")).toBeNull();
   });
@@ -174,7 +178,7 @@ describe("AirQualityView", () => {
     expect(screen.getByText("No valid PM2.5 readings in this window (1 reading without a valid value) — missing data is never drawn as a line.")).toBeDefined();
     expect(screen.getByText("No valid Humidity readings in this window (4 readings without a valid value) — missing data is never drawn as a line.")).toBeDefined();
     expect(screen.getByText("Bedroom AC has no Temperature sensor — nothing to chart.")).toBeDefined();
-    expect(document.querySelector("svg[role=img], [role=img]")).toBeNull();
+    expect(charts()).toBe(0);
     fireEvent.click(screen.getByRole("tab", { name: "Table" }));
     expect(screen.queryByRole("region")).toBeNull();
   });
