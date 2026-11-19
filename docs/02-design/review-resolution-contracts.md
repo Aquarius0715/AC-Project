@@ -11068,3 +11068,9 @@ The evidence text IR844 writes ("Device <serial> stopped reporting | lost power 
 2. **The fix.** An empty or blank field is refused with "Kilograms, 0 or more" under it, as a negative or non-numeric one already was. A typed 0 is still a valid amount.
 3. **Tests.** `techJob.test.ts`: an empty and a blank amount are refused; `workspaceModals.test.tsx` (technician): the dialog shows the error under the emptied field and adds nothing.
 
+## IR859 An HQ installation job shows the HQ request badge to contractors and technicians (IR113, DEC-106) — 2026-11-19
+
+1. **The fault.** The technician overview's job list and three contractor screens (the Jobs list, a job's offer card, Job history) chose the origin badge with `origin === "periodic_plan" ? "plan" : "request"`. An installation job HQ creates has the origin `hq_request` (DEC-106), so the contractor and the technician saw "Client request" on it, although no client asked for it. The Admin and customer screens already showed "HQ request", through `originOf` (shared/lib/origin.ts).
+2. **The fix.** The four screens use `originOf` as well: `periodic_plan` → Periodic plan, `hq_request` → HQ request, any other origin → Client request.
+3. **Tests.** `overviewView.test.tsx` (technician) badges a plan, an HQ request, a client request and a job without an origin. `jobsView.test.tsx`, `historyView.test.tsx` and `jobView.test.tsx` (partner) show "HQ request" for an `hq_request` job. Each of these fails with the old mapping.
+

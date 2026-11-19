@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Badge, Banner, Card, EmptyState, Kpi, LinkButton, Page, Select, SeverityBadge, Tabs, TextLink, cx, Plain, ScrollX } from "@ac/web/components/ui";
 import { OriginBadge } from "@ac/web/components/JobBits";
+import { originOf } from "@ac/web/lib/origin";
 import { useT } from "@ac/web/components/I18n";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import type { OverviewLive } from "../_lib/load";
@@ -44,7 +45,7 @@ export function OverviewView({ live }: Readonly<{ live: OverviewLive }>) {
           <div className="flex flex-col">
             {live.rows.map((j) => (
               <Link key={j.id} href={`/technician/jobs/${j.id}`} className="flex items-center justify-between gap-3 border-t border-line py-2.5 first:border-0 hover:bg-surface2/60">
-                <span className="min-w-0"><span className="flex flex-wrap items-center gap-2"><b className="text-[13px]">{j.short} · {j.title}</b>{j.origin && <OriginBadge origin={j.origin === "periodic_plan" ? "plan" : "request"} />}</span><span className="block text-xs text-muted-foreground">{j.line}</span></span>
+                <span className="min-w-0"><span className="flex flex-wrap items-center gap-2"><b className="text-[13px]">{j.short} · {j.title}</b>{j.origin && <OriginBadge origin={originOf(j.origin)} />}</span><span className="block text-xs text-muted-foreground">{j.line}</span></span>
                 <span className="flex shrink-0 items-center gap-2"><Badge tone={j.badge.tone}>{j.badge.text}</Badge><span className="text-muted-foreground"><Icon name="chevronRight" /></span></span>
               </Link>
             ))}

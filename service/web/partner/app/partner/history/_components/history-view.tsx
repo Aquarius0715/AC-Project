@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Badge, Banner, Btn, Card, Choice, EmptyState, Field, Page, Select, Tabs, Textarea, cx, Plain, ScrollX } from "@ac/web/components/ui";
 import { OriginBadge } from "@ac/web/components/JobBits";
+import { originOf } from "@ac/web/lib/origin";
 import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
@@ -53,7 +54,7 @@ function List({ live }: Readonly<{ live: HistoryLive }>) {
               <tbody>
                 {live.rows.map((r) => (
                   <tr key={r.id} className="border-t border-line align-top hover:bg-surface2/60">
-                    <td className="py-2.5 pr-3"><Link href={hrefOf(live, r.id)} className="font-semibold text-ink hover:text-primary">{r.short} · {r.title}</Link>{r.origin && <span className="ml-2 align-middle"><OriginBadge origin={r.origin === "periodic_plan" ? "plan" : "request"} /></span>}<span className="block text-[11px] text-muted-foreground">{r.sub}</span></td>
+                    <td className="py-2.5 pr-3"><Link href={hrefOf(live, r.id)} className="font-semibold text-ink hover:text-primary">{r.short} · {r.title}</Link>{r.origin && <span className="ml-2 align-middle"><OriginBadge origin={originOf(r.origin)} /></span>}<span className="block text-[11px] text-muted-foreground">{r.sub}</span></td>
                     <td className="py-2.5 pr-3"><b className={cx("font-semibold", r.tech.tone === "crit" && "text-crit")}>{r.tech.name}</b><span className="block text-[11px] text-muted-foreground">{r.tech.sub}</span></td>
                     <td className="py-2.5 pr-3">{r.last ? <><b className={cx("font-semibold", r.overdue && "text-crit")}>{r.overdue ? t("Work window ended") : r.last.title}</b><span className="block text-[11px] text-muted-foreground">{r.last.when}</span></> : <span className="text-muted-foreground">—</span>}</td>
                     <td className="py-2.5 pr-3"><Badge tone={r.badge.tone}>{r.badge.text}</Badge></td>

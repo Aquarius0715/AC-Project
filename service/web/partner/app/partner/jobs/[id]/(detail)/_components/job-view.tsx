@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Badge, Banner, Btn, Card, Field, Input, LinkButton, Modal, Page, Select, SummaryList, Textarea } from "@ac/web/components/ui";
 import { OriginBadge } from "@ac/web/components/JobBits";
+import { originOf } from "@ac/web/lib/origin";
 import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { alertTitle } from "@ac/web/lib/alerts";
@@ -103,7 +104,7 @@ function OfferView({ live }: Readonly<{ live: Extract<JobDetailLive, { kind: "of
       <Card title={t("{id} · Offer from HQ", { id: short })} action={j.status === "offered" ? <Badge tone="warn">{t("Expires {time}", { time: x.expires })}</Badge> : <Badge tone="primary">{t("Accepted")}</Badge>}>
         <Banner>{t("Before acceptance: job type, registered installation address and required qualifications only. No live telemetry, entry instructions or billing.")}</Banner>
         <div className="mt-3"><SummaryList items={[
-          [t("Origin"), <OriginBadge key="o" origin={j.origin === "periodic_plan" ? "plan" : "request"} />],
+          [t("Origin"), <OriginBadge key="o" origin={originOf(j.origin)} />],
           [t("Job type"), typeLabel(j.type, t)],
           [t("Installation address"), t("{address} (registered)", { address: j.siteAddress ?? "—" })],
           [t("Required qualification"), quals.join(" · ") || t("none")],

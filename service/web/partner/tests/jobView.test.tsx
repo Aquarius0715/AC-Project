@@ -125,6 +125,7 @@ describe("offer before acceptance", () => {
     expect(screen.getByText("job-p09- · 12 Jalan Ampang · offer")).toBeTruthy();
     expect(screen.getByText("Expires 14 Sep 2:00 pm")).toBeTruthy();
     expect(text()).toContain("12 Jalan Ampang (registered)");
+    expect(text()).toContain("OriginHQ request"); // an HQ installation offer is not a client's request (IR859)
     expect(text()).toContain("Indoor unit work · Electrical work");
     expect(text()).toContain("Visit time (fixed)");
     expect(text()).toContain("16 Sep 10:00 am–12:00 pm · requested by HQ");

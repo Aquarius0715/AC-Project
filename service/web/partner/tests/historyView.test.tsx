@@ -110,6 +110,12 @@ describe("History list", () => {
     const cells = screen.getByRole("link", { name: "Open the history of job-c" }).closest("tr")?.querySelectorAll("td");
     expect(cells?.[2]?.textContent).toBe("—");
   });
+
+  it("badges an HQ installation job as HQ's request, not the client's (IR859)", () => {
+    render(<HistoryView live={live({ rows: [row({ id: "job-h", short: "job-h", origin: "hq_request" })], total: 1 })} />);
+    expect(screen.getByText("HQ request")).toBeTruthy();
+    expect(screen.queryByText("Client request")).toBeNull();
+  });
 });
 
 describe("History detail", () => {
