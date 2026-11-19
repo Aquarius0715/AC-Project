@@ -48,3 +48,7 @@ load-out/
 .review-loop-logs/
 .review-loop-run.out
 .review-loop-stop
+
+# the cache Vitest leaves when it is started from the repository root (node_modules/.vite, .vitest-cache); there is
+# no package.json here, so nothing else belongs in it
+/node_modules/
