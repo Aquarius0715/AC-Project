@@ -1,6 +1,43 @@
 # 提案型エアコンオートメーションのWeb接続引き継ぎ
 
-この機能は、エアコンの操作・予定・世帯の在宅履歴を集計し、開始時刻などの変更案と根拠を出す承認型デモです。現在は仮データで動作し、HTMLで提案と承認履歴を確認できます。Webで提案を表示し、承認を保存して既存予定に反映する接続は今後の実装です。**完全オートは Coming Soon** です。デモの詳しい操作と判定ルールは [README](README.md) を参照してください。
+エアコンの操作・予定・世帯の在宅履歴を使う承認型デモと、既存 Web への接続範囲をまとめます。デモの詳しい操作と判定ルールは [README](README.md) を参照してください。
+
+## 既存 Web に接続した範囲
+
+`/customer/automations` の API モードで、Go API が PostgreSQL の現行ルール、操作履歴、独立した電源観測を読みます。機器・曜日ごとに、直近4回の完了した対象曜日を同じタイムゾーンで集計します。各日の最初の確認済み手動オンを1票とし、±15分に3日以上入る候補を、支持数、合計の時刻差、早い時刻の順に選びます。候補が現在の開始と一致する場合や終了以降になる場合は見送ります。この集計順はデモの `start_pattern` と同じです。
+
+| 提案 | 既存の取得元と粒度 | 蓄積状況・実装に必要なデータ |
+|---|---|---|
+| 開始時刻 | `control.automations` は現行のルールと版。`control.commands` は機器ごとの操作、発生・送信・応答時刻、操作元、実行者を保持。 | 既存の `assets.units.observed_state` は最新値で、ACK からも更新されます。実機の MQTT state も IR で送信した設定値です。`control.power_observations` を新設し、端末の現行バインド単位で実測時刻・受信時刻・オン／オフ／不明を保持します。既存の履歴からの補完は行いません。開発 fixture では確認できます。実機での提案には、独立した物理状態の計測・取込と、少なくとも直近4回の対象曜日を評価できる観測が必要です。 |
+| 暑い日の温度 | `control.commands` の `set_temperature` に要求時刻と設定値。設備の `monitoring.measurements` はセンサー別・時刻別の室内計測。`weather_temperature` は評価時に渡せる事実。 | 設置地点と操作日時に対応する過去の実測外気温が必要です。外気温の本番提供元は未決定で、操作時の外気温系列と設定変更前の値を揃えられません。暑い日だけ有効な温度変更を再現できる履歴と実行時の気象入力が必要です。 |
+| 電気代を抑える予冷 | Energy は実測の分スロット電力を集計します。既存の集計額は固定のデモ単価 (`tariff-demo-1`)。`tariff` は評価時に渡せる値。 | 契約・時間帯別の有効単価と、同一期間の現行・予冷それぞれのスロット別 kWh、必要時刻の室温と予測時点が必要です。観測済みの kWh やデモ単価だけでは算出できないため、見送ります。 |
+| 在宅による見直し | DEC-109 の `control.presence_states` は物件・メンバーごとに最新の内外、最終変更・報告時刻を保持。 | 予定開始時点の世帯判定を遡れません。同意の有効期間、観測・受信時刻付きの履歴、世帯全員を判定できる範囲と観測の期限、および当日の予定版が必要です。未同意・未取得・失敗や当時の記録がない在宅状態は不明で、手動オンからの開始提案には影響しません。 |
+
+開始時刻はルール所有者の `ui` のオンを対象に、操作前後5分以内の最も近い観測がオフ→オンで、その間に別の電源操作がない場合に数えます。ACK のみ、時刻不明、あるいは物理状態を確認できない操作は採用しません。デモの旅行・「今回だけ」の除外に相当する区分は現行のコマンドにありません。根拠は手動開始の時刻であり、過去の予定との差やその変更の動機は推定しません。本番 DB での履歴の蓄積状況は未確認です。
+
+承認は、表示された提案 ID・曜日と `X-Expected-Version` をサーバーで照合し、既存と同じ顧客の操作権限で行います。承認結果と承認者・時刻は監査ログに残します。単一曜日なら元のルールを更新します。複数曜日なら元の ID に残りの曜日を置き、承認済み曜日だけを同じ所有者の別ルールにします。終了時刻・開始と終了のアクション（設定温度を含む）・条件・優先度・タイムゾーンは引き継ぎます。既存の同一機器に競合し得る予定がある場合、複数機器を対象とする場合、日をまたぐ場合は提案の対象外です。承認時に対象枠が実行中かスケジューラに未処理の過去枠があれば、次の確認まで更新を見送ります。保存から機器へのコマンドは発行されません。
+
+### PostgreSQL での再現
+
+標準の PostgreSQL と、固定の開発時計（2026-09-14）を使います。API 結合テストは専用 DB の標準 seed にテスト用の予定、コマンド、電源観測を追加します。リポジトリ直下から実行します。
+
+```sh
+docker compose --profile infra up -d postgres
+DB=ac_test_start_proposals sh service/api/scripts/resetdb.sh
+(cd service/api && AC_TEST_DB=ac_test_start_proposals go test ./test/integration -count=1 -run TestStartProposals)
+(cd service/api && AC_TEST_DB=ac_test_start_proposals AC_TEST_CLUSTER=1 go test ./test/integration -count=1 -run TestStartProposals)
+```
+
+ブラウザの再現は、新規の標準 seed を使うローカル開発スタックで行います。既定の Compose 構成は DB 名 `ac` を使います。別名の検証 DB を使う構成では、その DB 名に読み替えます。fixture は初回だけ投入します。
+
+```sh
+docker compose --env-file .env.local --profile full up -d --build
+docker compose exec -T postgres psql -U postgres -d ac -v ON_ERROR_STOP=1 < service/api/test/fixtures/start_proposals.sql
+(cd service/web && E2E_START_PROPOSALS=1 npm run e2e -- --project=customer start-proposals.e2e.ts)
+```
+
+`customer-a` で、水曜18:30→20:00と金曜18:30→21:15のカードにそれぞれ3日分の確認日が表示されます。履歴に ACK しかない機器のカードは出ません。水曜を承認すると水曜20:00、月・木18:30、どちらも23:30終了・24℃で保存されます。金曜の予定を別タブで編集した後で古いカードを承認すると、変更後の開始と新しい提案が表示されます。完全オートは Coming Soon です。
+
 
 ## これまでの経緯
 
@@ -41,7 +78,7 @@ python3 -B -m unittest discover -s automation/tests -p test_approval_replacement
 
 各出力先の `index.html` はブラウザで直接開けます。H008は判定日8/20に水曜18:30→20:00を提案し、10/1には水曜21:00の案が成立します。G003は8/24に平日カードを表示し、入力履歴の月・火・木・金の承認を8/25の判定で反映待ち、予定版が有効になった8/27に反映済みと表示します。水曜は今回だけ対象外です。`snapshot` は10/31の最終判定を表示します。置き換えの回帰テストは別のG003入力を組み立て、20:00→21:00の承認順序と、日次再生と各基準日時点の結果の一致を確認します。
 
-## Web接続例　水曜18:30開始を20:00に変える
+## デモ時点のWeb接続例　水曜18:30開始を20:00に変える
 
 ### 既存Webにある入口
 
@@ -52,14 +89,14 @@ python3 -B -m unittest discover -s automation/tests -p test_approval_replacement
 | [`draftOf`](../service/web/shared/lib/clientAutomations.ts#L287)、[`saveInput`](../service/web/shared/lib/clientAutomations.ts#L313)、[`saveAutomation`](../service/web/customer/app/customer/automations/actions.ts#L24) | 取得した既存ルールから編集値と版を作り、Server Actionが `automations.save` を呼びます。保存はルールの更新で、保存時にエアコンへのコマンドは発行されません。 |
 | [`coreCall`](../service/web/shared/lib/dal.ts#L164) と [Core APIの `save` / `updateAutomation`](../service/api/internal/modules/control/automations.go#L816) | DALが認証・テナント・メンバーシップのヘッダー、書き込みの `Idempotency-Key`、更新の `X-Expected-Version` を設定します。APIが機器や操作の可否を検証し、[`updateAutomation`](../service/api/internal/modules/control/automations.go#L1019) が現在のルール版と照合してから版を進めます。 |
 
-### 今後つなぐ処理
+### デモ時点の接続案
 
 1. **実データから判定入力を作る。** 認証済み顧客が参照できる機器を基準に、機器ID、タイムゾーン、有効な予定と予定履歴、操作と前後の電源観測を対応付けます。スマホ在宅を使う場合は同意と観測・受信時刻も渡します。現在のルールを曜日別へ展開するとき、Web/APIの曜日は月1〜日7、Pythonは月0〜日6です。水曜はAPIで3、Pythonで2です。開始変更に必要な実測根拠が取得できることを確認してから評価します。
 2. **提案と理由を表示する。** 既存ルール一覧の近くに提案欄を設ける案です。対象エアコン、水曜18:30→20:00、維持する終了時刻と操作設定、根拠となった観測日・件数を表示します。たとえば「直近4回の水曜のうち3日で、20:00前後に手動で電源を入れたことを確認」です。表示値は `cards[].members[].values`、理由と根拠は判定の `reason`・`evidence`、支持日はカードの `support_dates` を参照できます。候補の内部計算値 `candidate_values` と、承認する表示値を区別します。
 3. **水曜の承認を受ける。** サーバーで対象顧客・機器、曜日別の提案ID、表示時の値・根拠、元になったルールIDと版を照合し、承認者・日時・選んだ曜日を記録します。Webの書き込みでは、デモの連番 `proposal_id` をそのまま永続IDとせず、再評価後も承認対象を特定できるIDを決めます。カードのまとめ単位と承認の単位は分け、チェックを外した曜日の変更は作りません。
 4. **承認した変更を既存予定に反映する。** 対象が水曜単独のルールなら、終了時刻・開始/終了アクション・条件などを保ったまま `startLocal` を20:00にして既存の保存経路を使えます。更新には、提案の前提として記録し承認時に再確認した **Automationの `version`** を `expectedVersion` として渡します。これは機器の版やデモの `schedule_versions` の番号とは異なります。Core APIで版が不一致なら `409 CONFLICT`（`error.versionConflict`）です。最新予定と差分を取り直して再提示し、承認の前提を確認してから保存します。成功後は保存されたルールとその有効時点を承認記録に対応付け、承認受付から予定反映までを追えるようにします。 [更新ルートの定義](../service/api/internal/modules/control/swagger_routes.go#L21)
 
-## Web接続前に確認すること
+## デモ時点の確認事項
 
 | 判断事項 | 具体的な確認例 |
 |---|---|

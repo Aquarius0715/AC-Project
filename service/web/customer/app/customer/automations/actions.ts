@@ -26,6 +26,23 @@ async function run<T>(fn: () => Promise<T>, write = true): Promise<ActionResult<
 export async function saveAutomation(input: OpInput<"automations.save">, version: number | null) {
   return run(() => coreOp<ApiAutomation>("automations.save", input, { write: true, ...((version !== null) && { expectedVersion: version }) }));
 }
+/** Approve the version and weekday shown on one proposal card. */
+export async function approveStartProposal(selection: unknown) {
+  const p = z.object({
+    id: z.uuid(), proposalId: z.uuid(), weekday: z.number().int().min(1).max(7), version: z.number().int().positive(),
+  }).safeParse(selection);
+  if (!p.success) {
+    return { ok: false, code: "VALIDATION", messageKey: "error.validation", fieldErrors: {} } satisfies ActionResult;
+  }
+  const { version, ...input } = p.data;
+  return run(async () => {
+    await coreOp<ApiAutomation>("automations.approveStartProposal", input, {
+      write: true, expectedVersion: version, idempotencyKey: input.proposalId,
+    });
+    return null;
+  });
+}
+
 /** automations.delete: the rule stops; its Commands and run log stay (IR214). */
 export async function deleteAutomation(id: string, version: number) {
   return run(() => coreOp<{ id: string; deleted: true }>("automations.delete", { id }, { write: true, expectedVersion: version }));

@@ -240,6 +240,35 @@
   ],
   "items": null
  },
+ "automations.approveStartProposal": {
+  "fields": [
+   "action",
+   "condition",
+   "createdAt",
+   "createdByUserId",
+   "disabledReason",
+   "enabled",
+   "endAction",
+   "endLocal",
+   "endsNextDay",
+   "id",
+   "kind",
+   "lastRun",
+   "name",
+   "onlyIf",
+   "ownerMembershipId",
+   "priority",
+   "startAction",
+   "startLocal",
+   "tenantId",
+   "timezone",
+   "unitIds",
+   "updatedAt",
+   "version",
+   "weekdays"
+  ],
+  "items": null
+ },
  "automations.delete": {
   "fields": [
    "deleted",
@@ -334,6 +363,21 @@
    "results"
   ],
   "items": null
+ },
+ "automations.startProposals": {
+  "fields": [],
+  "items": [
+   "automationId",
+   "endLocal",
+   "from",
+   "id",
+   "occurrences",
+   "supportDates",
+   "to",
+   "unitId",
+   "version",
+   "weekday"
+  ]
  },
  "baselines.delete": {
   "fields": [

@@ -527,7 +527,7 @@ func TestAutomationExtraConditions(t *testing.T) {
 			base+`,"onlyIf":`+extra+`}`,
 			0,
 		); code != 422 ||
-			asObj(t, resp["fieldErrors"])["onlyIf"] == nil {
+			asObj(t, resp["fieldErrors"])[fieldOnlyIf] == nil {
 			t.Errorf("%s: %d %v", name, code, resp)
 		}
 	}
@@ -536,7 +536,7 @@ func TestAutomationExtraConditions(t *testing.T) {
 		srv,
 		customerB(),
 		"automations.save",
-		scheduleRule(unitID, map[string]string{"onlyIf": `[{"type":"weekday","weekdays":[1]}]`}),
+		scheduleRule(unitID, map[string]string{fieldOnlyIf: `[{"type":"weekday","weekdays":[1]}]`}),
 		0,
 	); code != 422 ||
 		fields(resp) != "onlyIf=errors.weekday_on_schedule" {
@@ -572,7 +572,7 @@ func TestAutomationExtraConditions(t *testing.T) {
 		base+`,"onlyIf":[{"type":"weekday","weekdays":[1]},{"type":"occupancy","occupied":true}]}`,
 		0,
 	)
-	if code != 200 || len(asArr(t, data(res)["onlyIf"])) != 2 || data(res)["lastRun"] != nil {
+	if code != 200 || len(asArr(t, data(res)[fieldOnlyIf])) != 2 || data(res)["lastRun"] != nil {
 		t.Fatalf("save: %d %v", code, res)
 	}
 
@@ -705,7 +705,7 @@ func TestAutomationExtraConditions(t *testing.T) {
 		base+`,"id":"`+automationID+`","onlyIf":[{"type":"weekday","weekdays":[6,7]}]}`,
 		1,
 	)
-	if code != 200 || len(asArr(t, data(res)["onlyIf"])) != 1 {
+	if code != 200 || len(asArr(t, data(res)[fieldOnlyIf])) != 1 {
 		t.Fatalf("weekend only: %d %v", code, res)
 	}
 
@@ -721,7 +721,7 @@ func TestAutomationExtraConditions(t *testing.T) {
 		fieldStartLocal: jsonHalfPastNine,
 		fieldEndLocal:   jsonTenOClock,
 		fieldEnabled:    jsonTrue,
-		"onlyIf":        `[{"type":"occupancy","occupied":true}]`,
+		fieldOnlyIf:     `[{"type":"occupancy","occupied":true}]`,
 	}), 0)
 	if code != 200 {
 		t.Fatalf("schedule with onlyIf: %d %v", code, res)

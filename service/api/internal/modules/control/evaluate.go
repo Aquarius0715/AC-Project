@@ -243,7 +243,7 @@ func extrasMatch(
 		}
 
 		_ = json.Unmarshal(rawMessage, &extra)
-		if extra.Type == "weekday" {
+		if extra.Type == condWeekday {
 			loc, err := time.LoadLocation(timezone)
 			if err != nil {
 				return reasonNoMatch

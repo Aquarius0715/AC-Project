@@ -23,11 +23,13 @@ import { oneOf } from "@ac/web/lib/oneOf";
 import { Checkbox } from "@ac/web/components/ui/checkbox";
 import { isAfter } from "@ac/web/lib/order";
 import { entryOf, lookup } from "@ac/web/lib/lookup";
+import { ScheduleProposals } from "./schedule-proposals";
+import type { StartProposal } from "@ac/web/lib/contracts.gen";
 import { TimeSelect } from "@ac/web/components/TimeSelect";
 
 interface Ac { id: string; name: string; property: string; path: string }
 export interface AutomationsLive {
-  rules: ApiAutomation[]; cards: RuleCard[]; acs: Ac[]; caps: Record<string, Caps | null>; timezone: string; editing: string | null;
+  proposals: StartProposal[]; rules: ApiAutomation[]; cards: RuleCard[]; acs: Ac[]; caps: Record<string, Caps | null>; timezone: string; editing: string | null;
   consent: { version: number | null; granted: boolean; title: string; text: string; tone: "ok" | "warn" | "muted" }; nextRuns: Record<string, string | null>;
   /** the ACs of a new after-hours rule opened from the Running list (IR811); empty otherwise */
   preset: string[];
@@ -106,6 +108,7 @@ function List({ live, notice, setNotice, create, edit }: Readonly<{ live: Automa
       <PageHead title={t("Your automations")} sub={t(live.cards.length === 1 ? "{n} automation · {on} on · checked again when it runs" : "{n} automations · {on} on · checked again when it runs", { n: live.cards.length, on })} action={live.cards.length > 0 && <Btn variant="primary" onClick={create}><Icon name="add" /> {t(CREATE_AUTOMATION)}</Btn>} />
       {/* with no automation the empty state carries the one Create button, not the header as well (UI/UX loop R132) */}
       {notice && <Banner tone="ok" action={<Btn size="sm" variant="ghost" onClick={() => { setNotice(null); }}>{t("Dismiss")}</Btn>}><b>{notice.title}</b><div className="text-xs text-muted-foreground">{notice.text}</div></Banner>}
+      <ScheduleProposals proposals={live.proposals} units={live.acs} rules={live.rules} />
       <ConsentCard live={live} />
       {live.cards.length === 0 ? <EmptyState title={t("No automations yet")} action={<Btn size="sm" onClick={create}><Icon name="add" /> {t(CREATE_AUTOMATION)}</Btn>}>{t("Create one to pre-cool before you arrive or to stop an empty room. Saving sends no command — the automation runs at its time or event.")}</EmptyState> : (
         <div className="flex flex-col gap-3">

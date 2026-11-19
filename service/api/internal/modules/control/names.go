@@ -2,6 +2,8 @@ package control
 
 // The values the control module compares and writes by name: kinds, condition types, phases, decisions and keys.
 const (
+	condWeekday           = "weekday"
+	fieldStartLocal       = "startLocal"
 	condBattery           = "battery"
 	condLocation          = "location"
 	condOccupancy         = "occupancy"

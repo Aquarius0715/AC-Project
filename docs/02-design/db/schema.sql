@@ -716,6 +716,16 @@ CREATE INDEX commands_unit ON control.commands (tenant_id, unit_id, requested_at
 CREATE UNIQUE INDEX commands_one_pending_per_unit ON control.commands (unit_id) WHERE status IN ('requested','sent') AND source <> 'restriction';
 CREATE INDEX commands_open_expiry ON control.commands (expires_at) WHERE status IN ('requested','sent');
 
+-- Independently measured AC power. Command acknowledgements and IR transmitter settings must never populate this table.
+CREATE TABLE control.power_observations (
+  tenant_id   uuid NOT NULL,
+  binding_id  uuid NOT NULL,
+  observed_at timestamptz NOT NULL,
+  received_at timestamptz NOT NULL CHECK (received_at >= observed_at),
+  power       boolean,                           -- NULL when the physical state could not be established
+  PRIMARY KEY (tenant_id, binding_id, observed_at)
+);
+
 CREATE TABLE control.diagnostic_runs (           -- FR-T10
   id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id           uuid NOT NULL,
@@ -2077,3 +2087,5 @@ INSERT INTO identity.permissions (code, resource, kind) VALUES
  ('audit.read','audit','read'),
  ('partner.accept','partner','action'),('partner.assign','partner','action'),('partner.review','partner','action'),
  ('data.forceDelete','data','action');
+
+REVOKE INSERT, UPDATE, DELETE ON control.power_observations FROM ac_app, ac_worker, ac_svc_equipment;

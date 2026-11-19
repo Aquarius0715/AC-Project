@@ -1,6 +1,6 @@
 ---
 document_id: DD-COMMON
-version: 0.114.0
+version: 0.115.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -147,7 +147,7 @@ interface CommandRepository {
 
 `DemoViewContext` describes the selected fictional user, role, and visible scope. `DemoWriteOptions` carries a key to prevent duplicate demo actions and the version before the change. These do not define production authentication or server permissions. See the [Frontend Input and Output Contract](implementation-contracts.md) for the fields.
 
-The [Operation Catalog](operation-catalog.csv) lists the 234 local service operations needed by the screens, with their inputs, return values, and screens that use them. Its `rest_routes` column gives each operation's Core API REST route (IR222); database tables and transactions are in the [database design](database-design.md).
+The [Operation Catalog](operation-catalog.csv) lists the 236 local service operations needed by the screens, with their inputs, return values, and screens that use them. Its `rest_routes` column gives each operation's Core API REST route (IR222); database tables and transactions are in the [database design](database-design.md).
 
 Successful mock operations return ServiceResult<T>; failures reject with DomainError. Pending processing is shown through Command.status or similar fields in the success DTO. Do not create a custom pending Promise response type.
 

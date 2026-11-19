@@ -23,6 +23,8 @@ import (
 // versionZero sends X-Expected-Version: 0 (an absent row); 0 itself omits the header.
 const versionZero = -100
 
+const requiredExpectedVersion = "expectedVersion=error.required"
+
 func write(srv *apiserver.Server, who *actor, op, body string, version int) (int, map[string]any) {
 	method, target, reqBody := ops.ClientRequest(op, body)
 	req := httptest.NewRequestWithContext(context.Background(), method, target, reqBody)
@@ -172,7 +174,7 @@ func TestAssetWritesLifecycle(t *testing.T) {
 		upd,
 		0,
 	); code != 422 ||
-		fields(res) != "expectedVersion=error.required" {
+		fields(res) != requiredExpectedVersion {
 		t.Fatalf("update without version: %d %s", code, fields(res))
 	}
 
