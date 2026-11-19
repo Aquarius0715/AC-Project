@@ -25,15 +25,17 @@ const request = new Request("http://partner.test/");
 const documentCtx = (id: string): Parameters<typeof certificateDocument>[1] => ({ params: Promise.resolve({ id }) });
 const photoCtx = (id: string, attachmentId: string): Parameters<typeof jobPhoto>[1] => ({ params: Promise.resolve({ id, attachmentId }) });
 const file = (name: string, mime: string, text: string) => ({ name, mime, bytes: new TextEncoder().encode(text).toBase64() });
-// the HTTP status of each of three calls
+// the status, the body and the file headers of each of three calls: a refusal sends its message key and no file
 const statusesOf = async (call: () => Promise<Response>) => {
-  const statuses: number[] = [];
+  const answers: [number, string, string | null][] = [];
   for (let i = 0; i < 3; i++) {
     const res = await call();
-    statuses.push(res.status);
+    const body = await res.text();
+    answers.push([res.status, body, res.headers.get("content-disposition")]);
   }
-  return statuses;
+  return answers;
 };
+const refusals = [[404, "error.not_found", null], [403, "error.forbidden", null], [502, "error.unavailable", null]];
 
 beforeEach(() => { dal.coreOp.mockReset(); });
 
@@ -52,7 +54,7 @@ describe("the certificate document route", () => {
       .mockRejectedValueOnce(new dal.CoreError("NOT_FOUND"))
       .mockRejectedValueOnce(new dal.CoreError("FORBIDDEN"))
       .mockRejectedValueOnce(new dal.CoreError("UNAVAILABLE"));
-    await expect(statusesOf(() => certificateDocument(request, documentCtx("other")))).resolves.toStrictEqual([404, 403, 502]);
+    await expect(statusesOf(() => certificateDocument(request, documentCtx("other")))).resolves.toStrictEqual(refusals);
   });
 
   it("lets an error that is not the Core API's through", async () => {
@@ -77,7 +79,7 @@ describe("the job photo route", () => {
       .mockRejectedValueOnce(new dal.CoreError("NOT_FOUND"))
       .mockRejectedValueOnce(new dal.CoreError("FORBIDDEN"))
       .mockRejectedValueOnce(new dal.CoreError("UNAVAILABLE"));
-    await expect(statusesOf(() => jobPhoto(request, photoCtx("job-x", "att-1")))).resolves.toStrictEqual([404, 403, 502]);
+    await expect(statusesOf(() => jobPhoto(request, photoCtx("job-x", "att-1")))).resolves.toStrictEqual(refusals);
   });
 
   it("lets an error that is not the Core API's through", async () => {

@@ -42,7 +42,7 @@ describe("overview page", () => {
     expect(loaders.loadOverview).not.toHaveBeenCalled();
   });
 
-  it("reads the URL's period (none for a repeated or empty value, so the loader takes this week) and renders the view", async () => {
+  it("reads the URL's period, passing none for a repeated or empty value, and renders the view", async () => {
     dal.apiMode.mockReturnValue(true);
     const live = { period: "week" };
     loaders.loadOverview.mockResolvedValue(live);
@@ -64,7 +64,7 @@ describe("history page", () => {
     dal.apiMode.mockReturnValue(true);
     const live = { rows: [] };
     loaders.loadHistory.mockResolvedValue(live);
-    const page = await history({ jobId: ["job-p02", "job-p03"], tab: "internal", sort: "oldest", period: "30d" });
+    const page = await history({ jobId: ["job-p02", "job-p03"], tab: ["internal", "all"], sort: ["oldest", "newest"], period: ["30d", "7d"] });
     expect(shape(page)).toStrictEqual({ type: HistoryView, props: { live } });
     expect(loaders.loadHistory).toHaveBeenLastCalledWith({ jobId: "job-p02", tab: "internal", sort: "oldest", period: "30d" });
     await history({});
