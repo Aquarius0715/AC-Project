@@ -24,6 +24,7 @@ LABELS = dict(
     suppressed="見送り済み",
     approved="承認済み",
     approved_pending="承認済み・反映待ち",
+    replaced_by_approval="後の承認で置き換え済み",
     applied="反映済み",
     merged="根拠を統合",
     unavailable="比較データなし",

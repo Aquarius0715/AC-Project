@@ -123,8 +123,14 @@ def apply_feedback(report, raw, at, proposal_history=(), *, schedule_versions=No
         )
         for state in device["approval_states"]:
             for feedback in known:
-                if feedback["id"] == state["response_id"]:
-                    feedback["approval_superseded"] = state["superseded"]
+                if (
+                    feedback.get("origin") == "card_response"
+                    and feedback["device_id"] == state["device_id"]
+                    and feedback["id"] == state["response_id"]
+                ):
+                    feedback["approval_superseded"] = (
+                        state["superseded"] or state["status"] == "replaced_by_approval"
+                    )
         for item in device["decisions"]:
             if item["kind"] == "start_review" and item["status"] == "merged":
                 start = next(

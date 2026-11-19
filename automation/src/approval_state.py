@@ -32,21 +32,41 @@ def first_application(values, weekday, approved_at, versions, at):
 
 
 def card_approval_states(known, device_id, schedules, *, versions, at):
-    states = []
+    approvals = []
     for feedback in known:
         if (
-            feedback.get("origin") != "card_response"
-            or feedback["device_id"] != device_id
-            or feedback["response"] != "approved"
+            feedback.get("origin") == "card_response"
+            and feedback["device_id"] == device_id
+            and feedback["response"] == "approved"
         ):
-            continue
-        approved_at = timestamp(feedback["responded_at"], "responded_at")
-        if approved_at > at:
-            continue
+            approved_at = timestamp(feedback["responded_at"], "responded_at")
+            if approved_at <= at:
+                approvals.append((approved_at, feedback))
+    approvals.sort(key=lambda approval: (approval[0], approval[1]["id"]))
+
+    states = []
+    for approved_at, feedback in approvals:
         weekday = feedback["weekday"]
         values = copy.deepcopy(feedback["values"])
+        replacement = next(
+            (
+                (later_at, later)
+                for later_at, later in approvals
+                if later_at > approved_at and later["weekday"] == weekday
+            ),
+            None,
+        )
         applied_at = first_application(values, weekday, approved_at, versions, at)
-        if applied_at is None and any(
+        # A match at or after replacement cannot apply the earlier approval.
+        if replacement and (
+            applied_at is None or timestamp(applied_at, "applied_at") >= replacement[0]
+        ):
+            status = "replaced_by_approval"
+            applied_at = None
+        else:
+            replacement = None
+            status = "applied" if applied_at is not None else "approved_pending"
+        if status == "approved_pending" and any(
             f["device_id"] == device_id
             and f["kind"] == "start"
             and f["weekday"] == weekday
@@ -71,8 +91,12 @@ def card_approval_states(known, device_id, schedules, *, versions, at):
                 approved_at=feedback["responded_at"],
                 values=values,
                 current_schedule=copy.deepcopy(current),
-                status="applied" if applied_at is not None else "approved_pending",
+                status=status,
                 applied_at=applied_at,
+                replaced_at=replacement[0].isoformat() if replacement else None,
+                replacement_proposal_id=replacement[1]["proposal_id"]
+                if replacement
+                else None,
                 current_matches=current_matches,
                 superseded=applied_at is not None and not current_matches,
             )
@@ -90,7 +114,11 @@ def card_approval_states(known, device_id, schedules, *, versions, at):
 def apply_card_approval(item, states):
     if item["kind"] != "start":
         return False
-    matching = [s for s in states if s["weekday"] == item["weekday"]]
+    matching = [
+        s
+        for s in states
+        if s["weekday"] == item["weekday"] and s["status"] != "replaced_by_approval"
+    ]
     state = (
         max(matching, key=lambda s: timestamp(s["approved_at"], "approved_at"))
         if matching

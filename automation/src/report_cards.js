@@ -92,5 +92,8 @@ function approvalStatusText(day) {
   const states = day.devices.flatMap(device => device.approval_states || []);
   const pending = states.filter(a => a.status === 'approved_pending').length;
   const applied = states.filter(a => a.status === 'applied').length;
-  return (pending ? ' / 反映待ち ' + pending : '') + (applied ? ' / 反映済み ' + applied : '');
+  const replaced = states.filter(a => a.status === 'replaced_by_approval').length;
+  return (pending ? ' / 反映待ち ' + pending : '')
+    + (applied ? ' / 反映済み ' + applied : '')
+    + (replaced ? ' / 置き換え済み ' + replaced : '');
 }

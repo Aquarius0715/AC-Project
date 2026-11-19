@@ -284,6 +284,8 @@ class ApplicationIntervalTests(unittest.TestCase):
             [(s["proposal_id"], s["status"]) for s in states],
             [("P1", "applied"), ("P2", "approved_pending")],
         )
+        self.assertEqual(states[0]["applied_at"], "2026-08-27T00:00:00+09:00")
+        self.assertIsNone(states[0]["replaced_at"])
 
 
 if __name__ == "__main__":
