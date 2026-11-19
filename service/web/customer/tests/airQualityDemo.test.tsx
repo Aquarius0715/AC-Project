@@ -10,7 +10,12 @@ vi.mock("@ac/web/components/ui", async (importOriginal) => ({ ...(await importOr
 import { AirQualityDemo } from "../app/customer/air-quality/_components/air-quality-demo";
 
 const tab = (name: string) => { fireEvent.click(screen.getByRole("tab", { name })); };
-const history = () => within(screen.getByText("Ventilation history").closest("section") ?? document.body);
+/** the Ventilation history card: its rows, one div each with the record and its time */
+function historyRows() {
+  const card = screen.getByRole("heading", { name: "Ventilation history" }).closest<HTMLElement>("[data-slot=card]");
+  if (card === null) throw new TypeError("no Ventilation history card");
+  return [...card.querySelectorAll(":scope [data-slot=card-content] > div")].map((r) => [...r.children].map((c) => c.textContent));
+}
 
 beforeEach(() => { toast.mockReset(); });
 afterEach(() => { cleanup(); });
@@ -56,14 +61,14 @@ describe("AirQualityDemo", () => {
     fireEvent.click(screen.getByRole("button", { name: "Log ventilation" }));
     fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
     expect(screen.queryByRole("dialog")).toBeNull();
+    expect(toast).not.toHaveBeenCalled();
+    expect(historyRows()).toStrictEqual([["Ran ventilation fan · 20 min", "Yesterday 18:10"]]);
     fireEvent.click(screen.getByRole("button", { name: "Log ventilation" }));
     const dialog = within(screen.getByRole("dialog"));
     fireEvent.change(dialog.getByLabelText("What did you do?"), { target: { value: "Manual ventilation" } });
     fireEvent.click(dialog.getByRole("button", { name: "Save record" }));
-    expect(toast).toHaveBeenCalledWith("Ventilation logged");
+    expect(toast.mock.calls).toStrictEqual([["Ventilation logged"]]);
     expect(screen.queryByRole("dialog")).toBeNull();
-    const texts = history().getAllByText(/ventilation/u).map((e) => e.textContent);
-    expect(texts.slice(-2)).toStrictEqual(["Manual ventilation", "Ran ventilation fan · 20 min"]);
-    expect(screen.getByText("Today 09:15")).toBeDefined();
+    expect(historyRows()).toStrictEqual([["Manual ventilation", "Today 09:15"], ["Ran ventilation fan · 20 min", "Yesterday 18:10"]]);
   });
 });
