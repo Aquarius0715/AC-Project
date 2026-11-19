@@ -43,11 +43,12 @@ afterEach(() => { cleanup(); });
 
 describe("WorkspaceDemo live assignment", () => {
   it("shows the store's assignment of tech-external-a, but the fixture workspace for another technician or a fixture job", () => {
-    store.jobs = [assignment(), assignment({ id: "job-other", technician: "tech-external-a2" }), assignment({ id: "job-t07" })];
+    const fixtures = ["job-contractor-a", "job-t07", "job-p05", "job-p09"];
+    store.jobs = [assignment(), assignment({ id: "job-other", technician: "tech-external-a2" }), ...fixtures.map((id) => assignment({ id }))];
     const { unmount } = render(<WorkspaceDemo id="job-live" />);
     expect(screen.getByText("New assignment — please accept")).toBeDefined();
     unmount();
-    for (const id of ["job-other", "job-t07"]) {
+    for (const id of ["job-other", ...fixtures]) {
       const view = render(<WorkspaceDemo id={id} />);
       expect(screen.queryByText("New assignment — please accept")).toBeNull();
       expect(screen.getByText("Inspection checklist")).toBeDefined();
@@ -91,7 +92,8 @@ describe("WorkspaceDemo live assignment", () => {
     expect(screen.getByText(/You told HQ you can’t make it/).textContent).toContain("“Sick · Clinic”");
     expect(screen.getByText("Job — assigned to you")).toBeDefined();
     expect(screen.getByText("the client (via HQ)")).toBeDefined();
-    expect(screen.getAllByText("—").length).toBeGreaterThan(0); // no visit time
+    const visit = screen.getByText("Visit time").parentElement;
+    expect(visit?.textContent).toBe("Visit time—"); // no visit time
   });
 });
 
