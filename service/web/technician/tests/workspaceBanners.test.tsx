@@ -52,13 +52,14 @@ describe("WorkspaceView assignment banners", () => {
     fireEvent.click(button("Accept assignment"));
     expect(acknowledge).toHaveBeenCalledWith("job-1", 5, "accept", null, null);
     await waitFor(() => { expect(acknowledge).toHaveBeenCalledOnce(); });
-    await Promise.resolve();
+    await Promise.resolve(); // the accept's answer reaches `after`
+    expect(document.activeElement?.id).not.toBe("job-title"); // only the next view takes the focus
     unmount();
     render(<WorkspaceView live={live({ version: 6 })} />); // the page mounts the view again for the new version
     expect(document.activeElement?.id).toBe("job-title");
   });
 
-  it("sends can't make with the trimmed reason and the other time in the display zone, or without a time; an empty reason is refused", () => {
+  it("sends can't make with the trimmed reason and the other time in the display zone, or without a time; an empty reason is refused", async () => {
     render(<WorkspaceView live={live({ assignment: assignment({ acknowledgement: "pending" }) })} />);
     fireEvent.click(button("Can’t make this time…"));
     const dialog = screen.getByRole("dialog");
@@ -68,9 +69,12 @@ describe("WorkspaceView assignment banners", () => {
     fireEvent.change(within(dialog).getByPlaceholderText("Medical appointment on that morning"), { target: { value: "  Medical appointment  " } });
     fireEvent.click(within(dialog).getByRole("button", { name: "Send to coordinator" }));
     expect(acknowledge).toHaveBeenLastCalledWith("job-1", 5, "cant_make", "Medical appointment", null);
-    fireEvent.change(within(dialog).getByLabelText(/^A time you could do instead \(optional\)/), { target: { value: "2026-11-20" } });
-    fireEvent.change(within(dialog).getByRole("combobox"), { target: { value: "14:00-16:00" } });
-    fireEvent.click(within(dialog).getByRole("button", { name: "Send to coordinator" }));
+    await waitFor(() => { expect(screen.queryByRole("dialog")).toBeNull(); }); // sent: the dialog closes
+    fireEvent.click(button("Can’t make this time…")); // its form keeps what was typed
+    const again = screen.getByRole("dialog");
+    fireEvent.change(within(again).getByLabelText(/^A time you could do instead \(optional\)/), { target: { value: "2026-11-20" } });
+    fireEvent.change(within(again).getByRole("combobox"), { target: { value: "14:00-16:00" } });
+    fireEvent.click(within(again).getByRole("button", { name: "Send to coordinator" }));
     // 14:00–16:00 in Kuala Lumpur (UTC+8)
     expect(acknowledge).toHaveBeenLastCalledWith("job-1", 5, "cant_make", "Medical appointment", { startAt: "2026-11-20T06:00:00.000Z", endAt: "2026-11-20T08:00:00.000Z" });
   });
@@ -85,14 +89,15 @@ describe("WorkspaceView assignment banners", () => {
   });
 
   it.each([
-    { phase: "before", over: { scheduledStart: "2026-11-18T05:00:00Z" }, text: /^Read-only until the window opens at /, enabled: false },
-    { phase: "open", over: {}, text: /^On site: Start job opens Check in/, enabled: true },
-    { phase: "ending", over: { scheduledEnd: "2026-11-18T03:10:00Z" }, text: /^On site: Start job opens Check in/, enabled: true },
-    { phase: "ended", over: { scheduledEnd: "2026-11-18T02:30:00Z" }, text: /^The work window has ended — ask your coordinator/, enabled: false },
-  ])("an accepted assignment $phase the window: its text, Start job enabled $enabled", ({ over, text, enabled }) => {
+    { phase: "before", over: { scheduledStart: "2026-11-18T05:00:00Z" }, text: /^Read-only until the window opens at /, enabled: false, ending: false },
+    { phase: "open", over: {}, text: /^On site: Start job opens Check in/, enabled: true, ending: false },
+    { phase: "ending", over: { scheduledEnd: "2026-11-18T03:10:00Z" }, text: /^On site: Start job opens Check in/, enabled: true, ending: true },
+    { phase: "ended", over: { scheduledEnd: "2026-11-18T02:30:00Z" }, text: /^The work window has ended — ask your coordinator/, enabled: false, ending: false },
+  ])("an accepted assignment $phase the window: its text, Start job enabled $enabled", ({ over, text, enabled, ending }) => {
     render(<WorkspaceView live={live({ assignment: assignment(over) })} />);
     expect(screen.getByText(text)).toBeDefined();
     expect(button("Start job (check in)").disabled).toBe(!enabled);
+    expect(screen.queryByText("ending") !== null).toBe(ending); // the Work window line's badge
   });
 });
 
@@ -124,6 +129,10 @@ describe("WorkspaceView job state banners", () => {
   });
 
   it("an in-progress job past its window is read-only with the discard banner", () => {
+    render(<WorkspaceView live={live({ status: "in_progress", timeOnSite: { startedAt: "2026-11-18T02:10:00Z" } }, { report: report() })} />);
+    expect(button("Save draft")).toBeDefined(); // inside the window it is editable
+    expect(screen.queryByText(/^The work window ended/)).toBeNull();
+    cleanup();
     render(<WorkspaceView live={live({ status: "in_progress", assignment: assignment({ scheduledEnd: "2026-11-18T02:30:00Z" }), timeOnSite: { startedAt: "2026-11-18T02:10:00Z" } }, { report: report() })} />);
     expect(screen.getByText(/^The work window ended — unsaved input was discarded/)).toBeDefined();
     expect(screen.queryByRole("button", { name: "Save draft" })).toBeNull();
@@ -146,7 +155,9 @@ describe("WorkspaceView refusals", () => {
     { name: "another conflict", over: { code: "CONFLICT", messageKey: "errors.invalid_state" }, text: "The job is not in a state that allows this (on hold, submitted or cancelled); the page shows the latest state." },
     { name: "a known forbidden reason", over: { code: "FORBIDDEN", messageKey: "errors.assignment_ended" }, text: "Not allowed: your work window has ended." },
     { name: "another forbidden reason", over: { code: "FORBIDDEN", messageKey: "error.not_your_company" }, text: "Not allowed: not your company." },
+    { name: "a changed version under another code", over: { code: "FORBIDDEN", messageKey: "errors.report_version_changed" }, text: "The report or job changed elsewhere; reload the page to continue from the latest version." },
     { name: "an unreachable Core API", over: { code: "UNAVAILABLE" }, text: "Not sent; your draft is kept on this page. Try again." },
+    { name: "the write limit, as every action says it", over: { code: "RATE_LIMITED", retryAfterSeconds: 12 }, text: "Too many changes in a short time — try again in 12 s" },
   ])("$name", async ({ over, text }) => {
     refusedWith(over);
     render(<WorkspaceView live={live({ assignment: assignment({ acknowledgement: "pending" }) })} />);
@@ -161,13 +172,12 @@ describe("WorkspaceView Job & unit card", () => {
       assignment: assignment({ scheduledStart: "2026-11-18T05:00:00Z" }), symptom: "Water dripping", alertCount: 2, origin: "hq_request",
       problemPhotos: [{ id: "ph-1", name: "drip.jpg" }],
     }, { unitRefused: "errors.assignment_not_started" })} />);
-    const scope = screen;
-    expect(scope.getByText("opens at the start of your window")).toBeDefined();
-    expect(scope.getByText("Unit A")).toBeDefined();
-    expect(scope.getByText("“Water dripping”")).toBeDefined();
-    expect(scope.getByText(/· HQ request$/)).toBeDefined();
-    expect(scope.getByRole("link", { name: "drip.jpg" }).getAttribute("href")).toBe("/technician/jobs/job-1/problem-photos/ph-1");
-    expect(scope.getByRole("link", { name: /^2 alerts/ }).getAttribute("href")).toBe("/technician/units/unit-12345678/alerts?jobId=job-1");
+    expect(screen.getByText("opens at the start of your window")).toBeDefined();
+    expect(screen.getByText("Unit A")).toBeDefined();
+    expect(screen.getByText("“Water dripping”")).toBeDefined();
+    expect(screen.getByText(/· HQ request$/)).toBeDefined();
+    expect(screen.getByRole("link", { name: "drip.jpg" }).getAttribute("href")).toBe("/technician/jobs/job-1/problem-photos/ph-1");
+    expect(screen.getByRole("link", { name: /^2 alerts/ }).getAttribute("href")).toBe("/technician/units/unit-12345678/alerts?jobId=job-1");
     expect(screen.queryByRole("link", { name: /^Diagnostics/ })).toBeNull();
   });
 
