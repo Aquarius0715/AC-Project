@@ -37,7 +37,7 @@ import { RouteError, RouteLoading } from "@ac/web/components/RouteStates";
 
 const NOW = new Date("2026-09-15T01:12:30Z");
 const property = (id: string, name: string, kind: "home" | "office", customerOrgId = "org-a"): ApiPropertyRow => ({
-  id, name, kind, customerOrgId, version: 3, address: null, accessInstructions: null, location: null, geofenceRadiusMeters: null, archived: false, updatedAt: "2026-09-12T02:00:00Z",
+  id, name, kind, customerOrgId, version: 3, address: null, accessInstructions: null, location: null, geofenceRadiusMeters: null, archived: false, updatedAt: "2026-09-11T20:00:00Z",
 });
 const space = (id: string, name: string, kind: ApiSpaceRow["kind"], parentSpaceId: string | null): ApiSpaceRow => ({ id, name, parentSpaceId, kind, propertyId: "p-home", version: 1, archived: false });
 const unit = (id: string, displayName: string, spaceId: string | null, over: Partial<ApiUnitRow> = {}): ApiUnitRow => ({
@@ -102,7 +102,7 @@ describe("renameLocation", () => {
 describe("sendCommand", () => {
   it("creates the command at the unit's current version; a refused read sends nothing", async () => {
     const command = { id: "c-1", status: "pending" };
-    dal.coreOp.mockResolvedValueOnce(detailOf(units[0] ?? unit("x", "x", null))).mockResolvedValueOnce(command);
+    dal.coreOp.mockResolvedValueOnce(detailOf(unit("u-bed1", "Bedroom AC", "s-bed"))).mockResolvedValueOnce(command);
     await expect(sendCommand("u-bed1", { kind: "set_power", power: false })).resolves.toStrictEqual({ ok: true, value: command });
     expect(dal.coreOp.mock.calls).toStrictEqual([["units.get", { id: "u-bed1" }], ["commands.create", { unitId: "u-bed1", action: { kind: "set_power", power: false }, expectedUnitVersion: 4 }, { write: true }]]);
     dal.coreOp.mockClear();
@@ -148,6 +148,8 @@ describe("properties page", () => {
     dal.coreOp.mockClear();
     const alone = await open({ unassignedOnly: "true" });
     expect(alone.selection).toMatchObject({ kind: "property", property: { id: "p-home" } });
+    const unknown = await open({ spaceId: "s-gone" });
+    expect(unknown.selection).toMatchObject({ kind: "property", property: { id: "p-home" } });
     const office = await open({ propertyId: "p-office" });
     expect(office.units).toStrictEqual([]);
   });
