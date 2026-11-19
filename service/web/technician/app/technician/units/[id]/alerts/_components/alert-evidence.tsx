@@ -31,8 +31,9 @@ export function AlertEvidenceView({ live }: Readonly<{ live: AlertsLive }>) {
   const [busy, start] = useTransition();
   const refreshThen = useRefreshThen(busy);
   const a = live.alert;
+  const head = <div className="flex flex-wrap items-center gap-2 text-[13px]"><Link href={live.unitHref} className="font-semibold text-primary" aria-label={t("Back")}><Icon name="chevronLeft" /></Link><h1 className="text-base font-bold">{t("Alert evidence")}</h1><span className="text-muted-foreground">· {live.unitName}</span></div>;
+  if (!a) return <Page>{head}<Card><EmptyState title={t("No alerts on this unit")}>{t("Alerts raised on this unit appear here with their evidence.")}</EmptyState></Card></Page>;
   const act = (op: "acknowledge" | "resolve") => {
-    if (!a) return;
     if (op === "resolve" && !reason.trim()) { setMessage(t("A resolution reason is required (1–1000 characters).")); return; }
     const ids = picked.filter((id) => live.evidence?.some((r) => r.id === id)); // a re-read list drops what is no longer a candidate
     const problem = op === "resolve" && live.evidence ? evidenceProblem(a.policyless, ids, t) : null;
@@ -50,58 +51,54 @@ export function AlertEvidenceView({ live }: Readonly<{ live: AlertsLive }>) {
   };
   return (
     <Page>
-      <div className="flex flex-wrap items-center gap-2 text-[13px]"><Link href={live.unitHref} className="font-semibold text-primary" aria-label={t("Back")}><Icon name="chevronLeft" /></Link><h1 className="text-base font-bold">{t("Alert evidence")}</h1><span className="text-muted-foreground">· {live.unitName}</span></div>
-      {a ? (
-        <>
-          <div className={cx("flex flex-wrap items-center justify-between gap-3 rounded-2xl border px-4 py-3", BANNER[a.banner.tone])}>
-            <div className="min-w-0"><b className="block text-[15px]">{a.banner.title}</b><span className="text-xs">{a.banner.sub}</span></div>
-            <div className="flex items-center gap-2"><SeverityBadge s={a.severity} />{a.status === "open" ? <Btn size="sm" disabled={busy} onClick={() => { act("acknowledge"); }}>{t("Acknowledge")}</Btn> : <b className="text-xs">{a.banner.state}</b>}</div>
+      {head}
+      <div className={cx("flex flex-wrap items-center justify-between gap-3 rounded-2xl border px-4 py-3", BANNER[a.banner.tone])}>
+        <div className="min-w-0"><b className="block text-[15px]">{a.banner.title}</b><span className="text-xs">{a.banner.sub}</span></div>
+        <div className="flex items-center gap-2"><SeverityBadge s={a.severity} />{a.status === "open" ? <Btn size="sm" disabled={busy} onClick={() => { act("acknowledge"); }}>{t("Acknowledge")}</Btn> : <b className="text-xs">{a.banner.state}</b>}</div>
+      </div>
+      <div className="grid-fluid" style={{ ["--min" as string]: "260px" }}>
+        {a.cards.map((c) => (
+          <div key={c.title} className="rounded-2xl border border-line bg-surface p-4">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{c.kind}</div>
+            <div className="text-[13px] font-semibold">{c.title}</div>
+            <div className="mt-1 text-[15px] font-bold">{c.value}</div>
+            <div className="mt-1 text-[11px] text-muted-foreground">{c.sub}</div>
           </div>
-          <div className="grid-fluid" style={{ ["--min" as string]: "260px" }}>
-            {a.cards.map((c) => (
-              <div key={c.title} className="rounded-2xl border border-line bg-surface p-4">
-                <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{c.kind}</div>
-                <div className="text-[13px] font-semibold">{c.title}</div>
-                <div className="mt-1 text-[15px] font-bold">{c.value}</div>
-                <div className="mt-1 text-[11px] text-muted-foreground">{c.sub}</div>
-              </div>
-            ))}
-          </div>
-          <Card title={t("Resolution")}>
-            {message && <div className="mb-3"><Banner tone="crit">{message}</Banner></div>}
-            {a.resolution.done ? <Banner tone="ok">{a.resolution.done}</Banner> : (
-              <>
-                {a.resolution.info && <Banner>{a.resolution.info}</Banner>}
-                {live.evidence && <div className="mt-3"><EvidencePicker rows={live.evidence} policyless={a.policyless} picked={picked.filter((id) => live.evidence?.some((r) => r.id === id))} onChange={setPicked} /></div>}
-                <div className="mt-3"><Field label={t("Resolution reason (required, 1–1000 characters)")}><Textarea value={reason} maxLength={1000} placeholder={t("e.g. Confirmed on site that airflow is restored after filter cleaning.")} onChange={(e) => { setReason(e.target.value); }} /></Field></div>
-                <div className="mt-3"><Btn variant="primary" className="w-full" disabled={busy} onClick={() => { act("resolve"); }}>{t("Resolve alert")}</Btn></div>
-              </>
-            )}
-            <p className="mt-2 text-[11px] text-muted-foreground">{a.resolution.note}</p>
-          </Card>
-          <div className="split">
-            <Card title={t("Alert history")}>
-              {a.history.map((h) => (
-                <div key={h.id} className="flex items-start justify-between gap-2 border-t border-line py-2 first:border-0">
-                  <span className="min-w-0"><b className="block text-[13px]">{h.time} · {h.title}</b>{h.sub && <span className="text-xs text-muted-foreground">{h.sub}</span>}</span><Badge tone={h.badge.tone}>{h.badge.text}</Badge>
-                </div>
+        ))}
+      </div>
+      <Card title={t("Resolution")}>
+        {message && <div className="mb-3"><Banner tone="crit">{message}</Banner></div>}
+        {a.resolution.done ? <Banner tone="ok">{a.resolution.done}</Banner> : (
+          <>
+            {a.resolution.info && <Banner>{a.resolution.info}</Banner>}
+            {live.evidence && <div className="mt-3"><EvidencePicker rows={live.evidence} policyless={a.policyless} picked={picked.filter((id) => live.evidence?.some((r) => r.id === id))} onChange={setPicked} /></div>}
+            <div className="mt-3"><Field label={t("Resolution reason (required, 1–1000 characters)")}><Textarea value={reason} maxLength={1000} placeholder={t("e.g. Confirmed on site that airflow is restored after filter cleaning.")} onChange={(e) => { setReason(e.target.value); }} /></Field></div>
+            <div className="mt-3"><Btn variant="primary" className="w-full" disabled={busy} onClick={() => { act("resolve"); }}>{t("Resolve alert")}</Btn></div>
+          </>
+        )}
+        <p className="mt-2 text-[11px] text-muted-foreground">{a.resolution.note}</p>
+      </Card>
+      <div className="split">
+        <Card title={t("Alert history")}>
+          {a.history.map((h) => (
+            <div key={h.id} className="flex items-start justify-between gap-2 border-t border-line py-2 first:border-0">
+              <span className="min-w-0"><b className="block text-[13px]">{h.time} · {h.title}</b>{h.sub && <span className="text-xs text-muted-foreground">{h.sub}</span>}</span><Badge tone={h.badge.tone}>{h.badge.text}</Badge>
+            </div>
+          ))}
+        </Card>
+        <div className="flex min-w-0 flex-col gap-4">
+          <Card title={t("Related")}><SummaryList items={a.related} /></Card>
+          {live.count > 1 && (
+            <Card title={t("Alerts on this unit ({n})", { n: live.count })}>
+              {live.choices.map((x) => (
+                <Plain key={x.id} type="button" onClick={() => { setMessage(null); setPicked([]); patch({ alertId: x.id }); }} className={cx("flex w-full items-center justify-between gap-2 border-t border-line py-2 text-left first:border-0", x.id === a.id && "font-bold")}>
+                  <span className="min-w-0"><span className="block text-[13px]">{x.title}</span><span className="text-xs font-normal text-muted-foreground">{x.sub}</span></span><SeverityBadge s={x.severity} />
+                </Plain>
               ))}
             </Card>
-            <div className="flex min-w-0 flex-col gap-4">
-              <Card title={t("Related")}><SummaryList items={a.related} /></Card>
-              {live.count > 1 && (
-                <Card title={t("Alerts on this unit ({n})", { n: live.count })}>
-                  {live.choices.map((x) => (
-                    <Plain key={x.id} type="button" onClick={() => { setMessage(null); setPicked([]); patch({ alertId: x.id }); }} className={cx("flex w-full items-center justify-between gap-2 border-t border-line py-2 text-left first:border-0", x.id === a.id && "font-bold")}>
-                      <span className="min-w-0"><span className="block text-[13px]">{x.title}</span><span className="text-xs font-normal text-muted-foreground">{x.sub}</span></span><SeverityBadge s={x.severity} />
-                    </Plain>
-                  ))}
-                </Card>
-              )}
-            </div>
-          </div>
-        </>
-      ) : <Card><EmptyState title={t("No alerts on this unit")}>{t("Alerts raised on this unit appear here with their evidence.")}</EmptyState></Card>}
+          )}
+        </div>
+      </div>
     </Page>
   );
 }
