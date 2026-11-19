@@ -270,15 +270,14 @@ describe("Certificate dialog", () => {
     fireEvent.change(within(d).getByLabelText(/Choose a file/), { target: { files: [pdf()] } });
     actions.submitCertificate.mockResolvedValue(refusal("VALIDATION", { number: "error.length", file: "error.invalidFile" }));
     fireEvent.click(within(d).getByRole("button", { name: "Submit for verification" }));
-    await waitFor(() => { expect(failures).toStrictEqual(["VALIDATION"]); });
-    expect(within(d).getByText("Too long")).toBeTruthy();
+    expect(await within(d).findByText("Too long")).toBeTruthy();
     expect(within(d).getByText("Use a PDF, JPG or PNG file of at most 10 MB")).toBeTruthy();
     fireEvent.change(within(d).getByLabelText(/^Certificate number/), { target: { value: "IN-8" } });
     expect(within(d).queryByText("Too long")).toBeNull();
     actions.submitCertificate.mockResolvedValue(refusal("NOT_FOUND"));
     fireEvent.click(within(d).getByRole("button", { name: "Submit for verification" }));
-    await waitFor(() => { expect(failures).toStrictEqual(["VALIDATION", "NOT_FOUND"]); });
-    expect(within(d).getByText("That technician or certificate is no longer in your company — reload the page.")).toBeTruthy();
+    expect(await within(d).findByText("That technician or certificate is no longer in your company — reload the page.")).toBeTruthy();
+    expect(failures).toStrictEqual(["VALIDATION", "NOT_FOUND"]);
     fireEvent.click(within(d).getByRole("button", { name: "Cancel" }));
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(toasts).toStrictEqual([]);
@@ -286,7 +285,7 @@ describe("Certificate dialog", () => {
 });
 
 describe("Training dialog", () => {
-  it("needs a note of 1–1000 characters and sends the trimmed check to the certificate's version", async () => {
+  it("needs a note of 1–1000 characters after trimming, and sends the note to the certificate's version", async () => {
     const d = await openTraining();
     expect(within(d).getByText("Request training — Outdoor licence")).toBeTruthy();
     expect(within(d).getByText("Outdoor licence · Expiring · 22 d")).toBeTruthy();
@@ -294,8 +293,11 @@ describe("Training dialog", () => {
     expect(within(d).getByText("A note is required (1–1000 characters)")).toBeTruthy();
     const note = within(d).getByRole("textbox");
     fireEvent.change(note, { target: { value: "x".repeat(1001) } });
+    expect(within(d).getByText("A note is required (1–1000 characters)")).toBeTruthy(); // too long counts as wrong too
     fireEvent.click(within(d).getByRole("button", { name: "Request training" }));
     expect(actions.requestTraining).not.toHaveBeenCalled();
+    fireEvent.change(note, { target: { value: "x".repeat(1000) } });
+    expect(within(d).queryByText("A note is required (1–1000 characters)")).toBeNull();
     fireEvent.change(note, { target: { value: "  Refresher in December  " } });
     expect(within(d).queryByText("A note is required (1–1000 characters)")).toBeNull();
     actions.requestTraining.mockResolvedValue({ ok: true, value: null });
@@ -305,22 +307,36 @@ describe("Training dialog", () => {
     expect(toasts).toStrictEqual(["Training requested."]);
   });
 
-  it("says why a request was refused: the changed certificate, the refused note, and nothing beyond the toast for an outage", async () => {
+  it("says why a request was refused: the changed certificate, the refused note, nothing beyond the toast for an outage; an edit clears them", async () => {
     const d = await openTraining();
-    fireEvent.change(within(d).getByRole("textbox"), { target: { value: "Refresher" } });
+    const note = within(d).getByRole("textbox");
+    const changed = "The certificate changed in the meantime — the page shows the latest state.";
+    const submit = () => { fireEvent.click(within(d).getByRole("button", { name: "Request training" })); };
+    fireEvent.change(note, { target: { value: "Refresher" } });
     actions.requestTraining.mockResolvedValue(refusal("CONFLICT"));
-    fireEvent.click(within(d).getByRole("button", { name: "Request training" }));
-    await waitFor(() => { expect(failures).toStrictEqual(["CONFLICT"]); });
-    expect(within(d).getByText("The certificate changed in the meantime — the page shows the latest state.")).toBeTruthy();
+    submit();
+    expect(await within(d).findByText(changed)).toBeTruthy();
+    fireEvent.change(note, { target: { value: "Refresher course" } });
+    expect(within(d).queryByText(changed)).toBeNull();
+    // the refused note under its field, the earlier reason gone
+    submit();
+    expect(await within(d).findByText(changed)).toBeTruthy();
     actions.requestTraining.mockResolvedValue(refusal("VALIDATION", { note: "error.length" }));
-    fireEvent.click(within(d).getByRole("button", { name: "Request training" }));
-    await waitFor(() => { expect(failures).toStrictEqual(["CONFLICT", "VALIDATION"]); });
-    expect(within(d).getByText("Too long")).toBeTruthy();
-    // an outage is the toast's to say (useAction); the dialog does not blame the input
+    submit();
+    expect(await within(d).findByText("Too long")).toBeTruthy();
+    expect(within(d).queryByText(changed)).toBeNull();
+    fireEvent.change(note, { target: { value: "Refresher" } });
+    expect(within(d).queryByText("Too long")).toBeNull();
+    // a VALIDATION naming no field asks to check the input
+    actions.requestTraining.mockResolvedValue(refusal("VALIDATION"));
+    submit();
+    expect(await within(d).findByText("Check the input.")).toBeTruthy();
+    // an outage is the toast's to say (useAction): the dialog keeps no earlier message and does not blame the input
     actions.requestTraining.mockResolvedValue(refusal("UNAVAILABLE"));
-    fireEvent.click(within(d).getByRole("button", { name: "Request training" }));
-    await waitFor(() => { expect(failures).toStrictEqual(["CONFLICT", "VALIDATION", "UNAVAILABLE"]); });
-    expect(within(d).queryByText("Check the input.")).toBeNull();
+    submit();
+    await waitFor(() => { expect(within(d).queryByText("Check the input.")).toBeNull(); });
+    expect(failures).toStrictEqual(["CONFLICT", "CONFLICT", "VALIDATION", "VALIDATION", "UNAVAILABLE"]);
+    expect(within(d).queryByText(changed)).toBeNull();
     expect(within(d).queryByText("Too long")).toBeNull();
     fireEvent.click(within(d).getByRole("button", { name: "Cancel" }));
     expect(screen.queryByRole("dialog")).toBeNull();

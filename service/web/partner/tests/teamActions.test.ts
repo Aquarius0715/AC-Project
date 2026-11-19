@@ -97,7 +97,7 @@ describe("submitCertificate", () => {
     await expect(submitCertificate(certForm({ file }))).resolves.toStrictEqual({ ok: true, value: { id: "c-9" } });
     expect(dal.coreOp).toHaveBeenCalledExactlyOnceWith("certificates.submit", {
       membershipId: "m-1", code: "demo_outdoor", name: "Outdoor licence", number: "OUT-2", issuedAt: "2026-11-09T16:00:00.000Z", expiresAt: "2027-11-08T16:00:00.000Z",
-      file: { name: "scans_out.png", mime: "application/pdf", size: 8, bytes: "JVBERi0xLjc=" } // "%PDF-1.7",
+      file: { name: "scans_out.png", mime: "application/pdf", size: 8, bytes: "JVBERi0xLjc=" }, // the base64 of "%PDF-1.7"
     }, { write: true });
     expect(cache.refresh).toHaveBeenCalledOnce();
   });
