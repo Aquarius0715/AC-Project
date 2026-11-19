@@ -95,6 +95,18 @@ describe("WorkspaceDemo live assignment", () => {
     const visit = screen.getByText("Visit time").parentElement;
     expect(visit?.textContent).toBe("Visit time—"); // no visit time
   });
+
+  it("reads a job without an answer as new, and names HQ everywhere when a contractor job has no contractor yet", () => {
+    store.jobs = [assignment({ contractor: null, techAck: null })];
+    render(<WorkspaceDemo id="job-live" />);
+    expect(screen.getByText(/new assignment$/)).toBeDefined();
+    expect(screen.getByText("Assigned by").parentElement?.textContent).toBe("Assigned byHQ");
+    expect(screen.getByText(/^Accepting tells HQ that you will attend/)).toBeDefined(); // not "HQ and HQ"
+    fireEvent.click(button("Can’t make this time…"));
+    fireEvent.change(within(dialog()).getByPlaceholderText("Medical appointment on 10-01 morning."), { target: { value: "Clinic" } });
+    fireEvent.click(button("Send to HQ", dialog()));
+    expect(toast).toHaveBeenCalledWith("Sent to HQ", "warn");
+  });
 });
 
 describe("WorkspaceDemo fixture workspace", () => {

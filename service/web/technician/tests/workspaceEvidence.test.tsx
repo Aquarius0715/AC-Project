@@ -124,6 +124,16 @@ describe("WorkspaceView evidence under a finding", () => {
     expect(screen.queryByRole("link", { name: "coil.jpg" })).toBeNull();
   });
 
+  it("sends an installation photo with what it shows (DEC-106)", async () => {
+    answers.upload = { ok: true, value: { id: "rep-1", version: 2, signOff: null, attachmentRefs: [{ ...photo("ph-9", "plate.jpg", "processing"), tag: "name_plate" }] } };
+    render(<WorkspaceView live={live({ installation: { confirmedModelId: "m-1", serial: "SN-1" }, items: [item("filter", "normal"), item("drain_pan", "normal")] }, { type: "installation" })} />);
+    choose("Photo of the name plate", file("plate.jpg", "image/jpeg"));
+    expect(uploadPhoto).toHaveBeenCalledOnce();
+    const form = vi.mocked(uploadPhoto).mock.calls[0]?.[0];
+    expect([form?.get("reportId"), form?.get("tag")]).toStrictEqual(["rep-1", "name_plate"]);
+    await waitFor(() => { expect(screen.getByRole("img", { name: "plate.jpg" })).toBeDefined(); });
+  });
+
   it("uploads a photo taken for a finding on the saved draft and links the new photo to it", async () => {
     answers.upload = { ok: true, value: { id: "rep-1", version: 2, signOff: null, attachmentRefs: [photo("ph-1", "coil.jpg"), photo("ph-9", "new.jpg", "processing")] } };
     render(<WorkspaceView live={live({ attachmentRefs: [photo("ph-1", "coil.jpg")], items: [item("filter", "attention"), item("drain_pan", "normal")] })} />);
@@ -217,6 +227,10 @@ describe("WorkspaceView time on site, next action and submit", () => {
     expect(within(dialog).getByText(/^No customer sign-off yet/)).toBeDefined();
     fireEvent.click(button("Cancel", dialog));
     expect(screen.queryByRole("dialog")).toBeNull();
+    fireEvent.click(button("Submit report"));
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" }); // Escape closes it too, without submitting
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(submitReport).not.toHaveBeenCalled();
     fireEvent.click(button("Submit report"));
     fireEvent.click(button("Submit", screen.getByRole("dialog")));
     expect(saveDraft).not.toHaveBeenCalled();

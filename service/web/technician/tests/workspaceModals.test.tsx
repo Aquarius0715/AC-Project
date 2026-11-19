@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ApiTechReport } from "@ac/web/lib/techJob";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
+import type { ComponentKey } from "@ac/web/lib/contracts.gen";
 
 // the job workspace's Check in at site, Add part and Refrigerant dialogs, and the checklist's results and reasons with
 // Submit report's issues (review round 1077)
@@ -88,6 +89,16 @@ describe("WorkspaceView Check in at site", () => {
     expect(get).toHaveBeenCalledWith(expect.any(Function), expect.any(Function), { enableHighAccuracy: true, timeout: 15_000, maximumAge: 0 });
     expect(within(again).getByText("The location could not be read — allow location for this app, or check in manually with a reason")).toBeDefined();
     expect(button("Get my location", again).disabled).toBe(false); // locating ended
+  });
+
+  it("says Locating… and holds the button while the device looks for a fix", () => {
+    let answerFix: ((p: unknown) => void) | null = null;
+    Object.defineProperty(navigator, "geolocation", { configurable: true, value: { getCurrentPosition: (ok: (p: unknown) => void) => { answerFix = ok; } } });
+    const dialog = openCheckIn();
+    fireEvent.click(button("Get my location", dialog));
+    expect(button("Locating…", dialog).disabled).toBe(true); // one request at a time
+    act(() => { answerFix?.({ coords: { latitude: 3.1, longitude: 101.6, accuracy: 12 } }); });
+    expect(button("Locate again", dialog).disabled).toBe(false);
   });
 
   it("refuses a fix coarser than 100 m, and checks in with a good fix and the trimmed QR; the next view focuses the title", async () => {
@@ -247,5 +258,19 @@ describe("WorkspaceView checklist", () => {
     // the tab was left and opened again: its reason field is a new element
     fireEvent.change(screen.getByPlaceholderText("Reason (required for Attention)"), { target: { value: "Clogged" } });
     expect(screen.getByText(/^1 issue blocks submit/)).toBeDefined(); // re-checked as the draft changes
+  });
+
+  it("names one issue in the singular, and lists six issues at most before an ellipsis", () => {
+    const keys: ComponentKey[] = ["filter", "drain_pan", "drain_pipe", "evaporator_coil", "blower_motor", "blower_fan", "louver"];
+    render(<WorkspaceView live={inWork({ components: keys.map((key) => ({ group: "indoor", key })) })} />);
+    fireEvent.click(button("Submit report"));
+    const many = screen.getByText(/^Not submitted — 7 issues:/).parentElement?.textContent ?? "";
+    expect(many).toMatch(/ · …\. The draft is kept\.$/);
+    expect(many.split(" · ")).toHaveLength(7); // six issues, then the ellipsis
+    cleanup();
+    render(<WorkspaceView live={inWork({ components: [{ group: "indoor", key: "filter" }] })} />);
+    fireEvent.click(button("Submit report"));
+    const one = screen.getByText(/^Not submitted — 1 issue:/).parentElement?.textContent ?? "";
+    expect(one).not.toContain("…");
   });
 });
