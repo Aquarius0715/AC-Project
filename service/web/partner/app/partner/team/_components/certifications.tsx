@@ -182,12 +182,14 @@ function TrainingModal({ row, onClose }: Readonly<{ row: CertRow; onClose: () =>
   const [note, setNote] = useState("");
   const [tried, setTried] = useState(false);
   const [refused, setRefused] = useState<string | null>(null);
+  const [noteRefused, setNoteRefused] = useState<string | undefined>();
   const isBad = note.trim().length === 0 || note.trim().length > 1000;
   const save = () => {
     setTried(true);
     const { cert } = row;
     if (isBad || !cert) return;
-    run(() => requestTraining(cert.id, cert.version, note), t("Training requested."), onClose, (f) => { setRefused(certificateRefusal(f, t).text ?? t("Check the input.")); });
+    // the refused note under its field, the reason in the banner; any other failure is the toast's alone (useAction)
+    run(() => requestTraining(cert.id, cert.version, note), t("Training requested."), onClose, (f) => { const r = certificateRefusal(f, t); setNoteRefused(r.fields.note); setRefused(r.text); });
   };
   return (
     <Modal open onClose={onClose} title={t("Request training — {name}", { name: row.name })} footer={<>
@@ -195,8 +197,8 @@ function TrainingModal({ row, onClose }: Readonly<{ row: CertRow; onClose: () =>
       <Btn variant="primary" disabled={pending} onClick={save}>{t("Request training")}</Btn>
     </>}>
       <SummaryList items={[[t(TECHNICIAN), row.technician], [t("Certificate"), `${row.name} · ${row.badge.text}`]]} />
-      <Field label={t("Note (required, 1–1000 characters)")} error={tried && isBad ? t("A note is required (1–1000 characters)") : undefined}>
-        <Textarea value={note} maxLength={1000} onChange={(e) => { setNote(e.target.value); }} placeholder={t("Refresher course before the certificate expires.")} />
+      <Field label={t("Note (required, 1–1000 characters)")} error={tried && isBad ? t("A note is required (1–1000 characters)") : noteRefused}>
+        <Textarea value={note} maxLength={1000} onChange={(e) => { setNote(e.target.value); setNoteRefused(undefined); setRefused(null); }} placeholder={t("Refresher course before the certificate expires.")} />
       </Field>
       {refused && <Banner tone="crit">{refused}</Banner>}
     </Modal>
