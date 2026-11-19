@@ -63,11 +63,19 @@ func proposalDevice(t *testing.T, unit string) startEvidenceFixture {
 
 func (f startEvidenceFixture) command(t *testing.T, requestedAt time.Time, source, action string) {
 	t.Helper()
+
+	f.delayedCommand(t, requestedAt, requestedAt, source, action)
+}
+
+func (f startEvidenceFixture) delayedCommand(
+	t *testing.T, requestedAt, sentAt time.Time, source, action string,
+) {
+	t.Helper()
 	owner(
 		t,
 		`INSERT INTO control.commands (tenant_id, unit_id, device_id, actor_membership_id, source, action,
 		status, delivery, requested_at, sent_at, acknowledged_at, expires_at, correlation_id)
-		SELECT tenant_id, id, $2, $3, $4, $5, 'acknowledged', 'sent', $6, $6, $6::timestamptz + interval '1 second',
+		SELECT tenant_id, id, $2, $3, $4, $5, 'acknowledged', 'sent', $6, $7, $7::timestamptz + interval '1 second',
 		$6::timestamptz + interval '30 seconds', 'start-proposal-fixture' FROM assets.units WHERE id = $1`,
 		f.unit,
 		f.device,
@@ -75,6 +83,7 @@ func (f startEvidenceFixture) command(t *testing.T, requestedAt time.Time, sourc
 		source,
 		action,
 		requestedAt,
+		sentAt,
 	)
 }
 

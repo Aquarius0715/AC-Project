@@ -90,52 +90,6 @@ func proposalRules(ctx context.Context, call *ops.Call) ([]Automation, error) {
 	return rules, apperr.Wrap(rows.Err(), "list schedules for proposals")
 }
 
-// confirmedManualStarts reads the rule owner's manual commands against observations of the unit's current binding.
-// Nearest observations must be off and on respectively. Missing or unknown samples and intervening power operations
-// leave the start unconfirmed. A command result alone supplies neither observation.
-func confirmedManualStarts(
-	ctx context.Context,
-	call *ops.Call,
-	rule Automation,
-	since time.Time,
-) ([]time.Time, error) {
-	rows, err := call.Tx.Query(ctx, `SELECT c.requested_at
-		FROM devices.device_bindings b JOIN control.commands c
-			ON c.tenant_id = b.tenant_id AND c.unit_id = b.unit_id AND c.device_id = b.device_id
-		CROSS JOIN LATERAL (
-			SELECT observed_at, power FROM control.power_observations p
-			WHERE p.tenant_id = b.tenant_id AND p.binding_id = b.id AND p.received_at <= $4
-				AND p.observed_at >= b.bound_at
-				AND p.observed_at >= c.requested_at - interval '5 minutes' AND p.observed_at < c.requested_at
-			ORDER BY p.observed_at DESC LIMIT 1
-		) pre
-		CROSS JOIN LATERAL (
-			SELECT observed_at, power FROM control.power_observations p
-			WHERE p.tenant_id = b.tenant_id AND p.binding_id = b.id AND p.received_at <= $4
-				AND p.observed_at > c.requested_at AND p.observed_at <= c.requested_at + interval '5 minutes'
-			ORDER BY p.observed_at LIMIT 1
-		) post
-		WHERE b.unit_id = $1 AND b.unbound_at IS NULL AND b.customer_org_id = $5
-			AND c.actor_membership_id = $2 AND c.requested_at >= $3 AND c.requested_at < $4
-			AND c.source = 'ui' AND c.status = 'acknowledged' AND c.acknowledged_at <= $4
-			AND c.action @> '{"kind":"set_power","power":true}' AND c.sent_at >= c.requested_at
-			AND c.sent_at < post.observed_at AND pre.power IS FALSE AND post.power IS TRUE
-			AND NOT EXISTS (
-				SELECT 1 FROM control.commands other
-				WHERE other.tenant_id = c.tenant_id AND other.unit_id = c.unit_id AND other.id <> c.id
-					AND other.requested_at BETWEEN pre.observed_at AND post.observed_at
-					AND (other.action->>'kind' = 'set_power' OR other.source = 'restriction')
-			)
-		ORDER BY c.requested_at`, rule.UnitIDs[0], rule.OwnerMembershipID, since, call.Now, rule.customerOrg)
-	if err != nil {
-		return nil, apperr.Wrap(err, "select confirmed manual starts")
-	}
-
-	starts, err := pgx.CollectRows(rows, pgx.RowTo[time.Time])
-
-	return starts, apperr.Wrap(err, "read confirmed manual starts")
-}
-
 type startVote struct {
 	Date   string
 	Minute int

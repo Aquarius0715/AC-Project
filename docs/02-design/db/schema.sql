@@ -726,6 +726,17 @@ CREATE TABLE control.power_observations (
   PRIMARY KEY (tenant_id, binding_id, observed_at)
 );
 
+-- Opt-in power ranges verified for one sensor on one binding. There are no default ranges.
+CREATE TABLE control.start_power_bands (
+  tenant_id       uuid NOT NULL,
+  binding_id      uuid NOT NULL,
+  sensor_id       uuid NOT NULL,
+  verified_from   timestamptz NOT NULL,
+  standby_max_kw  double precision NOT NULL CHECK (standby_max_kw >= 0),
+  running_min_kw  double precision NOT NULL CHECK (running_min_kw > standby_max_kw AND running_min_kw < 'Infinity'),
+  PRIMARY KEY (tenant_id, binding_id)
+);
+
 CREATE TABLE control.diagnostic_runs (           -- FR-T10
   id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id           uuid NOT NULL,
@@ -2088,4 +2099,4 @@ INSERT INTO identity.permissions (code, resource, kind) VALUES
  ('partner.accept','partner','action'),('partner.assign','partner','action'),('partner.review','partner','action'),
  ('data.forceDelete','data','action');
 
-REVOKE INSERT, UPDATE, DELETE ON control.power_observations FROM ac_app, ac_worker, ac_svc_equipment;
+REVOKE INSERT, UPDATE, DELETE ON control.power_observations, control.start_power_bands FROM ac_app, ac_worker, ac_svc_equipment;
