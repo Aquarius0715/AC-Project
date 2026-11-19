@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // the Server Actions of the technician device, alert evidence and diagnostic control screens: each write carries the
-// version the API checks, the reasons and notes are trimmed, the page is refreshed whether or not the call succeeds, a
-// refused call keeps its code and field errors, and a call that got no answer reads as unavailable
+// version the API checks, the bind, note and diagnostic reasons are trimmed (the alert screen trims its resolution reason
+// before the call), the page is refreshed whether or not the call succeeds, a refused call keeps its code and field
+// errors, a call that got no answer reads as unavailable, and the DAL's redirect to sign-in goes on
 const dal = vi.hoisted(() => {
   interface DomainError { code: string; messageKey: string; fieldErrors: Record<string, string>; correlationId: string; retryAfterSeconds: number | null }
   class CoreError extends Error {
@@ -22,6 +23,7 @@ vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => cache);
 vi.mock("@ac/web/lib/dal", () => dal);
 
+import { redirect } from "next/navigation";
 import { acknowledgeAlert as ackDeviceAlert, addResponseNote, bindDevice, calibrateSensor, checkDevice, registerDevice, updateFirmware } from "../app/technician/devices/actions";
 import { acknowledgeAlert, resolveAlert } from "../app/technician/units/[id]/alerts/actions";
 import { sendDiagnostic, startTestRun } from "../app/technician/units/[id]/control/actions";
@@ -104,6 +106,19 @@ describe("alert evidence actions", () => {
       ok: false, code: "CONFLICT", messageKey: "error.conflict", fieldErrors: {}, retryAfterSeconds: null,
     });
     expect(dal.coreOp).toHaveBeenCalledWith("alerts.resolve", { alertId: "alert-1", resolutionReason: "Cleaned the filter", resolutionEvidenceIds: ["rd-1", "rd-2"] }, { write: true, expectedVersion: 9 });
+    expect(cache.refresh).toHaveBeenCalledOnce();
+  });
+
+  it("reads a call with no answer as unavailable", async () => {
+    dal.coreOp.mockRejectedValueOnce(new TypeError("fetch failed"));
+    await expect(acknowledgeAlert("alert-1", 8)).resolves.toStrictEqual(unavailable);
+    expect(cache.refresh).toHaveBeenCalledOnce();
+  });
+
+  it("lets the DAL's redirect to sign-in through instead of reading it as a failure", async () => {
+    const signIn = (() => { try { redirect("/sign-in"); } catch (error) { return error; } })();
+    dal.coreOp.mockRejectedValueOnce(signIn);
+    await expect(resolveAlert("alert-1", 9, "Cleaned the filter", [])).rejects.toBe(signIn);
     expect(cache.refresh).toHaveBeenCalledOnce();
   });
 });
