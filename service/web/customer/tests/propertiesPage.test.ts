@@ -167,6 +167,9 @@ describe("properties page", () => {
     dal.coreOp.mockClear();
     expect((await open({ search: "porch", spaceId: "s-bed" })).filter).toBeNull();
     expect(read()).toStrictEqual(["u-bed1", "u-bed2"]);
+    dal.coreOp.mockClear();
+    expect((await open({ powerState: "on", propertyId: "p-office" })).filter).toBeNull();
+    expect(read()).toStrictEqual([]);
   });
 
   it("an empty tree selects nothing and reads no unit", async () => {
