@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { isValidElement } from "react";
+import { isValidElement, type ComponentProps } from "react";
 
 // The Server Actions of the partner Users page (FR-P11): each write goes to its Core API operation with the trimmed
 // texts, the row version where one is needed, and re-reads the page whatever happens. The page renders the demo outside
@@ -49,30 +49,43 @@ const save = (body: Record<string, unknown>, options: Record<string, unknown>) =
 describe("user actions", () => {
   it("send each write with trimmed texts at the row version, return null and re-read each time", async () => {
     await expect(invitePartnerUser(" lim@example.com ", "technician", " Lim ", "2026-12-31T15:59:59Z")).resolves.toStrictEqual(done);
-    expect(dal.coreOp).toHaveBeenLastCalledWith(...save({ email: "lim@example.com", partnerRole: "technician", displayName: "Lim", accessUntil: "2026-12-31T15:59:59Z" }, { write: true }));
-    await expect(invitePartnerUser("boss@example.com", "contractor", "Boss", null)).resolves.toStrictEqual(done);
-    expect(dal.coreOp).toHaveBeenLastCalledWith(...save({ email: "boss@example.com", partnerRole: "contractor", displayName: "Boss" }, { write: true }));
+    expect(dal.coreOp.mock.lastCall).toStrictEqual(save({ email: "lim@example.com", partnerRole: "technician", displayName: "Lim", accessUntil: "2026-12-31T15:59:59Z" }, { write: true }));
+    // a contractor has no access end: the key is left out, for null and for an empty date alike
+    for (const until of [null, ""]) {
+      await expect(invitePartnerUser("boss@example.com", "contractor", "Boss", until)).resolves.toStrictEqual(done);
+      expect(dal.coreOp.mock.lastCall).toStrictEqual(save({ email: "boss@example.com", partnerRole: "contractor", displayName: "Boss" }, { write: true }));
+    }
+    expect(cache.refresh).toHaveBeenCalledTimes(3);
     await expect(setPartnerAccess("pu-1", 7, "amy@example.com", "technician", "2027-01-31T15:59:59Z", " extended ")).resolves.toStrictEqual(done);
-    expect(dal.coreOp).toHaveBeenLastCalledWith(...save({ id: "pu-1", email: "amy@example.com", partnerRole: "technician", accessUntil: "2027-01-31T15:59:59Z", reason: "extended" }, { write: true, expectedVersion: 7 }));
+    expect(dal.coreOp.mock.lastCall).toStrictEqual(save({ id: "pu-1", email: "amy@example.com", partnerRole: "technician", accessUntil: "2027-01-31T15:59:59Z", reason: "extended" }, { write: true, expectedVersion: 7 }));
+    expect(cache.refresh).toHaveBeenCalledTimes(4);
     await expect(setPartnerUserStatus("pu-1", 8, "amy@example.com", "technician", "disabled", " left ")).resolves.toStrictEqual(done);
-    expect(dal.coreOp).toHaveBeenLastCalledWith(...save({ id: "pu-1", email: "amy@example.com", partnerRole: "technician", status: "disabled", reason: "left" }, { write: true, expectedVersion: 8 }));
+    expect(dal.coreOp.mock.lastCall).toStrictEqual(save({ id: "pu-1", email: "amy@example.com", partnerRole: "technician", status: "disabled", reason: "left" }, { write: true, expectedVersion: 8 }));
+    expect(cache.refresh).toHaveBeenCalledTimes(5);
     await expect(removePartnerUser("pu-1", 9, " gone ")).resolves.toStrictEqual(done);
-    expect(dal.coreOp).toHaveBeenLastCalledWith("partnerUsers.remove", { id: "pu-1", reason: "gone" }, { write: true, expectedVersion: 9 });
-    await expect(resendPartnerInvite("pu-2")).resolves.toStrictEqual(done);
-    expect(dal.coreOp).toHaveBeenLastCalledWith("partnerUsers.resendInvite", { id: "pu-2" }, { write: true });
+    expect(dal.coreOp.mock.lastCall).toStrictEqual(["partnerUsers.remove", { id: "pu-1", reason: "gone" }, { write: true, expectedVersion: 9 }]);
     expect(cache.refresh).toHaveBeenCalledTimes(6);
+    await expect(resendPartnerInvite("pu-2")).resolves.toStrictEqual(done);
+    expect(dal.coreOp.mock.lastCall).toStrictEqual(["partnerUsers.resendInvite", { id: "pu-2" }, { write: true }]);
+    expect(cache.refresh).toHaveBeenCalledTimes(7);
   });
 
   it("return a refusal with its code, key, fields and wait, an outage as unavailable, let the sign-in redirect through, and re-read after each", async () => {
     dal.coreOp.mockRejectedValueOnce(new dal.CoreError({ code: "VALIDATION", messageKey: "error.validation", fieldErrors: { accessUntil: "error.range" }, retryAfterSeconds: null, correlationId: "c-1" }));
     await expect(setPartnerAccess("pu-1", 7, "amy@example.com", "technician", "2030-01-01T00:00:00Z", "far")).resolves.toStrictEqual({ ok: false, code: "VALIDATION", messageKey: "error.validation", fieldErrors: { accessUntil: "error.range" }, retryAfterSeconds: null });
+    expect(cache.refresh).toHaveBeenCalledOnce();
     dal.coreOp.mockRejectedValueOnce(new dal.CoreError("CONFLICT"));
     await expect(removePartnerUser("pu-1", 7, "gone")).resolves.toMatchObject({ ok: false, code: "CONFLICT" });
+    expect(cache.refresh).toHaveBeenCalledTimes(2);
+    dal.coreOp.mockRejectedValueOnce(new dal.CoreError({ code: "RATE_LIMITED", messageKey: "error.rate_limited", fieldErrors: {}, retryAfterSeconds: 60 }));
+    await expect(resendPartnerInvite("pu-2")).resolves.toStrictEqual({ ok: false, code: "RATE_LIMITED", messageKey: "error.rate_limited", fieldErrors: {}, retryAfterSeconds: 60 });
+    expect(cache.refresh).toHaveBeenCalledTimes(3);
     dal.coreOp.mockRejectedValueOnce(new TypeError("fetch failed"));
     await expect(resendPartnerInvite("pu-2")).resolves.toStrictEqual({ ok: false, code: "UNAVAILABLE", messageKey: "error.unavailable", fieldErrors: {} });
+    expect(cache.refresh).toHaveBeenCalledTimes(4);
     dal.coreOp.mockImplementationOnce(() => { redirect("/bff/auth/login"); });
     await expect(setPartnerUserStatus("pu-1", 7, "amy@example.com", "technician", "active", "back")).rejects.toMatchObject({ digest: expect.stringMatching(/^NEXT_REDIRECT/) as unknown });
-    expect(cache.refresh).toHaveBeenCalledTimes(4);
+    expect(cache.refresh).toHaveBeenCalledTimes(5);
   });
 });
 
@@ -83,8 +96,10 @@ const user = (id: string, over: Partial<ApiPartnerUser> = {}): ApiPartnerUser =>
 const USERS = [user("boss", { partnerRole: "contractor" }), user("amy", { accessUntil: "2026-09-15T15:59:59Z" }), user("ben", { status: "disabled" })];
 const page = (status?: string | string[]) => PartnerUsersPage({ params: Promise.resolve({}), searchParams: Promise.resolve(status === undefined ? {} : { status }) });
 const liveProps = (element: unknown) => {
-  if (!isValidElement<{ live: { rows: { id: string; status: string; you: boolean; ended: boolean }[] } & Record<string, unknown> }>(element) || element.type !== UsersLive) throw new TypeError("not UsersLive");
-  return element.props.live;
+  if (!isValidElement<ComponentProps<typeof UsersLive>>(element) || element.type !== UsersLive) throw new TypeError("not UsersLive");
+  const { live } = element.props;
+  if (!live) throw new TypeError("UsersLive without data");
+  return live;
 };
 
 // API mode with a signed-in contractor of Cool Co
