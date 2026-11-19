@@ -243,7 +243,8 @@ test("the HQ overview in Malay keeps the period in Kuala Lumpur days", async ({ 
   // and the new-membership checks, which stop before any call
   await page.goto("/admin/settings/access");
   for (const name of ["Semua peranan", "Pentadbir", "Kontraktor", "Juruteknik"]) await expect(main.getByRole("button", { name, exact: true }).first()).toBeVisible();
-  await expect(main.getByRole("heading", { name: "Keahlian", exact: true })).toBeVisible();
+  // "Membership" (the chosen one's card) and "Memberships" (the list) are both "Keahlian" in Malay
+  await expect(main.getByRole("heading", { name: "Keahlian", exact: true }).first()).toBeVisible();
   await expect(main).toContainText(/GMT\+9 → /); // the valid period in the display zone
   await expect(main).toContainText("Masa dalam Asia/Tokyo");
   await expect(main.getByRole("columnheader", { name: "Baca" })).toBeVisible();
