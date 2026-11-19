@@ -11062,3 +11062,9 @@ The evidence text IR844 writes ("Device <serial> stopped reporting | lost power 
 2. **The fix.** web-edge takes compose.test.yaml's default, 3204. The next deployment recreates web-edge for the changed port, so the apps' ports close for the second or so web-edge takes to start.
 3. **Checked at each deployment.** `deploy.sh` waits for the portal too: `PORTAL_WEB_URL`, or, in an environment file without it, the customer app's host on `PORTAL_WEB_PORT` (3204 by default). Before, a file without the URL left the portal out of the check, so its move went unnoticed. The environment file is a write-only secret, so the file itself is not changed.
 
+## IR858 An emptied refrigerant amount is refused, not recorded as 0 kg (IR625) — 2026-11-19
+
+1. **The fault.** `refrigerantErrors` (shared/lib/techJob.ts) took `Number(v)` of the Recovered and Charged fields; `Number("")` is 0, so a technician who cleared a field added a line with 0 kg, and the per-unit refrigerant log (leak checks, regulatory records) kept an amount nobody gave.
+2. **The fix.** An empty or blank field is refused with "Kilograms, 0 or more" under it, as a negative or non-numeric one already was. A typed 0 is still a valid amount.
+3. **Tests.** `techJob.test.ts`: an empty and a blank amount are refused; `workspaceModals.test.tsx` (technician): the dialog shows the error under the emptied field and adds nothing.
+
