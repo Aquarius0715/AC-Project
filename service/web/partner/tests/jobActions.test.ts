@@ -52,6 +52,7 @@ beforeEach(() => {
   dal.coreOp.mockResolvedValue({ id: "job-p02", status: "accepted" });
 });
 
+const accepted = { ok: true, value: { id: "job-p02", status: "accepted" } };
 const slot = { startAt: "2026-11-25T01:00:00Z", endAt: "2026-11-25T03:00:00Z" };
 
 describe("offer actions", () => {
@@ -59,13 +60,13 @@ describe("offer actions", () => {
     await expect(acceptOffer("job-p02", "of-1", "terms-3", 7)).resolves.toStrictEqual({ ok: true, value: { id: "job-p02", status: "accepted" } });
     expect(dal.coreOp).toHaveBeenLastCalledWith("jobs.accept", { jobId: "job-p02", offerId: "of-1", termsVersion: "terms-3" }, { write: true, expectedVersion: 7 });
     expect(cache.refresh).toHaveBeenCalledOnce();
-    await expect(declineOffer("job-p02", "of-1", 7, "No technician that week")).resolves.toMatchObject({ ok: true });
+    await expect(declineOffer("job-p02", "of-1", 7, "No technician that week")).resolves.toStrictEqual(accepted);
     expect(dal.coreOp).toHaveBeenLastCalledWith("jobs.decline", { jobId: "job-p02", offerId: "of-1", reason: "No technician that week" }, { write: true, expectedVersion: 7 });
     expect(cache.refresh).toHaveBeenCalledOnce();
-    await expect(proposeSlot("job-p02", "of-1", 7, slot, "m-1", "Earlier is better")).resolves.toMatchObject({ ok: true });
+    await expect(proposeSlot("job-p02", "of-1", 7, slot, "m-1", "Earlier is better")).resolves.toStrictEqual(accepted);
     expect(dal.coreOp).toHaveBeenLastCalledWith("jobs.proposePartnerSlot", { jobId: "job-p02", offerId: "of-1", technicianMembershipId: "m-1", reason: "Earlier is better", slot }, { write: true, expectedVersion: 7 });
     expect(cache.refresh).toHaveBeenCalledTimes(2);
-    await expect(withdrawProposal("job-p02", "pp-1", 8)).resolves.toMatchObject({ ok: true });
+    await expect(withdrawProposal("job-p02", "pp-1", 8)).resolves.toStrictEqual(accepted);
     expect(dal.coreOp).toHaveBeenLastCalledWith("jobs.withdrawPartnerSlot", { jobId: "job-p02", proposalId: "pp-1" }, { write: true, expectedVersion: 8 });
     expect(cache.refresh).toHaveBeenCalledTimes(3);
   });
