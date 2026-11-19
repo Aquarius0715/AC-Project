@@ -94,10 +94,8 @@ describe("WorkspaceView evidence under a finding", () => {
     render(<WorkspaceView live={live({ items: [item("filter", "attention"), item("drain_pan", "normal")] })} />);
     expect(screen.getByText("Take or add a photo here: it is linked to this finding.")).toBeDefined(); // no ready photo yet
     expect(button("Link photo").disabled).toBe(true);
-    fireEvent.click(screen.getAllByText("Parts & refrigerant")[0] ?? document.body);
-    const findingButtons = screen.getAllByRole("button", { name: /Add reading/ });
-    expect(findingButtons).toHaveLength(1); // the Parts tab has no Add reading of its own: only the finding's
-    fireEvent.click(findingButtons[0] ?? document.body);
+    fireEvent.click(screen.getByText("Parts & refrigerant"));
+    fireEvent.click(button(/Add reading/)); // the Parts tab has no Add reading of its own: this is the finding's, the only one
     expect(screen.getByText("Reading")).toBeDefined();
     expect(screen.getByText(/^Temperature · — °C/)).toBeDefined();
     expect(screen.getAllByRole("row")).toHaveLength(2); // the Readings tab is open again, with the new row
@@ -159,9 +157,10 @@ describe("WorkspaceView evidence under a finding", () => {
     expect(screen.getByText("“scan.gif” was not added — only JPEG/PNG up to 5 MiB, max 10 photos. Saved text and photos are kept.")).toBeDefined();
     choose("Add photos", file("huge.jpg", "image/jpeg", (5 << 20) + 1));
     expect(screen.getByText(/^“huge.jpg” was not added/)).toBeDefined();
-    expect(uploadPhoto).not.toHaveBeenCalled();
     fireEvent.change(screen.getByLabelText("Add photos"), { target: { files: [] } }); // no file chosen: nothing changes
     expect(screen.getByText(/^“huge.jpg” was not added/)).toBeDefined();
+    expect(uploadPhoto).not.toHaveBeenCalled();
+    expect(saveDraft).not.toHaveBeenCalled();
     fireEvent.error(screen.getByRole("img", { name: "coil.jpg" })); // the file is gone
     expect(screen.getByTitle("coil.jpg").textContent).toBe("Photo unavailable");
     cleanup();
@@ -172,19 +171,23 @@ describe("WorkspaceView evidence under a finding", () => {
 
 describe("WorkspaceView time on site, next action and submit", () => {
   it("pauses the work on the saved draft and resumes a paused one; the next view focuses the same button", async () => {
-    render(<WorkspaceView live={live()} />);
+    // its own job: the open view of a job outlives the test (the view keeps it per job, IR625)
+    const job = { id: "job-pause" };
+    render(<WorkspaceView live={live({}, job)} />);
     fireEvent.click(screen.getByText("Time on site"));
+    expect(screen.getByText("Started")).toBeDefined();
     fireEvent.click(button("Pause work"));
     expect(saveDraft).not.toHaveBeenCalled();
-    expect(pauseWork).toHaveBeenCalledWith("job-1", 5, true);
-    await waitFor(() => { expect(pauseWork).toHaveBeenCalledOnce(); });
-    await Promise.resolve();
+    expect(pauseWork).toHaveBeenCalledExactlyOnceWith("job-pause", 5, true);
+    await vi.mocked(pauseWork).mock.results[0]?.value; // its `after` ran first: the focus hand-off is set
     cleanup();
-    render(<WorkspaceView live={live({}, { version: 6, timeOnSite: { startedAt: "2026-11-18T02:10:00Z", pauses: [{ from: "2026-11-18T02:50:00Z", to: null }] } })} />);
+    render(<WorkspaceView live={live({}, { ...job, version: 6, timeOnSite: { startedAt: "2026-11-18T02:10:00Z", pauses: [{ from: "2026-11-18T02:50:00Z", to: null }] } })} />);
     expect(document.activeElement?.id).toBe("pause-toggle");
-    expect(screen.getByText("Time on site")).toBeDefined(); // the open view outlives the remount
-    fireEvent.click(button("Resume work"));
-    expect(pauseWork).toHaveBeenLastCalledWith("job-1", 6, false);
+    const toggle = button("Resume work"); // the Time on site view is still open, and the work is paused
+    expect(toggle.id).toBe("pause-toggle");
+    expect(screen.getByText(/^since /)).toBeDefined();
+    fireEvent.click(toggle);
+    expect(pauseWork).toHaveBeenLastCalledWith("job-pause", 6, false);
   });
 
   it("asks a follow-up for its date and note, and shows a submitted one as text", () => {
