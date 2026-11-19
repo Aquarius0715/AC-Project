@@ -61,6 +61,8 @@ export function TechDevicesView({ live }: Readonly<{ live: TechDevicesLive }>) {
     setRefused(deviceRefusal(f, t));
   };
   const closeRefused = () => { setRefused(null); close(); };
+  // the assignment ended while a form was open (the page read again): nothing is sent, and the banner says why
+  const jobEnded = () => { close(); setRefused(t("Device work runs under your assigned job on this unit — there is none now, so the device is read-only.")); };
   const isBusy = !!dv?.detail.activeOperation;
   useEffect(() => { // an operation starts on the scheduler and finishes with the device's answer or at its deadline (IR67)
     const timer = isBusy ? setInterval(() => { router.refresh(); }, 4000) : null;
@@ -76,8 +78,9 @@ export function TechDevicesView({ live }: Readonly<{ live: TechDevicesLive }>) {
   const register = () => {
     const e: Record<string, string> = {};
     if (!/^[A-Za-z0-9-]{3,64}$/.test(reg.serial.trim())) e.serial = t("3–64 letters, digits or hyphens");
-    if (!reg.unitId) e.unitId = t("Choose a unit");
-    if (!reg.jobId) e.jobId = t("Choose the job");
+    // the unit and job must still be listed: after a refresh the chosen unit may have its device and leave the list
+    if (!regUnit) e.unitId = t("Choose a unit");
+    if (!regUnit?.jobs.some((j) => j.id === reg.jobId)) e.jobId = t("Choose the job");
     setErrors(e);
     if (Object.keys(e).length > 0) return;
     run(() => registerDevice(reg.serial.trim(), reg.sensors, reg.unitId, reg.jobId), t("Device registered — bind it to the unit once it is installed"), closeRefused, failed);
@@ -98,13 +101,14 @@ export function TechDevicesView({ live }: Readonly<{ live: TechDevicesLive }>) {
     if (cal.reference.trim() === "" || !Number.isFinite(Number(cal.reference))) e.referenceValue = t("Enter a number");
     if (cal.measured.trim() === "" || !Number.isFinite(Number(cal.measured))) e.measuredValue = t("Enter a number");
     setErrors(e);
-    const jobId = dv?.jobId;
-    if (Object.keys(e).length > 0 || !dv || !s || !jobId) return;
+    if (Object.keys(e).length > 0 || !dv || !s) return;
+    const jobId = dv.jobId;
+    if (!jobId) { jobEnded(); return; }
     run(() => calibrateSensor(dv.detail.id, dv.detail.version, s.id, s.metric, s.unit, Number(cal.reference), Number(cal.measured), jobId), t("Calibration recorded — earlier readings unchanged"), closeRefused, failed);
   };
   const firmware = () => {
     const jobId = dv?.jobId;
-    if (!dv || !fw || !jobId) { setErrors({ firmwareVersion: t("Choose a version") }); return; }
+    if (!dv || !jobId) { jobEnded(); return; }
     run(() => updateFirmware(dv.detail.id, dv.detail.version, fw, jobId), t("Firmware update to {version} requested", { version: fw }), closeRefused, failed);
   };
   const saveNote = () => {
@@ -176,7 +180,7 @@ export function TechDevicesView({ live }: Readonly<{ live: TechDevicesLive }>) {
                 </div>
               )}
               {live.canMaintain && !dv.jobId && <p className="-mt-2 text-xs text-muted-foreground">{t("Device work runs under your assigned job on this unit — there is none now, so the device is read-only.")}</p>}
-              {isBusy && <p className="-mt-2 text-xs text-muted-foreground">{t("One device operation at a time ({operation}) — the others wait; control commands are locked during an update.", { operation: dv.detail.activeOperation ? operationLabel(dv.detail.activeOperation, t) : "" })}</p>}
+              {dv.detail.activeOperation && <p className="-mt-2 text-xs text-muted-foreground">{t("One device operation at a time ({operation}) — the others wait; control commands are locked during an update.", { operation: operationLabel(dv.detail.activeOperation, t) })}</p>}
               {dv.firmwareCard && (
                 <div className={cx("rounded-xl border p-3", firmwareCardLook(dv.firmwareCard.tone))}>
                   <div className="flex items-center justify-between gap-2"><b className="text-[13px]">{dv.firmwareCard.title}</b><Badge tone={dv.firmwareCard.tone}>{dv.firmwareCard.status}</Badge></div>
