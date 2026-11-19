@@ -102,7 +102,8 @@ describe("unit page", () => {
   it("passes no job for a missing, empty or repeated jobId", async () => {
     dal.apiMode.mockReturnValue(true);
     loaders.loadUnit.mockResolvedValue({ unit: { id: "ac-a01" } });
-    for (const query of [{}, { jobId: "" }, { jobId: ["job-p02", "job-p03"] }]) {
+    const queries: Query[] = [{}, { jobId: "" }, { jobId: ["job-p02", "job-p03"] }];
+    for (const query of queries) {
       await unit("ac-a01", query);
       expect(loaders.loadUnit).toHaveBeenLastCalledWith("ac-a01", undefined);
     }
