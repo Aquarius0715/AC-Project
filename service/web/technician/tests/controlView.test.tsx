@@ -147,6 +147,9 @@ describe("ControlView test run", () => {
     render(<ControlView live={live()} />);
     const minutes = screen.getByRole<HTMLInputElement>("textbox", { name: "Duration (min)" });
     for (const bad of ["0", "16", "2.5", ""]) {
+      fireEvent.change(minutes, { target: { value: "1" } });
+      fireEvent.click(button("Start test run"));
+      expect(screen.queryByText("A test run lasts 1–15 minutes")).toBeNull();
       fireEvent.change(minutes, { target: { value: bad } });
       fireEvent.click(button("Start test run"));
       expect(screen.getByText("A test run lasts 1–15 minutes")).toBeDefined();
@@ -206,7 +209,7 @@ describe("ControlView test run", () => {
     store.next = refusedWith("CONFLICT", {});
     render(<ControlView live={live({ run: testRun({ state: "end_failed", reason: "r".repeat(1000) }) })} />);
     fireEvent.click(button("Retry end command"));
-    await waitFor(() => { expect(vi.mocked(sendDiagnostic)).toHaveBeenCalledOnce(); });
+    expect(await screen.findByText("The unit or job changed; the page now shows the latest version.")).toBeDefined();
     const sent = vi.mocked(sendDiagnostic).mock.calls[0]?.[0];
     expect(sent?.reason).toHaveLength(1000);
     expect(store.toasts).toStrictEqual([]);
@@ -218,6 +221,10 @@ describe("ControlView test run", () => {
     expect(screen.getByText("Outside your work window 10:00–12:00 — diagnostic commands can’t be sent now.")).toBeDefined();
     expect(screen.getByText("10:00–12:00", { selector: "span" }).className).toContain("text-crit");
     out.unmount();
+    const open = render(<ControlView live={live({ run: testRun({ state: "end_failed" }), active: true })} />);
+    expect(button("Retry end command").disabled).toBe(true);
+    expect(screen.queryByText("Retry not available — no authorization")).toBeNull();
+    open.unmount();
     render(<ControlView live={live({ run: testRun({ state: "end_blocked" }) })} />);
     expect(screen.queryByRole("button", { name: "Retry end command" })).toBeNull();
     expect(screen.getByText("Retry not available — no authorization")).toBeDefined();
