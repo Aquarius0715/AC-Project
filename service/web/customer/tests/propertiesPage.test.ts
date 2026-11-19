@@ -39,7 +39,7 @@ const NOW = new Date("2026-09-15T01:12:30Z");
 const property = (id: string, name: string, kind: "home" | "office", customerOrgId = "org-a"): ApiPropertyRow => ({
   id, name, kind, customerOrgId, version: 3, address: null, accessInstructions: null, location: null, geofenceRadiusMeters: null, archived: false, updatedAt: "2026-09-12T02:00:00Z",
 });
-const space = (id: string, name: string, kind: ApiSpaceRow["kind"], parentSpaceId: string | null): ApiSpaceRow => ({ id, propertyId: "p-home", name, version: 1, parentSpaceId, kind, archived: false });
+const space = (id: string, name: string, kind: ApiSpaceRow["kind"], parentSpaceId: string | null): ApiSpaceRow => ({ id, name, parentSpaceId, kind, propertyId: "p-home", version: 1, archived: false });
 const unit = (id: string, displayName: string, spaceId: string | null, over: Partial<ApiUnitRow> = {}): ApiUnitRow => ({
   id, displayName, spaceId, version: 1, customerOrgId: "org-a", propertyId: "p-home", modelId: "cap-1", type: "split", installState: "installed", installedAt: null, serviceScope: [],
   alertPolicyIds: [], archived: false, capabilityVersion: 1, connection: "online", lastSeenAt: null, warrantyEndsAt: null, effectivePowerState: "on", activeAlertCount: 0, ...over,
@@ -146,8 +146,10 @@ describe("properties page", () => {
     expect(read()).toStrictEqual(["u-porch"]);
     expect(live.mode).toBe("single");
     dal.coreOp.mockClear();
-    expect((await open({ unassignedOnly: "true" })).selection).toMatchObject({ kind: "property", property: { id: "p-home" } });
-    expect((await open({ propertyId: "p-office" })).units).toStrictEqual([]);
+    const alone = await open({ unassignedOnly: "true" });
+    expect(alone.selection).toMatchObject({ kind: "property", property: { id: "p-home" } });
+    const office = await open({ propertyId: "p-office" });
+    expect(office.units).toStrictEqual([]);
   });
 
   it("the KPI filter lists the matching units across properties; a search matches a place; a location turns it off", async () => {
@@ -163,12 +165,15 @@ describe("properties page", () => {
     expect(found.filter?.search).toBe("1f");
     expect(read()).toStrictEqual(["u-bed1", "u-bed2", "u-hall"]);
     dal.coreOp.mockClear();
-    expect((await open({ search: "old shop" })).units.map((u) => [u.id, u.place])).toStrictEqual([["u-old", ""]]);
+    const elsewhere = await open({ search: "old shop" });
+    expect(elsewhere.units.map((u) => [u.id, u.place])).toStrictEqual([["u-old", ""]]);
     dal.coreOp.mockClear();
-    expect((await open({ search: "porch", spaceId: "s-bed" })).filter).toBeNull();
+    const room = await open({ search: "porch", spaceId: "s-bed" });
+    expect(room.filter).toBeNull();
     expect(read()).toStrictEqual(["u-bed1", "u-bed2"]);
     dal.coreOp.mockClear();
-    expect((await open({ powerState: "on", propertyId: "p-office" })).filter).toBeNull();
+    const chosen = await open({ powerState: "on", propertyId: "p-office" });
+    expect(chosen.filter).toBeNull();
     expect(read()).toStrictEqual([]);
   });
 
