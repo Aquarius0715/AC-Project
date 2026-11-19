@@ -61,7 +61,7 @@ function renderDelivery(day, parent) {
     const section = el('section'); section.id = 'approval-states';
     section.append(el('h3', '承認した曜日の反映状況'));
     const scheduleText = s => s ? s.start + '〜' + s.end + ' / ' + s.temperature_c + '℃' : '予定なし';
-    table(section, ['機器・曜日', '状態', '判定時点の現行予定', '承認した変更', '承認した曜日別ID', '承認日時'], approvals.map(a => [a.device_id + ' / ' + WEEKDAY_NAMES[a.weekday], label(a.status), scheduleText(a.current_schedule), scheduleText(a.values), a.proposal_id, a.approved_at]));
+    table(section, ['機器・曜日', '承認履歴の状態', '判定時点の現行予定', '承認した変更', '反映日時', '承認した曜日別ID', '承認日時'], approvals.map(a => [a.device_id + ' / ' + WEEKDAY_NAMES[a.weekday], label(a.status) + (a.superseded ? '（その後に別編集）' : ''), scheduleText(a.current_schedule), scheduleText(a.values), a.applied_at || '未反映', a.proposal_id, a.approved_at]));
     panel.append(section);
   }
   const notice = day.notification;

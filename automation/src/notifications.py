@@ -19,7 +19,9 @@ def review_key(member):
 
 def same_review(left, right):
     if left["kind"] == "start":
-        return same_start_choice(left["values"], right["values"])
+        return same_start_choice(left["values"], right["values"]) and left.get(
+            "current"
+        ) == right.get("current")
     return left["values"] == right["values"] and left.get("current_start") == right.get(
         "current_start"
     )

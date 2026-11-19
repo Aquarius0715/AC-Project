@@ -2,7 +2,9 @@
 
 import copy
 import unittest
+from dataclasses import replace
 from datetime import datetime
+from decimal import Decimal
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -10,7 +12,7 @@ from automation.src.approval_state import apply_card_approval, card_approval_sta
 from automation.src.dataset import ROOT, load_dataset
 from automation.src.feedback_scope import feedback_matches, resolve_precool_date
 from automation.src.generate_review_cases import make_review_cases
-from automation.src.loader import InputError
+from automation.src.loader import InputError, minute
 from automation.src.notifications import NotificationPlanner
 from automation.src.replay import apply_feedback, known_feedback, replay_customer
 from test_dataset import single
@@ -125,9 +127,26 @@ class ApprovalApplicationTests(unittest.TestCase):
         for field, value in (("end", "23:30"), ("temperature_c", "25")):
             changed = copy.deepcopy(plans)
             changed[0][field] = value
+            versions = copy.deepcopy(self.dataset.prepare("G003").versions["G003-AC1"])
+            for version in versions:
+                version["schedules"] = tuple(
+                    replace(
+                        s,
+                        **(
+                            {"end": minute(value, "end")}
+                            if field == "end"
+                            else {"temperature": Decimal(value)}
+                        ),
+                    )
+                    if s.weekday == 0
+                    else s
+                    for s in version["schedules"]
+                )
             state = next(
                 s
-                for s in card_approval_states(known, "G003-AC1", changed)
+                for s in card_approval_states(
+                    known, "G003-AC1", changed, versions=versions, at=at("2026-08-27")
+                )
                 if s["weekday"] == 0
             )
             self.assertEqual(state["status"], "approved_pending")

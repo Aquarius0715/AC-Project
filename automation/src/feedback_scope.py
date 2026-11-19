@@ -55,6 +55,8 @@ def resolve_precool_date(feedback, history=()):
 
 
 def feedback_matches(item, feedback):
+    if feedback.get("approval_superseded"):
+        return False
     if item["device_id"] != feedback["device_id"] or item["kind"] != feedback["kind"]:
         return False
     if item["kind"] == "precool":

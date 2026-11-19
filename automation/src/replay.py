@@ -110,13 +110,21 @@ def known_feedback(raw, at, proposal_history=()):
     return known + known_card_feedback(raw, at)
 
 
-def apply_feedback(report, raw, at, proposal_history=()):
+def apply_feedback(report, raw, at, proposal_history=(), *, schedule_versions=None):
     known = known_feedback(raw, at, proposal_history)
     for device in report["devices"]:
         schedules = {s["weekday"]: s for s in device["current_schedules"]}
         device["approval_states"] = card_approval_states(
-            known, device["device_id"], schedules
+            known,
+            device["device_id"],
+            schedules,
+            versions=(schedule_versions or {}).get(device["device_id"], ()),
+            at=at,
         )
+        for state in device["approval_states"]:
+            for feedback in known:
+                if feedback["id"] == state["response_id"]:
+                    feedback["approval_superseded"] = state["superseded"]
         for item in device["decisions"]:
             if item["kind"] == "start_review" and item["status"] == "merged":
                 start = next(
@@ -422,7 +430,13 @@ def replay_customer(
             for d in report["devices"]
             for i in d["decisions"]
         )
-        known = apply_feedback(report, raw, at, proposal_history)
+        known = apply_feedback(
+            report,
+            raw,
+            at,
+            proposal_history,
+            schedule_versions=snapshot.schedule_versions,
+        )
         controls = apply_fixed_weekdays(report, raw, at)
         next_active = {}
         events = []
