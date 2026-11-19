@@ -65,13 +65,15 @@ describe("WorkspaceView without its assignment or unit", () => {
 
 describe("WorkspaceView readings", () => {
   it("edits one reading of several and leaves the others as they were", () => {
-    render(<WorkspaceView live={live("job-readings", { measurements: [reading("m-1"), reading("m-2", { componentKey: "drain_pan", value: 3 })] })} />);
+    render(<WorkspaceView live={live("job-readings", { measurements: [reading("m-1"), reading("m-2", { componentKey: "drain_pan", value: 3 })] }, {}, {
+      components: [{ group: "indoor", key: "filter" }, { group: "indoor", key: "drain_pan" }, { group: "outdoor", key: "fan" }],
+    })} />);
     const [first, second] = rows();
     if (!first || !second) throw new Error("two readings expected");
     fireEvent.change(within(second).getByLabelText("Metric"), { target: { value: "humidity" } });
     fireEvent.change(within(second).getByRole("textbox"), { target: { value: "55" } });
-    fireEvent.change(within(second).getByLabelText("Linked item"), { target: { value: "filter" } });
-    expect([select(second, "Metric"), within(second).getByRole<HTMLInputElement>("textbox").value, select(second, "Linked item")]).toStrictEqual(["humidity", "55", "filter"]);
+    fireEvent.change(within(second).getByLabelText("Linked item"), { target: { value: "fan" } }); // a third item, so the first row's would show a shared edit
+    expect([select(second, "Metric"), within(second).getByRole<HTMLInputElement>("textbox").value, select(second, "Linked item")]).toStrictEqual(["humidity", "55", "fan"]);
     expect([select(first, "Metric"), within(first).getByRole<HTMLInputElement>("textbox").value, select(first, "Linked item")]).toStrictEqual(["temperature", "12", "filter"]);
   });
 
