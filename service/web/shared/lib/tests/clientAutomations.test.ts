@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  actionGroupOf, actionLabel, actionOptions, apiErrors, consentCard, firstAction, draftErrors, draftOf, eventTest, ruleCard, runClock, runText, saveInput, scheduleTest, summaryText, weekdaysText, whenText, type ApiAutomation, type Caps,
+  actionGroupOf, actionLabel, actionOptions, afterHoursDraft, apiErrors, blankDraft, commonActionOptions, consentCard, firstAction, draftErrors, draftOf, eventTest, ruleCard, runClock, runText, saveInput, scheduleTest, summaryText, weekdaysText, whenText, type ApiAutomation, type Caps,
 } from "@ac/web/lib/clientAutomations";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
 
@@ -51,6 +51,9 @@ describe("customer automation sentences (FR-C04, FR-C05, IR260)", () => {
     expect(summaryText(d, BEDROOM_AC, "Home A")).toBe("When Weekdays at 18:00 → Bedroom AC power ON. At 22:00 → Bedroom AC power OFF.");
     expect(summaryText({ ...d, endsNextDay: true, endLocal: "06:00", startAction: "temp:24" }, BEDROOM_AC, "Home A", ms)).toBe("Apabila Hari bekerja pada 18:00 → tetapkan Bedroom AC kepada 24°C. Pada 06:00 (hari berikutnya) → Bedroom AC kuasa MATI.");
     expect(draftErrors({ ...d, name: "", weekdays: [], startLocal: "18:00", endLocal: "18:00" }, ms)).toStrictEqual({ name: "1–120 aksara", weekdays: "Pilih sekurang-kurangnya satu hari", endLocal: "Mula dan tamat tidak boleh sama — bukan operasi 24 jam" });
+    // UI/UX loop R11: the end action is "never assumed": a new schedule starts without one and cannot be saved so
+    const blank = { ...blankDraft("u1", "Asia/Kuala_Lumpur"), name: "Pre-cool" };
+    expect([blank.endAction, draftErrors(blank).endAction, summaryText(blank, BEDROOM_AC, "Home A")]).toStrictEqual(["", "Choose what happens at the end", "When Weekdays at 18:00 → set Bedroom AC to 25°C. At 22:00 → (not chosen yet)."]);
     expect(apiErrors({ "draft.endsNextDay": "errors.over_24_hours", name: "error.length" }, ms)).toStrictEqual({ endsNextDay: "Paling lama 24 jam", name: "1–120 aksara" });
     const choices = actionOptions({ control: true, modeControl: true, fanControl: false, temperature: { min: 24, max: 25, step: 1 }, modes: ["cool"], fanLevels: [] }, ms);
     expect(choices.map((g) => [g.group, g.options.map((o) => o.label)])).toStrictEqual([["Kuasa", ["Kuasa HIDUP", "Kuasa MATI"]], ["Suhu", ["Tetapkan suhu 24°C", "Tetapkan suhu 25°C"]], ["Mod", ["Mod Sejuk"]]]);
@@ -74,7 +77,7 @@ describe("customer automation sentences (FR-C04, FR-C05, IR260)", () => {
     expect(warned.tone).toBe("warn");
     expect(warned.text).toMatch(/^Withdrawn 20 Sept 2026, 9:49 am MYT · 2 location automations were turned off/);
     expect(consentCard(revoked, 0, 0, MS).text).toMatch(/^Ditarik balik .* automasi lokasi tidak boleh berjalan/);
-    expect(consentCard({ id: "c", version: 2, granted: true, grantedAt: "2026-09-10T02:00:00Z", revokedAt: null }, 1, 0, MS)).toMatchObject({ title: "Diberikan", text: "Diberikan 10 Sep 2026, 11:00 PG GMT+9 · digunakan hanya oleh 1 automasi lokasi · peristiwa lokasi demo (tiada sejarah GPS sebenar)." });
+    expect(consentCard({ id: "c", version: 2, granted: true, grantedAt: "2026-09-10T02:00:00Z", revokedAt: null }, 1, 0, MS)).toMatchObject({ title: "Diberikan", text: "Diberikan 10 Sep 2026, 11:00 PG GMT+9 · digunakan hanya oleh 1 automasi lokasi · hanya di rumah atau keluar disimpan, bukan kedudukan anda." });
     expect([runClock(TEXT_2026_09_14T14_00_00Z), runClock(TEXT_2026_09_14T14_00_00Z, "Asia/Tokyo")]).toStrictEqual(["22:00 MYT", "23:00 GMT+9"]);
   });
 });
@@ -115,5 +118,27 @@ describe("runText / runClock with a value that does not format", () => {
   });
   it("still falls back to Kuala Lumpur for a zone the runtime does not know", () => {
     expect([runText(TEXT_2026_09_14T10_00_00Z, "No/Such_Zone"), runClock(TEXT_2026_09_14T14_00_00Z, "No/Such_Zone")]).toStrictEqual(["Mon, 14 Sept, 18:00 MYT", "22:00 MYT"]);
+  });
+});
+
+// IR802: one rule may control several ACs, so the editor offers only the actions every chosen AC takes
+describe("actions of several ACs", () => {
+  it("keeps the actions all chosen ACs support", () => {
+    const wide: Caps = { control: true, modeControl: true, fanControl: true, temperature: { min: 16, max: 30, step: 1 }, modes: ["cool", "dry"], fanLevels: ["low", "high"] };
+    const narrow: Caps = { control: true, modeControl: true, fanControl: false, temperature: { min: 24, max: 26, step: 1 }, modes: ["cool"], fanLevels: [] };
+    const both = commonActionOptions([wide, narrow]);
+    expect(both.map((g) => [g.id, g.options.map((o) => o.short)])).toStrictEqual([["power", ["ON", "OFF"]], ["temp", ["24°C", "25°C", "26°C"]], ["mode", ["Cool"]]]);
+    expect(commonActionOptions([wide])).toStrictEqual(actionOptions(wide));
+    expect([commonActionOptions([]), commonActionOptions([wide, null])]).toStrictEqual([[], []]);
+  });
+});
+
+// IR811: the Running list opens a new after-hours rule with its ACs and Power OFF at 19:00; the end is left to choose
+describe("after-hours preset", () => {
+  it("fills the ACs and the start, never the end", () => {
+    const d = afterHoursDraft(["a", "b", "c"], "Asia/Kuala_Lumpur", "Switch off after hours");
+    expect([d.unitId, d.others, d.trigger, d.weekdays, d.startLocal, d.startAction, d.endAction, d.enabled, d.name])
+      .toStrictEqual(["a", ["b", "c"], "schedule", [1, 2, 3, 4, 5], "19:00", "power:off", "", false, "Switch off after hours"]);
+    expect(afterHoursDraft(Array.from({ length: 60 }, (_, i) => `u${String(i)}`), "UTC", "x").others).toHaveLength(49);
   });
 });

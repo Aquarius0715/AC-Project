@@ -179,15 +179,53 @@ func checkForceAndLogins(t *testing.T, conn *pgx.Conn) {
 		t.Fatalf("Seeded = %t, %v", ok, seededErr)
 	}
 
-	ensureLoginErr := EnsureLogin(ctx, conn, "ac_app_login", "it's-local", "ac_app")
-	if ensureLoginErr != nil {
-		t.Fatal(ensureLoginErr)
+	checkNewLogin(t, conn)
+}
+
+// checkNewLogin creates a role that does not exist yet, runs EnsureLogin on it again (the existing-role branch), then
+// checks it can log in with the second, quoted password and is in the group. Roles belong to the whole cluster, so
+// the test never touches ac_app_login: the other packages' tests log in as it at the same time, and changing its
+// password, even for a moment, failed their connections (28P01, TestMiddleware 503 in CI on PR #515).
+func checkNewLogin(t *testing.T, conn *pgx.Conn) {
+	t.Helper()
+
+	ctx := context.Background()
+
+	const login = "ac_migrate_test_login"
+
+	drop := func() {
+		_, _ = conn.Exec(ctx, "DROP ROLE IF EXISTS "+login)
+	}
+	drop()
+	t.Cleanup(drop)
+
+	ensureErr := EnsureLogin(ctx, conn, login, "first", "ac_app")
+	if ensureErr != nil {
+		t.Fatal(ensureErr)
 	}
 
-	ensureLoginErr = EnsureLogin(ctx, conn, "ac_app_login", "local", "ac_app")
-	if ensureLoginErr != nil {
-		t.Fatal("EnsureLogin must be idempotent:", ensureLoginErr)
+	ensureErr = EnsureLogin(ctx, conn, login, "it's-new", "ac_app")
+	if ensureErr != nil {
+		t.Fatal("EnsureLogin must be idempotent:", ensureErr)
 	}
+
+	var member bool
+
+	scanErr := conn.QueryRow(ctx, `SELECT pg_has_role($1, 'ac_app', 'MEMBER')`, login).Scan(&member)
+	if scanErr != nil || !member {
+		t.Fatalf("new login in ac_app = %t, %v", member, scanErr)
+	}
+
+	cfg := conn.Config().Copy()
+	cfg.User = login
+	cfg.Password = "it's-new"
+
+	loginConn, connectErr := pgx.ConnectConfig(ctx, cfg)
+	if connectErr != nil {
+		t.Fatal("new login cannot connect:", connectErr)
+	}
+
+	_ = loginConn.Close(ctx)
 }
 
 //nolint:paralleltest // every test rebuilds the same scratch database ac_migrate_test

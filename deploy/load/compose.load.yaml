@@ -79,15 +79,15 @@ services:
   customer-web-api:
     ports: !reset []
     environment: { OIDC_APP_CLIENT_ID: ac-load, OIDC_APP_CLIENT_SECRET: "${LOAD_CLIENT_SECRET:-}" }
-    healthcheck: { test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/login').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"], interval: 5s, timeout: 5s, retries: 30 }
+    healthcheck: { test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/login', { redirect: 'manual' }).then((r) => process.exit(r.status < 400 ? 0 : 1)).catch(() => process.exit(1))"], interval: 5s, timeout: 5s, retries: 30 }
   partner-web-api:
     ports: !reset []
     environment: { OIDC_APP_CLIENT_ID: ac-load, OIDC_APP_CLIENT_SECRET: "${LOAD_CLIENT_SECRET:-}" }
-    healthcheck: { test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/login').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"], interval: 5s, timeout: 5s, retries: 30 }
+    healthcheck: { test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/login', { redirect: 'manual' }).then((r) => process.exit(r.status < 400 ? 0 : 1)).catch(() => process.exit(1))"], interval: 5s, timeout: 5s, retries: 30 }
   technician-web-api:
     ports: !reset []
     environment: { OIDC_APP_CLIENT_ID: ac-load, OIDC_APP_CLIENT_SECRET: "${LOAD_CLIENT_SECRET:-}" }
-    healthcheck: { test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/login').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"], interval: 5s, timeout: 5s, retries: 30 }
+    healthcheck: { test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/login', { redirect: 'manual' }).then((r) => process.exit(r.status < 400 ? 0 : 1)).catch(() => process.exit(1))"], interval: 5s, timeout: 5s, retries: 30 }
 
   # the IoT scenarios (phase 3): the bridge that stands in for AWS IoT rules, told about the load devices by the links file
   # loadseed wrote, and the generator that plays those devices. The real broker is not named anywhere here: REAL_MQTT_* stay

@@ -47,6 +47,10 @@ const (
 	OfferAccessChanged      = "OfferAccessChanged"      // a contractor's access window to a unit (accepted Offers)
 	AssignmentAccessChanged = "AssignmentAccessChanged" // a technician's viewing and work window on a unit
 
+	// maintenance → equipment: an accepted installation report installed the unit (DEC-106).
+
+	UnitInstalled = "UnitInstalled" // a planned unit becomes installed, on the day the installation job started
+
 	// identity → equipment (IR53, IR214).
 
 	ConsentRevoked = "ConsentRevoked" // a membership withdrew location consent: disable its location automations
@@ -106,6 +110,12 @@ type AssignmentAccess struct {
 	CreatedAt              time.Time  `json:"createdAt"`
 	ScheduledFrom          *time.Time `json:"scheduledFrom"`
 	ScheduledUntil         *time.Time `json:"scheduledUntil"`
+}
+
+// UnitInstalledPayload is the payload of UnitInstalled.
+type UnitInstalledPayload struct {
+	UnitID      uuid.UUID `json:"unitId"`
+	InstalledAt time.Time `json:"installedAt"`
 }
 
 // UnitRestriction is the payload of UnitRestrictionApplied / UnitRestrictionCleared.

@@ -26,8 +26,10 @@ export function ExceptionDemo({ id }: Readonly<{ id: string }>) {
   const [tried, setTried] = useState(false);
   const isNeedsDate = act === "defer" || act === "exempt";
   const openedAt = useOpenedAt(); // reference time for the date check (render stays pure)
-  const dateError = tried && isNeedsDate && (!until || new Date(until).getTime() < openedAt - 86_400e3) ? "Date must be in the future" : undefined;
-  const run = () => { setTried(true); if (!reason.trim() || dateError) { return; } if (act === "override" && !hasOverride) { toast("FORBIDDEN — restriction.override required", "crit"); return; } setDone(true); toast("Action recorded"); };
+  // the rule, and its message once Apply was tried: the handler checks the rule, not the last render's message (R843)
+  const dateProblem = isNeedsDate && (!until || new Date(until).getTime() < openedAt - 86_400e3) ? "Date must be in the future" : undefined;
+  const dateError = tried ? dateProblem : undefined;
+  const run = () => { setTried(true); if (!reason.trim() || dateProblem) { return; } if (act === "override" && !hasOverride) { toast("FORBIDDEN — restriction.override required", "crit"); return; } setDone(true); toast("Action recorded"); };
   return (
     <Page>
       <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground"><Link href="/admin/restrictions" className="font-semibold text-primary"><Icon name="arrowLeft" /> Back</Link>/ <b className="text-ink">{id}</b></div>

@@ -1,8 +1,10 @@
 package ops_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -18,6 +20,12 @@ const correlation = "corr-1"
 
 // pathDomain answers with a DomainError.
 const pathDomain = "/domain"
+
+// pathUpstream answers with a DomainError that already carries the correlation ID of the service it came from.
+const pathUpstream = "/upstream"
+
+// upstreamCorrelation is the correlation ID the error carries before the handler sees it.
+const upstreamCorrelation = "upstream-1"
 
 var errDatabaseExploded = errors.New("database exploded")
 
@@ -43,6 +51,13 @@ func errorApp() *echo.Echo {
 	app.GET("/plain", func(*echo.Context) error { return errDatabaseExploded })
 	app.GET("/large", func(*echo.Context) error { return echo.ErrStatusRequestEntityTooLarge })
 	app.GET("/timeout", func(*echo.Context) error { return echo.ErrServiceUnavailable })
+	app.GET("/media", func(*echo.Context) error { return echo.ErrUnsupportedMediaType })
+	app.GET(pathUpstream, func(*echo.Context) error {
+		relayed := apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
+		relayed.CorrelationID = upstreamCorrelation
+
+		return relayed
+	})
 	app.GET("/committed", func(c *echo.Context) error {
 		_ = c.NoContent(http.StatusAccepted)
 
@@ -62,6 +77,7 @@ func TestHTTPErrorHandler(t *testing.T) {
 		{http.MethodGet, "/plain", 503, apperr.Unavailable},
 		{http.MethodGet, "/large", 422, apperr.Validation},
 		{http.MethodGet, "/timeout", 504, apperr.Timeout},
+		{http.MethodGet, "/media", 503, apperr.Unavailable}, // an Echo status with no DomainError of its own
 		{http.MethodGet, "/missing", 404, apperr.NotFound},
 		{http.MethodPost, pathDomain, 404, apperr.NotFound},
 		{http.MethodHead, pathDomain, 409, ""},
@@ -116,5 +132,63 @@ func checkErrorResponse(t *testing.T, testCase errorCase, rec *httptest.Response
 
 	if testCase.path == "/plain" && domainError.MessageKey == errDatabaseExploded.Error() {
 		t.Error("internal error text leaked")
+	}
+}
+
+// serve sends one GET with the test's request ID to app.
+func serve(t *testing.T, app *echo.Echo, path string) *httptest.ResponseRecorder {
+	t.Helper()
+
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, path, nil)
+	rec := httptest.NewRecorder()
+	rec.Header().Set(echo.HeaderXRequestID, correlation)
+	app.ServeHTTP(rec, req)
+
+	return rec
+}
+
+// A server error is logged with its cause and the request ID, which is all an operator has to find it, since the body
+// says only UNAVAILABLE; a client error is not logged.
+func TestHTTPErrorHandlerLogsServerErrors(t *testing.T) {
+	t.Parallel()
+
+	logs := new(bytes.Buffer)
+	app := errorApp()
+	app.Logger = slog.New(slog.NewJSONHandler(logs, nil))
+
+	serve(t, app, pathDomain)
+
+	if logs.Len() != 0 {
+		t.Errorf("a 409 was logged: %s", logs)
+	}
+
+	serve(t, app, "/plain")
+
+	entry := map[string]string{} // slog's keys: time, level, msg and the handler's attributes
+
+	err := json.Unmarshal(logs.Bytes(), &entry)
+	if err != nil {
+		t.Fatalf("log %q: %v", logs, err)
+	}
+
+	if entry["level"] != "ERROR" || entry["error"] != errDatabaseExploded.Error() ||
+		entry["request_id"] != correlation {
+		t.Errorf("log entry %v", entry)
+	}
+}
+
+// An error that already carries a correlation ID (one relayed from another service) keeps it; only an error without
+// one gets the request's (D07).
+func TestHTTPErrorHandlerKeepsUpstreamCorrelation(t *testing.T) {
+	t.Parallel()
+
+	rec := serve(t, errorApp(), pathUpstream)
+
+	var domainError apperr.DomainError
+
+	err := json.Unmarshal(rec.Body.Bytes(), &domainError)
+	if err != nil || rec.Code != http.StatusConflict ||
+		domainError.CorrelationID != upstreamCorrelation {
+		t.Errorf("status %d body %s", rec.Code, rec.Body)
 	}
 }

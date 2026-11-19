@@ -1,6 +1,7 @@
 "use client";
 const TEMPERATURE_LIMIT = "temperature_limit";
 
+import { anySet } from "@ac/web/lib/filters";
 import Link from "next/link";
 import { useState } from "react";
 import { Badge, Banner, Btn, Card, Check, DataTable, EmptyState, Field, Input, ListRow, Modal, Page, Select, Steps, SummaryList, Textarea, Plain } from "@ac/web/components/ui";
@@ -15,9 +16,10 @@ import {
 } from "@ac/web/lib/restrictions";
 import { executeRestriction, reconcileUnits, requestRelease, retryUnits, scheduleRestriction } from "../actions";
 import { Icon } from "@ac/web/components/Icon";
+import { NeedsAccess } from "@ac/web/components/NeedsAccess";
 import { oneOf } from "@ac/web/lib/oneOf";
 import type { RestrictionRecoveryCase } from "@ac/web/lib/contracts.gen";
-import { commonRange } from "@ac/web/lib/temperatureRange";
+import { commonRange, sharesNoSetpoint } from "@ac/web/lib/temperatureRange";
 import { DateTimeSelect } from "@ac/web/components/TimeSelect";
 
 interface ScheduleContract {
@@ -47,8 +49,7 @@ function causeStatus(c: { paid: boolean; processing: boolean }): "paid" | "proce
 }
 
 export function RestrictionsView({ live }: { live: RestrictionsLive }) {
-  const t = useT();
-  return live ? <Manager live={live} /> : <Page><EmptyState title={t("No access")}>{t("Restrictions need restriction.read, restriction.write or restriction.override.")}</EmptyState></Page>;
+  return live ? <Manager live={live} /> : <NeedsAccess what="Restrictions" permission="restriction.read" />;
 }
 
 function Manager({ live }: Readonly<{ live: NonNullable<RestrictionsLive> }>) {
@@ -85,10 +86,10 @@ function Manager({ live }: Readonly<{ live: NonNullable<RestrictionsLive> }>) {
           </Select></Field>
         </div>
       )}
-      {!live.full && <Banner>{t("Release view (restriction.override only): billing fields are not shown.")}</Banner>}
+      {!live.full && <Banner>{t("Release view (“Override restrictions” only): billing fields are not shown.")}</Banner>}
       <div className="split-rev">
         <Card title={t("Restrictions")} sub={t("newest first")} className="self-start">
-          {live.rows.length === 0 ? <EmptyState title={t("No restrictions")}>{t("No restriction matches this scope.")}</EmptyState> : <div className="flex flex-col gap-2">{live.rows.map((x) => <ListRow key={x.id} selected={r?.id === x.id} onClick={() => { setConfirmRules(false); nav({ restrictionId: x.id }); }}><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="truncate text-[13px]">{x.id.slice(0, 8)}</b><Badge tone={stateTone(x.state)}>{stateWord(x.state, t)}</Badge></div><div className="text-[11px] text-muted-foreground">{x.label}</div><div className="text-[11px] text-muted-foreground">{x.policy} · {t(x.units === 1 ? "1 unit" : "{n} units", { n: x.units })} · {x.progress}</div></div></ListRow>)}</div>}
+          {live.rows.length === 0 ? <EmptyState title={t("No restrictions")}>{t(anySet(live.scope.contractId, live.scope.invoiceId, live.scope.status) ? "No restriction matches this scope." : "No restriction has been applied yet.")}</EmptyState> : <div className="flex flex-col gap-2">{live.rows.map((x) => <ListRow key={x.id} selected={r?.id === x.id} onClick={() => { setConfirmRules(false); nav({ restrictionId: x.id }); }}><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="truncate text-[13px]">{x.id.slice(0, 8)}</b><Badge tone={stateTone(x.state)}>{stateWord(x.state, t)}</Badge></div><div className="text-[11px] text-muted-foreground">{x.label}</div><div className="text-[11px] text-muted-foreground">{x.policy} · {t(x.units === 1 ? "1 unit" : "{n} units", { n: x.units })} · {x.progress}</div></div></ListRow>)}</div>}
         </Card>
         {r ? (
           <div className="flex min-w-0 flex-col gap-4">
@@ -162,7 +163,11 @@ function ScheduleModal({ open, onClose, contracts, now, onDone }: Readonly<{ ope
   else if (k.invoices.length === 0) errors.contractId = t("This contract has no overdue unpaid invoice");
   else if (k.recipients === 0) errors.contractId = t("No active client can receive the notice");
   if (unitIds.length === 0) errors.unitIds = t("Choose at least one unit");
-  if (kind === TEMPERATURE_LIMIT && (!range || !(sp >= range.min && sp <= range.max))) errors.setpoint = range ? t("Within {min}–{max} °C for the chosen units", { min: range.min, max: range.max }) : t("The chosen units need a temperature range");
+  if (kind === TEMPERATURE_LIMIT) {
+    if (!range) errors.setpoint = t("The chosen units need a temperature range");
+    else if (sharesNoSetpoint(range)) errors.setpoint = t("The chosen units share no temperature setting");
+    else if (!(sp >= range.min && sp <= range.max)) errors.setpoint = t("Within {min}–{max} °C for the chosen units", { min: range.min, max: range.max });
+  }
   if (!at || Date.parse(at) < now.getTime() + 24 * 3600 * 1000) errors.executeAfter = t("At least 24 hours from now");
   if (reason.trim().length === 0 || reason.length > 1000) errors.reason = t("1–1000 characters, shown to the customer");
   const save = () => {

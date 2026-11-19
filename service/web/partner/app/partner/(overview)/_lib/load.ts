@@ -35,8 +35,10 @@ export async function loadOverview(sp: { from?: string; to?: string }) {
     Promise.all(p.days.map((item) => capacityOf(item))),
     p.days.includes(today) ? Promise.resolve(null) : capacityOf(today),
   ]);
-  // activity: the events of the jobs that moved last (open ones first), newest first
-  const recent = [...jobs].toSorted((a, b) => Number(a.status === "completed") - Number(b.status === "completed") || Date.parse(b.dueAt ?? "") - Date.parse(a.dueAt ?? "")).slice(0, 8);
+  // activity: the events of the jobs that moved last (open ones first), newest first; a history snapshot has no due
+  // date and goes last (Date.parse("") is NaN, which made the order depend on the sort's comparisons)
+  const dueMs = (j: (typeof jobs)[number]) => (j.dueAt ? Date.parse(j.dueAt) : 0);
+  const recent = [...jobs].toSorted((a, b) => Number(a.status === "completed") - Number(b.status === "completed") || dueMs(b) - dueMs(a)).slice(0, 8);
   const eventLists = await Promise.all(recent.map((j) => optional(coreItems<ApiJobEvent>("jobs.events", { jobId: j.id, query: { limit: 100 } }), [])));
   const events = eventLists.flat();
   const names = new Map(members.map((m) => [m.id, m.displayName]));

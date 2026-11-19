@@ -12,7 +12,9 @@ import { QrScan } from "./QrScan";
 import { CURRENT_CLIENT } from "@ac/web/lib/clientUsers";
 import { setStoredValue, useStoredValue } from "@ac/web/lib/urlState";
 import { DEFAULT_DISPLAY, isLocale, LOCALE_KEY, translate, type Display } from "@ac/web/lib/i18n";
-import { I18nProvider } from "./I18n";
+import { useNavPending } from "@ac/web/lib/navPending";
+import { I18nProvider, useT } from "./I18n";
+import { UpdateNotice } from "./UpdateNotice";
 import { useBffSession } from "@ac/web/lib/useOp";
 import { Sheet, SheetContent } from "@ac/web/components/ui/sheet";
 import { Button } from "@ac/web/components/ui/button";
@@ -31,20 +33,24 @@ export function useStoredRole(): Role {
 
 const SHARED = SHARED_PAGES.map((s) => ({ ...s, icon: (s.href === "/notifications" ? "notifications" : "preferences") as IconName }));
 
-function NavLink({ href, label, icon, badge, active }: Readonly<{ href: string; label: string; icon: IconName; badge?: string; active: boolean }>) {
+function NavLink({ href, label, icon, badge, active, locked }: Readonly<{ href: string; label: string; icon: IconName; badge?: string; active: boolean; locked?: boolean }>) {
+  const t = useT();
   return (
-    <Link href={href} aria-current={active ? "page" : undefined} className={cx("flex items-center gap-2.5 rounded-control px-3 py-2 text-[13px] font-semibold", active ? "bg-primary-soft text-primary" : "text-ink hover:bg-surface2")}>
+    <Link href={href} aria-current={active ? "page" : undefined} className={cx("flex items-center gap-2.5 rounded-control px-3 py-2 text-[13px] font-semibold", active ? "bg-primary-soft text-primary" : "text-ink hover:bg-surface2", locked && !active && "text-muted-foreground")}>
       <Icon name={icon} className={cx("text-[15px]", active ? "text-primary" : "text-muted-foreground")} />
       <span className="min-w-0 flex-1 leading-tight">{label}</span>
-      {badge && <span className="grid h-[18px] min-w-[18px] place-items-center rounded-full bg-crit px-1 text-[10px] font-bold text-white">{badge}</span>}
+      {/* the screen only says which access is missing: marked before the click, not after (UI/UX loop R55) */}
+      {locked && <span title={t("Your role can’t open this")}><Icon name="locked" className="text-[13px] text-muted-foreground" /><span className="sr-only"> · {t("Your role can’t open this")}</span></span>}
+      {/* a count, not a severity: red stays for critical and errors (the alert itself carries its severity) */}
+      {badge && <span className="grid h-[18px] min-w-[18px] place-items-center rounded-full bg-primary px-1 text-[10px] font-bold text-white">{badge}</span>}
     </Link>
   );
 }
 
-interface NavItem { href: string; label: string; icon: IconName; badge?: string; match?: string[] }
+interface NavItem { href: string; label: string; icon: IconName; badge?: string; match?: string[]; locked?: boolean }
 /** The role's sidebar items with the active one: the longest matching path, where an item whose href carries a query
 (Sidebar › Assigned jobs = /technician?tab=all) wins on its path only when the query matches too. */
-function RoleNav({ items, base, pathname, search }: Readonly<{ items: NavItem[]; base: string; pathname: string; search: string }>) {
+function RoleNav({ items, base, pathname, search, label }: Readonly<{ items: NavItem[]; base: string; pathname: string; search: string; label: string }>) {
   const query = new URLSearchParams(search);
   const score = (href: string, match?: string[]) => {
     const hits = [href, ...(match ?? [])].filter((h) => {
@@ -56,9 +62,10 @@ function RoleNav({ items, base, pathname, search }: Readonly<{ items: NavItem[];
   };
   const best = Math.max(0, ...items.map((i) => score(i.href, i.match)));
   const activeHref = best ? items.find((i) => score(i.href, i.match) === best)?.href : undefined;
-  return <nav className="flex flex-col gap-0.5">{items.map((i) => <NavLink key={i.href} {...i} active={i.href === activeHref} />)}</nav>;
+  // two navigation landmarks in the sidebar: each is named, so a screen reader can tell them apart (UI/UX loop R71)
+  return <nav aria-label={label} className="flex flex-col gap-0.5">{items.map((i) => <NavLink key={i.href} {...i} active={i.href === activeHref} />)}</nav>;
 }
-function RoleNavWithQuery(props: Readonly<{ items: NavItem[]; base: string; pathname: string }>) {
+function RoleNavWithQuery(props: Readonly<{ items: NavItem[]; base: string; pathname: string; label: string }>) {
   return <RoleNav {...props} search={useSearchParams().toString()} />; // the search params need a Suspense boundary (static routes)
 }
 
@@ -80,6 +87,7 @@ export function AppShell({ appRole: forced, live, children }: Readonly<{ appRole
     return badge ? String(badge) : undefined;
   };
   const pathname = usePathname();
+  const isNavPending = useNavPending();
   const session = useBffSession();
   // API mode is the layout's `live` (IR241), known on the first render, or a session that says so (the shared pages pass
   // no `live` without a session); the session read in the browser is null until it answers and the mock session when it
@@ -99,7 +107,7 @@ export function AppShell({ appRole: forced, live, children }: Readonly<{ appRole
   const demoBadge = demoUnread > 0 ? String(demoUnread) : undefined; // no badge for 0, like the Core API's counts
   const unreadBadge = (href: string) => (live ? count(href) : demoBadge); // the demo counts its own unread
 
-  const items = (live ? config.nav.map((i) => ({ ...i, badge: count(i.href) })) : config.nav).map((i) => ({ ...i, label: t(i.label) }));
+  const items = (live ? config.nav.map((i) => ({ ...i, badge: count(i.href), locked: live.locked?.includes(i.href) ?? false })) : config.nav).map((i) => ({ ...i, label: t(i.label) }));
   // the page's name: the menu item with the longest matching path (/customer/units/x is "Units & locations")
   const label = pageLabel(role, pathname);
   const title = label ? t(label) : "AC Project";
@@ -114,9 +122,10 @@ export function AppShell({ appRole: forced, live, children }: Readonly<{ appRole
             <span className="leading-tight"><span className="block text-[15px] font-bold">{config.app}</span><span className="block text-[11px] text-muted-foreground">{t(config.sub)}</span></span>
           </Link>
           <div className="px-3 pb-1 text-[10px] font-bold tracking-wider text-muted-foreground">{scope}</div>
-          <Suspense fallback={<RoleNav items={items} base={config.base} pathname={pathname} search="" />}><RoleNavWithQuery items={items} base={config.base} pathname={pathname} /></Suspense>
+          <Suspense fallback={<RoleNav items={items} base={config.base} pathname={pathname} search="" label={t("Main menu")} />}><RoleNavWithQuery items={items} base={config.base} pathname={pathname} label={t("Main menu")} /></Suspense>
           <div className="my-2 border-t border-line" />
-          <nav className="flex flex-col gap-0.5">
+          <nav aria-label={t("Account and settings")} className="flex flex-col gap-0.5">
+            {role === "client" && isOwner && <NavLink href="/customer/installations" label={t("Installations")} icon="maintenance" active={pathname === "/customer/installations"} />}
             {role === "client" && isOwner && <NavLink href="/customer/users" label={t("Users")} icon="users" active={pathname === "/customer/users"} />}
             {role === "contractor" && <NavLink href="/partner/users" label={t("Users")} icon="users" active={pathname === "/partner/users"} />}
             {SHARED.map((s) => <NavLink key={s.href} {...s} label={t(s.label)} active={pathname === s.href} badge={s.href === "/notifications" ? unreadBadge(s.href) : undefined} />)}
@@ -162,7 +171,11 @@ export function AppShell({ appRole: forced, live, children }: Readonly<{ appRole
               <span className="inline-flex items-center gap-1.5 rounded-control bg-surface2 px-3 py-1.5 text-xs font-semibold"><Icon name="account" /> <span className="max-sm:hidden">{chip}</span><span className="sm:hidden">{chip.split(" — ", 1)[0]}</span></span>
             </div>
           </header>
-          <main id="main" tabIndex={-1} className="min-w-0 flex-1 px-4 py-5 outline-none sm:px-6 lg:px-8">{children}</main>
+          {/* the app was deployed since this page loaded: offer a reload (IR856) */}
+          <UpdateNotice />
+          {/* a filter, tab or selection change waits for the server's render: a thin line says it is on its way (UI/UX loop R76) */}
+          {isNavPending && <div role="progressbar" aria-label={t("Loading")} className="pointer-events-none fixed inset-x-0 top-0 z-50 h-0.5 animate-pulse bg-primary" />}
+          <main id="main" tabIndex={-1} aria-busy={isNavPending} className="min-w-0 flex-1 px-4 py-5 outline-none sm:px-6 lg:px-8">{children}</main>
         </div>
       </div>
       {role === "technician" && isApiMode && <QrScan open={qr} onClose={() => { setQr(false); }} />}

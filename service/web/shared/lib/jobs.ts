@@ -26,6 +26,7 @@ seed, FR-X05). Phase 1A only: with DATA_SOURCE=API the job screens write through
 stay local and return their refusals at once.
 */
 import { useSyncExternalStore } from "react";
+import { originOf, type Origin } from "@ac/web/lib/origin";
 import { z } from "@ac/web/lib/zod";
 import { readDemoAs, writeDemo } from "@ac/web/lib/demoStore";
 import { oneOf } from "@ac/web/lib/oneOf";
@@ -35,7 +36,6 @@ import { isBefore } from "@ac/web/lib/order";
 import { lookup } from "@ac/web/lib/lookup";
 
 export interface Slot { date: string; win: string }
-export type Origin = "request" | "plan";
 export const jobStatuses = ["requested", TIME_PROPOSED, "offered", "accepted", "assigned", "in_progress", "submitted", "rework_requested", "completed", "cancelled", "on_hold"] as const;
 export type JobStatus = (typeof jobStatuses)[number];
 interface Proposal { by: "hq" | "contractor"; slot: Slot; who: string; message: string; replyBy: string; status: "pending" | "accepted" | "declined" | "withdrawn" }
@@ -180,7 +180,7 @@ function jobFromApi(j: ApiJob): Job {
     unit: j.unitId ? `Unit ${j.unitId.slice(0, 8)}` : "Unit",
     loc: "",
     customer: "",
-    origin: j.origin === "periodic_plan" ? "plan" : "request",
+    origin: originOf(j.origin ?? ""),
     type: lookup(typeLabel, j.type) ?? "Reactive",
     symptom: "",
     preferred: (j.preferredSlots ?? []).map((x) => slotOf(x)).filter((s): s is Slot => s !== null),

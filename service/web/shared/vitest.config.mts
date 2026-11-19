@@ -11,5 +11,10 @@ export default defineConfig({
   resolve: { alias: { "@ac/web": here } },
   // 30 s per test: the guards that parse every source file of the four apps (contract, controls, i18n, icons) take a
   // few seconds here and more on a busy CI runner, where the default 5 s timed out
-  test: { environment: "jsdom", include: ["**/*.test.{ts,tsx}"], exclude: ["**/node_modules/**", "**/.next/**"], testTimeout: 30_000 },
+  test: {
+    environment: "jsdom", include: ["**/*.test.{ts,tsx}"], exclude: ["**/node_modules/**", "**/.next/**"], testTimeout: 30_000,
+    // `npx vitest run --coverage --coverage.include=<files>`: the review loop measures the area it reads (off by default);
+    // the table goes to the terminal only, so no report files are left for the linters to read
+    coverage: { provider: "v8", reporter: ["text"], reportsDirectory: "coverage" },
+  },
 });

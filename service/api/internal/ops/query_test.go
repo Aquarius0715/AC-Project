@@ -102,6 +102,49 @@ func TestAskRoutesQueries(t *testing.T) {
 	}
 }
 
+// checkedIn is the input of a query that validates itself: n must be positive.
+type checkedIn struct {
+	N int `json:"n"`
+}
+
+func (in *checkedIn) Validate() map[string]string {
+	if in.N <= 0 {
+		return map[string]string{"n": apperr.KeyInvalid}
+	}
+
+	return nil
+}
+
+// TestQueryInputIsValidated: an input that validates itself is refused with its field errors before the handler runs,
+// as an operation's input is (IR431).
+func TestQueryInputIsValidated(t *testing.T) {
+	t.Parallel()
+
+	reg := ops.NewRegistry()
+	handled := 0
+
+	ops.RegisterQuery(
+		reg,
+		ops.DomainEquipment,
+		queryTwice,
+		func(_ context.Context, _ *ops.Call, in *checkedIn) (echoOut, error) {
+			handled++
+
+			return echoOut{Twice: in.N * 2}, nil
+		},
+	)
+
+	_, err := ops.Ask[echoOut](t.Context(), reg, callOf(reg), queryTwice, checkedIn{N: 0})
+	if err == nil || apperr.From(err).FieldErrors["n"] != apperr.KeyInvalid || handled != 0 {
+		t.Errorf("an invalid input: %v, handler ran %d times", err, handled)
+	}
+
+	out, err := ops.Ask[echoOut](t.Context(), reg, callOf(reg), queryTwice, checkedIn{N: 2})
+	if err != nil || out.Twice != 4 || handled != 1 {
+		t.Errorf("a valid input: %v %v", out, err)
+	}
+}
+
 // TestAskAnotherDomain: a query of a domain another service serves is UNAVAILABLE without a transport.
 func TestAskAnotherDomain(t *testing.T) {
 	t.Parallel()

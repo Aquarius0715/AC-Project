@@ -26,6 +26,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/platform/idp"
 	"github.com/pradita/ac-project/service/api/internal/platform/logging"
 	"github.com/pradita/ac-project/service/api/internal/platform/ratelimit"
+	"github.com/pradita/ac-project/service/api/internal/platform/stripe"
 )
 
 var (
@@ -101,8 +102,14 @@ func run(service string, domains []string) error {
 		go c.Run(ctx, consumerPoll)
 	}
 
+	return serve(ctx, cfg.Addr, srv.Echo)
+}
+
+// serve runs app on addr until ctx is cancelled and the requests in flight have finished or gracefulTimeout has passed.
+// A normal stop returns nil; a failure to listen is an error, so the process exits non-zero.
+func serve(ctx context.Context, addr string, app *echo.Echo) error {
 	startConfig := echo.StartConfig{
-		Address:          cfg.Addr,
+		Address:          addr,
 		HideBanner:       true,
 		HidePort:         true,
 		GracefulTimeout:  gracefulTimeout,
@@ -115,9 +122,9 @@ func run(service string, domains []string) error {
 		BeforeServeFunc:  nil,
 	}
 
-	startErr := startConfig.Start(ctx, srv.Echo)
-	if startErr != nil && !errors.Is(startErr, http.ErrServerClosed) {
-		slog.Error("serve", "err", startErr)
+	err := startConfig.Start(ctx, app)
+	if err != nil && !errors.Is(err, http.ErrServerClosed) {
+		return apperr.Wrap(err, "serve")
 	}
 
 	return nil
@@ -254,32 +261,67 @@ func accountAppsFromEnv() identity.AccountApps {
 	}
 }
 
+// configureCheckout sets the Stripe Checkout client (DEC-68) when a secret key is configured. Without one the field
+// stays nil: payments.startCheckout then answers UNAVAILABLE, and the demo provider stays in use. A key without its
+// webhook secret is refused at start-up.
+func configureCheckout(cfg *Config) error {
+	stripeCfg := stripe.ConfigFromEnv()
+
+	err := stripeCfg.Validate()
+	if err != nil {
+		return apperr.Wrap(err, "stripe configuration")
+	}
+
+	cfg.StripeWebhookSecret = stripeCfg.WebhookSecret
+
+	if !stripeCfg.Enabled() {
+		return nil
+	}
+
+	checkout, err := stripe.NewCheckout(stripeCfg)
+	if err != nil {
+		return fmt.Errorf("stripe: %w", err)
+	}
+
+	cfg.Checkout = checkout
+
+	return nil
+}
+
 // ConfigFromEnv reads the configuration of a domain service (or its worker, IR195) from the environment.
 func ConfigFromEnv(logger *slog.Logger, domains []string) (Config, error) {
 	cfg := Config{
-		Logger:            logger,
-		DatabaseURL:       os.Getenv("DATABASE_URL"),
-		DatabaseReaderURL: os.Getenv("DATABASE_READER_URL"),
-		Addr:              envOr("ADDR", ":8080"),
-		DemoOps:           os.Getenv("DEMO_OPS") == "1",
-		Domains:           domains,
-		IdentityURL:       os.Getenv("IDENTITY_INTERNAL_URL"),
-		InternalToken:     os.Getenv("INTERNAL_API_TOKEN"),
-		ServiceURLs:       serviceURLsFromEnv(),
-		Clock:             nil,
-		DemoShared:        false,
-		DemoStart:         time.Time{},
-		PrincipalTTL:      0,
-		DemoClock:         nil,
-		WriteLimit:        nil,
-		DenyLimit:         nil,
-		IdentityProvider:  nil,
-		AccountApps:       accountAppsFromEnv(),
-		AccountsPerDay:    0,
-		WrapTx:            nil,
+		Logger:              logger,
+		DatabaseURL:         os.Getenv("DATABASE_URL"),
+		DatabaseReaderURL:   os.Getenv("DATABASE_READER_URL"),
+		Addr:                envOr("ADDR", ":8080"),
+		DemoOps:             os.Getenv("DEMO_OPS") == "1",
+		Domains:             domains,
+		IdentityURL:         os.Getenv("IDENTITY_INTERNAL_URL"),
+		InternalToken:       os.Getenv("INTERNAL_API_TOKEN"),
+		ServiceURLs:         serviceURLsFromEnv(),
+		Clock:               nil,
+		DemoShared:          false,
+		DemoStart:           time.Time{},
+		PrincipalTTL:        0,
+		DemoClock:           nil,
+		WriteLimit:          nil,
+		DenyLimit:           nil,
+		IdentityProvider:    nil,
+		AccountApps:         accountAppsFromEnv(),
+		AccountsPerDay:      0,
+		WrapTx:              nil,
+		Checkout:            nil,
+		StripeWebhookSecret: "",
+		CustomerAppURL:      envOr("APP_URL_CUSTOMER", "http://localhost:3000"),
 	}
 
 	err := checkInternalToken(cfg.InternalToken, cfg.DemoOps)
+	if err != nil {
+		return cfg, err
+	}
+
+	err = configureCheckout(&cfg)
 	if err != nil {
 		return cfg, err
 	}

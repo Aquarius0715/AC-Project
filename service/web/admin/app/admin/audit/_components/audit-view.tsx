@@ -3,7 +3,7 @@ const HQ_OPERATOR = "hq-operator";
 const DEVICE_ONLINE_RTO = "device-online-rto";
 
 import { useRef, useState, type ReactNode } from "react";
-import { Badge, Banner, Btn, Card, Choice, DataTable, EmptyState, Field, Input, ListRow, Page, Select, SummaryList, Tabs, TextLink, Timeline, Plain } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Choice, DataTable, EmptyState, Field, Input, ListRow, Page, Select, SummaryList, Tabs, TextLink, Timeline, Plain, type Tone } from "@ac/web/components/ui";
 import { useI18n } from "@ac/web/components/I18n";
 import type { T } from "@ac/web/lib/i18n";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
@@ -16,7 +16,7 @@ import { byText } from "@ac/web/lib/order";
 
 /** Why a related command could not be read: not permitted, out of scope or gone, or anything else. */
 function commandFailure(code: string, t: T): string {
-  if (code === "FORBIDDEN") return t("You may not read this command — it needs control.execute, restriction.read, restriction.override or automation.policy.read.");
+  if (code === "FORBIDDEN") return t("You may not read this command — it needs “Control ACs”, “View restrictions”, “Override restrictions” or “View automation policies”.");
   return t(code === "NOT_FOUND" ? "This command is outside your scope or no longer exists." : "The command could not be loaded — try again.");
 }
 const seed: AuditRow[] = [
@@ -43,7 +43,7 @@ const demoFilters: AuditFilters = { from: "2026-09-01", to: "2026-09-30", actorI
 with its correlation trace and related records, and on the device tab the devices and the chosen device's events. */
 export interface AuditLive {
   tab: "log" | "devices"; rows: AuditRow[]; total: number; filters: AuditFilters; searched: boolean; actors: { id: string; name: string }[]; kinds: string[];
-  selected: string | null; entryMissing: boolean; trace: { id: string; time: string; title: string; detail: string }[]; related: Related | null;
+  selected: string | null; entryMissing: boolean; trace: { id: string; time: string; title: string; detail: string; tone: Tone }[]; related: Related | null;
   device?: { options: { id: string; label: string }[]; deviceId: string | null; missing: boolean; label: string | null; total: number; events: AuditDeviceEvent[]; selected: string | null };
 }
 
@@ -169,7 +169,7 @@ export function AuditView({ live }: Readonly<{ live?: AuditLive }>) {
                   {trace.length > 0 && (
                     <>
                       <h3 className="mt-4 mb-2 text-[13px] font-bold">{t("Correlation trace")}</h3>
-                      <Timeline items={trace.map((x) => ({ time: x.time, title: x.title, detail: x.detail, tone: x.id === sel.id ? "primary" : undefined }))} />
+                      <Timeline items={trace.map((x) => ({ time: x.time, title: x.id === sel.id ? <>{x.title} <Badge tone="primary">{t("This entry")}</Badge></> : x.title, detail: x.detail, tone: x.tone }))} />
                       <p className="mt-2 text-[11px] text-muted-foreground">{t("Pending is shown on its own; the final result is a new entry with the same correlation ID. Earlier entries are never edited.")}</p>
                     </>
                   )}
@@ -292,7 +292,7 @@ function DeviceEvents({ device, f, periodErr, zone, live, onDate, onDevice, onEv
               ]} />
               <h3 className="mt-4 mb-2 text-[13px] font-bold">{t("Response notes (read-only here)")}</h3>
               {event.notes.length === 0 ? <p className="text-xs text-muted-foreground">{t("No response notes.")}</p> : <ul className="flex flex-col gap-2">{event.notes.map((n, k) => <li key={k} className="rounded-lg border border-line px-3 py-2 text-[13px]">“{n.text}”<div className="text-[11px] text-muted-foreground">{n.by}</div></li>)}</ul>}
-              <p className="mt-2 rounded-lg bg-primary-soft/50 px-3 py-2 text-[11px] text-muted-foreground">{t("Notes are added from Devices & models (device.write), not here.")}</p>
+              <p className="mt-2 rounded-lg bg-primary-soft/50 px-3 py-2 text-[11px] text-muted-foreground">{t("Notes are added from Devices & models (“Edit devices & models”), not here.")}</p>
             </Card>
           )}
         </div>

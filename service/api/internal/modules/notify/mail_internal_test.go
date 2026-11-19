@@ -3,7 +3,10 @@ package notify
 import (
 	"bufio"
 	"context"
+	"crypto/tls"
 	"net"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -130,6 +133,34 @@ func TestMailLinksAtTheSignInAddress(t *testing.T) {
 	}
 }
 
+// TestAppsOnKeepsSchemeAndPort: a listed host replaces only the host name of the app address (no port added when the
+// canonical address has none, compared case-insensitively); an address that does not parse stays the canonical one.
+func TestAppsOnKeepsSchemeAndPort(t *testing.T) {
+	t.Parallel()
+
+	const listed = "x.ts.net"
+
+	apps := Apps{
+		Customer:   "https://app.example",
+		Partner:    "https://partner.example:8443/",
+		Technician: "://bad",
+		Admin:      "",
+		Hosts:      []string{listed},
+	}
+
+	for _, check := range []struct{ role, host, want string }{
+		{authz.RoleClient, listed, "https://" + listed},
+		{authz.RoleClient, "X.TS.NET", "https://" + listed},
+		{authz.RoleContractor, listed, "https://" + listed + ":8443"},
+		{authz.RoleTechnician, listed, "://bad"},
+		{authz.RoleClient, "y.ts.net", "https://app.example"},
+	} {
+		if got := apps.on(check.role, check.host); got != check.want {
+			t.Errorf("on(%q, %q) = %q, want %q", check.role, check.host, got, check.want)
+		}
+	}
+}
+
 // TestSMTPRefusesHeaderBreaks: an address or subject with a line break never reaches the SMTP server.
 func TestSMTPRefusesHeaderBreaks(t *testing.T) {
 	t.Parallel()
@@ -250,6 +281,83 @@ func TestSMTPSends(t *testing.T) {
 		!strings.Contains(message, "Body line\r\nsecond") ||
 		strings.Contains(message, "\r\r\n") {
 		t.Errorf("received: %q", message)
+	}
+}
+
+// TestSMTPVerifiesTheStartTLSCertificate: a server that offers STARTTLS with a certificate no trusted authority signed
+// gets no message: the handshake fails verification and Send reports it (the certificate is checked against the
+// host name, at TLS 1.2 or later).
+func TestSMTPVerifiesTheStartTLSCertificate(t *testing.T) {
+	t.Parallel()
+
+	cfg := tlsConfig("mail.example.com")
+	if cfg.MinVersion != tls.VersionTLS12 || cfg.ServerName != "mail.example.com" ||
+		cfg.InsecureSkipVerify {
+		t.Errorf("tls config: min %x, server name %q, skip verify %v",
+			cfg.MinVersion, cfg.ServerName, cfg.InsecureSkipVerify)
+	}
+
+	// only for its self-signed certificate
+	untrusted := httptest.NewTLSServer(http.NotFoundHandler())
+	defer untrusted.Close()
+
+	var listenConfig net.ListenConfig
+
+	listener, err := listenConfig.Listen(t.Context(), "tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = listener.Close() }()
+
+	handshake := make(chan error, 1)
+
+	go func() { // an SMTP server that offers STARTTLS and switches to TLS when asked
+		conn, err := listener.Accept()
+		if err != nil {
+			handshake <- err
+
+			return
+		}
+		defer func() { _ = conn.Close() }()
+
+		reader := bufio.NewReader(conn)
+		reply := func(s string) { _, _ = conn.Write([]byte(s + "\r\n")) }
+		reply("220 test")
+
+		for {
+			line, err := reader.ReadString('\n')
+			if err != nil {
+				handshake <- err
+
+				return
+			}
+
+			switch cmd := strings.ToUpper(strings.TrimSpace(line)); {
+			case strings.HasPrefix(cmd, "EHLO"):
+				reply("250-test\r\n250 STARTTLS")
+			case cmd == "STARTTLS":
+				reply("220 go ahead")
+
+				handshake <- tls.Server(conn, untrusted.TLS).HandshakeContext(t.Context())
+
+				return
+			default:
+				reply("250 ok")
+			}
+		}
+	}()
+
+	s := SMTP{Addr: listener.Addr().String(), From: "no-reply@ac-project.local"}
+
+	_, sendErr := s.Send(t.Context(), "tan@example.com", "Hello", "body")
+	if sendErr == nil || !strings.Contains(sendErr.Error(), "starttls:") ||
+		!strings.Contains(sendErr.Error(), "certificate") {
+		t.Errorf("send to an untrusted server: %v", sendErr)
+	}
+
+	serverErr := <-handshake
+	if serverErr == nil {
+		t.Error("the TLS handshake with an untrusted certificate succeeded")
 	}
 }
 

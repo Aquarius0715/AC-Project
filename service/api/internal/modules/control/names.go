@@ -30,6 +30,7 @@ const (
 	phaseScheduleEnd      = "schedule_end"
 	phaseScheduleStart    = "schedule_start"
 	qualityStale          = "stale"
+	qualityValid          = "valid"
 	reasonMissingData     = "missing_data"
 	reasonNoMatch         = "no_match"
 	reasonOffline         = "offline"

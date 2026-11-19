@@ -1,5 +1,6 @@
 // web-smoke: three virtual users (a customer, a partner, a technician) sign in through the web apps and open their pages for
-// a minute. It checks the script and the web stack, and has to finish with no error at all.
+// a minute. It checks the script and the web stack, and has to finish with no error at all. Its size is fixed: TIME_SCALE
+// and VU_SCALE do not change it.
 import { watched, webIteration, type Setup } from "../lib/run.ts";
 
 export const options = {
@@ -8,7 +9,7 @@ export const options = {
   thresholds: { ...watched(), ac_errors: ["rate==0"] },
 };
 
-export { handleSummary, setup } from "../lib/run.ts";
+export { fixedSummary as handleSummary, setup } from "../lib/run.ts";
 
 export default function webSmoke(data: Setup): void {
   webIteration(data, true);

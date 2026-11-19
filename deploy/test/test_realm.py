@@ -57,6 +57,15 @@ class RealmTest(unittest.TestCase):
             local = passwords(json.load(f))
         self.assertEqual(passwords(written("")), local)
 
+    def test_each_app_has_its_own_client_with_its_own_address_and_theme(self) -> None:
+        clients = {c["clientId"]: c for c in written("")["clients"]}  # IR790: the sign-in page names the service
+        for app, port in (("customer", 3200), ("partner", 3201), ("technician", 3202)):
+            client = clients[f"ac-{app}-web"]
+            self.assertEqual(client["redirectUris"], [f"http://lab:{port}/*"])
+            self.assertEqual(client["secret"], "web")
+            self.assertEqual(client["attributes"]["login_theme"], f"ac-{app}")
+        self.assertNotIn("ac-web", clients)
+
 
 if __name__ == "__main__":
     unittest.main()

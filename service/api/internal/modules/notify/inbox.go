@@ -1174,6 +1174,15 @@ func (Inbox) preview(
 		severity = *input.Severity
 	}
 
+	name := resolved.name // the preview is shown to the caller, so a contractor gets the job label (IR775)
+	if label, masked := jobLabel(
+		call.Principal.Role,
+		input.Target.Kind,
+		input.Target.ID.String(),
+	); masked {
+		name = label
+	}
+
 	return Notification{
 		ID:                     uuid.New(),
 		TenantID:               call.Principal.TenantID,
@@ -1190,7 +1199,7 @@ func (Inbox) preview(
 		},
 		TemplateKey: input.TemplateKey,
 		Params: Params{
-			TargetName: resolved.name,
+			TargetName: name,
 			At:         call.Now,
 			Status:     status,
 			Reason:     input.Reason,

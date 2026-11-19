@@ -51,12 +51,14 @@ CUSTOMER_WEB_PORT=3200
 PARTNER_WEB_PORT=3201
 TECHNICIAN_WEB_PORT=3202
 ADMIN_WEB_PORT=3203
+PORTAL_WEB_PORT=3204
 KEYCLOAK_PORT=8281
 MAILPIT_PORT=8225
 CUSTOMER_WEB_URL=http://$host:3200
 PARTNER_WEB_URL=http://$host:3201
 TECHNICIAN_WEB_URL=http://$host:3202
 ADMIN_WEB_URL=http://$host:3203
+PORTAL_WEB_URL=http://$host:3204
 KEYCLOAK_URL=http://$host:8281
 # more than one address (IR651): the lab network and the Tailnet, the canonical one first, e.g.
 # PUBLIC_HOSTS=192.0.2.10,100.64.0.10
@@ -124,7 +126,7 @@ Next, register this server as the repository's self-hosted runner, as $(id -un):
   3. Then: sudo ./svc.sh install $(id -un) && sudo ./svc.sh start
 Then a tag such as test1.0.0r2 on a commit of main runs the workflow "Test deployment" on this server: the Actions
 tab shows its build and deploy logs, and the apps open at $(grep '^CUSTOMER_WEB_URL=' "$SETTINGS" | cut -d= -f2-)
-(customer), :3201 partner, :3202 technician, :3203 HQ. On this server:
+(customer), :3201 partner, :3202 technician, :3203 HQ, :3204 the portal with every service address. On this server:
   state     bash $ROOT/deploy.sh status
   reset     bash $ROOT/deploy.sh reset
 EOF

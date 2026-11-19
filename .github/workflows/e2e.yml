@@ -44,11 +44,14 @@ jobs:
           for key in MQTT_DEVICE_SIM_KEY MQTT_IOT_BRIDGE_KEY; do
             sed -i "s/^$key=.*/$key=$(openssl rand -hex 24)/" "$SETTINGS"
           done
+          # every published port differs from the shared test environment's 3200–3204 on the same server: the portal's
+          # default in compose.test.yaml is ac-test's 3204, which failed compose up while ac-test ran (R935)
           cat >>"$SETTINGS" <<EOF
           CUSTOMER_WEB_PORT=3300
           PARTNER_WEB_PORT=3301
           TECHNICIAN_WEB_PORT=3302
           ADMIN_WEB_PORT=3303
+          PORTAL_WEB_PORT=3304
           CUSTOMER_WEB_URL=http://localhost:3300
           PARTNER_WEB_URL=http://localhost:3301
           TECHNICIAN_WEB_URL=http://localhost:3302
@@ -96,7 +99,9 @@ jobs:
         run: |
           for url in http://localhost:8081/realms/ac/.well-known/openid-configuration http://localhost:3300/login http://localhost:3301/login http://localhost:3302/login http://localhost:3303/login; do
             for i in $(seq 1 120); do
-              if [ "$(curl -s -o /dev/null -w '%{http_code}' "$url")" = 200 ]; then echo "ready: $url"; break; fi
+              # an app's /login answers 307 to the identity provider (IR790): up is any answer below 400
+              code=$(curl -s -o /dev/null -w '%{http_code}' "$url")
+              if [ "$code" -ge 200 ] && [ "$code" -lt 400 ]; then echo "ready: $url"; break; fi
               [ "$i" = 120 ] && { echo "not ready: $url"; docker compose -p ac-e2e --env-file "$SETTINGS" -f compose.yaml -f deploy/test/compose.test.yaml --profile full ps; exit 1; }
               sleep 5
             done
@@ -112,7 +117,7 @@ jobs:
             -v "$HOME/.cache/ac-e2e-npm:/tmp/home/.npm" \
             -e E2E_CUSTOMER_URL=http://localhost:3300 -e E2E_PARTNER_URL=http://localhost:3301 \
             -e E2E_TECHNICIAN_URL=http://localhost:3302 -e E2E_ADMIN_URL=http://localhost:3303 \
-            -v "$GITHUB_WORKSPACE:/work" -w /work/service/web mcr.microsoft.com/playwright:v1.65.0-noble \
+            -v "$GITHUB_WORKSPACE:/work" -w /work/service/web mcr.microsoft.com/playwright:v1.65.1-noble \
             bash -c 'npm ci && npm run e2e -- --reporter=github,list --max-failures=10'
       - name: stack logs on failure
         if: failure()

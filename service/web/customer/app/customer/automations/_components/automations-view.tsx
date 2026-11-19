@@ -8,13 +8,14 @@ import { useAction } from "@ac/web/lib/useAction";
 import { useOp } from "@ac/web/lib/useOp";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import {
-  actionGroupOf, actionLabel, actionOf, actionOptions, apiErrors, compares, compareText, dayLong, dayShort, draftErrors, draftOf, eventTest, extraChoices, extraLabel, firstAction, fitExtras, blankDraft, blankExtra, runClock, runText,
-  saveInput, scheduleDraft, scheduleTest, summaryNote, summaryText, testFact, triggerInfo, triggers,
+  actionGroupOf, actionLabel, actionOf, apiErrors, commonActionOptions, compares, compareText, dayLong, dayShort, draftErrors, draftOf, eventTest, extraChoices, extraLabel, firstAction, fitExtras, blankDraft, blankExtra, runClock, runText,
+  afterHoursDraft, saveInput, scheduleDraft, scheduleTest, summaryNote, summaryText, testFact, triggerInfo, triggers,
   type ApiAutomation, type ApiOccurrence, type Caps, type Draft, type ExtraDraft, type RuleCard, type TestRow,
 } from "@ac/web/lib/clientAutomations";
 import { useI18n, useT } from "@ac/web/components/I18n";
 import type { T } from "@ac/web/lib/i18n";
 import { deleteAutomation, saveAutomation, testEvent, updateConsent } from "../actions";
+import { PresenceSwitch } from "./presence-switch";
 import { Icon } from "@ac/web/components/Icon";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@ac/web/components/ui/dropdown-menu";
 import { Button } from "@ac/web/components/ui/button";
@@ -28,6 +29,10 @@ interface Ac { id: string; name: string; property: string; path: string }
 export interface AutomationsLive {
   rules: ApiAutomation[]; cards: RuleCard[]; acs: Ac[]; caps: Record<string, Caps | null>; timezone: string; editing: string | null;
   consent: { version: number | null; granted: boolean; title: string; text: string; tone: "ok" | "warn" | "muted" }; nextRuns: Record<string, string | null>;
+  /** the ACs of a new after-hours rule opened from the Running list (IR811); empty otherwise */
+  preset: string[];
+  /** the customer's property names by id, for the away/home switch's line (DEC-109) */
+  places: Record<string, string>;
 }
 interface Notice { title: string; text: string }
 
@@ -37,9 +42,9 @@ export function AutomationsView({ live }: Readonly<{ live: AutomationsLive }>) {
   const patch = useUrlPatch();
   const [notice, setNotice] = useState<Notice | null>(null);
   if (live.editing) {
-    return <Editor key={live.editing} live={live} onDone={(n) => { setNotice(n); patch({ automationId: null }); }} onCancel={() => { patch({ automationId: null }); }} />;
+    return <Editor key={live.editing} live={live} onDone={(n) => { setNotice(n); patch({ automationId: null, preset: null, unitIds: null }); }} onCancel={() => { patch({ automationId: null, preset: null, unitIds: null }); }} />;
   }
-  return <List live={live} notice={notice} setNotice={setNotice} create={() => { setNotice(null); patch({ automationId: "new" }); }} edit={(id) => { setNotice(null); patch({ automationId: id }); }} />;
+  return <List live={live} notice={notice} setNotice={setNotice} create={() => { setNotice(null); patch({ automationId: "new", preset: null, unitIds: null }); }} edit={(id) => { setNotice(null); patch({ automationId: id }); }} />;
 }
 
 // a card's or a status's badge icon per tone (dot for the others)
@@ -74,7 +79,8 @@ function ConsentCard({ live, compact }: Readonly<{ live: AutomationsLive; compac
         <div className="flex flex-wrap items-center gap-2 text-[13px]"><b className="inline-flex items-center gap-1.5">{!compact && <Icon name="location" />}{t(compact ? "Location consent" : "Location consent — for arrival/departure automations only")}</b>{badge}</div>
         {action}
       </div>
-      <p className="mt-1.5 text-xs text-muted-foreground">{compact ? t("Required for this automation. Used only for arrival/departure automations; phase 1A uses predefined demo events — no real GPS history is collected.") : c.text}</p>
+      <p className="mt-1.5 text-xs text-muted-foreground">{compact ? t("Required for this automation. Used only for arrival/departure automations: your device’s location is compared with the map pin of your home or office, and only home or away is kept.") : c.text}</p>
+      {!compact && c.granted && <PresenceSwitch places={live.places} />}
     </div>
   );
 }
@@ -97,7 +103,8 @@ function List({ live, notice, setNotice, create, edit }: Readonly<{ live: Automa
   };
   return (
     <Page>
-      <PageHead title={t("Your automations")} sub={t(live.cards.length === 1 ? "{n} automation · {on} on · each rule controls one AC · checked again when it runs" : "{n} automations · {on} on · each rule controls one AC · checked again when it runs", { n: live.cards.length, on })} action={<Btn variant="primary" onClick={create}><Icon name="add" /> {t(CREATE_AUTOMATION)}</Btn>} />
+      <PageHead title={t("Your automations")} sub={t(live.cards.length === 1 ? "{n} automation · {on} on · checked again when it runs" : "{n} automations · {on} on · checked again when it runs", { n: live.cards.length, on })} action={live.cards.length > 0 && <Btn variant="primary" onClick={create}><Icon name="add" /> {t(CREATE_AUTOMATION)}</Btn>} />
+      {/* with no automation the empty state carries the one Create button, not the header as well (UI/UX loop R132) */}
       {notice && <Banner tone="ok" action={<Btn size="sm" variant="ghost" onClick={() => { setNotice(null); }}>{t("Dismiss")}</Btn>}><b>{notice.title}</b><div className="text-xs text-muted-foreground">{notice.text}</div></Banner>}
       <ConsentCard live={live} />
       {live.cards.length === 0 ? <EmptyState title={t("No automations yet")} action={<Btn size="sm" onClick={create}><Icon name="add" /> {t(CREATE_AUTOMATION)}</Btn>}>{t("Create one to pre-cool before you arrive or to stop an empty room. Saving sends no command — the automation runs at its time or event.")}</EmptyState> : (
@@ -173,7 +180,11 @@ function Editor({ live, onDone, onCancel }: Readonly<{ live: AutomationsLive; on
   const i18n = useI18n();
   const { t } = i18n;
   const rule = live.editing === "new" ? null : live.rules.find((r) => r.id === live.editing) ?? null;
-  const [draft, setDraft] = useState<Draft>(() => (rule ? draftOf(rule) : blankDraft(live.acs[0]?.id ?? "", live.timezone)));
+  const soleAc = live.acs.length === 1 ? live.acs[0]?.id ?? "" : ""; // a new rule names its AC only when there is one
+  const [draft, setDraft] = useState<Draft>(() => {
+    if (rule) return draftOf(rule);
+    return live.preset.length > 0 ? afterHoursDraft(live.preset, live.timezone, t("Switch off after hours")) : blankDraft(soleAc, live.timezone);
+  });
   const [apiError, setApiError] = useState<Record<string, string>>({});
   const [shown, setShown] = useState(false); // client checks shown after the first Save / Test
   const [test, setTest] = useState<TestRow[] | null>(null);
@@ -188,9 +199,12 @@ function Editor({ live, onDone, onCancel }: Readonly<{ live: AutomationsLive; on
     return <Page><EmptyState title={t("This automation no longer exists")} action={<Btn size="sm" onClick={onCancel}><Icon name="arrowLeft" /> {t("Automations")}</Btn>}>{t("It may have been deleted on another device.")}</EmptyState></Page>;
   }
   const ac = live.acs.find((u) => u.id === draft.unitId);
-  const options = actionOptions(live.caps[draft.unitId] ?? null, t);
+  // one rule may control several ACs (IR802): the actions all of them take
+  const targets = [draft.unitId, ...draft.others].filter(Boolean);
+  const options = commonActionOptions(targets.map((id) => live.caps[id] ?? null), t);
   const supported = (k: string) => options.some((g) => g.options.some((o) => o.key === k));
-  const unsupported = (k: string) => (draft.unitId && !supported(k) ? t("Not supported by this AC — choose another action") : undefined);
+  const notSupported = t(targets.length > 1 ? "Not supported by every chosen AC — choose another action" : "Not supported by this AC — choose another action");
+  const unsupported = (k: string) => (draft.unitId && k && !supported(k) ? notSupported : undefined);
   const isDirty = !rule || JSON.stringify(saveInput(draft)) !== JSON.stringify(saveInput(draftOf(rule)));
   const runsShown = preview.data.filter((o) => o.phase === "schedule_start").slice(0, 2).map((s) => ({ start: s, end: preview.data.find((o) => o.phase === "schedule_end" && isAfter(o.at, s.at)) }));
   const previewError = preview.error ? apiErrors(preview.error.error.fieldErrors, t) : {};
@@ -226,6 +240,10 @@ function Editor({ live, onDone, onCancel }: Readonly<{ live: AutomationsLive; on
   };
   // the action in two parts, each under its own label: the Setting (power, temperature, mode, fan, ventilation) and its
   // Value — side by side when the box is wide enough, stacked on a narrow screen
+  const settingPrompt = (value: string) => {
+    if (!draft.unitId) return t("Choose the target AC first");
+    return !value || supported(value) ? t("Choose a setting") : t("{action} (not supported)", { action: actionLabel(actionOf(value), t) });
+  };
   const actionSelect = (label: string, key: "startAction" | "endAction" | "action", hint?: string) => {
     const value = draft[key];
     const group = options.find((g) => g.id === actionGroupOf(value));
@@ -240,8 +258,9 @@ function Editor({ live, onDone, onCancel }: Readonly<{ live: AutomationsLive; on
       <Field label={t("Action")} labelHidden hint={hint} error={lookup(errors, key) ?? (shown ? unsupported(value) : undefined)}>
         <div className="@container"><div className="grid grid-cols-1 items-start gap-3 @[22rem]:grid-cols-[minmax(120px,170px)_minmax(0,1fr)]">
           {part(t("Setting"), (
-            <Select aria-label={t("{label} — setting", { label })} value={group?.id ?? ""} onChange={(e) => { pick(firstAction(options, e.target.value)); }}>
-              {!group && <option value="">{supported(value) ? t("Choose a setting") : t("{action} (not supported)", { action: actionLabel(actionOf(value), t) })}</option>}
+            <Select aria-label={t("{label} — setting", { label })} value={group?.id ?? ""} disabled={!draft.unitId} onChange={(e) => { pick(firstAction(options, e.target.value)); }}>
+              {/* the settings follow the AC's model: none is offered, nor called unsupported, before the AC is chosen (UI/UX loop R79) */}
+              {!group && <option value="">{settingPrompt(value)}</option>}
               {options.map((g) => <option key={g.id} value={g.id}>{g.group}</option>)}
             </Select>
           ))}
@@ -265,9 +284,9 @@ function Editor({ live, onDone, onCancel }: Readonly<{ live: AutomationsLive; on
             {step(1, t("When …"), rule ? undefined : t("Choose what starts the automation"))}
             <div className="grid-fluid" style={{ ["--min" as string]: "150px" }} role="radiogroup" aria-label={t("Trigger")}>
               {triggers.map((tr) => (
-                <Plain key={tr} type="button" role="radio" aria-checked={draft.trigger === tr} disabled={!!rule && (tr === "schedule") !== isSched} onClick={() => { set({ trigger: tr, extras: fitExtras({ ...draft, trigger: tr }) }); }}
+                <Plain key={tr} type="button" role="radio" aria-checked={draft.trigger === tr} disabled={(!!rule && (tr === "schedule") !== isSched) || (tr === "presence" && draft.trigger !== "presence")} onClick={() => { set({ trigger: tr, extras: fitExtras({ ...draft, trigger: tr }) }); }}
                   className={cx("rounded-xl border px-3 py-2 text-left disabled:cursor-not-allowed disabled:opacity-50", draft.trigger === tr ? "border-primary bg-primary-soft text-primary ring-1 ring-primary" : "border-line bg-surface hover:bg-surface2")}>
-                  <div className="flex items-center gap-1.5 text-[13px] font-semibold"><Icon name={entryOf(triggerInfo, tr).icon} />{t(entryOf(triggerInfo, tr).label)}</div><div className="text-[11px] text-muted-foreground">{t(entryOf(triggerInfo, tr).sub)}</div>
+                  <div className="flex items-center gap-1.5 text-[13px] font-semibold"><Icon name={entryOf(triggerInfo, tr).icon} />{t(entryOf(triggerInfo, tr).label)}{tr === "presence" && draft.trigger !== "presence" && <span className="rounded-full bg-surface2 px-1.5 text-[11px] font-medium text-muted-foreground">{t("Coming soon")}</span>}</div><div className="text-[11px] text-muted-foreground">{t(entryOf(triggerInfo, tr).sub)}</div>
                 </Plain>
               ))}
             </div>
@@ -317,13 +336,15 @@ function Editor({ live, onDone, onCancel }: Readonly<{ live: AutomationsLive; on
             )}
             {step(2, t("Only if … (optional)"), t("Extra conditions — all must be true"))}
             <OnlyIf draft={draft} errors={errors} set={set} />
-            {step(3, t("Then …"), t("Action for one AC"))}
+            {step(3, t("Then …"), t(targets.length > 1 ? "Action for {n} ACs" : "Action for one AC", { n: targets.length }))}
             <Field label={t("Target AC")} error={errors.unitId}>
               <Select value={draft.unitId} onChange={(e) => { set({ unitId: e.target.value }); }}>
-                {live.acs.length === 0 && <option value="">{t("No AC available")}</option>}
+                {/* no AC is chosen for the user (one AC aside): a preselected first AC was easy to save unnoticed */}
+                <option value="" disabled>{t(live.acs.length === 0 ? "No AC available" : "Choose the AC to control…")}</option>
                 {live.acs.map((u) => <option key={u.id} value={u.id}>{u.name} · {u.path}</option>)}
               </Select>
             </Field>
+            {draft.unitId && <OtherAcs acs={live.acs} primary={draft.unitId} others={draft.others} onChange={(others) => { set({ others }); }} />}
             {isSched ? (
               // the start and the end in their own boxes, each headed by its time
               <div className="grid gap-3 md:grid-cols-2">
@@ -350,7 +371,8 @@ function Editor({ live, onDone, onCancel }: Readonly<{ live: AutomationsLive; on
             {isSched && (
               <div className="mt-3 grid grid-cols-[90px_1fr] gap-2 border-t border-line pt-2 text-xs">
                 <span className="text-muted-foreground">{t("Next runs")}</span>
-                <span>{nextRuns()}</span>
+                {/* saved off, nothing runs: the times say when it would run once turned on */}
+                <span>{nextRuns()}{!draft.enabled && <span className="mt-0.5 block font-semibold text-warn">{t("Only after you turn it on — it is saved off")}</span>}</span>
               </div>
             )}
             <div className="mt-2 flex items-center justify-between gap-2 border-t border-line pt-2 text-xs">
@@ -383,6 +405,41 @@ function Editor({ live, onDone, onCancel }: Readonly<{ live: AutomationsLive; on
 }
 
 /** Step 2 “Only if …” (Figma 03b/03e, IR215): up to three extra conditions that must all hold when the rule runs. */
+/** More ACs for the same rule (IR802): "switch the office off at 19:00" is one rule, not one per AC. Folded until opened,
+so a one-AC rule stays as simple as before; the API takes up to 50 ACs per rule. */
+const MAX_ACS = 50;
+const alsoText = (t: T, n: number) => {
+  if (n === 0) return t("Also apply to other ACs");
+  return t(n === 1 ? "Also apply to {n} other AC" : "Also apply to {n} other ACs", { n });
+};
+function OtherAcs({ acs, primary, others, onChange }: Readonly<{ acs: Ac[]; primary: string; others: string[]; onChange: (others: string[]) => void }>) {
+  const t = useT();
+  const chosen = others.filter((id) => id !== primary);
+  const property = acs.find((u) => u.id === primary)?.property ?? "";
+  const rest = acs.filter((u) => u.id !== primary);
+  const sameProperty = rest.filter((u) => u.property === property).map((u) => u.id);
+  const isFull = chosen.length + 1 >= MAX_ACS;
+  const toggle = (id: string, on: boolean) => { onChange(on ? [...chosen, id] : chosen.filter((x) => x !== id)); };
+  // open when the rule already has more ACs; after that the user opens and closes it (Clear does not fold it away)
+  const [isOpen, setIsOpen] = useState(chosen.length > 0);
+  return (
+    <details className="rounded-xl border border-line bg-surface p-3" open={isOpen} onToggle={(e) => { setIsOpen(e.currentTarget.open); }}>
+      <summary className="cursor-pointer text-[13px] font-semibold">{alsoText(t, chosen.length)}</summary>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {sameProperty.length > 0 && <Btn size="sm" disabled={sameProperty.every((id) => chosen.includes(id))} onClick={() => { onChange([...new Set([...chosen, ...sameProperty])].slice(0, MAX_ACS - 1)); }}>{t("All ACs in {property} ({n})", { property, n: sameProperty.length + 1 })}</Btn>}
+        <Btn size="sm" variant="ghost" disabled={chosen.length === 0} onClick={() => { onChange([]); }}>{t("Clear")}</Btn>
+      </div>
+      <div className="mt-2 flex max-h-56 flex-col gap-1 overflow-y-auto">
+        {rest.map((u) => {
+          const isOn = chosen.includes(u.id);
+          return <label key={u.id} className="flex items-center gap-2 text-xs"><Checkbox checked={isOn} disabled={!isOn && isFull} onCheckedChange={(v) => { toggle(u.id, v); }} /><span><b>{u.name}</b> · <span className="text-muted-foreground">{u.path}</span></span></label>;
+        })}
+      </div>
+      <p className="mt-2 text-[11px] text-muted-foreground">{t("Every chosen AC gets the same actions; only actions all of them support are offered. Up to {max} ACs per automation.", { max: MAX_ACS })}</p>
+    </details>
+  );
+}
+
 function OnlyIf({ draft, errors, set }: Readonly<{ draft: Draft; errors: Record<string, string>; set: (p: Partial<Draft>) => void }>) {
   const t = useT();
   const [adding, setAdding] = useState(false);
@@ -420,7 +477,9 @@ function OnlyIf({ draft, errors, set }: Readonly<{ draft: Draft; errors: Record<
       ))}
       {errors.onlyIf && <p className="flex items-center gap-1 text-xs font-medium text-crit"><Icon name="error" />{errors.onlyIf}</p>}
       <div className="flex flex-wrap items-center gap-2">
-        {adding && choices.length > 0 ? choices.map((c) => <Btn key={c} size="sm" onClick={() => { set({ extras: [...extras, blankExtra(c)] }); setAdding(false); }}>{t(entryOf(extraLabel, c))}</Btn>)
+        {adding && choices.length > 0 ? choices.map((c) => c === "occupancy"
+          ? <Btn key={c} size="sm" disabled>{t(entryOf(extraLabel, c))} <span className="rounded-full bg-surface2 px-1.5 text-[11px] font-medium text-muted-foreground">{t("Coming soon")}</span></Btn>
+          : <Btn key={c} size="sm" onClick={() => { set({ extras: [...extras, blankExtra(c)] }); setAdding(false); }}>{t(entryOf(extraLabel, c))}</Btn>)
           : <Btn size="sm" disabled={choices.length === 0} onClick={() => { setAdding(true); }}><Icon name="add" /> {t("Add condition")}</Btn>}
         <span className="text-xs text-muted-foreground">{t(choices.length === 0 && extras.length > 0 ? "No more condition types for this trigger" : "e.g. only if someone is home · only if outdoor ≥ 30°C")}</span>
       </div>

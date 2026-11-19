@@ -3,6 +3,7 @@
 // and the client views. Texts in the display language (`t` / `i`, IR267). Contract periods, due dates and billing months
 // are Kuala Lumpur business days (REV18-035) written in the user's language; payments, inquiries, restriction events and
 // reminders are instants in the user's display time zone (IR44).
+import { z } from "zod";
 import { amount } from "@ac/web/lib/energy";
 import {  businessDay, invoiceStatus, KL, type ApiContract, type ApiInquiry, type ApiInvoice, type ApiPayment, type InvoiceStatus } from "@ac/web/lib/billing";
 import { policyText, stateLabel, type ApiCommand, type ApiRestriction, type RestrictionState } from "@ac/web/lib/restrictions";
@@ -15,6 +16,10 @@ const en = translator("en");
 /** The same day without the year (“1 Sept”), for the start of a range whose end shows the year. */
 const plain = (s: string) => s.replaceAll(/[\u{A0}\u{2009}\u{202F}]/gu, " ");
 const businessDayShort = (iso: string, locale: Locale) => plain(new Date(iso).toLocaleDateString(intlTag(locale), { timeZone: KL, month: "short", day: "numeric" }));
+const klYear = (iso: string) => new Date(iso).toLocaleDateString("en", { timeZone: KL, year: "numeric" });
+/** A business-day range: the start drops its year only when the end is in the same year — “1 Jan → 1 Jan 2027” read
+as one year, so a range across years writes both (UI/UX loop R129). */
+const dayRange = (from: string, to: string, locale: Locale) => `${klYear(from) === klYear(to) ? businessDayShort(from, locale) : businessDay(from, locale)} → ${businessDay(to, locale)}`;
 
 const planName: Record<string, string> = { rto: "RTO Plan", general: "General maintenance", energy: "Energy service", environment: "Environment service" };
 const planLong: Record<string, string> = { rto: "Rent-to-own (RTO)", general: "General maintenance", energy: "Energy service", environment: "Environment service" };
@@ -36,6 +41,20 @@ export function unitPlaces(us: { id: string; displayName: string; propertyId: st
   };
   return new Map(us.map((u) => [u.id, { name: u.displayName, place: [property.get(u.propertyId) ?? "", ...path(u.spaceId)].filter(Boolean).join(" › ") }]));
 }
+/** A unit picker's options: one group per property by name, its units by room then name, each named with the rest of
+its path; 23 units in one run hid which home or office each was in (UI/UX loop R89). */
+export function unitsByProperty(us: readonly (UnitPlace & { id: string })[]): { property: string; units: { id: string; label: string }[] }[] {
+  const groups = new Map<string, { id: string; label: string; where: string }[]>();
+  for (const u of us) {
+    const [property = "", ...rest] = u.place.split(" › ");
+    const where = rest.join(" › ");
+    groups.set(property, [...(groups.get(property) ?? []), { id: u.id, label: where ? `${u.name} · ${where}` : u.name, where }]);
+  }
+  return [...groups].toSorted(([a], [b]) => a.localeCompare(b)).map(([property, list]) => ({
+    property,
+    units: list.toSorted((a, b) => a.where.localeCompare(b.where) || a.label.localeCompare(b.label)).map(({ id, label }) => ({ id, label })),
+  }));
+}
 export type ClientContract = ApiContract & { activeRestrictionIds?: string[] };
 export interface ContractCard {
   id: string; version: number; name: string; sub: string; period: string; plan: string; planType: string; status: "Active" | "Expired" | "Upcoming";
@@ -54,7 +73,7 @@ export function contractCards(cs: ClientContract[], unit: (id: string) => UnitPl
   return [...cs].toSorted((a, b) => rank[status(a)] - rank[status(b)] || b.startAt.localeCompare(a.startAt)).map((k) => {
     return {
       id: k.id, version: k.version, name: textOf(planName, k.planType, t) ?? k.planType,
-      sub: `${k.id.slice(0, 8)} · ${businessDayShort(k.startAt, locale)} → ${businessDay(k.endAt, locale)}`,
+      sub: `${k.id.slice(0, 8)} · ${dayRange(k.startAt, k.endAt, locale)}`,
       period: `${businessDay(k.startAt, locale)} → ${businessDay(k.endAt, locale)}`, plan: textOf(planLong, k.planType, t) ?? k.planType, planType: k.planType, status: status(k),
       units: k.unitIds.map((id) => ({ id, ...(unit(id) ?? { name: id.slice(0, 8), place: "" }) })), restrictionIds: k.activeRestrictionIds ?? [],
     };
@@ -86,13 +105,18 @@ export function statusQuery(f: StatusFilter): { overdueOnly?: true; status?: Exc
 // ---- one invoice (FR-C11) ----
 
 export type ClientPayment = ApiPayment & { createdAt: string; updatedAt: string };
-export const methodLabel: Record<string, string> = { demo_credit_card: "Credit card (demo)", demo_debit_card: "Debit card (demo)" };
+const methodLabel: Record<string, string> = { demo_credit_card: "Credit card (demo)", demo_debit_card: "Debit card (demo)" };
+/** How a payment was taken, in words: the demo card, Stripe Checkout (DEC-68) or a transfer HQ recorded. */
+export function paymentWay(p: { method: string | null; channel: string }, t: T = en): string {
+  if (p.method) return textOf(methodLabel, p.method, t) ?? p.method;
+  return t(p.channel === "stripe_checkout" ? "Stripe Checkout" : "Bank transfer (recorded by HQ)");
+}
 export interface PaymentLine { id: string; version: number; label: string; at: string; status: ClientPayment["status"]; reference: string | null }
 export function paymentLines(ps: ClientPayment[], i: I18n = EN): PaymentLine[] {
   const { t, display } = i;
   return [...ps].toSorted((a, b) => b.createdAt.localeCompare(a.createdAt)).map((p) => {
     return {
-      id: p.id, version: p.version, label: `${p.id.slice(0, 8)} · ${p.method ? (textOf(methodLabel, p.method, t) ?? p.method) : t("Bank transfer (recorded by HQ)")}`,
+      id: p.id, version: p.version, label: `${p.id.slice(0, 8)} · ${paymentWay(p, t)}`,
       at: showTime(p.confirmedAt ?? p.updatedAt, display), status: p.status, reference: p.paymentReference,
     };
   });
@@ -102,13 +126,17 @@ export function paymentPhase(ps: ClientPayment[]): { open: ClientPayment | null;
   const sorted = [...ps].toSorted((a, b) => b.createdAt.localeCompare(a.createdAt));
   return { open: sorted.find((p) => p.status === "initiated" || p.status === "processing") ?? null, last: sorted[0] ?? null };
 }
+/** payments.startCheckout's answer: the payment in flight and the hosted Stripe Checkout page (DEC-68). The page goes
+straight to location.assign, so only an HTTPS address passes (IR840): z.url() alone also takes script, data and plain-http addresses. */
+export const checkoutStartSchema = z.object({ paymentId: z.string().min(1), checkoutUrl: z.url({ protocol: /^https$/ }) });
 /** The demo PSP reference of a payment (unique per payment, as payments.simulate requires for confirm). */
 export const demoReference = (paymentId: string) => `DEMO-PAY-${paymentId.replaceAll('-', "").slice(-8).toUpperCase()}`;
 
 // ---- cooling restriction notice (FR-C12) ----
 
 const live = new Set<RestrictionState>(["scheduled", "requested", "applied", "release_requested"]);
-export interface RestrictionNotice { id: string; state: RestrictionState; label: string; policy: string; units: string; live: boolean }
+/** unitIds are the restricted units, so a list of units can mark them where they are listed */
+export interface RestrictionNotice { id: string; state: RestrictionState; label: string; policy: string; units: string; unitIds: string[]; live: boolean }
 /** A unit's name with its place in the given brackets, or the start of its ID when it is unknown. */
 function unitLabel(id: string, u: UnitPlace | undefined, around: (place: string) => string): string {
   if (!u) return id.slice(0, 8);
@@ -117,7 +145,7 @@ function unitLabel(id: string, u: UnitPlace | undefined, around: (place: string)
 export function restrictionNotice(r: ApiRestriction, unit: (id: string) => UnitPlace | undefined, t: T = en): RestrictionNotice {
   const names = r.unitIds.map((id) => unitLabel(id, unit(id), (place) => ` (${place})`));
   return {
-    id: r.id, state: r.state, label: t(stateLabel[r.state]), policy: policyText(r.policy, t), live: live.has(r.state),
+    id: r.id, state: r.state, label: t(stateLabel[r.state]), policy: policyText(r.policy, t), live: live.has(r.state), unitIds: r.unitIds,
     units: t(r.unitIds.length === 1 ? "{n} unit in scope · {names}" : "{n} units in scope · {names}", { n: r.unitIds.length, names: names.join(", ") }),
   };
 }

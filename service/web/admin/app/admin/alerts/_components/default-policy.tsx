@@ -105,7 +105,7 @@ export function DefaultPolicyEditor({ p, customers, units, canWrite, copyFor, on
           <span><b>{t("Default policy rule — runs on every unit of every customer")}</b><span className="block text-xs">{t("Saving changes affects all units. Customers and HQ can add their own policies on top; this rule cannot be detached from a unit.")}</span>
             {!copyable(rule) && <span className="block text-xs">{t("{metric} is not a metric a customer policy can watch, so this rule cannot be copied.", { metric: textOf(metricLabel, rule.metric, t) ?? rule.metric })}</span>}</span>
         </Banner>
-        {!canWrite && <Banner>{t("You can read the default policy. Changing it needs alert.policy.write.")}</Banner>}
+        {!canWrite && <Banner>{t("You can read the default policy. Changing it needs “Edit alert policies”.")}</Banner>}
         <section aria-label={t("Rules")}><h3 className="mb-2 text-[13px] font-bold">{t("Rules ({n})", { n: rules.length })}</h3>
           <div className="grid-fluid" style={{ ["--min" as string]: "240px" }}>
             {rules.map((r) => (

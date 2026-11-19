@@ -3,6 +3,7 @@ const IN_PROGRESS = "in_progress";
 const REFRIGERANT = "Refrigerant";
 const LOCATION_QR = "location_qr";
 
+import { buttonVariants } from "@ac/web/components/ui/button";
 import Link from "next/link";
 import { useEffect, useRef, useState, useEffectEvent } from "react";
 import { Badge, Banner, Btn, Card, Choice, cx, DataTable, EmptyState, Field, Input, Modal, Page, Select, SummaryList, Tabs, Textarea, UtilizationBar, Plain, ScrollX } from "@ac/web/components/ui";
@@ -16,10 +17,12 @@ import { typeLabel } from "@ac/web/lib/partnerJobDetail";
 import { actionMessage, fieldErrorTexts, type ActionFailure } from "@ac/web/lib/actionMessage";
 import {
   CHECK_IN_API_FIELDS, CHECK_IN_FIELDS, checkInErrors, checkResults, componentLabel, PART_FIELDS, partErrors, REFRIGERANT_FIELDS, refrigerantErrors, draftFrom, draftInput, fmtOf, followUpText, groupLabel, itemPhotos, linkPhoto, progress, readingMetrics, submitIssues, timeRows, versionRows, windowState,
-  type ApiTechReport, type CheckInField, type Draft, type DraftPart, type DraftRefrigerant, type Group, type Issue, type Known, type Result, type TimeOnSite,
+  type ApiTechReport, type PhotoTag, type CheckInField, type CheckInPosition, type Draft, type DraftPart, type DraftRefrigerant, type Group, type Issue, type Known, type Result, type TimeOnSite,
 } from "@ac/web/lib/techJob";
 import { acknowledge, checkIn, pauseWork, resumeRework, saveDraft, signOff, submitReport, uploadPhoto } from "../actions";
 import { Icon } from "@ac/web/components/Icon";
+import { EquipmentCard } from "./equipment-card";
+import { SignModal } from "./sign-modal";
 import type { ComponentKey } from "@ac/web/lib/contracts.gen";
 import { without } from "@ac/web/lib/omit";
 import { lookup } from "@ac/web/lib/lookup";
@@ -32,7 +35,7 @@ export interface WorkspaceLive {
     timeOnSite: TimeOnSite | null; draftReportRef: { reportId: string; reportVersion: number } | null; reportRefs: { reportId: string; reportVersion: number }[];
     problemPhotos: { id: string; name: string }[];
   };
-  unit: { name: string; place: string; access: string | null; model: string; scope: string[] } | null; unitRefused: string | null;
+  unit: { name: string; place: string; access: string | null; model: string; modelId: string; planned: boolean; scope: string[] } | null; unitRefused: string | null;
   unitName: string | null; // also before the window, when the unit itself is not open yet
   components: { group: Group; key: ComponentKey }[];
   report: ApiTechReport | null; reportRefused: string | null;
@@ -57,6 +60,7 @@ const refusal = (f: ActionFailure, t: T): string => {
 }; // field errors, the write limit's wait and other codes (IR380)
 const LEAK: Record<string, string> = { pass: "passed", fail: "failed", not_done: "not done" };
 const MAX_PHOTOS = 10, MAX_BYTES = 5 << 20;
+const ORIGIN_TEXT: Record<string, string> = { periodic_plan: "periodic plan", hq_request: "HQ request" };
 
 /** The technician's job workspace (FR-T04–T06, T08, T09, T13–T15): assignment, check-in, the inspection checklist of the
 unit's service scope, readings, parts and refrigerant, photos, the work report with its next action, the customer's
@@ -88,7 +92,7 @@ function JobUnitCard({ live, win, isUnitOpen }: Readonly<{ live: WorkspaceLive; 
         <SummaryList items={[
           [t("Window"), <span key="w" className={win.phase === "ending" || win.phase === "ended" ? "font-semibold text-crit" : undefined}>{job.assignment ? f.span(job.assignment.scheduledStart, job.assignment.scheduledEnd) : "—"}</span>],
           [t("Site"), live.unit?.place ?? (live.unitRefused ? t("opens at the start of your window") : "—")], [t("Access"), live.unit?.access ?? "—"], [t("Unit"), live.unit ? `${live.unit.name} · ${live.unit.model}` : live.unitName ?? job.unitId.slice(0, 8)],
-          [t("Job"), `${typeLabel(job.type, t)} · ${t(job.origin === "periodic_plan" ? "periodic plan" : "client request")}`], [t("Request"), job.symptom ? `“${job.symptom}”` : "—"],
+          [t("Job"), `${typeLabel(job.type, t)} · ${t(ORIGIN_TEXT[job.origin] ?? "client request")}`], [t("Request"), job.symptom ? `“${job.symptom}”` : "—"],
           ...(job.problemPhotos.length > 0 ? [[t("Client’s photos"), <span key="p" className="flex flex-wrap gap-x-3">{job.problemPhotos.map((p) => <a key={p.id} href={`/technician/jobs/${job.id}/problem-photos/${p.id}`} target="_blank" rel="noreferrer" className="font-semibold text-primary">{p.name}</a>)}</span>] as [string, React.ReactNode]] : []),
           [t("Linked alerts"), job.alertCount ? <Link key="a" className="font-semibold text-crit" href={`/technician/units/${job.unitId}/alerts?jobId=${job.id}`}>{t(job.alertCount === 1 ? "1 alert" : "{n} alerts", { n: job.alertCount })} <Icon name="arrowRight" /></Link> : t("none")],
         ]} />
@@ -191,7 +195,7 @@ function WorkReportCard({ versionText, issues, isEditable, notice, isInWork, has
               <div>
                 <p className="mb-1 text-xs font-semibold">{t("Photos (JPEG/PNG, ≤5 MiB, ≤{max})", { max: MAX_PHOTOS })}</p>
                 <div className="flex flex-wrap gap-2">
-                  {photos.map((a) => <Photo key={a.id} src={photoUrl(a)} name={a.name} />)}
+                  {photos.map((a) => <Photo key={photoUrl(a)} src={photoUrl(a)} name={a.name} />)}
                   {isEditable && photos.length < MAX_PHOTOS && (
                     <label className={cx("grid h-16 w-20 cursor-pointer place-items-center rounded-lg border border-dashed border-line text-xl text-muted-foreground hover:bg-surface2 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-primary", pending && "pointer-events-none opacity-50")}>
                       +<Input type="file" aria-label={t("Add photos")} accept="image/jpeg,image/png" className="sr-only h-px w-px" onChange={(e) => { addPhotos(e.target.files); e.target.value = ""; }} />
@@ -239,7 +243,8 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
     return () => { clearInterval(timer); };
   }, [live.now]);
   const editableReport = job.draftReportRef && live.report?.version === job.draftReportRef.reportVersion ? live.report : null;
-  const [draft, setDraft] = useState<Draft>(() => draftFrom(editableReport ?? (job.status === IN_PROGRESS ? null : live.report), live.components));
+  const isInstallation = job.type === "installation";
+  const [draft, setDraft] = useState<Draft>(() => draftFrom(editableReport ?? (job.status === IN_PROGRESS ? null : live.report), live.components, isInstallation));
   const [rep, setRep] = useState<Rep | null>(editableReport);
   const [dirty, setDirty] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
@@ -279,17 +284,22 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
   // returned for rework (IR94, IR283; Figma Technician 423:604)
   const isUnitOpen = ["assigned", IN_PROGRESS, "rework_requested"].includes(job.status) && win.phase !== "ended" && win.phase !== "before";
   const failed = (x: ActionFailure) => { setRefused(refusal(x, t)); };
-  const edit = (fn: (d: Draft) => Draft) => { setDraft(fn); setDirty(true); };
+  // counts the edits, so a save or an upload that lands clears "Unsaved changes" only if nothing was typed meanwhile
+  const edits = useRef(0);
+  const edit = (fn: (d: Draft) => Draft) => { setDraft(fn); setDirty(true); edits.current += 1; };
+  const savedUpTo = (at: number) => { setDirty(edits.current !== at); };
   const photos = (rep ?? live.report)?.attachmentRefs.filter((a) => a.id !== (rep ?? live.report)?.signOff?.signatureAttachmentId) ?? [];
-  const issues: Issue[] | null = checked ? submitIssues(draft, photos, now, t) : null;
+  const signedOff = !!(rep ?? live.report)?.signOff;
+  const issues: Issue[] | null = checked ? submitIssues(draft, photos, now, t, signedOff) : null;
   const photoUrl = (a: { id: string }) => {
     const r = rep ?? live.report;
     return r ? `/technician/jobs/${job.id}/photos/${a.id}?reportId=${r.id}&reportVersion=${String(r.version)}` : "";
   };
 
-  const save = (after?: (r: Rep) => void) => {
-    run(() => saveDraft(draftInput(job.id, rep?.id ?? null, draft), rep?.version ?? null), t("Draft saved"), (r) => {
-      setRep(r); setDirty(false); setSavedAt(new Date(now).toISOString()); setRefused(null); after?.(r);
+  const save = (after?: (r: Rep, at: number) => void) => {
+    const at = edits.current;
+    run(() => saveDraft(draftInput(job.id, rep?.id ?? null, draft, live.unit?.modelId ?? null), rep?.version ?? null), t("Draft saved"), (r) => {
+      setRep(r); savedUpTo(at); setSavedAt(new Date(now).toISOString()); setRefused(null); after?.(r, at);
     }, failed);
   };
   // autosave 20 s after the last edit while the work window is open (the API keeps every saved version)
@@ -299,9 +309,12 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
     const timer = dirty && isEditable && !pending ? setTimeout(() => { autosave(); }, 20_000) : null;
     return () => { if (timer) clearTimeout(timer); };
   }, [draft, dirty, isEditable, pending]);
-  const withSaved = (fn: (r: Rep) => void) => { if (dirty || !rep) save(fn); else fn(rep); };
-  const photoAdded = (next: Rep) => { setRep(next); edit((d) => ({ ...d, attachmentIds: next.attachmentRefs.map((a) => a.id) })); setDirty(false); };
-  const addPhotos = (files: FileList | null) => {
+  // `at`: the edits the saved draft holds, so an upload that follows clears "Unsaved changes" only up to them
+  const withSaved = (fn: (r: Rep, at: number) => void) => { if (dirty || !rep) save(fn); else fn(rep, edits.current); };
+  // the upload changed the saved draft's photos only: the photo list follows it without counting as an edit
+  const photoAdded = (next: Rep, at: number) => { setRep(next); setDraft((d) => ({ ...d, attachmentIds: next.attachmentRefs.map((a) => a.id) })); savedUpTo(at); };
+  // linkTo: the finding the photo was taken for, linked once it is uploaded (no trip to the Photos card and back)
+  const addPhotos = (files: FileList | null, tag?: PhotoTag, linkTo?: string) => {
     const file = files?.[0];
     if (!file) return;
     if (!["image/jpeg", "image/png"].includes(file.type) || file.size > MAX_BYTES || photos.length >= MAX_PHOTOS) {
@@ -309,14 +322,21 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
       return;
     }
     setPhotoError(null);
-    withSaved((r) => {
+    withSaved((r, at) => {
       const form = new FormData();
       form.set("jobId", job.id); form.set("reportId", r.id); form.set("reportVersion", String(r.version)); form.set("file", file);
-      run(() => uploadPhoto(form), t("Photo {name} added — sign-off cleared", { name: file.name }), photoAdded, failed);
+      if (tag) form.set("tag", tag);
+      const known = new Set(photos.map((a) => a.id));
+      const added = (next: Rep) => {
+        photoAdded(next, at);
+        const fresh = linkTo ? next.attachmentRefs.find((a) => !known.has(a.id)) : undefined;
+        if (linkTo && fresh) edit((d) => linkPhoto(d, linkTo, fresh.id, true));
+      };
+      run(() => uploadPhoto(form), t("Photo {name} added — sign-off cleared", { name: file.name }), added, failed);
     });
   };
   const trySubmit = () => {
-    const found = submitIssues(draft, photos, now, t);
+    const found = submitIssues(draft, photos, now, t, signedOff);
     setChecked(true);
     if (found.length > 0) {
       const first = found.find((i) => i.group);
@@ -387,9 +407,15 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
           <div className="flex flex-wrap gap-2">
             <Btn size="sm" onClick={() => { addReading(it.componentKey); selectView("readings"); }}><Icon name="add" /> {t("Add reading")}</Btn>
             <Btn size="sm" disabled={ph.free.length === 0} aria-expanded={linking === it.componentKey} onClick={() => { setLinking((k) => (k === it.componentKey ? null : it.componentKey)); }}><Icon name="add" /> {t("Link photo")}</Btn>
+            {photos.length < MAX_PHOTOS && (
+              <label className={cx(buttonVariants({ variant: "outline", size: "sm" }), "cursor-pointer has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-primary", pending && "pointer-events-none opacity-50")}>
+                <Icon name="camera" /> {t("Add photo")}
+                <Input type="file" aria-label={t("Add a photo to {item}", { item: name })} accept="image/jpeg,image/png" disabled={pending} className="sr-only h-px w-px" onChange={(e) => { addPhotos(e.target.files, undefined, it.componentKey); e.target.value = ""; }} />
+              </label>
+            )}
           </div>
         )}
-        {isActions && photos.every((x) => x.status !== "ready") && <p className="text-[11px] text-muted-foreground">{t("Add a photo under Photos first, then link it to this finding.")}</p>}
+        {isActions && photos.every((x) => x.status !== "ready") && <p className="text-[11px] text-muted-foreground">{t("Take or add a photo here: it is linked to this finding.")}</p>}
         {isActions && linking === it.componentKey && ph.free.length > 0 && (
           <div role="group" aria-label={t("Report photos to link to {item}", { item: name })} className="flex flex-wrap gap-1.5 rounded-lg border border-line p-2">
             {ph.free.map((x) => <Btn key={x.id} size="sm" variant="ghost" onClick={() => { edit((d) => linkPhoto(d, it.componentKey, x.id, true)); setLinking(null); }}><Icon name="camera" />{x.name}</Btn>)}
@@ -439,6 +465,7 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
               <p className="mt-2 text-[11px] text-muted-foreground">{t("Initial result is always empty — normal is never preselected. Attention, not inspected and not applicable need a reason.")}</p>
             </Card>
             <div className="flex min-w-0 flex-col gap-4">
+              <EquipmentCard draft={draft} edit={edit} isEditable={isEditable} model={live.unit?.model ?? null} photos={photos} pending={pending} addPhoto={addPhotos} />
               <ChecklistProgressCard groups={groups} issues={issues} isEditable={isEditable} emptyCount={draft.items.filter((x) => x.result === null).length} />
               <JobUnitCard live={live} win={win} isUnitOpen={isUnitOpen} />
             </div>
@@ -493,30 +520,47 @@ type View = "readings" | "parts" | "time";
 const openTab = new Map<string, Group>();
 const openView = new Map<string, View>();
 /** The check-in form's fields by id: one dialog per page, and a refusal from the Core API focuses its field. */
-const CHECK_IN_IDS: Record<CheckInField, string> = { distance: "check-in-distance", qr: "check-in-qr", reason: "check-in-reason" };
+const CHECK_IN_IDS: Record<CheckInField, string> = { position: "check-in-position", qr: "check-in-qr", reason: "check-in-reason" };
 
-function CheckInModal({ open, unitId, pending, errors, setErrors, onClose, onCheckIn }: Readonly<{ open: boolean; unitId: string; pending: boolean; errors: CheckInErrors; setErrors: (e: CheckInErrors) => void; onClose: () => void; onCheckIn: (method: "location_qr" | "manual", distance: number | null, qr: string | null, reason: string | null) => void }>) {
+function CheckInModal({ open, unitId, pending, errors, setErrors, onClose, onCheckIn }: Readonly<{ open: boolean; unitId: string; pending: boolean; errors: CheckInErrors; setErrors: (e: CheckInErrors) => void; onClose: () => void; onCheckIn: (method: "location_qr" | "manual", position: CheckInPosition | null, qr: string | null, reason: string | null) => void }>) {
   const t = useT();
   const [method, setMethod] = useState<"location_qr" | "manual">(LOCATION_QR);
-  const [distance, setDistance] = useState("40");
+  const [position, setPosition] = useState<CheckInPosition | null>(null);
+  const [locating, setLocating] = useState(false);
   const [qr, setQr] = useState(`ac-unit:${unitId}`);
   const [reason, setReason] = useState("");
   const clear = (k: CheckInField) => { if (lookup(errors, k)) setErrors(without(errors, k)); };
+  // the device's own fix (DEC-109, IR825): the server measures it against the site's pin; nothing else is sent or kept
+  const locate = () => {
+    clear("position");
+    if (!("geolocation" in navigator)) { setErrors({ ...errors, position: t("This device cannot share its location — check in manually with a reason") }); return; }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (fix) => { setLocating(false); setPosition({ latitude: fix.coords.latitude, longitude: fix.coords.longitude, accuracyMeters: fix.coords.accuracy }); },
+      () => { setLocating(false); setErrors({ ...errors, position: t("The location could not be read — allow location for this app, or check in manually with a reason") }); },
+      { enableHighAccuracy: true, timeout: 15_000, maximumAge: 0 }, // a fresh fix: "Locate again" must not answer the last one
+    );
+  };
+  let locateLabel = t("Get my location");
+  if (position) locateLabel = t("Locate again");
+  if (locating) locateLabel = t("Locating…");
   const go = () => {
-    const e = checkInErrors(method, distance, qr, reason, t);
+    const e = checkInErrors(method, position, qr, reason, t);
     setErrors(e);
     // a refused check-in takes the focus to the first field to fix, top to bottom (IR586, IR621)
     const bad = CHECK_IN_FIELDS.find((k) => e[k]);
     if (bad) { focusField(CHECK_IN_IDS[bad]); return; }
-    if (method === "manual") onCheckIn("manual", null, null, reason.trim());
-    else onCheckIn(LOCATION_QR, Number(distance), qr.trim(), null);
+    if (method === "manual") onCheckIn("manual", position, null, reason.trim());
+    else onCheckIn(LOCATION_QR, position, qr.trim(), null);
   };
   return (
     <Modal open={open} onClose={onClose} title={t("Check in at site")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={go}>{t("Check in & start")}</Btn></>}>
       <Field label={t("How")}><Choice value={method} onChange={(v) => { setMethod(v); setErrors({}); }} options={[{ id: LOCATION_QR, label: t("Location + unit QR") }, { id: "manual", label: t("Manual (reason)") }]} /></Field>
       {method === LOCATION_QR ? (
         <div className="grid-fluid" style={{ ["--min" as string]: "160px" }}>
-          <Field label={t("Distance to the site (m)")} hint={t("Demo: the device's location service fills this; within 200 m")} error={errors.distance}><Input id={CHECK_IN_IDS.distance} inputMode="numeric" value={distance} onChange={(e) => { setDistance(e.target.value); clear("distance"); }} /></Field>
+          <Field label={t("Your location")} hint={position ? t("Found, accurate to ±{n} m — the server checks you are within 200 m of the site", { n: Math.round(position.accuracyMeters) }) : t("Within 200 m of the site, as HQ set it on the map")} error={errors.position}>
+            <Btn id={CHECK_IN_IDS.position} disabled={locating} onClick={locate}><Icon name="location" /> {locateLabel}</Btn>
+          </Field>
           <Field label={t("Scanned unit QR")} hint={t("Demo: the camera scan fills this")} error={errors.qr}><Input id={CHECK_IN_IDS.qr} value={qr} onChange={(e) => { setQr(e.target.value); clear("qr"); }} /></Field>
         </div>
       ) : <Field label={t("Reason (required)")} error={errors.reason}><Textarea id={CHECK_IN_IDS.reason} value={reason} maxLength={1000} placeholder={t("No GPS signal in the basement plant room")} onChange={(e) => { setReason(e.target.value); clear("reason"); }} /></Field>}
@@ -617,61 +661,6 @@ function RefrigerantModal({ open, onClose, onAdd }: Readonly<{ open: boolean; on
         <Field label={t("Leak check")}><Select value={leak} onChange={(e) => { setLeak(oneOf(["pass", "fail", "not_done"] as const, e.target.value, leak)); }}><option value="pass">{t("Pass")}</option><option value="fail">{t("Fail")}</option><option value="not_done">{t("Not done")}</option></Select></Field>
         {leak !== "not_done" && <Field label={t("Method")}><Input value={method} onChange={(e) => { setMethod(e.target.value); }} /></Field>}
       </div>
-    </Modal>
-  );
-}
-
-function SignModal({ open, pending, summary, onClose, onSign }: Readonly<{ open: boolean; pending: boolean; summary: string; onClose: () => void; onSign: (form: FormData) => void }>) {
-  const t = useT();
-  const canvas = useRef<HTMLCanvasElement>(null);
-  const drawing = useRef(false);
-  const [drawn, setDrawn] = useState(false);
-  const [name, setName] = useState("");
-  const [absent, setAbsent] = useState(false);
-  const [reason, setReason] = useState("");
-  const [photo, setPhoto] = useState<File | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const point = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    const r = e.currentTarget.getBoundingClientRect();
-    return [((e.clientX - r.left) / r.width) * e.currentTarget.width, ((e.clientY - r.top) / r.height) * e.currentTarget.height] as const;
-  };
-  const clear = () => { canvas.current?.getContext("2d")?.clearRect(0, 0, canvas.current.width, canvas.current.height); setDrawn(false); };
-  const sign = () => {
-    if (!name.trim()) { setError(t("The signer's name is required")); return; }
-    const form = new FormData();
-    form.set("signerName", name.trim());
-    if (absent) {
-      if (!reason.trim()) { setError(t("Say why the customer could not sign")); return; }
-      if (!photo || !["image/jpeg", "image/png"].includes(photo.type) || photo.size > 5 << 20) { setError(t("A site photo (JPEG/PNG, ≤5 MiB) is required when the customer is not available")); return; }
-      form.set("absentReason", reason.trim()); form.set("sitePhoto", photo);
-    } else {
-      if (!drawn || !canvas.current) { setError(t("Ask the customer to sign in the box")); return; }
-      form.set("signature", canvas.current.toDataURL("image/png").split(",", 2)[1] ?? "");
-    }
-    setError(null);
-    onSign(form);
-  };
-  return (
-    <Modal open={open} onClose={onClose} title={t("Customer sign-off")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={sign}>{t("Save sign-off")}</Btn></>}>
-      <p className="text-xs text-muted-foreground">{t("Report {summary}", { summary })}</p>
-      <Field label={t("Signer name")}><Input value={name} maxLength={120} placeholder="Ms Tan" onChange={(e) => { setName(e.target.value); }} /></Field>
-      <Field label={t("How")}><Choice value={absent ? "absent" : "sign"} onChange={(v) => { setAbsent(v === "absent"); }} options={[{ id: "sign", label: t("Signature") }, { id: "absent", label: t("Customer not available") }]} /></Field>
-      {absent ? (
-        <>
-          <Field label={t("Why the customer could not sign")}><Textarea value={reason} maxLength={1000} onChange={(e) => { setReason(e.target.value); }} /></Field>
-          <Field label={t("Site photo (JPEG/PNG)")}><Input type="file" accept="image/jpeg,image/png" onChange={(e) => { setPhoto(e.target.files?.[0] ?? null); }} /></Field>
-        </>
-      ) : (
-        <div>
-          <canvas ref={canvas} width={560} height={160} aria-label={t("Signature pad")} className="h-32 w-full touch-none rounded-xl border border-dashed border-line bg-surface"
-            onPointerDown={(e) => { drawing.current = true; const c = e.currentTarget.getContext("2d"); if (!c) { return; } const [x, y] = point(e); c.lineWidth = 2.5; c.lineCap = "round"; c.strokeStyle = "#0f172a"; c.beginPath(); c.moveTo(x, y); e.currentTarget.setPointerCapture(e.pointerId); }}
-            onPointerMove={(e) => { const c = e.currentTarget.getContext("2d"); if (!c || !drawing.current) { return; } const [x, y] = point(e); c.lineTo(x, y); c.stroke(); setDrawn(true); }}
-            onPointerUp={() => { drawing.current = false; }} />
-          <div className="mt-1 flex justify-between text-[11px] text-muted-foreground"><span className="flex items-center gap-1"><Icon name="signature" />{t("Sign here")}</span><Plain type="button" className="font-semibold text-primary" onClick={clear}>{t("Clear")}</Plain></div>
-        </div>
-      )}
-      {error && <Banner tone="crit">{error}</Banner>}
-      <p className="text-[11px] text-muted-foreground">{t("The sign-off is bound to this report version; saving the draft again clears it.")}</p>
     </Modal>
   );
 }

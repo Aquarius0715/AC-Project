@@ -20,6 +20,8 @@ export default async function CustomerAutomationsPage({ searchParams }: Readonly
   if (!apiMode()) return <AutomationsDemo />;
   const sp = await searchParams;
   const editing = typeof sp.automationId === "string" && sp.automationId ? sp.automationId : null;
+  // preset=off&unitIds=…: a new after-hours rule for those ACs, from the Running list (IR811)
+  const presetIds = editing === "new" && sp.preset === "off" && typeof sp.unitIds === "string" ? sp.unitIds.split(",").filter(Boolean) : [];
   const [prefs, rules, units, properties, spaces, consent, display] = await Promise.all([
     coreOp<{ timezone: string }>("preferences.get", {}), coreAll<ApiAutomation>("automations.list"), coreAll<ApiUnitRow>("units.list"),
     coreAll<ApiPropertyRow>("properties.list"), coreAll<ApiSpaceRow>("spaces.list"),
@@ -56,6 +58,8 @@ export default async function CustomerAutomationsPage({ searchParams }: Readonly
     cards: rules.map((r) => ruleCard(r, ac.get(r.unitIds[0] ?? "") ?? null, nextRuns.get(r.id) ?? null, isGranted, i)),
     consent: consent ? { version: consent.version, ...consentCard(consent, location.length, location.filter((r) => r.disabledReason === "consent_revoked").length, i) } : { version: null, ...consentCard(null, 0, 0, i) },
     nextRuns: Object.fromEntries(nextRuns),
+    preset: presetIds.filter((id) => ac.has(id)),
+    places: Object.fromEntries(propertyName), // the away/home switch names the home it saw you arrive at (DEC-109)
   };
   return <AutomationsView live={live} />;
 }

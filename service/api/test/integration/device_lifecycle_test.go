@@ -509,7 +509,7 @@ func TestDeviceEvents(t *testing.T) {
 		&status,
 	)
 
-	if typ != "tamper" || severity != "critical" || status != statusOpen {
+	if typ != kindTamper || severity != severityCritical || status != statusOpen {
 		t.Fatalf("tamper alert: %s %s %s", typ, severity, status)
 	}
 	// the same eventId again: no new event; with other content CONFLICT

@@ -25,18 +25,20 @@ const (
 
 // LiveTopic is the node and the kind (LiveSensors, LiveResult, LiveState or LiveStatus) of a node's topic
 // smarthome/ac/<node>/<kind>; ok is false for any other topic under the subscription, among them the commands the
-// bridge publishes itself.
+// bridge publishes itself and any deeper topic whose last segments only look like a node's (the node is always the
+// third segment, the one LiveCommandTopic publishes to).
 func LiveTopic(topic string) (string, string, bool) {
-	parts := strings.Split(topic, "/")
-	last := len(parts) - 1
+	rest, found := strings.CutPrefix(topic, "smarthome/ac/")
+	if !found {
+		return "", "", false
+	}
 
-	var node, kind string
+	node, kind, _ := strings.Cut(rest, "/")
 
-	switch {
-	case last >= 2 && parts[last-1]+"/"+parts[last] == LiveResult:
-		node, kind = parts[last-2], LiveResult
-	case last >= 1 && (parts[last] == LiveSensors || parts[last] == LiveState || parts[last] == LiveStatus):
-		node, kind = parts[last-1], parts[last]
+	switch kind {
+	case LiveSensors, LiveState, LiveStatus, LiveResult:
+	default:
+		return "", "", false
 	}
 
 	if node == "" {

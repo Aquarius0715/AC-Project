@@ -36,6 +36,8 @@ export interface ApiJobEvent { id: string; jobId: string; actorUserId: string | 
 export interface PartnerJob {
   id: string; short: string; status: string; type: string; unit: string | null; address: string | null;
   slot: Slot | null; dueAt: string | null; offerExpiresAt: string | null; assignmentId: string | null; technicianId: string | null;
+  /** the delegation ended (a history row): only the company’s own decisions stay, the job is no longer its work */
+  isEnded?: boolean;
 }
 
 const KL_OFFSET = 8 * 3_600_000; // Asia/Kuala_Lumpur, no daylight saving
@@ -97,7 +99,7 @@ export function partnerJob(j: ApiPartnerJob, units: Map<string, string>): Partne
     return { id: j.jobId, short: j.jobId.slice(0, 8), status: j.status, type: j.type, unit: null, address: j.siteAddress, slot: firstSlot(j.candidateSlots), dueAt: j.dueAt, offerExpiresAt: j.status === "offered" ? j.offerExpiresAt : null, assignmentId: null, technicianId: null };
   }
   if (j.projection === "history") {
-    return { id: j.jobId, short: j.jobId.slice(0, 8), status: j.status, type: j.type, unit: null, address: null, slot: null, dueAt: null, offerExpiresAt: null, assignmentId: null, technicianId: null };
+    return { id: j.jobId, short: j.jobId.slice(0, 8), status: j.status, type: j.type, unit: null, address: null, slot: null, dueAt: null, offerExpiresAt: null, assignmentId: null, technicianId: null, isEnded: true };
   }
   return {
     id: j.id, short: j.id.slice(0, 8), status: j.status, type: j.type, unit: units.get(j.unitId) ?? null, address: null,
@@ -108,6 +110,8 @@ export function partnerJob(j: ApiPartnerJob, units: Map<string, string>): Partne
 export type Bucket = "offered" | "unassigned" | "active" | "overdue" | "review" | "completed" | "other";
 /** The progress bucket of a job: overdue is an assigned or started job whose work window has ended (IR89). */
 export function bucket(j: PartnerJob, now: number): Bucket {
+  // an open job whose delegation ended is not the company's work any more, as in summaries.activeCount (UI/UX loop R43)
+  if (j.isEnded && j.status !== "completed") return "other";
   switch (j.status) {
     case "offered": {
       return "offered";
@@ -162,15 +166,22 @@ export function kpis(counts: ApiCounts, jobs: PartnerJob[], now: number, names: 
   const active = Math.max(0, counts.activeCount - unassigned.length);
   const who = (id: string | null) => names.get(id ?? "") ?? t("Technician");
   const nextVisit = (j: NonNullable<typeof next>) => t(j.status === IN_PROGRESS ? "{name} on site from {time}" : "{name} starts {time}", { name: who(j.technicianId), time: relativeTime(j.slot.startAt, now, i) });
+  // an empty tile says so in words, as Offers to answer does, instead of a bare dash (UI/UX loop R130)
+  let activeSub = "—"; // jobs are running but none has a visit ahead
+  if (next) activeSub = nextVisit(next);
+  else if (active === 0) activeSub = t("No jobs in progress or scheduled");
+  let reviewSub = "—"; // counted, but not on this page of jobs
+  if (review[0]) reviewSub = t("{job} · awaiting review", { job: label(review[0], t) });
+  else if (counts.reviewCount === 0) reviewSub = t("No reports to review");
   return [
     { label: t("Offers to answer"), value: counts.offerCount, sub: offers[0] ? t("{job} · expires in {left}", { job: offers[0].short, left: until(offers[0].offerExpiresAt, now, t) }) : t("No open offers"), href: list("offered"), link: t("link::Open offers") },
-    { label: t("Awaiting assignment"), value: unassigned.length, sub: unassigned.length > 0 ? t("Accepted, no technician yet") : "—", href: "/partner/schedule", link: t("Assign"), tone: unassigned.length > 0 ? "warn" : undefined },
+    { label: t("Awaiting assignment"), value: unassigned.length, sub: unassigned.length > 0 ? t("Accepted, no technician yet") : t("No jobs waiting for a technician"), href: "/partner/schedule", link: t("Assign"), tone: unassigned.length > 0 ? "warn" : undefined },
     {
       label: t("In progress / scheduled"), value: active, href: list("active"), link: t("View jobs"),
-      sub: next ? nextVisit(next) : "—",
+      sub: activeSub,
     },
-    { label: t("Reports to review"), value: counts.reviewCount, sub: review[0] ? t("{job} · awaiting review", { job: label(review[0], t) }) : "—", href: review.length === 1 ? `/partner/jobs/${review[0]?.id ?? ""}/review` : list("review"), link: t("Review") },
-    { label: t("Overdue"), value: counts.overdueCount, sub: counts.overdueCount ? t("Past the due date or the work window") : "—", href: list("active"), link: t("View"), tone: counts.overdueCount ? "crit" : undefined },
+    { label: t("Reports to review"), value: counts.reviewCount, sub: reviewSub, href: review.length === 1 ? `/partner/jobs/${review[0]?.id ?? ""}/review` : list("review"), link: t("Review") },
+    { label: t("Overdue"), value: counts.overdueCount, sub: counts.overdueCount ? t("Past the due date or the work window") : t("No overdue jobs"), href: list("active"), link: t("View"), tone: counts.overdueCount ? "crit" : undefined },
   ];
 }
 

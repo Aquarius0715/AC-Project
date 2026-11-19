@@ -3,7 +3,7 @@
 // contractor as a new person in Access & roles; the contractor sets a password from the set-up e-mail (Mailpit) and
 // signs in to the partner app, which shows their company and their own account. Each run leaves one company and one
 // person, under names of their own. Skipped on a stack without Mailpit.
-import type { Browser, Page } from "@playwright/test";
+import type { Browser, BrowserContext, Page } from "@playwright/test";
 import { test, expect, FAILED_PAGE } from "../../fixtures/test";
 import { APPS, type App } from "../../fixtures/apps";
 import { startSignIn } from "../../fixtures/auth";
@@ -12,10 +12,17 @@ import { must } from "../../fixtures/must";
 import { pickDateTime } from "../../fixtures/time";
 
 const app = (id: App["id"]) => must(APPS.find((a) => a.id === id));
+// every context the test opens, closed after it whether it passed or failed
+const opened: BrowserContext[] = [];
 const open = async (browser: Browser, a: App, signedIn = true): Promise<Page> => {
   const context = await browser.newContext({ baseURL: a.url, viewport: { width: 1920, height: 1080 }, ...(signedIn ? { storageState: a.state } : { storageState: { cookies: [], origins: [] } }) });
+  opened.push(context);
   return context.newPage();
 };
+
+test.afterEach(async () => {
+  await Promise.all(opened.splice(0).map((c) => c.close()));
+});
 
 test("HQ adds a contractor company and its first contractor, who signs in to the partner app", async ({ browser }) => {
   test.setTimeout(240_000);
@@ -78,8 +85,5 @@ test("HQ adds a contractor company and its first contractor, who signs in to the
     await expect(me.locator("aside")).toContainText(new RegExp(company, "i"));
     await me.goto(`${partner.url}/partner/users`);
     await expect(me.getByRole("row").filter({ hasText: "E2E Boss (you)" })).toContainText("Your account");
-    await me.context().close();
   });
-
-  await admin.context().close();
 });

@@ -1,6 +1,6 @@
 ---
 document_id: DD-C
-version: 0.37.0
+version: 0.38.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -29,7 +29,7 @@ Always validate route parameters (values in URLs) as untrusted input. “Service
 | DD-C02 / FR-C02 | `/customer/properties` / `PropertyExplorer` | `properties.list`, `spaces.list`, `units.list`, `locations.rename` | Read-only tree property→floor/area→room→units; rename a location only (1–120 characters, unique among siblings). HQ creates, moves, and deletes the structure | No add/move/delete controls. Deleted URLs show not-found. Breadcrumbs return to parent levels |
 | DD-C03 / FR-C03 | `/customer/units/:id` / `UnitControl` | `units.get`, `commands.create`, `commands.get`, `locations.rename`, `units.setAlertPolicies`, `policies.list`, `commands.list`, `units.list` | Build temperature min/max/step, mode, and fan options from capabilities. Mutate after confirmation. Show room temperature separately from settings | Show rejection, expiry, and failure reasons. Recheck state before manual retry |
 | DD-C04 / FR-C04 | `/customer/automations` / `AutomationEditor` | `automations.list`, `automations.save`, `automations.simulate`, `automations.fire`, `automations.nextRuns`, `units.list`, `units.get`, `automations.delete`, `properties.list`, `spaces.list`, `preferences.get` | Require at least one weekday, start/end times, timezone, target units, and actions. Explicitly confirm overnight settings | Warn on overlapping conditions and show priorities. Reject triggered automation under restrictions and show the reason |
-| DD-C05 / FR-C05 | `/customer/automations` / `AutomationEditor` | `automations.save`, `automations.simulate`, `automations.fire`, `consents.get`, `consents.update`, `units.list`, `units.get` | Change fields by condition type (discriminated union). Explain the purpose of location consent. The demo does not collect real location; users enter arrival/departure events | If consent is denied or location unavailable, use manual or scheduled control. Clearly label lifestyle-pattern inference as a demo |
+| DD-C05 / FR-C05 | `/customer/automations` / `AutomationEditor` | `automations.save`, `automations.simulate`, `automations.fire`, `consents.get`, `consents.update`, `units.list`, `units.get`, `presence.report` | Change fields by condition type (discriminated union). Explain the purpose of location consent. The demo does not collect real location; users enter arrival/departure events | If consent is denied or location unavailable, use manual or scheduled control. Clearly label lifestyle-pattern inference as a demo |
 | DD-C06 / FR-C06 | `/customer/energy` / `EnergyExplorer` | `energy.summary`, `baselines.list`, `units.list` | Require start<end and at most 366 days (provisional). Show currency, tariff version, comparison period, and data reliability | Show usable data coverage when data is missing. Do not treat estimated replacements as measurements |
 | DD-C07 / FR-C07 | `/customer/air-quality` / `AirQuality` | `telemetry.series`, `units.get`, `units.list`, `ventilation.log`, `ventilation.list`, `properties.list`, `spaces.list` | Select metric and period. Log a manual ventilation (method, 1–240 minutes); no device command | Show “Unsupported” when no sensor exists. A log does not imply CO₂ fell |
 | DD-C08 / FR-C08 | `/customer/alerts` / `AlertInbox` | `alerts.list`, `notifications.markAllRead`, `notifications.list`, `summaries.get`, `units.list`, `properties.list`, `spaces.list` | Filter by severity or unread status. Keep notificationId separate from alertId | Do not show a healthy “No alerts” summary when fetching fails |
@@ -43,7 +43,8 @@ Always validate route parameters (values in URLs) as untrusted input. “Service
 | DD-C16 / FR-C16 | `/customer/energy` / `EnergyReportExport` | `energy.exportReport` | Completed month, at least one section, PDF/CSV | Same tariff and estimation labels as the screen |
 | DD-C17 / FR-C17 | `/customer/maintenance?jobId=` / `JobCompletionFeedback` | `jobs.get`, `jobs.rate`, `jobs.reportProblem` | 1–5 ★ required; editable 7 days; problem details 10–2000, up to 5 photos | Not completed → CONFLICT; ratings never shown to other customers |
 | DD-C18 / FR-C18 | `/customer/maintenance?tab=filter-care` / `FilterCare` | `filterCare.list`, `filterCare.markCleaned`, `filterCare.saveSettings`, `filterCare.getSettings` | Run time since cleaning per AC; threshold 50–2000 h or model default; fallback days 7–180 | Offline → unknown, never 0 |
-| DD-C19 / FR-C19 | `/customer/users` / `ClientUsers` | `clientUsers.list`, `clientUsers.save`, `clientUsers.remove`, `clientUsers.resendInvite` | Owner only; e-mail unique per customer (case-insensitive); the account is created when added and its e-mail is fixed (IR461); never the own account; the customer keeps an active owner (IR417) | Password resets stay with HQ (DD-A17) |
+| DD-C19 / FR-C19 | `/customer/users` / `ClientUsers` | `clientUsers.list`, `clientUsers.save`, `clientUsers.remove`, `clientUsers.resendInvite` | Owner only; e-mail unique per customer (case-insensitive); the account is created when added and its e-mail is fixed (IR461); never the own account; the customer keeps an active owner (IR417) | A forgotten password is reset by its user with Forgot password? on the sign-in page (IR646, IR818); an owner does not reset another user's password |
+| DD-C20 / FR-C20 | `/customer/installations` / `InstallationRequests` | `installationRequests.list`, `installationRequests.create`, `installationRequests.cancel`, `properties.list`, `spaces.list`, `capabilities.list` | Owner only; property (and space) of the customer; units 1–10; model or not decided; IoT yes/no; 3 distinct future slots ≥ 1 day ahead; note ≤ 2000 | The client creates no unit and no installation job; HQ decides (DD-A06) |
 
 ## Shared Implementation Steps
 
@@ -86,7 +87,9 @@ Scope: FR-C01 / Main display pattern: **UI-OVERVIEW**. Service boundary: `units.
    - Show total energy for the period and current power at the latest observation time.
    - As built (IR610, DEC-90): while an invoice is overdue, a notice above the tiles names it — or how many are overdue and their total — with Pay now (or View invoices). It also names the restriction the invoice caused and on how many units, with View restriction details, the restriction's own detail as the unit page links it (IR583). A scheduled restriction says when it starts. The notice reads `invoices.list` (overdue), `contracts.list` and `restrictions.forInvoice`, as the payments page does. A member without billing access, or a customer with nothing overdue, sees no notice (Figma Client 01c).
 3. Viewing does not change business state. Keep filters in the URL and restore them on Back.
+   - As built (IR816): on a phone (below `sm`), the most severe open warning or fault is a banner under the overdue notice, with its unit and time, “+n more” and View alerts. On a phone the Needs attention tile is the fourth card, two screens down. Wider screens keep the tile in the first row and show no banner.
 4. Queries to update: `units / telemetry / alerts (only on subscribed events)`.
+   - As built (IR814): ACs pinned on their own pages (“Pin to Overview”, kept with the user's preferences, IR819/IR820) appear first as “Pinned ACs” with place, room temperature and power and connection badges, each with Unpin.
 
 **Boundary cases and failures**: If one unit cannot be measured, count it as unknown rather than normal. Do not include another customer's unit in summaries even if its ID is supplied as a filter.
 
@@ -112,6 +115,7 @@ Scope: FR-C02 / Main display pattern: **UI-LIST**. Service boundary: `properties
 1. Show the property list (with type and unit counts) and the selected property's floors/areas and rooms. Selecting a room lists every AC in it with power/connection badges; opening one goes to Unit Control. Unassigned units appear under the property with the note “placed by HQ” (IR62).
 2. The structure is read-only (IR109): no add, move, archive, or delete controls. ✎ / Rename opens a centered modal showing the location, its type, and the new name; saving calls `locations.rename`.
 3. After a rename, update tree and breadcrumbs; IDs and parents never change. For navigation from KPIs, show the unit list filtered by powerState/connections (IR50).
+   - As built (IR801): above the tree, “Find a room or AC…” searches by name. The URL key `search` lists the units whose name or place (property › floor › room) contains the text, case-insensitively, in the same filtered list as the KPI links. Each row has its state and Open control. Typing waits 300 ms before it asks. A tree row or Clear filter clears the search. With no match, the list says no room or AC name contains the text.
 4. Queries to update: `properties / spaces / units / customer summary`.
 
 **Boundary cases and failures**: Empty or 121-character names return VALIDATION with the input kept; a duplicate sibling name is CONFLICT `error.duplicateSiblingName` (IR208) and a stale version CONFLICT `error.versionConflict`, both keeping the input. Direct structural writes from a client session return FORBIDDEN.
@@ -143,12 +147,17 @@ Scope: FR-C03 / Main display pattern: **UI-DETAIL**. Service boundary: `units.ge
    - Offer only what the model supports (IR524, IR530; Figma 02o, 02p).
      - A model without control shows "No remote control on this model" and that settings are changed on the AC itself.
      - The temperature row needs a temperature range. The mode and fan rows need their control and list only the model's own values.
-     - A model with the power only sends it at once, with no change summary or review bar.
+     - A model with the power only has no change summary or review bar. The power switch, on any model, asks first (target and change) and sends after the confirmation.
    - A change is only what the user changed: a setting the AC has not reported is no change from the screen's default (IR524).
    - Devices in this room show each AC's latest valid room temperature and power draw, never its setting (IR527).
    - A power-OFF request does not set measured temperature to 0.
    - Disable new requests to a unit while a request for that unit is pending.
 3. Create one Command and show the requested value separately. Update confirmed settings only after the device returns acknowledged. Keep the request and reason in history even on failure.
+   - As built (IR810): once every command of a send is acknowledged, its result banner offers Undo beside Dismiss. Undo sends, at once and without a second confirmation, the commands that put each changed setting back to the confirmed value it replaced. That value is the observed state before the send; a setting without one is left out. The undo itself offers no Undo, and a send that failed part-way offers none.
+   - As built (IR809): the unit page re-reads its data every 30 s while the tab is shown, so a change made by another user, an automation or the device appears without a reload. The header says “Updates every 30 s while this page is open”. Re-reading pauses (“Updates paused while you change settings”) while a setting is edited, a confirmation or the rename or attach dialog is open, or a command is awaited, because a newer report resets the controls.
+   - As built (IR808): in Cool, a setpoint below 22 °C shows a hint under the temperature control, before Review & send. A lower setting does not cool the room faster; the AC runs longer and uses more power, and 24–26 °C is a common comfortable range. Nothing is blocked, and other modes show no hint. The outdoor temperature is not available to the web apps, so the hint uses the setpoint alone.
+   - As built (IR806): while a command waits for the device, the banner counts down the seconds it has left. The count runs from its request to its expiry, 30 s when unknown, and on the browser's clock from the moment it appears. At zero it reads “No answer yet — checking the result…”. The sentence stays the same for screen readers, and only the seconds, which are not read out, change.
+   - As built (IR804): a history row of a command sent by hand (`source` ui) ends “· by you” when the reader sent it (`actorMembershipId` is the reader's membership) and “· by someone else” otherwise. Several people share one customer account, and the AC that “changed by itself” was often changed by another of them. No name is shown. Automation, restriction and test-run commands keep their own source.
 4. Queries to update: `commands / unit detail / telemetry summary / audit`。
 
 **Boundary cases and failures**: For demo capability 16–30 degrees in 1-degree steps, reject 15, 31, and 24.5 degrees. Offline units, other customers' units, restriction violations, and late acknowledgements are not successes. Follow IR46 for actions under restrictions and IR47 for connection/power-signal rejection. An offline AC sends nothing; below the disabled controls the screen offers Request repair, a new repair request for the AC (Figma 02h, IR315).
@@ -188,6 +197,11 @@ Scope: FR-C04 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 3. Save timezone, start/end actions, and enabled in Automation. Creation alone does not send a Command. The equipment scheduler job evaluates demo-clock start/end occurrences internally, rechecks owner permissions at trigger time, and creates Commands, once per occurrence (IR214). When another schedule of the AC starts in the same minute as one ends and its start would run, the end is not sent; the ended rule's last run says it was superseded (IR504). Screens do not call automations.fire for these triggers (IR54). The editor previews an unsaved schedule with automations.nextRuns draft; Delete (⋯ menu, confirmation) is automations.delete and keeps the rule's Commands (IR214).
 4. Queries to update: `automations / next-run preview / audit`。
 5. Delete (`automations.delete`, Figma 03g–03i): the owner confirms in a dialog; the rule leaves the list and the screen shows the removed state. As with disabling, its scheduled events create no new Commands.
+7. After-hours preset (IR811). `automationId=new&preset=off&unitIds=…` opens a new rule named “Switch off after hours” with those ACs: the first is the target, the rest go under Also apply, up to 50. It starts on weekdays at 19:00 with Power OFF, ends at 23:00 with the end action left to choose (never assumed), and is saved off. The Running list's Turn off panel links to it with the ACs still ticked. Closing the editor drops `preset` and `unitIds`, so a later Create starts blank.
+6. Several ACs in one rule (IR802). The API already took 1–50 `unitIds`, but the editor offered one Target AC only, so "the office off at 19:00" took one rule per AC.
+   - Under Target AC, a folded "Also apply to other ACs" lists the other ACs with their place, with "All ACs in {property}" and Clear. It opens by itself when the rule already has more.
+   - The setting and value lists offer only the actions every chosen AC supports (`commonActionOptions`). An action that one of them does not take reads "Not supported by every chosen AC".
+   - Step 3 says "Action for {n} ACs". The card keeps "(+n more ACs)". The list header no longer says "each rule controls one AC".
 
 **Boundary cases and failures**: Reject zero weekdays, missing end actions, and ambiguous or nonexistent times (such as daylight-saving changes). After disabling a rule, its scheduled events must not create new requests.
 
@@ -197,7 +211,7 @@ Scope: FR-C04 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 
 **Source mapping**: SRC-06 BIZ-14, BIZ-15, BIZ-17 → FR-C05 → DD-C05. Source category: original company requirements SRC-06 + design additions. Design additions: withdrawing consent and condition priority. Field types, required status, defaults, and action order are implementation proposals.
 
-Scope: FR-C05 / Main display pattern: **UI-FORM**. Service boundary: `automations.save, automations.simulate, automations.fire, consents.get, consents.update, units.list, units.get`.
+Scope: FR-C05 / Main display pattern: **UI-FORM**. Service boundary: `automations.save, automations.simulate, automations.fire, consents.get, consents.update, units.list, units.get, presence.report`.
 
 **Initial view and prerequisites**: Automation targets and condition types can be selected. Location conditions require purpose-specific consent. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
@@ -217,7 +231,7 @@ Scope: FR-C05 / Main display pattern: **UI-FORM**. Service boundary: `automation
 1. Select occupancy, arrival/departure, lifestyle pattern, or weather conditions. Check required consent and save actions. Use simulated events to check condition matches.
 2. Apply the following business rules to both reads and actions.
    - Manage location consent only for location_automation; do not record consent to use the app itself (IR102).
-   - Phase 1A uses only synthetic events for location data.
+   - Phase 1A uses only synthetic events for location data. As built (DEC-109, IR826): with the consent granted, the consent card has "Use this device's location". While the page is open and the switch is on, the browser reports its position (`presence.report`) when it has moved 50 m, and every 5 minutes otherwise; it sends no fix coarser than 100 m. The Core API compares the position with the pin and radius HQ set for each of the customer's homes and offices (default 150 m; beyond the radius plus 50 m counts as away, and in between nothing changes). It keeps only home or away per member and property (`control.presence_states`), never the position. A property's household arrives when its first member comes inside and departs when its last one leaves. That change is a location fact for the property's installed units, decided as a schedule tick is, so each rule's owner must still hold the consent. The card names the change ("Arrived at Home A — 1 automation ran"). A browser does not report in the background, and the card says so; withdrawing the consent deletes the member's states.
    - Lifestyle-pattern inference is a demo; do not collect real personal behavior histories.
    - Missing condition data does not count as a match. Every “Only if” condition must hold too; when a rule's own trigger held but it could not run, the run log keeps the reason and the list shows the last skip (IR215).
 3. Withdrawing consent disables related condition rules. Do not show already issued Commands as cancelled. Manual actions remain available within permissions. As built (IR619): the list's consent card warns, with the count, only when a withdrawal turned location automations off. Otherwise it says plainly that location automations cannot run until consent is given again, and Grant consent is a secondary button beside the page's Create automation.
@@ -254,6 +268,8 @@ Scope: FR-C06 / Main display pattern: **UI-ANALYSIS**. Service boundary: `energy
    - Round money to the currency's decimal places only at the end.
 3. Changing conditions updates the URL and Query key. This screen only displays data; it does not change contract tariffs or emission factors.
 4. Queries to update: `energy (only when search conditions change)`.
+5. Highest use (IR803). Below the daily chart, "Highest use in this period" ranks the customer's ACs by measured energy. The page runs one `energy.summary` per unit for the period and keeps the five highest; units without measured energy are left out. Each row gives kWh, its share of the measured total and its data coverage, which reads as a warning under 80%. Show opens that AC in the charts above, and Compare adds it to the selection (up to four). The card shows only when two or more ACs have measured energy.
+6. Default AC (IR815). With no AC in the URL, the page opens on the period's highest-use AC from the same ranking, instead of the first by name, and the Units row says so. A link or a choice that names ACs is kept as it is.
 
 **Boundary cases and failures**: A 100kWh baseline, 80kWh actual use, and 0.5MYR unit price produce 10MYR savings. Do not show a reduction rate for baseline 0. For actual use 120kWh, the DTO has reduction -20kWh and reduction rate -20; display “Increase 20.0 kWh” and “Increase 20.0%” (IR68/IR80). Show missing data with coverage.
 
@@ -329,6 +345,7 @@ Scope: FR-C08 / Main display pattern: **UI-LIST**. Service boundary: `alerts.lis
    - normal is a health notice, not an unresolved problem.
    - Use type to distinguish cleaning/replacement reminders from problem alerts.
 3. Save read time on Notification. Do not change Alert.status. Restore filters and page position when returning from another screen.
+   - As built (IR800): every unresolved alert names what to do, as a "What to do" line in its Needs attention row and a row of its detail. The step depends on the suspected cause: an open window says check the windows and doors, and turn the AC off if nobody is in the room. Then it depends on the type: tamper, or the restriction check (nothing to do). Last comes the kind: cleaning, air quality, inspection record or fault (request a repair). A resolved alert shows none. An air-quality alert also links to Air quality.
 4. Queries to update: `notifications / unread count`。
 
 **Boundary cases and failures**: Do not show zero alerts after a fetch failure. If the referenced unit is unavailable, show only “Unavailable” without details.
@@ -410,6 +427,8 @@ Scope: FR-C10 / Main display pattern: **UI-LIST / UI-DETAIL**. Service boundary:
 **Card Type and Payment Instruction Selection (BIZ-22)**
 
 The screen's paymentChoice is demo_credit_card/demo_debit_card/demo_instructions. Pass only the two card choices as method to payments.simulate(event=initiate). For demo_instructions, pass event=instructions with only invoiceId/demoConfirmed; do not create Payment or change Invoice method/state. Credit and debit cards use the same state flow; keep the selected type in confirmation and results. An invoice takes one card attempt at a time: while one is initiated or processing, or once one is confirmed, initiate is CONFLICT `errors.invoice_has_payment`; after a failed attempt a new one starts (IR474). Viewing instructions alone does not set paid. notifications.preview shows invoice ID, contact channel, and selected payment method. Provide no real card or bank information fields.
+
+**Stripe Checkout (DEC-68, IR827).** With a Stripe secret key configured, `payments.startCheckout` (invoiceId, expectedVersion) creates one Checkout Session for the whole unpaid invoice in MYR and returns its hosted page. The payment is stored first, in state `initiated` with channel `stripe_checkout`, and the invoice is paid only by the signed webhook; Stripe returns the payer to this invoice's page, which shows the state the webhook has reached and re-reads itself until then. A payer who left Stripe's page starts again: the earlier session is expired at Stripe and its payment shows as Expired; a completed one is not replaced. Card and bank entry happen on Stripe's page only. Without a key the demo path above applies and `startCheckout` answers UNAVAILABLE.
 
 Verification: AT-C11-SRC. Reproduce processing, success, and failure for each card type. Check that history records the selected type. Opening payment instructions alone leaves the invoice unpaid.
 
@@ -522,12 +541,14 @@ Scope: FR-C14 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 **Steps**
 
 1. Toggle Single AC / Group control. Cards show each AC with power/connection badges; “Select all online” and Clear.
-2. Choose the change; Review & send opens a centered modal listing each AC: change (before → after), Will send, Skipped (offline), or clamped value under a restriction (IR46).
+2. Choose the change. Power, temperature, mode and fan each start on Keep (every AC keeps its own setting), and Review & send stays disabled until one is chosen; Power Off sends only the power. Review & send opens a centered modal listing each AC: change (before → after), Will send, Skipped (offline), or clamped value under a restriction (IR46).
 3. Send calls `commands.create` per AC that will be sent and per changed setting (a Command carries one UnitAction, as in single control), each with its own idempotency key and expectedUnitVersion (IR109, IR211); an AC's settings go one after another and stop at its first failure. Each card follows its Command with `commands.get` (Sending → Confirmed / Failed); Retry resends one AC.
    - As built (IR380): a command refused by the member's write limit (RATE_LIMITED, IR375) changed nothing, so it waits the advised seconds and is sent again, up to five times. Meanwhile its card shows Waiting with the seconds. Any other refusal shows the shared wording on the card.
 4. Queries to update: `units / commands`.
 
-**Boundary cases and failures**: Mixed spaces → VALIDATION before sending. A failure of one AC never rolls back others.
+5. Turn off running ACs (IR798): on the Running list (`powerState=on`, no connection filter, 2 or more ACs) an owner gets “Turn off running ACs…”. The same panel opens with Power Off as the only change and every online AC selected; each card also shows its place (property › floor › room), as the list spans properties. Review & turn off and the sending follow steps 2–3. The panel stays open after the list is re-read: ACs confirmed off are gone from it, and one line says how many were turned off; failed ones keep their card and Retry. “Back to the list” returns to the rows.
+
+**Boundary cases and failures**: Mixed spaces → VALIDATION before sending, except Turn off running ACs (power off only). A failure of one AC never rolls back others.
 
 **Verification**: Check the traceability entries under AT-C14 (N/E/B).
 
@@ -663,9 +684,42 @@ Scope: FR-C19 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 3. Not signed in yet: Resend set-up e-mail (`clientUsers.resendInvite`; at most every 5 minutes per user, sooner → RATE_LIMITED `errors.invite_recently_sent` with the seconds to wait, IR423), Change role and Remove (reason → `clientUsers.remove`; the sign-in account is turned off).
 4. On a user who has signed in: Change role, Disable / Enable (reason → `clientUsers.save` with clientRole / status; the sign-in account is turned off / on) and Remove (reason → `clientUsers.remove`; the membership ends now and the sign-in account is turned off).
 
-**Boundary cases and failures**: Duplicate e-mail → VALIDATION (fieldErrors.email, input kept, 11c); an address someone with access holds → VALIDATION `errors.email_taken` (a person removed here is added again instead, IR462). A refused add or change takes the focus to the first field to fix, and a field the Core API refuses shows its message under that field as well as in the toast (IR620); a changed e-mail → VALIDATION `error.immutable`; a 31st account the owner adds to the customer within 24 hours → RATE_LIMITED `errors.too_many_accounts` with the seconds to wait (IR464; HQ is not limited). The own account → CONFLICT `errors.own_account`; demoting, disabling or removing the last active owner → CONFLICT `errors.last_owner`; a user whose access HQ revoked → CONFLICT `errors.revoked_by_hq` on any change but disabling, and adding the person again → VALIDATION `email` `errors.revoked_by_hq` (the row shows “Access ended by HQ” and offers only Remove; DEC-83, IR508); a stale version → CONFLICT, the list refetches. Member sessions have no sidebar item; the direct URL shows Page unavailable (FORBIDDEN). Password resets stay with HQ (DD-A17).
+**Boundary cases and failures**: Duplicate e-mail → VALIDATION (fieldErrors.email, input kept, 11c); an address someone with access holds → VALIDATION `errors.email_taken` (a person removed here is added again instead, IR462). A refused add or change takes the focus to the first field to fix, and a field the Core API refuses shows its message under that field as well as in the toast (IR620); a changed e-mail → VALIDATION `error.immutable`; a 31st account the owner adds to the customer within 24 hours → RATE_LIMITED `errors.too_many_accounts` with the seconds to wait (IR464; HQ is not limited). The own account → CONFLICT `errors.own_account`; demoting, disabling or removing the last active owner → CONFLICT `errors.last_owner`; a user whose access HQ revoked → CONFLICT `errors.revoked_by_hq` on any change but disabling, and adding the person again → VALIDATION `email` `errors.revoked_by_hq` (the row shows “Access ended by HQ” and offers only Remove; DEC-83, IR508); a stale version → CONFLICT, the list refetches. Member sessions have no sidebar item; the direct URL shows Page unavailable (FORBIDDEN). A forgotten password is reset by its user with Forgot password? on the sign-in page (IR646, IR818); an owner does not reset another user's password.
 
 **Verification**: Check the traceability entries under AT-C19 (N/E/B).
+
+### DD-C20 Details
+
+**Source mapping**: user request 2026-11-13 (DEC-107, IR794) → FR-C20 → DD-C20, supporting SRC-06 BIZ-07, BIZ-12, BIZ-20.
+
+Scope: FR-C20 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `installationRequests.list, installationRequests.create, installationRequests.cancel, properties.list, spaces.list, capabilities.list`.
+
+**Initial view and prerequisites**: clientRole=owner; sidebar Installations (`/customer/installations`), shown only for owners (Shell sidebar variant Active=installations).
+
+| Field | Type / required | Default / constraints | Purpose |
+|---|---|---|---|
+| propertyId | ID/required | A property of the customer, not archived | Where |
+| spaceId | ID/optional | A space of that property | Where in the property |
+| quantity | integer/required | 1–10 | Units to install |
+| modelId | ID/optional | An active model of the register; empty = not decided | Model |
+| withIot | boolean | false; “Install an IoT device with each unit” | IoT choice, shown to HQ and the technician |
+| preferredSlots | Slot[3]/required | 3 distinct future slots, each starting ≥ 1 day ahead (IR113) | Visit time |
+| contactWindow | string/optional | As jobs.create | Contact |
+| note | string/optional | 0–2000 | Free text |
+| status | enum, read-only | submitted / approved / declined / cancelled | State |
+| declineReason | string, read-only | 5–500 | Why HQ declined |
+| jobIds | ID[], read-only | Unfinished and finished installation jobs of the request | Link to FR-C09 |
+
+**Steps**
+
+1. `installationRequests.list` (own customer) shows number, property, units, IoT, status, the first preferred time and the linked jobs.
+2. + New request opens a centered dialog; the property list comes from `properties.list`, the spaces from `spaces.list`, the models from `capabilities.list`. `installationRequests.create` answers the request with its number; an idempotency key is sent (D04).
+3. Submitted: Cancel (`installationRequests.cancel`, expectedVersion). Approved: each job id opens `/customer/maintenance?jobId=` where the owner accepts or declines the time HQ offers (FR-C09). Declined: the reason is shown.
+4. No notification is sent in DEC-107: HQ finds the submitted requests in Jobs › Installation requests, the owner sees the state in the list.
+
+**Boundary cases and failures**: another customer's property or space → NOT_FOUND; an archived property → VALIDATION (`propertyId`); fewer than 3 slots, a duplicate, a past slot or one less than 1 day ahead → VALIDATION (`preferredSlots`); quantity outside 1–10 → VALIDATION (`quantity`); cancelling a request that is not submitted → CONFLICT; a member session → FORBIDDEN.
+
+**Verification**: Check the traceability entries under AT-C20 (N/E/B).
 
 Convert condition forms to the Condition type's discriminated union. occupancy is {type,occupied}, location is {type,event}, pattern is {type,localTime}, weather is {type,metric:"temperature",operator,value}, tariff is {type,operator,value,unit:"MYR_per_kWh"}, peak is {type,active}, and solar/battery is {type,operator,value,unit:"kW"}. A customer automation takes ClientCondition (occupancy, location, pattern, weather); tariff, peak, solar and battery are HQ automation policy conditions (PolicyCondition, IR314). Do not send an extra params wrapper. Use weather_temperature for weather Fact.metric; do not confuse it with the room-temperature Fact temperature.
 

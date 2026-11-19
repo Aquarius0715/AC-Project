@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import {
+import { unitBackHref,
   conditionText, defaultRuleRows, durationText, POLICY_FIELDS, policyCards, policyErrors, policyFieldId, policyForm, policyInput, policyRefusal, summaryText, toggledInput, windowText,
   type ApiAlertPolicy, type ApiDefaultPolicy,
 } from "@ac/web/lib/customerPolicies";
@@ -78,6 +78,24 @@ describe("customer alert policies", () => {
   });
 });
 
+// each field the API refuses (monitoring/policies.go) has its own sentence; an unknown refusal shows its code
+describe("a refused policy save", () => {
+  it("names the field the API refused", () => {
+    const refusal = (fieldErrors: Record<string, string>) => policyRefusal({ code: "VALIDATION", fieldErrors });
+    expect([
+      refusal({ durationSeconds: "error.range" }), refusal({ activeWindow: "error.window" }), refusal({ "activeWindow.weekdays": "error.required" }),
+      refusal({ channels: "error.required" }), refusal({ name: "error.length" }), refusal({}), policyRefusal({ code: "NOT_FOUND", fieldErrors: {} }),
+    ]).toStrictEqual([
+      "Not saved: the duration is 1 s to 24 h.", "Not saved: check the days and times of “Only if”.", "Not saved: check the days and times of “Only if”.",
+      "Not saved: choose how to be notified.", "Not saved: the name is 1–120 characters.", "Not saved (VALIDATION).", "Not saved: this policy no longer exists.",
+    ]);
+  });
+
+  it("lists picked days by name, in week order", () => {
+    expect(windowText({ weekdays: [3, 1], startLocal: "08:00", endLocal: "12:00" })).toBe("only 08:00–12:00 on Mon, Wed");
+  });
+});
+
 // IR623: a refused save focuses the first field to fix, so every field a check names has a place in the order
 describe("the editor's field order", () => {
   it("holds every field policyErrors can name, top to bottom, each with its element id", () => {
@@ -85,5 +103,17 @@ describe("the editor's field order", () => {
     expect(Object.keys(all).toSorted(byText)).toStrictEqual([...POLICY_FIELDS].toSorted(byText));
     expect(POLICY_FIELDS.find((k) => lookup(all, k))).toBe("name");
     expect(policyFieldId("recovery")).toBe("policy-recovery");
+  });
+});
+
+describe("the way back from a new policy to its AC (UI/UX loop R46)", () => {
+  it("goes back only to an AC page, with the new policy to tick", () => {
+    expect(unitBackHref("/customer/units/u-1", "p1")).toBe("/customer/units/u-1?attach=p1");
+    expect(unitBackHref("/customer/units/u-1")).toBe("/customer/units/u-1");
+    expect(unitBackHref("https://example.com/customer/units/u-1", "p1")).toBeNull();
+    expect(unitBackHref("//example.com/customer/units/u-1", "p1")).toBeNull();
+    expect(unitBackHref("/customer/units/u-1?x=1", "p1")).toBeNull();
+    expect(unitBackHref("/customer/payments", "p1")).toBeNull();
+    expect(unitBackHref(null, "p1")).toBeNull();
   });
 });

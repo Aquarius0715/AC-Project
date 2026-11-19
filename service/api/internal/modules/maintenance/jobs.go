@@ -29,9 +29,19 @@ type JobUnits interface {
 		c *ops.Call,
 		unit uuid.UUID,
 	) (org uuid.UUID, archived bool, found bool, err error)
+	// UnitInstall is the install state, "planned" or "installed" ("" for no such unit), and the model of the unit: only a
+	// planned unit has an installation job.
+	UnitInstall(
+		ctx context.Context,
+		c *ops.Call,
+		unit uuid.UUID,
+	) (state string, model uuid.UUID, err error)
 	UnitsOfProperty(ctx context.Context, c *ops.Call, property uuid.UUID) ([]uuid.UUID, error)
 	OrgOfCustomer(ctx context.Context, c *ops.Call, customer uuid.UUID) (uuid.UUID, bool, error)
 	UnitsOfOrg(ctx context.Context, c *ops.Call, org uuid.UUID) ([]uuid.UUID, error)
+	// InstallSite answers whether the property, space and model of an installation request exist, and who owns the
+	// property (DEC-107).
+	InstallSite(ctx context.Context, c *ops.Call, in InstallSiteInput) (InstallSite, error)
 }
 
 // UnitSeverity returns the IR23 job severity per unit (highest open/acknowledged alert, normal without one).
@@ -253,10 +263,12 @@ func completeScan(job Job, preferred []byte, schedStart, schedEnd *time.Time) (J
 
 // The roles of the callers (Principal.Role).
 const (
-	roleAdmin      = "admin"
-	roleClient     = "client"
-	roleContractor = "contractor"
-	roleTechnician = "technician"
+	roleAdmin       = "admin"
+	roleClient      = "client"
+	jobInstallation = "installation"
+	installPlanned  = "planned"
+	roleContractor  = "contractor"
+	roleTechnician  = "technician"
 )
 
 // employmentInternal is the employment of HQ's own technicians (Principal.Employment, identity.Technician.Employment).
@@ -285,9 +297,11 @@ const (
 	fieldJobID          = "jobId"
 	fieldName           = "name"
 	fieldNextAction     = "nextAction"
+	fieldInstallation   = "installation"
 	fieldWorkText       = "workText"
 	fieldOrganizationID = "organizationId"
 	fieldReason         = "reason"
+	fieldPosition       = "position"
 	fieldRefrigerant    = "refrigerant"
 	fieldReportVersion  = "reportVersion"
 	fieldSlot           = "slot"
@@ -350,11 +364,18 @@ type CreateInput struct {
 	AlternativeSlots []Slot     `json:"alternativeSlots"`
 	ContactWindow    *string    `json:"contactWindow,omitempty"`
 	DueAt            *time.Time `json:"dueAt,omitempty"`
+	// InstallationRequestID links an installation job to the client request it answers (HQ only, DEC-107).
+	InstallationRequestID *uuid.UUID `json:"installationRequestId,omitempty"`
 }
 
 // jobTypes are the types of a job (MaintenanceJob.type).
 func jobTypes() map[string]bool {
-	return map[string]bool{"periodic": true, "reactive": true, "preventive": true}
+	return map[string]bool{
+		"periodic":      true,
+		"reactive":      true,
+		"preventive":    true,
+		jobInstallation: true,
+	}
 }
 
 // maxContactWindowLength is the longest contact window, in characters after trimming.
@@ -474,7 +495,10 @@ func PreferredSlotsOK(now time.Time, slots []Slot) bool {
 //	@Description	Authorization: client:self | admin:job.write
 //	@Description	Validation: D01; input constraints in the corresponding DD; IR38 dueAt only for job.write; defaults \
 //	@Description	to requestedEnd; IR113 client: requested slot + exactly 2 alternativeSlots, 3 distinct future slots \
-//	@Description	≥1 day ahead; HQ on behalf: 0–2
+//	@Description	≥1 day ahead; HQ on behalf: 0–2; DEC-107 installationRequestId (HQ only, type installation): the \
+//	@Description	request is submitted or approved, of the unit's customer, with fewer unfinished jobs than its \
+//	@Description	quantity (CONFLICT), the job has origin client_request and the client slot rule applies; the first \
+//	@Description	job sets the request approved
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-A06, DD-C09
 //	@Tags			jobs
@@ -512,6 +536,13 @@ func (m Jobs) createJob(ctx context.Context, call *ops.Call, input *CreateInput)
 	jobID, err := insertRequest(ctx, call, input, org, slots, due)
 	if err != nil {
 		return Job{}, err
+	}
+
+	if input.InstallationRequestID != nil {
+		err = approveRequest(ctx, call, *input.InstallationRequestID)
+		if err != nil {
+			return Job{}, err
+		}
 	}
 
 	eventErr := m.event(ctx, call, jobID, "job.created", nil)
@@ -561,7 +592,50 @@ func (m Jobs) unitToRequest(
 		return uuid.Nil, apperr.Fields(map[string]string{fieldUnitID: apperr.KeyUnitArchived})
 	}
 
-	return org, nil
+	err = m.checkInstallation(ctx, call, input)
+	if err != nil {
+		return org, err
+	}
+
+	return org, checkRequestLink(ctx, call, m.Units, input, org)
+}
+
+// checkInstallation applies DEC-106 to a new job: an installation job is HQ's, for a planned unit and the only
+// unfinished one of the unit, and a planned unit has no other kind of job.
+func (m Jobs) checkInstallation(ctx context.Context, call *ops.Call, input *CreateInput) error {
+	state, _, err := m.Units.UnitInstall(ctx, call, input.UnitID)
+	if err != nil {
+		return apperr.Wrap(err, "maintenance.JobUnits.UnitInstall")
+	}
+
+	planned := state == installPlanned
+
+	switch {
+	case input.Type == jobInstallation && call.Principal.Role == roleClient:
+		return apperr.Fields(map[string]string{"type": apperr.KeyNotAllowed})
+	case input.Type == jobInstallation && !planned, input.Type != jobInstallation && planned:
+		return apperr.Fields(map[string]string{"type": apperr.KeyInvalidState})
+	case input.Type != jobInstallation:
+		return nil
+	}
+
+	var open bool
+
+	err = call.Tx.QueryRow(
+		ctx,
+		`SELECT EXISTS (SELECT 1 FROM maintenance.jobs WHERE unit_id = $1 AND type = 'installation'
+			AND status NOT IN ('completed','cancelled'))`,
+		input.UnitID,
+	).Scan(&open)
+	if err != nil {
+		return apperr.Wrap(err, "select maintenance.jobs")
+	}
+
+	if open {
+		return apperr.E(apperr.Conflict, apperr.KeyConflict)
+	}
+
+	return nil
 }
 
 // requestedSlots answers the job's preferred slots, the requested slot and its alternatives (IR113 item 2: a client
@@ -570,7 +644,8 @@ func requestedSlots(call *ops.Call, input *CreateInput) ([]Slot, time.Time, erro
 	slots := append([]Slot{{input.RequestedStart, input.RequestedEnd}}, input.AlternativeSlots...)
 
 	alts := len(input.AlternativeSlots)
-	if (call.Principal.Role == roleClient && alts != 2) || alts > 2 {
+	if ((call.Principal.Role == roleClient || input.InstallationRequestID != nil) && alts != 2) ||
+		alts > 2 {
 		return nil, time.Time{}, apperr.Fields(
 			map[string]string{"alternativeSlots": apperr.KeyCount},
 		)
@@ -619,11 +694,12 @@ func insertRequest(
 
 	err = call.Tx.QueryRow(ctx, `INSERT INTO maintenance.jobs (tenant_id, unit_id, customer_org_id, type, status, origin,
 		symptom, contact_window, requested_slot,
-		preferred_slots, preference_round, due_at) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, 'requested',
-		'client_request', $4, $5,
-		tstzrange($6, $7), $8, 1, $9) RETURNING
+		preferred_slots, preference_round, due_at, installation_request_id)
+		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, 'requested',
+		CASE WHEN $3 = 'installation' AND $10::uuid IS NULL THEN 'hq_request' ELSE 'client_request' END, $4, $5,
+		tstzrange($6, $7), $8, 1, $9, $10) RETURNING
 		id`, input.UnitID, org, input.Type, input.Symptom, contactWindow, input.RequestedStart, input.RequestedEnd, pref,
-		due).
+		due, input.InstallationRequestID).
 		Scan(&jobID)
 
 	return jobID, apperr.Wrap(err, "insert maintenance.jobs")
@@ -1267,7 +1343,7 @@ func (m Jobs) getAttachment(
 //	@Description	unanswered offer: NOT_FOUND for contractor
 //	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
 //	@Description	Design: DD-A06, DD-C09, DD-P01, DD-P02, DD-P05, DD-P08, DD-T04, DD-T05, DD-T06, DD-T08, DD-T09, \
-//	@Description	DD-T10, DD-C17, DD-T13, DD-P10, DD-P03, DD-T02, DD-T07
+//	@Description	DD-T10, DD-C17, DD-T13, DD-P10, DD-P03, DD-T02, DD-T07, DD-T16
 //	@Tags			jobs
 //	@Accept			json
 //	@Produce		json
@@ -1316,6 +1392,9 @@ type listFilters struct {
 	ProposalPending *bool        `json:"proposalPending,omitempty"`
 	// MaintenanceJob.type; offer and history rows match their public type (IR290)
 	Type *string `json:"type,omitempty"`
+	// CurrentOnly leaves out the history rows of jobs whose access ended, so a stage tab lists only the work the caller
+	// still holds (IR797)
+	CurrentOnly *bool `json:"currentOnly,omitempty"`
 }
 
 // Summary is JobSummary of service-contracts.ts.
@@ -1408,7 +1487,8 @@ func severityRank() map[string]int {
 //	@Description	Design: DD-A06, DD-C09, DD-P01, DD-P03, DD-P06, DD-T01, DD-T11, DD-T12, DD-P10, DD-P07, DD-T13, \
 //	@Description	DD-T02 · Query: filters \
 //	@Description	unitId,unitIds,status,severity,from,to,organizationId,membershipId,customerId,propertyId,statuses,\
-//	@Description	overdueOnly,origin,proposalPending,type · sort id,severity,dueAt,status (default status asc;id asc)
+//	@Description	overdueOnly,origin,proposalPending,type,currentOnly · sort id,severity,dueAt,status (default status \
+//	@Description	asc;id asc)
 //	@Tags			jobs
 //	@Accept			json
 //	@Produce		json
@@ -1430,6 +1510,7 @@ func severityRank() map[string]int {
 //	@Param			origin			query		string		false	"filter"
 //	@Param			proposalPending	query		boolean		false	"filter"
 //	@Param			type			query		string		false	"filter"
+//	@Param			currentOnly		query		boolean		false	"filter"
 //	@Success		200				{object}	ops.Envelope{data=anyPage}
 //	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
 //	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
@@ -2514,7 +2595,7 @@ func (m Jobs) cancelJob(ctx context.Context, call *ops.Call, input *CancelInput)
 	}
 
 	if !allowed {
-		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
+		return Job{}, apperr.E(apperr.Conflict, apperr.KeyConflict)
 	}
 
 	_, execErr := call.Tx.Exec(
@@ -2650,7 +2731,7 @@ func (m Jobs) holdJob(ctx context.Context, call *ops.Call, input *ReasonInput) (
 	}
 
 	if status != statusInProgress && status != statusSubmitted {
-		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
+		return Job{}, apperr.E(apperr.Conflict, apperr.KeyConflict)
 	}
 
 	_, execErr := call.Tx.Exec(
@@ -2714,7 +2795,7 @@ func (m Jobs) resumeHoldJob(ctx context.Context, call *ops.Call, input *ReasonIn
 	}
 
 	if status != statusOnHold {
-		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
+		return Job{}, apperr.E(apperr.Conflict, apperr.KeyConflict)
 	}
 
 	_, execErr := call.Tx.Exec(
@@ -2810,7 +2891,7 @@ func (m Jobs) addNote(ctx context.Context, call *ops.Call, input *NoteInput) (No
 	}
 
 	if status == statusCompleted || status == statusCancelled {
-		return Note{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
+		return Note{}, apperr.E(apperr.Conflict, apperr.KeyConflict)
 	}
 
 	var note uuid.UUID

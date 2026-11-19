@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 # AC Project web apps (Next.js App Router): one image per entry point, built from the npm workspace in service/
-# (IR178). Build with --build-arg APP=customer | partner | technician | admin; context service/web/.
+# (IR178). Build with --build-arg APP=customer | partner | technician | admin | portal; context service/web/.
 ARG NODE_VERSION=26.12.1
 
 FROM node:${NODE_VERSION}-bookworm-slim AS deps
@@ -11,6 +11,7 @@ COPY customer/package.json customer/
 COPY partner/package.json partner/
 COPY technician/package.json technician/
 COPY admin/package.json admin/
+COPY portal/package.json portal/
 RUN --mount=type=cache,target=/root/.npm npm ci
 
 FROM node:${NODE_VERSION}-bookworm-slim AS build
@@ -20,6 +21,10 @@ ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=deps /src ./
 COPY shared shared
 COPY ${APP} ${APP}
+# the build the app names (IR856): the deployed tag in the shared test environment (compose passes IMAGE_TAG), so an
+# open page can see that the app was deployed since it loaded; declared here so the layers above stay cached
+ARG APP_VERSION=dev
+ENV APP_VERSION=${APP_VERSION}
 RUN npm run typecheck -w ${APP} && npm run build -w ${APP}
 
 # The runtime is the official Node image, not distroless: distroless's Node 22 line stopped at 22.22.0 without the fixes

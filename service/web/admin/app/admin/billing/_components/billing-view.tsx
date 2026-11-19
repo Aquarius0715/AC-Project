@@ -10,6 +10,8 @@ const CONTRACT_RTO_A = "contract-rto-a";
 const INVOICE_OVERDUE_A = "invoice-overdue-a";
 const NO_METHOD = "Method not selected";
 
+import { anySet } from "@ac/web/lib/filters";
+import { byName } from "@ac/web/lib/text";
 import { isNone } from "@ac/web/lib/isNone";
 import Link from "next/link";
 import { useState, useTransition } from "react";
@@ -41,6 +43,8 @@ const ROLE_WORD: Record<string, string> = { client: "Client", admin: "Admin", co
 
 type Tab = "invoices" | "inquiries" | "payouts";
 export interface BillingLive {
+  /** a restriction's link is shown only to a role that can open the Restrictions screen */
+  canOpenRestrictions: boolean;
   tab: Tab; scope: { customerId?: string; propertyId?: string; contractId?: string; overdueOnly: boolean; from?: string; to?: string };
   /** the billing months of the scope in words (Kuala Lumpur months), null without a period */
   months: string | null;
@@ -126,6 +130,14 @@ interface ReminderCardProps {
   onPreview: () => void; onSend: () => void;
 }
 
+/** Why Preview / Send reminder cannot be pressed yet, said beside them (UI/UX loop R56): a reason first, then (in API
+mode) a preview, since Send uses the previewed text. Null once Send can be pressed. */
+const hintText = (hint: string | null, t: (s: string) => string) => (hint ? t(hint) : null);
+function reminderHint(live: boolean, reminder: { reason: string; preview: string }): string | null {
+  if (!reminder.reason.trim()) return "Enter a reason to preview and send the reminder.";
+  return live && !reminder.preview ? "Preview the message first: Send uses the previewed text." : null;
+}
+
 /** The payment reminder of an overdue invoice: recipient, channel, reason, the preview and the buttons. */
 function ReminderCard({ live, recipients, recipient, reminder, setReminder, channel, channels, channelName, message, pending, onPreview, onSend }: Readonly<ReminderCardProps>) {
   const { t } = useI18n();
@@ -135,7 +147,7 @@ function ReminderCard({ live, recipients, recipient, reminder, setReminder, chan
           <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}><Field label={t("Recipient")}>{live ? <Select value={recipient?.id ?? ""} onChange={(e) => { setReminder({ ...reminder, recipient: e.target.value, preview: "" }); }}>{recipients.map((r) => <option key={r.id} value={r.id}>{r.displayLabel} · {t(ROLE_WORD[r.role] ?? r.role)}</option>)}</Select> : <Select><option>customer-a · Client</option></Select>}</Field><Field label={t("Channel")}><Select value={channel} onChange={(e) => { setReminder({ ...reminder, channel: e.target.value, preview: "" }); }}>{channels.map((c) => <option key={c} value={c}>{channelName(c)}</option>)}</Select></Field></div>
           <Field label={t("Reason · e.g. “2nd reminder after due date”")}><Input value={reminder.reason} onChange={(e) => { setReminder({ ...reminder, reason: e.target.value, preview: "" }); }} /></Field>
           {message && <div className="my-3 rounded-xl bg-surface2 p-3 text-xs"><b>{t("Preview · {channel}", { channel: channelName(channel) })}</b> <span className="text-muted-foreground">{t("nothing is sent yet")}</span><br />{message.subject && <><b>{message.subject}</b><br /></>}{message.body}</div>}
-          <div className="mt-3 flex justify-end gap-2">{live && <Btn disabled={pending || !reminder.reason.trim()} onClick={onPreview}>{t("Preview")}</Btn>}<Btn variant="primary" disabled={pending || !reminder.reason.trim() || (live && !reminder.preview)} onClick={onSend}>{t("Send reminder")}</Btn></div>
+          <div className="mt-3 flex flex-wrap items-center justify-end gap-2"><p aria-live="polite" className="mr-auto text-xs text-muted-foreground">{hintText(reminderHint(!!live, reminder), t)}</p>{live && <Btn disabled={pending || !reminder.reason.trim()} onClick={onPreview}>{t("Preview")}</Btn>}<Btn variant="primary" disabled={pending || !reminder.reason.trim() || (live && !reminder.preview)} onClick={onSend}>{t("Send reminder")}</Btn></div>
         </>}
       </Card>
   );
@@ -146,12 +158,12 @@ interface NewInvoice { contractId: string; from: string; to: string; dueAt: stri
 /** The scope filters of the invoices tab: customer, property, contract, billing months, overdue only. */
 function ScopeBar({ live, nav }: Readonly<{ live: BillingLive; nav: (patch: Record<string, string | null>) => void }>) {
   const { t } = useI18n();
-  const scopeProps = live.properties.filter((p) => !live.scope.customerId || p.customerId === live.scope.customerId);
+  const scopeProps = live.properties.filter((p) => !live.scope.customerId || p.customerId === live.scope.customerId).toSorted(byName);
   const scopeContracts = live.contractsOfCustomer.filter((k) => !live.scope.customerId || k.customerId === live.scope.customerId);
   const { contracts } = live;
   return (
       <div className="flex flex-wrap items-end gap-3">
-        <Field label={t("Customer")}><Select value={live.scope.customerId ?? ""} onChange={(e) => { nav({ customerId: e.target.value || null, propertyId: null, contractId: null, invoiceId: null }); }}><option value="">{t("All customers")}</option>{live.customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field>
+        <Field label={t("Customer")}><Select value={live.scope.customerId ?? ""} onChange={(e) => { nav({ customerId: e.target.value || null, propertyId: null, contractId: null, invoiceId: null }); }}><option value="">{t("All customers")}</option>{live.customers.toSorted(byName).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field>
         <Field label={t("Property")}><Select value={live.scope.propertyId ?? ""} onChange={(e) => { nav({ propertyId: e.target.value || null, invoiceId: null }); }}><option value="">{t("All properties")}</option>{scopeProps.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></Field>
         <Field label={t("Contract")}><Select value={live.scope.contractId ?? ""} onChange={(e) => { nav({ contractId: e.target.value || null, invoiceId: null }); }}><option value="">{t("All contracts")}</option>{scopeContracts.map((k) => <option key={k.id} value={k.id}>{contracts.find((c) => c.id === k.id)?.label ?? k.id}</option>)}</Select></Field>
         <BillingMonths from={live.scope.from} to={live.scope.to} onChange={(from, to) => { nav({ from, to, invoiceId: null }); }} />
@@ -341,7 +353,7 @@ export function BillingView({ live }: Readonly<{ live?: BillingLive }>) {
       {tab === "payouts" && (live ? <PayoutsTab live={live} nav={nav} act={act} pending={pending} /> : <ContractorPayouts />)}{tab === "invoices" && (
         <>
           {live && <ScopeBar live={live} nav={nav} />}
-          <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}>{[[t("Outstanding"), totals(list, ["Unpaid", "Overdue", PROCESSING]), t("unpaid · processing")], [t("Overdue"), totals(list, ["Overdue"]), t("reminders allowed")], [t(PROCESSING), totals(list, [PROCESSING]), t("awaiting HQ confirmation")], live?.months ? [t("Paid in period"), totals(list, ["Paid"]), live.months] : [t("Paid"), totals(list, ["Paid"]), t("in this scope")]].map(([a, b, c]) => <div key={a} className="rounded-2xl border border-line bg-surface p-4"><div className="text-xs text-muted-foreground">{a}</div><div className="text-xl font-bold">{b}</div><div className="text-[11px] text-muted-foreground">{c}</div></div>)}</div>
+          <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}>{[[t("Outstanding"), totals(list, ["Unpaid", "Overdue", PROCESSING]), t("unpaid + overdue + processing")], [t("Overdue"), totals(list, ["Overdue"]), t("reminders allowed")], [t(PROCESSING), totals(list, [PROCESSING]), t("awaiting HQ confirmation")], live?.months ? [t("Paid in period"), totals(list, ["Paid"]), live.months] : [t("Paid"), totals(list, ["Paid"]), t("in this scope")]].map(([a, b, c]) => <div key={a} className="rounded-2xl border border-line bg-surface p-4"><div className="text-xs text-muted-foreground">{a}</div><div className="text-xl font-bold">{b}</div><div className="text-[11px] text-muted-foreground">{c}</div></div>)}</div>
           <p className="text-[11px] text-muted-foreground">{t("Totals per currency — never converted")}{isOtherZone && ` · ${t("Billing periods and due dates are Kuala Lumpur dates ({zone}).", { zone: KL })}`}</p>
           <div className="flex flex-wrap items-center justify-between gap-3"><Tabs value={f} onChange={setF} tabs={(["All", "Unpaid", "Overdue", PROCESSING, "Paid"] as const).map((k) => ({ id: k, label: k === "All" ? t("All") : entryOf(statusText, k), count: k === "All" ? list.length : list.filter((x) => x.st === k).length }))} /><Btn size="sm" variant="primary" onClick={() => { setNw({ contractId: contracts[0]?.id ?? "", from: "", to: "", dueAt: "" }); setModal("create"); }}><Icon name="add" /> {t("Create invoice")}</Btn></div>
           {sel ? (
@@ -358,7 +370,7 @@ export function BillingView({ live }: Readonly<{ live?: BillingLive }>) {
                   {conflict && <div className="mt-3"><Banner tone="warn">{t("The invoice changed first (for example a payment arrived), so the action was stopped. The screen shows the latest version.")}</Banner></div>}
                 </Card>
                 {sel.st === "Overdue" && <ReminderCard live={live} recipients={recipients} recipient={recipient} reminder={reminder} setReminder={setReminder} channel={channel} channels={channels} channelName={channelName} message={message} pending={pending} onPreview={preview} onSend={send} />}
-                <RelatedRestrictions ids={live ? detail?.restrictionIds ?? [] : ["restriction-limited-a"]} />
+                <RelatedRestrictions ids={live ? detail?.restrictionIds ?? [] : ["restriction-limited-a"]} canOpen={live?.canOpenRestrictions ?? true} />
                 <Card title={t(CUSTOMER_INQUIRIES)}>
                   {linked.length === 0 ? <p className="text-xs text-muted-foreground">{t("No inquiry about this invoice.")}</p> : <div className="flex flex-col gap-2">{linked.map((q) => (
                       <div key={q.id} className={`rounded-xl p-2 ${live?.selectedInquiryId === q.id ? "bg-primary-soft" : ""}`}><p className="text-[13px]">{q.text}</p><p className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">{t("{kind} · received {time} · {customer}", { kind: q.kind, time: q.at, customer: q.cust })} {q.state === "answered" && <Badge tone="ok">{t("Answered")}</Badge>}<Plain className="font-semibold text-primary" onClick={() => { openInquiry(q.id); }}>{t("Open in Inquiries")} <Icon name="arrowRight" /></Plain></p></div>
@@ -366,7 +378,7 @@ export function BillingView({ live }: Readonly<{ live?: BillingLive }>) {
                 </Card>
               </div>
             </div>
-          ) : <Card title={t("Invoices")}><EmptyState title={t("No invoices")}>{t("No invoice matches this scope.")}</EmptyState></Card>}
+          ) : <Card title={t("Invoices")}><EmptyState title={t("No invoices")}>{t(!live || anySet(live.scope.customerId, live.scope.propertyId, live.scope.contractId, live.scope.overdueOnly, live.scope.from, live.scope.to) ? "No invoice matches this scope." : "No invoice has been issued yet.")}</EmptyState></Card>}
         </>
       )}{tab === "inquiries" && <InquiriesPanel inquiries={inquiries} iqState={iqState} setIqState={setIqState} iqShown={iqShown} iq={iq} iqInvoice={iqInvoice} openInquiry={openInquiry} openInvoice={openInvoice} reply={reply} setReply={setReply} tried={tried} setTried={setTried} pending={pending} act={act} invoiceLabel={invoiceLabel} live={live} toast={toast} />}
       <PaymentModal modal={modal} close={close} onRecord={modal === "confirm" ? confirm : record} pending={pending} tried={tried} live={live} sel={sel} m={m} setM={setM} />
@@ -385,16 +397,16 @@ function restrictionCell(id: string | null | undefined, isLive: boolean): React.
 }
 /** The restrictions this invoice is a cause of (DD-A08 step 6): their IDs with a link each to the restriction on the
 Restrictions screen, which checks restriction.read itself; their state and units are not read here (IR321). */
-function RelatedRestrictions({ ids }: Readonly<{ ids: string[] }>) {
+function RelatedRestrictions({ ids, canOpen }: Readonly<{ ids: string[]; canOpen: boolean }>) {
   const { t } = useI18n();
   return (
     <Card title={t(ids.length > 1 ? "Related restrictions" : "Related restriction")}>
       {ids.length === 0 ? <p className="text-xs text-muted-foreground">{t("No restriction cites this invoice.")}</p> : (
         <div className="flex flex-col gap-1.5">{ids.map((id) => (
-            <p key={id} className="flex flex-wrap items-center justify-between gap-2 text-[13px]"><span className="font-mono font-semibold">{shortId(id)}</span><Link className="text-xs font-semibold text-primary" href={`/admin/restrictions?restrictionId=${id}`}>{t("Open restriction")} <Icon name="arrowRight" /></Link></p>
+            <p key={id} className="flex flex-wrap items-center justify-between gap-2 text-[13px]"><span className="font-mono font-semibold">{shortId(id)}</span>{canOpen ? <Link className="text-xs font-semibold text-primary" href={`/admin/restrictions?restrictionId=${id}`}>{t("Open restriction")} <Icon name="arrowRight" /></Link> : <span className="text-xs text-muted-foreground"><Icon name="locked" /> {t("Your role can’t open Restrictions")}</span>}</p>
           ))}
-          <p className="text-xs text-muted-foreground">{t(ids.length > 1 ? "This invoice is a cause of these restrictions. Once all cause invoices of a restriction are paid, it moves to “release requested”. Their states and units are on the Restrictions screen (restriction.read)."
-            : "This invoice is a cause of this restriction. Once all of its cause invoices are paid, it moves to “release requested”. Its state and units are on the Restrictions screen (restriction.read).")}</p>
+          <p className="text-xs text-muted-foreground">{t(ids.length > 1 ? "This invoice is a cause of these restrictions. Once all cause invoices of a restriction are paid, it moves to “release requested”. Their states and units are on the Restrictions screen (“View restrictions”)."
+            : "This invoice is a cause of this restriction. Once all of its cause invoices are paid, it moves to “release requested”. Its state and units are on the Restrictions screen (“View restrictions”).")}</p>
         </div>
       )}
     </Card>
@@ -465,12 +477,12 @@ function PayoutsTab({ live, nav, act, pending }: Readonly<{ live: BillingLive; n
         </Card>
         {live.statementMissing ? <EmptyState title={t("That statement is not in this list")}>{t("It does not exist, or the period, contractor or status filter hides it.")}</EmptyState> : st && (
           <Card title={`${st.contractor} · ${st.period}`} sub={t("Priced by the rate card effective at acceptance · pays {date}", { date: st.payDate })} className="self-start"
-            action={<span className="flex gap-2">{st.status === "Draft" && <Btn size="sm" variant="primary" disabled={pending} onClick={() => { act(() => transitionStatement(st.id, st.version, "approve"), t("Statement approved")); }}>{t("Approve")}</Btn>}{st.status === "Approved" && <Btn size="sm" variant="primary" disabled={pending || !st.payable} title={st.payable ? undefined : t("Payable on or after {date}", { date: st.payDate })} onClick={() => { act(() => transitionStatement(st.id, st.version, "mark_paid"), t("Marked paid")); }}>{t("Mark paid")}</Btn>}</span>}>
+            action={<span className="flex gap-2">{st.status === "Draft" && <Btn size="sm" variant="primary" disabled={pending} onClick={() => { act(() => transitionStatement(st.id, st.version, "approve"), t("Statement approved")); }}>{t("Approve")}</Btn>}{st.status === "Approved" && <Btn size="sm" variant="primary" disabled={pending || !st.payable} onClick={() => { act(() => transitionStatement(st.id, st.version, "mark_paid"), t("Marked paid")); }}>{t("Mark paid")}</Btn>}{st.status === "Approved" && !st.payable && <span className="self-center text-[11px] text-muted-foreground">{t("Payable on or after {date}", { date: st.payDate })}</span>}</span>}>
             <SummaryList items={[
               [t("Jobs"), String(st.jobs)], [t("Gross"), st.gross], [t("Deductions"), st.deductions], [t("Net"), st.net], [t("Status"), st.statusText],
               ...(st.approvedBy ? [[t("Approved by"), st.approvedBy] as [string, string]] : []),
             ]} />
-            {st.status === "Approved" && !st.payable && <p className="mt-2 text-[11px] text-muted-foreground">{t("Mark paid unlocks on the pay date ({date}). Payouts need billing.payment; every action is audited.", { date: st.payDate })}</p>}
+            {st.status === "Approved" && !st.payable && <p className="mt-2 text-[11px] text-muted-foreground">{t("Mark paid unlocks on the pay date ({date}). Payouts need “Confirm payments”; every action is audited.", { date: st.payDate })}</p>}
             {st.lines.length > 0 && <div className="mt-3"><DataTable rows={st.lines} rowKey={(r) => r.id} cols={[{ key: "j", label: t("Job"), render: (r) => <span className="font-mono text-xs">{r.job}</span> }, { key: "w", label: t("Work"), render: (r) => r.work }, { key: "k", label: t("Kind"), render: (r) => r.kind }, { key: "a", label: t("Amount"), render: (r) => r.amount }, { key: "n", label: t("Note"), render: (r) => r.note }]} /></div>}
             {st.queries.map((q) => (
               <div key={q.id} className="mt-3 rounded-xl bg-surface2 p-3 text-[13px]">

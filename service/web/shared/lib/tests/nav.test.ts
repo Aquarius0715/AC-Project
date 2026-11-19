@@ -1,7 +1,7 @@
 // The page's name in the shell header and the document title (WCAG 2.4.2, IR490): the menu item with the longest matching
 // path, the shared pages, Users and Demo controls, in the display language.
 import { describe, expect, it } from "vitest";
-import { documentTitle, pageLabel, ROLES, SHARED_PAGES } from "@ac/web/lib/nav";
+import { lockedNav, documentTitle, pageLabel, ROLES, SHARED_PAGES } from "@ac/web/lib/nav";
 import { ms } from "@ac/web/lib/i18n-ms";
 
 const TECHNICIAN = "technician";
@@ -20,6 +20,9 @@ describe("page names and document titles (IR490)", () => {
   it("names the shared pages, Users and Demo controls, and nothing off the menu", () => {
     expect([pageLabel("client", "/notifications"), pageLabel("admin", "/settings/preferences"), pageLabel("client", "/customer/users"), pageLabel("contractor", "/partner/users"), pageLabel(TECHNICIAN, "/demo"), pageLabel("client", "/login")])
       .toStrictEqual(["Notifications", "Preferences", "Users", "Users", "Demo controls", null]);
+    // the installation requests page (FR-C20) has no menu item but is named by its exact path
+    expect([pageLabel("client", "/customer/installations"), pageLabel("client", "/customer/installation")]).toStrictEqual(["Installations", null]);
+    expect(Object.hasOwn(ms, "Installations")).toBe(true);
   });
 
   it("titles the document in the display language", () => {
@@ -30,5 +33,18 @@ describe("page names and document titles (IR490)", () => {
   it("has a Malay name for every menu item and shared page", () => {
     const labels = [...Object.values(ROLES).flatMap((r) => [...r.nav.map((i) => i.label), r.sub]), ...SHARED_PAGES.map((s) => s.label), "Users", "Demo controls"];
     expect(labels.filter((l) => !Object.hasOwn(ms, l))).toStrictEqual([]);
+  });
+});
+
+describe("the HQ menu's locked screens (UI/UX loop R55)", () => {
+  it("locks a screen missing one of its `all` permissions, or every one of its `any`", () => {
+    const everything = ["dashboard.read", "asset.read", "identity.read", "device.read", "alert.read", "alert.policy.read", "job.read", "contract.read", "billing.read",
+      "restriction.override", "automation.policy.read", "energy.read", "mrv.read", "offset.read", "audit.read"];
+    expect(lockedNav(new Set(everything))).toStrictEqual([]);
+    expect(lockedNav(new Set(everything.filter((p) => p !== "asset.read")))).toStrictEqual([
+      "/admin/units", "/admin/settings/access", "/admin/alerts", "/admin/jobs", "/admin/billing/contracts", "/admin/billing", "/admin/settings/automation", "/admin/energy",
+    ]);
+    expect(lockedNav(new Set(everything.filter((p) => p !== "restriction.override")))).toStrictEqual(["/admin/restrictions"]);
+    expect(lockedNav(new Set())).toHaveLength(14);
   });
 });

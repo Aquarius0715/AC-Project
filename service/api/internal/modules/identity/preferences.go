@@ -23,7 +23,13 @@ type Preferences struct {
 	Currency           string `json:"currency"`
 	MonthlyReportEmail bool   `json:"monthlyReportEmail"`
 	TwoFactorEnabled   bool   `json:"twoFactorEnabled"`
+	// PinnedUnitIDs are the ACs the user pinned to their Overview (IR819), newest first; ids only, the screen shows
+	// those the user can still read.
+	PinnedUnitIDs []uuid.UUID `json:"pinnedUnitIds"`
 }
+
+// MaxPinnedUnits is how many ACs a user may pin (the column's CHECK too).
+const MaxPinnedUnits = 8
 
 func loadPreferences(ctx context.Context, call *ops.Call) (Preferences, error) {
 	preferences := Preferences{
@@ -32,11 +38,13 @@ func loadPreferences(ctx context.Context, call *ops.Call) (Preferences, error) {
 		Currency:           "MYR",
 		MonthlyReportEmail: false,
 		TwoFactorEnabled:   false,
+		PinnedUnitIDs:      []uuid.UUID{},
 	}
 
-	err := call.Tx.QueryRow(ctx, `SELECT locale, timezone, currency, monthly_report_email FROM identity.preferences WHERE
-		user_id = $1`, call.Principal.UserID).
-		Scan(&preferences.Locale, &preferences.Timezone, &preferences.Currency, &preferences.MonthlyReportEmail)
+	err := call.Tx.QueryRow(ctx, `SELECT locale, timezone, currency, monthly_report_email, pinned_unit_ids FROM
+		identity.preferences WHERE user_id = $1`, call.Principal.UserID).
+		Scan(&preferences.Locale, &preferences.Timezone, &preferences.Currency, &preferences.MonthlyReportEmail,
+			&preferences.PinnedUnitIDs)
 	if errors.Is(err, pgx.ErrNoRows) {
 		err = nil
 	}
@@ -57,6 +65,8 @@ type PreferencesInput struct {
 	Locale             string `json:"locale"`
 	Timezone           string `json:"timezone"`
 	MonthlyReportEmail *bool  `json:"monthlyReportEmail,omitempty"`
+	// PinnedUnitIDs replaces the pins when given (IR819); left out, they stay as they are.
+	PinnedUnitIDs *[]uuid.UUID `json:"pinnedUnitIds,omitempty"`
 }
 
 // ValidTimezone reports whether tz is a supported IANA zone name (not "Local").
@@ -73,7 +83,7 @@ func ValidTimezone(tz string) bool {
 // Validate implements ops.Validator.
 func (in *PreferencesInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
-	if !slices.Contains([]string{"en", "ms", "ja"}, in.Locale) {
+	if !slices.Contains([]string{"en", "ms", "ja", "id"}, in.Locale) {
 		fieldErrs["locale"] = apperr.KeyInvalid
 	}
 
@@ -81,7 +91,29 @@ func (in *PreferencesInput) Validate() map[string]string {
 		fieldErrs["timezone"] = apperr.KeyInvalid
 	}
 
+	if in.PinnedUnitIDs != nil && !validPins(*in.PinnedUnitIDs) {
+		fieldErrs["pinnedUnitIds"] = apperr.KeyInvalid
+	}
+
 	return fieldErrs
+}
+
+// validPins accepts at most MaxPinnedUnits distinct, non-nil ids.
+func validPins(ids []uuid.UUID) bool {
+	if len(ids) > MaxPinnedUnits {
+		return false
+	}
+
+	seen := make(map[uuid.UUID]bool, len(ids))
+	for _, id := range ids {
+		if id == uuid.Nil || seen[id] {
+			return false
+		}
+
+		seen[id] = true
+	}
+
+	return true
 }
 
 // updatePreferences saves the caller's preferences; monthlyReportEmail is accepted only from client sessions (IR112).
@@ -130,16 +162,22 @@ func updatePreferences(
 		monthly = *input.MonthlyReportEmail
 	}
 
+	pins := cur.PinnedUnitIDs
+	if input.PinnedUnitIDs != nil {
+		pins = *input.PinnedUnitIDs
+	}
+
 	_, execErr := call.Tx.Exec(
 		ctx,
-		`INSERT INTO identity.preferences (user_id, locale, timezone, monthly_report_email, updated_at) VALUES ($1, $2, $3,
-			$4, $5)
-		ON CONFLICT (user_id) DO UPDATE SET locale = $2, timezone = $3, monthly_report_email = $4, version =
-		identity.preferences.version + 1, updated_at = $5`,
+		`INSERT INTO identity.preferences (user_id, locale, timezone, monthly_report_email, pinned_unit_ids, updated_at)
+			VALUES ($1, $2, $3, $4, $5, $6)
+		ON CONFLICT (user_id) DO UPDATE SET locale = $2, timezone = $3, monthly_report_email = $4, pinned_unit_ids = $5,
+		version = identity.preferences.version + 1, updated_at = $6`,
 		call.Principal.UserID,
 		input.Locale,
 		input.Timezone,
 		monthly,
+		pins,
 		call.Now,
 	)
 	if execErr != nil {
@@ -160,7 +198,7 @@ func updatePreferences(
 		},
 	)
 
-	cur.Locale, cur.Timezone, cur.MonthlyReportEmail = input.Locale, input.Timezone, monthly
+	cur.Locale, cur.Timezone, cur.MonthlyReportEmail, cur.PinnedUnitIDs = input.Locale, input.Timezone, monthly, pins
 
 	return cur, nil
 }

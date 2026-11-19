@@ -6,10 +6,11 @@ import { Badge, EmptyState, ErrorState, Page, PageHead, Select, Tabs, Plain } fr
 import { OriginBadge } from "@ac/web/components/JobBits";
 import { type PJob, pjobs } from "@ac/web/lib/partner";
 import { fmt, useJobs } from "@ac/web/lib/jobs";
+import type { Origin } from "@ac/web/lib/origin";
 import { oneOf } from "@ac/web/lib/oneOf";
 import { orDash } from "@ac/web/lib/text";
 
-type Row = PJob & { origin: "request" | "plan" };
+type Row = PJob & { origin: Origin };
 type StoreJob = ReturnType<typeof useJobs>[number];
 
 /** A store job's line and status label: offered (or with the contractor's time proposal), accepted, or assigned. */

@@ -36,7 +36,9 @@ export async function loadMaintenance(sp: Record<string, string | string[] | und
   const { t } = i;
   const nowMs = now.getTime();
   const place = unitPlaces(units, properties, spaces);
-  const unitOf = (id: string) => place.get(id) ?? { name: t("Unit"), place: "" };
+  // a unit missing from units.list (archived, or a planned unit removed before install) is named as gone, not as a bare
+  // "Unit" (UI/UX loop R125)
+  const unitOf = (id: string) => place.get(id) ?? { name: t("AC no longer available"), place: "" };
   const active = units.filter((u) => !u.archived);
   // new=<unitId>: open New request for that unit (an alert's “Request repair”, Figma Client 06g)
   const requestUnitId = active.find((u) => u.id === one(sp.new))?.id ?? null;

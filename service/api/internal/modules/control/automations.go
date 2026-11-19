@@ -26,6 +26,8 @@ type Automations struct {
 	Units    Units
 	Cmd      Commands
 	Notifier Notifier
+	// Sites are the customer's pinned properties of the away/home geofence (presence.report, DEC-109)
+	Sites Sites
 }
 
 // Notifier evaluates alert-policy notifications per unit (Monitoring, SR21/SR25).
@@ -1317,11 +1319,12 @@ func (m Automations) delete(
 	return Deleted{ID: cur.ID, Deleted: true}, nil
 }
 
-// RegisterAutomations binds automations.save / list / nextRuns / delete.
-func RegisterAutomations(r *ops.Registry, m Automations) {
-	ops.Register(r, "automations.save", m.save)
-	ops.Register(r, "automations.list", m.list)
-	ops.Register(r, "automations.nextRuns", m.nextRuns)
-	ops.Register(r, "automations.delete", m.delete)
-	RegisterEvaluation(r, m)
+// RegisterAutomations binds automations.save / list / nextRuns / delete and the away/home presence report.
+func RegisterAutomations(reg *ops.Registry, automations Automations) {
+	ops.Register(reg, "automations.save", automations.save)
+	ops.Register(reg, "automations.list", automations.list)
+	ops.Register(reg, "automations.nextRuns", automations.nextRuns)
+	ops.Register(reg, "automations.delete", automations.delete)
+	ops.Register(reg, "presence.report", automations.reportPresence)
+	RegisterEvaluation(reg, automations)
 }

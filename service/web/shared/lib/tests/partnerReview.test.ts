@@ -114,7 +114,7 @@ describe("review availability (IR31)", () => {
     expect(availabilityText({ allowed: false, reason: NOT_SUBMITTED }, "completed")).toMatch(/accepted; the job is completed/);
     expect(availabilityText({ allowed: false, reason: NOT_SUBMITTED }, "rework_requested")).toMatch(/returned for rework/);
     expect(availabilityText({ allowed: false, reason: NOT_SUBMITTED }, "in_progress")).toMatch(/not been submitted/);
-    expect(availabilityText({ allowed: false, reason: "permission_denied" }, "submitted")).toMatch(/partner\.review/);
+    expect(availabilityText({ allowed: false, reason: "permission_denied" }, "submitted")).toMatch(/Review technician reports/); // the permission in words (IR821)
   });
 });
 

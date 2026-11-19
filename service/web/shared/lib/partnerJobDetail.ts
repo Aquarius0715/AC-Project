@@ -38,18 +38,19 @@ export const qualificationLabel = (code: string, t: T = en) => (textOf(QUALIFICA
 const SCOPE_QUALIFICATION: Record<string, string> = { indoor: "demo_indoor", outdoor: "demo_outdoor", electrical: "demo_electrical" }; // fixture qualificationRequirements
 /** The qualifications a delegated job requires: one per entry of the unit's maintenance scope (IR123 item 3). */
 export const requiredFor = (serviceScope: string[]) => serviceScope.map((s) => lookup(SCOPE_QUALIFICATION, s)).filter((q): q is string => !!q);
-const TYPES: Record<string, string> = { periodic: "Periodic inspection", reactive: "Repair", preventive: "Preventive maintenance" };
+const TYPES: Record<string, string> = { periodic: "Periodic inspection", reactive: "Repair", preventive: "Preventive maintenance", installation: "Installation" };
 export const typeLabel = (type: string, t: T = en) => (textOf(TYPES, type, t) ?? type);
-export const originLabel = (o: string, t: T = en) => t(o === "periodic_plan" ? "from the periodic plan" : "agreed with the client");
+const ORIGINS: Record<string, string> = { periodic_plan: "from the periodic plan", hq_request: "requested by HQ" };
+export const originLabel = (o: string, t: T = en) => t(lookup(ORIGINS, o) ?? "agreed with the client");
 const STATUS_WORDS: Record<string, string> = {
   requested: "requested", offered: "offered", accepted: "accepted", assigned: "assigned", in_progress: "in progress", on_hold: "on hold", submitted: "submitted",
   rework_requested: "rework requested", completed: "completed", cancelled: "cancelled",
 };
 /** A job status inside a sentence (“the job is on hold”), in the display language. */
 export const statusWord = (status: string, t: T = en) => (textOf(STATUS_WORDS, status, t) ?? status.replaceAll('_', " "));
-/** “1st”, “2nd”, “3rd”, “4th” … in English, “ke-1” in Malay, “第1” in Japanese. */
+/** “1st”, “2nd”, “3rd”, “4th” … in English, “ke-1” in Malay and Indonesian, “第1” in Japanese. */
 export function ordinal(n: number, locale: Locale = "en"): string {
-  if (locale === "ms") return `ke-${String(n)}`;
+  if (locale === "ms" || locale === "id") return `ke-${String(n)}`;
   if (locale === "ja") return `第${String(n)}`;
   const teen = n % 100 >= 11 && n % 100 <= 13;
   const suffix = teen ? "th" : (["th", "st", "nd", "rd"].at(n % 10) ?? "th");

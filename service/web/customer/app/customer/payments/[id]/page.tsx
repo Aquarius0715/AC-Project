@@ -17,11 +17,17 @@ import {
   type ClientContract, type ClientPayment,
 } from "@ac/web/lib/clientBilling";
 import { InvoiceDemo } from "./_components/invoice-demo";
+import { demoInvoice } from "../_lib/demo-contracts";
 import { InvoiceView, type InvoiceLive } from "./_components/invoice-view";
 import { queryReader } from "@ac/web/lib/searchParams";
 import { orNull } from "@ac/web/lib/promises";
+import { z } from "zod";
 
 const RESTRICTION = "restriction";
+// the payment provider of the deployment (DEC-68): demo by default; an unknown value fails at start, not on a payment
+const PAYMENT_PROVIDER = z.enum(["demo", "stripe"]).parse((process.env.PAYMENT_PROVIDER ?? "demo").toLowerCase());
+// Stripe sends the payer back with ?checkout=return or ?checkout=cancelled (payments.startCheckout)
+const checkoutReturn = z.enum(["return", "cancelled"]);
 
 export default async function CustomerInvoicePage({ params, searchParams }: Readonly<PageProps<"/customer/payments/[id]">>) {
   interface Reminder { id: string; channel: string; occurredAt: string; target: { kind: string; id: string } }
@@ -30,7 +36,11 @@ export default async function CustomerInvoicePage({ params, searchParams }: Read
   const sp = await searchParams;
   const one = queryReader(sp);
   await connection();
-  if (!apiMode()) return <InvoiceDemo id={id} tab={one("tab")} />;
+  if (!apiMode()) {
+    const demo = demoInvoice(id);
+    if (!demo) notFound();
+    return <InvoiceDemo invoice={demo.invoice} contract={demo.contract} tab={one("tab")} />;
+  }
   let inv: ApiInvoiceDetail & { createdAt: string; paymentRefs: ClientPayment[] };
   try {
     inv = await coreOp("invoices.get", { id });
@@ -90,6 +100,9 @@ export default async function CustomerInvoicePage({ params, searchParams }: Read
     restriction,
     otherZone: display.timeZone !== KL,
     whatsapp: whatsappReady,
+    // the provider the deployment uses: Stripe Checkout takes the payment and the demo payment events are off (DEC-68)
+    stripe: PAYMENT_PROVIDER === "stripe",
+    checkout: checkoutReturn.safeParse(one("checkout")).data ?? null,
     invoice: {
       id: inv.id, version: inv.version, number: inv.number, amount: amount(inv.amountMinor, inv.currency),
       due: t("Due {date} · billing period {month}", { date: businessDay(inv.dueAt, loc), month: billingMonth(inv.period.from, loc) }), dueDate: businessDay(inv.dueAt, loc), status: st, payable: st === "Unpaid" || st === "Overdue",
@@ -99,8 +112,8 @@ export default async function CustomerInvoicePage({ params, searchParams }: Read
       scope: `${t(contract.units.length === 1 ? "{n} unit" : "{n} units", { n: contract.units.length })}${contract.units.length > 0 ? ` (${contract.units.map((u) => u.name).join(", ")})` : ""}`,
     },
     payments: paymentLines(inv.paymentRefs, i18n),
-    open: open && { id: open.id, version: open.version, status: open.status, method: open.method },
-    last: last && { status: last.status, reference: last.paymentReference, method: last.method, id: last.id },
+    open: open && { id: open.id, version: open.version, status: open.status, method: open.method, channel: open.channel },
+    last: last && { status: last.status, reference: last.paymentReference, method: last.method, id: last.id, channel: last.channel },
     inquiries: inquiryLines(inquiries, i18n),
     inquiryId: one("inquiryId") ?? null,
     reminders: reminders.map((n) => ({ id: n.id, channel: n.channel, at: showDate(n.occurredAt, display) })),

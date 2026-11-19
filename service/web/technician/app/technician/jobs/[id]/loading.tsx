@@ -1,5 +1,5 @@
 import { RouteLoading } from "@ac/web/components/RouteStates";
 
 export default function Loading() {
-  return <RouteLoading what="job" />;
+  return <RouteLoading what="job" variant="detail" />;
 }

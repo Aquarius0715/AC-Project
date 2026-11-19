@@ -1,4 +1,5 @@
 "use client";
+const NEW_POLICY_FOR = "New policy for {name}";
 const ADD_PROPERTY = "Add property";
 const VERSION_V = "version {v}";
 const DEFAULT_ALERT = "default_alert";
@@ -6,7 +7,7 @@ const REASON_REQUIRED = "Reason · required";
 const MAINTENANCE_CONTRACT = "Maintenance contract";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Badge, Banner, Btn, Card, Check, Choice, ConnBadge, cx, DataTable, EmptyState, Field, Input, Kpi, LinkButton, Modal, Page, PowerBadge, Search, Select, SummaryList, Tabs, Textarea, TextLink, Toggle, ActionMenu, Plain } from "@ac/web/components/ui";
 import { useI18n, useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
@@ -25,8 +26,11 @@ import { nameError as personNameError } from "@ac/web/lib/partnerUsers";
 import type { Metric } from "@ac/web/lib/devices";
 import { amount } from "@ac/web/lib/energy";
 import { typeLabel } from "@ac/web/lib/partnerJobDetail";
-import { type NewUnitDevice, archiveLocation, archiveUnit, createCustomer, deleteCustomer, deleteUnit, importCommit, importPreview, importUndo, inviteClientUser, previewPasswordReset, recordWarrantyClaim, removeClientUser, resendInvite, saveProperty, saveSpace, saveUnit, saveUnitWithDevice, setDefaultRule, setUnitPolicies, updateClientUser, updateCustomer, signOutEverywhere } from "../actions";
+import { type NewUnitDevice, archiveLocation, archiveUnit, createCustomer, deleteCustomer, deleteUnit, importCommit, importPreview, importUndo, inviteClientUser, previewPasswordReset, recordWarrantyClaim, removeClientUser, resendInvite, saveProperty, saveSpace, searchAddress, saveUnit, saveUnitWithDevice, setDefaultRule, setUnitPolicies, updateClientUser, updateCustomer, signOutEverywhere } from "../actions";
 import { NewUnitDeviceSection, UnitDevicePanel, type UnitDevice } from "./unit-device";
+import { LocationPicker, PinMap } from "@ac/web/components/LocationPicker";
+import type { MapConfig } from "@ac/web/lib/mapConfig";
+import { DEFAULT_GEOFENCE_RADIUS, parseRadius, showPoint } from "@ac/web/lib/geoPoint";
 import { Icon, type IconName } from "@ac/web/components/Icon";
 import { NeedsAccess } from "@ac/web/components/NeedsAccess";
 import { ForceDeleteField, forceReady, noForce } from "@ac/web/components/DeleteDialog";
@@ -47,6 +51,8 @@ interface WarrantyLive { rows: CoverageRow[]; kpis: ReturnType<typeof coverageKp
 export interface UnitsLive {
   now: string; todayKL: string; canWrite: boolean; canForce: boolean; standingKnown: boolean; rows: CustomerRow[]; kpis: ReturnType<typeof registerKpis>; search: string; missing: boolean;
   top: "customers" | "warranty"; activeCustomers: { id: string; name: string }[]; coverageAttention: number | null; warranty?: WarrantyLive | null; customer?: CustomerLive;
+  /** the property pin's map and address search (DEC-109) */
+  map: MapConfig;
 }
 type Nav = ReturnType<typeof useUrlPatch>;
 type Run = ReturnType<typeof useAction>[1];
@@ -113,7 +119,9 @@ function CustomerList({ live }: Readonly<{ live: UnitsLive }>) {
         <Kpi label={t("Customers")} value={k.customers} sub={k.inactive ? t("+{n} inactive (not counted)", { n: k.inactive }) : t("all active")} />
         <Kpi label={t("Properties")} value={k.properties} sub={k.propertyNames} />
         <Kpi label={t("Units")} value={k.units} sub={k.power} />
-        <Kpi label={t("Needs attention")} value={k.attention} tone={k.attention ? "warn" : undefined} sub={t(live.standingKnown ? "overdue billing / restriction / open alert" : "open alerts (billing needs billing.read)")} />
+        <Kpi label={t("Needs attention")} value={k.attention} tone={k.attention ? "warn" : undefined}
+          badge={live.standingKnown && k.attention > 0 && <Plain type="button" touch className="text-xs font-semibold text-primary hover:underline" aria-pressed={contract === "attention"} onClick={() => { setContract(contract === "attention" ? "all" : "attention"); }}>{t(contract === "attention" ? "Clear filter" : "Show these")}</Plain>}
+          sub={t(live.standingKnown ? "overdue billing / restriction / open alert" : "open alerts (billing needs “View billing”)")} />
       </div>
       <Card title={t("Customers")} sub={t("Select a customer to manage its properties, spaces and units")} action={live.canWrite && <Btn size="sm" variant="primary" onClick={() => { setOpen(true); }}><Icon name="add" /> {t("New customer")}</Btn>}>
         <div className="mb-3 flex flex-wrap items-center gap-3">
@@ -121,13 +129,13 @@ function CustomerList({ live }: Readonly<{ live: UnitsLive }>) {
           <Select aria-label={t("Status")} className="w-auto" value={status} onChange={(e) => { setStatus(oneOf(["active", "all"] as const, e.target.value, status)); }}><option value="active">{t("Status: Active")}</option><option value="all">{t("Status: All")}</option></Select>
           {live.standingKnown && (
             <Select aria-label={t("Contract")} className="w-auto" value={contract} onChange={(e) => { setContract(oneOf(contractFilters, e.target.value, contract)); }}>
-              <option value="all">{t("Contract: All")}</option><option value="overdue">{t("Overdue")}</option><option value="restricted">{t("Restriction")}</option><option value="good">{t("Good standing")}</option><option value="none">{t("No contract")}</option>
+              <option value="all">{t("Contract: All")}</option><option value="attention">{t("Needs attention")}</option><option value="overdue">{t("Overdue")}</option><option value="restricted">{t("Restriction")}</option><option value="good">{t("Good standing")}</option><option value="none">{t("No contract")}</option>
             </Select>
           )}
         </div>
         {live.rows.length === 0 ? <EmptyState title={t("No customers yet")}>{t(live.canWrite ? "Create the first customer, then add its properties and units." : "Customers appear here once HQ registers them.")}</EmptyState> : (
           <DataTable rows={rows} rowKey={(r) => r.id} onRowClick={(r) => { nav({ customerId: r.id, tab: null, locationId: null, unitId: null, powerState: null, connections: null, search: null }); }} cols={[
-            { key: "c", label: t("Customer"), render: (r) => <><b>{r.name}</b><div className="text-xs text-muted-foreground">{r.billingName} · {r.id.slice(0, 8)}</div></> },
+            { key: "c", label: t("Customer"), render: (r) => <><b>{r.name}</b><div className="text-xs text-muted-foreground">{r.billingName && r.billingName !== r.name ? t("billed as {name} · {id}", { name: r.billingName, id: r.id.slice(0, 8) }) : r.id.slice(0, 8)}</div></> },
             { key: "s", label: t("Status"), render: (r) => <Badge tone={r.status === "active" ? "ok" : "unknown"}>{t(r.status === "active" ? "Active" : "Inactive")}</Badge> },
             { key: "p", label: t("Properties"), render: (r) => r.properties, hideBelow: "sm" },
             { key: "u", label: t("Units"), render: (r) => r.units },
@@ -186,6 +194,10 @@ function CustomerScreen({ live, c }: Readonly<{ live: UnitsLive; c: CustomerLive
   const canWrite = live.canWrite;
   const sel = c.selection;
   const selId = selectionId(sel);
+  // one New unit in view: the header's only where the units card (which has its own) is not shown, and never next to the
+  // Users or Alert policies tab's own primary action (UI/UX loop R100)
+  const isUnitsTab = c.tab !== "policies" && c.tab !== "users";
+  const isHeaderNewUnit = isUnitsTab && (Boolean(c.unit) || !sel);
   const addUnitHere = () => { setM({ kind: "unit", propertyId: sel?.property.id ?? c.tree[0]?.id ?? "", spaceId: sel?.kind === "space" ? sel.space.id : "" }); };
   const unitsTotal = c.tree.reduce((n, p) => n + p.units, 0);
   return (
@@ -197,8 +209,10 @@ function CustomerScreen({ live, c }: Readonly<{ live: UnitsLive; c: CustomerLive
         {/* the actions wrap at phone width: three in Malay are wider than 360 px (IR730) */}
         <div className="ml-auto flex flex-wrap justify-end gap-2">
           {canWrite && <Btn size="sm" onClick={() => { setM({ kind: "customer" }); }}>{t("Edit customer")}</Btn>}
-          {canWrite && <Btn size="sm" variant="danger" onClick={() => { setM({ kind: "deleteCustomer" }); }}>{t("Delete customer…")}</Btn>}
-          {canWrite && r.status === "active" && c.tree.length > 0 && <Btn size="sm" variant="primary" onClick={addUnitHere}><Icon name="add" /> {t("New unit")}</Btn>}
+          {/* a customer with units is refused even with force (Units … still stop it): off up front, with the reason (UI/UX loop R134) */}
+          {canWrite && <Btn size="sm" variant="danger" disabled={r.units > 0} onClick={() => { setM({ kind: "deleteCustomer" }); }}>{t("Delete customer…")}</Btn>}
+          {canWrite && r.units > 0 && <span className="self-center text-xs text-muted-foreground">{t("Has units — a customer with units cannot be deleted")}</span>}
+          {canWrite && r.status === "active" && c.tree.length > 0 && isHeaderNewUnit && <Btn size="sm" variant="primary" onClick={addUnitHere}><Icon name="add" /> {t("New unit")}</Btn>}
         </div>
       </div>
       <Card>
@@ -214,10 +228,10 @@ function CustomerScreen({ live, c }: Readonly<{ live: UnitsLive; c: CustomerLive
       <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}>
         <Kpi label={t("Units")} value={unitsTotal} sub={c.perProperty} />
         <Kpi label={t("Operation")} value={r.operation} sub={t("Running {on} / known {known}", { on: r.running, known: r.known })} />
-        <Kpi label={t("Open alerts")} value={r.alerts} tone={r.alerts ? "warn" : undefined} sub={c.alertsSub ?? t("severity needs alert.read")} href="/admin/alerts" link={t("Alerts")} />
+        <Kpi label={t("Open alerts")} value={r.alerts} tone={r.alerts ? "warn" : undefined} sub={c.alertsSub ?? t("severity needs “View alerts”")} href="/admin/alerts" link={t("Alerts")} />
         {s ? <Kpi label={t("Overdue billing")} value={s.overdueAmount ?? t("None")} tone={s.overdue ? "crit" : undefined}
           {...standingLine(s, r.id, t)} />
-          : <Kpi label={t("Overdue billing")} value="—" sub={t("needs billing.read")} />}
+          : <Kpi label={t("Overdue billing")} value="—" sub={t("needs “View billing”")} />}
       </div>
       <Tabs value={c.tab} onChange={(v) => { nav({ tab: v === "overview" ? null : v, unitId: null }); }} tabs={[
         { id: "overview" as const, label: t("Units & locations"), count: unitsTotal }, { id: "users" as const, label: t("Users"), count: c.users.length },
@@ -244,7 +258,7 @@ function CustomerScreen({ live, c }: Readonly<{ live: UnitsLive; c: CustomerLive
           <div className="flex min-w-0 flex-col gap-4">
             {c.unitMissing && <Banner tone="warn" action={<Btn size="sm" onClick={() => { nav(clearUnit); }}>{t("Close")}</Btn>}>{t("This unit no longer exists or belongs to another customer.")}</Banner>}
             {c.unit ? <UnitEdit key={c.unit.u.id} live={live} c={c} x={c.unit} nav={nav} run={run} pending={pending} /> : sel && <>
-              <LocationCard c={c} sel={sel} canWrite={canWrite} active={r.status === "active"} setM={setM} />
+              <LocationCard mapStyle={live.map.styleUrl} c={c} sel={sel} canWrite={canWrite} active={r.status === "active"} setM={setM} />
               <UnitsCard key={selId} c={c} sel={sel} nav={nav} canWrite={canWrite && r.status === "active"} onNew={addUnitHere} />
             </>}
           </div>
@@ -253,7 +267,7 @@ function CustomerScreen({ live, c }: Readonly<{ live: UnitsLive; c: CustomerLive
       {m?.kind === "customer" && <CustomerModal row={r} pending={pending} onClose={close} onSave={(d) => { run(() => updateCustomer(r.id, r.version, { id: r.orgId, version: r.orgVersion ?? 1, name: r.billingName, status: r.orgStatus }, { billingName: d.billingName, name: d.name, serviceProfile: d.profile, status: d.status }), t("Customer saved"), close); }} />}
       {m?.kind === "deleteCustomer" && <DeleteCustomerModal name={r.name} canForce={live.canForce} pending={pending} onClose={close}
         onSave={(reason, force) => { run(() => deleteCustomer(r.id, r.version, { id: r.orgId, version: r.orgVersion ?? 1 }, reason, force), t("Customer deleted"), () => { close(); nav({ customerId: null, tab: null, locationId: null, propertyId: null, unitId: null, powerState: null, connections: null, search: null }); }); }} />}
-      {m?.kind === "property" && <PropertyModal p={m.p} pending={pending} onClose={close} onSave={(d) => { run(() => saveProperty(propertyInput(d, r.orgId, m.p?.id), m.p?.version), t(m.p ? "Property saved" : "Property added"), (id) => { close(); nav({ locationId: id, ...clearUnit }); }); }} />}
+      {m?.kind === "property" && <PropertyModal map={live.map} p={m.p} pending={pending} onClose={close} onSave={(d) => { run(() => saveProperty(propertyInput(d, r.orgId, m.p?.id), m.p?.version), t(m.p ? "Property saved" : "Property added"), (id) => { close(); nav({ locationId: id, ...clearUnit }); }); }} />}
       {m?.kind === "space" && <SpaceModal c={c} init={m} pending={pending} onClose={close} onSave={(x) => { run(() => saveSpace(x), t("{kind} “{name}” added", { kind: (textOf(kindLabel, x.kind, t) ?? x.kind), name: x.name }), (id) => { close(); nav({ locationId: id, ...clearUnit }); }); }} />}
       {m?.kind === "rename" && <RenameModal name={m.p?.name ?? m.s?.name ?? ""} where={m.p ? t("{kind} · property", { kind: (textOf(kindLabel, m.p.kind, t) ?? m.p.kind) }) : (textOf(kindLabel, m.s.kind, t) ?? m.s.kind)} pending={pending} onClose={close}
         onSave={(name) => {
@@ -307,7 +321,7 @@ function LocationMenu({ onRename, onDelete }: Readonly<{ onRename: () => void; o
   );
 }
 
-function LocationCard({ c, sel, canWrite, active, setM }: Readonly<{ c: CustomerLive; sel: Selection; canWrite: boolean; active: boolean; setM: (m: ModalState) => void }>) {
+function LocationCard({ mapStyle, c, sel, canWrite, active, setM }: Readonly<{ mapStyle: string | null; c: CustomerLive; sel: Selection; canWrite: boolean; active: boolean; setM: (m: ModalState) => void }>) {
   const t = useT();
   if (sel.kind === "unassigned") {
     return <Card title={t("Unassigned")} sub={t("{property} · units without a room or floor", { property: sel.property.name })}><p className="text-[13px] text-muted-foreground">{t("These units belong to the property but no floor or room. Open a unit and pick its space under Location.")}</p></Card>;
@@ -318,7 +332,9 @@ function LocationCard({ c, sel, canWrite, active, setM }: Readonly<{ c: Customer
       <Card title={p.name} sub={[t("{kind} · property", { kind: (textOf(kindLabel, p.kind, t) ?? p.kind) }), p.address, count(t, p.floors, "1 floor", "{n} floors"), count(t, p.rooms, "1 room", "{n} rooms"), units(t, p.units)].filter(Boolean).join(" · ")}
         action={canWrite && <div className="flex flex-wrap gap-2"><Btn size="sm" onClick={() => { setM({ kind: "rename", p }); }}>{t("Rename")}</Btn><Btn size="sm" onClick={() => { setM({ kind: "property", p }); }}>{t("Edit details")}</Btn>
           <Btn size="sm" onClick={() => { setM({ kind: "space", propertyId: p.id, parentSpaceId: null, spaceKind: p.kind === "office" ? "area" : "floor" }); }}><Icon name="add" /> {t(p.kind === "office" ? "Add floor / area" : "Add floor")}</Btn><Btn size="sm" variant="danger" onClick={() => { setM({ kind: "archive", p }); }}>{t("Delete")}</Btn></div>}>
-        <SummaryList cols={2} items={[[t("Type"), (textOf(kindLabel, p.kind, t) ?? p.kind)], [t("Address"), p.address ?? "—"], [t("Access instructions"), p.accessInstructions ?? "—"], [t("Time zone"), "Asia/Kuala_Lumpur"], [t("Last edited"), c.lastEdit ?? "—"]]} />
+        <SummaryList cols={2} items={[[t("Type"), (textOf(kindLabel, p.kind, t) ?? p.kind)], [t("Address"), p.address ?? "—"], [t("Access instructions"), p.accessInstructions ?? "—"],
+          [t("Location on the map"), p.location ? showPoint(p.location) : t("No pin yet")], [t("Away/home radius"), t("{n} m", { n: p.geofenceRadiusMeters ?? DEFAULT_GEOFENCE_RADIUS })], [t("Time zone"), "Asia/Kuala_Lumpur"], [t("Last edited"), c.lastEdit ?? "—"]]} />
+        {mapStyle && p.location && <PinMap key={p.id} styleUrl={mapStyle} point={p.location} label={t("Map of {name} with its pin", { name: p.name })} className="mt-3 h-56 w-full overflow-hidden rounded-md border" />}
       </Card>
     );
   }
@@ -386,7 +402,10 @@ function UnitEdit({ live, c, x, nav, run, pending }: Readonly<{ live: UnitsLive;
   const [source, setSource] = useState(key);
   const [d, setD] = useState<UnitDraft>(unitDraft(u));
   const [tried, setTried] = useState(false);
-  const [modal, setModal] = useState<null | "relocate" | "delete" | "attach">(null);
+  // back from creating a policy in its Attach dialog (?attach=<policy>): the dialog reopens with it ticked (UI/UX loop R44)
+  const attachId = useSearchParams().get("attach");
+  const [modal, setModal] = useState<null | "relocate" | "delete" | "attach">(attachId && c.canAttach && !u.archived ? "attach" : null);
+  const closeAttach = () => { setModal(null); if (attachId) nav({ attach: null }); };
   if (source !== key) { // the form restarts from each saved unit version (adjust state during render)
     setSource(key);
     setD(unitDraft(u));
@@ -420,14 +439,15 @@ function UnitEdit({ live, c, x, nav, run, pending }: Readonly<{ live: UnitsLive;
               {c.places.map((p) => <option key={`${p.propertyId}|${p.spaceId}`} value={`${p.propertyId}|${p.spaceId}`}>{p.label}</option>)}
             </Select>
           </Field>
-          <Field label={t("Aircon model")} hint={t(c.models.length > 0 ? "Which controls the unit has · type split (fixed)" : "Models need device.read — the current model stays")} error={fieldError("modelId")}>
+          <Field label={t("Aircon model")} hint={t(c.models.length > 0 ? "Which controls the unit has · type split (fixed)" : "Models need “View devices & models” — the current model stays")} error={fieldError("modelId")}>
             <Select value={d.modelId} disabled={isRo || c.models.length === 0} onChange={(e) => { set({ modelId: e.target.value }); }}>
               {c.models.every((k) => k.id !== d.modelId) && <option value={d.modelId}>{x.model}</option>}
               {c.models.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}
             </Select>
           </Field>
-          <Field label={t("Installed at")} hint={t("A Kuala Lumpur day · leave empty for “Not registered”")} error={fieldError("installedAt")}><Input type="date" max={live.todayKL} value={d.installedAt} disabled={isRo} onChange={(e) => { set({ installedAt: e.target.value }); }} /></Field>
-          <Field label={t("Warranty end")} hint={t("Manufacturer warranty; coverage also counts active maintenance contracts")} error={fieldError("warrantyEnd")}><Input type="date" min={d.installedAt || undefined} value={d.warrantyEnd} disabled={isRo} onChange={(e) => { set({ warrantyEnd: e.target.value }); }} /></Field>
+          {d.installState === "planned" && <Banner tone="primary">{t("Installation planned: the installation date is set when HQ accepts the technician’s installation report. Create the installation job in Jobs.")}</Banner>}
+          <Field label={t("Installed at")} hint={t("A Kuala Lumpur day · leave empty for “Not registered”")} error={fieldError("installedAt")}><Input type="date" max={live.todayKL} value={d.installedAt} disabled={isRo || d.installState === "planned"} onChange={(e) => { set({ installedAt: e.target.value }); }} /></Field>
+          <Field label={t("Warranty end")} hint={t("Manufacturer warranty; coverage also counts active maintenance contracts")} error={fieldError("warrantyEnd")}><Input type="date" min={d.installedAt || undefined} value={d.warrantyEnd} disabled={isRo || d.installState === "planned"} onChange={(e) => { set({ warrantyEnd: e.target.value }); }} /></Field>
           <Field label={t("IoT device")} hint={t("The device's IoT model sets its sensors; it is shown here as registered. The aircon model above is the unit's own.")}>
             <UnitDevicePanel unitId={u.id} unitName={u.displayName} device={x.device} deviceKnown={x.deviceKnown} canWrite={live.canWrite && c.canRegisterDevice && !u.archived} iotModels={c.iotModels} />
           </Field>
@@ -445,7 +465,7 @@ function UnitEdit({ live, c, x, nav, run, pending }: Readonly<{ live: UnitsLive;
       </Card>
       <Card title={t("Alert policies on this unit")} sub={t("Only {name}’s policies can be attached. The unit carries the policies, not the other way round.", { name: c.row.name })}
         action={c.canAttach && !u.archived && <Btn size="sm" onClick={() => { setModal("attach"); }}><Icon name="add" /> {t("Attach policy")}</Btn>}>
-        {c.policies === null ? <p className="text-[13px] text-muted-foreground">{t("Policies need alert.policy.read.")}</p> : (
+        {c.policies === null ? <p className="text-[13px] text-muted-foreground">{t("Policies need “View alert policies”.")}</p> : (
           <div className="flex flex-col">
             {x.attached.map((p) => (
               <div key={p.id} className="flex flex-wrap items-center gap-2 border-t border-line py-2.5 text-[13px] first:border-0">
@@ -466,22 +486,22 @@ function UnitEdit({ live, c, x, nav, run, pending }: Readonly<{ live: UnitsLive;
       {modal === "delete" && <DeleteUnitModal x={x} pending={pending} onClose={() => { setModal(null); }}
         onArchive={(reason) => { run(() => archiveUnit(u.id, u.version, reason), t("“{name}” taken out of use", { name: u.displayName }), () => { setModal(null); nav({ unitId: null }); }); }}
         onDelete={(reason) => { run(() => deleteUnit(u.id, u.version, reason), t("“{name}” deleted", { name: u.displayName }), () => { setModal(null); nav({ unitId: null }); }); }} />}
-      {modal === "attach" && <AttachModal c={c} unit={u.displayName} attached={attachedIds} pending={pending} onClose={() => { setModal(null); }}
-        onSave={(ids) => { run(() => setUnitPolicies(u.id, u.version, [...attachedIds, ...ids]), count(t, ids.length, "1 policy attached", "{n} policies attached"), () => { setModal(null); }); }} />}
+      {modal === "attach" && <AttachModal c={c} unit={u.displayName} attached={attachedIds} preset={attachId} pending={pending} onClose={closeAttach}
+        onSave={(ids) => { run(() => setUnitPolicies(u.id, u.version, [...attachedIds, ...ids]), count(t, ids.length, "1 policy attached", "{n} policies attached"), closeAttach); }} />}
     </>
   );
 }
 
 // ---- alert policies tab ----
 
-function PoliciesTab({ c, run, pending }: Readonly<{ c: CustomerLive; run: Run; pending: boolean }>) {
+export function PoliciesTab({ c, run, pending }: Readonly<{ c: CustomerLive; run: Run; pending: boolean }>) {
   const t = useT();
   const router = useRouter();
-  if (!c.policies) return <EmptyState title={t("Alert policies need alert.policy.read")}>{t("Ask an identity administrator for Alert policies access.")}</EmptyState>;
+  if (!c.policies) return <EmptyState title={t("Alert policies need “View alert policies”")}>{t("Ask an identity administrator for Alert policies access.")}</EmptyState>;
   return (
     <>
       <Card title={t("Alert policies of {name}", { name: c.row.name })} sub={t("Policies belong to the customer. Each unit picks which of them it carries (unit edit › Alert policies). Air-quality limits are alert policies too.")}
-        action={<LinkButton size="sm" variant="primary" href={`/admin/alerts?tab=policies&customerId=${c.row.id}&new=${c.row.id}`}><Icon name="add" /> {t("New policy for {name}", { name: c.row.name })}</LinkButton>}>
+        action={<LinkButton size="sm" variant="primary" href={`/admin/alerts?tab=policies&customerId=${c.row.id}&new=${c.row.id}`}><Icon name="add" /> {t(NEW_POLICY_FOR, { name: c.row.name })}</LinkButton>}>
         <DataTable rows={c.policies} rowKey={(p) => p.id} onRowClick={(p) => { router.push(`/admin/alerts?tab=policies&customerId=${c.row.id}&policyId=${p.id}`); }} cols={[
           { key: "n", label: t("Policy"), render: (p) => <><b>{p.name}</b>{!p.enabled && <Badge className="ml-2">{t("Off")}</Badge>}</> },
           { key: "t", label: t("Type"), render: (p) => <Badge tone={p.kind === DEFAULT_ALERT ? "primary" : "muted"}>{p.type}</Badge> },
@@ -497,12 +517,12 @@ function PoliciesTab({ c, run, pending }: Readonly<{ c: CustomerLive; run: Run; 
             {c.rules.items.map((r) => (
               <div key={r.ruleKey} className="flex flex-wrap items-center gap-3 border-t border-line py-2.5 text-[13px] first:border-0">
                 <div className="min-w-0 flex-1"><b>{r.name}</b><div className="text-xs text-muted-foreground">{r.condition}{r.note ? ` · ${r.note}` : ""}</div></div>
-                <Toggle on={r.enabled} label={t(r.enabled ? "On" : "Off")} disabled={!c.canRules || pending}
+                <Toggle on={r.enabled} label={t("{rule} for {name}", { rule: r.name, name: c.row.name })} disabled={!c.canRules || pending}
                   onChange={(on) => { const { rules } = c; if (!rules) { return; } run(() => setDefaultRule(rules.policyId, r.ruleKey, c.row.id, on, r.version), t(on ? "{rule} switched on for {name}" : "{rule} switched off for {name}", { rule: r.name, name: c.row.name })); }} />
               </div>
             ))}
           </div>
-          {!c.canRules && <p className="mt-2 text-[11px] text-muted-foreground">{t("Switching rules needs alert.policy.write.")}</p>}
+          {!c.canRules && <p className="mt-2 text-[11px] text-muted-foreground">{t("Switching rules needs “Edit alert policies”.")}</p>}
         </Card>
       )}
     </>
@@ -511,19 +531,29 @@ function PoliciesTab({ c, run, pending }: Readonly<{ c: CustomerLive; run: Run; 
 
 // ---- modals ----
 
-function PropertyModal({ p, pending, onClose, onSave }: Readonly<{ p?: TreeProperty; pending: boolean; onClose: () => void; onSave: (d: PropertyDraft) => void }>) {
+function PropertyModal({ map, p, pending, onClose, onSave }: Readonly<{ map: MapConfig; p?: TreeProperty; pending: boolean; onClose: () => void; onSave: (d: PropertyDraft) => void }>) {
   const t = useT();
   const [d, setD] = useState<PropertyDraft>(propertyDraft(p));
   const [tried, setTried] = useState(false);
-  const e = propertyErrors(d, t);
+  const [pinValid, setPinValid] = useState(true);
+  const [radius, setRadius] = useState(p?.geofenceRadiusMeters === null || p?.geofenceRadiusMeters === undefined ? "" : String(p.geofenceRadiusMeters));
+  const parsedRadius = parseRadius(radius);
+  const e: Record<string, string> = { ...propertyErrors(d, t), ...(!pinValid && { location: t("Latitude −90 to 90 and longitude −180 to 180, in degrees") }), ...(!parsedRadius.ok && { geofenceRadiusMeters: t("A whole number of metres, 50–2000") }) };
   const fieldError = (k: string) => (tried ? e[k] : undefined);
   return (
-    <Modal open onClose={onClose} title={p ? t("Edit {name}", { name: p.name }) : t(ADD_PROPERTY)} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (Object.keys(e).length === 0) onSave(d); }}>{t(p ? "Save property" : ADD_PROPERTY)}</Btn></>}>
+    <Modal wide open onClose={onClose} title={p ? t("Edit {name}", { name: p.name }) : t(ADD_PROPERTY)} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (Object.keys(e).length === 0) onSave({ ...d, geofenceRadiusMeters: parsedRadius.ok ? parsedRadius.radius : null }); }}>{t(p ? "Save property" : ADD_PROPERTY)}</Btn></>}>
       <div className="flex flex-col gap-3">
         <Field label={t("Kind · required")}><Choice value={d.kind} onChange={(v: "home" | "office") => { setD({ ...d, kind: v }); }} options={[{ id: "home", label: t("Home") }, { id: "office", label: t("Office") }]} /></Field>
         <Field label={t("Name · required")} hint={t("1–120 characters, unique among the customer’s properties")} error={fieldError("name")}><Input value={d.name} onChange={(x) => { setD({ ...d, name: x.target.value }); }} /></Field>
         <Field label={t("Address")} hint={t("0–500 characters · fictional values only; shown as the site address")} error={fieldError("address")}><Input value={d.address} onChange={(x) => { setD({ ...d, address: x.target.value }); }} /></Field>
         <Field label={t("Access instructions")} hint={t("0–1000 characters · visible to a contractor only after acceptance, within the valid period")} error={fieldError("accessInstructions")}><Textarea rows={3} value={d.accessInstructions} onChange={(x) => { setD({ ...d, accessInstructions: x.target.value }); }} /></Field>
+        <Field label={t("Location on the map")} hint={t("Used for the technician’s site check-in and the customer’s away/home automations. Click the map, search the address or type the coordinates.")} error={fieldError("location")}>
+          <LocationPicker value={d.location} styleUrl={map.styleUrl} onSearch={map.search ? searchAddress : null} address={d.address}
+            onChange={(location, valid) => { setPinValid(valid); setD((x) => ({ ...x, location })); }} />
+        </Field>
+        <Field label={t("Away/home radius (m)")} hint={t("50–2000 m around the pin; empty uses {n} m", { n: DEFAULT_GEOFENCE_RADIUS })} error={fieldError("geofenceRadiusMeters")}>
+          <Input inputMode="numeric" value={radius} placeholder={String(DEFAULT_GEOFENCE_RADIUS)} onChange={(x) => { setRadius(x.target.value); }} />
+        </Field>
       </div>
     </Modal>
   );
@@ -629,12 +659,15 @@ function NewUnitModal({ live, c, init, pending, onClose, onSave }: Readonly<{ li
         <Field label={t("Room / space · optional")} hint={t("Same property only. Leave empty for no room or floor.")}>
           <Select value={d.spaceId} onChange={(x) => { set({ spaceId: x.target.value }); }}><option value="">{t("— not assigned —")}</option>{(p ? flatten(p.spaces) : []).map((x) => <option key={x.id} value={x.id}>{x.name} ({(textOf(kindLabel, x.kind, t) ?? x.kind)})</option>)}</Select>
         </Field>
-        <Field label={t("Aircon model · required")} hint={t(c.models.length > 0 ? "Which controls the unit has" : "Models need device.read")} error={fieldError("modelId")}>
+        <Field label={t("Aircon model · required")} hint={t(c.models.length > 0 ? "Which controls the unit has" : "Models need “View devices & models”")} error={fieldError("modelId")}>
           <Select value={d.modelId} onChange={(x) => { set({ modelId: x.target.value }); }}>{c.models.length === 0 && <option value="">{t("no model available")}</option>}{c.models.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}</Select>
         </Field>
         <Field label={t("Display name · required")} hint={t("1–120 characters, unique in its room")} error={fieldError("displayName")}><Input value={d.displayName} onChange={(x) => { set({ displayName: x.target.value }); }} /></Field>
-        <Field label={t("Installed at · optional")} hint={t("A Kuala Lumpur day · leave empty for “Not registered”")} error={fieldError("installedAt")}><Input type="date" max={live.todayKL} value={d.installedAt} onChange={(x) => { set({ installedAt: x.target.value }); }} /></Field>
-        <Field label={t("Warranty end · optional")} error={fieldError("warrantyEnd")}><Input type="date" min={d.installedAt || undefined} value={d.warrantyEnd} onChange={(x) => { set({ warrantyEnd: x.target.value }); }} /></Field>
+        <Field label={t("Installation")} hint={t("A planned unit is installed by a technician; HQ creates the installation job for it.")} className="sm:col-span-2">
+          <Choice value={d.installState} onChange={(installState) => { set({ installState, ...(installState === "planned" && { installedAt: "", warrantyEnd: "" }) }); }} options={[{ id: "installed" as const, label: t("Already installed") }, { id: "planned" as const, label: t("Installation planned") }]} />
+        </Field>
+        <Field label={t("Installed at · optional")} hint={t("A Kuala Lumpur day · leave empty for “Not registered”")} error={fieldError("installedAt")}><Input type="date" max={live.todayKL} value={d.installedAt} disabled={d.installState === "planned"} onChange={(x) => { set({ installedAt: x.target.value }); }} /></Field>
+        <Field label={t("Warranty end · optional")} error={fieldError("warrantyEnd")}><Input type="date" min={d.installedAt || undefined} value={d.warrantyEnd} disabled={d.installState === "planned"} onChange={(x) => { set({ warrantyEnd: x.target.value }); }} /></Field>
         <Field label={t("Service scope · required · type: split (fixed)")} error={fieldError("serviceScope")} className="sm:col-span-2">
           <div className="flex flex-wrap gap-3">{scopes.map((sc) => <Check key={sc} label={t(entryOf(scopeLabel, sc))} checked={d.serviceScope.includes(sc)} onChange={(on) => { set({ serviceScope: on ? [...d.serviceScope, sc] : d.serviceScope.filter((v) => v !== sc) }); }} />)}</div>
         </Field>
@@ -690,15 +723,19 @@ function DeleteUnitModal({ x, pending, onClose, onArchive, onDelete }: Readonly<
   );
 }
 
-function AttachModal({ c, unit, attached, pending, onClose, onSave }: Readonly<{ c: CustomerLive; unit: string; attached: string[]; pending: boolean; onClose: () => void; onSave: (ids: string[]) => void }>) {
+function AttachModal({ c, unit, attached, preset, pending, onClose, onSave }: Readonly<{ c: CustomerLive; unit: string; attached: string[]; preset: string | null; pending: boolean; onClose: () => void; onSave: (ids: string[]) => void }>) {
   const t = useT();
-  const [pick, setPick] = useState<string[]>([]);
   const options = (c.policies ?? []).filter((p) => p.kind === "alert");
+  const [pick, setPick] = useState<string[]>(() => (preset && !attached.includes(preset) && options.some((p) => p.id === preset) ? [preset] : []));
+  // a policy made for this customer comes back here, to this unit with its dialog open (no hunting for the unit again)
+  const params = useSearchParams();
+  const here = `${usePathname()}?${new URLSearchParams([...params.entries()].filter(([k]) => k !== "attach")).toString()}`;
+  const policyFormHref = `/admin/alerts?tab=policies&customerId=${encodeURIComponent(c.row.id)}&new=${encodeURIComponent(c.row.id)}&returnTo=${encodeURIComponent(here)}`;
   return (
     <Modal open onClose={onClose} title={t("Attach policies to {unit}", { unit })} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending || pick.length === 0} onClick={() => { onSave(pick); }}>{pick.length > 0 ? count(t, pick.length, "Attach 1 policy", "Attach {n} policies") : t("Attach policy")}</Btn></>}>
       <div className="flex flex-col gap-2">
         <p className="text-[13px] text-muted-foreground">{t("Showing {name}’s policies only. The default policy is always on and not listed.", { name: c.row.name })}</p>
-        {options.length === 0 && <EmptyState title={t("No customer policies yet")}>{t("Create one in Alert policies first.")}</EmptyState>}
+        {options.length === 0 && <EmptyState title={t("No customer policies yet")} action={<LinkButton size="sm" variant="primary" href={policyFormHref}><Icon name="add" /> {t(NEW_POLICY_FOR, { name: c.row.name })}</LinkButton>}>{t("Create one for this customer; you come back here to attach it.")}</EmptyState>}
         {options.map((p) => {
           const isAlready = attached.includes(p.id);
           return (
@@ -708,7 +745,7 @@ function AttachModal({ c, unit, attached, pending, onClose, onSave }: Readonly<{
             </div>
           );
         })}
-        <p className="text-[11px] text-muted-foreground">{t("Disabled policies can be attached; they start alerting once enabled.")} <TextLink href={`/admin/alerts?tab=policies&customerId=${c.row.id}&new=${c.row.id}`}><Icon name="add" /> {t("New policy for {name}", { name: c.row.name })}</TextLink></p>
+        <p className="text-[11px] text-muted-foreground">{t("Disabled policies can be attached; they start alerting once enabled.")} {options.length > 0 && <TextLink href={policyFormHref}><Icon name="add" /> {t(NEW_POLICY_FOR, { name: c.row.name })}</TextLink>}</p>
       </div>
     </Modal>
   );
@@ -843,7 +880,7 @@ function WarrantyTab({ live }: Readonly<{ live: UnitsLive }>) {
   const [f, setF] = useState<CoverageFilter>({ customerId: "", coverage: "", within: "" });
   const [claim, setClaim] = useState<ClaimCandidate | null>(null);
   const w = live.warranty;
-  if (!w) return <EmptyState title={t("Coverage needs asset.read or contract.read")}>{t("Ask an identity administrator for Customers & units or Contracts access.")}</EmptyState>;
+  if (!w) return <EmptyState title={t("Coverage needs “View customers & units” or “View contracts”")}>{t("Ask an identity administrator for Customers & units or Contracts access.")}</EmptyState>;
   const rows = w.rows.filter((r) => coverageMatch(r, f));
   const k = w.kpis;
   return (
@@ -862,7 +899,9 @@ function WarrantyTab({ live }: Readonly<{ live: UnitsLive }>) {
       <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}>
         <Kpi label={t("Under warranty")} value={k.underWarranty} sub={t("of {units}", { units: units(t, k.total) })} />
         <Kpi label={t("Warranty ends ≤ 90 days")} value={k.within90} tone={k.within90 ? "warn" : undefined} sub={t("{n} within 30 days", { n: k.within30 })} />
-        <Kpi label={t("Out of warranty, no contract")} value={k.noCoverage} tone={k.noCoverage ? "crit" : undefined} sub={t("Offer maintenance")} />
+        {/* the tile's call to act lists its units, where each row has Renewal offer (UI/UX loop R101) */}
+        <Kpi label={t("Out of warranty, no contract")} value={k.noCoverage} tone={k.noCoverage ? "crit" : undefined}
+          sub={k.noCoverage > 0 ? <Plain type="button" touch className="text-xs font-semibold text-primary hover:underline" aria-pressed={f.coverage === "no_coverage"} onClick={() => { setF({ ...f, coverage: f.coverage === "no_coverage" ? "" : "no_coverage" }); }}>{t(f.coverage === "no_coverage" ? "Clear filter" : "Offer maintenance")}</Plain> : t("Offer maintenance")} />
         <Kpi label={t(MAINTENANCE_CONTRACT)} value={k.contract} sub={k.contractNames} />
       </div>
       <Card title={t("Units by coverage end")} sub={t("{n} of {total}", { n: rows.length, total: w.rows.length })} action={<Btn size="sm" disabled={rows.length === 0} onClick={() => { download("warranty-coverage.csv", coverageCsv(rows)); }}>{t("Export CSV")}</Btn>}>
@@ -883,7 +922,7 @@ function WarrantyTab({ live }: Readonly<{ live: UnitsLive }>) {
         <p className="mt-2 text-[11px] text-muted-foreground">{t("The warranty end is set on the unit (unit edit › Warranty end) or by the CSV import. Coverage = an active maintenance contract, otherwise the warranty; fewer than 90 days left counts as ending.")}</p>
       </Card>
       <Card title={t("Warranty on jobs")} sub={t("Jobs completed while the unit’s warranty ran whose accepted report lists replaced parts — the parts cost is claimable from the manufacturer until a claim is filed.")}>
-        {w.claims === null && <p className="text-[13px] text-muted-foreground">{t("Claimable jobs need job.read.")}</p>}{w.claims?.length === 0 && <p className="text-[13px] text-muted-foreground">{t("No claimable job right now.")}</p>}{w.claims && w.claims.length > 0 && (
+        {w.claims === null && <p className="text-[13px] text-muted-foreground">{t("Claimable jobs need “View maintenance jobs”.")}</p>}{w.claims?.length === 0 && <p className="text-[13px] text-muted-foreground">{t("No claimable job right now.")}</p>}{w.claims && w.claims.length > 0 && (
           <div className="flex flex-col">
             {w.claims.map((x) => (
               <div key={x.jobId} className="flex flex-wrap items-center gap-3 border-t border-line py-2.5 text-[13px] first:border-0">

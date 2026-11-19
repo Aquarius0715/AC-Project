@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  airChartSeries, airGuidance, airMetricsOf, airNumber, airRooms, airRows, airSlots, airWindow, allergenView, axisLabels, cleanNote, co2Now, metricCard, slotHeadings, toggleAirMetric, ventRow, ventStrip, windowSub, windowTitle,
-  type ApiAllergen, type ApiMeasurement, type ApiVentilationLog,
+  airChartGroups, airChartSeries, airGuidance, airMetricsOf, airNumber, airRooms, airRows, airSlots, airWindow, allergenView, axisLabels, cleanNote, co2Now, metricCard, slotHeadings, toggleAirMetric, ventRow, ventStrip, windowSub, windowTitle,
+  type AirMetric, type ApiAllergen, type ApiMeasurement, type ApiVentilationLog,
 } from "@ac/web/lib/air";
 import type { ApiPropertyRow, ApiSpaceRow, ApiUnitRow } from "@ac/web/lib/assets";
 import { i18nOf, showClock, showDay } from "@ac/web/lib/i18n";
@@ -48,7 +48,7 @@ describe("air-quality metric cards (FR-C07, IR44, IR99, IR213, IR260)", () => {
   });
 
   it("never shows a stale, suspect, null or unsupported reading as a current value", () => {
-    expect(metricCard("co2", m("co2", 900, { quality: "stale" }), true)).toMatchObject({ value: null, feed: { text: "Unavailable" }, status: { text: "Not measured" }, sub: "No reading since 9:12 am MYT (last 900 ppm)" });
+    expect(metricCard("co2", m("co2", 900, { quality: "stale" }), true)).toMatchObject({ value: null, feed: { text: "Unavailable" }, status: null, sub: "No reading since 14 Sept 2026, 9:12 am MYT (last 900 ppm)" }); // with the date (UI/UX loop R42); one badge, not "Unavailable" and "Not measured" (UI/UX loop R19)
     expect(metricCard("co2", m("co2", 5000, { quality: "suspect", qualityReason: "out_of_range" }), true)).toMatchObject({ value: "5000", feed: { text: "Suspect" }, sub: "Observed 9:12 am MYT · out of range", advice: "Not used for advice", warn: false });
     expect(metricCard("humidity", m("humidity", null), true)).toMatchObject({ value: null, feed: { text: "Unknown" }, sub: "No reading (null) — not 0% · 9:12 am MYT", advice: "Not enough data for advice" });
     expect(metricCard("pm25", undefined, false)).toMatchObject({ feed: { text: "Unsupported" }, sub: "No PM2.5 sensor on this model", advice: "Not enough data for PM2.5 advice" });
@@ -61,10 +61,10 @@ describe("air-quality metric cards (FR-C07, IR44, IR99, IR213, IR260)", () => {
   });
 });
 
-const property = (id: string, name: string): ApiPropertyRow => ({ id, name, version: 1, customerOrgId: "org-1", kind: "home", address: null, accessInstructions: null, archived: false, updatedAt: "2026-09-01T00:00:00Z" });
+const property = (id: string, name: string): ApiPropertyRow => ({ id, name, version: 1, customerOrgId: "org-1", kind: "home", address: null, accessInstructions: null, location: null, geofenceRadiusMeters: null, archived: false, updatedAt: "2026-09-01T00:00:00Z" });
 const space = (id: string, parentSpaceId: string | null, name: string, kind: ApiSpaceRow["kind"]): ApiSpaceRow => ({ id, parentSpaceId, kind, name, version: 1, propertyId: "p1", archived: false });
 const unit = (id: string, spaceId: string | null, displayName: string): ApiUnitRow => ({
-  id, spaceId, displayName, version: 1, customerOrgId: "org-1", propertyId: "p1", modelId: "model-1", type: "split", installedAt: null, serviceScope: [], alertPolicyIds: [], archived: false,
+  id, spaceId, displayName, version: 1, customerOrgId: "org-1", propertyId: "p1", modelId: "model-1", type: "split", installState: "installed", installedAt: null, serviceScope: [], alertPolicyIds: [], archived: false,
   capabilityVersion: 1, connection: "online", lastSeenAt: null, warrantyEndsAt: null, effectivePowerState: "on", activeAlertCount: 0,
 });
 
@@ -97,6 +97,7 @@ describe("the air-quality screen in the display language and time zone (FR-C07, 
     const seen: ApiAllergen = { availability: "available", substance: "Dust mite", value: 12, unit: "ng/m³", sourceLabel: "Lab kit", observedAt: "2026-09-14T01:00:00Z", evidenceText: "Kit #4" };
     expect(allergenView(seen, MS_TOKYO)).toStrictEqual({ title: "Alergen (Dust mite)", badge: { text: "Dikesan", tone: "warn", icon: "warning" }, text: "12 ng/m³ · Sumber: Lab kit · 10:00 PG GMT+9 · Kit #4" });
     expect(allergenView({ ...seen, unit: null }).text).toBe("Value unknown (no unit) · Source: Lab kit · 9:00 am MYT · Kit #4");
+    expect(allergenView({ ...seen, unit: null }, undefined, Date.parse("2026-09-20T03:00:00Z")).text).toBe("Value unknown (no unit) · Source: Lab kit · 14 Sept 2026, 9:00 am MYT · Kit #4"); // dated on a later day (UI/UX loop R67)
     expect([allergenView(null).text, allergenView({ ...seen, evidenceText: null }, MS_TOKYO).badge.text, allergenView({ ...seen, availability: "unsupported" }, MS_TOKYO).text]).toStrictEqual([
       "No observation for this selection — this does not mean “no allergens”.", "Tidak diketahui", "Unit ini tidak dapat memerhati alergen — ini tidak bermaksud “tiada alergen”.",
     ]);
@@ -148,14 +149,22 @@ describe("the air-quality screen in the display language and time zone (FR-C07, 
 const slotsOf = (avgs: (number | null)[]) => avgs.map((avg, k) => ({ avg, start: `2026-09-14T0${String(k)}:00:00.000Z`, n: avg === null ? 0 : 3 }));
 // IR689: several metrics in one chart, each on the axis of its unit, with the time of every slot in the tooltip
 describe("metrics in one chart", () => {
-  it("reads the metrics of the URL: known ones, each once, two units at most, CO2 when none is left", () => {
+  it("reads the metrics of the URL: known ones, each once, all four allowed, CO2 when none is left", () => {
     expect([airMetricsOf(undefined), airMetricsOf("pm25"), airMetricsOf("co2,pm25"), airMetricsOf("pm25,pm25,nonsense,co2"), airMetricsOf("co2,pm25,humidity,temperature"), airMetricsOf("nonsense")])
-      .toStrictEqual([["co2"], ["pm25"], ["co2", "pm25"], ["pm25", "co2"], ["co2", "pm25"], ["co2"]]);
+      .toStrictEqual([["co2"], ["pm25"], ["co2", "pm25"], ["pm25", "co2"], ["co2", "pm25", "humidity", TEMPERATURE], ["co2"]]);
   });
 
-  it("puts a metric in or takes it out, never the last one, and refuses a third unit", () => {
+  it("puts a metric in or takes it out, never the last one", () => {
     expect([toggleAirMetric(["co2"], "pm25"), toggleAirMetric(["co2", "pm25"], "co2"), toggleAirMetric(["co2"], "co2"), toggleAirMetric(["co2", "pm25"], TEMPERATURE)])
-      .toStrictEqual([["co2", "pm25"], ["pm25"], ["co2"], null]);
+      .toStrictEqual([["co2", "pm25"], ["pm25"], ["co2"], ["co2", "pm25", TEMPERATURE]]);
+  });
+
+  it("keeps one or two units in one chart and gives three or more a chart each on its own axis", () => {
+    const all = new Set(["co2", "pm25", TEMPERATURE, "humidity"]);
+    const of = (ms: AirMetric[]) => airChartSeries(ms, {}, all);
+    expect(airChartGroups(of(["co2", "pm25"])).map((g) => g.map((l) => `${l.metric}:${l.axis}`))).toStrictEqual([["co2:left", "pm25:right"]]);
+    const four = airChartGroups(of(["co2", "pm25", TEMPERATURE, "humidity"]));
+    expect(four.map((g) => g.map((l) => `${l.metric}:${l.axis}`))).toStrictEqual([["co2:left"], ["pm25:left"], ["temperature:left"], ["humidity:left"]]);
   });
 
   it("gives the first unit the left axis and the second the right one, with the values of each metric", () => {

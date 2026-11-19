@@ -7,7 +7,7 @@
 import { EN, relativeTime, showClock, showDate, showDayMonth, showSpan, type I18n, type T, textOf, byCount } from "@ac/web/lib/i18n";
 import { evidenceText, resolutionText } from "@ac/web/lib/evidence";
 import { alertTitle, type ApiAlert } from "@ac/web/lib/alerts";
-import { metricLabel } from "@ac/web/lib/adminAlerts";
+import { metricName } from "@ac/web/lib/adminAlerts";
 import { airNumber } from "@ac/web/lib/air";
 import { toggleSeries, unitAxes } from "@ac/web/lib/chartScale";
 import { bucket, type ApiUnitDetail } from "@ac/web/lib/units";
@@ -48,25 +48,25 @@ export function metricOf(d: ApiTechUnit, v?: string): Metric {
 }
 /** The metrics of the URL's `metric` ("temperature,humidity"; one name is the old link): those the unit measures, each
 once, in two units at most (a chart has a left and a right axis, IR689); the one metric `metricOf` gives when none is left. */
-export function metricsOf(d: ApiTechUnit, text = ""): Metric[] {
+export function metricsOf(d: ApiTechUnit, text = ""): [Metric, ...Metric[]] {
   const unit = (m: string) => d.latestMeasurements.find((x) => x.metric === m)?.unit ?? "";
   const measured = new Set<string>(d.latestMeasurements.map((x) => x.metric));
   const isMeasured = (m: string): m is Metric => measured.has(m);
   const named = [...new Set(text.split(","))].filter((m) => isMeasured(m));
   const axes = unitAxes(named.map((m) => unit(m)));
-  const fits = named.filter((m) => axes.has(unit(m)));
-  return fits.length > 0 ? fits : [metricOf(d)];
+  const [first, ...rest] = named.filter((m) => axes.has(unit(m)));
+  return first === undefined ? [metricOf(d)] : [first, ...rest];
 }
 /** The metrics the unit measures, for the chart's choice: each with its name and unit, and the selection after it is pressed (null when its unit would be a third one). */
 export function metricChoices(d: ApiTechUnit, selected: readonly string[], t: T): { metric: string; name: string; unit: string; next: string[] | null; on: boolean }[] {
   const unit = (m: string) => d.latestMeasurements.find((x) => x.metric === m)?.unit ?? "";
   return d.latestMeasurements.map((x) => ({ metric: x.metric, name: label(x.metric, t), unit: x.unit, on: selected.includes(x.metric), next: toggleSeries(selected, x.metric, unit) }));
 }
-const label = (metric: string, t: T) => (textOf(metricLabel, metric, t) ?? metric.replaceAll('_', " "));
+const label = (metric: string, t: T) => (textOf(metricName, metric, t) ?? metric.replaceAll('_', " "));
 
 const SCOPE: Record<string, string> = { indoor: "Indoor", outdoor: "Outdoor", electrical: "Electrical" };
 const TYPE: Record<string, string> = { split: "Split" };
-const COUNT: Record<Group, string> = { indoor: "{n} indoor", outdoor: "{n} outdoor", electrical: "{n} electrical" };
+const COUNT: Record<Group, string> = { indoor: "{n} indoor", outdoor: "{n} outdoor", electrical: "{n} electrical", installation: "{n} installation" };
 export interface Register { rows: [string, string][]; missing: boolean; note: string }
 /** The unit register (Figma: location, manufacturer / model, configuration, installed, capability version, maintenance
 scope). A value the register lacks says “Not registered” — never a similar model's value or today's date (DD-T02). */

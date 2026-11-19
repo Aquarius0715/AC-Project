@@ -134,7 +134,7 @@ export function FirmwareCampaigns() {
         <ListRow><div className="min-w-0 flex-1"><b className="text-[13px]">fw-2.0.0-pilot</b><div className="text-[11px] text-muted-foreground">CTRL-A1 · 5 devices</div></div><Badge tone="ok">Completed</Badge></ListRow>
       </Card>
       <Card title="fw-2.0.0-rollout" sub="Auto-pause if failures exceed 5 % within a wave" action={<Btn size="sm" onClick={() => { setPaused((p) => !p); toast(paused ? "Campaign resumed" : "Campaign paused", "warn"); }}>{paused ? "Resume" : "Pause"}</Btn>}>
-        <div className="flex flex-col gap-3">{waves.map(([l, p, d]) => <div key={l}><div className="mb-1 flex justify-between text-xs"><b>{l}</b><span className="text-muted-foreground">{d}</span></div><UtilizationBar pct={p} tone={p >= 95 ? "ok" : "primary"} /></div>)}</div>
+        <div className="flex flex-col gap-3">{waves.map(([l, p, d]) => <div key={l}><div className="mb-1 flex justify-between text-xs"><b>{l}</b><span className="text-muted-foreground">{d}</span></div><UtilizationBar pct={p} tone={p >= 95 ? "ok" : "primary"} label={`${l}: ${d}`} /></div>)}</div>
         <div className="mt-3"><SummaryList items={[["Succeeded / installing / pending", "47 / 4 / 34"], ["Failed", "2 · old version kept (AC-DEMO-0003 checksum mismatch → rolled back to 1.9.2)"], ["Skipped", "3 · offline / busy (AC-DEMO-0002 test run job-t12)"]]} /></div>
       </Card>
       <Modal open={modal} onClose={() => { setModal(false); }} title="New firmware campaign" footer={<><Btn onClick={() => { setModal(false); }}>Cancel</Btn><Btn variant="primary" onClick={() => { setModal(false); toast("Campaign scheduled"); }}>Schedule</Btn></>}>

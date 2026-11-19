@@ -466,6 +466,16 @@ func (m Plans) save(ctx context.Context, call *ops.Call, input *PlanSaveInput) (
 		return Plan{}, apperr.Fields(map[string]string{fieldUnitID: apperr.KeyUnitArchived})
 	}
 
+	// a unit that is not installed yet has no maintenance to plan (DEC-106)
+	state, _, installErr := m.Jobs.Units.UnitInstall(ctx, call, input.UnitID)
+	if installErr != nil {
+		return Plan{}, apperr.Wrap(installErr, "maintenance.JobUnits.UnitInstall")
+	}
+
+	if state == installPlanned {
+		return Plan{}, apperr.Fields(map[string]string{fieldUnitID: apperr.KeyInvalidState})
+	}
+
 	next := input.NextDueAt.UTC()
 
 	var planID uuid.UUID

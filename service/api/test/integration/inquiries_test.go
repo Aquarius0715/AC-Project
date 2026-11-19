@@ -1,6 +1,7 @@
 package integration_test
 
 import (
+	"slices"
 	"testing"
 	"time"
 
@@ -10,7 +11,11 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
-const fieldFiltersTo = "filters.to"
+const (
+	fieldFiltersTo = "filters.to"
+	keyPeriodRange = "errors.period_range"
+	resultDenied   = "denied"
+)
 
 //nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestInquiries(t *testing.T) {
@@ -25,7 +30,10 @@ func TestInquiries(t *testing.T) {
 		0,
 	)
 	rid := asStr(t, data(resp)["id"])
+	// the customer's own invoice that the restriction does not cite
+	_, uncited := newInvoice(t, srv)
 	refused := map[string]string{ // the field each VALIDATION case is refused for
+		"uncited invoice":          "invoiceId=errors.not_a_cause_invoice",
 		"bad subject":              "subjectType=error.invalid",
 		"blank message":            refusedMessageLength,
 		"payment with restriction": "restrictionId=error.notAllowed",
@@ -48,6 +56,8 @@ func TestInquiries(t *testing.T) {
 			`"restrictionId":"` + uuid.NewString() + `","message":"why"}`, 404},
 		"unknown cited invoice": {`{"subjectType":"restriction",` +
 			`"restrictionId":"` + rid + `","invoiceId":"` + uuid.NewString() + `","message":"why"}`, 404},
+		"uncited invoice": {`{"subjectType":"restriction",` +
+			`"restrictionId":"` + rid + `","invoiceId":"` + uncited + `","message":"why"}`, 422},
 	} {
 		code, m := write(srv, customerB(), "inquiries.create", testCase.body, 0)
 		if w, ok := refused[name]; ok {
@@ -275,21 +285,75 @@ func TestAuditList(t *testing.T) {
 		t.Error("unknown correlation is empty")
 	}
 
-	if _, m := post(
+	// actorId, action and result each narrow the list: one actor's entries are success/denied × two actions
+	actor := "system-" + uuid.NewString()
+
+	const aSuccess, aDenied, bDenied = "test.a/success", "test.a/denied", "test.b/denied"
+
+	for _, entry := range [][2]string{{"test.a", "success"}, {"test.a", resultDenied}, {"test.b", resultDenied}} {
+		owner(
+			t,
+			`INSERT INTO audit.audit_log (tenant_id, actor_id, actor_role_at_time, action, target_kind, target_id, occurred_at,
+				correlation_id, result)
+			VALUES ($1, $2, 'system', $3, 'test', $4, $5, $6, $7)`,
+			seed.ID("tenant-a"),
+			actor,
+			entry[0],
+			uuid.NewString(),
+			clock(),
+			uuid.NewString(),
+			entry[1],
+		)
+	}
+
+	for extra, want := range map[string][]string{
+		``:                                     {aSuccess, aDenied, bDenied},
+		`,"result":"denied"`:                   {aDenied, bDenied},
+		`,"action":"test.a"`:                   {aSuccess, aDenied},
+		`,"action":"test.a","result":"denied"`: {aDenied},
+	} {
+		_, res := post(
+			srv,
+			hq(),
+			"audit.list",
+			`{"filters":{`+day+`,"actorId":"`+actor+`"`+extra+`},"limit":100}`,
+		)
+
+		list := items(t, res)
+		got := make([]string, 0, len(list))
+
+		for _, item := range list {
+			got = append(got, asStr(t, item["action"])+"/"+asStr(t, item["result"]))
+		}
+
+		slices.Sort(got)
+		slices.Sort(want)
+
+		if !slices.Equal(got, want) {
+			t.Errorf("filters %q: %v, want %v", extra, got, want)
+		}
+	}
+
+	// a period of exactly 366 days is allowed
+	if code, _ := post(
 		srv,
 		hq(),
 		"audit.list",
-		`{"filters":{`+day+`,"result":"denied"},"sort":{"field":"occurredAt","direction":"asc"},"limit":2}`,
-	); m["data"] == nil {
-		t.Error("result filter")
+		`{"filters":{`+period(clock().Add(-366*24*time.Hour), clock())+`}}`,
+	); code != 200 {
+		t.Errorf("366-day period: %d", code)
 	}
 	// the period is required (both ends named when missing), from < to and at most 366 days
 	for body, want := range map[string]map[string]string{
+		`{"filters":{` + period(clock(), clock()) + `}}`: {fieldFiltersTo: keyPeriodRange},
+		`{"filters":{` + period(clock().Add(-366*24*time.Hour-time.Second), clock()) + `}}`: {
+			fieldFiltersTo: keyPeriodRange,
+		},
 		`{}`: {"filters.from": apperr.KeyRequired, fieldFiltersTo: apperr.KeyRequired},
 		`{"filters":{"from":"` + clock().Format(time.RFC3339) + `"}}`:           {fieldFiltersTo: apperr.KeyRequired},
 		`{"filters":{"to":"` + clock().Format(time.RFC3339) + `"}}`:             {"filters.from": apperr.KeyRequired},
-		`{"filters":{` + period(clock(), clock().Add(-time.Hour)) + `}}`:        {fieldFiltersTo: "errors.period_range"},
-		`{"filters":{` + period(clock().Add(-400*24*time.Hour), clock()) + `}}`: {fieldFiltersTo: "errors.period_range"},
+		`{"filters":{` + period(clock(), clock().Add(-time.Hour)) + `}}`:        {fieldFiltersTo: keyPeriodRange},
+		`{"filters":{` + period(clock().Add(-400*24*time.Hour), clock()) + `}}`: {fieldFiltersTo: keyPeriodRange},
 		`{"filters":{` + day + `,"result":"ok"}}`:                               {fieldFilters: apperr.KeyInvalid},
 		`{"filters":{` + day + `,"x":1}}`:                                       {"x": apperr.KeyNotAllowed},
 	} {

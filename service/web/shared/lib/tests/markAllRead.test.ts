@@ -10,13 +10,29 @@ const dal = vi.hoisted(() => {
   return { coreOp: vi.fn(), CoreError };
 });
 vi.mock("server-only", () => ({}));
-vi.mock("next/cache", () => ({ refresh: vi.fn() }));
+const cache = vi.hoisted(() => ({ refresh: vi.fn() }));
+vi.mock("next/cache", () => cache);
 vi.mock("@ac/web/lib/dal", () => dal);
 
-import { markAllRead } from "@ac/web/screens/shell/notifications/actions";
+import { markAllRead, markRead } from "@ac/web/screens/shell/notifications/actions";
 import { domainError, type DomainError } from "@ac/web/lib/domainError";
 
-beforeEach(() => dal.coreOp.mockReset());
+beforeEach(() => {
+  dal.coreOp.mockReset();
+  cache.refresh.mockReset();
+});
+
+// IR380: one notification is marked with its row version; the list is re-read whether or not the write landed
+describe("Mark as read", () => {
+  it("sends the row version and re-renders after a success and after a refusal", async () => {
+    dal.coreOp.mockResolvedValueOnce({});
+    expect(await markRead("n1", 4)).toBeNull();
+    expect(dal.coreOp).toHaveBeenCalledExactlyOnceWith("notifications.markRead", { id: "n1" }, { write: true, expectedVersion: 4 });
+    dal.coreOp.mockRejectedValueOnce(new dal.CoreError(domainError({ code: "CONFLICT", messageKey: "error.conflict", fieldErrors: {}, retryAfterSeconds: null })));
+    expect(await markRead("n1", 4)).toMatchObject({ code: "CONFLICT", messageKey: "error.conflict" });
+    expect(cache.refresh).toHaveBeenCalledTimes(2);
+  });
+});
 
 // IR379: "Mark all as read" is one write for the whole list, so it spends one of the member's writes a minute (IR375)
 describe("Mark all as read", () => {

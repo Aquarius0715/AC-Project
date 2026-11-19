@@ -1,11 +1,11 @@
 // HQ billing (FR-A08, DD-A08, SCR-A08, Figma Admin 38:7, IR321): the billing months are a URL filter (from / to,
-// Kuala Lumpur months) and the paid tile then counts the period; the invoice's related restriction links the
-// restriction on the Restrictions screen. The seed has one invoice, INV-202608-0001 (August 2026, overdue), the cause of
-// Demo Customer A's applied restriction. Nothing is paid, reminded or created.
+// Kuala Lumpur months) and the paid tile then counts the period; the invoice's related restriction is named, without a
+// link for hq-operator (no restriction.* permission). The seed has one invoice, INV-202608-0001 (August 2026,
+// overdue), the cause of Demo Customer A's applied restriction. Nothing is paid, reminded or created.
 import { test, expect } from "../../fixtures/test";
 import { expectAccessible } from "../../fixtures/a11y";
 
-test("billing months filter the invoices and the related restriction opens on the Restrictions screen", async ({ page }) => {
+test("billing months filter the invoices and the related restriction is locked for a role without Restrictions", async ({ page }) => {
   await page.goto("/admin/billing?from=2026-08&to=2026-08");
   const main = page.getByRole("main");
   await expect(main).toContainText("Paid in period");
@@ -13,10 +13,12 @@ test("billing months filter the invoices and the related restriction opens on th
   await expect(main.getByRole("button", { name: /INV-202608-0001/ })).toBeVisible();
   await expect(main.getByLabel("Billing months from")).toHaveValue("2026-08");
 
-  // the related restriction: its short ID and a link to it on the Restrictions screen
+  // the related restriction: hq-operator has no restriction.* permission, so the card names the restriction and says
+  // the role can't open Restrictions instead of linking it (the link for a restriction role: access.test.ts)
   const related = main.locator('section, [data-slot="card"]').filter({ has: page.getByRole("heading", { name: "Related restriction", exact: true }) });
-  await expect(related.getByRole("link", { name: "Open restriction" })).toHaveAttribute("href", /^\/admin\/restrictions\?restrictionId=[0-9a-f-]{36}$/);
   await expect(related).toContainText("This invoice is a cause of this restriction.");
+  await expect(related).toContainText("Your role can’t open Restrictions");
+  await expect(related.getByRole("link", { name: "Open restriction" })).toHaveCount(0);
 
   // a month without invoices, then all months again
   await page.goto("/admin/billing?from=2026-09&to=2026-09");
@@ -36,6 +38,48 @@ test("billing months filter the invoices and the related restriction opens on th
     await expect(main).toContainText("The first month must not be after the last", { timeout: 2000 });
   }).toPass({ timeout: 20_000 });
   expect(new URL(page.url()).searchParams.has("to")).toBe(false);
+});
+
+// Record manual payment (FR-A08, IR447): the seed invoice has no payment started, so HQ may record one received
+// outside the app. The dialog takes only the full invoice amount, a reference and a reason; it refuses before any call
+// otherwise and stays open. Nothing is recorded: the dialog is cancelled.
+test("a manual payment takes only the full amount, a reference and a reason", async ({ page }) => {
+  let sent = false;
+  page.on("request", (r) => {
+    if (r.method() === "POST" && r.url().includes("/admin/billing")) sent = true;
+  });
+  await page.goto("/admin/billing?from=2026-08&to=2026-08");
+  const main = page.getByRole("main");
+  await main.getByRole("button", { name: /INV-202608-0001/ }).click();
+  await expect(main).toContainText("The customer has not started a payment.");
+  await main.getByRole("button", { name: "Record manual payment…" }).click();
+
+  const dialog = page.getByRole("dialog", { name: "Record manual payment" });
+  await expectAccessible(page, '[role="dialog"]');
+  const amount = dialog.getByLabel("Amount (must equal invoice — full payment only)");
+  const full = await amount.inputValue();
+  expect(full).toMatch(/^\d+\.\d{2}$/);
+
+  // nothing filled in: the reference and the reason are asked for, the prefilled amount is the invoice's
+  await dialog.getByRole("button", { name: "Record payment" }).click();
+  await expect(dialog).toContainText("Reference is required");
+  await expect(dialog).toContainText("A reason is required");
+  await expect(dialog).not.toContainText("Must equal");
+
+  // a part payment is refused even with a reference and a reason
+  await dialog.getByLabel("Reference").fill("e2e-manual-not-sent");
+  await dialog.getByLabel("Reason").fill("E2E: must not be sent");
+  await amount.fill((Number(full) - 1).toFixed(2));
+  await dialog.getByRole("button", { name: "Record payment" }).click();
+  await expect(dialog).toContainText("Must equal");
+  await expect(dialog).not.toContainText("Reference is required");
+  await expect(dialog).toBeVisible();
+  expect(sent).toBe(false);
+
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(main).toContainText("Overdue");
+  expect(sent).toBe(false);
 });
 
 // Contractor payouts (FR-A23, DD-A23, Figma Admin 699:22119, IR322): the period, contractor and status filters live in

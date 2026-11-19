@@ -43,6 +43,15 @@ describe("HQ access & roles (FR-A03, BR-A03, IR107)", () => {
     expect(memberRows([member({ validUntil: TEXT_2026_09_15T00_00_00Z, revokedAt: TEXT_2026_09_15T00_00_00Z })], [], NOW).map((r) => [r.active, r.revoked])).toStrictEqual([[false, true]]); // IR508
   });
 
+  // UI/UX loop R28: Access & roles listed ended and revoked memberships above the active ones (API order)
+  it("lists active memberships first, then inactive, then revoked", () => {
+    const rows = memberRows([
+      member({ id: "revoked", validUntil: TEXT_2026_09_15T00_00_00Z, revokedAt: TEXT_2026_09_15T00_00_00Z }), member({ id: "ended", validUntil: TEXT_2026_09_15T00_00_00Z }),
+      member({ id: "a1" }), member({ id: "a2" }),
+    ], [], NOW);
+    expect(rows.map((r) => r.id)).toStrictEqual(["a1", "a2", "ended", "revoked"]);
+  });
+
   it("types the valid period in the display time zone and saves the same instants", () => {
     const tokyo = memberDraft(member({}), "", ASIA_TOKYO);
     expect([tokyo.validFrom, tokyo.validUntil, memberDraft(member({})).validFrom]).toStrictEqual(["2026-09-01T09:00", "2027-01-01T01:00", TEXT_2026_09_01T08_00]);
@@ -72,6 +81,8 @@ describe("HQ access & roles (FR-A03, BR-A03, IR107)", () => {
       "newUser.email": "A valid email address (up to 254 characters)", "newUser.displayName": "A name of 1–120 characters",
     });
     expect(memberErrors(draft({ userId: "", creatingUser: true, inviteEmail: "new@example.com", inviteName: "New Colleague" }), { selfUserId: "me" })).toStrictEqual({});
+    // 254 bytes, as members.create counts newUser.email (len in Go)
+    expect(memberErrors(draft({ userId: "", creatingUser: true, inviteEmail: `${"é".repeat(130)}@x.com`, inviteName: "New Colleague" }), { selfUserId: "me" })).toStrictEqual({ "newUser.email": "A valid email address (up to 254 characters)" });
     expect(memberInput(draft({ userId: "", creatingUser: true, inviteEmail: " new@example.com ", inviteName: " New Colleague " }))).toMatchObject({
       userId: "00000000-0000-0000-0000-000000000000", "newUser": { email: "new@example.com", displayName: "New Colleague" },
     });

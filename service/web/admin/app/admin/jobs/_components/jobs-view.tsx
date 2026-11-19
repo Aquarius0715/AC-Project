@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Badge, Banner, Btn, Card, Choice, EmptyState, Field, Input, ListRow, Modal, Page, Select, SummaryList, Textarea, cx, Plain, ScrollX } from "@ac/web/components/ui";
 import { JobStatusBadge, OriginBadge } from "@ac/web/components/JobBits";
+import { originOf } from "@ac/web/lib/origin";
 import { useI18n, useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
@@ -26,7 +27,7 @@ import { isBefore } from "@ac/web/lib/order";
 import { DateTimeSelect, TimeSelect } from "@ac/web/components/TimeSelect";
 
 type Detail = NonNullable<JobsLive["detail"]>;
-const TYPES = [{ id: "", label: "All" }, { id: "reactive", label: "Repair" }, { id: "periodic", label: "Periodic" }, { id: "preventive", label: "Preventive" }];
+const TYPES = [{ id: "", label: "All" }, { id: "reactive", label: "Repair" }, { id: "periodic", label: "Periodic" }, { id: "preventive", label: "Preventive" }, { id: "installation", label: "Installation" }];
 const RANK = ["1st", "2nd", "3rd"];
 // a step's dot and label by its state; a step to do keeps the plain dot and a done step the plain label
 const STEP_DOT = new Map<string, string>([["done", "bg-primary text-white"], ["current", "border-2 border-primary text-primary"]]);
@@ -77,7 +78,7 @@ function JobsTab({ live, patch, fresh, onFresh }: Readonly<{ live: JobsLive; pat
         <Select aria-label={t("Type")} className="w-auto" value={q.type ?? ""} onChange={(e) => { patch({ type: e.target.value || null }); }}>{TYPES.map((x) => <option key={x.id} value={x.id}>{t("Type: {value}", { value: t(x.label) })}</option>)}</Select>
         <Select aria-label={t("Origin")} className="w-auto" value={q.origin ?? ""} onChange={(e) => { patch({ origin: e.target.value || null }); }}><option value="">{t("Origin: All")}</option><option value="client_request">{t("Origin: Client request")}</option><option value="periodic_plan">{t("Origin: Periodic plan")}</option></Select>
         <Select aria-label={t("Delivery")} className="w-auto" value={q.delivery ?? ""} onChange={(e) => { patch({ delivery: e.target.value || null }); }}><option value="">{t("Delivery: All")}</option>{live.deliveries.map((d) => <option key={d.id} value={d.id}>{t("Delivery: {name}", { name: d.name })}</option>)}</Select>
-        <Select aria-label={t("Assignee")} className="w-auto" value={q.assignee ?? ""} onChange={(e) => { patch({ assignee: e.target.value || null }); }}><option value="">{t("Assignee: All")}</option>{live.assignees.map((a) => <option key={a.id} value={a.id}>{t("Assignee: {name}", { name: a.name })}</option>)}</Select>
+        <Select aria-label={t("Assignee")} className="w-auto" value={q.assignee ?? ""} onChange={(e) => { patch({ assignee: e.target.value || null }); }}><option value="">{t("Assignee: All")}</option>{live.assignees.map((g) => <optgroup key={g.org} label={g.org || t("Other")}>{g.people.map((a) => <option key={a.id} value={a.id}>{t("Assignee: {name}", { name: a.name })}</option>)}</optgroup>)}</Select>
         <Select aria-label={t("Sort")} className="w-auto" value={live.sort} onChange={(e) => { patch({ sort: e.target.value === "status" ? null : e.target.value }); }}>{live.sorts.map((s) => <option key={s.id} value={s.id}>{t("Sort: {sort}", { sort: s.text })}</option>)}</Select>
         <label className="flex items-center gap-1.5 rounded-control border border-line bg-surface px-3 py-1.5 text-[13px]"><Checkbox checked={q.overdue === "1"} onCheckedChange={(v) => { patch({ overdue: v ? "1" : null }); }} /> {t("Overdue only")}</label>
         {live.periodChip && <Plain type="button" touch onClick={() => { patch({ from: null, to: null, jobId: null }); }} className="rounded-full bg-primary-soft px-3 py-1 text-xs font-semibold text-primary" aria-label={t("{period} — clear the requested-time period", { period: live.periodChip })}>{live.periodChip} <Icon name="close" /></Plain>}
@@ -89,7 +90,7 @@ function JobsTab({ live, patch, fresh, onFresh }: Readonly<{ live: JobsLive; pat
               <ListRow key={r.id} selected={!!sel && !("missing" in live) && sel.job.id === r.id} href={`/admin/jobs?${new URLSearchParams({ ...Object.fromEntries(Object.entries(q).filter(([, v]) => typeof v === "string" && v !== "")), ...((live.sort !== "status") && { sort: live.sort }), jobId: r.id })}`}>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-2"><b className="truncate text-[13px]">{r.short} · {r.title}</b><JobStatusBadge s={r.badge.status} /></div>
-                  <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground"><OriginBadge origin={r.origin === PERIODIC_PLAN ? "plan" : "request"} />{r.customer} · {r.type}{r.badge.overdue && <Badge tone="crit">{t("!! Overdue")}</Badge>}</div>
+                  <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground"><OriginBadge origin={originOf(r.origin)} />{r.customer} · {r.type}{r.badge.overdue && <Badge tone="crit" icon="error">{t("Overdue")}</Badge>}</div>
                   <div className={cx("text-[11px]", r.lineTone === "warn" ? "text-warn" : TEXT_MUTED_FOREGROUND)}>{r.line}</div>
                 </div>
               </ListRow>
@@ -220,7 +221,8 @@ function CostsCard({ ctx }: Readonly<{ ctx: DetailCtx }>) {
   const j = d.job;
   return (
     <>
-      <Card title={t("Costs")} action={<Btn size="sm" disabled={pending || j.status === "cancelled"} title={j.status === "cancelled" ? t("A cancelled job’s costs cannot change.") : undefined} onClick={() => { setModal({ kind: "cost" }); }}><Icon name="add" /> {t("Add cost line")}</Btn>}>
+      {/* why Add cost line is off, in words under the title rather than only in a tooltip (UI/UX loop R118) */}
+      <Card title={t("Costs")} sub={j.status === "cancelled" ? t("A cancelled job’s costs cannot change.") : undefined} action={<Btn size="sm" disabled={pending || j.status === "cancelled"} onClick={() => { setModal({ kind: "cost" }); }}><Icon name="add" /> {t("Add cost line")}</Btn>}>
         {d.costs.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No cost lines yet — add estimates before the work and actuals after it.")}</p> : (
           <ScrollX><table className="w-full min-w-[560px] text-[13px]">
             <thead><tr className="text-left text-[11px] uppercase text-muted-foreground"><th className="py-1.5">{t("Kind")}</th><th>{t("Description")}</th><th>{t("Visibility")}</th><th className="text-right">{t("Amount")}</th><th className="w-8"><span className="sr-only">{t("Remove")}</span></th></tr></thead>
@@ -264,7 +266,7 @@ function JobDetail({ d, live, fresh, onFresh }: Readonly<{ d: Detail; live: Jobs
   return (
     <div className="flex min-w-0 flex-col gap-4">
       {result && <Banner tone={result.tone}>{result.text}</Banner>}
-      <Card title={<span className="flex flex-wrap items-center gap-2">{j.id.slice(0, 8)} · {d.title} <JobStatusBadge s={sp?.status === "pending" ? "time_proposed" : j.status} /><OriginBadge origin={j.origin === PERIODIC_PLAN ? "plan" : "request"} /></span>}
+      <Card title={<span className="flex flex-wrap items-center gap-2">{j.id.slice(0, 8)} · {d.title} <JobStatusBadge s={sp?.status === "pending" ? "time_proposed" : j.status} /><OriginBadge origin={originOf(j.origin)} /></span>}
         sub={`${typeLabel(j.type, t)} · ${d.customer}${d.location ? ` · ${d.location}` : ""}${j.planId ? ` · ${t("plan occurrence {date}", { date: d.texts.occurrence ?? "" })}` : ""}`}
         action={<div className="flex gap-2">
           {c.hold && <Btn size="sm" disabled={pending} onClick={() => { setModal({ kind: "reason", what: "hold" }); }}>{t("Hold…")}</Btn>}
@@ -408,13 +410,13 @@ function ReasonModal({ d, live, what, onClose, onFail }: ModalProps & { what: "h
     setTried(true);
     if (!r.trim() || r.length > 1000 || (what === "reassign" && !tech)) return;
     const slot = j.assignment ? { startAt: j.assignment.scheduledStart, endAt: j.assignment.scheduledEnd } : j.scheduledSlot;
-    if (!slot) return;
+    if (what === "reassign" && !slot) return; // only a reassignment keeps the agreed time; holding or cancelling a job that is not booked yet needs none
     const done = t({ hold: "Job put on hold — scheduling and reports are blocked.", resume: "Job resumed.", cancel: "Job cancelled.", reassign: "Reassigned — the new technician must accept." }[what]);
     const send = () => {
       if (what === "hold") return holdJob(j.id, j.version, r);
       if (what === "resume") return resumeJob(j.id, j.version, r);
       if (what === "cancel") return cancelJob(j.id, j.version, r);
-      return assignInternal(j.id, j.version, tech, slot, r);
+      return slot ? assignInternal(j.id, j.version, tech, slot, r) : Promise.reject(new Error("a reassignment keeps the agreed time"));
     };
     run(send, done, () => { onClose(done); }, onFail);
   };
@@ -566,6 +568,7 @@ function ExtendModal({ d, live, until, onClose, onFail }: ModalProps & { until: 
 
 const JOB_TYPES = [{ id: "reactive" as const, label: "Repair" }, { id: "preventive" as const, label: "Preventive" }, { id: "periodic" as const, label: "Periodic" }];
 
+
 /** New job (DD-A06 item 8, Figma 06-1 New job): step 1 creates the job (requested) with the customer's preferred times
 asked by phone; “Save as requested” stops there, “Next: choose delivery” opens step 2 (the booking dialog) on it. */
 export function NewJobModal({ live, initial, onClose, onCreated }: Readonly<{ live: { now: string; units: JobsLive["units"]; q: { unitId?: string } }; initial?: { unitId: string; symptom: string }; onClose: () => void; onCreated?: (f: Fresh) => void }>) {
@@ -574,7 +577,9 @@ export function NewJobModal({ live, initial, onClose, onCreated }: Readonly<{ li
   const now = Date.parse(live.now);
   const [pending, run] = useAction();
   const [unitId, setUnitId] = useState(initial?.unitId ?? live.q.unitId ?? live.units[0]?.id ?? "");
-  const [type, setType] = useState<"reactive" | "preventive" | "periodic">("reactive");
+  const [chosenType, setChosenType] = useState<"reactive" | "preventive" | "periodic">("reactive");
+  const isPlanned = live.units.find((u) => u.id === unitId)?.planned ?? false;
+  const type = isPlanned ? "installation" : chosenType;
   const [symptom, setSymptom] = useState(initial?.symptom ?? "");
   const tomorrow = tomorrowIn(now, zone);
   const [times, setTimes] = useState([{ date: tomorrow, from: "10:00", to: "12:00" }]);
@@ -605,7 +610,7 @@ export function NewJobModal({ live, initial, onClose, onCreated }: Readonly<{ li
       {refusal && <Banner tone="crit">{refusal}</Banner>}
       <div className="grid-fluid" style={{ ["--min" as string]: "220px" }}>
         <Field label={t("Unit · required")} error={tried ? errors.unitId : undefined}><Select value={unitId} onChange={(e) => { setUnitId(e.target.value); }}>{groups.map((g) => <optgroup key={g} label={g}>{live.units.filter((u) => u.customer === g).map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</optgroup>)}</Select></Field>
-        <Field label={t("Type")}><Choice value={type} onChange={setType} options={JOB_TYPES.map((x) => ({ id: x.id, label: t(x.label) }))} /></Field>
+        <Field label={t("Type")}>{isPlanned ? <Badge tone="primary">{t("Installation")}</Badge> : <Choice value={chosenType} onChange={setChosenType} options={JOB_TYPES.map((x) => ({ id: x.id, label: t(x.label) }))} />}</Field>
       </div>
       <Field label={t("Symptom · required (10–2000)")} error={tried ? errors.symptom : undefined}><Textarea value={symptom} maxLength={2000} onChange={(e) => { setSymptom(e.target.value); }} placeholder={t("Unit shows offline since 08:12; the customer reports no cooling.")} /></Field>
       <div className="flex flex-col gap-2">

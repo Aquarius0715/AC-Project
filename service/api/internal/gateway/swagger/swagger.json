@@ -2415,7 +2415,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | admin:dashboard.read | admin:device.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A02, DD-A04 · Query: filters none · sort id,createdAt,updatedAt (default id asc)",
+                "description": "Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | admin:dashboard.read | admin:device.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A02, DD-A04, DD-C20 · Query: filters none · sort id,createdAt,updatedAt (default id asc)",
                 "consumes": [
                     "application/json"
                 ],
@@ -6816,7 +6816,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: technician:device.maintain:assigned-valid-job | admin:device.write\nValidation: D01; input constraints in the corresponding DD; IR43 sensorTypes⊆IoTModel.sensors (DEC-105: the iotModelId, else the planned unit's IoT model; none allows no sensors; sensorTypes omitted = every sensor of the model); unitId omitted registers an unplanned device (HQ only); IR94 technician write table (assignment and work window, jobId required when typed)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-T11, DD-A04",
+                "description": "Authorization: technician:device.maintain:assigned-valid-job | admin:device.write\nValidation: D01; input constraints in the corresponding DD; IR43 sensorTypes⊆IoTModel.sensors (DEC-105: the iotModelId, else the planned unit's IoT model; none allows no sensors; sensorTypes omitted = every sensor of the model); unitId omitted registers an unplanned device (HQ only); IR94 technician write table (assignment and work window, jobId required when typed)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-T11, DD-A04, DD-T16",
                 "consumes": [
                     "application/json"
                 ],
@@ -11122,6 +11122,480 @@
                 }
             }
         },
+        "/v1/installation-requests": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Authorization: client:self-customer:owner | admin:job.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-C20, DD-A06 · Query: filters status,customerId,propertyId · sort id,status,createdAt,updatedAt (default createdAt desc;id asc)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "installationRequests"
+                ],
+                "summary": "installationRequests.list (read)",
+                "operationId": "installationRequests.list",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "page cursor: nextCursor of the previous page (D12)",
+                        "name": "cursor",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "page size 1–100, default 25",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "field:direction — fields id,status,createdAt,updatedAt; default createdAt desc;id asc",
+                        "name": "sort",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "filter → status",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "filter → customerOrgId",
+                        "name": "customerId",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "filter → propertyId",
+                        "name": "propertyId",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ops.Envelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/maintenance.InstallationRequestPage"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "403": {
+                        "description": "FORBIDDEN",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "409": {
+                        "description": "CONFLICT / OFFLINE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "422": {
+                        "description": "VALIDATION (fieldErrors)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "429": {
+                        "description": "RATE_LIMITED (retryAfterSeconds)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "503": {
+                        "description": "UNAVAILABLE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "504": {
+                        "description": "TIMEOUT",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Authorization: client:self-customer:owner\nValidation: D01; input constraints in the corresponding DD; property and space of the caller's customer and not archived; quantity 1–10; 3 distinct future slots ≥1 day ahead (IR113); note ≤2000\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-C20",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "installationRequests"
+                ],
+                "summary": "installationRequests.create (write)",
+                "operationId": "installationRequests.create",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "D04: the same key replays the stored response; another body for the same key is CONFLICT",
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "input",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/maintenance.CreateRequestInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ops.Envelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/maintenance.InstallationRequest"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "403": {
+                        "description": "FORBIDDEN",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "409": {
+                        "description": "CONFLICT / OFFLINE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "422": {
+                        "description": "VALIDATION (fieldErrors)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "429": {
+                        "description": "RATE_LIMITED (retryAfterSeconds)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "503": {
+                        "description": "UNAVAILABLE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "504": {
+                        "description": "TIMEOUT",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/installation-requests/{id}/cancel": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Authorization: client:self-customer:owner\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; own customer's submitted request only (CONFLICT otherwise)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-C20",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "installationRequests"
+                ],
+                "summary": "installationRequests.cancel (write)",
+                "operationId": "installationRequests.cancel",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "D04: the same key replays the stored response; another body for the same key is CONFLICT",
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "all: required (target installation_request, read installationRequests.list)",
+                        "name": "X-Expected-Version",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "input field id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "input; the path parameters come from the route",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/maintenance.RequestIDInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ops.Envelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/maintenance.InstallationRequest"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "403": {
+                        "description": "FORBIDDEN",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "409": {
+                        "description": "CONFLICT / OFFLINE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "422": {
+                        "description": "VALIDATION (fieldErrors)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "429": {
+                        "description": "RATE_LIMITED (retryAfterSeconds)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "503": {
+                        "description": "UNAVAILABLE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "504": {
+                        "description": "TIMEOUT",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/installation-requests/{id}/decline": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Authorization: admin:job.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; reason 5–500; submitted request only (CONFLICT otherwise)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A06",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "installationRequests"
+                ],
+                "summary": "installationRequests.decline (write)",
+                "operationId": "installationRequests.decline",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "D04: the same key replays the stored response; another body for the same key is CONFLICT",
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "all: required (target installation_request, read installationRequests.list)",
+                        "name": "X-Expected-Version",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "input field id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "input; the path parameters come from the route",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/maintenance.DeclineRequestInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ops.Envelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/maintenance.InstallationRequest"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "403": {
+                        "description": "FORBIDDEN",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "409": {
+                        "description": "CONFLICT / OFFLINE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "422": {
+                        "description": "VALIDATION (fieldErrors)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "429": {
+                        "description": "RATE_LIMITED (retryAfterSeconds)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "503": {
+                        "description": "UNAVAILABLE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "504": {
+                        "description": "TIMEOUT",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    }
+                }
+            }
+        },
         "/v1/invoices": {
             "get": {
                 "security": [
@@ -12183,7 +12657,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: client:self | contractor:offer-projection-or-delegated-history | technician:assigned-history | admin:job.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR23: project before filters/sort/total\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A06, DD-C09, DD-P01, DD-P03, DD-P06, DD-T01, DD-T11, DD-T12, DD-P10, DD-P07, DD-T13, DD-T02 · Query: filters unitId,unitIds,status,severity,from,to,organizationId,membershipId,customerId,propertyId,statuses,overdueOnly,origin,proposalPending,type · sort id,severity,dueAt,status (default status asc;id asc)",
+                "description": "Authorization: client:self | contractor:offer-projection-or-delegated-history | technician:assigned-history | admin:job.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR23: project before filters/sort/total\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A06, DD-C09, DD-P01, DD-P03, DD-P06, DD-T01, DD-T11, DD-T12, DD-P10, DD-P07, DD-T13, DD-T02 · Query: filters unitId,unitIds,status,severity,from,to,organizationId,membershipId,customerId,propertyId,statuses,overdueOnly,origin,proposalPending,type,currentOnly · sort id,severity,dueAt,status (default status asc;id asc)",
                 "consumes": [
                     "application/json"
                 ],
@@ -12311,6 +12785,12 @@
                         "description": "filter",
                         "name": "type",
                         "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "filter",
+                        "name": "currentOnly",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -12388,7 +12868,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: client:self | admin:job.write\nValidation: D01; input constraints in the corresponding DD; IR38 dueAt only for job.write; defaults to requestedEnd; IR113 client: requested slot + exactly 2 alternativeSlots, 3 distinct future slots ≥1 day ahead; HQ on behalf: 0–2\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A06, DD-C09",
+                "description": "Authorization: client:self | admin:job.write\nValidation: D01; input constraints in the corresponding DD; IR38 dueAt only for job.write; defaults to requestedEnd; IR113 client: requested slot + exactly 2 alternativeSlots, 3 distinct future slots ≥1 day ahead; HQ on behalf: 0–2; DEC-107 installationRequestId (HQ only, type installation): the request is submitted or approved, of the unit's customer, with fewer unfinished jobs than its quantity (CONFLICT), the job has origin client_request and the client slot rule applies; the first job sets the request approved\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A06, DD-C09",
                 "consumes": [
                     "application/json"
                 ],
@@ -12495,7 +12975,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: client:self | contractor:offer-projection-or-delegated-history | technician:assigned-history | admin:job.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR86 expired unanswered offer: NOT_FOUND for contractor\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A06, DD-C09, DD-P01, DD-P02, DD-P05, DD-P08, DD-T04, DD-T05, DD-T06, DD-T08, DD-T09, DD-T10, DD-C17, DD-T13, DD-P10, DD-P03, DD-T02, DD-T07",
+                "description": "Authorization: client:self | contractor:offer-projection-or-delegated-history | technician:assigned-history | admin:job.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR86 expired unanswered offer: NOT_FOUND for contractor\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A06, DD-C09, DD-P01, DD-P02, DD-P05, DD-P08, DD-T04, DD-T05, DD-T06, DD-T08, DD-T09, DD-T10, DD-C17, DD-T13, DD-P10, DD-P03, DD-T02, DD-T07, DD-T16",
                 "consumes": [
                     "application/json"
                 ],
@@ -13049,7 +13529,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: technician:assigned-valid-job\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 within the work window; manual method requires reason 1–1000; location within 200 m for location_qr\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-T13",
+                "description": "Authorization: technician:assigned-valid-job\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 within the work window; manual method requires reason 1–1000; location_qr: the device's fix within 200 m of the property's pin measured on the server (accuracy counts; at most 100 m)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-T13",
                 "consumes": [
                     "application/json"
                 ],
@@ -14899,7 +15379,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: technician:assigned-valid-job\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR94 technician write table (assignment and work window, jobId required when typed); IR100 partial items allowed\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-T04, DD-T05, DD-T06, DD-T09, DD-T14",
+                "description": "Authorization: technician:assigned-valid-job\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR94 technician write table (assignment and work window, jobId required when typed); IR100 partial items allowed\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-T04, DD-T05, DD-T06, DD-T09, DD-T14, DD-T16",
                 "consumes": [
                     "application/json"
                 ],
@@ -16607,7 +17087,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: technician:assigned-valid-job\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR94 technician write table (assignment and work window, jobId required when typed); IR100 component set and report completeness\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-T04, DD-T05, DD-T06, DD-T08, DD-T09 · Input versions: reportVersion=WorkReport.version",
+                "description": "Authorization: technician:assigned-valid-job\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR94 technician write table (assignment and work window, jobId required when typed); IR100 component set and report completeness\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-T04, DD-T05, DD-T06, DD-T08, DD-T09, DD-T16 · Input versions: reportVersion=WorkReport.version",
                 "consumes": [
                     "application/json"
                 ],
@@ -21279,6 +21759,120 @@
                 }
             }
         },
+        "/v1/payments/checkout": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Authorization: client:self\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR474 full amount and one attempt in flight (CONFLICT errors.invoice_has_payment); DEC-68 hosted Stripe Checkout in MYR; paid only by the signed webhook\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-C11, DD-A08",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "payments"
+                ],
+                "summary": "payments.startCheckout (write)",
+                "operationId": "payments.startCheckout",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "D04: the same key replays the stored response; another body for the same key is CONFLICT",
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "all: required (target invoice, read invoices.get)",
+                        "name": "X-Expected-Version",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "input",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/billing.StartCheckoutInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ops.Envelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/billing.CheckoutStart"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "403": {
+                        "description": "FORBIDDEN",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "409": {
+                        "description": "CONFLICT / OFFLINE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "422": {
+                        "description": "VALIDATION (fieldErrors)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "429": {
+                        "description": "RATE_LIMITED (retryAfterSeconds)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "503": {
+                        "description": "UNAVAILABLE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "504": {
+                        "description": "TIMEOUT",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    }
+                }
+            }
+        },
         "/v1/payments/confirm": {
             "post": {
                 "security": [
@@ -24016,6 +24610,113 @@
                 }
             }
         },
+        "/v1/presence": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Authorization: client:own-membership\nValidation: D01; input constraints in the corresponding DD; DEC-109 the member's location_automation consent (else CONFLICT); accuracy at most 100 m; only inside/outside per pinned property is kept\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-C05",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "presence"
+                ],
+                "summary": "presence.report (write)",
+                "operationId": "presence.report",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "D04: the same key replays the stored response; another body for the same key is CONFLICT",
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "input",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/control.PresenceInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ops.Envelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/control.PresenceResult"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "403": {
+                        "description": "FORBIDDEN",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "409": {
+                        "description": "CONFLICT / OFFLINE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "422": {
+                        "description": "VALIDATION (fieldErrors)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "429": {
+                        "description": "RATE_LIMITED (retryAfterSeconds)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "503": {
+                        "description": "UNAVAILABLE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "504": {
+                        "description": "TIMEOUT",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    }
+                }
+            }
+        },
         "/v1/properties": {
             "get": {
                 "security": [
@@ -24023,7 +24724,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: client:self-customer | admin:asset.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A02, DD-C02, DD-C07, DD-C04, DD-A06, DD-C09, DD-C01, DD-C08, DD-A01 · Query: filters customerId,kind · sort id,createdAt,updatedAt (default id asc)",
+                "description": "Authorization: client:self-customer | admin:asset.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A02, DD-C02, DD-C07, DD-C04, DD-A06, DD-C09, DD-C01, DD-C08, DD-A01, DD-C20 · Query: filters customerId,kind · sort id,createdAt,updatedAt (default id asc)",
                 "consumes": [
                     "application/json"
                 ],
@@ -26396,7 +27097,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: client:self-customer | admin:asset.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A02, DD-C02, DD-C07, DD-C04, DD-C09, DD-C01, DD-C08 · Query: filters propertyId,kind · sort id,createdAt,updatedAt (default id asc)",
+                "description": "Authorization: client:self-customer | admin:asset.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A02, DD-C02, DD-C07, DD-C04, DD-C09, DD-C01, DD-C08, DD-C20 · Query: filters propertyId,kind · sort id,createdAt,updatedAt (default id asc)",
                 "consumes": [
                     "application/json"
                 ],
@@ -29456,6 +30157,9 @@
                 "id": {
                     "type": "string"
                 },
+                "installState": {
+                    "type": "string"
+                },
                 "installedAt": {
                     "type": "string"
                 },
@@ -29611,6 +30315,17 @@
                 },
                 "id": {
                     "type": "string"
+                }
+            }
+        },
+        "assets.GeoPoint": {
+            "type": "object",
+            "properties": {
+                "latitude": {
+                    "type": "number"
+                },
+                "longitude": {
+                    "type": "number"
                 }
             }
         },
@@ -29781,11 +30496,23 @@
                 "customerOrgId": {
                     "type": "string"
                 },
+                "geofenceRadiusMeters": {
+                    "description": "GeofenceRadiusMeters is the away/home radius around Location; nil means the default (150 m).",
+                    "type": "integer"
+                },
                 "id": {
                     "type": "string"
                 },
                 "kind": {
                     "type": "string"
+                },
+                "location": {
+                    "description": "Location is the map pin HQ set (DEC-109); nil until one is set.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/assets.GeoPoint"
+                        }
+                    ]
                 },
                 "name": {
                     "type": "string"
@@ -29833,11 +30560,22 @@
                 "customerOrgId": {
                     "type": "string"
                 },
+                "geofenceRadiusMeters": {
+                    "type": "integer"
+                },
                 "id": {
                     "type": "string"
                 },
                 "kind": {
                     "type": "string"
+                },
+                "location": {
+                    "description": "Location is the map pin (DEC-109); null clears it. The save replaces it, as it replaces the address.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/assets.GeoPoint"
+                        }
+                    ]
                 },
                 "name": {
                     "type": "string"
@@ -29999,6 +30737,9 @@
                 "id": {
                     "type": "string"
                 },
+                "installState": {
+                    "type": "string"
+                },
                 "installedAt": {
                     "type": "string"
                 },
@@ -30148,6 +30889,9 @@
                     "type": "string"
                 },
                 "id": {
+                    "type": "string"
+                },
+                "installState": {
                     "type": "string"
                 },
                 "installedAt": {
@@ -30306,6 +31050,10 @@
                 "id": {
                     "type": "string"
                 },
+                "installState": {
+                    "description": "InstallState is planned for a unit not installed yet (DEC-106): omitted is installed for a new unit and the\nstored state for a saved one; it never changes by a save (an accepted installation report installs the unit).",
+                    "type": "string"
+                },
                 "installedAt": {
                     "type": "string"
                 },
@@ -30433,6 +31181,17 @@
                     "type": "string"
                 },
                 "reply": {
+                    "type": "string"
+                }
+            }
+        },
+        "billing.CheckoutStart": {
+            "type": "object",
+            "properties": {
+                "checkoutUrl": {
+                    "type": "string"
+                },
+                "paymentId": {
                     "type": "string"
                 }
             }
@@ -30850,6 +31609,10 @@
                 "amountMinor": {
                     "type": "integer"
                 },
+                "channel": {
+                    "description": "Channel is how the payment is taken: demo, stripe_checkout (DEC-68) or manual (recorded by HQ).",
+                    "type": "string"
+                },
                 "confirmationReason": {
                     "description": "ConfirmationReason is the reason HQ gave when confirming or recording the payment; HQ callers only.",
                     "type": "string"
@@ -31045,6 +31808,14 @@
                     "type": "string"
                 },
                 "paymentReference": {
+                    "type": "string"
+                }
+            }
+        },
+        "billing.StartCheckoutInput": {
+            "type": "object",
+            "properties": {
+                "invoiceId": {
                     "type": "string"
                 }
             }
@@ -31527,6 +32298,48 @@
                 },
                 "draft": {
                     "$ref": "#/definitions/control.ScheduleDraft"
+                }
+            }
+        },
+        "control.PresenceInput": {
+            "type": "object",
+            "properties": {
+                "accuracyMeters": {
+                    "type": "number"
+                },
+                "latitude": {
+                    "type": "number"
+                },
+                "longitude": {
+                    "type": "number"
+                }
+            }
+        },
+        "control.PresenceResult": {
+            "type": "object",
+            "properties": {
+                "transitions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/control.PresenceTransition"
+                    }
+                }
+            }
+        },
+        "control.PresenceTransition": {
+            "type": "object",
+            "properties": {
+                "commandIds": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "event": {
+                    "type": "string"
+                },
+                "propertyId": {
+                    "type": "string"
                 }
             }
         },
@@ -34163,6 +34976,13 @@
                 "monthlyReportEmail": {
                     "type": "boolean"
                 },
+                "pinnedUnitIds": {
+                    "description": "PinnedUnitIDs are the ACs the user pinned to their Overview (IR819), newest first; ids only, the screen shows\nthose the user can still read.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
                 "timezone": {
                     "type": "string"
                 },
@@ -34179,6 +34999,13 @@
                 },
                 "monthlyReportEmail": {
                     "type": "boolean"
+                },
+                "pinnedUnitIds": {
+                    "description": "PinnedUnitIDs replaces the pins when given (IR819); left out, they stay as they are.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 },
                 "timezone": {
                     "type": "string"
@@ -34373,6 +35200,10 @@
                 },
                 "reportId": {
                     "type": "string"
+                },
+                "tag": {
+                    "description": "Tag says what a photo of an installation report shows (name plate, indoor unit, outdoor unit; DEC-106).",
+                    "type": "string"
                 }
             }
         },
@@ -34484,6 +35315,9 @@
                     "type": "integer"
                 },
                 "status": {
+                    "type": "string"
+                },
+                "tag": {
                     "type": "string"
                 },
                 "tenantId": {
@@ -34710,14 +35544,14 @@
         "maintenance.CheckInInput": {
             "type": "object",
             "properties": {
-                "distanceMeters": {
-                    "type": "number"
-                },
                 "jobId": {
                     "type": "string"
                 },
                 "method": {
                     "type": "string"
+                },
+                "position": {
+                    "$ref": "#/definitions/maintenance.Position"
                 },
                 "qrUnitId": {
                     "type": "string"
@@ -34821,6 +35655,10 @@
                 "dueAt": {
                     "type": "string"
                 },
+                "installationRequestId": {
+                    "description": "InstallationRequestID links an installation job to the client request it answers (HQ only, DEC-107).",
+                    "type": "string"
+                },
                 "requestedEnd": {
                     "type": "string"
                 },
@@ -34835,6 +35673,38 @@
                 },
                 "unitId": {
                     "type": "string"
+                }
+            }
+        },
+        "maintenance.CreateRequestInput": {
+            "type": "object",
+            "properties": {
+                "contactWindow": {
+                    "type": "string"
+                },
+                "modelId": {
+                    "type": "string"
+                },
+                "note": {
+                    "type": "string"
+                },
+                "preferredSlots": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/maintenance.Slot"
+                    }
+                },
+                "propertyId": {
+                    "type": "string"
+                },
+                "quantity": {
+                    "type": "integer"
+                },
+                "spaceId": {
+                    "type": "string"
+                },
+                "withIot": {
+                    "type": "boolean"
                 }
             }
         },
@@ -34887,6 +35757,17 @@
                 }
             }
         },
+        "maintenance.DeclineRequestInput": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "reason": {
+                    "type": "string"
+                }
+            }
+        },
         "maintenance.DeletedResource": {
             "type": "object",
             "properties": {
@@ -34926,6 +35807,14 @@
                     "items": {
                         "type": "string"
                     }
+                },
+                "installation": {
+                    "description": "Installation is the equipment an installation job confirms (DEC-106); null on any other job.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/maintenance.InstallationCheck"
+                        }
+                    ]
                 },
                 "items": {
                     "type": "array",
@@ -35052,6 +35941,9 @@
                     "type": "integer"
                 },
                 "status": {
+                    "type": "string"
+                },
+                "tag": {
                     "type": "string"
                 },
                 "tenantId": {
@@ -35214,6 +36106,102 @@
                 },
                 "technicianMembershipId": {
                     "type": "string"
+                }
+            }
+        },
+        "maintenance.InstallationCheck": {
+            "type": "object",
+            "properties": {
+                "confirmedModelId": {
+                    "type": "string"
+                },
+                "serial": {
+                    "type": "string"
+                }
+            }
+        },
+        "maintenance.InstallationRequest": {
+            "type": "object",
+            "properties": {
+                "contactWindow": {
+                    "type": "string"
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "customerOrgId": {
+                    "type": "string"
+                },
+                "decidedAt": {
+                    "type": "string"
+                },
+                "declineReason": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "jobIds": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "modelId": {
+                    "type": "string"
+                },
+                "note": {
+                    "type": "string"
+                },
+                "preferredSlots": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/maintenance.Slot"
+                    }
+                },
+                "propertyId": {
+                    "type": "string"
+                },
+                "quantity": {
+                    "type": "integer"
+                },
+                "spaceId": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "tenantId": {
+                    "type": "string"
+                },
+                "updatedAt": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "integer"
+                },
+                "withIot": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "maintenance.InstallationRequestPage": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/maintenance.InstallationRequest"
+                    }
+                },
+                "nextCursor": {
+                    "type": "string"
+                },
+                "snapshotVersion": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
                 }
             }
         },
@@ -35772,6 +36760,20 @@
                 }
             }
         },
+        "maintenance.Position": {
+            "type": "object",
+            "properties": {
+                "accuracyMeters": {
+                    "type": "number"
+                },
+                "latitude": {
+                    "type": "number"
+                },
+                "longitude": {
+                    "type": "number"
+                }
+            }
+        },
         "maintenance.ProblemInput": {
             "type": "object",
             "properties": {
@@ -36131,6 +37133,9 @@
                 "id": {
                     "type": "string"
                 },
+                "installation": {
+                    "$ref": "#/definitions/maintenance.InstallationCheck"
+                },
                 "items": {
                     "type": "array",
                     "items": {
@@ -36256,6 +37261,14 @@
                 },
                 "version": {
                     "type": "integer"
+                }
+            }
+        },
+        "maintenance.RequestIDInput": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
                 }
             }
         },

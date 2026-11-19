@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { must } from "./must";
 import {
-  attentionCard, bucketPoints, bucketTimes, emissionsCard, energyCard, nextRunText, overviewRows, overviewScope, periodNote, periodOf, previousRange, whenText, type OverviewUnit,
+  attentionCard, bucketPoints, bucketTimes, byProperty, emissionsCard, energyCard, nextRunText, overviewRows, overviewScope, periodNote, periodOf, previousRange, whenText, type OverviewUnit,
 } from "@ac/web/lib/customerOverview";
 import type { ApiAlert } from "@ac/web/lib/alerts";
 import type { ApiEnergySummary } from "@ac/web/lib/energy";
@@ -21,12 +22,12 @@ const m = (metric: string, value: number | null, over: Record<string, unknown> =
 };
 const unit = (id: string, over: Partial<OverviewUnit> = {}): OverviewUnit => {
   return {
-    id, version: 1, customerOrgId: "o", propertyId: "home", spaceId: null, displayName: `AC ${id}`, modelId: "m", type: "split", installedAt: null, serviceScope: ["indoor"], alertPolicyIds: [],
+    id, version: 1, customerOrgId: "o", propertyId: "home", spaceId: null, displayName: `AC ${id}`, modelId: "m", type: "split", installState: "installed", installedAt: null, serviceScope: ["indoor"], alertPolicyIds: [],
     archived: false, capabilityVersion: 1, connection: "online", lastSeenAt: TEXT_2026_09_14T01_12_00Z, warrantyEndsAt: null, effectivePowerState: "on", activeAlertCount: 0, latestMeasurements: [], ...over,
   };
 };
-const props = [{ id: "home", version: 1, customerOrgId: "o", kind: "home" as const, name: "Home A", address: null, accessInstructions: null, archived: false, updatedAt: "" },
-  { id: "office", version: 1, customerOrgId: "o", kind: "office" as const, name: "Office A", address: null, accessInstructions: null, archived: false, updatedAt: "" }];
+const props = [{ id: "home", version: 1, customerOrgId: "o", kind: "home" as const, name: "Home A", address: null, accessInstructions: null, location: null, geofenceRadiusMeters: null, archived: false, updatedAt: "" },
+  { id: "office", version: 1, customerOrgId: "o", kind: "office" as const, name: "Office A", address: null, accessInstructions: null, location: null, geofenceRadiusMeters: null, archived: false, updatedAt: "" }];
 const sum = (kWh: number | null, over: Partial<ApiEnergySummary["totals"]> = {}, factor = true) => {
   return ({
     period: { from: "", to: "" }, unitIds: [], currency: "MYR", baselineRef: null, factorRef: null, baselineSnapshot: null, tariffVersion: "t", boundaryId: "ac_input_electricity", boundary: "", coverage: 1, qualityWarnings: [],
@@ -58,6 +59,10 @@ describe("customer overview", () => {
   it("shows the measured room temperature, humidity and power — never the AC setting", () => {
     const [r] = overviewRows([unit("u1", { latestMeasurements: [m(TEMPERATURE, 28), m("humidity", 60.04), m("power", 0.68)] })], () => "Home A › Bedroom");
     expect([r?.temp, r?.hum, r?.power, r?.observed, r?.state, r?.place]).toStrictEqual(["28.0", "60.0", "680", "9:12 am MYT", "running", "Home A › Bedroom"]);
+    // with the page's now, the same reading keeps the clock today and gains its date on a later day (UI/UX loop R64)
+    const today = overviewRows([unit("u1", { latestMeasurements: [m(TEMPERATURE, 28)] })], () => "", undefined, Date.parse(TEXT_2026_09_14T01_12_00Z))[0]?.observed;
+    const later = overviewRows([unit("u1", { latestMeasurements: [m(TEMPERATURE, 28)] })], () => "", undefined, Date.parse("2026-09-17T01:00:00Z"))[0]?.observed;
+    expect([today, later]).toStrictEqual(["9:12 am MYT", "14 Sept 2026, 9:12 am MYT"]);
     const [stale] = overviewRows([unit("u2", { latestMeasurements: [m(TEMPERATURE, 30, { quality: "stale" })], connection: "offline", effectivePowerState: "unknown", lastSeenAt: "2026-09-12T10:40:00Z" })], () => "");
     expect([stale?.temp, stale?.hum, stale?.power, stale?.observed, stale?.state, stale?.conn]).toStrictEqual([null, null, null, "last seen 12 Sept 2026, 6:40 pm MYT", "unknown", "offline"]);
     // the user's language and display time zone (IR260)
@@ -103,5 +108,12 @@ describe("customer overview", () => {
 describe("air card tooltip headings", () => {
   it("gives each hourly point the hour it averages", () => {
     expect(bucketTimes([{ start: "2026-09-14T01:00:00.000Z" }, { start: "2026-09-14T02:00:00.000Z" }])).toStrictEqual(["Mon, 14 Sept, 9:00 – 10:00 am MYT", "Mon, 14 Sept, 10:00 – 11:00 am MYT"]);
+  });
+  // UI/UX loop R17: the overview listed a whole account's units in one run, homes and offices mixed
+  it("groups the unit rows under their property in name order", () => {
+    const rows = overviewRows([unit("a"), unit("b"), unit("c"), unit("d")], (u) => ({ a: "Home A › 1F › Bedroom", b: "Office A", c: "Home A › 1F › Living room", d: "" })[u.id] ?? "");
+    expect(byProperty(rows).map((g) => [g.property, g.rows.map((r) => r.id)])).toStrictEqual([["Home A", ["a", "c"]], ["Office A", ["b"]], ["", ["d"]]]);
+    // name order, not first appearance: "Mock fleet" before "Office A" though its unit comes later (UI/UX loop R142)
+    expect(byProperty([...rows.slice(0, 2), { ...must(rows[0]), id: "m", place: "Mock fleet › 1F" }]).map((g) => g.property)).toStrictEqual(["Home A", "Mock fleet", "Office A"]);
   });
 });

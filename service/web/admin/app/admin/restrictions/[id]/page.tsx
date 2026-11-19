@@ -6,11 +6,11 @@
 // restriction.
 import { connection } from "next/server";
 import { notFound } from "next/navigation";
-import { EmptyState, Page as Screen } from "@ac/web/components/ui";
-import { apiMode, coreDisplay, coreNow, coreOp, corePermissions, CoreError, coreAllPage } from "@ac/web/lib/dal";
+import { NeedsAccess } from "@ac/web/components/NeedsAccess";
+import { apiMode, coreAll, coreDisplay, coreNow, coreOp, corePermissions, CoreError, coreAllPage } from "@ac/web/lib/dal";
 import { auditItem, type ApiAudit } from "@ac/web/lib/audit";
 import { i18nOf } from "@ac/web/lib/i18n";
-import { activePeriod, intentText, unitRows, type ApiRestriction } from "@ac/web/lib/restrictions";
+import { activePeriod, bypassNames, intentText, unitRows, type ApiRestriction } from "@ac/web/lib/restrictions";
 import { ExceptionDemo } from "./_components/exception-demo";
 import { ExceptionView } from "./_components/exception-view";
 import { recover } from "@ac/web/lib/promises";
@@ -22,11 +22,11 @@ export default async function AdminRestrictionPage({ params }: Readonly<PageProp
   const { id } = await params;
   if (!apiMode()) return <ExceptionDemo id={id} />;
   const [now, perms, display] = await Promise.all([coreNow(), corePermissions(), coreDisplay()]);
-  const i = i18nOf(display), { t } = i;
   // the same permission state as the list (D01): without restriction.read / .write / .override nothing is read
   if (!perms.has("restriction.read") && !perms.has("restriction.write") && !perms.has("restriction.override")) {
-    return <Screen><EmptyState title={t("No access")}>{t("Restrictions need restriction.read, restriction.write or restriction.override.")}</EmptyState></Screen>;
+    return <NeedsAccess what="Restrictions" permission="restriction.read" />; // as every HQ page says it, with whom to ask (IR581)
   }
+  const i = i18nOf(display);
   const [r, units] = await Promise.all([
     recover(coreOp<ApiRestriction>("restrictions.get", { id }), (error: unknown) => {
       if (error instanceof CoreError && error.error.code === "NOT_FOUND") notFound();
@@ -37,11 +37,19 @@ export default async function AdminRestrictionPage({ params }: Readonly<PageProp
   const canAudit = perms.has("audit.read");
   const from = new Date(now.getTime() - 365 * 24 * 3600 * 1000).toISOString();
   const to = new Date(now.getTime() + 24 * 3600 * 1000).toISOString();
+  // DEC-110, IR849: the units whose restriction may be bypassed, for alert.read holders (unresolved = open or acknowledged)
+  const unitIds = r.perUnit.map((u) => u.unitId);
+  const unresolved = perms.has("alert.read") && unitIds.length > 0
+    ? await Promise.all((["open", "acknowledged"] as const).map((status) => coreAll<{ unitId: string; type: string; status: string }>("alerts.list", { filters: { unitIds, status } })))
+    : [];
+  const alerts = unresolved.flat();
   const audit = canAudit ? await coreOp<Page<ApiAudit>>("audit.list", { limit: 100, filters: { targetKind: "restriction", targetId: id, from, to }, sort: { field: "occurredAt", direction: "asc" } }) : null;
+  const rows = unitRows(r, new Map(units.items.map((u) => [u.id, u.displayName])), new Map(), i);
   return (
     <ExceptionView live={{
       now: now.toISOString(),
-      units: unitRows(r, new Map(units.items.map((u) => [u.id, u.displayName])), new Map(), i),
+      units: rows,
+      bypass: bypassNames(rows, alerts),
       canWrite: perms.has("restriction.write"),
       canOverride: perms.has("restriction.override"),
       period: activePeriod(r, now, i),

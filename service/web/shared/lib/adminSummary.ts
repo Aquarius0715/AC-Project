@@ -1,6 +1,7 @@
 // Admin dashboard KPIs (FR-A01, IR115): admin.summary projected into the KPI tiles. Pure code shared by the
 // Server Component that reads it and the client view. Texts in the display language (`t` / `i`, IR289); the as-of time
 // in the user's display time zone (IR44), the period in Kuala Lumpur days (named so).
+import { upperFirst } from "@ac/web/lib/text";
 import { isNone } from "@ac/web/lib/isNone";
 import { byCount, EN, showClock, translator, type I18n, type T } from "@ac/web/lib/i18n";
 import { statusWord } from "@ac/web/lib/partnerJobDetail";
@@ -34,7 +35,7 @@ export function kpisFrom(a: AdminSummary, t: T = en): Kpis {
     kwh: isNone(e?.totals.kWh) ? "—" : `${e.totals.kWh.toFixed(1)} kWh`,
     kwhSub: t("measured · coverage {coverage} · cost {cost}", { coverage: isNone(e?.coverage) ? "—" : `${coveragePct(e.coverage, 0)}%`, cost: isNone(e?.totals.amountMinor) ? "—" : formatMoney(e.totals.amountMinor, "MYR") }),
     billing: a.billingVisibility === "forbidden" ? t("Not permitted") : (a.amountsByCurrency ?? []).map((item) => money(item)).join(" · ") || "0.00 MYR",
-    billingSub: a.billingVisibility === "forbidden" ? t("billing.read required") : byCount(overdue, { one: t("1 overdue invoice · unpaid, per currency"), many: t("{n} overdue invoices · unpaid, per currency", { n: overdue }) }),
+    billingSub: a.billingVisibility === "forbidden" ? t("“View billing” required") : byCount(overdue, { one: t("1 overdue invoice · unpaid, per currency"), many: t("{n} overdue invoices · unpaid, per currency", { n: overdue }) }),
     jobs: Object.values(a.jobCounts).reduce((x, y) => x + y, 0), online: a.online, offline: a.offline, connUnknown: a.unknown,
   };
 }
@@ -59,7 +60,7 @@ export function overviewLinks(q: { customerId: string | null; propertyId: string
   };
   return {
     units: `/admin/units${scope()}`, power: (state: "on" | "off" | "unknown") => `/admin/units${scope({ powerState: state })}`,
-    connection: (c: string) => `/admin/units${scope({ connections: c })}`, alerts: "/admin/alerts", billing: "/admin/billing?overdueOnly=true",
+    connection: (c: string) => `/admin/units${scope({ connections: c })}`, alerts: "/admin/alerts?severity=attention", billing: "/admin/billing?overdueOnly=true",
     jobs: (stage?: string) => `/admin/jobs${scope({ ...(stage && { stage }), ...(q.period && { from: q.period.from, to: q.period.to }) })}`, energy: "/admin/energy",
     // the requests waiting for HQ, whatever their requested time (DEC-90, IR611)
     waiting: `/admin/jobs${scope({ stage: "requested" })}`,
@@ -108,21 +109,23 @@ export function forecastView(f: ApiForecast | null | undefined, t: T = en): Fore
   };
 }
 
-export interface AxisRow { label: string; count: number; pct: number; tone: "primary" | "muted" | "warn" | "ok" | "crit"; href: string; key: string }
-/** The power-state and connection cards (SR27): one row per class with its share of the bar and its list link. */
+export interface AxisRow { label: string; count: number; pct: number; tone: "muted" | "ok" | "unknown"; href: string; key: string }
+/** The power-state and connection cards (SR27): one row per class with its share of the bar and its list link. The tones
+are the product's state badges (PowerBadge, ConnBadge): Running and Online green, Stopped gray, power unknown and Offline
+slate, connection unknown / connecting / error light gray beside Offline — a state that is not known is not a warning. */
 const pct = (n: number, of: number) => (of ? (n / of) * 100 : 0);
 export function axisRows(s: AdminSummary, links: ReturnType<typeof overviewLinks>, t: T = en) {
   const conn = s.online + s.offline + s.unknown;
   return {
     power: [
-      { label: t("Running"), key: "powerState=on", count: s.powerOn, pct: pct(s.powerOn, s.total), tone: "primary", href: links.power("on") },
+      { label: t("Running"), key: "powerState=on", count: s.powerOn, pct: pct(s.powerOn, s.total), tone: "ok", href: links.power("on") },
       { label: t("Stopped"), key: "powerState=off", count: s.powerOff, pct: pct(s.powerOff, s.total), tone: "muted", href: links.power("off") },
-      { label: t("Unknown (stale / no valid power signal)"), key: "powerState=unknown", count: s.powerUnknown, pct: pct(s.powerUnknown, s.total), tone: "warn", href: links.power("unknown") },
+      { label: t("Unknown (stale / no valid power signal)"), key: "powerState=unknown", count: s.powerUnknown, pct: pct(s.powerUnknown, s.total), tone: "unknown", href: links.power("unknown") },
     ] as AxisRow[],
     connection: [
       { label: t("Online"), key: "connections=online", count: s.online, pct: pct(s.online, conn), tone: "ok", href: links.connection("online") },
-      { label: t("Offline"), key: "connections=offline", count: s.offline, pct: pct(s.offline, conn), tone: "crit", href: links.connection("offline") },
-      { label: t("Unknown / connecting / error"), key: "connections=connecting,error,unknown", count: s.unknown, pct: pct(s.unknown, conn), tone: "warn", href: links.connection("connecting,error,unknown") },
+      { label: t("Offline"), key: "connections=offline", count: s.offline, pct: pct(s.offline, conn), tone: "unknown", href: links.connection("offline") },
+      { label: t("Unknown / connecting / error"), key: "connections=connecting,error,unknown", count: s.unknown, pct: pct(s.unknown, conn), tone: "muted", href: links.connection("connecting,error,unknown") },
     ] as AxisRow[],
     rateNote: t("Operation rate = Running ÷ (Running + Stopped) = {on} ÷ {known} = {rate}. total {total} = Running + Stopped + unknown. Unknown is never counted as Stopped. Archived units are excluded.", {
       on: s.powerOn, known: s.powerOn + s.powerOff, rate: s.operatingRate === null ? "—" : `${s.operatingRate.toFixed(1)}%`, total: s.total,
@@ -133,7 +136,8 @@ export function axisRows(s: AdminSummary, links: ReturnType<typeof overviewLinks
 /** All ten job statuses in pipeline order, zeros included (DD-A01); each links to the Jobs tab stage when it has one. */
 const JOB_STATUSES = ["requested", "offered", "accepted", "assigned", "in_progress", "submitted", "completed", "rework_requested", "on_hold", "cancelled"] as const;
 export function jobRows(counts: Record<string, number>, links: ReturnType<typeof overviewLinks>, t: T = en) {
-  return JOB_STATUSES.map((st) => ({ status: st, label: statusWord(st, t), count: lookup(counts, st) ?? 0, href: links.jobs(st === "cancelled" ? undefined : st) }));
+  // the status word starts a row label like the power and connection rows beside it ("Running"), not mid-sentence (UI/UX loop R94)
+  return JOB_STATUSES.map((st) => ({ status: st, label: upperFirst(statusWord(st, t)), count: lookup(counts, st) ?? 0, href: links.jobs(st === "cancelled" ? undefined : st) }));
 }
 
 /** The billing card: overdue invoices and one row per currency, never summed across currencies; forbidden without billing.read. */

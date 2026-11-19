@@ -5,7 +5,7 @@
 import { EN, showTime, translator, zonedInstant, zonedParts, type I18n, type T } from "@ac/web/lib/i18n";
 import type { OpInput } from "@ac/web/lib/opTypes";
 import type { Permission } from "@ac/web/lib/contracts.gen";
-import { codePoints, isEmail } from "@ac/web/lib/text";
+import { codePoints, isEmail, utf8Length } from "@ac/web/lib/text";
 import { isAfter } from "@ac/web/lib/order";
 import { lookup } from "@ac/web/lib/lookup";
 
@@ -102,8 +102,13 @@ export function memberRows(ms: ApiMember[], orgs: ApiOrganization[], now: Date, 
       label: `${roleWord(m.role, m.employment, t)} · ${orgName}`,
       m,
     };
-  });
+  }).toSorted((a, b) => standing(a) - standing(b)); // the people who can work now first, ended and revoked access below
 }
+/** The list order of a membership row: active 0, inactive 1, revoked 2 (a stable sort keeps the list's order inside each). */
+const standing = (r: { active: boolean; revoked: boolean }): number => {
+  if (r.active) return 0;
+  return r.revoked ? 2 : 1;
+};
 
 export interface MemberDraft {
   userId: string; organizationId: string; role: Role; employment: "internal" | "external"; permissions: string[]; scopes: ScopeRef[]; validFrom: string; validUntil: string; reason: string;
@@ -143,7 +148,7 @@ export function memberErrors(d: MemberDraft, ctx: { selfUserId: string; current?
   const e: Record<string, string> = {};
   if (d.creatingUser) { // IR461: the person is created with the membership
     const email = d.inviteEmail.trim();
-    if (email.length > 254 || !isEmail(email)) e["newUser.email"] = t("A valid email address (up to 254 characters)");
+    if (utf8Length(email) > 254 || !isEmail(email)) e["newUser.email"] = t("A valid email address (up to 254 characters)");
     const n = codePoints(d.inviteName.trim());
     if (n < 1 || n > 120) e["newUser.displayName"] = t("A name of 1–120 characters");
   }

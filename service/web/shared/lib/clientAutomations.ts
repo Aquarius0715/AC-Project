@@ -258,6 +258,13 @@ export function actionOf(key: string): UnitAction {
   if (k === "vent") return { kind: "ventilate", level: oneOf(fanLevels, v ?? "", "mid") };
   return { kind: "set_fan", fanLevel: oneOf(fanLevels, v ?? "", "mid") };
 }
+/** A new rule that switches the given ACs off on weekday evenings (IR811), opened from the Running list's "Turn off
+running ACs": the ACs and Power OFF at 19:00 are filled in; the end action stays for the customer to choose (it is
+never assumed, DD-C04), and the rule is saved off like any new one. The first AC is the target, the rest `others`. */
+export function afterHoursDraft(unitIds: string[], timezone: string, name: string): Draft {
+  const [first = "", ...rest] = unitIds;
+  return { ...blankDraft(first, timezone), name, others: rest.slice(0, 49), startLocal: "19:00", endLocal: "23:00", startAction: "power:off" };
+}
 export function blankDraft(unitId: string, timezone: string): Draft {
   return {
     id: null,
@@ -272,7 +279,7 @@ export function blankDraft(unitId: string, timezone: string): Draft {
     endLocal: "22:00",
     endsNextDay: false,
     startAction: "temp:25",
-    endAction: "power:off",
+    endAction: "", // never assumed: the customer chooses what happens at the end
     occupied: false,
     event: "arrival",
     localTime: "18:00",
@@ -335,6 +342,7 @@ export function draftErrors(d: Draft, tr: T = en): Record<string, string> {
   if (!d.unitId) e.unitId = tr("Choose the AC");
   if (d.trigger === "schedule") {
     if (d.weekdays.length === 0) e.weekdays = tr("Choose at least one weekday");
+    if (!d.endAction) e.endAction = tr("Choose what happens at the end");
     if (!hhmm.test(d.startLocal)) e.startLocal = noTime;
     if (!hhmm.test(d.endLocal)) e.endLocal = noTime;
     if (!e.startLocal && !e.endLocal) {
@@ -382,6 +390,14 @@ export interface ActionGroup { id: "power" | "temp" | "mode" | "fan" | "vent"; g
 /** The actions a unit takes (DD-C05 “within unit capabilities”, the API's rule): the AC settings with control, and
 ventilation on a model with a fresh-air function (IR314). Grouped by the setting they change: the editor picks the
 setting first, then its value (`short` is the value alone, `label` the whole action). */
+/** The actions every chosen AC takes (IR802): one rule may control several ACs, and the API refuses an action one of
+them does not support, so only the actions all of them offer are listed. */
+export function commonActionOptions(cs: (Caps | null)[], t: T = en): ActionGroup[] {
+  const [first, ...rest] = cs.map((c) => actionOptions(c, t));
+  if (!first) return [];
+  const has = (groups: ActionGroup[], key: string) => groups.some((g) => g.options.some((o) => o.key === key));
+  return first.map((g) => ({ ...g, options: g.options.filter((o) => rest.every((r) => has(r, o.key))) })).filter((g) => g.options.length > 0);
+}
 export function actionOptions(c: Caps | null, t: T = en): ActionGroup[] {
   if (!c) return [];
   const temps: ActionGroup["options"] = [];
@@ -412,6 +428,7 @@ export function firstAction(groups: ActionGroup[], id: string): string {
 /** The editor summary (Figma 03b/03e right panel). */
 export function summaryText(d: Draft, unit: string, place: string, t: T = en): string {
   const set = (k: string) => {
+    if (!k) return t("(not chosen yet)");
     const a = actionOf(k);
     switch (a.kind) {
       case "set_power": { return t(a.power ? "{unit} power ON" : "{unit} power OFF", { unit });
@@ -514,7 +531,7 @@ export function consentCard(c: ApiConsent | null, locationRules: number, disable
   const { t } = i;
   if (!c) return { granted: false, title: t("Not recorded"), text: t("No location consent record exists for your account — location automations cannot be used."), tone: "muted" };
   if (c.granted) {
-    return { granted: true, title: t("Granted"), tone: "ok", text: t(locationRules === 1 ? "Granted {when} · used only by {n} location automation · demo location events (no real GPS history)." : "Granted {when} · used only by {n} location automations · demo location events (no real GPS history).", { when: showTime(c.grantedAt, i.display), n: locationRules }) };
+    return { granted: true, title: t("Granted"), tone: "ok", text: t(locationRules === 1 ? "Granted {when} · used only by {n} location automation · only home or away is kept, never your position." : "Granted {when} · used only by {n} location automations · only home or away is kept, never your position.", { when: showTime(c.grantedAt, i.display), n: locationRules }) };
   }
   if (disabledByConsent === 0 && c.revokedAt) { // a choice, not a fault: nothing was turned off (IR619)
     return { granted: false, title: t("Revoked"), tone: "muted", text: t("Withdrawn {when} · location automations cannot run until you grant it again. Manual control and schedules are unaffected.", { when: showTime(c.revokedAt, i.display) }) };
@@ -522,5 +539,5 @@ export function consentCard(c: ApiConsent | null, locationRules: number, disable
   if (c.revokedAt) {
     return { granted: false, title: t("Revoked"), tone: "warn", text: t(disabledByConsent === 1 ? "Withdrawn {when} · {n} location automation was turned off and will not run. Granting consent again does NOT turn them back on automatically — you re-enable each one. Manual control is unaffected." : "Withdrawn {when} · {n} location automations were turned off and will not run. Granting consent again does NOT turn them back on automatically — you re-enable each one. Manual control is unaffected.", { when: showTime(c.revokedAt, i.display), n: disabledByConsent }) };
   }
-  return { granted: false, title: t("Not granted"), tone: "muted", text: t("Location automations need your consent. It is used only for arrival/departure automations — demo location events, no real GPS history.") };
+  return { granted: false, title: t("Not granted"), tone: "muted", text: t("Location automations need your consent. It is used only for arrival/departure automations: your device’s location is compared with the map pins of your homes and offices, and only home or away is kept.") };
 }

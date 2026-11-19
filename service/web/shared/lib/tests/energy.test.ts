@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compareRow, dayRanges, periodRange, pickUnits, previousMonth, selectionQuery } from "@ac/web/lib/clientEnergy";
+import { compareRow, dayRanges, periodRange, pickUnits, previousMonth, selectionQuery, topUsers } from "@ac/web/lib/clientEnergy";
 import { amount, baselineErrors, baselineRows, coveragePct, one, roundAway, saving, summaryView, warning, type ApiEnergySummary, type BaselineDraft } from "@ac/web/lib/energy";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
 import { must } from "./must";
@@ -48,6 +48,8 @@ describe("customer energy & cost (FR-C06, FR-C13)", () => {
 
   it("shows the figures and the calculation conditions of a summary", () => {
     const v = summaryView(summary);
+    expect(v.rate).toBe("0.50 MYR/kWh"); // 60.12 MYR ÷ 120.25 kWh (UI/UX loop R137)
+    expect(summaryView(empty).rate).toBeNull();
     expect([v.actual, v.baseline, v.difference, v.percent, v.cost, v.savedCost, v.emissions, v.savedEmissions, v.coverage, v.comparable, v.increase])
       .toEqual(["120.3 kWh", "135.0 kWh", "Reduction 14.8 kWh", "Reduction 10.9%", "60.12 MYR", "Reduction 7.38 MYR", "71.0 kgCO₂e", "Reduction 8.7 kgCO₂e", "98.8%", true, false]);
     expect(v.conditions).toEqual([
@@ -56,6 +58,11 @@ describe("customer energy & cost (FR-C06, FR-C13)", () => {
       ["Emission factor", "MY-Peninsular 2025 v1 · 0.59 kgCO₂e/kWh · demo factor"], ["Tariff", "TNB-C1-2026"], ["Coverage", "98.8% of expected readings"],
     ]);
     expect(v.warnings).toEqual(["Partial coverage — some expected readings are missing or invalid", "Modeled baseline — a demo assumption, not a measurement"]);
+  });
+
+  it("says no reading at all is valid instead of calling it partial coverage", () => {
+    const v = summaryView({ ...summary, totals: { ...summary.totals, kWh: null } });
+    expect(v.warnings[0]).toBe("No valid readings in this period — every expected reading is missing or invalid");
   });
 
   it("words a summary in Malay and keeps the Kuala Lumpur business period named (REV18-035, IR265)", () => {
@@ -157,5 +164,18 @@ describe("the month before now", () => {
     expect(previousMonth(new Date("2026-11-30T17:00:00Z"))).toBe("2026-11"); // 2026-12-01 01:00
     expect(previousMonth(new Date("2026-03-31T16:30:00Z"))).toBe("2026-03"); // 2026-04-01 00:30
     expect(previousMonth(new Date("2026-03-31T15:59:00Z"))).toBe("2026-02"); // 2026-03-31 23:59, still March
+  });
+});
+
+// IR803: which AC to review first — the highest measured use, with its share of what was measured
+describe("highest use", () => {
+  it("ranks the units with measured energy, highest first, and gives each its share", () => {
+    const rows = [
+      { unitId: "a", name: "Lobby AC", kWh: 30, coverage: 1 }, { unitId: "b", name: "Bedroom AC", kWh: 10, coverage: 0.5 },
+      { unitId: "c", name: "No readings", kWh: null, coverage: null }, { unitId: "d", name: "Off all week", kWh: 0, coverage: 1 }, { unitId: "e", name: "Atrium AC", kWh: 10, coverage: 1 },
+    ];
+    expect(topUsers(rows).map((r) => [r.unitId, r.share])).toStrictEqual([["a", 0.6], ["e", 0.2], ["b", 0.2]]);
+    expect(topUsers(rows, 1).map((r) => r.unitId)).toStrictEqual(["a"]);
+    expect(topUsers([])).toStrictEqual([]);
   });
 });

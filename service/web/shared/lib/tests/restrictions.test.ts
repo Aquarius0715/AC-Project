@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { EN, i18nOf, translator } from "@ac/web/lib/i18n";
 import {
-  actionOutcome, activePeriod, executeBlocker, intentText, policyText, progressText, releaseBlocker, restrictionRows, stateWord, unitRows,
+  actionOutcome, activePeriod, bypassNames, executeBlocker, intentText, policyText, progressText, releaseBlocker, restrictionRows, stateWord, unitRows,
   type ApiCommand, type ApiRestriction, type PerUnit,
 } from "@ac/web/lib/restrictions";
 
@@ -39,12 +39,26 @@ describe("HQ restrictions (FR-A09, FR-A10)", () => {
       unit({ unitId: "u3", observedRestriction: { restrictionId: "other", rulesVersion: "v0" }, releaseCommandIds: ["c2"] }),
     ] });
     expect(unitRows(r, new Map([["u1", "Lobby AC"]]), commands).map((u) => [u.name, u.apply, u.release, u.observed, u.commands, u.retryApply, u.reconcile])).toStrictEqual([
-      ["Lobby AC", "not applied", "none", "none observed", "apply failed (OFFLINE)", true, false],
+      ["Lobby AC", "not applied", "none", "none observed", "apply failed (the AC was offline)", true, false],
       ["u2", "sent, result unknown", "none", "this restriction · 14 Sept 2026, 10:00 am MYT", "—", false, true],
       ["u3", "applied", "none", "another restriction", "remove acknowledged", false, false],
     ]);
     const releasing = restriction({ state: RELEASE_REQUESTED, perUnit: [unit({ releaseState: "failed" }), unit({ unitId: "u2", releaseState: "none" })] });
     expect(unitRows(releasing, new Map(), new Map()).map((u) => u.retryRelease)).toStrictEqual([true, true]);
+  });
+
+  it("offers a retry only where the Core API accepts it (retryAllowed, retryRelease)", () => {
+    // causes paid or a grace period/exception active: the API refuses an apply retry (errors.restriction_not_applicable)
+    const requested = restriction({ state: "requested", perUnit: [unit({ applyState: "not_sent" }), unit({ unitId: "u2", applyState: "not_applied" })] });
+    expect([true, false].map((wanted) => unitRows(requested, new Map(), new Map(), EN, wanted).map((u) => u.retryApply))).toStrictEqual([[true, true], [false, false]]);
+    // a failed release is retried only on a unit that applied the restriction; any other needs reconciling first (errors.reconcile_required)
+    const releasing = restriction({ state: RELEASE_REQUESTED, perUnit: [
+      unit({ releaseState: "failed" }), unit({ unitId: "u2", applyState: "sent_unknown", releaseState: "failed" }), unit({ unitId: "u3", applyState: "not_applied", releaseState: "failed" }),
+      unit({ unitId: "u4", applyState: "not_applied", releaseState: "none" }), unit({ unitId: "u5", releaseState: "waiting_reconcile" }), unit({ unitId: "u6", releaseState: "requested" }),
+    ] });
+    expect(unitRows(releasing, new Map(), new Map()).map((u) => [u.unitId, u.retryRelease, u.reconcile])).toStrictEqual([
+      ["u1", true, false], ["u2", false, true], ["u3", false, false], ["u4", false, false], ["u5", false, false], ["u6", false, false],
+    ]);
   });
 
   it("says why execute or release is not possible, and what each exception action does (IR35, IR96, IR140)", () => {
@@ -86,5 +100,21 @@ describe("HQ restrictions in Malay with the display time zone (IR301)", () => {
       .toStrictEqual(["Dilaksanakan selepas 16 Sep 2026, 9:00 PG GMT+9", "Hanya sekatan yang diminta atau dikenakan boleh dilepaskan"]);
     expect([actionOutcome("override", "requested", t).result, actionOutcome("cancel", "cancelled", t).result]).toStrictEqual(["Diminta → Pelepasan diminta (sumber: pelepasan manual); invois kekal belum dibayar", "Tidak boleh — sekatan ini dibatalkan"]);
     expect([stateWord("scheduled", t), intentText(restriction({ releaseIntent: { source: "payment", at: TEXT_2026_09_14T02_00_00Z } }), MS)]).toStrictEqual(["Dijadualkan", "pembayaran · 14 Sep 2026, 11:00 PG GMT+9"]);
+  });
+});
+
+// DEC-110, IR849: the detail names the units whose restriction may be bypassed — an unresolved restriction_bypass
+// Alert of one of its own units; a resolved one, another type, or another unit's Alert does not count
+describe("bypassNames", () => {
+  it("names the units with an unresolved restriction_bypass alert", () => {
+    const units = [{ unitId: "u1", name: "Bedroom AC" }, { unitId: "u2", name: "Lobby AC" }, { unitId: "u3", name: "Office AC" }];
+    expect(bypassNames(units, [
+      { unitId: "u1", type: "restriction_bypass", status: "open" },
+      { unitId: "u2", type: "restriction_bypass", status: "resolved" },
+      { unitId: "u3", type: "tamper", status: "open" },
+      { unitId: "u3", type: "restriction_bypass", status: "acknowledged" },
+      { unitId: "u9", type: "restriction_bypass", status: "open" },
+    ])).toStrictEqual(["Bedroom AC", "Office AC"]);
+    expect(bypassNames(units, [])).toStrictEqual([]);
   });
 });

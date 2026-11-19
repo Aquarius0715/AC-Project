@@ -1,6 +1,8 @@
 "use client";
 const DEMO_FIXED = "demo_fixed";
 
+import { anySet } from "@ac/web/lib/filters";
+import { byName } from "@ac/web/lib/text";
 import { useId, useState } from "react";
 import { Badge, Banner, Btn, Card, Check, Choice, EmptyState, Field, Input, ListRow, Page, Select, SummaryList, Tabs, Textarea } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
@@ -64,7 +66,7 @@ function Analysis({ live, a }: Readonly<{ live: EnergyLive; a: NonNullable<Energ
     <>
       <Card title={t("Scope")}>
         <div className="flex flex-wrap items-end gap-3">
-          <Field label={t("Customer")}><Select value={live.scope.customerId ?? ""} onChange={(e) => { nav({ customerId: e.target.value || null, unitIds: null, baselineId: null }); }}><option value="">{t("All customers")}</option>{live.customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field>
+          <Field label={t("Customer")}><Select value={live.scope.customerId ?? ""} onChange={(e) => { nav({ customerId: e.target.value || null, unitIds: null, baselineId: null }); }}><option value="">{t("All customers")}</option>{live.customers.toSorted(byName).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field>
           <Field label={t("Baseline")}><Select value={a.baselineId ?? ""} onChange={(e) => { nav({ baselineId: e.target.value || null, unitIds: null, from: null, to: null }); }}><option value="">{t("No baseline")}</option>{live.baselines.map((b) => <option key={b.id} value={b.id}>{b.id.slice(0, 8)} · {b.dates} · {b.value} · {b.units}</option>)}</Select></Field>
           <Field label={t("From (Kuala Lumpur)")}><DateTimeSelect value={from} onChange={(v) => { setFrom(v); }} /></Field>
           <Field label={t("To")}><DateTimeSelect value={to} onChange={(v) => { setTo(v); }} /></Field>
@@ -116,7 +118,7 @@ function Baselines({ live, l }: Readonly<{ live: EnergyLive; l: NonNullable<Ener
   }
   const errors = baselineErrors(d, t);
   const set = (patch: Partial<BaselineDraft>) => { setD((x) => ({ ...x, ...patch })); };
-  const props = live.properties.filter((p) => !live.scope.customerId || p.customerId === live.scope.customerId);
+  const props = live.properties.filter((p) => !live.scope.customerId || p.customerId === live.scope.customerId).toSorted(byName);
   const scopeUnits = live.units.filter((u) => (!live.scope.customerId || u.customerId === live.scope.customerId) && (!live.scope.propertyId || u.propertyId === live.scope.propertyId));
   const [from, setFrom] = useState(l.from);
   const [to, setTo] = useState(l.to);
@@ -134,7 +136,7 @@ function Baselines({ live, l }: Readonly<{ live: EnergyLive; l: NonNullable<Ener
     <>
       <div className="flex flex-wrap items-end gap-3">
         <span className="pb-2 text-xs font-semibold text-muted-foreground">{t("Scope")}</span>
-        <Field label={t("Customer")}><Select value={live.scope.customerId ?? ""} onChange={(e) => { nav({ customerId: e.target.value || null, propertyId: null, unitId: null, baselineId: null }); }}><option value="">{t("All customers")}</option>{live.customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field>
+        <Field label={t("Customer")}><Select value={live.scope.customerId ?? ""} onChange={(e) => { nav({ customerId: e.target.value || null, propertyId: null, unitId: null, baselineId: null }); }}><option value="">{t("All customers")}</option>{live.customers.toSorted(byName).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field>
         <Field label={t("Property")}><Select value={live.scope.propertyId ?? ""} onChange={(e) => { nav({ propertyId: e.target.value || null, unitId: null, baselineId: null }); }}><option value="">{t("All properties")}</option>{props.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></Field>
         <Field label={t("Unit")}><Select value={live.scope.unitId ?? ""} onChange={(e) => { nav({ unitId: e.target.value || null, baselineId: null }); }}><option value="">{t("All units")}</option>{scopeUnits.map((u) => <option key={u.id} value={u.id}>{u.label}</option>)}</Select></Field>
         <Field label={t("Period starts from (Kuala Lumpur)")}><DateTimeSelect value={from} onChange={(v) => { setFrom(v); }} /></Field>
@@ -144,7 +146,7 @@ function Baselines({ live, l }: Readonly<{ live: EnergyLive; l: NonNullable<Ener
       </div>
       <div className="split-rev">
         <Card title={customer ? t("Baselines · {customer}", { customer }) : t("Baselines · all customers")} action={live.canWrite && <Btn size="sm" variant="primary" onClick={() => { setCreating(true); }}><Icon name="add" /> {t("New baseline")}</Btn>} className="self-start">
-          {l.rows.length === 0 ? <EmptyState title={t("No baselines")}>{t("No baseline matches this scope.")}</EmptyState> : <div className="flex flex-col gap-2">{l.rows.map((x) => <ListRow key={x.id} selected={sel?.id === x.id} onClick={() => { setCreating(false); nav({ baselineId: x.id }); }}><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="text-[13px]">{x.id.slice(0, 8)}</b><Badge tone={x.method === DEMO_FIXED ? "muted" : "primary"}>{t(x.method === DEMO_FIXED ? "v{v} · modeled" : "v{v} · measured", { v: x.version })}</Badge></div><div className="text-[11px] text-muted-foreground">{x.units} · {x.period}</div><div className="text-[11px] text-muted-foreground">{x.method} · {x.value} · {x.boundaryId}</div></div></ListRow>)}</div>}
+          {l.rows.length === 0 ? <EmptyState title={t("No baselines")}>{t(anySet(live.scope.customerId, live.scope.propertyId, live.scope.unitId, l.from, l.to) ? "No baseline matches this scope." : "Create the first one with New baseline.")}</EmptyState> : <div className="flex flex-col gap-2">{l.rows.map((x) => <ListRow key={x.id} selected={sel?.id === x.id} onClick={() => { setCreating(false); nav({ baselineId: x.id }); }}><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="text-[13px]">{x.id.slice(0, 8)}</b><Badge tone={x.method === DEMO_FIXED ? "muted" : "primary"}>{t(x.method === DEMO_FIXED ? "v{v} · modeled" : "v{v} · measured", { v: x.version })}</Badge></div><div className="text-[11px] text-muted-foreground">{x.units} · {x.period}</div><div className="text-[11px] text-muted-foreground">{x.method} · {x.value} · {t(x.boundaryId === "whole_building_electricity" ? "Whole-building electricity" : "AC input electricity")}</div></div></ListRow>)}</div>}
         </Card>
         {creating || sel ? (
           <Card title={sel ? <span className="flex flex-wrap items-center gap-2">{t("Baseline {id}", { id: sel.id.slice(0, 8) })}<Badge>{t("Version {v}", { v: sel.version })}</Badge><Badge tone="warn">{t("Editing → v{n}", { n: sel.version + 1 })}</Badge></span> : t("New baseline")}

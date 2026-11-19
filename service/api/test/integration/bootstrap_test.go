@@ -182,8 +182,11 @@ func TestBootstrapAdmin(t *testing.T) {
 				Technician: "",
 				Admin:      "",
 			},
-			AccountsPerDay: 0,
-			WrapTx:         nil,
+			AccountsPerDay:      0,
+			WrapTx:              nil,
+			Checkout:            nil,
+			CustomerAppURL:      "",
+			StripeWebhookSecret: "",
 		},
 		tokens,
 	)

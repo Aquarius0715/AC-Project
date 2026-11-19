@@ -5,7 +5,7 @@ import { Badge, BarChart, Banner, Btn, Card, Check, Choice, DataTable, DemoBadge
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { klLocal, one, type SummaryView } from "@ac/web/lib/energy";
-import type { CompareRow, Period, PeriodKind } from "@ac/web/lib/clientEnergy";
+import type { CompareRow, Period, PeriodKind, UseRow } from "@ac/web/lib/clientEnergy";
 import { intlTag, LOCALES } from "@ac/web/lib/i18n";
 import { useLocale, useT } from "@ac/web/components/I18n";
 import { exportReport, type ReportFile, type ReportInput } from "../actions";
@@ -17,7 +17,9 @@ import { DateTimeSelect } from "@ac/web/components/TimeSelect";
 export interface EnergyLive {
   units: { id: string; name: string }[]; unitIds: string[]; period: Period; baselines: { id: string; label: string }[]; baselineId: string | null;
   summary: SummaryView | null; raw?: { kWh: number | null; baseline: number | null; tariff: string; factor: string | null; coverage: number | null };
-  daily: { label: string; actual: number | null; baseline: number | null }[]; compare: { rows: CompareRow[]; series: number[][] | null } | null;
+  daily: { label: string; actual: number | null; baseline: number | null }[]; top: UseRow[];
+  /** the page opened on the period's highest-use AC, as none was chosen (IR815) */
+  isTopDefault: boolean; compare: { rows: CompareRow[]; series: number[][] | null } | null;
   properties: { id: string; name: string }[]; prefs: { locale: string; timezone: string; monthlyReportEmail: boolean } | null; lastMonth: string; query: string; error?: string;
 }
 const colors = ["#005bea", "#f59e0b", "#10b981", "#8b5cf6"];
@@ -33,6 +35,12 @@ function savingClass(s: { comparable: boolean; increase: boolean }): string {
   if (!s.comparable) return "text-muted-foreground";
   return s.increase ? "text-warn" : "text-ok";
 }
+/** The chart's title names a baseline only when one is chosen (otherwise only actual energy is drawn). */
+function chartTitle(isMulti: boolean, hasBaseline: boolean): string {
+  if (isMulti) return "Daily actual energy by unit";
+  return hasBaseline ? "Daily energy — Actual vs Baseline" : "Daily energy";
+}
+
 export function EnergyView({ live }: Readonly<{ live: EnergyLive }>) {
   const t = useT();
   const nav = useUrlPatch();
@@ -55,7 +63,7 @@ export function EnergyView({ live }: Readonly<{ live: EnergyLive }>) {
     if (view === "chart" && live.daily.every((d) => !d.actual)) return <p className="rounded-xl bg-surface2 p-4 text-center text-[13px] text-muted-foreground">{t("No valid power readings in this period — the chart appears once the units report minute readings (coverage {coverage}).", { coverage: summary.coverage })}</p>;
     if (view === "chart") {
       if (isMulti) return live.compare?.series ? <BarChart labels={live.daily.map((d) => d.label)} series={live.compare.series} names={live.unitIds.map((u) => names.get(u) ?? u)} unit="kWh" height={200} colors={colors} /> : <p className="text-[13px] text-muted-foreground">{t("The per-unit daily chart covers up to 7 days — see the table for this period.")}</p>;
-      return raw.baseline === null ? <BarChart labels={live.daily.map((d) => d.label)} series={[live.daily.map((d) => d.actual ?? 0)]} names={[t("Actual (measured)")]} colors={["#005bea"]} unit="kWh" height={200} /> : <BarChart labels={live.daily.map((d) => d.label)} series={[live.daily.map((d) => d.baseline ?? 0), live.daily.map((d) => d.actual ?? 0)]} names={[t("Baseline (normal operation)"), t("Actual (measured)")]} unit="kWh" height={200} />;
+      return raw.baseline === null ? <BarChart labels={live.daily.map((d) => d.label)} series={[live.daily.map((d) => d.actual)]} names={[t("Actual (measured)")]} colors={["#005bea"]} unit="kWh" height={200} /> : <BarChart labels={live.daily.map((d) => d.label)} series={[live.daily.map((d) => d.baseline), live.daily.map((d) => d.actual)]} names={[t("Baseline (normal operation)"), t("Actual (measured)")]} unit="kWh" height={200} />;
     }
     return isMulti && live.compare ? (
               <DataTable rows={live.compare.rows} rowKey={(x) => x.unitId} cols={[
@@ -65,7 +73,8 @@ export function EnergyView({ live }: Readonly<{ live: EnergyLive }>) {
             ) : (
               <DataTable rows={live.daily} rowKey={(d) => d.label} cols={[
                 { key: "d", label: t("Day"), render: (d) => d.label }, { key: "a", label: t("Actual (kWh)"), render: (d) => (d.actual === null ? "—" : one(d.actual)) },
-                { key: "b", label: t("Baseline (kWh)"), render: (d) => (d.baseline === null ? "—" : one(d.baseline)) },
+                // the baseline column only with a baseline, as the chart draws it (a column of dashes said nothing; UI/UX loop R70)
+                ...(raw.baseline === null ? [] : [{ key: "b", label: t("Baseline (kWh)"), render: (d: (typeof live.daily)[number]) => (d.baseline === null ? "—" : one(d.baseline)) }]),
               ]} />
             );
   };
@@ -84,7 +93,8 @@ export function EnergyView({ live }: Readonly<{ live: EnergyLive }>) {
             {/* the periods are Kuala Lumpur days (REV18-035), so the custom range is typed in Kuala Lumpur time and says so */}
             <Field label={t("From")} hint="Asia/Kuala_Lumpur"><DateTimeSelect value={from} onChange={(v) => { setFrom(v); }} /></Field>
             <Field label={t("To")} hint="Asia/Kuala_Lumpur"><DateTimeSelect value={to} onChange={(v) => { setTo(v); }} /></Field>
-            <Btn size="sm" variant="primary" onClick={() => { nav({ period: "custom", from, to }); }}>{t("Apply")}</Btn>
+            {/* off until a bound changes, as MRV's Apply is: applying the period already shown changes nothing (UI/UX loop R122) */}
+            <Btn size="sm" variant="primary" disabled={from === klLocal(live.period.from) && to === klLocal(live.period.to)} onClick={() => { nav({ period: "custom", from, to }); }}>{t("Apply")}</Btn>
             {live.period.error && <span className="text-xs text-crit">{live.period.error}</span>}
           </div>
         )}
@@ -103,25 +113,26 @@ export function EnergyView({ live }: Readonly<{ live: EnergyLive }>) {
               <option value="">{t("Add a unit to compare")}</option>{live.units.filter((u) => !live.unitIds.includes(u.id)).map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
             </Select>
           )}
-          <span className="text-[11px] text-muted-foreground">{t("up to 4 units")}</span>
+          <span className="text-[11px] text-muted-foreground">{t(live.isTopDefault ? "Showing the AC that used the most in this period · up to 4 units" : "up to 4 units")}</span>
         </div>
       </Card>
       {live.error && <Banner tone="warn">{live.error}</Banner>}
       {s && r && <>
         <div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>
           <Kpi label={t("Actual energy")} value={r.kWh === null ? "—" : one(r.kWh)} unit={r.kWh === null ? undefined : "kWh"} sub={t("{subject} · {days} · coverage {coverage}", { subject, days, coverage: s.coverage })} />
-          <Kpi label={t("Estimated cost")} value={s.cost.split(" ", 1)[0]} unit={s.cost === "—" ? undefined : s.cost.split(" ", 2)[1]} sub={t("{tariff} · taxes excluded", { tariff: r.tariff })} />
+          <Kpi label={t("Estimated cost")} value={s.cost.split(" ", 1)[0]} unit={s.cost === "—" ? undefined : s.cost.split(" ", 2)[1]} sub={s.rate ? t("avg {rate} · {tariff} · taxes excluded", { rate: s.rate, tariff: r.tariff }) : t("{tariff} · taxes excluded", { tariff: r.tariff })} />
           <Kpi label={t("Savings vs baseline")} value={s.comparable ? s.difference : "—"} tone={savingTone(s)}
             sub={s.comparable ? t("{percent} · {cost} vs {baseline} baseline", { percent: s.percent, cost: s.savedCost, baseline: s.baseline }) : noSavings} />
           <Kpi label={t("Data coverage")} value={s.coverage} sub={t(r.coverage === 1 ? "All expected minutes observed" : "Missing readings are not filled in")} />
         </div>
-        <Card title={t(isMulti ? "Daily actual energy by unit" : "Daily energy — Actual vs Baseline")} sub={isMulti ? t("kWh per day · max 4 units · baselines are compared in the table") : chartSub}
+        <Card title={t(chartTitle(isMulti, live.baselineId !== null))} sub={isMulti ? t("kWh per day · max 4 units · baselines are compared in the table") : chartSub}
           action={<Tabs value={view} onChange={setView} tabs={[{ id: "chart", label: t("Chart") }, { id: "table", label: t("Table") }]} />}>
           {chartBody(s, r)}
           {isMulti && <p className="mt-3 text-[11px] text-muted-foreground">{t("Totals across units are shown only when all units share the same calculation boundary; increases are labelled, never shown as a negative saving.")}</p>}
           {s.warnings.length > 0 && <div className="mt-3"><Banner tone="warn">{s.warnings.join(" · ")}</Banner></div>}
           <details className="mt-3 text-[12px]"><summary className="cursor-pointer font-semibold text-muted-foreground">{t("Calculation conditions")}</summary><div className="mt-2"><SummaryList items={s.conditions} /></div></details>
         </Card>
+        <TopUsers live={live} show={(id) => { setUnits([id]); }} add={(id) => { setUnits([...live.unitIds, id]); }} />
         <Card title={t("Carbon impact")} sub={t("Same period & units as above · {factor}", { factor: r.factor ?? t("emission factor missing") })} action={<LinkButton size="sm" href={`/customer/energy/offsets?${live.query}`}>{t("Offset these emissions")}<Icon name="arrowRight" /></LinkButton>}>
           <div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>
             <div><div className="text-xs text-muted-foreground">{t("Estimated emissions")}</div><div className="text-2xl font-bold">{s.emissions}</div><div className="text-[11px] text-muted-foreground">{r.kWh === null ? t("no valid readings") : t("{kWh} kWh actual × factor", { kWh: one(r.kWh) })}</div></div>
@@ -133,6 +144,33 @@ export function EnergyView({ live }: Readonly<{ live: EnergyLive }>) {
       </>}
       {exporting && <ExportModal live={live} onClose={() => { setExporting(false); }} />}
     </Page>
+  );
+}
+
+const percent = (x: number | null) => (x === null ? "—" : `${String(Math.round(x * 100))}%`);
+/** The ACs that used the most in the period (IR803): where to look first when energy or cost is high. Show opens one AC
+in the charts above; Compare adds it to the selection (up to four). */
+function TopUsers({ live, show, add }: Readonly<{ live: EnergyLive; show: (id: string) => void; add: (id: string) => void }>) {
+  const t = useT();
+  if (live.top.length < 2) return null;
+  const isFull = live.unitIds.length >= 4;
+  return (
+    <Card title={t("Highest use in this period")} sub={t("All your ACs, by measured energy — start a review with the top ones")}>
+      <DataTable<UseRow> rowKey={(r) => r.unitId} rows={live.top} cols={[
+        { key: "n", label: t("AC"), render: (r) => <b>{r.name}</b> },
+        { key: "k", label: t("Energy"), render: (r) => `${one(r.kWh)} kWh` },
+        { key: "s", label: t("Share of measured"), render: (r) => percent(r.share) },
+        { key: "c", label: t("Data coverage"), render: (r) => <span className={r.coverage !== null && r.coverage < 0.8 ? "text-warn" : undefined}>{percent(r.coverage)}</span> },
+        { key: "a", label: "", render: (r) => {
+          const isShown = live.unitIds.includes(r.unitId);
+          return <span className="flex gap-2">
+            <Btn size="sm" disabled={isShown && live.unitIds.length === 1} onClick={() => { show(r.unitId); }}>{t("Show")}</Btn>
+            {!isShown && !isFull && <Btn size="sm" variant="ghost" onClick={() => { add(r.unitId); }}>{t("Compare")}</Btn>}
+          </span>;
+        } },
+      ]} />
+      <p className="mt-2 text-[11px] text-muted-foreground">{t("Low coverage means missing readings: that AC may have used more than shown.")}</p>
+    </Card>
   );
 }
 

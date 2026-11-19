@@ -32,8 +32,15 @@ func EventHandlers() map[string]events.Handler {
 				consentRevocation.MembershipID,
 				consentRevocation.At,
 			)
+			if err != nil {
+				return apperr.Wrap(err, "update control.automations")
+			}
 
-			return apperr.Wrap(err, "update control.automations")
+			return forgetPresence(
+				ctx,
+				txn,
+				consentRevocation.MembershipID,
+			) // DEC-109: the member's away/home states go
 		},
 		events.RestrictionCommandRequested: func(ctx context.Context, txn pgx.Tx, event events.Event) error {
 			var restrictionCommand events.RestrictionCommand

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assignRefusal, candidates, formMode, freeText, scheduleRow, scheduleTeam, sortOf, weekGrid } from "@ac/web/lib/partnerSchedule";
+import { assignRefusal, candidates, formMode, freeText, sameInstant, scheduleRow, scheduleTeam, sortOf, weekGrid } from "@ac/web/lib/partnerSchedule";
 import type { ApiDetail, ApiOffer } from "@ac/web/lib/partnerJobDetail";
 import type { ApiCapacity, ApiMember, ApiPartnerJob } from "@ac/web/lib/partnerOverview";
 import { EN, i18nOf, translator } from "@ac/web/lib/i18n";
@@ -188,5 +188,12 @@ describe("the schedule's team", () => {
     const all = [...members, ended, revoked];
     expect(scheduleTeam(all, NOW, null).map((m) => m.id)).toStrictEqual(["m-a", "m-b", "m-c"]);
     expect(scheduleTeam(all, NOW, "m-e").map((m) => m.id)).toStrictEqual(["m-a", "m-b", "m-c", "m-e"]);
+  });
+});
+
+describe("sameInstant", () => {
+  it("treats the API notation and the form notation of one instant as equal", () => {
+    expect(sameInstant("2026-09-25T10:00:00Z", "2026-09-25T10:00:00.000Z")).toBe(true);
+    expect(sameInstant("2026-09-25T10:00:00Z", "2026-09-25T10:30:00.000Z")).toBe(false);
   });
 });

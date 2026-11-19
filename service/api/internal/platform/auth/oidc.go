@@ -24,6 +24,7 @@ var (
 	errNoSubject    = errors.New("no subject")
 	errClaimsFormat = errors.New("claims are not a JSON object")
 	errNoIssuer     = errors.New("OIDC_ISSUER is required")
+	errNoAppClient  = errors.New("OIDC_APP_CLIENT_ID is required")
 )
 
 // The JWKS refresh of NewVerifierFromEnv (keyfunc.Override).
@@ -35,7 +36,7 @@ const (
 
 // OIDCVerifier verifies RS256 access tokens from Cognito (production) or Keycloak (local): issuer, audience
 // (one of the app clients), expiry, the token type and the signature against the JWKS (container design §4:
-// OIDC_ISSUER, OIDC_JWKS_URL, OIDC_APP_CLIENT_ID, OIDC_ADMIN_CLIENT_ID).
+// OIDC_ISSUER, OIDC_JWKS_URL, OIDC_APP_CLIENT_ID (one client per app, comma separated, IR790), OIDC_ADMIN_CLIENT_ID).
 type OIDCVerifier struct {
 	// Issuers are the issuers a token may name. One for a provider with one address; several when it answers on more
 	// than one (IR651): the tokens of a sign-in carry the address the sign-in started on.
@@ -47,7 +48,7 @@ type OIDCVerifier struct {
 
 // NewVerifierFromEnv builds the OIDC verifier from the environment.
 func NewVerifierFromEnv(ctx context.Context) (*OIDCVerifier, error) {
-	issuers := issuerList(os.Getenv("OIDC_ISSUER"))
+	issuers := commaList(os.Getenv("OIDC_ISSUER"))
 	jwks := os.Getenv("OIDC_JWKS_URL")
 
 	if len(issuers) == 0 {
@@ -76,27 +77,33 @@ func NewVerifierFromEnv(ctx context.Context) (*OIDCVerifier, error) {
 		return nil, fmt.Errorf("jwks: %w", err)
 	}
 
+	apps := commaList(os.Getenv("OIDC_APP_CLIENT_ID"))
+	if len(apps) == 0 {
+		return nil, errNoAppClient
+	}
+
 	admin := os.Getenv("OIDC_ADMIN_CLIENT_ID")
 
 	return &OIDCVerifier{
 		Issuers:     issuers,
-		Audiences:   []string{os.Getenv("OIDC_APP_CLIENT_ID"), admin},
+		Audiences:   append(apps, admin),
 		AdminClient: admin,
 		Keyfunc:     keys.Keyfunc,
 	}, nil
 }
 
-// issuerList splits OIDC_ISSUER into its issuers: comma separated, without blanks or empty entries.
-func issuerList(value string) []string {
-	var issuers []string
+// commaList splits a comma separated setting (OIDC_ISSUER, OIDC_APP_CLIENT_ID) into its entries, without blanks
+// or empty ones.
+func commaList(value string) []string {
+	var entries []string
 
 	for part := range strings.SplitSeq(value, ",") {
 		if trimmed := strings.TrimSpace(part); trimmed != "" {
-			issuers = append(issuers, trimmed)
+			entries = append(entries, trimmed)
 		}
 	}
 
-	return issuers
+	return entries
 }
 
 // Verify implements Verifier and returns the `sub` claim with the `auth_time` claim, which Cognito and Keycloak put

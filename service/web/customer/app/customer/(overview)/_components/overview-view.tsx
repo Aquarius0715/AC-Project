@@ -2,17 +2,46 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { Badge, Banner, BarChart, Btn, Card, ConnBadge, Kpi, LineChart, Page, PowerBadge, Select, SeverityBadge, Tabs, TextLink } from "@ac/web/components/ui";
+import { Fragment, useEffect, useState } from "react";
+import { Badge, Banner, BarChart, Btn, Card, ConnBadge, Kpi, LineChart, Page, PowerBadge, Select, SeverityBadge, Tabs, TextLink, cx } from "@ac/web/components/ui";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
-import { OVERVIEW_PERIODS, type OverviewPeriod } from "@ac/web/lib/customerOverview";
+import { byProperty, OVERVIEW_PERIODS, type OverviewPeriod } from "@ac/web/lib/customerOverview";
 import { byCount, showClock } from "@ac/web/lib/i18n";
 import { useT } from "@ac/web/components/I18n";
 import type { OverviewLive } from "../_lib/load";
 import { Icon } from "@ac/web/components/Icon";
+import { usePins } from "../../_lib/usePins";
 
 /** Customer overview (FR-C01, DD-C01, Figma Client 01a) from the Core API: the scope and period live in the URL; the
 texts and times follow the user's display language and time zone (IR260). */
+/** Units a property shows before "Show all" on the overview. */
+const UNITS_FIRST = 5;
+
+/** The ACs pinned on their own pages (IR814), first on the Overview with their reading and state; none pinned, no card.
+A pin for an AC outside the selection (another property) is not shown here. */
+function PinnedUnits({ rows, initial }: Readonly<{ rows: OverviewLive["rows"]; initial: string[] }>) {
+  const t = useT();
+  const [pins, toggle] = usePins(initial);
+  const pinned = pins.flatMap((id) => rows.filter((r) => r.id === id));
+  if (pinned.length === 0) return null;
+  return (
+    <Card title={t("Pinned ACs")} sub={t("Pinned on each AC's page · kept with your account")} className="xl:col-span-2">
+      <div className="grid-fluid" style={{ ["--min" as string]: "220px" }}>
+        {pinned.map((u) => (
+          <div key={u.id} className="flex items-start justify-between gap-2 rounded-xl border border-line p-3">
+            <Link href={`/customer/units/${u.id}`} className="min-w-0 hover:opacity-80">
+              <div className="truncate font-bold">{u.name}</div>
+              <div className="truncate text-[11px] text-muted-foreground">{u.place}</div>
+              <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs"><span className="font-bold">{u.temp ?? "—"}{u.temp === null ? "" : " °C"}</span><PowerBadge s={u.state} /><ConnBadge s={u.conn} /></div>
+            </Link>
+            <Btn size="sm" variant="ghost" aria-label={t("Unpin {name}", { name: u.name })} onClick={() => { toggle(u.id); }}><Icon name="close" /></Btn>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
 export function OverviewView({ live }: Readonly<{ live: OverviewLive }>) {
   const t = useT();
   const router = useRouter();
@@ -22,6 +51,9 @@ export function OverviewView({ live }: Readonly<{ live: OverviewLive }>) {
   const a = live.attention;
   // the values were read when the page rendered: two minutes later they read as stale until a refresh (DD-C01)
   const [staleFor, setStaleFor] = useState<string | null>(null);
+  // a property with many units shows its first ones; the rest open on request — the Mock fleet's 19 rows pushed the
+  // overview's other cards far down (UI/UX loop R141)
+  const [allOf, setAllOf] = useState<string[]>([]);
   useEffect(() => {
     const timer = setTimeout(() => { setStaleFor(live.asOf); }, 120_000);
     return () => { clearTimeout(timer); };
@@ -33,7 +65,7 @@ export function OverviewView({ live }: Readonly<{ live: OverviewLive }>) {
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-muted-foreground">{t("Viewing")}</span>
           <Select aria-label={t("Property")} className="w-auto text-xs font-semibold" value={live.propertyId ?? ""} onChange={(e) => { patch({ propertyId: e.target.value || null, unitId: null }); }}>
-            <option value="">{t("Property: All properties")}</option>{live.properties.map((p) => <option key={p.id} value={p.id}>{t("Property: {name}", { name: p.name })}</option>)}
+            <option value="">{t("Property: All properties")}</option>{live.properties.toSorted((x, y) => x.name.localeCompare(y.name)).map((p) => <option key={p.id} value={p.id}>{t("Property: {name}", { name: p.name })}</option>)}
           </Select>
           <Select aria-label={t("Unit")} className="w-auto text-xs font-semibold" value={live.unitId ?? ""} onChange={(e) => { patch({ unitId: e.target.value || null }); }}>
             <option value="">{t("Unit: All units ({n})", { n: live.units.length })}</option>{live.units.map((u) => <option key={u.id} value={u.id}>{t("Unit: {name}", { name: u.name })}</option>)}
@@ -53,6 +85,12 @@ export function OverviewView({ live }: Readonly<{ live: OverviewLive }>) {
             ))}</div>
         </Banner>
       )}
+      {/* on a phone the Needs attention tile is the fourth, two screens down: the most severe open alert is said first (IR816) */}
+      {a.items[0] && <div className="sm:hidden">
+        <Banner tone="warn" action={<TextLink href="/customer/alerts">{t("View alerts")} <Icon name="arrowRight" /></TextLink>}>
+          <b>{a.items[0].title}</b> · {a.items[0].where}{a.more + a.items.length > 1 && <> · {t("+{n} more", { n: a.more + a.items.length - 1 })}</>}
+        </Banner>
+      </div>}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))]">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Kpi label={t("Running")} badge={<PowerBadge s="running" />} value={c.powerOn} sub={live.propertyName ? t("{units} in {property} · latest observation", { units: units(c.total), property: live.propertyName }) : t("{units} · latest observation", { units: units(c.total) })} href="/customer/properties?powerState=on" link={t("View running units")} />
@@ -81,7 +119,7 @@ export function OverviewView({ live }: Readonly<{ live: OverviewLive }>) {
         </Card>
         <Card title={live.air ? t("Air quality · {room}", { room: live.air.room }) : t("Air quality")} action={live.air && <Badge tone={live.air.co2.feed.tone} icon={live.air.co2.feed.icon}>{live.air.co2.feed.text}</Badge>}>
           {live.air ? <>
-            <div className="text-[28px] font-bold"><span className="text-xs font-normal text-muted-foreground">CO2 </span>{live.air.co2.value ?? "—"} <span className="text-sm font-medium text-muted-foreground">ppm</span></div>
+            <div className="text-[28px] font-bold"><span className="text-xs font-normal text-muted-foreground">CO2 </span>{live.air.co2.value ?? "—"}{live.air.co2.value !== null && <span className="ml-1 text-sm font-medium text-muted-foreground">ppm</span>}</div>
             {live.air.co2.warn && <div className="my-1"><Badge tone="warn" icon="warning">{t("Ventilation recommended")}</Badge></div>}
             <p className="mb-2 text-[11px] text-muted-foreground">{t("{sub} · {unit} sensor · threshold 1000 ppm", { sub: live.air.co2.sub, unit: live.air.unit })}</p>
             {live.air.points.some((p) => p !== null) ? <LineChart points={live.air.points} name="CO2" unit="ppm" times={live.air.times} min={400} max={Math.max(1200, ...live.air.points.filter((p): p is number => p !== null).map((p) => p + 100))} threshold={1000} height={90} />
@@ -93,23 +131,29 @@ export function OverviewView({ live }: Readonly<{ live: OverviewLive }>) {
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(0,1fr)]">
+        <PinnedUnits rows={live.rows} initial={live.pins} />
         <Card title={live.propertyName ? t("Units in {property}", { property: live.propertyName }) : t("Units in all properties")} sub={t("Latest value per unit — no averaged temperature across rooms")} action={<TextLink href="/customer/properties">{t("View all")} <Icon name="arrowRight" /></TextLink>}>
           <div className="flex flex-col divide-y divide-line">
             <div className="hidden grid-cols-[minmax(0,1fr)_72px_72px_72px_120px_14px] gap-2 pb-2 text-[11px] text-muted-foreground lg:grid">
               <span>{t("Unit · location · observed")}</span><span>{t("Room temp")}</span><span>{t("Humidity")}</span><span>{t("Power now")}</span><span>{t("Status")}</span><span />
             </div>
-            {live.rows.map((u) => (
+            {byProperty(live.rows).map((g, gi, groups) => <Fragment key={g.property || "none"}>
+              {groups.length > 1 && <h3 className={cx("flex items-baseline gap-2 pb-1 text-xs font-bold text-muted-foreground", gi > 0 ? "pt-4" : "pt-1")}>{g.property || t("Not in a property")}<span className="font-normal">{t(g.rows.length === 1 ? "{n} unit" : "{n} units", { n: g.rows.length })}</span></h3>}
+              {(allOf.includes(g.property) ? g.rows : g.rows.slice(0, UNITS_FIRST)).map((u) => (
               <Link key={u.id} href={`/customer/units/${u.id}`} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-2 py-3 hover:bg-surface2/50 lg:grid-cols-[minmax(0,1fr)_72px_72px_72px_120px_14px]">
                 <div className="flex min-w-0 items-center gap-2.5"><span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-primary-soft text-primary"><Icon name="units" /></span><div className="min-w-0"><div className="truncate font-bold">{u.name}</div><div className="truncate text-[11px] text-muted-foreground">{u.place ? `${u.place} · ` : ""}{u.observed}</div></div></div>
                 <div className="col-span-2 row-start-2 flex gap-4 text-xs lg:contents">
-                  {([[u.temp, "°C"], [u.hum, "%"], [u.power, "W"]] as const).map(([v, unit], i) => (
-                      <div key={i}><span className="text-[13px] font-bold">{v ?? "—"}</span> <span className="text-[11px] text-muted-foreground">{v === null ? t("no data") : unit}</span></div>
+                  {/* below lg the column headings are hidden, so each reading names itself ("— no data" three times said nothing; UI/UX loop R8) */}
+                  {([[u.temp, "°C", "Room temp"], [u.hum, "%", "Humidity"], [u.power, "W", "Power now"]] as const).map(([v, unit, label]) => (
+                      <div key={label}><span className="block text-[10px] text-muted-foreground lg:hidden">{t(label)}</span><span className="text-[13px] font-bold">{v ?? "—"}</span> <span className="text-[11px] text-muted-foreground">{v === null ? t("no data") : unit}</span></div>
                     ))}
                 </div>
                 <div className="col-start-2 row-start-1 flex flex-col items-end gap-1 lg:col-auto lg:row-auto lg:items-start"><PowerBadge s={u.state} /><ConnBadge s={u.conn} /></div>
                 <span className="hidden text-muted-foreground lg:block"><Icon name="chevronRight" /></span>
               </Link>
-            ))}
+              ))}
+              {g.rows.length > UNITS_FIRST && <div className="py-2"><Btn size="sm" variant="ghost" aria-expanded={allOf.includes(g.property)} onClick={() => { setAllOf((x) => (x.includes(g.property) ? x.filter((p) => p !== g.property) : [...x, g.property])); }}>{t(allOf.includes(g.property) ? "Show the first {n}" : "Show all {total}", { n: UNITS_FIRST, total: g.rows.length })}</Btn></div>}
+            </Fragment>)}
             {live.rows.length === 0 && <p className="py-4 text-center text-xs text-muted-foreground">{t("No units in this selection.")}</p>}
           </div>
         </Card>

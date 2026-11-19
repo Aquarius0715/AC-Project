@@ -1,6 +1,6 @@
 ---
 document_id: REQ-T
-version: 0.30.0
+version: 0.31.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -44,6 +44,7 @@ P0 means the core foundational flow. P1 is also required for completion in phase
 | FR-T13 | P1 | Figma-confirmed screen specification 2026-10-01 (Technician 01-6/02-32) / BIZ-12, BIZ-20 | QR scan and site check-in | Scan the unit label to open today's job or the unit register; check in at the site (location within 200 m, unit QR, inside the work window) to start the job, or check in manually with a reason. |
 | FR-T14 | P1 | Figma-confirmed screen specification 2026-10-01 (Technician 02-29/02-30) / BIZ-12 | Parts, refrigerant, and time on site | Record parts (catalogue/van stock), refrigerant recovered/charged with leak check, and arrival/start/pause/finish times in the work report. |
 | FR-T15 | P1 | Figma-confirmed screen specification 2026-10-01 (Technician 02-31) / BIZ-12 | Customer sign-off | Capture the customer's signature (or an absence reason with a site photo) on the report version before submitting. |
+| FR-T16 | P1 | Added design details (supporting a company goal) / BIZ-07, BIZ-12, BIZ-20 | New aircon installation | HQ plans a unit that is not installed yet and creates an installation job; the technician follows an installation checklist, confirms model and serial with photos, optionally binds the IoT device, gets the customer sign-off, and submits. HQ acceptance marks the unit installed and sets its installation date. |
 
 ## Business boundaries and dependencies
 
@@ -319,7 +320,7 @@ Design: [DD-T12](../02-design/technician.md#dd-t12-details). Assess parent AT-T1
 - **Company request basis**: SRC-06 BIZ-12, BIZ-20; Figma-confirmed Technician 01-6 and 02-32 (2026-10-01).
 - **Entry conditions**: Technician with an active assignment; the QR label encodes the unit.
 - **Main flow**: Overview › Scan QR → matched unit and today's job → Open job / Open unit (read-only register) / Enter ID manually. In the job, Start job on site opens Check in: location (within 200 m), unit QR matched, arrival inside the work window → Check in & start.
-- **Business rule BR-T13**: `units.resolveQr` returns only assigned units; others show the shared “Page unavailable” with no unit data (same as AT-T02-E②). `jobs.checkIn` records arrival time, method, and distance, then moves the job to in_progress (same rules as `jobs.start`, IR76/IR94). If location or QR is unavailable, a manual check-in needs a reason (1–1000) and HQ sees “manual check-in”. Arrival inside the window counts toward SLA (FR-A22).
+- **Business rule BR-T13**: `units.resolveQr` returns only assigned units; others show the shared “Page unavailable” with no unit data (same as AT-T02-E②). `jobs.checkIn` records arrival time, method, and distance (measured on the server from the device's location to the pin HQ set for the property, DEC-109/IR825), then moves the job to in_progress (same rules as `jobs.start`, IR76/IR94). If location or QR is unavailable, a manual check-in needs a reason (1–1000) and HQ sees “manual check-in”. Arrival inside the window counts toward SLA (FR-A22).
 - **Resulting business state**: MaintenanceJob.timeOnSite.arrivedAt/startedAt set; status in_progress.
 - **Boundaries/prohibitions**: Before the window opens or after it ends, check-in is rejected like `jobs.start` (FORBIDDEN/CONFLICT per IR76/IR89).
 
@@ -365,6 +366,23 @@ Design: [DD-T14](../02-design/technician.md#dd-t14-details). Assess parent AT-T1
 
 Design: [DD-T15](../02-design/technician.md#dd-t15-details). Assess parent AT-T15 using all N/E/B cases in traceability.
 
+
+### FR-T16 New aircon installation
+
+- **Company request basis**: none directly; added design details supporting SRC-06 BIZ-07 (unit register), BIZ-12 (work reports), BIZ-20 (IoT lifecycle). Decided 2026-11-12 (DEC-106).
+- **Entry conditions**: HQ created a unit with install state `planned` (Admin unit edit, FR-A02) and an `installation` job for it (FR-A06). The job follows the normal offer, acceptance, assignment, check-in and start flow (FR-T08, FR-T13); the technician needs the job's work window (IR49).
+- **Main flow**: Open the job → workspace shows the installation checklist instead of the indoor/outdoor/electrical groups → record a result (or a reason for not doing it) for mounting, refrigerant piping, vacuum and leak test, electrical connection, drainage, test run and customer handover → Equipment check: confirm the model and enter the serial, attach photos of the name plate, the indoor unit and the outdoor unit → optionally register and bind the IoT device (FR-T11, with the job) → customer sign-off (FR-T15) → Submit.
+- **Business rule BR-T16**: An installation job can only be created by HQ (a client asks with an installation request, FR-C20, DEC-107; HQ may link the job to it), only for a `planned` unit, and a unit has at most one unfinished installation job (CONFLICT). A `planned` unit accepts no other job type and no maintenance plan. Submit needs: every checklist item with a result, or a reason when the result is not "normal"; the confirmed model equal to the unit's model (`errors.model_mismatch`); a non-empty serial; at least one ready photo of each of name plate, indoor unit and outdoor unit; a sign-off (signature, or absence reason with site photo); the work text and next action as for any report. IoT binding is optional. When HQ accepts the report, the unit becomes `installed` and `installedAt` is the day the job started; `warrantyEndsAt` stays empty until HQ sets it in the unit edit (BR-A19, the register keeps no warranty period per model). A returned report keeps the unit `planned`. A `planned` unit has no device, so it has no readings or alerts; Admin and the assigned technician see it with an "Installation planned" badge.
+- **Resulting business state**: Report and job as in FR-T09; on acceptance Unit.installState=installed and installedAt; the report keeps the confirmed model and serial.
+- **Boundaries/prohibitions**: The client cannot create an installation job; it asks with an installation request (FR-C20) and HQ creates the job. A job made for a request shows its note and “IoT device requested” to the technician. Do not fill installedAt before HQ accepts. Do not require IoT binding.
+
+| Acceptance ID | Given / When | Then (observable result) |
+|---|---|---|
+| AT-T16-N | HQ created planned unit unit-planned-a and job-install-a; assigned technician has checked in. When: all seven checklist items normal, model and serial confirmed, three photos, IoT device bound, signed, submitted, HQ accepts | Job completed; unit installState=installed with installedAt; warrantyEndsAt stays empty |
+| AT-T16-E | ① Create an installation job for an installed unit, or as a client ② Create a second unfinished installation job for unit-planned-a ③ Create a reactive job for a planned unit ④ Submit with a different model, no outdoor photo, or no sign-off | ① ③ VALIDATION (`type`; a client calling `jobs.create` is refused, FR-C20 is the way to ask) ② CONFLICT ④ VALIDATION naming the field (`installation`, `attachmentIds`, `signOff`) |
+| AT-T16-B | ① HQ returns the report ② Submit without any IoT device | ① The unit stays planned, rework as FR-T08 ② Accepted; no binding required |
+
+Design: [DD-T16](../02-design/technician.md#dd-t16-details). Assess parent AT-T16 using all N/E/B cases in traceability.
 
 0.9.0 correction contracts: Read [strict review correction contracts](../02-design/strict-review-contracts.md) and [operation version contracts](../02-design/write-version-catalog.csv) together.
 

@@ -71,7 +71,7 @@ export async function loadTechUnit(id: string, sp: { jobId?: string; metric?: st
     return {
       kind: "not_started" as const, title: t("Not started yet"),
       text: start ? t("You can see this AC from {time}, when your work window starts.", { time: showTime(start, display) }) : t("Available from the work start time of your assigned job."),
-      job: start && sp.jobId ? { href: `/technician/jobs/${sp.jobId}`, label: t("Open the job") } : null,
+      job: start && sp.jobId ? { href: `/technician/jobs/${encodeURIComponent(sp.jobId)}`, label: t("Open the job") } : null,
     };
   }
   const tab = sp.metric ? "monitoring" as const : "register" as const;
@@ -82,8 +82,9 @@ export async function loadTechUnit(id: string, sp: { jobId?: string; metric?: st
   const [alerts, jobs, pointsList, more, devices] = await Promise.all([
     optional(unitAlerts<ApiAlert>(id, 50), [] as ApiAlert[]), // every unresolved one, then the latest resolved (IR712)
     optional(coreItems<ApiTechJobRow>("jobs.list", { limit: 20, filters: { unitId: id } }), [] as ApiTechJobRow[]),
-    Promise.all(metrics.map((m) => optional(series(id, m, from, to, period, 4), NONE))),
-    Promise.all(others.map((m) => optional(series(id, m, from, to, period, 1), NONE))),
+    // each metric with its own readings, so the chart and the other metrics never look a series up by position
+    Promise.all(metrics.map(async (m) => ({ metric: m, unit: unitOf(m), ...(await optional(series(id, m, from, to, period, 4), NONE)) }))),
+    Promise.all(others.map(async (m) => ({ metric: m, ...(await optional(series(id, m, from, to, period, 1), NONE)) }))),
     tab === MONITORING ? optional(coreItems<{ id: string }>("devices.list", { limit: 5, filters: { unitId: id } }), []) : Promise.resolve([]),
   ]);
   const eventLists = await Promise.all(devices.map((x) => {
@@ -94,8 +95,9 @@ export async function loadTechUnit(id: string, sp: { jobId?: string; metric?: st
   const events = eventLists.flat();
   const control = controlJob(jobs, sp.jobId);
   const job = control ?? sp.jobId ?? null; // the job the alert evidence opens with
-  const back = sp.jobId ? `/technician/jobs/${sp.jobId}` : "/technician";
-  const alertsHref = `/technician/units/${id}/alerts${job ? `?jobId=${job}` : ""}`;
+  // the URL's jobId is encoded, so "x&alertId=…" stays one value instead of adding a parameter to the links
+  const back = sp.jobId ? `/technician/jobs/${encodeURIComponent(sp.jobId)}` : "/technician";
+  const alertsHref = `/technician/units/${id}/alerts${job ? `?jobId=${encodeURIComponent(job)}` : ""}`;
   return {
     kind: "live" as const,
     short: id.slice(0, 8),
@@ -108,14 +110,14 @@ export async function loadTechUnit(id: string, sp: { jobId?: string; metric?: st
     components: componentCards(d, i),
     componentCount: d.components.length,
     tiles: liveTiles(d, nowMs, i),
-    chart: seriesCharts(metrics.map((m, k) => ({ metric: m, unit: unitOf(m), items: pointsList.at(k)?.items ?? [], total: pointsList.at(k)?.total ?? 0, complete: pointsList.at(k)?.complete ?? false })), period, nowMs, i),
-    others: otherMetrics(d, metrics, Object.fromEntries(others.map((m, k) => [m, more.at(k)?.items ?? []])), period, nowMs, i,
-      Object.fromEntries(others.map((m, k) => [m, more.at(k)?.complete ? 0 : more.at(k)?.total ?? 0]))),
+    chart: seriesCharts(pointsList, period, nowMs, i),
+    others: otherMetrics(d, metrics, Object.fromEntries(more.map((s) => [s.metric, s.items])), period, nowMs, i,
+      Object.fromEntries(more.map((s) => [s.metric, s.complete ? 0 : s.total]))),
     events: windowEvents(alerts, events, period, nowMs, i),
     history: jobRows(jobs, i),
-    alerts: openAlerts(alerts, nowMs, i).map((a) => ({ ...a, href: `${alertsHref}${job ? "&" : "?"}alertId=${a.id}` })),
-    controlHref: control ? `/technician/units/${id}/control?jobId=${control}` : null,
-    metric: metrics[0] ?? "temperature",
+    alerts: openAlerts(alerts, nowMs, i).map((a) => ({ ...a, href: `${alertsHref}${job ? "&" : "?"}alertId=${encodeURIComponent(a.id)}` })),
+    controlHref: control ? `/technician/units/${id}/control?jobId=${encodeURIComponent(control)}` : null,
+    metric: metrics[0],
     choices: metricChoices(d, metrics, t),
     id,
     back,

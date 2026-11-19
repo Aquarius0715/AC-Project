@@ -111,8 +111,8 @@ test("the HQ overview in Malay keeps the period in Kuala Lumpur days", async ({ 
   await expect(main.getByRole("heading", { name: "Unit mengikut tamat liputan", exact: true })).toBeVisible();
   // the device registry (IR295): models, IoT devices, firmware campaigns and the new-campaign dialog, closed unsaved
   await page.goto("/admin/devices");
-  await expect(main.getByRole("tab", { name: /^Model/ })).toHaveAttribute("aria-selected", "true");
-  for (const name of ["Identiti", "Kawalan", "Penderia"]) await expect(main.getByRole("heading", { name, exact: true })).toBeVisible();
+  await expect(main.getByRole("tab", { name: /^Model penyaman udara/ })).toHaveAttribute("aria-selected", "true"); // the aircon models; the IoT models are the next tab (DEC-105)
+  for (const name of ["Identiti", "Kawalan"]) await expect(main.getByRole("heading", { name, exact: true })).toBeVisible();
   await main.getByRole("tab", { name: /^Peranti IoT/ }).click();
   await page.waitForURL(/tab=devices/);
   await expect(main.getByRole("heading", { name: "Peristiwa peranti", exact: true })).toBeVisible();
@@ -238,7 +238,7 @@ test("the HQ overview in Malay keeps the period in Kuala Lumpur days", async ({ 
   // restrictions (IR301): this account holds no restriction permission, so the screen says so in Malay
   // (restrictions-language.e2e.ts opens them as the restriction manager)
   await page.goto("/admin/restrictions");
-  await expect(main).toContainText("Sekatan memerlukan restriction.read, restriction.write atau restriction.override.");
+  await expect(main).toContainText("memerlukan kebenaran “Lihat sekatan”"); // the permission in words (IR821)
   // access & roles (IR302): the memberships, the selected one's valid period in GMT+9 and its form typed in Asia/Tokyo,
   // and the new-membership checks, which stop before any call
   await page.goto("/admin/settings/access");

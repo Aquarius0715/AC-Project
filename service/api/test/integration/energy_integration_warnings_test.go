@@ -35,7 +35,19 @@ func TestEnergySlotWarnings(t *testing.T) {
 		uuid.NewString(),
 	)
 
-	end := start.Add(4 * time.Minute) // minute 3 has no sample
+	owner( // minute 3's sample is in W, not kW: excluded without a warning of its own, like an empty slot
+		t,
+		`INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, unit,
+			origin, quality, boundary_id, received_at, event_id)
+		VALUES ($1,$2,$3,'power',$4,1,60000,'W','measured','valid','ac_input_electricity',$4,$5)`,
+		seed.ID("tenant-a"),
+		unit,
+		uuid.NewString(),
+		start.Add(3*time.Minute),
+		uuid.NewString(),
+	)
+
+	end := start.Add(4 * time.Minute)
 	body := fmt.Sprintf(
 		`{"from":%q,"to":%q,"unitIds":[%q]}`,
 		start.Format(time.RFC3339),

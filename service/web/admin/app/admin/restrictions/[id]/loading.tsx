@@ -1,5 +1,5 @@
 import { RouteLoading } from "@ac/web/components/RouteStates";
 
 export default function Loading() {
-  return <RouteLoading what="restrictions" />;
+  return <RouteLoading what="restrictions" variant="detail" />;
 }

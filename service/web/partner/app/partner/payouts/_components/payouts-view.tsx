@@ -51,15 +51,23 @@ export function PayoutsView({ live }: Readonly<{ live: PayoutsLive }>) {
     run(() => askHq(sel.statement.id, sel.statement.version, ask.lineId, topic, m), t("Question sent — HQ answers on the statement"), () => { setAsk(null); setNotice(""); setRefused(null); },
       (f) => { setRefused(refusal(f, t)); if (f.fieldErrors.message) setError(questionError); });
   };
-  const download = () => {
-    if (!sel) return;
-    const url = URL.createObjectURL(new Blob([payoutPdf(sel.statement, sel.rows, live.company, t, locale)], { type: "application/pdf" }));
+  // the button is only shown with a statement open, so the caller passes it
+  const download = (shown: NonNullable<PayoutsLive["selected"]>) => {
+    const url = URL.createObjectURL(new Blob([payoutPdf(shown.statement, shown.rows, live.company, t, locale)], { type: "application/pdf" }));
     const a = document.createElement("a");
-    a.href = url; a.download = `statement-${sel.statement.period}-${sel.statement.id.slice(0, 8)}.pdf`; a.click();
+    a.href = url; a.download = `statement-${shown.statement.period}-${shown.statement.id.slice(0, 8)}.pdf`; a.click();
     URL.revokeObjectURL(url);
   };
+  // before the first statement there is nothing to filter or open: one empty state instead of two and the filters
+  const isFirst = live.statements.length === 0 && !isFiltered;
   return (
     <Page>
+      {isFirst ? (
+        <Card title={t("Statements")}>
+          <EmptyState title={t("No statements yet")}>{t("A statement appears here once HQ approves your first one.")}</EmptyState>
+          <p className="mt-2 text-[11px] text-muted-foreground">{t("A statement is issued on the 1st for jobs whose report was accepted in the previous month. HQ approves it; payment follows on the 15th. Drafts stay with HQ.")}</p>
+        </Card>
+      ) : <>
       <div className="flex flex-wrap items-center gap-2">
         <div className="w-48"><Select value={live.period} onChange={(e) => { nav({ period: e.target.value || null, statementId: null }); }} aria-label={t("Period")}><option value="">{t("Period: {period}", { period: t("All") })}</option>{live.periods.map((p) => <option key={p.value} value={p.value}>{t("Period: {period}", { period: p.text })}</option>)}</Select></div>
         <div className="w-48"><Select value={live.status} onChange={(e) => { nav({ status: e.target.value || null, statementId: null }); }} aria-label={t("Status")}><option value="">{t("Status: All")}</option><option value="approved">{t("Status: {status}", { status: t("Approved") })}</option><option value="paid">{t("Status: {status}", { status: t("Paid") })}</option></Select></div>
@@ -69,7 +77,8 @@ export function PayoutsView({ live }: Readonly<{ live: PayoutsLive }>) {
       {sel && <div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>{sel.kpis.map((k) => <Kpi key={k.label} label={k.label} value={k.value} sub={k.badge ? <Badge tone={k.badge.tone}>{k.badge.label}</Badge> : k.sub} />)}</div>}
       <div className="split-rev">
         <Card title={t("Statements")} className="self-start">
-          {live.statements.length === 0 ? <EmptyState title={t(isFiltered ? "No statements" : "No statements yet")}>{t(isFiltered ? "No statement matches these filters." : "A statement appears here once HQ approves your first one.")}</EmptyState> : (
+          {/* an empty list here is always a filtered one: unfiltered, isFirst shows the first-statement state instead */}
+          {live.statements.length === 0 ? <EmptyState title={t("No statements")}>{t("No statement matches these filters.")}</EmptyState> : (
             <div className="flex flex-col gap-2">{live.statements.map((s) => (
                 <ListRow key={s.id} selected={sel?.statement.id === s.id} onClick={() => { nav({ statementId: s.id }); }}><div className="min-w-0 flex-1"><b className="text-[13px]">{s.label}</b><div className="text-[11px] text-muted-foreground">{s.sub}</div></div><Badge tone={s.badge.tone}>{s.badge.label}</Badge></ListRow>
               ))}</div>
@@ -78,7 +87,7 @@ export function PayoutsView({ live }: Readonly<{ live: PayoutsLive }>) {
         </Card>
         {sel ? (
           <Card title={sel.title} sub={sel.sub}
-            action={<div className="flex items-center gap-2"><Badge tone={sel.statement.status === "paid" ? "ok" : "primary"}>{t(sel.statement.status === "paid" ? "Paid" : "Approved")}</Badge><Btn size="sm" onClick={download}>{t("Download PDF")}</Btn></div>}>
+            action={<div className="flex items-center gap-2"><Badge tone={sel.statement.status === "paid" ? "ok" : "primary"}>{t(sel.statement.status === "paid" ? "Paid" : "Approved")}</Badge><Btn size="sm" onClick={() => { download(sel); }}>{t("Download PDF")}</Btn></div>}>
             <DataTable rowKey={(r) => r.key} rows={sel.rows} cols={[
               { key: "job", label: t("Job"), render: (r) => <b>{r.job}</b> },
               { key: "work", label: t("Work"), render: (r) => <><div>{r.work}</div>{r.sub && <div className="text-[11px] text-muted-foreground">{r.sub}</div>}</> },
@@ -100,6 +109,7 @@ export function PayoutsView({ live }: Readonly<{ live: PayoutsLive }>) {
           </Card>
         ) : <Card title={t("Statement")}><EmptyState title={t("No statement to show")}>{t("Only approved and paid statements are shown; jobs still in review move to the next statement.")}</EmptyState></Card>}
       </div>
+      </>}
       <Modal open={!!ask} onClose={() => { setAsk(null); }} title={t("Ask HQ about this line")} footer={<><Btn onClick={() => { setAsk(null); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={send}>{t("Send")}</Btn></>}>
         <Field label={t("Line")}><Select value={ask?.lineId ?? ""} onChange={(e) => { setAsk({ lineId: e.target.value }); }}>{askable.map((r) => <option key={r.lineId} value={r.lineId}>{r.job} · {r.work} · {r.amount} {sel?.statement.currency}</option>)}</Select></Field>
         <Field label={t("Topic")}><Select value={topic} onChange={(e) => { setTopic(oneOf(live.topics.map((x) => x.id), e.target.value, topic)); }}>{live.topics.map((x) => <option key={x.id} value={x.id}>{x.text}</option>)}</Select></Field>

@@ -27,7 +27,8 @@ export function MockTeam() {
   const [modal, setModal] = useState<null | "unavail" | "upload">(null);
   const [activeOnly, setActiveOnly] = useState(true);
   const [q, setQ] = useState("");
-  const list = techs.filter((t) => (!activeOnly || t.active) && (!q || t.quals.some((x) => x.toLowerCase().includes(q.toLowerCase())) || t.id.includes(q)));
+  const needle = q.toLowerCase(); // qualification and technician ID alike, in any letter case
+  const list = techs.filter((t) => (!activeOnly || t.active) && (!q || t.quals.some((x) => x.toLowerCase().includes(needle)) || t.id.includes(needle)));
   return (
     <Page>
       <div className="flex flex-wrap items-center justify-between gap-2"><Tabs value={tab} onChange={setTab} tabs={[{ id: "members", label: "Members" }, { id: "certs", label: "Certifications", count: 1 }]} /><div className="flex gap-2"><Btn size="sm" onClick={() => { setModal("unavail"); }}><Icon name="add" /> Unavailable days</Btn></div></div>
@@ -40,7 +41,7 @@ export function MockTeam() {
           {list.map((t) => {
             const pct = t.tot ? Math.round((t.used / t.tot) * 100) : null;
             return <Card key={t.id} title={t.id} sub={t.sub} action={<div className="text-right"><div className="text-xl font-bold">{pct === null ? "—" : `${String(pct)}%`}</div><div className="text-[11px] text-muted-foreground">utilization</div></div>}>
-              <div className="mb-2 flex justify-between text-xs"><span>Week of 09-14</span><b>{t.used} h / {t.tot} h</b></div><UtilizationBar pct={pct} />
+              <div className="mb-2 flex justify-between text-xs"><span>Week of 09-14</span><b>{t.used} h / {t.tot} h</b></div><UtilizationBar pct={pct} label={`${t.id}: ${String(t.used)} h / ${String(t.tot)} h`} />
               <div className="mt-2 grid-fluid text-xs" style={{ ["--min"as string]: "180px" }}><span>{t.asg}</span><span className="text-ok">{t.free}</span></div>
             </Card>;
           })}

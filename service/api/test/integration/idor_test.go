@@ -172,6 +172,33 @@ func TestForeignTargets(t *testing.T) {
 
 	unavA := asStr(t, data(resp)["id"])
 
+	code, resp = write(
+		srv,
+		customerA(),
+		"installationRequests.create",
+		`{"propertyId":"`+propA+`","quantity":1,"modelId":null,"withIot":false,"preferredSlots":[`+slotJSON(
+			25,
+			2,
+		)+","+
+			slotJSON(
+				49,
+				2,
+			)+","+slotJSON(
+			73,
+			2,
+		)+`]}`,
+		0,
+	)
+	if code != 200 {
+		t.Fatalf("customer A's installation request: %d %v", code, resp)
+	}
+
+	requestA := asStr(t, data(resp)["id"])
+
+	t.Cleanup(func() {
+		owner(t, `DELETE FROM maintenance.installation_requests WHERE id = $1`, requestA)
+	})
+
 	t.Cleanup(func() { owner(t, `DELETE FROM maintenance.unavailability WHERE id = $1`, unavA) })
 
 	stmtA, lineA := uuid.NewString(), uuid.NewString()
@@ -234,6 +261,7 @@ func TestForeignTargets(t *testing.T) {
 			`{"event":"initiate","invoiceId":"` + invA + `","method":"demo_credit_card","demoConfirmed":true}`,
 			1,
 		},
+		{customerB(), "payments.startCheckout", `{"invoiceId":"` + invA + `"}`, 1},
 		{customerB(), opJobsGet, `{"jobId":"` + jobA + `"}`, 0},
 		{
 			customerB(),
@@ -244,6 +272,23 @@ func TestForeignTargets(t *testing.T) {
 		{customerB(), opJobsEvents, `{"jobId":"` + jobA + `","query":{"limit":5}}`, 0},
 		{customerB(), "jobs.create", jobBody(unitA, nil), 0},
 		{customerB(), "jobs.cancel", `{"jobId":"` + jobA + `","cancelReason":"Not needed"}`, 1},
+		{customerB(), "installationRequests.cancel", `{"id":"` + requestA + `"}`, 1},
+		{
+			customerB(),
+			"installationRequests.create",
+			`{"propertyId":"` + propA + `","quantity":1,"modelId":null,"withIot":false,"preferredSlots":[` +
+				slotJSON(
+					25,
+					2,
+				) + "," + slotJSON(
+				49,
+				2,
+			) + "," + slotJSON(
+				73,
+				2,
+			) + `]}`,
+			0,
+		},
 		{
 			customerB(),
 			opJobsAddNote,
@@ -578,7 +623,7 @@ func TestForeignTargets(t *testing.T) {
 		{
 			techB(),
 			opJobsCheckIn,
-			`{"jobId":"` + jobW + `","method":"manual","distanceMeters":null,"qrUnitId":null,"reason":"No QR label"}`,
+			`{"jobId":"` + jobW + `","method":"manual","position":null,"qrUnitId":null,"reason":"No QR label"}`,
 			3,
 		},
 		{techB(), "jobs.pauseWork", `{"jobId":"` + jobW + `","paused":true}`, 3},
@@ -767,6 +812,12 @@ func TestForeignTargets(t *testing.T) {
 			opDevicesList,
 			`{"limit":100,"filters":{"unitId":"` + unitA + `"}}`,
 			[]string{unitA},
+		},
+		{
+			customerB(),
+			"installationRequests.list",
+			`{"limit":100,"filters":{"propertyId":"` + propA + `"}}`,
+			[]string{propA, requestA},
 		},
 		{
 			customerB(),
@@ -1072,7 +1123,8 @@ func TestForeignTargets(t *testing.T) {
 		"twoFactor.enable":            ownSession,
 		"twoFactor.disable":           ownSession,
 		"consents.get":                "own membership",
-		"consents.update":             "own membership",
+		opConsentsUpdate:              "own membership",
+		"presence.report":             "own membership and own customer's pinned properties; no target (TestPresenceReport)",
 		"filterCare.getSettings":      "own customer; no target",
 		"filterCare.saveSettings":     "own customer; no target",
 		"notifications.list":          "recipient only; no filter names a recipient",

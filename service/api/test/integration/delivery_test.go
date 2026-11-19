@@ -15,6 +15,7 @@ import (
 const (
 	fieldOfferExpiresAt  = "offerExpiresAt"
 	refusedSlotNotAgreed = "startAt=errors.slot_not_agreed"
+	refusedAccessCover   = "accessValidFrom=error.accessMustCoverVisit"
 )
 
 //nolint:paralleltest // the integration tests share one server and the seeded test database
@@ -63,11 +64,11 @@ func TestOfferAcceptAssign(t *testing.T) {
 		return out + "}"
 	}
 	refused := map[string]string{ // the field each VALIDATION case is refused for
-		"access does not cover": "accessValidFrom=error.accessMustCoverVisit",
+		"access does not cover": refusedAccessCover,
 		"blank terms":           "termsVersion=error.length",
 		"expiry after access":   "offerExpiresAt=error.afterAccess",
 		"expiry in the past":    "offerExpiresAt=error.past",
-		"access starts late":    "accessValidFrom=error.accessMustCoverVisit",
+		"access starts late":    refusedAccessCover,
 	}
 
 	for name, testCase := range map[string]struct {
@@ -1357,6 +1358,93 @@ func TestReleaseQualificationEnded(t *testing.T) {
 
 	if !grantEnds.Equal(clock().Add(100 * time.Hour)) {
 		t.Errorf("the grant ends %v, want the longest certificate's end", grantEnds)
+	}
+
+	// a valid certificate that began earlier and still runs widens the grant back to its start, and one that begins
+	// after the grant ends leaves a gap, so it is not joined (IR781)
+	insertCert := func(from, until int) {
+		t.Helper()
+		owner(
+			t,
+			`INSERT INTO maintenance.certificates (tenant_id, membership_id, organization_id, code, name, number, issued_at,
+				expires_at, status) VALUES ($1, $2, $3, 'demo_indoor', 'Indoor AC', 'N-2', $4, $5, 'valid')`,
+			seed.ID("tenant-a"),
+			tech,
+			seed.ID("org-contractor-a"),
+			clock().Add(time.Duration(from)*time.Hour),
+			clock().Add(time.Duration(until)*time.Hour),
+		)
+	}
+	insertCert(-300, 20)
+	insertCert(150, 300)
+	approve(100)
+	ownerScan(
+		t,
+		`SELECT valid_from, valid_until FROM identity.qualification_grants WHERE membership_id = $1 AND code = 'demo_indoor'`,
+		[]any{tech},
+		&grantStarts,
+		&grantEnds,
+	)
+
+	if !grantStarts.Equal(clock().Add(-300 * time.Hour)) {
+		t.Errorf("the grant starts %v, want the earlier certificate's start", grantStarts)
+	}
+
+	if !grantEnds.Equal(clock().Add(100 * time.Hour)) {
+		t.Errorf("the grant ends %v: the certificate after the gap was joined", grantEnds)
+	}
+
+	// an approved certificate of the catch-all code "other" is valid but grants no work
+	code, res := write(
+		srv,
+		contrA(),
+		"certificates.submit",
+		`{"membershipId":"`+tech.String()+`","code":"other","name":"First aid","number":"N-2","issuedAt":"`+stamp(
+			-240,
+		)+`","expiresAt":"`+stamp(
+			100,
+		)+`","file":`+pdf+`}`,
+		0,
+	)
+	if code != 200 {
+		t.Fatalf("submit other: %d %v", code, res)
+	}
+
+	other := asStr(t, data(res)["id"])
+	if code, reply := write(
+		srv,
+		hq(),
+		"certificates.verify",
+		`{"certificateId":"`+other+`","decision":"approve"}`,
+		1,
+	); code != 200 {
+		t.Fatalf("approve other: %d %v", code, reply)
+	}
+
+	var (
+		otherStatus string
+		otherGrants int
+	)
+
+	ownerScan(
+		t,
+		`SELECT status FROM maintenance.certificates WHERE id = $1`,
+		[]any{other},
+		&otherStatus,
+	)
+	ownerScan(
+		t,
+		`SELECT count(*) FROM identity.qualification_grants WHERE membership_id = $1 AND code = 'other'`,
+		[]any{tech},
+		&otherGrants,
+	)
+
+	if otherStatus != "valid" || otherGrants != 0 {
+		t.Errorf(
+			"approved other: status %s, grants %d, want valid and none",
+			otherStatus,
+			otherGrants,
+		)
 	}
 }
 

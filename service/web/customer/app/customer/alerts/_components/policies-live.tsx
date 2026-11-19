@@ -2,7 +2,7 @@
 const base = "/customer/alerts?tab=policies";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Badge, Banner, Btn, Card, Check, Choice, Field, Input, LinkButton, Modal, Select, SeverityBadge, Toggle, cx, Plain, ScrollX } from "@ac/web/components/ui";
 import { useAction } from "@ac/web/lib/useAction";
@@ -11,7 +11,7 @@ import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import { metricUnit, opSymbol, type Operator, type Severity } from "@ac/web/lib/adminAlerts";
 import { oneOf } from "@ac/web/lib/oneOf";
 import {
-  metricGroups, metricOfGroup, POLICY_FIELDS, policyErrors, policyFieldId, policyInput, summaryText, toggledInput, type PolicyCard, type PolicyForm,
+  metricGroups, metricOfGroup, POLICY_FIELDS, policyErrors, policyFieldId, policyInput, summaryText, toggledInput, type PolicyCard, type PolicyForm, unitBackHref,
 } from "@ac/web/lib/customerPolicies";
 import { useT } from "@ac/web/components/I18n";
 import { deletePolicy, savePolicy, setDefaultRule } from "../actions";
@@ -44,6 +44,8 @@ function PolicyList({ p, onDone, onFail }: Readonly<Props>) {
   const t = useT();
   const [pending, run] = useAction();
   const [remove, setRemove] = useState<PolicyCard | null>(null);
+  // switching a default rule off stops its alerts on every AC of the account: it asks first (switching on does not)
+  const [turnOff, setTurnOff] = useState<{ ruleKey: string; name: string; version: number } | null>(null);
   const d = p.defaults;
   const fail = (f: ActionFailure) => { onFail(f); };
   useEffect(() => { takeListFocus(); }, []);
@@ -68,12 +70,18 @@ function PolicyList({ p, onDone, onFail }: Readonly<Props>) {
               <tr key={r.ruleKey} className={cx("border-t border-line", !r.enabled && "text-muted-foreground")}>
                 <td className="py-2 pr-3 font-semibold">{r.name}</td><td className="pr-3">{r.condition}</td><td className="pr-3"><Badge tone={r.category === "air_quality" ? "primary" : "muted"}>{r.type}</Badge></td>
                 <td className="pr-3"><SeverityBadge s={r.severity} /></td>
-                <td><Toggle on={r.enabled} disabled={!p.owner || pending} onChange={(v) => { toggleRule(r.ruleKey, r.name, v, r.version); }} label={r.name} /></td>
+                <td><Toggle on={r.enabled} disabled={!p.owner || pending} onChange={(v) => { if (v) toggleRule(r.ruleKey, r.name, true, r.version); else setTurnOff({ ruleKey: r.ruleKey, name: r.name, version: r.version }); }} label={r.name} /></td>
               </tr>
             ))}</tbody>
           </table></ScrollX>
           {d.notes.map((n) => <p key={n} className="mt-2 text-xs text-muted-foreground">{n}</p>)}
         </Card>
+      )}
+      {turnOff && (
+        <Modal open onClose={() => { setTurnOff(null); }} title={t("Turn off “{name}” for all your ACs?", { name: turnOff.name })}
+          footer={<><Btn onClick={() => { setTurnOff(null); }}>{t("Keep it on")}</Btn><Btn variant="danger" disabled={pending} onClick={() => { toggleRule(turnOff.ruleKey, turnOff.name, false, turnOff.version); setTurnOff(null); }}>{t("Turn off")}</Btn></>}>
+          <p className="text-[13px]">{t("This rule then raises no alert on any of your ACs until it is switched on again. HQ still sees device status.")}</p>
+        </Modal>
       )}
       <div id="your-policies" tabIndex={-1} className="rounded text-[13px] font-bold outline-none focus-visible:ring-2 focus-visible:ring-ring/50">{t("Your policies")} <span className="text-xs font-normal text-muted-foreground">{t("{n} · added on top of the default policy · a policy belongs to your account and can be attached to many ACs", { n: p.cards.length })}</span></div>
       {p.cards.map((c) => (
@@ -132,6 +140,9 @@ const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 function PolicyEditor({ p, editor, onDone, onFail }: Props & { editor: NonNullable<Live["editor"]> }) {
   const t = useT();
   const router = useRouter();
+  // opened from an AC's Attach dialog: a new policy goes back there to be ticked (UI/UX loop R46)
+  const returnTo = useSearchParams().get("returnTo");
+  const back = editor.policy ? null : unitBackHref(returnTo);
   const [pending, run] = useAction();
   const [f, setF] = useState<PolicyForm>(editor.form);
   const [tried, setTried] = useState(false);
@@ -158,12 +169,17 @@ function PolicyEditor({ p, editor, onDone, onFail }: Props & { editor: NonNullab
     const { customerId } = p;
     if (!customerId) return;
     run(() => savePolicy(policyInput(f, editor.policy, { customerId, membershipId: p.membershipId, timezone: p.timezone }), editor.policy?.version ?? null), t("Policy saved"),
-      (id) => { listFocus = `policy-title-${id}`; onDone(t(editor.policy ? "“{name}” saved." : "“{name}” saved — attach it on an AC’s page.", { name: f.name.trim() })); router.replace(base, { scroll: false }); }, onFail);
+      (id) => {
+        const name = f.name.trim();
+        if (back) { onDone(t("“{name}” saved — tick it to attach it to this AC.", { name })); router.push(unitBackHref(back, id) ?? back); return; }
+        listFocus = `policy-title-${id}`; onDone(t(editor.policy ? "“{name}” saved." : "“{name}” saved — attach it on an AC’s page.", { name })); router.replace(base, { scroll: false });
+      }, onFail);
   };
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,320px)]">
       <Card>
         <div className="mb-3 text-[13px]"><Link href={base} className="font-semibold text-primary"><Icon name="arrowLeft" /> {t("Alert policies")}</Link> › {t(editor.policy ? "Edit alert policy" : "Create alert policy")}</div>
+        {back && <div className="mb-3"><Banner>{t("After you save it, you go back to the AC with this policy ready to attach.")} <Link href={back} className="font-semibold text-primary">{t("Back to the AC without saving")}</Link></Banner></div>}
         <Field label={t("Name")} error={tried ? errorText.name : undefined}><Input id={policyFieldId("name")} value={f.name} maxLength={120} onChange={(e) => { set({ name: e.target.value }); }} /></Field>
         <h3 className="mt-4 text-[13px] font-bold">{t("1 · When …")} <span className="font-normal text-muted-foreground">{t("What to watch")}</span></h3>
         <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -202,8 +218,9 @@ function PolicyEditor({ p, editor, onDone, onFail }: Props & { editor: NonNullab
         <h3 className="mt-4 text-[13px] font-bold">{t("3 · Then …")} <span className="font-normal text-muted-foreground">{t("How loud the alert is and who hears about it")}</span></h3>
         <div className="mt-2 flex flex-col gap-2 text-[13px]">
           <div className="flex flex-wrap items-center gap-3">{t("Severity")} <Choice value={f.severity} onChange={(v: Severity) => { set({ severity: v }); }} options={[{ id: "normal", label: t("Info") }, { id: "warning", label: t("Warning") }, { id: "critical", label: t("Critical") }]} /></div>
-          <div className="flex flex-wrap items-center gap-3">{t("Notify me by")} <Check label={t("In-app (always)")} checked disabled /><Check label={t("Email")} checked={f.email} onChange={(v) => { set({ email: v }); }} /><Check label="WhatsApp" checked={false} disabled /></div>
-          <p className="text-[11px] text-muted-foreground">{t("WhatsApp is only available after you allow it in Preferences. Missing or stale readings never trigger — they show “not measured”.")}</p>
+          <div className="flex flex-wrap items-center gap-3">{t("Notify me by")} <Check label={t("In-app (always)")} checked disabled /><Check label={t("Email")} checked={f.email} onChange={(v) => { set({ email: v }); }} /><Check label={<span>WhatsApp <span className="ml-1 rounded-full bg-surface2 px-1.5 text-[11px] font-medium text-muted-foreground">{t("Coming soon")}</span></span>} checked={false} disabled /></div>
+          {/* no setting anywhere turns WhatsApp on yet, so the hint sends no one to Preferences for it (UI/UX loop R47) */}
+          <p className="text-[11px] text-muted-foreground">{t("WhatsApp alerts are not available yet. Missing or stale readings never trigger — they show “not measured”.")}</p>
         </div>
       </Card>
       <div className="flex flex-col gap-4">
@@ -214,7 +231,7 @@ function PolicyEditor({ p, editor, onDone, onFail }: Props & { editor: NonNullab
         </Card>
         <Card>
           <Btn variant="primary" className="w-full" disabled={pending} onClick={save}>{t("Save policy")}</Btn>
-          <Link href={base} className="mt-2 block text-center text-[13px] font-semibold text-primary">{t("Cancel")}</Link>
+          <Link href={back ?? base} className="mt-2 block text-center text-[13px] font-semibold text-primary">{t("Cancel")}</Link>
           {editor.policy && <><Btn variant="danger" className="mt-3 w-full" onClick={() => { setRemove(true); }}>{t("Delete policy")}</Btn><p className="mt-2 text-[11px] text-muted-foreground">{editor.attached.length === 0 ? t("Deleting detaches it from every AC first (you confirm). The default policy can’t be deleted.") : null}{editor.attached.length > 0 && editor.attached.length === 1 && t("Deleting detaches it from its AC first (you confirm). The default policy can’t be deleted.")}{editor.attached.length > 0 && editor.attached.length !== 1 && t("Deleting detaches it from all {n} ACs first (you confirm). The default policy can’t be deleted.", { n: editor.attached.length })}</p></>}
           {!p.customerId && <Banner tone="warn">{t("Your customer account could not be read — saving is not possible.")}</Banner>}
         </Card>

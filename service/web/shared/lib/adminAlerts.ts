@@ -12,6 +12,7 @@ import { byNumber, byText } from "@ac/web/lib/order";
 import { filled } from "@ac/web/lib/filled";
 import { wrapped } from "@ac/web/lib/text";
 import { entryOf, lookup } from "@ac/web/lib/lookup";
+import { metricName } from "@ac/web/lib/metricLabels";
 
 const TEMPERATURE = "temperature";
 const DEFAULT_ALERT = "default_alert";
@@ -75,10 +76,7 @@ export interface AdminPolicy {
   rules: DefaultRule[]; settings: RuleSettingRow[];
 }
 
-export const metricLabel: Record<string, string> = {
-  temperature: "Temperature", humidity: "Humidity", co2: "CO₂ (ppm)", pm25: "PM2.5", power: "Power", vibration: "Vibration",
-  refrigerant_pressure: "Refrigerant pressure", compressor_cycles: "Compressor cycles", airflow_drop: "Airflow drop", heartbeat_gap: "Heartbeat gap",
-};
+export { metricLabel, metricName } from "@ac/web/lib/metricLabels";
 export const metricUnit: Record<string, string> = { temperature: "°C", humidity: "%", co2: "ppm", pm25: "µg/m³", power: "kW", vibration: "mm/s", refrigerant_pressure: "kPa", compressor_cycles: "cycles/h", airflow_drop: "%", heartbeat_gap: "min" };
 export const opSymbol: Record<Operator, string> = { gt: ">", gte: "≥", lt: "<", lte: "≤" };
 /** The metrics an HQ alert policy may watch (IR66 item 3, the Core API's hqMetrics); default rules have their own. */
@@ -122,7 +120,8 @@ export function adminAlertRows(alerts: ApiAdminAlert[], units: ApiUnitName[], cu
         id: a.id, version: a.version, title: alertTitle(a, t), time: when(a.detectedAt), sev: a.severity,
         meta: `${customer} · ${u?.displayName ?? a.unitId} · ${pol}`, state: a.status, st: t(stLabel[a.status]),
         unitId: a.unitId, customerId: (u && custIdByOrg.get(u.customerOrgId)) ?? null, policyless: !a.policyId, inferred: a.evidenceKind === "inferred",
-        unit: `${u?.displayName ?? t("Unit")} · ${a.unitId}`, context: customer,
+        // the unit's short ID, as every other list and detail shows IDs; the full UUID only made the row noisy (UI/UX loop R99)
+        unit: `${u?.displayName ?? t("Unit")} · ${a.unitId.slice(0, 8)}`, context: customer,
         evidence: `${textOf(evidenceKind, a.evidenceKind, t) ?? a.evidenceKind} — “${evidenceText(a.evidenceText, t)}”`,
         cause: a.causeCode === "unknown" ? t("not determined") : t("{cause} (suspected)", { cause: a.causeCode }),
         observed: showTime(a.observedAt, display), detected: showTime(a.detectedAt, display),
@@ -147,7 +146,7 @@ export function policyRows(policies: ApiPolicy[], customers: ApiCustomerName[], 
       const rules = p.rules?.length ?? 0;
       const sub = p.kind === DEFAULT_ALERT
         ? byCount(rules, { one: t("1 rule · ventilation (CO₂, PM2.5) + fault causes"), many: t("{n} rules · ventilation (CO₂, PM2.5) + fault causes", { n: rules }) })
-        : `${textOf(metricLabel, metric, t) ?? metric} ${entryOf(opSymbol, op)} ${String(p.threshold ?? "—")} ${lookup(metricUnit, metric) ?? ""} ${t("for {n} s", { n: p.durationSeconds ?? 0 })}`;
+        : `${textOf(metricName, metric, t) ?? metric} ${entryOf(opSymbol, op)} ${String(p.threshold ?? "—")} ${lookup(metricUnit, metric) ?? ""} ${t("for {n} s", { n: p.durationSeconds ?? 0 })}`;
       const recipients = (p.recipientMembershipIds ?? []).map((id) => {
         const m = member.get(id);
         return { id, label: filled(m?.displayName) ?? id, role: m ? recipientRole(m.role, t) : "" };
@@ -355,4 +354,12 @@ export function testOutcome(d: NotificationDecision | null, p: Pick<AdminPolicy,
     default: { return ({ tone: "muted", text: holds(p.operator, value, p.threshold) ? t("No alert: {value} {unit} meets {op} {threshold} {unit}, but not within the active hours.", v) : t("No alert: {value} {unit} does not meet {op} {threshold} {unit}.", v) });
     }
   }
+}
+
+/** Where a new policy hands back to the unit it was made for (UI/UX loop R44): `returnTo` from the unit's Attach
+dialog, kept only inside /admin/units, with the new policy to tick there; null for any other address. */
+export function attachBackHref(returnTo: string | null, policyId?: string): string | null {
+  if (!returnTo || !/^\/admin\/units(?:\?|$)/.test(returnTo)) return null;
+  if (!policyId) return returnTo;
+  return `${returnTo}${returnTo.includes("?") ? "&" : "?"}attach=${encodeURIComponent(policyId)}`;
 }

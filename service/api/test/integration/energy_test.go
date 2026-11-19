@@ -277,6 +277,18 @@ func TestBaselines(t *testing.T) {
 		t.Errorf("bad baseline filter: %d %s", code, fields(res))
 	}
 
+	// an empty or reversed period filter is refused on filters.to, not answered with an empty list
+	at := start.Format(time.RFC3339)
+	if code, res := post(
+		srv,
+		hq(),
+		"baselines.list",
+		`{"filters":{"from":"`+at+`","to":"`+at+`"}}`,
+	); code != 422 ||
+		fields(res) != "filters.to=error.range" {
+		t.Errorf("empty period filter: %d %s", code, fields(res))
+	}
+
 	if code, _ := write(
 		srv,
 		customerB(),
@@ -411,6 +423,12 @@ func TestEnergySummary(t *testing.T) {
 		asNum(t, tot["savingPercentage"]) != -25 {
 		t.Errorf("increase: %v", tot)
 	}
+	// a zero baseline compares, but a percentage of zero is unknown, never 0 % or a division error
+	_, resp = post(srv, hq(), "energy.summary", body(end, `,"baselineId":"`+fixed("0", 5)+`"`))
+	if tot := asObj(t, data(resp)["totals"]); asNum(t, tot["savedKWh"]) != -5 ||
+		tot["savingPercentage"] != nil {
+		t.Errorf("zero baseline: %v", tot)
+	}
 	// partial coverage or another minute count: actuals only
 	_, resp = post(
 		srv,
@@ -472,6 +490,21 @@ func TestEnergySummary(t *testing.T) {
 		body(end, `,"baselineId":"`+uuid.NewString()+`"`),
 	); code != 404 {
 		t.Error("unknown baseline")
+	}
+	// HQ is not scoped to a customer, so an unknown or archived unit is refused by the second count
+	archived := newUnit(t, srv, "Archived summary AC")
+	owner(t, `UPDATE assets.units SET archived = true WHERE id = $1`, archived)
+
+	for name, id := range map[string]string{"unknown": uuid.NewString(), "archived": archived} {
+		code, _ := post(
+			srv,
+			hq(),
+			"energy.summary",
+			`{"from":"2026-09-01T00:00:00Z","to":"2026-09-01T00:10:00Z","unitIds":["`+unit+`","`+id+`"]}`,
+		)
+		if code != 404 {
+			t.Errorf("%s unit: %d, want 404", name, code)
+		}
 	}
 }
 
@@ -661,18 +694,21 @@ func TestEnergyReportFigures(t *testing.T) {
 		new(float64(60)),
 	)
 
-	size := func(month string) int {
+	exportFile := func(month, sections, format string) map[string]any {
 		code, res := post(
 			srv,
 			customerB(),
 			"energy.exportReport",
-			`{"month":"`+month+`","propertyIds":["`+prop+`"],"sections":["energy_cost"],"format":"csv"}`,
+			`{"month":"`+month+`","propertyIds":["`+prop+`"],"sections":[`+sections+`],"format":"`+format+`"}`,
 		)
 		if code != 200 {
-			t.Fatalf("export %s: %d %v", month, code, res)
+			t.Fatalf("export %s %s: %d %v", month, sections, code, res)
 		}
 
-		return int(asNum(t, data(res)["size"]))
+		return data(res)
+	}
+	size := func(month string) int {
+		return int(asNum(t, exportFile(month, `"energy_cost"`, "csv")["size"]))
 	}
 
 	header := len("section,metric,value\n")
@@ -694,5 +730,52 @@ func TestEnergyReportFigures(t *testing.T) {
 		"energy_cost,cost,n/a\n",
 	); got != want {
 		t.Errorf("July without readings: %d bytes, want %d", got, want)
+	}
+
+	// the comparison states July (no readings) beside August, the counts are the unit's own (none), and a PDF wraps
+	// the same rows
+	content := "%PDF-1.4\n% Demo energy report 2026-08 (fictional values)\n" + "section,metric,value\n" +
+		"month_comparison,previous_kWh,n/a\nmonth_comparison,current_kWh,5.0\n" +
+		"alerts_maintenance,alerts,0\nalerts_maintenance,completed_jobs,0\n" + "%%EOF\n"
+
+	// the offsets section states the month's emissions beside the offsets retired in it (none in August)
+	if got, want := int(
+		asNum(t, exportFile("2026-08", `"co2_offsets"`, "csv")["size"]),
+	), header+len(
+		"co2_offsets,emissions_kg,2.5\nco2_offsets,demo_retired_kg,0.0\n",
+	); got != want {
+		t.Errorf("CO2 offsets section: %d bytes, want %d", got, want)
+	}
+
+	pdf := exportFile("2026-08", `"month_comparison","alerts_maintenance"`, "pdf")
+
+	got, want := int(asNum(t, pdf["size"])), len(content)
+	if got != want || pdf["mime"] != "application/pdf" ||
+		pdf["fileName"] != "energy-report-2026-08.pdf" {
+		t.Errorf("PDF report: %v, want %d bytes", pdf, want)
+	}
+}
+
+// A report covers only the caller's own properties (another customer's is NOT_FOUND, IDOR) and only a month that has
+// ended in the caller's timezone (IR110): the test clock's month, September 2026, is refused on its field.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
+func TestEnergyReportRefusals(t *testing.T) {
+	srv := server(t)
+	_, prop := isolatedUnit(t, srv) // customer-b's
+	body := func(month string) string {
+		return `{"month":"` + month + `","propertyIds":["` + prop + `"],"sections":["energy_cost"],"format":"csv"}`
+	}
+
+	if code, res := post(srv, customerA(), "energy.exportReport", body("2026-08")); code != 404 ||
+		res["code"] != "NOT_FOUND" {
+		t.Errorf("another customer's property: %d %v", code, res)
+	}
+
+	code, res := post(srv, customerB(), "energy.exportReport", body(clock().Format("2006-01")))
+	refusal(t, "month not ended", code, res, "month=errors.month_not_ended")
+
+	if code, res := post(srv, customerB(), "energy.exportReport", body("2026-08")); code != 200 {
+		t.Errorf("own property, ended month: %d %v", code, res)
 	}
 }

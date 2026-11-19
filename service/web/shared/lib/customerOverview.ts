@@ -5,7 +5,7 @@
 // card. Pure code shared by the Server Component and the client view; texts and times in the user's display language and
 // time zone (`i`, IR260), the period note in Asia/Kuala_Lumpur, where the periods are cut.
 import { alertTitle, type ApiAlert } from "@ac/web/lib/alerts";
-import { EN, intlTag, relativeTime, showClock, showSpan, showTime, type I18n } from "@ac/web/lib/i18n";
+import { EN, intlTag, relativeTime, showClock, showRecent, showSpan, showTime, type I18n } from "@ac/web/lib/i18n";
 import { airNumber, type ApiMeasurement } from "@ac/web/lib/air";
 import type { ApiPropertyRow, ApiUnitRow } from "@ac/web/lib/assets";
 import type { ApiEnergySummary } from "@ac/web/lib/energy";
@@ -67,15 +67,17 @@ function trendIcon(delta: number): IconName {
   if (delta < 0) return "arrowDown";
   return delta > 0 ? "arrowUp" : "remove";
 }
-/** One row per unit: the latest valid room temperature, humidity and power (W); missing readings stay empty. */
-export function overviewRows(units: OverviewUnit[], place: (u: OverviewUnit) => string, i: I18n = EN): OverviewRow[] {
+/** One row per unit: the latest valid room temperature, humidity and power (W); missing readings stay empty. With `nowMs`
+a reading from another day carries its date, so “10:54 pm” days ago does not read as newer than the page (UI/UX loop R64). */
+export function overviewRows(units: OverviewUnit[], place: (u: OverviewUnit) => string, i: I18n = EN, nowMs?: number): OverviewRow[] {
   return units.map((u) => {
     const t = latestOf(u, "temperature"), h = latestOf(u, "humidity"), p = latestOf(u, "power");
     const last = [t, h, p].filter((m): m is ApiMeasurement => !!m).map((m) => m.observedAt).toSorted(byText).at(-1);
     const power = current(p), temperature = current(t), humidity = current(h);
     const perUnit = p?.unit === "kW" ? 1000 : 1;
     const watts = power === null ? null : Math.round(power * perUnit);
-    const reading = last ? showClock(last, i.display) : i.t("no reading yet");
+    const at = (iso: string) => (nowMs === undefined ? showClock(iso, i.display) : showRecent(iso, nowMs, i.display));
+    const reading = last ? at(last) : i.t("no reading yet");
     const seen = u.lastSeenAt ? showTime(u.lastSeenAt, i.display) : i.t("never");
     return {
       id: u.id, name: u.displayName, place: place(u),
@@ -85,6 +87,19 @@ export function overviewRows(units: OverviewUnit[], place: (u: OverviewUnit) => 
       state: runState(u.effectivePowerState), conn: u.connection,
     };
   });
+}
+
+/** The overview's unit rows under their property (the first part of the place, "" for a unit not in a property): a flat
+list of a whole account mixed the homes and offices. Properties go in name order, as the Property select lists them,
+with the units outside a property last (UI/UX loop R142). */
+export function byProperty(rows: OverviewRow[]): { property: string; rows: OverviewRow[] }[] {
+  const groups = new Map<string, OverviewRow[]>();
+  for (const r of rows) {
+    const property = r.place.split(" › ", 1)[0] ?? "";
+    groups.set(property, [...(groups.get(property) ?? []), r]);
+  }
+  return [...groups].map(([property, list]) => ({ property, rows: list }))
+    .toSorted((x, y) => Number(x.property === "") - Number(y.property === "") || x.property.localeCompare(y.property));
 }
 
 export interface EnergyCard { sub: string; total: string | null; delta: { text: string; icon: IconName; tone: "ok" | "warn" } | null; labels: string[]; series: number[][]; gaps: boolean }

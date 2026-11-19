@@ -105,6 +105,9 @@ describe("deviceTiles", () => {
     expect(conn).toMatchObject({ value: "Offline", dot: "crit", sub: "lost 8:12 am MYT" });
     expect(power).toMatchObject({ value: "Lost", dot: "crit", sub: "power_signal 8:33 am MYT" });
     expect(tamper).toMatchObject({ value: "Detected", dot: "warn", sub: "cover opened 8:41 am MYT", warn: true });
+    // three days later the same faults carry their date (UI/UX loop R68)
+    const [connLater, , tamperLater] = deviceTiles(detail({ connection: "offline", powerSignal: "off", tamper: "detected" }), null, NOW + 3 * 86_400_000, faults);
+    expect([connLater?.sub, tamperLater?.sub]).toStrictEqual(["lost 14 Sept 2026, 8:12 am MYT", "cover opened 14 Sept 2026, 8:41 am MYT"]);
   });
   it("points to the events when a fault has no dated event", () => {
     const [conn, , tamper] = deviceTiles(detail({ connection: "error", tamper: "detected" }), null, NOW);
@@ -187,7 +190,7 @@ describe("device events (T12)", () => {
       { ...lost, restoredAt: "2026-09-14T01:10:00Z" }, event({ id: "f", eventType: "operation_failed" }), event({ id: "p", eventType: "power_lost", evidenceSource: "power_signal" }),
     ];
     const rows = eventRows(es, alerts, NOW);
-    expect(rows[0]).toMatchObject({ tone: "ok", detail: "Connection restored · heartbeat", recovery: "recovers communication_lost today 9:00 am MYT", time: "today 9:10 am MYT" });
+    expect(rows[0]).toMatchObject({ tone: "ok", detail: "Connection restored · heartbeat", recovery: "recovers Communication lost today 9:00 am MYT", time: "today 9:10 am MYT" });
     expect(rows[1]).toMatchObject({ tone: "warn", detail: "Cover opened while powered · tamper_signal · 2 alerts", recovery: "open · unacknowledged", notes: ["today 9:02 am MYT — Cover refitted"] });
     expect(rows[1]?.alerts.map((a) => a.id)).toStrictEqual(["al-1"]);
     expect(rows[2]?.recovery).toBe("open · acknowledged");

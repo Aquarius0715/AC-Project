@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { inboxAlerts, type ApiAlert } from "@ac/web/lib/alerts";
+import { alertNext, alertTitle, inboxAlerts, type ApiAlert } from "@ac/web/lib/alerts";
 import { inboxRow, NOTIFICATION_KEYS, type ApiNotification } from "@ac/web/lib/notifications";
-import { i18nOf } from "@ac/web/lib/i18n";
+import { i18nOf, translator } from "@ac/web/lib/i18n";
 import { ms } from "@ac/web/lib/i18n-ms";
 import { must } from "./must";
 
@@ -37,6 +37,11 @@ describe("inbox rows and alert rows", () => {
     expect(inboxRow(note({ channel: "email" }), "client", { locale: "ms", timeZone: "UTC" }).d).toBe("Diminta · e-mel"); // the channel in words too (IR488)
     expect(inboxRow(note({ type: "fault", templateKey: "alert", sourceAlertId: "a1", target: { kind: "unit", id: "u1" }, params: { ...note({}).params, targetName: BEDROOM_AC, status: "open" } }), "client"))
       .toMatchObject({ t: "Alert on Bedroom AC", href: "/customer/alerts" });
+    // DEC-110, IR846: HQ's notice of a suspected restriction bypass says so, in the display language
+    const bypass = note({ type: "fault", templateKey: "alert", sourceAlertId: "a2", target: { kind: "unit", id: "u1" }, params: { ...note({}).params, targetName: BEDROOM_AC, status: "restriction_bypass" } });
+    expect([inboxRow(bypass, "admin").d, inboxRow(bypass, "admin", { locale: "ja", timeZone: "UTC" }).d]).toStrictEqual([
+      "Restriction may be bypassed — HQ checks the unit", "制限が回避された可能性 — HQ がユニットを確認します",
+    ]);
   });
 
   it("does not link a notice whose page no longer opens for the reader (IR602)", () => {
@@ -125,6 +130,35 @@ describe("inbox rows and alert rows", () => {
       [], () => ({ name: BEDROOM_AC, place: "" }), i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" }));
     expect([win?.title, win?.kind, win?.status.text, win?.status.detail, old?.status.detail, old?.where, old?.evidence.split(":", 1)[0]]).toStrictEqual([
       "Kemungkinan tingkap terbuka", "Punca beban (mungkin)", "Diakui", "Diakui 14 Sep 2026, 10:30 PG GMT+9 · masih belum selesai", "Diselesaikan 14 Sep 2026, 11:00 PG GMT+9 · penapis dibersihkan", "Bedroom AC · dikesan 14 Sep 2026, 10:00 PG GMT+9", "Bukti (disimpulkan)",
+    ]);
+  });
+
+  // IR800: every unresolved alert names a next step (by cause, then type, then kind); a resolved one needs none
+  it("says what to do about each unresolved alert", () => {
+    const next = (over: Partial<ApiAlert>, status = "open") => alertNext(alert("a", "warning", status, over));
+    expect([
+      next({ causeCode: "window_open" }), next({ type: "maintenance" }), next({ type: "quality" }), next({ type: "tamper" }), next({}), next({ evidenceKind: "inspection" }), next({}, "resolved"),
+    ]).toStrictEqual([
+      "Check that the room's windows and doors are closed. If nobody is in the room, turn the AC off.",
+      "Book a filter cleaning. The AC keeps working, but cools less well until then.",
+      "Air the room or switch on ventilation, then check Air quality for the latest readings.",
+      "Check whether someone opened the AC's cover. If nobody should have, request a repair.",
+      "Request a repair. A technician checks the AC.",
+      "A technician's note. Nothing to do unless the problem comes back.",
+      null,
+    ]);
+    const [win] = inboxAlerts([alert("win", "warning", "open", { causeCode: "window_open" })], [], vi.fn(), i18nOf({ locale: "ms", timeZone: "UTC" }));
+    expect(win?.next).toBe("Pastikan tingkap dan pintu bilik ditutup. Jika tiada orang di dalam bilik, matikan AC.");
+  });
+
+  // DEC-110, IR844: a device fault under a restriction is a suspected bypass, titled and explained as such
+  it("names a suspected restriction bypass and what to do about it", () => {
+    const bypass = alert("b", "critical", "open", { type: "restriction_bypass" });
+    expect([alertTitle(bypass), alertNext(bypass), alertTitle(bypass, translator("ja")), alertNext(bypass, translator("id"))]).toStrictEqual([
+      "Restriction may be bypassed",
+      "The AC's restriction device stopped working while a restriction is on. Reconnect it and keep it in sight of the AC; HQ checks the unit.",
+      "制限が回避された可能性",
+      "Perangkat pembatasan AC berhenti bekerja saat pembatasan aktif. Sambungkan kembali dan letakkan menghadap AC; HQ akan memeriksa unit ini.",
     ]);
   });
 });

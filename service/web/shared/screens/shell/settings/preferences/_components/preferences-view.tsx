@@ -6,7 +6,7 @@ import { useAction } from "@ac/web/lib/useAction";
 import { actionMessage } from "@ac/web/lib/actionMessage";
 import { consentNote, type Consent } from "@ac/web/lib/preferences";
 import { codeComplete, groupKey, type QrPath } from "@ac/web/lib/twoFactor";
-import { useT } from "@ac/web/components/I18n";
+import { useI18n, useT } from "@ac/web/components/I18n";
 import { languageOptions, type Locale } from "@ac/web/lib/i18n";
 import { disableTwoFactor, enableTwoFactor, savePreferences } from "../actions";
 import { Icon } from "@ac/web/components/Icon";
@@ -25,6 +25,7 @@ export interface PreferencesLive {
 for a client the location consent and the monthly energy report e-mail (BR-C16), two-step verification. */
 export function PreferencesView({ live }: Readonly<{ live: PreferencesLive }>) {
   const t = useT();
+  const i18n = useI18n();
   const [pending, run] = useAction();
   const [locale, setLocale] = useState(live.prefs.locale);
   const [zone, setZone] = useState(live.prefs.timezone);
@@ -45,7 +46,7 @@ export function PreferencesView({ live }: Readonly<{ live: PreferencesLive }>) {
     <Page className="max-w-3xl">
       {failed && <Banner tone="crit">{t("Not saved: {reason}", { reason: failed })}</Banner>}
       <Card>
-        <Field label={t("Display language")} hint={t("Affects the screens, notifications and date/time display. Stored data stays UTC. Malay and Japanese text is a draft under review; text not translated yet stays in English.")}>
+        <Field label={t("Display language")} hint={t("Affects the screens, notifications and date/time display. Stored data stays UTC. Malay, Japanese and Indonesian text is a draft under review; text not translated yet stays in English.")}>
           <Choice value={locale} onChange={setLocale} options={languageOptions(t)} />
         </Field>
         <div className="my-4 border-t border-line" />
@@ -57,7 +58,7 @@ export function PreferencesView({ live }: Readonly<{ live: PreferencesLive }>) {
         {live.client && (
           <div className="flex flex-col gap-3">
             <div className="text-[13px] font-semibold">{t("Consent")}</div>
-            <div className="flex items-center justify-between gap-3"><div><div className="text-[13px]">{t("Location, for location automations")}</div><div className="text-xs text-muted-foreground">{t("{when} · withdrawal turns off location automations", { when: consentNote(live.consent, t) })}</div></div><Toggle on={location} onChange={setLocation} label={t("Location consent")} /></div>
+            <div className="flex items-center justify-between gap-3"><div><div className="text-[13px]">{t("Location, for location automations")}</div><div className="text-xs text-muted-foreground">{t("{when} · withdrawal turns off location automations", { when: consentNote(live.consent, i18n) })}</div></div><Toggle on={location} onChange={setLocation} label={t("Location consent")} /></div>
             <div className="mt-1 text-[13px] font-semibold">{t("Reports")}</div>
             <div className="flex items-center justify-between gap-3"><div><div className="text-[13px]">{t("Email me the monthly energy report (1st of each month)")}</div><div className="text-xs text-muted-foreground">{t("Last month's report, to your account e-mail · also set from Energy & cost › Export report")}</div></div><Toggle on={monthly} onChange={setMonthly} label={t("Monthly energy report e-mail")} /></div>
           </div>

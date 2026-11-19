@@ -6,6 +6,7 @@ import type { Metric, RestrictionAction, UnitAction as AnyUnitAction, UnitSymbol
 import { policyText } from "@ac/web/lib/restrictions";
 import { DEFAULT_DISPLAY, showClock, showRecent, showTime, translator, type Display, type T, textOf } from "@ac/web/lib/i18n";
 import { lookup } from "@ac/web/lib/lookup";
+import { commandFailure } from "@ac/web/lib/commandFailure";
 
 type Mode = "cool" | "dry" | "fan";
 type Fan = "low" | "mid" | "high";
@@ -42,6 +43,9 @@ export interface ApiUnitDetail {
   pendingCommands: ApiCommand[];
   location: { pathLabels: string[]; address: string | null; accessInstructions: string | null };
   installedAt: string | null;
+  /** planned until an accepted installation report installs the unit (DEC-106) */
+  installState: "planned" | "installed";
+  modelId: string;
   capabilityVersion: number;
   serviceScope: ("indoor" | "outdoor" | "electrical")[];
   components: string[];
@@ -72,7 +76,7 @@ export function setsTemperature(cap: ApiUnitDetail["capabilities"] | null): bool
   return controlLayout(cap).temperature !== null;
 }
 
-export interface ApiCommand { id: string; action: CommandAction; status: "requested" | "sent" | "acknowledged" | "failed" | "expired" | "cancelled"; requestedAt: string; acknowledgedAt?: string | null; expiresAt?: string; failureCode: string | null; source?: string }
+export interface ApiCommand { id: string; action: CommandAction; status: "requested" | "sent" | "acknowledged" | "failed" | "expired" | "cancelled"; requestedAt: string; acknowledgedAt?: string | null; expiresAt?: string; failureCode: string | null; source?: string; actorMembershipId?: string }
 
 const en = translator("en");
 
@@ -110,11 +114,43 @@ export function actionText(a: CommandAction, t: T = en): string {
 const statusText: Record<ApiCommand["status"], string> = { requested: "requested", sent: "waiting for device", acknowledged: "acknowledged by device", failed: "failed", expired: "no device response (expired)", cancelled: "cancelled" };
 const sourceText: Record<string, string> = { automation: " · by an automation", restriction: " · by a restriction", diagnostic: " · technician test run" };
 
-/** One command history row: the sentence, its state and who sent it, and when it was requested (IR44 time). */
-export function historyRow(c: ApiCommand, t: T = en, display: Display = DEFAULT_DISPLAY) {
+/** The commands that put back what `actions` changed (IR810): each sent setting returns to the confirmed one it replaced
+(`before`, the observed state before sending), in the same order. A setting with no confirmed value before cannot be
+put back and is left out; so is one that did not change. Empty when nothing can be undone. */
+export function undoActions(actions: UnitAction[], before: ApiUnitDetail["observedState"]): UnitAction[] {
+  return actions.flatMap((a): UnitAction[] => {
+    if (a.kind === "set_power") return before.power === null || before.power === a.power ? [] : [{ kind: "set_power", power: before.power }];
+    if (a.kind === "set_temperature") return before.celsius === null || before.celsius === a.celsius ? [] : [{ kind: "set_temperature", celsius: before.celsius }];
+    if (a.kind === "set_mode") return before.mode === null || before.mode === a.mode ? [] : [{ kind: "set_mode", mode: before.mode }];
+    return before.fanLevel === null || before.fanLevel === a.fanLevel ? [] : [{ kind: "set_fan", fanLevel: before.fanLevel }];
+  });
+}
+
+/** The setpoint below which cooling gets a hint (IR808). */
+const COOL_HINT_BELOW = 22;
+/** A hint to review a very low cooling setpoint (IR808): setting the AC colder does not cool the room faster, it only
+runs longer and uses more power. Null when the mode is not cooling or the setpoint is at or above COOL_HINT_BELOW. */
+export function coolingHint(mode: string, celsius: number, t: T = en): string | null {
+  return mode === "cool" && celsius < COOL_HINT_BELOW ? t("{celsius}°C is very cold for cooling: a lower setting does not cool the room faster, it runs longer and uses more power. 24–26°C is a common comfortable range.", { celsius }) : null;
+}
+
+/** The seconds a command's device has to answer it (IR806): from its request to its expiry, 30 when either is missing
+or the span is not a positive number. */
+export function answerSeconds(c: Pick<ApiCommand, "requestedAt" | "expiresAt">): number {
+  const span = c.expiresAt ? Math.round((Date.parse(c.expiresAt) - Date.parse(c.requestedAt)) / 1000) : NaN;
+  return Number.isFinite(span) && span > 0 ? span : 30;
+}
+
+/** One command history row: the sentence, its state and who sent it, and when it was requested (IR44 time). With the
+reader's membership (`me`), a command sent by hand says "by you" or "by someone else" (IR804): several people use one
+account, and the AC that changed by itself was often changed by another of them. No name is shown. */
+export function historyRow(c: ApiCommand, t: T = en, display: Display = DEFAULT_DISPLAY, me?: string) {
   const isBad = c.status === "failed" || c.status === "expired";
-  const by = (c.source ? textOf(sourceText, c.source, t) : undefined) ?? "";
-  return { id: c.id.slice(0, 8), text: `${actionText(c.action, t)} — ${t(statusText[c.status])}${c.failureCode && c.status === "failed" ? ` (${c.failureCode})` : ""}${by}`, when: showTime(c.requestedAt, display), bad: isBad };
+  const bySource = c.source ? textOf(sourceText, c.source, t) : undefined;
+  const who = c.actorMembershipId === me ? " · by you" : " · by someone else";
+  const byHand = me && c.actorMembershipId ? t(who) : "";
+  const by = bySource ?? byHand;
+  return { id: c.id.slice(0, 8), text: `${actionText(c.action, t)} — ${t(statusText[c.status])}${c.failureCode && c.status === "failed" ? `: ${commandFailure(c.failureCode, t)}` : ""}${by}`, when: showTime(c.requestedAt, display), bad: isBad };
 }
 
 const qualityText: Record<string, string> = { missing: "missing", stale: "stale", suspect: "suspect" };

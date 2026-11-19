@@ -8,6 +8,10 @@
 #        MAX_ROUNDS  stop after this many rounds (default: 0 = no limit)
 #        MAX_FAILS   stop after this many failed rounds in a row (default: 3)
 #        BUDGET_USD  per-round spend cap passed to claude (default: 15)
+#        MODEL       model for each round, e.g. claude-fable-5-2 (default: unset = the account's default model)
+#        EFFORT      reasoning effort for each round, e.g. high (default: unset = Claude Code's default); sent as
+#                    CLAUDE_CODE_EFFORT_LEVEL. Fable 5.2 costs twice as much per token as Opus 5.5, so raise BUDGET_USD
+#                    with MODEL=claude-fable-5-2 or a round may stop at the cap.
 #
 # Note: in -p mode nobody can answer a permission prompt, so a command that is not allowed fails the round.
 # acceptEdits allows file edits only. The prompt runs git, make, npm, gh, docker, so either allow those in
@@ -27,11 +31,20 @@ PROMPT_FILE=review-loop-prompt.md
 [ -f "$PROMPT_FILE" ] || { echo "missing $PROMPT_FILE" >&2; exit 1; }
 mkdir -p "$LOG_DIR"
 
+# The prompt is read again for every round from origin/main (after a fetch), so a merged change to it takes effect
+# from the next round even while a round's branch is checked out in this tree; the local file is the fallback.
 # The file starts with "/loop "; a one-shot session needs the body only, and must not self-schedule.
-PROMPT=$(sed '1s|^/loop ||' "$PROMPT_FILE")
-PROMPT="$PROMPT
+read_prompt() {
+  body=""
+  if git fetch -q origin main 2>/dev/null; then
+    body=$(git show "origin/main:$PROMPT_FILE" 2>/dev/null) || body=""
+  fi
+  [ -n "$body" ] || body=$(cat "$PROMPT_FILE")
+  PROMPT=$(printf '%s\n' "$body" | sed '1s|^/loop ||')
+  PROMPT="$PROMPT
 
 【この実行について】外側のシェルループが回を繰り返す。この会話では 1 回（1 PR）だけ行い、記録を書いたら終了する。ScheduleWakeup は使わない。"
+}
 
 n=0
 fails=0
@@ -47,7 +60,15 @@ while :; do
   n=$((n + 1))
   log="$LOG_DIR/round-$(date +%Y%m%d-%H%M%S).log"
   echo "[$(date '+%F %T')] round $n -> $log"
-  claude -p "$PROMPT" --permission-mode "$PERM_MODE" --max-budget-usd "$BUDGET_USD" >"$log" 2>&1
+  read_prompt
+  # without MODEL and EFFORT this is the same command as before
+  set -- -p "$PROMPT" --permission-mode "$PERM_MODE" --max-budget-usd "$BUDGET_USD"
+  if [ -n "${MODEL:-}" ]; then set -- "$@" --model "$MODEL"; fi
+  if [ -n "${EFFORT:-}" ]; then
+    CLAUDE_CODE_EFFORT_LEVEL="$EFFORT" claude "$@" >"$log" 2>&1
+  else
+    claude "$@" >"$log" 2>&1
+  fi
   rc=$?
   echo "[$(date '+%F %T')] round $n rc=$rc"
   if [ "$rc" -eq 0 ]; then

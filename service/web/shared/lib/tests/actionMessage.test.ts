@@ -35,7 +35,7 @@ describe("actionMessage (one toast line per failed Server Action)", () => {
   it("says why a refusal without a field happened, in every display language (IR756)", () => {
     const keys = ["error.customerActive", "error.notEmpty", "error.unitActive", "error.unitInUse", "error.alreadyUndone", "error.undoWindowClosed", "error.importPlaceInUse", "error.importUnitInUse", "error.alreadyBound", "error.unitHasDevice", "error.unitBusy", "error.duplicateModel", "error.retryOnlyFailedOrSkipped", "error.idempotencyKeyReused", "error.requestInProgress"];
     for (const messageKey of keys) {
-      for (const language of ["en", "ms", "ja"] as const) {
+      for (const language of ["en", "ms", "ja", "id"] as const) {
         const line = actionMessage(failure({ code: "CONFLICT", messageKey }), translator(language));
         expect(line, `${messageKey} (${language})`).not.toContain("CONFLICT");
       }
@@ -46,7 +46,7 @@ describe("actionMessage (one toast line per failed Server Action)", () => {
   it("words the shared refusal keys, whatever their code, in every display language (IR758)", () => {
     const cases = [["CONFLICT", "error.invalidState"], ["CONFLICT", "error.conflict"], ["TIMEOUT", "error.timeout"], ["OFFLINE", "error.offline"], ["CONFLICT", "error.deviceNotBound"], ["CONFLICT", "error.duplicateSerial"], ["CONFLICT", "error.tamperUnresolved"], ["CONFLICT", "error.duplicateName"], ["CONFLICT", "error.unitArchived"]] as const;
     for (const [code, messageKey] of cases) {
-      for (const language of ["en", "ms", "ja"] as const) {
+      for (const language of ["en", "ms", "ja", "id"] as const) {
         const line = actionMessage(failure({ code, messageKey }), translator(language));
         expect(line, `${messageKey} (${language})`).not.toContain(code);
       }
@@ -105,7 +105,7 @@ describe("actionMessage for the user management refusals (IR416–IR421)", () =>
     expect(actionMessage(r("errors.own_account"))).toBe("You can’t change or remove your own account");
     expect(actionMessage(r("errors.last_owner"), translator("ms"))).toBe("Pemilik aktif terakhir tidak boleh diturunkan, dilumpuhkan atau dialih keluar");
     expect(actionMessage(r("errors.invoice_has_payment"), translator("ms"))).toBe("Invois ini sudah mempunyai pembayaran yang sedang diproses atau telah direkodkan — selesaikan atau gagalkan pembayaran itu dahulu");
-    expect(actionMessage(r("errors.last_identity_admin"))).toBe("At least one active membership must keep identity.write — give it to another HQ membership first, then change this one");
+    expect(actionMessage(r("errors.last_identity_admin"))).toBe("At least one active membership must keep “Edit users & roles” — give it to another HQ membership first, then change this one");
     expect(actionMessage(r("errors.some_other_rule"))).toBe("Some other rule"); // other keys are still humanized
   });
 });

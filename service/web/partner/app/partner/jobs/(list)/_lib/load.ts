@@ -38,8 +38,11 @@ export async function loadJobs(sp: { tab?: string; sort?: string; from?: string;
   ]);
   const unitNames = new Map(units.map((u) => [u.id, u.displayName]));
   const names = new Map(members.map((m) => [m.id, m.displayName]));
-  const cursorPage = sp.cursor ? 2 : 1; // a cursor without a page number is past the first page
-  const page = isRestarted ? 1 : Number(sp.page) || cursorPage;
+  // the URL's page number only labels a cursor's page: a whole number from 2 (a cursor without one is the second page)
+  // to the last page; without a cursor the rows are the first page's
+  const asked = Number(sp.page);
+  const cursorPage = Number.isSafeInteger(asked) && asked >= 2 ? asked : 2;
+  const page = isRestarted || !sp.cursor ? 1 : Math.min(cursorPage, pages(list.total, 1).of);
   return {
     tab, sort, sortText: t((SORTS.find((s) => s.id === sort) ?? SORTS[0]).text), restarted: isRestarted,
     tabs: TABS.map((tb, k) => ({ id: tb.id, label: t(tb.label), count: counts.at(k) ?? 0 })),

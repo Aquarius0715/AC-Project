@@ -101,7 +101,7 @@ func scanCap(row pgx.Row) (Capability, error) {
 //	@Description	admin:dashboard.read | admin:device.read
 //	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
 //	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-//	@Description	Design: DD-A02, DD-A04 · Query: filters none · sort id,createdAt,updatedAt (default id asc)
+//	@Description	Design: DD-A02, DD-A04, DD-C20 · Query: filters none · sort id,createdAt,updatedAt (default id asc)
 //	@Tags			capabilities
 //	@Accept			json
 //	@Produce		json

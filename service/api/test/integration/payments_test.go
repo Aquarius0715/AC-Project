@@ -15,7 +15,13 @@ import (
 	apiserver "github.com/pradita/ac-project/service/api/internal/server"
 )
 
-const statusConfirmed = "confirmed"
+const (
+	statusConfirmed = "confirmed"
+	statusInitiated = "initiated"
+	keyUnavailable  = "error.unavailable"
+	// the refusal of a second payment while one is in flight or confirmed (IR474).
+	keyInvoiceHasPayment = "errors.invoice_has_payment"
+)
 
 // newInvoice creates a customer-b contract (rto, restriction eligible) and an unpaid invoice; returns contract and
 // invoice IDs.
@@ -116,7 +122,7 @@ func TestPaymentSimulation(t *testing.T) {
 		`{"event":"initiate","invoiceId":"`+inv+`","method":"demo_debit_card","demoConfirmed":true}`,
 		1,
 	)
-	if code != 200 || data(resp)["status"] != "initiated" ||
+	if code != 200 || data(resp)["status"] != statusInitiated ||
 		data(resp)["method"] != "demo_debit_card" {
 		t.Fatalf("initiate: %d %v", code, resp)
 	}
@@ -531,7 +537,7 @@ func TestManualAfterFailedPayment(t *testing.T) {
 			version,
 		)
 	}
-	if code, m := manual(2); code != 409 || m["messageKey"] != "errors.invoice_has_payment" {
+	if code, m := manual(2); code != 409 || m["messageKey"] != keyInvoiceHasPayment {
 		t.Errorf("manual while a card payment is in flight: %d %v", code, m)
 	}
 
@@ -582,7 +588,7 @@ func TestInvoiceOnePaymentAtATime(t *testing.T) {
 		initiate,
 		invoiceVersion(),
 	); code != 409 ||
-		m["messageKey"] != "errors.invoice_has_payment" {
+		m["messageKey"] != keyInvoiceHasPayment {
 		t.Fatalf("a second attempt while one is initiated: %d %v", code, m)
 	}
 

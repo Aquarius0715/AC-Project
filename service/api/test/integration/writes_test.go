@@ -127,7 +127,7 @@ func TestWritesGetResult(t *testing.T) {
 		op  string
 		key string
 	}{
-		"other member": {techA(), opPreferencesUpdate, key}, "other operation": {techB(), "consents.update", key},
+		"other member": {techA(), opPreferencesUpdate, key}, "other operation": {techB(), opConsentsUpdate, key},
 		"unknown key": {techB(), opPreferencesUpdate, "nokey-" + uuid.NewString()},
 	} {
 		if _, m := get(testCase.a, testCase.op, testCase.key); data(m)["state"] != "not_received" {

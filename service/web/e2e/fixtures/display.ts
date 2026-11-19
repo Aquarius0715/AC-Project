@@ -6,8 +6,9 @@ import { expect, type Page } from "@playwright/test";
 export const ENGLISH = /English|Inggeris|英語/;
 export const MALAY = /^Bahasa Melayu$/;
 export const JAPANESE = /^日本語$/;
-const SAVE = /Save preferences|Simpan keutamaan|^設定を保存$/;
-const SAVED = /Preferences saved|Keutamaan disimpan|設定を保存しました/;
+export const INDONESIAN = /^Bahasa Indonesia$/;
+const SAVE = /Save preferences|Simpan keutamaan|Simpan preferensi|^設定を保存$/;
+const SAVED = /Preferences saved|Keutamaan disimpan|Preferensi disimpan|設定を保存しました/;
 
 /** Saves Preferences and waits for the Server Action's answer and its toast (Save is also disabled while pending). */
 export async function savePreferences(page: Page) {

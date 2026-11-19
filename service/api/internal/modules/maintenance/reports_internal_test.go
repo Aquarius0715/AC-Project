@@ -57,9 +57,10 @@ func draftItems() []Item {
 // attachment.
 func validDraft() Report {
 	return Report{
-		Items:      draftItems(),
-		WorkText:   "Cleaned the filter and checked the drain.",
-		NextAction: &NextAction{Kind: nextActionNone, Date: nil, Note: nil},
+		Installation: nil,
+		Items:        draftItems(),
+		WorkText:     "Cleaned the filter and checked the drain.",
+		NextAction:   &NextAction{Kind: nextActionNone, Date: nil, Note: nil},
 		Parts: []Part{
 			{
 				Name:                 "Filter",
@@ -75,6 +76,7 @@ func validDraft() Report {
 		AttachmentRefs: []AttachmentRef{
 			{
 				Status:    "ready",
+				Tag:       nil,
 				ID:        uuid.UUID{},
 				TenantID:  uuid.UUID{},
 				Version:   0,
@@ -113,6 +115,7 @@ func TestSubmitErrorsComplete(t *testing.T) {
 
 	if fieldErrs := submitErrors(
 		&Report{
+			Installation:       nil,
 			Items:              validDraft().Items,
 			WorkText:           validDraft().WorkText,
 			NextAction:         validDraft().NextAction,
@@ -248,6 +251,7 @@ func TestDraftRefrigerantCylinder(t *testing.T) {
 		"newline": {"\n\t", map[string]string{fieldRefrigerant: apperr.KeyInvalid}},
 	} {
 		draft := DraftInput{
+			Installation: nil,
 			JobID:        uuid.New(),
 			Items:        []ItemInput{},
 			Measurements: []MeasurementInput{},

@@ -85,7 +85,7 @@ export function periodOfQuery(q: Pick<Query, "from" | "to">): { from: string; to
 export const periodChip = (p: { from: string; to: string }, i: I18n = EN) => i.t("Requested time {span}", { span: showSpan(p.from, p.to, i.display) });
 /** Every status but cancelled: the list without a stage tile, and the jobs counted "in scope" (no tile names cancelled). */
 export const LISTED = ["requested", "offered", "accepted", "assigned", IN_PROGRESS, "submitted", REWORK_REQUESTED, "completed", "on_hold"];
-const TYPE_IDS = new Set(["reactive", "periodic", "preventive"]);
+const TYPE_IDS = new Set(["reactive", "periodic", "preventive", "installation"]);
 /** The jobs.list filters of the scope and the filter bar; delivery is the HQ organization (internal) or a contractor.
 The type and the default "not cancelled" are filters of jobs.list too (IR290), so its total counts what the list shows. */
 export function filtersOf(q: Query, hqOrgId: string | null, withStage = true): Record<string, unknown> {
@@ -428,7 +428,7 @@ function reviewNote(status: string, av: ApiWorkReport["reviewAvailability"], mod
       : "You did not contribute to this report, so you can review it (self-approval is rejected).";
   }
   if (av.reason === "self_authored") return "You submitted this report version, so you cannot accept or return it (self-approval is rejected).";
-  return av.reason === "not_current" ? "A newer report version exists — reload to review it." : "Reviewing needs the job.write permission.";
+  return av.reason === "not_current" ? "A newer report version exists — reload to review it." : "Reviewing needs the “Edit maintenance jobs” permission.";
 }
 /** The card's colour: a decision HQ may take (warn when it is an escalation), or the outcome. */
 function cardTone(isDecide: boolean, mode: ReportCard["mode"], status: string): ReportCard["tone"] {
@@ -477,3 +477,24 @@ export function reportCard(j: ApiHqJob, r: ApiWorkReport, byUser: Map<string, st
   };
 }
 export { returnReason } from "@ac/web/lib/partnerReview"; // the HQ dialog's reason, shared with the contractor's (IR609)
+
+/** A technician as the Assignee filter of the Jobs tab reads it from members.list. */
+export interface AssigneeMember { id: string; displayName: string; organizationId: string; validUntil: string | null; revokedAt?: string | null }
+
+/** The Assignee filter of the Jobs tab: one group per company by name, since technicians of several companies can share
+a name; in a group the people with access first by name, then those whose access ended or was revoked, marked so
+(their past jobs stay findable). UI/UX loop R78. */
+export function assigneeGroups(ms: readonly AssigneeMember[], orgs: ReadonlyMap<string, string>, nowMs: number, t: T = EN.t): { org: string; people: { id: string; name: string }[] }[] {
+  const isEnded = (m: AssigneeMember) => Boolean(m.revokedAt) || (m.validUntil !== null && Date.parse(m.validUntil) <= nowMs);
+  const groups = new Map<string, AssigneeMember[]>();
+  for (const m of ms) {
+    const org = orgs.get(m.organizationId) ?? "";
+    groups.set(org, [...(groups.get(org) ?? []), m]);
+  }
+  return [...groups].toSorted(([a], [b]) => a.localeCompare(b)).map(([org, people]) => ({
+    org,
+    people: people.map((m) => ({ m, ended: isEnded(m) }))
+      .toSorted((a, b) => Number(a.ended) - Number(b.ended) || a.m.displayName.localeCompare(b.m.displayName))
+      .map(({ m, ended }) => ({ id: m.id, name: ended ? t("{name} (access ended)", { name: m.displayName }) : m.displayName })),
+  }));
+}

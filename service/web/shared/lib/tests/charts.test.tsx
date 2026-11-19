@@ -49,6 +49,15 @@ describe("charts", () => {
     expect(container.textContent).toContain("°C");
   });
 
+  // the lines and bars draw var(--color-<key>): the container's style attribute carries the colours (no <style>, CSP)
+  it("gives each series its colour as a custom property on the chart", () => {
+    const { container } = render(<LineChart labels={["a", "b"]} series={[{ name: "A", points: [1, 2] }, { name: "B", points: [2, 3], color: "#123456" }]} />);
+    const chart = container.querySelector<HTMLElement>("[data-slot=chart]");
+    expect(chart?.style.getPropertyValue("--color-v0")).toBe("var(--color-primary)");
+    expect(chart?.style.getPropertyValue("--color-v1")).toBe("#123456");
+    expect(container.querySelector("style")).toBeNull();
+  });
+
   it("shows the time, the name and the value with its unit in the tooltip", () => {
     const { container } = render(<LineChart height={200} times={["Mon 9 Nov, 15:00–15:05", "Mon 9 Nov, 15:05–15:10", "Mon 9 Nov, 15:10–15:15"]} series={[
       { name: "CO₂", unit: "ppm", points: [500, 800, 1200], format: (v) => String(Math.round(v)) },
@@ -89,6 +98,13 @@ describe("charts", () => {
     const ticks = [...container.querySelectorAll(".recharts-cartesian-axis-tick-value")].map((x) => x.textContent).filter((t) => /^\d/.test(t));
     expect(ticks.length).toBeGreaterThan(1);
     expect(new Set(ticks).size).toBe(ticks.length);
+  });
+
+  // UI/UX loop R12: the energy page drew a day without readings as a 0 kWh bar; a missing value is no bar and says so
+  it("draws no bar for a missing value and marks a day no series has as no data", () => {
+    const { container } = render(<BarChart labels={["Mon", "Tue", "Wed"]} series={[[1, null, null], [2, 3, null]]} names={["Baseline", "Actual"]} />);
+    expect(container.querySelectorAll(".recharts-bar-rectangle")).toHaveLength(3);
+    expect(container.textContent.match(/no data/g)).toHaveLength(1);
   });
 
   it("draws no legend for an unnamed series", () => {

@@ -9,12 +9,18 @@ import { isAfter } from "@ac/web/lib/order";
 import { withoutYear } from "@ac/web/lib/text";
 import { entryOf, lookup } from "@ac/web/lib/lookup";
 
+/** A plan type as the screen words it (contracts, invoices, contract options) — never the API code (“rto”). */
+export const planWord = (p: string, t: T = translator("en")) => {
+  const words = new Map(Object.entries({ rto: t("RTO"), general: t("General"), energy: t("Energy"), environment: t("Environment") }));
+  return words.get(p) ?? p; // a value the API adds before this table does
+};
+
 const PROCESSING = "processing";
 
 const en = translator("en");
 interface Range { from: string; to: string }
 export interface ApiInvoice { id: string; version: number; number: string; amountMinor: number; currency: Currency; contractId: string; contractVersion: number; period: Range; dueAt: string; status: "unpaid" | "processing" | "paid"; paymentMethod: string | null; paymentStatus: string | null; paidAt: string | null }
-export interface ApiPayment { id: string; version: number; amountMinor: number; currency: Currency; invoiceId: string; method: string | null; status: "initiated" | "processing" | "confirmed" | "failed"; paymentReference: string | null; confirmedAt: string | null; confirmationReason: string | null }
+export interface ApiPayment { id: string; version: number; amountMinor: number; currency: Currency; invoiceId: string; method: string | null; channel: "demo" | "stripe_checkout" | "manual"; status: "initiated" | "processing" | "confirmed" | "failed" | "expired"; paymentReference: string | null; confirmedAt: string | null; confirmationReason: string | null }
 export type ApiInvoiceDetail = ApiInvoice & { paymentRefs: ApiPayment[]; restrictionIds: string[] };
 export interface ApiContract { id: string; version: number; customerId: string; customerOrgId: string; unitIds: string[]; planType: string; startAt: string; endAt: string; priceMinor: number; currency: Currency; restrictionEligible: boolean }
 export interface ApiCustomer { id: string; name: string; organizationId: string; status: string }
@@ -74,9 +80,11 @@ const methodName = (m: string | null, t: T) => {
   if (m === "demo_debit_card") return t("Debit card");
   return m;
 };
+/** The channel of a payment taken on Stripe's hosted page (DEC-68). */
+const STRIPE_CHECKOUT = "stripe_checkout";
 /** A payment's status as the screen words it; another code stays as it is. */
 export const paymentWord = (s: string, t: T = en) => {
-  const words = new Map(Object.entries({ initiated: t("initiated"), processing: t(PROCESSING), confirmed: t("confirmed"), failed: t("failed") }));
+  const words = new Map(Object.entries({ initiated: t("initiated"), processing: t(PROCESSING), confirmed: t("confirmed"), failed: t("failed"), expired: t("expired") }));
   return words.get(s) ?? s; // a value the API adds before this table does
 };
 
@@ -104,7 +112,7 @@ export function invoiceRows(invoices: ApiInvoice[], contracts: ApiContract[], cu
       amt: money(i.amountMinor, i.currency),
       amountMinor: i.amountMinor,
       currency: i.currency,
-      meta: `${(k && customer.get(k.customerId)) ?? t("customer")} · ${k ? t("{plan} contract v{version}", { plan: k.planType, version: i.contractVersion }) : i.contractId} · ${billingMonth(i.period.from, locale)}`,
+      meta: `${(k && customer.get(k.customerId)) ?? t("customer")} · ${k ? t("{plan} contract v{version}", { plan: planWord(k.planType, t), version: i.contractVersion }) : i.contractId} · ${billingMonth(i.period.from, locale)}`,
       method: paymentState ? `${name} · ${paymentState}` : name,
       methodName: name,
       customerId: k?.customerId ?? "",
@@ -121,16 +129,19 @@ export function invoiceRows(invoices: ApiInvoice[], contracts: ApiContract[], cu
 export function totals(rows: InvoiceRow[], statuses: InvoiceStatus[]): string {
   const by = new Map<string, number>();
   for (const r of rows) if (statuses.includes(r.st)) by.set(r.currency, (by.get(r.currency) ?? 0) + r.amountMinor);
+  // nothing in these statuses: zero in the scope's currencies, so the tile reads like its neighbours (UI/UX loop R81)
+  if (by.size === 0) for (const r of rows) by.set(r.currency, 0);
   return by.size === 0 ? "0.00" : [...by].map(([c, m]) => money(m, c)).join(" · ");
 }
 
 export function invoiceDetail(d: ApiInvoiceDetail, t: T = en): InvoiceDetail {
-  const processing = d.paymentRefs.find((p) => p.status === PROCESSING);
+  // HQ confirms a processing demo payment by hand; a Stripe one is confirmed only by its webhook (DEC-68, IR827)
+  const processing = d.paymentRefs.find((p) => p.status === PROCESSING && p.channel !== STRIPE_CHECKOUT);
   return {
     id: d.id, version: d.version, processingPaymentId: processing?.id ?? null, processingPaymentVersion: processing?.version ?? null,
     payments: d.paymentRefs.map((p) => {
       return [
-        methodName(p.method, t) ?? t("No method (recorded by HQ)"), paymentWord(p.status, t), p.paymentReference && t("ref {ref}", { ref: p.paymentReference }),
+        methodName(p.method, t) ?? t(p.channel === STRIPE_CHECKOUT ? "Stripe Checkout" : "No method (recorded by HQ)"), paymentWord(p.status, t), p.paymentReference && t("ref {ref}", { ref: p.paymentReference }),
         p.confirmationReason && t("reason “{reason}”", { reason: p.confirmationReason }),
       ].filter(Boolean).join(" · ");
     }),
@@ -154,7 +165,7 @@ export function inquiryRows(inquiries: ApiInquiry[], customers: ApiCustomer[], i
 
 export function contractOptions(contracts: ApiContract[], customers: ApiCustomer[], t: T = en): ContractOption[] {
   const customer = new Map(customers.map((c) => [c.id, c.name]));
-  return contracts.map((k) => ({ id: k.id, version: k.version, label: `${customer.get(k.customerId) ?? t("customer")} · ${k.planType} · ${money(k.priceMinor, k.currency)}`, priceMinor: k.priceMinor, currency: k.currency }));
+  return contracts.map((k) => ({ id: k.id, version: k.version, label: `${customer.get(k.customerId) ?? t("customer")} · ${planWord(k.planType, t)} · ${money(k.priceMinor, k.currency)}`, priceMinor: k.priceMinor, currency: k.currency }));
 }
 
 /** PayoutStatement of service-contracts.ts. */

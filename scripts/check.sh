@@ -46,7 +46,7 @@ run_job() {
 
 web="cd service/web"
 # the apps' lint and typecheck both run `next typegen` into the app's own .next: one job each, one after the other
-for app in customer partner technician admin; do
+for app in customer partner technician admin portal; do
   job "web $app" "$web && npm run lint --workspace=$app && npm run typecheck --workspace=$app"
 done
 job "web shared" "$web && npm run lint --workspace=shared && npm run typecheck --workspace=shared"
@@ -57,7 +57,8 @@ job "go" "cd service/api && { test -z \"\$(gofmt -l .)\" || { gofmt -l .; exit 1
 # one command per line: under set -e a failure on the left of && does not stop the script (IR505); the contract check
 # uses the workspace's TypeScript, as CI's validator job does
 job "docs" "sh docker/mosquitto/passwd.test.sh && python3 docs/tools/validate_documents.py --tsc service/web/node_modules/typescript/lib/tsc.js \
-  && python3 docs/tools/check_review_regressions.py"
+  && python3 docs/tools/check_review_regressions.py \
+  && python3 -m unittest deploy/test/test_realm.py deploy/load/test_realm.py deploy/load/test_iot_check.py docker/keycloak/test_themes.py"   # the realm copies, the IoT run judge and the sign-in themes, as CI's other-lint job
 
 [ "${CHECK_SERIAL:-}" = 1 ] || { step "waiting for $count jobs"; wait; }
 

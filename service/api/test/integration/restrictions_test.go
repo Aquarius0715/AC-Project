@@ -24,6 +24,7 @@ const (
 	fieldPolicy            = "policy"
 	projectionRelease      = "release"
 	statusNotApplied       = "not_applied"
+	statusNotRequired      = "not_required"
 	statusSentUnknown      = "sent_unknown"
 	statusWaitingReconcile = "waiting_reconcile"
 )
@@ -210,15 +211,16 @@ func TestRestrictionLifecycle(t *testing.T) {
 	units := []string{online, offline}
 	key, inv := overdueContract(t, srv, online, offline)
 	refused := map[string]string{ // the field each VALIDATION case is refused for
-		caseBlankReason:      refusedReasonLength,
-		caseDuplicateUnit:    refusedUnitIDsInvalid,
-		"missing cause":      "causeInvoiceIds=errors.cause_invoices_mismatch",
-		"notice under 24h":   "executeAfter=errors.notice_24h",
-		"power off setpoint": "policy=error.invalid",
-		"rules mismatch":     "rulesVersion=errors.rules_version_mismatch",
-		"setpoint off step":  "policy=errors.setpoint_out_of_range",
-		"setpoint too low":   "policy=errors.setpoint_out_of_range",
-		"unit not in deal":   "unitIds=errors.unit_not_in_contract",
+		caseBlankReason:       refusedReasonLength,
+		caseDuplicateUnit:     refusedUnitIDsInvalid,
+		"missing cause":       "causeInvoiceIds=errors.cause_invoices_mismatch",
+		"notice under 24h":    "executeAfter=errors.notice_24h",
+		"power off setpoint":  "policy=error.invalid",
+		"unknown policy kind": "policy=error.invalid",
+		"rules mismatch":      "rulesVersion=errors.rules_version_mismatch",
+		"setpoint off step":   "policy=errors.setpoint_out_of_range",
+		"setpoint too low":    "policy=errors.setpoint_out_of_range",
+		"unit not in deal":    "unitIds=errors.unit_not_in_contract",
 	}
 
 	for name, testCase := range map[string]struct {
@@ -234,12 +236,13 @@ func TestRestrictionLifecycle(t *testing.T) {
 		"setpoint too low": {map[string]string{fieldPolicy: `{"kind":"temperature_limit","minimumCoolingSetpoint":15}`}, 422},
 		"setpoint off step": {map[string]string{fieldPolicy: `{"kind":"temperature_limit",` +
 			`"minimumCoolingSetpoint":24.5}`}, 422},
-		"power off setpoint": {map[string]string{fieldPolicy: `{"kind":"power_off","minimumCoolingSetpoint":24}`}, 422},
-		"unit not in deal":   {map[string]string{fieldUnitIDs: `["` + seed.ID("unit-online-rto").String() + `"]`}, 422},
-		caseDuplicateUnit:    {map[string]string{fieldUnitIDs: `["` + online + `","` + online + `"]`}, 422},
-		caseBlankReason:      {map[string]string{fieldReason: `"  "`}, 422},
-		"stale contract":     {map[string]string{fieldExpectedContractVersion: "2"}, 409},
-		"unknown contract":   {map[string]string{fieldContractID: `"` + uuid.NewString() + `"`}, 404},
+		"power off setpoint":  {map[string]string{fieldPolicy: `{"kind":"power_off","minimumCoolingSetpoint":24}`}, 422},
+		"unknown policy kind": {map[string]string{fieldPolicy: `{"kind":"shutdown"}`}, 422},
+		"unit not in deal":    {map[string]string{fieldUnitIDs: `["` + seed.ID("unit-online-rto").String() + `"]`}, 422},
+		caseDuplicateUnit:     {map[string]string{fieldUnitIDs: `["` + online + `","` + online + `"]`}, 422},
+		caseBlankReason:       {map[string]string{fieldReason: `"  "`}, 422},
+		"stale contract":      {map[string]string{fieldExpectedContractVersion: "2"}, 409},
+		"unknown contract":    {map[string]string{fieldContractID: `"` + uuid.NewString() + `"`}, 404},
 	} {
 		code, res := write(
 			srv,
@@ -468,7 +471,7 @@ func TestRestrictionLifecycle(t *testing.T) {
 	}
 
 	for _, e := range asArr(t, items(t, resp)[0]["events"]) {
-		if ev := asObj(t, e); ev["actorId"] != "masked" || ev["actorName"] != nil ||
+		if ev := asObj(t, e); ev["actorId"] != valueMasked || ev["actorName"] != nil ||
 			ev["reason"] != nil {
 			t.Errorf("unmasked event %v", ev)
 		}
@@ -513,7 +516,7 @@ func TestRestrictionLifecycle(t *testing.T) {
 	if onlineState["releaseState"] != statusRequested ||
 		len(asArr(t, onlineState["releaseCommandIds"])) != 1 ||
 		off["applyState"] != statusNotApplied ||
-		off["releaseState"] != "not_required" {
+		off["releaseState"] != statusNotRequired {
 		t.Fatalf("release eval: %v %v", onlineState, off)
 	}
 
@@ -567,13 +570,26 @@ func TestRestrictionCancelAndPayment(t *testing.T) {
 	)
 
 	restrictionID := asStr(t, data(resp)["id"])
-	if code, res := write(
+	// a stale version is refused and leaves the restriction scheduled
+	code, res := write(
+		srv,
+		restrMgr(),
+		"restrictions.cancel",
+		`{"restrictionId":"`+restrictionID+`","reason":"mistake"}`,
+		2,
+	)
+	if code != 409 || res["messageKey"] != apperr.KeyVersionConflict {
+		t.Fatalf("cancel stale version: %d %v", code, res)
+	}
+
+	code, res = write(
 		srv,
 		restrMgr(),
 		"restrictions.cancel",
 		`{"restrictionId":"`+restrictionID+`","reason":"mistake"}`,
 		1,
-	); code != 200 ||
+	)
+	if code != 200 ||
 		data(res)["state"] != statusCancelled {
 		t.Fatalf("cancel scheduled: %d %v", code, res)
 	}
@@ -683,7 +699,7 @@ func TestRestrictionCancelAndPayment(t *testing.T) {
 		t.Fatalf("applied: %v", resp)
 	}
 	// payment of all causes → release_requested with a remove command (IR35 ①); expiry → release failed
-	code, resp := write(
+	code, resp = write(
 		srv,
 		restrMgr(),
 		"payments.recordManual",
@@ -874,6 +890,28 @@ func TestRestrictionExceptionReleaseRetry(t *testing.T) {
 	}
 
 	owner(t, `UPDATE billing.invoices SET status = 'unpaid' WHERE id = $1`, inv)
+	// an apply retry rechecks the notice evidence like execute (IR191)
+	owner(
+		t,
+		`UPDATE notify.notifications SET occurred_at = occurred_at - interval '1 hour' WHERE target->>'id' = $1`,
+		restrictionID,
+	)
+
+	if code, res := retry(
+		restrMgr(),
+		"apply",
+		"rules-1",
+		offline,
+	); code != 409 ||
+		res["messageKey"] != "errors.notice_invalid" {
+		t.Errorf("apply retry with altered notice evidence: %d %v", code, res)
+	}
+
+	owner(
+		t,
+		`UPDATE notify.notifications SET occurred_at = occurred_at + interval '1 hour' WHERE target->>'id' = $1`,
+		restrictionID,
+	)
 	owner(t, `UPDATE devices.devices SET connection = 'online' WHERE unit_id = $1`, offline)
 
 	code, resp := retry(restrMgr(), "apply", "rules-1", offline)
@@ -916,7 +954,7 @@ func TestRestrictionExceptionReleaseRetry(t *testing.T) {
 	if code, res := write(
 		srv,
 		restrMgr(),
-		"restrictions.defer",
+		opRestrictionsDefer,
 		deferBody(clock().Add(-time.Hour)),
 		ver(t, get()),
 	); code != 422 ||
@@ -927,7 +965,7 @@ func TestRestrictionExceptionReleaseRetry(t *testing.T) {
 	if code, res := write(
 		srv,
 		restrMgr(),
-		"restrictions.defer",
+		opRestrictionsDefer,
 		deferBody(clock().Add(100*24*time.Hour)),
 		ver(t, get()),
 	); code != 422 ||
@@ -938,7 +976,7 @@ func TestRestrictionExceptionReleaseRetry(t *testing.T) {
 	code, resp = write(
 		srv,
 		restrMgr(),
-		"restrictions.defer",
+		opRestrictionsDefer,
 		deferBody(clock().Add(48*time.Hour)),
 		ver(t, get()),
 	)
@@ -948,6 +986,29 @@ func TestRestrictionExceptionReleaseRetry(t *testing.T) {
 		unitState(t, resp, online)["releaseState"] != statusRequested ||
 		unitState(t, resp, offline)["releaseState"] != statusRequested {
 		t.Fatalf("defer: %d %v", code, resp)
+	}
+	// the grace is a state change the client sees (IR42), with the reason and the actor masked
+	_, clientView := post(
+		srv,
+		customerB(),
+		opRestrictionsForInvoice,
+		`{"invoiceId":"`+inv+`","query":{}}`,
+	)
+
+	deferEvents := 0
+
+	for _, item := range items(t, clientView) {
+		for _, raw := range asArr(t, item["events"]) {
+			event := asObj(t, raw)
+			if event["action"] == opRestrictionsDefer && event["reason"] == nil &&
+				event["actorId"] == valueMasked {
+				deferEvents++
+			}
+		}
+	}
+
+	if deferEvents != 1 {
+		t.Errorf("client sees the grace once: %v", clientView)
 	}
 
 	if code, again := write(
@@ -1033,7 +1094,7 @@ func TestRestrictionExceptionReleaseRetry(t *testing.T) {
 		t.Fatal("released after retry")
 	}
 
-	for _, operation := range []string{"restrictions.defer", "restrictions.exempt"} {
+	for _, operation := range []string{opRestrictionsDefer, "restrictions.exempt"} {
 		if code, _ := write(
 			srv,
 			restrMgr(),
@@ -1161,6 +1222,17 @@ func TestRestrictionOverrideReconcile(t *testing.T) {
 		t.Error("override without permission")
 	}
 
+	if code, stale := write(
+		srv,
+		overrider(),
+		"restrictions.override",
+		`{"restrictionId":"`+restrictionID+`","reason":"hardship"}`,
+		ver(t, get())-1,
+	); code != 409 ||
+		stale["messageKey"] != apperr.KeyVersionConflict {
+		t.Errorf("override with a stale version: %d %v", code, stale)
+	}
+
 	code, res = write(
 		srv,
 		overrider(),
@@ -1250,7 +1322,7 @@ func TestRestrictionReconcileNotApplied(t *testing.T) {
 		`{"invoiceId":"`+inv+`","query":{"filters":{"status":"release_requested"}}}`,
 	); len(items(t, res)) != 1 ||
 		asObj(t, items(t, res)[0]["exception"])["reason"] != nil ||
-		asObj(t, items(t, res)[0]["releaseIntent"])["actorMembershipId"] != "masked" {
+		asObj(t, items(t, res)[0]["releaseIntent"])["actorMembershipId"] != valueMasked {
 		t.Fatalf("client mask: %v", res)
 	}
 	// query catalog: contractId => contractId, status => state; the invoice is the path, not a filter
@@ -1297,7 +1369,7 @@ func TestRestrictionReconcileNotApplied(t *testing.T) {
 		ver(t, get()),
 	)
 	if code != 200 || data(resp)["state"] != statusReleased ||
-		unitState(t, resp, unit)["releaseState"] != "not_required" ||
+		unitState(t, resp, unit)["releaseState"] != statusNotRequired ||
 		unitState(t, resp, unit)["applyState"] != statusNotApplied {
 		t.Fatalf("reconcile not applied: %d %v", code, resp)
 	}
@@ -1530,6 +1602,34 @@ func TestRestrictionReconcilePaths(t *testing.T) {
 		`{"restrictionId":"`+id3+`","rulesVersion":"rules-1"}`,
 	)
 
+	// a device operation running on the unit holds the remove back (D04): the reconcile is refused, nothing is recorded
+	var device3 string
+	ownerScan(t, `SELECT id::text FROM devices.devices WHERE unit_id = $1`, []any{unit3}, &device3)
+
+	busyOp := uuid.NewString()
+	owner(
+		t,
+		`INSERT INTO devices.device_operations (id, tenant_id, device_id, unit_id, kind, status, expires_at)
+		VALUES ($1,$2,$3,$4,'check','running',$5)`,
+		busyOp,
+		seed.ID("tenant-a"),
+		device3,
+		unit3,
+		clock().Add(time.Hour),
+	)
+
+	if code, res := reconcile(id3, unit3, ver(t, get3())); code != 409 ||
+		res["messageKey"] != "errors.unit_busy" {
+		t.Fatalf("reconcile while a device operation runs: %d %v", code, res)
+	}
+
+	if state := unitState(t, get3(), unit3); state["releaseState"] != statusWaitingReconcile ||
+		state["applyState"] == statusApplied {
+		t.Errorf("a refused reconcile recorded the unit: %v", state)
+	}
+
+	owner(t, `DELETE FROM devices.device_operations WHERE id = $1`, busyOp)
+
 	code, resp := reconcile(id3, unit3, ver(t, get3()))
 	if code != 200 || unitState(t, resp, unit3)["applyState"] != statusApplied ||
 		unitState(t, resp, unit3)["releaseState"] != statusRequested ||
@@ -1604,6 +1704,76 @@ func TestRestrictionExplicitRelease(t *testing.T) {
 	)
 	if len(items(t, res)) != 1 {
 		t.Errorf("audit of the release: %v", items(t, res))
+	}
+}
+
+// rejectApply reports a restriction command as rejected by the device: the Command fails and CommandsEnded reaches
+// restrictions (D03), the restriction part of demo.trigger command_fail (no audit entry, no diagnostic run).
+func rejectApply(t *testing.T, commandID string, when time.Time) {
+	t.Helper()
+
+	ctx := context.Background()
+
+	conn, err := pgx.Connect(ctx, testDB("postgres"))
+	if err != nil {
+		t.Skip(err)
+	}
+	defer func() { _ = conn.Close(ctx) }()
+
+	id := uuid.MustParse(commandID)
+
+	beginErr := pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
+		_, execErr := tx.Exec(
+			ctx,
+			`UPDATE control.commands SET status = 'failed', failure_code = $2 WHERE id = $1 AND status IN ('requested','sent')`,
+			id,
+			codeDeviceRejected,
+		)
+		if execErr != nil {
+			return apperr.Wrap(execErr, "update control.commands")
+		}
+
+		return control.EndRestrictionCommands(ctx, tx, []uuid.UUID{id}, when)
+	})
+	if beginErr != nil {
+		t.Fatal(beginErr)
+	}
+
+	drainEvents(
+		t,
+	) // the device path is not an operation: apply the resulting events as the consumers would (IR185)
+}
+
+// TestRestrictionReleaseAfterRejectedApply (D03): a device that rejects the apply leaves the unit not_applied, and a
+// release then needs nothing from it: releaseState=not_required, no remove command, and the restriction is released.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
+func TestRestrictionReleaseAfterRejectedApply(t *testing.T) {
+	srv := server(t)
+	unit := boundUnit(t, srv, "online")
+	key, inv := overdueContract(t, srv, unit)
+	restrictionID, res := executed(t, srv, key, inv, []string{unit})
+
+	rejectApply(t, cmdOf(t, res, unit, "applyCommandIds"), clock())
+
+	_, got := post(srv, restrMgr(), "restrictions.get", `{"id":"`+restrictionID+`"}`)
+	if unitState(t, got, unit)["applyState"] != statusNotApplied {
+		t.Fatalf("rejected apply: %v", got)
+	}
+
+	owner(t, `UPDATE billing.invoices SET status = 'paid' WHERE id = $1`, inv)
+
+	code, resp := write(
+		srv,
+		restrMgr(),
+		"restrictions.release",
+		`{"restrictionId":"`+restrictionID+`"}`,
+		ver(t, got),
+	)
+	if code != 200 || data(resp)["state"] != statusReleased ||
+		unitState(t, resp, unit)["releaseState"] != statusNotRequired ||
+		len(asArr(t, unitState(t, resp, unit)["releaseCommandIds"])) != 0 {
+		t.Fatalf("release of a not-applied unit: %d %v", code, resp)
 	}
 }
 
@@ -1747,6 +1917,70 @@ func TestRestrictionEndsWhenItsInvoicesArePaidAtOnce(t *testing.T) {
 				state,
 			)
 		}
+	}
+}
+
+// R897: paying the cause invoice of a scheduled restriction cancels it as HQ's cancel and the execute-time check do
+// (RestrictionCancelled, units untouched): before, the payment published RestrictionReleaseRequested for a restriction
+// that was never applied and a RestrictionCommandsCancelled per unit for commands that never existed.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
+func TestScheduledRestrictionCancelledByPayment(t *testing.T) {
+	srv := server(t)
+	unit := boundUnit(t, srv, "online")
+	key, inv := overdueContract(t, srv, unit)
+
+	code, res := write(
+		srv,
+		restrMgr(),
+		"restrictions.schedule",
+		scheduleBody(key, inv, []string{unit}, nil),
+		0,
+	)
+	if code != 200 {
+		t.Fatalf("schedule: %d %v", code, res)
+	}
+
+	restrictionID := asStr(t, data(res)["id"])
+	_, invoice := post(srv, hq(), "invoices.get", `{"id":"`+inv+`"}`)
+
+	code, res = write(
+		srv,
+		hq(),
+		"payments.recordManual",
+		`{"invoiceId":"`+inv+`","paymentReference":"BANK-`+inv[:8]+`","confirmedAmountMinor":5000,"currency":"MYR",`+
+			`"reason":"bank transfer seen"}`,
+		ver(t, invoice),
+	)
+	if code != 200 {
+		t.Fatalf("payment: %d %v", code, res)
+	}
+
+	var state, applied, released, published string
+
+	ownerScan(
+		t,
+		`SELECT r.state, ru.apply_state, ru.release_state, (SELECT string_agg(o.event_type, ',' ORDER BY o.event_type)
+			FROM platform.outbox o WHERE o.aggregate_id = r.id AND o.event_type NOT LIKE 'RowChanged:%')
+		FROM restrictions.restrictions r JOIN restrictions.restriction_units ru ON ru.restriction_id = r.id WHERE r.id = $1`,
+		[]any{restrictionID},
+		&state,
+		&applied,
+		&released,
+		&published,
+	)
+
+	if state != statusCancelled || applied != "not_sent" || released != "none" {
+		t.Errorf(
+			"paid scheduled restriction: state %s, unit apply %s / release %s",
+			state,
+			applied,
+			released,
+		)
+	}
+
+	if published != "RestrictionCancelled,RestrictionScheduled" {
+		t.Errorf("events of the paid scheduled restriction: %s", published)
 	}
 }
 

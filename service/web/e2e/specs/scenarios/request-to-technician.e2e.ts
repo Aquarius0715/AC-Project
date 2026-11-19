@@ -5,17 +5,24 @@
 // so a run leaves one cancelled job. Starting the work needs the visit window, which only a jump of the
 // never-returning demo clock would reach, so the scenario stops here. The seed keeps tech-external-a on its own job
 // until 20 Sept (KL), so a visit before that would find them busy: the preferred times move after it (IR316).
-import type { Browser, Page } from "@playwright/test";
+import type { Browser, BrowserContext, Page } from "@playwright/test";
 import { test, expect } from "../../fixtures/test";
 import { APPS, type App } from "../../fixtures/apps";
 import { signIn } from "../../fixtures/auth";
 import { must } from "../../fixtures/must";
 
 const app = (id: App["id"]) => must(APPS.find((a) => a.id === id));
+// every context the test opens, closed after it whether it passed or failed
+const opened: BrowserContext[] = [];
 const open = async (browser: Browser, a: App, signedIn = true): Promise<Page> => {
   const context = await browser.newContext({ baseURL: a.url, viewport: { width: 1920, height: 1080 }, ...(signedIn && { storageState: a.state }) });
+  opened.push(context);
   return context.newPage();
 };
+
+test.afterEach(async () => {
+  await Promise.all(opened.splice(0).map((c) => c.close()));
+});
 
 test("a customer request reaches the partner's technician", async ({ browser }) => {
   test.setTimeout(240_000);
@@ -30,6 +37,7 @@ test("a customer request reaches the partner's technician", async ({ browser }) 
       const dialog = customer.getByRole("dialog");
       await dialog.getByLabel(/Symptoms/).fill("E2E scenario: water drips from the indoor unit.");
       await dialog.getByLabel(/Contact window/).fill("Weekdays 09:00-18:00");
+      await dialog.getByRole("combobox", { name: "Unit", exact: true }).selectOption({ index: 1 }); // no AC is preselected
       const selected = await dialog.getByRole("combobox", { name: "Unit", exact: true }).evaluate((s: HTMLSelectElement) => s.selectedOptions[0]?.text ?? "");
       unitName = selected.split(" · ", 1)[0] ?? "";
       expect(unitName).not.toBe("");

@@ -50,7 +50,15 @@ async function AdminEnergyPageContent({ searchParams }: Readonly<PageProps<"/adm
   ]);
   const i = i18nOf(display);
   const customerOfOrg = new Map(customers.items.map((c) => [c.organizationId, c.id]));
-  const unitOptions = units.items.filter((u) => !u.archived).map((u) => ({ id: u.id, label: u.displayName, customerId: customerOfOrg.get(u.customerOrgId) ?? "", propertyId: u.propertyId }));
+  // units in customer › property › name order, so a customer's ACs sit together in the chips and the select instead of
+  // the database order mixing customers (UI/UX loop R138)
+  const customerName = new Map(customers.items.map((c) => [c.organizationId, c.name]));
+  const propertyName = new Map(properties.items.map((p) => [p.id, p.name]));
+  const customerOf = (u: Unit) => customerName.get(u.customerOrgId) ?? "";
+  const propertyOf = (u: Unit) => propertyName.get(u.propertyId) ?? "";
+  const byPlace = (x: Unit, y: Unit) => customerOf(x).localeCompare(customerOf(y)) || propertyOf(x).localeCompare(propertyOf(y)) || x.displayName.localeCompare(y.displayName);
+  const unitOptions = units.items.filter((u) => !u.archived).toSorted(byPlace)
+    .map((u) => ({ id: u.id, label: u.displayName, customerId: customerOfOrg.get(u.customerOrgId) ?? "", propertyId: u.propertyId }));
   const scope = { customerId: one("customerId"), propertyId: one("propertyId"), unitId: one("unitId") };
   const live: EnergyLive = {
     tab,

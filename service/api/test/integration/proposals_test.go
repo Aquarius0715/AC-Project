@@ -206,6 +206,11 @@ func TestSlotProposals(t *testing.T) {
 		t.Error("other customer responds")
 	}
 
+	if code, res := respond(customerA(), job, proposal1, `"decision":"accept"`, 1); code != 409 ||
+		res["messageKey"] != apperr.KeyVersionConflict {
+		t.Errorf("respond with a stale version: %d %v", code, res)
+	}
+
 	if code, res := respond(
 		customerA(),
 		job,
@@ -479,6 +484,40 @@ func TestPartnerProposalsAndReschedule(t *testing.T) {
 		2,
 	); code != 404 {
 		t.Error("other contractor")
+	}
+
+	// a candidate time of the offer needs no proposal: the contractor assigns it directly (IR636 item 6)
+	if code, res := proposePartner(
+		contrA(),
+		slotJSON(49, 2),
+		"tech-external-a",
+		"busy",
+		2,
+	); code != 422 ||
+		fields(res) != "slot=errors.slot_is_preferred" {
+		t.Errorf("partner proposal of a candidate time: %d %s", code, fields(res))
+	}
+
+	// the proposed technician must be qualified for the slot: revoke the grants for the check, then restore them
+	revokedMark := time.Date(2001, 2, 3, 4, 5, 6, 0, time.UTC)
+	owner(
+		t,
+		`UPDATE identity.qualification_grants SET revoked_at = $2 WHERE membership_id = $1 AND revoked_at IS NULL`,
+		seed.ID("tech-external-a"),
+		revokedMark,
+	)
+
+	code, res := proposePartner(contrA(), slotJSON(101, 2), "tech-external-a", "busy", 2)
+
+	owner(
+		t,
+		`UPDATE identity.qualification_grants SET revoked_at = NULL WHERE membership_id = $1 AND revoked_at = $2`,
+		seed.ID("tech-external-a"),
+		revokedMark,
+	)
+
+	if code != 403 || res["messageKey"] != "errors.qualification_missing" {
+		t.Errorf("partner proposal of an unqualified technician: %d %v", code, res)
 	}
 
 	if code, res := proposePartner(
@@ -786,6 +825,17 @@ func TestPartnerProposalsAndReschedule(t *testing.T) {
 	); code != 422 ||
 		fields(res) != "preferredSlots=error.slotRules" {
 		t.Errorf("reschedule to a time today: %d %s", code, fields(res))
+	}
+
+	if code, res := write(
+		srv,
+		customerA(),
+		"jobs.requestReschedule",
+		`{"jobId":"`+planJob+`","preferredSlots":`+three+`}`,
+		1,
+	); code != 409 ||
+		res["messageKey"] != apperr.KeyVersionConflict {
+		t.Errorf("reschedule with a stale version: %d %v", code, res)
 	}
 
 	if code, res := write(

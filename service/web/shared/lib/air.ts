@@ -6,9 +6,9 @@
 import { periodRange } from "@ac/web/lib/clientEnergy";
 import { evidenceText } from "@ac/web/lib/evidence";
 import { roundAway } from "@ac/web/lib/energy";
-import { toggleSeries, unitAxes } from "@ac/web/lib/chartScale";
+import { unitAxes } from "@ac/web/lib/chartScale";
 import { spacePath, type ApiPropertyRow, type ApiSpaceRow, type ApiUnitRow } from "@ac/web/lib/assets";
-import { DEFAULT_DISPLAY, EN, relativeTime, showClock, showDate, showDay, showSpan, translator, type Display, type I18n, type T } from "@ac/web/lib/i18n";
+import { DEFAULT_DISPLAY, EN, relativeTime, showClock, showDate, showDay, showRecent, showSpan, showTime, translator, type Display, type I18n, type T } from "@ac/web/lib/i18n";
 import type { IconName } from "@ac/web/components/Icon";
 import { entryOf, lookup } from "@ac/web/lib/lookup";
 
@@ -94,7 +94,8 @@ export function airSelection(rooms: AirRoom[], unitId?: string, spaceId?: string
 suspect reading is never shown as a current normal value (D07); humidity 0 is a measured zero. */
 export interface MetricCard {
   metric: AirMetric; label: string; unit: string; value: string | null;
-  feed: { text: string; tone: Tone; icon: IconName }; status: { text: string; tone: Tone; icon: IconName }; sub: string; advice: string; warn: boolean;
+  /** status is the reading against its guide; null when there is no current reading (the feed badge says why) */
+  feed: { text: string; tone: Tone; icon: IconName }; status: { text: string; tone: Tone; icon: IconName } | null; sub: string; advice: string; warn: boolean;
 }
 const reasonText: Record<string, string> = { unit_mismatch: "unit mismatch", non_finite: "not a number", out_of_range: "out of range", invalid_time: "invalid time" };
 const originText: Record<string, string> = { estimated: "estimated", inspection: "inspection" };
@@ -125,11 +126,13 @@ export function metricCard(metric: AirMetric, m: ApiMeasurement | undefined, has
   const setpoint = setsTemperature ? "Setpoint is on Unit Control" : "Set on the AC itself";
   const noAdvice = t(noAdviceText(metric, setpoint), { metric: label });
   const unavailable = (sub: string, feed?: MetricCard["feed"]): MetricCard =>
-    ({ metric, label, unit, sub, feed: feed ?? { text: t("Unavailable"), tone: "unknown", icon: "offline" }, value: null, status: { text: t("Not measured"), tone: "muted", icon: "dot" }, advice: noAdvice, warn: false });
+    ({ metric, label, unit, sub, feed: feed ?? { text: t("Unavailable"), tone: "unknown", icon: "offline" }, value: null, status: null, advice: noAdvice, warn: false });
   if (!hasSensor) return unavailable(t("No {metric} sensor on this model", { metric: label }), { text: t("Unsupported"), tone: "muted", icon: UNSUPPORTED });
   if (!m) return unavailable(t("No reading yet"));
   const at = showClock(m.observedAt, display);
-  if (m.quality === "stale") return unavailable(m.value === null ? t("No reading since {time}", { time: at }) : t("No reading since {time} (last {value} {unit})", { time: at, value: airNumber(metric, m.value), unit }));
+  // a stale reading is from an earlier hour or day: with the date, so 10:54 pm yesterday does not read as after “Updated 9:56 pm”
+  const since = showTime(m.observedAt, display);
+  if (m.quality === "stale") return unavailable(m.value === null ? t("No reading since {time}", { time: since }) : t("No reading since {time} (last {value} {unit})", { time: since, value: airNumber(metric, m.value), unit }));
   if (m.quality === "suspect") {
     return {
       metric, label, unit, value: m.value === null ? null : airNumber(metric, m.value), feed: { text: t("Suspect"), tone: "warn", icon: "alert" },
@@ -192,7 +195,7 @@ export function cleanNote(g: Guidance[], pm25: ApiMeasurement | undefined, room:
 
 /** The allergen strip (IR98): an observation needs substance, source, time and evidence, a number also its unit; missing
 or unsupported data never reads as “no allergens”, and nothing is derived from PM2.5. */
-export function allergenView(a: ApiAllergen | null, i: I18n = EN): { title: string; badge: { text: string; tone: Tone; icon: IconName }; text: string } {
+export function allergenView(a: ApiAllergen | null, i: I18n = EN, nowMs?: number): { title: string; badge: { text: string; tone: Tone; icon: IconName }; text: string } {
   const { t, display } = i;
   const title = t("Allergen");
   if (!a) return { title, badge: { text: t("Unknown"), tone: "unknown", icon: "unknown" }, text: t("No observation for this selection — this does not mean “no allergens”.") };
@@ -202,7 +205,7 @@ export function allergenView(a: ApiAllergen | null, i: I18n = EN): { title: stri
   const value = a.value === null ? [] : [a.unit ? `${String(a.value)} ${a.unit}` : t("Value unknown (no unit)")];
   return {
     title: t("Allergen ({substance})", { substance: a.substance }), badge: { text: t("Detected"), tone: "warn", icon: "warning" },
-    text: [...value, t("Source: {source}", { source: a.sourceLabel }), showClock(a.observedAt, display), evidenceText(a.evidenceText, t)].join(" · "),
+    text: [...value, t("Source: {source}", { source: a.sourceLabel }), nowMs === undefined ? showClock(a.observedAt, display) : showRecent(a.observedAt, nowMs, display), evidenceText(a.evidenceText, t)].join(" · "),
   };
 }
 
@@ -229,17 +232,17 @@ export function windowSub(w: AirWindow, unit: string, room: string, i: I18n = EN
   return `${unit} · ${room} · ${span}`;
 }
 
-/** The metrics the URL's `metric` names ("co2,pm25"; a single name is the old form of the link): the known ones, each once,
-and no more than a chart has axes for — one unit on the left axis, another on the right, a third is left out (IR689). CO2
-when none is left. */
+/** The metrics the URL's `metric` names ("co2,pm25"; a single name is the old form of the link): the known ones, each once —
+all four may be shown at once (IR793). CO2 when none is left. */
 export function airMetricsOf(text = ""): AirMetric[] {
   const named = [...new Set(text.split(",").filter((m): m is AirMetric => (airMetrics as string[]).includes(m)))];
-  const axes = unitAxes(named.map((m) => entryOf(metricInfo, m).unit));
-  const fits = named.filter((m) => axes.has(entryOf(metricInfo, m).unit));
-  return fits.length > 0 ? fits : ["co2"];
+  return named.length > 0 ? named : ["co2"];
 }
-/** The selection after a metric is pressed: taken out (never the last one) or put in; null when its unit would be a third on a chart with two axes. */
-export const toggleAirMetric = (selected: AirMetric[], metric: AirMetric): AirMetric[] | null => toggleSeries(selected, metric, (m) => entryOf(metricInfo, m).unit);
+/** The selection after a metric is pressed: taken out (never the last one) or put in. */
+export const toggleAirMetric = (selected: AirMetric[], metric: AirMetric): AirMetric[] => {
+  if (!selected.includes(metric)) return [...selected, metric];
+  return selected.length > 1 ? selected.filter((m) => m !== metric) : selected;
+};
 /** The heading of each slot in the chart's tooltip: its span in the display time zone ("Mon 9 Nov, 15:00 – 15:05 MYT"). */
 export function slotHeadings(slots: AirSlot[], slotMs: number, i: I18n = EN): string[] {
   return slots.map((s) => showSpan(s.start, new Date(Date.parse(s.start) + slotMs).toISOString(), i.display, true));
@@ -255,6 +258,12 @@ export function airChartSeries(metrics: AirMetric[], series: Partial<Record<AirM
     const points = (got?.slots ?? []).map((s) => s.avg);
     return { metric, points, name: i.t(info.label), unit: info.unit, guide: info.guide, axis: axes.get(info.unit) ?? "left", hasSensor: sensors.has(metric), valid: points.some((p) => p !== null), readings: got?.total ?? 0 };
   });
+}
+/** The charts of the selected lines: one or two units share a chart (the first unit on the left axis, the second on the right);
+three or more would need more axes than a chart has, so each line gets a chart of its own on the same time axis (IR793). */
+export function airChartGroups(lines: AirChartSeries[]): AirChartSeries[][] {
+  if (new Set(lines.map((l) => l.unit)).size <= 2) return lines.length > 0 ? [lines] : [];
+  return lines.map((l) => [{ ...l, axis: "left" }]);
 }
 
 /** The averages of valid readings per slot of the window (null = no valid reading: a gap the chart never joins). */

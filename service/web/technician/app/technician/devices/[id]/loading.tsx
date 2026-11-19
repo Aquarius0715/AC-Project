@@ -1,5 +1,5 @@
 import { RouteLoading } from "@ac/web/components/RouteStates";
 
 export default function Loading() {
-  return <RouteLoading what="devices" />;
+  return <RouteLoading what="devices" variant="detail" />;
 }

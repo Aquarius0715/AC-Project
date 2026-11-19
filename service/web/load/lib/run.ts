@@ -89,5 +89,10 @@ export function watched(): Record<string, string[]> {
 
 /** Writes the report to the console and the whole data to /out/summary.json (the workflow keeps it). */
 export function handleSummary(data: unknown): Record<string, string> {
-  return { stdout: report(data), "/out/summary.json": JSON.stringify(data, null, 2) };
+  return { stdout: report(data, true), "/out/summary.json": JSON.stringify(data, null, 2) };
+}
+
+/** handleSummary of a scenario of fixed size (smoke, web-smoke): the report never calls it shortened. */
+export function fixedSummary(data: unknown): Record<string, string> {
+  return { stdout: report(data, false), "/out/summary.json": JSON.stringify(data, null, 2) };
 }

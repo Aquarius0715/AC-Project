@@ -63,23 +63,28 @@ export function Badge({ tone = "muted", icon, children, className }: Readonly<{ 
   );
 }
 
-// the state badges speak the display language (IR258); the state values themselves stay as stored
+// the state badges speak the display language (IR258); the state values themselves stay as stored. The power and the
+// connection badge stand side by side, so each names what it describes: a hidden "Power state:" / "Connection:" for screen
+// readers, and an unknown state says which one is unknown ("Unknown" twice read as one state).
 export function PowerBadge({ s }: Readonly<{ s: "running" | "stopped" | "unknown" }>) {
   const t = useT();
+  const what = <span className="sr-only">{t("Power state")}: </span>;
   switch (s) {
-    case "running": { return <Badge tone="ok" icon="running">{t("Running")}</Badge>; }
-    case "stopped": { return <Badge tone="muted" icon="stopped">{t("Stopped")}</Badge>; }
-    case "unknown": { return <Badge tone="unknown" icon="unknown">{t("Unknown")}</Badge>; }
+    case "running": { return <Badge tone="ok" icon="running">{what}{t("Running")}</Badge>; }
+    case "stopped": { return <Badge tone="muted" icon="stopped">{what}{t("Stopped")}</Badge>; }
+    case "unknown": { return <Badge tone="unknown" icon="unknown">{what}{t("Power unknown")}</Badge>; }
   }
 }
-export function ConnBadge({ s }: Readonly<{ s: "online" | "offline" | "connecting" | "unknown" | "error" }>) {
+// offlineTone: the technician app shows Offline as something to act on (red), like its filter chips and tiles (UI/UX loop R50)
+export function ConnBadge({ s, offlineTone = "unknown" }: Readonly<{ s: "online" | "offline" | "connecting" | "unknown" | "error"; offlineTone?: "unknown" | "crit" }>) {
   const t = useT();
+  const what = <span className="sr-only">{t("Connection")}: </span>;
   switch (s) {
-    case "online": { return <Badge tone="ok" icon="online">{t("Online")}</Badge>; }
-    case "offline": { return <Badge tone="unknown" icon="offline">{t("Offline")}</Badge>; }
-    case "error": { return <Badge tone="crit" icon="error">{t("Error")}</Badge>; }
-    case "unknown": { return <Badge tone="unknown" icon="unknown">{t("Unknown")}</Badge>; }
-    case "connecting": { return <Badge tone="primary" icon="refresh">{t("Connecting")}</Badge>; }
+    case "online": { return <Badge tone="ok" icon="online">{what}{t("Online")}</Badge>; }
+    case "offline": { return <Badge tone={offlineTone} icon="offline">{what}{t("Offline")}</Badge>; }
+    case "error": { return <Badge tone="crit" icon="error">{what}{t("Error")}</Badge>; }
+    case "unknown": { return <Badge tone="unknown" icon="unknown">{what}{t("Connection unknown")}</Badge>; }
+    case "connecting": { return <Badge tone="primary" icon="refresh">{what}{t("Connecting")}</Badge>; }
   }
 }
 export function SeverityBadge({ s }: Readonly<{ s: "critical" | "warning" | "normal" }>) {
@@ -128,6 +133,9 @@ export function Page({ children, className, narrow }: Readonly<{ children: React
   return <div className={cx("page mx-auto flex w-full flex-col gap-4", narrow ? "max-w-[640px]" : "max-w-[1280px]", className)}>{children}</div>;
 }
 
+/** Whether a component sits inside a Card, whose title is the h2 its own headings go under. */
+const InCard = createContext(false);
+
 /** A card: the shadcn/ui Card. The title stays a level-2 heading; `pad={false}` lets a table reach the edges; the
 overflow stays visible for the menus that still open inside a card. */
 export function Card({ title, sub, action, children, className, pad = true, tone }: Readonly<{ title?: React.ReactNode; sub?: React.ReactNode; action?: React.ReactNode; children?: React.ReactNode; className?: string; pad?: boolean; tone?: "crit" | "warn" | "ok" }>) {
@@ -144,7 +152,7 @@ export function Card({ title, sub, action, children, className, pad = true, tone
           {hasContent(action) && <CardAction className="self-start">{action}</CardAction>}
         </CardHeader>
       )}
-      <CardContent className={cn("min-w-0", !pad && "px-0")}>{children}</CardContent>
+      <CardContent className={cn("min-w-0", !pad && "px-0")}><InCard.Provider value>{children}</InCard.Provider></CardContent>
     </UICard>
   );
 }
@@ -229,11 +237,13 @@ export function Banner({ tone = "primary", icon, children, action }: Readonly<{ 
 
 /** No rows, a failed read, no connection: the shadcn/ui Empty. The title stays a level-3 heading. */
 export function EmptyState({ title, children, action }: Readonly<{ title: string; children?: React.ReactNode; action?: React.ReactNode }>) {
+  // under a card's h2 the title is an h3; on its own below the page heading an h2, so no heading level is skipped (UI/UX loop R73)
+  const Heading = useContext(InCard) ? "h3" : "h2";
   return (
     <Empty className="border bg-card">
       <EmptyHeader>
         <EmptyMedia variant="icon"><Icon name="info" /></EmptyMedia>
-        <EmptyTitle><h3>{title}</h3></EmptyTitle>
+        <EmptyTitle><Heading>{title}</Heading></EmptyTitle>
         {hasContent(children) && <EmptyDescription>{children}</EmptyDescription>}
       </EmptyHeader>
       {hasContent(action) && <EmptyContent>{action}</EmptyContent>}
@@ -407,21 +417,29 @@ export function QrCode({ qr, label, className }: Readonly<{ qr: { size: number; 
 /** A checkbox with its label: the shadcn/ui Checkbox, 20 px so the lists' targets keep 24 px apart (WCAG 2.5.8, IR360). */
 export function Check({ label, checked, onChange, disabled }: Readonly<{ label: React.ReactNode; checked?: boolean; onChange?: (v: boolean) => void; disabled?: boolean }>) {
   return (
-    <label className="inline-flex items-center gap-2 text-[13px]">
+    // a disabled choice reads as one in its label too, not only in its box (UI/UX loop R80)
+    <label className={cx("inline-flex items-center gap-2 text-[13px]", disabled && "cursor-not-allowed text-muted-foreground")}>
       <Checkbox checked={checked} disabled={disabled} onCheckedChange={(v) => onChange?.(v)} className="size-5" />
       {label}
     </label>
   );
 }
-/** An on/off switch: the shadcn/ui Switch, named by `label`. */
-export function Toggle({ on, onChange, label, disabled }: Readonly<{ on: boolean; onChange: (v: boolean) => void; label?: string; disabled?: boolean }>) {
+/** An on/off switch: the shadcn/ui Switch, named by `label`: what it switches (the switch announces its
+state itself), so a list of switches can be told apart (R910). */
+export function Toggle({ on, onChange, label, disabled }: Readonly<{ on: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean }>) {
   return <Switch checked={on} onCheckedChange={(v) => { onChange(v); }} aria-label={label} disabled={disabled} />;
 }
-/** One choice of a few, shown as pressed buttons: the shadcn/ui ToggleGroup. The chosen one stays chosen when pressed again. */
-export function Choice<T extends string>({ options, value, onChange, disabled }: Readonly<{ options: { id: T; label: string }[]; value: T; onChange: (v: T) => void; disabled?: boolean }>) {
+// One choice of a few, shown as pressed buttons: the shadcn/ui ToggleGroup. The chosen one stays chosen when pressed again.
+// An option marked `soon` is shown as Coming soon and cannot be chosen, unless it is the current value (a saved rule keeps showing it).
+export function Choice<T extends string>({ options, value, onChange, disabled }: Readonly<{ options: { id: T; label: string; soon?: boolean }[]; value: T; onChange: (v: T) => void; disabled?: boolean }>) {
+  const t = useT();
   return (
-    <ToggleGroup value={[value]} disabled={disabled} onValueChange={(v) => { const next = options.find((o) => o.id === v.at(-1)); if (next && next.id !== value) onChange(next.id); }} variant="outline" className="flex-wrap">
-      {options.map((o) => <ToggleGroupItem key={o.id} value={o.id} className="px-3 text-[13px] font-semibold data-pressed:border-primary data-pressed:bg-primary-soft data-pressed:text-primary">{o.label}</ToggleGroupItem>)}
+    <ToggleGroup value={[value]} disabled={disabled} onValueChange={(v) => { const next = options.find((o) => o.id === v.at(-1)); if (next && next.id !== value && !next.soon) onChange(next.id); }} variant="outline" className="flex-wrap">
+      {options.map((o) => (
+        <ToggleGroupItem key={o.id} value={o.id} disabled={!!o.soon && o.id !== value} className="px-3 text-[13px] font-semibold data-pressed:border-primary data-pressed:bg-primary-soft data-pressed:text-primary">
+          {o.label}{o.soon && o.id !== value && <span className="ml-1.5 rounded-full bg-surface2 px-1.5 text-[11px] font-medium text-muted-foreground">{t("Coming soon")}</span>}
+        </ToggleGroupItem>
+      ))}
     </ToggleGroup>
   );
 }
@@ -598,7 +616,9 @@ function Cell<T>({ render, row }: { render: ((r: T) => React.ReactNode) | undefi
 record (`onRowClick`) is focusable and opens with Enter or Space as well as a click (keyboard access, IR294). */
 export function DataTable<T extends RowData>({ cols, rows, rowKey, onRowClick, selectedKey }: Readonly<{ cols: Col<T>[]; rows: T[]; rowKey: (r: T) => string; onRowClick?: (r: T) => void; selectedKey?: string }>) {
   const t = useT();
-  const columns = cols.map((c): ColumnDef<typeof tableFx, T> => ({ id: c.key, header: c.label, meta: { className: c.className, hideBelow: c.hideBelow } }));
+  // a column without a heading (a row's arrow or its buttons) still names itself to screen readers (UI/UX loop R72)
+  const actions = t("Actions");
+  const columns = cols.map((c): ColumnDef<typeof tableFx, T> => ({ id: c.key, header: c.label === "" ? () => <span className="sr-only">{actions}</span> : c.label, meta: { className: c.className, hideBelow: c.hideBelow } }));
   const renders = new Map(cols.map((c) => [c.key, c.render]));
   const table = useTable({ features: tableFx, data: rows, getRowId: (r) => rowKey(r), columns });
   return (
@@ -654,17 +674,30 @@ export function ListRow({ id, selected, onClick, href, children, className }: { 
 const axisTick = { fontSize: 10 };
 const defaultBarColors = ["#c9d8ee", "#005bea"];
 
-/** Grouped bars, one group per label. `names` name the series in the tooltip and the legend under the chart. */
-export function BarChart({ labels, series, names, unit, height = 160, colors = defaultBarColors }: Readonly<{ labels: string[]; series: number[][]; names?: string[]; unit?: string; height?: number; colors?: string[] }>) {
+/** A day label of a bar chart, with "no data" under it when no series has a value there (a missing reading is no bar, never 0). */
+function BarTick({ x, y, payload, missing }: Readonly<{ x?: number; y?: number; payload?: { value?: string; index?: number }; missing: ReadonlySet<number> }>) {
   const t = useT();
-  const max = Math.max(1, ...series.flat()) * 1.1;
+  return (
+    <text x={x} y={y} dy={10} textAnchor="middle" fontSize={10} className="fill-muted-foreground">
+      {payload?.value}
+      {payload?.index !== undefined && missing.has(payload.index) && <tspan x={x} dy={12} fontStyle="italic">{t("no data")}</tspan>}
+    </text>
+  );
+}
+
+/** Grouped bars, one group per label. `names` name the series in the tooltip and the legend under the chart; a null value
+is a missing reading: no bar, and "no data" under the label when every series misses it. */
+export function BarChart({ labels, series, names, unit, height = 160, colors = defaultBarColors }: Readonly<{ labels: string[]; series: (number | null)[][]; names?: string[]; unit?: string; height?: number; colors?: string[] }>) {
+  const t = useT();
+  const max = Math.max(1, ...series.flat().filter((v): v is number => v !== null)) * 1.1;
+  const missing = new Set(labels.map((_, i) => i).filter((i) => series.every((s) => (s.at(i) ?? null) === null)));
   const data = labels.map((label, i) => ({ label, ...Object.fromEntries(series.map((s, j) => [`s${String(j)}`, s.at(i)])) }));
   const config: ChartConfig = Object.fromEntries(series.map((_, j) => [`s${String(j)}`, { label: names?.at(j) ?? t("Value"), color: colors.at(j % colors.length) }]));
   return (
     <ChartContainer config={config} className="aspect-auto w-full" style={{ height: height + (names ? 28 : 0) }}>
       <RBarChart data={data} margin={{ top: unit ? 14 : 6, right: 4, bottom: 0, left: 0 }} title={t("Bar chart")}>
         <CartesianGrid vertical={false} />
-        <XAxis dataKey="label" tickLine={false} axisLine={false} tick={axisTick} interval={0} />
+        <XAxis dataKey="label" tickLine={false} axisLine={false} tick={<BarTick missing={missing} />} interval={0} height={missing.size > 0 ? 34 : 22} />
         <YAxis domain={[0, max]} ticks={[0, max / 2, max]} tickFormatter={(v: number) => (max < 10 ? v.toFixed(1) : String(Math.round(v)))} tickLine={false} axisLine={false} tick={axisTick} width={28} />
         {unit && <text x="100%" y={10} dx={-2} textAnchor="end" fontSize={10} className="fill-muted-foreground">{unit}</text>}
         <ChartTooltip cursor={false} content={<ChartTooltipContent labelFormatter={(v) => (unit ? <>{v} <span className="font-normal text-muted-foreground">· {unit}</span></> : v)} />} />
@@ -778,8 +811,8 @@ export function LineChart({ points = noPoints, series, times, min, max, threshol
 }
 
 const BAR_CLS = new Map<Tone, string>([["ok", "**:data-[slot=progress-indicator]:bg-ok"], ["warn", "**:data-[slot=progress-indicator]:bg-warn"], ["crit", "**:data-[slot=progress-indicator]:bg-crit"]]);
-/** A progress bar (shadcn/ui's Progress); `label` names it for assistive technology (WCAG 4.1.2, IR359). */
-export function UtilizationBar({ pct, tone = "primary", label }: Readonly<{ pct: number | null; tone?: Tone; label?: string }>) {
+/** A progress bar (shadcn/ui's Progress); `label` names it for assistive technology (WCAG 4.1.2, IR359), so every bar must have one. */
+export function UtilizationBar({ pct, tone = "primary", label }: Readonly<{ pct: number | null; tone?: Tone; label: string }>) {
   return (
     <Progress value={pct} aria-label={label}
       className={cx("*:data-[slot=progress-track]:h-2", BAR_CLS.get(tone))} />

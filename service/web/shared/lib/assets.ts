@@ -8,11 +8,11 @@ import { EN, intlTag, showDate, showTime, translator, type I18n, type Locale, ty
 import { businessDay } from "@ac/web/lib/clientBilling";
 import { klStamp, one } from "@ac/web/lib/energy";
 import { moneyByCurrency } from "@ac/web/lib/money";
-import { metricLabel, metricUnit, opSymbol, type Operator, type Severity } from "@ac/web/lib/adminAlerts";
+import { metricLabel, metricName, metricUnit, opSymbol, type Operator, type Severity } from "@ac/web/lib/adminAlerts";
 import { csvCell } from "@ac/web/lib/csv";
 import type { IconName } from "@ac/web/components/Icon";
 import { byText, isAfter, isBefore } from "@ac/web/lib/order";
-import { codePoints, isEmail, wrapped } from "@ac/web/lib/text";
+import { codePoints, isEmail, utf8Length, wrapped } from "@ac/web/lib/text";
 import { entryOf, lookup } from "@ac/web/lib/lookup";
 
 const TEXT_1_120_CHARACTERS = "1–120 characters";
@@ -26,13 +26,18 @@ export type Scope = "indoor" | "outdoor" | "electrical";
 
 export interface ApiOrgRow { id: string; version: number; name: string; kind: "customer" | "contractor" | "operator"; status: "active" | "inactive" }
 export interface ApiCustomerRow { id: string; version: number; name: string; status: "active" | "inactive"; organizationId: string; serviceProfile: Profile; createdAt: string }
+/** GeoPoint of service-contracts.ts: WGS 84 degrees (DEC-109). */
+export interface GeoPoint { latitude: number; longitude: number }
 export interface ApiPropertyRow {
-  id: string; version: number; customerOrgId: string; kind: "home" | "office"; name: string; address: string | null; accessInstructions: string | null; archived: boolean; updatedAt: string;
+  id: string; version: number; customerOrgId: string; kind: "home" | "office"; name: string; address: string | null; accessInstructions: string | null;
+  location: GeoPoint | null; geofenceRadiusMeters: number | null; archived: boolean; updatedAt: string;
 }
 export interface ApiSpaceRow { id: string; version: number; propertyId: string; parentSpaceId: string | null; kind: "area" | "floor" | "room" | "space"; name: string; archived: boolean }
+/** planned until an accepted installation report installs the unit (DEC-106) */
+type InstallState = "planned" | "installed";
 /** UnitSummary of service-contracts.ts (fields shown on this screen). */
 export interface ApiUnitRow {
-  id: string; version: number; customerOrgId: string; propertyId: string; spaceId: string | null; displayName: string; modelId: string; iotModelId?: string | null; type: "split"; installedAt: string | null;
+  id: string; version: number; customerOrgId: string; propertyId: string; spaceId: string | null; displayName: string; modelId: string; iotModelId?: string | null; type: "split"; installState: InstallState; installedAt: string | null;
   serviceScope: Scope[]; alertPolicyIds: string[]; archived: boolean; capabilityVersion: number; connection: Connection; lastSeenAt: string | null; warrantyEndsAt: string | null;
   effectivePowerState: PowerState; activeAlertCount: number;
 }
@@ -112,10 +117,12 @@ export function customerRows(cs: ApiCustomerRow[], orgs: ApiOrgRow[], ps: ApiPro
     };
   });
 }
-export const contractFilters = ["all", "overdue", "restricted", "good", "none"] as const;
+export const contractFilters = ["all", "attention", "overdue", "restricted", "good", "none"] as const;
 export type ContractFilter = (typeof contractFilters)[number];
 export function contractMatch(f: ContractFilter, r: CustomerRow): boolean {
   if (f === "all") return true;
+  // the customers the Needs attention tile counts: an open alert, overdue billing or an active restriction (UI/UX loop R84)
+  if (f === "attention") return r.status === "active" && (r.alerts > 0 || (r.standing?.overdue ?? 0) > 0 || !!r.standing?.restriction);
   const s = r.standing;
   if (!s || r.status === "inactive") return false;
   if (f === "overdue") return s.overdue > 0;
@@ -135,7 +142,7 @@ export function registerKpis(rows: CustomerRow[], us: ApiUnitRow[], t: T = en) {
   return {
     customers: active.length, inactive: rows.length - active.length, properties: names.length,
     propertyNames: names.length > 3 ? `${names.slice(0, 3).join(" · ")} +${String(names.length - 3)}` : names.join(" · ") || t("none yet"),
-    units: units.length, power: t("Running {on} · Stopped {off} · unknown {unknown}", { on: n("on"), off: n("off"), unknown: n("unknown") }),
+    units: units.length, power: t("Running {on} · Stopped {off} · Unknown {unknown}", { on: n("on"), off: n("off"), unknown: n("unknown") }),
     attention: active.filter((r) => r.alerts > 0 || (r.standing?.overdue ?? 0) > 0 || !!r.standing?.restriction).length,
   };
 }
@@ -156,7 +163,8 @@ const hasLength = (s: string, max: number) => codePoints(s.trim()) >= 1 && codeP
 
 export interface TreeSpace { id: string; version: number; kind: ApiSpaceRow["kind"]; name: string; propertyId: string; parentSpaceId: string | null; direct: number; units: number; children: TreeSpace[] }
 export interface TreeProperty {
-  id: string; version: number; kind: "home" | "office"; name: string; address: string | null; accessInstructions: string | null; updatedAt: string;
+  id: string; version: number; kind: "home" | "office"; name: string; address: string | null; accessInstructions: string | null;
+  location: GeoPoint | null; geofenceRadiusMeters: number | null; updatedAt: string;
   units: number; unassigned: number; floors: number; rooms: number; spaces: TreeSpace[];
 }
 export const flatten = (xs: TreeSpace[]): TreeSpace[] => xs.flatMap((x) => [x, ...flatten(x.children)]);
@@ -174,7 +182,8 @@ export function locationTree(ps: ApiPropertyRow[], ss: ApiSpaceRow[], us: ApiUni
     const spaces = build(p.id, null);
     const all = flatten(spaces);
     return {
-      id: p.id, version: p.version, kind: p.kind, name: p.name, address: p.address, accessInstructions: p.accessInstructions, updatedAt: p.updatedAt,
+      id: p.id, version: p.version, kind: p.kind, name: p.name, address: p.address, accessInstructions: p.accessInstructions,
+      location: p.location, geofenceRadiusMeters: p.geofenceRadiusMeters, updatedAt: p.updatedAt,
       units: us.filter((u) => u.propertyId === p.id).length, unassigned: us.filter((u) => u.propertyId === p.id && u.spaceId === null).length,
       floors: all.filter((s) => s.kind === "floor").length, rooms: all.filter((s) => s.kind === "room").length, spaces,
     };
@@ -231,8 +240,11 @@ export function placeOptions(tree: TreeProperty[], ss: ApiSpaceRow[], t: T = en)
   });
 }
 
-export interface PropertyDraft { kind: "home" | "office"; name: string; address: string; accessInstructions: string }
-export const propertyDraft = (p?: TreeProperty): PropertyDraft => ({ kind: p?.kind ?? "home", name: p?.name ?? "", address: p?.address ?? "", accessInstructions: p?.accessInstructions ?? "" });
+/** The property form; location and geofenceRadiusMeters ride along unchanged until the map pin is edited (DEC-109). */
+export interface PropertyDraft { kind: "home" | "office"; name: string; address: string; accessInstructions: string; location: GeoPoint | null; geofenceRadiusMeters: number | null }
+export const propertyDraft = (p?: TreeProperty): PropertyDraft => ({
+  kind: p?.kind ?? "home", name: p?.name ?? "", address: p?.address ?? "", accessInstructions: p?.accessInstructions ?? "", location: p?.location ?? null, geofenceRadiusMeters: p?.geofenceRadiusMeters ?? null,
+});
 export function propertyErrors(d: PropertyDraft, t: T = en): Record<string, string> {
   const e: Record<string, string> = {};
   if (!hasLength(d.name, 120)) e.name = t(TEXT_1_120_CHARACTERS);
@@ -243,6 +255,7 @@ export function propertyErrors(d: PropertyDraft, t: T = en): Record<string, stri
 export const propertyInput = (d: PropertyDraft, orgId: string, id?: string) => {
   return {
     ...(id && { id }), customerOrgId: orgId, kind: d.kind, name: d.name.trim(), address: d.address.trim() || null, accessInstructions: d.accessInstructions.trim() || null,
+    location: d.location, geofenceRadiusMeters: d.geofenceRadiusMeters,
   };
 };
 export const nameError = (name: string, t: T = translator("en")) => (hasLength(name, 120) ? undefined : t(TEXT_1_120_CHARACTERS));
@@ -276,13 +289,20 @@ export function filterUnits(us: ApiUnitRow[], f: { powerState?: PowerState; conn
   });
 }
 
+/** The units whose name or place (property › floor › room) contains the search, ignoring case (IR801): a complaint
+names a room more often than an AC. An empty search keeps every unit. */
+export function unitsMatching(us: ApiUnitRow[], search: string, place: (u: ApiUnitRow) => string): ApiUnitRow[] {
+  const q = search.trim().toLowerCase();
+  return q ? us.filter((u) => u.displayName.toLowerCase().includes(q) || place(u).toLowerCase().includes(q)) : us;
+}
+
 /** The unit form (DD-A02 fields, warranty end IR209). installedAt and warrantyEnd are Kuala Lumpur dates. */
 /** iotModelId is the unit's planned IoT model; empty is none (DEC-105). */
-export interface UnitDraft { displayName: string; propertyId: string; spaceId: string; modelId: string; iotModelId: string; installedAt: string; warrantyEnd: string; serviceScope: Scope[] }
+export interface UnitDraft { displayName: string; propertyId: string; spaceId: string; modelId: string; iotModelId: string; installState: InstallState; installedAt: string; warrantyEnd: string; serviceScope: Scope[] }
 const klDate = (iso: string | null | undefined) => (iso ? klStamp(iso).slice(0, 10) : "");
-export const unitDraft = (u?: Pick<ApiUnitRow, "displayName" | "propertyId" | "spaceId" | "modelId" | "iotModelId" | "installedAt" | "warrantyEndsAt" | "serviceScope">, propertyId = "", spaceId = ""): UnitDraft => {
+export const unitDraft = (u?: Pick<ApiUnitRow, "displayName" | "propertyId" | "spaceId" | "modelId" | "iotModelId" | "installState" | "installedAt" | "warrantyEndsAt" | "serviceScope">, propertyId = "", spaceId = ""): UnitDraft => {
   return {
-    displayName: u?.displayName ?? "", propertyId: u?.propertyId ?? propertyId, spaceId: u?.spaceId ?? (u ? "" : spaceId), modelId: u?.modelId ?? "", iotModelId: u?.iotModelId ?? "",
+    displayName: u?.displayName ?? "", propertyId: u?.propertyId ?? propertyId, spaceId: u?.spaceId ?? (u ? "" : spaceId), modelId: u?.modelId ?? "", iotModelId: u?.iotModelId ?? "", installState: u?.installState ?? "installed",
     installedAt: klDate(u?.installedAt), warrantyEnd: klDate(u?.warrantyEndsAt), serviceScope: u?.serviceScope ?? ["indoor", "outdoor"],
   };
 };
@@ -291,6 +311,8 @@ export function unitErrors(d: UnitDraft, todayKL: string, t: T = en): Record<str
   if (!hasLength(d.displayName, 120)) e.displayName = t(TEXT_1_120_CHARACTERS);
   if (!d.propertyId) e.propertyId = t("Choose a location");
   if (!d.modelId) e.modelId = t("Choose a model");
+  if (d.installState === "planned" && d.installedAt) e.installedAt = t("A planned unit has no installation date yet");
+  if (d.installState === "planned" && d.warrantyEnd) e.warrantyEnd = t("A planned unit has no warranty end yet");
   if (d.installedAt && isAfter(d.installedAt, todayKL)) e.installedAt = t("An installation date cannot be in the future");
   if (d.warrantyEnd && d.installedAt && isBefore(d.warrantyEnd, d.installedAt)) e.warrantyEnd = t("A warranty cannot end before the installation");
   if (d.serviceScope.length === 0) e.serviceScope = t("Choose at least one inspection group");
@@ -298,7 +320,7 @@ export function unitErrors(d: UnitDraft, todayKL: string, t: T = en): Record<str
 }
 export const unitInput = (d: UnitDraft, orgId: string, id?: string, changeReason?: string) => {
   return {
-    ...(id && { id }), customerOrgId: orgId, propertyId: d.propertyId, spaceId: d.spaceId || null, displayName: d.displayName.trim(), modelId: d.modelId, iotModelId: d.iotModelId || null, type: "split" as const,
+    ...(id && { id }), customerOrgId: orgId, propertyId: d.propertyId, spaceId: d.spaceId || null, displayName: d.displayName.trim(), modelId: d.modelId, iotModelId: d.iotModelId || null, type: "split" as const, installState: d.installState,
     installedAt: d.installedAt ? `${d.installedAt}T00:00:00+08:00` : null, warrantyEndsAt: d.warrantyEnd ? `${d.warrantyEnd}T00:00:00+08:00` : null,
     serviceScope: d.serviceScope, ...(changeReason && { changeReason }),
   };
@@ -351,7 +373,7 @@ export function conditionText(p: { metric?: string; operator?: Operator; thresho
   const m = p.metric ?? "";
   const w = p.activeWindow ? `, ${days(p.activeWindow.weekdays, i)}${p.activeWindow.startLocal}–${p.activeWindow.endLocal}` : "";
   const cond = m === "heartbeat_gap" ? `${t("No heartbeat for {n} min", { n: p.threshold ?? 0 })}${w}` // the gap itself is the duration (minutes)
-    : `${textOf(metricLabel, m, t) ?? m} ${entryOf(opSymbol, p.operator ?? "gte")} ${String(p.threshold ?? 0)} ${lookup(metricUnit, m) ?? ""} ${t("for {duration}", { duration: duration(p.durationSeconds ?? 0, t) })}${w}`;
+    : `${textOf(metricName, m, t) ?? m} ${entryOf(opSymbol, p.operator ?? "gte")} ${String(p.threshold ?? 0)} ${lookup(metricUnit, m) ?? ""} ${t("for {duration}", { duration: duration(p.durationSeconds ?? 0, t) })}${w}`;
   return p.severity ? `${cond} → ${t(sevLabel[p.severity])}` : cond;
 }
 export interface PolicyLine { id: string; version: number; kind: "alert" | "default_alert"; name: string; type: string; condition: string; madeBy: string; units: number; enabled: boolean }
@@ -420,10 +442,10 @@ export function clientUserRows(us: ApiClientUser[], who: (membershipId: string) 
     };
   });
 }
-/** A plain address up to 254 characters, not yet a user of this customer (case-insensitive). */
+/** A plain address up to 254 bytes (as clientUsers.save counts), not yet a user of this customer (case-insensitive). */
 export function inviteError(email: string, us: { email: string }[], t: T = translator("en")): string | undefined {
   const e = email.trim();
-  if (e.length > 254 || !isEmail(e)) return t("A valid email address (up to 254 characters)");
+  if (utf8Length(e) > 254 || !isEmail(e)) return t("A valid email address (up to 254 characters)");
   if (us.some((u) => u.email.toLowerCase() === e.toLowerCase())) return t("Already a user of this customer");
   return undefined;
 }

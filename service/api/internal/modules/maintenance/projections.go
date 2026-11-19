@@ -119,9 +119,21 @@ type History struct {
 	RedactedReportSummary map[string]any `json:"redactedReportSummary"`
 }
 
-// SiteAddresses resolves IR25 site addresses (Assets).
+// SiteAddresses resolves IR25 site addresses and the site's map pin (Assets).
 type SiteAddresses interface {
 	SiteAddress(ctx context.Context, c *ops.Call, unit uuid.UUID) (*string, []string, error)
+	// SiteLocation is the map pin of the unit's property (DEC-109); found is false when HQ set none.
+	SiteLocation(
+		ctx context.Context,
+		c *ops.Call,
+		unit uuid.UUID,
+	) (pin SitePoint, found bool, err error)
+}
+
+// SitePoint is a site's map pin in WGS 84 degrees.
+type SitePoint struct {
+	Latitude  float64 `json:"latitude"`
+	Longitude float64 `json:"longitude"`
 }
 
 // offers returns the contractor's JobOfferSummary rows valid now (IR124 item 2); job limits the result to one job.
@@ -417,6 +429,10 @@ func (m Jobs) extraProjections(
 				},
 			)
 		}
+	}
+
+	if filters.CurrentOnly != nil && *filters.CurrentOnly {
+		return out, nil // only the jobs the caller still holds: no history rows (IR797)
 	}
 
 	hs, err := m.histories(ctx, call, nil)

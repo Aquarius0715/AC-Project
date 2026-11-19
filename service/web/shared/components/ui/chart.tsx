@@ -1,7 +1,7 @@
 "use client"
 
 import { hasContent } from "@ac/web/lib/hasContent";
-import { createContext, useContext, useId, useMemo, type CSSProperties, type ComponentProps, type ComponentType, type ReactNode } from "react"
+import { createContext, useContext, useId, useMemo, type ComponentProps, type ComponentType, type ReactNode } from "react"
 import { cn } from "cn"
 import { cssVariables } from "@ac/web/lib/cssVariables"
 import { Legend, ResponsiveContainer, Tooltip, type DefaultLegendContentProps, type DefaultTooltipContentProps, type TooltipValueType } from "recharts"
@@ -88,12 +88,14 @@ function ChartContainer({
 // The config's colours as custom properties in the chart's style attribute. shadcn/ui writes them into a <style> element,
 // which the nonce Content Security Policy refuses (DEC-75); the product has one, light, theme.
 function chartColors(config: ChartConfig) {
-  return Object.fromEntries(
-    Object.entries(config).flatMap(([key, item]) => {
-      const color = item.theme?.light ?? item.color
-      return color ? [[`--color-${key}`, color]] : []
-    })
-  ) as CSSProperties
+  const colors: Record<`--${string}`, string> = {}
+  for (const [key, item] of Object.entries(config)) {
+    const color = item.theme?.light ?? item.color
+    if (color) {
+      colors[`--color-${key}`] = color
+    }
+  }
+  return cssVariables(colors)
 }
 
 const ChartTooltip = Tooltip

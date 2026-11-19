@@ -94,7 +94,7 @@ export function mrvDraftErrors(d: MRVDraft, t: T = en): Record<string, string> {
   if (period) e.period = period;
   if (!d.baseline) e.baseline = t("Choose a baseline version");
   if (!d.factor) e.factor = t("Choose an emission factor version");
-  if (codePoints(d.boundary.trim()) === 0 || d.boundary.length > 500) e.boundary = t("1–500 characters");
+  if (codePoints(d.boundary.trim()) === 0 || codePoints(d.boundary.trim()) > 500) e.boundary = t("1–500 characters");
   return e;
 }
 
@@ -144,4 +144,11 @@ export const MAX_EVIDENCE = 20;
 export function evidenceRows(as: ApiEvidenceAttachment[], units: { id: string; label: string }[], i: I18n = EN): EvidenceRow[] {
   const unit = new Map(units.map((u) => [u.id, u.label]));
   return as.map((a) => ({ id: a.id, name: a.name, sub: `${unit.get(a.unitId) ?? a.unitId} · ${i.t("uploaded {time}", { time: showTime(a.createdAt, i.display) })}` }));
+}
+/** The page of attachments.list the picker reads: the newest 100 candidates and how many there are in all. */
+export interface ApiEvidencePage { items: ApiEvidenceAttachment[]; total: number }
+/** The note under the candidates when the units and period hold more than the page read: the older ones are not
+listed, so the picker says how many it shows instead of dropping them silently (R878). */
+export function evidenceMore(p: ApiEvidencePage, t: T = en): string | null {
+  return p.total <= p.items.length ? null : t("The newest {shown} of {total} photos are listed: narrow the units or the period to find older ones.", { shown: String(p.items.length), total: String(p.total) });
 }

@@ -1,21 +1,33 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { Banner, Btn, Select } from "@ac/web/components/ui";
 import { useAction } from "@ac/web/lib/useAction";
-import { demoRefusal, jumpDone, type DeviceOption } from "@ac/web/lib/demoPanel";
+import { clockAt, demoRefusal, jumpDone, type DeviceOption } from "@ac/web/lib/demoPanel";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import { useT } from "@ac/web/components/I18n";
 import { advanceClock, deviceSignal, expireSession } from "../actions";
 import { ClockFace, DemoFrame, TriggerTile } from "./demo-frame";
 
-export interface DemoLive { clock: string; devices: DeviceOption[] | null; hidden: number } // hidden: listed devices whose history needs a current assignment
+/** The scenario clock as the page was rendered, ticking once a second at real-time speed; a new `iso` (after a jump) starts over. */
+function useTickingClock(iso: string): string {
+  const [tick, setTick] = useState({ iso, elapsed: 0 });
+  useEffect(() => {
+    const start = Date.now();
+    const id = setInterval(() => { setTick({ iso, elapsed: Date.now() - start }); }, 1000);
+    return () => { clearInterval(id); };
+  }, [iso]);
+  return clockAt(iso, tick.iso === iso ? tick.elapsed : 0);
+}
+
+export interface DemoLive { clock: string /* ISO time of the Core API clock */; devices: DeviceOption[] | null; hidden: number } // hidden: listed devices whose history needs a current assignment
 
 /** Demo controls in API mode (FR-X05, IR154, IR249; Figma Client 10e): the Core API scenario clock moves forward, a
 device the signed-in role can see loses its connection or gets it back, and the session can be expired; the reset and
 the transport delay exist only in the browser demo and say so. */
 export function DemoView({ live }: Readonly<{ live: DemoLive }>) {
   const t = useT();
+  const clock = useTickingClock(live.clock);
   const [pending, run] = useAction();
   const [expiring, startExpire] = useTransition();
   const [failed, setFailed] = useState<string | null>(null);
@@ -32,7 +44,7 @@ export function DemoView({ live }: Readonly<{ live: DemoLive }>) {
   return (
     <DemoFrame
       above={failed && <Banner tone="crit">{t("Not done: {reason}", { reason: t(failed) })}</Banner>}
-      clock={<ClockFace time={live.clock} disabled={isBusy} onJump={(minutes) => { run(() => advanceClock(minutes), jumpDone(minutes, t), ok, fail); }} />}
+      clock={<ClockFace time={clock} disabled={isBusy} onJump={(minutes) => { run(() => advanceClock(minutes), jumpDone(minutes, t), ok, fail); }} />}
       scenario={<><Select aria-label={t("Scenario")} disabled value="seed"><option value="seed">{t("Core API seed · generation 1")}</option></Select><p className="mt-2 text-[11px] text-muted-foreground">{t("The demo seed in fixture-contract.json is the source of truth. The Core API demo runs this one scenario; the simulator switch is in the browser demo.")}</p></>}
       reset={<><p className="text-[11px] text-muted-foreground">{t("Returns clock, subscriptions, image URLs, caches, and business data to their initial seed")}</p><Btn variant="danger" className="mt-3" disabled>{t("Reset demo data")}</Btn><p className="mt-2 text-[11px] text-muted-foreground">{t("The running Core API keeps shared data: rebuild it offline with make resetdb.")}</p></>}
       triggers={

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { clientUserRows, inviteError, type ApiClientUser } from "@ac/web/lib/assets";
 import type { ApiInvoice } from "@ac/web/lib/billing";
 import {
-  dueNotice,
+  checkoutStartSchema, dueNotice, paymentPhase, paymentWay, statusFilters, statusQuery,
   clientInvoiceRows, contractCards, inquiryLines, noticeTimeline, noticeUnits, paymentLines, previewText, restrictionNotice, type ClientContract, type ClientPayment,
 } from "@ac/web/lib/clientBilling";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
@@ -38,11 +38,18 @@ const restriction = {
     { action: "payments.release", occurredAt: TEXT_2026_09_13T02_05_00Z, actorId: "", actorRoleAtTime: "", reason: null, result: "" },
   ],
 } as ApiRestriction;
+const checkoutPayment = (id: string, status: ClientPayment["status"], createdAt: string): ClientPayment => ({
+  id, createdAt, status, version: 1, amountMinor: 12_000, currency: "MYR", invoiceId: "i1", method: null, channel: "stripe_checkout", paymentReference: null,
+  confirmedAt: null, confirmationReason: null, updatedAt: createdAt,
+});
+const checkoutStarts = (checkoutUrl: string) => checkoutStartSchema.safeParse({ checkoutUrl, paymentId: "p1" }).success;
 const commands = new Map<string, ApiCommand>([["c2", { id: "c2", status: "sent", delivery: "", requestedAt: "", failureCode: null }], ["c3", { id: "c3", status: "expired", delivery: "", requestedAt: "", failureCode: null }]]);
 
 describe("customer contracts & payments in the display language (FR-C10–C12, IR267)", () => {
   it("names contracts and keeps their periods and the due dates on Kuala Lumpur business days", () => {
-    expect(contractCards([contract], unit, NOW).map((c) => [c.name, c.sub, c.period, c.plan, c.status])).toStrictEqual([["RTO Plan", "k1aaaaaa · 1 Sept → 1 Sept 2027", "1 Sept 2026 → 1 Sept 2027", "Rent-to-own (RTO)", "Active"]]);
+    expect(contractCards([contract], unit, NOW).map((c) => [c.name, c.sub, c.period, c.plan, c.status])).toStrictEqual([["RTO Plan", "k1aaaaaa · 1 Sept 2026 → 1 Sept 2027", "1 Sept 2026 → 1 Sept 2027", "Rent-to-own (RTO)", "Active"]]);
+    // the short start drops its year only within one year (UI/UX loop R129)
+    expect(contractCards([{ ...contract, endAt: "2026-12-30T16:00:00Z" }], unit, NOW)[0]?.sub).toBe("k1aaaaaa · 1 Sept → 31 Dec 2026");
     const old = { ...contract, id: "k2bbbbbbbb", planType: "general", startAt: "2025-08-31T16:00:00Z", endAt: TEXT_2026_08_31T16_00_00Z };
     expect(contractCards([old, contract], unit, NOW, MS_TOKYO).map((c) => [c.name, c.period, c.status])).toStrictEqual([["Pelan RTO", "1 Sep 2026 → 1 Sep 2027", "Active"], ["Penyelenggaraan am", "1 Sep 2025 → 1 Sep 2026", "Expired"]]);
     expect(clientInvoiceRows([invoice], NOW).map((r) => [r.due, r.status, r.payable])).toStrictEqual([["Due 10 Sept 2026", "Overdue", true]]);
@@ -52,7 +59,7 @@ describe("customer contracts & payments in the display language (FR-C10–C12, I
 
   it("times payments, restriction events and inquiries in the display time zone", () => {
     const p: ClientPayment = {
-      id: "p1aaaaaaaa", version: 2, amountMinor: 12_000, currency: "MYR", invoiceId: "i1", method: "demo_credit_card", status: "confirmed", paymentReference: "DEMO-PAY-1",
+      id: "p1aaaaaaaa", version: 2, amountMinor: 12_000, currency: "MYR", invoiceId: "i1", method: "demo_credit_card", channel: "demo", status: "confirmed", paymentReference: "DEMO-PAY-1",
       confirmedAt: TEXT_2026_09_13T02_05_00Z, confirmationReason: null, createdAt: "2026-09-13T02:00:00Z", updatedAt: TEXT_2026_09_13T02_05_00Z,
     };
     expect(paymentLines([p]).map((l) => [l.label, l.at])).toStrictEqual([["p1aaaaaa · Credit card (demo)", "13 Sept 2026, 10:05 am MYT"]]);
@@ -67,7 +74,7 @@ describe("customer contracts & payments in the display language (FR-C10–C12, I
   });
 
   it("words the restriction notice per unit in Malay, never released before the unit confirms", () => {
-    expect(restrictionNotice(restriction, unit)).toMatchObject({ label: "Release requested", policy: "Temperature limit — cooling setpoint ≥ 27 °C", units: "2 units in scope · Bedroom AC (Home A › 1F), Bedroom AC (Home A › 1F)" });
+    expect(restrictionNotice(restriction, unit)).toMatchObject({ label: "Release requested", policy: "Temperature limit — cooling setpoint ≥ 27 °C", units: "2 units in scope · Bedroom AC (Home A › 1F), Bedroom AC (Home A › 1F)", unitIds: restriction.unitIds }); // the restricted units by ID too (UI/UX loop R34)
     expect(restrictionNotice(restriction, unit, MS_TOKYO.t)).toMatchObject({ label: "Pelepasan diminta", policy: "Had suhu — suhu tetapan penyejukan ≥ 27 °C", units: "2 unit dalam skop · Bedroom AC (Home A › 1F), Bedroom AC (Home A › 1F)" });
     expect(noticeUnits(restriction, unit, commands, MS_TOKYO.t).map((u) => [u.apply, u.release, u.releaseTone, u.note, u.tone])).toStrictEqual([
       ["Dikenakan", "Pelepasan dihantar", "primary", "menunggu unit mengesahkan", "warn"], ["Keputusan tidak diketahui", "Pelepasan gagal", "crit", "unit di luar talian · arahan terakhir tamat tempoh", "unknown"],
@@ -75,6 +82,34 @@ describe("customer contracts & payments in the display language (FR-C10–C12, I
     const busy = { ...restriction, perUnit: [{ ...must(restriction.perUnit[0]), releaseState: "none" as const, releaseCommandIds: [], applyCommandIds: [], pendingReason: "device_operation_running" }] };
     expect([noticeUnits(busy, unit, commands)[0]?.note, noticeUnits(busy, unit, commands, MS_TOKYO.t)[0]?.note]).toStrictEqual(["the unit is busy with a device update", "unit sedang sibuk dengan kemas kini peranti"]);
     expect([policyText({ kind: "power_off" }), policyText({ kind: "power_off" }, MS_TOKYO.t)]).toStrictEqual(["Power off", "Matikan kuasa"]);
+  });
+
+  it("names how a payment was taken: the demo card, Stripe Checkout or HQ's recorded transfer (DEC-68)", () => {
+    expect([
+      paymentWay({ method: "demo_debit_card", channel: "demo" }),
+      paymentWay({ method: null, channel: "stripe_checkout" }),
+      paymentWay({ method: null, channel: "manual" }),
+    ]).toStrictEqual(["Debit card (demo)", "Stripe Checkout", "Bank transfer (recorded by HQ)"]);
+  });
+
+  it("finds the open payment, and gives Pay back once the last attempt expired or failed (DEC-68)", () => {
+    const failed = checkoutPayment("p1", "failed", "2026-09-13T01:00:00Z");
+    const expired = checkoutPayment("p2", "expired", "2026-09-13T02:00:00Z");
+    const open = checkoutPayment("p3", "initiated", "2026-09-13T03:00:00Z");
+    expect(paymentPhase([])).toStrictEqual({ open: null, last: null });
+    expect(paymentPhase([failed, expired])).toStrictEqual({ open: null, last: expired });
+    expect(paymentPhase([open, failed, expired])).toStrictEqual({ open, last: open });
+    expect(paymentPhase([failed, { ...open, status: "processing" }]).open?.id).toBe("p3");
+  });
+
+  it("maps the URL's status filter to invoices.list (overdue = overdueOnly, all = none)", () => {
+    expect(statusFilters.map((f) => statusQuery(f))).toStrictEqual([{}, { status: "unpaid" }, { overdueOnly: true }, { status: "processing" }, { status: "paid" }]);
+  });
+
+  it("takes only an HTTPS Stripe Checkout address from the Core API (IR840)", () => {
+    expect(checkoutStarts("https://checkout.stripe.com/c/pay/cs_test_a1")).toBe(true);
+    // the address goes straight to location.assign, so a script, data or plain-http address never passes
+    expect(["javascript:alert(1)", "data:text/html,x", "http://evil.example/x", "JAVASCRIPT:alert(1)", ""].map((u) => checkoutStarts(u))).toStrictEqual([false, false, false, false, false]);
   });
 
   it("writes the payment message preview in the recipient's language", () => {
@@ -100,6 +135,8 @@ describe("the customer's users in the display language (FR-C19, IR267)", () => {
 
   it("checks an invite address in either language", () => {
     expect([inviteError("bad", []), inviteError("lim@x.com", [{ email: "LIM@x.com" }], translator("ms")), inviteError("new@x.com", [])]).toStrictEqual(["A valid email address (up to 254 characters)", "Sudah menjadi pengguna pelanggan ini", undefined]);
+    // 254 bytes, as clientUsers.save counts (len in Go)
+    expect([inviteError(`${"a".repeat(248)}@x.com`, []), inviteError(`${"é".repeat(130)}@x.com`, [])]).toStrictEqual([undefined, "A valid email address (up to 254 characters)"]);
   });
 });
 

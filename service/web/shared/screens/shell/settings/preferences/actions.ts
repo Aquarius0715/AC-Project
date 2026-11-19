@@ -27,13 +27,18 @@ const run = async <T,>(fn: () => Promise<T>): Promise<Result<T>> => {
 };
 
 /** preferences.update with the display language and time zone (and a client's monthly report e-mail); a changed
-location consent goes with it. */
+location consent goes with it. When the preferences are saved but the consent is refused, the page is re-rendered
+too, so it shows the saved preferences and only the consent stays to retry. */
 export async function savePreferences(input: { locale: Locale; timezone: string; monthlyReportEmail?: boolean }, consent: { granted: boolean; version: number } | null) {
-  return run(async () => {
+  const step = { saved: false }; // an object: a `let` set inside the callback would stay narrowed to false here
+  const result = await run(async () => {
     await coreOp("preferences.update", input, { write: true });
+    step.saved = true;
     if (consent) await coreOp("consents.update", { purpose: "location_automation", granted: consent.granted }, { write: true, expectedVersion: consent.version });
     return null;
   });
+  if (!result.ok && step.saved &&result.code !== "CONFLICT") refresh(); // run re-rendered after a CONFLICT already
+  return result;
 }
 
 /** twoFactor.enable with the 6-digit code: the recovery codes are shown once. */

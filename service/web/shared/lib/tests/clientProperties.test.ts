@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { changeText, groupPlan, roomUnits, type GroupChange } from "@ac/web/lib/clientProperties";
+import { changeText, groupPlan, hasChoice, KEEP_ALL, roomUnits, TURN_OFF, type GroupChange } from "@ac/web/lib/clientProperties";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
 import type { ApiUnitDetail } from "@ac/web/lib/units";
 
@@ -8,7 +8,7 @@ const TEXT_2026_09_14T01_10_00Z = "2026-09-14T01:10:00Z";
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 const unit = (id: string, over: Partial<ApiUnitDetail> = {}): ApiUnitDetail => {
   return {
-    id, version: 1, spaceId: "room", displayName: `AC ${id}`, alertPolicyIds: [], connection: "online", effectivePowerState: "on",
+    id, version: 1, spaceId: "room", displayName: `AC ${id}`, installState: "installed", modelId: "model-1", alertPolicyIds: [], connection: "online", effectivePowerState: "on",
     observedState: { power: true, celsius: 26, mode: "cool", fanLevel: "mid", observedAt: "2026-09-14T01:00:00Z" }, lastSeenAt: TEXT_2026_09_14T01_10_00Z,
     latestMeasurements: [
       { id: "m1", unitId: id, sensorId: "s1", metric: "temperature", value: 27.04, unit: "°C", observedAt: TEXT_2026_09_14T01_10_00Z, origin: "measured", quality: "valid", qualityReason: null },
@@ -43,12 +43,42 @@ describe("units & locations: the room list and group control (FR-C02, FR-C14, IR
       ["off", "Skipped", "—", "Offline since 9:10 am MYT — not sent", 0],
       ["blocked", "Skipped", "—", "Control blocked (reconciliation required)", 0],
     ]);
-    expect([changeText(ch), changeText({ ...ch, power: false }), changeText({ ...ch, fan: null })]).toStrictEqual(["Power On · 24 °C · Dry · Fan high", "Power Off", "Power On · 24 °C · Dry · Fan unchanged"]);
+    expect([changeText(ch), changeText({ ...ch, power: false }), changeText({ ...ch, fan: null })]).toStrictEqual(["Power On · 24 °C · Dry · Fan high", "Power Off", "Power On · 24 °C · Dry"]);
+  });
+
+  it("dates an offline time of another day (UI/UX loop R65)", () => {
+    const off = unit("off", { connection: "offline" });
+    const sameDay = Date.parse("2026-09-14T03:00:00Z"), later = Date.parse("2026-09-17T03:00:00Z");
+    expect([roomUnits([off], undefined, sameDay)[0]?.seen, roomUnits([off], undefined, later)[0]?.seen]).toStrictEqual(["9:10 am MYT", "14 Sept 2026, 9:10 am MYT"]);
+    expect(groupPlan([off], ch, undefined, later)[0]?.note).toBe("Offline since 14 Sept 2026, 9:10 am MYT — not sent");
   });
 
   it("words the plan in Malay; the result stays the plan's code", () => {
     const [ok, off] = groupPlan([unit("ok"), unit("off", { connection: "offline", lastSeenAt: null })], ch, MS);
     expect([ok?.result, ok?.change, off?.note]).toStrictEqual(["Will send", "26 → 24 °C, Kering, Kipas tinggi", "Luar talian — tidak dihantar"]);
     expect(changeText(ch, translator("ms"))).toBe("Kuasa Hidup · 24 °C · Kering · Kipas tinggi");
+  });
+
+  // UI/UX loop R6: the panel used to start at Power on · 24 °C · Cool, so Review & send changed a Dry AC to Cool though the
+  // user chose nothing. It now starts with every setting kept; only what is chosen is planned.
+  it("starts with every setting kept and plans only the chosen ones", () => {
+    expect([hasChoice(KEEP_ALL), changeText(KEEP_ALL), hasChoice({ ...KEEP_ALL, mode: "dry" })]).toStrictEqual([false, "No change chosen", true]);
+    const dry = unit("dry", { observedState: { power: true, celsius: 26, mode: "dry", fanLevel: "mid", observedAt: null } });
+    const offAc = unit("offac", { observedState: { power: false, celsius: 26, mode: "cool", fanLevel: "mid", observedAt: null } });
+    const plan = groupPlan([dry, offAc], { ...KEEP_ALL, celsius: 24 });
+    expect(plan.map((r) => [r.id, r.change, r.actions.map((a) => a.kind)])).toStrictEqual([["dry", "26 → 24 °C", ["set_temperature"]], ["offac", "26 → 24 °C", ["set_temperature"]]]);
+    expect(groupPlan([dry], KEEP_ALL).map((r) => r.result)).toStrictEqual(["No change"]);
+    expect(groupPlan([dry], { ...KEEP_ALL, power: false, celsius: 20 }).map((r) => r.actions)).toStrictEqual([[{ kind: "set_power", power: false }]]);
+  });
+
+  // IR798: “Turn off running ACs” sends power off and nothing else; an AC already off has nothing to send
+  it("turns running ACs off with power off only", () => {
+    const on = unit("on", { observedState: { power: true, celsius: 24, mode: "cool", fanLevel: "mid", observedAt: null } });
+    const off = unit("off", { observedState: { power: false, celsius: 24, mode: "cool", fanLevel: "mid", observedAt: null } });
+    expect([hasChoice(TURN_OFF), changeText(TURN_OFF)]).toStrictEqual([true, "Power Off"]);
+    expect(groupPlan([on, off], TURN_OFF).map((r) => [r.id, r.result, r.actions])).toStrictEqual([
+      ["on", "Will send", [{ kind: "set_power", power: false }]],
+      ["off", "No change", []],
+    ]);
   });
 });

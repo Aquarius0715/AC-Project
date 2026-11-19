@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, Choice, EmptyState, Field, Page, Select, Textarea, cx, Plain, ScrollX } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Choice, EmptyState, Field, Page, Select, Tabs, Textarea, cx, Plain, ScrollX } from "@ac/web/components/ui";
 import { OriginBadge } from "@ac/web/components/JobBits";
 import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
@@ -38,9 +38,8 @@ function List({ live }: Readonly<{ live: HistoryLive }>) {
   return (
     <Page>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div role="tablist" className="flex flex-wrap gap-2">
-          {live.tabs.map((x) => <Plain key={x.id} role="tab" aria-selected={live.tab === x.id} onClick={() => { patch({ tab: x.id === "all" ? null : x.id }); }} className={cx("rounded-control border px-3 py-1.5 text-[13px] font-semibold", live.tab === x.id ? "border-primary bg-primary text-white" : "border-line bg-surface text-ink hover:bg-surface2")}>{x.label} ({x.count})</Plain>)}
-        </div>
+        {/* the same tab strip as Jobs, its counts as badges (UI/UX loop R115) */}
+        <Tabs value={live.tab} onChange={(id) => { patch({ tab: id === "all" ? null : id }); }} tabs={live.tabs.map((x) => ({ id: x.id, label: x.label, count: x.count }))} />
         <div className="flex flex-wrap gap-2">
           <Select aria-label={t("Sort")} className="w-auto" value={live.sort} onChange={(e) => { patch({ sort: e.target.value === "latest" ? null : e.target.value }); }}>{live.sorts.map((s) => <option key={s.id} value={s.id}>{s.text}</option>)}</Select>
           <Select aria-label={t("Period")} className="w-auto" value={live.period} onChange={(e) => { patch({ period: e.target.value === "90d" ? null : e.target.value }); }}>{live.periods.map((p) => <option key={p.id} value={p.id}>{p.text}</option>)}</Select>
@@ -65,7 +64,8 @@ function List({ live }: Readonly<{ live: HistoryLive }>) {
             </table>
           </ScrollX>
         )}
-        <p className="mt-3 text-[11px] text-muted-foreground">{t(live.total > 100 ? "Showing {shown} of {total} (the latest 100) · own company only · offers appear here after acceptance." : "Showing {shown} of {total} · own company only · offers appear here after acceptance.", { shown: live.rows.length, total: all })}</p>
+        {/* over 100 jobs, only the latest 100 were read: the total is the API's, not the count of those read */}
+        <p className="mt-3 text-[11px] text-muted-foreground">{t(live.total > 100 ? "Showing {shown} of {total} (the latest 100) · own company only · offers appear here after acceptance." : "Showing {shown} of {total} · own company only · offers appear here after acceptance.", { shown: live.rows.length, total: live.total > 100 ? live.total : all })}</p>
       </Card>
     </Page>
   );
@@ -147,6 +147,8 @@ function Compose({ detail, onPreview }: Readonly<{ detail: Extract<DetailRows, {
   const isTooLong = message.trim().length > 2000;
   const lengthError = isTooLong ? t("At most 2000 characters") : undefined;
   const isClosed = mode.kind === "closed";
+  // a closed delegation takes no communication: say so, without a form whose every field is disabled
+  if (isClosed) return <Card title={t("New communication preview")}><Banner>{mode.text}</Banner></Card>;
   const send = () => {
     setTried(true);
     if (!message.trim() || isTooLong || !chosen) return;
@@ -175,21 +177,21 @@ function Compose({ detail, onPreview }: Readonly<{ detail: Extract<DetailRows, {
   return (
     <Card title={t("New communication preview")}>
       <div className="flex flex-col gap-3">
-        {mode.text && <Banner tone={isClosed ? undefined : "warn"}>{mode.text}</Banner>}
+        {mode.text && <Banner tone="warn">{mode.text}</Banner>}
         {result && <Banner tone={result.tone}>{result.text}</Banner>}
-        <Field label={t("Template")}><Select value={template} disabled={isClosed} onChange={(e) => { setTemplate(oneOf(TEMPLATES.map((x) => x.id), e.target.value, template)); }}>{TEMPLATES.map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}</Select></Field>
+        <Field label={t("Template")}><Select value={template} onChange={(e) => { setTemplate(oneOf(TEMPLATES.map((x) => x.id), e.target.value, template)); }}>{TEMPLATES.map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}</Select></Field>
         {mode.kind === "note" && <Field label={t("Visibility")}><Choice value={visibility} onChange={setVisibility} options={[{ id: "internal", label: t("Internal (default)") }, { id: "customer", label: t("Customer-visible") }]} /></Field>}
         <Field label={t("Recipient role")} hint={chosen ? `${t(ROLES.find((x) => x.id === role)?.sub ?? "")} · ${chosen.displayLabel}` : t("Nobody of this role is part of the job.")}>
-          <Select value={role} disabled={isClosed} onChange={(e) => { setRole(e.target.value); setRecipient(detail.recipients.find((p) => p.role === e.target.value)?.id ?? ""); }}>
+          <Select value={role} onChange={(e) => { setRole(e.target.value); setRecipient(detail.recipients.find((p) => p.role === e.target.value)?.id ?? ""); }}>
             {ROLES.map((x) => <option key={x.id} value={x.id} disabled={detail.recipients.every((p) => p.role !== x.id)}>{x.label}</option>)}
           </Select>
         </Field>
         {ofRole.length > 1 && <Field label={t("Recipient")}><Select value={chosen?.id ?? ""} onChange={(e) => { setRecipient(e.target.value); }}>{ofRole.map((p) => <option key={p.id} value={p.id}>{p.displayLabel}</option>)}</Select></Field>}
-        <Field label={t("Channel")}><Select value={channels.some((c) => c.id === channel) ? channel : "inApp"} disabled={isClosed} onChange={(e) => { setChannel(e.target.value); }}>{channels.map((c) => <option key={c.id} value={c.id}>{t("{channel} · preview only", { channel: c.id })}</option>)}</Select></Field>
+        <Field label={t("Channel")}><Select value={channels.some((c) => c.id === channel) ? channel : "inApp"} onChange={(e) => { setChannel(e.target.value); }}>{channels.map((c) => <option key={c.id} value={c.id}>{t("{channel} · preview only", { channel: c.id })}</option>)}</Select></Field>
         <Field label={t("Message (1–2000 chars)")} error={tried && !message.trim() ? t("A message is required — nothing was saved") : lengthError}>
-          <Textarea value={message} disabled={isClosed} onChange={(e) => { setMessage(e.target.value); }} placeholder={t("Schedule moved to 2026-09-22 09:00–11:00 due to technician availability.")} />
+          <Textarea value={message} onChange={(e) => { setMessage(e.target.value); }} placeholder={t("Schedule moved to 2026-09-22 09:00–11:00 due to technician availability.")} />
         </Field>
-        <div className="flex flex-wrap justify-end gap-2"><Btn disabled={pending || isClosed} onClick={() => { setMessage(""); setTried(false); setResult(null); }}>{t("Clear")}</Btn><Btn variant="primary" disabled={pending || isClosed || !chosen} onClick={send} className="h-auto min-h-8 max-w-full whitespace-normal text-left">{mode.add && <Icon name="add" />}{mode.button}</Btn></div>
+        <div className="flex flex-wrap justify-end gap-2"><Btn disabled={pending || (message === "" && !tried && result === null)} onClick={() => { setMessage(""); setTried(false); setResult(null); }}>{t("Clear")}</Btn><Btn variant="primary" disabled={pending || !chosen} onClick={send} className="h-auto min-h-8 max-w-full whitespace-normal text-left">{mode.add && <Icon name="add" />}{mode.button}</Btn></div>
         <p className="text-[11px] text-muted-foreground">{t("No real sending. Only people involved in this job are offered; free-form external recipients and other jobs’ recipients are rejected. Internal notes stay hidden from customers.")}</p>
       </div>
     </Card>

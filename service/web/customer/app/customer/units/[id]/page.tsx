@@ -43,7 +43,7 @@ export default async function CustomerUnitPage({ params }: Readonly<PageProps<"/
     if (error instanceof CoreError && (error.error.code === "NOT_FOUND" || error.error.fieldErrors.id)) notFound();
     throw error;
   }
-  const [room, policies, history, display, restriction, now, me] = await Promise.all([
+  const [room, policies, history, display, restriction, now, me, prefs] = await Promise.all([
     coreOp<{ items: ApiUnit[] }>("units.list", { limit: 100, filters: detail.spaceId ? { spaceId: detail.spaceId } : { unitIds: [id] } }),
     coreOp<{ items: ApiPolicy[] }>("policies.list", { limit: 100 }),
     coreOp<{ items: ApiCommand[] }>("commands.list", { unitId: id, query: { limit: 20 } }),
@@ -51,6 +51,7 @@ export default async function CustomerUnitPage({ params }: Readonly<PageProps<"/
     detail.effectiveControlPolicy.state === "restricted" ? orNull(restrictionHref(id)) : Promise.resolve(null), // a link only, never a failure
     coreNow(), // the scenario's now: a time of another day keeps its date (IR613)
     corePrincipal(),
+    orNull(coreOp<{ pinnedUnitIds?: string[] }>("preferences.get", {})), // the pins (IR819)
   ]);
   const i = i18nOf(display), { t } = i;
   const severity: Record<string, string> = { critical: "Critical", warning: "Warning", normal: "Info" };
@@ -61,5 +62,5 @@ export default async function CustomerUnitPage({ params }: Readonly<PageProps<"/
   // the default policy's rules on for this customer, as the owner switched them (IR623)
   const defaultPolicy = policies.items.find(isDefault);
   const defaults = defaultPolicy ? { on: defaultRuleRows(defaultPolicy, me.customerId, me.membershipId, i).on, n: defaultPolicy.rules.length } : null;
-  return <UnitView id={id} detail={detail} room={room.items.map((item) => unitRowFromApi(item))} policies={options} defaults={defaults} history={history.items} restrictionHref={restriction} nowMs={now.getTime()} />;
+  return <UnitView id={id} detail={detail} room={room.items.map((item) => unitRowFromApi(item))} policies={options} defaults={defaults} history={history.items} restrictionHref={restriction} nowMs={now.getTime()} me={me.membershipId} pins={prefs?.pinnedUnitIds ?? []} />;
 }

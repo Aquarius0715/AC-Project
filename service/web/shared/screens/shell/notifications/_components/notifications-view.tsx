@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import { Badge, Btn, Card, Page, Tabs, useToast, cx } from "@ac/web/components/ui";
 import { useStoredRole } from "@ac/web/components/AppShell";
 import { useT } from "@ac/web/components/I18n";
+import { Icon } from "@ac/web/components/Icon";
 import { jobActions, useDemoInbox } from "@ac/web/lib/jobs";
 import type { InboxRow } from "@ac/web/lib/notifications";
 import { actionMessage, type ActionFailure } from "@ac/web/lib/actionMessage";
@@ -67,7 +68,8 @@ export function NotificationsView({ rows }: Readonly<{ rows?: InboxRow[] }>) {
       <Card pad={false} className={pending ? "opacity-70" : undefined}>
         <ul className="divide-y divide-line">
           {shown.map((n) => {
-            const body = <><span className={cx("mt-1.5 h-2 w-2 shrink-0 rounded-full", n.read ? "bg-transparent" : "bg-primary")} /><span className="min-w-0 flex-1"><span className={cx("block text-[13px]", !n.read && "font-bold")}>{n.t}</span><span className="block text-xs text-muted-foreground">{n.d}</span></span><span className="shrink-0 text-xs text-muted-foreground">{n.w}</span></>;
+            // unread is said in words too (the dot and bold are visual only); a row that opens a page shows where it goes
+            const body = <><span aria-hidden className={cx("mt-1.5 h-2 w-2 shrink-0 rounded-full", n.read ? "bg-transparent" : "bg-primary")} /><span className="min-w-0 flex-1"><span className={cx("block text-[13px]", !n.read && "font-bold")}>{!n.read && <span className="sr-only">{t("Unread")}: </span>}{n.t}</span><span className="block text-xs text-muted-foreground">{n.d}</span></span><span className="shrink-0 text-xs text-muted-foreground">{n.w}</span>{n.href && <Icon name="chevronRight" className="mt-0.5 shrink-0 text-muted-foreground" />}</>;
             const cls = "flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-surface2/60";
             return <li key={n.id}>{n.href ? <Link href={n.href} onClick={() => { open(n); }} className={cls}>{body}</Link> : <Button variant="ghost" onClick={() => { open(n); }} className={`h-auto justify-start whitespace-normal ${cls}`}>{body}</Button>}</li>;
           })}

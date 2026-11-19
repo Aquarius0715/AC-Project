@@ -30,26 +30,31 @@ describe("HQ billing (FR-A08, FR-A23, DD-A08)", () => {
     expect([invoiceStatus(invoice({}), NOW), invoiceStatus(invoice({ dueAt: "2026-09-20T16:00:00Z" }), NOW), invoiceStatus(invoice({ status: PROCESSING }), NOW), invoiceStatus(invoice({ status: "paid" }), NOW)])
       .toStrictEqual(["Overdue", "Unpaid", "Processing", "Paid"]);
     const [a, b] = invoiceRows([invoice({}), invoice({ id: "i2", contractId: "kx", paymentMethod: "demo_credit_card", paymentStatus: PROCESSING, status: PROCESSING })], contracts, customers, NOW);
-    expect(a).toMatchObject({ amt: "120.00 MYR", meta: "Demo Customer A · rto contract v1 · August 2026", method: "Method not selected", methodName: "Method not selected", paymentState: null, st: "Overdue", period: "1 Aug 2026 → 1 Sept 2026", due: "10 Sept 2026" });
+    expect(a).toMatchObject({ amt: "120.00 MYR", meta: "Demo Customer A · RTO contract v1 · August 2026", method: "Method not selected", methodName: "Method not selected", paymentState: null, st: "Overdue", period: "1 Aug 2026 → 1 Sept 2026", due: "10 Sept 2026" });
     expect(b).toMatchObject({ meta: "customer · kx · August 2026", method: "Credit card · processing", methodName: "Credit card", paymentState: PROCESSING, customerId: "" });
-    expect([totals([must(a), must(b)], ["Overdue", "Processing"]), totals([must(a)], ["Paid"])]).toStrictEqual(["240.00 MYR", "0.00"]);
+    expect([totals([must(a), must(b)], ["Overdue", "Processing"]), totals([must(a)], ["Paid"])]).toStrictEqual(["240.00 MYR", "0.00 MYR"]);
+    expect(totals([], ["Paid"])).toBe("0.00");
   });
 
   it("words the payments of an invoice, inquiries, contracts and payout statements", () => {
     const d = invoiceDetail({ ...invoice({}), restrictionIds: ["r1"], paymentRefs: [
-      { id: "p1", version: 1, amountMinor: 12_000, currency: "MYR", invoiceId: "i1", method: null, status: "confirmed", paymentReference: "BANK-1", confirmationReason: "Bank transfer", confirmedAt: "2026-09-12T02:00:00Z" },
-      { id: "p2", version: 3, amountMinor: 12_000, currency: "MYR", invoiceId: "i1", method: "demo_debit_card", status: PROCESSING, paymentReference: null, confirmationReason: null, confirmedAt: null },
+      { id: "p1", version: 1, amountMinor: 12_000, currency: "MYR", invoiceId: "i1", method: null, channel: "manual", status: "confirmed", paymentReference: "BANK-1", confirmationReason: "Bank transfer", confirmedAt: "2026-09-12T02:00:00Z" },
+      { id: "p2", version: 3, amountMinor: 12_000, currency: "MYR", invoiceId: "i1", method: "demo_debit_card", channel: "demo", status: PROCESSING, paymentReference: null, confirmationReason: null, confirmedAt: null },
     ] });
     expect(d).toStrictEqual({ id: "i1", version: 1, processingPaymentId: "p2", processingPaymentVersion: 3, restrictionIds: ["r1"], manualAllowed: false, payments: ["No method (recorded by HQ) · confirmed · ref BANK-1 · reason “Bank transfer”", "Debit card · processing"] });
     // IR447: only a failed (or expired) card payment leaves the invoice open to a manual payment
-    const failed = { id: "p3", version: 2, amountMinor: 12_000, currency: "MYR" as const, invoiceId: "i1", method: "demo_credit_card" as const, status: "failed" as const, paymentReference: null, confirmationReason: null, confirmedAt: null };
+    const failed = { id: "p3", version: 2, amountMinor: 12_000, currency: "MYR" as const, invoiceId: "i1", method: "demo_credit_card" as const, channel: "demo" as const, status: "failed" as const, paymentReference: null, confirmationReason: null, confirmedAt: null };
     expect([invoiceDetail({ ...invoice({}), restrictionIds: [], paymentRefs: [failed] }).manualAllowed, invoiceDetail({ ...invoice({}), restrictionIds: [], paymentRefs: [] }).manualAllowed,
       invoiceDetail({ ...invoice({}), restrictionIds: [], paymentRefs: [{ ...failed, status: "initiated" }] }).manualAllowed]).toStrictEqual([true, true, false]);
+    // IR827: a Stripe payment is named as such, an expired one in words, and a processing one is not HQ's to confirm
+    const stripe = { ...failed, id: "p4", method: null, channel: "stripe_checkout" as const, status: "processing" as const, paymentReference: "pi_1" };
+    const viaStripe = invoiceDetail({ ...invoice({}), restrictionIds: [], paymentRefs: [stripe, { ...stripe, id: "p5", status: "expired" as const, paymentReference: null }] });
+    expect([viaStripe.processingPaymentId, viaStripe.payments]).toStrictEqual([null, ["Stripe Checkout · processing · ref pi_1", "Stripe Checkout · expired"]]);
     const iq: ApiInquiry = { id: "q1", version: 1, customerId: "c1", invoiceId: "i1", restrictionId: null, subjectType: "payment", message: "Paid already", state: "received", reply: null, createdAt: "2026-09-14T02:00:00Z" };
     expect(inquiryRows([{ ...iq, id: "q0", state: "answered", createdAt: "2026-09-15T00:00:00Z", subjectType: "restriction" }, iq], customers).map((r) => [r.id, r.kind, r.at, r.text])).toStrictEqual([
       ["q1", "Payment", "14 Sept 2026, 10:00 am MYT", "“Paid already”"], ["q0", "Cooling restriction", "15 Sept 2026, 8:00 am MYT", "“Paid already”"],
     ]); // received first
-    expect(contractOptions(contracts, [])[0]?.label).toBe("customer · rto · 120.00 MYR");
+    expect(contractOptions(contracts, [])[0]?.label).toBe("customer · RTO · 120.00 MYR");
     expect(statementRows([statement], [{ id: "org-p", name: "CoolFix", kind: "contractor" }])).toStrictEqual([{
       id: "s1", version: 2, contractor: "CoolFix", period: "Aug 2026", status: "Approved", jobs: 2, net: "250.00 MYR", statusText: "Approved · pays 15 Sept 2026", queryCount: 2, openQueries: 1,
     }]);
@@ -84,7 +89,7 @@ describe("HQ billing in Malay with the display time zone (IR299)", () => {
     const t = translator("ms");
     expect([businessDay("2026-09-09T16:00:00Z", "ms"), billingMonth("2026-07-31T16:00:00Z", "ms")]).toStrictEqual(["10 Sep 2026", "Ogos 2026"]); // Kuala Lumpur days, not Tokyo's
     const [r] = invoiceRows([invoice({ paymentMethod: "demo_debit_card", paymentStatus: "failed" })], contracts, [], NOW, MS);
-    expect(r).toMatchObject({ meta: "pelanggan · kontrak rto v1 · Ogos 2026", method: "Kad debit · gagal", period: "1 Ogo 2026 → 1 Sep 2026", due: "10 Sep 2026" });
+    expect(r).toMatchObject({ meta: "pelanggan · kontrak RTO v1 · Ogos 2026", method: "Kad debit · gagal", period: "1 Ogo 2026 → 1 Sep 2026", due: "10 Sep 2026" });
     expect([paymentWord("initiated", t), paymentWord("refunded", t), statementWord("Draft", t), statementWord("Paid", t)]).toStrictEqual(["dimulakan", "refunded", "Draf", "Dibayar"]);
     const iq: ApiInquiry = { id: "q1", version: 1, customerId: "cx", invoiceId: null, restrictionId: "r1", subjectType: "restriction", message: "Why?", state: "received", reply: null, createdAt: "2026-09-14T02:00:00Z" };
     expect(inquiryRows([iq], customers, MS)[0]).toMatchObject({ cust: "pelanggan", kind: "Sekatan penyejukan", at: "14 Sep 2026, 11:00 PG GMT+9" });

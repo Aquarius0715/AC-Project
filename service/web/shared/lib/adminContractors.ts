@@ -11,7 +11,7 @@ import { amount } from "@ac/web/lib/money";
 import { qualificationLabel } from "@ac/web/lib/partnerJobDetail";
 import type { IconName } from "@ac/web/components/Icon";
 import { byText } from "@ac/web/lib/order";
-import { codePoints, isEmail } from "@ac/web/lib/text";
+import { codePoints, isEmail, utf8Length } from "@ac/web/lib/text";
 
 const en = translator("en");
 
@@ -85,7 +85,7 @@ export function rateCardView(cards: ApiRateCard[], rateCardId: string | null, no
   const { t } = i;
   const day = (iso: string) => businessDay(iso, i.display.locale);
   const current = cards.find((c) => c.id === rateCardId) ?? null;
-  const lines = (c: ApiRateCard) => WORK_TYPES.flatMap((w) => c.lines.filter((l) => l.workType === w.id).map((l) => ({ workType: w.id, label: t(w.label), amount: rateAmount(l), note: l.note })));
+  const lines = (c: ApiRateCard) => WORK_TYPES.flatMap((w) => c.lines.filter((l) => l.workType === w.id).map((l) => ({ workType: w.id, label: t(w.label), amount: rateAmount(l), entry: (l.amountMinor / 100).toFixed(2), note: l.note })));
   return {
     current: current ? { title: t("Rate card v{v} (from {date})", { v: current.version, date: day(current.effectiveFrom) }), since: t("v{v} (from {date})", { v: current.version, date: day(current.effectiveFrom) }), currency: current.currency, lines: lines(current) } : null,
     scheduled: cards.filter((c) => Date.parse(c.effectiveFrom) > now).toSorted((a, b) => Date.parse(a.effectiveFrom) - Date.parse(b.effectiveFrom)).map((c) => ({ id: c.id, title: t("v{v} from {date} · scheduled", { v: c.version, date: day(c.effectiveFrom) }), currency: c.currency, lines: lines(c) })),
@@ -113,8 +113,11 @@ export function technicianRows(technicians: ApiTechnician[], certs: ApiCertifica
     else if (!soonest || quals.length === 0) badge = { label: t(quals.length > 0 ? "Expired" : "None"), tone: quals.length > 0 ? "crit" : "muted" };
     else if (Date.parse(soonest.validUntil) - now <= 30 * 86_400_000) badge = { label: t("expiring · {date}", { date: dayMonth(soonest.validUntil, i) }), tone: "warn" };
     else badge = { label: t("Valid"), tone: "ok" };
-    return { id: x.id, name: x.displayName, sub, badge };
-  });
+    return { id: x.id, name: x.displayName, sub, badge, ended };
+  })
+    // the technicians who can work first, ended memberships below them in the same order (one active among fifteen ended, UI/UX loop R121)
+    .toSorted((a, b) => Number(a.ended) - Number(b.ended))
+    .map((r) => ({ id: r.id, name: r.name, sub: r.sub, badge: r.badge }));
 }
 
 /** The certificates waiting for HQ (Verify uploads), oldest first. */
@@ -127,7 +130,7 @@ export function profileErrors(f: { registrationNo: string; serviceAreas: string;
   if (r < 1 || r > 64) e.registrationNo = t("1–64 characters.");
   const areas = areasOf(f.serviceAreas);
   if (areas.length === 0 || areas.length > 20 || areas.some((a) => a.length > 80) || new Set(areas.map((a) => a.toLowerCase())).size !== areas.length) e.serviceAreas = t("1–20 different areas, comma-separated.");
-  if (!isEmail(f.contactEmail.trim()) || codePoints(f.contactEmail.trim()) > 254) e.contactEmail = t("A valid e-mail address.");
+  if (!isEmail(f.contactEmail.trim()) || utf8Length(f.contactEmail.trim()) > 254) e.contactEmail = t("A valid e-mail address.");
   return e;
 }
 export const areasOf = (v: string) => v.split(",").map((a) => a.trim()).filter(Boolean);

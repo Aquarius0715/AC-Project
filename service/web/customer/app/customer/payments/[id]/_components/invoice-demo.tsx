@@ -5,9 +5,11 @@ import Link from "next/link";
 import { useState } from "react";
 import { Badge, Banner, Btn, Card, DemoBadge, Modal, Page, SummaryList, Timeline, useToast, Plain } from "@ac/web/components/ui";
 import { Icon } from "@ac/web/components/Icon";
+import type { DemoContract, DemoInvoice } from "../../_lib/demo-contracts";
 
-/** The Phase 1A demo of /customer/payments/[id] (fixtures; DATA_SOURCE≠API). */
-export function InvoiceDemo({ id, tab }: Readonly<{ id: string; tab?: string }>) { // SCR-C11 tabs: payment (default) · restriction · inquiry
+/** The Phase 1A demo of /customer/payments/[id] (fixtures; DATA_SOURCE≠API): the invoice and contract of the list. */
+export function InvoiceDemo({ invoice, contract, tab }: Readonly<{ invoice: DemoInvoice; contract: DemoContract; tab?: string }>) { // SCR-C11 tabs: payment (default) · restriction · inquiry
+  const { id } = invoice;
   type Phase = "choose" | "processing" | "confirmed" | "failed";
   const toast = useToast();
   const [phase, setPhase] = useState<Phase>("choose");
@@ -15,7 +17,8 @@ export function InvoiceDemo({ id, tab }: Readonly<{ id: string; tab?: string }>)
   const [preview, setPreview] = useState<string | null>(null);
   const [reminders, setReminders] = useState(false);
 
-  if (tab === "restriction") {
+  // as in API mode, the restriction tab exists only for an invoice that causes a restriction
+  if (tab === "restriction" && invoice.restricted) {
     return (
       <Page>
         <div className="text-[13px] text-muted-foreground"><Link href={`/customer/payments/${id}`} className="font-semibold text-primary"><Icon name="arrowLeft" /> Invoice {id}</Link> › Cooling restriction</div>
@@ -34,7 +37,8 @@ export function InvoiceDemo({ id, tab }: Readonly<{ id: string; tab?: string }>)
       </Page>
     );
   }
-  const isPaid = id !== "invoice-overdue-a" && id !== "invoice-sep-a";
+  const isPaid = invoice.paid !== null;
+  const scope = `${String(contract.units.length)} ${contract.units.length === 1 ? "unit" : "units"} (${contract.units.map(([n]) => n).join(", ")})`;
 
   const pay = () => {
     setPhase(PROCESSING);
@@ -52,9 +56,9 @@ export function InvoiceDemo({ id, tab }: Readonly<{ id: string; tab?: string }>)
       <Banner tone="warn" action={<DemoBadge />}>Demo payment — no real money moves. No card number, CVV or expiry is collected.</Banner>
       <div className="split">
         <Card title="Amount due" action={amountBadge()}>
-          <div className="text-[32px] font-bold">120.00 <span className="text-base text-muted-foreground">MYR</span></div>
-          <p className="text-xs text-muted-foreground">Due Sep 10, 2026 · issued Aug 27</p>
-          <SummaryList items={[["Contract", "RTO Plan · contract-rto-a"], ["Contract scope", "3 units (Bedroom AC, Meeting room AC, Lobby AC)"]]} />
+          <div className="text-[32px] font-bold">{invoice.amount} <span className="text-base text-muted-foreground">MYR</span></div>
+          <p className="text-xs text-muted-foreground">Due {invoice.due} · issued {invoice.issued}</p>
+          <SummaryList items={[["Contract", `${contract.name} · ${contract.id}`], ["Contract scope", scope]]} />
           {!isPaid && phase === "choose" && (
             <>
               <h3 className="mt-4 mb-2 text-[13px] font-bold">Payment method</h3>
@@ -71,14 +75,14 @@ export function InvoiceDemo({ id, tab }: Readonly<{ id: string; tab?: string }>)
           {phase === "failed" && <div className="mt-4"><Banner tone="crit" action={<Btn size="sm" onClick={() => { setMethod("credit"); setPhase("choose"); }}>Retry</Btn>}>Payment failed — invoice stays unpaid. Retry or choose another method.</Banner></div>}
         </Card>
         <div className="flex min-w-0 flex-col gap-4">
-          <Card title="Payment history">{phase === "confirmed" || isPaid ? <p className="text-[13px]">Demo card payment · {isPaid ? "Aug 8" : "just now"} · 120.00 MYR</p> : <p className="text-xs text-muted-foreground">No payments yet</p>}</Card>
+          <Card title="Payment history">{phase === "confirmed" || isPaid ? <p className="text-[13px]">Demo card payment · {invoice.paid ?? "just now"} · {invoice.amount} MYR</p> : <p className="text-xs text-muted-foreground">No payments yet</p>}</Card>
           <Card title="Payment reminders" action={<Btn size="sm" variant="ghost" aria-label={reminders ? "Hide reminders" : "Show reminders"} aria-expanded={reminders} onClick={() => { setReminders((r) => !r); }}><Icon name={reminders ? "chevronUp" : "chevronDown"} /></Btn>} sub="Notifications only — not payment methods">
             {reminders && ([["Email", "Demo record Sep 10"], ["WhatsApp", "Demo record Sep 12"]] as const).map(([c, d]) => <div key={c} className="flex flex-wrap items-center justify-between gap-2 border-t border-line py-2 text-[13px]"><span>{c} · {d}<span className="block text-xs text-muted-foreground">Sent {d.replace("Demo record ", "")} (demo record)</span></span><Btn size="sm" variant="ghost" onClick={() => { setPreview(c); }}>View preview</Btn></div>)}
           </Card>
         </div>
       </div>
-      <Banner tone="warn" action={<Link className="text-xs font-semibold text-primary" href={`/customer/payments/${id}?tab=restriction`}>View restriction <Icon name="arrowRight" /></Link>}><b>Cooling restriction active</b> — 1 unit in scope · Lobby AC (Office A) — minimum cooling setpoint 24 °C. Paying does not restore cooling immediately.</Banner>
-      <Modal open={!!preview} onClose={() => { setPreview(null); }} title={`${preview ?? ""} preview`} footer={<Btn onClick={() => { setPreview(null); }}>Close</Btn>}><p className="rounded-xl bg-surface2 p-3 text-[13px]">Your invoice invoice-overdue-a (120.00 MYR) was due on 10 Sep. Pay by card or view payment instructions in the app.</p><p className="text-xs text-muted-foreground">Preview only — nothing was sent.</p></Modal>
+      {invoice.restricted && <Banner tone="warn" action={<Link className="text-xs font-semibold text-primary" href={`/customer/payments/${id}?tab=restriction`}>View restriction <Icon name="arrowRight" /></Link>}><b>Cooling restriction active</b> — 1 unit in scope · Lobby AC (Office A) — minimum cooling setpoint 24 °C. Paying does not restore cooling immediately.</Banner>}
+      <Modal open={!!preview} onClose={() => { setPreview(null); }} title={`${preview ?? ""} preview`} footer={<Btn onClick={() => { setPreview(null); }}>Close</Btn>}><p className="rounded-xl bg-surface2 p-3 text-[13px]">Your invoice {id} ({invoice.amount} MYR) is due on {invoice.due}. Pay by card or view payment instructions in the app.</p><p className="text-xs text-muted-foreground">Preview only — nothing was sent.</p></Modal>
     </Page>
   );
 }

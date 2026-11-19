@@ -28,6 +28,10 @@ const fieldText: Record<string, string> = {
   // a cause invoice of the restriction has a payment under way (restrictions.execute, IR773)
   "errors.payment_processing": "A payment of a cause invoice is in progress — wait for it to be confirmed or to fail",
   "errors.qr_unit_mismatch": "The scanned QR label is not this job's unit — scan the label on this AC, or check in manually with a reason",
+  // the server measures the device's fix against the site's pin (jobs.checkIn, DEC-109, IR825)
+  "errors.too_far": "You are more than 200 m from the site — move closer and try again, or check in manually with a reason",
+  "errors.site_location_missing": "HQ has not set this site's location yet — check in manually with a reason",
+  "errors.position_inaccurate": "Your location is not precise enough — move into the open and try again, or check in manually with a reason",
 };
 // the refusals of the user management and assignment (IR416, IR417, IR420, IR421, IR433) say what to do
 const keyText: Record<string, string> = {
@@ -37,7 +41,7 @@ const keyText: Record<string, string> = {
   "errors.last_owner": "The last active owner can’t be demoted, disabled or removed",
   "errors.last_contractor": "Your company keeps one active contractor — this one can’t be disabled or removed",
   // losing the permission, ending or starting later: the tenant keeps someone who can manage access (IR472)
-  "errors.last_identity_admin": "At least one active membership must keep identity.write — give it to another HQ membership first, then change this one",
+  "errors.last_identity_admin": "At least one active membership must keep “Edit users & roles” — give it to another HQ membership first, then change this one",
   "errors.access_expired": "This account’s access period has ended — set a new access end first",
   // HQ ended the access in Access & roles: no access end, enabling or role change brings it back (IR508)
   "errors.revoked_by_hq": "HQ ended this account's access — only HQ can give it back",

@@ -21,7 +21,7 @@ export function AdminOverviewDemo() {
       {isEmpty && <Banner tone="warn">Zero units in scope — nothing to show yet.</Banner>}
       <div className="grid-fluid" style={{ ["--min"as string]: "200px" }}>
         <Kpi label="Active customers" value={isEmpty ? 0 : k.customers} sub="Customer active (IR40)" href="/admin/units" link="Open" />
-        <Kpi label="Target units" value={isEmpty ? 0 : k.units} sub={`Running ${String(k.on)} · Stopped ${String(k.off)} · unknown ${String(k.unknown)} · archived excluded`} href="/admin/units" link="Open" />
+        <Kpi label="Target units" value={isEmpty ? 0 : k.units} sub={`Running ${String(k.on)} · Stopped ${String(k.off)} · Unknown ${String(k.unknown)} · archived excluded`} href="/admin/units" link="Open" />
         <Kpi label="Operation rate" value={isEmpty ? "—" : k.rate} sub={`Running ${String(k.on)} / known ${String(k.on + k.off)} · unknown ${String(k.unknown)} not in denominator`} href="/admin/units?powerState=on" link="Open" />
         <Kpi label="Unresolved alerts" value={isEmpty ? 0 : k.alerts} tone="warn" sub="open/acknowledged · critical and warning (IR51)" href="/admin/alerts" link="Open" />
         <Kpi label="Energy used (actual)" value={isEmpty ? "—" : k.kwh} sub={k.kwhSub} href="/admin/energy" link="Open" />

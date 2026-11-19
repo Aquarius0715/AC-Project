@@ -1,0 +1,57 @@
+# The shared test environment without downtime at a deployment (DEC-111, IR855): deploy.sh adds this file on top of
+# compose.yaml, compose.test.yaml and compose.live.yaml, and replaces the API services and the apps one container at a
+# time: the new container starts next to the old one, and the old one stops once the new one is healthy.
+#
+# - The apps' ports are web-edge's (nginx, deploy/test/web-edge.conf): two containers of one app cannot both publish a
+#   port. web-edge sends the requests to the new container before the old one stops.
+# - The services call each other by service name; while two containers answer to one name, Docker's DNS gives both,
+#   and a stopping Go service finishes the requests in flight within stop_grace_period (its graceful timeout is 25 s).
+# - Every replaced service has a health check, so deploy.sh knows when the new container is ready.
+# E2E and the local stack do not use this file.
+x-app-health: &app-health
+  # /bff/version answers without a session (IR856)
+  test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/bff/version').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+  interval: 10s
+  timeout: 3s
+  retries: 3
+  start_period: 120s
+  start_interval: 2s
+x-api-health: &api-health
+  start_period: 120s
+  start_interval: 2s
+
+services:
+  customer-web-api: { ports: !reset [], healthcheck: *app-health }
+  partner-web-api: { ports: !reset [], healthcheck: *app-health }
+  technician-web-api: { ports: !reset [], healthcheck: *app-health }
+  admin-web-api: { ports: !reset [], healthcheck: *app-health }
+  portal-web:
+    ports: !reset []
+    healthcheck:
+      <<: *app-health
+      # the portal has no BFF: its page (no sign-in) answers
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+  gateway: { stop_grace_period: 30s, healthcheck: *api-health }
+  identity-api: { stop_grace_period: 30s, healthcheck: *api-health }
+  equipment-api: { stop_grace_period: 30s, healthcheck: *api-health }
+  maintenance-api: { stop_grace_period: 30s, healthcheck: *api-health }
+  billing-api: { stop_grace_period: 30s, healthcheck: *api-health }
+  energy-api: { stop_grace_period: 30s, healthcheck: *api-health }
+  web-edge:
+    image: nginx:1.29-alpine@sha256:5616878291a2eed594aee8db4dade5878cf7edcb475e59193904b198d9b830de   # pinned by digest (IR373), as keycloak-edge
+    restart: unless-stopped
+    environment: { NGINX_ENTRYPOINT_QUIET_LOGS: "1" }
+    # the defaults are compose.test.yaml's: an environment file from before the portal names no PORTAL_WEB_PORT, and the
+    # portal stays on 3204 (IR857)
+    ports:
+      - "${PUBLISH_ADDR:-127.0.0.1}:${CUSTOMER_WEB_PORT:-3000}:3000"
+      - "${PUBLISH_ADDR:-127.0.0.1}:${PARTNER_WEB_PORT:-3001}:3001"
+      - "${PUBLISH_ADDR:-127.0.0.1}:${TECHNICIAN_WEB_PORT:-3002}:3002"
+      - "${PUBLISH_ADDR:-127.0.0.1}:${ADMIN_WEB_PORT:-3003}:3003"
+      - "${PUBLISH_ADDR:-127.0.0.1}:${PORTAL_WEB_PORT:-3204}:3004"
+    # outside the checkout, whose path changes with the runner that deploys (a changed path would recreate web-edge)
+    volumes: ["${WEB_EDGE_DIR:?deploy.sh names the directory of edge.conf and 00-upstreams.conf}:/etc/nginx/conf.d:ro"]
+    # the first deployment with this file: the apps give up their ports before web-edge takes them
+    depends_on: [customer-web-api, partner-web-api, technician-web-api, admin-web-api, portal-web]
+    networks: [edge]
+    profiles: [full]

@@ -32,7 +32,7 @@ test("the customer screens in Malay keep IDs and units and use the display time 
   await page.goto("/customer/properties");
   await expect(main.getByRole("heading", { name: "Premis saya" })).toBeVisible();
   await main.locator("button[aria-pressed]").first().click(); // the first property of the tree: its summary
-  await expect(main.getByText("Pilih bilik untuk melihat penyaman udaranya")).toBeVisible();
+  await expect(main.getByText(/^Penyaman udara di premis ini \(\d+\)$/)).toBeVisible(); // its ACs, listed at once (UI/UX loop R35)
   await page.goto("/customer/automations");
   await expect(main.getByRole("heading", { name: "Automasi anda" })).toBeVisible();
   await page.goto("/customer/automations?automationId=new");
@@ -86,7 +86,8 @@ test("the customer screens in Malay keep IDs and units and use the display time 
   await dialog.getByRole("button", { name: "Batal" }).click();
   await expect(dialog).toBeHidden();
   await page.goto(must(href));
-  for (const name of ["KAWALAN JAUH", "Sejarah arahan", "Telemetri langsung"]) await expect(main.getByRole("heading", { name })).toBeVisible();
+  // the telemetry card is "Live" with fresh readings and "Last" with stale ones: either is right, in Malay
+  for (const name of ["KAWALAN JAUH", "Sejarah arahan", /^Telemetri (langsung|terakhir)$/]) await expect(main.getByRole("heading", { name })).toBeVisible();
   expect(new URL(page.url()).pathname).toBe(href); // the ID is the stored one
   await expect(main).toContainText("°C");
   await expect(main).toContainText("GMT+9"); // Asia/Tokyo, not the Malaysian MYT

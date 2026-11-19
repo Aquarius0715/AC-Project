@@ -1307,7 +1307,7 @@ Details fixed while implementing `clientUsers.*` and `twoFactor.*` (IR118); IR11
 
 1. **Client user records.** `identity.client_users` lists a customer's users. The seed creates one active owner row per seed client membership; `members.save` creating a client membership adds an active member row (unless the email is already listed). `Target.kind` gains `client_user` and `Notification.templateKey` gains `invite` for the invite preview.
 2. **clientUsers.list.** Client owners (members FORBIDDEN) see their own customer; HQ asset.read sees all. Filters customerId, status, clientRole; sort email (default), invitedAt or id. lastSignInAt comes from the linked user and is recorded at sign-in (IR268).
-3. **clientUsers.save.** Email must be a plain valid address up to 254 characters and unique per customer, case-insensitive (VALIDATION). Without id it invites: status=invited, invitedAt=now, invitedBy=caller; status is not allowed; a client owner may invite only members without status or reason (FORBIDDEN otherwise) and only into their own customer (NOT_FOUND). With id it is HQ asset.write only, latest version, reason 1–1000 required, customerId immutable; an invite cannot be set active before first sign-in (CONFLICT); demoting or disabling the last active owner is CONFLICT. Changes are mirrored on the linked membership (clientRole; disabled ends validUntil=now, active clears it; scopeVersion+1).
+3. **clientUsers.save.** Email must be a plain valid address up to 254 bytes (UTF-8, IR834) and unique per customer, case-insensitive (VALIDATION). Without id it invites: status=invited, invitedAt=now, invitedBy=caller; status is not allowed; a client owner may invite only members without status or reason (FORBIDDEN otherwise) and only into their own customer (NOT_FOUND). With id it is HQ asset.write only, latest version, reason 1–1000 required, customerId immutable; an invite cannot be set active before first sign-in (CONFLICT); demoting or disabling the last active owner is CONFLICT. Changes are mirrored on the linked membership (clientRole; disabled ends validUntil=now, active clears it; scopeVersion+1).
 4. **clientUsers.remove.** HQ asset.write, latest version, reason 1–1000; the last active owner is CONFLICT. The row is deleted, the linked membership ends at now, and DeletedResource {id, deleted:true} is returned.
 5. **clientUsers.resendInvite.** Read: client owner of the customer or HQ asset.write; only status=invited (CONFLICT otherwise); returns an email NotificationPreview (templateKey/type invite, target client_user, deliveryState preview) and saves or sends nothing.
 6. **twoFactor.** Per user in `identity.two_factor`. get returns enabled=false with a stable demo setupKey, or enabled=true with enabledAt and recoveryCodesLeft. enable accepts any 6 digits (VALIDATION otherwise), CONFLICT when already enabled, and returns 8 recovery codes once (stored hashed). disable accepts any 6 digits and is CONFLICT when not enabled. Preferences.twoFactorEnabled reflects the record.
@@ -4540,6 +4540,7 @@ No UI kit, icon set, or form, schema, query or translation library is added. Rea
 3. **Report review (IR31).** The same user acting through another membership is still the report's author, so review availability says `self_authored`.
 4. **Restriction retry (SR26).**
    - An apply retry is not applicable once every cause invoice is paid (`errors.restriction_not_applicable`), and it is refused once the restriction is applied (`errors.restriction_state`).
+   - An apply retry whose notice evidence no longer holds is refused like execute (`errors.notice_invalid`, IR838).
    - A release retry needs reconciliation for a unit waiting for reconciliation, or one never confirmed applied (`errors.reconcile_required`).
 5. **Energy (SR09).** Without a current default emission factor, the emissions are null and `factor_missing` is reported. They are never shown as zero.
 6. **Alert policies (D02, IR115).**
@@ -10506,3 +10507,558 @@ Review round 747 (the migration runner). `migrate.Up` skips every migration at o
 ## IR787 A cursor's offset is bounded — 2026-11-12
 
 Review round 749 (`platform/paging`). A cursor is base64 JSON with no signature, so a caller can edit its offset (the hash and versions are copied from a real cursor). An offset near the largest integer made `Offset+Limit` wrap negative in the handlers that slice a list in memory (`jobs.go` merged list: slice bounds out of range, a 500). `cursorOffset` now answers VALIDATION on `cursor` (`error.invalid`) for an offset above 2^31. Test: `TestResolveRefusesAnAbsurdCursorOffset`. Phase 1A unchanged.
+
+## IR788 The Demo clock's long jumps work, and the shown time runs — 2026-11-12
+
+Reported on the test environment: the Demo clock "does not move". Two causes. (1) IR641 added the +2, +4, +8, +12 and +24 hour buttons, but the Server Action `advanceClock` still accepted 1 and 60 minutes only, so each of the five answered VALIDATION `minutes` ("Not done: Try again") and the clock stayed. The action now accepts every `CLOCK_JUMPS` value. (2) The page printed the clock once, when the server rendered it, although the card says "Real-time speed"; `DemoView` now gets the ISO time and shows it ticking each second from that moment (`clockAt`), starting over when a jump re-renders the page. The Core API clock itself was right (shared offset 0 with `DEMO_CLOCK_START=now`). Tests: `advanceClockAction.test.ts` (every jump reaches `demo.advanceClock`, an unknown one is refused), `demoPanel.test.ts` (`clockAt`). Phase 1A unchanged.
+
+## IR790 One sign-in screen, one Keycloak client per app — 2026-11-13
+
+Reported: the sign-in looked doubled. Since IR646 (DEC-100) each app's `/login` asked for the e-mail address and then the identity provider's page asked for the address again with the password. DEC-100's app step is replaced: with the identity service, `/login` of each app (FR-X01, DDC-07, SCR-X-login) goes straight to `/bff/auth/login?returnTo=…`, so the one sign-in screen is the identity provider's (e-mail address and password on one page, its own English / Malay / Japanese choice, one-time code for HQ, reset of a forgotten password). Only a sign-in that came back (`?error=`) stops on the app's page, with the reason and a Sign in button, so there is no redirect loop; the browser demo (no identity service) keeps its Continue page. The app's language buttons, the e-mail field and the "Other AC Project services" list are removed (the portal, IR791, lists the services), and so is the pre-sign-in language cookie.
+
+The apps still have separate sign-ins: Customer, Partner and Technician no longer share the Keycloak client `ac-web`. The realm has `ac-customer-web`, `ac-partner-web` and `ac-technician-web` (and `ac-admin-web` for HQ), each with its own redirect URI and a child theme (`ac-customer`, `ac-partner`, `ac-technician`, `ac-hq`) whose title says the service ("Sign in to AC Project Customer"). `docker/keycloak/configure.sh` creates the clients in a realm that exists (with the tenant, membership and role claims), `deploy/test/realm.py` and `deploy/load/realm.py` write them with the environment's secrets. `OIDC_APP_CLIENT_ID` of the Go services is a comma separated list of the app clients; an account's set-up link returns to its own app's client. Phase 1A unchanged.
+
+## IR791 The portal lists every service address — 2026-11-13
+
+To go from one screen to each service and to the administration tools, a new web app `service/web/portal` (workspace `ac-portal-web`, dev port 3004, test environment port 3204) shows every service address on one page, with no sign-in and no data of its own. It lists the four applications' sign-ins (`/login` of Customer, Partner, Technician, HQ Admin), Keycloak (the account page and the administration console), the Core API's OpenAPI documentation (Swagger UI and `swagger.json`), and the development tools (Mailpit, Jaeger) where the environment publishes them. Each address comes from the setting that already names it (`CUSTOMER_WEB_URL`, …, `KEYCLOAK_URL`, `MAILPIT_URL`, `JAEGER_URL`), is validated with Zod, and is shown on the address the request came by when `PUBLIC_HOSTS` lists it (IR651); a service with no address is left out. The gateway is not published in the shared test environment (IR373), so the portal's three fixed routes `/docs`, `/docs/init.js` and `/swagger.json` fetch those pages from the gateway (`CORE_API_URL`) and nothing else is relayed. The test environment's compose override publishes the portal on `PORTAL_WEB_PORT` and leaves out Mailpit and Jaeger, which are on the server's loopback. The readiness checks (`deploy/test/deploy.sh`, `e2e.yml`, the load stack's health checks) accept the 307 that an app's `/login` now answers (IR790). Phase 1A unchanged.
+
+## IR792 The test deployment waits for CI inside its own run — 2026-11-13
+
+Pushing a test tag while the commit's CI still ran made the tag's run end green at once with the deploy step skipped ("deployed when it passes"); a second run, started by CI's completion (`workflow_run`), did the deployment. The first run looked like a deployment that had not happened, and starting CI by hand before tagging was needed when a merge had started none. `deploy-test.yml` is now one run: job `gate` (a GitHub-hosted runner, so waiting for CI holds no lab-server runner, which was the reason for IR631's split) starts CI if the commit has none and waits for it (`ci_gate.py`, 80 minutes), then job `deploy` (the lab server, `needs: gate`) runs `deploy.sh`. The `workflow_run` trigger and its zizmor exception are removed; only a tag push deploys. The concurrency group `test-deployment` is on the `deploy` job, so deployments still run one at a time and a newer waiting one replaces an older waiting one. Phase 1A unchanged.
+
+## IR793 Air quality shows all four metrics at once — 2026-11-13
+
+The customer air-quality chart took two units at most (IR689: one axis each side), so CO2, PM2.5, temperature and humidity — four different units — could not be seen together. Every metric can now be chosen (`airMetricsOf` keeps all the known names; `toggleAirMetric` never refuses; an "All" chip shows the four or goes back to the first). One or two units still share one chart with an axis each; three or more get a chart each, stacked in the same card on the same time axis and period (`airChartGroups`). The table view already had one table per metric. Unit monitoring of the technician keeps its two-unit limit. Phase 1A unchanged.
+
+## IR794 Client installation requests (DEC-107, FR-C20) — 2026-11-13
+
+DEC-106 let only HQ create an installation job, and BR-T16 said a client cannot ask for one. The user asked (2026-11-13) that the client side can apply for the installation of new aircons and IoT devices; the choices were: new aircons with an IoT yes/no for each request (retrofitting IoT on installed aircons stays out), HQ reviews and creates the units and jobs, Figma not updated. A customer owner creates an `InstallationRequest` (`installationRequests.create`: property, optional space, 1–10 units, model or not decided, `withIot`, 3 preferred slots by the IR113 rule, contact window, note) and may cancel it while `submitted`. HQ reads the requests (`installationRequests.list`, job.read), declines with a reason of 5–500 characters (`installationRequests.decline`, job.write) or approves by creating the planned units (FR-A02) and the jobs: `jobs.create` takes an optional `installationRequestId` (HQ and type `installation` only; otherwise VALIDATION `installationRequestId`). The request must be `submitted` or `approved`, of the unit's customer, and have fewer unfinished jobs than `quantity` (CONFLICT); the job's origin is `client_request` and the client slot rule (the requested slot plus exactly 2 alternatives, IR113) applies; a request whose times have passed is refused by the slot rule, and the owner sends a new one; creating the first job sets the request `approved` in the same transaction. A client still cannot create an installation job itself. No unit is created by a client; the planned unit's `installState` rules of IR789 are unchanged. A request needs no cross-domain events: the maintenance domain reads the customer's property, space and model through the assets and identity query interfaces (`ops.Ask`), as `jobs.create` reads units. No notification is sent (a later change may add one): HQ finds submitted requests in Jobs › Installation requests and the owner sees the state in the list. Operations 228 → 232, REST routes 250 → 254. Migration 000006 adds `maintenance.installation_requests` and `maintenance.jobs.installation_request_id`.
+
+## IR795 Bahasa Indonesia is a fourth display language (DEC-108) — 2026-11-13
+
+The user asked for Indonesian to be selectable as a language, as Japanese was added in IR639.
+
+1. **The language.** `Locale` is `en|ms|ja|id` in `service-contracts.ts` (and the generated `contracts.gen.ts`), in the Go validator of `preferences.update`, and in the `CHECK`s of `identity.preferences.locale` and `notify.templates.locale` (migration `000007_locale_indonesian.up.sql`: the two constraints are dropped and added again; `000001` stays frozen, IR785, and `schema.sql` carries the same CHECKs). Preferences and the browser demo offer "Bahasa Indonesia" under its own name. Anything else is still VALIDATION.
+2. **The texts.** `shared/lib/i18n-id.ts` holds an Indonesian text for each of the 5,944 English keys of `i18n-ms.ts`, in the same order, with the same `{placeholders}`; it is written from the English text, not copied from Malay (*kata sandi*, *masuk / keluar*, *faktur*, *perangkat*). The key check of IR44 runs on it like on the other dictionaries. Indonesian shares loanwords with English (Unit, Status, Filter, Online), so a test allows a short list of texts that stay as they are, not the list of ja's strict check. The Business / UI / UX review of the Indonesian text is still to come, as for Malay and Japanese; the hint under "Display language" names all three drafts.
+3. **Dates and times.** Indonesian uses `id-ID` formats and takes the zone abbreviation from the English data (`id-ID` names Kuala Lumpur and Singapore "GMT+8"), so a time reads "… MYT" as in English. Ordinals read "ke-3", as in Malay.
+4. **The sign-in pages.** `supportedLocales` of the realm and `configure.sh` and the `locales` of the five login themes list `id`; Keycloak ships its own Indonesian login and e-mail texts, so the themes add only the product's titles (`messages_id.properties`) and the language's own name in the chooser.
+5. **The payout PDF.** The statement PDF has an ASCII-only Courier font; Indonesian is written in Latin letters, so an Indonesian user's PDF is in Indonesian (a Japanese user's stays English, IR639).
+6. **Tests.** Vitest runs the dictionary checks for the new language (placeholders, keys, once-only keys, role words), the Indonesian date, ordinal, locale list and PDF; the Go integration test saves `id` with `Asia/Jakarta` and reads it back; Playwright saves Indonesian in Preferences, reads the shell back and puts English back.
+7. **Not done.** Figma (the language chooser of Preferences in each role's Shared row), as for Japanese.
+
+## IR796 Auto-merge pull requests are brought up to date one at a time — 2026-11-15
+
+`main` requires a branch that is up to date with it (strict required checks). Once one pull request merged, every other open one was behind, and GitHub's auto-merge waited for ever: 34 green UI/UX pull requests (#277–#310) stood still until they were merged together through #311. A merge or a branch update made with the workflow token also starts no workflow, so `main` had no CI after an auto-merge (deploy-test starts it for a tag, IR792).
+
+1. **The workflow.** `.github/workflows/keep-prs-current.yml` runs every five minutes (and by hand) on a GitHub-hosted runner, only in this repository, with `actions`, `contents` and `pull-requests` write for its one job.
+2. **One step per run** (`.github/scripts/keep_prs_current.py`): CI on `main` when its head has none, and then one step for the pull requests: CI on an up-to-date pull request whose head has none and is older than three minutes (a branch it updated); a wait while one pull request's CI runs or one that passed is about to merge; otherwise the oldest behind pull request is brought up to date with `main` (`update-branch`) and its CI started (`workflow_dispatch` on its branch, whose check runs on the head satisfy the required checks).
+3. **Which pull requests.** The ones `auto-merge.yml` turns auto-merge on for: open, not draft, the owner's, from a branch of this repository, auto-merge on. A conflicting one (`dirty`) gets a warning in the run and is left for its own merge of `main`.
+4. **Kept.** The strict rule stays: each pull request is tested on the `main` it merges into. A merge queue would do the same but is for organisation repositories only.
+5. **Tests.** `test_keep_prs_current.py` (other-lint) covers the order of the steps: the oldest behind one, waiting for one that runs or merges, the grace for a fresh push, and failed or conflicting ones not holding the others.
+
+## IR797 The partner's open-stage tabs list only the work the company still holds — 2026-11-16
+
+IR614 matched a history without completion by its as-of, so a job whose delegation ended unfinished lists in the partner Jobs list of that week. It keeps its frozen status and so also counted under Active, while the Overview's Active KPI counts only the jobs the company still holds (UX proposal from IR614 item 4; the user took the recommendation on 2026-11-16).
+
+1. **Filter.** `jobs.list` takes `currentOnly` (boolean). With `true`, the history rows of a contractor or technician (JobHistorySnapshot) are left out; offers and summaries are unchanged. The query catalog lists it for `jobs.list`; `service-contracts.ts`'s Query filters have it.
+2. **Screen.** The partner Jobs list's Offered, Active and Review tabs, and their counts, ask with `currentOnly: true`. Completed and All keep the histories, since a completed job is one. DD-P01 says so.
+3. **Tests.**
+   - `TestContractorAndTechnicianProjections`: the ended delegation is listed with `status: accepted` and left out with `currentOnly: true`. The query catalog test sends the filter.
+   - `partnerJobs.test.ts`: the open stages ask with `currentOnly`, Completed and All without.
+
+## IR798 The Running list turns its ACs off, unticking those to keep — 2026-11-16
+
+Found in the UI/UX loop (UX-45). Overview › Running › View running units lists every running AC across properties. Turning them off meant opening each AC's own screen: about 27 clicks for 9 ACs. Group control works on one room or area only (DD-C14), and these ACs were in 8 rooms.
+
+1. **Turn off running ACs.** On the Running list (`/customer/properties?powerState=on`, no connection filter, 2 or more ACs) an owner gets "Turn off running ACs…". It opens the group panel with Power Off as the only change (`TURN_OFF`) and every online AC ticked.
+   - The owner unticks those that should keep running.
+   - Each card shows its place (property › floor › room).
+   - Review & turn off and the sending are those of Group control: one `commands.create` and `commands.get` per AC.
+   - This is the one exception to one space. Power off sets nothing else, so no room's settings can mix.
+2. **After sending.** The list is re-read, and the ACs confirmed off leave it. The panel stays open, says how many were turned off, and Retry covers the failed ACs that are still listed.
+3. **Docs and tests.** FR-C14 and DD-C14 step 5 say so. `clientProperties.test.ts` plans power off only, and an AC already off has nothing to send.
+
+## IR799 A failed command says why in words, never with its code — 2026-11-16
+
+Found in the UI/UX loop (UX-46). A command the AC refused read "Set power OFF — failed (DEVICE_REJECTED)" in the customer's command history, the group-control cards and the control toast. HQ's restriction rows showed "apply failed (OFFLINE)". The technician's command list and test-run banner showed "rejected by the device (DEVICE_REJECTED)" and "The device reported TIMEOUT". IR626 removed codes from the texts but kept these, because they come from the stored failure code.
+
+1. **Words.** `commandFailure` (shared/lib/commandFailure.ts) turns the stored code into a reason, in the display language:
+   - DEVICE_REJECTED: the AC refused it
+   - TIMEOUT: no answer from the AC in time
+   - OFFLINE: the AC was offline
+   - UNAVAILABLE: the AC reported a fault
+   - CONFLICT: another command was still running
+
+   A code it does not know reads "no reason given". The code is never shown.
+2. **Where.**
+   - The command history row reads "Set power OFF — failed: the AC refused it" (customer unit page, toasts and group control).
+   - HQ's restriction rows read "apply failed (the AC was offline)".
+   - The technician's command outcome reads "failed: {reason}".
+   - The test-run banners read "Not done: {reason} · no end command is needed." and "Not confirmed: {reason} · the unit may still be running; check it on site."
+3. **Tests.** units, restrictions and techControl tests expect the words, and an unknown code reads "no reason given".
+
+## IR800 Every unresolved alert says what to do — 2026-11-16
+
+Found in the UI/UX loop (UX-47, the customer's "anomaly response" on a phone). The open "Possible open window" alert showed where, its evidence and "Open — not resolved yet", with View unit as its only action. Nothing said what the customer should do. Faults had Request repair and reminders Book cleaning, but a load cause, a tamper or an air-quality alert left the customer guessing.
+
+1. **Next step.** `alertNext` (shared/lib/alerts.ts) gives the step of an unresolved alert. It looks at the cause first, then the type, then the kind.
+   - window_open: check that the windows and doors are closed, and turn the AC off if nobody is in the room.
+   - insulation_loss: ask for an inspection.
+   - tamper: check the cover, and request a repair if nobody should have opened it.
+   - reconciliation_required: nothing to do while HQ checks.
+   - The kinds: inspection (nothing to do), maintenance (book a cleaning), quality (air the room, see Air quality), fault (request a repair).
+
+   A resolved alert has none. `InboxAlert.next` carries it.
+2. **Screen.** The customer's Needs attention rows add "What to do: …", and the alert detail adds a What to do row. An air-quality alert gets an Air quality link. DD-C08 step 3 says so.
+3. **Tests.** `notifications.test.ts` checks the step by cause, type and kind, none once resolved, and the Malay text.
+
+## IR801 Find a room or AC by name in Units & locations — 2026-11-16
+
+Found in the UI/UX loop (UX-48, a complaint call: "the director's office is hot"). Units & locations had only the tree: 3 properties, 6 floors, 15 rooms. The customer had to scan it for the room, open it, then the AC. There was no search; `filterUnits` took a search, but the customer page always passed an empty one.
+
+1. **Search.** "Find a room or AC…" sits above the tree. Typing waits 300 ms, then sets the URL key `search`. The page lists the units whose display name or place (property › floor › room) contains the text, case-insensitively, together with any power or connection filter. The filtered list is the one the KPI links use: name, place, readings, power and connection badges, Open control. Its title shows the text in quotes.
+2. **Clearing.** A tree row and Clear filter remove `search`, and the box follows the URL. With no match, the list says no room or AC name contains the text and suggests checking the spelling.
+3. **Docs.** DD-C02 step 3 and SCR-C02's URL keys add `search`.
+
+## IR802 One automation for several ACs — 2026-11-16
+
+Found in the UI/UX loop (UX-49, scheduled operation: "switch Office A off at 19:00 on weekdays"). The list header said "each rule controls one AC" and the editor offered one Target AC. Turning a 21-AC office off after hours therefore took 21 rules, each filled in by hand. `automations.save` already took 1–50 `unitIds`, the scheduler (`schedules.go`) fires each rule for all its units, and the editor kept extra units of rules saved elsewhere (`Draft.others`) without showing them.
+
+1. **Editor.** Under Target AC, "Also apply to other ACs" is folded by default, so a one-AC rule stays as before. It lists every other AC with its place, and offers "All ACs in {property}" (the target's property) and Clear. A rule with more ACs opens it with them ticked. A rule holds up to 50 ACs, and the boxes lock at 50.
+2. **Actions.** `commonActionOptions` (shared/lib/clientAutomations.ts) keeps only the actions every chosen AC supports. The API refuses any other with `unitIds: unsupported_action`. An action that does not fit reads "Not supported by every chosen AC — choose another action".
+3. **Texts.** Step 3 reads "Action for {n} ACs". The list header drops "each rule controls one AC". The card still names the first AC "(+n more ACs)".
+4. **Tests.** `clientAutomations.test.ts`: the common actions of a wide and a narrow AC (power, the shared temperatures, cool), one AC equal to its own options, none for no AC or an AC without capabilities.
+5. **Checked on the dev stack.** A rule for Lobby AC and Meeting room AC (Office A) was saved, listed as "(+1 more AC)", reopened with both, then deleted.
+
+## IR803 Energy & cost ranks the ACs by use — 2026-11-16
+
+Found in the UI/UX loop (UX-50: "which AC should I review?"). Energy & cost showed one AC, the first by name, or up to four that the customer picked. Nothing said which of the 23 ACs used the most, so finding the one to review took 23 selections.
+
+1. **Ranking.** For the period, the page also runs one `energy.summary` per unit of the customer. `topUsers` (shared/lib/clientEnergy.ts) keeps the five highest and leaves out units without measured energy. Ties go by name. Each unit's share is of the measured total.
+2. **Card.** "Highest use in this period" lists the AC, its kWh, its share of measured and its data coverage, in warning colour under 80%. A note says low coverage means the AC may have used more than shown. Show selects that AC alone. Compare adds it, up to four, and is hidden when the AC is already shown or four are chosen. The card is hidden with fewer than two ranked ACs.
+3. **Docs and tests.** DD-C06 step 5. `energy.test.ts` checks the order, the shares and leaving out units without measured use.
+
+## IR804 The command history says who sent a command: you or someone else — 2026-11-16
+
+Found in the UI/UX loop (UX-51, several users on one account). A customer owner and their family or staff share one account. When an AC's setting changed, its command history said "Set power OFF — acknowledged by device" with no hint of who sent it. Only automations, restrictions and test runs named their source. `commands.list` already returns `actorMembershipId` to the client; IR216 hides only another actor's reason.
+
+1. **Rows.** `historyRow` takes the reader's membership. A command with no other source (sent by hand) ends "· by you" when its actor is the reader, else "· by someone else". No name is shown, so nothing new is disclosed. Automation, restriction and test-run commands keep "· by an automation" and the others.
+2. **Where.** The customer unit page's command history. The page passes `me.membershipId` from the session.
+3. **Tests.** `units.test.ts`: by you, by someone else, an automation's command, and no reader (unchanged).
+
+## IR805 A narrow list card names each value — 2026-11-16
+
+Found in the UI/UX loop (UX-52, a contractor coordinator on a phone). Below a breakpoint, the partner Jobs list and the customer Overview's unit list hide their column headings. Each row becomes a card, and the values stand without them. The partner card read "—  history only / —  access closed". The customer row read "— no data" three times, with no sign of which was temperature, humidity or power.
+
+1. **Partner Jobs list.** Below `@3xl`, the Technician and Slot / deadline values carry their heading above them, the same words as the hidden column headings.
+2. **Customer Overview.** Below `lg`, the three readings carry Room temp, Humidity and Power now.
+3. **Wide screens** are unchanged: the labels hide where the headings show. These were the only two lists of the four apps that hide headings this way (searched for `hidden grid-cols-[` headings).
+
+## IR806 Waiting for the AC counts down — 2026-11-16
+
+Found in the UI/UX loop (UX-53, the single-AC control on a phone, criterion 9). After Send, the panel said "Waiting for device response… (fails after 30 s)". The button was disabled, so double sends were already prevented, but nothing moved for up to 30 s, which reads as a hang.
+
+1. **Countdown.** `WaitBanner` on the customer unit page reads "Waiting for the AC to confirm… The result shows only after it acknowledges." followed by "{s} s left".
+   - The seconds come from `answerSeconds` (shared/lib/units.ts): request to expiry, else 30.
+   - It counts on the browser's clock from when the command was created. The command's own times are on the scenario clock.
+   - Each command of a multi-setting send restarts it (keyed by command id).
+   - At zero it reads "No answer yet — checking the result…" until the follow-up answers.
+2. **Accessibility.** The banner is a polite live region, so the sentence stays fixed and the seconds are `aria-hidden`. A screen reader hears the sentence once, not a count every second.
+3. **Tests.** `units.test.ts` covers `answerSeconds`: 30 s, 120 s, a missing expiry, a zero span and an unreadable time.
+
+## IR807 HQ's Unresolved alerts tile opens the alerts it counts — 2026-11-16
+
+Found in the UI/UX loop (UX-54, HQ anomaly response). The Overview tile "Unresolved alerts 4 · open or acknowledged · critical and warning" linked to `/admin/alerts`. That list opened on every open alert, 19 of them: the four warnings plus 15 filter-cleaning reminders (info). The count and the list disagreed, and the dispatcher had to filter by hand.
+
+1. **Filter.** The severity select of the alerts tab adds "Severity: Critical & warning" (`severity=attention`). `alerts.list` takes a single severity, so with this value the page reads without one and leaves out the `normal` rows. The status tiles and the list follow.
+2. **Link.** `overviewLinks().alerts` is `/admin/alerts?severity=attention`, so the tile's 4 is the list's Open 4.
+3. **Docs and tests.** DD-A05 step 5. `adminSummary.test.ts` checks the link.
+
+## IR808 A very low cooling setpoint gets a hint — 2026-11-16
+
+Found in the UI/UX loop (UX-55, criterion 12: notice the settings worth reviewing). Lowering a cooling setpoint to 16–21 °C went through the control and the confirmation with nothing said. A low setting is a common reason for high use, and it does not cool a room faster. The outdoor temperature is not available to the web apps (no weather operation), so the comparison with outside is left for later.
+
+1. **Hint.** `coolingHint(mode, celsius)` (shared/lib/units.ts) returns a sentence when the mode is Cool and the setpoint is below 22 °C. The sentence: "{celsius}°C is very cold for cooling: a lower setting does not cool the room faster, it runs longer and uses more power. 24–26°C is a common comfortable range." It returns null otherwise.
+2. **Where.** The customer unit page shows it under the temperature row, in warning colour with an info icon, while the user picks the value. It blocks nothing.
+3. **Tests.** `units.test.ts` covers cooling at 18 and 22 °C and the other modes.
+
+## IR809 The unit page shows others' changes without a reload — 2026-11-16
+
+Found in the UI/UX loop (UX-56, criterion 14: several users at once). The customer unit page read its data once, so a change by another user, an automation or the device showed only after a manual reload. No page in the four apps re-read by itself.
+
+1. **Hook.** `useAutoRefresh(enabled, seconds = 30)` (shared/lib/useAutoRefresh.ts) calls `router.refresh()` at the interval while enabled. It skips ticks while the tab is hidden.
+2. **Unit page.** `LiveNote` enables it unless the user is busy: a setting edited and not sent, the confirmation, the power confirmation, rename or attach dialog open, or a command being awaited. A newer device report resets the controls (the "adjust state during render" sync), so re-reading then would lose the user's change. The header card says which state it is in.
+3. **Tests.** `useAutoRefresh.test.tsx` uses fake timers: it refreshes at each interval, never while paused, stops when paused again, and skips hidden ticks.
+4. **Load.** One server render per open unit page every 30 s.
+
+## IR810 Undo the last change of an AC — 2026-11-16
+
+Found in the UI/UX loop (UX-57, criterion 14: undo of the last operation). A change sent by mistake had to be put back by hand: remember the old values, set them, review and send again.
+
+1. **What is undone.** `undoActions(actions, before)` (shared/lib/units.ts) maps each sent setting back to the confirmed value it replaced. That value comes from the observed state read before the send, and the commands keep the order of the send. Power, temperature, mode and fan are covered. A setting without a confirmed value before, or one that did not change, is left out.
+2. **Where.** On the customer unit page, when every command of a send is acknowledged, the result banner shows Undo beside Dismiss. Undo sends those commands through the same path as any send: own idempotency key, version check, waiting with the countdown, and a result. The user's click is the confirmation, since the commands restore what was confirmed a moment before. The undo itself offers no further Undo, and a send that failed part-way offers none.
+3. **Tests.** `units.test.ts` covers a temperature and fan send undone in order, a power send undone, and settings with no confirmed value before (nothing to undo).
+4. **Not checked live.** The mock fleet did not acknowledge commands on the dev stack (scenario clock), so the banner's Undo was not seen in the browser. Real devices were not used.
+
+## IR811 From turning the running ACs off to doing it every weekday — 2026-11-16
+
+Found in the UI/UX loop (UX-58, criterion 11: fewer manual steps; principle 15: fewer trips to other screens). After "Turn off running ACs" (IR798), the customer who does this every evening had to go to Automations, create a rule, pick the same ACs again and set Power OFF.
+
+1. **Link.** The Turn off panel on the Running list offers "Turn these off automatically every weekday…". It goes to `/customer/automations?automationId=new&preset=off&unitIds=<the ticked ACs>`, up to 50.
+2. **Preset.** `afterHoursDraft(unitIds, timezone, name)` (shared/lib/clientAutomations.ts) builds a schedule rule named "Switch off after hours". It runs on weekdays, starts at 19:00 with Power OFF and ends at 23:00. The end action stays empty, since DD-C04 never assumes it. The first AC is the target and the rest are `others`, up to 49. The rule is saved off, like every new one. The page reads `preset` and `unitIds` only with `automationId=new` and keeps only the customer's own unarchived ACs.
+3. **Leaving.** Done, Cancel and Create clear `preset` and `unitIds`, so the next new rule starts blank.
+4. **Tests.** `clientAutomations.test.ts` checks the filled fields, the empty end action and the 50-AC cap.
+
+## IR813 Book cleaning from an alert opens on that AC — 2026-11-16
+
+Found in the UI/UX loop (UX-60, principle 15: no searching again after following a link). A filter-cleaning reminder's Book cleaning opened Filter care (`tab=filter-care`), which lists every AC: 15 overdue in the demo. The customer had to find again the AC the reminder was about.
+
+1. **Link.** The alert row and detail link to `/customer/maintenance?tab=filter-care&unitId=<the alert's unit>`.
+2. **Filter care.** `FilterCareTab` takes `focus`, the `unitId` from the URL. That AC's row is marked (`aria-current`, a tinted background) and scrolled to the middle of the view once, on arrival. An area that folds it opens. Request cleaning and Mark cleaned work as before.
+3. **Docs.** SCR-C09 lists the URL key `unitId`, which is optional.
+
+## IR815 Energy & cost opens on the AC that used the most — 2026-11-16
+
+Found in the UI/UX loop (UX-62, criterion 12; noted in UX-50). Opening Energy & cost showed the first AC by name ("Bedroom AC"), whatever it used, so the first view rarely answered "where does the energy go?".
+
+1. **Default.** When the URL names no AC of the customer, the page waits for the per-unit ranking (IR803) and opens on its first AC. The ranking still runs in parallel with the other reads when ACs are named. With no measured use at all, it falls back to the first by name as before.
+2. **Note.** The Units row then reads "Showing the AC that used the most in this period · up to 4 units".
+3. **Docs.** DD-C06 step 6.
+
+## IR816 On a phone, the Overview says the most severe open alert first — 2026-11-16
+
+Found in the UI/UX loop (UX-64; noted in UX-47). On a phone the customer Overview stacks the KPI tiles one per row. The Needs attention tile is the fourth, about two screens down, under Running, Stopped and Unknown, so an open warning was not on the first screen.
+
+1. **Banner.** Below the `sm` breakpoint, a warning banner under the overdue notice names the most severe open alert from `attentionCard`: its title, unit and when, with "+n more" when there are others and View alerts. With no open warning or fault there is no banner.
+2. **Wider screens.** No change: the tile is in the first row there.
+3. **Docs.** DD-C01.
+
+## IR812 A demo event's evidence names its metric and comparison in words — 2026-11-16
+
+Found in the UI/UX loop (UX-59, HQ anomaly response; noted in UX-54). A policy rule's demo event is stored as "Demo event: heartbeat_gap gte threshold" (monitoring notifier). The alert detail and its activity showed it with the metric code and the comparison code. IR626 had worded the template but kept both values as stored.
+
+1. **Words.** `evidenceText` (shared/lib/evidence.ts) now reads the template as "Demo event: {metric} {operator} its alert threshold".
+   - The metric uses its alert name, for example Heartbeat gap or Temperature.
+   - The comparison reads above, at or above, below or at or below.
+   - All three are in the display language. An unknown metric or comparison keeps its stored form.
+2. **Shared names.** The metric names moved from adminAlerts.ts to `metricLabels.ts`. evidence.ts reads them there, because adminAlerts imports evidence. adminAlerts re-exports them, so nothing else changes.
+3. **Tests.** `evidence.test.ts` checks the Malay text for temperature and the English one for heartbeat_gap.
+
+## IR817 "Already signed in as another user" says what to do — 2026-11-16
+
+Found in the UI/UX loop (UX-66; seen in UX-54 and UX-63). Signing in to one app while this browser's identity-provider session belongs to another user ended on Keycloak's "You are already authenticated as different user 'customer-a' in this session. Please sign out first." It was a dead end, with no hint where to sign out.
+
+1. **Message.** The shared login theme `ac` overrides `differentUserAuthenticated` in en, ms, ja and id: "You are already signed in as {0} in this browser. To use another account here, sign out in the AC Project app you are signed in to (its menu, Sign out), then open this page again." "Sign out" uses each language's word from the apps (Log keluar, ログアウト, Keluar).
+2. **Scope.** This changes the text only. Keycloak's error template is not overridden, since it is tied to its version, so the page still has no button. The apps' own "Sign in with another account" (`prompt=login`) is unchanged.
+3. **Checked.** On the dev stack, with a partner session in the browser, HQ sign-in now shows the Japanese text. The theme is mounted read-only and needs no restart.
+
+## IR814 Pin ACs to the Overview — 2026-11-16
+
+Found in the UI/UX loop (UX-61, criterion 7: find the AC quickly; "favourites"). A customer who checks the same two or three ACs every day had to find them each time: Overview → Units & locations → the property → the room → the AC.
+
+1. **Pins.** The customer unit page's header has "Pin to Overview". It is a toggle button (`aria-pressed`), and once pinned it reads "Pinned to Overview" with a filled star. The pins live in this browser's localStorage (`ac:pinned-units`) as a per-viewer convenience. `parsePins` reads them back through a Zod schema, at most 8 ids. A missing, blocked or broken store reads as no pins. A new pin goes first, and the oldest drops beyond 8.
+2. **Overview.** "Pinned ACs" comes before the unit list. It shows each pinned AC of the current selection with its place, room temperature, and power and connection badges. Each links to the AC's page and has an unpin button. With no pin in the selection the card is not shown.
+3. **Not stored on the server.** Pins do not follow the user to another device. The card says "this browser only".
+4. **Tests.** `pinnedUnits.test.ts` covers valid and invalid stored values, the 8-pin cap, and pin and unpin order.
+
+## IR818 Customer Users says how a forgotten password is reset — 2026-11-16
+
+Found in the UI/UX loop (UX-70, criteria 4 and 10). The customer Users page said "For a password reset, contact HQ." Since IR646, the sign-in page's Forgot password? sends the reset e-mail itself (`resetPasswordAllowed`, SMTP set). An owner asked about a forgotten password was sent to HQ for something the user does alone.
+
+1. **Text.** The note now reads "A user who forgot their password resets it with “Forgot password?” on the sign-in page." In ms, ja and id it uses the sign-in page's own label: Lupa kata laluan? / パスワードをお忘れですか？ / Lupa kata sandi?. The demo view and the page comment say the same.
+2. **Docs.** DD-C19's two lines follow. The DEC-77 entry's "Password resets stay with HQ" is about another user's password: an owner still cannot reset it.
+
+## IR819 Pinned ACs are kept per user on the server (stage 1: API and DB) — 2026-11-16
+
+IR814 kept a customer's pinned ACs in the browser, so they did not follow the user to another device. This first stage stores them with the user's preferences. Stage 2 moves the web to it.
+
+1. **Data.** `identity.preferences.pinned_unit_ids uuid[] NOT NULL DEFAULT '{}'`, with at most eight. The change is migration 000008 with `IF NOT EXISTS` (000001 stays frozen, IR785), and `schema.sql` has the same column.
+2. **Contract.** `Preferences.pinnedUnitIds: ID[]`, newest first. `preferences.update` takes an optional `pinnedUnitIds?: ID[]`, which replaces the pins when given. When it is left out the pins stay as they were, so the existing language and time-zone saves are unaffected. At most eight distinct non-nil ids; else VALIDATION `pinnedUnitIds=error.invalid`. Only ids are kept: the screen shows those the user can still read, so a pin to another customer's AC shows nothing and discloses nothing.
+3. **Generated.** catalog_gen.go, contracts.gen.ts, contractInputs.gen.json and Swagger.
+4. **Tests.** `TestPreferencesAndConsents` covers saving two pins and reading them back in order. The pins are kept by an update that leaves them out. Nine, repeated or nil ids are refused, and an empty list clears them.
+5. **Dev DB.** The column was added by hand (ALTER), as with every migration.
+
+## IR820 Pinned ACs follow the user: the web keeps them on the server (stage 2) — 2026-11-16
+
+Stage 2 of IR819. The customer web reads and writes the pins through preferences instead of localStorage. A pin made on one device shows on the others.
+
+1. **Reading.** The Overview loader and the unit page read `preferences.get` alongside their other reads. A failed read means no pins, never a failed page.
+2. **Writing.** `togglePinned` (customer/_lib/pins.ts, a Server Action) reads the stored language and time zone and sends `preferences.update` with them and the new pins. The new pin goes first, and the oldest drops beyond eight. `usePins` shows the change at once. A refused save puts the pins back and shows "The pin was not saved — try again.".
+3. **Text.** The Overview card says "kept with your account" instead of "this browser only". The browser store from IR814 is no longer read; its old key is simply left unused.
+4. **Checked on the dev stack** with identity-api rebuilt with IR819. Pinning Bedroom AC stored its id in `identity.preferences.pinned_unit_ids`, and the Overview showed it. Unpinning cleared it.
+
+## IR821 Permissions are named in words (stage 1: the labels and Access & roles) — 2026-11-16
+
+The user decided on 2026-11-16 that the screens name a permission by what it allows, not by its code. This replaces the earlier rule, in the translation rounds and IR626, that kept permission codes as they are. The codes were shown in about 30 texts (for example "Not resolved — you don't have alert.resolve.") and in every checkbox of Access & roles. People outside HQ's administrators do not read them.
+
+1. **Labels.** `permissionLabel(code, t)` (shared/lib/permissionLabels.ts) gives each of the 39 permissions a label, for example "Resolve alerts", "View billing", "Run test runs" or "Force-delete data", in en, ms, ja and id. A code it does not know stays as it is.
+2. **Access & roles.** Each Read, Write and Action checkbox reads its label, with the code small beside it, so an administrator can still match the screen to a permission they were told about.
+3. **Tests.** `permissionLabels.test.ts` checks that every permission of the matrix has a label in every language, that a known one is worded, and that an unknown one is kept.
+4. **Stage 2.** The texts that name a permission use these labels instead of codes.
+
+## IR822 Texts name permissions in words (stage 2) — 2026-11-16
+
+Stage 2 of IR821. Every displayed text that named a permission by its code now names it by its label.
+
+1. **35 texts** in the HQ, partner and technician apps and the shared libraries. Examples: "Not resolved — you don't have “Resolve alerts”." "Needs “View devices & models”". "Coverage needs “View customers & units” or “View contracts”". "Diagnostic control needs “Run test runs” on an assigned job." In ms, ja and id the code became that language's label, in “ ” (ms, id) or 「」 (ja). The change was made by a script (scratchpad perm_texts.py), which rewrote the key in the source, the tests and each dictionary together.
+2. **Page unavailable.** `NeedsAccess` reads "To open {what}, your role needs the “{permission}” permission." with the label. It is what every HQ page shows when a read is refused (IR581), for example Restrictions for hq-operator.
+3. **Tests.** The unit tests that pinned the codes (techAlerts, partnerReview, actionMessage) and three E2E expectations (admin overview, audit, language) now expect the labels.
+
+## IR823 A property keeps a map pin (DEC-109, stage 1: API and DB) — 2026-11-16
+
+DEC-109: HQ sets a Home or Office's position with a pin on a map in Admin, and the position is used with GPS: a technician's site check-in is measured against it, and a customer's away/home automations use it as a geofence. This first stage stores the pin. Later stages add the Admin map, the GPS check-in and the geofence.
+
+1. **Data.** `assets.properties` gets `latitude` and `longitude` (double precision, WGS 84, set or cleared together) and `geofence_radius_m` (50–2000; NULL means 150 m). The change is migration 000009 with `IF NOT EXISTS` (000001 stays frozen, IR785), and `schema.sql` has the same columns.
+2. **Contract.** `GeoPoint = {latitude, longitude}`. `Property` carries `location: GeoPoint|null` and `geofenceRadiusMeters: number|null`, and `properties.save` takes both. The save replaces them as it replaces the address, so the Admin web passes the current values through a rename or an edit of the other fields. A point off the globe is VALIDATION `location=error.range`, and a radius outside 50–2000 is `geofenceRadiusMeters=error.range`.
+3. **Who reads it.** `properties.list` already answers HQ and the customer's own users, so a customer sees the pin of their own Home or Office. Contractors and technicians do not get the coordinates: the check-in distance will be measured on the server.
+4. **Generated.** catalog_gen.go, contracts.gen.ts, contractInputs.gen.json, contractResults.gen.json and Swagger.
+5. **Tests.** `TestPropertyLocation` covers saving a pin with a radius, reading it back from `properties.list`, moving it, clearing it, and the four range refusals.
+6. **Dev DB.** The columns were added by hand (ALTER), as with every migration.
+
+## IR824 HQ sets the property pin on a map (DEC-109, stage 2: Admin) — 2026-11-16
+
+Stage 2 of DEC-109. Admin's Edit details and Add property of a Home or Office set the pin that IR823 stores.
+
+1. **Form.** "Location on the map" has a MapLibre map (`maplibre-gl` 6.16.0): a click places the pin and a drag moves it. An address search shows up to five places, and choosing one moves the pin. "Use my location" takes the browser's position. Latitude and longitude can be typed: this is the keyboard way, and the only way when the environment has no map. "Remove pin" clears it. "Away/home radius (m)" takes 50–2000, and empty means 150 m. Off-globe coordinates and radii out of range keep the dialog open with the field's message. A pin set outside the map (typed, searched or located) is centred and zoomed in; a pin placed on the map leaves the view where it is.
+2. **Property page.** The summary shows the pin (six decimals) or "No pin yet" and the radius. A map with the pin follows when the environment has a map.
+3. **Environment.** `MAP_STYLE_URL` is an HTTPS MapLibre style; unset or invalid means no map. `GEOCODER` is `none` (the default), `nominatim` (development and test only: at most one request a second, a search on a button) or `aws` (Amazon Location Places with `AWS_LOCATION_REGION` and `AWS_LOCATION_API_KEY`). compose.yaml gives admin-web-api OpenFreeMap's key-free style and Nominatim. Production sets an Amazon Location style and `aws`. Both are read on the server at run time, so one image serves every environment.
+4. **Address search.** `searchAddress` is a Server Action. It calls no Core API operation, so it checks an Admin session with `asset.write` itself. Only the query goes to the provider, with a fixed URL and the query encoded. Answers are checked with Zod, and places without a position are dropped. A failure answers "not available" and the pin can still be placed on the map or typed.
+5. **Security headers.** See network-architecture.md: the Admin app allows `geolocation=(self)`, and its CSP adds the style's origin to `img-src` / `connect-src` plus `worker-src 'self'`. MapLibre finds its worker next to its own module, which in a bundled chunk is a file that does not exist. The component therefore points it to the bundler's copy (`setWorkerUrl`). Before this fix the map showed no tiles ("Worker failed to load").
+6. **Tests.** `geoPoint.test.ts` covers parsing, rounding, the radius, the settings and the search: Amazon Location's request and answer, refusals, and Nominatim's one-a-second limit. `securityHeaders.test.ts` covers the map origins. E2E `property-pin.e2e.ts` covers setting and showing a pin with a radius, and the refusals; it restores the pin in afterEach. The security-headers E2E expects `geolocation=(self)` on Admin. Checked in Chromium against a production build with the strict CSP: the tiles, a map click, the device position and a Nominatim search, with no console errors.
+7. **Not done.** Figma (DEC-109 open item). The customer and technician apps do not show the map.
+
+## IR825 The site check-in is measured on the server (DEC-109, stage 3: technician) — 2026-11-16
+
+Stage 3 of DEC-109. The technician's location check-in used a distance typed into the form (a demo value). It now uses the device's own position.
+
+1. **Contract.** `jobs.checkIn` takes `position: CheckInPosition|null` (`{latitude, longitude, accuracyMeters}`) instead of `distanceMeters`. `TimeOnSite.distanceMeters` stays: it now holds the distance the server measured.
+2. **Rules.** A `location_qr` check-in needs a position (`position=error.required`). A fix off the globe or with negative accuracy is `position=error.range`, and accuracy over 100 m is `position=errors.position_inaccurate`. Then come the scanned unit (as before) and the site. A unit whose property has no pin is `position=errors.site_location_missing`, and the technician checks in manually. A fix whose distance to the pin, less its accuracy, is over 200 m is `position=errors.too_far`. So a fix 250 m away with 60 m accuracy passes. The distance is the great-circle distance on the mean Earth sphere, rounded to the metre. A `manual` check-in may send a position: the distance is recorded when the property has a pin, and it never refuses. The position itself is not stored.
+3. **Between services.** Maintenance asks the equipment domain for the pin with the new internal query `assets.siteLocation` (unit → pin, found). It runs on `maintenance.SiteAddresses.SiteLocation`, beside `assets.siteAddress`, and no maintenance table copies the coordinates.
+4. **Technician app.** Check in at site has "Get my location" in place of the distance field. The browser's position is shown with its accuracy, and the server's refusals show under that field and take the focus (IR620/IR621). The app allows `geolocation=(self)`. The Server Action checks the position's shape with Zod. The demo preview (Phase 1A) is unchanged.
+5. **Tests.** `TestCheckInDistance` covers the distance (0 m, 200 m north and east, Kuala Lumpur to Singapore, across the antimeridian) and the accuracy rule. `TestOnSiteOperations` covers the site without a pin, then with a pin set by SQL: too far, no position, coarse fix, no QR, mismatch, a success at 200 m, and a manual check-in 999 m away that records the distance. `TestRequiredInputs` and `TestForeignTargets` follow the new input. `techJob.test.ts` covers the form's checks. The security-headers E2E expects `geolocation=(self)` on Technician. The full check-in cannot be an E2E, because the visit window needs the demo clock (as for DEC-106).
+
+## IR826 The customer's away/home geofence (DEC-109, stage 4: client) — 2026-11-16
+
+Stage 4 of DEC-109. Location automations ("Away power-save", "Arrival at Home A") ran on demo location events only. They now run on the customer's own devices.
+
+1. **Operation.** `presence.report` (client, `client:own-membership`, write) takes `{latitude, longitude, accuracyMeters}` and answers `PresenceResult {transitions: {propertyId, event: 'arrival'|'departure', commandIds}[]}`. It is the 233rd operation and the 255th route (`POST /v1/presence`). It needs the member's `location_automation` consent; without it the answer is CONFLICT `errors.consent_required`. A latitude off the globe is `latitude=error.range` and a longitude off it `longitude=error.range` (IR830). A negative accuracy is `accuracyMeters=error.range`, and one over 100 m is `accuracyMeters=errors.position_inaccurate`.
+2. **Rules.** For each property of the customer that has a pin (assets `PinnedProperties`, read through `control.Sites`), the distance (`internal/platform/geo`, shared with the IR825 check-in) decides whether the member is inside. Inside means within the radius (default 150 m). Away means beyond the radius plus 50 m. In between, the member keeps the state they had, so a fix at the edge does not flip. `control.presence_states` (migration 000010) keeps only inside, changed_at and reported_at per member and property. The rows of a property are taken under a transaction advisory lock, so two members reporting at once see each other. The household arrives when its first member comes inside and departs when its last one leaves. That change becomes one location fact per installed unit of the property (`metric location`, `unit event`, value arrival/departure, quality valid). It is evaluated by `Automations.evaluate` with fire, as the scheduler's ticks are, outside the one-UI-evaluation-per-minute tick rule (IR21), and an audit entry `presence.report` names the property and the event. Each location rule's owner must still hold the consent (evaluate, SR02). A withdrawn consent deletes the member's states (the IR53 consumer) and fires nothing.
+3. **Client app.** The consent card on the automations page has "Use this device's location" when the consent is granted. The choice is the device's (`localStorage`, read with `useSyncExternalStore`; memory only where storage is blocked). While the page is open and the switch is on, `watchPosition` reports a precise fix when it moved 50 m, or every 5 minutes, through a Server Action that checks the fix with Zod. The answer is checked with Zod too. The card names the change ("Arrived at Home A — 1 automation ran") or says nothing changed. It says a browser does not report in the background. The app allows `geolocation=(self)`. The consent texts drop "demo location events, no real GPS history" and say only home or away is kept.
+4. **Tests.** `TestPresenceReport` covers the consent, the refusals, far and near, the arrival with its rule's Command, staying home, the hysteresis band, a second member keeping the household home, the last departure, and the withdrawal deleting the states. `TestDistance` (geo) and `presence.test.ts` cover the report rule, the words and the result schema. `TestForeignTargets` exempts the operation: it uses the caller's own membership and customer, with no target. Counts move to 233 operations and 255 routes.
+5. **Not done.** Native apps and background reporting; a state that stops being reported stays as it was (no expiry yet). Figma (DEC-109 open item).
+
+## IR827 Stripe Checkout starts the invoice payment (DEC-68, DD-C11) — 2026-11-16
+
+The payment of an invoice was the demo provider only (`payments.simulate`). DEC-68 decided hosted Stripe Checkout in MYR with a signed webhook as the only confirmation; the design had the tables and the environment, not the operation.
+
+1. **The operation.** `payments.startCheckout` (`{invoiceId}`, write, `client:self`, expectedVersion on the invoice, `POST /v1/payments/checkout`) returns `{paymentId, checkoutUrl}`. It refuses by the same rules as `payments.simulate` initiate: a stale version is CONFLICT, an invoice that is not unpaid is CONFLICT `error.invalidState`, a payment in flight or confirmed is CONFLICT `errors.invoice_has_payment` (IR474, full amount only), another customer's invoice is NOT_FOUND. Those refusals come before the provider's availability.
+2. **Stripe.** The payment row is stored first (`channel = stripe_checkout`, `status = initiated`), then one Checkout Session is created (mode payment, one line in the invoice amount named by the invoice number, metadata `tenant_id` / `invoice_id` / `payment_id` on the session and its payment intent, Managed Payments off: the platform is the seller of its own invoices, and Stripe as merchant of record refuses a line without a product tax code). The session's idempotency key is the Idempotency-Key of the write (carried by `ops.WithIdempotencyKey`, D04) with the payment ID: the SDK's own retries create no second session, and a write retried after a rollback (a new payment row) is a new request to Stripe rather than a reuse of the key with other parameters, which Stripe refuses. A provider failure answers UNAVAILABLE and the transaction rolls the row back, so the same intent can be sent again. Stripe sends the payer back to the invoice's page, `/customer/payments/{invoiceId}?checkout=return` or `?checkout=cancelled`.
+3. **Starting again.** A payer who cancelled or closed Stripe's page starts again at once: when the open payment is a Stripe attempt still `initiated`, the operation asks Stripe for its session; an open session is expired there, an expired one is taken as is, and the payment moves to `expired` before the new session is created. A completed session (paid, its webhook not yet received) is not replaced: the start is CONFLICT `errors.invoice_has_payment`. So at most one session of an invoice can take money.
+4. **Confirmation.** Nothing confirms the payment on the return page. The signed webhook does: `POST /stripe` (signature checked with the 5-minute tolerance; no sign-in, the signature is the authentication; the event's API version is not compared, as the Stripe CLI sends the account's version and only fields every version keeps are read). A delivery is stored in `billing.stripe_events` first, keyed by the Stripe event ID, so a replay changes nothing; the answer is 2xx only after the store, so Stripe resends what was not recorded. `checkout.session.completed` with `paid`, `checkout.session.async_payment_succeeded` and `payment_intent.succeeded` confirm the payment when its session and amount match the invoice (reference = the PaymentIntent ID), then pay the invoice through the IR35 route. `checkout.session.completed` with `unpaid` (a method that settles later) moves the payment and the invoice to `processing`. `checkout.session.async_payment_failed` and `checkout.session.expired` move the payment to `failed` or `expired` and the invoice back to unpaid; `payment_intent.payment_failed` is stored and changes nothing (IR829). Any other delivery, and one with no tenant in its metadata (an event no checkout here started), is stored and changes nothing, answered 2xx. The delivery acts as the system actor (`ops.SystemPrincipal`), so its audit rows name the `system` role the audit table accepts. HQ's `payments.confirm` refuses a Stripe payment (CONFLICT `error.invalidState`): a bank payment Stripe still processes is settled by its webhook, and HQ's Invoices name it Stripe Checkout without the confirm action.
+   **Deviation from IR197:** the receiver is mounted on the billing service, not in a separate `cmd/webhook` process; the gateway forwards `POST /stripe` to it unchanged. One process serves the billing domain's wiring and transactions, and the events of a delivery are applied after its commit as after any write.
+5. **Contract.** `Payment` carries `channel` (`demo`, `stripe_checkout`, `manual`) and the status `expired`, as the CHECK lists of `billing.payments` already had them; `CheckoutStart` is the new result type. When two payments of an invoice have the same creation time, the invoice's `paymentStatus` names the open one.
+6. **Configuration.** `STRIPE_SECRET_KEY` (restricted) turns Stripe on; `STRIPE_WEBHOOK_SECRET` is required with it (a key without a webhook secret is refused at start-up); `STRIPE_API_BASE` is stripe-mock by default in compose and `https://api.stripe.com` in `.env.local` for a real test-mode run. Without a key `startCheckout` answers UNAVAILABLE and the demo path stays. The `stripe` profile's CLI forwards the six events above to `gateway:8080/stripe` (this CLI version needs `--events`) with `STRIPE_TEST_SECRET_KEY`, else `STRIPE_SECRET_KEY`.
+7. **Code.** `internal/platform/stripe` (SDK client `stripe-go/v85`: session creation, release, signature verification, delivery parsing), `internal/modules/billing/checkout.go` (the op) and `stripe_events.go` (the deliveries), `internal/server/stripe_webhook.go` (the route). `stripe-go` is on the depguard allowlist, as DEC-68 names it.
+8. **Counts.** 234 operations, 256 routes (common.md, backend architecture, the validators, the Go and web route tests).
+9. **Tests.** Go unit tests verify webhook signatures (valid, another API version, wrong secret, tampered, expired, missing). The integration tests run the op against a fake provider: the session carries the amount, currency, metadata and the invoice's return pages; starting again expires the left session and its payment, a completed one is not replaced; a provider failure leaves no payment and a retry succeeds; a foreign invoice is NOT_FOUND; without a provider the answer is UNAVAILABLE. The IDOR table lists the op as a client call on another customer's invoice. The webhook tests post signed deliveries to the route: a confirmed payment pays its invoice once, a replayed event and an intent for the same payment change nothing, a forged signature is refused (422), a wrong amount, another session or an unknown payment is stored and changes nothing, an expired session frees the invoice, a bank payment goes processing then paid with its intent as reference, an event of no checkout is answered 200. A regression found while writing them (an audit row with an empty actor role stalled the audit consumer for later writes) is fixed by the system actor.
+10. **Real test-mode run (2026-11-16).** Against Stripe's test mode with the account's key and the Stripe CLI: a session was created, a second start expired it at Stripe, the 4242 test card was paid on the hosted page (MYR 50.00, the invoice number as the line), and the signed deliveries through the CLI confirmed the payment and paid the invoice. The run found the two refusals fixed above (Managed Payments' tax code, the event API version).
+11. **Demo events closed with Stripe.** `payments.simulate` carried `client:self:demo-event-only`, but the authorization engine never enforced that qualifier: any customer could start and confirm a demo payment of an own invoice, and the invoice was paid with no money moving. With a Stripe key configured the core now refuses the customer's demo events (initiate, processing, confirm, fail: FORBIDDEN); instructions still show. Without a key the demo path is unchanged, for the demo environment only.
+12. **Customer app.** `PAYMENT_PROVIDER=stripe` (compose, `.env.local.example`; default `demo`, any case) makes Pay call `payments.startCheckout` and open the hosted page; the demo banner and the demo provider buttons are off in that mode. While a Stripe payment waits for its webhook the page re-reads itself every 5 seconds and offers to start again; a cancelled return says nothing was charged; history and results name the way as Stripe Checkout and an expired attempt as Expired. Texts in ms, ja and id.
+13. **Not done.** The endpoint registration in Stripe's dashboard for the deployed environments (the six events, its own signing secret), the review of the new ms/ja/id texts (drafts), the Figma boards (the payment states of SCR-C11 and the operation count on boards 01/02/03/06/08), and the deployment (no deploy was made).
+
+## IR828 Stripe test mode in the shared test environment (DEC-68, DEC-93) — 2026-11-17
+
+IR827 left the shared test environment on the demo payments: its environment file has no Stripe values, and the lab server cannot be reached from the internet, so Stripe could not deliver its webhooks there.
+
+1. **Switch.** `deploy/test/deploy.sh` turns Stripe on when the environment file sets `STRIPE_SECRET_KEY`: it adds the compose profile `stripe` (the Stripe CLI, `restart: unless-stopped` in `compose.test.yaml`), which forwards the six events billing handles to `gateway:8080/stripe`. It sets `STRIPE_API_BASE=https://api.stripe.com` and `PAYMENT_PROVIDER=stripe` unless the file names them.
+2. **Refusal first.** A key without `STRIPE_WEBHOOK_SECRET` stops the deployment at its first step with the reason (the billing service would refuse to start anyway).
+3. **Off again.** Without the key, `leave_out` removes a Stripe CLI container left from an earlier deployment, as it does for the mock fleet.
+4. **Secrets.** The workflow masks both values by name (`*_KEY`, `*SECRET`, IR733).
+5. **Checked.** `compose()` and the refusal were run with a stub `docker` for four files: none (demo), key and secret, key alone (refused), and a file that names its own API base and provider; the merged compose configuration gives the CLI its restart policy and the edge network.
+6. **Not done.** Setting the values in the Environment `test` secret or `~/ac-test/env`, and a deployment: both are the user's step.
+
+## IR829 A declined card leaves the Checkout attempt open (DEC-68, IR827) — 2026-11-17
+
+Review round 846 found that `payment_intent.payment_failed` moved a Stripe Checkout payment to `failed` and its invoice back to unpaid. In Checkout a declined card does not end the session: the payer stays on Stripe's page and may retry with another card. The retry's `checkout.session.completed` (`paid`) then found the payment `failed`, which no webhook moves, so the money was taken and the invoice stayed unpaid; and as the attempt no longer counted as open, a second Checkout could be started and paid as well.
+
+1. **Rule.** `payment_intent.payment_failed` is stored as evidence and changes nothing. Only the session's own end settles a failed attempt: `checkout.session.async_payment_failed` (a bank payment that did not settle) moves it to `failed`, `checkout.session.expired` to `expired`; a payer who leaves is handled by the session's expiry or by the next start's release (IR827).
+2. **Tests.** `TestStripeWebhookDeclinedCardKeepsTheSessionOpen`: a decline, then the retry on the same session pays the invoice (it failed before the change). `TestStartCheckoutRefusals` adds the missing `invoiceId` refusal and a provider failure while a left session is released (503, the open attempt stays `initiated`).
+3. **Docs.** IR827 §4 above and the Stripe row of `docs/02-design/backend-architecture.md`.
+
+## IR830 An ended membership no longer holds the household home (DEC-109, IR826) — 2026-11-17
+
+Review round 851 found that `control.presence_states` kept the inside state of a member whose access had ended. The states went only with a withdrawn location consent (`ConsentRevoked`). A client user disabled by the owner, a membership ended by HQ or run out, or a forced `members.delete` left `inside` behind, so the property's household never departed again (no departure automation fired) and no later arrival fired either. The same round found that a longitude off the globe was refused as `latitude=error.range`.
+
+1. **Rule.** Before the household is counted, `presence.report` asks identity (`identity.Members`, the active memberships at the call's time) about the property's other members who are inside, and deletes the states of those whose membership is no longer active. No event is needed, so a membership that simply runs out (`valid_until`) is covered too.
+2. **Validation.** A latitude outside ±90 is `latitude=error.range`; a longitude outside ±180 is `longitude=error.range` (IR826 §1).
+3. **Tests.** `TestPresenceReport`: the second member at home is now a real membership of the customer; its access ends while it is inside, and the next report of the other member is the household's departure and deletes the ended member's state (no departure before the change). A longitude of 181 is `longitude=error.range` (`latitude` before the change).
+4. **Not done.** A member whose phone stops reporting still stays as they were (IR826 §5).
+
+
+## IR831 One approval event per installation request; the healthcheck takes a host in ADDR (DEC-107) — 2026-11-17
+
+Review round 853 found that every installation job linked to a request emitted `InstallationRequestApproved`, also when the request was approved already and nothing changed (the second job of a request for two units), and that the event did not name the customer as the cancel and decline events do. The same round found that the container healthcheck built `http://127.0.0.1` + `ADDR`, so an `ADDR` with a host (`0.0.0.0:8080`) gave a broken address and an unhealthy container.
+
+1. **Rule.** The request moves from `submitted` to `approved` with the first job only, and only that change emits `InstallationRequestApproved`, with `customerOrgId`. The count that limits the jobs of a request is its non-cancelled jobs, completed ones included (the comment said "unfinished").
+2. **Healthcheck.** `health.Check` takes the port of `ADDR` (`:8080` or `host:port`) and asks `127.0.0.1` at that port; an `ADDR` without a port is unhealthy.
+3. **Tests.** `TestInstallationRequests`: after two jobs there is one approval event and it names the customer (two events and none named before the change). `TestCheck` (new): 200 is healthy with `:port` and `host:port` (`host:port` was unhealthy before the change), 503, a connection closed before the answer and an `ADDR` without a port are not. `TestInstallationRequestRefusals` (new, review coverage): a phone number or more than 200 characters in the contact window, a note over 2000 characters (2000 after trimming is accepted), a stale version on decline of a submitted request (`error.versionConflict`), and a job for a unit at another property of the customer (`unitId=error.invalid`).
+
+## IR832 The restriction detail offers a unit retry only where the Core API accepts it (FR-A09, IR141) — 2026-11-17
+
+Review round 855 found two buttons of the HQ restriction detail (`/admin/restrictions`) that could only fail. "Retry apply" showed for every requested restriction with a unit not sent or not applied, but the Core API refuses an apply retry when all cause invoices are paid or a grace period or exception is active (`errors.restriction_not_applicable`, `retryAllowed`). "Retry release" showed for every unit whose release failed, but the API sends the remove command again only to a unit that applied the restriction; any other unit is `errors.reconcile_required` (`retryRelease`), so a unit with an unknown result showed Reconcile and a Retry release that failed.
+
+1. **Rule.** `unitRows` takes whether an apply is still wanted (the page passes: not all causes paid and no active grace period or exception); without it no unit offers Retry apply. Retry release needs a release that failed or was not sent, on a unit whose apply state is `applied`. The API's rules are unchanged.
+2. **Tests.** `restrictions.test.ts`: the same requested units offer Retry apply when an apply is wanted and not otherwise; of six releasing units only the applied one with a failed release offers Retry release, and the one with an unknown result offers Reconcile (the unknown-result and not-applied units offered Retry release before the change).
+
+## IR833 A setpoint range the chosen units do not share, and a recovered metric in words (FR-A09, IR480, IR626) — 2026-11-17
+
+Review rounds 861 and 862 found two texts that told the user something wrong. `commonRange` (`shared/lib/temperatureRange.ts`) returns the highest minimum to the lowest maximum of the chosen units; when the ranges do not overlap (16–20 °C and 22–30 °C) that is an empty range, and the HQ automation and restriction forms said "Within 22–20 °C". The submission was already blocked (no setpoint passes), only the message was wrong. The resolution reason "Recovered: <metric> …" (`shared/lib/evidence.ts`) showed the metric code (`refrigerant_pressure`), while codes are never shown (IR626) and the demo event text already words its metric (IR812).
+
+1. **Rule.** `sharesNoSetpoint` tells an empty common range. The automation form (`autoErrors`) says "The target units share no temperature setting" and hides "(targets allow …)"; the restriction form says "The chosen units share no temperature setting". The recovered reason words its metric with `metricName`; a metric with no word stays as sent. The API is unchanged.
+2. **Tests.** `temperatureRange.test.ts`: disjoint ranges give an empty range, a one-value range is not empty. `automation.test.ts`: 21 °C on targets 16–20 and 22–30 gives the new message (it said "Within 22–20 °C" before the change). `evidence.test.ts`: "Recovered: refrigerant_pressure …" reads "Refrigerant pressure" (the code before the change), temperature reads "Suhu" in Malay, an unknown metric stays as sent; the "no cleaning recorded" cleaning text (untested before) is worded in Malay.
+
+## IR834 An e-mail address of at most 254 bytes in the web forms, as the Core API counts (FR-C19, FR-P11, FR-A03, IR416, IR461) — 2026-11-17
+
+Review round 867 found that the web forms counted an e-mail address in UTF-16 units (`partnerInviteError`, `inviteError`, `memberErrors`) or code points (`profileErrors`), while partnerUsers.save, clientUsers.save, members.create (newUser.email) and the contractor profile save refuse an address over 254 bytes (`len` in Go). An address with non-ASCII characters of 128–254 units (130 × "é" + "@x.com" = 136 units, 266 bytes) passed the form and came back as the server's field error. No data was harmed: the server refused it.
+
+1. **Rule.** `utf8Length` (`shared/lib/text.ts`) counts UTF-8 bytes; the four checks use it, so a form refuses exactly what the Core API refuses. clientUsers.save is worded "up to 254 bytes". The API is unchanged.
+2. **Tests.** `text.test.ts`: byte lengths of ASCII, é, 日 and an emoji. `partnerUsers.test.ts`: 254 ASCII bytes pass, 255 are refused, the 266-byte address is refused (it passed before the change); the same address in `clientBilling.test.ts`, `members.test.ts` and `adminContractors.test.ts` (each passed before the change). `ops.test.ts` (new): `callRelay` posts to /bff/ops/<operation>, sends an Idempotency-Key only on a write (a new one each call, or the caller's), X-Expected-Version when given, throws the refusal's DomainError with the HTTP status, and reads a non-DomainError refusal or an answer without an envelope as unavailable.
+
+## IR835 The property pin's address search: Enter keeps the button's guards, and a failed call frees the button (DEC-109, IR824) — 2026-11-17
+
+Review round 869 found two gaps in `LocationPicker` (`shared/components/LocationPicker.tsx`). Enter in the search field called the search without the Search button's guards, so a 1-character query was sent (the answer "No place found for this address." is the wrong message for a too-short query) and a second Enter during a search started another one (with Nominatim the quick "busy" answer could land first). And when the Server Action call itself rejected (network drop, a server error outside `searchPlaces`), `busy` stayed on: the Search button stayed disabled until the dialog was reopened, and the rejection went unhandled. No data was affected: the search only reads.
+
+1. **Rule.** One `canSearch` (not busy, at least 2 characters after trimming) guards the button and Enter alike. A rejected call is read as "unavailable": the button is freed and the note says "The address search is not available. Place the pin on the map or type it." The API and the Server Action are unchanged.
+2. **Tests.** `locationPicker.test.tsx` (new): Enter on " a " sends nothing; two Enters during a search send one, and its empty answer shows "No place found for this address." with the button enabled again; a rejected call frees the button and shows the not-available note. All three failed before the change.
+
+## IR836 The load test's web visits keep a session through one failed page, and a non-JSON token answer is a refusal (IR691) — 2026-11-17
+
+Review round 871 found that a web virtual user of the k6 load test (`service/web/load/lib/web.ts`) dropped its session on any failed page, also a single 5xx or timeout while the session was still good. Its next sign-in fetched /bff/auth/login, and the identity provider, which still held the virtual user's single sign-on cookie (`noCookiesReset`), sent it straight back to the app without the password form; `submitForm` found no form and the visit was counted as a failed sign-in, and so on at every following iteration until the run ended. One transient page failure made a virtual user a permanent error source and could fail the `ac_errors` threshold. And `auth.ts` parsed a 200 token answer outside a `try`, so a non-JSON 200 threw out of the iteration instead of being recorded as an auth failure. Only the measurement was affected; the product is unchanged.
+
+1. **Rule.** A sign-in whose start already lands on the app's home page with 200 is a sign-in (the form is skipped). A failed page drops the session only when it ended on a sign-in page (`/login`, where the DAL sends a lost session) or answered 401; any other failure is recorded and the session is kept. A token answer that is not JSON is a refusal, recorded like any other.
+2. **Tests.** None: the load library runs only inside k6 (its `k6/http` module has no Node runtime) and is checked by the load workspace's lint and typecheck and by the load workflow's smoke run.
+
+## IR837 The load test's `load` and `stress` scenarios honour TIME_SCALE and VU_SCALE, and the smoke checks are never called shortened (IR691) — 2026-11-17
+
+Review round 873 found that `load` and `stress` (`service/web/load/scenarios`) wrote their stages as literal durations and virtual users, while the web scenarios used `minutes()` and `vus()`. A run of them with `TIME_SCALE` or `VU_SCALE` other than 1, which [load-test.md](load-test.md#running-it) documents as shortening a scenario, still ran full length and size, yet the report printed "SHORTENED RUN … not a measurement of the stated scenario". `smoke` and `web-smoke` had the same mismatch. Only the measurement's label was affected; the product is unchanged.
+
+1. **Rule.** `load` and `stress` scale every stage with `minutes()` and `vus()` (the last stage of `stress` still goes to 0 users). `smoke` and `web-smoke` keep their fixed size and use `fixedSummary`, whose report never prints the SHORTENED line; every other scenario's report prints it when either setting is not 1.
+2. **Tests.** None: the load library runs only inside k6 and is checked by the load workspace's lint and typecheck, as in IR836.
+
+## IR838 An apply retry rechecks the restriction's notice evidence, as execute does (IR191, SR26) — 2026-11-17
+
+Review round 902 found that `restrictions.retry` with `phase=apply` (`retryAllowed` in `service/api/internal/modules/restrictions/actions.go`) checked only the state, unpaid causes and exemptions. It never called `checkNotice`, which `restrictions.execute` uses, although this document (IR191) and the operation's comment say that an apply retry rechecks the notice evidence. A restriction whose contract changed after the notice, or whose stored notice notifications no longer matched, still had its apply commands sent again under the old notice.
+
+1. **Rule.** An apply retry refuses with CONFLICT `errors.notice_invalid` unless the contract is still at the version the restriction was scheduled on and identity stored every notice notification for the restriction at notice time, the same check as execute. The time conditions are not rechecked: state `requested` means execute already passed them. A release retry is unchanged.
+2. **Tests.** `TestRestrictionExceptionReleaseRetry` moves the stored notice's time and expects `errors.notice_invalid` from an apply retry; it failed (200, commands resent) before the fix.
+
+## IR839 The jobs of an installation request are found through an index (DEC-107) — 2026-11-17
+
+Review round 913 found that `maintenance.jobs.installation_request_id` (migration 000006) had a foreign key but no index; PostgreSQL does not index the referencing columns of a foreign key. `installationRequests.list` looks up each request's linked jobs in a subquery per row, and creating an installation job for a request counts the request's open jobs, so both read the whole jobs table, a cost that grows with every job of the tenant.
+
+1. **Rule.** Migration 000011 adds `jobs_installation_request` on `maintenance.jobs (installation_request_id) WHERE installation_request_id IS NOT NULL`, and [schema.sql](db/schema.sql) has the same index. No query changes.
+2. **Tests.** `TestForeignKeysHaveIndexes` (new, integration) lists every foreign key without an index whose leading columns hold the key's columns other than `tenant_id`; it failed on this key before the migration. The 26 other keys it found are listed in the test for the decision of B-52, so a new foreign key without an index fails it.
+
+## IR840 The customer app follows only an HTTPS Stripe Checkout address (IR827, DEC-68) — 2026-11-17
+
+Review round 914 found that the customer invoice page's `startCheckout` action checked the `checkoutUrl` of `payments.startCheckout` with `z.url()` alone, which also accepts `javascript:`, `data:` and plain `http:` addresses, and the page passes the address straight to `location.assign`. The Core API forwards the URL of the Stripe session without checking it, so the boundary check was the only guard and did not hold.
+
+1. **Rule.** `checkoutStartSchema` (now in `service/web/shared/lib/clientBilling.ts`) takes `checkoutUrl` only with the `https` scheme; any other answer fails the action as UNAVAILABLE (`error.unavailable`), and the payer stays on the invoice page.
+2. **Tests.** `clientBilling.test.ts` refuses a `javascript:`, `data:`, `http:`, upper-case `JAVASCRIPT:` and empty address and accepts a `https://checkout.stripe.com` one; it failed on the first four before the fix. The same round adds the untested branches of `paymentWay` (Stripe Checkout), `paymentPhase` (expired and failed attempts are not open) and `statusQuery`.
+
+## IR841 A failed presence report is tried again with the next position (DEC-109, IR826) — 2026-11-17
+
+Review round 952 found that the customer's "Use this device's location" switch remembered a position as reported before `presence.report` answered. When the report failed (the network, a 503, a refusal), the next position was compared with the one that was never sent, so the next try waited until the device moved 50 m or 5 minutes passed, although the line says "the next one is tried in a moment". A server action that rejects (the network down) also left an unhandled rejection and no line.
+
+1. **Rule.** `presenceReporter` (`service/web/shared/lib/presence.ts`) sends one report at a time and compares each position with the last one that was *sent*; a failed or rejected report leaves it unchanged, so the next position of the watch is sent. Positions that come while a report is in flight are dropped. A rejected report shows the same "could not be sent" line as a refused one.
+2. **Tests.** `presence.test.ts` sends again after a failed and after a rejected report in the same place, holds positions while one is in flight, and covers the per-device choice (localStorage `"1"` only, the in-memory fallback when storage is blocked, subscribers told until they unsubscribe); the retry test failed with the position remembered before the answer.
+
+## IR842 The presence switch ignores answers of an ended watch and says when the browser has no location (DEC-109, IR826) — 2026-11-17
+
+Review rounds 954–955 found two gaps in the customer's "Use this device's location" switch. When the member turned it off and on again while a report was in flight, the old watch's answer still set the line, so a "could not be sent" or "Arrived at …" line of the earlier watch showed under the new one. And in a browser without geolocation the switch could be turned on but no watch started and no line was shown, so it looked on while nothing was ever reported.
+
+1. **Rule.** The switch (now `service/web/customer/app/customer/automations/_components/presence-switch.tsx`) ends a watch's reports when the switch changes: the answer to a report of an ended watch changes no line. A browser without `navigator.geolocation` shows "This browser cannot share a location — switch this off, or use another browser." while the switch is on (en, ms, ja, id).
+2. **Tests.** `customer/tests/presenceSwitch.test.tsx` (jsdom, a fake geolocation and a deferred `reportPresence`): the line of a sent and of a refused report, no line from the answer of a report sent before the switch was turned off and on again, and the no-geolocation line; the last two failed before the fix.
+
+## IR843 Placeholders use the secondary text colour; the unused lighter text colour is gone (IR359, IR403) — 2026-11-18
+
+Review round 999 found that the UI/UX specification said input placeholders on white use `text-subtle` (#64788E, 4.55:1), but since the shadcn/ui inputs (DEC-75) every placeholder uses `placeholder:text-muted-foreground` (#5B6E84), and no screen used `--color-subtle` any more. The token stayed in `shared/globals.css` with its old comment, at 4.16:1 to 4.38:1 on the page background and the tinted surfaces, so a label or placeholder given that colour would fall below WCAG 2.2 AA 1.4.3.
+
+1. **Rule.** The web palette has one secondary text colour, `--muted-foreground` (#5B6E84), for secondary text, placeholders and chart labels; `--color-subtle` is removed. The Figma variable `color/text-subtle` is not changed in this round (the Figma connection is not available to the loop).
+2. **Tests.** `shared/lib/tests/themeContrast.test.ts` reads `globals.css`: every colour token is named as a text colour, a surface, an on-colour pair or a non-text colour; every text colour reads at 4.5:1 or more on every light surface; and each on-colour on its fill. It failed before the fix on the unnamed `color-subtle`, and, with `color-subtle` counted as a text colour, on eight surfaces.
+
+## IR844 A device fault under a restriction opens a restriction_bypass Alert (DEC-110, BIZ-21, FR-A09) — 2026-11-18
+
+A restriction (power off or a temperature limit) reaches the air conditioner as infrared from the unit's ESP32 node (device-firmware.md §1, §3). The node's `result:"sent"` makes the restriction `applied` (`iotbridge/livecontrol.go`), but infrared is one way: it is not proof that the air conditioner obeyed, the node has no receiver for the original remote, and nothing tied a fault of the node to the restriction. So hiding, covering or unplugging the node, or switching the air conditioner on with its remote, ended a restriction while every screen still said `applied`.
+
+1. **Rule.** When a device reports a fault — `communication_lost`, `power_lost` or `tamper` (the live bridge sends `communication_lost` after three silent minutes, IR532) — for a bound unit whose `observedRestriction` is set (from the node's applied answer until the release), the same transition opens the unit's `restriction_bypass` Alert: `type restriction_bypass`, `severity critical`, `causeCode unknown`, `evidenceKind inferred`, the evidence text naming the device, the fault and the policy kind, no policy. Its ID is added to the DeviceEvent's `alertIds` (after the tamper Alert for a tamper).
+2. **One incident per unit (IR66).** While the unit's `restriction_bypass` Alert is unresolved, later faults name the same Alert. A `restored` does not resolve it, because a node back online does not prove the restriction held meanwhile; it resolves by hand only (`alerts.resolve`). A fault after it was resolved opens a new one with `previousAlertId`.
+3. **Contract.** `Alert.type` gains `restriction_bypass` (service-contracts.ts, `monitoring.alerts.type` CHECK by migration 000012; schema.sql). The web titles it "Restriction may be bypassed" with a next step (en, ms, ja, id).
+4. **Not in this round.** HQ notification of the Alert, the power reading against the restriction (50 W for 5 minutes by default), sending the restriction again at intervals, and an Admin badge on the restriction's units follow as separate changes (DEC-110). Firmware and an enforcing means need hardware and a business decision.
+5. **Tests.** `TestRestrictionBypassAlert` (applied power-off restriction acknowledged through control: silent node → one critical Alert; power lost → the same Alert; tamper → its tamper Alert and the same one; restored leaves it open; a fault after it was resolved opens a new one linking it; a unit under no restriction gets none). `notifications.test.ts` checks the title and next step.
+
+
+## IR845 The Idempotency-Key is counted in characters, as the API contract and the database say (D04) — 2026-11-18
+
+The API contract says a write carries an Idempotency-Key of 8–128 characters, and `platform.idempotency_keys` checks `length(key) BETWEEN 8 AND 128` (characters, migration 000001). The registry counted bytes (`len(key)`), so a key of three to seven multi-byte characters (three CJK characters are nine bytes) passed the registry and failed the database CHECK, which answered a status-only `VALIDATION error.validation` without the field (against IR331); a key of more than 42 three-byte characters was refused although it is within 128 characters; and a key that is not UTF-8 (Go's server accepts such header bytes) failed the text column with an error the API answers as `UNAVAILABLE`. Review rounds 1003–1004 found it.
+
+1. **Rule.** The registry counts the key in characters (`utf8.RuneCountInString`) and refuses a key that is not valid UTF-8; both refusals are `VALIDATION` with `fieldErrors {"Idempotency-Key": "error.required"}`, as for a missing key. `writes.getResult` already counted its `idempotencyKey` in characters.
+2. **Tests.** `TestIdempotencyKeyLength` (7 ASCII, 3 and 7 three-byte characters, invalid UTF-8 and 129 ASCII are refused with the field; 8 and 128 three-byte characters and 128 ASCII pass). It failed on four cases before the fix. `TestWriteLimit` covers the write limit of the same step (IR375): over the limit → `RATE_LIMITED` with `Retry-After` and nothing runs or claims its key, reads are not counted, and a limit store that does not answer lets the write through.
+
+## IR846 HQ's restriction managers hear of a suspected restriction bypass (DEC-110, IR844) — 2026-11-18
+
+A `restriction_bypass` Alert (IR844) has no policy, so no policy recipients and no escalation time (IR784) reached anyone: HQ saw it only by opening the Alerts list.
+
+1. **Rule.** The equipment scheduler runs `monitoring.BypassNotices`: a `restriction_bypass` Alert with status `open` and no `escalated_at` is marked (`escalated_at` = the tick, no version bump, as IR784) and each HQ member who holds `restriction.write` gets one critical `alert` notice (type `fault`) about the unit, with the Alert as its source and the status `restriction_bypass`. One audit entry `alerts.escalate` per Alert with the reason `restriction_bypass`.
+2. **Once per incident.** Later faults name the same Alert (IR844 item 2), which is already marked, so HQ is told once per Alert. An Alert acknowledged or resolved before the next tick is not told. The notice is readable by the members who read the unit (IR142: alert.read for an alert notice).
+3. **Web.** The notice's detail line says "Restriction may be bypassed — HQ checks the unit" (en, ms, ja, id).
+4. **Tests.** `TestRestrictionBypassAlert`: one notice to hq-restriction-manager at the next tick, none more at the following tick with a second fault; it fails with the job's query broken. `notifications.test.ts` checks the detail line in English and Japanese.
+
+## IR846 A unit that keeps drawing power under a power_off restriction opens a restriction_bypass Alert (DEC-110) — 2026-11-18
+
+IR844 catches a node that is hidden, unplugged or opened. A node that stays online while the air conditioner is switched on with its original remote reports nothing wrong: the node's `state` is what the node last sent, not the air conditioner's (device-firmware.md §4). Where a power meter (PZEM, DEV-33) is wired into the air conditioner's supply, its readings show whether the air conditioner runs.
+
+1. **Rule.** The equipment scheduler runs `monitoring.BypassPower` before `monitoring.BypassNotices`. A unit gets a `restriction_bypass` Alert (IR844's incident key, evidence `inferred`, the text naming the threshold, the lowest reading and the time) when all hold: its `observedRestriction` is a `power_off` policy observed at or before the window's start; it has no unresolved `restriction_bypass` Alert; its valid power readings in the last 5 minutes, `(tick − 5 min, tick]`, all exceed **50 W**; and they cover the window (the first at most 1 minute after its start, the last at most 1 minute before the tick).
+2. **Values.** 50 W is above an indoor unit's standby and below any cooling; 5 minutes are five of the live nodes' minute readings (IR529). Both are constants of the job (`bypassPowerWatts`, `bypassPowerFor`), the initial values recommended in DEC-110.
+3. **Not checked.** A temperature limit lets the air conditioner run, so its power is not compared. A unit without power readings (no power meter wired, `parts.pzem:false`) is not checked; DEC-110 makes the meter a required part of an RTO installation in the firmware phase.
+4. **HQ.** BypassNotices (IR845) tells HQ at the same tick, as for any `restriction_bypass` Alert.
+5. **Tests.** `TestRestrictionBypassPower`: power drawn the whole window under `power_off` → one Alert with its text, none more at the next tick; one reading of 20 W, readings of the last two minutes only, a restriction observed two minutes before the tick, and a temperature limit → none. It fails with the threshold raised to 500 W and with the observed-before-the-window condition removed.
+
+## IR847 The restriction-bypass Alert's evidence is shown in the display language (DEC-110, IR844, IR480) — 2026-11-18
+
+The evidence text IR844 writes ("Device <serial> stopped reporting | lost power | reported its cover opened while the unit is under a <kind> restriction: the restriction may no longer hold") had no entry in the web's evidence templates, so ms, ja and id users saw this critical Alert in English with the policy code (`power_off`) in it, against IR480. Review round 1007 found it.
+
+1. **Rule.** `shared/lib/evidence.ts` words the three fault texts in the display language, keeping the serial, and names the restriction kind in words ("Power off", "Temperature limit"); a kind with no word stays as sent. The stored English text does not change.
+2. **Tests.** `evidence.test.ts` checks one fault per kind in en, ja and ms and an unknown kind, and that ja and id have every evidence key (before, only ms was checked). `TestBypassFault` (devices) pins the three fault texts the templates read; it fails when a text changes.
+
+## IR849 Admin and the customer see a suspected restriction bypass on the restriction (DEC-110, IR844–IR846) — 2026-11-18
+
+1. **Admin.** The restriction detail (`/admin/restrictions/[id]`, FR-A10) reads the unresolved Alerts (`open` and `acknowledged`) of the restriction's units with `alerts.list` (`unitIds`), for `alert.read` holders only. When any unit has an unresolved `restriction_bypass` Alert, a critical banner names those units — "Restriction may be bypassed on {units}: its device went silent, lost power or was opened, or the unit draws power under power off. Check the unit." — with a link to Alerts, where the Alert is acknowledged and resolved. `shared/lib/restrictions.ts` `bypassNames` picks the units.
+2. **Customer.** While the restriction is `requested`, `applied` or `release_requested`, the restriction tab of the invoice (FR-C12) says: "Keep the AC's control device plugged in and in sight of the AC while the restriction lasts. If it goes silent, loses power or is opened, or the AC runs under power off, HQ is told." The customer also sees the `restriction_bypass` Alert itself in their alert inbox (IR844).
+3. **Texts.** en, ms, ja, id.
+4. **Tests.** `restrictions.test.ts` `bypassNames`: an open and an acknowledged `restriction_bypass` Alert name their units; a resolved one, a tamper Alert and another unit's Alert do not; no Alerts name none. i18n tests keep the four dictionaries in step.
+
+## IR855 The shared test environment deploys without downtime (DEC-111) — 2026-11-18
+
+1. **One container at a time.** After a tag that has `deploy/test/compose.rolling.yaml`, `deploy.sh` first starts the services it does not replace one by one, with `--no-deps` (the stores, Keycloak, migrate and the workers, which wait for migrate as before; the IoT bridge), then replaces, in this order, the five domain services, the gateway and the five apps: `docker compose up --no-deps --no-recreate --scale <service>=2` starts the new container next to the old one; once its health check passes, the old one stops (`docker stop -t 30`) and is removed. A service whose container already has the tag's configuration hash is left alone (the way back to a tag that did not change it). A new container that is not healthy within 5 minutes is removed, the old one keeps serving, and the deployment fails and goes back to the tag before it, one container at a time again.
+2. **web-edge.** `compose.rolling.yaml` moves the apps' ports (3200–3204) to `web-edge`, an nginx (the image of keycloak-edge, pinned by digest) on the edge network; two containers of one app cannot both publish a port. Its configuration is `deploy/test/web-edge.conf`, copied with the upstreams `deploy.sh` writes to `~/ac-test/web-edge/` (outside the checkout, whose path changes with the runner). Each upstream is the app's service name, resolved again through Docker's DNS every 5 s; while an app is replaced it is the old container alone until the new one is healthy, then the new one alone before the old one stops, and after `nginx -s reload` the deployment waits for the old worker processes to finish their requests. The apps get the browser's Host and headers as when they published their ports themselves; nginx adds none. Bodies up to 10 MiB (Report a problem's 8 MiB), streamed answers unbuffered.
+3. **The Go services** call each other by service name: while two containers answer to one, Docker's DNS gives both, a refused connection goes to the other address, and a stopping service finishes its requests in flight (graceful timeout 25 s, `stop_grace_period` 30 s). The overlay adds health checks to the apps (`/bff/version`, IR856; the portal's page) and a 2 s start interval to the API services' checks.
+4. **The whole stack restarts** (as before) when the data is built again from the seed, when a migration the tag adds has a `-- migrate:breaking <reason>` line, at the first deployment with the file (the apps still hold their ports), and after a reboot.
+5. **Migrations only add.** `internal/migrate` `TestMigrationsKeepTheDeployedCodeRunning` fails for a migration after the baseline that drops a table, view, schema or column, renames, changes a column's type, makes a column required or adds a required column without a default, unless it names its reason on a `-- migrate:breaking` line (`TestBreakingMigrationsAreFound` checks the rules). Migrations 000002–000012 pass.
+6. **Not covered.** The stores, Keycloak, Mailpit and the workers restart in place (background work pauses for seconds; the screens do not). The IoT bridge's readings during its restart are lost until it keeps a persistent broker session (next step). A request in flight between two services when the old one is forced to stop after 30 s fails. The local stack and E2E are unchanged.
+7. **Checks.** shellcheck; a sandbox repository with tags checks the choice of mode (no tag, a tag without the file, a plain migration, a `-- migrate:breaking` one) and the upstreams written; `docker compose config` shows the merged ports, health checks and grace periods. The rolling deployment itself runs on the lab server at the next tag.
+
+## IR856 An open page offers a reload after a deployment (DEC-111) — 2026-11-18
+
+1. **The build.** The apps' images take the build argument `APP_VERSION` (compose passes `IMAGE_TAG`: the deployed tag in the shared test environment, `dev` locally and `e2e` in E2E), which `next.config.ts` puts into the server and the browser bundles as `AC_APP_VERSION` (`shared/lib/appVersion.ts`; `dev` without it).
+2. **`GET /bff/version`** (customer, partner, technician and admin apps) answers `{ "version": … }` with `Cache-Control: no-store`, without a session; the deployment's health check reads it too (IR855).
+3. **The offer.** Every page of the app shell (`UpdateNotice`, under the header) asks `/bff/version` every 60 s while the page is in view and when it comes back into view (focus, visibility); a page that has just loaded does not ask. When the server answers another build, a banner says "A new version of the app is available. Reload the page to use it; save what you are entering first." with **Reload page**, and the page asks no more. An answer that cannot be read (offline, an error, another shape) shows nothing. The page keeps working until the person reloads, so nothing being entered is lost.
+4. **Texts.** en, ms, ja, id.
+5. **Tests.** `updateNotice.test.tsx`: the banner appears after another build answers and stops asking; the same build, a non-string version, a 502 and a failed request show nothing; a hidden page does not ask and asks on focus; `/bff/version` answers its build, never stored.
+
+## IR857 The portal keeps port 3204 behind web-edge (IR855, IR791) — 2026-11-18
+
+1. **The fault.** `compose.rolling.yaml` published the portal on `${PORTAL_WEB_PORT:-3004}`, while `compose.test.yaml` had published it on `${PORTAL_WEB_PORT:-3204}`. The lab server's environment file predates the portal and names no `PORTAL_WEB_PORT`, so after test1.0.1r5 the portal answered on 3004 and no longer on 3204.
+2. **The fix.** web-edge takes compose.test.yaml's default, 3204. The next deployment recreates web-edge for the changed port, so the apps' ports close for the second or so web-edge takes to start.
+3. **Checked at each deployment.** `deploy.sh` waits for the portal too: `PORTAL_WEB_URL`, or, in an environment file without it, the customer app's host on `PORTAL_WEB_PORT` (3204 by default). Before, a file without the URL left the portal out of the check, so its move went unnoticed. The environment file is a write-only secret, so the file itself is not changed.
+

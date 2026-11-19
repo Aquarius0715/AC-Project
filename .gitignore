@@ -13,6 +13,8 @@ service/.cover/
 service/api/coverage.out
 service/api/.cover/
 service/api/.test-all/
+# Vitest coverage reports (`vitest run --coverage` in a service/web workspace)
+service/web/*/coverage/
 # the binaries `go build ./cmd/<name>/` (one package) leaves in service/api; three were committed by mistake in 8d3080a0
 service/api/billing-api
 service/api/devicesim
@@ -46,3 +48,7 @@ load-out/
 .review-loop-logs/
 .review-loop-run.out
 .review-loop-stop
+
+# the cache Vitest leaves when it is started from the repository root (node_modules/.vite, .vitest-cache); there is
+# no package.json here, so nothing else belongs in it
+/node_modules/

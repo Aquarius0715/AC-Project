@@ -65,6 +65,12 @@ type runHoursIn struct {
 	Since  *time.Time `json:"since"`
 }
 
+// unitInstallOut is the install state and the model of a unit.
+type unitInstallOut struct {
+	State   string    `json:"state"`
+	ModelID uuid.UUID `json:"modelId"`
+}
+
 type unitStateOut struct {
 	OrgID    uuid.UUID `json:"orgId"`
 	Archived bool      `json:"archived"`
@@ -93,6 +99,11 @@ type siteOut struct {
 	Scope   []string `json:"scope"`
 }
 
+type siteLocationOut struct {
+	Location maintenance.SitePoint `json:"location"`
+	Found    bool                  `json:"found"`
+}
+
 type targetOut struct {
 	Caps  restrictions.UnitCaps `json:"caps"`
 	Found bool                  `json:"found"`
@@ -108,12 +119,15 @@ type deviceOut struct {
 // Internal query names of the equipment domain.
 const (
 	qUnitState         = "assets.unitState"
+	qUnitInstall       = "assets.unitInstall"
+	qInstallSite       = "assets.installSite"
 	qUnitsOfProperty   = "assets.unitsOfProperty"
 	qOrgOfCustomer     = "assets.orgOfCustomer"
 	qUnitsOfOrg        = "assets.unitsOfOrg"
 	qUnitService       = "assets.unitService"
 	qCustomerProfiles  = "assets.customerProfiles"
 	qSiteAddress       = "assets.siteAddress"
+	qSiteLocation      = "assets.siteLocation"
 	qWarrantyEnd       = "assets.warrantyEnd"
 	qBriefUnits        = "assets.briefUnits"
 	qCustomerOfOrg     = "assets.customerOfOrg"
@@ -134,6 +148,26 @@ func (v equipmentView) UnitState(
 	r, err := ops.Delegate(ctx, c, qUnitState, unitIn{unit}, v.unitState)
 
 	return r.OrgID, r.Archived, r.Found, apperr.Wrap(err, "delegate assets.unitState")
+}
+
+func (v equipmentView) UnitInstall(
+	ctx context.Context,
+	c *ops.Call,
+	unit uuid.UUID,
+) (string, uuid.UUID, error) {
+	r, err := ops.Delegate(ctx, c, qUnitInstall, unitIn{unit}, v.unitInstall)
+
+	return r.State, r.ModelID, apperr.Wrap(err, "delegate assets.unitInstall")
+}
+
+func (v equipmentView) InstallSite(
+	ctx context.Context,
+	c *ops.Call,
+	in maintenance.InstallSiteInput,
+) (maintenance.InstallSite, error) {
+	r, err := ops.Delegate(ctx, c, qInstallSite, in, v.installSite)
+
+	return r, apperr.Wrap(err, "delegate assets.installSite")
 }
 
 func (v equipmentView) UnitsOfProperty(
@@ -184,6 +218,17 @@ func (v equipmentView) CustomerProfiles(
 	out, err := ops.Delegate(ctx, c, qCustomerProfiles, orgsIn{orgs}, v.customerProfiles)
 
 	return out, apperr.Wrap(err, "delegate assets.customerProfiles")
+}
+
+// SiteLocation implements maintenance.SiteAddresses: the pin of the unit's property (DEC-109).
+func (v equipmentView) SiteLocation(
+	ctx context.Context,
+	c *ops.Call,
+	unit uuid.UUID,
+) (maintenance.SitePoint, bool, error) {
+	r, err := ops.Delegate(ctx, c, qSiteLocation, unitIn{unit}, v.siteLocation)
+
+	return r.Location, r.Found, apperr.Wrap(err, "delegate assets.siteLocation")
 }
 
 func (v equipmentView) SiteAddress(
@@ -321,6 +366,49 @@ func (v equipmentView) unitState(
 	return unitStateOut{org, archived, found}, apperr.Wrap(err, "assets.Module.UnitState")
 }
 
+func (v equipmentView) unitInstall(
+	ctx context.Context,
+	c *ops.Call,
+	in *unitIn,
+) (unitInstallOut, error) {
+	state, model, err := v.am.UnitInstall(ctx, c, in.UnitID)
+
+	return unitInstallOut{state, model}, apperr.Wrap(err, "assets.Module.UnitInstall")
+}
+
+func (v equipmentView) installSite(
+	ctx context.Context,
+	call *ops.Call,
+	input *maintenance.InstallSiteInput,
+) (maintenance.InstallSite, error) {
+	org, archived, found, spaceOK, err := v.am.PropertySite(
+		ctx,
+		call,
+		input.PropertyID,
+		input.SpaceID,
+	)
+	if err != nil {
+		return maintenance.InstallSite{}, apperr.Wrap(err, "assets.Module.PropertySite")
+	}
+
+	site := maintenance.InstallSite{
+		OrgID:    org,
+		Found:    found,
+		Archived: archived,
+		SpaceOK:  spaceOK,
+		ModelOK:  true,
+	}
+
+	if input.ModelID != nil {
+		_, site.ModelOK, err = v.models.CurrentVersion(ctx, call, *input.ModelID)
+		if err != nil {
+			return maintenance.InstallSite{}, apperr.Wrap(err, "devices.Models.CurrentVersion")
+		}
+	}
+
+	return site, nil
+}
+
 func (v equipmentView) unitsOfProperty(
 	ctx context.Context,
 	c *ops.Call,
@@ -369,6 +457,19 @@ func (v equipmentView) customerProfiles(
 	out, err := v.am.CustomerProfiles(ctx, c, in.OrgIDs)
 
 	return out, apperr.Wrap(err, "assets.Module.CustomerProfiles")
+}
+
+func (v equipmentView) siteLocation(
+	ctx context.Context,
+	c *ops.Call,
+	in *unitIn,
+) (siteLocationOut, error) {
+	pin, found, err := v.am.SiteLocation(ctx, c, in.UnitID)
+
+	return siteLocationOut{
+		Location: maintenance.SitePoint{Latitude: pin.Latitude, Longitude: pin.Longitude},
+		Found:    found,
+	}, apperr.Wrap(err, "assets.Module.SiteLocation")
 }
 
 func (v equipmentView) siteAddress(ctx context.Context, c *ops.Call, in *unitIn) (siteOut, error) {
@@ -575,12 +676,15 @@ func registerCrossDomain(
 ) {
 	equipmentDomain := ops.DomainEquipment
 	ops.RegisterQuery(reg, equipmentDomain, qUnitState, equipment.unitState)
+	ops.RegisterQuery(reg, equipmentDomain, qUnitInstall, equipment.unitInstall)
+	ops.RegisterQuery(reg, equipmentDomain, qInstallSite, equipment.installSite)
 	ops.RegisterQuery(reg, equipmentDomain, qUnitsOfProperty, equipment.unitsOfProperty)
 	ops.RegisterQuery(reg, equipmentDomain, qOrgOfCustomer, equipment.orgOfCustomer)
 	ops.RegisterQuery(reg, equipmentDomain, qUnitsOfOrg, equipment.unitsOfOrg)
 	ops.RegisterQuery(reg, equipmentDomain, qUnitService, equipment.unitService)
 	ops.RegisterQuery(reg, equipmentDomain, qCustomerProfiles, equipment.customerProfiles)
 	ops.RegisterQuery(reg, equipmentDomain, qSiteAddress, equipment.siteAddress)
+	ops.RegisterQuery(reg, equipmentDomain, qSiteLocation, equipment.siteLocation)
 	ops.RegisterQuery(reg, equipmentDomain, qWarrantyEnd, equipment.warrantyEnd)
 	ops.RegisterQuery(reg, equipmentDomain, qBriefUnits, equipment.briefUnits)
 	ops.RegisterQuery(reg, equipmentDomain, qCustomerOfOrg, equipment.customerOfOrg)

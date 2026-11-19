@@ -4,6 +4,7 @@
 // language and display time zone, so the first render matches the browser's (IR292). The Alerts tab's scope (customer →
 // property → unit), severity, status and selected alert live in the URL (DD-A05 item 5, Figma Admin 256:2, IR318); so do
 // the Policies tab's selected policy (`policyId`) and the owner customer of a new one (`new`, DD-A05 item 8, IR345).
+import { scopeLists } from "@ac/web/lib/scopeLists";
 import { connection } from "next/server";
 import { apiMode, coreAll, coreDisplay, coreNow, coreOp, corePermissions, CoreError, orWhenForbidden, coreAllPage } from "@ac/web/lib/dal";
 import { i18nOf } from "@ac/web/lib/i18n";
@@ -28,6 +29,9 @@ export default async function AdminAlertsPage({ searchParams }: Readonly<PagePro
   await connection();
   if (!apiMode()) return <AdminAlertsView />;
   const sp = await searchParams;
+  // "attention" is critical and warning together (IR807): the Overview's Unresolved alerts tile counts those, and its
+  // link opened a list where filter reminders buried them; the API takes one severity, so the info rows are left out here
+  const isAttention = one(sp.severity) === "attention";
   const severity = SEVERITIES.find((s) => s === one(sp.severity)) ?? null;
   const q = {
     customerId: one(sp.customerId),
@@ -35,7 +39,7 @@ export default async function AdminAlertsPage({ searchParams }: Readonly<PagePro
     unitId: one(sp.unitId),
     status: STATES.find((s) => s === one(sp.status)) ?? "open",
     alertId: one(sp.alertId) ?? null,
-    severity,
+    severity: isAttention ? "attention" as const : severity,
   };
   const scope = { ...(q.customerId && { customerId: q.customerId }), ...(q.propertyId && { propertyId: q.propertyId }), ...(q.unitId && { unitId: q.unitId }) };
   const filters = { ...scope, ...(severity && { severity }) };
@@ -69,19 +73,14 @@ export default async function AdminAlertsPage({ searchParams }: Readonly<PagePro
   const [alerts, units, customers, properties, policies, defaults] = [read(alertsRead), read(unitsRead), read(customersRead), read(propertiesRead), read(policiesRead), read(defaultsRead)];
   const scoped = [...defaults.items, ...policies.items.filter((p) => p.kind !== "default_alert")];
   const i = i18nOf(display);
-  const custOrg = customers.items.find((c) => c.id === q.customerId)?.organizationId;
   const custByOrg = new Map(customers.items.map((c) => [c.organizationId, c.id]));
   return (
     <AdminAlertsView
       live={{
         tab: sp.tab === "policies" ? "policies" : "alerts",
-        scope: {
-          customers: customers.items.map((c) => ({ id: c.id, name: c.name })),
-          properties: properties.filter((p) => !custOrg || p.customerOrgId === custOrg).map((p) => ({ id: p.id, name: p.name })),
-          units: units.items.filter((u) => (!custOrg || u.customerOrgId === custOrg) && (!q.propertyId || u.propertyId === q.propertyId)).map((u) => ({ id: u.id, name: u.displayName })),
-        },
+        scope: scopeLists(customers.items, properties, units.items, q),
         scopeName: customers.items.find((c) => c.id === q.customerId)?.name ?? null,
-        alerts: adminAlertRows(alerts.items, units.items, customers.items, scoped, now.getTime(), i),
+        alerts: adminAlertRows(isAttention ? alerts.items.filter((a) => a.severity !== "normal") : alerts.items, units.items, customers.items, scoped, now.getTime(), i),
         policies: policyRows(scoped, customers.items, members.items, i.t, units.items),
         pol: {
           policyId: one(sp.policyId) ?? null, creatingFor: one(sp.new) ?? null, from: one(sp.from) ?? null, canWrite: perms.has("alert.policy.write"), timezone: display.timeZone,

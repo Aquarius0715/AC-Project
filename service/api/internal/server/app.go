@@ -34,6 +34,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/platform/db"
 	"github.com/pradita/ac-project/service/api/internal/platform/democlock"
 	"github.com/pradita/ac-project/service/api/internal/platform/events"
+	"github.com/pradita/ac-project/service/api/internal/platform/geo"
 	"github.com/pradita/ac-project/service/api/internal/platform/ratelimit"
 )
 
@@ -71,6 +72,12 @@ type Config struct {
 	AccountsPerDay int
 	// tests only: wraps each operation's transaction to inject database failures; nil = none
 	WrapTx func(pgx.Tx) pgx.Tx
+	// Stripe Checkout for payments.startCheckout (DEC-68); nil = Stripe not configured
+	Checkout billing.Checkout
+	// the signing secret of the Stripe webhook (POST /stripe on the billing service); empty = no webhook route
+	StripeWebhookSecret string
+	// the customer app's origin, where Stripe sends the payer back after Checkout
+	CustomerAppURL string
 }
 
 // Server is the assembled Core API.
@@ -102,7 +109,14 @@ func New(ctx context.Context, cfg Config, verifier auth.Verifier) (*Server, erro
 		return nil, err
 	}
 
-	registerModules(reg, txm, demo, identity.Accounts{PerOrgPerDay: cfg.AccountsPerDay})
+	bill := registerModules(
+		reg,
+		txm,
+		demo,
+		identity.Accounts{PerOrgPerDay: cfg.AccountsPerDay},
+		cfg.Checkout,
+		cfg.CustomerAppURL,
+	)
 
 	servesIdentity := len(cfg.Domains) == 0 || slices.Contains(cfg.Domains, ops.DomainIdentity)
 
@@ -119,6 +133,13 @@ func New(ctx context.Context, cfg Config, verifier auth.Verifier) (*Server, erro
 		txm.Close()
 
 		return nil, err
+	}
+
+	// the Stripe webhook is mounted on the billing service: it applies the payments it confirms (DEC-68)
+	servesBilling := len(cfg.Domains) == 0 || slices.Contains(cfg.Domains, ops.DomainBilling)
+	if servesBilling && cfg.StripeWebhookSecret != "" {
+		//nolint:contextcheck // the handler runs on each request's own context, not on the one the server starts with
+		app.POST("/stripe", stripeWebhook(reg, txm, bill, cfg.StripeWebhookSecret))
 	}
 
 	srv := &Server{
@@ -192,6 +213,9 @@ type wiring struct {
 	jobs      maintenance.Jobs
 	delivery  maintenance.Delivery
 	accounts  identity.Accounts // the daily cap on the accounts a contractor or customer owner adds (IR464)
+	checkout  billing.Checkout  // Stripe Checkout (DEC-68); nil = not configured
+	customer  string            // the customer app's origin (Checkout return pages)
+	bill      *billing.Billing  // the billing module the Stripe webhook applies deliveries with (set by registerBilling)
 }
 
 // registerModules registers every module's operations, queries and scheduler jobs. The steps keep their order: the
@@ -201,7 +225,9 @@ func registerModules(
 	txm *db.TxManager,
 	demo *demoOps,
 	accounts identity.Accounts,
-) {
+	checkout billing.Checkout,
+	customerURL string,
+) billing.Billing {
 	registerDemo(reg, demo)
 	identity.Register(reg)
 	identity.RegisterMembers(reg)
@@ -218,12 +244,17 @@ func registerModules(
 		jobs:      jobs,
 		delivery:  delivery,
 		accounts:  accounts,
+		checkout:  checkout,
+		customer:  customerURL,
+		bill:      nil,
 	}
 	wired.registerControl()
 	wired.registerReads()
 	wired.registerBilling()
 	wired.registerCare()
 	wired.registerDevices()
+
+	return *wired.bill
 }
 
 // registerEquipment registers the units and their devices and alerts, and returns the assets module with the view
@@ -298,6 +329,10 @@ func registerMaintenance(
 		Blobs:    blobs,
 	}
 	maintenance.RegisterJobs(reg, jobs)
+	maintenance.RegisterInstallationRequests(
+		reg,
+		maintenance.InstallationRequests{Units: equipment},
+	)
 	maintenance.RegisterOnSite(
 		reg,
 		maintenance.OnSite{Jobs: jobs, Access: maintenance.Access{}},
@@ -343,6 +378,7 @@ func (w *wiring) registerControl() {
 		Units:    controlTargets{w.assets},
 		Cmd:      cmds,
 		Notifier: monitoring.Notifier{Notify: notify.Store{}},
+		Sites:    controlTargets{w.assets},
 	}
 	control.RegisterAutomations(w.reg, automations)
 	w.demo.notify = automations.Notify // demo.trigger automation: a gateway's facts against the alert policies (IR529)
@@ -397,7 +433,10 @@ func (w *wiring) registerBilling() {
 		Restrictions: restrictions.Busy{},
 		Recipients:   identity.Directory{},
 		Releases:     restrictionsModule, Notify: notify.Store{},
+		Checkout:     w.checkout,
+		CustomerBase: w.customer,
 	}
+	w.bill = &bill
 	billing.Register(w.reg, bill)
 	billing.RegisterPayments(w.reg, bill)
 	billing.RegisterInquiries(w.reg, bill)
@@ -470,6 +509,14 @@ func (w *wiring) registerDevices() {
 		ops.DomainEquipment,
 		monitoring.Escalation{Notify: notify.Store{}}.Run,
 	) // IR784: an alert nobody acknowledged in the policy's escalation time goes to HQ (DD-A05)
+	w.reg.AddJob(
+		ops.DomainEquipment,
+		monitoring.BypassPower{}.Run,
+	) // IR846: a power_off restriction whose unit keeps drawing power opens a restriction_bypass Alert (DEC-110)
+	w.reg.AddJob(
+		ops.DomainEquipment,
+		monitoring.BypassNotices{Notify: notify.Store{}}.Run,
+	) // IR846: HQ's restriction managers hear of a suspected restriction bypass (DEC-110)
 	w.reg.AddJob(
 		ops.DomainEquipment,
 		devices.Lifecycle{Guard: control.Busy{}}.Advance,
@@ -738,4 +785,38 @@ func (t controlTargets) Target(
 		Version:    version,
 		Caps:       caps,
 	}, true, apperr.Wrap(err, "devices.Models.Caps")
+}
+
+// PinnedSites implements control.Sites: the customer's pinned properties with their radius (default 150 m) and
+// installed units (DEC-109).
+func (t controlTargets) PinnedSites(
+	ctx context.Context,
+	call *ops.Call,
+	org uuid.UUID,
+) ([]control.Site, error) {
+	pinned, err := t.am.PinnedProperties(ctx, call, org)
+	if err != nil {
+		return nil, apperr.Wrap(err, "assets.Module.PinnedProperties")
+	}
+
+	sites := make([]control.Site, 0, len(pinned))
+
+	for _, property := range pinned {
+		radius := control.DefaultGeofenceRadius
+		if property.RadiusMeters != nil {
+			radius = *property.RadiusMeters
+		}
+
+		sites = append(sites, control.Site{
+			PropertyID: property.ID,
+			Pin: geo.Point{
+				Latitude:  property.Pin.Latitude,
+				Longitude: property.Pin.Longitude,
+			},
+			RadiusMeters: radius,
+			UnitIDs:      property.UnitIDs,
+		})
+	}
+
+	return sites, nil
 }

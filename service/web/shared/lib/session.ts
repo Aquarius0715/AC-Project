@@ -348,7 +348,7 @@ export function oidcConfig() {
   return {
     issuer, // browser-facing issuer (authorize redirect)
     internalIssuer: process.env.OIDC_INTERNAL_ISSUER ?? issuer, // server-to-server token endpoint
-    clientId: process.env.OIDC_APP_CLIENT_ID ?? "ac-web",
+    clientId: process.env.OIDC_APP_CLIENT_ID ?? "ac-customer-web",
     clientSecret: process.env.OIDC_APP_CLIENT_SECRET ?? "local-ac-web-secret",
     appUrl: process.env.APP_URL ?? "http://localhost:3000",
   };

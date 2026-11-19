@@ -3,8 +3,8 @@
 // the action availability. Pure code shared by the Server Components and the client views. Texts in the display
 // language and instants in the display time zone (`t` / `i`, IR301); the customer's notice uses the same words (IR267).
 import { EN, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
-import { wrapped } from "@ac/web/lib/text";
 import { lookup } from "@ac/web/lib/lookup";
+import { commandFailure } from "@ac/web/lib/commandFailure";
 
 const RELEASE_REQUESTED = "release_requested";
 
@@ -85,9 +85,18 @@ export function restrictionRows(rs: ApiRestriction[], contractLabel: (id?: strin
   return rs.map((r) => ({ id: r.id, version: r.version, state: r.state, label: contractLabel(r.contractId), policy: policyText(r.policy, i.t), units: r.unitIds.length, progress: progressText(r, i) }));
 }
 
-/** Per-unit rows of the detail with the actions each unit allows (IR141 items 4–5, SR26). */
+/** Per-unit rows of the detail with the actions each unit allows (IR141 items 4–5, SR26), as the Core API's retry rules
+accept them (IR832). `applyWanted` is false when all causes are paid or a grace period or exception is active: the API
+refuses an apply retry then (errors.restriction_not_applicable). */
 export interface UnitRow { unitId: string; name: string; apply: string; release: string; observed: string; pending: string | null; retryApply: boolean; retryRelease: boolean; reconcile: boolean; commands: string }
-export function unitRows(r: ApiRestriction, names: Map<string, string>, commands: Map<string, ApiCommand>, i: I18n = EN): UnitRow[] {
+/** The names of the restriction's units with an unresolved restriction_bypass Alert (DEC-110, IR849): the node went
+silent, lost power or was opened, or the unit draws power under power off, so the restriction may no longer hold. */
+export function bypassNames(units: readonly Pick<UnitRow, "unitId" | "name">[], alerts: readonly { unitId: string; type: string; status: string }[]): string[] {
+  const suspected = new Set(alerts.filter((a) => a.type === "restriction_bypass" && a.status !== "resolved").map((a) => a.unitId));
+  return units.filter((u) => suspected.has(u.unitId)).map((u) => u.name);
+}
+
+export function unitRows(r: ApiRestriction, names: Map<string, string>, commands: Map<string, ApiCommand>, i: I18n = EN, applyWanted = true): UnitRow[] {
   const { t } = i;
   const apply: Partial<Record<PerUnit["applyState"], string>> = { not_sent: t("not sent"), sent_unknown: t("sent, result unknown"), applied: t("applied"), not_applied: t("not applied") };
   const release: Partial<Record<PerUnit["releaseState"], string>> = {
@@ -100,12 +109,13 @@ export function unitRows(r: ApiRestriction, names: Map<string, string>, commands
     const last = (ids: string[]) => { const id = ids.at(-1); return id ? commands.get(id) : undefined; };
     const a = last(u.applyCommandIds);
     const releaseId = last(u.releaseCommandIds);
-    const status = (c: ApiCommand) => `${lookup(command, c.status) ?? c.status}${wrapped(c.failureCode, " (", ")")}`;
+    const status = (c: ApiCommand) => `${lookup(command, c.status) ?? c.status}${c.failureCode ? ` (${commandFailure(c.failureCode, t)})` : ""}`;
     return {
       unitId: u.unitId, name: names.get(u.unitId) ?? u.unitId.slice(0, 8), apply: lookup(apply, u.applyState) ?? u.applyState, release: lookup(release, u.releaseState) ?? u.releaseState, pending: pending(u.pendingReason),
       observed: observedText(u, r.id, i),
-      retryApply: r.state === "requested" && (u.applyState === "not_sent" || u.applyState === "not_applied"),
-      retryRelease: r.state === RELEASE_REQUESTED && (u.releaseState === "failed" || (u.releaseState === "none" && u.applyState === "applied")),
+      retryApply: applyWanted && r.state === "requested" && (u.applyState === "not_sent" || u.applyState === "not_applied"),
+      // a unit that has not applied it (or whose result is unknown) is reconciled first (errors.reconcile_required)
+      retryRelease: r.state === RELEASE_REQUESTED && (u.releaseState === "failed" || u.releaseState === "none") && u.applyState === "applied",
       reconcile: ["requested", "applied", RELEASE_REQUESTED].includes(r.state) && u.applyState === "sent_unknown",
       commands: [a && t("apply {status}", { status: status(a) }), releaseId && t("remove {status}", { status: status(releaseId) })].filter(Boolean).join(" · ") || "—",
     };

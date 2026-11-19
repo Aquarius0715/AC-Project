@@ -95,16 +95,34 @@ func TestAlerts(t *testing.T) {
 		bodyInfoSeverity:          "filters.severity=error.invalid",
 		bodyUnknownStatus:         refusedFilterStatusInvalid,
 		"{\"filters\":{\"z\":1}}": "z=error.notAllowed",
+		// a known filter of the wrong type is refused as filters, not read as no filter
+		"{\"filters\":{\"unitId\":\"not-a-uuid\"}}":              refusedFiltersInvalid,
 		"{\"sort\":{\"field\":\"title\",\"direction\":\"asc\"}}": refusedSortFieldInvalid,
 	}
 
 	for _, body := range []string{
 		bodyInfoSeverity, bodyUnknownStatus,
 		bodyReversedPeriod, `{"filters":{"z":1}}`,
-		`{"sort":{"field":"title","direction":"asc"}}`,
+		`{"sort":{"field":"title","direction":"asc"}}`, `{"filters":{"unitId":"not-a-uuid"}}`,
 	} {
 		code, m := post(srv, hq(), "alerts.list", body)
 		refusal(t, body, code, m, want[body])
+	}
+	// the nil UUID is a UUID, so the route passes it on and Validate refuses it by name
+	if code, m := post(srv, hq(), "alerts.get", `{"id":"`+uuid.Nil.String()+`"}`); code != 422 ||
+		fields(m) != refusedIDRequired {
+		t.Errorf("alerts.get nil id: %d %s", code, fields(m))
+	}
+
+	if code, nilAck := write(
+		srv,
+		hq(),
+		"alerts.acknowledge",
+		`{"alertId":"`+uuid.Nil.String()+`"}`,
+		1,
+	); code != 422 ||
+		fields(nilAck) != "alertId=error.required" {
+		t.Errorf("alerts.acknowledge nil id: %d %s", code, fields(nilAck))
 	}
 	// scope: customer-b sees, customer-a does not; units.list shows the active count
 	if code, _ := post(srv, customerB(), "alerts.get", `{"id":"`+crit+`"}`); code != 200 {

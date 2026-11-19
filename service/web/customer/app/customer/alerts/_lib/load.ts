@@ -19,7 +19,7 @@ const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 export async function loadAlerts(sp: Record<string, string | string[] | undefined>) {
   interface Unit { id: string; displayName: string; propertyId: string; spaceId: string | null }
   const tab = one(sp.tab) === "policies" ? "policies" as const : "alerts" as const;
-  const severity = oneOf(["critical", "warning"] as const, one(sp.severity) ?? "", null);
+  const severity = oneOf(["critical", "warning", "normal"] as const, one(sp.severity) ?? "", null);
   const isUnreadOnly = one(sp.unreadOnly) === "true";
   const unitId = one(sp.unitId);
   const [now, me, alerts, notes, summary, units, properties, spaces, policies, defaults, prefs, display] = await Promise.all([

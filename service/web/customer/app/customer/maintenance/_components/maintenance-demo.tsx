@@ -168,11 +168,12 @@ function NewRequest({ open, onClose, onDone }: Readonly<{ open: boolean; onClose
   const [sym, setSym] = useState("");
   const [slots, setSlots] = useState<Slot[]>(blank());
   const [tried, setTried] = useState(false);
-  const symError = tried && (symptomLength(sym) < 10 || symptomLength(sym) > 2000) ? "Symptoms must be 10–2000 characters" : undefined;
+  const isSymBad = symptomLength(sym) < 10 || symptomLength(sym) > 2000; // the same count the form shows
+  const symError = tried && isSymBad ? "Symptoms must be 10–2000 characters" : undefined;
   const slotError = tried ? preferredError(slots) : undefined;
   const submit = () => {
     setTried(true);
-    if (sym.trim().length < 10 || sym.length > 2000 || preferredError(slots)) return;
+    if (isSymBad || preferredError(slots)) return;
     const u = units.find((x) => x.id === unitId);
     if (!u) return;
     const id = jobActions.create({ unitId, type, unit: u.name, loc: u.loc, symptom: sym.trim(), preferred: slots });
@@ -308,7 +309,7 @@ function FilterCare({ onRequest }: Readonly<{ onRequest: () => void }>) {
         <DataTable rowKey={(r) => r.unit} rows={rows} cols={[
           { key: "u", label: "AC", render: (r) => <div><b>{r.unit}</b><div className="text-[11px] text-muted-foreground">{r.loc}</div></div> },
           { key: "h", label: "Run time", render: (r) => `${String(r.h)} h since cleaning` },
-          { key: "p", label: "Progress", render: (r) => <div className="w-28"><UtilizationBar pct={Math.min(100, (r.h / 250) * 100)} tone={filterTone(r.st)} /></div>, hideBelow: "sm" },
+          { key: "p", label: "Progress", render: (r) => <div className="w-28"><UtilizationBar pct={Math.min(100, (r.h / 250) * 100)} tone={filterTone(r.st)} label={`${r.unit}: ${String(r.h)} h since cleaning`} /></div>, hideBelow: "sm" },
           { key: "s", label: "Status", render: (r) => <Badge tone={filterTone(r.st)}>{r.st}</Badge> },
           { key: "a", label: "", render: (r) => r.st === "Overdue" ? <Btn size="sm" variant="primary" onClick={onRequest}>Request cleaning</Btn> : <Btn size="sm" onClick={() => { setRows((s) => s.map((x) => (x.unit === r.unit ? { ...x, h: 0, st: "OK", loc: `${x.loc.split(" · ", 1)[0] ?? x.loc} · cleaned by you just now` } : x))); toast("Marked cleaned — counter reset"); }}>Mark cleaned</Btn> },
         ]} />

@@ -164,6 +164,7 @@
    "reportId",
    "size",
    "status",
+   "tag",
    "tenantId",
    "updatedAt",
    "version"
@@ -197,6 +198,7 @@
    "reportId",
    "size",
    "status",
+   "tag",
    "tenantId",
    "unitId",
    "updatedAt",
@@ -1670,6 +1672,103 @@
    "version"
   ]
  },
+ "installationRequests.cancel": {
+  "fields": [
+   "contactWindow",
+   "createdAt",
+   "customerOrgId",
+   "decidedAt",
+   "declineReason",
+   "id",
+   "jobIds",
+   "modelId",
+   "note",
+   "preferredSlots",
+   "propertyId",
+   "quantity",
+   "spaceId",
+   "status",
+   "tenantId",
+   "updatedAt",
+   "version",
+   "withIot"
+  ],
+  "items": null
+ },
+ "installationRequests.create": {
+  "fields": [
+   "contactWindow",
+   "createdAt",
+   "customerOrgId",
+   "decidedAt",
+   "declineReason",
+   "id",
+   "jobIds",
+   "modelId",
+   "note",
+   "preferredSlots",
+   "propertyId",
+   "quantity",
+   "spaceId",
+   "status",
+   "tenantId",
+   "updatedAt",
+   "version",
+   "withIot"
+  ],
+  "items": null
+ },
+ "installationRequests.decline": {
+  "fields": [
+   "contactWindow",
+   "createdAt",
+   "customerOrgId",
+   "decidedAt",
+   "declineReason",
+   "id",
+   "jobIds",
+   "modelId",
+   "note",
+   "preferredSlots",
+   "propertyId",
+   "quantity",
+   "spaceId",
+   "status",
+   "tenantId",
+   "updatedAt",
+   "version",
+   "withIot"
+  ],
+  "items": null
+ },
+ "installationRequests.list": {
+  "fields": [
+   "items",
+   "nextCursor",
+   "snapshotVersion",
+   "total"
+  ],
+  "items": [
+   "contactWindow",
+   "createdAt",
+   "customerOrgId",
+   "decidedAt",
+   "declineReason",
+   "id",
+   "jobIds",
+   "modelId",
+   "note",
+   "preferredSlots",
+   "propertyId",
+   "quantity",
+   "spaceId",
+   "status",
+   "tenantId",
+   "updatedAt",
+   "version",
+   "withIot"
+  ]
+ },
  "invoices.create": {
   "fields": [
    "amountMinor",
@@ -2806,6 +2905,7 @@
    "authorId",
    "createdAt",
    "id",
+   "installation",
    "items",
    "jobId",
    "measurements",
@@ -2999,12 +3099,15 @@
    "createdAt",
    "customerOrgId",
    "displayName",
+   "geofenceRadiusMeters",
    "id",
+   "installState",
    "installedAt",
    "iotModelId",
    "iotModelVersion",
    "kind",
    "lastSeenAt",
+   "location",
    "modelId",
    "name",
    "observedRestriction",
@@ -3596,6 +3699,7 @@
  "payments.confirm": {
   "fields": [
    "amountMinor",
+   "channel",
    "confirmationReason",
    "confirmedAt",
    "createdAt",
@@ -3615,6 +3719,7 @@
  "payments.recordManual": {
   "fields": [
    "amountMinor",
+   "channel",
    "confirmationReason",
    "confirmedAt",
    "createdAt",
@@ -3660,6 +3765,13 @@
    "type",
    "updatedAt",
    "version"
+  ],
+  "items": null
+ },
+ "payments.startCheckout": {
+  "fields": [
+   "checkoutUrl",
+   "paymentId"
   ],
   "items": null
  },
@@ -4037,6 +4149,7 @@
    "currency",
    "locale",
    "monthlyReportEmail",
+   "pinnedUnitIds",
    "timezone",
    "twoFactorEnabled"
   ],
@@ -4047,8 +4160,15 @@
    "currency",
    "locale",
    "monthlyReportEmail",
+   "pinnedUnitIds",
    "timezone",
    "twoFactorEnabled"
+  ],
+  "items": null
+ },
+ "presence.report": {
+  "fields": [
+   "transitions"
   ],
   "items": null
  },
@@ -4073,8 +4193,10 @@
    "archived",
    "createdAt",
    "customerOrgId",
+   "geofenceRadiusMeters",
    "id",
    "kind",
+   "location",
    "name",
    "tenantId",
    "updatedAt",
@@ -4088,8 +4210,10 @@
    "archived",
    "createdAt",
    "customerOrgId",
+   "geofenceRadiusMeters",
    "id",
    "kind",
+   "location",
    "name",
    "tenantId",
    "updatedAt",
@@ -4144,6 +4268,7 @@
    "authorId",
    "createdAt",
    "id",
+   "installation",
    "items",
    "jobId",
    "measurements",
@@ -4177,6 +4302,7 @@
    "authorId",
    "createdAt",
    "id",
+   "installation",
    "items",
    "jobId",
    "measurements",
@@ -4746,6 +4872,7 @@
    "effectiveControlPolicy",
    "effectivePowerState",
    "id",
+   "installState",
    "installedAt",
    "iotModel",
    "iotModelId",
@@ -4836,6 +4963,7 @@
    "displayName",
    "effectivePowerState",
    "id",
+   "installState",
    "installedAt",
    "iotModelId",
    "iotModelVersion",
@@ -4871,6 +4999,7 @@
    "customerOrgId",
    "displayName",
    "id",
+   "installState",
    "installedAt",
    "iotModelId",
    "iotModelVersion",
@@ -4899,6 +5028,7 @@
    "customerOrgId",
    "displayName",
    "id",
+   "installState",
    "installedAt",
    "iotModelId",
    "iotModelVersion",

@@ -38,6 +38,7 @@ type ACUnit struct {
 	DisplayName         string          `json:"displayName"`
 	ModelID             uuid.UUID       `json:"modelId"`
 	Type                string          `json:"type"`
+	InstallState        string          `json:"installState"`
 	InstalledAt         *time.Time      `json:"installedAt"`
 	ServiceScope        []string        `json:"serviceScope"`
 	WarrantyEndsAt      *time.Time      `json:"warrantyEndsAt"`
@@ -187,7 +188,8 @@ func scopeSQL(
 
 const unitCols = `u.id, u.tenant_id, u.version, u.created_at, u.updated_at, u.customer_org_id, u.property_id, ` +
 	`u.space_id, u.display_name,
-	u.model_id, u.type, u.installed_at, u.service_scope, u.warranty_ends_at, u.archived, u.capability_version, ` +
+	u.model_id, u.type, u.install_state, u.installed_at, u.service_scope, u.warranty_ends_at, u.archived, ` +
+	`u.capability_version, ` +
 	`u.iot_model_id, u.iot_model_version, u.connection,
 	u.observed_state, u.observed_restriction, u.last_seen_at,
 	COALESCE((SELECT array_agg(policy_id ORDER BY policy_id) FROM assets.unit_alert_policies ap WHERE ap.unit_id = ` +
@@ -240,6 +242,7 @@ func (m *Module) query(
 			&unit.DisplayName,
 			&unit.ModelID,
 			&unit.Type,
+			&unit.InstallState,
 			&unit.InstalledAt,
 			&unit.ServiceScope,
 			&unit.WarrantyEndsAt,

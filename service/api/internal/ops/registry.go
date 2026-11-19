@@ -17,6 +17,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -95,6 +96,22 @@ type AuditEntry struct {
 	Result string
 	// Before / After hold the changed fields only (see Changes); the recorder masks secrets and contacts.
 	Before, After map[string]*string
+}
+
+// idempotencyKeyCtx keys the write's Idempotency-Key in a handler's context.
+type idempotencyKeyCtx struct{}
+
+// WithIdempotencyKey carries a write's Idempotency-Key to its handler: a handler that calls an external provider
+// passes it on, so the provider answers a repeated request with the same result (D04).
+func WithIdempotencyKey(ctx context.Context, key string) context.Context {
+	return context.WithValue(ctx, idempotencyKeyCtx{}, key)
+}
+
+// IdempotencyKeyOf is the write's Idempotency-Key, empty outside a write.
+func IdempotencyKeyOf(ctx context.Context) string {
+	key, _ := ctx.Value(idempotencyKeyCtx{}).(string)
+
+	return key
 }
 
 // Call carries everything a handler needs for one operation.
@@ -791,7 +808,9 @@ func (r *Registry) claim(
 		return nil, nil
 	}
 
-	if len(key) < 8 || len(key) > 128 { // platform.idempotency_keys CHECK (8–128)
+	// platform.idempotency_keys CHECK (length(key) BETWEEN 8 AND 128) counts characters, and a key that is not UTF-8
+	// fails the text column: both are refused here with the field named, not by the database (as writes.getResult)
+	if n := utf8.RuneCountInString(key); !utf8.ValidString(key) || n < 8 || n > 128 {
 		return nil, apperr.Fields(map[string]string{"Idempotency-Key": apperr.KeyRequired})
 	}
 
@@ -879,6 +898,8 @@ func (r *Registry) execute(
 	write bool,
 	key string,
 ) (any, int64, json.RawMessage, error) {
+	ctx = WithIdempotencyKey(ctx, key)
+
 	if operation.OwnTx {
 		out, err := operation.Handle(ctx, call, input)
 

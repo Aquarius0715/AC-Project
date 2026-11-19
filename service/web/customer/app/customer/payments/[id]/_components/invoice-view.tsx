@@ -10,11 +10,12 @@ import { useState } from "react";
 import { Badge, Banner, Btn, Card, Choice, DemoBadge, EmptyState, Field, Modal, Page, SummaryList, Tabs, Textarea, Timeline, Plain } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
+import { useAutoRefresh } from "@ac/web/lib/useAutoRefresh";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import type { InvoiceStatus } from "@ac/web/lib/billing";
 import { stateTone } from "@ac/web/lib/restrictions";
-import { methodLabel, previewText, type InquiryLine, type NoticeUnit, type PaymentLine, type PreviewParams, type RestrictionNotice } from "@ac/web/lib/clientBilling";
-import { demoOutcome, paymentInstructions, previewMessage, sendInquiry, startPayment } from "../actions";
+import { paymentWay, previewText, type InquiryLine, type NoticeUnit, type PaymentLine, type PreviewParams, type RestrictionNotice } from "@ac/web/lib/clientBilling";
+import { demoOutcome, paymentInstructions, previewMessage, sendInquiry, startCheckout, startPayment } from "../actions";
 import { Icon, type IconName } from "@ac/web/components/Icon";
 import { textOf } from "@ac/web/lib/i18n";
 
@@ -22,12 +23,16 @@ export interface InvoiceLive {
   tab: "payment" | "restriction" | "inquiry";
   /** The signed-in user gets WhatsApp reminders: only an account with a phone number does (IR578). */
   whatsapp: boolean;
+  /** Stripe Checkout takes the payment (DEC-68): the demo payment events are off and Pay opens Stripe's page. */
+  stripe: boolean;
+  /** The payer came back from Stripe's page: finished there (return) or cancelled; null otherwise. */
+  checkout: "return" | "cancelled" | null;
   /** The display time zone is not Kuala Lumpur, so the due line says the date is a Kuala Lumpur business day. */
   otherZone: boolean;
   invoice: { id: string; version: number; number: string; amount: string; due: string; dueDate: string; status: InvoiceStatus; payable: boolean };
   contract: { name: string; id: string; scope: string } | null;
-  payments: PaymentLine[]; open: { id: string; version: number; status: string; method: string | null } | null;
-  last: { id: string; status: string; reference: string | null; method: string | null } | null;
+  payments: PaymentLine[]; open: { id: string; version: number; status: string; method: string | null; channel: string } | null;
+  last: { id: string; status: string; reference: string | null; method: string | null; channel: string } | null;
   restriction: {
     notice: RestrictionNotice; units: NoticeUnit[]; timeline: { time: string; title: string; tone?: "warn" | "ok" }[]; inquiries: InquiryLine[];
     reason: string; noticeAt: string; start: string; released: string;
@@ -36,8 +41,10 @@ export interface InvoiceLive {
 }
 const statusTone = { Overdue: "crit", Unpaid: "warn", Processing: "primary", Paid: "ok" } as const;
 const STATUS_ICON = new Map<string, IconName>([["Overdue", "alert"], ["Paid", "check"], [PROCESSING, "refresh"]]);
-const paymentTone = { initiated: "primary", processing: "primary", confirmed: "ok", failed: "crit" } as const;
-const paymentLabel = { initiated: "Initiated", processing: PROCESSING, confirmed: "Paid", failed: "Failed" } as const;
+const paymentTone = { initiated: "primary", processing: "primary", confirmed: "ok", failed: "crit", expired: "muted" } as const;
+const paymentLabel = { initiated: "Initiated", processing: PROCESSING, confirmed: "Paid", failed: "Failed", expired: "Expired" } as const;
+/** While Stripe is to confirm a payment, the page re-reads itself this often, so the webhook's result shows soon. */
+const STRIPE_REFRESH_SECONDS = 5;
 const channelName: Record<string, string> = { email: "Email", whatsapp: "WhatsApp", inApp: "In-app" };
 
 /** Invoice / demo payment (FR-C11) and the cooling-restriction notice (FR-C12) in API mode. No card data is ever asked
@@ -71,8 +78,16 @@ function PaymentTab({ live }: Readonly<{ live: InvoiceLive }>) {
   const open = live.open;
   const isFailed = !open && i.payable && live.last?.status === "failed";
   const isConfirmed = i.status === "Paid" && live.last?.status === "confirmed";
-  const methodText = (m: string | null, none: string) => (m ? (textOf(methodLabel, m, t) ?? m) : t(none));
+  const stripeOpen = open?.channel === "stripe_checkout" ? open : null;
+  // back from a cancel on Stripe's page: the attempt is still open there until it is started again or expires
+  const cancelled = live.checkout === "cancelled" && i.payable && (!open || stripeOpen?.status === "initiated");
+  // the webhook, not the return to this page, confirms a Stripe payment: re-read until it has
+  useAutoRefresh(stripeOpen !== null && !cancelled, STRIPE_REFRESH_SECONDS);
   const pay = () => {
+    if (live.stripe) {
+      run(() => startCheckout(i.id, i.version), t("Redirecting to the secure payment page"), (url) => { location.assign(url); });
+      return;
+    }
     if (method === INSTRUCTIONS) run(() => paymentInstructions(i.id, i.version), t("Payment instructions shown — the invoice stays unpaid"), setInstructions); else run(() => startPayment(i.id, i.version, method), t("Demo payment started — processing"));
   };
   const show = (channel: "email" | "whatsapp") => { run(() => previewMessage(i.id, channel), t("Preview only — nothing was sent"), () => { setPreview({ channel, text: previewText(channel, i, t) }); }); };
@@ -81,40 +96,52 @@ function PaymentTab({ live }: Readonly<{ live: InvoiceLive }>) {
     [INSTRUCTIONS, "Payment instructions", "Bank transfer details — viewing them does not pay the invoice"],
   ] as const;
   const payLabel = () => {
+    if (live.stripe) return t("Continue to secure payment");
     if (method === INSTRUCTIONS) return t("View instructions");
     return t(isFailed ? "Try again — Demo" : "Continue to payment — Demo");
   };
   return (
     <>
-      <Banner tone="warn" action={<DemoBadge />}>{t("Demo payment — no real money moves. No card number, CVV or expiry is collected.")}</Banner>
+      {!live.stripe && <Banner tone="warn" action={<DemoBadge />}>{t("Demo payment — no real money moves. No card number, CVV or expiry is collected.")}</Banner>}
       <div className="split">
         <Card title={t(i.status === "Paid" ? "Amount paid" : "Amount due")} action={<Badge tone={statusTone[i.status]} icon={STATUS_ICON.get(i.status)}>{t(i.status)}</Badge>}>
           <div className="text-[32px] font-bold">{i.amount.split(" ", 1)[0]} <span className="text-base text-muted-foreground">{i.amount.split(" ", 2)[1]}</span></div>
           <p className="text-xs text-muted-foreground">{i.due}{live.otherZone && ` · ${t("Kuala Lumpur date (Asia/Kuala_Lumpur)")}`}</p>
           <SummaryList items={[[t("Contract"), live.contract ? `${live.contract.name} · ${live.contract.id.slice(0, 8)}` : "—"], [t("Contract scope"), live.contract?.scope ?? "—"]]} />
-          {open && (
+          {cancelled && <div className="mt-4"><Banner>{t("Payment cancelled on Stripe's page — nothing was charged. The invoice is still unpaid.")}</Banner></div>}
+          {stripeOpen && (
             <div className="mt-4 flex flex-col gap-3">
-              <Banner icon="refresh"><b>{t("Processing payment")}</b><div className="text-xs">{t("{id} · {method}. Processing is not paid — please don’t start another payment. This page updates when the receipt is confirmed.", { id: open.id.slice(0, 8), method: methodText(open.method, "demo") })}</div></Banner>
-              <div className="rounded-xl border border-dashed border-warn bg-warn-soft/30 p-3 text-[13px]">
+              {!cancelled && (stripeOpen.status === "initiated"
+                ? <Banner icon="refresh"><b>{t("Waiting for Stripe")}</b><div className="text-xs">{t("Payment {id} is not paid until Stripe confirms it; this page updates by itself. If you left the payment page, start again — the earlier page stops taking payment.", { id: stripeOpen.id.slice(0, 8) })}</div></Banner>
+                : <Banner icon="refresh"><b>{t("Processing payment")}</b><div className="text-xs">{t("Stripe is processing payment {id}. A bank payment can take a while; this page updates when Stripe confirms it.", { id: stripeOpen.id.slice(0, 8) })}</div></Banner>)}
+              {stripeOpen.status === "initiated" && live.stripe && <div className="flex justify-end"><Btn variant="primary" disabled={pending} onClick={pay}>{t("Continue to secure payment")}</Btn></div>}
+            </div>
+          )}
+          {open && !stripeOpen && (
+            <div className="mt-4 flex flex-col gap-3">
+              <Banner icon="refresh"><b>{t("Processing payment")}</b><div className="text-xs">{t("{id} · {method}. Processing is not paid — please don’t start another payment. This page updates when the receipt is confirmed.", { id: open.id.slice(0, 8), method: paymentWay(open, t) })}</div></Banner>
+              {!live.stripe && <div className="rounded-xl border border-dashed border-warn bg-warn-soft/30 p-3 text-[13px]">
                 <div className="mb-2 flex items-center gap-2"><DemoBadge /><b>{t("Demo payment provider")}</b><span className="text-xs text-muted-foreground">{t("test events, separate from the payment form")}</span></div>
                 <div className="flex flex-wrap gap-2">
                   {open.status === "initiated" && <Btn size="sm" disabled={pending} onClick={() => { run(() => demoOutcome(open.id, open.version, "processing"), t("Payment is processing")); }}>{t(PROCESSING)}</Btn>}
                   {open.status === "processing" && <Btn size="sm" variant="primary" disabled={pending} onClick={() => { run(() => demoOutcome(open.id, open.version, "confirm"), t("Payment confirmed — the invoice is paid")); }}>{t("Confirm receipt")}</Btn>}
                   <Btn size="sm" variant="danger" disabled={pending} onClick={() => { run(() => demoOutcome(open.id, open.version, "fail"), t("Payment declined — the invoice stays unpaid")); }}>{t("Decline")}</Btn>
                 </div>
-              </div>
+              </div>}
             </div>
           )}
           {isConfirmed && <PaymentResult live={live} outcome="confirmed" />}
           {isFailed && <PaymentResult live={live} outcome="failed" />}
           {i.payable && !open && (
             <>
+              {live.stripe ? <Banner>{t("Card and bank payments are taken on Stripe's secure page. No card details are entered here.")}</Banner> : (<>
               <h3 className="mb-2 mt-4 text-[13px] font-bold">{t("Payment method")}</h3>
               <div className="flex flex-col gap-2">
                 {methods.map(([k, label, d]) => (
                     <Plain key={k} type="button" onClick={() => { setMethod(k); }} aria-pressed={method === k} className={`rounded-xl border p-3 text-left ${method === k ? "border-primary bg-primary-soft/60" : "border-line hover:bg-surface2"}`}><b className="text-[13px]">{t(label)}</b><div className="text-xs text-muted-foreground">{t(d)}</div></Plain>
                   ))}
               </div>
+              </>)}
               <div className="mt-3 flex justify-end"><Btn variant="primary" disabled={pending} onClick={pay}>{payLabel()}</Btn></div>
             </>
           )}
@@ -156,8 +183,11 @@ function PaymentResult({ live, outcome }: Readonly<{ live: InvoiceLive; outcome:
   const t = useT();
   const { last } = live;
   if (!last) return null;
-  if (outcome === "failed") return <div className="mt-4"><Banner tone="crit"><b>{t("Payment failed")}</b><div className="text-xs">{t("Demo payment {id} failed. Nothing was charged; the invoice is still unpaid. Your method is kept — you can try again.", { id: last.id.slice(0, 8) })}</div></Banner></div>;
-  const method = last.method ? (textOf(methodLabel, last.method, t) ?? last.method) : t("recorded by HQ");
+  if (outcome === "failed") {
+    const text = last.channel === "stripe_checkout" ? "Payment {id} failed on Stripe. Nothing was charged; the invoice is still unpaid — you can try again." : "Demo payment {id} failed. Nothing was charged; the invoice is still unpaid. Your method is kept — you can try again.";
+    return <div className="mt-4"><Banner tone="crit"><b>{t("Payment failed")}</b><div className="text-xs">{t(text, { id: last.id.slice(0, 8) })}</div></Banner></div>;
+  }
+  const method = last.method || last.channel === "stripe_checkout" ? paymentWay(last, t) : t("recorded by HQ");
   return <div className="mt-4"><Banner tone="ok"><b>{t("Payment confirmed")}</b><div className="text-xs">{t("Reference {reference} · {method}. The invoice is now paid.", { reference: last.reference ?? "—", method: method })}{live.restriction?.notice.live ? ` ${t("A cooling-restriction release is requested — cooling returns only after the units confirm.")}` : ""}</div></Banner></div>;
 }
 
@@ -190,6 +220,7 @@ function RestrictionTab({ live }: Readonly<{ live: InvoiceLive }>) {
             </div>
           ))}
         </div>
+        {["requested", "applied", RELEASE_REQUESTED].includes(r.notice.state) && <div className="mt-3"><Banner tone="warn">{t("Keep the AC's control device plugged in and in sight of the AC while the restriction lasts. If it goes silent, loses power or is opened, or the AC runs under power off, HQ is told.")}</Banner></div>}
         <h3 className="mb-2 mt-4 text-[13px] font-bold">{t("Timeline")}</h3>
         <Timeline items={r.timeline} />
         {r.notice.state === RELEASE_REQUESTED && <div className="mt-3"><Banner>{t("Status stays “Release requested” until every unit confirms. It is never shown as Released while a device result is unknown.")}</Banner></div>}

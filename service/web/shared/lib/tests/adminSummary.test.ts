@@ -35,6 +35,8 @@ describe("HQ overview sections (DD-A01, IR244)", () => {
     expect([l.units, l.power("off"), l.connection("connecting,error,unknown"), l.jobs("assigned"), l.billing, overviewLinks({ customerId: null, propertyId: null }).units])
       .toStrictEqual(["/admin/units?customerId=c1", "/admin/units?customerId=c1&powerState=off", "/admin/units?customerId=c1&connections=connecting%2Cerror%2Cunknown", "/admin/jobs?customerId=c1&stage=assigned", "/admin/billing?overdueOnly=true", "/admin/units"]);
     const withPeriod = overviewLinks({ customerId: null, propertyId: null, period: { from: "2026-09-13T16:00:00.000Z", to: "2026-09-14T01:00:00.000Z" } });
+    // IR807: Unresolved alerts counts critical and warning, so its list opens on those
+    expect(l.alerts).toBe("/admin/alerts?severity=attention");
     expect([withPeriod.jobs("completed"), withPeriod.units]).toStrictEqual(["/admin/jobs?stage=completed&from=2026-09-13T16%3A00%3A00.000Z&to=2026-09-14T01%3A00%3A00.000Z", "/admin/units"]);
   });
 
@@ -60,7 +62,7 @@ describe("HQ overview sections (DD-A01, IR244)", () => {
     expect(a.connection.map((r) => r.count)).toStrictEqual([5, 0, 0]);
     expect(a.rateNote).toMatch(/= 2 ÷ 4 = 50\.0%/);
     const jobs = jobRows(s.jobCounts, overviewLinks({ customerId: null, propertyId: null }));
-    expect([jobs.length, jobs[0], jobs.at(-1)]).toStrictEqual([10, { status: "requested", label: "requested", count: 1, href: "/admin/jobs?stage=requested" }, { status: "cancelled", label: "cancelled", count: 0, href: "/admin/jobs" }]);
+    expect([jobs.length, jobs[0], jobs.at(-1)]).toStrictEqual([10, { status: "requested", label: "Requested", count: 1, href: "/admin/jobs?stage=requested" }, { status: "cancelled", label: "Cancelled", count: 0, href: "/admin/jobs" }]);
     expect(billingView(summary({ amountsByCurrency: [{ amountMinor: 12_000, currency: "MYR" }, { amountMinor: 5000, currency: "USD" }] }))).toStrictEqual({ forbidden: false, overdue: 1, rows: [{ currency: "MYR", text: "120.00 MYR" }, { currency: "USD", text: "50.00 USD" }] });
     expect(billingView(summary({ billingVisibility: "forbidden", amountsByCurrency: null, overdueInvoiceCount: null }))).toStrictEqual({ forbidden: true });
     expect(kpisFrom(s)).toMatchObject({ rate: "50.0%", kwh: "9.0 kWh", billing: "120.00 MYR", jobs: 2, kwhSub: "measured · coverage 40% · cost 3.29 MYR", billingSub: "1 overdue invoice · unpaid, per currency" });
@@ -76,7 +78,7 @@ describe("HQ overview in Malay with the display time zone (IR289)", () => {
     expect(forecastView(null, MS.t)).toMatchObject({ text: "Tidak dapat dikira" });
     const a = axisRows(s, overviewLinks({ customerId: null, propertyId: null }), MS.t);
     expect([a.power[0]?.label, a.connection[1]?.label]).toStrictEqual(["Berjalan", "Luar talian"]);
-    expect(jobRows(s.jobCounts, overviewLinks({ customerId: null, propertyId: null }), MS.t).slice(0, 2).map((j) => j.label)).toStrictEqual(["diminta", "ditawarkan"]);
+    expect(jobRows(s.jobCounts, overviewLinks({ customerId: null, propertyId: null }), MS.t).slice(0, 2).map((j) => j.label)).toStrictEqual(["Diminta", "Ditawarkan"]);
   });
 });
 

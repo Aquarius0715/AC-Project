@@ -366,7 +366,7 @@ func TestPartnerUserAccess(t *testing.T) {
 			`leave"}`,
 		bookedVersion,
 	); code != 409 ||
-		res["messageKey"] != "errors.technician_booked" {
+		res["messageKey"] != keyTechnicianBooked {
 		t.Errorf("disable a booked technician: %d %v", code, res)
 	}
 
@@ -377,7 +377,7 @@ func TestPartnerUserAccess(t *testing.T) {
 		`{"id":"`+booked+`","reason":"left"}`,
 		bookedVersion,
 	); code != 409 ||
-		res["messageKey"] != "errors.technician_booked" {
+		res["messageKey"] != keyTechnicianBooked {
 		t.Errorf("remove a booked technician: %d %v", code, res)
 	}
 	// a technician without assignments
@@ -896,12 +896,12 @@ func TestPartnerUserInputs(t *testing.T) {
 		op, body, want string
 	}{
 		"remove without id": {opPartnerUsersRemove, `{"id":"00000000-0000-0000-0000-000000000000",` +
-			`"reason":"x"}`, "id=error.required"},
+			`"reason":"x"}`, refusedIDRequired},
 		"remove long reason": {opPartnerUsersRemove, `{"id":"` + uuid.NewString() + `","reason":"` +
 			strings.Repeat("x", 1001) + `"}`, refusedReasonLength},
 		"resend without id": {
 			opPartnerUsersResendInvite, `{"id":"00000000-0000-0000-0000-000000000000"}`,
-			"id=error.required",
+			refusedIDRequired,
 		},
 		"reason on an invite": {opPartnerUsersSave, `{"email":"x-` + uuid.NewString()[:8] + `@example.com",` +
 			`"partnerRole":"contractor","displayName":"X","reason":"why"}`, "reason=error.notAllowed"},
@@ -1027,7 +1027,7 @@ func TestNotificationMailRetry(t *testing.T) {
 			context.Background(),
 			srv.DB,
 			sender,
-			notify.Apps{Customer: "http://c", Partner: "", Technician: "", Admin: "", Hosts: nil},
+			customerMailApps(),
 			when,
 			500,
 		)
@@ -1134,7 +1134,7 @@ func TestNotificationMail(t *testing.T) {
 		context.Background(),
 		srv.DB,
 		sender,
-		notify.Apps{Customer: "http://c", Partner: "", Technician: "", Admin: "", Hosts: nil},
+		customerMailApps(),
 		clock(),
 		500,
 	)
@@ -1204,6 +1204,143 @@ func TestNotificationMail(t *testing.T) {
 
 	if left != 1 {
 		t.Error("a recent notification was swept")
+	}
+}
+
+// customerMailApps link the notification e-mails of the tests to a customer app.
+func customerMailApps() notify.Apps {
+	return notify.Apps{Customer: "http://c", Partner: "", Technician: "", Admin: "", Hosts: nil}
+}
+
+// mailNote stores an e-mail alert notification with params for a new client member of customer-a and answers its ID.
+func mailNote(t *testing.T, params string) string {
+	t.Helper()
+
+	membership, notificationID := uuid.NewString(), uuid.NewString()
+	owner(
+		t,
+		`INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, client_role, valid_from)
+		VALUES ($1, $2, $3, $4, 'client', 'member', $5)`,
+		membership,
+		seed.ID("tenant-a"),
+		newUser(t),
+		seed.ID("org-customer-a"),
+		clock().Add(-time.Hour),
+	)
+	owner(
+		t,
+		`INSERT INTO notify.notifications (id, tenant_id, recipient_membership_id, scope_version_at_creation, type, channel,
+			template_key, target, params, severity, occurred_at)
+		VALUES ($1, $2, $3, 1, 'fault', 'email', 'alert', '{"kind":"unit","id":"`+seed.ID("unit-online-rto").
+			String()+
+			`"}', $4, 'warning', $5)`,
+		notificationID,
+		seed.ID("tenant-a"),
+		membership,
+		params,
+		clock(),
+	)
+
+	return notificationID
+}
+
+// mailDelivery is the state, failure reason and attempts of a notification's e-mail delivery.
+func mailDelivery(t *testing.T, notificationID string) (string, string, int) {
+	t.Helper()
+
+	var status, reason string
+
+	var attempts int
+
+	ownerScan(
+		t,
+		`SELECT state, COALESCE(failure_reason, ''), attempts FROM notify.deliveries WHERE notification_id = $1 AND
+			channel = 'email'`,
+		[]any{notificationID},
+		&status,
+		&reason,
+		&attempts,
+	)
+
+	return status, reason, attempts
+}
+
+// TestNotificationMailGivesUp (IR425): the pause before a retry doubles (1, 2, 4, 8 minutes) and a mail that failed
+// five times is not tried again.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
+func TestNotificationMailGivesUp(t *testing.T) {
+	srv := server(t)
+	notificationID := mailNote(t, `{"targetName":"Give-up AC","status":"open"}`)
+	down := &fakeMail{err: errSMTPDown, sent: nil}
+	start := clock()
+	// minutes after the first attempt, and the attempts recorded after a run then
+	for _, step := range []struct {
+		minutes  int
+		attempts int
+	}{
+		{0, 1},
+		{1, 2},
+		{2, 2}, // a minute after the second attempt: the pause is now 2 minutes
+		{3, 3},
+		{6, 3},
+		{7, 4},
+		{14, 4},
+		{15, 5},
+		{60, 5}, // five attempts: no more
+		{24 * 60, 5},
+	} {
+		_, err := notify.DeliverAll(
+			context.Background(),
+			srv.DB,
+			down,
+			customerMailApps(),
+			start.Add(time.Duration(step.minutes)*time.Minute),
+			500,
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		st, reason, attempts := mailDelivery(t, notificationID)
+		if st != statusFailed || reason != "smtp down" || attempts != step.attempts {
+			t.Fatalf(
+				"after %d min: %s %q %d attempts, want failed after %d",
+				step.minutes,
+				st,
+				reason,
+				attempts,
+				step.attempts,
+			)
+		}
+	}
+}
+
+// TestNotificationMailBadParams: parameters that are not a JSON object cannot be written into a mail; the delivery
+// is suppressed with its reason and nothing is sent.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
+func TestNotificationMailBadParams(t *testing.T) {
+	srv := server(t)
+	notificationID := mailNote(t, `["Bad params AC"]`)
+	sender := &fakeMail{err: nil, sent: nil}
+
+	_, err := notify.DeliverAll(
+		context.Background(),
+		srv.DB,
+		sender,
+		customerMailApps(),
+		clock(),
+		500,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// the sender works: a send would have recorded "sent"
+	st, reason, attempts := mailDelivery(t, notificationID)
+	if st != "suppressed" || reason != "parameters do not decode" || attempts != 1 {
+		t.Fatalf("delivery: %s %q %d", st, reason, attempts)
 	}
 }
 

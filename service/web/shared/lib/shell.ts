@@ -7,8 +7,8 @@
 // build time, when there is no API (IR248).
 import "server-only";
 import { connection } from "next/server";
-import { apiMode, coreDisplay, coreIdentity, coreOp } from "@ac/web/lib/dal";
-import type { Role, ShellLive } from "@ac/web/lib/nav";
+import { apiMode, coreDisplay, coreIdentity, coreOp, corePermissions } from "@ac/web/lib/dal";
+import { lockedNav, type Role, type ShellLive } from "@ac/web/lib/nav";
 import type { OpCall } from "@ac/web/lib/opTypes";
 import { orNull } from "@ac/web/lib/promises";
 
@@ -40,6 +40,8 @@ export async function loadShell(role: Role): Promise<ShellLive | undefined> {
     case "admin": { counts.push(badge("/admin/alerts", openAlerts())); break; }
     case "technician": { break; } // the technician shell counts the notifications only
   }
-  const [who, display, ...badges] = await Promise.all([identityOrBlank(), coreDisplay(), ...counts]);
-  return { user: who.displayName, organization: who.organizationName, badges: Object.fromEntries(badges.filter((b): b is [string, number] => b[1] !== null)), display };
+  // HQ roles differ: the menu marks the screens this one cannot open (no permissions read → no marks)
+  const locked = role === "admin" ? orNull(corePermissions()).then((p) => (p ? lockedNav(p) : [])) : Promise.resolve([]);
+  const [who, display, lockedHrefs, ...badges] = await Promise.all([identityOrBlank(), coreDisplay(), locked, ...counts]);
+  return { user: who.displayName, organization: who.organizationName, badges: Object.fromEntries(badges.filter((b): b is [string, number] => b[1] !== null)), locked: lockedHrefs, display };
 }

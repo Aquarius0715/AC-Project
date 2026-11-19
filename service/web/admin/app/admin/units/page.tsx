@@ -24,6 +24,8 @@ import {
   type ApiClientUser, type ApiCoverage, type ApiSpaceRow, type ApiUnitDetail, type ApiUnitRow, type ClaimCandidate, type Connection,
 } from "@ac/web/lib/assets";
 import { UnitsDemo } from "./_components/units-demo";
+import "maplibre-gl/dist/maplibre-gl.css"; // the property pin's map (DEC-109)
+import { mapConfig } from "@ac/web/lib/mapConfig";
 import { UnitsView, type CustomerLive, type UnitLive, type UnitsLive } from "./_components/units-view";
 import { queryReader } from "@ac/web/lib/searchParams";
 
@@ -80,6 +82,7 @@ export default async function AdminUnitsPage({ searchParams }: Readonly<PageProp
     top: one("tab") === "warranty" ? "warranty" : "customers",
     activeCustomers: rows.filter((r) => r.status === "active").map((r) => ({ id: r.id, name: r.name })),
     coverageAttention: null,
+    map: mapConfig(),
     rows,
   };
   // a unit link without its customer (the audit's related records, IR320) goes to the unit under its customer
@@ -136,7 +139,8 @@ export default async function AdminUnitsPage({ searchParams }: Readonly<PageProp
     iotModels: iotModels.map((k) => ({ id: k.id, label: `${k.manufacturer} ${k.model}`, sensors: k.sensors.map((s) => s.metric) })).toSorted((a, b) => a.label.localeCompare(b.label)),
     canRegisterDevice: has("device.write"),
     perProperty: tree.map((p) => `${p.name} ${String(p.units)}`).join(" · ") || t("no properties yet"),
-    alertsSub: openAlerts ? ([["{n} critical", sev("critical")], ["{n} warning", sev("warning")], ["{n} info", sev("normal")]] as const).filter(([, n]) => n > 0).map(([l, n]) => t(l, { n })).join(" · ") || t("none open") : null,
+    // the KPI counts critical and warning alerts (activeAlertCount); info ones are named apart, so “1” beside “15 info” adds up (UI/UX loop R52)
+    alertsSub: openAlerts ? ([["{n} critical", sev("critical")], ["{n} warning", sev("warning")], ["{n} info, not counted", sev("normal")]] as const).filter(([, n]) => n > 0).map(([l, n]) => t(l, { n })).join(" · ") || t("none open") : null,
     filter: { powerState, connections: conns, search: one("search") ?? "" },
     total: at.length,
     units: unitRows(filterUnits(at, { powerState, connections: conns, search: "" }), spaces, models, t),

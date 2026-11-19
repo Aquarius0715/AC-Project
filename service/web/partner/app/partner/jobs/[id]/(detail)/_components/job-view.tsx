@@ -174,7 +174,9 @@ function DetailView({ live }: Readonly<{ live: Extract<JobDetailLive, { kind: "d
   const now = Date.parse(live.now);
   const short = j.id.slice(0, 8);
   const isSettled = ["submitted", "completed", "cancelled"].includes(j.status); // the work is done: no technician to find any more
-  const reading = u?.latestMeasurements.find((m) => m.value !== null);
+  const reading = u?.latestMeasurements.find((m): m is typeof m & { value: number } => m.value !== null);
+  const photos = (j.problemPhotos ?? []).filter((p) => p.status === "ready");
+  const [firstAlert] = live.alerts;
   const isNeedsTech = j.status === "accepted" || (j.assignment?.acknowledgement === "cant_make") || (!!j.assignment && Date.parse(j.assignment.scheduledEnd) <= now && (j.status === "assigned" || j.status === "in_progress"));
   const status = textOf(statusWord, j.status, t) ?? j.status.replaceAll('_', " ");
   const connection = u ? (textOf(connectionWord, u.connection, t) ?? u.connection) : "";
@@ -188,7 +190,7 @@ function DetailView({ live }: Readonly<{ live: Extract<JobDetailLive, { kind: "d
             <SummaryList items={[
               [t("Job type"), typeLabel(j.type, t)],
               ...(j.symptom ? [[t("Request"), `“${j.symptom}”`] as [string, React.ReactNode]] : []),
-              ...((j.problemPhotos ?? []).some((p) => p.status === "ready") ? [[t("Client’s photos"), <span key="p" className="flex flex-wrap gap-x-3">{(j.problemPhotos ?? []).filter((p) => p.status === "ready").map((p) => <a key={p.id} href={`/partner/jobs/${j.id}/photos/${p.id}`} target="_blank" rel="noreferrer" className="font-semibold text-primary">{p.name}</a>)}</span>] as [string, React.ReactNode]] : []),
+              ...(photos.length > 0 ? [[t("Client’s photos"), <span key="p" className="flex flex-wrap gap-x-3">{photos.map((p) => <a key={p.id} href={`/partner/jobs/${j.id}/photos/${p.id}`} target="_blank" rel="noreferrer" className="font-semibold text-primary">{p.name}</a>)}</span>] as [string, React.ReactNode]] : []),
               [t("Site address"), u?.location.address ?? "—"],
               [t("Entry instructions"), u?.location.accessInstructions ?? "—"],
               [t("Required qualification"), live.required.map((q) => qualificationLabel(q, t)).join(" · ") || "—"],
@@ -213,8 +215,8 @@ function DetailView({ live }: Readonly<{ live: Extract<JobDetailLive, { kind: "d
                     [t("Connection"), x.seen ? t("{state} · seen {time}", { state: connection, time: x.seen }) : connection],
                   ]} />
                   <SummaryList items={[
-                    [t("Open alerts"), live.alerts.length > 0 ? <span key="a" className="text-crit">{live.alerts.length} · {live.alerts[0] ? alertTitle(live.alerts[0], t) : ""}</span> : t("none")],
-                    [t("Last reading"), reading ? `${reading.metric.replaceAll('_', " ")} ${String(reading.value ?? "—")} ${reading.unit}` : "—"],
+                    [t("Open alerts"), firstAlert ? <span key="a" className="text-crit">{live.alerts.length} · {alertTitle(firstAlert, t)}</span> : t("none")],
+                    [t("Last reading"), reading ? `${reading.metric.replaceAll('_', " ")} ${String(reading.value)} ${reading.unit}` : "—"],
                     [t("Maintenance scope"), u.serviceScope.map((s) => (textOf(scopeLabel, s, t) ?? s)).join(" · ")],
                   ]} />
                 </div>

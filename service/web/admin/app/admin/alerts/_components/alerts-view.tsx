@@ -3,6 +3,7 @@ const ACKNOWLEDGED = "Acknowledged";
 const ACKNOWLEDGED_2 = "acknowledged";
 const CUSTOMER_A_BEDROOM_AC = "customer-a · Bedroom AC";
 
+import type { ScopeLists } from "@ac/web/lib/scopeLists";
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { usePathname, useRouter } from "next/navigation";
@@ -25,7 +26,7 @@ import { reached } from "@ac/web/lib/unreachable";
 
 const ST: Record<AlertState, string> = { open: "Open", acknowledged: ACKNOWLEDGED, resolved: "Resolved" };
 const LIST: Record<AlertState, string> = { open: "Open alerts", acknowledged: "Acknowledged alerts", resolved: "Resolved alerts" };
-const SEVERITY: [Severity, string][] = [["critical", "Severity: Critical"], ["warning", "Severity: Warning"], ["normal", "Severity: Info"]];
+const SEVERITY: [Severity | "attention", string][] = [["attention", "Severity: Critical & warning"], ["critical", "Severity: Critical"], ["warning", "Severity: Warning"], ["normal", "Severity: Info"]];
 // the Phase 1A demo's fixture rows (their data stays English, as the other demo screens)
 const STATE_TITLE = new Map([["resolved", "Resolved"], [ACKNOWLEDGED_2, "Acknowledged — waiting for resolution"]]);
 const demoTimeline = (time: string, st: AlertState): AdminAlert["timeline"] => {
@@ -72,9 +73,8 @@ const demoEvidence: ApiEvidenceCandidate[] = [
   { id: "measurement-0920", kind: "remeasurement", observedAt: "2026-09-14T01:20:00Z", metric: "temperature", value: 26.4, unit: "°C", origin: "measured", quality: "valid", eventType: null },
   { id: "measurement-0910", kind: "remeasurement", observedAt: "2026-09-14T01:10:00Z", metric: "temperature", value: 26.9, unit: "°C", origin: "measured", quality: "valid", eventType: null },
 ];
-interface Scope { customers: { id: string; name: string }[]; properties: { id: string; name: string }[]; units: { id: string; name: string }[] }
-interface Query { customerId?: string; propertyId?: string; unitId?: string; severity: Severity | null; status: AlertState; alertId: string | null }
-interface Live { tab: "alerts" | "policies"; q: Query; scope: Scope; scopeName: string | null; alerts: AdminAlert[]; policies: AdminPolicy[]; pol: PoliciesLive }
+interface Query { customerId?: string; propertyId?: string; unitId?: string; severity: Severity | "attention" | null; status: AlertState; alertId: string | null }
+interface Live { tab: "alerts" | "policies"; q: Query; scope: ScopeLists; scopeName: string | null; alerts: AdminAlert[]; policies: AdminPolicy[]; pol: PoliciesLive }
 
 /** HQ alerts and alert policies. `live` comes from the Server Component in API mode (writes are Server Actions that
 re-render the route); the demo keeps its fixture rows in local state. Texts in the display language (IR292). */
@@ -124,7 +124,7 @@ export function AdminAlertsView({ live }: Readonly<{ live?: Live }>) {
   // scoped to one active customer, “+ New policy for <customer>” opens its draft at once (Figma 268:2)
   const scopeOwner = live?.q.customerId ? live.pol.customers.find((c) => c.id === live.q.customerId) ?? null : null;
   const pols = live ? live.policies : seedPolicies;
-  const scopeUnit = live?.q.unitId ? live.scope.units.find((u) => u.id === live.q.unitId)?.name ?? live.q.unitId : null;
+  const scopeUnit = live?.q.unitId ? live.scope.unitGroups.flatMap((g) => g.units).find((u) => u.id === live.q.unitId)?.name ?? live.q.unitId : null;
   const [resolve, setResolve] = useState(false);
   const [reason, setReason] = useState("");
   const [picked, setPicked] = useState<string[]>([]);

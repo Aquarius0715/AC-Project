@@ -9,7 +9,11 @@ const tableEmissionFactors = "energy.emission_factors"
 // opFactorsSave saves an emission factor.
 const opFactorsSave = "factors.save"
 
+// valueMasked replaces an actor or membership id the client projection hides (IR42).
+const valueMasked = "masked"
+
 const (
+	opAdminSummary                = "admin.summary"
 	opAlertsList                  = "alerts.list"
 	opAutomationsNextRuns         = "automations.nextRuns"
 	opAutomationsSave             = "automations.save"
@@ -19,6 +23,7 @@ const (
 	opCommandsCreate              = "commands.create"
 	opCommandsGet                 = "commands.get"
 	opCommandsList                = "commands.list"
+	opConsentsUpdate              = "consents.update"
 	opContractorsList             = "contractors.list"
 	opDemoSessionExtend           = "demoSession.extend"
 	opDemoSessionSignIn           = "demoSession.signIn"
@@ -57,6 +62,7 @@ const (
 	opPreferencesUpdate           = "preferences.update"
 	opReportsGet                  = "reports.get"
 	opReportsSignOff              = "reports.signOff"
+	opRestrictionsDefer           = "restrictions.defer"
 	opRestrictionsForInvoice      = "restrictions.forInvoice"
 	opRestrictionsRetry           = "restrictions.retry"
 	opSessionGet                  = "session.get"
@@ -152,10 +158,12 @@ const (
 	refusedEnergyRange           = "from=errors.energy_range"
 	refusedFileInvalid           = "file=" + apperr.KeyInvalidFile
 	refusedFilterKindInvalid     = "filters.kind=" + apperr.KeyInvalid
+	refusedFixedRules            = "rules=" + apperr.KeyFixedRules
 	refusedFilterStatusInvalid   = "filters.status=" + apperr.KeyInvalid
 	refusedFilterStatusesInvalid = "filters.statuses=" + apperr.KeyInvalid
 	refusedFilterToRange         = "filters.to=" + apperr.KeyRange
 	refusedFiltersInvalid        = "filters=" + apperr.KeyInvalid
+	refusedIDRequired            = "id=" + apperr.KeyRequired
 	refusedInvoiceIDRequired     = "invoiceId=" + apperr.KeyRequired
 	refusedKindFixed             = "kind=" + apperr.KeyKindFixed
 	refusedKindInvalid           = "kind=" + apperr.KeyInvalid
@@ -170,6 +178,8 @@ const (
 	refusedSortFieldInvalid      = "sort.field=" + apperr.KeyInvalid
 	refusedStatusNotAllowed      = "status=" + apperr.KeyNotAllowed
 	refusedTimezoneInvalid       = "timezone=" + apperr.KeyInvalid
+	refusedFiltersToRange        = "query.filters.to=" + apperr.KeyRange
+	refusedSensorNotInCapability = "sensorTypes=error.notInCapability"
 	refusedToRange               = "to=" + apperr.KeyRange
 	refusedUnitArchived          = "unitId=" + apperr.KeyUnitArchived
 	refusedUnitIDsInvalid        = "unitIds=" + apperr.KeyInvalid
@@ -182,6 +192,7 @@ const (
 	keyAssignmentNotStarted = "errors.assignment_not_started"
 	keyOwnAccount           = "errors.own_account"
 	keyAccessExpired        = "errors.access_expired"
+	keyTechnicianBooked     = "errors.technician_booked"
 	keyUnitBusy             = "errors.unit_busy"
 )
 
@@ -219,6 +230,7 @@ const (
 	statusSent             = "sent"
 	stateSucceeded         = "succeeded"
 	statusUnpaid           = "unpaid"
+	statusProcessing       = "processing"
 	statusWithdrawn        = "withdrawn"
 	decisionDecline        = "decline" // Offer.decision of a declined offer
 )

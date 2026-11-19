@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { isEmail, withoutNote, withoutYear } from "@ac/web/lib/text";
+import { byName, isEmail, utf8Length, withoutNote, withoutYear } from "@ac/web/lib/text";
+
+describe("utf8Length", () => {
+  it("counts UTF-8 bytes, as Go's len counts an address", () => {
+    expect(["", "a@b.c", "é", "日", "😀"].map((s) => utf8Length(s))).toStrictEqual([0, 5, 2, 3, 4]);
+  });
+});
 
 describe("isEmail", () => {
   it("accepts one @, a local part and a dot inside the domain", () => {
@@ -15,5 +21,12 @@ describe("withoutNote and withoutYear", () => {
   it("drop a trailing note or year as the old patterns did", () => {
     expect(["Power (kW)", "Power", "a (b) (c)", "a (b (c)", "(x)", "x )"].map((a) => withoutNote(a))).toStrictEqual(["Power", "Power", "a (b)", "a", "", "x )"]);
     expect(["Mar 2026", "Mar2026", "2026", "Mar 26", "12345"].map((a) => withoutYear(a))).toStrictEqual(["Mar", "Mar", "", "Mar 26", "1"]);
+  });
+});
+
+describe("byName (UI/UX loop R128)", () => {
+  it("puts scope options in name order and keeps equal names in their order", () => {
+    const rows = [{ id: "b", name: "Demo Customer B" }, { id: "h2", name: "Home" }, { id: "a", name: "Demo Customer A" }, { id: "h1", name: "Home" }];
+    expect(rows.toSorted(byName).map((r) => r.id)).toStrictEqual(["a", "b", "h2", "h1"]);
   });
 });

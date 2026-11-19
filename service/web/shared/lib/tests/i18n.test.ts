@@ -1,7 +1,8 @@
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { DICTIONARIES, intlTag, isLocale, showRecent, showSpan, showTime, translate, translator, zonedInstant, zonedParts, type Locale } from "@ac/web/lib/i18n";
+import { DICTIONARIES, i18nOf, intlTag, isLocale, languageOptions, LOCALES, showClock, showDate, showDayMonth, showRecent, showSpan, showTime, translate, translator, zonedInstant, zonedParts, type Locale } from "@ac/web/lib/i18n";
+import { id } from "@ac/web/lib/i18n-id";
 import { ja } from "@ac/web/lib/i18n-ja";
 import { ms } from "@ac/web/lib/i18n-ms";
 import { ordinal } from "@ac/web/lib/partnerJobDetail";
@@ -30,13 +31,13 @@ function literalText(literal: string): string | null {
 }
 /** The TypeScript sources under a directory, without dependencies, builds and tests. */
 const sources = (directory: string): string[] => readdirSync(directory, { recursive: true, encoding: "utf8" })
-  .filter((f) => f.split(path.sep).every((part) => !["node_modules", ".next", "tests", "e2e"].includes(part)) && /\.tsx?$/.test(f) && !f.endsWith("i18n-ms.ts") && !f.endsWith("i18n-ja.ts"))
+  .filter((f) => f.split(path.sep).every((part) => !["node_modules", ".next", "tests", "e2e"].includes(part)) && /\.tsx?$/.test(f) && !f.endsWith("i18n-ms.ts") && !f.endsWith("i18n-ja.ts") && !f.endsWith("i18n-id.ts"))
   .map((f) => path.join(directory, f));
 
 const names = (text: string) => text.matchAll(/\{(\w+)\}/g).map((m) => must(m[1])).toArray().toSorted(byText);
 
 /** The dictionaries every check below runs on: each language that is not English (IR639). */
-const LANGUAGES: [Exclude<Locale, "en">, string, Readonly<Record<string, string>>][] = [["ms", "Malay", ms], ["ja", "Japanese", ja]];
+const LANGUAGES: [Exclude<Locale, "en">, string, Readonly<Record<string, string>>][] = [["ms", "Malay", ms], ["ja", "Japanese", ja], ["id", "Indonesian", id]];
 
 describe("Display language (FR-X01, AT-X01-N, IR258, IR639)", () => {
   it("keeps English as the key and falls back to it when Malay has no entry", () => {
@@ -58,6 +59,21 @@ describe("Display language (FR-X01, AT-X01-N, IR258, IR639)", () => {
 
   it("has the same English keys, in the same order, in every dictionary", () => {
     expect(Object.keys(ja)).toStrictEqual(Object.keys(ms));
+    expect(Object.keys(id)).toStrictEqual(Object.keys(ms));
+  });
+
+  it("offers English first as the default, in the reader's language, and every other language by its own name", () => {
+    const own = ["Bahasa Melayu", "日本語", "Bahasa Indonesia"];
+    expect(languageOptions(translator("en"))).toStrictEqual([
+      { id: "en", label: "English (default)" }, { id: "ms", label: "Bahasa Melayu" }, { id: "ja", label: "日本語" }, { id: "id", label: "Bahasa Indonesia" },
+    ]);
+    expect(LOCALES.map((l) => must(languageOptions(translator(l))[0]).label)).toStrictEqual(["English (default)", "Bahasa Inggeris (lalai)", "英語（既定）", "Bahasa Inggris (default)"]);
+    expect(LOCALES.map((l) => languageOptions(translator(l)).slice(1).map((o) => o.label))).toStrictEqual(LOCALES.map(() => own));
+  });
+
+  it("shows “—” for a missing time in every date and time format", () => {
+    expect([showTime(null), showClock(null), showDate(null), showDayMonth(null), showRecent(null, 0)]).toStrictEqual(["—", "—", "—", "—", "—"]);
+    expect([showTime(""), showDate(""), showDayMonth("")]).toStrictEqual(["—", "—", "—"]);
   });
 
   describe.each(LANGUAGES)("the %s dictionary (%s)", (locale, _name, dictionary) => {
@@ -82,7 +98,7 @@ describe("Display language (FR-X01, AT-X01-N, IR258, IR639)", () => {
     expect([...new Set(literals.filter((text) => !Object.hasOwn(dictionary, text)))]).toStrictEqual([]);
   });
 
-  it.each(["ms", "ja"])("lists each English text once in the %s dictionary (a renamed key can collide with an existing one)", (locale) => {
+  it.each(["ms", "ja", "id"])("lists each English text once in the %s dictionary (a renamed key can collide with an existing one)", (locale) => {
     const keys = readFileSync(path.join(root, `shared/lib/i18n-${locale}.ts`), "utf8").matchAll(/^\s*("(?:[^"\\]|\\.)*"):/gm).map((m) => m[1]).toArray();
     expect(keys.length).toBeGreaterThan(1000);
     expect(keys.filter((k, n) => keys.indexOf(k) !== n)).toStrictEqual([]);
@@ -97,10 +113,10 @@ describe("Display language (FR-X01, AT-X01-N, IR258, IR639)", () => {
   // IR639: a Japanese text is Japanese; only names and formats that read the same in every language stay as written
   it("leaves in English only the Japanese texts that read the same in every language", () => {
     const same = Object.entries(ja).filter(([key, text]) => text === (key.includes("::") ? key.slice(key.indexOf("::") + 2) : key)).map(([key]) => key);
-    expect(same).toStrictEqual(["CO2", "PM2.5", "CO₂", "WhatsApp", "MRV", "{field} — {problem}", "v{version} · {state}", "fw {version}", "RTO", "HH:MM – HH:MM", "{from} – {to}"]);
+    expect(same).toStrictEqual(["CO2", "PM2.5", "CO₂", "WhatsApp", "Stripe Checkout", "MRV", "{field} — {problem}", "v{version} · {state}", "fw {version}", "RTO", "HH:MM – HH:MM", "{from} – {to}", "{n} m"]);
   });
   it("writes every Japanese text with Japanese characters unless it is a name or a format", () => {
-    const proper = new Set(["CO2", "PM2.5", "CO₂", "WhatsApp", "MRV", "RTO"]);
+    const proper = new Set(["CO2", "PM2.5", "CO₂", "WhatsApp", "MRV", "RTO", "Stripe Checkout"]);
     const japanese = /[\u{3040}-\u{30FF}\u{4E00}-\u{9FFF}]/u;
     // a text of placeholders, numbers and signs alone ("{from}～{to}") has no word to translate
     const english = Object.entries(ja).filter(([key, text]) => !proper.has(key) && !japanese.test(text) && /[A-Za-z]{4,}/.test(text.replaceAll(/\{\w+\}/g, ""))).map(([key]) => key);
@@ -148,8 +164,9 @@ describe("Display language (FR-X01, AT-X01-N, IR258, IR639)", () => {
 
   it("puts the consent line in the display language", () => {
     const c = { id: "c1", version: 2, granted: true, grantedAt: "2026-09-14T01:00:00Z", revokedAt: null };
-    expect([consentNote(c, translator("ms")), consentNote(null, translator("ms"))]).toStrictEqual(["Diberikan 2026-09-14", "Belum diberikan"]);
-    expect([consentNote(c, translator("ja")), consentNote(null, translator("ja"))]).toStrictEqual(["2026-09-14 に同意", "まだ同意していません"]);
+    const inMs = i18nOf({ locale: "ms", timeZone: "Asia/Kuala_Lumpur" }), inJa = i18nOf({ locale: "ja", timeZone: "Asia/Tokyo" });
+    expect([consentNote(c, inMs), consentNote(null, inMs)]).toStrictEqual([`Diberikan ${showTime(c.grantedAt, inMs.display)}`, "Belum diberikan"]);
+    expect([consentNote(c, inJa), consentNote(null, inJa)]).toStrictEqual([`${showTime(c.grantedAt, inJa.display)} に同意`, "まだ同意していません"]);
   });
 
   it("speaks Japanese, with the same placeholders and fallbacks as Malay (IR639)", () => {
@@ -157,15 +174,34 @@ describe("Display language (FR-X01, AT-X01-N, IR258, IR639)", () => {
     expect([translate("ja", "tamper::Clear"), translate("ja", "Clear")]).toStrictEqual(["解除", "クリア"]);
     expect(translate("ja", "A text nobody translated yet")).toBe("A text nobody translated yet");
     expect(translate("ja", "nobody::Untranslated")).toBe("Untranslated");
+    expect(["A", "B"].join(translate("ja", " and "))).toBe("A かつ B"); // the join keeps a space on both sides
   });
 
-  it("counts in each language: 1st, ke-1, 第1", () => {
-    expect([ordinal(1), ordinal(2), ordinal(11), ordinal(3, "ms"), ordinal(3, "ja")]).toStrictEqual(["1st", "2nd", "11th", "ke-3", "第3"]);
+  it("speaks Indonesian, with the same placeholders and fallbacks as Malay (DEC-108)", () => {
+    expect([translate("id", "Sign out"), translate("id", "Not saved: {reason}", { reason: "conflict" })]).toStrictEqual(["Keluar", "Tidak tersimpan: conflict"]);
+    expect([translate("id", "tamper::Clear"), translate("id", "Clear")]).toStrictEqual(["Tidak ada perusakan", "Bersihkan"]);
+    expect(translate("id", "A text nobody translated yet")).toBe("A text nobody translated yet");
+    expect(translate("id", "nobody::Untranslated")).toBe("Untranslated");
   });
 
-  it("accepts only the three locales; English and Malay format for Malaysia, Japanese for Japan", () => {
-    expect([isLocale("en"), isLocale("ms"), isLocale("ja"), isLocale("fr"), isLocale(null)]).toStrictEqual([true, true, true, false, false]);
-    expect([intlTag("en"), intlTag("ms"), intlTag("ja")]).toStrictEqual(["en-MY", "ms-MY", "ja-JP"]);
+  // DEC-108: Indonesian shares many loanwords with English (Unit, Status, Filter, Online); only names, formats and such words may stay as written
+  it("leaves in English only short names, formats and loanwords in the Indonesian dictionary", () => {
+    const same = Object.entries(id).filter(([key, text]) => text === (key.includes("::") ? key.slice(key.indexOf("::") + 2) : key)).map(([key]) => key);
+    expect(same.length).toBeLessThan(120);
+    expect(same.filter((key) => key.length > 40)).toStrictEqual([]);
+  });
+
+  it("shows an Indonesian date and time with the zone's abbreviation from the English data (DEC-108)", () => {
+    expect(showTime("2026-09-14T01:00:00Z", { locale: "id", timeZone: ASIA_KUALA_LUMPUR })).toMatch(/MYT$/);
+  });
+
+  it("counts in each language: 1st, ke-1 (Malay and Indonesian), 第1", () => {
+    expect([ordinal(1), ordinal(2), ordinal(11), ordinal(3, "ms"), ordinal(3, "ja"), ordinal(3, "id")]).toStrictEqual(["1st", "2nd", "11th", "ke-3", "第3", "ke-3"]);
+  });
+
+  it("accepts only the four locales; English and Malay format for Malaysia, Japanese for Japan, Indonesian for Indonesia", () => {
+    expect([isLocale("en"), isLocale("ms"), isLocale("ja"), isLocale("id"), isLocale("fr"), isLocale(null)]).toStrictEqual([true, true, true, true, false, false]);
+    expect([intlTag("en"), intlTag("ms"), intlTag("ja"), intlTag("id")]).toStrictEqual(["en-MY", "ms-MY", "ja-JP", "id-ID"]);
   });
 
   it("shows a Japanese date and time with the zone's abbreviation, as in English (IR639)", () => {

@@ -67,8 +67,15 @@ func TestDeviceHistory(t *testing.T) {
 	}
 
 	code, resp := post(srv, hq(), "devices.events", `{"id":"`+dev+`","query":{"limit":10}}`)
-	if code != 200 || len(items(t, resp)) != 1 || items(t, resp)[0]["eventType"] != "tamper" {
+	if code != 200 || len(items(t, resp)) != 1 || items(t, resp)[0]["eventType"] != kindTamper {
 		t.Fatalf("events: %d %v", code, resp)
+	}
+
+	// the events period is [from, to): an empty or reversed period is refused
+	for _, from := range []string{"2026-09-02T00:00:00Z", "2026-09-03T00:00:00Z"} {
+		body := `{"id":"` + dev + `","query":{"filters":{"from":"` + from + `","to":"2026-09-02T00:00:00Z"}}}`
+		code, m := post(srv, hq(), "devices.events", body)
+		refusal(t, body, code, m, refusedFiltersToRange)
 	}
 	// customer-b (owner of the bound unit) reads events; customer-a gets NOT_FOUND
 	if code, res := post(
@@ -273,5 +280,19 @@ func TestDeviceBindingRefusals(t *testing.T) {
 	); code != 409 ||
 		res["messageKey"] != "error.unitHasDevice" {
 		t.Errorf("a second device on the unit: %d %v", code, res)
+	}
+	// a replacement takes over only from the device bound to the target unit (error.notOnUnit)
+	if code, res := write(
+		srv,
+		hq(),
+		"devices.bind",
+		`{"deviceId":"`+asStr(t, second["id"])+`","unitId":"`+unit+`","replaceDeviceId":"`+asStr(
+			t,
+			register("BC")["id"],
+		)+`","reason":"replace"}`,
+		1,
+	); code != 409 ||
+		res["messageKey"] != "error.notOnUnit" {
+		t.Errorf("replace a device that is not on the unit: %d %v", code, res)
 	}
 }

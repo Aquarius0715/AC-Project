@@ -1,10 +1,11 @@
 "use client";
 const MY_REQUESTS = "My requests";
 
+import { unitsByProperty } from "@ac/web/lib/clientBilling";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useId, useState, useTransition } from "react";
-import { Badge, Banner, Btn, Card, Choice, Field, Input, ListRow, Modal, Page, PageHead, Select, SummaryList, Tabs, Textarea, Timeline, cx, Plain } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Check, Choice, Field, Input, ListRow, Modal, Page, PageHead, Select, SummaryList, Tabs, Textarea, Timeline, cx, Plain } from "@ac/web/components/ui";
 import { JobStatusBadge, OriginBadge } from "@ac/web/components/JobBits";
 import { useAction } from "@ac/web/lib/useAction";
 import { showTime, zonedInstant, zonedParts } from "@ac/web/lib/i18n";
@@ -12,9 +13,9 @@ import { useDisplay, useT } from "@ac/web/components/I18n";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import { clientJobRefusal, contactError, followUpText, PROBLEMS, preferredError, RATING_TAGS, STATUS_TABS, symptomLength, type StatusTab } from "@ac/web/lib/customerMaintenance";
 import { filterRefusal } from "@ac/web/lib/customerFilterCare";
-import { addNote, cancelRequest, createRequest, rateJob, reportProblem, requestReschedule, respondProposal } from "../actions";
+import { addNote, cancelRequest, createCleaningRequests, createRequest, rateJob, reportProblem, requestReschedule, respondProposal } from "../actions";
 import type { MaintenanceLive } from "../_lib/load";
-import { FilterCareTab, type CleaningPrefill } from "./filter-care";
+import { FilterCareTab, type CleaningBatch, type CleaningPrefill } from "./filter-care";
 import { Icon } from "@ac/web/components/Icon";
 import { Checkbox } from "@ac/web/components/ui/checkbox";
 import { oneOf } from "@ac/web/lib/oneOf";
@@ -22,22 +23,24 @@ import { TimeSelect } from "@ac/web/components/TimeSelect";
 
 type Detail = NonNullable<MaintenanceLive["detail"]>;
 interface Slot { startAt: string; endAt: string }
-interface Row { date: string; from: string; to: string }
-type ModalKind = null | "new" | "decline" | "other" | "rate" | "problem" | "note" | "cancel";
+export interface Row { date: string; from: string; to: string }
+type ModalKind = null | "new" | "batch" | "decline" | "other" | "rate" | "problem" | "note" | "cancel";
 // The preferred times are typed in the user's display time zone and sent as instants (NFR-08); "" while incomplete.
-const toSlot = (r: Row, tz: string): Slot => ({ startAt: zonedInstant(r.date, r.from, tz), endAt: zonedInstant(r.date, r.to, tz) });
+export const toSlot = (r: Row, tz: string): Slot => ({ startAt: zonedInstant(r.date, r.from, tz), endAt: zonedInstant(r.date, r.to, tz) });
 const dayAfter = (now: number, n: number, tz: string) => zonedParts(new Date(now + n * 86_400_000).toISOString(), tz).date;
-const threeRows = (now: number, tz: string, start = 2): Row[] => [0, 1, 2].map((i) => ({ date: dayAfter(now, start + i, tz), from: i === 1 ? "14:00" : "10:00", to: i === 1 ? "16:00" : "12:00" }));
+export const threeRows = (now: number, tz: string, start = 2): Row[] => [0, 1, 2].map((i) => ({ date: dayAfter(now, start + i, tz), from: i === 1 ? "14:00" : "10:00", to: i === 1 ? "16:00" : "12:00" }));
 
 /** Customer maintenance (FR-C09, FR-C17, FR-C18, Figma Client 07a–07p) from the Core API. The tab is in the URL (tab=
 filter-care): the server reads only what the shown tab needs. */
 export function MaintenanceView({ live }: Readonly<{ live: MaintenanceLive }>) {
   const t = useT();
   const router = useRouter();
+  const params = useSearchParams(); // unitId: the AC a link came for on Filter care (IR813)
   const [going, startGo] = useTransition();
   const [target, setTarget] = useState<"requests" | "filters">(live.page);
   const page = going ? target : live.page;
   const [prefill, setPrefill] = useState<CleaningPrefill | null>(live.requestUnitId ? { unitId: live.requestUnitId, symptom: "", type: "reactive" } : null);
+  const [batch, setBatch] = useState<CleaningBatch>([]);
   const [tab, setTab] = useState<StatusTab>("all");
   const [origin, setOrigin] = useState<"all" | "request" | "plan">("all");
   const [modal, setModal] = useState<ModalKind>(live.requestUnitId ? "new" : null);
@@ -56,7 +59,7 @@ export function MaintenanceView({ live }: Readonly<{ live: MaintenanceLive }>) {
   };
   // the shown tab's body: filter care once loaded, or the requests with the selected one beside them
   const filtersBody = () => (live.filters && !going ? (
-      <FilterCareTab f={live.filters} owner={live.owner} onRequest={(p) => { setPrefill(p); setModal("new"); }}
+      <FilterCareTab f={live.filters} owner={live.owner} focus={params.get("unitId")} onRequest={(p) => { setPrefill(p); setModal("new"); }} onRequestAll={(b) => { setBatch(b); setModal("batch"); }}
         onDone={(text) => { setResult({ tone: "ok", text }); }} onFail={(f) => { setResult({ tone: f.code === "FORBIDDEN" ? "warn" : "crit", text: filterRefusal(f, t) }); }} />
   ) : <Card title={t("Filters by AC")}><p className="text-[13px] text-muted-foreground">{t("Loading filter care…")}</p></Card>);
   const requestsBody = () => {
@@ -98,6 +101,7 @@ export function MaintenanceView({ live }: Readonly<{ live: MaintenanceLive }>) {
       {result && <Banner tone={result.tone}>{result.text}</Banner>}
       {page === "filters" ? filtersBody() : requestsBody()}
       {modal === "new" && <NewRequest live={live} prefill={prefill} onClose={(text, tone) => { setPrefill(null); close(text, tone); }} onFail={(f) => { setPrefill(null); fail(f); }} />}
+      {modal === "batch" && <BatchCleaning live={live} batch={batch} onClose={close} onFail={fail} />}
       {d && modal === "decline" && <DeclineModal d={d} now={Date.parse(live.now)} onClose={close} onFail={fail} />}
       {d && modal === "other" && <OtherTimeModal d={d} now={Date.parse(live.now)} onClose={close} onFail={fail} />}
       {d && modal === "rate" && <RateModal d={d} onClose={close} onFail={fail} />}
@@ -135,7 +139,7 @@ function JobDetail({ d, open, onDone, onFail }: Readonly<{ d: Detail; open: (m: 
   const status = j.slotProposal?.status === "pending" ? "time_proposed" : j.status;
   const isClosed = j.status === "completed" || j.status === "cancelled";
   return (
-    <Card title={j.id.slice(0, 8)} sub={`${d.unit.name} — ${j.origin === "periodic_plan" ? t("periodic inspection") : j.symptom.slice(0, 48)}`} className="self-start"
+    <Card title={d.unit.name} sub={`${j.origin === "periodic_plan" ? t("periodic inspection") : j.symptom.slice(0, 48)} · ${j.id.slice(0, 8)}`} className="self-start"
       action={<div className="flex items-center gap-2"><JobStatusBadge s={status} client /><Link href="/customer/maintenance" aria-label={t("Close")} className="rounded px-2 text-muted-foreground hover:bg-surface2"><Icon name="close" /></Link></div>}>
       <SummaryList items={d.facts} />
       {d.preferred.length > 0 && (
@@ -191,7 +195,7 @@ interface ModalProps { onClose: Done; onFail: (f: ActionFailure) => void }
 /** Three preferred times: date, from, to (each 1–4 h, from tomorrow, all different — IR113). */
 // One group for the times: its error describes the group, which names it when focus enters (IR573); `firstId` lets a
 // failed submit focus the first date.
-function TimesInput({ rows, onChange, error, label, firstId }: Readonly<{ rows: Row[]; onChange: (r: Row[]) => void; error?: string | null; label?: string; firstId?: string }>) {
+export function TimesInput({ rows, onChange, error, label, firstId }: Readonly<{ rows: Row[]; onChange: (r: Row[]) => void; error?: string | null; label?: string; firstId?: string }>) {
   const t = useT();
   const { timeZone } = useDisplay();
   const titleId = useId(), errorId = useId();
@@ -219,7 +223,9 @@ function NewRequest({ live, prefill, onClose, onFail }: ModalProps & { live: Mai
   const router = useRouter();
   const now = Date.parse(live.now);
   const [pending, run] = useAction();
-  const [unitId, setUnitId] = useState(prefill?.unitId ?? live.units[0]?.id ?? "");
+  // the AC is chosen by the user unless the request was opened for one (or there is only one): a preselected first AC
+  // was easy to send unnoticed for the wrong unit
+  const [unitId, setUnitId] = useState(prefill?.unitId ?? (live.units.length === 1 ? live.units[0]?.id ?? "" : ""));
   const [type, setType] = useState<"reactive" | "preventive">(prefill?.type ?? (prefill ? "preventive" : "reactive"));
   const [sym, setSym] = useState(prefill?.symptom ?? "");
   const [rows, setRows] = useState<Row[]>(threeRows(now, timeZone));
@@ -229,6 +235,7 @@ function NewRequest({ live, prefill, onClose, onFail }: ModalProps & { live: Mai
   const symError = symptomLength(sym) < 10 || symptomLength(sym) > 2000 ? t("Symptoms must be 10–2000 characters") : null;
   const slotError = preferredError(slots, now, 3, t);
   const cError = contactError(contact, t);
+  const unitError = unitId ? null : t("Choose the AC that needs service");
   const ids = { unit: useId(), sym: useId(), times: useId(), contact: useId() };
   // the first field to fix, top to bottom, or null when the form is valid
   const firstBad = () => {
@@ -250,12 +257,50 @@ function NewRequest({ live, prefill, onClose, onFail }: ModalProps & { live: Mai
   };
   return (
     <Modal open wide onClose={() => { onClose(); }} title={t("New maintenance request")} footer={<><Btn onClick={() => { onClose(); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={submit}>{t("Submit request")}</Btn></>}>
-      <Field label={t("Unit")}><Select id={ids.unit} value={unitId} onChange={(e) => { setUnitId(e.target.value); }}>{live.units.map((u) => <option key={u.id} value={u.id}>{u.name}{u.place ? ` · ${u.place}` : ""}</option>)}</Select></Field>
+      <Field label={t("Unit")} error={tried ? unitError ?? undefined : undefined}><Select id={ids.unit} value={unitId} onChange={(e) => { setUnitId(e.target.value); }}><option value="" disabled>{t("Choose an AC…")}</option>{unitsByProperty(live.units).map((g) => <optgroup key={g.property} label={g.property || t("Other")}>{g.units.map((u) => <option key={u.id} value={u.id}>{u.label}</option>)}</optgroup>)}</Select></Field>
       <Field label={t("Type")}><Choice value={type} onChange={setType} options={[{ id: "reactive", label: t("Repair") }, { id: "preventive", label: t("Preventive") }]} /></Field>
       <Field label={t("Symptoms (10–2000 characters)")} error={tried ? symError ?? undefined : undefined} hint={`${String(symptomLength(sym))} / 2000`}><Textarea id={ids.sym} value={sym} onChange={(e) => { setSym(e.target.value); }} placeholder={t("Cold air is weak and there is water dripping from the indoor unit.")} /></Field>
       <TimesInput rows={rows} onChange={setRows} error={tried ? slotError : null} firstId={ids.times} />
       <Field label={t("Contact window (optional)")} hint={t("Use HH:mm for times (example: Weekdays 09:00-18:00) — no phone numbers or e-mail addresses")} error={tried ? cError ?? undefined : undefined}><Input id={ids.contact} value={contact} maxLength={200} onChange={(e) => { setContact(e.target.value); }} /></Field>
       <Banner>{t("Nothing is booked yet — you will see “Scheduled” once a time is confirmed. Any time outside your 3 options needs your approval.")}</Banner>
+    </Modal>
+  );
+}
+
+/** Request cleaning for every overdue filter at once (UI/UX loop R140, user decision 2026-11-16): the ACs ticked, one set of
+3 preferred times and a contact window; it sends one preventive request per AC, each with its own run-time line. */
+function BatchCleaning({ live, batch, onClose, onFail }: ModalProps & { live: MaintenanceLive; batch: CleaningBatch }) {
+  const t = useT();
+  const { timeZone } = useDisplay();
+  const now = Date.parse(live.now);
+  const [pending, run] = useAction();
+  const [chosen, setChosen] = useState<string[]>(batch.map((b) => b.unitId));
+  const [rows, setRows] = useState<Row[]>(threeRows(now, timeZone));
+  const [contact, setContact] = useState("");
+  const [tried, setTried] = useState(false);
+  const slots = rows.map((r) => toSlot(r, timeZone));
+  const slotError = preferredError(slots, now, 3, t);
+  const cError = contactError(contact, t);
+  const units = batch.filter((b) => chosen.includes(b.unitId));
+  const submit = () => {
+    setTried(true);
+    if (units.length === 0 || slotError || cError) return;
+    run(() => createCleaningRequests({ units, slots, contactWindow: contact }), (v) => t(v.stopped ? "Not all requests were sent" : "Requests sent"), (v) => {
+      const sent = t(v.ids.length === 1 ? "1 cleaning request sent with 3 preferred times — nothing is booked until a time is confirmed." : "{n} cleaning requests sent with 3 preferred times — nothing is booked until a time is confirmed.", { n: v.ids.length });
+      // a refusal stops the batch: the ones sent before it stay, so a partial batch says how many went
+      if (!v.stopped) onClose(sent);
+      else if (v.ids.length > 0) onClose(t("{sent} of {total} cleaning requests sent; the rest were not sent: {reason}", { sent: v.ids.length, total: units.length, reason: clientJobRefusal(v.stopped, t) }), "warn");
+      else onFail(v.stopped);
+    }, onFail);
+  };
+  return (
+    <Modal open wide onClose={() => { onClose(); }} title={t("Request cleaning for overdue filters")} footer={<><Btn onClick={() => { onClose(); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending || units.length === 0} onClick={submit}>{t(units.length === 1 ? "Send 1 request" : "Send {n} requests", { n: units.length })}</Btn></>}>
+      <Field label={t("ACs to clean ({n} of {total})", { n: units.length, total: batch.length })} error={tried && units.length === 0 ? t("Choose at least one AC") : undefined}>
+        <div className="flex flex-col gap-1.5">{batch.map((b) => <Check key={b.unitId} label={<span>{b.unit}{b.place && <span className="text-muted-foreground"> · {b.place}</span>}</span>} checked={chosen.includes(b.unitId)} onChange={(on) => { setChosen((c) => (on ? [...c, b.unitId] : c.filter((x) => x !== b.unitId))); }} />)}</div>
+      </Field>
+      <TimesInput rows={rows} onChange={setRows} error={tried ? slotError : null} />
+      <Field label={t("Contact window (optional)")} hint={t("Use HH:mm for times (example: Weekdays 09:00-18:00) — no phone numbers or e-mail addresses")} error={tried ? cError ?? undefined : undefined}><Input value={contact} maxLength={200} onChange={(e) => { setContact(e.target.value); }} /></Field>
+      <Banner>{t("One preventive request per AC, each with its own run time. Nothing is booked yet — you will see “Scheduled” once a time is confirmed.")}</Banner>
     </Modal>
   );
 }

@@ -91,8 +91,11 @@ func run() error {
 				Technician: "",
 				Admin:      "",
 			},
-			AccountsPerDay: 0,
-			WrapTx:         nil,
+			AccountsPerDay:      0,
+			WrapTx:              nil,
+			Checkout:            nil,
+			CustomerAppURL:      "",
+			StripeWebhookSecret: "",
 		},
 		nil,
 	)

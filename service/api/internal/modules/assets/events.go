@@ -19,7 +19,29 @@ func EventHandlers() map[string]events.Handler {
 		events.RecoveryCasesChanged:    recoveryCasesChanged,
 		events.OfferAccessChanged:      offerAccessChanged,
 		events.AssignmentAccessChanged: assignmentAccessChanged,
+		events.UnitInstalled:           unitInstalled,
 	}
+}
+
+// unitInstalled installs a planned unit: an accepted installation report fixes the installation date (DEC-106). The
+// warranty end stays as it is, to be set in the unit's edit (BR-A19).
+func unitInstalled(ctx context.Context, txn pgx.Tx, e events.Event) error {
+	var payload events.UnitInstalledPayload
+
+	decodeErr := e.Decode(&payload)
+	if decodeErr != nil {
+		return apperr.Wrap(decodeErr, "events.Event.Decode")
+	}
+
+	_, err := txn.Exec(
+		ctx,
+		`UPDATE assets.units SET install_state = 'installed', installed_at = $2, version = version + 1,
+			updated_at = platform.app_now() WHERE id = $1 AND install_state = 'planned'`,
+		payload.UnitID,
+		payload.InstalledAt,
+	)
+
+	return apperr.Wrap(err, "update assets.units")
 }
 
 // restrictionApplied keeps the unit's copy of the restriction it now observes.

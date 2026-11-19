@@ -28,8 +28,10 @@ const r = (waveIndex: number, status: ApiCampaign["results"][number]["status"]) 
 
 describe("HQ device registry", () => {
   it("lists models and devices", () => {
-    expect(modelRows([cap], units, [row({}), row({ id: "d2", unitId: null })])[0]).toMatchObject({ name: "DemoAir SPL-100", used: "1 unit · 1 device", updated: "10 Sept 2026, 10:00 am MYT" });
-    expect(iotModelRows([iot], units, [row({}), row({ id: "d2", unitId: null })])[0]).toMatchObject({ name: "DemoNode ESP-1", used: "1 unit · 2 devices" });
+    expect(modelRows([cap], units, [row({}), row({ id: "d2", unitId: null })])[0]).toMatchObject({ name: "DemoAir SPL-100", used: "1 unit · 1 device", inUse: true, updated: "10 Sept 2026, 10:00 am MYT" });
+    expect(iotModelRows([iot], units, [row({}), row({ id: "d2", unitId: null })])[0]).toMatchObject({ name: "DemoNode ESP-1", used: "1 unit · 2 devices", inUse: true });
+    // nothing on it: Delete stays on (UI/UX loop R133)
+    expect([modelRows([cap], [], [])[0]?.inUse, iotModelRows([iot], [], [])[0]?.inUse]).toStrictEqual([false, false]);
     expect(deviceRows([row({}), row({ id: "d2", unitId: null, tamper: "detected" })], units).map((device) => [device.unit, device.tamper])).toStrictEqual([["Bedroom AC", false], ["Unbound", true]]);
     expect(capabilityErrors({ ...capabilityDraft(cap), control: false, changeReason: "" }, true)).toStrictEqual({ control: "Mode, fan or temperature control needs power control", changeReason: "A reason is required (1–1000 characters)" });
   });

@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
@@ -189,6 +190,11 @@ func TestForceDeleteCustomerWithAccounts(t *testing.T) {
 	}
 
 	orgDelete := `{"id":"` + kit.org + `",` + testReason + `}`
+	if code, res := write(srv, hq(), "organizations.delete", orgDelete, kit.orgV+1); code != 409 ||
+		res["messageKey"] != apperr.KeyVersionConflict {
+		t.Errorf("organization delete on a stale version: %d %v", code, res["messageKey"])
+	}
+
 	if code, res := write(srv, hq(), "organizations.delete", orgDelete, kit.orgV); code != 200 ||
 		data(res)["deleted"] != true {
 		t.Fatalf("organization delete: %d %v", code, res)

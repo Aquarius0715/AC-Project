@@ -348,6 +348,21 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 		t.Error("history with own organization")
 	}
 
+	// currentOnly: a stage tab of the company's jobs leaves the ended delegation out; the same filter without it
+	// keeps it (IR797)
+	accepted := `"status":"accepted"`
+	for filter, want := range map[string]bool{accepted: true, accepted + `,"currentOnly":true`: false} {
+		if code, resp := post(
+			srv,
+			contrA(),
+			"jobs.list",
+			`{"filters":{`+filter+`},"limit":100}`,
+		); code != 200 ||
+			(byJob(t, resp, job) != nil) != want {
+			t.Errorf("history with {%s}: want %v", filter, want)
+		}
+	}
+
 	for typ, want := range map[string]bool{"reactive": true, "preventive": false} { // the history's public type (IR290)
 		if code, resp := post(
 			srv,

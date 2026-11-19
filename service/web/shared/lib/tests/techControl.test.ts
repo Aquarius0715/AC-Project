@@ -40,7 +40,7 @@ describe("historyRows", () => {
       deviceCommand({ id: "cmd-00000004", status: "requested", acknowledgedAt: null }), deviceCommand({ id: "cmd-00000005", status: "cancelled", acknowledgedAt: null }),
     ], []);
     expect(rows[0]).toStrictEqual({ id: "cmd-00000001", at: "9:00 am MYT", title: "set_mode = cool", sub: "cmd-0000 · acknowledged 9:00 am MYT", badge: { text: "Acked", tone: "ok" }, run: false });
-    expect(rows[1]).toMatchObject({ sub: "cmd-0000 · rejected by the device (DEVICE_REJECTED)", badge: { text: "Rejected", tone: "crit" } });
+    expect(rows[1]).toMatchObject({ sub: "cmd-0000 · failed: the AC refused it", badge: { text: "Rejected", tone: "crit" } });
     expect(rows[2]).toMatchObject({ sub: "cmd-0000 · no device response (expired)", badge: { text: "No response", tone: "crit" } });
     expect(rows[3]).toMatchObject({ sub: "cmd-0000 · waiting for the device", badge: { text: "Waiting", tone: "warn" } });
     expect(rows[4]).toMatchObject({ sub: "cmd-0000 · cancelled", badge: { text: "Cancelled", tone: "muted" } });
@@ -61,7 +61,7 @@ describe("run banner and state", () => {
     expect(runBanner(run())).toMatchObject({ tone: "warn", title: "Running — ends 9:10 am MYT (start acknowledged 9:05 am MYT)", text: "The test run ends 5 min after it started. The end command (Power OFF) is sent at 9:10 am MYT." });
     expect(runBanner(run({ state: "end_requested" }))).toMatchObject({ tone: "warn", title: "End requested 9:10 am MYT — awaiting device response" });
     expect(runBanner(run({ state: "completed" }))).toMatchObject({ tone: "ok", title: "End acknowledged — test run completed", text: "The device confirmed Power OFF." });
-    expect(runBanner(run({ state: "start_failed", failureCode: "TIMEOUT" }))).toMatchObject({ tone: "crit", text: "The device reported TIMEOUT · no end command is needed." });
+    expect(runBanner(run({ state: "start_failed", failureCode: "TIMEOUT" }))).toMatchObject({ tone: "crit", text: "Not done: no answer from the AC in time · no end command is needed." });
     expect(runBanner(run({ state: "end_failed" }))?.text).toBe("The unit may still be running; check it on site.");
     expect(runBanner(run({ state: "end_blocked" }))?.title).toMatch(/^End blocked/);
     expect([null, run({ state: "completed" }), run({ state: "end_failed" })].map((item) => runActive(item))).toStrictEqual([false, false, false]);

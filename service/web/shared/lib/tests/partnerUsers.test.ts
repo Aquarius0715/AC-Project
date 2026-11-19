@@ -72,6 +72,10 @@ describe("partner invite checks", () => {
     expect(partnerInviteError(" tech@example.com ", us)).toBe("Already a user of your company");
     expect(partnerInviteError("tech@example.com", us, undefined, "a")).toBeUndefined();
     expect(partnerInviteError("new@example.com", us)).toBeUndefined();
+    // 254 bytes, as partnerUsers.save counts (len in Go): 136 UTF-16 units but 266 bytes is refused
+    expect(partnerInviteError(`${"a".repeat(248)}@x.com`, us)).toBeUndefined();
+    expect(partnerInviteError(`${"a".repeat(249)}@x.com`, us)).toBe("A valid email address (up to 254 characters)");
+    expect(partnerInviteError(`${"é".repeat(130)}@x.com`, us)).toBe("A valid email address (up to 254 characters)");
   });
   it("needs a reason of 1–1000 characters", () => {
     expect(reasonError("  ")).toBeDefined();

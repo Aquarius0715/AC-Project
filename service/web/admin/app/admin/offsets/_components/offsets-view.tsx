@@ -2,6 +2,7 @@
 const DEMO_PURCHASED = "demo_purchased";
 const DEMO_RETIRED = "Demo retired";
 
+import { byName } from "@ac/web/lib/text";
 import Link from "next/link";
 import { useState } from "react";
 import { Badge, Banner, Btn, Card, Check, DemoBadge, EmptyState, Field, Input, ListRow, Modal, Page, Select, Steps, SummaryList, Tabs, Textarea, Timeline, type Tone } from "@ac/web/components/ui";
@@ -33,6 +34,7 @@ time zone (IR298). */
 export function OffsetsView({ live }: Readonly<{ live: Live }>) {
   const i = useI18n(), { t } = i;
   const nav = useUrlPatch();
+  const isFiltered = Boolean(live.scope.customerId) || Boolean(live.scope.status) || live.scope.created !== "all";
   const [pending, run] = useAction();
   const sel = live.rows.find((r) => r.id === live.selectedId) ?? null;
   const [modal, setModal] = useState(false);
@@ -68,13 +70,14 @@ export function OffsetsView({ live }: Readonly<{ live: Live }>) {
         <>
         <div className="flex flex-wrap items-end gap-3">
           <span className="pb-2 text-xs font-semibold text-muted-foreground">{t("Filter")}</span>
-          <Field label={t("Customer")}><Select value={live.scope.customerId ?? ""} onChange={(e) => { nav({ customerId: e.target.value || null, recordId: null }); }}><option value="">{t("All customers")}</option>{live.customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field>
+          <Field label={t("Customer")}><Select value={live.scope.customerId ?? ""} onChange={(e) => { nav({ customerId: e.target.value || null, recordId: null }); }}><option value="">{t("All customers")}</option>{live.customers.toSorted(byName).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field>
           <Field label={t("Status")}><Select value={live.scope.status ?? ""} onChange={(e) => { nav({ status: e.target.value || null, recordId: null }); }}><option value="">{t("All statuses")}</option>{(["demo_requested", DEMO_PURCHASED, "demo_retired", "failed"] as const).map((x) => <option key={x} value={x}>{textOf(STATE_WORD, x, t) ?? x}</option>)}</Select></Field>
           <Field label={t("Created")}><Select value={live.scope.created} onChange={(e) => { nav({ created: e.target.value === "30d" ? null : e.target.value, recordId: null }); }}><option value="7d">{t("Last 7 days")}</option><option value="30d">{t("Last 30 days")}</option><option value="90d">{t("Last 90 days")}</option><option value="all">{t("All time")}</option></Select></Field>
         </div>
         <div className="split-rev">
           <Card title={t("Demo offset records")} action={live.canWrite && <Btn size="sm" variant="primary" onClick={() => { setD(blank); setModal(true); }}><Icon name="add" /> {t("New demo quote")}</Btn>} className="self-start">
-            {live.rows.length === 0 ? <EmptyState title={t("No records")}>{t(live.scope.customerId || live.scope.status || live.scope.created !== "all" ? "No record matches these filters — widen them, or get a demo quote and request it to create a record." : "Get a demo quote and request it to create a record.")}</EmptyState> : <div className="flex flex-col gap-2">{live.rows.map((x) => <ListRow key={x.id} selected={sel?.id === x.id} onClick={() => { setAck(false); nav({ recordId: x.id }); }}><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="text-[13px]">{x.id.slice(0, 8)}</b><Badge tone={tone(x.state)}>{x.stateText}</Badge></div><div className="text-[11px] text-muted-foreground">{x.customer} · {x.amount}</div><div className="text-[11px] text-muted-foreground">{x.next}</div></div></ListRow>)}</div>}
+            {/* "widen them" comes with the way to do it, here, rather than three selects to reset (UI/UX loop R91) */}
+            {live.rows.length === 0 ? <EmptyState title={t("No records")} action={isFiltered && <Btn size="sm" onClick={() => { nav({ customerId: null, status: null, created: "all", recordId: null }); }}>{t("Clear the filters")}</Btn>}>{t(isFiltered ? "No record matches these filters — widen them, or get a demo quote and request it to create a record." : "Get a demo quote and request it to create a record.")}</EmptyState> : <div className="flex flex-col gap-2">{live.rows.map((x) => <ListRow key={x.id} selected={sel?.id === x.id} onClick={() => { setAck(false); nav({ recordId: x.id }); }}><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="text-[13px]">{x.id.slice(0, 8)}</b><Badge tone={tone(x.state)}>{x.stateText}</Badge></div><div className="text-[11px] text-muted-foreground">{x.customer} · {x.amount}</div><div className="text-[11px] text-muted-foreground">{x.next}</div></div></ListRow>)}</div>}
             <p className="mt-3 text-[11px] text-muted-foreground">{t("Energy savings and MRV estimates are shown separately and never converted into credits.")} <Link className="text-primary underline" href="/admin/energy">{t("Energy analysis")}</Link> · <Link className="text-primary underline" href="/admin/mrv">MRV</Link></p>
           </Card>
           {sel ? (
@@ -110,7 +113,7 @@ export function OffsetsView({ live }: Readonly<{ live: Live }>) {
       )}
       <Modal open={modal} onClose={close} title={t("New demo quote")} wide footer={<><Btn onClick={close}>{t("Cancel")}</Btn>{quote ? <Btn variant="primary" disabled={pending || !confirmed} onClick={request}>{t("Request (demo)")}</Btn> : <Btn variant="primary" disabled={pending} onClick={getQuote}>{t("Get demo quote")}</Btn>}</>}>
         <div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>
-          <Field label={t("Customer")} error={tried ? errors.customerId : undefined}><Select value={d.customerId} onChange={(e) => { set({ customerId: e.target.value, unitIds: [] }); }}><option value="">{t("Select…")}</option>{live.customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field>
+          <Field label={t("Customer")} error={tried ? errors.customerId : undefined}><Select value={d.customerId} onChange={(e) => { set({ customerId: e.target.value, unitIds: [] }); }}><option value="">{t("Select…")}</option>{live.customers.toSorted(byName).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field>
           <Field label={t("Amount (kgCO₂e)")} error={tried ? errors.amountKg : undefined}><Input type="number" min="0" step="0.001" value={d.amountKg} onChange={(e) => { set({ amountKg: e.target.value }); }} /></Field>
           <Field label={t("Period start (Kuala Lumpur)")} error={tried ? errors.period : undefined}><DateTimeSelect value={d.from} onChange={(v) => { set({ from: v }); }} /></Field>
           <Field label={t("Period end")}><DateTimeSelect value={d.to} onChange={(v) => { set({ to: v }); }} /></Field>

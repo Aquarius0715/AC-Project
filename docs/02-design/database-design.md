@@ -1,6 +1,6 @@
 ---
 document_id: DD-DATABASE
-version: 0.40.0
+version: 0.41.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent, operations]
@@ -23,7 +23,7 @@ The source of truth for fields and states is [service-contracts.ts](service-cont
 | identity | Identity & access | users, organizations, memberships, membership_permissions, membership_scopes, qualification_grants, permissions (39), preferences, two_factor, consents, client_users (the customer owners' user lists, IR417), partner_users (the contractors' user lists, IR416) |
 | assets | Assets | customers, properties, spaces, units, unit_alert_policies, unit_imports, unit_import_previews (30-minute CSV validation results written outside the read transaction of `units.importPreview`, purged after expiry), warranty_reminders (the BR-A19 reminders sent, IR340), unit_offer_access and unit_assignment_access (projections of accepted Offers and of Assignments with an `active` flag for the unit scope and the diagnostic-run scope, fed by change-capture events, IR186, IR187) |
 | devices | Devices | capabilities (versioned; the aircon models), iot_models (versioned; the IoT models, DEC-105, migration 000002), devices, sensors, device_bindings, device_operations, device_events, device_event_notes, calibration_records, firmware_campaigns, firmware_campaign_devices |
-| control | Control | commands, diagnostic_runs, automations, automation_units, automation_policies, automation_policy_units, automation_runs, evaluation_events, schedule_watermarks |
+| control | Control | commands, diagnostic_runs, automations, automation_units, automation_policies, automation_policy_units, automation_runs, evaluation_events, schedule_watermarks, presence_states |
 | monitoring | Monitoring & alerts | alert_policies, default_rule_settings, alerts, ventilation_logs, allergen_observations, measurements (partitioned), measurements_15m, measurements_1h, alert_notifications (requested alert notifications for the cooldown, IR191) |
 | maintenance | Maintenance | plans, jobs, job_alerts, slot_proposals, offers, partner_slot_proposals, assignments, work_reports (versioned), report_reviews, attachments, job_notes, job_events, job_history_snapshots, contractors, rate_cards, certificates, certificate_reminders (the BR-P09 expiry reminders sent, IR336), unavailability, sla_targets, filter_care_settings, filter_cleanings, filter_reminders, filter_reminder_watermarks, parts_catalog, ref_memberships reference copy (IR192) |
 | billing | Billing | contracts (versioned), contract_units, invoices, payments, stripe_events, inquiries, payout_statements, payout_lines, payout_queries, payout_runs (the scheduler's monthly draft runs, IR341), ref_customers and ref_units reference copies (IR194, IR199) |
@@ -32,9 +32,8 @@ The source of truth for fields and states is [service-contracts.ts](service-cont
 | notify | Notifications | notifications, deliveries, templates, reference copies of other domains' rows kept from RowChanged events (IR188): ref_units, ref_customers, ref_properties, ref_jobs, ref_offers, ref_assignments, ref_invoices, ref_inquiries, ref_restrictions, ref_restriction_units, ref_devices, ref_certificates, ref_job_histories (IR601) |
 | audit | Audit | audit_log (append-only, partitioned) |
 
-As built (IR335), six tables are created but not used yet:
+As built (IR335), five tables are created but not used yet (`billing.stripe_events` is used since IR827: the billing service stores each Stripe delivery there):
 
-- `billing.stripe_events`: the webhook service is planned (IR197);
 - `monitoring.measurements_15m` and `monitoring.measurements_1h`: the rollup worker is not built. `telemetry.series` reads the raw measurements, and the energy figures integrate the minute power samples copied to `energy.ref_power_samples`;
 - `notify.templates`: the notification texts come from the code. `notify.deliveries` is used since IR418: the notification worker records each e-mail delivery there;
 - `platform.scheduled_items`: the schedulers update the domain tables directly (backend architecture §10);
@@ -69,6 +68,10 @@ Mapping of notable TypeScript types:
 |---|---|
 | `Membership.permissions: Permission[]` | `identity.membership_permissions` rows referencing `identity.permissions` (38 codes, IR107) |
 | `Membership.scopes: ScopeRef[]` | `identity.membership_scopes (kind, ref_id)` |
+| `ACUnit.installState` | `assets.units.install_state` `planned`/`installed` (DEC-106, IR789, migration 000005): a planned unit has no `installed_at`; the `UnitInstalled` event from an accepted installation report sets `installed` and `installed_at` (the warranty end is set in the unit edit) |
+| `MaintenanceJob.type = 'installation'`, `origin = 'hq_request'` | `maintenance.jobs` CHECK lists widened; a partial unique index allows one unfinished installation job per unit; `work_reports.installation` and `attachments.tag` (migration 000005) |
+| `InstallationRequest` | `maintenance.installation_requests` (DEC-107, IR794, migration 000006): a customer owner's request for 1–10 new aircons with 3 preferred slots; `maintenance.jobs.installation_request_id` links the installation jobs HQ creates for it, and the first such job sets the request `approved` in the same transaction |
+| `PresenceState` | `control.presence_states` (DEC-109, IR826, migration 000010): per member and pinned property, whether the member's device is inside the property's away/home radius, when that last changed and when it was last reported. No position is stored; a withdrawn location consent deletes the member's rows |
 | `ACUnit.observedState`, `observedRestriction` | `jsonb` read-model columns on `assets.units`, written only from device events (IR47) |
 | `ACUnit.alertPolicyIds` | `assets.unit_alert_policies`; the HQ default policy is implicit and never stored per unit (IR108) |
 | `Policy` (`automation` / `alert` / `default_alert`) | `control.automation_policies` and `monitoring.alert_policies` (kind alert or default_alert); `policies.*` operations dispatch on kind |
@@ -81,7 +84,7 @@ Mapping of notable TypeScript types:
 | `Measurement` | `monitoring.measurements` (hot, 35 days) + aggregates; raw history in S3 Parquet |
 | `TwoFactorStatus`, passwords, sessions | Not stored here: two-step verification and credentials live in Amazon Cognito; server sessions in ElastiCache (as built, the BFF's session store, IR382) (`twoFactor.*`, `auth.*`, `demoSession.*` call Cognito / the session store) |
 
-Production-only enumeration values (not in the Phase 1A contract; add them to service-contracts.ts when the API adapter is built): `billing.payments.status` adds `expired` (Stripe Checkout Session expiry) and `method` / `channel` describe real methods instead of the demo `PaymentMethod`; `notify.notifications.template_key` adds `invite` (FR-C19 e-mail invites); `energy.baselines.method` adds `measured_period`; `energy.mrv_reports.status` adds `reviewed`; `energy.offset_records.state` adds `requested` / `purchased` / `retired` for a future real registry. All other CHECK lists equal the TypeScript unions, and every write operation that requires an expected version in the write version catalog has a `version` column on its target table (checked 2026-10-07).
+Production-only enumeration values (not in the Phase 1A contract; add them to service-contracts.ts when the API adapter is built): `notify.notifications.template_key` adds `invite` (FR-C19 e-mail invites); `energy.baselines.method` adds `measured_period`; `energy.mrv_reports.status` adds `reviewed`; `energy.offset_records.state` adds `requested` / `purchased` / `retired` for a future real registry. Since IR827 `Payment` carries `channel` (`demo`, `stripe_checkout`, `manual`) and the status `expired` (a Stripe Checkout Session that ended unpaid), as the CHECK lists of `billing.payments` have them. All other CHECK lists equal the TypeScript unions, and every write operation that requires an expected version in the write version catalog has a `version` column on its target table (checked 2026-10-07).
 
 ## 4. Entity relationships (per schema)
 
@@ -185,6 +188,7 @@ At the design capacity (20,000 units, about 120,000 measurements per minute) the
 | Alerts inbox (`alerts.list`) | open alerts by customer and severity | `alerts_open` |
 | Jobs lists (HQ / partner / technician) | by status, contractor, assigned technician | `jobs_status`, `jobs_contractor`, `assignments_technician` |
 | Follow-ups to classify (IR114) | `follow_up_class = 'pending'` | `jobs_follow_up_pending` |
+| Installation requests (`installationRequests.list`, installation `jobs.create`) | the jobs of a request | `jobs_installation_request` (IR839, migration 000011) |
 | Invoices & payments | by customer and due date, overdue | `invoices_customer`, `invoices_overdue`, `payments_invoice` |
 | Audit search (`audit.list`) | by target, correlation ID, actor | `audit_target`, `audit_correlation`, `audit_actor` |
 | Notifications | inbox by recipient, unread count | `notifications_inbox`, `notifications_unread` |

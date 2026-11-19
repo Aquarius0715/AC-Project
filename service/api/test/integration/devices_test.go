@@ -154,7 +154,7 @@ func TestDevicesRegisterListGet(t *testing.T) {
 		body("X-"+uuid.NewString()[:6], newUnit(t, srv, "Cap"), `["vibration"]`, ""),
 		0,
 	); code != 422 ||
-		fields(res) != "sensorTypes=error.notInCapability" {
+		fields(res) != refusedSensorNotInCapability {
 		t.Errorf("sensor not in capability (IR43): %d %s", code, fields(res))
 	}
 
@@ -333,8 +333,26 @@ func TestTechnicianWriteTable(t *testing.T) {
 		t.Error("job for another unit → NOT_FOUND")
 	}
 
-	if code, m := reg(unit5, active); code != 200 {
-		t.Fatalf("inside window: %d %v", code, m)
+	code, registered := reg(unit5, active)
+	if code != 200 {
+		t.Fatalf("inside window: %d %v", code, registered)
+	}
+
+	// the device stays unbound until devices.bind: the technician sees it as their own, but has no unit whose
+	// history they could read, so the history reads are NOT_FOUND (historyAccess)
+	own := asStr(t, data(registered)["id"])
+	if code, res := post(srv, techInt(), "devices.get", `{"id":"`+own+`"}`); code != 200 {
+		t.Fatalf("own unbound device: %d %v", code, res)
+	}
+
+	for operation, body := range map[string]string{
+		"devices.events":      `{"id":"` + own + `","query":{}}`,
+		opDevicesOperations:   `{"deviceId":"` + own + `","query":{}}`,
+		opDevicesCalibrations: `{"deviceId":"` + own + `","query":{}}`,
+	} {
+		if code, res := post(srv, techInt(), operation, body); code != 404 {
+			t.Errorf("%s of an unbound device: %d %v", operation, code, res)
+		}
 	}
 
 	other := assign(

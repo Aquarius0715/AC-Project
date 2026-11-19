@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"net/http"
 	"net/url"
@@ -662,7 +663,12 @@ func bodyObject(body []byte) (map[string]any, error) {
 	dec.UseNumber()
 
 	err := dec.Decode(&obj)
-	if err != nil || obj == nil || dec.More() {
+	if err != nil || obj == nil {
+		return nil, apperr.Fields(map[string]string{"_": apperr.KeyMalformedInput})
+	}
+
+	// Nothing may follow the object: dec.More() is false before a stray } or ], so read on until the end.
+	if !errors.Is(dec.Decode(new(json.RawMessage)), io.EOF) {
 		return nil, apperr.Fields(map[string]string{"_": apperr.KeyMalformedInput})
 	}
 

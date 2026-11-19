@@ -8,7 +8,8 @@ import { refresh } from "next/cache";
 import { coreOp, CoreError } from "@ac/web/lib/dal";
 import { actionFailure } from "@ac/web/lib/actionFailure";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
-import type { ApiTechReport } from "@ac/web/lib/techJob";
+import { photoTags, type ApiTechReport, type CheckInPosition } from "@ac/web/lib/techJob";
+import { z } from "zod";
 import { uploadName, uploadType } from "@ac/web/lib/files";
 import type { OpInput } from "@ac/web/lib/opTypes";
 import { formText } from "@ac/web/lib/formData";
@@ -33,10 +34,14 @@ export async function acknowledge(jobId: string, version: number, decision: "acc
   return run(() => coreOp("jobs.acknowledgeAssignment", { jobId, decision, ...((decision === "cant_make") && { ...(reason && { reason }), alternativeSlot }) }, { write: true, expectedVersion: version }), true);
 }
 
-/** jobs.checkIn (IR111): location ≤ 200 m with the scanned unit QR, or manual with a reason; checking in starts the
+const checkInPosition = z.object({ latitude: z.number(), longitude: z.number(), accuracyMeters: z.number() }).nullable();
+
+/** jobs.checkIn (IR111): the device's fix within 200 m of the site's pin, measured by the server (DEC-109, IR825), with
+the scanned unit QR, or manual with a reason (a fix, when there is one, records the distance); checking in starts the
 work. The QR code is resolved with units.resolveQr first (the label's unit must be the job's unit): a label it does
 not find among the technician's assigned units is refused as the check-in refuses another unit's label (IR486). */
-export async function checkIn(jobId: string, version: number, method: "location_qr" | "manual", distanceMeters: number | null, qrCode: string | null, reason: string | null): Promise<Result<unknown>> {
+export async function checkIn(jobId: string, version: number, method: "location_qr" | "manual", position: CheckInPosition | null, qrCode: string | null, reason: string | null): Promise<Result<unknown>> {
+  const fix = checkInPosition.safeParse(position); // a Server Action's argument comes from the network; the Core API checks the ranges
   let qrUnitId: string | null = null;
   if (method === "location_qr" && qrCode) {
     try {
@@ -46,7 +51,7 @@ export async function checkIn(jobId: string, version: number, method: "location_
       return error instanceof CoreError && error.error.code === "NOT_FOUND" ? { ok: false, code: "VALIDATION", messageKey: "error.validation", fieldErrors: { qrUnitId: "errors.qr_unit_mismatch" } } : actionFailure(error);
     }
   }
-  return run(() => coreOp("jobs.checkIn", { jobId, method, distanceMeters: method === "location_qr" ? distanceMeters : null, qrUnitId, ...(method === "manual" && reason !== null && { reason }) }, { write: true, expectedVersion: version }), true);
+  return run(() => coreOp("jobs.checkIn", { jobId, method, position: fix.success ? fix.data : null, qrUnitId, ...(method === "manual" && reason !== null && { reason }) }, { write: true, expectedVersion: version }), true);
 }
 
 /** jobs.pauseWork: pause or resume the time on site. */
@@ -66,7 +71,10 @@ export async function uploadPhoto(form: FormData) {
   if (!(file instanceof File)) return { ok: false as const, code: "VALIDATION", messageKey: "error.validation", fieldErrors: { file: "error.required" } };
   const buffer = Buffer.from(await file.arrayBuffer());
   return run(async () => {
-    await coreOp("attachments.add", { jobId, reportId, file: { name: uploadName(file.name), mime: formValue(imageMime, uploadType(buffer, file.type), "file"), size: file.size, bytes: buffer.toString("base64") } }, { write: true, expectedVersion: version });
+    // what an installation report photo shows (DEC-106); checked inside run, so a tag the contract does not know is
+    // returned as a VALIDATION failure naming the field instead of being thrown out of the action (R1030)
+    const tag = form.has("tag") ? formValue(z.enum(photoTags), form.get("tag"), "tag") : null;
+    await coreOp("attachments.add", { jobId, reportId, file: { name: uploadName(file.name), mime: formValue(imageMime, uploadType(buffer, file.type), "file"), size: file.size, bytes: buffer.toString("base64") }, ...(tag && { tag }) }, { write: true, expectedVersion: version });
     return reportState(await coreOp<ApiTechReport>("reports.get", { jobId, reportId, reportVersion: version + 1 }));
   });
 }

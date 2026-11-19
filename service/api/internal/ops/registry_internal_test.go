@@ -492,6 +492,111 @@ func checkBodies(t *testing.T, testRig rig) {
 	}
 }
 
+// TestIdempotencyKeyLength: the key is counted in characters like the CHECK (length(key) BETWEEN 8 AND 128) of
+// platform.idempotency_keys, so a short key of multi-byte characters is refused with the field named, not by the
+// database; a key that is not UTF-8 is refused the same way.
+func TestIdempotencyKeyLength(t *testing.T) {
+	t.Parallel()
+
+	testRig := setup(t)
+
+	cases := []struct {
+		name, key string
+		status    int
+	}{
+		{name: "7 ASCII", key: "key-001", status: 422},
+		{name: "3 three-byte characters (9 bytes)", key: "€€€", status: 422},
+		{name: "7 three-byte characters (21 bytes)", key: strings.Repeat("€", 7), status: 422},
+		{name: "not UTF-8", key: "key-\xff\xfe-0001", status: 422},
+		{name: "129 ASCII", key: strings.Repeat("k", 129), status: 422},
+		{name: "8 three-byte characters", key: strings.Repeat("€", 8), status: 200},
+		{name: "128 three-byte characters (384 bytes)", key: strings.Repeat("€", 128), status: 200},
+		{name: "128 ASCII", key: strings.Repeat("k", 128), status: 200},
+	}
+
+	for _, testCase := range cases {
+		recorder := do(t, testRig.app, adminPrincipal(), opUnitsSave, bodyNameA, testCase.key)
+		if recorder.Code != testCase.status {
+			t.Errorf("%s: got %d %s", testCase.name, recorder.Code, recorder.Body.String())
+
+			continue
+		}
+
+		if testCase.status != 422 {
+			continue
+		}
+
+		var domainError apperr.DomainError
+
+		err := json.Unmarshal(recorder.Body.Bytes(), &domainError)
+		if err != nil || domainError.FieldErrors["Idempotency-Key"] != apperr.KeyRequired {
+			t.Errorf("%s: field not named: %s", testCase.name, recorder.Body.String())
+		}
+	}
+}
+
+// fakeLimiter answers every Allow with wait and err, and remembers the keys it was asked for.
+type fakeLimiter struct {
+	wait int
+	err  error
+	keys []string
+}
+
+func (f *fakeLimiter) Allow(_ context.Context, key string) (int, error) {
+	f.keys = append(f.keys, key)
+
+	return f.wait, f.err
+}
+
+var errLimitStoreDown = errors.New("limit store down")
+
+// TestWriteLimit: a membership over its write limit gets RATE_LIMITED with Retry-After and nothing runs; a limit store
+// that does not answer lets the write through (IR375); reads are never counted.
+func TestWriteLimit(t *testing.T) {
+	t.Parallel()
+
+	testRig := setup(t)
+	limiter := &fakeLimiter{wait: 7, err: nil, keys: nil}
+	testRig.reg.Limit = limiter
+
+	limited := do(t, testRig.app, adminPrincipal(), opUnitsSave, bodyNameA, "key-limit1")
+	if limited.Code != 429 || errCode(t, limited) != apperr.RateLimited ||
+		limited.Header().
+			Get("Retry-After") !=
+			"7" || !strings.Contains(limited.Body.String(), `"retryAfterSeconds":7`) {
+		t.Fatalf("over the limit: %d %v %s", limited.Code, limited.Header(), limited.Body.String())
+	}
+
+	if testRig.rec.n != 0 || len(testRig.idem.hash) != 0 {
+		t.Fatalf(
+			"a limited write must not run or claim its key: rec=%d keys=%v",
+			testRig.rec.n,
+			testRig.idem.hash,
+		)
+	}
+
+	wantKey := uuid.UUID{}.String() + ":" + uuid.UUID{}.String()
+	if len(limiter.keys) != 1 || limiter.keys[0] != wantKey {
+		t.Fatalf("limit key: %v", limiter.keys)
+	}
+
+	read := do(t, testRig.app, clientPrincipal(), opUnitsGet, `{"id":"mine"}`, "")
+	if read.Code != 200 || len(limiter.keys) != 1 {
+		t.Fatalf("reads are not limited: %d keys=%v", read.Code, limiter.keys)
+	}
+
+	limiter.wait, limiter.err = 0, errLimitStoreDown
+
+	passed := do(t, testRig.app, adminPrincipal(), opUnitsSave, bodyNameA, "key-limit2")
+	if passed.Code != 200 || testRig.rec.n != 1 {
+		t.Fatalf(
+			"a store that does not answer lets the write through: %d %s",
+			passed.Code,
+			passed.Body.String(),
+		)
+	}
+}
+
 func TestRecorderFailureRollsBack(t *testing.T) {
 	t.Parallel()
 
@@ -557,7 +662,8 @@ func TestCatalogShape(t *testing.T) {
 
 	if len(
 		Catalog,
-	) != 228 {
+	) != 234 {
+		// IR827 payments.startCheckout, IR826 presence.report,
 		// IR657 members.delete,
 		// IR656 baselines.delete + factors.delete + mrv.deleteDraft,
 		// IR655 plans.delete + rateCards.delete,

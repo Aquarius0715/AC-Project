@@ -27,6 +27,11 @@ const alert = (id: string, status: string, severity: ApiAlert["severity"]): ApiA
 const server = [...Array.from({ length: 50 }, (_, n) => alert(`resolved-${String(n)}`, "resolved", "critical")), alert("open-1", "open", "warning")];
 interface Query { limit?: number; filters?: { status?: string } }
 const matching = (q: Query = {}) => server.filter((a) => !q.filters?.status || a.status === q.filters.status);
+// the alerts as above, and today's job, so unit-1 is one of the current assignments
+const withAssignment = (operation: string, q: Query) => {
+  if (operation === "alerts.list") return matching(q);
+  return operation === "jobs.list" ? [todayJob] : [];
+};
 
 describe("technician overview", () => {
   it("keeps today's job that the list returns after its first page (IR702)", async () => {
@@ -48,8 +53,58 @@ describe("technician overview", () => {
     dal.coreDisplay.mockResolvedValue({ locale: "en", timeZone: "Asia/Kuala_Lumpur" });
     dal.coreOp.mockResolvedValue({ counts: { total: 0, scheduledCount: 0, inProgressCount: 0, overdueCount: 0, assignedCount: 0 } });
     dal.coreItems.mockImplementation((operation: string, q: Query) => Promise.resolve(operation === "alerts.list" ? matching(q).slice(0, q.limit ?? 25) : []));
-    dal.coreAll.mockImplementation((operation: string, q: Query) => Promise.resolve(operation === "alerts.list" ? matching(q) : []));
+    // unit-1 is assigned (todayJob): the card lists only the alerts of the current assignments (UI/UX loop R49)
+    dal.coreAll.mockImplementation((operation: string, q: Query) => Promise.resolve(withAssignment(operation, q)));
     const live = await loadOverview({});
     expect(live.alerts.map((a) => a.id)).toStrictEqual(["open-1"]);
+    dal.coreAll.mockImplementation((operation: string, q: Query) => Promise.resolve(operation === "alerts.list" ? matching(q) : []));
+    const unassigned = await loadOverview({});
+    expect(unassigned.alerts).toStrictEqual([]); // readable, but no unit of an assignment
+  });
+
+  // later today, not accepted yet: read-only until its window opens (IR49) and waiting for the acknowledgement
+  const laterJob: ApiTechJobRow = {
+    ...todayJob, id: "job-later", unitId: "unit-2", assignmentAcknowledgement: "pending",
+    requestedSlot: { startAt: "2026-11-10T06:00:00Z", endAt: "2026-11-10T08:00:00Z" }, scheduledSlot: { startAt: "2026-11-10T06:00:00Z", endAt: "2026-11-10T08:00:00Z" },
+  };
+  const tomorrowJob: ApiTechJobRow = {
+    ...todayJob, id: "job-tomorrow", dueAt: "2026-11-12T10:00:00Z",
+    requestedSlot: { startAt: "2026-11-11T01:00:00Z", endAt: "2026-11-11T05:00:00Z" }, scheduledSlot: { startAt: "2026-11-11T01:00:00Z", endAt: "2026-11-11T05:00:00Z" },
+  };
+  const counts = { counts: { total: 3, scheduledCount: 0, inProgressCount: 0, overdueCount: 0, assignedCount: 3 } };
+
+  it("lists every assigned job on the all tab, sorted as asked, in another display time zone", async () => {
+    dal.coreNow.mockResolvedValue(now);
+    dal.coreDisplay.mockResolvedValue({ locale: "en", timeZone: "Asia/Tokyo" });
+    dal.coreOp.mockResolvedValue(counts);
+    dal.coreAll.mockImplementation((operation: string) => {
+      if (operation === "jobs.list") return Promise.resolve([todayJob, laterJob, tomorrowJob]);
+      return Promise.resolve(operation === "units.list" ? [{ id: "unit-1", displayName: "Lobby AC" }] : []);
+    });
+    const live = await loadOverview({ tab: "all", sort: "status" });
+    expect(dal.coreAll).toHaveBeenCalledWith("jobs.list", { sort: { field: "status", direction: "asc" } });
+    expect([live.tab, live.sort, live.title]).toStrictEqual(["all", "status", "All assigned — sorted by progress"]);
+    expect(live.rows.map((r) => r.id)).toStrictEqual(["job-today", "job-later", "job-tomorrow"]);
+    expect(live.todayRows.map((r) => r.id)).toStrictEqual(["job-today", "job-later"]);
+    expect(live.tabs).toStrictEqual([{ id: "today", label: "Today", count: 2 }, { id: "all", label: "All assigned", count: 3 }]);
+    expect(live.sorts.map((s) => s.id)).toStrictEqual(["severity", "dueAt", "status"]);
+    expect(live.pending.map((r) => r.id)).toStrictEqual(["job-later"]);
+    expect(live.readOnly.map((r) => r.id)).toStrictEqual(["job-later"]);
+    expect(live.otherZone).toBe(true);
+    expect(live.now).toBe(now.toISOString());
+    expect(live.rows.map((r) => r.title)).toStrictEqual(["Lobby AC", "Unit", "Lobby AC"]); // unit-2 is not in units.list
+  });
+
+  it("defaults to today sorted by severity and keeps the page when units and alerts are refused", async () => {
+    dal.coreNow.mockResolvedValue(now);
+    dal.coreDisplay.mockResolvedValue({ locale: "en", timeZone: "Asia/Kuala_Lumpur" });
+    dal.coreOp.mockResolvedValue(counts);
+    dal.coreAll.mockImplementation((operation: string) => operation === "jobs.list" ? Promise.resolve([todayJob, tomorrowJob]) : Promise.reject(new Error("refused")));
+    const live = await loadOverview({ tab: "unknown", sort: "unknown" });
+    expect(dal.coreAll).toHaveBeenCalledWith("jobs.list", { sort: { field: "severity", direction: "desc" } });
+    expect([live.tab, live.sort, live.title]).toStrictEqual(["today", "severity", "Today — sorted by severity, deadline, progress"]);
+    expect(live.rows.map((r) => r.id)).toStrictEqual(["job-today"]);
+    expect([live.alerts, live.pending, live.readOnly, live.otherZone]).toStrictEqual([[], [], [], false]);
+    expect(live.day).toMatch(/^Today · /);
   });
 });

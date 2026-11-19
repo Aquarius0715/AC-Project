@@ -98,6 +98,8 @@ export const warningShort = (code: string, t: T = en) => (textOf(warningShortTex
 export interface SummaryView {
   actual: string; baseline: string; difference: string; percent: string; cost: string; savedCost: string; emissions: string; savedEmissions: string;
   coverage: string; conditions: [string, string][]; warnings: string[]; comparable: boolean; increase: boolean;
+  /** the period's average price per kWh (cost ÷ actual), so the cost tile says what it was worked out from (UI/UX loop R137) */
+  rate: string | null;
 }
 
 /** The figures of an energy.summary as the screens show them; the period is Kuala Lumpur days and says so. */
@@ -111,6 +113,7 @@ export function summaryView(s: ApiEnergySummary, i: I18n = EN): SummaryView {
     baseline: baselineValue(b, tr),
     difference: saving(t.savedKWh, " kWh", one, tr), percent: saving(t.savingPercentage, "%", one, tr),
     cost: t.amountMinor === null ? "—" : amount(t.amountMinor, s.currency),
+    rate: t.amountMinor === null || !t.kWh ? null : `${amount(Math.round(t.amountMinor / t.kWh), s.currency)}/kWh`,
     savedCost: t.savedAmountMinor === null ? tr("Cannot calculate") : saving(t.savedAmountMinor, "", (x) => amount(x, s.currency), tr),
     emissions: t.emissionsKg === null ? "—" : `${one(t.emissionsKg)} kgCO₂e`, savedEmissions: saving(t.savedEmissionsKg, " kgCO₂e", one, tr),
     coverage: s.coverage === null ? "—" : `${coveragePct(s.coverage)}%`, comparable: t.savedKWh !== null, increase: (t.savedKWh ?? 0) < 0,
@@ -122,7 +125,8 @@ export function summaryView(s: ApiEnergySummary, i: I18n = EN): SummaryView {
       [tr("Emission factor"), f ? `${f.region} ${String(f.year)} v${String(f.version)} · ${String(f.kgCO2ePerKWh)} kgCO₂e/kWh · ${f.source}` : tr("missing")],
       [tr("Tariff"), s.tariffVersion], [tr("Coverage"), s.coverage === null ? "—" : tr("{pct}% of expected readings", { pct: coveragePct(s.coverage) })],
     ],
-    warnings: s.qualityWarnings.map((w) => warning(w, tr)),
+    // no valid reading at all is not "partial": say so rather than "some readings are missing" (UI/UX loop R90)
+    warnings: s.qualityWarnings.map((w) => (w === "partial_coverage" && t.kWh === null ? tr("No valid readings in this period — every expected reading is missing or invalid") : warning(w, tr))),
   };
 }
 

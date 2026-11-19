@@ -169,8 +169,11 @@ func serverCfg(t *testing.T, opt func(*apiserver.Config)) *apiserver.Server {
 			Technician: "",
 			Admin:      "",
 		},
-		AccountsPerDay: 0,
-		WrapTx:         nil,
+		AccountsPerDay:      0,
+		WrapTx:              nil,
+		Checkout:            nil,
+		CustomerAppURL:      "",
+		StripeWebhookSecret: "",
 	}
 	opt(&cfg)
 

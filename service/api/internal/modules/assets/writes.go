@@ -34,6 +34,13 @@ const (
 	maxText     = 1000 // access instructions and reasons
 )
 
+// The geofence radius a property may have, in metres (DEC-109): wide enough for a GPS fix's error, small enough
+// that a neighbour's house is outside.
+const (
+	minGeofenceRadius = 50
+	maxGeofenceRadius = 2000
+)
+
 func strLen(s string, lo, hi int) bool {
 	n := utf8.RuneCountInString(s)
 
@@ -84,14 +91,33 @@ type Property struct {
 	Name               string    `json:"name"`
 	Address            *string   `json:"address"`
 	AccessInstructions *string   `json:"accessInstructions"`
-	Archived           bool      `json:"archived"`
+	// Location is the map pin HQ set (DEC-109); nil until one is set.
+	Location *GeoPoint `json:"location"`
+	// GeofenceRadiusMeters is the away/home radius around Location; nil means the default (150 m).
+	GeofenceRadiusMeters *int `json:"geofenceRadiusMeters"`
+	Archived             bool `json:"archived"`
+}
+
+// GeoPoint is GeoPoint of service-contracts.ts: WGS 84 degrees.
+type GeoPoint struct {
+	Latitude  float64 `json:"latitude"`
+	Longitude float64 `json:"longitude"`
+}
+
+// valid reports whether the point is on the globe (latitude −90..90, longitude −180..180).
+func (g GeoPoint) valid() bool {
+	return g.Latitude >= -90 && g.Latitude <= 90 && g.Longitude >= -180 && g.Longitude <= 180
 }
 
 const propertyCols = `id, tenant_id, version, created_at, updated_at, customer_org_id, kind, name, address, ` +
-	`access_instructions, archived`
+	`access_instructions, latitude, longitude, geofence_radius_m, archived`
 
 func scanProperty(row pgx.Row) (Property, error) {
-	var property Property
+	var (
+		property  Property
+		latitude  *float64
+		longitude *float64
+	)
 
 	err := row.Scan(
 		&property.ID,
@@ -104,10 +130,20 @@ func scanProperty(row pgx.Row) (Property, error) {
 		&property.Name,
 		&property.Address,
 		&property.AccessInstructions,
+		&latitude,
+		&longitude,
+		&property.GeofenceRadiusMeters,
 		&property.Archived,
 	)
+	if err != nil {
+		return property, apperr.Wrap(err, "scan (scanProperty)")
+	}
 
-	return property, apperr.Wrap(err, "scan (scanProperty)")
+	if latitude != nil && longitude != nil { // the table's CHECK keeps the two together
+		property.Location = &GeoPoint{Latitude: *latitude, Longitude: *longitude}
+	}
+
+	return property, nil
 }
 
 // PropertySave is properties.save input.
@@ -118,6 +154,9 @@ type PropertySave struct {
 	Name               string     `json:"name"`
 	Address            *string    `json:"address"`
 	AccessInstructions *string    `json:"accessInstructions"`
+	// Location is the map pin (DEC-109); null clears it. The save replaces it, as it replaces the address.
+	Location             *GeoPoint `json:"location"`
+	GeofenceRadiusMeters *int      `json:"geofenceRadiusMeters"`
 }
 
 // Validate implements ops.Validator (DD-A02 field table).
@@ -145,7 +184,25 @@ func (in *PropertySave) Validate() map[string]string {
 		fieldErrs["accessInstructions"] = apperr.KeyLength
 	}
 
+	if in.Location != nil && !in.Location.valid() {
+		fieldErrs["location"] = apperr.KeyRange
+	}
+
+	if r := in.GeofenceRadiusMeters; r != nil &&
+		(*r < minGeofenceRadius || *r > maxGeofenceRadius) {
+		fieldErrs["geofenceRadiusMeters"] = apperr.KeyRange
+	}
+
 	return fieldErrs
+}
+
+// latLng splits the pin into the two nullable columns.
+func (in *PropertySave) latLng() (*float64, *float64) {
+	if in.Location == nil {
+		return nil, nil
+	}
+
+	return &in.Location.Latitude, &in.Location.Longitude
 }
 
 // dupSibling maps the properties_name / spaces_name unique indexes (lower(name) per parent) to the sibling-name
@@ -286,8 +343,11 @@ type UnitSave struct {
 	DisplayName   string     `json:"displayName"`
 	ModelID       uuid.UUID  `json:"modelId"`
 	// IoTModelID is the unit's planned IoT model (DEC-105); null or omitted is none.
-	IoTModelID   *uuid.UUID `json:"iotModelId,omitempty"`
-	Type         string     `json:"type"`
+	IoTModelID *uuid.UUID `json:"iotModelId,omitempty"`
+	Type       string     `json:"type"`
+	// InstallState is planned for a unit not installed yet (DEC-106): omitted is installed for a new unit and the
+	// stored state for a saved one; it never changes by a save (an accepted installation report installs the unit).
+	InstallState *string    `json:"installState,omitempty"`
 	InstalledAt  *time.Time `json:"installedAt"`
 	ServiceScope []string   `json:"serviceScope"`
 	ChangeReason *string    `json:"changeReason,omitempty"`
@@ -326,6 +386,11 @@ func (in *UnitSave) Validate() map[string]string {
 
 	if in.Type != "split" {
 		fieldErrs["type"] = apperr.KeyInvalid
+	}
+
+	if in.InstallState != nil && *in.InstallState != installPlanned &&
+		*in.InstallState != installInstalled {
+		fieldErrs[keyInstallState] = apperr.KeyInvalid
 	}
 
 	if !strLen(in.DisplayName, 1, maxName) {
@@ -382,6 +447,34 @@ func (in *UnitSave) readWarranty() string {
 	in.warranty = &endsAt
 
 	return ""
+}
+
+// stateOf is the install state a new unit is saved with: installed unless the form says planned.
+func stateOf(state *string) string {
+	if state == nil {
+		return installInstalled
+	}
+
+	return *state
+}
+
+// plannedFieldErrs refuses what a planned unit cannot have (DEC-106): it is not installed, so it has no installation
+// date and no warranty end until an accepted installation report sets them.
+func plannedFieldErrs(input *UnitSave, state string) map[string]string {
+	fieldErrs := map[string]string{}
+	if state != installPlanned {
+		return fieldErrs
+	}
+
+	if input.InstalledAt != nil {
+		fieldErrs[keyInstalledAt] = apperr.KeyNotAllowed
+	}
+
+	if input.warranty != nil {
+		fieldErrs[keyWarrantyEndsAt] = apperr.KeyNotAllowed
+	}
+
+	return fieldErrs
 }
 
 // ---- archive ----
@@ -894,6 +987,67 @@ func (*Module) UnitState(
 	return org, archived, err == nil, apperr.Wrap(err, "select assets.units")
 }
 
+// UnitInstall returns the install state and the model of a unit, "" for the state when there is no such unit
+// (Maintenance installation jobs).
+func (*Module) UnitInstall(
+	ctx context.Context,
+	call *ops.Call,
+	unit uuid.UUID,
+) (string, uuid.UUID, error) {
+	var (
+		state string
+		model uuid.UUID
+	)
+
+	err := call.Tx.QueryRow(ctx, `SELECT install_state, model_id FROM assets.units WHERE id = $1`, unit).
+		Scan(&state, &model)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", uuid.Nil, nil
+	}
+
+	return state, model, apperr.Wrap(err, "select assets.units")
+}
+
+// PropertySite answers who owns a property and whether it is archived, and whether space (when given) is a live space
+// of that property: what an installation request is checked against (Maintenance, DEC-107).
+func (*Module) PropertySite(
+	ctx context.Context,
+	call *ops.Call,
+	property uuid.UUID,
+	space *uuid.UUID,
+) (uuid.UUID, bool, bool, bool, error) {
+	var (
+		org      uuid.UUID
+		archived bool
+	)
+
+	err := call.Tx.QueryRow(ctx, `SELECT customer_org_id, archived FROM assets.properties WHERE id = $1`, property).
+		Scan(&org, &archived)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return org, false, false, false, nil
+	}
+
+	if err != nil {
+		return org, false, false, false, apperr.Wrap(err, "select assets.properties")
+	}
+
+	spaceOK := space == nil
+
+	if space != nil {
+		err = call.Tx.QueryRow(
+			ctx,
+			`SELECT EXISTS (SELECT 1 FROM assets.spaces WHERE id = $1 AND property_id = $2 AND NOT archived)`,
+			*space,
+			property,
+		).Scan(&spaceOK)
+		if err != nil {
+			return org, archived, true, false, apperr.Wrap(err, "select assets.spaces")
+		}
+	}
+
+	return org, archived, true, spaceOK, nil
+}
+
 // UnitService returns the organization, property and service scope of a unit (Maintenance qualification checks).
 func (*Module) UnitService(
 	ctx context.Context,
@@ -928,6 +1082,36 @@ func (*Module) SiteAddress(
 		Scan(&addr, &scope)
 
 	return addr, scope, apperr.Wrap(err, "select assets.units")
+}
+
+// SiteLocation returns the map pin of a unit's property (DEC-109); found is false when HQ set none, or for a unit
+// that does not exist.
+func (*Module) SiteLocation(
+	ctx context.Context,
+	call *ops.Call,
+	unit uuid.UUID,
+) (GeoPoint, bool, error) {
+	var (
+		none                GeoPoint
+		latitude, longitude *float64
+	)
+
+	err := call.Tx.QueryRow(ctx, `SELECT p.latitude, p.longitude FROM assets.units u JOIN assets.properties p ON p.id =
+		u.property_id WHERE u.id = $1`, unit).
+		Scan(&latitude, &longitude)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return none, false, nil
+	}
+
+	if err != nil {
+		return none, false, apperr.Wrap(err, "select assets.units")
+	}
+
+	if latitude == nil || longitude == nil {
+		return none, false, nil
+	}
+
+	return GeoPoint{Latitude: *latitude, Longitude: *longitude}, true, nil
 }
 
 // WarrantyEnd returns a unit's warrantyEndsAt (Maintenance warranty claims).
@@ -1105,18 +1289,23 @@ func (m *Module) propertiesSave(
 		}
 
 		propertyID := uuid.Must(uuid.NewV7())
+		latitude, longitude := input.latLng()
 
 		property, err := scanProperty(
 			call.Tx.QueryRow(
 				ctx,
-				`INSERT INTO assets.properties (id, tenant_id, customer_org_id, kind, name, address, access_instructions)
-			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6) RETURNING `+propertyCols,
+				`INSERT INTO assets.properties (id, tenant_id, customer_org_id, kind, name, address, access_instructions,
+			latitude, longitude, geofence_radius_m)
+			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING `+propertyCols,
 				propertyID,
 				input.CustomerOrgID,
 				input.Kind,
 				input.Name,
 				input.Address,
 				input.AccessInstructions,
+				latitude,
+				longitude,
+				input.GeofenceRadiusMeters,
 			),
 		)
 		if err != nil {
@@ -1139,11 +1328,13 @@ func (m *Module) propertiesSave(
 		return property, nil
 	}
 
+	latitude, longitude := input.latLng()
+
 	updated, err := scanProperty(
 		call.Tx.QueryRow(
 			ctx,
 			`UPDATE assets.properties SET kind=$3, name=$4, address=$5, access_instructions=$6,
-		version = version + 1, updated_at = platform.app_now()
+		latitude=$8, longitude=$9, geofence_radius_m=$10, version = version + 1, updated_at = platform.app_now()
 		WHERE id = $1 AND version = $2 AND customer_org_id = $7 AND NOT archived RETURNING `+propertyCols,
 			*input.ID,
 			*call.ExpectedVersion,
@@ -1152,6 +1343,9 @@ func (m *Module) propertiesSave(
 			input.Address,
 			input.AccessInstructions,
 			input.CustomerOrgID,
+			latitude,
+			longitude,
+			input.GeofenceRadiusMeters,
 		),
 	)
 	if err != nil {
@@ -1412,6 +1606,11 @@ func (m *Module) unitsSaveUnit(ctx context.Context, call *ops.Call, input *UnitS
 	}
 
 	if input.ID == nil {
+		fieldErrs := plannedFieldErrs(input, stateOf(input.InstallState))
+		if len(fieldErrs) > 0 {
+			return Unit{}, apperr.Fields(fieldErrs)
+		}
+
 		return m.addUnit(ctx, call, input, models)
 	}
 
@@ -1425,6 +1624,7 @@ type unitValues struct {
 	name      string
 	model     uuid.UUID
 	iotModel  *uuid.UUID
+	state     string
 	installed *time.Time
 	scope     []string
 	warranty  *time.Time
@@ -1438,6 +1638,7 @@ func (values unitValues) history() map[string]any {
 		"displayName":     values.name,
 		keyModelID:        values.model,
 		keyIoTModelID:     values.iotModel,
+		keyInstallState:   values.state,
 		keyInstalledAt:    values.installed,
 		"serviceScope":    values.scope,
 		keyWarrantyEndsAt: values.warranty,
@@ -1454,11 +1655,12 @@ func (values unitValues) moved(property uuid.UUID, space *uuid.UUID) bool {
 func storedUnit(ctx context.Context, call *ops.Call, id, org uuid.UUID) (unitValues, error) {
 	var values unitValues
 
-	err := call.Tx.QueryRow(ctx, `SELECT property_id, space_id, display_name, model_id, iot_model_id, installed_at,
-		service_scope, warranty_ends_at FROM assets.units WHERE id = $1 AND customer_org_id = $2 AND NOT archived`,
+	err := call.Tx.QueryRow(ctx, `SELECT property_id, space_id, display_name, model_id, iot_model_id, install_state,
+		installed_at, service_scope, warranty_ends_at FROM assets.units
+		WHERE id = $1 AND customer_org_id = $2 AND NOT archived`,
 		id, org).
-		Scan(&values.property, &values.space, &values.name, &values.model, &values.iotModel, &values.installed,
-			&values.scope, &values.warranty)
+		Scan(&values.property, &values.space, &values.name, &values.model, &values.iotModel, &values.state,
+			&values.installed, &values.scope, &values.warranty)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return values, notFound()
 	}
@@ -1478,6 +1680,15 @@ func (m *Module) updateUnit(
 	current, err := storedUnit(ctx, call, *input.ID, input.CustomerOrgID)
 	if err != nil {
 		return Unit{}, err
+	}
+
+	fieldErrs := plannedFieldErrs(input, current.state)
+	if input.InstallState != nil && *input.InstallState != current.state {
+		fieldErrs[keyInstallState] = apperr.KeyNotAllowed
+	}
+
+	if len(fieldErrs) > 0 {
+		return Unit{}, apperr.Fields(fieldErrs)
 	}
 
 	reason := ""
@@ -1533,6 +1744,7 @@ func (m *Module) updateUnit(
 		name:      input.DisplayName,
 		model:     input.ModelID,
 		iotModel:  input.IoTModelID,
+		state:     current.state,
 		installed: input.InstalledAt,
 		scope:     input.ServiceScope,
 		warranty:  warranty,
@@ -1644,8 +1856,8 @@ func (m *Module) addUnit(
 	_, err = call.Tx.Exec(
 		ctx,
 		`INSERT INTO assets.units (id, tenant_id, customer_org_id, property_id, space_id, display_name, model_id, type,
-			installed_at, service_scope, capability_version, warranty_ends_at, iot_model_id, iot_model_version)
-		VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+			install_state, installed_at, service_scope, capability_version, warranty_ends_at, iot_model_id, iot_model_version)
+		VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
 		unitID,
 		input.CustomerOrgID,
 		input.PropertyID,
@@ -1653,6 +1865,7 @@ func (m *Module) addUnit(
 		input.DisplayName,
 		input.ModelID,
 		input.Type,
+		stateOf(input.InstallState),
 		input.InstalledAt,
 		input.ServiceScope,
 		models.capVer,

@@ -16,6 +16,7 @@ const PERIODIC_PLAN = "periodic_plan";
 export const problemReason = z.enum(["same_problem", "new_damage", "not_completed", "other"]);
 import { codePoints, wrapped } from "@ac/web/lib/text";
 import { lookup } from "@ac/web/lib/lookup";
+import { originOf, type Origin } from "@ac/web/lib/origin";
 import { isAfter } from "@ac/web/lib/order";
 
 export interface ApiClientRow {
@@ -63,8 +64,8 @@ const TAB_OF = new Map<string, StatusTab>([
 export const tabOf = (displayStatus: string): StatusTab => TAB_OF.get(displayStatus) ?? "progress";
 const ORDER = [TIME_PROPOSED, "requested", "in_progress", "rework_requested", "submitted", "offered", "accepted", "assigned", "on_hold", "completed", "cancelled"];
 
-export interface ClientRow { id: string; short: string; unit: string; place: string; origin: "plan" | "request"; type: string; status: string; tab: StatusTab; line: string; icon: IconName; warn: boolean }
-const TYPE: Record<string, string> = { reactive: "Repair", preventive: "Preventive maintenance", periodic: "Periodic inspection" };
+export interface ClientRow { id: string; short: string; unit: string; place: string; origin: Origin; type: string; status: string; tab: StatusTab; line: string; icon: IconName; warn: boolean }
+const TYPE: Record<string, string> = { reactive: "Repair", preventive: "Preventive maintenance", periodic: "Periodic inspection", installation: "Installation" };
 /** What a requested job waits for: the preferred times (not confirmed yet), HQ booking the plan visit, or HQ. */
 function requestedLine(j: ApiClientRow, isPlan: boolean, slot: (s: Slot) => string, t: T): string {
   const first = j.preferredSlots.at(0);
@@ -103,7 +104,7 @@ export function clientRows(rows: ApiClientRow[], unit: (id: string) => { name: s
       default: { line = `${t(isPlan ? "Scheduled {slot}" : "Confirmed {slot}", { slot: j.scheduledSlot ? slot(j.scheduledSlot) : "" })}${j.assignmentAcknowledgement === "accepted" ? t(" · technician confirmed") : ""}`;
       }
     }
-    return { id: j.id, short: j.id.slice(0, 8), unit: u.name, place: u.place, origin: isPlan ? "plan" : "request", type: t(isPlan ? "Periodic inspection" : lookup(TYPE, j.type) ?? j.type), status: j.displayStatus, tab: tabOf(j.displayStatus), warn: isWarn, line, icon };
+    return { id: j.id, short: j.id.slice(0, 8), unit: u.name, place: u.place, origin: originOf(j.origin), type: t(isPlan ? "Periodic inspection" : lookup(TYPE, j.type) ?? j.type), status: j.displayStatus, tab: tabOf(j.displayStatus), warn: isWarn, line, icon };
   });
 }
 

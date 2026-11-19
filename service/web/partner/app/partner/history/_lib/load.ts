@@ -13,6 +13,8 @@ import type { ApiMember, ApiPartnerJob } from "@ac/web/lib/partnerOverview";
 
 export interface ApiRecipient { id: string; role: string; displayLabel: string; allowedChannels: string[] }
 const optional = orWhenRefused;
+/** A job in the job dropdown of the history. */
+const optionOf = (r: HistoryRow) => ({ id: r.id, label: `${r.short} · ${r.title}` });
 export async function loadHistory(sp: { jobId?: string; tab?: string; sort?: string; period?: string }) {
   interface Page<T> { items: T[]; total: number }
   const [now, display, who] = await Promise.all([coreNow(), coreDisplay(), coreIdentity()]);
@@ -44,7 +46,7 @@ export async function loadHistory(sp: { jobId?: string; tab?: string; sort?: str
     tabs: TABS.map((x) => ({ id: x.id, label: t(x.label), count: counts[x.id] })),
     rows: visibleRows(listed.rows, tab, sort),
     total: listed.total,
-    options: listed.rows.map((r) => ({ id: r.id, label: `${r.short} · ${r.title}` })),
+    options: listed.rows.map((r) => optionOf(r)),
     tab,
     sort,
     period,
@@ -53,10 +55,13 @@ export async function loadHistory(sp: { jobId?: string; tab?: string; sort?: str
   if (!sp.jobId) return { ...base, detail: null };
   let hit = listed.rows.find((r) => r.id === sp.jobId);
   if (!hit && period === "90d") {
-    const all = await collect(false);
+    const all = wider ?? await collect(false); // an empty period already read the list without it
     hit = all.rows.find((r) => r.id === sp.jobId); // older than the period
   }
   if (!hit) return { ...base, detail: { missing: true as const, id: sp.jobId } };
+  // the job dropdown holds the open job, also one older than the period: a controlled select without its value shows
+  // another job as chosen, and choosing that job then does nothing
+  const options = listed.rows.includes(hit) ? base.options : [...base.options, optionOf(hit)];
   const [principal, events] = await Promise.all([ // the job's newest 100 events, newest first
     corePrincipal(),
     optional(coreItems<ApiEvent>("jobs.events", { jobId: hit.id, query: { limit: 100, sort: { field: "occurredAt", direction: "desc" } } }), [] as ApiEvent[]),
@@ -65,7 +70,7 @@ export async function loadHistory(sp: { jobId?: string; tab?: string; sort?: str
   const items = [...events].toSorted((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt) || b.id.localeCompare(a.id)).map((e) => eventItem(e, users, i));
   const mode = noteMode(hit, t);
   const recipients = mode.kind === "closed" ? [] : await optional(coreOp<Page<ApiRecipient>>("notifications.recipients", { target: { kind: "job", id: hit.id }, templateKey: "schedule_change", channel: "inApp", query: { limit: 100 } }).then((r) => r.items.filter((x) => x.role !== "contractor")), []);
-  return { ...base, detail: { missing: false as const, row: hit, items, mode, recipients } };
+  return { ...base, options, detail: { missing: false as const, row: hit, items, mode, recipients } };
 }
 
 export type HistoryLive = Awaited<ReturnType<typeof loadHistory>>;

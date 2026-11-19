@@ -68,7 +68,7 @@ function unitPath(u: ApiUnitDetail): string {
 /** How the technician can resolve an open alert: by reason, by a remeasurement when it has a policy, or not at all. */
 function resolveWay(canResolve: boolean, hasRule: boolean): string {
   if (canResolve) return hasRule ? "with a reason, or by a remeasurement" : "with a reason";
-  return hasRule ? "with a remeasurement only" : "no — ask a user with alert.resolve";
+  return hasRule ? "with a remeasurement only" : "no — ask a user with “Resolve alerts”";
 }
 /** When the alert reached its state: resolved or acknowledged (else when it was raised). */
 function stateTime(a: ApiTechAlert): string {
@@ -76,8 +76,8 @@ function stateTime(a: ApiTechAlert): string {
 }
 /** What resolves an open alert: a remeasurement within its recovery, or only a reason when it has no policy. */
 function resolutionInfo(words: { recovery: string } | null, t: T): string {
-  return words ? t("Automatic resolution needs a remeasurement {recovery} — or a reason below with alert.resolve.", { recovery: words.recovery })
-    : t("No remeasurement resolves this alert — it has no policy. Resolve it with a reason below with alert.resolve.");
+  return words ? t("Automatic resolution needs a remeasurement {recovery} — or a reason below with “Resolve alerts”.", { recovery: words.recovery })
+    : t("No remeasurement resolves this alert — it has no policy. Resolve it with a reason below with “Resolve alerts”.");
 }
 /** The selected alert as the screen shows it. `latest` is the unit's latest reading of the rule's metric (units.get);
 `job` the URL's job (jobs.get); `canResolve` whether the user holds alert.resolve. */
@@ -116,8 +116,8 @@ export function alertView(a: ApiTechAlert, ctx: { alerts: ApiTechAlert[]; unit: 
       done: a.status === "resolved" ? [t("Resolved {time} — {reason}.", { time: when(a.resolvedAt ?? a.detectedAt), reason: a.resolutionReason ? resolutionText(a.resolutionReason, t) : t("no reason recorded") }), a.acknowledgedAt ? t("Acknowledged {time}.", { time: when(a.acknowledgedAt) }) : ""].filter(Boolean).join(" ") : null,
       note: a.status === "resolved" ? t("Completing the job alone never resolves an alert. If the condition returns, a new alert is created that links back to alert {id}.", { id: a.id.slice(0, 8) })
         : t("If it recurs after it is resolved, a new alert is created that links back to this one."),
-      forbidden: words ? t("Not resolved — you don’t have alert.resolve. The alert resolves automatically once a remeasurement stays {recovery}, or ask a permitted user.", { recovery: words.recovery })
-        : t("Not resolved — you don’t have alert.resolve. Ask a permitted user to resolve it."),
+      forbidden: words ? t("Not resolved — you don’t have “Resolve alerts”. The alert resolves automatically once a remeasurement stays {recovery}, or ask a permitted user.", { recovery: words.recovery })
+        : t("Not resolved — you don’t have “Resolve alerts”. Ask a permitted user to resolve it."),
     },
     related: [
       [t("Job"), ctx.job ? `${ctx.job.id.slice(0, 8)} · ${typeLabel(ctx.job.type, t)}` : "—"], [t("Unit"), unit], [t("Policy"), rule ? rule.name : t("No policy")],

@@ -36,18 +36,21 @@ export function knownOf(i: I18n, clocks: (string | null | undefined)[], stamps: 
 }
 const EN_FMT = fmtOf(EN);
 
-export type Group = "indoor" | "outdoor" | "electrical";
+export type Group = "indoor" | "outdoor" | "electrical" | "installation";
 /** The component keys of each group in canonical order (maintenance.ComponentGroups of the Core API). */
 export const componentGroups: { group: Group; keys: ComponentKey[] }[] = [
   { group: "indoor", keys: ["filter", "evaporator_coil", "blower_motor", "blower_fan", "drain_pipe", "drain_pan", "outlet", "louver"] },
   { group: "outdoor", keys: ["condenser_coil", "compressor", "fan", "blade", "refrigerant_pipe"] },
   { group: "electrical", keys: ["thermostat", "sensor", "capacitor", "contactor", "wiring"] },
+  { group: "installation", keys: ["mounting", "refrigerant_piping", "vacuum_leak_test", "electrical_connection", "drainage", "test_run", "customer_handover"] },
 ];
-export const groupLabel: Record<Group, string> = { indoor: "Indoor", outdoor: "Outdoor", electrical: "Electrical" };
+export const groupLabel: Record<Group, string> = { indoor: "Indoor", outdoor: "Outdoor", electrical: "Electrical", installation: "Installation" };
 export const componentLabel: Record<string, string> = {
   filter: "Filter", evaporator_coil: "Evaporator coil", blower_motor: "Blower motor", blower_fan: "Blower fan", drain_pipe: "Drain pipe", drain_pan: "Drain pan",
   outlet: "Outlet", louver: "Louver", condenser_coil: "Condenser coil", compressor: "Compressor", fan: "Fan", blade: "Fan blade", refrigerant_pipe: "Refrigerant pipe",
   thermostat: "Thermostat", sensor: "Sensor", capacitor: "Capacitor", contactor: "Contactor", wiring: "Wiring insulation",
+  mounting: "Mounting", refrigerant_piping: "Refrigerant piping", vacuum_leak_test: "Vacuum and leak test", electrical_connection: "Electrical connection",
+  drainage: "Drainage", test_run: "Test run", customer_handover: "Customer handover",
 };
 export const groupOf = (key: string): Group | null => componentGroups.find((g) => g.keys.some((k) => k === key))?.group ?? null;
 /** The components a report of this unit must cover: every key of the groups in the unit's service scope (IR100). */
@@ -63,13 +66,19 @@ export const readingMetrics: { metric: Metric; label: string }[] = [
 /** WorkReport of service-contracts.ts as the technician reads it. */
 export interface ApiTechReport {
   id: string; version: number; jobId: string; authorId: string; state?: string;
+  /** The equipment an installation report confirms (DEC-106); null on any other job. */
+  installation: { confirmedModelId: string; serial: string } | null;
   items: { id: string; componentGroup: Group; componentKey: ComponentKey; result: Result; reason: string | null; evidenceIds: string[]; authorId: string; observedAt: string }[];
   measurements: { id: string; componentKey?: ComponentKey | null; metric: Metric; value: number | null; unit: string; observedAt: string; quality: string; qualityReason?: string | null }[];
   parts: DraftPart[]; refrigerant: DraftRefrigerant[]; signOff: { signerName: string; signedAt: string; signatureAttachmentId: string | null; absentReason: string | null; reportVersion: number } | null;
   workText: string; nextAction: { kind: "none" } | { kind: "follow_up"; date: string; note: string } | null;
-  attachmentRefs: { id: string; name: string; mime: string; size: number; status: "processing" | "ready" | "failed" }[]; submittedAt: string | null; acceptedAt: string | null;
+  attachmentRefs: { id: string; name: string; mime: string; size: number; status: "processing" | "ready" | "failed"; tag: PhotoTag | null }[]; submittedAt: string | null; acceptedAt: string | null;
   reviewHistory: { reviewerUserId: string; reportVersion: number; decision: "accept" | "return"; reason: string | null; occurredAt: string }[];
 }
+/** What a photo of an installation report shows (attachments.add `tag`, DEC-106): the report needs one of each. */
+export const photoTags = ["name_plate", "indoor_unit", "outdoor_unit"] as const;
+export type PhotoTag = (typeof photoTags)[number];
+export const photoTagLabel: Record<PhotoTag, string> = { name_plate: "Name plate", indoor_unit: "Indoor unit", outdoor_unit: "Outdoor unit" };
 export const checkResults = ["normal", "attention", "not_inspected", "not_applicable"] as const;
 export type Result = (typeof checkResults)[number] | null;
 interface DraftItem { componentGroup: Group; componentKey: ComponentKey; result: Result; reason: string; evidenceIds: string[] }
@@ -80,11 +89,14 @@ export interface DraftPart {
 }
 export interface DraftRefrigerant { refrigerant: "R32" | "R410A"; cylinderId: string; recoveredKg: number; chargedKg: number; leakCheck: "pass" | "fail" | "not_done"; leakCheckMethod: string | null }
 export type NextAction = { kind: "none" } | { kind: "follow_up"; date: string; note: string };
-export interface Draft { items: DraftItem[]; readings: DraftReading[]; parts: DraftPart[]; refrigerant: DraftRefrigerant[]; workText: string; nextAction: NextAction; attachmentIds: string[] }
+/** The equipment check of an installation draft: the technician confirms the registered model is the one installed
+(`confirmed`) and gives the serial; null on any other job. */
+interface DraftInstallation { confirmed: boolean; serial: string }
+export interface Draft { installation: DraftInstallation | null; items: DraftItem[]; readings: DraftReading[]; parts: DraftPart[]; refrigerant: DraftRefrigerant[]; workText: string; nextAction: NextAction; attachmentIds: string[] }
 
 /** The editable draft of a report: every required component in canonical order (null until a result is chosen — normal
 is never preselected, DD-T04), the readings as text so a half-typed value survives, and the other sections as saved. */
-export function draftFrom(r: ApiTechReport | null, components: { group: Group; key: ComponentKey }[]): Draft {
+export function draftFrom(r: ApiTechReport | null, components: { group: Group; key: ComponentKey }[], isInstallation = false): Draft {
   const items = components.map(({ group, key }) => {
     const it = r?.items.find((x) => x.componentKey === key);
     return { componentGroup: group, componentKey: key, result: it?.result ?? null, reason: it?.reason ?? "", evidenceIds: it?.evidenceIds ?? [] };
@@ -98,6 +110,7 @@ export function draftFrom(r: ApiTechReport | null, components: { group: Group; k
   return {
     items,
     readings,
+    installation: isInstallation ? { confirmed: !!r?.installation, serial: r?.installation?.serial ?? "" } : null,
     parts: r?.parts ?? [], refrigerant: r?.refrigerant ?? [], workText: r?.workText ?? "",
     nextAction: r?.nextAction ?? { kind: "none" }, attachmentIds: (r?.attachmentRefs ?? []).filter((a) => a.status !== "failed").map((a) => a.id),
   };
@@ -105,9 +118,11 @@ export function draftFrom(r: ApiTechReport | null, components: { group: Group; k
 
 /** The jobs.saveDraft body of a draft: trimmed reasons (empty → null), numeric readings in their metric's unit. */
 const toNumber = (v: string) => (v.trim() === "" || !Number.isFinite(Number(v)) ? null : Number(v));
-export function draftInput(jobId: string, reportId: string | null, d: Draft): OpInput<"jobs.saveDraft"> {
+export function draftInput(jobId: string, reportId: string | null, d: Draft, modelId: string | null = null): OpInput<"jobs.saveDraft"> {
   return {
     jobId, ...(reportId && { reportId }),
+    // only a confirmed model is sent: the report keeps the model the technician checked (the API compares it with the unit's)
+    ...(d.installation?.confirmed && modelId && { installation: { confirmedModelId: modelId, serial: d.installation.serial.trim() } }),
     items: d.items.map((it) => ({ componentGroup: it.componentGroup, componentKey: it.componentKey, result: it.result, reason: it.reason.trim() || null, evidenceIds: it.evidenceIds })),
     measurements: d.readings.map((m) => ({ ...(m.id && { id: m.id }), componentKey: m.componentKey, metric: m.metric, value: toNumber(m.value), unit: metricUnit[m.metric], observedAt: m.observedAt })),
     parts: d.parts.map((p) => ({ ...p, name: p.name.trim(), replacesComponentKey: p.replacesComponentKey })), refrigerant: d.refrigerant, workText: d.workText,
@@ -139,12 +154,29 @@ export function linkPhoto(d: Draft, key: string, id: string, on: boolean): Draft
   };
 }
 
+/** What an installation report needs besides the checklist (BR-T16): the model confirmed, the serial, a ready photo of
+each of the name plate, the indoor unit and the outdoor unit, and the customer's sign-off. */
+function installationIssues(i: DraftInstallation, attachments: { status: string; tag?: PhotoTag | null }[], signedOff: boolean, t: T): Issue[] {
+  const issue = (text: string): Issue => ({ key: null, group: null, text });
+  const out: Issue[] = [];
+  if (!i.confirmed) out.push(issue(t("Confirm that the installed model is the registered one")));
+  if (!i.serial.trim()) out.push(issue(t("Enter the serial number of the installed unit")));
+  const added = new Set(attachments.filter((a) => a.status === "ready").map((a) => a.tag));
+  for (const tag of photoTags) {
+    const part = t(entryOf(photoTagLabel, tag)).toLowerCase();
+    if (!added.has(tag)) out.push(issue(t("Add a photo of the {part}", { part })));
+  }
+  if (!signedOff) out.push(issue(t("An installation needs the customer’s sign-off")));
+  return out;
+}
+
 /** What blocks a submit (the IR100 / IR126 submit rules of the Core API, checked first in the browser so the
 technician sees every issue at once; the API stays the authority). */
 export interface Issue { key: string | null; group: Group | null; text: string }
 const PHOTO_STATE: Record<string, string> = { processing: "processing", failed: "failed", ready: "ready" };
-export function submitIssues(d: Draft, attachments: { id: string; name: string; status: string }[], now: number, t: T = en): Issue[] {
+export function submitIssues(d: Draft, attachments: { id: string; name: string; status: string; tag?: PhotoTag | null }[], now: number, t: T = en, signedOff = true): Issue[] {
   const out: Issue[] = [];
+  if (d.installation) out.push(...installationIssues(d.installation, attachments, signedOff, t));
   const label = (key: string) => t(lookup(componentLabel, key) ?? key);
   for (const it of d.items) {
     const where = `${t(entryOf(groupLabel, it.componentGroup))} › ${label(it.componentKey)}`;
@@ -175,20 +207,25 @@ export function progress(d: Draft, issues: Issue[], t: T = en) {
 Work window line — while open, the range with the warning and discard times (Figma Technician 02); notice is the
 warning banner of the last 15 minutes. */
 /** The fields of Check in at site (FR-T13, DD-T13). */
-export type CheckInField = "distance" | "qr" | "reason";
-export const CHECK_IN_FIELDS: CheckInField[] = ["distance", "qr", "reason"];
+export type CheckInField = "position" | "qr" | "reason";
+export const CHECK_IN_FIELDS: CheckInField[] = ["position", "qr", "reason"];
 /** The Core API's jobs.checkIn fields on the form's fields: a refusal shows under the field it names (IR620). */
-export const CHECK_IN_API_FIELDS: Record<string, CheckInField> = { distanceMeters: "distance", qrUnitId: "qr", reason: "reason" };
-/** Check in at site's own checks: a location check-in within 200 m with the scanned label, or a manual one with a
-reason of 1–1000 characters. Each error belongs to its field, so the form shows it there and focuses it (IR620). */
-export function checkInErrors(method: "location_qr" | "manual", distance: string, qr: string, reason: string, t: T = en): Partial<Record<CheckInField, string>> {
+export const CHECK_IN_API_FIELDS: Record<string, CheckInField> = { position: "position", qrUnitId: "qr", reason: "reason" };
+/** The device's GPS fix that jobs.checkIn takes (DEC-109, IR825): the server measures it against the site's pin. */
+export interface CheckInPosition { latitude: number; longitude: number; accuracyMeters: number }
+/** The coarsest fix a location check-in takes, in metres (the server's limit). */
+const MAX_FIX_ACCURACY = 100;
+/** Check in at site's own checks: a location check-in with a fix good enough to tell 200 m and the scanned label, or a
+manual one with a reason of 1–1000 characters. How far the fix is from the site is the server's to say. Each error
+belongs to its field, so the form shows it there and focuses it (IR620). */
+export function checkInErrors(method: "location_qr" | "manual", position: CheckInPosition | null, qr: string, reason: string, t: T = en): Partial<Record<CheckInField, string>> {
   if (method === "manual") {
     const n = reason.trim().length;
     return n < 1 || n > 1000 ? { reason: t("A reason is required for a manual check-in (1–1000 characters)") } : {};
   }
   const e: Partial<Record<CheckInField, string>> = {};
-  const d = Number(distance);
-  if (!Number.isFinite(d) || d < 0 || d > 200) e.distance = t("Location check-in needs you within 200 m of the site — check in manually with a reason otherwise");
+  if (!position) e.position = t("Get your location first — or check in manually with a reason");
+  else if (position.accuracyMeters > MAX_FIX_ACCURACY) e.position = t("Your location is only known to ±{n} m — move into the open and try again, or check in manually with a reason", { n: Math.round(position.accuracyMeters) });
   if (!qr.trim()) e.qr = t("Scan the unit’s QR label");
   return e;
 }

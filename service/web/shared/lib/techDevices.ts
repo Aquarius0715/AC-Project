@@ -3,7 +3,7 @@
 // card and the device event rows with their alerts and response notes. Pure code shared by the Server Components and
 // the client view; Vitest covers it. Texts in the display language (`i` / `t`, IR287); instants in the user's display
 // time zone (IR44). Event types, evidence sources and versions stay codes, as in Figma.
-import { EN, relativeTime, showClock, showTime, translator, type I18n, type T, textOf } from "@ac/web/lib/i18n";
+import { EN, relativeTime, showClock, showRecent, showTime, translator, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import type { ApiCalibration, ApiDevice, ApiDeviceDetail, ApiDeviceOperation, Connection, Metric } from "@ac/web/lib/devices";
 import { metricLabel } from "@ac/web/lib/adminAlerts";
 import { lookup } from "@ac/web/lib/lookup";
@@ -36,9 +36,14 @@ export interface ApiAlertLite { id: string; version: number; status: "open" | "a
 export interface TechJob { id: string; unitId: string; status: string }
 
 const rank: Record<string, number> = { in_progress: 0, assigned: 1, rework_requested: 2 };
+/** The jobs a device write on the unit can run under (IR94), in progress first, then assigned, then rework; ended jobs
+are left out, so the register form never offers one the server's technician gate refuses. */
+export function jobsFor(unitId: string | null, jobs: TechJob[]): TechJob[] {
+  return unitId ? jobs.filter((j) => j.unitId === unitId && Object.hasOwn(rank, j.status)).toSorted((a, b) => (lookup(rank, a.status) ?? 9) - (lookup(rank, b.status) ?? 9)) : [];
+}
 /** The job a device write on the unit runs under (IR94): in progress first, else assigned or rework; null without one. */
 export function jobFor(unitId: string | null, jobs: TechJob[]): string | null {
-  return unitId ? jobs.filter((j) => j.unitId === unitId && Object.hasOwn(rank, j.status)).toSorted((a, b) => (lookup(rank, a.status) ?? 9) - (lookup(rank, b.status) ?? 9))[0]?.id ?? null : null;
+  return jobsFor(unitId, jobs)[0]?.id ?? null;
 }
 
 /** The register form as it opens (FR-T11): the first assigned unit still without a device and its first job, no serial
@@ -120,7 +125,8 @@ const UNKNOWN_POWER = { text: "Unknown", dot: "muted" } as const;
 const POWER = new Map<string, { text: string; dot: "crit" | "primary" | "muted" }>([["on", { text: "ON", dot: "primary" }], ["off", { text: "Lost", dot: "crit" }]]);
 export function deviceTiles(d: ApiDeviceDetail, newer: string | null, now: number, faults: OpenFaults = {}, i: I18n = EN) {
   const { t, display } = i;
-  const clock = (iso: string) => showClock(iso, display);
+  // a fault of another day keeps its date: “lost 10:47 am” days ago is not today (UI/UX loop R68)
+  const clock = (iso: string) => showRecent(iso, now, display);
   const conn = d.connection;
   const lost = conn !== "online" && faults.connection ? t("lost {time}", { time: clock(faults.connection) }) : t("last seen {time}", { time: ago(d.lastSeenAt, now, t) });
   const power = POWER.get(d.powerSignal) ?? UNKNOWN_POWER;
@@ -208,16 +214,22 @@ const restoredDetail: Record<NonNullable<ApiDeviceEventFull["recovery"]>["axis"]
 /** What a device event means in words: the fault, or for a recovery the axis that came back. */
 export const eventCause = (e: Pick<ApiDeviceEventFull, "eventType" | "recovery">, t: T = en) => t(e.recovery ? restoredDetail[e.recovery.axis] : eventDetail[e.eventType]);
 /** One device event row (Figma 03 “Device events”): detection, evidence, its alerts and the recovery or response. */
-export interface EventRow { id: string; version: number; time: string; type: ApiDeviceEventFull["eventType"]; tone: "warn" | "crit" | "ok" | "muted"; detail: string; recovery: string; notes: string[]; alerts: ApiAlertLite[] }
+export interface EventRow { id: string; version: number; time: string; /** the event type in words */ type: string; tone: "warn" | "crit" | "ok" | "muted"; detail: string; recovery: string; notes: string[]; alerts: ApiAlertLite[] }
 const EVENT_TONE: Partial<Record<ApiDeviceEventFull["eventType"], EventRow["tone"]>> = { tamper: "warn", restored: "ok", operation_failed: "muted" };
 const alertCount = (n: number, t: T) => {
   if (n === 0) return "";
   return ` · ${n === 1 ? t("1 alert") : t("{n} alerts", { n })}`;
 };
 /** Where an event stands: restored, a recovery of an earlier fault, or open with its alerts' state. */
+/** A device event's type in words for its badge and the recovery line; the wire codes ("communication_lost") read as
+code on screen (UI/UX loop R102). */
+const EVENT_LABEL: Record<ApiDeviceEventFull["eventType"], string> = {
+  communication_lost: "Communication lost", power_lost: "Power lost", tamper: "Tamper", restored: "Restored", operation_failed: "Operation failed",
+};
+const eventLabel = (type: ApiDeviceEventFull["eventType"], t: T) => textOf(EVENT_LABEL, type, t) ?? type;
 function eventRecovery(e: ApiDeviceEventFull, source: ApiDeviceEventFull | undefined, as: ApiAlertLite[], open: number, when: (iso: string) => string, t: T): string {
   if (e.restoredAt) return t("restored {time}", { time: when(e.restoredAt) });
-  if (e.eventType === "restored") return source ? t("recovers {event} {time}", { event: source.eventType, time: when(source.occurredAt) }) : t("recovers an earlier fault");
+  if (e.eventType === "restored") return source ? t("recovers {event} {time}", { event: eventLabel(source.eventType, t), time: when(source.occurredAt) }) : t("recovers an earlier fault");
   if (as.length === 0) return t("open");
   if (open) return t("open · unacknowledged");
   return t(as.every((a) => a.status === "resolved") ? "open · resolved" : "open · acknowledged");
@@ -235,7 +247,7 @@ export function eventRows(es: ApiDeviceEventFull[], alerts: Map<string, ApiAlert
       id: e.id,
       version: e.version,
       time: when(e.occurredAt),
-      type: e.eventType,
+      type: eventLabel(e.eventType, t),
       tone: lookup(EVENT_TONE, e.eventType) ?? "crit",
       detail: `${eventCause(e, t)} · ${e.evidenceSource}${alertCount(e.alertIds.length, t)}`,
       notes: e.responseNotes.map((n) => `${when(n.at)} — ${n.message}`),

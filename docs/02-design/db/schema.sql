@@ -245,11 +245,12 @@ CREATE INDEX qualification_grants_membership ON identity.qualification_grants (m
 
 CREATE TABLE identity.preferences (
   user_id               uuid PRIMARY KEY REFERENCES identity.users(id),
-  locale                text NOT NULL DEFAULT 'en' CHECK (locale IN ('en','ms','ja')),
+  locale                text NOT NULL DEFAULT 'en' CHECK (locale IN ('en','ms','ja','id')),
   timezone              text NOT NULL DEFAULT 'Asia/Kuala_Lumpur',
   currency              char(3) NOT NULL DEFAULT 'MYR' CHECK (currency = 'MYR'),
   monthly_report_email  boolean NOT NULL DEFAULT false,
   channels              text[] NOT NULL DEFAULT '{inApp}',
+  pinned_unit_ids       uuid[] NOT NULL DEFAULT '{}' CHECK (cardinality(pinned_unit_ids) <= 8), -- IR819: ACs pinned to the Overview
   version               int NOT NULL DEFAULT 1,
   updated_at            timestamptz NOT NULL DEFAULT platform.app_now()
 );
@@ -340,10 +341,14 @@ CREATE TABLE assets.properties (
   name                text NOT NULL CHECK (length(name) BETWEEN 1 AND 120),
   address             text,
   access_instructions text,
+  latitude            double precision CHECK (latitude BETWEEN -90 AND 90),     -- DEC-109: HQ's map pin (WGS 84)
+  longitude           double precision CHECK (longitude BETWEEN -180 AND 180),
+  geofence_radius_m   int CHECK (geofence_radius_m BETWEEN 50 AND 2000),        -- away/home radius; NULL = 150 m
   archived            boolean NOT NULL DEFAULT false,
   version             int NOT NULL DEFAULT 1,
   created_at          timestamptz NOT NULL DEFAULT platform.app_now(),
   updated_at          timestamptz NOT NULL DEFAULT platform.app_now(),
+  CONSTRAINT properties_location_pair CHECK ((latitude IS NULL) = (longitude IS NULL)),
   UNIQUE (tenant_id, id)
 );
 CREATE INDEX properties_customer ON assets.properties (tenant_id, customer_org_id) WHERE NOT archived;
@@ -376,6 +381,7 @@ CREATE TABLE assets.units (                      -- ACUnit
   display_name        text NOT NULL CHECK (length(display_name) BETWEEN 1 AND 120),
   model_id            uuid NOT NULL,             -- devices.capabilities.id (other module: no FK)
   type                text NOT NULL DEFAULT 'split' CHECK (type = 'split'),
+  install_state       text NOT NULL DEFAULT 'installed' CHECK (install_state IN ('planned','installed')),  -- DEC-106: planned until an installation report is accepted
   installed_at        timestamptz,
   service_scope       text[] NOT NULL DEFAULT '{indoor,outdoor,electrical}',
   warranty_ends_at    timestamptz,
@@ -819,6 +825,17 @@ CREATE TABLE control.schedule_watermarks (       -- schedule automations evaluat
   evaluated_until timestamptz NOT NULL
 );
 
+CREATE TABLE control.presence_states (          -- DEC-109/IR826: a member's device inside a property's away/home radius; no position is kept
+  tenant_id     uuid NOT NULL,
+  membership_id uuid NOT NULL,                   -- the reporting client member (identity; consent location_automation)
+  property_id   uuid NOT NULL,                   -- assets.properties with a pin (read through Assets, no cross-schema FK)
+  inside        boolean NOT NULL,
+  changed_at    timestamptz NOT NULL,            -- when inside last changed
+  reported_at   timestamptz NOT NULL,            -- the last report that kept or changed it
+  PRIMARY KEY (tenant_id, membership_id, property_id)
+);
+CREATE INDEX presence_states_property ON control.presence_states (tenant_id, property_id) WHERE inside;
+
 -- ---------------------------------------------------------------------------------------------
 -- monitoring
 -- ---------------------------------------------------------------------------------------------
@@ -872,7 +889,7 @@ CREATE TABLE monitoring.alerts (
   customer_org_id     uuid NOT NULL,
   policy_id           uuid,
   rule_key            text,
-  type                text NOT NULL CHECK (type IN ('sensor','quality','maintenance','tamper','reconciliation_required')),
+  type                text NOT NULL CHECK (type IN ('sensor','quality','maintenance','tamper','reconciliation_required','restriction_bypass')),  -- restriction_bypass: DEC-110, IR844
   severity            text NOT NULL CHECK (severity IN ('critical','warning','normal')),
   status              text NOT NULL CHECK (status IN ('open','acknowledged','resolved')),
   cause_code          text NOT NULL CHECK (cause_code IN ('window_open','insulation_loss','unknown')),
@@ -1014,6 +1031,32 @@ CREATE TABLE maintenance.plans (                 -- periodic plans (FR-A06)
   UNIQUE (tenant_id, id)
 );
 
+CREATE TABLE maintenance.installation_requests (   -- a customer owner's request for new aircons (DEC-107, FR-C20)
+  id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id         uuid NOT NULL,
+  customer_org_id   uuid NOT NULL,
+  property_id       uuid NOT NULL,                 -- assets.properties of the customer (checked through the assets query interface, no cross-schema FK)
+  space_id          uuid,
+  quantity          int NOT NULL CHECK (quantity BETWEEN 1 AND 10),
+  model_id          uuid,                          -- null = model not decided
+  with_iot          boolean NOT NULL DEFAULT false,
+  preferred_slots   jsonb NOT NULL,                -- Slot[3] (IR113)
+  contact_window    text,
+  note              text CHECK (char_length(note) <= 2000),
+  status            text NOT NULL DEFAULT 'submitted' CHECK (status IN ('submitted','approved','declined','cancelled')),
+  decline_reason    text CHECK (char_length(decline_reason) BETWEEN 5 AND 500),
+  decided_by        uuid,
+  decided_at        timestamptz,
+  created_by        uuid NOT NULL,
+  version           int NOT NULL DEFAULT 1,
+  created_at        timestamptz NOT NULL DEFAULT platform.app_now(),
+  updated_at        timestamptz NOT NULL DEFAULT platform.app_now(),
+  UNIQUE (tenant_id, id),
+  CHECK ((status = 'declined') = (decline_reason IS NOT NULL))
+);
+CREATE INDEX installation_requests_customer ON maintenance.installation_requests (tenant_id, customer_org_id, created_at DESC);
+CREATE INDEX installation_requests_open ON maintenance.installation_requests (tenant_id, created_at) WHERE status = 'submitted';
+
 CREATE TABLE maintenance.jobs (
   id                     uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id              uuid NOT NULL,
@@ -1021,9 +1064,9 @@ CREATE TABLE maintenance.jobs (
   customer_org_id        uuid NOT NULL,
   plan_id                uuid,
   occurrence_at          timestamptz,
-  type                   text NOT NULL CHECK (type IN ('periodic','reactive','preventive')),
+  type                   text NOT NULL CHECK (type IN ('periodic','reactive','preventive','installation')),
   status                 text NOT NULL CHECK (status IN ('requested','offered','accepted','assigned','in_progress','submitted','completed','rework_requested','cancelled','on_hold')),
-  origin                 text NOT NULL CHECK (origin IN ('client_request','periodic_plan')),
+  origin                 text NOT NULL CHECK (origin IN ('client_request','periodic_plan','hq_request')),
   symptom                text NOT NULL DEFAULT '',
   contact_window         text,
   requested_slot         tstzrange NOT NULL,
@@ -1045,18 +1088,22 @@ CREATE TABLE maintenance.jobs (
   customer_confirmed_at  timestamptz,
   warranty_claims        jsonb NOT NULL DEFAULT '[]',
   hold_reason            text,
+  installation_request_id uuid,                 -- DEC-107: the client request this installation job answers
   version                int NOT NULL DEFAULT 1,
   created_at             timestamptz NOT NULL DEFAULT platform.app_now(),
   updated_at             timestamptz NOT NULL DEFAULT platform.app_now(),
   FOREIGN KEY (tenant_id, plan_id) REFERENCES maintenance.plans(tenant_id, id),
+  FOREIGN KEY (tenant_id, installation_request_id) REFERENCES maintenance.installation_requests(tenant_id, id),
   UNIQUE (tenant_id, id),
   UNIQUE (plan_id, occurrence_at)
 );
+CREATE UNIQUE INDEX jobs_one_installation ON maintenance.jobs (tenant_id, unit_id) WHERE type = 'installation' AND status NOT IN ('completed','cancelled');
 CREATE INDEX jobs_status ON maintenance.jobs (tenant_id, status, due_at);
 CREATE INDEX jobs_unit ON maintenance.jobs (tenant_id, unit_id, created_at DESC);
 CREATE INDEX jobs_customer ON maintenance.jobs (tenant_id, customer_org_id, created_at DESC);
 CREATE INDEX jobs_contractor ON maintenance.jobs (tenant_id, contractor_org_id, status) WHERE contractor_org_id IS NOT NULL;
 CREATE INDEX jobs_follow_up_pending ON maintenance.jobs (tenant_id, created_at) WHERE follow_up_class = 'pending';
+CREATE INDEX jobs_installation_request ON maintenance.jobs (installation_request_id) WHERE installation_request_id IS NOT NULL;  -- IR839: the request's jobs
 
 CREATE TABLE maintenance.job_alerts (
   tenant_id uuid NOT NULL,
@@ -1187,6 +1234,7 @@ CREATE TABLE maintenance.work_reports (          -- one row per report version; 
   parts               jsonb NOT NULL DEFAULT '[]',
   refrigerant         jsonb NOT NULL DEFAULT '[]',
   sign_off            jsonb,
+  installation        jsonb,                         -- InstallationCheck of an installation job: confirmed model and serial (DEC-106)
   work_text           text NOT NULL DEFAULT '',
   next_action         jsonb,
   review_availability text NOT NULL DEFAULT 'pending',
@@ -1224,6 +1272,7 @@ CREATE TABLE maintenance.attachments (
   size_bytes  int NOT NULL CHECK (size_bytes BETWEEN 1 AND 10485760),
   status      text NOT NULL CHECK (status IN ('processing','ready','failed')),
   scan_result text,
+  tag         text CHECK (tag IN ('name_plate','indoor_unit','outdoor_unit')),  -- installation report photos (DEC-106)
   uploaded_by uuid NOT NULL,
   created_at  timestamptz NOT NULL DEFAULT platform.app_now(),
   updated_at  timestamptz NOT NULL DEFAULT platform.app_now(),
@@ -1796,7 +1845,7 @@ CREATE TABLE notify.deliveries (
 CREATE TABLE notify.templates (
   key        text NOT NULL,
   channel    text NOT NULL CHECK (channel IN ('inApp','email','whatsapp')),
-  locale     text NOT NULL CHECK (locale IN ('en','ms','ja')),
+  locale     text NOT NULL CHECK (locale IN ('en','ms','ja','id')),
   version    int NOT NULL,
   subject    text,
   body       text NOT NULL,

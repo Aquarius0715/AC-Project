@@ -1,5 +1,5 @@
 // smoke: a few virtual users for a minute, one account of each kind first. It checks the script and the stack, and has to
-// finish with no error at all.
+// finish with no error at all. Its size is fixed: TIME_SCALE and VU_SCALE do not change it.
 import { iteration, thresholds } from "../lib/run.ts";
 
 export const options = {
@@ -11,4 +11,4 @@ export default function smoke(): void {
   iteration(true);
 }
 
-export { handleSummary } from "../lib/run.ts";
+export { fixedSummary as handleSummary } from "../lib/run.ts";

@@ -6,6 +6,7 @@
 // time (the HQ technicians free and qualified then, IR113), and the latest report (reports.get with up to four ready
 // photos through attachments.getContent). The Plans tab (loadPlans) reads plans.list in the same scope, plans.get for
 // the selected plan and jobs.list (the unit's periodic jobs) for the status of each generated occurrence.
+import { scopeLists } from "@ac/web/lib/scopeLists";
 import "server-only";
 import { evidenceText } from "@ac/web/lib/evidence";
 import { coreAll, coreDisplay, coreNow, coreOp, CoreError, corePermissions, orWhenRefused, coreItems } from "@ac/web/lib/dal";
@@ -14,17 +15,20 @@ import { i18nOf, showTime, textOf } from "@ac/web/lib/i18n";
 import { alertTitle } from "@ac/web/lib/alerts";
 import { jobEventTitle, type ApiJobEvent } from "@ac/web/lib/partnerOverview";
 import type { ApiWorkReport } from "@ac/web/lib/partnerReview";
-import { agreedSlots, classifyBy, controls, costTotals, delivery, facts, filtersOf, hqRow, LISTED, longSlot, periodChip, periodOfQuery, preferredRows, reportCard, slotText, SORTS, sortOf, STAGES, stageOf, stepper, type ApiHqJob, type ApiHqRow, type Names, type Query } from "@ac/web/lib/adminJobs";
+import { agreedSlots, assigneeGroups, classifyBy, controls, costTotals, delivery, facts, filtersOf, hqRow, LISTED, longSlot, periodChip, periodOfQuery, preferredRows, reportCard, slotText, SORTS, sortOf, STAGES, stageOf, stepper, type ApiHqJob, type ApiHqRow, type Names, type Query } from "@ac/web/lib/adminJobs";
 import { nextOccurrence, planDate, planRows, type ApiPlan } from "@ac/web/lib/adminPlans";
 import { breachRows, PERIODS, periodOf, slaRows, slaTiles, targetsByPlan, type ApiScorecard } from "@ac/web/lib/adminSla";
 import { contractorRows, kpiTiles, pendingCertificates, profileFacts, rateCardView, technicianRows, type ApiCertificate, type ApiProfile, type ApiRateCard, type ApiTechnician } from "@ac/web/lib/adminContractors";
 import { recover } from "@ac/web/lib/promises";
+import { requestRows, type InstallationRequest } from "@ac/web/lib/installationRequests";
+import type { ApiCapability } from "@ac/web/lib/devices";
+import type { ApiSpaceRow } from "@ac/web/lib/assets";
 
 const TECHNICIAN = "technician";
 
 interface Page<T> { items: T[]; total: number }
 interface Org { id: string; version: number; name: string; kind: string; status: string }
-interface Member { id: string; userId: string; displayName: string; role: string; employment: string | null; organizationId: string; validUntil: string | null; qualifications?: ApiTechnician["qualifications"] }
+interface Member { id: string; userId: string; displayName: string; role: string; employment: string | null; organizationId: string; validUntil: string | null; revokedAt?: string | null; qualifications?: ApiTechnician["qualifications"] }
 const optional = orWhenRefused;
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
@@ -37,7 +41,7 @@ async function shared(sp: SP) {
   const i = i18nOf(display);
   const [orgs, customers, properties, units, members] = await Promise.all([
     optional(coreAll<Org>("organizations.list"), []), optional(coreAll<{ id: string; name: string; organizationId: string }>("customers.list"), []),
-    optional(coreAll<{ id: string; name: string; customerOrgId: string }>("properties.list"), []), optional(coreAll<{ id: string; displayName: string; customerOrgId: string; propertyId: string }>("units.list"), []),
+    optional(coreAll<{ id: string; name: string; customerOrgId: string }>("properties.list"), []), optional(coreAll<{ id: string; displayName: string; customerOrgId: string; propertyId: string; installState: "planned" | "installed" }>("units.list"), []),
     optional(coreAll<Member>("members.list"), []),
   ]);
   const hq = orgs.find((o) => o.kind === "operator") ?? null;
@@ -49,7 +53,6 @@ async function shared(sp: SP) {
   const unitOrg = new Map(units.map((u) => [u.id, u.customerOrgId]));
   const sq = { customerId: one(sp.customerId), propertyId: one(sp.propertyId), unitId: one(sp.unitId) };
   const scope = filtersOf(sq, hq?.id ?? null, false);
-  const custOrg = customers.find((c) => c.id === sq.customerId)?.organizationId;
   const [jobsInScope, plansInScope] = await Promise.all([
     coreOp<Page<unknown>>("jobs.list", { filters: { ...scope, statuses: LISTED }, limit: 1 }).then((r) => r.total),
     optional(coreOp<Page<unknown>>("plans.list", { filters: scope, limit: 1 }).then((r) => r.total), 0),
@@ -58,12 +61,8 @@ async function shared(sp: SP) {
     now, i, orgs, customers, properties, units, members, hq, contractors, names, unitOrg, scope,
     head: {
       now: now.toISOString(), counts: { jobs: jobsInScope, plans: plansInScope, contractors: contractors.length },
-      scope: {
-        customers: customers.map((c) => ({ id: c.id, name: c.name })),
-        properties: properties.filter((p) => !custOrg || p.customerOrgId === custOrg).map((p) => ({ id: p.id, name: p.name })),
-        units: units.filter((u) => (!custOrg || u.customerOrgId === custOrg) && (!sq.propertyId || u.propertyId === sq.propertyId)).map((u) => ({ id: u.id, name: u.displayName })),
-      },
-      units: units.map((u) => ({ id: u.id, name: u.displayName, customer: names.customers.get(u.customerOrgId) ?? i.t("customer") })).toSorted((a, b) => a.customer.localeCompare(b.customer) || a.name.localeCompare(b.name)),
+      scope: scopeLists(customers, properties, units, sq),
+      units: units.map((u) => ({ id: u.id, name: u.displayName, planned: u.installState === "planned", customer: names.customers.get(u.customerOrgId) ?? i.t("customer") })).toSorted((a, b) => a.customer.localeCompare(b.customer) || a.name.localeCompare(b.name)),
     },
   };
 }
@@ -93,7 +92,7 @@ export async function loadJobs(sp: SP) {
     ...head, q, requestDraft: jobRequest, created, period, periodChip: period ? periodChip(period, i) : null, sort, sorts: SORTS.map((x) => ({ id: x.id, text: t(x.text) })), total: list.total,
     stages: STAGES.map((x, k) => ({ id: x.id, label: t(x.label), count: counts.at(k) ?? 0 })),
     deliveries: [{ id: "internal", name: t("Internal") }, ...contractors.map((c) => ({ id: c.id, name: c.name }))],
-    assignees: members.filter((m) => m.role === TECHNICIAN).map((m) => ({ id: m.id, name: m.displayName })),
+    assignees: assigneeGroups(members.filter((m) => m.role === TECHNICIAN), names.orgs, nowMs, t),
     contractors: contractors.map((c) => ({ id: c.id, name: c.name, status: profiles.find((p) => p.organizationId === c.id)?.status === "suspended" ? "suspended" : c.status })),
     internalTechs: members.filter((m) => m.role === TECHNICIAN && m.employment === "internal").map((m) => ({ id: m.id, name: m.displayName })),
     rows,
@@ -250,3 +249,24 @@ export async function loadSla(sp: SP) {
 
 export type SlaLive = Awaited<ReturnType<typeof loadSla>>;
 
+
+const REQUEST_STATUSES = ["submitted", "approved", "declined", "cancelled"] as const;
+
+/** The Installation requests tab (FR-C20, DEC-107): the customers' requests with the status from the URL (submitted
+unless asked otherwise, "all" for every one), the names of the place and the model, and what HQ needs to make the units. */
+export async function loadInstallations(sp: SP) {
+  const [{ i, properties, names, head }, perms] = await Promise.all([shared(sp), corePermissions()]);
+  const asked = one(sp.status);
+  const status = REQUEST_STATUSES.find((s) => s === asked) ?? (asked === "all" ? "all" : "submitted");
+  const [requests, spaces, models] = await Promise.all([
+    coreAll<InstallationRequest>("installationRequests.list", { filters: status === "all" ? {} : { status } }),
+    optional(coreAll<ApiSpaceRow>("spaces.list"), []), optional(coreAll<ApiCapability>("capabilities.list"), []),
+  ]);
+  const rows = requestRows(requests, { properties, spaces, models }, i).map((r) => ({ ...r, customer: names.customers.get(r.customerOrgId) ?? "—" }));
+  return {
+    ...head, q: {}, canDecline: perms.has("job.write"), canApprove: perms.has("job.write") && perms.has("asset.write"), status, statuses: ["all", ...REQUEST_STATUSES], rows, models: models.map((m) => ({ id: m.id, name: `${m.manufacturer} ${m.model}` })),
+    spaceOf: Object.fromEntries(requests.map((r) => [r.id, r.spaceId])),
+  };
+}
+
+export type InstallationsLive = Awaited<ReturnType<typeof loadInstallations>>;

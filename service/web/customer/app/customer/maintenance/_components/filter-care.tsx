@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { Fragment, useState } from "react";
+import { Fragment, useRef, useState } from "react";
 import { Badge, Banner, Btn, Card, Check, Choice, Field, Input, Modal, SummaryList, UtilizationBar, cx, Plain, ScrollX } from "@ac/web/components/ui";
 import { useAction } from "@ac/web/lib/useAction";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
-import { cleaningSymptom, DEFAULT_FILTER_HOURS, filterStatus, reminderErrors, reminderInput, type FilterGroup, type FilterRow, type ReminderForm } from "@ac/web/lib/customerFilterCare";
+import { cleaningSymptom, DEFAULT_FILTER_HOURS, overdueRows, filterStatus, reminderErrors, reminderInput, type FilterGroup, type FilterRow, type ReminderForm } from "@ac/web/lib/customerFilterCare";
 import { useT } from "@ac/web/components/I18n";
 import { markCleaned, saveReminders } from "../actions";
 import type { MaintenanceLive } from "../_lib/load";
@@ -13,18 +13,32 @@ import type { MaintenanceLive } from "../_lib/load";
 type Filters = NonNullable<MaintenanceLive["filters"]>;
 /** The New request modal opened from a row: the unit, type preventive and a symptom line. */
 export interface CleaningPrefill { unitId: string; symptom: string; type?: "reactive" | "preventive" }
-interface Props { f: Filters; owner: boolean; onRequest: (p: CleaningPrefill) => void; onDone: (text: string) => void; onFail: (f: ActionFailure) => void }
+/** The ACs of a batch cleaning request, each with its own symptom line. */
+export type CleaningBatch = { unitId: string; unit: string; place: string; symptom: string }[];
+/** focus: the AC a link came for (`unitId`, IR813): its row is marked, in view and its folded area open */
+interface Props { f: Filters; owner: boolean; focus?: string | null; onRequest: (p: CleaningPrefill) => void; onRequestAll: (b: CleaningBatch) => void; onDone: (text: string) => void; onFail: (f: ActionFailure) => void }
 
 /** Filter care (FR-C18, DD-C18, Figma Client 07j) from the Core API: run time since the cleaning per AC, areas with many
 ACs folded into a summary row, Request cleaning / Mark cleaned and the owner's reminder settings. */
-export function FilterCareTab({ f, owner, onRequest, onDone, onFail }: Readonly<Props>) {
+export function FilterCareTab({ f, owner, focus = null, onRequest, onRequestAll, onDone, onFail }: Readonly<Props>) {
   const t = useT();
-  const [open, setOpen] = useState<string[]>([]);
+  // several overdue filters: one request for all of them instead of a Request cleaning per row (UI/UX loop R140)
+  const overdue = overdueRows(f.lines);
+  // an alert's Book cleaning names its AC: the area holding it starts open, so its row can be shown
+  const [open, setOpen] = useState<string[]>(() => f.lines.filter((l) => l.kind === "group" && l.group.rows.some((r) => r.unitId === focus)).map((l) => (l.kind === "group" ? l.group.key : "")));
   const [edit, setEdit] = useState(false);
   const [pending, run] = useAction();
+  // brought into view once, on arrival; later re-renders (a Mark cleaned elsewhere) must not pull the page back
+  const isScrolled = useRef(false);
+  const bringIntoView = (el: HTMLTableRowElement | null) => {
+    if (!el || isScrolled.current) return;
+    isScrolled.current = true;
+    el.scrollIntoView({ block: "center" });
+  };
   const mark = (r: FilterRow) => { run(() => markCleaned(r.unitId), t("Marked cleaned"), () => { onDone(t("{unit}: marked cleaned — the counter restarts at 0 h and your technician sees it.", { unit: r.unit })); }, onFail); };
   const unitRow = (r: FilterRow, inner = false) => (
-    <tr key={r.unitId} className="border-t border-line">
+    <tr key={r.unitId} aria-current={r.unitId === focus ? "true" : undefined} ref={r.unitId === focus ? bringIntoView : undefined}
+      className={cx("border-t border-line", r.unitId === focus && "bg-primary-soft/60")}>
       <td className={cx("px-3 py-2.5 align-middle", inner && "pl-8")}>
         <b>{r.unit}</b>
         <div className="text-[11px] text-muted-foreground">{r.place ? `${r.place} · ` : ""}{r.last}{r.jobId && <> (<Link className="text-primary hover:underline" href={`/customer/maintenance?jobId=${r.jobId}`}>{r.jobId.slice(0, 8)}</Link>)</>}</div>
@@ -33,7 +47,7 @@ export function FilterCareTab({ f, owner, onRequest, onDone, onFail }: Readonly<
       <td className="px-3 py-2.5 max-sm:hidden"><Progress pct={r.pct} tone={filterStatus[r.state].bar} text={r.progress} /></td>
       <td className="px-3 py-2.5"><Badge tone={filterStatus[r.state].badge}>{t(filterStatus[r.state].label)}</Badge></td>
       <td className="px-3 py-2.5">
-        <div className="flex justify-end gap-1.5 whitespace-nowrap">
+        <div className="flex flex-col items-stretch gap-1.5 whitespace-nowrap">
           {r.state === "overdue" && <Btn size="sm" variant="primary" onClick={() => { onRequest({ unitId: r.unitId, symptom: cleaningSymptom(r, t) }); }}>{t("Request cleaning")}</Btn>}
           <Btn size="sm" disabled={pending} onClick={() => { mark(r); }} aria-label={t("Mark cleaned — {unit}", { unit: r.unit })}>{t("Mark cleaned")}</Btn>
         </div>
@@ -59,12 +73,13 @@ export function FilterCareTab({ f, owner, onRequest, onDone, onFail }: Readonly<
   };
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,360px)]">
-      <Card title={t("Filters by AC")} sub={t("Run time since the last cleaning, from telemetry · reminder at {hours}", { hours: f.settings.thresholdHours ? `${String(f.settings.thresholdHours)} h` : t("{n} h (model default)", { n: DEFAULT_FILTER_HOURS }) })}>
+      <Card title={t("Filters by AC")} action={overdue.length > 1 && <Btn size="sm" variant="primary" onClick={() => { onRequestAll(overdue.map((r) => ({ unitId: r.unitId, unit: r.unit, place: r.place, symptom: cleaningSymptom(r, t) }))); }}>{t("Request cleaning for all overdue ({n})", { n: overdue.length })}</Btn>} sub={t("Run time since the last cleaning, from telemetry · reminder at {hours}", { hours: f.settings.thresholdHours ? `${String(f.settings.thresholdHours)} h` : t("{n} h (model default)", { n: DEFAULT_FILTER_HOURS }) })}>
         <ScrollX className="rounded-xl border border-line">
+          {/* the AC column keeps room for the name and place (they wrapped word by word into six lines), and the two actions stack so the row stays narrow (UI/UX loop R106) */}
           <table className="w-full border-collapse text-left text-[13px]">
             <thead>
               <tr className="bg-surface2 text-[11px] uppercase tracking-wide text-muted-foreground">
-                <th className="px-3 py-2 font-semibold">AC</th><th className="px-3 py-2 font-semibold">{t("Run time")}</th><th className="px-3 py-2 font-semibold max-sm:hidden">{t("Progress")}</th>
+                <th className="min-w-40 px-3 py-2 font-semibold">{t("AC")}</th><th className="px-3 py-2 font-semibold">{t("Run time")}</th><th className="px-3 py-2 font-semibold max-sm:hidden">{t("Progress")}</th>
                 <th className="px-3 py-2 font-semibold">{t("Status")}</th><th className="px-3 py-2"><span className="sr-only">{t("Actions")}</span></th>
               </tr>
             </thead>

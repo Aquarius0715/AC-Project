@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.632.0 / Created: 2026-09-14 / Updated: 2026-11-11 / Status: Draft for review / Language: English
+Version: 0.633.0 / Created: 2026-09-14 / Updated: 2026-11-13 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -100,7 +100,48 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.656.0 (2026-11-16): IR813: an alert's Book cleaning opens Filter care on that AC.
+0.655.0 (2026-11-16): IR812: a demo alert's evidence names its metric and comparison in words (Heartbeat gap at or above its alert threshold).
+0.654.0 (2026-11-16): IR811: from Turn off running ACs, one link opens an after-hours rule with the same ACs.
+0.657.0 (2026-11-16): IR814: a customer pins ACs to the Overview from their pages (this browser only).
+0.658.0 (2026-11-16): IR815: Energy & cost opens on the AC that used the most in the period.
+0.673.0 (2026-11-18): IR857: the portal keeps port 3204 behind web-edge (the server's environment file names no PORTAL_WEB_PORT).
+0.672.0 (2026-11-18): IR855, IR856 (DEC-111): the shared test environment deploys without downtime (API services and apps replaced one container at a time behind web-edge; migrations only add unless marked -- migrate:breaking), and an open page offers a reload after a deployment.
+0.671.0 (2026-11-17): IR828: the shared test environment runs Stripe test mode when its environment file sets STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET (deploy.sh adds the Stripe CLI, forwarding to the gateway); otherwise demo payments as before.
+0.670.0 (2026-11-16): IR827: Stripe Checkout for invoice payments (DEC-68): `payments.startCheckout` (DD-C11) creates one hosted MYR Checkout Session for the whole unpaid invoice; the payment is stored first (channel `stripe_checkout`) and paid only by the signed webhook, which `POST /stripe` on the billing service receives through the gateway (signature checked, stored once, applied in one transaction). Operations 234, routes 256. Phase 1A unchanged.
+0.669.0 (2026-11-16): IR826: a customer's device reports its position on the automations page, and the household's arrival or departure at a pinned home or office runs the location automations (presence.report, DEC-109, stage 4).
+0.668.0 (2026-11-16): IR825: the technician's site check-in reads the device's location, and the server measures it against the property's pin (DEC-109, stage 3).
+0.667.0 (2026-11-16): IR824: HQ sets the pin of a Home or Office on a map in Admin (address search, own location, typed coordinates) with its away/home radius (DEC-109, stage 2).
+0.666.0 (2026-11-16): IR823: a Home or Office keeps a map pin and an away/home radius set by HQ, for GPS check-in and location automations (DEC-109, stage 1: API and DB).
+0.665.0 (2026-11-16): IR822: every text that named a permission by its code names it in words, and so does the page shown when a role lacks one.
+0.664.0 (2026-11-16): IR821: permissions are named in words (labels in four languages; Access & roles shows them with the code beside), replacing the rule that kept codes.
+0.663.0 (2026-11-16): IR820: pinned ACs are kept with the user's account, so they follow the user to another device.
+0.662.0 (2026-11-16): IR819: the user's pinned ACs are stored with their preferences (preferences.pinnedUnitIds), stage 1 of server-side pins.
+0.661.0 (2026-11-16): IR818: customer Users says a forgotten password is reset with Forgot password? on the sign-in page.
+0.660.0 (2026-11-16): IR817: "already signed in as another user" on the sign-in page says where to sign out.
+0.659.0 (2026-11-16): IR816: on a phone the customer Overview names the most severe open alert on the first screen.
+0.653.0 (2026-11-16): IR810: after a confirmed change, the customer unit page offers Undo, which puts back the previous confirmed setting.
+0.652.0 (2026-11-16): IR809: the customer unit page refreshes every 30 s while open (paused while editing), so others' changes appear.
+0.651.0 (2026-11-16): IR808: a cooling setpoint below 22 °C gets a hint that a lower setting only uses more power.
+0.650.0 (2026-11-16): IR807: HQ's Unresolved alerts tile opens its list on critical and warning alerts, so the counts agree.
+0.649.0 (2026-11-16): IR806: waiting for the AC to confirm a command counts down the seconds it has left.
+0.648.0 (2026-11-16): IR805: on a phone, the partner Jobs cards and the customer Overview rows name each value.
+0.647.0 (2026-11-16): IR804: the customer's command history says whether you or someone else sent each command.
+0.646.0 (2026-11-16): IR803: Energy & cost ranks the ACs by measured use (Highest use in this period), each with Show and Compare.
+0.645.0 (2026-11-16): IR802: one automation can switch several ACs (Also apply to other ACs, All ACs in a property), offering only the actions all of them take.
+0.644.0 (2026-11-16): IR801: Units & locations finds a room or AC by name or place.
+0.643.0 (2026-11-16): IR800: every unresolved customer alert says what to do (close the windows, book a cleaning, request a repair …).
+0.642.0 (2026-11-16): IR798: on the Running list an owner turns the running ACs off at once, unticking those that should keep running.
+0.641.0 (2026-11-16): IR799: a failed command says why in words (the AC refused it, no answer in time, offline …), never with its failure code, for customers, HQ and technicians.
+0.640.0 (2026-11-16): IR797: `jobs.list` `currentOnly` leaves out the history rows of ended access; the partner Jobs list's Offered, Active and Review tabs ask with it, so a delegation that ended unfinished no longer counts under Active. Phase 1A unchanged.
+0.639.0 (2026-11-15): IR796: auto-merge pull requests keep moving into `main`: every five minutes `keep-prs-current.yml` brings the oldest behind one up to date and starts its CI (and CI on `main` when a merge started none). Phase 1A unchanged.
+0.638.0 (2026-11-13): client installation requests (DEC-107, IR794): FR-C20 and DD-C20, the customer owner asks HQ to install 1–10 new aircons (property, model or not decided, IoT device yes/no, 3 preferred times); HQ approves into planned units and installation jobs (`jobs.create` with `installationRequestId`, origin `client_request`) or declines with a reason; `installationRequests.create/list/cancel/decline` (232 operations), `maintenance.installation_requests` (migration 000006). Replaces the DEC-106 rule that a client cannot ask for an installation; a client still cannot create the job itself. Figma not updated (open item).
+0.637.0 (2026-11-13): IR793: air quality shows all four metrics at once — one or two share a chart (axis per unit, IR689), three or more get a chart each on the same time axis; an All chip. Phase 1A unchanged.
+0.636.0 (2026-11-13): IR792: the test deployment waits for CI inside its own run (gate job on a hosted runner, then the deploy job); no `workflow_run` trigger. Phase 1A unchanged.
+0.635.0 (2026-11-13): IR790: one sign-in screen (the identity provider's; the app's e-mail step is removed, DEC-100 replaced), one Keycloak client per app (ac-customer-web, ac-partner-web, ac-technician-web, ac-admin-web) so the screen names the service, and (IR791) a portal that lists every service address, with the API documentation relayed from the gateway. Phase 1A unchanged.
+0.634.0 (2026-11-12): new aircon installation (DEC-106, IR789): FR-T16 and DD-T16, `installation` job type created by HQ for a planned unit, installation checklist and equipment check in the work report, HQ acceptance installs the unit (85 requirement IDs, 228 operations; the contract types, API and web follow in later PRs).
 0.633.0 (2026-11-11): the IoT model is a register of its own beside the aircon model; a unit takes an optional IoT model and a device can be registered with the unit (228 operations, 250 routes; DEC-105, IR788).
+0.633.0 (2026-11-13): Bahasa Indonesia is a fourth display language beside English, Malay and Japanese: every translated text, the sign-in pages and the date and time formats (DEC-108, IR795).
 0.632.0 (2026-11-12): IR787: a cursor's offset is bounded (an edited cursor with an offset near the largest integer made a list slice panic). Phase 1A unchanged.
 
 0.631.0 (2026-11-12): IR786: the migration versions must be 1, 2, 3 … without a gap (`migrate.Load` refuses a hole, which a database already past it would never fill). Phase 1A unchanged.

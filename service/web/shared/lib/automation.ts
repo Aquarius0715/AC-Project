@@ -6,6 +6,7 @@ import type { OpInput } from "@ac/web/lib/opTypes";
 import type { Fact } from "@ac/web/lib/contracts.gen";
 import { codePoints } from "@ac/web/lib/text";
 import { entryOf, lookup } from "@ac/web/lib/lookup";
+import { sharesNoSetpoint } from "@ac/web/lib/temperatureRange";
 
 const SET_TEMPERATURE = "set_temperature";
 
@@ -141,6 +142,7 @@ export function autoErrors(d: AutoDraft, temperatureRange: { min: number; max: n
 /** What is wrong with the temperature, or undefined: not a number, or outside the range every target unit allows. */
 function celsiusError(c: number, range: { min: number; max: number } | null | undefined, t: T): string | undefined {
   if (!Number.isFinite(c)) return t("A temperature");
+  if (range && sharesNoSetpoint(range)) return t("The target units share no temperature setting");
   return range && (c < range.min || c > range.max) ? t("Within {min}–{max} °C on every target unit", { min: range.min, max: range.max }) : undefined;
 }
 function draftCondition(d: AutoDraft): AutoCondition {

@@ -3,7 +3,8 @@
 import { hasContent } from "@ac/web/lib/hasContent";
 import { Badge, Input, Select, cx } from "./ui";
 import { Icon, type IconName } from "@ac/web/components/Icon";
-import type { JobStatus, Origin, Slot } from "@ac/web/lib/jobs";
+import type { JobStatus, Slot } from "@ac/web/lib/jobs";
+import type { Origin } from "@ac/web/lib/origin";
 import { jobStatuses, statusLabel } from "@ac/web/lib/jobs";
 import { oneOf } from "@ac/web/lib/oneOf";
 import { useT } from "./I18n";
@@ -11,8 +12,9 @@ import { isAfter } from "@ac/web/lib/order";
 import { entryOf } from "@ac/web/lib/lookup";
 
 /** Where a job came from — shown on every role (IR113), in the display language. */
-export function OriginBadge({ origin }: { origin: Origin }) {
+export function OriginBadge({ origin }: Readonly<{ origin: Origin }>) {
   const t = useT();
+  if (origin === "hq") return <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-[#e8efff] px-2 py-0.5 text-[11px] font-semibold leading-4 text-[#1d4ed8]"><Icon name="mail" />{t("HQ request")}</span>;
   return origin === "plan" ? (
     <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-[#f3ebff] px-2 py-0.5 text-[11px] font-semibold leading-4 text-[#6d28d9]"><Icon name="routine" />{t("Periodic plan")}</span>
   ) : (

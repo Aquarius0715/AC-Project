@@ -5,7 +5,10 @@ import type { NextConfig } from "next";
 // package (Next.js docs: transpilePackages for monorepo packages); tracing starts at the workspace root so the
 // standalone server includes it.
 const nextConfig: NextConfig = {
-  env: { AC_APP_ROLE: "client" }, // this app's role (session cookie name, sign-in checks)
+  env: {
+    AC_APP_ROLE: "client", // this app's role (session cookie name, sign-in checks)
+    AC_APP_VERSION: process.env.APP_VERSION ?? "dev", // the build (the image's APP_VERSION argument): the reload offer after a deployment (IR856)
+  },
   output: "standalone", // self-contained server bundle for the Docker image (container design §3)
   poweredByHeader: false, // no X-Powered-By: Next.js on responses (it names the framework to attackers)
   transpilePackages: ["@ac/web"],
@@ -17,8 +20,9 @@ const nextConfig: NextConfig = {
       { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
       { key: "X-Frame-Options", value: "DENY" },
       // the apps use none of these browser features, so a page cannot ask for them even if a script were injected
-      // (IR383); the simulated QR camera needs no camera. A real scanner would allow camera=(self) on its app only
-      { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=(), usb=(), display-capture=()" },
+      // (IR383); the simulated QR camera needs no camera. A real scanner would allow camera=(self) on its app only.
+      // Geolocation is this app's own: "Use this device's location" of the away/home automations (DEC-109, IR826)
+      { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(self), payment=(), usb=(), display-capture=()" },
     ] }, {
       // the BFF answers carry the session and Core API data: never stored by the browser, as the gateway's (IR407, IR434)
       source: "/bff/:path*", headers: [{ key: "Cache-Control", value: "no-store" }],

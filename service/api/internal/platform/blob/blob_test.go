@@ -56,6 +56,43 @@ func TestDir(t *testing.T) {
 	}
 }
 
+// A store whose directory was never made (a fresh or lost volume) answers ErrNotFound, so a stored row whose content
+// is gone reads as not found (IR229) rather than an internal error; the first Put makes the directory and the file
+// for the API's user only.
+func TestDirNotMadeYet(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "store")
+	dir := blob.Dir(path)
+	ctx := t.Context()
+
+	_, err := dir.Get(ctx, "a/b")
+	if !errors.Is(err, blob.ErrNotFound) {
+		t.Fatalf("get before the directory exists: %v", err)
+	}
+
+	err = dir.Put(ctx, "a/b", "text/plain", []byte("x"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for name, want := range map[string]fs.FileMode{
+		path:                          0o700,
+		filepath.Join(path, "a"):      0o700,
+		filepath.Join(path, "a", "b"): 0o600,
+	} {
+		info, statErr := os.Stat(name)
+		if statErr != nil {
+			t.Fatal(statErr)
+		}
+
+		got := info.Mode().Perm()
+		if got != want {
+			t.Errorf("%s: mode %v, want %v", name, got, want)
+		}
+	}
+}
+
 // A symbolic link inside the directory does not lead the store to a file outside it.
 func TestDirStaysInside(t *testing.T) {
 	t.Parallel()

@@ -18,7 +18,7 @@ interface Live {
   waiting: number | null; // requests waiting for HQ, any requested time (IR611); null without job.read
 }
 const PERIODS = [{ id: "today", label: "Today" }, { id: "7d", label: "Last 7 days" }, { id: "30d", label: "Last 30 days" }, { id: "custom", label: "Custom" }];
-const barTone: Record<AxisRow["tone"], string> = { primary: "bg-primary", muted: "bg-muted-foreground/50", warn: "bg-warn", ok: "bg-ok", crit: "bg-crit" };
+const barTone: Record<AxisRow["tone"], string> = { muted: "bg-muted-foreground/30", ok: "bg-ok", unknown: "bg-unknown" };
 
 // The custom period's two ends. Each is kept here too, so a picker shows its choice while the page reads the new period.
 function CustomPeriod({ from, to }: Readonly<{ from: string; to: string }>) {
@@ -47,12 +47,12 @@ export function AdminOverviewView({ live }: Readonly<{ live: Live }>) {
         <div className="flex flex-wrap items-center gap-2">
           {live.customers && (
             <Select aria-label={t("Customer")} className="w-auto text-xs font-semibold" value={live.customerId ?? ""} onChange={(e) => { patch({ customerId: e.target.value || null, propertyId: null }); }}>
-              <option value="">{t("Customer: All")}</option>{live.customers.map((c) => <option key={c.id} value={c.id}>{t("Customer: {name}", { name: c.name })}</option>)}
+              <option value="">{t("Customer: All")}</option>{live.customers.toSorted((x, y) => x.name.localeCompare(y.name)).map((c) => <option key={c.id} value={c.id}>{t("Customer: {name}", { name: c.name })}</option>)}
             </Select>
           )}
           {live.customers && (
             <Select aria-label={t("Property")} className="w-auto text-xs font-semibold" disabled={!live.properties} value={live.propertyId ?? ""} onChange={(e) => { patch({ propertyId: e.target.value || null }); }}>
-              <option value="">{t("Property: All")}</option>{(live.properties ?? []).map((p) => <option key={p.id} value={p.id}>{t("Property: {name}", { name: p.name })}</option>)}
+              <option value="">{t("Property: All")}</option>{(live.properties ?? []).toSorted((x, y) => x.name.localeCompare(y.name)).map((p) => <option key={p.id} value={p.id}>{t("Property: {name}", { name: p.name })}</option>)}
             </Select>
           )}
           <Select aria-label={t("Period")} className="w-auto text-xs font-semibold" value={live.period.kind} onChange={(e) => { patch({ period: e.target.value === "today" ? null : e.target.value, ...(e.target.value !== "custom" && { from: null, to: null }) }); }}>
@@ -85,7 +85,7 @@ function Sections({ s, links, waiting }: Readonly<{ s: AdminSummary; links: Retu
         {/* what waits for HQ whatever the period: requests to book, offers declined or expired, follow-ups to classify (IR611) */}
         {waiting !== null && <Kpi label={t("Waiting for HQ")} value={waiting} tone={waiting ? "warn" : undefined} sub={t("requests to book or reassign · any requested time")} href={links.waiting} link={t("Open requests")} />}
         <Kpi label={t("Active customers")} value={k.customers} sub={t("with Active status")} />
-        <Kpi label={t("Target units")} value={k.units} sub={t("Running {on} · Stopped {off} · unknown {unknown} · archived excluded", { on: k.on, off: k.off, unknown: k.unknown })} href={links.units} link={t(OPEN_UNITS)} />
+        <Kpi label={t("Target units")} value={k.units} sub={t("Running {on} · Stopped {off} · Unknown {unknown} · archived excluded", { on: k.on, off: k.off, unknown: k.unknown })} href={links.units} link={t(OPEN_UNITS)} />
         <Kpi label={t("Operation rate")} value={k.rate} sub={t("Running {on} / known {known} · unknown {unknown} not in denominator", { on: k.on, known: k.on + k.off, unknown: k.unknown })} href={links.power("on")} link={t("Units running")} />
         <Kpi label={t("Unresolved alerts")} value={k.alerts} tone={k.alerts ? "warn" : undefined} sub={t("open or acknowledged · critical and warning")} href={links.alerts} link={t("View alerts")} />
         <Kpi label={t("Energy used (actual)")} value={k.kwh} sub={k.kwhSub} href={links.energy} link={t("Energy analysis")} />

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { csvShape,
   changedFields, claimCandidate, conditionText, coverageCsv, coverageKpis, coverageRows, customerRows, defaultRules, errorReportCsv, importMessage, placeOptions, policyLines,
-  registerKpis, standing as standingOf, standingMarks, unitDraft, unitErrors, unitRows, type ApiCoverage, type ApiCustomerPolicy, type ApiImportRow, type ApiUnitRow, type Standing,
+  registerKpis, standing as standingOf, standingMarks, unitDraft, unitErrors, unitRows, unitsMatching, type ApiCoverage, type ApiCustomerPolicy, type ApiImportRow, type ApiUnitRow, type Standing,
 } from "@ac/web/lib/assets";
 import { i18nOf } from "@ac/web/lib/i18n";
 import { without } from "@ac/web/lib/omit";
@@ -14,7 +14,7 @@ const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 const NOW = new Date("2026-09-14T01:00:00Z"); // 09:00 in Kuala Lumpur
 const unit = (over: Partial<ApiUnitRow>): ApiUnitRow => {
   return {
-    id: "u1", version: 3, customerOrgId: "org-a", propertyId: "p1", spaceId: "s1", displayName: BEDROOM_AC, modelId: "m1", type: "split", installedAt: "2026-01-09T16:00:00Z",
+    id: "u1", version: 3, customerOrgId: "org-a", propertyId: "p1", spaceId: "s1", displayName: BEDROOM_AC, modelId: "m1", type: "split", installState: "installed", installedAt: "2026-01-09T16:00:00Z",
     serviceScope: ["indoor", "outdoor"], alertPolicyIds: [], archived: false, capabilityVersion: 2, connection: "online", lastSeenAt: null, warrantyEndsAt: "2027-01-09T16:00:00Z",
     effectivePowerState: "on", activeAlertCount: 0, ...over,
   };
@@ -50,7 +50,7 @@ describe("HQ customers & units", () => {
     const rows = customerRows([{ id: "c1", version: 1, name: "Demo Customer A", status: "active", organizationId: "org-a", serviceProfile: "rto", createdAt: "2026-04-01T00:00:00Z" }],
       [{ id: "org-a", version: 2, name: "Customer A Sdn Bhd", kind: "customer", status: "active" }], [], [unit({}), unit({ id: "u2", effectivePowerState: "off" })], () => null);
     expect([rows[0]?.since, rows[0]?.operation, rows[0]?.billingName]).toStrictEqual(["Apr 2026", "50.0%", "Customer A Sdn Bhd"]);
-    expect(registerKpis(rows, [unit({}), unit({ id: "u2", effectivePowerState: "unknown" })])).toMatchObject({ customers: 1, propertyNames: "none yet", power: "Running 1 · Stopped 0 · unknown 1" });
+    expect(registerKpis(rows, [unit({}), unit({ id: "u2", effectivePowerState: "unknown" })])).toMatchObject({ customers: 1, propertyNames: "none yet", power: "Running 1 · Stopped 0 · Unknown 1" });
   });
 
   it("lists units and checks the unit form", () => {
@@ -62,13 +62,13 @@ describe("HQ customers & units", () => {
       displayName: "1–120 characters", installedAt: "An installation date cannot be in the future", serviceScope: "Choose at least one inspection group",
     });
     expect(changedFields(unit({}), { ...d, displayName: "Bedroom AC 2", spaceId: "" })).toStrictEqual(["Name", "Location"]);
-    expect(placeOptions([{ id: "p1", version: 1, kind: "home", name: "Home A", address: null, accessInstructions: null, updatedAt: "", units: 0, unassigned: 0, floors: 0, rooms: 0, spaces: [] }], [])[0]?.label).toBe("Home A (no space)");
+    expect(placeOptions([{ id: "p1", version: 1, kind: "home", name: "Home A", address: null, accessInstructions: null, location: null, geofenceRadiusMeters: null, updatedAt: "", units: 0, unassigned: 0, floors: 0, rooms: 0, spaces: [] }], [])[0]?.label).toBe("Home A (no space)");
   });
 
   it("words the policies' conditions and the default rules", () => {
     expect(conditionText(policy({ activeWindow: { weekdays: [1, 2, 3, 4, 5], startLocal: "08:00", endLocal: "19:00" } }))).toBe("Temperature ≥ 30 °C for 60 s, weekdays 08:00–19:00 → Warning");
     expect(conditionText(withoutSeverity({ metric: "heartbeat_gap", threshold: 10, activeWindow: { weekdays: [1, 3], startLocal: "22:00", endLocal: "06:00" } }))).toBe("No heartbeat for 10 min, Mon, Wed 22:00–06:00");
-    expect(defaultRules(defaults)[0]).toMatchObject({ condition: "CO₂ (ppm) ≥ 1200 ppm for 15 min", enabled: false, note: "Off since 10 Sept 2026 · office closed" });
+    expect(defaultRules(defaults)[0]).toMatchObject({ condition: "CO₂ ≥ 1200 ppm for 15 min", enabled: false, note: "Off since 10 Sept 2026 · office closed" });
     expect(policyLines([policy({}), defaults], ["u1"], () => CUSTOMER_A).map((p) => [p.name, p.type, p.condition, p.madeBy])).toStrictEqual([
       ["Default policy", "Default", "1 rule · 0 on for this customer", "HQ (template)"], [BEDROOM_TOO_HOT, "Temperature", "Temperature ≥ 30 °C for 60 s → Warning", CUSTOMER_A],
     ]);
@@ -92,7 +92,7 @@ describe("HQ customers & units", () => {
 describe("HQ customers & units in Malay with the display time zone (IR293)", () => {
   it("words the register, units, conditions and coverage", () => {
     expect(standingMarks("active", standing({ restriction: { id: "r", state: "requested", contractId: "k" } }), MS.t).map((m) => m.label)).toStrictEqual(["Sekatan diminta"]);
-    expect(registerKpis([], [], MS.t)).toMatchObject({ propertyNames: "belum ada", power: "Berjalan 0 · Berhenti 0 · tidak diketahui 0" });
+    expect(registerKpis([], [], MS.t)).toMatchObject({ propertyNames: "belum ada", power: "Berjalan 0 · Berhenti 0 · Tidak diketahui 0" });
     expect(unitRows([unit({ spaceId: null })], [], new Map(), MS.t)[0]).toMatchObject({ location: "Belum ditugaskan", policies: "Lalai" });
     expect(conditionText(policy({ activeWindow: { weekdays: [6, 7], startLocal: "08:00", endLocal: "12:00" } }), MS)).toBe("Suhu ≥ 30 °C selama 60 s, hujung minggu 08:00–12:00 → Peringatan");
     expect(conditionText(withoutSeverity({ durationSeconds: 900, activeWindow: { weekdays: [1, 3], startLocal: "22:00", endLocal: "06:00" } }), MS)).toMatch(/^Suhu ≥ 30 °C selama 15 min, Isn, Rab 22:00–06:00$/);
@@ -110,5 +110,15 @@ describe("csvShape", () => {
   it("reads quoted cells and every line ending", () => {
     expect(csvShape('\u{FEFF}a,"b,c","d""e"\r\n1,2,3\n\n4,5,6\n')).toStrictEqual({ header: ["a", "b,c", 'd"e'], rows: 2 });
     expect([csvShape("x\ry\r\nz"), csvShape(""), csvShape('"q\nr",s\n1,2')]).toStrictEqual([{ header: ["x"], rows: 2 }, { header: [], rows: 0 }, { header: ["q\nr", "s"], rows: 1 }]);
+  });
+});
+
+const placeOf = (u: ApiUnitRow) => (u.spaceId === "s2" ? "Mock fleet › 3F › Director's office" : "Home A › 1F › Bedroom");
+// IR801: a complaint names a room ("the director's office is hot"), so the search matches the place as well as the name
+describe("units & locations search", () => {
+  it("finds units by name or place, ignoring case", () => {
+    const us = [unit({ id: "a", displayName: BEDROOM_AC, spaceId: "s1" }), unit({ id: "b", displayName: "Mock · rejects commands", spaceId: "s2" })];
+    expect([unitsMatching(us, "DIRECTOR", placeOf), unitsMatching(us, " bedroom ", placeOf), unitsMatching(us, "xyz", placeOf), unitsMatching(us, "", placeOf)].map((r) => r.map((u) => u.id)))
+      .toStrictEqual([["b"], ["a"], [], ["a", "b"]]);
   });
 });

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ApiEnergySummary } from "@ac/web/lib/energy";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
 import {
-  evidenceRows, factorErrors, factorInput, MAX_EVIDENCE, mrvConditions, mrvDraftErrors, mrvDraftOf, mrvView, reportRows, reviewItems, statusWord, versionKey,
+  evidenceMore, evidenceRows, factorErrors, factorInput, MAX_EVIDENCE, mrvConditions, mrvDraftErrors, mrvDraftOf, mrvView, reportRows, reviewItems, statusWord, versionKey,
   type ApiMRVReport, type FactorDraft, type MRVDraft,
 } from "@ac/web/lib/mrv";
 
@@ -70,6 +70,9 @@ describe("HQ digital MRV (FR-A14, DD-A14)", () => {
       organizationId: "Choose a customer organization", unitIds: "Choose 1–100 units", period: "The end must be after the start",
       baseline: "Choose a baseline version", factor: "Choose an emission factor version", boundary: "1–500 characters",
     });
+    // the boundary is counted as mrv.saveDraft counts it: trimmed, in code points (mrv.go), so padding and characters beyond U+FFFF fit
+    expect([mrvDraftErrors(draft({ boundary: `${"a".repeat(500)}  ` })), mrvDraftErrors(draft({ boundary: "😀".repeat(500) }))]).toStrictEqual([{}, {}]);
+    expect(mrvDraftErrors(draft({ boundary: "😀".repeat(501) }))).toStrictEqual({ boundary: "1–500 characters" });
     const c = mrvConditions(draft({}));
     expect([c.from, c.to, c.baselineId, c.baselineVersion, c.factorId, c.factorVersion, c.boundary]).toStrictEqual(["2026-08-31T16:00:00.000Z", "2026-09-07T16:00:00.000Z", "b1", 2, "f1", 1, "AC input"]);
     expect(mrvDraftOf(report.conditions)).toStrictEqual(draft({ boundary: "AC input", unitIds: ["u1", "u2"] }));
@@ -110,5 +113,13 @@ describe("MRV evidence candidates (DD-A14 item 6, IR349)", () => {
     ]);
     expect(evidenceRows([a], [], i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" }))[0]?.sub).toBe("u1 · dimuat naik 13 Sep 2026, 11:30 PG GMT+9");
     expect(MAX_EVIDENCE).toBe(20);
+  });
+
+  it("says how many candidates it lists when the units and period hold more than the page read (R878)", () => {
+    const a = { id: "att-1", jobId: "j1", reportId: "r1", name: "meter.png", mime: "image/png", size: 10, status: "ready", createdAt: "2026-09-13T02:30:00Z", unitId: "u1", acceptedAt: "2026-09-13T04:00:00Z" };
+    expect(evidenceMore({ items: [], total: 0 })).toBeNull();
+    expect(evidenceMore({ items: [a, a], total: 2 })).toBeNull();
+    expect(evidenceMore({ items: [a, a], total: 140 })).toBe("The newest 2 of 140 photos are listed: narrow the units or the period to find older ones.");
+    expect(evidenceMore({ items: [a], total: 2 }, translator("ja"))).toBe("2 枚のうち新しい 1 枚を表示しています。古い写真を探すにはユニットか期間を絞ってください。");
   });
 });

@@ -17,6 +17,7 @@ services:
   # whose settings do not, keeps compose.yaml's 8025, which its specs open (IR729)
   mailpit: { ports: !override ["127.0.0.1:${MAILPIT_PORT:-8025}:8025"], restart: unless-stopped }
   stripe-mock: { restart: unless-stopped }
+  stripe-cli: { restart: unless-stopped } # profile stripe: deploy.sh turns it on with STRIPE_SECRET_KEY (IR828)
   weather-mock: { restart: unless-stopped }
   keycloak:
     restart: unless-stopped
@@ -25,6 +26,11 @@ services:
   partner-web-api: { restart: unless-stopped }
   technician-web-api: { restart: unless-stopped }
   admin-web-api: { restart: unless-stopped }
+  # the portal (IR791): published like the apps; the inbox and the traces are on the server's loopback, so it does not list them
+  portal-web:
+    restart: unless-stopped
+    ports: !override ["${PUBLISH_ADDR:-127.0.0.1}:${PORTAL_WEB_PORT:-3204}:3000"]
+    environment: { MAILPIT_URL: "", JAEGER_URL: "" }
   iot-bridge: { restart: unless-stopped }
   device-sim: { restart: unless-stopped }
 

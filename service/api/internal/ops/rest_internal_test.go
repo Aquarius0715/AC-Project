@@ -490,6 +490,8 @@ func TestRESTBodyRefusals(t *testing.T) {
 		`[1]`:                           {"_": apperr.KeyMalformedInput},
 		`null`:                          {"_": apperr.KeyMalformedInput},
 		`{"a":1} {"b":2}`:               {"_": apperr.KeyMalformedInput},
+		`{"a":1}}`:                      {"_": apperr.KeyMalformedInput},
+		`{"a":1}]`:                      {"_": apperr.KeyMalformedInput},
 		`{"action":"approve"}`:          nil,
 		`{"target":{"kind":"space a"}}`: nil,
 	} {

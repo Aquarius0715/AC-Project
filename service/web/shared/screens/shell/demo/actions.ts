@@ -10,7 +10,7 @@ import { redirect } from "next/navigation";
 import { coreClockFresh, coreOp, CoreError } from "@ac/web/lib/dal";
 import { actionFailure } from "@ac/web/lib/actionFailure";
 import { clearedCookieOptions, dropSession, SESSION_COOKIE } from "@ac/web/lib/session";
-import { advanceTarget, nextSequence, openFault, type ApiDevice, type ApiDeviceEvent } from "@ac/web/lib/demoPanel";
+import { advanceTarget, CLOCK_JUMPS, nextSequence, openFault, type ApiDevice, type ApiDeviceEvent } from "@ac/web/lib/demoPanel";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 
 type Result<T> = { ok: true; value: T } | ({ ok: false } & ActionFailure);
@@ -25,11 +25,11 @@ const run = async <T,>(fn: () => Promise<T>): Promise<Result<T>> => {
 };
 const invalid = (field: string): Result<never> => ({ ok: false, code: "VALIDATION", messageKey: "error.validation", fieldErrors: { [field]: "error.invalid" } });
 
-/** demo.advanceClock to the scenario clock now plus one minute or one hour (forward only, IR36). Every service reads the
+/** demo.advanceClock to the scenario clock now plus one of the CLOCK_JUMPS (1 minute to 24 hours, IR641; forward only, IR36). Every service reads the
 shared offset at most a second late (IR168), so the action waits until session.get shows the jump before the page
 renders again. */
 export async function advanceClock(minutes: number) {
-  if (minutes !== 1 && minutes !== 60) return invalid("minutes");
+  if (!CLOCK_JUMPS.includes(minutes)) return invalid("minutes");
   return run(async () => {
     const to = advanceTarget(await coreClockFresh(), minutes);
     await coreOp("demo.advanceClock", { to }, { write: true });

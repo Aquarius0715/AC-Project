@@ -543,6 +543,28 @@ func TestAutomationExtraConditions(t *testing.T) {
 		t.Errorf("weekday on a schedule: %d", code)
 	}
 
+	// a weather extra on an occupancy rule compares the temperature with a value in range (-50…100 °C)
+	occupancyRule := strings.Replace(
+		base,
+		`"condition":{"type":"weather","metric":"temperature","operator":"gte","value":33}`,
+		`"condition":{"type":"occupancy","occupied":true}`,
+		1,
+	)
+	for name, extra := range map[string]string{
+		"weather over 100 °C": `[{"type":"weather","metric":"temperature","operator":"gte","value":101}]`,
+		"weather humidity":    `[{"type":"weather","metric":"humidity","operator":"gte","value":30}]`,
+		"weather operator":    `[{"type":"weather","metric":"temperature","operator":"eq","value":30}]`,
+	} {
+		code, resp := write(
+			srv,
+			customerB(),
+			"automations.save",
+			occupancyRule+`,"onlyIf":`+extra+`}`,
+			0,
+		)
+		refusal(t, name, code, resp, "onlyIf=error.invalid")
+	}
+
 	code, res := write(
 		srv,
 		customerB(),

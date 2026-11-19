@@ -6,7 +6,7 @@ const PERMISSIONS = "permissions";
 
 import { useRef, useState } from "react";
 import { Badge, Banner, Btn, Card, Check, Choice, EmptyState, Field, Input, ListRow, Modal, Page, Search, SearchSelect, Select, Textarea, Plain, ScrollX, type Tone } from "@ac/web/components/ui";
-import { useI18n } from "@ac/web/components/I18n";
+import { useI18n, useT } from "@ac/web/components/I18n";
 import { showTime } from "@ac/web/lib/i18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
@@ -18,6 +18,7 @@ import {
 import { deleteMember, revokeMember, saveMember, signOutEverywhere } from "../actions";
 import { DeleteDialog } from "@ac/web/components/DeleteDialog";
 import { oneOf } from "@ac/web/lib/oneOf";
+import { permissionLabel } from "@ac/web/lib/permissionLabels";
 import { Icon } from "@ac/web/components/Icon";
 import { DateTimeSelect } from "@ac/web/components/TimeSelect";
 
@@ -37,12 +38,32 @@ function memberTone(u: { active: boolean; revoked: boolean }): Tone {
 the URL; saving and revoking are members.save through a Server Action (a revoke sets validUntil to now). The
 organization filter and the scope targets are search-selects (DD-A03, IR321). Texts in the display language; the
 valid period is typed in the display time zone (IR302). */
+/** The right column when no membership is open: an asked one this list does not hold (with Clear the filters when a
+filter may hide it), or none chosen yet — no form opens on its own for a member nobody picked. */
+function NoMembership({ missing, scope, onClear }: Readonly<{ missing: boolean; scope: { role?: string; status?: string; organizationId?: string }; onClear: () => void }>) {
+  const { t } = useI18n();
+  if (!missing) return <Card title={t("Membership")}><EmptyState title={t("Choose a membership")}>{t("Pick one in the list to see or change its access, or start a New membership.")}</EmptyState></Card>;
+  const filtered = [scope.role, scope.status, scope.organizationId].some(Boolean);
+  return (
+    <EmptyState title={t("That membership is not in this list")} action={filtered ? <Btn size="sm" onClick={onClear}>{t("Clear the filters")}</Btn> : undefined}>
+      {t("It does not exist, or the organization, role or status filter hides it.")}
+    </EmptyState>
+  );
+}
+
+/** A permission in words, its code small beside it so an administrator can match the two (IR821). */
+function PermissionName({ code }: Readonly<{ code: string }>) {
+  const t = useT();
+  return <span className="text-xs">{permissionLabel(code, t)} <span className="font-mono text-[10px] text-muted-foreground">{code}</span></span>;
+}
+
 export function AccessView({ live }: Readonly<{ live: Live }>) {
   const i = useI18n(), { t } = i, zone = i.display.timeZone;
   const nav = useUrlPatch();
   const [pending, run] = useAction();
   const [q, setQ] = useState("");
   const isMissing = live.selected === "missing";
+  // "none": nothing chosen yet, so no form opens on its own (NoMembership)
   const sel = live.selected === "new" || isMissing ? null : live.rows.find((r) => r.id === live.selected) ?? null;
   const key = sel ? `${sel.id}:${String(sel.version)}` : "new";
   const [source, setSource] = useState(key);
@@ -127,7 +148,7 @@ export function AccessView({ live }: Readonly<{ live: Live }>) {
         <SearchSelect className="w-64" label={t("Filter by organization")} value={live.scope.organizationId ?? ""} onChange={(v) => { nav({ organizationId: v || null, membershipId: null }); }}
           options={[{ id: "", label: t("Organization: All") }, ...live.orgs.filter((o) => o.kind !== "customer").toSorted((a, b) => a.name.localeCompare(b.name)).map((o) => ({ id: o.id, label: o.name }))]} />
         <Choice value={live.scope.role ?? "all"} onChange={(v) => { nav({ role: v === "all" ? null : v, membershipId: null }); }} options={[{ id: "all", label: t("All roles") }, ...roles]} />
-        <Choice value={live.scope.status ?? "all"} onChange={(v) => { nav({ status: v === "all" ? null : v, membershipId: null }); }} options={[{ id: "all", label: t("All") }, { id: "active", label: t("Active") }, { id: "inactive", label: t("Inactive") }]} />
+        <Choice value={live.scope.status ?? "all"} onChange={(v) => { nav({ status: v === "all" ? null : v, membershipId: null }); }} options={[{ id: "all", label: t("All") }, { id: "active", label: t("Active") }, { id: "inactive", label: t("Inactive") }, { id: "revoked", label: t("Revoked") }]} />
       </div>
       <div className="split-rev">
         <Card title={t("Memberships")} sub={t("{n} · HQ, contractor and technician", { n: live.rows.length })} action={live.canWrite && <Btn size="sm" variant="primary" onClick={() => { nav({ membershipId: "new" }); }}><Icon name="add" /> {t("New membership")}</Btn>} className="self-start">
@@ -135,14 +156,12 @@ export function AccessView({ live }: Readonly<{ live: Live }>) {
           {shown.length === 0 ? <EmptyState title={t("No memberships")}>{t("No membership matches these filters.")}</EmptyState> : <div className="flex flex-col gap-1.5">{shown.map((u) => <ListRow key={u.id} id={`member-row-${u.id}`} selected={sel?.id === u.id} onClick={() => { nav({ membershipId: u.id }); }}><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="truncate text-[13px]">{u.name}</b><Badge tone={memberTone(u)}>{memberWord(u)}</Badge></div><div className="truncate text-[11px] text-muted-foreground">{u.label}</div></div></ListRow>)}</div>}
           <p className="mt-3 text-[11px] text-muted-foreground">{t("Client accounts are not listed here — they are managed per customer in Customers & units › Users.")}</p>
         </Card>
-        {isMissing ? (
-          <EmptyState title={t("That membership is not in this list")} action={(live.scope.role || live.scope.status || live.scope.organizationId) ? <Btn size="sm" onClick={() => { nav({ role: null, status: null, organizationId: null }); }}>{t("Clear the filters")}</Btn> : undefined}>
-            {t("It does not exist, or the organization, role or status filter hides it.")}
-          </EmptyState>
+        {sel === null && live.selected !== "new" ? (
+          <NoMembership missing={isMissing} scope={live.scope} onClear={() => { nav({ role: null, status: null, organizationId: null }); }} />
         ) : (
         <Card title={sel ? sel.name : t("New membership")} sub={sel ? t("{validity} · scope version {scope} · version {v}", { validity: sel.validity, scope: sel.m.scopeVersion, v: sel.version }) : t("For an existing user, or a new person whose account is created with it")}>
           <div className="flex flex-col gap-5">
-            {!live.canWrite && <Banner>{t("Read only — editing needs identity.write.")}</Banner>}
+            {!live.canWrite && <Banner>{t("Read only — editing needs “Edit users & roles”.")}</Banner>}
             {sel?.m.revokedAt && <Banner tone="warn">{t("Access revoked {date}: the sign-in is off, and their company or customer cannot extend or enable it again. Saving a later “Valid until” gives the access back and turns the sign-in on.", { date: showTime(sel.m.revokedAt, i.display) })}</Banner>}
             <section>
               <h3 className="mb-2 text-[13px] font-bold">{t("Identity & role")}</h3>
@@ -176,11 +195,11 @@ export function AccessView({ live }: Readonly<{ live: Live }>) {
               <h3 className="mb-2 text-[13px] font-bold">{t("Permissions · {n} of {total}", { n: d.permissions.length, total: allPermissions.length })}</h3>
               <ScrollX><table id={memberFieldId(PERMISSIONS)} className="w-full min-w-[560px] text-left text-[13px]"><thead className="text-[11px] uppercase text-muted-foreground"><tr><th className="py-1.5 pr-3">{t("Resource")}</th><th className="pr-3">{t("permission::Read")}</th><th className="pr-3">{t("Write")}</th><th>{t("Actions")}</th></tr></thead><tbody>{permissionRows.map((r) => (
                 <tr key={r.res} className="border-t border-line"><td className="py-2 pr-3 font-semibold">{resourceWord(r.res, t)}</td>
-                  <td className="pr-3">{r.read ? <Check label={<span className="font-mono text-xs">{r.read}</span>} checked={has(r.read)} disabled={blocked(r.read) || has(r.write)} onChange={(v) => { if (r.read) toggle(r.read, v); }} /> : <span className="text-muted-foreground">—</span>}</td>
-                  <td className="pr-3">{r.write ? <Check label={<span className="font-mono text-xs">{r.write}</span>} checked={has(r.write)} disabled={blocked(r.write)} onChange={(v) => { setWrite(r, v); }} /> : <span className="text-muted-foreground">—</span>}</td>
-                  <td><div className="flex flex-wrap gap-x-3 gap-y-2">{(r.actions ?? []).map((a) => <Check key={a} label={<span className="font-mono text-xs">{a}</span>} checked={has(a)} disabled={blocked(a)} onChange={(v) => { toggle(a, v); }} />)}{!r.actions && <span className="text-muted-foreground">—</span>}</div></td></tr>
+                  <td className="pr-3">{r.read ? <Check label={<PermissionName code={r.read} />} checked={has(r.read)} disabled={blocked(r.read) || has(r.write)} onChange={(v) => { if (r.read) toggle(r.read, v); }} /> : <span className="text-muted-foreground">—</span>}</td>
+                  <td className="pr-3">{r.write ? <Check label={<PermissionName code={r.write} />} checked={has(r.write)} disabled={blocked(r.write)} onChange={(v) => { setWrite(r, v); }} /> : <span className="text-muted-foreground">—</span>}</td>
+                  <td><div className="flex flex-wrap gap-x-3 gap-y-2">{(r.actions ?? []).map((a) => <Check key={a} label={<PermissionName code={a} />} checked={has(a)} disabled={blocked(a)} onChange={(v) => { toggle(a, v); }} />)}{!r.actions && <span className="text-muted-foreground">—</span>}</div></td></tr>
               ))}</tbody></table></ScrollX>
-              <p className="mt-2 text-[11px] text-muted-foreground">{t("Write includes Read (Read is locked on while Write is on). Actions are independent of Read/Write — e.g. billing.write issues invoices but confirming payments needs billing.payment; mrv.write drafts reports but recording a review needs mrv.review and changing emission factors needs mrv.factors.")}{isSelf ? ` ${t("identity.write and restriction.override cannot be granted to yourself.")}` : ""}</p>
+              <p className="mt-2 text-[11px] text-muted-foreground">{t("Write includes Read (Read is locked on while Write is on). Actions are independent of Read/Write — e.g. “Edit billing” issues invoices but confirming payments needs “Confirm payments”; “Edit MRV reports” drafts reports but recording a review needs “Review MRV reports” and changing emission factors needs “Change emission factors”.")}{isSelf ? ` ${t("“Edit users & roles” and “Override restrictions” cannot be granted to yourself.")}` : ""}</p>
               {fieldError(PERMISSIONS) && <p className="mt-1 text-xs text-crit">{fieldError(PERMISSIONS)}</p>}
             </section>
             {live.canWrite && <>

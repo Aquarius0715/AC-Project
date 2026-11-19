@@ -43,8 +43,11 @@ func assembled(t *testing.T) *server.Server {
 				Technician: "",
 				Admin:      "",
 			},
-			AccountsPerDay: 0,
-			WrapTx:         nil,
+			AccountsPerDay:      0,
+			WrapTx:              nil,
+			Checkout:            nil,
+			CustomerAppURL:      "",
+			StripeWebhookSecret: "",
 		},
 		nil,
 	)
@@ -94,7 +97,7 @@ func TestRESTRoutesResolve(t *testing.T) {
 		}
 	}
 
-	if routes != 250 {
-		t.Fatalf("%d routes, want 250", routes)
+	if routes != 256 { // IR827 POST /v1/payments/checkout, IR826 POST /v1/presence
+		t.Fatalf("%d routes, want 256", routes)
 	}
 }

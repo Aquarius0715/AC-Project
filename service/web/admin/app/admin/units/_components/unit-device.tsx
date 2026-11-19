@@ -101,7 +101,7 @@ export function UnitDevicePanel({ unitId, unitName, device, deviceKnown, canWrit
             <span className="flex flex-wrap items-center gap-2"><b>{device.serial}</b><ConnBadge s={device.connection} /><TextLink href={`/admin/devices?tab=devices&deviceId=${device.id}`}>{t("Devices")} <Icon name="chevronRight" /></TextLink></span>
             <span className="text-xs text-muted-foreground">{[iotName(device.iotModelId) ?? t("No IoT model"), device.mqttNode].filter(Boolean).join(" · ")}</span>
           </>
-        ) : <span className="text-muted-foreground">{deviceKnown ? t("No device bound") : t("Needs device.read")}</span>}
+        ) : <span className="text-muted-foreground">{deviceKnown ? t("No device bound") : t("Needs “View devices & models”")}</span>}
         {canWrite && deviceKnown && (
           <span className="flex flex-wrap gap-2">
             <Btn size="sm" onClick={() => { setModal("connect"); }}>{device ? t("Replace…") : t("Connect device…")}</Btn>

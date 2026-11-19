@@ -132,6 +132,14 @@ describe("payouts in Malay (IR279)", () => {
     expect(pdf).not.toMatch(/\P{ASCII}/u);
   });
 
+  // DEC-108: Indonesian is written in Latin letters, so its statement is Indonesian, not the English one
+  it("writes an Indonesian user's statement in Indonesian, in ASCII", () => {
+    const rows = lineRows(statement(), new Map(), [{ id: JOB_EEEEEEEE, type: "periodic", unitName: null }]);
+    const pdf = payoutPdf(statement(), rows, "Demo Contractor A", translator("id"), "id");
+    expect(pdf).toContain("(LAPORAN PENCAIRAN stmt-202");
+    expect(pdf).not.toMatch(/\P{ASCII}/u);
+  });
+
   // IR639: the PDF's font has ASCII only, so a Japanese user's statement is the English one, not a page of “-”
   it("writes a Japanese user's statement in English", () => {
     const rows = lineRows(statement(), new Map(), [{ id: JOB_EEEEEEEE, type: "periodic", unitName: null }]);

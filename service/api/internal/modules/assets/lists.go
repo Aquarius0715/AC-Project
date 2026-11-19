@@ -488,8 +488,8 @@ func (m *Module) canDeactivate(ctx context.Context, call *ops.Call, org uuid.UUI
 //	@Description	Authorization: client:self-customer | admin:asset.read
 //	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
 //	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-//	@Description	Design: DD-A02, DD-C02, DD-C07, DD-C04, DD-A06, DD-C09, DD-C01, DD-C08, DD-A01 · Query: filters \
-//	@Description	customerId,kind · sort id,createdAt,updatedAt (default id asc)
+//	@Description	Design: DD-A02, DD-C02, DD-C07, DD-C04, DD-A06, DD-C09, DD-C01, DD-C08, DD-A01, DD-C20 · Query: \
+//	@Description	filters customerId,kind · sort id,createdAt,updatedAt (default id asc)
 //	@Tags			properties
 //	@Accept			json
 //	@Produce		json
@@ -572,8 +572,8 @@ func (*Module) propertiesList(
 //	@Description	Authorization: client:self-customer | admin:asset.read
 //	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
 //	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-//	@Description	Design: DD-A02, DD-C02, DD-C07, DD-C04, DD-C09, DD-C01, DD-C08 · Query: filters propertyId,kind · \
-//	@Description	sort id,createdAt,updatedAt (default id asc)
+//	@Description	Design: DD-A02, DD-C02, DD-C07, DD-C04, DD-C09, DD-C01, DD-C08, DD-C20 · Query: filters \
+//	@Description	propertyId,kind · sort id,createdAt,updatedAt (default id asc)
 //	@Tags			spaces
 //	@Accept			json
 //	@Produce		json

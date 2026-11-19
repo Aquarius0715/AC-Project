@@ -1,6 +1,7 @@
 package integration_test
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/seed"
+	apiserver "github.com/pradita/ac-project/service/api/internal/server"
 )
 
 //nolint:paralleltest // the integration tests share one server and the seeded test database
@@ -502,7 +504,7 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 
 	if code, m := alertPreview(
 		`,"severity":"critical"`,
-	); code != 200 || data(m)["severity"] != "critical" ||
+	); code != 200 || data(m)["severity"] != severityCritical ||
 		data(m)["deliveryState"] != deliveryPreview {
 		t.Errorf("critical alert preview: %d %v", code, m)
 	}
@@ -669,6 +671,24 @@ func TestPreferencesAndConsents(t *testing.T) {
 	if _, m := post(srv, customerB(), "preferences.get", `{}`); data(m)["locale"] != "ja" {
 		t.Error("the saved Japanese preference")
 	}
+
+	// and so is Bahasa Indonesia (DEC-108)
+	if code, res := write(
+		srv,
+		customerB(),
+		"preferences.update",
+		`{"locale":"id","timezone":"Asia/Jakarta"}`,
+		0,
+	); code != 200 ||
+		data(res)["locale"] != "id" {
+		t.Fatalf("update to Indonesian: %d %v", code, res)
+	}
+
+	if _, m := post(srv, customerB(), "preferences.get", `{}`); data(m)["locale"] != "id" {
+		t.Error("the saved Indonesian preference")
+	}
+
+	preferencePins(t, srv)
 
 	if code, res := write(
 		srv,
@@ -1036,6 +1056,35 @@ func TestWithdrawnOfferNoticeHasNoLink(t *testing.T) {
 		t.Errorf("the contractor's notice names %v, want Job %s", params["targetName"], job[:8])
 	}
 
+	// a preview shown to the contractor names the job too (IR775)
+	code, res := post(
+		srv,
+		contrA(),
+		"notifications.recipients",
+		`{"target":{"kind":"job","id":"`+job+`"},"templateKey":"job_update","channel":"inApp","query":{}}`,
+	)
+	if code != 200 || len(items(t, res)) == 0 {
+		t.Fatalf("contractor recipients: %d %v", code, res)
+	}
+
+	code, res = post(
+		srv,
+		contrA(),
+		"notifications.preview",
+		`{"target":{"kind":"job","id":"`+job+`"},"templateKey":"job_update","channel":"inApp","recipientMembershipId":"`+
+			asStr(
+				t,
+				items(t, res)[0]["id"],
+			)+`"}`,
+	)
+	if code != 200 {
+		t.Fatalf("contractor preview: %d %v", code, res)
+	}
+
+	if name := asObj(t, data(res)["params"])["targetName"]; name != "Job "+job[:8] {
+		t.Errorf("the contractor's preview names %v, want Job %s (IR775)", name, job[:8])
+	}
+
 	if code, res := write(
 		srv,
 		hq(),
@@ -1158,4 +1207,61 @@ func TestExternalTechnicianUnitNotificationScope(t *testing.T) {
 	if listed() {
 		t.Error("assignment window over: the unit notice is still listed")
 	}
+}
+
+// preferencePins checks the pinned ACs (IR819): they are saved and read back in order, kept when an update leaves
+// them out, and refused beyond eight, repeated or empty.
+func preferencePins(t *testing.T, srv *apiserver.Server) {
+	t.Helper()
+
+	first, second := "11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222"
+	if code, res := write(
+		srv,
+		customerB(),
+		opPreferencesUpdate,
+		`{"locale":"en","timezone":"Asia/Kuala_Lumpur","pinnedUnitIds":["`+first+`","`+second+`"]}`,
+		0,
+	); code != 200 {
+		t.Fatalf("pin: %d %v", code, res)
+	}
+
+	if code, res := write(
+		srv,
+		customerB(),
+		opPreferencesUpdate,
+		`{"locale":"en","timezone":"Asia/Kuala_Lumpur"}`,
+		0,
+	); code != 200 {
+		t.Fatalf("update without pins: %d %v", code, res)
+	}
+
+	_, got := post(srv, customerB(), "preferences.get", `{}`)
+	if pins, ok := data(got)["pinnedUnitIds"].([]any); !ok || len(pins) != 2 || pins[0] != first ||
+		pins[1] != second {
+		t.Errorf("pins after an update without them: %v", data(got)["pinnedUnitIds"])
+	}
+
+	nine := make([]string, 9)
+	for i := range nine {
+		nine[i] = `"` + uuidOf(i+1) + `"`
+	}
+
+	for _, body := range []string{
+		`{"locale":"en","timezone":"UTC","pinnedUnitIds":[` + strings.Join(nine, ",") + `]}`,
+		`{"locale":"en","timezone":"UTC","pinnedUnitIds":["` + first + `","` + first + `"]}`,
+		`{"locale":"en","timezone":"UTC","pinnedUnitIds":["00000000-0000-0000-0000-000000000000"]}`,
+	} {
+		code, m := write(srv, customerB(), opPreferencesUpdate, body, 0)
+		refusal(t, body, code, m, "pinnedUnitIds=error.invalid")
+	}
+
+	if code, res := write(srv, customerB(), opPreferencesUpdate,
+		`{"locale":"en","timezone":"Asia/Kuala_Lumpur","pinnedUnitIds":[]}`, 0); code != 200 {
+		t.Fatalf("unpin all: %d %v", code, res)
+	}
+}
+
+// uuidOf is a version-4 shaped id whose last digits are n.
+func uuidOf(n int) string {
+	return fmt.Sprintf("33333333-3333-4333-8333-%012d", n)
 }

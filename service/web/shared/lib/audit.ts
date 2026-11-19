@@ -142,9 +142,10 @@ export const auditItem = (a: ApiAudit, i: I18n = EN) => {
 };
 
 /** The entries of one correlation ID in the order they were appended (Figma Admin 338:2): a pending entry stays as it
-was; the final result is a later entry of its own. Empty when the entry stands alone. */
+was; the final result is a later entry of its own. Empty when the entry stands alone. Each dot takes its result's
+badge tone, so a failure no longer reads like the pending step before it (UI/UX loop R93). */
 export const correlationTrace = (group: ApiAudit[], i: I18n = EN) =>
-  group.length < 2 ? [] : [...group].toSorted((a, b) => Date.parse(a.occurredAt) - Date.parse(b.occurredAt) || a.id.localeCompare(b.id)).map((a) => ({ id: a.id, ...auditItem(a, i) }));
+  group.length < 2 ? [] : [...group].toSorted((a, b) => Date.parse(a.occurredAt) - Date.parse(b.occurredAt) || a.id.localeCompare(b.id)).map((a) => ({ id: a.id, ...auditItem(a, i), tone: resultTone(resultOf(a.result)) }));
 
 /** The target kinds the Target filter always offers, the records HQ looks up most; the kinds of the shown entries and
 the URL's kind join them (targetKind is a string like AuditView.targetRef.kind and the log records more kinds). */

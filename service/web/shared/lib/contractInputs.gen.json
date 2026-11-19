@@ -29,7 +29,8 @@
  "attachments.add": [
   "file",
   "jobId",
-  "reportId"
+  "reportId",
+  "tag"
  ],
  "attachments.getContent": [
   "attachmentId",
@@ -505,6 +506,29 @@
   "limit",
   "sort"
  ],
+ "installationRequests.cancel": [
+  "id"
+ ],
+ "installationRequests.create": [
+  "contactWindow",
+  "modelId",
+  "note",
+  "preferredSlots",
+  "propertyId",
+  "quantity",
+  "spaceId",
+  "withIot"
+ ],
+ "installationRequests.decline": [
+  "id",
+  "reason"
+ ],
+ "installationRequests.list": [
+  "cursor",
+  "filters",
+  "limit",
+  "sort"
+ ],
  "invoices.create": [
   "amountMinor",
   "contractId",
@@ -574,9 +598,9 @@
   "jobId"
  ],
  "jobs.checkIn": [
-  "distanceMeters",
   "jobId",
   "method",
+  "position",
   "qrUnitId",
   "reason"
  ],
@@ -589,6 +613,7 @@
   "alternativeSlots",
   "contactWindow",
   "dueAt",
+  "installationRequestId",
   "requestedEnd",
   "requestedStart",
   "symptom",
@@ -711,6 +736,7 @@
  ],
  "jobs.saveDraft": [
   "attachmentIds",
+  "installation",
   "items",
   "jobId",
   "measurements",
@@ -953,6 +979,9 @@
   "paymentId",
   "paymentReference"
  ],
+ "payments.startCheckout": [
+  "invoiceId"
+ ],
  "payouts.generate": [
   "period"
  ],
@@ -1052,7 +1081,13 @@
  "preferences.update": [
   "locale",
   "monthlyReportEmail",
+  "pinnedUnitIds",
   "timezone"
+ ],
+ "presence.report": [
+  "accuracyMeters",
+  "latitude",
+  "longitude"
  ],
  "properties.archive": [
   "id",
@@ -1068,8 +1103,10 @@
   "accessInstructions",
   "address",
   "customerOrgId",
+  "geofenceRadiusMeters",
   "id",
   "kind",
+  "location",
   "name"
  ],
  "rateCards.delete": [
@@ -1263,6 +1300,7 @@
   "customerOrgId",
   "displayName",
   "id",
+  "installState",
   "installedAt",
   "iotModelId",
   "modelId",
