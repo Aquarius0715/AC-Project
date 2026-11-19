@@ -232,7 +232,7 @@ describe("TechDevicesView after the page reads again with a form open", () => {
     fireEvent.click(button("Record calibration"));
     expect(calibrateSensor).not.toHaveBeenCalled();
     expect(screen.queryByRole("dialog")).toBeNull();
-    expect(screen.getAllByText(READ_ONLY)).toHaveLength(2); // the banner and the note under the actions
+    expect(screen.getByRole("alert").textContent).toMatch(READ_ONLY);
   });
   it("a firmware update whose assignment ended is not sent and the banner says why", () => {
     const { rerender } = render(<TechDevicesView live={live()} />);
@@ -240,11 +240,22 @@ describe("TechDevicesView after the page reads again with a form open", () => {
     rerender(<TechDevicesView live={live({ device: shown({ jobId: null }) })} />);
     fireEvent.click(button("Start update"));
     expect(updateFirmware).not.toHaveBeenCalled();
-    expect(screen.getAllByText(READ_ONLY)).toHaveLength(2);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByRole("alert").textContent).toMatch(READ_ONLY);
+  });
+  it("a firmware version no longer offered (an update finished) must be chosen again", () => {
+    const { rerender } = render(<TechDevicesView live={live()} />);
+    fireEvent.click(button(/Update firmware/));
+    rerender(<TechDevicesView live={live({ device: shown({ firmware: ["1.3.0"] }) })} />);
+    fireEvent.click(button("Start update"));
+    expect(updateFirmware).not.toHaveBeenCalled();
+    expect(within(dialog()).getByText("Choose a version")).toBeDefined();
   });
   it("a sensor the device no longer has (a rebind issues new IDs) must be chosen again", () => {
     const { rerender } = render(<TechDevicesView live={live()} />);
     fireEvent.click(button(/Calibrate sensor/));
+    fireEvent.change(screen.getByRole("textbox", { name: /^Reference value/ }), { target: { value: "1" } });
+    fireEvent.change(screen.getByRole("textbox", { name: /^Measured value/ }), { target: { value: "2" } });
     rerender(<TechDevicesView live={live({ device: shown({ detail: detail({ sensors: [{ id: "sen-9", metric: "temperature", unit: "°C", staleAfterSeconds: 300, calibratedAt: null }] }) }) })} />);
     fireEvent.click(button("Record calibration"));
     expect(screen.getByText("Choose a sensor")).toBeDefined();
@@ -297,7 +308,8 @@ describe("TechDevicesView register", () => {
     rerender(<TechDevicesView live={live({ register: [] })} />);
     expect(select(/^Planned unit/).textContent).toBe("No unit without a device");
     fireEvent.click(button("Register"));
-    expect(screen.getByText("Choose a unit")).toBeDefined();
+    expect(within(dialog()).getByText("Choose a unit")).toBeDefined();
+    expect(within(dialog()).getByText("Choose the job")).toBeDefined();
     expect(registerDevice).not.toHaveBeenCalled();
   });
   it("a serial already registered is refused in words and the form stays open", async () => {
@@ -370,7 +382,7 @@ describe("TechDevicesView events", () => {
     await waitFor(() => { expect(store.toasts).toStrictEqual(["Response note added — the device state is unchanged"]); });
     expect(addResponseNote).toHaveBeenCalledWith("dev-11111111aaaa", "evt-2", 5, "Power restored");
     fireEvent.click(button("Acknowledge tamper alert alr-1234"));
-    await waitFor(() => { expect(store.toasts).toHaveLength(2); });
+    await waitFor(() => { expect(store.toasts.at(1)).toBe("Alert acknowledged — the tamper state stays until the device reports it clear"); });
     expect(acknowledgeAlert).toHaveBeenCalledWith("alr-12345678abcd", 3);
   });
   it("a note longer than 1000 characters is refused", () => {

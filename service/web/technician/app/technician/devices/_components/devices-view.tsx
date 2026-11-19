@@ -109,6 +109,8 @@ export function TechDevicesView({ live }: Readonly<{ live: TechDevicesLive }>) {
   const firmware = () => {
     const jobId = dv?.jobId;
     if (!dv || !jobId) { jobEnded(); return; }
+    // the version must still be offered: after a refresh (an update finished) the list may no longer hold it
+    if (!dv.firmware.includes(fw)) { setErrors({ firmwareVersion: t("Choose a version") }); return; }
     run(() => updateFirmware(dv.detail.id, dv.detail.version, fw, jobId), t("Firmware update to {version} requested", { version: fw }), closeRefused, failed);
   };
   const saveNote = () => {
