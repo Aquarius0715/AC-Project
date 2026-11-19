@@ -63,7 +63,7 @@ test("the contractor screens in Malay keep Kuala Lumpur days and show instants i
   await expect(main.getByRole("region", { name: "Menunggu pengesahan HQ" })).toBeVisible(); // a KPI
   await page.goto("/partner/history");
   await expect(main.getByRole("heading", { name: /^Kerja anda — .+ sahaja · pilih kerja untuk membuka sejarahnya$/ })).toBeVisible();
-  await expect(page.getByRole("tab", { name: /^Semua \(\d+\)$/ })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("tab", { name: /^Semua \d+$/ })).toHaveAttribute("aria-selected", "true");
   await expect(main.getByRole("combobox", { name: "Isih" })).toContainText("Isih: Peristiwa terkini dahulu");
   const history = main.locator("a[href^='/partner/history?jobId=']").first();
   if (await history.count()) {

@@ -28,7 +28,7 @@ test("the technician overview in Malay keeps the timeline in Kuala Lumpur hours"
   await setDisplay(page, MALAY, "Asia/Tokyo");
   await page.goto("/technician");
   const main = page.getByRole("main");
-  await expect(page.getByRole("tab", { name: /^Hari ini \(\d+\)$/ })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("tab", { name: /^Hari ini \d+$/ })).toHaveAttribute("aria-selected", "true");
   await expect(main.getByRole("combobox", { name: "Isih" })).toContainText("Isih: Keterukan, paling teruk dahulu");
   for (const name of ["Hari ini — diisih mengikut keterukan, tarikh akhir, kemajuan", /^Hari ini · /, /^Amaran pada unit saya \(\d+\)$/, "Laporan saya"]) await expect(main.getByRole("heading", { name })).toBeVisible();
   await expect(main).toContainText("Unit yang ditugaskan");
@@ -41,7 +41,7 @@ test("the technician overview in Malay keeps the timeline in Kuala Lumpur hours"
   await expect(qr.getByRole("status")).toContainText("Halaman tidak tersedia");
   await page.keyboard.press("Escape");
   await expect(qr).toBeHidden();
-  await page.getByRole("tab", { name: /^Semua yang ditugaskan \(\d+\)$/ }).click();
+  await page.getByRole("tab", { name: /^Semua yang ditugaskan \d+$/ }).click();
   await page.waitForURL(/tab=all/);
   await expect(main.getByRole("heading", { name: "Semua yang ditugaskan — diisih mengikut keterukan" })).toBeVisible();
   const job = main.locator("a[href^='/technician/jobs/']").first();

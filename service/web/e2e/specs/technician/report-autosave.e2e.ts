@@ -26,10 +26,10 @@ test("the report autosaves once, 20 s after the last edit", async ({ browser }) 
     if (await start.count()) {
       await start.first().click();
       const checkIn = page.getByRole("dialog", { name: "Check in at site" });
-      // the demo location service and the camera scan fill these a moment after the dialog opens: checking in before
-      // that is refused (a fast CI runner did)
-      await expect(checkIn.getByLabel("Distance to the site (m)")).toHaveValue(/\d/);
-      await expect(checkIn.getByLabel("Scanned unit QR")).not.toHaveValue("");
+      // a manual check-in: the location check-in measures the device's GPS fix against the site's map pin (DEC-109,
+      // IR825), and the seed's sites have no pin
+      await checkIn.getByRole("button", { name: "Manual (reason)" }).click();
+      await checkIn.getByRole("textbox", { name: /^Reason/ }).fill("E2E: the seed's site has no map pin");
       await checkIn.getByRole("button", { name: "Check in & start" }).click();
       await expect(page.getByText("Checked in — the job has started").first()).toBeVisible();
     }

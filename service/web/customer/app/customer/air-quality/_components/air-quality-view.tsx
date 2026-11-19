@@ -42,6 +42,15 @@ export function AirQualityView({ live }: Readonly<{ live: AirLive | null }>) {
   const router = useRouter();
   const [view, setView] = useState<"chart" | "table">("chart");
   const [open, setOpen] = useState(false);
+  // each metric press starts from the last choice, not from the page the server last sent: two quick presses (Temp,
+  // then Humidity) built the second URL from the old metrics and lost the first one. A new page from the server resets it.
+  const metrics = live?.metrics ?? [];
+  const [chosen, setChosen] = useState(metrics);
+  const [sent, setSent] = useState(metrics);
+  if (sent !== metrics && live) {
+    setSent(metrics);
+    setChosen(metrics);
+  }
   if (!live) {
     return <Page><EmptyState title={t("No air conditioners yet")} action={<LinkButton href="/customer/properties" size="sm">{t("Units & locations")}</LinkButton>}>{t("Air quality is read from the sensors of your units. Once a unit is registered its readings appear here.")}</EmptyState></Page>;
   }
@@ -59,9 +68,10 @@ export function AirQualityView({ live }: Readonly<{ live: AirLive | null }>) {
   });
   const shown = c.series.filter((l) => l.hasSensor && l.valid);
   // a chip or a card puts its metric in the chart or takes it out; "All" shows the four, or goes back to the first one
-  const press = (metric: AirMetric) => { patch({ metric: toggleAirMetric(live.metrics, metric).join(",") }); };
-  const allOn = airMetrics.every((k) => live.metrics.includes(k));
-  const pressAll = () => { patch({ metric: (allOn ? live.metrics.slice(0, 1) : airMetrics).join(",") }); };
+  const choose = (next: AirMetric[]) => { setChosen(next); patch({ metric: next.join(",") }); };
+  const press = (metric: AirMetric) => { choose(toggleAirMetric(chosen, metric)); };
+  const allOn = airMetrics.every((k) => chosen.includes(k));
+  const pressAll = () => { choose(allOn ? chosen.slice(0, 1) : [...airMetrics]); };
   const groups = airChartGroups(shown);
   const stacked = groups.length > 1;
   return (

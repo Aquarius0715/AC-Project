@@ -1,13 +1,17 @@
 // @vitest-environment jsdom
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { DataTable, type Col } from "@ac/web/components/ui";
 import { must } from "./must";
 
 const BEDROOM_AC = "Bedroom AC";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 
 interface Unit { id: string; name: string; status: string }
 const units: Unit[] = [{ id: "u-1", name: BEDROOM_AC, status: "Online" }, { id: "u-2", name: "Office AC", status: "Offline" }];
@@ -74,5 +78,26 @@ describe("DataTable", () => {
     expect(screen.getByText("Opened 1")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Edit Bedroom AC" })).toBe(edit);
     expect(document.activeElement).toBe(edit);
+  });
+
+  // axe scrollable-region-focusable: a table wider than the screen (Installations at phone width in Malay) scrolls in
+  // its own box, which the keyboard reaches only while it scrolls
+  it("puts the table's scrolling box in the tab order only while the table is wider than it", () => {
+    const observers: (() => void)[] = [];
+    vi.stubGlobal("ResizeObserver", class {
+      observe = vi.fn();
+      unobserve = vi.fn();
+      disconnect = vi.fn();
+      constructor(callback: () => void) { observers.push(callback); }
+    });
+    let tableWidth = 500;
+    vi.spyOn(HTMLElement.prototype, "scrollWidth", "get").mockImplementation(() => tableWidth);
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(300);
+    const { container } = render(<DataTable cols={cols} rows={units} rowKey={(u) => u.id} />);
+    const box = must(container.querySelector<HTMLElement>('[data-slot="table-container"]'));
+    expect(box.getAttribute("tabindex")).toBe("0");
+    tableWidth = 301; // within a pixel of the box: rounding, not a scroll
+    act(() => { for (const resized of observers) resized(); });
+    expect(box.getAttribute("tabindex")).toBeNull();
   });
 });

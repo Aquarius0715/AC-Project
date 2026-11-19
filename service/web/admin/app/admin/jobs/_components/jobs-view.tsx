@@ -50,7 +50,9 @@ export function JobsView({ live }: Readonly<{ live: JobsLive }>) {
   const [creating, setCreating] = useState(!!live.requestDraft); // opened by ?new=<unitId> (an alert's Request maintenance)
   // The job New job just created: its detail opens step 2 (book) or says it was saved as requested.
   const [fresh, setFresh] = useState<Fresh | null>(() => (live.created?.id ? live.created : null));
-  const clearFresh = useCallback(() => { setFresh(null); patch({ created: null }); }, [patch]);
+  // the job stays in the URL: the create action's re-render of the old URL can open the new job (first in the list)
+  // before the dialog's push to ?jobId=…&created=… is on screen, and a patch built from that old URL replaced the push
+  const clearFresh = useCallback((id: string) => { setFresh(null); patch({ created: null, jobId: id }); }, [patch]);
   return (
     <Page className="max-w-[1440px]">
       <JobsTabs tab="jobs" counts={live.counts} q={live.q} action={<Btn variant="primary" size="sm" onClick={() => { setCreating(true); }}><Icon name="add" /> {t("New job")}</Btn>} />
@@ -63,7 +65,7 @@ export function JobsView({ live }: Readonly<{ live: JobsLive }>) {
 interface Fresh { id: string; book: boolean }
 // New job opened from another tab hands the created job over here (browser module state; never set during rendering).
 
-function JobsTab({ live, patch, fresh, onFresh }: Readonly<{ live: JobsLive; patch: (p: Record<string, string | null>) => void; fresh: Fresh | null; onFresh: () => void }>) {
+function JobsTab({ live, patch, fresh, onFresh }: Readonly<{ live: JobsLive; patch: (p: Record<string, string | null>) => void; fresh: Fresh | null; onFresh: (id: string) => void }>) {
   const t = useT();
   const q = live.q;
   const sel = live.detail;
@@ -244,7 +246,7 @@ function CostsCard({ ctx }: Readonly<{ ctx: DetailCtx }>) {
   );
 }
 
-function JobDetail({ d, live, fresh, onFresh }: Readonly<{ d: Detail; live: JobsLive; fresh: Fresh | null; onFresh: () => void }>) {
+function JobDetail({ d, live, fresh, onFresh }: Readonly<{ d: Detail; live: JobsLive; fresh: Fresh | null; onFresh: (id: string) => void }>) {
   const t = useT();
   const j = d.job;
   const now = Date.parse(live.now);
@@ -256,7 +258,7 @@ function JobDetail({ d, live, fresh, onFresh }: Readonly<{ d: Detail; live: Jobs
   const [pending, run] = useAction();
   const [result, setResult] = useState<{ tone: "ok" | "crit" | "warn"; text: string } | null>(() => (fresh && !fresh.book ? { tone: "ok", text: t("Job created as requested — book one of the preferred times or propose another.") } : null));
   useEffect(() => {
-    if (fresh) onFresh();
+    if (fresh) onFresh(fresh.id);
   }, [fresh, onFresh]);
   const failed = (f: ActionFailure) => { setResult({ tone: f.code === "CONFLICT" ? "warn" : "crit", text: hqRefusal(f, t) }); };
   const close = (text?: string) => { setModal(null); if (text) setResult({ tone: "ok", text }); };

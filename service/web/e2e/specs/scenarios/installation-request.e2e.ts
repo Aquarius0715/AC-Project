@@ -39,7 +39,7 @@ test("the owner asks for an installation and HQ declines it with a reason", asyn
     await expect(dialog).toContainText("A whole number of 1–10");
     await expect(dialog.getByLabel("Number of units (1–10)")).toBeFocused();
     await dialog.getByLabel("Number of units (1–10)").fill("2");
-    await dialog.getByLabel("Install an IoT device with each unit").check();
+    await dialog.getByRole("checkbox", { name: "Install an IoT device with each unit" }).check();
     await dialog.getByLabel("Note (optional)").fill(note);
     await dialog.getByRole("button", { name: "Send request" }).click();
     await expect(customer.getByText(/^Request \S+ sent — HQ will decide/).first()).toBeVisible();

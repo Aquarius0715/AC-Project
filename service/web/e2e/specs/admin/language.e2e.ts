@@ -243,7 +243,11 @@ test("the HQ overview in Malay keeps the period in Kuala Lumpur days", async ({ 
   // and the new-membership checks, which stop before any call
   await page.goto("/admin/settings/access");
   for (const name of ["Semua peranan", "Pentadbir", "Kontraktor", "Juruteknik"]) await expect(main.getByRole("button", { name, exact: true }).first()).toBeVisible();
-  await expect(main.getByRole("heading", { name: "Keahlian", exact: true })).toBeVisible();
+  // "Membership" (the chosen one's card) and "Memberships" (the list) are both "Keahlian" in Malay
+  await expect(main.getByRole("heading", { name: "Keahlian", exact: true }).first()).toBeVisible();
+  // no membership is open until one is chosen: open HQ's own
+  await main.getByRole("button", { name: /^hq-operator / }).click();
+  await page.waitForURL(/membershipId=/);
   await expect(main).toContainText(/GMT\+9 → /); // the valid period in the display zone
   await expect(main).toContainText("Masa dalam Asia/Tokyo");
   await expect(main.getByRole("columnheader", { name: "Baca" })).toBeVisible();
@@ -258,7 +262,9 @@ test("the HQ overview in Malay keeps the period in Kuala Lumpur days", async ({ 
   await expect(main.getByRole("heading", { name: "Polisi automasi HQ", exact: true })).toBeVisible();
   await main.getByRole("button", { name: "Polisi baharu" }).click();
   await page.waitForURL(/policyId=new/);
-  for (const name of ["Penghunian", "Tarif", "Puncak", "Solar", "Bateri"]) await expect(main.getByRole("button", { name, exact: true })).toBeVisible();
+  // Occupancy carries its "coming soon" badge in its name
+  await expect(main.getByRole("button", { name: "Penghunian Akan datang", exact: true })).toBeDisabled();
+  for (const name of ["Tarif", "Puncak", "Solar", "Bateri"]) await expect(main.getByRole("button", { name, exact: true })).toBeVisible();
   await expect(main).toContainText("Apabila tarif elektrik > 0.6 MYR/kWh → tetapkan suhu kepada 26 °C.");
   await expect(main.getByRole("heading", { name: "Cara konflik diselesaikan", exact: true })).toBeVisible();
   await main.getByRole("button", { name: "Cipta polisi" }).click();

@@ -10,5 +10,5 @@ const shared = `${import.meta.dirname.replace(/\/$/, "")}/../shared`;
 export default defineConfig({
   plugins: [react()],
   resolve: { alias: { "@ac/web": shared } },
-  test: { environment: "node", include: ["tests/**/*.test.{ts,tsx}"] },
+  test: { environment: "node", include: ["tests/**/*.test.{ts,tsx}"], setupFiles: [`${shared}/lib/tests/setup-dom.ts`] },
 });
