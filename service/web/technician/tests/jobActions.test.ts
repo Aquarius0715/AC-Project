@@ -86,7 +86,7 @@ describe("checkIn", () => {
 
   it("checks in manually with the reason, drops a malformed fix and looks no label up", async () => {
     dal.coreOp.mockResolvedValue(null);
-    const malformed = { latitude: "3.1", longitude: 101.6, accuracyMeters: 12 } as unknown;
+    const malformed = { latitude: "3.1", longitude: 101.6, accuracyMeters: 12 };
     // @ts-expect-error -- a Server Action's argument comes from the network: a malformed fix must not reach the Core API
     await checkIn("job-1", 4, "manual", malformed, "QR-ABC", "Label torn off");
     await checkIn("job-1", 4, "location_qr", null, null, "Label torn off");
@@ -125,6 +125,14 @@ describe("saveDraft", () => {
     ]);
     expect(cache.refresh).not.toHaveBeenCalled();
   });
+
+  it("returns a refused save as its failure and an unreachable Core API as unavailable, without refreshing", async () => {
+    dal.coreOp.mockRejectedValueOnce(refusal("CONFLICT")).mockRejectedValueOnce(new TypeError("fetch failed"));
+    const body = draftInput("job-1", "report-1", draftFrom(null, []));
+    await expect(saveDraft(body, 4)).resolves.toStrictEqual(conflict);
+    await expect(saveDraft(body, 4)).resolves.toStrictEqual({ ok: false, code: "UNAVAILABLE", messageKey: "error.unavailable", fieldErrors: {} });
+    expect(cache.refresh).not.toHaveBeenCalled();
+  });
 });
 
 describe("signOff", () => {
@@ -157,5 +165,11 @@ describe("signOff", () => {
       ok: false, code: "VALIDATION", messageKey: "error.validation", fieldErrors: { sitePhoto: "error.invalid" }, retryAfterSeconds: null,
     });
     expect(dal.coreOp).not.toHaveBeenCalled();
+  });
+
+  it("returns a sign-off refused at a stale draft version as its failure, without refreshing", async () => {
+    dal.coreOp.mockRejectedValueOnce(refusal("CONFLICT"));
+    await expect(signOff(form({ signature: png.toBase64(), signerName: "Aisha" }))).resolves.toStrictEqual(conflict);
+    expect(cache.refresh).not.toHaveBeenCalled();
   });
 });
