@@ -65,7 +65,8 @@ describe("EquipmentCard", () => {
   });
 
   it("is read-only when the workspace is not editable", () => {
-    render(<Harness isEditable={false} start={{ ...base, installation: { confirmed: true, serial: "SN-1" } }} />);
+    render(<Harness isEditable={false} start={{ ...base, installation: { confirmed: true, serial: "SN-1" } }} photos={[{ id: "p1", status: "ready", tag: "name_plate" }]} />);
+    expect(row("Name plate").getByText("Added")).toBeTruthy();
     expect(box().getAttribute("aria-disabled")).toBe("true");
     expect(box().getAttribute("aria-checked")).toBe("true");
     expect(serial().readOnly).toBe(true);
@@ -81,18 +82,24 @@ describe("EquipmentCard", () => {
     expect(row("Indoor unit").getByText("Missing")).toBeTruthy();
     expect(row("Indoor unit").getByText("Add photo")).toBeTruthy();
     expect(row("Outdoor unit").getByText("Missing")).toBeTruthy();
+    // nothing is being sent: the controls are not dimmed
+    expect(row("Indoor unit").getByText("Add photo").classList.contains("pointer-events-none")).toBe(false);
   });
 
   it("hands the chosen file to addPhoto with its tag and clears the input", () => {
     render(<Harness />);
     const input = screen.getByLabelText<HTMLInputElement>("Photo of the outdoor unit");
     const file = new File(["x"], "plate.png", { type: "image/png" });
+    // jsdom's file input reports "" whatever is set, so the reset is seen through a setter of the node's own
+    const cleared = vi.fn<(v: string) => void>();
+    Object.defineProperty(input, "value", { configurable: true, get: () => "", set: cleared });
     fireEvent.change(input, { target: { files: [file] } });
     expect(addPhoto).toHaveBeenCalledOnce();
     const [files, tag] = addPhoto.mock.calls[0] ?? [null, null];
     expect(tag).toBe("outdoor_unit");
     expect(files?.[0]).toBe(file);
-    expect(input.value).toBe("");
+    // cleared, so choosing the same file again fires a change
+    expect(cleared).toHaveBeenCalledWith("");
   });
 
   it("dims the upload controls while a photo is being sent", () => {
