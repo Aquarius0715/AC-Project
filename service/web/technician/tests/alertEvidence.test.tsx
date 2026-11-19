@@ -175,13 +175,28 @@ describe("AlertEvidenceView", () => {
     expect(screen.queryByText("Automatic resolution needs a remeasurement")).toBeNull();
   });
 
-  it("switches to another alert through the URL, clearing the message", () => {
+  it("refuses more than 20 evidence records without calling the API", () => {
+    const many = Array.from({ length: 21 }, (_, n): EvidenceRow => ({ id: `ev-${String(n)}`, kind: "remeasurement", title: `Remeasurement ${String(n)}`, sub: "measured · valid" }));
+    render(<AlertEvidenceView live={live({ evidence: many })} />);
+    const boxes = screen.getAllByRole("checkbox", { name: /Remeasurement/ });
+    expect(boxes).toHaveLength(21);
+    for (const box of boxes) fireEvent.click(box);
+    typeReason("Fixed");
+    fireEvent.click(button("Resolve alert"));
+    expect(screen.getByText("Pick at most 20 evidence records")).toBeDefined();
+    expect(resolveAlert).not.toHaveBeenCalled();
+  });
+
+  it("switches to another alert through the URL, clearing the message and the picked evidence", () => {
     render(<AlertEvidenceView live={live()} />);
+    fireEvent.click(screen.getByRole("checkbox", { name: /Remeasurement/ }));
+    expect(screen.getByRole("checkbox", { name: /Remeasurement/ }).getAttribute("aria-checked")).toBe("true");
     fireEvent.click(button("Resolve alert"));
     expect(screen.getByText("A resolution reason is required (1–1000 characters).")).toBeDefined();
     fireEvent.click(button(/Sensor offline/));
     expect(screen.queryByText("A resolution reason is required (1–1000 characters).")).toBeNull();
     expect(store.replace).toHaveBeenCalledWith("/technician/units/unit-1/alerts?alertId=alert-2", { scroll: false });
+    expect(screen.getByRole("checkbox", { name: /Remeasurement/ }).getAttribute("aria-checked")).toBe("false");
   });
 });
 
