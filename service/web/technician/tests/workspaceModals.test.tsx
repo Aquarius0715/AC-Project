@@ -199,8 +199,9 @@ describe("WorkspaceView Add part and Refrigerant", () => {
     expect(within(dialog).getByText("The cylinder ID is required")).toBeDefined();
     expect(within(dialog).getByText("Kilograms, 0 or more")).toBeDefined(); // the emptied amount, not 0 kg
     await focused("refrigerant-cylinder");
+    expect(within(dialog).getByLabelText(/^Recovered \(kg\)Kilograms, 0 or more/)).toBeDefined(); // the error is under the emptied field (IR573: part of its label)
+    expect(screen.queryByText(/^Refrigerant \(R32\) — cylinder/)).toBeNull(); // nothing was added
     fireEvent.change(within(dialog).getByPlaceholderText("CYL-R32-0182"), { target: { value: " CYL-9 " } });
-    // an error is part of its field's label (IR573)
     fireEvent.change(within(dialog).getByLabelText(/^Recovered \(kg\)/), { target: { value: "1.5" } });
     fireEvent.change(within(dialog).getByLabelText(/^Charged \(kg\)/), { target: { value: "0.25" } });
     expect(within(dialog).queryByText("Kilograms, 0 or more")).toBeNull();
@@ -232,6 +233,7 @@ describe("WorkspaceView Add part and Refrigerant", () => {
 describe("WorkspaceView checklist", () => {
   it("asks a reason for a result other than normal; Submit report lists the issues, opens the item's tab and focuses it", async () => {
     render(<WorkspaceView live={inWork()} />);
+    fireEvent.click(screen.getByRole("tab", { name: /^Indoor/ })); // the open tab outlives a view of the same job (IR625)
     const filter = screen.getByRole<HTMLSelectElement>("combobox", { name: "Result of Filter" });
     expect(filter.value).toBe(""); // never preselected
     fireEvent.change(filter, { target: { value: "attention" } });
