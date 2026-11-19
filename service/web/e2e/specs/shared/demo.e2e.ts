@@ -56,6 +56,10 @@ test("Expire session asks to sign in again", async ({ browser, app }) => {
   await page.getByRole("button", { name: /Expire session/ }).click();
   await expect(page).toHaveURL(/\/login\?error=expired$/);
   await expect(page.locator('[role="alert"]:not(#__next-route-announcer__)')).toContainText("Your session ended"); // the banner, not Next.js's route announcer
+  // the next page asks for a sign-in again. Since IR790 /login goes straight to the identity provider, whose own
+  // session is still on, so it lets the person back in without the form: the app's session was what expired
+  const asked = page.waitForRequest((r) => r.isNavigationRequest() && r.url().includes("/login?returnTo="));
   await page.goto(app.home);
-  await expect(page).toHaveURL(/\/login\?returnTo=/);
+  await asked;
+  await expect(page).toHaveURL(new RegExp(`${app.home}$`));
 });

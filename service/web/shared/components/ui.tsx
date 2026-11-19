@@ -23,7 +23,7 @@ import { NativeSelect } from "@ac/web/components/ui/native-select";
 import { Progress } from "@ac/web/components/ui/progress";
 import { Switch } from "@ac/web/components/ui/switch";
 import { DateTimeSelect, TimeSelect } from "@ac/web/components/TimeSelect";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@ac/web/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, useOverflows } from "@ac/web/components/ui/table";
 import { Tabs as UITabs, TabsList, TabsTrigger } from "@ac/web/components/ui/tabs";
 import { Toaster } from "@ac/web/components/ui/sonner";
 import { Textarea as UITextarea } from "@ac/web/components/ui/textarea";
@@ -173,19 +173,7 @@ export function PageHead({ title, sub, action }: Readonly<{ title: React.ReactNo
 it can take the focus, so a keyboard can scroll it (WCAG 2.1.1, axe scrollable-region-focusable); with a label it is a
 named region. On a wide screen nothing overflows and it adds no tab stop. */
 export function ScrollX({ label, className, children }: Readonly<{ label?: string; className?: string; children: React.ReactNode }>) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [overflows, setOverflows] = useState(false);
-  useEffect(() => {
-    const el = ref.current;
-    const check = () => { if (el) setOverflows(el.scrollWidth > el.clientWidth + 1); };
-    const observer = new ResizeObserver(check);
-    if (el) {
-      check();
-      observer.observe(el);
-      for (const child of el.children) observer.observe(child);
-    }
-    return () => { observer.disconnect(); };
-  }, []);
+  const [ref, overflows] = useOverflows<HTMLDivElement>();
   // relative: an absolutely positioned descendant (a visually hidden column header) is clipped with the table instead
   // of widening the page (IR501)
   return <div ref={ref} className={cx("scroll-x relative", className)} tabIndex={overflows ? 0 : undefined} role={label ? "region" : undefined} aria-label={label}>{children}</div>;

@@ -3,7 +3,8 @@
 // finally block in a timed-out test only runs once the page is gone (R256 left a user in Malay that way).
 import { expect, type Page } from "@playwright/test";
 
-export const ENGLISH = /English|Inggeris|英語/;
+// the English choice as each language names it: "Bahasa Inggeris" (ms), "Bahasa Inggris" (id), "英語" (ja)
+export const ENGLISH = /English|Inggeris|Inggris|英語/;
 export const MALAY = /^Bahasa Melayu$/;
 export const JAPANESE = /^日本語$/;
 export const INDONESIAN = /^Bahasa Indonesia$/;
