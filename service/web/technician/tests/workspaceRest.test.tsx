@@ -20,7 +20,7 @@ vi.mock("@ac/web/lib/useAction", () => ({
   }],
 }));
 
-import { checkIn, saveDraft, signOff } from "../app/technician/jobs/[id]/actions";
+import { acknowledge, checkIn, saveDraft, signOff } from "../app/technician/jobs/[id]/actions";
 import { WorkspaceView, type WorkspaceLive } from "../app/technician/jobs/[id]/_components/workspace-view";
 
 const report = (over: Partial<ApiTechReport> = {}): ApiTechReport => ({
@@ -53,7 +53,7 @@ const signAbsent = (dialog: HTMLElement) => {
 
 beforeEach(() => {
   answers.save = { ok: true, value: null }; answers.sign = { ok: true, value: null };
-  for (const fn of [saveDraft, signOff, checkIn]) vi.mocked(fn).mockClear();
+  for (const fn of [saveDraft, signOff, checkIn, acknowledge]) vi.mocked(fn).mockClear();
 });
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 
@@ -109,6 +109,7 @@ describe("WorkspaceView parts and check-in", () => {
     };
     render(<WorkspaceView live={live("job-cant", {}, { status: "assigned", timeOnSite: null, draftReportRef: null, assignment: { scheduledStart: "2026-11-18T02:00:00Z", scheduledEnd: "2026-11-18T08:00:00Z", status: "pending", acknowledgement: "pending", cantMakeReason: null } })} />);
     await closes(() => { fireEvent.click(button("Can’t make this time…")); });
+    expect(acknowledge).not.toHaveBeenCalled();
     cleanup();
     render(<WorkspaceView live={live("job-cancel")} />);
     fireEvent.click(button("(see Parts & refrigerant)")); // the work report's link opens the Parts tab
@@ -201,9 +202,13 @@ describe("WorkspaceView timers", () => {
     expect(saveDraft).toHaveBeenCalledOnce();
   });
 
-  it("does not autosave a read-only report", () => {
+  it("does not autosave an edit once the work window has ended", () => {
     vi.useFakeTimers();
-    render(<WorkspaceView live={live("job-autosave-ro", {}, { status: "submitted", draftReportRef: null })} />);
+    render(<WorkspaceView live={live("job-autosave-ended", {}, {}, "2026-11-18T07:59:35Z")} />); // 25 s before the end
+    act(() => { vi.advanceTimersByTime(15_000); });
+    fireEvent.change(workText(), { target: { value: "Cleaned the filters and the coil" } }); // its autosave would run 20 s later
+    act(() => { vi.advanceTimersByTime(15_000); }); // the clock passes the end first
+    expect(screen.getByText(/^The work window ended/)).toBeDefined();
     act(() => { vi.advanceTimersByTime(60_000); });
     expect(saveDraft).not.toHaveBeenCalled();
   });
