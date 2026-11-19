@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 
 const patch = vi.fn<(p: Record<string, string | null>) => void>();
@@ -155,6 +155,38 @@ describe("TechUnitView", () => {
     render(<TechUnitView live={live({ tab: "monitoring" })} />);
     fireEvent.click(screen.getByRole("button", { name: "Humidity" }));
     expect(patch).toHaveBeenLastCalledWith({ metric: "temperature,humidity" });
+  });
+});
+
+// jsdom lays nothing out: give the chart's box a size, as a browser would, so that Recharts draws
+const box = (width: number, height: number) => ({ width, height, top: 0, left: 0, right: width, bottom: height, x: 0, y: 0, toJSON: () => ({}) });
+// Recharts' keyboard layer moves the tooltip to the second point
+const hover = (layer: HTMLElement) => { fireEvent.focus(layer); fireEvent.keyDown(layer, { key: "ArrowRight" }); };
+
+// IR44 in the tooltips: the main chart and a metric's own card round each value by its metric, not as received
+describe("TechUnitView chart tooltips", () => {
+  beforeAll(() => {
+    vi.stubGlobal("ResizeObserver", class { observe = vi.fn(); unobserve = vi.fn(); disconnect = vi.fn(); });
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+      return this.classList.contains("recharts-responsive-container") ? box(600, 200) : box(0, 0);
+    });
+  });
+  afterAll(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+
+  it("rounds the chart's temperature and a card's humidity to one decimal", () => {
+    render(<TechUnitView live={live({
+      tab: "monitoring",
+      chart: { title: "Temperature · 24 h", labels: [], times: ["a", "b", "c"], lines: [line("temperature", { points: [24.56, 25.04, 26] })] },
+      others: [{ metric: "humidity", label: "Humidity", unit: "%RH", value: "60 %RH", sub: "observed 09:41", points: [55.55, 60.04], cut: false }],
+    })} />);
+    const [main, card] = screen.getAllByRole("application", { name: "Line chart" });
+    if (!main || !card) throw new TypeError("both charts should be drawn");
+    hover(main);
+    expect(document.body.textContent).toContain("25.0 °C");
+    expect(document.body.textContent).not.toContain("25.04");
+    hover(card);
+    expect(document.body.textContent).toContain("60.0 %RH");
+    expect(document.body.textContent).not.toContain("60.04");
   });
 });
 

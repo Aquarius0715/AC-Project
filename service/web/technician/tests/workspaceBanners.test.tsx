@@ -192,4 +192,9 @@ describe("WorkspaceView Job & unit card", () => {
     expect(screen.getByRole("link", { name: /^Diagnostics/ }).getAttribute("href")).toBe("/technician/units/unit-12345678/control?jobId=job-1");
     expect(screen.getByRole("link", { name: /^Alert evidence/ }).getAttribute("href")).toBe("/technician/units/unit-12345678/alerts?jobId=job-1");
   });
+
+  it("names one linked alert in the singular", () => {
+    render(<WorkspaceView live={live({ alertCount: 1 })} />);
+    expect(screen.getByRole("link", { name: /^1 alert$/ }).getAttribute("href")).toBe("/technician/units/unit-12345678/alerts?jobId=job-1");
+  });
 });

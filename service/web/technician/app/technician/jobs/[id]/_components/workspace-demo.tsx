@@ -40,7 +40,8 @@ function LiveAssignment({ j }: Readonly<{ j: Job }>) {
   const [alt, setAlt] = useState("Fri 10-02 14:00–16:00");
   const [tried, setTried] = useState(false);
   const ack = j.techAck?.status ?? "pending";
-  const coord = j.delivery === "contractor" ? j.contractor : "HQ";
+  // the contractor coordinates its own jobs; HQ does the others, and a contractor job no contractor has taken yet
+  const coord = j.delivery === "contractor" && j.contractor ? j.contractor : "HQ";
   return (
     <Page>
       <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground"><Link href="/technician" className="font-semibold text-primary"><Icon name="arrowLeft" /> Overview</Link><b className="text-ink">{j.id} · {j.unit} — {ack === "pending" ? "new assignment" : "assigned"}</b></div>
@@ -52,14 +53,14 @@ function LiveAssignment({ j }: Readonly<{ j: Job }>) {
           <Card title="Job & unit" action={<Link className="text-xs font-semibold text-primary" href={`/technician/units/${j.unitId}`}>Unit <Icon name="arrowRight" /></Link>}><SummaryList items={[["Window", j.scheduled ? longDate(j.scheduled) : "—"], ["Site", `${j.customer} · ${j.loc}`], ["Access", "Security desk · show job ID"], ["Unit", `${j.unitId} · Split 2.5 kW`], ["Request", `“${j.symptom}”`]]} /></Card>
         </div>
         <Card title={ack === "pending" ? "New assignment — please accept" : "Job — assigned to you"} className="self-start">
-          <SummaryList items={[["Job", `${j.type} · ${j.customer} · ${j.unitId}`], ["Origin", <OriginBadge key="o" origin={j.origin} />], ["Visit time", <b key="v">{j.scheduled ? longDate(j.scheduled) : "—"}</b>], ["Assigned by", coord ?? "HQ"], ["Agreed with", j.origin === "plan" ? "periodic plan (client notified)" : "the client (via HQ)"]]} />
-          <div className="mt-3"><Banner>Accepting tells {coord} and HQ that you will attend at this time. The client then sees your name.</Banner></div>
+          <SummaryList items={[["Job", `${j.type} · ${j.customer} · ${j.unitId}`], ["Origin", <OriginBadge key="o" origin={j.origin} />], ["Visit time", <b key="v">{j.scheduled ? longDate(j.scheduled) : "—"}</b>], ["Assigned by", coord], ["Agreed with", j.origin === "plan" ? "periodic plan (client notified)" : "the client (via HQ)"]]} />
+          <div className="mt-3"><Banner>Accepting tells {coord === "HQ" ? "HQ" : `${coord} and HQ`} that you will attend at this time. The client then sees your name.</Banner></div>
           {ack === "pending" && <div className="mt-3 flex flex-col gap-2"><Btn variant="primary" onClick={() => { jobActions.techAccept(j.id); toast("Assignment accepted"); }}><Icon name="check" />Accept assignment</Btn><Btn variant="danger" onClick={() => { setCant(true); }}>Can’t make this time…</Btn></div>}
           {ack === "accepted" && <div className="mt-3"><Btn variant="primary" disabled className="w-full">Start job (opens check-in)</Btn></div>}
         </Card>
       </div>
       <Modal open={cant} onClose={() => { setCant(false); }} title="Can’t make this time" footer={<><Btn onClick={() => { setCant(false); }}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!comment.trim()) { return; }
-    jobActions.techCantMake(j.id, `${reasonLabel[reason]} · ${comment.trim()}`, alt); setCant(false); toast(`Sent to ${coord ?? "—"}`, "warn"); }}>Send to {coord}</Btn></>}>
+    jobActions.techCantMake(j.id, `${reasonLabel[reason]} · ${comment.trim()}`, alt); setCant(false); toast(`Sent to ${coord}`, "warn"); }}>Send to {coord}</Btn></>}>
         <p className="text-xs text-muted-foreground">{j.id} · {fmt(j.scheduled)} · assigned by {coord}</p>
         <Field label="Reason"><Choice value={reason} onChange={setReason} options={reasonIds.map((id) => ({ id, label: reasonLabel[id] }))} /></Field>
         <Field label="Comment (required)" error={tried && !comment.trim() ? "Tell your coordinator why" : undefined}><Input value={comment} onChange={(e) => { setComment(e.target.value); }} placeholder="Medical appointment on 10-01 morning." /></Field>
