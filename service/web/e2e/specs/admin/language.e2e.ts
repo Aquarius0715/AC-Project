@@ -262,7 +262,9 @@ test("the HQ overview in Malay keeps the period in Kuala Lumpur days", async ({ 
   await expect(main.getByRole("heading", { name: "Polisi automasi HQ", exact: true })).toBeVisible();
   await main.getByRole("button", { name: "Polisi baharu" }).click();
   await page.waitForURL(/policyId=new/);
-  for (const name of ["Penghunian", "Tarif", "Puncak", "Solar", "Bateri"]) await expect(main.getByRole("button", { name, exact: true })).toBeVisible();
+  // Occupancy carries its "coming soon" badge in its name
+  await expect(main.getByRole("button", { name: "Penghunian Akan datang", exact: true })).toBeDisabled();
+  for (const name of ["Tarif", "Puncak", "Solar", "Bateri"]) await expect(main.getByRole("button", { name, exact: true })).toBeVisible();
   await expect(main).toContainText("Apabila tarif elektrik > 0.6 MYR/kWh → tetapkan suhu kepada 26 °C.");
   await expect(main.getByRole("heading", { name: "Cara konflik diselesaikan", exact: true })).toBeVisible();
   await main.getByRole("button", { name: "Cipta polisi" }).click();
