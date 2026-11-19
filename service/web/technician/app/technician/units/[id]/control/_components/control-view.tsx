@@ -8,7 +8,7 @@ import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { focusField } from "@ac/web/lib/focusField";
 import { actionOf } from "@ac/web/lib/clientAutomations";
-import { actionCode, actionWord, fieldText, offeredKey, refusal } from "@ac/web/lib/techControl";
+import { actionCode, actionWord, fieldText, offeredKey, refusal, type ApiRun } from "@ac/web/lib/techControl";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import { sendDiagnostic, startTestRun } from "../actions";
 import type { ControlLive } from "../_lib/load";
@@ -86,9 +86,8 @@ export function ControlView({ live }: Readonly<{ live: ControlLive }>) {
   const latest = live.history.find((h) => !h.run); // this card's own last command
   // the end of a run that got no answer can be sent again as a diagnostic command of the job (Figma Technician
   // 425:474, IR351): the run stays end_failed in the history; the new command carries the run's reason
-  const retryEnd = () => {
-    const r = live.run;
-    if (!r) return;
+  const endFailed = live.run?.state === "end_failed" ? live.run : null;
+  const retryEnd = (r: ApiRun) => {
     run(() => sendDiagnostic({ unitId: live.unit.id, jobId: job.id, action: r.endAction, reason: t("End of test run sent again: {reason}", { reason: r.reason }).slice(0, 1000), expectedUnitVersion: live.unit.version }),
       (c) => t("{id} sent — waiting for the device", { id: c.id.slice(0, 8) }), () => { setErrors({}); setRefused(null); }, failed);
   };
@@ -138,7 +137,7 @@ export function ControlView({ live }: Readonly<{ live: ControlLive }>) {
             <div className="mt-3"><Field label={t("End action")}>{select(end, setEnd, t("End action"))}</Field></div>
             <div className="mt-3"><Field label={t("Reason (required)")} error={errors.trReason}><Textarea id={ids.trReason} value={trReason} maxLength={1000} placeholder={t("What the test run should show")} onChange={(e) => { setTrReason(e.target.value); }} /></Field></div>
             {live.banner && <div className="mt-3"><Banner tone={live.banner.tone}><b>{live.banner.title}</b><div className="text-xs">{live.banner.text}</div></Banner></div>}
-            {live.run?.state === "end_failed" && <div className="mt-2"><Btn className="w-full" variant="danger" disabled={pending || live.active || !job.inWindow} onClick={retryEnd}>{t("Retry end command")}</Btn>{!job.inWindow && <p className="mt-1 text-[11px] text-muted-foreground">{t("Retry not available — no authorization")}</p>}</div>}
+            {endFailed && <div className="mt-2"><Btn className="w-full" variant="danger" disabled={pending || live.active || !job.inWindow} onClick={() => { retryEnd(endFailed); }}>{t("Retry end command")}</Btn>{!job.inWindow && <p className="mt-1 text-[11px] text-muted-foreground">{t("Retry not available — no authorization")}</p>}</div>}
             {live.run?.state === "end_blocked" && <p className="mt-2 text-[11px] text-muted-foreground">{t("Retry not available — no authorization")}</p>}
             <div className="mt-3"><Btn className="w-full" disabled={pending || isBusy || options.length === 0} onClick={() => { review("run"); }}>{runLabel()}</Btn></div>
             <p className="mt-2 text-[11px] text-muted-foreground">{t("1–15 minutes only. Reason required. Cannot start during firmware updates or an unfinished command.")}</p>
