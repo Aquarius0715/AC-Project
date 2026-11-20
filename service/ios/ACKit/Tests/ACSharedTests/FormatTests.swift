@@ -26,3 +26,12 @@ import Testing
         }
     }
 }
+
+@Suite struct ContextKeyTests {
+    @Test func aKeysContextIsNotShown() {
+        Localizer.with(.en) {
+            #expect(tr("tamper::Clear") == "Clear")
+            #expect(tr("Clear") == "Clear")
+        }
+    }
+}

@@ -59,7 +59,11 @@ public enum Localizer {
 /// A display text by its English text (the web apps' keys), in the display language, with its `{name}` placeholders
 /// filled. Every text the apps show goes through here, so the generator finds it (codegen/swift-strings.ts).
 public func tr(_ key: String, _ values: [String: String] = [:]) -> String {
-    values.reduce(Localizer.text(key)) { text, value in
+    // a key that names its context before "::" ("tamper::Clear", a state, not the button "Clear") shows its words alone
+    // where no translation replaces it (English), as the web's translator does
+    var text = Localizer.text(key)
+    if text == key, let context = key.range(of: "::") { text = String(key[context.upperBound...]) }
+    return values.reduce(text) { text, value in
         text.replacingOccurrences(of: "{\(value.key)}", with: value.value)
     }
 }
