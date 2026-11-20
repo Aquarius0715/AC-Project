@@ -19,8 +19,13 @@ extension XCUIApplication {
     @MainActor
     private func issues() throws -> [String] {
         var issues: [String] = []
+        let window = windows.firstMatch.frame
         try performAccessibilityAudit { issue in
-            let element = issue.element.map { "\($0.elementType) '\($0.label)' (\($0.identifier))" } ?? "the screen"
+            // an element the screen's edge cuts off is judged by the part that shows: its contrast is checked once it is
+            // scrolled into view
+            if issue.auditType == .contrast, let frame = issue.element?.frame, !window.contains(frame) { return true }
+            // where it is, so a finding names the one of several elements with that label
+            let element = issue.element.map { "\($0.elementType) '\($0.label)' (\($0.identifier)) at \($0.frame.integral)" } ?? "the screen"
             issues.append("\(issue.compactDescription): \(element) — \(issue.detailedDescription)")
             return true  // reported below, all of them at once
         }

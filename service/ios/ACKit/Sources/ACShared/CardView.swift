@@ -32,6 +32,18 @@ extension View {
         }
         .background(Color.groupedBackground)
         .solidNavigationBar()
+        .clearBottomEdge()
+    }
+
+    /// No soft edge at the foot of the screen (iOS 26 blurs what scrolls under the home indicator): a button there kept
+    /// its words below the contrast the accessibility audit asks for.
+    @ViewBuilder
+    private func clearBottomEdge() -> some View {
+        if #available(iOS 26, macOS 26, *) {
+            scrollEdgeEffectHidden(true, for: .bottom)
+        } else {
+            self
+        }
     }
 
     private func solidNavigationBar() -> some View {
