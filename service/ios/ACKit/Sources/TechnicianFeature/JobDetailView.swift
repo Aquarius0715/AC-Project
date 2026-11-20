@@ -70,7 +70,7 @@ struct JobDetailView: View {
             Card { bannerContent(banner) }
         }
         reportCard
-        Card(tr("Job & unit")) { Facts(rows: model.facts) }
+        jobCard(work)
         if let window = model.window {
             Card(tr("Work window")) { Text(verbatim: window.text).accessibilityIdentifier("job.window") }
         }
@@ -90,6 +90,20 @@ struct JobDetailView: View {
                 )
             )
             .font(.footnote)
+        }
+    }
+
+    /// The job and its unit, with the unit's screen.
+    private func jobCard(_ work: JobDetailModel.Work) -> some View {
+        Card(tr("Job & unit")) {
+            Facts(rows: model.facts)
+            NavigationLink {
+                TechUnitView(model: TechUnitModel(unitId: work.job.unitId, jobId: work.job.id, client: model.client))
+            } label: {
+                Label(tr("Unit"), systemImage: "air.conditioner.horizontal")
+            }
+            .secondaryAction()
+            .accessibilityIdentifier("job.unit")
         }
     }
 
