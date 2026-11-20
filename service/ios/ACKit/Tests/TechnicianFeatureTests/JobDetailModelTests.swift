@@ -489,6 +489,42 @@ private struct FixedPosition: PositionSource {
         #expect(model.note == "Work resumed")
     }
 
+    @Test func aReturnedReportSaysHQsReason() async throws {
+        var report = try savedReport()
+        report.reviewHistory = [
+            Review(reviewerUserId: "hq", reportVersion: 1, decision: .return, reason: "Add the coil photo", occurredAt: now)
+        ]
+        let ref = ReportRef(reportId: report.id, reportVersion: 1)
+        let (model, transport) = model([
+            try job {
+                $0.status = .reworkRequested
+                $0.reportRefs = [ref]
+            },
+            try unit, try answer(report),
+        ])
+        await model.load()
+        #expect(
+            model.banners.first?.text
+                == "Returned for rework — “Add the coil photo”. Resume to continue as a new draft version; the returned version stays as it was."
+        )
+        #expect(await transport.requests[2].url?.query() == "reportVersion=1", "the job, its unit, then the returned report")
+    }
+
+    @Test func theReportOpensOnceTheWorkHasStarted() async throws {
+        var (model, _) = try await loaded()
+        #expect(!model.hasReport && model.report() == nil, "before the check-in")
+        (model, _) = try await loaded({ $0.status = .inProgress }, then: [try job { $0.status = .inProgress }, try unit])
+        let report = try #require(model.report())
+        #expect(model.hasReport && report.job.id == model.jobId)
+        await report.jobChanged()
+        #expect(model.work?.job.status == .inProgress, "the job is read again")
+        (model, _) = try await loaded {
+            $0.status = .submitted
+            $0.reportRefs = [ReportRef(reportId: "r1", reportVersion: 1)]
+        }
+        #expect(model.hasReport, "a submitted report is read")
+    }
+
     @Test func returnedWorkIsResumed() async throws {
         let rework = try detail { $0.status = .reworkRequested }
         let (model, transport) = try await loaded({ $0.status = .reworkRequested }, then: [try answer(rework), try job(), try unit])

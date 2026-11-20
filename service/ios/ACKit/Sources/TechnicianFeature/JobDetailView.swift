@@ -69,6 +69,7 @@ struct JobDetailView: View {
         ForEach(Array(model.banners.enumerated()), id: \.offset) { _, banner in
             Card { bannerContent(banner) }
         }
+        reportCard
         Card(tr("Job & unit")) { Facts(rows: model.facts) }
         if let window = model.window {
             Card(tr("Work window")) { Text(verbatim: window.text).accessibilityIdentifier("job.window") }
@@ -89,6 +90,22 @@ struct JobDetailView: View {
                 )
             )
             .font(.footnote)
+        }
+    }
+
+    @ViewBuilder private var reportCard: some View {
+        Card(tr("Work report")) {
+            if let report = model.report() {
+                NavigationLink {
+                    ReportView(model: report)
+                } label: {
+                    Label(tr("Open the work report"), systemImage: "doc.text")
+                }
+                .secondaryAction()
+                .accessibilityIdentifier("job.report")
+            } else {
+                Text(verbatim: tr("The report opens when you check in at the site."))
+            }
         }
     }
 

@@ -99,7 +99,9 @@ export type NextAction = {kind:'none'}|{kind:'follow_up';date:Instant;note:strin
 /** Internal repository provenance; never returned in public WorkReport DTOs. */
 export type ReportRevisionProvenance = {reportId:ID;reportVersion:number;contributorUserIds:ID[]};
 export type ReviewAvailability = {allowed:true;reason:null}|{allowed:false;reason:'permission_denied'|'self_authored'|'not_current'|'not_submitted'};
-export type WorkReport = Entity & {reviewAvailability:ReviewAvailability;jobId:ID;authorId:ID;installation:InstallationCheck|null;items:InspectionItem[];measurements:Measurement[];parts:Part[];refrigerant:RefrigerantRecord[];signOff:SignOff|null;workText:string;nextAction:NextAction|null;attachmentRefs:Attachment[];submittedAt:Instant|null;acceptedAt:Instant|null;reviewHistory:Review[]};
+/** A reading of a work report: a Measurement (origin inspection) with the component it was taken on (IR865). */
+export type ReportMeasurement = Measurement & {componentKey:ComponentKey};
+export type WorkReport = Entity & {reviewAvailability:ReviewAvailability;jobId:ID;authorId:ID;installation:InstallationCheck|null;items:InspectionItem[];measurements:ReportMeasurement[];parts:Part[];refrigerant:RefrigerantRecord[];signOff:SignOff|null;workText:string;nextAction:NextAction|null;attachmentRefs:Attachment[];submittedAt:Instant|null;acceptedAt:Instant|null;reviewHistory:Review[]};
 export type Review = {reviewerUserId:ID;reportVersion:number;decision:'accept'|'return';reason:string|null;occurredAt:Instant};
 export type InstallationCheck = {confirmedModelId:ID;serial:string};
 export type WorkReportDraft = {jobId:ID;reportId?:ID;installation?:InstallationCheck|null;items:InspectionItemInput[];measurements:InspectionMeasurementInput[];parts:Part[];refrigerant:RefrigerantRecord[];workText:string;nextAction:NextAction|null;attachmentIds:ID[]};

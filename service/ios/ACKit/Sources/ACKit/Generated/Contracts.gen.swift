@@ -7162,6 +7162,126 @@ public enum ReportHistorySummaryTrueAcceptance: String, Codable, Sendable, Equat
   case notAccepted = "not_accepted"
 }
 
+public struct ReportMeasurement: Codable, Sendable, Equatable {
+  public var id: String
+  public var tenantId: String
+  public var version: Double
+  public var createdAt: String
+  public var updatedAt: String
+  public var boundaryId: EnergyBoundaryId?
+  public var qualityReason: MeasurementIssue?
+  public var rawUnit: String?
+  public var unitId: String
+  public var sensorId: String
+  public var metric: Metric
+  public var value: Double?
+  public var unit: UnitSymbol
+  public var observedAt: String
+  public var receivedAt: String
+  public var origin: EvidenceCandidateOrigin
+  public var quality: Quality
+  public var sequence: Double
+  public var eventId: String
+  public var componentKey: ComponentKey
+
+  public init(id: String, tenantId: String, version: Double, createdAt: String, updatedAt: String, boundaryId: EnergyBoundaryId?, qualityReason: MeasurementIssue?, rawUnit: String?, unitId: String, sensorId: String, metric: Metric, value: Double?, unit: UnitSymbol, observedAt: String, receivedAt: String, origin: EvidenceCandidateOrigin, quality: Quality, sequence: Double, eventId: String, componentKey: ComponentKey) {
+    self.id = id
+    self.tenantId = tenantId
+    self.version = version
+    self.createdAt = createdAt
+    self.updatedAt = updatedAt
+    self.boundaryId = boundaryId
+    self.qualityReason = qualityReason
+    self.rawUnit = rawUnit
+    self.unitId = unitId
+    self.sensorId = sensorId
+    self.metric = metric
+    self.value = value
+    self.unit = unit
+    self.observedAt = observedAt
+    self.receivedAt = receivedAt
+    self.origin = origin
+    self.quality = quality
+    self.sequence = sequence
+    self.eventId = eventId
+    self.componentKey = componentKey
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case isDemo
+    case id
+    case tenantId
+    case version
+    case createdAt
+    case updatedAt
+    case boundaryId
+    case qualityReason
+    case rawUnit
+    case unitId
+    case sensorId
+    case metric
+    case value
+    case unit
+    case observedAt
+    case receivedAt
+    case origin
+    case quality
+    case sequence
+    case eventId
+    case componentKey
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    try Constant.expect(true, in: c, at: .isDemo)
+    id = try c.decode(String.self, forKey: .id)
+    tenantId = try c.decode(String.self, forKey: .tenantId)
+    version = try c.decode(Double.self, forKey: .version)
+    createdAt = try c.decode(String.self, forKey: .createdAt)
+    updatedAt = try c.decode(String.self, forKey: .updatedAt)
+    boundaryId = try c.decode(EnergyBoundaryId?.self, forKey: .boundaryId)
+    qualityReason = try c.decode(MeasurementIssue?.self, forKey: .qualityReason)
+    rawUnit = try c.decode(String?.self, forKey: .rawUnit)
+    unitId = try c.decode(String.self, forKey: .unitId)
+    sensorId = try c.decode(String.self, forKey: .sensorId)
+    metric = try c.decode(Metric.self, forKey: .metric)
+    value = try c.decode(Double?.self, forKey: .value)
+    unit = try c.decode(UnitSymbol.self, forKey: .unit)
+    observedAt = try c.decode(String.self, forKey: .observedAt)
+    receivedAt = try c.decode(String.self, forKey: .receivedAt)
+    origin = try c.decode(EvidenceCandidateOrigin.self, forKey: .origin)
+    quality = try c.decode(Quality.self, forKey: .quality)
+    sequence = try c.decode(Double.self, forKey: .sequence)
+    eventId = try c.decode(String.self, forKey: .eventId)
+    componentKey = try c.decode(ComponentKey.self, forKey: .componentKey)
+  }
+
+  public func encode(to encoder: any Encoder) throws {
+    var c = encoder.container(keyedBy: CodingKeys.self)
+    try c.encode(true, forKey: .isDemo)
+    try c.encode(id, forKey: .id)
+    try c.encode(tenantId, forKey: .tenantId)
+    try c.encode(version, forKey: .version)
+    try c.encode(createdAt, forKey: .createdAt)
+    try c.encode(updatedAt, forKey: .updatedAt)
+    try c.encode(boundaryId, forKey: .boundaryId)
+    try c.encode(qualityReason, forKey: .qualityReason)
+    try c.encode(rawUnit, forKey: .rawUnit)
+    try c.encode(unitId, forKey: .unitId)
+    try c.encode(sensorId, forKey: .sensorId)
+    try c.encode(metric, forKey: .metric)
+    try c.encode(value, forKey: .value)
+    try c.encode(unit, forKey: .unit)
+    try c.encode(observedAt, forKey: .observedAt)
+    try c.encode(receivedAt, forKey: .receivedAt)
+    try c.encode(origin, forKey: .origin)
+    try c.encode(quality, forKey: .quality)
+    try c.encode(sequence, forKey: .sequence)
+    try c.encode(eventId, forKey: .eventId)
+    try c.encode(componentKey, forKey: .componentKey)
+  }
+}
+
 public struct ReportRef: Codable, Sendable, Equatable {
   public var reportId: String
   public var reportVersion: Double
@@ -9192,7 +9312,7 @@ public struct WorkReport: Codable, Sendable, Equatable {
   public var authorId: String
   public var installation: InstallationCheck?
   public var items: [InspectionItem]
-  public var measurements: [CoreMeasurement]
+  public var measurements: [ReportMeasurement]
   public var parts: [Part]
   public var refrigerant: [RefrigerantRecord]
   public var signOff: SignOff?
@@ -9203,7 +9323,7 @@ public struct WorkReport: Codable, Sendable, Equatable {
   public var acceptedAt: String?
   public var reviewHistory: [Review]
 
-  public init(id: String, tenantId: String, version: Double, createdAt: String, updatedAt: String, reviewAvailability: ReviewAvailability, jobId: String, authorId: String, installation: InstallationCheck?, items: [InspectionItem], measurements: [CoreMeasurement], parts: [Part], refrigerant: [RefrigerantRecord], signOff: SignOff?, workText: String, nextAction: NextAction?, attachmentRefs: [Attachment], submittedAt: String?, acceptedAt: String?, reviewHistory: [Review]) {
+  public init(id: String, tenantId: String, version: Double, createdAt: String, updatedAt: String, reviewAvailability: ReviewAvailability, jobId: String, authorId: String, installation: InstallationCheck?, items: [InspectionItem], measurements: [ReportMeasurement], parts: [Part], refrigerant: [RefrigerantRecord], signOff: SignOff?, workText: String, nextAction: NextAction?, attachmentRefs: [Attachment], submittedAt: String?, acceptedAt: String?, reviewHistory: [Review]) {
     self.id = id
     self.tenantId = tenantId
     self.version = version
@@ -9261,7 +9381,7 @@ public struct WorkReport: Codable, Sendable, Equatable {
     authorId = try c.decode(String.self, forKey: .authorId)
     installation = try c.decode(InstallationCheck?.self, forKey: .installation)
     items = try c.decode([InspectionItem].self, forKey: .items)
-    measurements = try c.decode([CoreMeasurement].self, forKey: .measurements)
+    measurements = try c.decode([ReportMeasurement].self, forKey: .measurements)
     parts = try c.decode([Part].self, forKey: .parts)
     refrigerant = try c.decode([RefrigerantRecord].self, forKey: .refrigerant)
     signOff = try c.decode(SignOff?.self, forKey: .signOff)

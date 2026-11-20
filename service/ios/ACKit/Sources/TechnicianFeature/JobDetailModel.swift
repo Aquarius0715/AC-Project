@@ -23,6 +23,8 @@ public final class JobDetailModel {
         public let unit: UnitDetail?
         public let unitName: String?
         public let now: Date
+        /// HQ's reason for returning the last report, while the job is returned for rework.
+        public var returnReason: String?
     }
 
     /// A line over the job: what the status asks of the technician, with the step it offers.
@@ -80,7 +82,7 @@ public final class JobDetailModel {
             // before the work window units.get refuses, but units.list still names the unit (IR570)
             var name = unit?.displayName
             if name == nil { name = await listedName(job.unitId) }
-            return .work(Work(job: job, unit: unit, unitName: name, now: now))
+            return .work(Work(job: job, unit: unit, unitName: name, now: now, returnReason: await returnReason(job)))
         case let .history(snapshot):
             return .history(snapshot)
         case .offer:
@@ -88,130 +90,16 @@ public final class JobDetailModel {
         }
     }
 
+    /// The reason HQ gave when it returned the last report (an unreadable report gives none).
+    private func returnReason(_ job: JobDetail) async -> String? {
+        guard job.status == .reworkRequested, let ref = job.reportRefs.last else { return nil }
+        let input = ReportsGetInput(jobId: job.id, reportId: ref.reportId, reportVersion: ref.reportVersion)
+        return try? await client.call(Ops.ReportsGet.self, input).data.reviewHistory.last?.reason
+    }
+
     private func listedName(_ unitId: String) async -> String? {
         let query = Query(limit: 1, filters: QueryFilters(unitIds: [unitId]))
         return try? await client.call(Ops.UnitsList.self, query).data.items.first?.displayName
-    }
-
-    // MARK: - What the screen shows
-
-    /// "f0000000 · Living room AC — Assigned": the job's short id, its unit and its status.
-    public var title: String {
-        guard let work else { return tr("Job") }
-        return "\(work.job.id.prefix(8)) · \(work.unitName ?? tr("Unit")) — \(Labels.job(work.job.status))"
-    }
-
-    public var window: WorkWindow? {
-        work.map { JobWords.window($0.job.assignment, now: $0.now) }
-    }
-
-    public var isInWork: Bool { work?.job.status == .inProgress }
-
-    public var isPaused: Bool { work?.job.timeOnSite?.pauses.contains { $0.to == nil } ?? false }
-
-    /// The time on site may be paused and resumed while the job is in progress inside its window.
-    public var canPause: Bool {
-        guard isInWork, let phase = window?.phase else { return false }
-        return phase != .ended && phase != .before
-    }
-
-    /// What the status asks of the technician (the web's banners, top to bottom).
-    public var banners: [Banner] {
-        guard let work, let window else { return [] }
-        let job = work.job
-        let assignment = job.assignment
-        var banners: [Banner] = []
-        switch job.status {
-        case .assigned:
-            switch assignment?.acknowledgement ?? .pending {
-            case .pending:
-                let visit = assignment.map { Format.span($0.scheduledStart, $0.scheduledEnd) } ?? ""
-                let text = tr(
-                    "New assignment for {window}. Accepting tells your coordinator and HQ you will attend; the client then sees your name.",
-                    ["window": visit]
-                )
-                banners.append(Banner(tone: .info, text: text, action: .acknowledge))
-            case .cantMake:
-                let text =
-                    if let reason = assignment?.cantMakeReason {
-                        tr(
-                            "You said you can’t make this time (“{reason}”). Your coordinator reassigns the job or asks the client for another time.",
-                            ["reason": reason]
-                        )
-                    } else {
-                        tr("You said you can’t make this time. Your coordinator reassigns the job or asks the client for another time.")
-                    }
-                banners.append(Banner(tone: .warn, text: text, action: nil))
-            case .accepted:
-                // accepted is the answer of an assignment, so there is one
-                if let assignment {
-                    let canStart = window.phase == .open || window.phase == .ending
-                    banners.append(
-                        Banner(
-                            tone: window.phase == .before ? .info : .ok,
-                            text: JobWords.accepted(window, opens: Format.dateTime(assignment.scheduledStart)),
-                            action: .checkIn(enabled: canStart)
-                        )
-                    )
-                }
-            }
-        case .onHold:
-            let text = tr(
-                "On hold by HQ — saving and submitting are blocked. Your saved draft is kept; continue when HQ resumes the job."
-            )
-            banners.append(Banner(tone: .warn, text: text, action: nil))
-        case .submitted:
-            let version = job.reportRefs.last.map { String(Int($0.reportVersion)) } ?? ""
-            let text = tr("Submitted v{version} — read-only, awaiting quality review.", ["version": version])
-            banners.append(Banner(tone: .ok, text: text, action: nil))
-        case .completed:
-            let text = tr("Accepted — the job is completed and the report is visible to the customer.")
-            banners.append(Banner(tone: .ok, text: text, action: nil))
-        case .reworkRequested:
-            let text = tr(
-                "Returned for rework. Resume to continue as a new draft version; the returned version stays as it was."
-            )
-            banners.append(Banner(tone: .warn, text: text, action: .resumeRework(enabled: window.phase != .ended)))
-        case .requested, .offered, .accepted, .inProgress, .cancelled:
-            break
-        }
-        if job.status == .inProgress, window.phase == .ended {
-            let text = tr(
-                "The work window ended — unsaved input was discarded and the job can no longer be edited. Ask your coordinator."
-            )
-            banners.append(Banner(tone: .critical, text: text, action: nil))
-        }
-        if let notice = window.notice { banners.append(Banner(tone: .warn, text: notice, action: nil)) }
-        return banners
-    }
-
-    /// The job and its unit, as the web's Job & unit card lists them.
-    public var facts: [(String, String)] {
-        guard let work else { return [] }
-        let job = work.job
-        let unit = work.unit
-        let site = unit.map { $0.location.pathLabels.joined(separator: " › ") } ?? tr("opens at the start of your window")
-        let model = unit.map { "\($0.displayName) · \($0.capabilities.manufacturer) \($0.capabilities.model)" }
-        let alerts =
-            switch job.alertIds.count {
-            case 0: tr("none")
-            case 1: tr("1 alert")
-            default: tr("{n} alerts", ["n": String(job.alertIds.count)])
-            }
-        return [
-            (tr("Window"), job.assignment.map { Format.span($0.scheduledStart, $0.scheduledEnd) } ?? "—"),
-            (tr("Site"), site),
-            (tr("Access"), unit?.location.accessInstructions ?? "—"),
-            (tr("Unit"), model ?? work.unitName ?? String(job.unitId.prefix(8))),
-            (tr("Job"), "\(Labels.jobType(job.type)) · \(JobWords.origin(job.origin))"),
-            (tr("Request"), job.symptom.isEmpty ? "—" : "“\(job.symptom)”"),
-            (tr("Linked alerts"), alerts),
-        ]
-    }
-
-    public var timeRows: [(String, String)] {
-        guard let work else { return [] }
-        return JobWords.timeRows(work.job.timeOnSite, now: work.now)
     }
 
     // MARK: - The steps
@@ -344,5 +232,147 @@ public final class JobDetailModel {
         }
         await load()
         return sent
+    }
+}
+
+/// What the screen shows of the job as last read.
+extension JobDetailModel {
+    /// "f0000000 · Living room AC — Assigned": the job's short id, its unit and its status.
+    public var title: String {
+        guard let work else { return tr("Job") }
+        return "\(work.job.id.prefix(8)) · \(work.unitName ?? tr("Unit")) — \(Labels.job(work.job.status))"
+    }
+
+    public var window: WorkWindow? {
+        work.map { JobWords.window($0.job.assignment, now: $0.now) }
+    }
+
+    public var isInWork: Bool { work?.job.status == .inProgress }
+
+    public var isPaused: Bool { work?.job.timeOnSite?.pauses.contains { $0.to == nil } ?? false }
+
+    /// The time on site may be paused and resumed while the job is in progress inside its window.
+    public var canPause: Bool {
+        guard isInWork, let phase = window?.phase else { return false }
+        return phase != .ended && phase != .before
+    }
+
+    /// What the status asks of the technician (the web's banners, top to bottom).
+    public var banners: [Banner] {
+        guard let work, let window else { return [] }
+        let job = work.job
+        let assignment = job.assignment
+        var banners: [Banner] = []
+        switch job.status {
+        case .assigned:
+            switch assignment?.acknowledgement ?? .pending {
+            case .pending:
+                let visit = assignment.map { Format.span($0.scheduledStart, $0.scheduledEnd) } ?? ""
+                let text = tr(
+                    "New assignment for {window}. Accepting tells your coordinator and HQ you will attend; the client then sees your name.",
+                    ["window": visit]
+                )
+                banners.append(Banner(tone: .info, text: text, action: .acknowledge))
+            case .cantMake:
+                let text =
+                    if let reason = assignment?.cantMakeReason {
+                        tr(
+                            "You said you can’t make this time (“{reason}”). Your coordinator reassigns the job or asks the client for another time.",
+                            ["reason": reason]
+                        )
+                    } else {
+                        tr("You said you can’t make this time. Your coordinator reassigns the job or asks the client for another time.")
+                    }
+                banners.append(Banner(tone: .warn, text: text, action: nil))
+            case .accepted:
+                // accepted is the answer of an assignment, so there is one
+                if let assignment {
+                    let canStart = window.phase == .open || window.phase == .ending
+                    banners.append(
+                        Banner(
+                            tone: window.phase == .before ? .info : .ok,
+                            text: JobWords.accepted(window, opens: Format.dateTime(assignment.scheduledStart)),
+                            action: .checkIn(enabled: canStart)
+                        )
+                    )
+                }
+            }
+        case .onHold:
+            let text = tr(
+                "On hold by HQ — saving and submitting are blocked. Your saved draft is kept; continue when HQ resumes the job."
+            )
+            banners.append(Banner(tone: .warn, text: text, action: nil))
+        case .submitted:
+            let version = job.reportRefs.last.map { String(Int($0.reportVersion)) } ?? ""
+            let text = tr("Submitted v{version} — read-only, awaiting quality review.", ["version": version])
+            banners.append(Banner(tone: .ok, text: text, action: nil))
+        case .completed:
+            let text = tr("Accepted — the job is completed and the report is visible to the customer.")
+            banners.append(Banner(tone: .ok, text: text, action: nil))
+        case .reworkRequested:
+            let text =
+                if let reason = work.returnReason {
+                    tr(
+                        "Returned for rework — “{reason}”. Resume to continue as a new draft version; the returned version stays as it was.",
+                        ["reason": reason]
+                    )
+                } else {
+                    tr("Returned for rework. Resume to continue as a new draft version; the returned version stays as it was.")
+                }
+            banners.append(Banner(tone: .warn, text: text, action: .resumeRework(enabled: window.phase != .ended)))
+        case .requested, .offered, .accepted, .inProgress, .cancelled:
+            break
+        }
+        if job.status == .inProgress, window.phase == .ended {
+            let text = tr(
+                "The work window ended — unsaved input was discarded and the job can no longer be edited. Ask your coordinator."
+            )
+            banners.append(Banner(tone: .critical, text: text, action: nil))
+        }
+        if let notice = window.notice { banners.append(Banner(tone: .warn, text: notice, action: nil)) }
+        return banners
+    }
+
+    /// The job and its unit, as the web's Job & unit card lists them.
+    public var facts: [(String, String)] {
+        guard let work else { return [] }
+        let job = work.job
+        let unit = work.unit
+        let site = unit.map { $0.location.pathLabels.joined(separator: " › ") } ?? tr("opens at the start of your window")
+        let model = unit.map { "\($0.displayName) · \($0.capabilities.manufacturer) \($0.capabilities.model)" }
+        let alerts =
+            switch job.alertIds.count {
+            case 0: tr("none")
+            case 1: tr("1 alert")
+            default: tr("{n} alerts", ["n": String(job.alertIds.count)])
+            }
+        return [
+            (tr("Window"), job.assignment.map { Format.span($0.scheduledStart, $0.scheduledEnd) } ?? "—"),
+            (tr("Site"), site),
+            (tr("Access"), unit?.location.accessInstructions ?? "—"),
+            (tr("Unit"), model ?? work.unitName ?? String(job.unitId.prefix(8))),
+            (tr("Job"), "\(Labels.jobType(job.type)) · \(JobWords.origin(job.origin))"),
+            (tr("Request"), job.symptom.isEmpty ? "—" : "“\(job.symptom)”"),
+            (tr("Linked alerts"), alerts),
+        ]
+    }
+
+    /// The work report opens once the work has started: while in progress, and afterwards read-only.
+    public var hasReport: Bool {
+        guard let job = work?.job else { return false }
+        return job.status == .inProgress || job.draftReportRef != nil || !job.reportRefs.isEmpty
+    }
+
+    /// The work report of the job as last read.
+    public func report() -> ReportModel? {
+        guard let work, hasReport else { return nil }
+        return ReportModel(job: work.job, unit: work.unit, now: work.now, canWork: canPause, client: client) { [weak self] in
+            await self?.load()
+        }
+    }
+
+    public var timeRows: [(String, String)] {
+        guard let work else { return [] }
+        return JobWords.timeRows(work.job.timeOnSite, now: work.now)
     }
 }

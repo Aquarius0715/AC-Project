@@ -24,6 +24,16 @@
     "ja": "住宅・事業所にまだ地図ピンがありません — HQ が設定します。",
     "ms": "Belum ada rumah atau pejabat anda yang mempunyai pin peta — HQ menetapkannya."
   },
+  "Open the work report": {
+    "id": "Buka laporan kerja",
+    "ja": "作業報告を開く",
+    "ms": "Buka laporan kerja"
+  },
+  "Take photo": {
+    "id": "Ambil foto",
+    "ja": "写真を撮る",
+    "ms": "Ambil foto"
+  },
   "The sign-in did not complete — try again": {
     "id": "Proses masuk tidak selesai — coba lagi",
     "ja": "サインインが完了しませんでした — もう一度お試しください",

@@ -92,7 +92,7 @@ public enum Evidence {
     }
 
     /// A metric's name (metricLabels.ts metricName).
-    static func metric(_ code: Substring) -> String {
+    public static func metric(_ code: Substring) -> String {
         switch code {
         case "temperature": tr("Temperature")
         case "humidity": tr("Humidity")

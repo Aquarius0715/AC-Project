@@ -7,6 +7,7 @@ import Foundation
 /// pausing change it as the Core API would; a label other than u1's is refused as another unit's.
 final class StubJobs {
     private var job: JobDetail
+    private let reports = StubReports()
     private let at: () -> String
 
     init(now: Date = Date()) {
@@ -80,6 +81,7 @@ final class StubJobs {
     func answer(_ method: String, _ path: String, _ body: Data?) throws -> (Int, Data)? {
         let encoder = JSONEncoder()
         let path = path.removingPercentEncoding ?? path
+        if let answer = try reports.answer(method, path, body, job: &job) { return answer }
         switch (method, path) {
         case ("GET", "/v1/jobs"):
             let page = Page(items: [JobsListResultItem.summary(summary)], nextCursor: nil, total: 1, snapshotVersion: 1)
