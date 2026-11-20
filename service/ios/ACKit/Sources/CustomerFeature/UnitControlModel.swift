@@ -74,8 +74,10 @@ public final class UnitControlModel {
         self.pause = pause
     }
 
-    /// The wait between polls in the app.
-    public static func sleep(_ duration: Duration) async {
+    /// The wait between polls in the app: not the main actor's (the model's), so the poll loop's wait is the plain
+    /// task sleep it is given as (a main-actor function converted to the nonisolated closure crashed the Swift 6.2
+    /// runtime on the CI runner: "freed pointer was not the last allocation").
+    public nonisolated static func sleep(_ duration: Duration) async {
         try? await Task.sleep(for: duration)
     }
 

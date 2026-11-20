@@ -9,7 +9,8 @@ import Testing
 /// The AC control on scripted answers: the real unit of the dev stack (Fixtures/units.get.customer.json) changed per
 /// case, and the refusals and answers that never come.
 @MainActor @Suite struct UnitControlFailureTests {
-    private struct Envelope<Value: Codable>: Codable {
+    /// An answer of the Core API, written by the tests (it is only encoded).
+    private struct Envelope<Value: Encodable>: Encodable {
         let data: Value
         let meta = ["correlationId": "c"]
     }
@@ -24,7 +25,7 @@ import Testing
         return detail
     }
 
-    private func answer(_ value: some Codable) throws -> StubTransport.Answer {
+    private func answer(_ value: some Encodable) throws -> StubTransport.Answer {
         .http(200, try #require(String(bytes: try JSONEncoder().encode(Envelope(data: value)), encoding: .utf8)))
     }
 
