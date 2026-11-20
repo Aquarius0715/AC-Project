@@ -11,8 +11,12 @@ swift test --enable-code-coverage >"$log" 2>&1 || { cat "$log"; exit 1; }
 products=$(swift build --show-bin-path)
 profile="$products/codecov/default.profdata"
 status=0
+# SwiftPM 6.3 and later build one test bundle per test target (each module is measured by its own tests); earlier ones
+# (the CI runner's Xcode 26) build one bundle of all of them, which then measures every module
+combined="$products/ACKitPackageTests.xctest/Contents/MacOS/ACKitPackageTests"
 for module in ACKit ACShared CustomerFeature TechnicianFeature; do
   binary="$products/${module}Tests.xctest/Contents/MacOS/${module}Tests"
+  [ -f "$binary" ] || binary=$combined
   report=$(xcrun llvm-cov report "$binary" -instr-profile "$profile" -ignore-filename-regex='(Generated/|View\.swift|Root\.swift|Debug/)' \
     "$PWD/Sources/$module")
   echo "== $module"
