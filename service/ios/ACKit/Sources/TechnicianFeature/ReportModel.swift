@@ -156,7 +156,9 @@ public final class ReportModel {
         autosave?.cancel()
         autosave = Task { [weak self, pause] in
             await pause(Self.autosaveAfter)
-            guard !Task.isCancelled else { return }
+            // a save since then (by hand, or before a step) took the edit: nothing to save, and a save with no edit
+            // would only make a version, and clear the sign-off
+            guard !Task.isCancelled, self?.isDirty == true else { return }
             await self?.save()
         }
     }
@@ -165,6 +167,7 @@ public final class ReportModel {
     @discardableResult
     public func save() async -> Bool {
         guard isEditable, !isSending else { return false }
+        autosave?.cancel()
         isSending = true
         defer { isSending = false }
         return await saved()

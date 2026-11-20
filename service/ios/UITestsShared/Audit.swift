@@ -84,8 +84,12 @@ extension XCTestCase {
     func type(_ text: String, into field: XCUIElement, in app: XCUIApplication) {
         tapScrolling(field, in: app)
         // the simulator may take the Mac's keyboard, so no on-screen keyboard tells whether the field has the focus
+        // iOS 26's growing field does not report its focus while it has it: the on-screen keyboard then says so
         let focused = NSPredicate(format: "hasKeyboardFocus == true")
-        let hasFocus = { XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: focused, object: field)], timeout: 2) == .completed }
+        let hasFocus = {
+            XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: focused, object: field)], timeout: 2) == .completed
+                || app.keyboards.firstMatch.exists
+        }
         // a field that grows takes the tap on its first line, not in the space it keeps for more lines
         if !hasFocus() { field.coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: 0.2)).tap() }
         XCTAssertTrue(hasFocus(), "\(field) has the keyboard focus")

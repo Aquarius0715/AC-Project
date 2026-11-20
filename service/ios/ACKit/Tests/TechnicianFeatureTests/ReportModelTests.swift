@@ -232,6 +232,34 @@ import Testing
         #expect(model.report?.version == 2)
     }
 
+    @Test func aSaveByHandTakesThePendingAutosave() async throws {
+        // the autosave's wait ends only when the test lets it: the save by hand comes first
+        let gate = AsyncStream<Void>.makeStream()
+        let transport = StubTransport([try reportAnswer, try partsAnswer, try saved()])
+        let client = CoreClient(baseURL: URL(filePath: "/"), transport: transport, credentials: FixedCredentials())
+        let waits = gate.stream
+        let model = ReportModel(
+            job: try job(),
+            unit: try unit(),
+            now: Date(),
+            canWork: true,
+            client: client,
+            jobChanged: {
+                // the job is not read again here
+            },
+            pause: { _ in
+                for await _ in waits { return }
+            }
+        )
+        await model.load()
+        model.edit { $0.workText = "Cleaned the filter." }
+        #expect(await model.save())
+        gate.continuation.yield()
+        gate.continuation.finish()
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(await transport.requests.count == 3, "one save: the autosave after it had nothing to save")
+    }
+
     @Test func aRefusedSaveKeepsTheDraft() async throws {
         let (model, _) = try await loaded(then: [refusal(409, "CONFLICT", "error.versionConflict")])
         model.edit { $0.workText = "Cleaned." }
