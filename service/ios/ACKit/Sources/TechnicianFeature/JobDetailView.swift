@@ -109,7 +109,7 @@ struct JobDetailView: View {
             } label: {
                 Label(tr("Alert evidence"), systemImage: "exclamationmark.bubble")
             }
-            .secondaryAction()
+            .linkAction()
             .accessibilityIdentifier("job.alerts")
         }
     }
