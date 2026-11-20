@@ -1,0 +1,92 @@
+# The Xcode project of the iOS apps (DEC-112), written by XcodeGen (sh scripts/tools.sh, then
+# .tools/xcodegen/xcodegen/bin/xcodegen): AC.xcodeproj is generated and not committed. The apps are thin: their screens and
+# models are the ACKit package's CustomerFeature and TechnicianFeature.
+name: AC
+options:
+  deploymentTarget: { iOS: "17.4" }
+  developmentLanguage: en
+  createIntermediateGroups: true
+packages:
+  ACKit: { path: ACKit }
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    SWIFT_TREAT_WARNINGS_AS_ERRORS: YES
+    GCC_TREAT_WARNINGS_AS_ERRORS: YES
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    LOCALIZATION_PREFERS_STRING_CATALOGS: YES
+    SWIFT_EMIT_LOC_STRINGS: NO          # the texts are the generated catalog's (codegen/swift-strings.ts), not extracted
+    TARGETED_DEVICE_FAMILY: "1"
+    CODE_SIGN_STYLE: Automatic
+    DEVELOPMENT_TEAM: ""                # set for TestFlight (phase 6); the simulator needs none
+  configs:
+    # the addresses the app calls: the dev stack on this Mac (the simulator shares its localhost)
+    Debug:
+      AC_CORE_API_URL: http://127.0.0.1:8080
+      AC_ISSUER_URL: http://localhost:8081/realms/ac
+    Release:
+      AC_CORE_API_URL: http://127.0.0.1:8080
+      AC_ISSUER_URL: http://localhost:8081/realms/ac
+targetTemplates:
+  App:
+    type: application
+    platform: iOS
+    sources:
+      - path: ${target_name}
+      - path: Shared
+    info:
+      path: ${target_name}/Info.plist
+      properties:
+        CFBundleDisplayName: ${display_name}
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        CFBundleLocalizations: [en, ms, ja, id]
+        ACCoreAPIURL: $(AC_CORE_API_URL)
+        ACIssuerURL: $(AC_ISSUER_URL)
+        ACClientID: ${client_id}
+        ACRedirectURI: ${scheme}://oauth/callback
+        # http only to this machine's dev stack (localhost); every other address is https
+        NSAppTransportSecurity: { NSAllowsLocalNetworking: true }
+targets:
+  CustomerApp:
+    templates: [App]
+    templateAttributes: { display_name: AC Customer, client_id: ac-customer-ios, scheme: ac-customer }
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.pradita.ac.customer
+    dependencies:
+      - package: ACKit
+        product: CustomerFeature
+      - package: ACKit
+        product: ACShared
+  TechnicianApp:
+    templates: [App]
+    templateAttributes: { display_name: AC Technician, client_id: ac-technician-ios, scheme: ac-technician }
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.pradita.ac.technician
+    dependencies:
+      - package: ACKit
+        product: TechnicianFeature
+      - package: ACKit
+        product: ACShared
+  CustomerUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [CustomerUITests, UITestsShared]
+    dependencies: [{ target: CustomerApp }]
+    settings: { base: { PRODUCT_BUNDLE_IDENTIFIER: com.pradita.ac.customer.uitests, GENERATE_INFOPLIST_FILE: YES } }
+  TechnicianUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [TechnicianUITests, UITestsShared]
+    dependencies: [{ target: TechnicianApp }]
+    settings: { base: { PRODUCT_BUNDLE_IDENTIFIER: com.pradita.ac.technician.uitests, GENERATE_INFOPLIST_FILE: YES } }
+schemes:
+  CustomerApp:
+    build: { targets: { CustomerApp: all, CustomerUITests: [test] } }
+    test: { targets: [CustomerUITests], gatherCoverageData: false }
+  TechnicianApp:
+    build: { targets: { TechnicianApp: all, TechnicianUITests: [test] } }
+    test: { targets: [TechnicianUITests], gatherCoverageData: false }

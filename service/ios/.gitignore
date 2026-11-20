@@ -1,0 +1,8 @@
+# generated or downloaded: the Xcode project (XcodeGen from project.yml), the pinned tools, the package's build
+AC.xcodeproj/
+.tools/
+ACKit/.build/
+ACKit/.swiftpm/
+*.xcresult
+CustomerApp/Info.plist
+TechnicianApp/Info.plist

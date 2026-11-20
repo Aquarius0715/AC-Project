@@ -1,0 +1,82 @@
+# SwiftLint of the iOS apps (CLAUDE.md, the iOS apps): every default rule, the opt-in rules below, run with --strict (a
+# warning fails). A suppression names its rule and its reason on the same line ("// swiftlint:disable:next <rule> -
+# <reason>"). The layout is swift-format's (.swift-format, `swift format -i -r`), never fixed by hand: the rules on layout
+# that it decides otherwise are off below.
+included: [ACKit/Sources, ACKit/Tests, ACKit/Package.swift, CustomerApp, TechnicianApp, CustomerUITests, TechnicianUITests, UITestsShared]
+# the generated files follow the contract and the catalog (service/web/codegen), not the style rules
+excluded: [ACKit/.build, .tools, ACKit/Sources/ACKit/Generated, ACKit/Sources/ACShared/Generated]
+disabled_rules:
+  # async_without_await (opt-in, not on): it flags the implementations of async protocol requirements (a transport's
+  # send, a credential source's credentials) that have nothing to wait for
+  - trailing_comma              # swift-format writes a trailing comma after the last element of a multi-line collection
+  - opening_brace               # swift-format puts a wrapped condition's brace on its own line
+opt_in_rules:
+  - force_unwrapping            # with force_cast and force_try (defaults): no assertion that narrows a type
+  - implicitly_unwrapped_optional
+  - discouraged_optional_boolean
+  - discouraged_none_name
+  - fatal_error_message
+  - unowned_variable_capture
+  - weak_delegate
+  - unavailable_function
+  - unhandled_throwing_task
+  - private_swiftui_state
+  - superfluous_disable_command
+  - blanket_disable_command
+  - empty_count
+  - empty_string
+  - first_where
+  - last_where
+  - contains_over_filter_count
+  - contains_over_filter_is_empty
+  - contains_over_first_not_nil
+  - contains_over_range_nil_comparison
+  - flatmap_over_map_reduce
+  - reduce_into
+  - sorted_first_last
+  - redundant_nil_coalescing
+  - redundant_type_annotation
+  - toggle_bool
+  - identical_operands
+  - array_init
+  - closure_spacing
+  - collection_alignment
+  - comma_inheritance
+  - convenience_type
+  - explicit_init
+  - fallthrough
+  - joined_default_parameter
+  - legacy_multiple
+  - literal_expression_end_indentation
+  - lower_acl_than_parent
+  - modifier_order
+  - multiline_arguments
+  - multiline_parameters
+  - operator_usage_whitespace
+  - overridden_super_call
+  - prefer_self_in_static_references
+  - prefer_self_type_over_type_of_self
+  - prefer_zero_over_explicit_init
+  - redundant_self
+  - return_value_from_void_function
+  - shorthand_optional_binding
+  - static_operator
+  - strict_fileprivate
+  - test_case_accessibility
+  - unneeded_parentheses_in_closure_argument
+  - vertical_parameter_alignment_on_call
+  - yoda_condition
+  - accessibility_label_for_image
+  - accessibility_trait_for_button
+  - non_overridable_class_declaration
+  - no_empty_block
+line_length: { warning: 140, error: 140, ignores_comments: false }
+type_body_length: { warning: 300, error: 400 }
+file_length: { warning: 500, error: 700 }
+function_body_length: { warning: 50, error: 80 }
+cyclomatic_complexity: { warning: 12, error: 20 }
+identifier_name:
+  min_length: 1                 # Go's convention, as CLAUDE.md asks: short names in short scopes (c, i, id, ok)
+  excluded: []
+type_name: { min_length: 3, max_length: 60 }
+nesting: { type_level: 2 }

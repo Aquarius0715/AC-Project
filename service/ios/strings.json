@@ -1,0 +1,22 @@
+{
+  "No connection — check the network and try again": {
+    "id": "Tidak ada koneksi — periksa jaringan dan coba lagi",
+    "ja": "接続できません — ネットワークを確認して、もう一度お試しください",
+    "ms": "Tiada sambungan — semak rangkaian dan cuba lagi"
+  },
+  "The sign-in did not complete — try again": {
+    "id": "Proses masuk tidak selesai — coba lagi",
+    "ja": "サインインが完了しませんでした — もう一度お試しください",
+    "ms": "Log masuk tidak selesai — cuba lagi"
+  },
+  "The sign-in service is unavailable — try again shortly": {
+    "id": "Layanan masuk tidak tersedia — coba lagi sebentar lagi",
+    "ja": "サインインサービスを利用できません — しばらくしてからもう一度お試しください",
+    "ms": "Perkhidmatan log masuk tidak tersedia — cuba lagi sebentar lagi"
+  },
+  "This account is not for this app — sign in with another account": {
+    "id": "Akun ini bukan untuk aplikasi ini — masuk dengan akun lain",
+    "ja": "このアカウントはこのアプリでは使えません — 別のアカウントでサインインしてください",
+    "ms": "Akaun ini bukan untuk aplikasi ini — log masuk dengan akaun lain"
+  }
+}
