@@ -70,7 +70,7 @@ final class TechnicianUITests: XCTestCase {
         )
 
         // another unit's label is refused under the QR field
-        let qr = app.textViews["checkIn.qr"]
+        let qr = field("checkIn.qr", in: app)
         type("ac-unit:u2", into: qr, in: app)
         tapScrolling(submit, in: app)
         XCTAssertTrue(
@@ -108,7 +108,7 @@ final class TechnicianUITests: XCTestCase {
         try app.audit()
         tapScrolling(send, in: app)
         XCTAssertTrue(wait(for: app.staticTexts["cantMake.error"], label: "Tell your coordinator why (1–1000 characters)"))
-        type("Medical appointment", into: app.textViews["cantMake.reason"], in: app)
+        type("Medical appointment", into: field("cantMake.reason", in: app), in: app)
         tapScrolling(send, in: app)
         XCTAssertTrue(wait(for: app.staticTexts["job.note"], label: "Sent to your coordinator"))
         let banner = app.staticTexts["job.banner"]
@@ -187,7 +187,7 @@ final class TechnicianUITests: XCTestCase {
         tapScrolling(app.buttons["job.checkIn"], in: app)
         XCTAssertTrue(app.buttons["checkIn.method.manual"].waitForExistence(timeout: 5))
         app.buttons["checkIn.method.manual"].tap()
-        type("No GPS signal in the plant room", into: app.textViews["checkIn.reason"], in: app)
+        type("No GPS signal in the plant room", into: field("checkIn.reason", in: app), in: app)
         tapScrolling(app.buttons["checkIn.submit"], in: app)
         XCTAssertTrue(wait(for: app.staticTexts["job.note"], label: "Checked in — the job has started"))
         let pause = app.buttons["job.pause"]

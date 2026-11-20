@@ -8,8 +8,10 @@ set -eu
 cd "$(dirname "$0")/../ACKit"
 log=$(mktemp)
 trap 'rm -f "$log"' EXIT
-swift test --enable-code-coverage >"$log" 2>&1 || { cat "$log"; exit 1; }
 products=$(swift build --show-bin-path)
+# the raw profiles of earlier builds are merged with this run's: one of another binary drops counters at random
+rm -rf "$products/codecov"
+swift test --enable-code-coverage >"$log" 2>&1 || { cat "$log"; exit 1; }
 profile="$products/codecov/default.profdata"
 status=0
 # SwiftPM 6.3 and later build one test bundle per test target (each module is measured by its own tests); earlier ones

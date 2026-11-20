@@ -95,4 +95,12 @@ extension XCTestCase {
     func scrollToTop(_ app: XCUIApplication) {
         for _ in 0..<3 { drag(app, from: 0.3, to: 0.9) }
     }
+
+    /// A text field by its identifier: a field that grows is a text view on iOS 17 and a text field on iOS 26.
+    @MainActor
+    func field(_ identifier: String, in app: XCUIApplication) -> XCUIElement {
+        let kinds = [XCUIElement.ElementType.textField, .textView].map(\.rawValue)
+        let predicate = NSPredicate(format: "identifier == %@ AND elementType IN %@", identifier, kinds)
+        return app.descendants(matching: .any).matching(predicate).firstMatch
+    }
 }
