@@ -28,9 +28,10 @@ export default async function CustomerOffsetsPage({ searchParams }: Readonly<Pag
   const kind = periodKinds.find((k) => k === one("period")) ?? "7d";
   const period = periodRange(kind, now, { from: one("from"), to: one("to") }, i);
   let estimate: { emissions: string; savedEmissions: string; factor: string; comparable: boolean } | null = null;
+  const baselineId = one(BASELINEID) === "none" ? undefined : one(BASELINEID); // "none": No baseline on Energy & cost
   if (unitIds.length > 0 && !period.error) {
     try {
-      const s = await coreOp<ApiEnergySummary>("energy.summary", { from: period.from, to: period.to, unitIds, ...(one(BASELINEID) && { baselineId: one(BASELINEID) }) });
+      const s = await coreOp<ApiEnergySummary>("energy.summary", { from: period.from, to: period.to, unitIds, ...(baselineId && { baselineId }) });
       const v = summaryView(s, i);
       estimate = { emissions: v.emissions, savedEmissions: v.savedEmissions, comparable: v.comparable, factor: s.factorSnapshot ? `${s.factorSnapshot.region} ${String(s.factorSnapshot.year)}` : i.t("emission factor missing") };
     } catch (error) {
