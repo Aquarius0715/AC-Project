@@ -1,0 +1,24 @@
+{
+    "data": {
+        "projection": "history",
+        "asOf": "2026-09-20T00:00:00Z",
+        "severity": null,
+        "dueAt": null,
+        "jobId": "41de64d5-73e5-52a7-bdd1-7c6c2cf13cf6",
+        "type": "preventive",
+        "status": "in_progress",
+        "contractorOrgId": "ae475bbf-d733-5d1f-8b02-0ed83b7090f1",
+        "completedAt": null,
+        "ownDecisionEvents": [],
+        "redactedReportSummary": {
+            "acceptance": "not_accepted",
+            "hasReport": false
+        }
+    },
+    "meta": {
+        "correlationId": "01a1f7c9-cc7f-76d1-b5e9-5e0cb96f22eb",
+        "eventCursor": 101636,
+        "operation": "jobs.get",
+        "snapshotAt": "2026-09-26T17:26:04.145810795Z"
+    }
+}

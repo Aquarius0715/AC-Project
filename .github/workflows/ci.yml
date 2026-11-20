@@ -1,6 +1,6 @@
 # Lint and tests of the whole repository on every push and pull request. Each check is its own job: Go lint (format, vet,
 # golangci-lint, generated files and the API description), the Go suite (unit + integration on one server), the integration suite
-# against the split services, the web lint (type-aware, no warnings allowed) per workspace, web dead code (knip), Python, shell, workflows and Dockerfiles, web typecheck, web unit tests, and the design document validators. The
+# against the split services, the web lint (type-aware, no warnings allowed) per workspace, web dead code (knip), Python, shell, workflows and Dockerfiles, web typecheck, web unit tests, the iOS apps (on a GitHub-hosted Mac), and the design document validators. The
 # end-to-end suite needs the whole compose stack and runs in e2e.yml.
 #
 # The jobs run on GitHub-hosted runners (ubuntu-latest, IR732), each in a container of its own (golang, node, python), so
@@ -220,6 +220,7 @@ jobs:
           if [ "${{ matrix.workspace }}" = e2e ]; then
             npx eslint --max-warnings=0 -c e2e/eslint.config.mjs e2e
             npx eslint --max-warnings=0 -c load/eslint.config.mjs load   # the k6 scenarios share this job (its name is a required check)
+            npx eslint --max-warnings=0 -c codegen/eslint.config.mjs codegen   # the iOS apps' Swift generators (DEC-112)
           else
             npm run lint --workspace=${{ matrix.workspace }}
           fi
@@ -268,6 +269,8 @@ jobs:
           restore-keys: npm-${{ runner.os }}-
       - run: npm ci
       - run: npm run typecheck
+      - name: the iOS apps' generated Swift is current (contract types, operations, texts; DEC-112)
+        run: npm run gen:swift -- --check
 
   web-test:
     name: Web unit tests (Vitest)
@@ -285,6 +288,20 @@ jobs:
           restore-keys: npm-${{ runner.os }}-
       - run: npm ci
       - run: npm test
+
+  # The iOS apps (DEC-112): SwiftLint, swift-format, the package's unit tests at 100 % of lines and functions, and both apps'
+  # UI tests against the stub, on a GitHub-hosted Mac (the lab server's runners are Linux; a pull request job never runs
+  # there). The tools are the releases service/ios/scripts/tools.sh pins, checked by their SHA-256.
+  ios:
+    name: iOS (lint, unit tests, UI tests)
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false } # no later step pushes or fetches with the job's token
+      - name: Xcode and simulators
+        run: xcodebuild -version && xcrun simctl list runtimes
+      - run: sh service/ios/scripts/check.sh
 
   docs:
     name: Design document validators

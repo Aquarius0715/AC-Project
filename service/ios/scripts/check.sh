@@ -1,0 +1,27 @@
+#!/bin/sh
+# The checks of the iOS apps (CLAUDE.md, the iOS apps), the same in CI (ci.yml, job ios) and in scripts/check.sh:
+# SwiftLint (--strict), swift-format (lint --strict), the package's unit tests with 100 % of lines and functions
+# (scripts/coverage.sh), then the Xcode project from project.yml and both apps' UI tests against the stub (AC_UI_TEST).
+#   sh service/ios/scripts/check.sh     exits 0 only when every check passed; needs Xcode
+set -eu
+cd "$(dirname "$0")/.."
+step() { printf '\n== %s\n' "$1"; }
+sh scripts/tools.sh
+sources="ACKit/Sources ACKit/Tests ACKit/Package.swift CustomerApp TechnicianApp CustomerUITests TechnicianUITests UITestsShared"
+
+step "SwiftLint"
+.tools/swiftlint/swiftlint lint --strict --quiet
+step "swift-format"
+# shellcheck disable=SC2086 # the source list is split on purpose
+swift format lint --strict -r $sources
+step "unit tests and coverage"
+sh scripts/coverage.sh
+step "UI tests (stub)"
+.tools/xcodegen/xcodegen/bin/xcodegen generate --spec project.yml --quiet
+# the first available iPhone simulator of the installed runtime: the runner's and a Mac's differ
+device=$(xcrun simctl list devices available | sed -n 's/^ *\(iPhone [^(]*\) (.*/\1/p' | sed 's/ *$//' | head -n 1)
+[ -n "$device" ] || { echo "no iPhone simulator is installed" >&2; exit 1; }
+for scheme in CustomerApp TechnicianApp; do
+  xcodebuild -project AC.xcodeproj -scheme "$scheme" -destination "platform=iOS Simulator,name=$device" -quiet test
+done
+echo "all iOS checks passed"

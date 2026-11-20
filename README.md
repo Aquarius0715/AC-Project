@@ -7,6 +7,7 @@ app on a Go Core API split into business-domain services. The specification live
 |---|---|
 | `service/api` | Go (Echo): gateway, five domain services (identity, equipment, maintenance, billing, energy), workers, migrations, IoT bridge and device simulator |
 | `service/web` | Next.js: `customer`, `partner`, `technician`, `admin` apps and the shared package; Playwright E2E in `e2e/` |
+| `service/ios` | SwiftUI: the AC Customer and AC Technician iOS apps (DEC-112) and their `ACKit` package; `project.yml` for XcodeGen |
 | `docs` | requirements, design, catalogs, validators (`docs/tools`) |
 | `docker` | Keycloak realm, Mosquitto, IoT demo script |
 | `compose.yaml` | the local stack (profiles below) |
@@ -66,6 +67,9 @@ docker compose --env-file .env.local --profile full run --rm migrate \
 sh scripts/check.sh                       # before a push: web lint/typecheck/Vitest, gofmt/vet/golangci-lint, generated files, docs validators
 (cd service/api && make test-all)         # Go unit + integration suites on fresh test databases (both service layouts)
 (cd service/web && npm run e2e)           # Playwright against the running stack
+sh service/ios/scripts/check.sh           # iOS: SwiftLint, swift-format, unit tests at 100 %, both apps' UI tests (needs Xcode)
+TEST_RUNNER_AC_UI_LIVE=1 xcodebuild -project service/ios/AC.xcodeproj -scheme CustomerApp test \
+  -destination 'platform=iOS Simulator,name=iPhone 15'   # an app's UI tests with its live sign-in to the running stack
 ```
 
 GitHub Actions run the same: `.github/workflows/ci.yml` (seven parallel jobs) and `.github/workflows/e2e.yml` (the

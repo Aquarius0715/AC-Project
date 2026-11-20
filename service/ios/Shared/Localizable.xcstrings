@@ -1,0 +1,2950 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "{field} — {problem}": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{field} — {problem}"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{field} — {problem}"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{field} — {problem}"
+          }
+        }
+      }
+    },
+    "{field} belongs to someone who still has access — use another address or ask HQ": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{field} milik seseorang yang masih mempunyai akses — gunakan alamat lain atau tanya ibu pejabat"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{field} は、まだアクセス権を持つ人のものです — 別のアドレスを使うか、本部にご相談ください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{field} milik seseorang yang masih memiliki akses — gunakan alamat lain atau tanyakan HQ"
+          }
+        }
+      }
+    },
+    "{field} has the wrong number of entries": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{field} mempunyai bilangan entri yang salah"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{field} の件数が正しくありません"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{field} memiliki jumlah entri yang salah"
+          }
+        }
+      }
+    },
+    "{field} is already used": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{field} sudah digunakan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{field} はすでに使われています"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{field} sudah digunakan"
+          }
+        }
+      }
+    },
+    "{field} is not an accepted file — check its type and size": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{field} bukan fail yang diterima — semak jenis dan saiznya"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{field} は受け付けられないファイルです — 種類とサイズを確認してください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{field} bukan file yang diterima — periksa jenis dan ukurannya"
+          }
+        }
+      }
+    },
+    "{field} is not valid": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{field} tidak sah"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{field} が正しくありません"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{field} tidak valid"
+          }
+        }
+      }
+    },
+    "{field} is out of range": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{field} di luar julat"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{field} が範囲外です"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{field} di luar rentang"
+          }
+        }
+      }
+    },
+    "{field} is required": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{field} diperlukan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{field} は必須です"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{field} wajib diisi"
+          }
+        }
+      }
+    },
+    "{field} is too short or too long": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{field} terlalu pendek atau terlalu panjang"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{field} は短すぎるか長すぎます"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{field} terlalu pendek atau terlalu panjang"
+          }
+        }
+      }
+    },
+    "{field} must not be in the future": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{field} tidak boleh pada masa hadapan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{field} は未来の日時にできません"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{field} tidak boleh di masa depan"
+          }
+        }
+      }
+    },
+    "{field} must not be in the past": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{field} tidak boleh pada masa lalu"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{field} は過去の日時にできません"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{field} tidak boleh di masa lalu"
+          }
+        }
+      }
+    },
+    "A capability for this manufacturer and model exists already": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keupayaan untuk pengeluar dan model ini sudah wujud"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このメーカーと型番の機能定義はすでにあります"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kemampuan untuk pabrikan dan model ini sudah ada"
+          }
+        }
+      }
+    },
+    "A firmware campaign names this model, so it cannot be deleted": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kempen perisian tegar menamakan model ini, jadi ia tidak boleh dipadam"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ファームウェア配信にこのモデルの名前があるため、削除できません"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kampanye firmware menyebut model ini, jadi tidak dapat dihapus"
+          }
+        }
+      }
+    },
+    "A payment of a cause invoice is in progress — wait for it to be confirmed or to fail": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pembayaran bagi invois punca sedang berjalan — tunggu sehingga ia disahkan atau gagal"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "原因となった請求書の支払いが処理中です — 確定するか失敗するまでお待ちください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pembayaran faktur penyebab sedang berlangsung — tunggu sampai dikonfirmasi atau gagal"
+          }
+        }
+      }
+    },
+    "Accepted": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diterima"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "承諾済み"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diterima"
+          }
+        }
+      }
+    },
+    "Air conditioners": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Penyaman udara"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "エアコン"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pendingin udara"
+          }
+        }
+      }
+    },
+    "An HQ account works in the HQ app — sign in there": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Akaun HQ berfungsi dalam aplikasi HQ — log masuk di sana"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本部のアカウントは本部アプリで使います — そちらでログインしてください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Akun HQ bekerja di aplikasi HQ — masuk di sana"
+          }
+        }
+      }
+    },
+    "An imported unit now has telemetry, jobs or other history — the import can no longer be undone": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unit yang diimport kini mempunyai telemetri, kerja atau sejarah lain — import ini tidak boleh dibatalkan lagi"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "取り込んだユニットに計測データや作業などの履歴ができたため、この取り込みは取り消せません"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unit yang diimpor kini memiliki telemetri, pekerjaan, atau riwayat lain — impor tidak dapat dibatalkan lagi"
+          }
+        }
+      }
+    },
+    "An MRV report cites this baseline, so it cannot be deleted": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Laporan MRV merujuk garis dasar ini, jadi tidak boleh dipadam"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MRV レポートがこのベースラインを参照しているため削除できません"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Laporan MRV merujuk baseline ini, jadi tidak dapat dihapus"
+          }
+        }
+      }
+    },
+    "An MRV report cites this factor, so it cannot be deleted": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Laporan MRV merujuk faktor ini, jadi tidak boleh dipadam"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MRV レポートがこの係数を参照しているため削除できません"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Laporan MRV merujuk faktor ini, jadi tidak dapat dihapus"
+          }
+        }
+      }
+    },
+    "Another device already has this MQTT node ID": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Peranti lain sudah mempunyai ID nod MQTT ini"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この MQTT ノード ID は、別のデバイスですでに使われています"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Perangkat lain sudah memiliki ID node MQTT ini"
+          }
+        }
+      }
+    },
+    "Another device already has this serial number": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Peranti lain sudah mempunyai nombor siri ini"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このシリアル番号のデバイスはすでにあります"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Perangkat lain sudah memiliki nomor seri ini"
+          }
+        }
+      }
+    },
+    "Another operation is running on this unit — try again when it has finished": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Operasi lain sedang berjalan pada unit ini — cuba lagi apabila ia selesai"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このユニットでは別の操作が実行中です。終わってからもう一度お試しください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Operasi lain sedang berjalan pada unit ini — coba lagi setelah selesai"
+          }
+        }
+      }
+    },
+    "Assigned": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ditugaskan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "割り当て済み"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ditugaskan"
+          }
+        }
+      }
+    },
+    "At least one active membership must keep “Edit users & roles” — give it to another HQ membership first, then change this one": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sekurang-kurangnya satu keahlian aktif mesti mengekalkan “Edit pengguna & peranan” — berikannya kepada keahlian HQ lain dahulu, kemudian ubah yang ini"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有効なメンバーシップのうち少なくとも1つは「ユーザーと役割の編集」を持つ必要があります — 先に別の本部のメンバーシップに付与してから、これを変更してください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Setidaknya satu keanggotaan aktif harus mempertahankan “Ubah pengguna & peran” — berikan kepada keanggotaan HQ lain lebih dulu, lalu ubah yang ini"
+          }
+        }
+      }
+    },
+    "Cancelled": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dibatalkan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "キャンセル済み"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dibatalkan"
+          }
+        }
+      }
+    },
+    "Check the entered values": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Semak nilai yang dimasukkan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "入力した値を確認してください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Periksa nilai yang dimasukkan"
+          }
+        }
+      }
+    },
+    "Completed": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selesai"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "完了"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selesai"
+          }
+        }
+      }
+    },
+    "Connecting": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Menyambung"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "接続中"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Menghubungkan"
+          }
+        }
+      }
+    },
+    "Connection unknown": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sambungan tidak diketahui"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "接続不明"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Koneksi tidak diketahui"
+          }
+        }
+      }
+    },
+    "Customer": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pelanggan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "顧客"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pelanggan"
+          }
+        }
+      }
+    },
+    "Due {time}": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tarikh akhir {time}"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "期限 {time}"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jatuh tempo {time}"
+          }
+        }
+      }
+    },
+    "Error": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ralat"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "エラー"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Error"
+          }
+        }
+      }
+    },
+    "HQ ended this account's access — only HQ can give it back": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HQ telah menamatkan akses akaun ini — hanya HQ boleh memulihkannya"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本部がこのアカウントのアクセスを終了しました — 戻せるのは本部だけです"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HQ mengakhiri akses akun ini — hanya HQ yang dapat mengembalikannya"
+          }
+        }
+      }
+    },
+    "HQ ended this person's access — only HQ can give it back": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HQ telah menamatkan akses orang ini — hanya HQ boleh memulihkannya"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本部がこの方のアクセスを終了しました — 戻せるのは本部だけです"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HQ mengakhiri akses orang ini — hanya HQ yang dapat mengembalikannya"
+          }
+        }
+      }
+    },
+    "HQ has not set this site's location yet — check in manually with a reason": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HQ belum menetapkan lokasi tapak ini — daftar masuk secara manual dengan sebab"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HQ がまだこの現場の位置を設定していません。理由を入力して手動でチェックインしてください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HQ belum menetapkan lokasi tempat ini — check-in manual dengan alasan"
+          }
+        }
+      }
+    },
+    "In progress": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sedang berjalan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "作業中"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sedang berjalan"
+          }
+        }
+      }
+    },
+    "Installation": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pemasangan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "設置"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Instalasi"
+          }
+        }
+      }
+    },
+    "Job history": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sejarah kerja"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "作業履歴"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riwayat pekerjaan"
+          }
+        }
+      }
+    },
+    "Jobs": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kerja"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "作業"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pekerjaan"
+          }
+        }
+      }
+    },
+    "No ACs in your account yet.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Belum ada AC dalam akaun anda."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アカウントにエアコンがまだありません。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Belum ada AC di akun Anda."
+          }
+        }
+      }
+    },
+    "No connection — check the network and try again": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tiada sambungan — semak rangkaian dan cuba lagi"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "接続できません — ネットワークを確認して、もう一度お試しください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak ada koneksi — periksa jaringan dan coba lagi"
+          }
+        }
+      }
+    },
+    "No jobs yet": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Belum ada kerja"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "まだ作業はありません"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Belum ada pekerjaan"
+          }
+        }
+      }
+    },
+    "Off": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mati"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "オフ"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nonaktif"
+          }
+        }
+      }
+    },
+    "Offered": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ditawarkan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "オファー済み"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ditawarkan"
+          }
+        }
+      }
+    },
+    "Offline": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Luar talian"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "オフライン"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Offline"
+          }
+        }
+      }
+    },
+    "On": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hidup"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "オン"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aktif"
+          }
+        }
+      }
+    },
+    "On hold": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ditangguhkan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保留中"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ditahan"
+          }
+        }
+      }
+    },
+    "Online": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dalam talian"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "オンライン"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Online"
+          }
+        }
+      }
+    },
+    "Only a failed or skipped device can be retried": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hanya peranti yang gagal atau dilangkau boleh dicuba semula"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "再試行できるのは失敗またはスキップされたデバイスだけです"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hanya perangkat yang gagal atau dilewati yang dapat dicoba ulang"
+          }
+        }
+      }
+    },
+    "Only a user who hasn’t signed in yet gets the set-up e-mail again": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hanya pengguna yang belum log masuk menerima e-mel persediaan sekali lagi"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "セットアップのメールを再送できるのは、まだログインしていないユーザーだけです"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hanya pengguna yang belum masuk yang mendapat email penyiapan lagi"
+          }
+        }
+      }
+    },
+    "Open jobs": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Buka kerja"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未完了の作業"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pekerjaan terbuka"
+          }
+        }
+      }
+    },
+    "Other units or spaces were added to the imported places — the import can no longer be undone": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unit atau ruang lain telah ditambah ke tempat yang diimport — import ini tidak boleh dibatalkan lagi"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "取り込んだ場所に別のユニットまたはスペースが追加されたため、この取り込みは取り消せません"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unit atau ruang lain ditambahkan ke tempat yang diimpor — impor tidak dapat dibatalkan lagi"
+          }
+        }
+      }
+    },
+    "Periodic inspection": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pemeriksaan berkala"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "定期点検"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inspeksi berkala"
+          }
+        }
+      }
+    },
+    "Power unknown": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kuasa tidak diketahui"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "電源不明"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Daya tidak diketahui"
+          }
+        }
+      }
+    },
+    "Preventive maintenance": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Penyelenggaraan pencegahan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "予防メンテナンス"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Perawatan preventif"
+          }
+        }
+      }
+    },
+    "Repair": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pembaikan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "修理"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Perbaikan"
+          }
+        }
+      }
+    },
+    "Requested": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diminta"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "依頼済み"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diminta"
+          }
+        }
+      }
+    },
+    "Rework requested": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kerja semula diminta"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "やり直し依頼"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pengerjaan ulang diminta"
+          }
+        }
+      }
+    },
+    "Sign in": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Log masuk"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "サインイン"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Masuk"
+          }
+        }
+      }
+    },
+    "Sign out": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Log keluar"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ログアウト"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keluar"
+          }
+        }
+      }
+    },
+    "Someone changed this in the meantime — the screen now shows the latest version": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seseorang telah mengubahnya sebentar tadi — skrin kini menunjukkan versi terkini"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "その間に他の人が変更しました — 最新の版を表示しています"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seseorang telah mengubah ini — layar kini menampilkan versi terbaru"
+          }
+        }
+      }
+    },
+    "Submitted": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dihantar"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "提出済み"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diserahkan"
+          }
+        }
+      }
+    },
+    "Technician": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Juruteknik"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "技術者"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Teknisi"
+          }
+        }
+      }
+    },
+    "The 24-hour undo period for this import has ended": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tempoh 24 jam untuk membatalkan import ini telah tamat"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この取り込みを取り消せる 24 時間の期限が過ぎました"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Masa pembatalan 24 jam untuk impor ini telah berakhir"
+          }
+        }
+      }
+    },
+    "The checked file has expired or changed — check it again, then import": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fail yang disemak telah tamat tempoh atau berubah — semak semula, kemudian import"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "確認したファイルの期限が切れたか、内容が変わりました。もう一度確認してから取り込んでください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "File yang diperiksa telah kedaluwarsa atau berubah — periksa lagi, lalu impor"
+          }
+        }
+      }
+    },
+    "The device is offline — try again when it is back online": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Peranti di luar talian — cuba lagi apabila ia kembali dalam talian"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "デバイスがオフラインです。オンラインに戻ってからもう一度お試しください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Perangkat offline — coba lagi saat kembali online"
+          }
+        }
+      }
+    },
+    "The last active owner can’t be demoted, disabled or removed": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pemilik aktif terakhir tidak boleh diturunkan, dilumpuhkan atau dialih keluar"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最後の有効なオーナーは、降格、無効化、削除ができません"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pemilik aktif terakhir tidak dapat diturunkan, dinonaktifkan, atau dikeluarkan"
+          }
+        }
+      }
+    },
+    "The MQTT node ID needs 1–64 letters, digits, hyphens or underscores": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ID nod MQTT memerlukan 1–64 huruf, digit, sempang atau garis bawah"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MQTT ノード ID は、1～64文字の英字、数字、ハイフン、またはアンダースコアにしてください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ID node MQTT memerlukan 1–64 huruf, angka, tanda hubung, atau garis bawah"
+          }
+        }
+      }
+    },
+    "The operator organization cannot be deleted": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Organisasi pengendali tidak boleh dipadam"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "運営組織は削除できません"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Organisasi operator tidak dapat dihapus"
+          }
+        }
+      }
+    },
+    "The request took too long — check whether the change was saved, then try again": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Permintaan mengambil masa terlalu lama — semak sama ada perubahan telah disimpan, kemudian cuba lagi"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "処理に時間がかかりすぎました。変更が保存されたか確認してから、もう一度お試しください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Permintaan memakan waktu terlalu lama — periksa apakah perubahan tersimpan, lalu coba lagi"
+          }
+        }
+      }
+    },
+    "The same request is still being processed — try again in a moment": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Permintaan yang sama masih diproses — cuba lagi sebentar lagi"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同じリクエストをまだ処理中です。少し待ってからもう一度お試しください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Permintaan yang sama masih diproses — coba lagi sebentar lagi"
+          }
+        }
+      }
+    },
+    "The scanned QR label is not this job's unit — scan the label on this AC, or check in manually with a reason": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Label QR yang diimbas bukan unit kerja ini — imbas label pada AC ini, atau daftar masuk secara manual dengan sebab"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "スキャンした QR ラベルは、この作業のユニットのものではありません — このエアコンのラベルをスキャンするか、理由を添えて手動でチェックインしてください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Label QR yang dipindai bukan unit pekerjaan ini — pindai label pada AC ini, atau check-in manual dengan alasan"
+          }
+        }
+      }
+    },
+    "The service is unavailable — try again shortly": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Perkhidmatan tidak tersedia — cuba lagi sebentar lagi"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "サービスを利用できません — しばらくしてからもう一度お試しください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Layanan tidak tersedia — coba lagi sebentar lagi"
+          }
+        }
+      }
+    },
+    "The sign-in did not complete — try again": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Log masuk tidak selesai — cuba lagi"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "サインインが完了しませんでした — もう一度お試しください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Proses masuk tidak selesai — coba lagi"
+          }
+        }
+      }
+    },
+    "The sign-in service is unavailable — try again shortly": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Perkhidmatan log masuk tidak tersedia — cuba lagi sebentar lagi"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "サインインサービスを利用できません — しばらくしてからもう一度お試しください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Layanan masuk tidak tersedia — coba lagi sebentar lagi"
+          }
+        }
+      }
+    },
+    "This account has acted or has an assignment or certificate, so it cannot be deleted — revoke the access instead": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Akaun ini pernah bertindak atau mempunyai tugasan atau sijil, jadi tidak boleh dipadam — batalkan akses sebaliknya"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このアカウントは操作の履歴、割り当て、または証明書があるため削除できません。代わりにアクセスを取り消してください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Akun ini pernah bertindak atau memiliki penugasan atau sertifikat, jadi tidak dapat dihapus — cabut aksesnya saja"
+          }
+        }
+      }
+    },
+    "This account is not for this app — sign in with another account": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Akaun ini bukan untuk aplikasi ini — log masuk dengan akaun lain"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このアカウントはこのアプリでは使えません — 別のアカウントでサインインしてください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Akun ini bukan untuk aplikasi ini — masuk dengan akun lain"
+          }
+        }
+      }
+    },
+    "This account’s access period has ended — set a new access end first": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tempoh akses akaun ini telah tamat — tetapkan tarikh tamat akses yang baharu dahulu"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このアカウントのアクセス期間は終了しています — 先に新しいアクセスの終了日を設定してください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Periode akses akun ini telah berakhir — tetapkan akhir akses baru lebih dulu"
+          }
+        }
+      }
+    },
+    "This campaign has not ended — abort it first": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kempen ini belum tamat — henti paksanya dahulu"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この配信はまだ終わっていません。先に中止してください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kampanye ini belum berakhir — batalkan lebih dulu"
+          }
+        }
+      }
+    },
+    "This clashes with another record, or with a change made at the same moment — reload the page and try again": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ini bertembung dengan rekod lain, atau dengan perubahan yang dibuat pada masa yang sama — muat semula halaman dan cuba lagi"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "別の記録、または同時に行われた変更と重なりました。ページを再読み込みしてもう一度お試しください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ini bertabrakan dengan catatan lain, atau dengan perubahan yang dilakukan pada saat yang sama — muat ulang halaman dan coba lagi"
+          }
+        }
+      }
+    },
+    "This contract already has an invoice for part of this period — choose a period after it": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kontrak ini sudah mempunyai invois bagi sebahagian tempoh ini — pilih tempoh selepasnya"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この契約には、この期間の一部について、すでに請求書があります — それより後の期間を選んでください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kontrak ini sudah memiliki faktur untuk sebagian periode ini — pilih periode setelahnya"
+          }
+        }
+      }
+    },
+    "This contractor has jobs, offers, certificates, payouts or users, so it cannot be deleted": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kontraktor ini mempunyai kerja, tawaran, sijil, bayaran atau pengguna, jadi tidak boleh dipadam"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この契約会社には案件・オファー・証明書・支払い・ユーザーがあるため削除できません"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kontraktor ini memiliki pekerjaan, penawaran, sertifikat, pencairan, atau pengguna, jadi tidak dapat dihapus"
+          }
+        }
+      }
+    },
+    "This customer has jobs, contracts, invoices, reports or users, so it cannot be deleted": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pelanggan ini mempunyai kerja, kontrak, invois, laporan atau pengguna, jadi tidak boleh dipadam"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このお客様には案件・契約・請求・レポート・ユーザーがあるため削除できません"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pelanggan ini memiliki pekerjaan, kontrak, faktur, laporan, atau pengguna, jadi tidak dapat dihapus"
+          }
+        }
+      }
+    },
+    "This customer is inactive — activate it first": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pelanggan ini tidak aktif — aktifkannya dahulu"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このお客様は無効です。先に有効にしてください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pelanggan ini tidak aktif — aktifkan lebih dulu"
+          }
+        }
+      }
+    },
+    "This customer still has units — delete them first": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pelanggan ini masih mempunyai unit — padamkannya dahulu"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このお客様にはまだユニットがあります。先に削除してください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pelanggan ini masih memiliki unit — hapus lebih dulu"
+          }
+        }
+      }
+    },
+    "This customer still has units, open jobs or current contracts — archive or end them before deactivating": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pelanggan ini masih mempunyai unit, kerja terbuka atau kontrak semasa — arkib atau tamatkannya sebelum menyahaktifkan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このお客様にはまだユニット、未完了の作業、または有効な契約があります。無効にする前にアーカイブするか終了してください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pelanggan ini masih memiliki unit, pekerjaan terbuka, atau kontrak berjalan — arsipkan atau akhiri sebelum menonaktifkan"
+          }
+        }
+      }
+    },
+    "This device has an operation under way — wait until it ends": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Peranti ini mempunyai operasi sedang berjalan — tunggu sehingga ia tamat"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このデバイスは操作の実行中です。終わるまで待ってください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Perangkat ini sedang menjalankan operasi — tunggu sampai selesai"
+          }
+        }
+      }
+    },
+    "This device has an unresolved tamper alert — resolve it first": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Peranti ini mempunyai amaran usikan yang belum diselesaikan — selesaikannya dahulu"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このデバイスには未解決の改ざん検知があります。先に解決してください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Perangkat ini memiliki peringatan perusakan yang belum terselesaikan — selesaikan lebih dulu"
+          }
+        }
+      }
+    },
+    "This device is already bound to this unit": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Peranti ini sudah terikat pada unit ini"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このデバイスはすでにこのユニットに紐付いています"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Perangkat ini sudah terikat ke unit ini"
+          }
+        }
+      }
+    },
+    "This device is bound to a unit — unbind it first": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Peranti ini dipaut pada sebuah unit — nyahpautkannya dahulu"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このデバイスはユニットに紐づいています。先に外してください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Perangkat ini terikat ke unit — lepaskan lebih dulu"
+          }
+        }
+      }
+    },
+    "This device is in a firmware campaign that has not ended — wait for it or abort the campaign": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Peranti ini berada dalam kempen perisian tegar yang belum tamat — tunggu atau henti paksa kempen"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このデバイスは終わっていないファームウェア配信に入っています。終わるのを待つか、配信を中止してください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Perangkat ini berada dalam kampanye firmware yang belum berakhir — tunggu atau batalkan kampanye"
+          }
+        }
+      }
+    },
+    "This device is not bound to a unit": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Peranti ini tidak dipaut pada mana-mana unit"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このデバイスはユニットに紐づいていません"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Perangkat ini tidak terikat ke unit"
+          }
+        }
+      }
+    },
+    "This device is not bound to a unit — bind it first": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Peranti ini tidak terikat pada unit — ikatkannya dahulu"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このデバイスはユニットに紐付いていません。先に紐付けてください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Perangkat ini tidak terikat ke unit — ikat lebih dulu"
+          }
+        }
+      }
+    },
+    "This import has already been undone": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Import ini telah pun dibatalkan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この取り込みはすでに取り消されています"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impor ini sudah dibatalkan"
+          }
+        }
+      }
+    },
+    "This invoice already has a payment in progress or recorded — finish or fail that one first": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Invois ini sudah mempunyai pembayaran yang sedang diproses atau telah direkodkan — selesaikan atau gagalkan pembayaran itu dahulu"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この請求書には、すでに処理中または記録済みの支払いがあります — 先にそれを完了するか失敗にしてください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Faktur ini sudah memiliki pembayaran yang sedang berlangsung atau tercatat — selesaikan atau gagalkan yang itu lebih dulu"
+          }
+        }
+      }
+    },
+    "This is no longer possible in its current state — reload the page to see the latest state": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ini tidak lagi boleh dilakukan dalam keadaannya sekarang — muat semula halaman untuk melihat keadaan terkini"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "現在の状態ではこの操作はできません。ページを再読み込みして最新の状態を確認してください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ini tidak lagi dimungkinkan pada status saat ini — muat ulang halaman untuk melihat status terbaru"
+          }
+        }
+      }
+    },
+    "This is the default factor of the energy summary, so it cannot be deleted": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ini faktor lalai ringkasan tenaga, jadi tidak boleh dipadam"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "これはエネルギー集計の既定の係数のため削除できません"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ini adalah faktor default ringkasan energi, jadi tidak dapat dihapus"
+          }
+        }
+      }
+    },
+    "This item no longer exists or is outside your scope": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Item ini tidak lagi wujud atau di luar skop anda"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この項目はもう存在しないか、担当範囲外です"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Item ini sudah tidak ada atau berada di luar cakupan Anda"
+          }
+        }
+      }
+    },
+    "This name is already used": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nama ini sudah digunakan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この名前はすでに使われています"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nama ini sudah dipakai"
+          }
+        }
+      }
+    },
+    "This organization still has a customer or contractor profile — delete that first": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Organisasi ini masih mempunyai profil pelanggan atau kontraktor — padamkannya dahulu"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この組織にはまだお客様または契約会社のプロフィールがあります。先に削除してください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Organisasi ini masih memiliki profil pelanggan atau kontraktor — hapus itu lebih dulu"
+          }
+        }
+      }
+    },
+    "This organization still has users — remove them first": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Organisasi ini masih mempunyai pengguna — buangkannya dahulu"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この組織にはまだユーザーがいます。先に削除してください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Organisasi ini masih memiliki pengguna — keluarkan mereka lebih dulu"
+          }
+        }
+      }
+    },
+    "This person does not get this notice on that channel": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Orang ini tidak menerima notis ini melalui saluran itu"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この方は、そのチャネルではこの通知を受け取りません"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Orang ini tidak menerima pemberitahuan ini lewat saluran tersebut"
+          }
+        }
+      }
+    },
+    "This person has another account — delete or end that first": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Orang ini mempunyai akaun lain — padam atau tamatkannya dahulu"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この人にはほかのアカウントがあります。先にそちらを削除または終了してください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Orang ini memiliki akun lain — hapus atau akhiri itu lebih dulu"
+          }
+        }
+      }
+    },
+    "This place still has units or spaces in it — move or archive them first": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tempat ini masih mempunyai unit atau ruang — pindahkan atau arkibkannya dahulu"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この場所にはまだユニットまたはスペースがあります。先に移動するかアーカイブしてください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tempat ini masih memiliki unit atau ruang di dalamnya — pindahkan atau arsipkan lebih dulu"
+          }
+        }
+      }
+    },
+    "This plan has made a job, so it cannot be deleted": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pelan ini telah membuat kerja, jadi tidak boleh dipadam"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このプランは案件を作成済みのため削除できません"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rencana ini sudah membuat pekerjaan, jadi tidak dapat dihapus"
+          }
+        }
+      }
+    },
+    "This rate card has started, so it cannot be deleted": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kad kadar ini telah bermula, jadi tidak boleh dipadam"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このレートカードは適用が始まっているため削除できません"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kartu tarif ini sudah berlaku, jadi tidak dapat dihapus"
+          }
+        }
+      }
+    },
+    "This report was reviewed, so it cannot be deleted": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Laporan ini telah disemak, jadi tidak boleh dipadam"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このレポートはレビュー済みのため削除できません"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Laporan ini sudah ditinjau, jadi tidak dapat dihapus"
+          }
+        }
+      }
+    },
+    "This request was already sent with different contents — reload the page and try again": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Permintaan ini telah dihantar dengan kandungan berbeza — muat semula halaman dan cuba lagi"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このリクエストは別の内容ですでに送信されています。ページを再読み込みしてもう一度お試しください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Permintaan ini sudah dikirim dengan isi berbeda — muat ulang halaman dan coba lagi"
+          }
+        }
+      }
+    },
+    "This technician still has an assigned job — reassign it first": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Juruteknik ini masih mempunyai kerja yang ditugaskan — tugaskan semula dahulu"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この技術者には、まだ割り当て済みの作業があります — 先に再割り当てしてください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Teknisi ini masih memiliki pekerjaan yang ditugaskan — tugaskan ulang lebih dulu"
+          }
+        }
+      }
+    },
+    "This technician's access ends before the visit — choose another technician or ask HQ to extend it": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Akses juruteknik ini tamat sebelum lawatan — pilih juruteknik lain atau minta HQ melanjutkannya"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この技術者のアクセスは、訪問の前に終了します — 別の技術者を選ぶか、本部にアクセスの延長を依頼してください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Akses teknisi ini berakhir sebelum kunjungan — pilih teknisi lain atau minta HQ memperpanjangnya"
+          }
+        }
+      }
+    },
+    "This unit already has a device — unbind it first": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unit ini sudah mempunyai peranti — leraikannya dahulu"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このユニットにはすでにデバイスがあります。先に紐付けを解除してください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unit ini sudah memiliki perangkat — lepaskan lebih dulu"
+          }
+        }
+      }
+    },
+    "This unit has history (jobs, contracts, invoices, telemetry or devices), so it cannot be deleted — archive it instead": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unit ini mempunyai sejarah (kerja, kontrak, invois, telemetri atau peranti), jadi tidak boleh dipadam — arkibkannya sahaja"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このユニットには履歴（作業・契約・請求・計測データ・デバイス）があるため削除できません。代わりにアーカイブしてください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unit ini memiliki riwayat (pekerjaan, kontrak, faktur, telemetri, atau perangkat), jadi tidak dapat dihapus — arsipkan saja"
+          }
+        }
+      }
+    },
+    "This unit is archived": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unit ini telah diarkibkan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このユニットはアーカイブ済みです"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unit ini diarsipkan"
+          }
+        }
+      }
+    },
+    "This unit is still in use — a current contract, an open job, a bound device, a restriction, or a command or check still running — end or remove them before archiving": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unit ini masih digunakan — kontrak semasa, kerja terbuka, peranti terikat, sekatan, atau arahan atau semakan yang masih berjalan — tamatkan atau alihkannya sebelum mengarkib"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このユニットはまだ使われています（有効な契約、未完了の作業、紐付いたデバイス、制限、実行中の操作や診断）。アーカイブする前に終了または解除してください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unit ini masih digunakan — kontrak berjalan, pekerjaan terbuka, perangkat terikat, pembatasan, atau perintah atau pemeriksaan yang masih berjalan — akhiri atau hapus sebelum mengarsipkan"
+          }
+        }
+      }
+    },
+    "This user hasn’t signed in yet — remove them, or wait until they have": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pengguna ini belum log masuk — alih keluar mereka, atau tunggu sehingga mereka log masuk"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このユーザーはまだログインしていません — 削除するか、ログインするまでお待ちください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pengguna ini belum masuk — keluarkan, atau tunggu sampai mereka masuk"
+          }
+        }
+      }
+    },
+    "Time proposed": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Masa dicadangkan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "時間を提案済み"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waktu diusulkan"
+          }
+        }
+      }
+    },
+    "Too many changes in a short time — try again in {s} s": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terlalu banyak perubahan dalam masa yang singkat — cuba lagi dalam {s} saat"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "短時間に変更が多すぎます — {s} 秒後にもう一度お試しください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terlalu banyak perubahan dalam waktu singkat — coba lagi dalam {s} dtk"
+          }
+        }
+      }
+    },
+    "Too many changes in a short time — try again shortly": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terlalu banyak perubahan dalam masa yang singkat — cuba lagi sebentar lagi"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "短時間に変更が多すぎます — しばらくしてからもう一度お試しください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terlalu banyak perubahan dalam waktu singkat — coba lagi sebentar lagi"
+          }
+        }
+      }
+    },
+    "Units still use this model — change their model first": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unit masih menggunakan model ini — tukar model unit itu dahulu"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このモデルをまだユニットが使っています。先にそのユニットのモデルを変えてください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unit masih memakai model ini — ubah model mereka lebih dulu"
+          }
+        }
+      }
+    },
+    "You are more than 200 m from the site — move closer and try again, or check in manually with a reason": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anda lebih 200 m dari tapak — dekati tapak dan cuba lagi, atau daftar masuk secara manual dengan sebab"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "現場から 200 m 以上離れています。近づいてやり直すか、理由を入力して手動でチェックインしてください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anda lebih dari 200 m dari lokasi — mendekatlah dan coba lagi, atau check-in manual dengan alasan"
+          }
+        }
+      }
+    },
+    "You are not allowed to force a delete — ask HQ for the Data deletion permission": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anda tidak dibenarkan memadam secara paksa — minta kebenaran Pemadaman data daripada HQ"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "強制削除は許可されていません。HQ に「データ削除」権限を依頼してください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anda tidak diizinkan menghapus paksa — minta HQ untuk izin Penghapusan data"
+          }
+        }
+      }
+    },
+    "You can’t change or remove your own account": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anda tidak boleh mengubah atau mengalih keluar akaun anda sendiri"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ご自身のアカウントは変更も削除もできません"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anda tidak dapat mengubah atau mengeluarkan akun Anda sendiri"
+          }
+        }
+      }
+    },
+    "You cannot delete the account you are signed in with": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anda tidak boleh memadam akaun yang sedang anda gunakan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "サインイン中のアカウントは削除できません"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anda tidak dapat menghapus akun yang sedang Anda gunakan untuk masuk"
+          }
+        }
+      }
+    },
+    "You don't have permission for this action": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anda tiada kebenaran untuk tindakan ini"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この操作を行う権限がありません"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anda tidak memiliki izin untuk tindakan ini"
+          }
+        }
+      }
+    },
+    "Your company keeps one active contractor — this one can’t be disabled or removed": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Syarikat anda mengekalkan seorang kontraktor aktif — yang ini tidak boleh dilumpuhkan atau dialih keluar"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "貴社には有効な協力会社ユーザーが1人必要です — このユーザーは無効化も削除もできません"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Perusahaan Anda memiliki satu kontraktor aktif — yang ini tidak dapat dinonaktifkan atau dikeluarkan"
+          }
+        }
+      }
+    },
+    "Your location is not precise enough — move into the open and try again, or check in manually with a reason": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lokasi anda tidak cukup tepat — pergi ke kawasan lapang dan cuba lagi, atau daftar masuk secara manual dengan sebab"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "現在地の精度が足りません。開けた場所に移動してやり直すか、理由を入力して手動でチェックインしてください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lokasi Anda kurang akurat — pindah ke tempat terbuka dan coba lagi, atau check-in manual dengan alasan"
+          }
+        }
+      }
+    },
+    "Your session ended — sign in again": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sesi anda telah tamat — log masuk semula"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "セッションが終了しました — もう一度ログインしてください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sesi Anda berakhir — masuk lagi"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}
