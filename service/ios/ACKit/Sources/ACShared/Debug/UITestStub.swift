@@ -41,6 +41,18 @@ public enum UITestStub {
         private var observed = ObservedState(power: true, celsius: 26, mode: .cool, fanLevel: .mid, observedAt: day)
         private var commands: [String: Command] = [:]
         private var version = 1.0
+        private var notifications = Transport.inbox
+        private var consent = Consent(
+            id: "consent1",
+            tenantId: "t1",
+            version: 1,
+            createdAt: Transport.day,
+            updatedAt: Transport.day,
+            membershipId: "m1",
+            granted: false,
+            grantedAt: nil,
+            revokedAt: nil
+        )
 
         init(role: String) {
             self.role = role
@@ -59,12 +71,32 @@ public enum UITestStub {
             if path.hasSuffix("/.well-known/openid-configuration") { return try encoder.encode(StubEndpoints()) }
             if path.hasPrefix("/v1/units/") { return try encoder.encode(StubAnswer(data: detail(String(path.dropFirst(10))))) }
             if path.hasPrefix("/v1/commands/") { return try encoder.encode(StubAnswer(data: acknowledge(String(path.dropFirst(13))))) }
+            if path.hasPrefix("/v1/notifications/"), path.hasSuffix("/mark-read") {
+                let id = String(path.dropFirst(18).dropLast(10))
+                return try encoder.encode(StubAnswer(data: markRead(id)))
+            }
             switch (method, path) {
             case (_, "/token"): return try encoder.encode(StubTokens(accessToken: token))
             case (_, "/logout"): return Data("{}".utf8)
             case (_, "/v1/units"): return try encoder.encode(StubAnswer(data: page(Self.units)))
             case (_, "/v1/jobs"): return try encoder.encode(StubAnswer(data: page(Self.jobs)))
             case (_, "/v1/preferences"): return try encoder.encode(StubAnswer(data: Self.preferences))
+            case (_, "/v1/notifications"): return try encoder.encode(StubAnswer(data: page(notifications)))
+            case ("POST", "/v1/notifications/mark-all-read"):
+                let ids = notifications.filter { $0.readAt == nil }.map(\.id)
+                for id in ids { _ = markRead(id) }
+                return try encoder.encode(StubAnswer(data: NotificationsMarked(markedIds: ids, skippedIds: [])))
+            case (_, "/v1/properties"): return try encoder.encode(StubAnswer(data: page([Self.home])))
+            case ("GET", "/v1/consents/location_automation"): return try encoder.encode(StubAnswer(data: consent))
+            case ("PUT", "/v1/consents/location_automation"):
+                // the purpose is the route's ({purpose}): the body holds only the choice
+                let input = try JSONDecoder().decode(StubConsentBody.self, from: body ?? Data())
+                consent.granted = input.granted
+                consent.version += 1
+                return try encoder.encode(StubAnswer(data: consent))
+            case ("POST", "/v1/presence"):
+                let arrival = PresenceResultTransitions(propertyId: Self.home.id, event: .arrival, commandIds: ["c-auto"])
+                return try encoder.encode(StubAnswer(data: PresenceResult(transitions: [arrival])))
             case ("GET", "/v1/commands"):
                 return try encoder.encode(StubAnswer(data: page(commands.values.sorted { $0.id > $1.id })))
             case ("POST", "/v1/commands"):
@@ -123,6 +155,73 @@ public enum UITestStub {
             default: break
             }
             version += 1
+        }
+
+        private func markRead(_ id: String) -> CoreNotification? {
+            guard let index = notifications.firstIndex(where: { $0.id == id }) else { return nil }
+            notifications[index].readAt = Self.day
+            notifications[index].version += 1
+            return notifications[index]
+        }
+
+        private static let home = Property(
+            id: "p1",
+            tenantId: "t1",
+            version: 1,
+            createdAt: day,
+            updatedAt: day,
+            customerOrgId: "c1",
+            kind: .home,
+            name: "Home A",
+            address: nil,
+            accessInstructions: nil,
+            location: GeoPoint(latitude: 3.139, longitude: 101.6869),
+            geofenceRadiusMeters: nil,
+            archived: false
+        )
+
+        private static let inbox = [
+            notice(id: "n1", type: .cleaningDue, template: .alert, name: "Living room AC", message: "Cleaning due. Not a fault."),
+            notice(id: "n2", type: .completion, template: .completion, name: "Bedroom AC", message: nil, status: "completed"),
+        ]
+
+        private static func notice(
+            id: String,
+            type: NotificationType,
+            template: CoreNotificationTemplateKey,
+            name: String,
+            message: String?,
+            status: String = ""
+        ) -> CoreNotification {
+            CoreNotification(
+                id: id,
+                tenantId: "t1",
+                version: 1,
+                createdAt: day,
+                updatedAt: day,
+                sourceAlertId: nil,
+                type: type,
+                recipientMembershipId: "m1",
+                scopeVersionAtCreation: 1,
+                target: Target(kind: .unit, id: "u1"),
+                templateKey: template,
+                params: CoreNotificationParams(
+                    targetName: name,
+                    at: day,
+                    status: status.isEmpty ? type.rawValue : status,
+                    reason: nil,
+                    amountMinor: nil,
+                    currency: nil,
+                    method: nil,
+                    message: message
+                ),
+                channel: .inApp,
+                deliveryState: .queued,
+                severity: .normal,
+                occurredAt: day,
+                readAt: nil,
+                targetOpen: true
+            )
         }
 
         private static func commandAction(_ action: UnitAction) -> CommandAction {
@@ -302,6 +401,10 @@ private struct StubTokens: Encodable {
         case refreshToken = "refresh_token"
         case expiresIn = "expires_in"
     }
+}
+
+private struct StubConsentBody: Decodable {
+    let granted: Bool
 }
 
 private struct StubAnswer<Result: Encodable>: Encodable {

@@ -19,9 +19,11 @@
     "alerts.get"
   ],
   "customer": [
+    "consents.get",
+    "consents.update",
+    "presence.report",
     "properties.list",
-    "spaces.list",
-    "presence.report"
+    "spaces.list"
   ],
   "technician": [
     "alerts.acknowledge",

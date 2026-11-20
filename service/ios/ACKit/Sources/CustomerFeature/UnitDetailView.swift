@@ -28,6 +28,7 @@ struct UnitDetailView: View {
             }
         }
         .cardScreen()
+        .hideTabBar()
         .overlay { if case .loading = model.unit { ProgressView() } }
         .navigationTitle(Text(verbatim: model.unit.value?.displayName ?? ""))
         .inlineTitle()
@@ -272,9 +273,9 @@ struct UnitDetailView: View {
                 .accessibilityIdentifier("outcome")
                 HStack {
                     if !outcome.undo.isEmpty {
-                        Button(tr("Undo")) { Task { await model.undo() } }.buttonStyle(.bordered).accessibilityIdentifier("outcome.undo")
+                        Button(tr("Undo")) { Task { await model.undo() } }.secondaryAction().accessibilityIdentifier("outcome.undo")
                     }
-                    Button(tr("Dismiss")) { model.outcome = nil }.buttonStyle(.bordered)
+                    Button(tr("Dismiss")) { model.outcome = nil }.secondaryAction()
                 }
             }
         }

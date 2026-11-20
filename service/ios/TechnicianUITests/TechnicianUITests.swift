@@ -33,6 +33,15 @@ final class TechnicianUITests: XCTestCase {
     }
 
     @MainActor
+    func testNotificationsHaveTheirTab() throws {
+        let app = launch(["AC_UI_TEST": "stub"])
+        app.buttons["signIn.button"].tap()
+        app.tabBars.buttons["Notifications"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["notification.n1"].waitForExistence(timeout: 5))
+        try app.audit()
+    }
+
+    @MainActor
     func testTheDevicesLanguageIsShown() {
         let app = launch(["AC_UI_TEST": "stub", "AC_UI_TEST_ROLE": "other"], language: "ja")
         XCTAssertTrue(app.buttons["signIn.button"].waitForExistence(timeout: 5))

@@ -1,0 +1,64 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "NSLocationAlwaysAndWhenInUseUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arriving at and leaving your homes and offices is reported also while the app is closed; only home or away is kept."
+          }
+        },
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ketibaan di dan keluar dari rumah dan pejabat anda dilaporkan walaupun aplikasi ditutup; hanya di rumah atau keluar disimpan."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アプリを閉じていても、住宅・事業所への到着と出発を報告します。保存されるのは在宅か外出かだけです。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tiba di dan meninggalkan rumah serta kantor Anda dilaporkan juga saat aplikasi ditutup; hanya di rumah atau pergi yang disimpan."
+          }
+        }
+      }
+    },
+    "NSLocationWhenInUseUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your position is compared with the map pins of your homes and offices; only home or away is kept."
+          }
+        },
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kedudukan anda dibandingkan dengan pin peta rumah dan pejabat anda; hanya di rumah atau keluar disimpan."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "現在地を住宅・事業所の地図ピンと照らし合わせます。保存されるのは在宅か外出かだけです。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Posisi Anda dibandingkan dengan pin peta rumah dan kantor Anda; hanya di rumah atau pergi yang disimpan."
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

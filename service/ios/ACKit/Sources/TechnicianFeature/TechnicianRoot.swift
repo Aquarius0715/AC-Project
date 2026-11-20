@@ -20,8 +20,13 @@ public struct TechnicianRoot: View {
     @ViewBuilder private var content: some View {
         switch session.state {
         case .signedIn:
-            JobsView(model: JobsModel(client: session.client), session: session)
-                .task { await session.applyPreferences() }
+            TabView {
+                JobsView(model: JobsModel(client: session.client), session: session)
+                    .tabItem { Label(tr("Jobs"), systemImage: "wrench.and.screwdriver") }
+                NotificationsView(model: NotificationsModel(client: session.client))
+                    .tabItem { Label(tr("Notifications"), systemImage: "bell") }
+            }
+            .task { await session.applyPreferences() }
         case .signedOut, .signingIn:
             SignInView(title: tr("Technician"), model: session, web: web)
         }

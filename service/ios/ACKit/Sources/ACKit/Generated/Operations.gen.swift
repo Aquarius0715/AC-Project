@@ -127,6 +127,28 @@ public enum CommandsList: CoreOperation {
 }
 }
 
+/// `consents.get`
+extension Ops {
+public enum ConsentsGet: CoreOperation {
+  public typealias Input = ACKit.ConsentsGetInput
+  public typealias Result = ACKit.Consent
+  public static let name = "consents.get"
+  public static let isWrite = false
+  public static let routes: [CoreRoute] = [.init(method: .get, path: "/v1/consents/{purpose}")]
+}
+}
+
+/// `consents.update`
+extension Ops {
+public enum ConsentsUpdate: CoreOperation {
+  public typealias Input = ACKit.ConsentsUpdateInput
+  public typealias Result = ACKit.Consent
+  public static let name = "consents.update"
+  public static let isWrite = true
+  public static let routes: [CoreRoute] = [.init(method: .put, path: "/v1/consents/{purpose}")]
+}
+}
+
 /// `devices.addResponseNote`
 extension Ops {
 public enum DevicesAddResponseNote: CoreOperation {

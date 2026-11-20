@@ -12,6 +12,24 @@ extension View {
     }
 }
 
+extension View {
+    /// A secondary button (Mark all as read, Undo, Dismiss, a filter not chosen): the body colour on the grey of a
+    /// bordered button; the accent on its light tint is below the contrast the accessibility audit asks for.
+    public func secondaryAction() -> some View {
+        buttonStyle(.bordered).tint(.primary)
+    }
+
+    /// A pushed detail screen without the tab bar: the bar's translucent background over the screen's last lines is
+    /// below the contrast the accessibility audit asks for.
+    public func hideTabBar() -> some View {
+        #if os(iOS)
+        toolbar(.hidden, for: .tabBar)
+        #else
+        self
+        #endif
+    }
+}
+
 /// A list section's heading in the body colour: the system's grey heading is below the contrast the accessibility audit
 /// asks for.
 public struct SectionHeading: View {
