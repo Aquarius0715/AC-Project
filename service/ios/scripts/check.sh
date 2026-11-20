@@ -21,7 +21,15 @@ step "UI tests (stub)"
 # the first available iPhone simulator of the installed runtime: the runner's and a Mac's differ
 device=$(xcrun simctl list devices available | sed -n 's/^ *\(iPhone [^(]*\) (.*/\1/p' | sed 's/ *$//' | head -n 1)
 [ -n "$device" ] || { echo "no iPhone simulator is installed" >&2; exit 1; }
+# each app's log stays out of the way unless its tests fail: then its failures are printed (xcodebuild -quiet prints none)
+log=$(mktemp)
+trap 'rm -f "$log"' EXIT
 for scheme in CustomerApp TechnicianApp; do
-  xcodebuild -project AC.xcodeproj -scheme "$scheme" -destination "platform=iOS Simulator,name=$device" -quiet test
+  if ! xcodebuild -project AC.xcodeproj -scheme "$scheme" -destination "platform=iOS Simulator,name=$device" test >"$log" 2>&1; then
+    grep -E "error:|Test Case .* failed|accessibility audit|^(Contrast|Dynamic Type|Hit area|Text clipped|Element)" "$log" || tail -n 60 "$log"
+    echo "$scheme: UI tests failed on $device" >&2
+    exit 1
+  fi
+  grep -E "Executed [0-9]+ tests" "$log" | tail -n 1
 done
 echo "all iOS checks passed"
