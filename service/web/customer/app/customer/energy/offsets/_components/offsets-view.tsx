@@ -5,7 +5,7 @@ import { useState } from "react";
 import { Badge, Banner, Btn, Card, Check, DemoBadge, Field, Input, Page, Steps, SummaryList, Plain } from "@ac/web/components/ui";
 import { useAction } from "@ac/web/lib/useAction";
 import { amount, klStamp } from "@ac/web/lib/energy";
-import { kg3, type ApiOffsetRecord, type ApiQuote } from "@ac/web/lib/offsets";
+import { conceptWord, kg3, type ApiOffsetRecord, type ApiQuote } from "@ac/web/lib/offsets";
 import { showDate, showTime } from "@ac/web/lib/i18n";
 import { useDisplay, useT } from "@ac/web/components/I18n";
 import { getQuote, requestOffset } from "../actions";
@@ -45,8 +45,8 @@ export function OffsetsView({ live }: Readonly<{ live: Live }>) {
         return;
       }
 
-      setQuote(null); setStep(0); });
-  }; // an expired or used quote: get a new one
+      setQuote(null); setAck(false); setStep(0); });
+  }; // an expired or used quote: get a new one, and confirm that one again
   const restart = () => { setDone(null); setQuote(null); setAck(false); setStep(0); };
   return (
     <Page>
@@ -100,7 +100,7 @@ export function OffsetsView({ live }: Readonly<{ live: Live }>) {
       </Card>
       <details className="rounded-2xl border border-line bg-surface p-4 text-[13px]">
         <summary className="cursor-pointer font-bold">{t("Future carbon market (concept)")} <span className="text-xs font-normal text-muted-foreground">{t("Not available · no prices, balances or trading")}</span></summary>
-        <p className="mt-2 text-xs text-muted-foreground">{t("Concept only — provider {provider}, verification {verification}, ledger {ledger}. Integration partners and verification conditions are undecided; nothing here is tradable.", { provider: quote ? quote.marketConcept.providerLabel : t("not selected"), verification: quote ? quote.marketConcept.verificationStatus : t("unverified"), ledger: quote ? quote.marketConcept.ledgerStatus.replace("_", " ") : t("not connected") })}</p>
+        <p className="mt-2 text-xs text-muted-foreground">{t("Concept only — provider {provider}, verification {verification}, ledger {ledger}. Integration partners and verification conditions are undecided; nothing here is tradable.", { provider: quote ? quote.marketConcept.providerLabel : t("not selected"), verification: conceptWord(quote ? quote.marketConcept.verificationStatus : "unverified", t), ledger: conceptWord(quote ? quote.marketConcept.ledgerStatus : "not_connected", t) })}</p>
       </details>
     </Page>
   );

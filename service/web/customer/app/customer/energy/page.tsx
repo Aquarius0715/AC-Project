@@ -53,7 +53,8 @@ export default async function CustomerEnergyPage({ searchParams }: Readonly<Page
     compare: null,
     top: [],
     isTopDefault: topId !== null,
-    query: selectionQuery({ unitIds, period: kind, from: one("from"), to: one("to"), baselineId: baseline?.id }),
+    // "none" is carried too, so coming back from Carbon offsets keeps No baseline rather than the default one
+    query: selectionQuery({ unitIds, period: kind, from: one("from"), to: one("to"), baselineId: one("baselineId") === "none" ? "none" : baseline?.id }),
     lastMonth: previousMonth(now),
     unitIds,
     period,

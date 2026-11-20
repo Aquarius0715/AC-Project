@@ -86,8 +86,12 @@ export function recordRows(rs: ApiOffsetRecord[], customers: { id: string; name:
 
 /** The market concept of a quote: known codes worded, others as they are. */
 export function conceptText(m: ApiQuote["marketConcept"], t: T = en): string {
+  return t("{stage} · verification {verification} · ledger {ledger}", { stage: conceptWord(m.stage, t), verification: conceptWord(m.verificationStatus, t), ledger: conceptWord(m.ledgerStatus, t) });
+}
+/** One market-concept code in the display language; an unknown code as it is. */
+export function conceptWord(code: string, t: T = en): string {
   const word: Record<string, string> = { future_concept: t("future concept"), unverified: t("unverified"), not_connected: t("not connected") };
-  return t("{stage} · verification {verification} · ledger {ledger}", { stage: lookup(word, m.stage) ?? m.stage, verification: lookup(word, m.verificationStatus) ?? m.verificationStatus, ledger: lookup(word, m.ledgerStatus) ?? m.ledgerStatus });
+  return lookup(word, code) ?? code;
 }
 
 /** The demo quote form (DD-A15 fields). */
