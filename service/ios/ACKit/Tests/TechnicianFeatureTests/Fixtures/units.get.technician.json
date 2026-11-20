@@ -1,0 +1,225 @@
+{
+    "data": {
+        "id": "e841ee95-3171-54d5-be91-1f2301bdb701",
+        "tenantId": "820cc6b6-9ea8-5d18-8b10-5c8c1d126814",
+        "version": 1,
+        "createdAt": "2026-09-01T00:00:00Z",
+        "updatedAt": "2026-09-01T00:00:00Z",
+        "customerOrgId": "7480dcb3-9986-5e52-ac69-d5fd9399507d",
+        "propertyId": "cd425e38-655c-5a52-b51d-cf12ef43d0bf",
+        "spaceId": "89d393e3-b0a7-527d-8419-43010560ee3f",
+        "displayName": "Living room AC",
+        "modelId": "4f0fce53-656a-5856-a603-d70bb496bca0",
+        "type": "split",
+        "installState": "installed",
+        "installedAt": null,
+        "serviceScope": [
+            "indoor",
+            "outdoor",
+            "electrical"
+        ],
+        "warrantyEndsAt": "2026-10-27T16:00:00Z",
+        "alertPolicyIds": [],
+        "archived": false,
+        "capabilityVersion": 1,
+        "iotModelId": "4f0fce53-656a-5856-a603-d70bb496bca0",
+        "iotModelVersion": 1,
+        "connection": "online",
+        "observedState": {
+            "power": false,
+            "celsius": 26,
+            "mode": "cool",
+            "fanLevel": "low",
+            "observedAt": "2026-09-14T00:59:30Z"
+        },
+        "observedRestriction": null,
+        "lastSeenAt": "2026-09-27T02:00:14.778138Z",
+        "effectivePowerState": "unknown",
+        "latestMeasurements": [
+            {
+                "id": "080d5500-c98d-5718-8d6b-4cbcf39870e6",
+                "tenantId": "820cc6b6-9ea8-5d18-8b10-5c8c1d126814",
+                "version": 1,
+                "createdAt": "2026-09-27T02:00:14.690298Z",
+                "updatedAt": "2026-09-27T02:00:14.690298Z",
+                "boundaryId": null,
+                "qualityReason": null,
+                "rawUnit": null,
+                "unitId": "e841ee95-3171-54d5-be91-1f2301bdb701",
+                "sensorId": "9f67089f-44c9-5231-ba20-03d3b9a1be53",
+                "metric": "humidity",
+                "value": 53.41,
+                "unit": "%",
+                "observedAt": "2026-09-27T02:00:00Z",
+                "receivedAt": "2026-09-27T02:00:14.690298Z",
+                "origin": "measured",
+                "quality": "valid",
+                "isDemo": true,
+                "sequence": 6669,
+                "eventId": "080d5500-c98d-5718-8d6b-4cbcf39870e6"
+            },
+            {
+                "id": "dc7a5418-8b68-588e-b862-08c94cf3ca1c",
+                "tenantId": "820cc6b6-9ea8-5d18-8b10-5c8c1d126814",
+                "version": 1,
+                "createdAt": "2026-09-27T02:00:14.690298Z",
+                "updatedAt": "2026-09-27T02:00:14.690298Z",
+                "boundaryId": "ac_input_electricity",
+                "qualityReason": null,
+                "rawUnit": null,
+                "unitId": "e841ee95-3171-54d5-be91-1f2301bdb701",
+                "sensorId": "9aa7d20f-f28a-53c7-9553-14097801e928",
+                "metric": "power",
+                "value": 0.95,
+                "unit": "kW",
+                "observedAt": "2026-09-27T02:00:00Z",
+                "receivedAt": "2026-09-27T02:00:14.690298Z",
+                "origin": "measured",
+                "quality": "valid",
+                "isDemo": true,
+                "sequence": 6658,
+                "eventId": "dc7a5418-8b68-588e-b862-08c94cf3ca1c"
+            },
+            {
+                "id": "cd6976d9-d370-590c-ba87-67fa88a0dbc7",
+                "tenantId": "820cc6b6-9ea8-5d18-8b10-5c8c1d126814",
+                "version": 1,
+                "createdAt": "2026-09-27T02:00:14.690298Z",
+                "updatedAt": "2026-09-27T02:00:14.690298Z",
+                "boundaryId": null,
+                "qualityReason": null,
+                "rawUnit": null,
+                "unitId": "e841ee95-3171-54d5-be91-1f2301bdb701",
+                "sensorId": "d8e49948-6f47-5bf0-988f-7b37feb6d5c9",
+                "metric": "temperature",
+                "value": 25.6,
+                "unit": "°C",
+                "observedAt": "2026-09-27T02:00:00Z",
+                "receivedAt": "2026-09-27T02:00:14.690298Z",
+                "origin": "measured",
+                "quality": "valid",
+                "isDemo": true,
+                "sequence": 6660,
+                "eventId": "cd6976d9-d370-590c-ba87-67fa88a0dbc7"
+            }
+        ],
+        "activeAlertCount": 0,
+        "capabilities": {
+            "id": "4f0fce53-656a-5856-a603-d70bb496bca0",
+            "tenantId": "820cc6b6-9ea8-5d18-8b10-5c8c1d126814",
+            "version": 1,
+            "createdAt": "2026-09-01T00:00:00Z",
+            "updatedAt": "2026-09-01T00:00:00Z",
+            "manufacturer": "DemoAir",
+            "model": "SPL-100",
+            "control": true,
+            "modeControl": true,
+            "fanControl": true,
+            "temperature": {
+                "min": 16,
+                "max": 30,
+                "step": 1
+            },
+            "modes": [
+                "cool",
+                "dry",
+                "fan"
+            ],
+            "fanLevels": [
+                "low",
+                "mid",
+                "high"
+            ],
+            "ventilation": false,
+            "ventilationLevels": []
+        },
+        "iotModel": {
+            "id": "4f0fce53-656a-5856-a603-d70bb496bca0",
+            "tenantId": "820cc6b6-9ea8-5d18-8b10-5c8c1d126814",
+            "version": 1,
+            "createdAt": "2026-09-01T00:00:00Z",
+            "updatedAt": "2026-09-01T00:00:00Z",
+            "manufacturer": "DemoAir",
+            "model": "SPL-100",
+            "sensors": [
+                {
+                    "boundaryId": null,
+                    "metric": "temperature",
+                    "unit": "°C",
+                    "staleAfterSeconds": 120
+                },
+                {
+                    "boundaryId": null,
+                    "metric": "humidity",
+                    "unit": "%",
+                    "staleAfterSeconds": 120
+                },
+                {
+                    "boundaryId": null,
+                    "metric": "co2",
+                    "unit": "ppm",
+                    "staleAfterSeconds": 120
+                },
+                {
+                    "boundaryId": null,
+                    "metric": "pm25",
+                    "unit": "µg/m³",
+                    "staleAfterSeconds": 120
+                },
+                {
+                    "boundaryId": "ac_input_electricity",
+                    "metric": "power",
+                    "unit": "kW",
+                    "staleAfterSeconds": 120
+                }
+            ],
+            "firmwareCandidates": [
+                "v1",
+                "v2"
+            ]
+        },
+        "effectiveControlPolicy": {
+            "state": "unrestricted"
+        },
+        "controlAvailability": {
+            "state": "available"
+        },
+        "components": [
+            "filter",
+            "evaporator_coil",
+            "blower_motor",
+            "blower_fan",
+            "drain_pipe",
+            "drain_pan",
+            "outlet",
+            "louver",
+            "condenser_coil",
+            "compressor",
+            "fan",
+            "blade",
+            "refrigerant_pipe",
+            "thermostat",
+            "sensor",
+            "capacitor",
+            "contactor",
+            "wiring"
+        ],
+        "pendingCommands": [],
+        "pendingCommandIds": [],
+        "location": {
+            "pathLabels": [
+                "Home A",
+                "1F",
+                "Living room"
+            ],
+            "address": "1 Demo Street, Kuala Lumpur (fictional)",
+            "accessInstructions": "Ring the demo bell (fictional)"
+        }
+    },
+    "meta": {
+        "correlationId": "01a1f9a1-18e9-776f-8edd-8958269ce664",
+        "eventCursor": 107263,
+        "operation": "units.get",
+        "snapshotAt": "2026-09-27T02:00:51.168055468Z"
+    }
+}

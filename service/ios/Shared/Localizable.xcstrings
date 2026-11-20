@@ -116,6 +116,29 @@
         }
       }
     },
+    "— (on submit)": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "— (semasa hantar)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "—（提出時）"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "— (saat diserahkan)"
+          }
+        }
+      }
+    },
     "{celsius}°C is very cold for cooling: a lower setting does not cool the room faster, it runs longer and uses more power. 24–26°C is a common comfortable range.": {
       "extractionState": "manual",
       "localizations": {
@@ -392,6 +415,52 @@
         }
       }
     },
+    "{h} h {m} min": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{h} j {m} min"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{h} 時間 {m} 分"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{h} j {m} mnt"
+          }
+        }
+      }
+    },
+    "{m} m from site · QR matched": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{m} m dari tapak · QR sepadan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "現場から {m} m · QR が一致"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{m} m dari lokasi · QR cocok"
+          }
+        }
+      }
+    },
     "{min}–{max}°C · step {step}°C · confirmed {confirmed}°C": {
       "extractionState": "manual",
       "localizations": {
@@ -415,6 +484,121 @@
         }
       }
     },
+    "{n} alerts": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{n} amaran"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アラート {n} 件"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{n} peringatan"
+          }
+        }
+      }
+    },
+    "{n} change:": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{n} perubahan:"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{n} 件の変更:"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{n} perubahan:"
+          }
+        }
+      }
+    },
+    "{n} changes:": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{n} perubahan:"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{n} 件の変更:"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{n} perubahan:"
+          }
+        }
+      }
+    },
+    "{n} min": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{n} min"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{n} 分"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{n} mnt"
+          }
+        }
+      }
+    },
+    "{n} new assignments to accept": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{n} tugasan baharu untuk diterima"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "承諾が必要な新しい割り当て {n} 件"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{n} penugasan baru untuk diterima"
+          }
+        }
+      }
+    },
     "{n} notifications marked as read": {
       "extractionState": "manual",
       "localizations": {
@@ -434,6 +618,52 @@
           "stringUnit": {
             "state": "translated",
             "value": "{n} notifikasi ditandai sudah dibaca"
+          }
+        }
+      }
+    },
+    "{n} pauses": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{n} jeda"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一時停止 {n} 回"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{n} jeda"
+          }
+        }
+      }
+    },
+    "{range} · warning at {warn} · discard at {end}": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{range} · amaran pada {warn} · dibuang pada {end}"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{range} · {warn} に警告 · {end} に破棄"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{range} · peringatan pada {warn} · dibuang pada {end}"
           }
         }
       }
@@ -484,6 +714,29 @@
         }
       }
     },
+    "{status} when your assignment ended": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{status} semasa tugasan anda tamat"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "あなたの割り当てが終了した時点で {status}"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{status} saat penugasan Anda berakhir"
+          }
+        }
+      }
+    },
     "{unit}: sent — its answer could not be read. Refresh to see the AC's state before sending again.": {
       "extractionState": "manual",
       "localizations": {
@@ -507,6 +760,29 @@
         }
       }
     },
+    "1 alert": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 amaran"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アラート 1 件"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 peringatan"
+          }
+        }
+      }
+    },
     "1 notification marked as read": {
       "extractionState": "manual",
       "localizations": {
@@ -526,6 +802,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "1 notifikasi ditandai sudah dibaca"
+          }
+        }
+      }
+    },
+    "1 pause": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 jeda"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一時停止 1 回"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 jeda"
           }
         }
       }
@@ -599,6 +898,29 @@
         }
       }
     },
+    "A reason is required for a manual check-in (1–1000 characters)": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sebab diperlukan untuk daftar masuk manual (1–1000 aksara)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "手動でチェックインするには理由が必要です（1～1000文字）"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alasan wajib untuk check-in manual (1–1000 karakter)"
+          }
+        }
+      }
+    },
     "a service restriction limits this setting": {
       "extractionState": "manual",
       "localizations": {
@@ -618,6 +940,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "pembatasan layanan membatasi pengaturan ini"
+          }
+        }
+      }
+    },
+    "A time you could do instead (optional)": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Masa lain yang anda boleh (pilihan)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "代わりに対応できる時刻（任意）"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waktu yang bisa Anda kerjakan sebagai gantinya (opsional)"
           }
         }
       }
@@ -645,6 +990,29 @@
         }
       }
     },
+    "Accept assignment": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terima tugasan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "割り当てを承諾"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terima penugasan"
+          }
+        }
+      }
+    },
     "Accepted": {
       "extractionState": "manual",
       "localizations": {
@@ -664,6 +1032,98 @@
           "stringUnit": {
             "state": "translated",
             "value": "Diterima"
+          }
+        }
+      }
+    },
+    "Accepted — the job is completed and the report is visible to the customer.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diterima — kerja telah selesai dan laporan boleh dilihat oleh pelanggan."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "承諾されました — 作業は完了し、報告書は顧客に表示されます。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diterima — pekerjaan selesai dan laporan terlihat oleh pelanggan."
+          }
+        }
+      }
+    },
+    "accepted in the quality review": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "diterima dalam semakan kualiti"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "品質レビューで承諾済み"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "diterima dalam tinjauan kualitas"
+          }
+        }
+      }
+    },
+    "Accepted in the quality review": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diterima dalam semakan kualiti"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "品質レビューで承諾済み"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diterima dalam tinjauan kualitas"
+          }
+        }
+      }
+    },
+    "Access": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Akses"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アクセス"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Akses"
           }
         }
       }
@@ -1128,6 +1588,75 @@
         }
       }
     },
+    "Arrival inside the window counts toward the SLA. Times are part of the report and visible to the contractor and HQ.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ketibaan dalam tetingkap dikira untuk SLA. Masa adalah sebahagian daripada laporan dan boleh dilihat oleh kontraktor dan HQ."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "作業時間内の到着は SLA の対象になります。時刻は報告書の一部で、協力会社と本部に表示されます。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kedatangan di dalam jendela dihitung untuk SLA. Waktu menjadi bagian laporan dan terlihat oleh kontraktor dan HQ."
+          }
+        }
+      }
+    },
+    "Arrival must be inside your work window. Checking in records the arrival and starts the work.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ketibaan mesti dalam tetingkap kerja anda. Daftar masuk merekodkan ketibaan dan memulakan kerja."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "到着は作業時間内である必要があります。チェックインすると、到着が記録され、作業が始まります。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kedatangan harus di dalam jendela pekerjaan Anda. Check-in mencatat kedatangan dan memulai pekerjaan."
+          }
+        }
+      }
+    },
+    "Arrived": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tiba"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "到着"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tiba"
+          }
+        }
+      }
+    },
     "Arrived at {name} — {n} automations ran.": {
       "extractionState": "manual",
       "localizations": {
@@ -1197,6 +1726,29 @@
         }
       }
     },
+    "ask your contractor or HQ to extend or reassign": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "minta kontraktor anda atau HQ melanjutkan atau menugaskan semula"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "協力会社または本部に、延長または再割り当てを依頼してください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "minta kontraktor atau HQ Anda memperpanjang atau menugaskan ulang"
+          }
+        }
+      }
+    },
     "Assigned": {
       "extractionState": "manual",
       "localizations": {
@@ -1216,6 +1768,52 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ditugaskan"
+          }
+        }
+      }
+    },
+    "Assignment accepted": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tugasan diterima"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "割り当てを承諾しました"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Penugasan diterima"
+          }
+        }
+      }
+    },
+    "Assignment ended": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tugasan tamat"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "割り当て終了"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Penugasan berakhir"
           }
         }
       }
@@ -1289,6 +1887,29 @@
         }
       }
     },
+    "awaiting quality review (read-only)": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "menunggu semakan kualiti (baca sahaja)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "品質レビュー待ち（読み取り専用）"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "menunggu tinjauan kualitas (hanya-baca)"
+          }
+        }
+      }
+    },
     "below": {
       "extractionState": "manual",
       "localizations": {
@@ -1312,6 +1933,29 @@
         }
       }
     },
+    "Can’t make it": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak dapat hadir"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "対応できません"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak bisa hadir"
+          }
+        }
+      }
+    },
     "Can’t make the visit": {
       "extractionState": "manual",
       "localizations": {
@@ -1331,6 +1975,52 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tidak dapat melakukan kunjungan"
+          }
+        }
+      }
+    },
+    "Can’t make this time": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak dapat hadir pada masa ini"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この時刻は対応できません"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak bisa hadir pada waktu ini"
+          }
+        }
+      }
+    },
+    "Can’t make this time…": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak dapat hadir pada masa ini…"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この時刻は対応できません…"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak bisa hadir pada waktu ini…"
           }
         }
       }
@@ -1427,6 +2117,75 @@
         }
       }
     },
+    "Check in & start": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Daftar masuk & mula"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "チェックインして開始"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check-in & mulai"
+          }
+        }
+      }
+    },
+    "Check in at site": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Daftar masuk di tapak"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "現場でチェックイン"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check-in di lokasi"
+          }
+        }
+      }
+    },
+    "check in to start": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "daftar masuk untuk mula"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "チェックインして開始"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "check-in untuk memulai"
+          }
+        }
+      }
+    },
     "Check the entered values": {
       "extractionState": "manual",
       "localizations": {
@@ -1446,6 +2205,52 @@
           "stringUnit": {
             "state": "translated",
             "value": "Periksa nilai yang dimasukkan"
+          }
+        }
+      }
+    },
+    "checked in": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "sudah daftar masuk"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "チェックイン済み"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "sudah check-in"
+          }
+        }
+      }
+    },
+    "Checked in — the job has started": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sudah daftar masuk — kerja telah bermula"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "チェックインしました — 作業が始まりました"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check-in selesai — pekerjaan telah dimulai"
           }
         }
       }
@@ -1542,6 +2347,29 @@
         }
       }
     },
+    "client request": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "permintaan pelanggan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "顧客からの依頼"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "permintaan klien"
+          }
+        }
+      }
+    },
     "CO₂": {
       "extractionState": "manual",
       "localizations": {
@@ -1607,6 +2435,52 @@
           "stringUnit": {
             "state": "translated",
             "value": "Selesai"
+          }
+        }
+      }
+    },
+    "Completed — your assignment ended with the job": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selesai — tugasan anda tamat bersama kerja"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "完了 — あなたの割り当ては作業の終了とともに終わりました"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selesai — penugasan Anda berakhir bersama pekerjaan"
+          }
+        }
+      }
+    },
+    "Completed {time}": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selesai {time}"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{time} に完了"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selesai {time}"
           }
         }
       }
@@ -1795,6 +2669,52 @@
         }
       }
     },
+    "critical alert on the unit": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "amaran kritikal pada unit"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ユニットに重大なアラート"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "peringatan kritis pada unit"
+          }
+        }
+      }
+    },
+    "Current power unknown · switching sends that command": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kuasa semasa tidak diketahui · menukar akan menghantar arahan itu"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "現在の電源は不明 · 切り替えるとそのコマンドを送信します"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Daya saat ini tidak diketahui · mengubahnya akan mengirim perintah itu"
+          }
+        }
+      }
+    },
     "Customer": {
       "extractionState": "manual",
       "localizations": {
@@ -1814,6 +2734,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Pelanggan"
+          }
+        }
+      }
+    },
+    "Date": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tarikh"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "日付"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tanggal"
           }
         }
       }
@@ -2255,29 +3198,6 @@
         }
       }
     },
-    "Due {time}": {
-      "extractionState": "manual",
-      "localizations": {
-        "ms": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tarikh akhir {time}"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "期限 {time}"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Jatuh tempo {time}"
-          }
-        }
-      }
-    },
     "email": {
       "extractionState": "manual",
       "localizations": {
@@ -2297,6 +3217,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "email"
+          }
+        }
+      }
+    },
+    "Ended {time} · {range}": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tamat {time} · {range}"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{time} に終了 · {range}"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Berakhir {time} · {range}"
           }
         }
       }
@@ -2531,6 +3474,29 @@
         }
       }
     },
+    "Finished": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selesai"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "終了"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selesai"
+          }
+        }
+      }
+    },
     "Firmware update from {date}, {from}–{to} local time. The AC may restart for about 2 minutes.": {
       "extractionState": "manual",
       "localizations": {
@@ -2550,6 +3516,75 @@
           "stringUnit": {
             "state": "translated",
             "value": "Pembaruan firmware mulai {date}, pukul {from}–{to} waktu lokal. AC dapat restart sekitar 2 menit."
+          }
+        }
+      }
+    },
+    "Found, accurate to ±{n} m — the server checks you are within 200 m of the site": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ditemui, tepat hingga ±{n} m — pelayan menyemak anda berada dalam 200 m dari tapak"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "取得しました（精度 ±{n} m）。現場から 200 m 以内かはサーバーが確認します"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ditemukan, akurat hingga ±{n} m — server memeriksa Anda berada dalam 200 m dari lokasi"
+          }
+        }
+      }
+    },
+    "Get my location": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dapatkan lokasi saya"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "現在地を取得"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ambil lokasi saya"
+          }
+        }
+      }
+    },
+    "Get your location first — or check in manually with a reason": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dapatkan lokasi anda dahulu — atau daftar masuk secara manual dengan sebab"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "先に現在地を取得してください。または理由を入力して手動でチェックインしてください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ambil lokasi Anda dahulu — atau check-in manual dengan alasan"
           }
         }
       }
@@ -2600,6 +3635,29 @@
         }
       }
     },
+    "held by HQ — actions are blocked": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ditangguhkan oleh HQ — tindakan disekat"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本部が保留中 — 操作はブロックされています"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ditahan HQ — tindakan diblokir"
+          }
+        }
+      }
+    },
     "High": {
       "extractionState": "manual",
       "localizations": {
@@ -2619,6 +3677,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tinggi"
+          }
+        }
+      }
+    },
+    "How": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cara"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "方法"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cara"
           }
         }
       }
@@ -2711,6 +3792,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "HQ sedang memeriksa AC ini"
+          }
+        }
+      }
+    },
+    "HQ request": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Permintaan HQ"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HQ 依頼"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Permintaan HQ"
           }
         }
       }
@@ -2830,6 +3934,52 @@
         }
       }
     },
+    "Job": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kerja"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "作業"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pekerjaan"
+          }
+        }
+      }
+    },
+    "Job & unit": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kerja & unit"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "作業とユニット"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pekerjaan & unit"
+          }
+        }
+      }
+    },
     "Job history": {
       "extractionState": "manual",
       "localizations": {
@@ -2895,6 +4045,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Pekerjaan"
+          }
+        }
+      }
+    },
+    "Jobs assigned to you appear here. Past assignments stay in their job history.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kerja yang ditugaskan kepada anda dipaparkan di sini. Tugasan lalu kekal dalam sejarah kerjanya."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "あなたに割り当てられた作業がここに表示されます。過去の割り当ては、作業履歴に残ります。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pekerjaan yang ditugaskan kepada Anda muncul di sini. Penugasan lalu tetap berada di riwayat pekerjaannya."
           }
         }
       }
@@ -2968,6 +4141,75 @@
         }
       }
     },
+    "Linked alerts": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Amaran yang dipautkan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "紐づくアラート"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Peringatan terkait"
+          }
+        }
+      }
+    },
+    "Locate again": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cari lokasi semula"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "もう一度取得"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ambil lokasi lagi"
+          }
+        }
+      }
+    },
+    "Locating…": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mencari lokasi…"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "取得中…"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mencari lokasi…"
+          }
+        }
+      }
+    },
     "Location": {
       "extractionState": "manual",
       "localizations": {
@@ -2987,6 +4229,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Lokasi"
+          }
+        }
+      }
+    },
+    "Location + unit QR": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lokasi + QR unit"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "位置情報とユニットの QR"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lokasi + QR unit"
           }
         }
       }
@@ -3056,6 +4321,52 @@
           "stringUnit": {
             "state": "translated",
             "value": "Persetujuan lokasi — hanya untuk otomasi tiba/pergi"
+          }
+        }
+      }
+    },
+    "Location consent granted": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Persetujuan lokasi diberikan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "位置情報の同意を付与しました"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Persetujuan lokasi diberikan"
+          }
+        }
+      }
+    },
+    "Location consent withdrawn — location automations are off": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Persetujuan lokasi ditarik balik — automasi lokasi dimatikan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "位置情報の同意を撤回しました — 位置情報による自動化はオフです"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Persetujuan lokasi dicabut — otomasi lokasi nonaktif"
           }
         }
       }
@@ -3152,6 +4463,75 @@
         }
       }
     },
+    "manual — {reason}": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "manual — {reason}"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "手動 — {reason}"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "manual — {reason}"
+          }
+        }
+      }
+    },
+    "Manual (reason)": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manual (sebab)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "手動（理由あり）"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manual (alasan)"
+          }
+        }
+      }
+    },
+    "manual check-in": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "daftar masuk manual"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "手動チェックイン"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "check-in manual"
+          }
+        }
+      }
+    },
     "Mark all as read": {
       "extractionState": "manual",
       "localizations": {
@@ -3171,6 +4551,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tandai semua sudah dibaca"
+          }
+        }
+      }
+    },
+    "Medical appointment on that morning": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Temu janji perubatan pada pagi itu"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "その日の午前に通院があります"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Janji medis pada pagi itu"
           }
         }
       }
@@ -3263,6 +4666,75 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mode → {mode}"
+          }
+        }
+      }
+    },
+    "new assignment — review and accept it": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "tugasan baharu — semak dan terimanya"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新しい割り当て — 確認して承諾してください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "penugasan baru — tinjau dan terima"
+          }
+        }
+      }
+    },
+    "New assignment for {window}. Accepting tells your coordinator and HQ you will attend; the client then sees your name.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tugasan baharu untuk {window}. Menerimanya memberitahu penyelaras anda dan HQ bahawa anda akan hadir; pelanggan kemudian melihat nama anda."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{window} の新しい割り当てです。承諾すると、担当者と本部に出席することが伝わり、顧客にはあなたの名前が表示されます。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Penugasan baru untuk {window}. Menerima memberi tahu koordinator dan HQ bahwa Anda akan hadir; klien kemudian melihat nama Anda."
+          }
+        }
+      }
+    },
+    "New assignment to accept — {job}": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tugasan baharu untuk diterima — {job}"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "承諾が必要な新しい割り当て — {job}"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Penugasan baru untuk diterima — {job}"
           }
         }
       }
@@ -3428,25 +4900,25 @@
         }
       }
     },
-    "No jobs yet": {
+    "No GPS signal in the basement plant room": {
       "extractionState": "manual",
       "localizations": {
         "ms": {
           "stringUnit": {
             "state": "translated",
-            "value": "Belum ada kerja"
+            "value": "Tiada isyarat GPS di bilik loji ruang bawah tanah"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "まだ作業はありません"
+            "value": "地下の機械室で GPS の電波が届かない"
           }
         },
         "id": {
           "stringUnit": {
             "state": "translated",
-            "value": "Belum ada pekerjaan"
+            "value": "Tidak ada sinyal GPS di ruang mesin basemen"
           }
         }
       }
@@ -3497,6 +4969,29 @@
         }
       }
     },
+    "no reason": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "tiada sebab"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "理由なし"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "tanpa alasan"
+          }
+        }
+      }
+    },
     "no recent measurement": {
       "extractionState": "manual",
       "localizations": {
@@ -3520,6 +5015,75 @@
         }
       }
     },
+    "No report from your assignment": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tiada laporan daripada tugasan anda"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "あなたの割り当てによる報告書はありません"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak ada laporan dari penugasan Anda"
+          }
+        }
+      }
+    },
+    "No work window": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tiada tetingkap kerja"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "作業時間なし"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak ada jendela pekerjaan"
+          }
+        }
+      }
+    },
+    "none": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "tiada"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "なし"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "tidak ada"
+          }
+        }
+      }
+    },
     "None of your homes or offices has a map pin yet — HQ sets them.": {
       "extractionState": "manual",
       "localizations": {
@@ -3539,6 +5103,52 @@
           "stringUnit": {
             "state": "translated",
             "value": "Belum ada rumah atau kantor Anda yang memiliki pin peta — HQ yang menetapkannya."
+          }
+        }
+      }
+    },
+    "Not accepted": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Belum diterima"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未承諾"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Belum diterima"
+          }
+        }
+      }
+    },
+    "not checked in": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "belum daftar masuk"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未チェックイン"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "belum check-in"
           }
         }
       }
@@ -3727,6 +5337,75 @@
         }
       }
     },
+    "On hold by HQ — saving and submitting are blocked. Your saved draft is kept; continue when HQ resumes the job.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ditangguhkan oleh HQ — menyimpan dan menghantar disekat. Draf yang disimpan dikekalkan; teruskan apabila HQ menyambung semula kerja."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本部が保留中です — 保存と提出はできません。保存済みの下書きは残ります。本部が作業を再開したら続けてください。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ditahan oleh HQ — menyimpan dan menyerahkan diblokir. Draf tersimpan Anda dipertahankan; lanjutkan saat HQ melanjutkan pekerjaan."
+          }
+        }
+      }
+    },
+    "On site: Start job opens Check in (location + unit QR); checking in starts the work.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Di tapak: Mulakan kerja membuka Daftar masuk (lokasi + QR unit); daftar masuk memulakan kerja."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "現地では、「作業を開始」でチェックイン（位置情報とユニットの QR）が開き、チェックインすると作業が始まります。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Di lokasi: Mulai pekerjaan membuka Check-in (lokasi + QR unit); check-in memulai pekerjaan."
+          }
+        }
+      }
+    },
+    "On-site time": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Masa di tapak"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "現地での作業時間"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waktu di lokasi"
+          }
+        }
+      }
+    },
     "Online": {
       "extractionState": "manual",
       "localizations": {
@@ -3842,6 +5521,52 @@
         }
       }
     },
+    "opens {time} (read-only until then)": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dibuka {time} (baca sahaja sehingga itu)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{time} に開きます（それまでは読み取り専用）"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "terbuka {time} (hanya-baca sampai saat itu)"
+          }
+        }
+      }
+    },
+    "opens at the start of your window": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dibuka pada permulaan tetingkap anda"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "作業時間の開始時に開きます"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "terbuka di awal jendela Anda"
+          }
+        }
+      }
+    },
     "Other units or spaces were added to the imported places — the import can no longer be undone": {
       "extractionState": "manual",
       "localizations": {
@@ -3861,6 +5586,52 @@
           "stringUnit": {
             "state": "translated",
             "value": "Unit atau ruang lain ditambahkan ke tempat yang diimpor — impor tidak dapat dibatalkan lagi"
+          }
+        }
+      }
+    },
+    "Pause work": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jeda kerja"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "作業を一時停止"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jeda pekerjaan"
+          }
+        }
+      }
+    },
+    "Paused": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dijeda"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一時停止"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dijeda"
           }
         }
       }
@@ -3957,6 +5728,29 @@
         }
       }
     },
+    "periodic plan": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "pelan berkala"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "定期計画"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "rencana berkala"
+          }
+        }
+      }
+    },
     "PM2.5": {
       "extractionState": "manual",
       "localizations": {
@@ -4026,6 +5820,52 @@
         }
       }
     },
+    "Power OFF": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kuasa MATI"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "電源オフ"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Daya OFF"
+          }
+        }
+      }
+    },
+    "Power ON": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kuasa HIDUP"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "電源オン"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Daya ON"
+          }
+        }
+      }
+    },
     "Power unknown": {
       "extractionState": "manual",
       "localizations": {
@@ -4091,6 +5931,52 @@
           "stringUnit": {
             "state": "translated",
             "value": "Naikkan suhu"
+          }
+        }
+      }
+    },
+    "Read-only until the window opens at {time} — Start is disabled before then.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baca sahaja sehingga tetingkap dibuka pada {time} — Mula dilumpuhkan sebelum itu."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{time} に作業時間が始まるまで読み取り専用です — それまで「開始」は使えません。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hanya-baca sampai jendela terbuka pukul {time} — Mulai dinonaktifkan sebelum itu."
+          }
+        }
+      }
+    },
+    "Reason (required)": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sebab (diperlukan)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "理由（必須）"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alasan (wajib)"
           }
         }
       }
@@ -4279,6 +6165,52 @@
         }
       }
     },
+    "report draft open": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "draf laporan dibuka"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "報告書の下書きが開いています"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "draf laporan terbuka"
+          }
+        }
+      }
+    },
+    "Request": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Permintaan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "依頼"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Permintaan"
+          }
+        }
+      }
+    },
     "requested": {
       "extractionState": "manual",
       "localizations": {
@@ -4371,6 +6303,75 @@
         }
       }
     },
+    "Resume rework": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sambung kerja semula"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "やり直しを再開"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lanjutkan pengerjaan ulang"
+          }
+        }
+      }
+    },
+    "Resume work": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sambung kerja"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "作業を再開"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lanjutkan pekerjaan"
+          }
+        }
+      }
+    },
+    "returned — resume in a new draft version": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dikembalikan — sambung dalam versi draf baharu"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "差し戻し済み — 新しい下書きの版で再開してください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dikembalikan — lanjutkan dalam versi draf baru"
+          }
+        }
+      }
+    },
     "Returned for rework": {
       "extractionState": "manual",
       "localizations": {
@@ -4390,6 +6391,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dikembalikan untuk pengerjaan ulang"
+          }
+        }
+      }
+    },
+    "Returned for rework. Resume to continue as a new draft version; the returned version stays as it was.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dikembalikan untuk kerja semula. Sambung untuk meneruskan sebagai versi draf baharu; versi yang dikembalikan kekal seperti asal."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "やり直しのため差し戻されました。再開すると新しい下書きの版で続けられます。差し戻された版はそのまま残ります。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dikembalikan untuk pengerjaan ulang. Lanjutkan sebagai versi draf baru; versi yang dikembalikan tetap seperti semula."
           }
         }
       }
@@ -4440,6 +6464,29 @@
         }
       }
     },
+    "Rework resumed — continue in the new draft": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kerja semula disambung — teruskan dalam draf baharu"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "やり直しを再開しました — 新しい下書きで続けてください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pengerjaan ulang dilanjutkan — lanjutkan di draf baru"
+          }
+        }
+      }
+    },
     "Room temperature (measured)": {
       "extractionState": "manual",
       "localizations": {
@@ -4459,6 +6506,75 @@
           "stringUnit": {
             "state": "translated",
             "value": "Suhu ruangan (terukur)"
+          }
+        }
+      }
+    },
+    "Scan": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Imbas"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "スキャン"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pindai"
+          }
+        }
+      }
+    },
+    "Scan the unit’s QR label": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Imbas label QR unit"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ユニットの QR ラベルをスキャン"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pindai label QR unit"
+          }
+        }
+      }
+    },
+    "Scanned unit QR": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "QR unit yang diimbas"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "スキャンしたユニットの QR"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "QR unit yang dipindai"
           }
         }
       }
@@ -4528,6 +6644,75 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kirim ke {name}"
+          }
+        }
+      }
+    },
+    "Send to coordinator": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hantar kepada penyelaras"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "担当者に送信"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kirim ke koordinator"
+          }
+        }
+      }
+    },
+    "Sent as its own command": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dihantar sebagai arahan tersendiri"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "単独のコマンドとして送信されます"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dikirim sebagai perintah tersendiri"
+          }
+        }
+      }
+    },
+    "Sent to your coordinator": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dihantar kepada penyelaras anda"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "担当者に送信しました"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terkirim ke koordinator Anda"
           }
         }
       }
@@ -4620,6 +6805,52 @@
           "stringUnit": {
             "state": "translated",
             "value": "Atur mode {mode}"
+          }
+        }
+      }
+    },
+    "Set power OFF": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tetapkan kuasa MATI"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "電源をオフにする"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Matikan daya"
+          }
+        }
+      }
+    },
+    "Set power ON": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tetapkan kuasa HIDUP"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "電源をオンにする"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nyalakan daya"
           }
         }
       }
@@ -4762,6 +6993,52 @@
         }
       }
     },
+    "since {time}": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "sejak {time}"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{time} から"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "sejak {time}"
+          }
+        }
+      }
+    },
+    "Site": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tapak"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "現場"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lokasi"
+          }
+        }
+      }
+    },
     "Someone changed this in the meantime — the screen now shows the latest version": {
       "extractionState": "manual",
       "localizations": {
@@ -4808,6 +7085,98 @@
         }
       }
     },
+    "Start job (check in)": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mulakan kerja (daftar masuk)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "作業を開始（チェックイン）"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mulai pekerjaan (check-in)"
+          }
+        }
+      }
+    },
+    "Started": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dimulakan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "開始"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dimulai"
+          }
+        }
+      }
+    },
+    "Starts {time} · {range}": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bermula {time} · {range}"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{time} に開始 · {range}"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mulai {time} · {range}"
+          }
+        }
+      }
+    },
+    "Status": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Status"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "状態"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Status"
+          }
+        }
+      }
+    },
     "Submitted": {
       "extractionState": "manual",
       "localizations": {
@@ -4827,6 +7196,52 @@
           "stringUnit": {
             "state": "translated",
             "value": "Diserahkan"
+          }
+        }
+      }
+    },
+    "Submitted — not accepted while you were assigned": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dihantar — tidak diterima semasa anda ditugaskan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "提出済み — あなたの割り当て中には承諾されませんでした"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diserahkan — tidak diterima saat Anda ditugaskan"
+          }
+        }
+      }
+    },
+    "Submitted v{version} — read-only, awaiting quality review.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dihantar v{version} — baca sahaja, menunggu semakan kualiti."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "v{version} を提出しました — 読み取り専用で、品質レビュー待ちです。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diserahkan v{version} — hanya-baca, menunggu tinjauan kualitas."
           }
         }
       }
@@ -4942,6 +7357,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kualifikasi teknisi berakhir — untuk ditugaskan ulang"
+          }
+        }
+      }
+    },
+    "Tell your coordinator why (1–1000 characters)": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Beritahu penyelaras anda sebabnya (1–1000 aksara)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "担当者に理由を伝えてください（1～1000文字）"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Beri tahu koordinator Anda mengapa (1–1000 karakter)"
           }
         }
       }
@@ -5153,6 +7591,29 @@
         }
       }
     },
+    "The job was cancelled, so the job details and the unit are no longer shown to you.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kerja ini telah dibatalkan, jadi butiran kerja dan unit tidak lagi ditunjukkan kepada anda."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "作業がキャンセルされたため、作業の詳細とユニットは表示されなくなりました。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pekerjaan dibatalkan, jadi detail pekerjaan dan unit tidak lagi ditampilkan kepada Anda."
+          }
+        }
+      }
+    },
     "The last active owner can’t be demoted, disabled or removed": {
       "extractionState": "manual",
       "localizations": {
@@ -5172,6 +7633,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Pemilik aktif terakhir tidak dapat diturunkan, dinonaktifkan, atau dikeluarkan"
+          }
+        }
+      }
+    },
+    "The location could not be read — allow location for this app, or check in manually with a reason": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lokasi tidak dapat dibaca — benarkan lokasi untuk aplikasi ini, atau daftar masuk secara manual dengan sebab"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "位置情報を取得できませんでした。このアプリに位置情報を許可するか、理由を入力して手動でチェックインしてください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lokasi tidak dapat dibaca — izinkan lokasi untuk aplikasi ini, atau check-in manual dengan alasan"
           }
         }
       }
@@ -5218,6 +7702,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Organisasi operator tidak dapat dihapus"
+          }
+        }
+      }
+    },
+    "The page doesn’t exist, or your account can’t open it. Nothing was navigated automatically.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Halaman ini tidak wujud, atau akaun anda tidak boleh membukanya. Tiada navigasi automatik dibuat."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ページが存在しないか、お客様のアカウントでは開けません。自動では移動していません。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Halaman tidak ada, atau akun Anda tidak dapat membukanya. Tidak ada navigasi otomatis."
           }
         }
       }
@@ -5356,6 +7863,98 @@
           "stringUnit": {
             "state": "translated",
             "value": "Layanan masuk tidak tersedia — coba lagi sebentar lagi"
+          }
+        }
+      }
+    },
+    "The visit time was agreed with the client; accept it or say you can’t make it.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Masa lawatan telah dipersetujui dengan pelanggan; terimanya atau nyatakan anda tidak dapat hadir."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "訪問時刻は顧客と合意済みです。承諾するか、対応できないと回答してください。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waktu kunjungan disepakati dengan klien; terima atau katakan Anda tidak bisa hadir."
+          }
+        }
+      }
+    },
+    "The visit times were agreed with the client.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Masa lawatan telah dipersetujui dengan pelanggan."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "訪問時刻は顧客と合意済みです。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waktu kunjungan disepakati dengan klien."
+          }
+        }
+      }
+    },
+    "The work window ended — unsaved input was discarded and the job can no longer be edited. Ask your coordinator.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tetingkap kerja telah tamat — input yang belum disimpan dibuang dan kerja tidak lagi boleh diedit. Tanya penyelaras anda."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "作業時間が終了しました — 未保存の入力は破棄され、この作業は編集できなくなりました。担当者に連絡してください。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jendela pekerjaan berakhir — masukan yang belum disimpan dibuang dan pekerjaan tidak dapat diubah lagi. Hubungi koordinator Anda."
+          }
+        }
+      }
+    },
+    "The work window has ended — ask your coordinator to reschedule.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tetingkap kerja telah tamat — minta penyelaras anda menjadualkan semula."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "作業時間が終了しました — 担当者に日程の変更を依頼してください。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jendela pekerjaan telah berakhir — minta koordinator Anda menjadwalkan ulang."
           }
         }
       }
@@ -5678,6 +8277,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Pelanggan ini masih memiliki unit, pekerjaan terbuka, atau kontrak berjalan — arsipkan atau akhiri sebelum menonaktifkan"
+          }
+        }
+      }
+    },
+    "This device cannot share its location — check in manually with a reason": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Peranti ini tidak dapat berkongsi lokasinya — daftar masuk secara manual dengan sebab"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この端末は位置情報を共有できません。理由を入力して手動でチェックインしてください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Perangkat ini tidak dapat membagikan lokasinya — check-in manual dengan alasan"
           }
         }
       }
@@ -6096,6 +8718,29 @@
         }
       }
     },
+    "This page isn’t available": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Halaman ini tidak tersedia"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このページは利用できません"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Halaman ini tidak tersedia"
+          }
+        }
+      }
+    },
     "This person does not get this notice on that channel": {
       "extractionState": "manual",
       "localizations": {
@@ -6487,6 +9132,29 @@
         }
       }
     },
+    "Time on site": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Masa di tapak"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "現地での作業時間"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waktu di lokasi"
+          }
+        }
+      }
+    },
     "Time proposed": {
       "extractionState": "manual",
       "localizations": {
@@ -6506,6 +9174,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Waktu diusulkan"
+          }
+        }
+      }
+    },
+    "Times in {zone}.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Masa dalam {zone}."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "時刻は {zone} です。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waktu dalam {zone}."
           }
         }
       }
@@ -6556,6 +9247,52 @@
         }
       }
     },
+    "Turn this AC off?": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Matikan AC ini?"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このエアコンの電源をオフにしますか？"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Matikan AC ini?"
+          }
+        }
+      }
+    },
+    "Turn this AC on?": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hidupkan AC ini?"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このエアコンの電源をオンにしますか？"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nyalakan AC ini?"
+          }
+        }
+      }
+    },
     "Undo": {
       "extractionState": "manual",
       "localizations": {
@@ -6575,6 +9312,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Urungkan"
+          }
+        }
+      }
+    },
+    "Unit": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unit"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ユニット"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unit"
           }
         }
       }
@@ -6740,6 +9500,29 @@
         }
       }
     },
+    "warning on the unit": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "amaran pada unit"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ユニットに警告"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "peringatan pada unit"
+          }
+        }
+      }
+    },
     "Warranty ending — {name}": {
       "extractionState": "manual",
       "localizations": {
@@ -6786,6 +9569,75 @@
         }
       }
     },
+    "Window": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tetingkap"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "作業時間"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jendela"
+          }
+        }
+      }
+    },
+    "window {slot}": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "tetingkap {slot}"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "作業時間 {slot}"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "jendela {slot}"
+          }
+        }
+      }
+    },
+    "window ends in {n} min": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "tetingkap tamat dalam {n} min"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "作業時間はあと {n} 分で終了します"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "jendela berakhir dalam {n} mnt"
+          }
+        }
+      }
+    },
     "Withdraw consent": {
       "extractionState": "manual",
       "localizations": {
@@ -6805,6 +9657,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Cabut persetujuan"
+          }
+        }
+      }
+    },
+    "Within 200 m of the site, as HQ set it on the map": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dalam 200 m dari tapak, seperti yang ditetapkan HQ pada peta"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HQ が地図で設定した現場から 200 m 以内"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dalam 200 m dari lokasi, seperti yang ditetapkan HQ di peta"
           }
         }
       }
@@ -6832,6 +9707,52 @@
         }
       }
     },
+    "Work not started": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kerja belum dimulakan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "作業未開始"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pekerjaan belum dimulai"
+          }
+        }
+      }
+    },
+    "Work paused": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kerja dijeda"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "作業を一時停止しました"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pekerjaan dijeda"
+          }
+        }
+      }
+    },
     "Work report returned — {name}": {
       "extractionState": "manual",
       "localizations": {
@@ -6851,6 +9772,98 @@
           "stringUnit": {
             "state": "translated",
             "value": "Laporan pekerjaan dikembalikan — {name}"
+          }
+        }
+      }
+    },
+    "Work resumed": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kerja disambung"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "作業を再開しました"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pekerjaan dilanjutkan"
+          }
+        }
+      }
+    },
+    "Work window": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tetingkap kerja"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "作業時間"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jendela pekerjaan"
+          }
+        }
+      }
+    },
+    "Work window ended": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tetingkap kerja tamat"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "作業時間が終了しました"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jendela pekerjaan berakhir"
+          }
+        }
+      }
+    },
+    "Work window ends in {n} min — unsaved input will be discarded at {time}.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tetingkap kerja tamat dalam {n} min — input yang belum disimpan akan dibuang pada {time}."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "作業時間はあと {n} 分で終了します — 未保存の入力は {time} に破棄されます。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jendela pekerjaan berakhir dalam {n} mnt — masukan yang belum disimpan akan dibuang pada {time}."
           }
         }
       }
@@ -6970,6 +9983,98 @@
         }
       }
     },
+    "you said you can’t make it — waiting for your contractor or HQ": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "anda menyatakan tidak dapat hadir — menunggu kontraktor anda atau HQ"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "対応できないと回答しました — 協力会社または本部の対応待ちです"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anda menyatakan tidak bisa hadir — menunggu kontraktor atau HQ Anda"
+          }
+        }
+      }
+    },
+    "You said you can’t make this time (“{reason}”). Your coordinator reassigns the job or asks the client for another time.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anda menyatakan tidak dapat hadir pada masa ini (“{reason}”). Penyelaras anda menugaskan semula kerja atau meminta masa lain daripada pelanggan."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この時刻は対応できないと回答しました（「{reason}」）。担当者が作業を再割り当てするか、顧客に別の時刻を依頼します。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anda menyatakan tidak bisa hadir pada waktu ini (“{reason}”). Koordinator Anda menugaskan ulang pekerjaan atau meminta klien memberi waktu lain."
+          }
+        }
+      }
+    },
+    "You said you can’t make this time. Your coordinator reassigns the job or asks the client for another time.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anda menyatakan tidak dapat hadir pada masa ini. Penyelaras anda menugaskan semula kerja atau meminta masa lain daripada pelanggan."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この時刻は対応できないと回答しました。担当者が作業を再割り当てするか、顧客に別の時刻を依頼します。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anda menyatakan tidak bisa hadir pada waktu ini. Koordinator Anda menugaskan ulang pekerjaan atau meminta klien memberi waktu lain."
+          }
+        }
+      }
+    },
+    "Your assignment on this job has ended": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tugasan anda untuk kerja ini telah tamat"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この作業へのあなたの割り当ては終了しました"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Penugasan Anda pada pekerjaan ini telah berakhir"
+          }
+        }
+      }
+    },
     "Your company keeps one active contractor — this one can’t be disabled or removed": {
       "extractionState": "manual",
       "localizations": {
@@ -6993,6 +10098,52 @@
         }
       }
     },
+    "Your coordinator reassigns the job or proposes a new time — the client must approve any change.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Penyelaras anda menugaskan semula kerja atau mencadangkan masa baharu — pelanggan mesti meluluskan sebarang perubahan."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "担当者が作業を再割り当てするか、新しい時刻を提案します — 変更には顧客の承認が必要です。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Koordinator Anda menugaskan ulang pekerjaan atau mengusulkan waktu baru — klien harus menyetujui setiap perubahan."
+          }
+        }
+      }
+    },
+    "Your location": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lokasi anda"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "現在地"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lokasi Anda"
+          }
+        }
+      }
+    },
     "Your location is not precise enough — move into the open and try again, or check in manually with a reason": {
       "extractionState": "manual",
       "localizations": {
@@ -7012,6 +10163,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Lokasi Anda kurang akurat — pindah ke tempat terbuka dan coba lagi, atau check-in manual dengan alasan"
+          }
+        }
+      }
+    },
+    "Your location is only known to ±{n} m — move into the open and try again, or check in manually with a reason": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lokasi anda hanya diketahui hingga ±{n} m — pergi ke kawasan lapang dan cuba lagi, atau daftar masuk secara manual dengan sebab"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "現在地の精度が ±{n} m しかありません。開けた場所に移動してやり直すか、理由を入力して手動でチェックインしてください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lokasi Anda hanya diketahui hingga ±{n} m — pindah ke tempat terbuka dan coba lagi, atau check-in manual dengan alasan"
           }
         }
       }
@@ -7062,6 +10236,29 @@
         }
       }
     },
+    "Your report": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Laporan anda"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "あなたの報告書"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Laporan Anda"
+          }
+        }
+      }
+    },
     "Your session ended — sign in again": {
       "extractionState": "manual",
       "localizations": {
@@ -7081,6 +10278,52 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sesi Anda berakhir — masuk lagi"
+          }
+        }
+      }
+    },
+    "Your time is free for other jobs. The report, the unit and its devices stay with HQ and the customer.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Masa anda lapang untuk kerja lain. Laporan, unit dan perantinya kekal dengan HQ dan pelanggan."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "あなたの時間は、ほかの作業に使えます。報告書、ユニット、そのデバイスは、本部と顧客のもとに残ります。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waktu Anda bebas untuk pekerjaan lain. Laporan, unit, dan perangkatnya tetap bersama HQ dan pelanggan."
+          }
+        }
+      }
+    },
+    "Your work window ended, or HQ or your coordinator changed the assignment, so the job details and the unit are no longer shown to you.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tetingkap kerja anda telah tamat, atau HQ atau penyelaras anda mengubah tugasan, jadi butiran kerja dan unit tidak lagi ditunjukkan kepada anda."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "作業時間が終了したか、本部または担当者が割り当てを変更したため、作業の詳細とユニットは表示されなくなりました。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jendela pekerjaan Anda berakhir, atau HQ atau koordinator Anda mengubah penugasan, jadi detail pekerjaan dan unit tidak lagi ditampilkan kepada Anda."
           }
         }
       }

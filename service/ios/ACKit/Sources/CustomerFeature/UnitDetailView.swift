@@ -36,12 +36,12 @@ struct UnitDetailView: View {
         .task { await model.load() }
         .task { await refreshWhileShown() }
         .confirmationDialog(
-            Text(verbatim: tr(askedPower ? "Turn this AC on?" : "Turn this AC off?")),
+            Text(verbatim: askedPower ? tr("Turn this AC on?") : tr("Turn this AC off?")),
             isPresented: $isAskingPower,
             titleVisibility: .visible
         ) {
             if isAskingPower {
-                Button(tr(askedPower ? "Power ON" : "Power OFF")) { Task { await model.sendPower(askedPower) } }
+                Button(askedPower ? tr("Power ON") : tr("Power OFF")) { Task { await model.sendPower(askedPower) } }
                     .accessibilityIdentifier("power.confirm")
             }
             Button(tr("Cancel"), role: .cancel) { isAskingPower = false }
@@ -187,7 +187,8 @@ struct UnitDetailView: View {
             VStack(alignment: .leading) {
                 Text(verbatim: tr("Power"))
                 Text(
-                    verbatim: tr(model.isPowerUnknown ? "Current power unknown · switching sends that command" : "Sent as its own command")
+                    verbatim: model.isPowerUnknown
+                        ? tr("Current power unknown · switching sends that command") : tr("Sent as its own command")
                 )
                 .font(.footnote)
             }
@@ -247,8 +248,10 @@ struct UnitDetailView: View {
     private func review(_ unit: UnitDetail) -> some View {
         let count = model.changes.count
         return VStack(alignment: .leading, spacing: 8) {
-            Text(verbatim: "\(tr(count == 1 ? "{n} change:" : "{n} changes:", ["n": String(count)])) \(model.changeSummary)")
-                .accessibilityIdentifier("review.summary")
+            Text(
+                verbatim: "\(count == 1 ? tr("{n} change:", ["n": "1"]) : tr("{n} changes:", ["n": String(count)])) \(model.changeSummary)"
+            )
+            .accessibilityIdentifier("review.summary")
             Text(verbatim: tr("Target: {name} only · you will confirm before sending", ["name": unit.displayName])).font(.footnote)
             // only a change there is to send has its button: a greyed-out button is below the contrast the audit asks
             // for, and the line above already says there is no change (the wait shows below while sending)

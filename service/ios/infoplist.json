@@ -12,5 +12,19 @@
       "ja": "アプリを閉じていても、住宅・事業所への到着と出発を報告します。保存されるのは在宅か外出かだけです。",
       "id": "Tiba di dan meninggalkan rumah serta kantor Anda dilaporkan juga saat aplikasi ditutup; hanya di rumah atau pergi yang disimpan."
     }
+  },
+  "TechnicianApp": {
+    "NSCameraUsageDescription": {
+      "en": "The camera scans the QR label on the AC when you check in at the site.",
+      "ms": "Kamera mengimbas label QR pada AC semasa anda daftar masuk di tapak.",
+      "ja": "現場でチェックインするとき、カメラでエアコンの QR ラベルを読み取ります。",
+      "id": "Kamera memindai label QR pada AC saat Anda check-in di lokasi."
+    },
+    "NSLocationWhenInUseUsageDescription": {
+      "en": "When you check in, your position is compared with the site's map pin (within 200 m); it is not kept.",
+      "ms": "Semasa anda daftar masuk, kedudukan anda dibandingkan dengan pin peta tapak (dalam 200 m); ia tidak disimpan.",
+      "ja": "チェックインのとき、現在地を現場の地図ピン（200 m 以内）と照らし合わせます。位置は保存されません。",
+      "id": "Saat Anda check-in, posisi Anda dibandingkan dengan pin peta lokasi (dalam 200 m); posisi tidak disimpan."
+    }
   }
 }

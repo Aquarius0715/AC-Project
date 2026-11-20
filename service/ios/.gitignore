@@ -6,3 +6,4 @@ ACKit/.swiftpm/
 *.xcresult
 CustomerApp/Info.plist
 TechnicianApp/Info.plist
+results/

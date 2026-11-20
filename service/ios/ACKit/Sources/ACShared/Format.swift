@@ -20,6 +20,25 @@ public enum Format {
         return date.formatted(style)
     }
 
+    /// "09:05": the time of day of an instant (the web's clock), in the display language and time zone.
+    public static func clock(_ instant: String, timeZone: TimeZone = Localizer.timeZone) -> String {
+        guard let date = parse(instant) else { return instant }
+        var style = Date.FormatStyle(date: .omitted, time: .shortened)
+        style.locale = Locale(identifier: Localizer.language.rawValue)
+        style.timeZone = timeZone
+        return date.formatted(style)
+    }
+
+    /// "27 Sep 2026, 09:05 – 12:35": a span from one instant to another (the web's span), the day once when both are
+    /// on it.
+    public static func span(_ from: String, _ to: String, timeZone: TimeZone = Localizer.timeZone) -> String {
+        guard let start = parse(from), let end = parse(to), start <= end else { return "\(dateTime(from)) – \(dateTime(to))" }
+        var style = Date.IntervalFormatStyle(date: .abbreviated, time: .shortened)
+        style.locale = Locale(identifier: Localizer.language.rawValue)
+        style.timeZone = timeZone
+        return (start..<end).formatted(style)
+    }
+
     /// An ISO 8601 instant with or without fractional seconds (the Core API writes milliseconds when it has them).
     public static func parse(_ instant: String) -> Date? {
         let fractional = Date.ISO8601FormatStyle(includingFractionalSeconds: true)

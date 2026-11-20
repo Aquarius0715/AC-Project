@@ -91,3 +91,13 @@ identifier_name:
   excluded: []
 type_name: { min_length: 3, max_length: 60 }
 nesting: { type_level: 2 }
+custom_rules:
+  # the text generator (service/web/codegen/swift-strings.ts) collects the texts from tr("…"): a key built any other way
+  # (a condition inside the call, a variable) is shown untranslated; write `c ? tr("A") : tr("B")`. ErrorText alone
+  # words the generated tables, whose texts the generator reads from those tables.
+  tr_literal_key:
+    name: "tr literal key"
+    regex: '\btr\(\s*[^"\s)]'
+    excluded: 'ACKit/Sources/ACShared/(ErrorText|Localizer)\.swift'
+    message: "tr takes its key as a string literal, so the generator finds and translates it"
+    severity: error
