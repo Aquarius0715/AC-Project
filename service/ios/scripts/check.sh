@@ -24,8 +24,12 @@ device=$(xcrun simctl list devices available | sed -n 's/^ *\(iPhone [^(]*\) (.*
 # each app's log stays out of the way unless its tests fail: then its failures are printed (xcodebuild -quiet prints none)
 log=$(mktemp)
 trap 'rm -f "$log"' EXIT
+# each app's result bundle (screenshots, the screen recording, the element tree of a failure) is kept in results/, which
+# CI uploads when a test fails: a runner's iOS may differ from this Mac's, and its log says only which check failed
+rm -rf results && mkdir -p results
 for scheme in CustomerApp TechnicianApp; do
-  if ! xcodebuild -project AC.xcodeproj -scheme "$scheme" -destination "platform=iOS Simulator,name=$device" test >"$log" 2>&1; then
+  if ! xcodebuild -project AC.xcodeproj -scheme "$scheme" -destination "platform=iOS Simulator,name=$device" test \
+    -resultBundlePath "results/$scheme.xcresult" >"$log" 2>&1; then
     grep -E "error:|Test Case .* failed|accessibility audit|^(Contrast|Dynamic Type|Hit area|Text clipped|Element)" "$log" || tail -n 60 "$log"
     echo "$scheme: UI tests failed on $device" >&2
     exit 1

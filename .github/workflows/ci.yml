@@ -302,6 +302,14 @@ jobs:
       - name: Xcode and simulators
         run: xcodebuild -version && xcrun simctl list runtimes
       - run: sh service/ios/scripts/check.sh
+      # a failed UI test's screenshots, recording and element tree, to read with Xcode or xcresulttool
+      - if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ios-ui-test-results
+          path: service/ios/results/
+          retention-days: 7
+          if-no-files-found: ignore
 
   docs:
     name: Design document validators
