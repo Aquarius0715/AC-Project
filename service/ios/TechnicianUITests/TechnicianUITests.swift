@@ -187,6 +187,24 @@ final class TechnicianUITests: XCTestCase {
     }
 
     @MainActor
+    func testTheUnitShowsItsRegisterAndItsMonitoring() throws {
+        let app = openJob()
+        tapScrolling(app.buttons["job.unit"], in: app)
+        XCTAssertTrue(app.buttons["unit.tab.monitoring"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Location, Home A › Living room"].exists || app.staticTexts["Home A › Living room"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["unit.alerts.al1"].waitForExistence(timeout: 5), "the open alert")
+        try app.audit()
+        keepScreenshot("unit-register", of: app)
+        app.buttons["unit.tab.monitoring"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["unit.chart"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["24.5 °C"].exists, "the latest temperature")
+        try app.audit()
+        keepScreenshot("unit-monitoring", of: app)
+        app.buttons["1h"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["Temperature (°C) · last 1 h (rolling)"].waitForExistence(timeout: 5))
+    }
+
+    @MainActor
     func testCantMakeIsSentWithItsReason() throws {
         let app = openJob()
         XCTAssertTrue(app.buttons["job.cantMake"].waitForExistence(timeout: 5))

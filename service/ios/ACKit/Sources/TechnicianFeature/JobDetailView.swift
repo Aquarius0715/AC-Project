@@ -70,7 +70,7 @@ struct JobDetailView: View {
             Card { bannerContent(banner) }
         }
         reportCard
-        Card(tr("Job & unit")) { Facts(rows: model.facts) }
+        jobCard(work)
         if let window = model.window {
             Card(tr("Work window")) { Text(verbatim: window.text).accessibilityIdentifier("job.window") }
         }
@@ -93,6 +93,20 @@ struct JobDetailView: View {
         }
     }
 
+    /// The job and its unit, with the unit's screen.
+    private func jobCard(_ work: JobDetailModel.Work) -> some View {
+        Card(tr("Job & unit")) {
+            Facts(rows: model.facts)
+            NavigationLink {
+                TechUnitView(model: TechUnitModel(unitId: work.job.unitId, jobId: work.job.id, client: model.client))
+            } label: {
+                Label(tr("Unit"), systemImage: "air.conditioner.horizontal")
+            }
+            .linkAction()
+            .accessibilityIdentifier("job.unit")
+        }
+    }
+
     @ViewBuilder private var reportCard: some View {
         Card(tr("Work report")) {
             if let report = model.report() {
@@ -101,7 +115,7 @@ struct JobDetailView: View {
                 } label: {
                     Label(tr("Open the work report"), systemImage: "doc.text")
                 }
-                .secondaryAction()
+                .linkAction()
                 .accessibilityIdentifier("job.report")
             } else {
                 Text(verbatim: tr("The report opens when you check in at the site."))

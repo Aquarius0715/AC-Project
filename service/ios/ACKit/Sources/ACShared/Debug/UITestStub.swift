@@ -90,6 +90,9 @@ public enum UITestStub {
                 let ids = notifications.filter { $0.readAt == nil }.map(\.id)
                 for id in ids { _ = markRead(id) }
                 return try encoder.encode(StubAnswer(data: NotificationsMarked(markedIds: ids, skippedIds: [])))
+            case ("GET", "/v1/alerts"): return try encoder.encode(StubAnswer(data: page([StubUnitData.alert])))
+            case ("GET", "/v1/telemetry/series"): return try encoder.encode(StubAnswer(data: StubUnitData.series))
+            case ("GET", "/v1/devices"): return try encoder.encode(StubAnswer(data: page([Device]())))
             case (_, "/v1/properties"): return try encoder.encode(StubAnswer(data: page([Self.home])))
             case ("GET", "/v1/consents/location_automation"): return try encoder.encode(StubAnswer(data: consent))
             case ("PUT", "/v1/consents/location_automation"):
@@ -266,13 +269,13 @@ public enum UITestStub {
                 observedRestriction: nil,
                 lastSeenAt: Self.day,
                 effectivePowerState: isLiving ? (observed.power == true ? .on : .off) : unit.effectivePowerState,
-                latestMeasurements: [],
+                latestMeasurements: role == "technician" && isLiving ? [StubUnitData.reading(24.5, secondsAgo: 120)] : [],
                 activeAlertCount: 0,
                 capabilities: Self.capability,
                 iotModel: nil,
                 effectiveControlPolicy: .unrestricted(EffectiveControlPolicyUnrestricted()),
                 controlAvailability: .available(ControlAvailabilityAvailable()),
-                components: [],
+                components: role == "technician" ? StubUnitData.components : [],
                 pendingCommands: [],
                 pendingCommandIds: [],
                 location: UnitDetailLocation(pathLabels: ["Home A", "Living room"], address: nil, accessInstructions: nil)

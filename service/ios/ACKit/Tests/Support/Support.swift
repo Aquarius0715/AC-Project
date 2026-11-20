@@ -18,6 +18,11 @@ public actor StubTransport: HTTPTransport {
         self.delay = delay
     }
 
+    /// Adds answers after the ones still queued (a screen's later reads).
+    public func queue(_ more: [Answer]) {
+        answers += more
+    }
+
     public func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
         requests.append(request)
         if delay > .zero { try await Task.sleep(for: delay) }
