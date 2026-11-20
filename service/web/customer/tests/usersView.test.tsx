@@ -51,7 +51,10 @@ beforeEach(() => {
   runs.toasts = [];
   for (const fn of Object.values(actions)) fn.mockReset().mockResolvedValue({ ok: true, value: null });
 });
-afterEach(() => { cleanup(); });
+afterEach(() => {
+  cleanup();
+  vi.unstubAllEnvs();
+});
 
 describe("UsersView", () => {
   it("shows Page unavailable to a member (no data)", () => {
@@ -97,7 +100,12 @@ describe("UsersView", () => {
     render(<UsersView live={live()} />);
     fireEvent.click(screen.getByRole("button", { name: "Add user" }));
     expect(screen.getByRole("dialog").textContent).toContain("Add a user to Demo Customer A");
-    const add = () => { fireEvent.click(dialog().getByRole("button", { name: "Add user" })); };
+    // the button keeps the focus, so only the refusal moves it to a field (the dialog opens on Name by itself)
+    const add = () => {
+      const button = dialog().getByRole("button", { name: "Add user" });
+      button.focus();
+      fireEvent.click(button);
+    };
     add();
     expect(dialog().getByText("A name of 1–120 characters")).toBeDefined();
     expect(dialog().getByText("A valid email address (up to 254 characters)")).toBeDefined();
@@ -153,6 +161,7 @@ describe("UsersView", () => {
     fireEvent.change(dialog().getByLabelText(/^Reason/), { target: { value: "new manager" } });
     fireEvent.click(dialog().getByRole("button", { name: "Change role" }));
     await waitFor(() => { expect(runs.toasts).toStrictEqual(["Ali is now a member", "Mei is now an owner"]); });
+    expect(actions.updateUser).toHaveBeenLastCalledWith("Mei", 3, "cust-a", "Mei@example.com", "owner", null, "new manager");
   });
 
   it("disables and enables with a reason, keeping the role", async () => {
@@ -197,8 +206,9 @@ describe("UsersView", () => {
     fireEvent.click(rowOf("Mei").getByRole("button", { name: "Remove" }));
     fireEvent.change(dialog().getByLabelText(/^Reason/), { target: { value: "x" } });
     fireEvent.click(dialog().getByRole("button", { name: "Remove" }));
-    await waitFor(() => { expect(document.activeElement).toBe(dialog().getByLabelText(/^Reason/)); });
-    expect(dialog().getByText(actionMessage(refused))).toBeDefined();
+    // Reason is the dialog's only field, so where the focus ends says nothing: the email refusal above checks the focus
+    await waitFor(() => { expect(dialog().getByText(actionMessage(refused))).toBeDefined(); });
+    expect(dialog().getByLabelText(/^Reason/).getAttribute("aria-invalid")).toBe("true");
     expect(runs.toasts).toStrictEqual([]);
   });
 
@@ -215,6 +225,8 @@ describe("UsersView", () => {
     await new Promise((resolve) => { requestAnimationFrame(resolve); });
     expect(document.activeElement).toBe(disable);
     expect(dialog().getByLabelText(/^Reason/).getAttribute("aria-invalid")).toBeNull();
+    expect(screen.getByRole("dialog").querySelector(".text-crit")).toBeNull();
+    expect(dialog().getByRole("button", { name: "Disable" })).toBe(disable);
     expect(runs.toasts).toStrictEqual([]);
   });
 
@@ -223,7 +235,7 @@ describe("UsersView", () => {
     render(<UsersView live={live()} />);
     expect(screen.getByText(/in development it arrives in the local Mailpit inbox/)).toBeDefined();
     cleanup();
-    vi.unstubAllEnvs();
+    vi.unstubAllEnvs(); // also in afterEach, should the first check fail
     render(<UsersView live={live()} />);
     expect(screen.getByText("The set-up e-mail comes from the sign-in service.")).toBeDefined();
   });
