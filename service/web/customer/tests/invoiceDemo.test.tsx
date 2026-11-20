@@ -56,7 +56,9 @@ describe("InvoiceDemo", () => {
     expect(screen.getByText("Processing")).toBeDefined();
     expect(screen.getByText(/“Processing” is not paid/)).toBeDefined();
     expect(screen.queryByRole("button", { name: "Pay now" })).toBeNull();
-    act(() => { vi.advanceTimersByTime(1800); });
+    act(() => { vi.advanceTimersByTime(1799); });
+    expect(screen.getByText("Processing")).toBeDefined();
+    act(() => { vi.advanceTimersByTime(1); });
     expect(screen.getByText("Confirmed")).toBeDefined();
     expect(screen.getByText(/Payment confirmed \(demo\)/)).toBeDefined();
     expect(screen.getByText("Demo card payment · just now · 120.00 MYR")).toBeDefined();

@@ -123,6 +123,13 @@ describe("invoice actions", () => {
     expect(cache.refresh).toHaveBeenCalledOnce();
   });
 
+  it("a refused initiate sends no processing event and comes back with its code", async () => {
+    dal.coreOp.mockRejectedValueOnce(refusal("VERSION_CONFLICT"));
+    await expect(startPayment("inv-1", 3, "demo_credit_card")).resolves.toMatchObject({ ok: false, code: "VERSION_CONFLICT" });
+    expect(dal.coreOp).toHaveBeenCalledOnce();
+    expect(cache.refresh).toHaveBeenCalledOnce();
+  });
+
   it("startCheckout returns only an HTTPS Stripe page; any other address fails as unavailable (IR840)", async () => {
     dal.coreOp.mockResolvedValueOnce({ paymentId: "pay-1", checkoutUrl: "https://checkout.stripe.com/c/pay/cs_1" });
     await expect(startCheckout("inv-1", 3)).resolves.toStrictEqual({ ok: true, value: "https://checkout.stripe.com/c/pay/cs_1" });
@@ -150,12 +157,17 @@ describe("invoice actions", () => {
     dal.coreOp.mockResolvedValueOnce({ params: { targetName: "INV-0042" }, templateKey: "payment", channel: "whatsapp", extra: true });
     await expect(previewMessage("inv-1", "whatsapp")).resolves.toStrictEqual({ ok: true, value: { params: { targetName: "INV-0042" }, templateKey: "payment", channel: "whatsapp" } });
     expect(dal.coreOp.mock.lastCall).toStrictEqual(["notifications.preview", { target: { kind: "invoice", id: "inv-1" }, templateKey: "payment", recipientMembershipId: "m-me", channel: "whatsapp" }]);
+    expect(cache.refresh).toHaveBeenCalledTimes(2);
   });
 
   it("sendInquiry trims the message and is a write without a version", async () => {
     dal.coreOp.mockResolvedValueOnce({ id: "q-9" });
     await expect(sendInquiry({ subjectType: "restriction", restrictionId: "r-1", message: "  why?  " })).resolves.toStrictEqual({ ok: true, value: "q-9" });
     expect(dal.coreOp.mock.lastCall).toStrictEqual(["inquiries.create", { subjectType: "restriction", restrictionId: "r-1", message: "why?" }, { write: true }]);
+    dal.coreOp.mockRejectedValueOnce(refusal("VALIDATION", { message: "too_long" }));
+    await expect(sendInquiry({ subjectType: "payment", invoiceId: "inv-1", message: "x" })).resolves.toMatchObject({ ok: false, code: "VALIDATION", fieldErrors: { message: "too_long" } });
+    expect(dal.coreOp.mock.lastCall).toStrictEqual(["inquiries.create", { subjectType: "payment", invoiceId: "inv-1", message: "x" }, { write: true }]);
+    expect(cache.refresh).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -195,14 +207,15 @@ describe("invoice page", () => {
 
   it("the open payment is the newest initiated or processing one, the last one is the newest; a paid invoice is not payable", async () => {
     data.invoice = invoice({ status: "processing", paymentRefs: [
-      payment("pay-old", { createdAt: "2026-09-18T00:00:00Z", status: "processing", version: 4, channel: "stripe_checkout", method: null }),
+      payment("pay-oldest", { createdAt: "2026-09-17T00:00:00Z", status: "initiated" }),
+      payment("pay-old",{ createdAt: "2026-09-18T00:00:00Z", status: "processing", version: 4, channel: "stripe_checkout", method: null }),
       payment("pay-new", { createdAt: "2026-09-19T00:00:00Z", status: "failed", paymentReference: "REF-1" }),
     ] });
     const live = await render({ checkout: "cancelled", inquiryId: "q-1" });
     expect(live.open).toStrictEqual({ id: "pay-old", version: 4, status: "processing", method: null, channel: "stripe_checkout" });
     expect(live.last).toStrictEqual({ id: "pay-new", status: "failed", reference: "REF-1", method: "demo_credit_card", channel: "demo" });
     expect(live.invoice).toMatchObject({ status: "Processing", payable: false });
-    expect(live.payments.map((p) => p.id)).toStrictEqual(["pay-new", "pay-old"]);
+    expect(live.payments.map((p) => p.id)).toStrictEqual(["pay-new", "pay-old", "pay-oldest"]);
     expect(live).toMatchObject({ checkout: "cancelled", inquiryId: "q-1" });
     data.invoice = invoice({ status: "paid" });
     await expect(render()).resolves.toMatchObject({ invoice: { status: "Paid", payable: false } });
@@ -230,11 +243,14 @@ describe("invoice page", () => {
     expect(live.whatsapp).toBe(true);
   });
 
-  it("outside Kuala Lumpur the due date is marked as a Kuala Lumpur day, and event times are in the user's zone", async () => {
-    dal.coreDisplay.mockResolvedValue({ locale: "en", timeZone: "Asia/Tokyo" });
+  it("outside Kuala Lumpur the due date stays the Kuala Lumpur day, and event times are in the user's zone", async () => {
+    // in London the due instant (10 Sept 00:00 in Kuala Lumpur) and the notice (12 Sept 00:30 there) are still 9 and 11 Sept
+    dal.coreDisplay.mockResolvedValue({ locale: "en", timeZone: "Europe/London" });
+    data.restrictions = [restriction("r-live", "applied")];
     const live = await render();
     expect(live.otherZone).toBe(true);
     expect(live.invoice.dueDate).toBe("10 Sept 2026");
+    expect(live.restriction?.noticeAt).toBe("11 Sept 2026 · in-app (demo)");
   });
 
   it("the restriction tab: the asked restriction, its newest commands (a missing one left out), its inquiries and lines", async () => {
@@ -258,7 +274,8 @@ describe("invoice page", () => {
     expect(r.noticeAt).toBe("12 Sept 2026 · in-app (demo)");
     expect(r.released).toMatch(/— automatically after payment confirmation$/);
     expect(r.start).toMatch(/— .*24/);
-    expect(r.units).toHaveLength(1);
+    // the release command read by commands.get is still "sent", so the unit waits for its confirmation
+    expect(r.units.map((u) => u.note)).toStrictEqual(["waiting for the unit to confirm"]);
   });
 
   it("without an asked restriction the live one is shown, else the first; HQ's release and none yet are worded", async () => {
@@ -281,7 +298,7 @@ describe("invoice page", () => {
     vi.stubEnv("PAYMENT_PROVIDER", "Stripe");
     const page = await import("../app/customer/payments/[id]/page");
     const element: unknown = await page.default({ params: Promise.resolve({ id: "inv-1" }), searchParams: Promise.resolve({ checkout: "return" }) });
-    if (!isValidElement<ComponentProps<typeof InvoiceView>>(element)) throw new TypeError("not an element");
+    if (!isValidElement<ComponentProps<typeof InvoiceView>>(element) || element.type !== views.InvoiceView) throw new TypeError("not InvoiceView");
     expect(element.props.live).toMatchObject({ stripe: true, checkout: "return" });
     vi.resetModules();
     vi.stubEnv("PAYMENT_PROVIDER", "paypal");

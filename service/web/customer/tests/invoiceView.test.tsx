@@ -129,6 +129,8 @@ describe("InvoiceView payment", () => {
     view.rerender(<InvoiceView live={live({ invoice: { ...live().invoice, ...paid }, restriction: restriction("release_requested"), last: { id: "pay-1", status: "confirmed", reference: null, method: null, channel: "manual" } })} />);
     expect(screen.getByText(/Reference — · recorded by HQ\. The invoice is now paid\. A cooling-restriction release is requested/)).toBeDefined();
     expect(screen.getByText("Cooling restriction — release requested")).toBeDefined();
+    view.rerender(<InvoiceView live={live({ stripe: true, invoice: { ...live().invoice, ...paid }, last: { id: "pay-1", status: "confirmed", reference: "pi_1", method: null, channel: "stripe_checkout" } })} />);
+    expect(screen.getByText(/^Reference pi_1 · Stripe Checkout\. The invoice is now paid\.$/)).toBeDefined();
   });
 
   it("payment history lists each payment with its status; reminders show their channel", () => {
@@ -264,9 +266,12 @@ describe("InvoiceView tabs, restriction and inquiries", () => {
     expect(screen.getByText(/Keep the AC's control device plugged in/)).toBeDefined();
     expect(screen.getByText(/Status stays “Release requested”/)).toBeDefined();
     expect(screen.queryByText("Payment history")).toBeNull();
-    view.rerender(<InvoiceView live={live({ tab: "restriction", contract: null, restriction: restriction("scheduled") })} />);
+    view.rerender(<InvoiceView live={live({ tab: "restriction", restriction: restriction("scheduled") })} />);
     expect(screen.queryByText(/Keep the AC's control device plugged in/)).toBeNull();
     expect(screen.queryByText(/Status stays/)).toBeNull();
+    view.rerender(<InvoiceView live={live({ tab: "restriction", contract: null, restriction: restriction("release_requested") })} />);
+    expect(screen.queryByText("RTO Plan · contract")).toBeNull();
+    expect(screen.getByText(/Status stays “Release requested”/)).toBeDefined();
   });
 
   it("the restriction tab without a restriction falls back to the payment tab", () => {
