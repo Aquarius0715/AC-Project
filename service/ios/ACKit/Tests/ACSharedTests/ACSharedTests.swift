@@ -252,7 +252,8 @@ import Testing
         #expect(units.data.items.map(\.displayName) == ["Living room AC", "Bedroom AC"])
         let jobs = try await session.client.call(Ops.JobsList.self, Query())
         #expect(jobs.data.items.count == 1)
-        await #expect(throws: CoreError.self) { try await session.client.call(Ops.SessionGet.self, Empty()) }
+        // a route the stub does not answer is refused
+        await #expect(throws: CoreError.self) { try await session.client.call(Ops.DevicesGet.self, DevicesGetInput(id: "none")) }
         await session.signOut()
         #expect(session.state == .signedOut(message: nil))
     }

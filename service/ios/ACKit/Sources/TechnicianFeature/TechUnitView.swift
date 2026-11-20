@@ -73,7 +73,22 @@ struct TechUnitView: View {
             }
         }
         Card(tr("Open alerts ({n})", ["n": String(model.openAlerts.count)])) {
-            rows(model.openAlerts, empty: tr("No open alerts."), id: "unit.alerts")
+            if model.openAlerts.isEmpty { Text(verbatim: tr("No open alerts.")).accessibilityIdentifier("unit.alerts.empty") }
+            ForEach(model.openAlerts) { row in
+                NavigationLink {
+                    AlertsView(model: AlertsModel(unitId: model.unitId, jobId: model.jobId, alertId: row.id, client: model.client))
+                } label: {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(verbatim: row.title).font(.headline)
+                        Text(verbatim: row.badge).font(.subheadline.weight(.semibold))
+                        Text(verbatim: row.sub).font(.subheadline)
+                    }
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .foregroundStyle(.primary)
+                }
+                .accessibilityIdentifier("unit.alerts.\(row.id)")
+            }
         }
         Card(tr("Maintenance history")) {
             rows(model.history, empty: tr("No jobs of yours on this unit."), id: "unit.history")

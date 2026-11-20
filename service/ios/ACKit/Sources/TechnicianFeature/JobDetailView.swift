@@ -104,6 +104,13 @@ struct JobDetailView: View {
             }
             .secondaryAction()
             .accessibilityIdentifier("job.unit")
+            NavigationLink {
+                AlertsView(model: AlertsModel(unitId: work.job.unitId, jobId: work.job.id, alertId: nil, client: model.client))
+            } label: {
+                Label(tr("Alert evidence"), systemImage: "exclamationmark.bubble")
+            }
+            .secondaryAction()
+            .accessibilityIdentifier("job.alerts")
         }
     }
 

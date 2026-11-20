@@ -43,6 +43,7 @@ public enum UITestStub {
         private var version = 1.0
         private var notifications = Transport.inbox
         private let jobs = StubJobs()
+        private let alerts = StubAlerts()
         private var consent = Consent(
             id: "consent1",
             tenantId: "t1",
@@ -63,7 +64,8 @@ public enum UITestStub {
             let url = request.url ?? URL(filePath: "/")
             let method = request.httpMethod ?? "GET"
             let (status, body) = try lock.withLock {
-                try jobs.answer(method, url.path(), request.httpBody)
+                try alerts.answer(method, url.path(), url.query(), request.httpBody)
+                    ?? jobs.answer(method, url.path(), request.httpBody)
                     ?? answer(method, url.path(), request.httpBody).map { (200, $0) } ?? (404, Data("{}".utf8))
             }
             let response = HTTPURLResponse(url: url, statusCode: status, httpVersion: nil, headerFields: nil)
@@ -90,7 +92,6 @@ public enum UITestStub {
                 let ids = notifications.filter { $0.readAt == nil }.map(\.id)
                 for id in ids { _ = markRead(id) }
                 return try encoder.encode(StubAnswer(data: NotificationsMarked(markedIds: ids, skippedIds: [])))
-            case ("GET", "/v1/alerts"): return try encoder.encode(StubAnswer(data: page([StubUnitData.alert])))
             case ("GET", "/v1/telemetry/series"): return try encoder.encode(StubAnswer(data: StubUnitData.series))
             case ("GET", "/v1/devices"): return try encoder.encode(StubAnswer(data: page([Device]())))
             case (_, "/v1/properties"): return try encoder.encode(StubAnswer(data: page([Self.home])))

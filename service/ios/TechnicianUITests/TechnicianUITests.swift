@@ -205,6 +205,33 @@ final class TechnicianUITests: XCTestCase {
     }
 
     @MainActor
+    func testAnAlertIsAcknowledgedThenResolvedWithItsEvidence() throws {
+        let app = openJob()
+        tapScrolling(app.buttons["job.alerts"], in: app)
+        let acknowledge = app.buttons["alerts.acknowledge"]
+        XCTAssertTrue(acknowledge.waitForExistence(timeout: 5))
+        try app.audit()
+        keepScreenshot("alert-open", of: app)
+        tapScrolling(acknowledge, in: app)
+        XCTAssertTrue(wait(for: app.staticTexts["alerts.note"], label: "Acknowledged"))
+        XCTAssertFalse(app.buttons["alerts.acknowledge"].exists, "an acknowledged alert is not acknowledged again")
+
+        // an alert without a policy resolves only with evidence
+        type("Cooled down after the filter was cleaned.", into: field("alerts.reason", in: app), in: app)
+        tapScrolling(app.buttons["alerts.resolve"], in: app)
+        XCTAssertTrue(wait(for: app.staticTexts["alerts.problem"], label: "Pick at least one evidence record — this alert has no policy"))
+        let evidence = app.switches["alerts.evidence.ev-r1"]
+        tapScrolling(evidence, in: app)
+        if evidence.value as? String != "1" { evidence.switches.firstMatch.tap() }
+        tapScrolling(app.buttons["alerts.resolve"], in: app)
+        XCTAssertTrue(wait(for: app.staticTexts["alerts.note"], label: "Resolved"))
+        XCTAssertTrue(app.staticTexts["alerts.done"].label.hasPrefix("Resolved "))
+        scrollToTop(app)
+        try app.audit()
+        keepScreenshot("alert-resolved", of: app)
+    }
+
+    @MainActor
     func testCantMakeIsSentWithItsReason() throws {
         let app = openJob()
         XCTAssertTrue(app.buttons["job.cantMake"].waitForExistence(timeout: 5))

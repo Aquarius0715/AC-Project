@@ -231,6 +231,29 @@
         }
       }
     },
+    "{condition} for {duration}": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{condition} selama {duration}"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{condition} が {duration}"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{condition} selama {duration}"
+          }
+        }
+      }
+    },
     "{field} — {problem}": {
       "extractionState": "manual",
       "localizations": {
@@ -530,6 +553,29 @@
         }
       }
     },
+    "{kind} · no policy — it resolves only with a reason": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{kind} · tiada dasar — ia hanya diselesaikan dengan sebab"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{kind} · ポリシーなし — 理由を添えた場合のみ解決できます"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{kind} · tanpa kebijakan — hanya terselesaikan dengan alasan"
+          }
+        }
+      }
+    },
     "{m} m from site · QR matched": {
       "extractionState": "manual",
       "localizations": {
@@ -687,6 +733,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "{n} perubahan:"
+          }
+        }
+      }
+    },
+    "{n} h": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{n} j"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{n} 時間"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{n} j"
           }
         }
       }
@@ -852,6 +921,29 @@
         }
       }
     },
+    "{n} s": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{n} s"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{n} 秒"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{n} dtk"
+          }
+        }
+      }
+    },
     "{name} reading is not a number": {
       "extractionState": "manual",
       "localizations": {
@@ -875,6 +967,29 @@
         }
       }
     },
+    "{origin} · valid": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{origin} · sah"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{origin} · 有効"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{origin} · valid"
+          }
+        }
+      }
+    },
     "{range} · warning at {warn} · discard at {end}": {
       "extractionState": "manual",
       "localizations": {
@@ -894,6 +1009,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "{range} · peringatan pada {warn} · dibuang pada {end}"
+          }
+        }
+      }
+    },
+    "{recovery} for {duration}": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{recovery} selama {duration}"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{recovery}（{duration}）"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{recovery} selama {duration}"
           }
         }
       }
@@ -1381,6 +1519,29 @@
         }
       }
     },
+    "A policy alert may also be resolved by hand without evidence": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Amaran daripada dasar juga boleh diselesaikan secara manual tanpa bukti"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ポリシーによるアラートは、根拠なしで手動で解決することもできます"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Peringatan kebijakan juga dapat diselesaikan secara manual tanpa bukti"
+          }
+        }
+      }
+    },
     "A reason is required for a manual check-in (1–1000 characters)": {
       "extractionState": "manual",
       "localizations": {
@@ -1400,6 +1561,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Alasan wajib untuk check-in manual (1–1000 karakter)"
+          }
+        }
+      }
+    },
+    "A resolution reason is required (1–1000 characters).": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sebab penyelesaian diperlukan (1–1000 aksara)."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "解決の理由が必要です（1～1000文字）。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alasan penyelesaian wajib diisi (1–1000 karakter)."
           }
         }
       }
@@ -1630,6 +1814,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Akses"
+          }
+        }
+      }
+    },
+    "Acknowledge": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Akui"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "確認済みにする"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Akui"
           }
         }
       }
@@ -2002,6 +2209,52 @@
         }
       }
     },
+    "Alert evidence": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bukti amaran"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アラートの根拠"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bukti peringatan"
+          }
+        }
+      }
+    },
+    "Alert history": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sejarah amaran"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アラートの履歴"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riwayat peringatan"
+          }
+        }
+      }
+    },
     "Alert on {name}": {
       "extractionState": "manual",
       "localizations": {
@@ -2071,6 +2324,75 @@
         }
       }
     },
+    "Alerts aren’t available": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Amaran tidak tersedia"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アラートを利用できません"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Peringatan tidak tersedia"
+          }
+        }
+      }
+    },
+    "Alerts on this unit ({n})": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Amaran pada unit ini ({n})"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このユニットのアラート（{n}）"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Peringatan pada unit ini ({n})"
+          }
+        }
+      }
+    },
+    "Alerts raised on this unit appear here with their evidence.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Amaran yang dicetuskan pada unit ini dipaparkan di sini bersama buktinya."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このユニットで発生したアラートが、根拠とともにここに表示されます。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Peringatan yang muncul pada unit ini tampil di sini beserta buktinya."
+          }
+        }
+      }
+    },
     "All": {
       "extractionState": "manual",
       "localizations": {
@@ -2136,6 +2458,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Jumlah tagihan {amount}"
+          }
+        }
+      }
+    },
+    "An evidence record is no longer a candidate of this alert — pick again from the list": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Satu rekod bukti bukan lagi calon bagi amaran ini — pilih semula daripada senarai"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "根拠の記録が、このアラートの候補ではなくなりました — 一覧からもう一度選んでください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sebuah catatan bukti bukan lagi kandidat peringatan ini — pilih lagi dari daftar"
           }
         }
       }
@@ -2692,6 +3037,29 @@
         }
       }
     },
+    "At least one · measurements after detection": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sekurang-kurangnya satu · ukuran selepas pengesanan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 件以上 · 検知後の測定値"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Setidaknya satu · pengukuran setelah deteksi"
+          }
+        }
+      }
+    },
     "At least one active membership must keep “Edit users & roles” — give it to another HQ membership first, then change this one": {
       "extractionState": "manual",
       "localizations": {
@@ -2780,6 +3148,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Perhatian"
+          }
+        }
+      }
+    },
+    "Automatic resolution needs a remeasurement {recovery} — or a reason below with “Resolve alerts”.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Penyelesaian automatik memerlukan pengukuran semula {recovery} — atau sebab di bawah dengan “Selesaikan amaran”."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自動で解決するには、再測定が {recovery} になる必要があります — または、下で理由を添えて「アラートの解決」で解決します。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Penyelesaian otomatis memerlukan pengukuran ulang {recovery} — atau alasan di bawah dengan “Selesaikan peringatan”."
           }
         }
       }
@@ -3612,6 +4003,29 @@
         }
       }
     },
+    "Completing the job alone never resolves an alert. If the condition returns, a new alert is created that links back to alert {id}.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Menyelesaikan kerja sahaja tidak pernah menyelesaikan amaran. Jika keadaan berulang, amaran baharu dicipta yang memaut kembali kepada amaran {id}."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "作業の完了だけでは、アラートは解決されません。状態が再発した場合は、アラート {id} に紐づく新しいアラートが作成されます。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Menyelesaikan pekerjaan saja tidak pernah menyelesaikan peringatan. Jika kondisi kembali, peringatan baru dibuat yang menaut kembali ke peringatan {id}."
+          }
+        }
+      }
+    },
     "Completing the job does not resolve it.": {
       "extractionState": "manual",
       "localizations": {
@@ -3723,6 +4137,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Koil kondensor"
+          }
+        }
+      }
+    },
+    "confidence unknown — no numeric probability shown": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "keyakinan tidak diketahui — tiada kebarangkalian berangka dipaparkan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "確度は不明 — 数値の確率は表示しません"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "tingkat keyakinan tidak diketahui — tidak ada probabilitas numerik yang ditampilkan"
           }
         }
       }
@@ -4647,6 +5084,29 @@
         }
       }
     },
+    "Device event · {time}": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Peristiwa peranti · {time}"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "デバイスのイベント · {time}"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Peristiwa perangkat · {time}"
+          }
+        }
+      }
+    },
     "Device operation — {name}": {
       "extractionState": "manual",
       "localizations": {
@@ -4758,6 +5218,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tutup"
+          }
+        }
+      }
+    },
+    "done {time}": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "selesai {time}"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{time} に完了"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "selesai {time}"
           }
         }
       }
@@ -4919,6 +5402,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Pengeringan"
+          }
+        }
+      }
+    },
+    "e.g. Confirmed on site that airflow is restored after filter cleaning.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "cth. Disahkan di tapak bahawa aliran udara pulih selepas pembersihan penapis."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "例: フィルター清掃後に風量が戻ったことを現地で確認しました。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "mis. Dikonfirmasi di lokasi bahwa aliran udara pulih setelah pembersihan filter."
           }
         }
       }
@@ -5130,6 +5636,29 @@
         }
       }
     },
+    "estimated": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "anggaran"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "推定"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "perkiraan"
+          }
+        }
+      }
+    },
     "Evaporator coil": {
       "extractionState": "manual",
       "localizations": {
@@ -5172,6 +5701,52 @@
           "stringUnit": {
             "state": "translated",
             "value": "Peristiwa pada periode ini"
+          }
+        }
+      }
+    },
+    "Evidence at detection": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bukti semasa dikesan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "検知時の根拠"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bukti saat deteksi"
+          }
+        }
+      }
+    },
+    "Evidence attached to this alert": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bukti yang dilampirkan pada amaran ini"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このアラートに添付された根拠"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bukti terlampir pada peringatan ini"
           }
         }
       }
@@ -5659,6 +6234,29 @@
         }
       }
     },
+    "good": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "baik"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "良好"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "baik"
+          }
+        }
+      }
+    },
     "Grant consent": {
       "extractionState": "manual",
       "localizations": {
@@ -5935,6 +6533,29 @@
         }
       }
     },
+    "If it recurs after it is resolved, a new alert is created that links back to this one.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jika ia berulang selepas diselesaikan, amaran baharu dicipta yang memaut kembali kepada amaran ini."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "解決後に再発した場合は、このアラートに紐づく新しいアラートが作成されます。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jika berulang setelah terselesaikan, peringatan baru dibuat yang menaut kembali ke yang ini."
+          }
+        }
+      }
+    },
     "In progress": {
       "extractionState": "manual",
       "localizations": {
@@ -6069,6 +6690,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Pembaruan pertanyaan — {name}"
+          }
+        }
+      }
+    },
+    "Inspection record": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rekod pemeriksaan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "点検記録"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Catatan inspeksi"
           }
         }
       }
@@ -6345,6 +6989,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "terakhir terlihat {time}"
+          }
+        }
+      }
+    },
+    "Latest reading": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bacaan terkini"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最新の測定値"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bacaan terbaru"
           }
         }
       }
@@ -6970,6 +7637,29 @@
         }
       }
     },
+    "measured": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "diukur"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "実測"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "terukur"
+          }
+        }
+      }
+    },
     "Medical appointment on that morning": {
       "extractionState": "manual",
       "localizations": {
@@ -7338,6 +8028,29 @@
         }
       }
     },
+    "no — ask a user with “Resolve alerts”": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "tidak — minta pengguna yang ada “Selesaikan amaran”"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "いいえ —「アラートの解決」を持つユーザーに依頼してください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "tidak — minta pengguna dengan “Selesaikan peringatan”"
+          }
+        }
+      }
+    },
     "No ACs in your account yet.": {
       "extractionState": "manual",
       "localizations": {
@@ -7380,6 +8093,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tidak ada peristiwa peringatan atau perangkat pada periode ini."
+          }
+        }
+      }
+    },
+    "No alerts on this unit": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tiada amaran pada unit ini"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このユニットにアラートはありません"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak ada peringatan pada unit ini"
           }
         }
       }
@@ -7798,6 +8534,29 @@
         }
       }
     },
+    "No policy": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tiada dasar"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ポリシーなし"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tanpa kebijakan"
+          }
+        }
+      }
+    },
     "no reading": {
       "extractionState": "manual",
       "localizations": {
@@ -7867,6 +8626,29 @@
         }
       }
     },
+    "no reason recorded": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "tiada sebab direkodkan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "理由は記録されていません"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "tidak ada alasan tercatat"
+          }
+        }
+      }
+    },
     "no recent measurement": {
       "extractionState": "manual",
       "localizations": {
@@ -7886,6 +8668,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "tidak ada pengukuran terbaru"
+          }
+        }
+      }
+    },
+    "No remeasurement resolves this alert — it has no policy. Resolve it with a reason below with “Resolve alerts”.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tiada pengukuran semula yang menyelesaikan amaran ini — ia tiada dasar. Selesaikannya dengan sebab di bawah dengan “Selesaikan amaran”."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "再測定ではこのアラートは解決されません — ポリシーがないためです。下で理由を添えて「アラートの解決」で解決してください。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak ada pengukuran ulang yang menyelesaikan peringatan ini — tidak memiliki kebijakan. Selesaikan dengan alasan di bawah dengan “Selesaikan peringatan”."
           }
         }
       }
@@ -8189,6 +8994,52 @@
         }
       }
     },
+    "Not resolved — you don’t have “Resolve alerts”. Ask a permitted user to resolve it.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak diselesaikan — anda tiada “Selesaikan amaran”. Minta pengguna yang dibenarkan menyelesaikannya."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "解決されていません —「アラートの解決」の権限がありません。権限のあるユーザーに解決を依頼してください。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Belum terselesaikan — Anda tidak memiliki “Selesaikan peringatan”. Minta pengguna yang berwenang menyelesaikannya."
+          }
+        }
+      }
+    },
+    "Not resolved — you don’t have “Resolve alerts”. The alert resolves automatically once a remeasurement stays {recovery}, or ask a permitted user.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak diselesaikan — anda tiada “Selesaikan amaran”. Amaran diselesaikan secara automatik apabila pengukuran semula kekal {recovery}, atau minta pengguna yang dibenarkan."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "解決されていません —「アラートの解決」の権限がありません。再測定が {recovery} のままになると、アラートは自動で解決されます。または、権限のあるユーザーに依頼してください。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Belum terselesaikan — Anda tidak memiliki “Selesaikan peringatan”. Peringatan terselesaikan otomatis setelah pengukuran ulang tetap {recovery}, atau minta pengguna yang berwenang."
+          }
+        }
+      }
+    },
     "not scheduled yet": {
       "extractionState": "manual",
       "localizations": {
@@ -8208,6 +9059,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "belum dijadwalkan"
+          }
+        }
+      }
+    },
+    "Not sent; your reason is kept. Try again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak dihantar; sebab anda disimpan. Cuba lagi."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "送信されませんでした。理由は残っています。もう一度お試しください。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak terkirim; alasan Anda tetap tersimpan. Coba lagi."
           }
         }
       }
@@ -8323,6 +9197,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Notifikasi"
+          }
+        }
+      }
+    },
+    "Observed (demo)": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diperhatikan (demo)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "観測（デモ）"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Teramati (demo)"
           }
         }
       }
@@ -8668,6 +9565,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Hanya penugasan Anda sendiri pada unit ini yang dicantumkan."
+          }
+        }
+      }
+    },
+    "Open": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terbuka"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未解決"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terbuka"
           }
         }
       }
@@ -9247,6 +10167,75 @@
         }
       }
     },
+    "Pick at least one evidence record — this alert has no policy": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pilih sekurang-kurangnya satu rekod bukti — amaran ini tiada dasar"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "根拠の記録を1件以上選んでください — このアラートにはポリシーがありません"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pilih setidaknya satu catatan bukti — peringatan ini tidak memiliki kebijakan"
+          }
+        }
+      }
+    },
+    "Pick at most {n} evidence records": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pilih paling banyak {n} rekod bukti"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "根拠の記録は {n} 件までです"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pilih paling banyak {n} catatan bukti"
+          }
+        }
+      }
+    },
+    "Pick each evidence record once, at most {n}": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pilih setiap rekod bukti sekali sahaja, paling banyak {n}"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "根拠の記録は重複させず、{n} 件までです"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pilih setiap catatan bukti sekali, paling banyak {n}"
+          }
+        }
+      }
+    },
     "PM2.5": {
       "extractionState": "manual",
       "localizations": {
@@ -9266,6 +10255,52 @@
           "stringUnit": {
             "state": "translated",
             "value": "PM2.5"
+          }
+        }
+      }
+    },
+    "Policy": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dasar"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ポリシー"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kebijakan"
+          }
+        }
+      }
+    },
+    "Policy: {metric} {op} {threshold}, recovery {recovery}, duration {duration}": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dasar: {metric} {op} {threshold}, pemulihan {recovery}, tempoh {duration}"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ポリシー: {metric} {op} {threshold}、復旧 {recovery}、継続 {duration}"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kebijakan: {metric} {op} {threshold}, pemulihan {recovery}, durasi {duration}"
           }
         }
       }
@@ -9523,6 +10558,29 @@
         }
       }
     },
+    "Previous alert": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Amaran sebelumnya"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "前のアラート"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Peringatan sebelumnya"
+          }
+        }
+      }
+    },
     "processing": {
       "extractionState": "manual",
       "localizations": {
@@ -9611,6 +10669,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Naikkan suhu"
+          }
+        }
+      }
+    },
+    "Raised": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dicetuskan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "発生"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dimunculkan"
           }
         }
       }
@@ -9753,6 +10834,29 @@
         }
       }
     },
+    "recorded on site": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "direkodkan di tapak"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "現地で記録"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dicatat di lokasi"
+          }
+        }
+      }
+    },
     "Recovered (kg)": {
       "extractionState": "manual",
       "localizations": {
@@ -9818,6 +10922,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "pemulihan terselesaikan"
+          }
+        }
+      }
+    },
+    "Recovery rule": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Peraturan pemulihan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "復旧ルール"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aturan pemulihan"
           }
         }
       }
@@ -9960,6 +11087,29 @@
         }
       }
     },
+    "Related": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Berkaitan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "関連"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terkait"
+          }
+        }
+      }
+    },
     "Release requested": {
       "extractionState": "manual",
       "localizations": {
@@ -10002,6 +11152,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dicabut"
+          }
+        }
+      }
+    },
+    "Remeasurement · {metric} {value} · {time}": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pengukuran semula · {metric} {value} · {time}"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "再測定 · {metric} {value} · {time}"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pengukuran ulang · {metric} {value} · {time}"
           }
         }
       }
@@ -10305,6 +11478,121 @@
         }
       }
     },
+    "Resolution": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Penyelesaian"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "解決"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Penyelesaian"
+          }
+        }
+      }
+    },
+    "Resolution evidence · optional": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bukti penyelesaian · pilihan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "解決の根拠 · 任意"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bukti penyelesaian · opsional"
+          }
+        }
+      }
+    },
+    "Resolution evidence · required": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bukti penyelesaian · wajib"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "解決の根拠 · 必須"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bukti penyelesaian · wajib"
+          }
+        }
+      }
+    },
+    "Resolution reason (required, 1–1000 characters)": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sebab penyelesaian (wajib, 1–1000 aksara)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "解決の理由（必須、1～1000文字）"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alasan penyelesaian (wajib, 1–1000 karakter)"
+          }
+        }
+      }
+    },
+    "Resolve alert": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selesaikan amaran"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アラートを解決"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selesaikan peringatan"
+          }
+        }
+      }
+    },
     "Resolved": {
       "extractionState": "manual",
       "localizations": {
@@ -10324,6 +11612,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Terselesaikan"
+          }
+        }
+      }
+    },
+    "Resolved {time} — {reason}.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diselesaikan {time} — {reason}."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{time} に解決 — {reason}。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terselesaikan {time} — {reason}."
           }
         }
       }
@@ -11892,6 +13203,29 @@
         }
       }
     },
+    "Suspected": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Disyaki"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "疑いあり"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dicurigai"
+          }
+        }
+      }
+    },
     "Take photo": {
       "extractionState": "manual",
       "localizations": {
@@ -12260,6 +13594,52 @@
         }
       }
     },
+    "The alert changed elsewhere — the latest state is shown.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Amaran berubah di tempat lain — keadaan terkini dipaparkan."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アラートが別の場所で変更されました — 最新の状態を表示しています。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Peringatan berubah di tempat lain — status terbaru ditampilkan."
+          }
+        }
+      }
+    },
+    "The alert is no longer in that state — the latest state is shown.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Amaran tidak lagi dalam keadaan itu — keadaan terkini dipaparkan."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アラートはもうその状態ではありません — 最新の状態を表示しています。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Peringatan tidak lagi dalam status itu — status terbaru ditampilkan."
+          }
+        }
+      }
+    },
     "The checked file has expired or changed — check it again, then import": {
       "extractionState": "manual",
       "localizations": {
@@ -12417,6 +13797,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Perangkat offline — coba lagi saat kembali online"
+          }
+        }
+      }
+    },
+    "The device's signal is back": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Isyarat peranti telah pulih"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "デバイスの信号が戻りました"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sinyal perangkat kembali"
           }
         }
       }
@@ -12996,6 +14399,29 @@
         }
       }
     },
+    "This AC is not in your assignments.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AC ini tiada dalam tugasan anda."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このエアコンは、あなたの割り当てに含まれていません。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AC ini tidak ada dalam penugasan Anda."
+          }
+        }
+      }
+    },
     "This AC is offline. Remote actions are disabled until the connection returns. Last seen {when}.": {
       "extractionState": "manual",
       "localizations": {
@@ -13107,6 +14533,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Periode akses akun ini telah berakhir — tetapkan akhir akses baru lebih dulu"
+          }
+        }
+      }
+    },
+    "This alert is not in your assignments.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Amaran ini tiada dalam tugasan anda."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このアラートは、あなたの割り当てに含まれていません。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Peringatan ini tidak ada dalam penugasan Anda."
           }
         }
       }
@@ -14974,6 +16423,75 @@
         }
       }
     },
+    "with a reason": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dengan sebab"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "理由を添えて"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dengan alasan"
+          }
+        }
+      }
+    },
+    "with a reason, or by a remeasurement": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dengan sebab, atau melalui pengukuran semula"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "理由を添えるか、再測定で"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dengan alasan, atau dengan pengukuran ulang"
+          }
+        }
+      }
+    },
+    "with a remeasurement only": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "melalui pengukuran semula sahaja"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "再測定のみ"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "hanya dengan pengukuran ulang"
+          }
+        }
+      }
+    },
     "Withdraw consent": {
       "extractionState": "manual",
       "localizations": {
@@ -15342,6 +16860,29 @@
         }
       }
     },
+    "You can resolve": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anda boleh menyelesaikan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "解決できます"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anda dapat menyelesaikan"
+          }
+        }
+      }
+    },
     "You can see this AC from {time}, when your work window starts.": {
       "extractionState": "manual",
       "localizations": {
@@ -15430,6 +16971,52 @@
           "stringUnit": {
             "state": "translated",
             "value": "Anda tidak memiliki izin untuk tindakan ini"
+          }
+        }
+      }
+    },
+    "You need an active assignment on this unit to act on its alerts.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anda memerlukan tugasan aktif pada unit ini untuk bertindak atas amarannya."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このユニットのアラートを操作するには、有効な割り当てが必要です。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anda memerlukan penugasan aktif pada unit ini untuk menindaklanjuti peringatannya."
+          }
+        }
+      }
+    },
+    "You need an active assignment on this unit to see its alerts.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anda memerlukan tugasan aktif pada unit ini untuk melihat amarannya."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このユニットのアラートを見るには、有効な割り当てが必要です。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anda memerlukan penugasan aktif pada unit ini untuk melihat peringatannya."
           }
         }
       }
@@ -15798,6 +17385,52 @@
           "stringUnit": {
             "state": "translated",
             "value": "Jendela pekerjaan Anda berakhir, atau HQ atau koordinator Anda mengubah penugasan, jadi detail pekerjaan dan unit tidak lagi ditampilkan kepada Anda."
+          }
+        }
+      }
+    },
+    "Your work window on this unit has ended.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tetingkap kerja anda pada unit ini telah tamat."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このユニットでのあなたの作業時間は終了しました。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jendela pekerjaan Anda pada unit ini telah berakhir."
+          }
+        }
+      }
+    },
+    "Your work window on this unit has not started yet.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tetingkap kerja anda pada unit ini belum bermula."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このユニットでのあなたの作業時間は、まだ始まっていません。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jendela pekerjaan Anda pada unit ini belum dimulai."
           }
         }
       }

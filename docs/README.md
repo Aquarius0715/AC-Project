@@ -105,6 +105,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 0.654.0 (2026-11-16): IR811: from Turn off running ACs, one link opens an after-hours rule with the same ACs.
 0.657.0 (2026-11-16): IR814: a customer pins ACs to the Overview from their pages (this browser only).
 0.658.0 (2026-11-16): IR815: Energy & cost opens on the AC that used the most in the period.
+0.683.0 (2026-11-21): IR867 (DEC-112): AC Technician shows an alert's evidence, acknowledges it and resolves it with a reason and the evidence it cites.
 0.682.0 (2026-11-21): IR866 (DEC-112): AC Technician shows the job's unit: the register and components, the latest values, a chart of one or two metrics over 1 h, 24 h or 7 days, the period's events, the open alerts and the technician's jobs on it.
 0.681.0 (2026-11-21): IR865 (DEC-112): AC Technician fills the work report on the phone (checklist, readings, parts and refrigerant, work text and next action, photos, the equipment check of an installation), takes the customer's sign-off and submits; a report's reading keeps its component in the contract (ReportMeasurement).
 0.680.0 (2026-11-20): IR864 (DEC-112): AC Technician lists the assigned jobs as the overview does and opens one: accepting the assignment or saying the time does not work, the check-in with the phone's fix and the unit's QR label or manually, pausing and resuming, resuming rework; texts whose key was not a literal are translated.

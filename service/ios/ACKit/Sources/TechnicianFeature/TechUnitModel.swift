@@ -45,14 +45,14 @@ public final class TechUnitModel {
         content = await content.after { () async throws(CoreError) in try await read() }
         guard let unit else { return }
         if metrics.isEmpty { metrics = [Self.firstMetric(unit)] }
-        alerts = (try? await unitAlerts()) ?? []
+        alerts = (try? await Self.alerts(of: unitId, client: client)) ?? []
         jobs = (try? await client.call(Ops.JobsList.self, Query(limit: 20, filters: QueryFilters(unitId: unitId))).data.items) ?? []
         await loadSeries()
     }
 
-    /// The unit's alerts: every unresolved one, then the latest resolved ones (IR712). The list sorts the most severe
+    /// A unit's alerts: every unresolved one, then the latest resolved ones (IR712). The list sorts the most severe
     /// first across the statuses, so one read of all of them could lose unresolved ones behind resolved ones.
-    private func unitAlerts() async throws(CoreError) -> [CoreAlert] {
+    static func alerts(of unitId: String, client: CoreClient) async throws(CoreError) -> [CoreAlert] {
         var alerts: [CoreAlert] = []
         for status in ["open", "acknowledged"] {
             let query = Query(limit: 100, filters: QueryFilters(unitId: unitId, status: status))
