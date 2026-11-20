@@ -21,6 +21,8 @@ final class StubAlerts {
                     StubAlertAnswer(data: Page(items: items, nextCursor: nil, total: Double(items.count), snapshotVersion: 1))
                 )
             )
+        case ("GET", "/v1/alerts/al1"):
+            return (200, try encoder.encode(StubAlertAnswer(data: alert)))
         case ("GET", "/v1/alerts/al1/evidence"):
             let candidate = EvidenceCandidate(
                 id: "ev-r1",
@@ -58,7 +60,7 @@ final class StubAlerts {
                 organizationName: "HQ",
                 organizationId: "o1",
                 customerId: nil,
-                permissions: [.alertResolve, .controlDiagnose],
+                permissions: [.alertResolve, .controlDiagnose, .deviceMaintain, .alertRead],
                 generation: 1,
                 viewEpoch: 1,
                 issuedAt: StubUnitData.at(3600),

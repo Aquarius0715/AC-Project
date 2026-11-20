@@ -26,6 +26,8 @@ public struct TechnicianRoot: View {
             TabView {
                 JobsView(model: JobsModel(client: session.client), session: session, position: position)
                     .tabItem { Label(tr("Jobs"), systemImage: "wrench.and.screwdriver") }
+                DevicesView(model: DevicesModel(client: session.client))
+                    .tabItem { Label(tr("Devices"), systemImage: "sensor") }
                 NotificationsView(model: NotificationsModel(client: session.client))
                     .tabItem { Label(tr("Notifications"), systemImage: "bell") }
             }

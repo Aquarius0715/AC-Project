@@ -259,6 +259,39 @@ final class TechnicianUITests: XCTestCase {
     }
 
     @MainActor
+    func testADeviceIsCheckedCalibratedUpdatedAndAnswered() throws {
+        let app = launch(["AC_UI_TEST": "stub"])
+        app.buttons["signIn.button"].tap()
+        app.tabBars.buttons["Devices"].firstMatch.tap()
+        let row = app.buttons["device.d1"]
+        XCTAssertTrue(row.waitForExistence(timeout: 5))
+        try app.audit()
+        row.tap()
+        let check = app.buttons["device.check"]
+        XCTAssertTrue(check.waitForExistence(timeout: 5))
+        try app.audit()
+        keepScreenshot("device", of: app)
+        tapScrolling(check, in: app)
+        XCTAssertTrue(wait(for: app.staticTexts["device.note"], label: "Connection check requested"))
+        tapScrolling(app.buttons["device.update.2.0"], in: app)
+        XCTAssertTrue(wait(for: app.staticTexts["device.note"], label: "Firmware update to 2.0 requested"))
+
+        type("24.0", into: field("device.calibrate.reference", in: app), in: app)
+        type("24.4", into: field("device.calibrate.measured", in: app), in: app)
+        tapScrolling(app.buttons["device.calibrate"], in: app)
+        XCTAssertTrue(wait(for: app.staticTexts["device.note"], label: "Calibration recorded — earlier readings unchanged"))
+
+        type("Cover closed and sealed", into: field("device.note.text", in: app), in: app)
+        tapScrolling(app.buttons["device.event.note.de1"], in: app)
+        XCTAssertTrue(wait(for: app.staticTexts["device.note"], label: "Response note added — the device state is unchanged"))
+        tapScrolling(app.buttons["device.alert.al1"], in: app)
+        XCTAssertTrue(wait(for: app.staticTexts["device.note"], label: "Acknowledged"))
+        scrollToTop(app)
+        try app.audit()
+        keepScreenshot("device-done", of: app)
+    }
+
+    @MainActor
     func testCantMakeIsSentWithItsReason() throws {
         let app = openJob()
         XCTAssertTrue(app.buttons["job.cantMake"].waitForExistence(timeout: 5))

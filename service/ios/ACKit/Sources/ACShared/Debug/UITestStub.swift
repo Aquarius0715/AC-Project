@@ -45,6 +45,7 @@ public enum UITestStub {
         private let jobs = StubJobs()
         private let alerts = StubAlerts()
         private let diagnostics = StubDiagnostics()
+        private let devices = StubDevices()
         private var consent = Consent(
             id: "consent1",
             tenantId: "t1",
@@ -67,6 +68,7 @@ public enum UITestStub {
             let (status, body) = try lock.withLock {
                 try alerts.answer(method, url.path(), url.query(), request.httpBody)
                     ?? diagnostics.answer(method, url.path(), url.query(), request.httpBody)
+                    ?? devices.answer(method, url.path(), request.httpBody)
                     ?? jobs.answer(method, url.path(), request.httpBody)
                     ?? answer(method, url.path(), request.httpBody).map { (200, $0) } ?? (404, Data("{}".utf8))
             }
@@ -95,7 +97,6 @@ public enum UITestStub {
                 for id in ids { _ = markRead(id) }
                 return try encoder.encode(StubAnswer(data: NotificationsMarked(markedIds: ids, skippedIds: [])))
             case ("GET", "/v1/telemetry/series"): return try encoder.encode(StubAnswer(data: StubUnitData.series))
-            case ("GET", "/v1/devices"): return try encoder.encode(StubAnswer(data: page([Device]())))
             case (_, "/v1/properties"): return try encoder.encode(StubAnswer(data: page([Self.home])))
             case ("GET", "/v1/consents/location_automation"): return try encoder.encode(StubAnswer(data: consent))
             case ("PUT", "/v1/consents/location_automation"):
@@ -275,7 +276,7 @@ public enum UITestStub {
                 latestMeasurements: role == "technician" && isLiving ? [StubUnitData.reading(24.5, secondsAgo: 120)] : [],
                 activeAlertCount: 0,
                 capabilities: Self.capability,
-                iotModel: nil,
+                iotModel: role == "technician" && isLiving ? StubDevices.model : nil,
                 effectiveControlPolicy: .unrestricted(EffectiveControlPolicyUnrestricted()),
                 controlAvailability: .available(ControlAvailabilityAvailable()),
                 components: role == "technician" ? StubUnitData.components : [],
