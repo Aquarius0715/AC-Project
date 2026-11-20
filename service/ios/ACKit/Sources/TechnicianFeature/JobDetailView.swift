@@ -102,7 +102,7 @@ struct JobDetailView: View {
             } label: {
                 Label(tr("Unit"), systemImage: "air.conditioner.horizontal")
             }
-            .secondaryAction()
+            .linkAction()
             .accessibilityIdentifier("job.unit")
             NavigationLink {
                 AlertsView(model: AlertsModel(unitId: work.job.unitId, jobId: work.job.id, alertId: nil, client: model.client))
@@ -122,7 +122,7 @@ struct JobDetailView: View {
                 } label: {
                     Label(tr("Open the work report"), systemImage: "doc.text")
                 }
-                .secondaryAction()
+                .linkAction()
                 .accessibilityIdentifier("job.report")
             } else {
                 Text(verbatim: tr("The report opens when you check in at the site."))
