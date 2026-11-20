@@ -1048,7 +1048,6 @@ export const id: Record<string, string> = {
   "Not in a property": "Tidak di properti",
   "{n} unit": "{n} unit",
   "{n} units": "{n} unit",
-  "{n} AC": "{n} AC",
   "{n} ACs": "{n} AC",
   "No properties yet": "Belum ada properti",
   "HQ registers your homes and offices with their rooms and air conditioners; they appear here once set up.": "HQ mendaftarkan rumah dan kantor Anda beserta ruangan dan pendingin udaranya; semuanya muncul di sini setelah disiapkan.",

@@ -31,8 +31,9 @@ const roomUnits: Record<string, { id: string; name: string; temp: number; w: num
 };
 // the workstations' third AC is stopped and the sixth unreachable; the others run
 const WS_STATE = new Map<number, GUnit["state"]>([[2, "stopped"], [5, "unknown"]]);
+const wsUnits: GUnit[] = Array.from({ length: 8 }, (_, i) => ({ id: `ws-ac-0${String(i + 1)}`, name: `WS-AC 0${String(i + 1)}`, temp: i === 2 || i === 7 ? null : 24 + (i % 3) * 0.5, w: i === 2 || i === 7 ? null : 580 + i * 10, state: WS_STATE.get(i) ?? "running", online: i !== 5 }));
 const groupUnits: Record<string, GUnit[]> = {
-  ws: Array.from({ length: 8 }, (_, i) => ({ id: `ws-ac-0${String(i + 1)}`, name: `WS-AC 0${String(i + 1)}`, temp: i === 2 || i === 7 ? null : 24 + (i % 3) * 0.5, w: i === 2 || i === 7 ? null : 580 + i * 10, state: WS_STATE.get(i) ?? "running", online: i !== 5 })),
+  ws: wsUnits,
   bedroom: [{ id: "unit-online-rto", name: "Bedroom AC", temp: 28, w: 680, state: "running", online: true }, { id: "unit-bedroom-2", name: "Bedroom AC #2", temp: 27, w: 0, state: "stopped", online: true }],
   meeting: [{ id: "unit-meeting", name: "Meeting room AC", temp: 25, w: 600, state: "running", online: true, min: 24 }, { id: "unit-meeting-2", name: "Meeting AC 2", temp: 25.5, w: 590, state: "running", online: true }],
 };
@@ -106,7 +107,7 @@ export function PropertiesDemo() {
             <div className="mb-3 flex flex-wrap items-center gap-2"><span className="text-xs text-muted-foreground">{groupUnits[sel].length} ACs ·</span>{(["single", "group"] as const).map((m) => <Plain key={m} aria-pressed={mode === m} onClick={() => { setMode(m); }} className={cx("rounded-control border px-3 py-1 text-xs font-semibold", mode === m ? "border-primary bg-primary-soft text-primary" : "border-line")}>{mode === m && <Icon name="check" />}{m === "single" ? "Single AC" : "Group control"}</Plain>)}</div>
           )}
           {groupUnits[sel] && mode === "group" && <GroupControl space={GROUP_SPACE.get(sel) ?? "Bedroom"} units={groupUnits[sel]} />}
-          {sel === "ws" && mode === "single" && <div className="flex flex-col gap-2">{(groupUnits.ws ?? []).map((u) => <Link key={u.id} href="/customer/units/unit-online-rto" className="flex items-center justify-between rounded-xl border border-line p-3 hover:bg-surface2/60"><b className="flex items-center gap-1.5"><Icon name="units" className="text-primary" />{u.name}</b><span className="flex items-center gap-3 text-xs"><PowerBadge s={u.state} />{u.temp ?? "—"} °C <Icon name="chevronRight" /></span></Link>)}</div>}
+          {sel === "ws" && mode === "single" && <div className="flex flex-col gap-2">{wsUnits.map((u) => <Link key={u.id} href="/customer/units/unit-online-rto" className="flex items-center justify-between rounded-xl border border-line p-3 hover:bg-surface2/60"><b className="flex items-center gap-1.5"><Icon name="units" className="text-primary" />{u.name}</b><span className="flex items-center gap-3 text-xs"><PowerBadge s={u.state} />{u.temp ?? "—"} °C <Icon name="chevronRight" /></span></Link>)}</div>}
           {us && mode === "single" && (
             <div className="flex flex-col gap-2">
               {us.map((u) => (
