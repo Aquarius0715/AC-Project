@@ -11,6 +11,8 @@ import { MaintenanceDemo } from "../app/customer/maintenance/_components/mainten
 import { jobActions } from "@ac/web/lib/jobs";
 
 const dialog = () => screen.getByRole("dialog");
+/** a lookup that must have found its element: the test stops at the step that missed it */
+const missing = (): never => { throw new Error("element not found"); };
 
 beforeEach(() => {
   toast.mockReset();
@@ -23,7 +25,7 @@ describe("MaintenanceDemo Report a problem", () => {
   // first: a refused report leaves job-c02 open to rate and report
   it("is refused in the dialog when the job is no longer completed", () => {
     render(<MaintenanceDemo jobId="job-c02" />);
-    fireEvent.click(within(screen.getByText("Completed report").closest("div") ?? document.body).getAllByRole("button", { name: "Report a problem" }).at(-1) ?? document.body);
+    fireEvent.click(within(screen.getByText("Completed report").closest("div") ?? missing()).getAllByRole("button", { name: "Report a problem" }).at(-1) ?? missing());
     act(() => { jobActions.cancel("job-c02", "elsewhere"); });
     fireEvent.change(within(dialog()).getByRole("textbox", { name: /Details/ }), { target: { value: "Water on the floor again" } });
     fireEvent.click(within(dialog()).getByRole("button", { name: "Send report" }));
@@ -37,8 +39,8 @@ describe("MaintenanceDemo Report a problem", () => {
     fireEvent.click(screen.getByRole("button", { name: "Report a problem" }));
     expect(within(dialog()).getByText("Report a problem — job-c02")).toBeDefined();
     fireEvent.click(within(dialog()).getByRole("button", { name: "Cancel" }));
-    const card = screen.getByText("Completed report").closest("div") ?? document.body;
-    fireEvent.click(within(card).getAllByRole("button", { name: "Report a problem" }).at(-1) ?? document.body);
+    const card = screen.getByText("Completed report").closest("div") ?? missing();
+    fireEvent.click(within(card).getAllByRole("button", { name: "Report a problem" }).at(-1) ?? missing());
     fireEvent.click(within(dialog()).getByRole("button", { name: "Send report" }));
     expect(within(dialog()).getByText("Describe the problem (10–2000 characters)")).toBeDefined();
     fireEvent.click(within(dialog()).getByRole("button", { name: "New damage" }));

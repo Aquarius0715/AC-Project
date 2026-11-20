@@ -62,6 +62,8 @@ const live = (over: { rows?: ClientRow[]; rateBanner?: { jobId: string; text: st
 };
 const button = (name: string | RegExp) => screen.getByRole("button", { name });
 const dialog = () => screen.getByRole("dialog");
+/** a lookup that must have found its element: the test stops at the step that missed it */
+const missing = (): never => { throw new Error("element not found"); };
 const failure = (code: string, messageKey = "error.x", fieldErrors: Record<string, string> = {}): Done<never> => ({ ok: false, code, messageKey, fieldErrors });
 const banner = (text: RegExp | string) => screen.findByText(text);
 const photo = (name: string, type: string, size = 10) => new File([new Uint8Array(size)], name, { type });
@@ -213,11 +215,11 @@ describe("MaintenanceView requests", () => {
     fireEvent.click(button("Request another time…"));
     expect(within(dialog()).getByText(/periodic visit 25 Sept 2026, 10:00 am/)).toBeDefined();
     // the 3rd time at 10–12 on the day of the 1st
-    fireEvent.change(within(dialog()).getAllByLabelText(/^Date/)[2] ?? dialog(), { target: { value: "2026-09-18" } });
+    fireEvent.change(within(dialog()).getAllByLabelText(/^Date/)[2] ?? missing(), { target: { value: "2026-09-18" } });
     fireEvent.click(within(dialog()).getByRole("button", { name: "Send to HQ" }));
     expect(within(dialog()).getByText("The 3 times must be different.")).toBeDefined();
     expect(actions.requestReschedule).not.toHaveBeenCalled();
-    fireEvent.change(within(dialog()).getAllByLabelText(/^Date/)[2] ?? dialog(), { target: { value: "2026-09-21" } });
+    fireEvent.change(within(dialog()).getAllByLabelText(/^Date/)[2] ?? missing(), { target: { value: "2026-09-21" } });
     fireEvent.change(within(dialog()).getByRole("textbox", { name: /Comment/ }), { target: { value: "Away" } });
     fireEvent.click(within(dialog()).getByRole("button", { name: "Send to HQ" }));
     await banner(/Asked HQ for another time/);
@@ -323,7 +325,7 @@ describe("MaintenanceView requests", () => {
     expect(actions.cancelRequest).toHaveBeenLastCalledWith("job-0001-aaaa", 4, "Resolved itself");
   });
 
-  it("the Filter care tab is asked for through the URL and shows a loading card until it arrives", () => {
+  it("the Filter care tab is asked for through the URL", () => {
     render(<MaintenanceView live={live()} />);
     fireEvent.click(screen.getByRole("tab", { name: "Filter care" }));
     expect(nav.replace).toHaveBeenCalledWith("/customer/maintenance?tab=filter-care", { scroll: false });
@@ -382,12 +384,12 @@ describe("MaintenanceView requests", () => {
     fireEvent.click(button("New maintenance request"));
     fireEvent.change(within(dialog()).getByRole("textbox", { name: /Symptoms/ }), { target: { value: "The AC smells of burning" } });
     const [fromHour] = within(within(dialog()).getByRole("group", { name: "From 1" })).getAllByRole("combobox");
-    fireEvent.change(fromHour ?? dialog(), { target: { value: "13" } });
+    fireEvent.change(fromHour ?? missing(), { target: { value: "13" } });
     fireEvent.click(button("Submit request"));
     expect(within(dialog()).getByText("Each time is 1–4 hours long.")).toBeDefined();
     await waitFor(() => { expect(document.activeElement?.getAttribute("type")).toBe("date"); });
     const [toHour] = within(within(dialog()).getByRole("group", { name: "To 1" })).getAllByRole("combobox");
-    fireEvent.change(toHour ?? dialog(), { target: { value: "15" } });
+    fireEvent.change(toHour ?? missing(), { target: { value: "15" } });
     fireEvent.change(within(dialog()).getByRole("textbox", { name: /Contact window/ }), { target: { value: "me@example.com" } });
     fireEvent.click(button("Submit request"));
     await waitFor(() => { expect(document.activeElement).toBe(within(dialog()).getByRole("textbox", { name: /Contact window/ })); });

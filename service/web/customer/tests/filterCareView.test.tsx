@@ -49,6 +49,8 @@ const live = (owner = true, s = settings(), list = items, known = units): Mainte
 });
 const button = (name: string | RegExp) => screen.getByRole("button", { name });
 const dialog = () => screen.getByRole("dialog");
+/** a lookup that must have found its element: the test stops at the step that missed it */
+const missing = (): never => { throw new Error("element not found"); };
 const scrolled = vi.fn();
 
 beforeEach(() => {
@@ -84,7 +86,7 @@ describe("Filter care", () => {
 
   it("Request cleaning opens New request for that AC as a preventive request with the run-time line", async () => {
     render(<MaintenanceView live={live()} />);
-    fireEvent.click(within(screen.getByText("Bedroom AC").closest("tr") ?? document.body).getByRole("button", { name: "Request cleaning" }));
+    fireEvent.click(within(screen.getByText("Bedroom AC").closest("tr") ?? missing()).getByRole("button", { name: "Request cleaning" }));
     expect(within(dialog()).getByRole<HTMLSelectElement>("combobox", { name: /Unit/ }).value).toBe("u-bed");
     expect(within(dialog()).getByRole("button", { name: "Preventive" }).getAttribute("aria-pressed")).toBe("true");
     expect(within(dialog()).getByRole<HTMLTextAreaElement>("textbox", { name: /Symptoms/ }).value).toBe("Filter cleaning: 300 h of running since the last cleaning (reminder at 250 h).");
@@ -100,12 +102,12 @@ describe("Filter care", () => {
     const boxes = within(dialog()).getAllByRole("checkbox");
     for (const box of boxes) fireEvent.click(box);
     expect(within(dialog()).getByRole("button", { name: "Send 0 requests" }).hasAttribute("disabled")).toBe(true);
-    fireEvent.click(boxes[1] ?? dialog());
+    fireEvent.click(boxes[1] ?? missing());
     fireEvent.change(within(dialog()).getByRole("textbox", { name: /Contact window/ }), { target: { value: "me@example.com" } });
     fireEvent.click(within(dialog()).getByRole("button", { name: "Send 1 request" }));
     expect(actions.createCleaningRequests).not.toHaveBeenCalled();
     fireEvent.change(within(dialog()).getByRole("textbox", { name: /Contact window/ }), { target: { value: "" } });
-    fireEvent.click(boxes[0] ?? dialog());
+    fireEvent.click(boxes[0] ?? missing());
     fireEvent.click(within(dialog()).getByRole("button", { name: "Send 2 requests" }));
     await screen.findByText(/2 cleaning requests sent with 3 preferred times/);
     // in the list's order, whatever the order they were ticked in
@@ -126,7 +128,7 @@ describe("Filter care", () => {
     actions.createCleaningRequests.mockResolvedValueOnce({ ok: true, value: { ids: ["job-c-1"], stopped: null } });
     const { unmount } = render(<MaintenanceView live={live()} />);
     fireEvent.click(button("Request cleaning for all overdue (2)"));
-    fireEvent.click(within(dialog()).getAllByRole("checkbox")[0] ?? dialog());
+    fireEvent.click(within(dialog()).getAllByRole("checkbox")[0] ?? missing());
     fireEvent.click(within(dialog()).getByRole("button", { name: "Send 1 request" }));
     await screen.findByText(/^1 cleaning request sent with 3 preferred times/);
     unmount();
@@ -185,11 +187,11 @@ describe("Filter care", () => {
     const all = [...area("due", "due_soon"), ...area("fine", "ok")];
     const list = [status("u-loose", { runHoursSinceCleaning: null }), ...all.map((x) => x.s)];
     render(<MaintenanceView live={live(true, settings(), list, [loose, ...all.map((x) => x.u)])} />);
-    const row = screen.getByText("Loose AC").closest("tr") ?? document.body;
+    const row = screen.getByText("Loose AC").closest("tr") ?? missing();
     expect(within(row).getByText("offline")).toBeDefined();
     expect(within(row).getByText(/^last cleaned/).textContent).toMatch(/^last cleaned \d+ Aug$/);
     // the area rows: due soon draws a warning bar, a fine area the plain one
-    const bars = screen.getAllByRole("button", { name: "View 4" }).map((b) => b.closest("tr")?.querySelector("[aria-label]")?.className ?? "");
+    const bars = screen.getAllByRole("button", { name: "View 4" }).map((b) => (b.closest("tr")?.querySelector("[aria-label]") ?? missing()).className);
     expect(bars.map((c) => barTone(c))).toStrictEqual(["warn", "plain"]);
     fireEvent.click(button("Edit reminders"));
     fireEvent.keyDown(dialog(), { key: "Escape" });

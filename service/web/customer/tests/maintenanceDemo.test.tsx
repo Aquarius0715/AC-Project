@@ -13,6 +13,8 @@ import { jobActions } from "@ac/web/lib/jobs";
 
 const button = (name: string | RegExp) => screen.getByRole("button", { name });
 const dialog = () => screen.getByRole("dialog");
+/** a lookup that must have found its element: the test stops at the step that missed it */
+const missing = (): never => { throw new Error("element not found"); };
 const c07Row = () => screen.getByRole("button", { name: /job-c07/ });
 
 beforeEach(() => {
@@ -97,7 +99,7 @@ describe("MaintenanceDemo", () => {
     expect(within(dialog()).getByText("Confirm & rate job-c02")).toBeDefined();
     fireEvent.click(within(dialog()).getByRole("button", { name: "Not now" }));
     expect(screen.getByText("Completed report")).toBeDefined();
-    fireEvent.click(within(screen.getByText("Completed report").closest("div") ?? document.body).getAllByRole("button", { name: "Confirm & rate" }).at(-1) ?? document.body);
+    fireEvent.click(within(screen.getByText("Completed report").closest("div") ?? missing()).getAllByRole("button", { name: "Confirm & rate" }).at(-1) ?? missing());
     fireEvent.click(within(dialog()).getByRole("button", { name: "1 stars" }));
     expect(within(dialog()).getByText(/What went wrong\?/)).toBeDefined();
     fireEvent.click(within(dialog()).getByRole("button", { name: "Polite" }));
@@ -121,7 +123,7 @@ describe("MaintenanceDemo", () => {
     fireEvent.click(button("Decline…"));
     fireEvent.change(within(dialog()).getByRole("textbox", { name: /Comment to HQ/ }), { target: { value: "Away" } });
     const [firstDate] = within(dialog()).getAllByLabelText(/date/i);
-    fireEvent.change(firstDate ?? dialog(), { target: { value: "2026-09-20" } });
+    fireEvent.change(firstDate ?? missing(), { target: { value: "2026-09-20" } });
     fireEvent.click(within(dialog()).getByRole("button", { name: "Decline & send new times" }));
     expect(within(dialog()).getByText("Each time must be at least 1 day ahead")).toBeDefined();
     expect(toast).not.toHaveBeenCalled();
@@ -148,7 +150,7 @@ describe("MaintenanceDemo", () => {
     fireEvent.click(button("Request another time…"));
     fireEvent.change(within(dialog()).getByRole("textbox", { name: /Comment/ }), { target: { value: "Away" } });
     const [, second] = within(dialog()).getAllByLabelText(/date/i);
-    fireEvent.change(second ?? dialog(), { target: { value: "" } });
+    fireEvent.change(second ?? missing(), { target: { value: "" } });
     fireEvent.click(within(dialog()).getByRole("button", { name: "Send to HQ" }));
     expect(within(dialog()).getByText("Enter 3 preferred times")).toBeDefined();
     expect(toast).not.toHaveBeenCalled();
@@ -187,7 +189,7 @@ describe("MaintenanceDemo", () => {
 
   it("Filter care marks a filter cleaned and sends an overdue one to New request", () => {
     render(<MaintenanceDemo initialTab="filter-care" />);
-    fireEvent.click(within(screen.getByText("Bedroom AC").closest("tr") ?? document.body).getByRole("button", { name: "Mark cleaned" }));
+    fireEvent.click(within(screen.getByText("Bedroom AC").closest("tr") ?? missing()).getByRole("button", { name: "Mark cleaned" }));
     expect(toast).toHaveBeenLastCalledWith("Marked cleaned — counter reset");
     expect(screen.getByText("Home A › 1F · cleaned by you just now")).toBeDefined();
     fireEvent.click(button("Edit reminders"));
