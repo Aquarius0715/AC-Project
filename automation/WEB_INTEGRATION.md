@@ -25,25 +25,50 @@
 
 ### PostgreSQL での再現
 
-標準の PostgreSQL と、固定の開発時計（2026-09-14）を使います。API 結合テストは専用 DB の標準 seed にテスト用の予定、コマンド、電源観測、または検証済みの電力範囲と分単位の計測を追加します。リポジトリ直下から実行します。
+標準の PostgreSQL と、固定の開発時計（2026-09-14）を使います。API 結合テストは専用 DB の標準 seed にテスト用の予定、コマンド、電源観測、検証済みの電力範囲を追加します。`TestStartProposalsFromLivePowerMessages` は実機と同じ形式の JSON を `iotbridge.LiveTriggers` に渡し、電力のイベントをサービス認証付きの `POST /v1/demo/trigger` に送ります。保存された kW の値と同じ分の再受信時の件数を確認し、提案一覧と承認を実行します。`TestStartProposalsUseIndependentObservationsBeforeMeterProfile` は電力範囲の有効化前後で採用される観測を確認します。実機の計測・MQTT 配信・実機用の電力範囲は別途確認が必要です。リポジトリ直下から実行します。
 
 ```sh
-docker compose --profile infra up -d postgres
+docker compose --env-file .env.local --profile infra up -d postgres
 DB=ac_test_start_proposals sh service/api/scripts/resetdb.sh
 (cd service/api && AC_TEST_DB=ac_test_start_proposals go test ./test/integration -count=1 -run TestStartProposals)
-(cd service/api && AC_TEST_DB=ac_test_start_proposals AC_TEST_CLUSTER=1 go test ./test/integration -count=1 -run TestStartProposals)
+DB=ac_test_start_proposals_cluster sh service/api/scripts/resetdb.sh
+(cd service/api && AC_TEST_DB=ac_test_start_proposals_cluster AC_TEST_CLUSTER=1 go test ./test/integration -count=1 -run TestStartProposals)
 ```
 
 ブラウザの再現は、新規の標準 seed を使うローカル開発スタックで行います。既定の Compose 構成は DB 名 `ac` を使います。別名の検証 DB を使う構成では、その DB 名に読み替えます。fixture は初回だけ投入します。
 
 ```sh
 docker compose --env-file .env.local --profile full up -d --build
-docker compose exec -T postgres psql -U postgres -d ac -v ON_ERROR_STOP=1 < service/api/test/fixtures/start_proposals.sql
+docker compose --env-file .env.local exec -T postgres psql -U postgres -d ac -v ON_ERROR_STOP=1 < service/api/test/fixtures/start_proposals.sql
 (cd service/web && E2E_START_PROPOSALS=1 npm run e2e -- --project=customer start-proposals.e2e.ts)
 ```
 
 `customer-a` で、水曜18:30→20:00と金曜18:30→21:15のカードにそれぞれ3日分の確認日が表示されます。履歴に ACK しかない機器のカードは出ません。水曜を承認すると水曜20:00、月・木18:30、どちらも23:30終了・24℃で保存されます。金曜の予定を別タブで編集した後で古いカードを承認すると、変更後の開始と新しい提案が表示されます。完全オートは Coming Soon です。
 
+## 天気・電気代・位置情報を接続する場合
+
+現行の提案 API と Web のカードは開始時刻の変更に対応しています。以下の入力が利用できるようになったら、履歴から候補と根拠を作る Go 側の判定、提案ごとの表示と承認、承認時の版と根拠の再照合を追加します。 [提案 API](../service/api/internal/modules/control/start_proposals.go) [Web の提案一覧](../service/web/customer/app/customer/automations/page.tsx)
+
+### 天気
+
+- **既存の入力口**　`automations.simulate` と `automations.fire` の評価入力は `weather_temperature` を受け取れます。`control.commands` の設定温度操作から要求時刻と設定先を読めます。Compose の `WEATHER_API_BASE` はモックの設定で、提案判定に外気温履歴を供給する処理はありません。 [評価ロジック](../service/api/internal/modules/control/evaluate.go) [開発環境の設定](../compose.yaml)
+- **Python デモ**　設置先に対応する観測地点の実測相当データを機器に紐付け、操作時刻から±30分以内で最も近い外気温を選びます。同距離で値が食い違う場合は見送ります。外気温32℃以上で同じ温度へ下げた日が3日以上あり、涼しい日に同じ変更をしていない場合に提案できます。 [月次データの変換](src/monthly_engine.py) [温度判定](src/engine.py)
+- **Web で追加する処理**　機器の設置先とその時点の観測地点を対応付けます。タイムゾーン付きの操作時刻に、観測時刻・取得時刻・品質を持つ外気温実測を照合し、変更直前に確認できた設定温度と変更後の値を揃えます。暑い日だけ設定温度を変える承認結果をどう保存し、予定実行時にどの鮮度の外気温を使うかも決める必要があります。
+- **最初のテスト**　同じ設定変更が3日ある DB fixture で、3日目の近い時刻の高温観測が別地点にしかない場合は提案せず、正しい地点に観測を追加するとその3日を根拠に提案することを確認します。
+
+### 電気代
+
+- **既存の入力口**　Energy は実測の分スロット電力を集計し、`tariff-demo-1` の固定単価で金額を出します。ルール評価では `tariff` を受け取れます。どちらにも、契約の時間帯別単価と運転案別の予測を組み合わせて比較する処理はありません。 [Energy の集計](../service/api/internal/modules/energy/summary.go) [評価ロジック](../service/api/internal/modules/control/evaluate.go)
+- **Python デモ**　入力済みの単価と運転予測から、同じ期間の各スロットの kWh に単価を掛け、通常運転と予冷案の総額を比較します。必要時刻の室温が目標の±0.5℃に収まり、同等の快適性を満たす比較元より総額が下がる案を提案します。料金・電力量・室温に欠損がある案は見送ります。月次デモでは使った気象予報と予測の対応も検証します。 [料金判定](src/engine.py) [月次の予冷判定](src/monthly_engine.py)
+- **Web で追加する処理**　契約・適用期間・時間帯ごとの単価を機器に紐付け、両案を同じ対象日・比較期間・通貨・必要時刻で評価します。通常運転と予冷案それぞれのスロット別予測 kWh と必要時刻の予測室温を、予測作成時刻と参照した予報の版とともに取得します。総額差と予測室温を根拠に添え、対象日の運転案として承認を保存する方法を決める必要があります。
+- **最初のテスト**　安い時間帯へ移しても予測 kWh が増えて総額が下がらない場合は見送り、同じ必要時刻に快適性を保って総額が下がる予測に差し替えると差額を添えて提案することを確認します。
+
+### 位置情報
+
+- **既存の入力口**　`presence.report` は位置情報の利用に同意したメンバーの現在地と精度を受け取り、物件のピンの圏内・圏外を判定します。座標は保存せず、`control.presence_states` の物件・メンバーごとの最終状態と報告時刻を上書きします。現在の到着・出発ルールに使う入口で、過去の予定開始時点を再現できる履歴はありません。 [報告 API](../service/api/internal/modules/control/presence.go) [保存形式](../service/api/internal/migrations/000010_presence_states.up.sql)
+- **Python デモ**　住人ごとの観測時刻・受信時刻・共有状態から、その時点までに届いた報告で当日の予定開始時の在宅を判定します。観測は2時間まで有効で、一人でも在宅なら在宅、全員の不在を確認できた場合は不在、それ以外は不明になります。開始時の不在が繰り返される場合は、その後に確認した帰宅時刻も見直しの根拠に使います。 [在宅判定](src/presence.py) [在宅の提案判定](src/presence_proposals.py)
+- **Web で追加する処理**　同意したメンバーについて、座標を保持せず物件別の在宅判定、観測・受信時刻、同意の有効期間を扱える履歴が必要です。当時の予定版と在籍メンバーを使い、開始時点で利用できた鮮度内の報告で世帯を判定します。未同意・撤回・未取得・取得失敗・期限切れは不明として不在の支持に入れません。手動操作からの開始時刻提案は引き続き評価します。
+- **最初のテスト**　2人世帯の予定開始時に、片方は不在の報告があり、もう片方の報告は開始後に届く場合、開始時点は不明となり、不在による変更の支持に入らないことを確認します。
 
 ## これまでの経緯
 

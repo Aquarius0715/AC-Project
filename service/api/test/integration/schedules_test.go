@@ -801,6 +801,10 @@ func TestScheduleBoundaries(t *testing.T) {
 	save(archived, "09:30", "09:45", `{"kind":"set_temperature","celsius":24}`)
 	zone := save(lost, "09:30", "09:45", `{"kind":"set_temperature","celsius":24}`)
 
+	t.Cleanup(func() {
+		owner(t, `DELETE FROM control.automations WHERE id = $1`, zone)
+	})
+
 	owner(t, `UPDATE assets.units SET archived = true WHERE id = $1`, archived)
 	owner(t, `UPDATE control.automations SET timezone = 'Mars/Olympus_Mons' WHERE id = $1`, zone)
 	setWatermark(t, clock())
