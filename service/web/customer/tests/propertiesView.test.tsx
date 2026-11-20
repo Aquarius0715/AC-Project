@@ -90,7 +90,7 @@ const cardOf = (name: string): HTMLElement => {
 };
 // a choice of a settings group (Power, Mode, Fan)
 const opt = (group: string, name: string) => within(screen.getByRole("group", { name: group })).getByRole("button", { name });
-const flush =() => act(async () => { await Promise.resolve(); });
+const flush = () => act(async () => { await Promise.resolve(); });
 
 beforeEach(() => {
   nav.patch.mockReset();

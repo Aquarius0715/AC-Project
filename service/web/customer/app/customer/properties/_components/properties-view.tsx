@@ -149,7 +149,7 @@ function UnitRows({ units }: Readonly<{ units: (RoomUnit & { place: string })[] 
   );
 }
 
-const connLabel: Record<Connection, string> ={ online: "Online", offline: "Offline", unknown: "Unknown", connecting: "Connecting", error: "Error" };
+const connLabel: Record<Connection, string> = { online: "Online", offline: "Offline", unknown: "Unknown", connecting: "Connecting", error: "Error" };
 function FilteredUnits({ live, f, clear }: Readonly<{ live: PropertiesLive; f: NonNullable<PropertiesLive["filter"]>; clear: () => void }>) {
   const t = useT();
   // “left on” check (IR798): an owner turns the running ACs off from this list, unticking those that should keep running,
