@@ -18,13 +18,19 @@ step "unit tests and coverage"
 sh scripts/coverage.sh
 step "UI tests (stub)"
 .tools/xcodegen/xcodegen/bin/xcodegen generate --spec project.yml --quiet
-# the first available iPhone simulator of the installed runtime: the runner's and a Mac's differ
-device=$(xcrun simctl list devices available | sed -n 's/^ *\(iPhone [^(]*\) (.*/\1/p' | sed 's/ *$//' | head -n 1)
-[ -n "$device" ] || { echo "no iPhone simulator is installed" >&2; exit 1; }
+# the first available iPhone simulator of the installed runtimes (the runner's and a Mac's differ) that Xcode also offers
+# for the apps: CoreSimulator may list one Xcode cannot run on. It is addressed by its id.
+offered=$(xcodebuild -project AC.xcodeproj -scheme CustomerApp -showdestinations 2>/dev/null | sed -n 's/.*platform:iOS Simulator, arch:[^,]*, id:\([^,]*\),.*/\1/p')
+destination=$(xcrun simctl list devices available | sed -n 's/^ *\(iPhone [^(]*[^ (]\) *(\([0-9A-F-]*\)).*/\2|\1/p' | while IFS='|' read -r id name; do
+  if printf '%s\n' "$offered" | grep -qx "$id"; then echo "$id|$name"; break; fi
+done)
+[ -n "$destination" ] || { echo "no iPhone simulator is installed" >&2; exit 1; }
+device_id=${destination%%|*}
+device=${destination#*|}
 # booted and left a moment first: a fresh simulator's first-boot banners ("Ready for Apple Intelligence") would cover
 # the app in the first test's accessibility audit
-xcrun simctl boot "$device" 2>/dev/null || true
-xcrun simctl bootstatus "$device" -b >/dev/null
+xcrun simctl boot "$device_id" 2>/dev/null || true
+xcrun simctl bootstatus "$device_id" -b >/dev/null
 sleep 20
 # each app's log stays out of the way unless its tests fail: then its failures are printed (xcodebuild -quiet prints none)
 log=$(mktemp)
@@ -33,7 +39,7 @@ trap 'rm -f "$log"' EXIT
 # CI uploads when a test fails: a runner's iOS may differ from this Mac's, and its log says only which check failed
 rm -rf results && mkdir -p results
 for scheme in CustomerApp TechnicianApp; do
-  if ! xcodebuild -project AC.xcodeproj -scheme "$scheme" -destination "platform=iOS Simulator,name=$device" test \
+  if ! xcodebuild -project AC.xcodeproj -scheme "$scheme" -destination "platform=iOS Simulator,id=$device_id" test \
     -resultBundlePath "results/$scheme.xcresult" >"$log" 2>&1; then
     grep -E "error:|Test Case .* failed|accessibility audit|^(Contrast|Dynamic Type|Hit area|Text clipped|Element)" "$log" || tail -n 60 "$log"
     echo "$scheme: UI tests failed on $device" >&2
