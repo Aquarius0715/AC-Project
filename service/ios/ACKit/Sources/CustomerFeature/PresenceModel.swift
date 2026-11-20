@@ -128,7 +128,7 @@ public final class PresenceModel {
         do {
             consent = try await client.call(Ops.ConsentsUpdate.self, ConsentsUpdateInput(granted: granted), expectedVersion: Int(version))
                 .data
-            line = tr(granted ? "Location consent granted" : "Location consent withdrawn — location automations are off")
+            line = granted ? tr("Location consent granted") : tr("Location consent withdrawn — location automations are off")
         } catch {
             line = ErrorText.of(error)
             return

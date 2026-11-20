@@ -28,7 +28,7 @@ public enum Words {
     /// A command as a sentence ("Set temperature 24°C").
     public static func action(_ action: UnitAction) -> String {
         switch action {
-        case let .setPower(change): tr(change.power ? "Set power ON" : "Set power OFF")
+        case let .setPower(change): if change.power { tr("Set power ON") } else { tr("Set power OFF") }
         case let .setTemperature(change): tr("Set temperature {celsius}°C", ["celsius": celsius(change.celsius)])
         case let .setMode(change): tr("Set mode {mode}", ["mode": mode(change.mode).uppercased()])
         case let .setFan(change): tr("Set fan {level}", ["level": fan(change.fanLevel).uppercased()])

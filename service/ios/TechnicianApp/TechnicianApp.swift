@@ -10,9 +10,17 @@ struct TechnicianApp: App {
     var body: some Scene {
         WindowGroup {
             switch launch {
-            case let .ready(session, web): TechnicianRoot(session: session, web: web)
+            case let .ready(session, web): TechnicianRoot(session: session, position: Self.position(stubbed: web != nil), web: web)
             case let .misconfigured(key): Text(verbatim: "Info.plist: \(key)")
             }
         }
+    }
+
+    /// The phone's position, or the UI tests' one with the stubbed Core API (Debug builds only).
+    private static func position(stubbed: Bool) -> any PositionSource {
+        #if DEBUG
+        if stubbed { return StubPosition() }
+        #endif
+        return CoreLocationPosition()
     }
 }

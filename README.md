@@ -73,6 +73,8 @@ TEST_RUNNER_AC_UI_LIVE=1 xcodebuild -project service/ios/AC.xcodeproj -scheme Cu
 # the live geofence report also needs a pin on a customer-a property, and the simulator at it with the permission:
 #   xcrun simctl privacy "iPhone 15" grant location-always com.pradita.ac.customer
 #   xcrun simctl location "iPhone 15" set <latitude>,<longitude>; then TEST_RUNNER_AC_UI_LIVE_PRESENCE=1 as well
+# the live job check needs a job assigned to tech-internal-a before its answer, its window around the stack's time:
+#   TEST_RUNNER_AC_UI_LIVE_JOB=<job id> (the TechnicianApp scheme); it accepts, checks in manually, pauses and resumes
 ```
 
 GitHub Actions run the same: `.github/workflows/ci.yml` (seven parallel jobs) and `.github/workflows/e2e.yml` (the

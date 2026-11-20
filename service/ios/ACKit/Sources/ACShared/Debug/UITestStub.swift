@@ -42,6 +42,7 @@ public enum UITestStub {
         private var commands: [String: Command] = [:]
         private var version = 1.0
         private var notifications = Transport.inbox
+        private let jobs = StubJobs()
         private var consent = Consent(
             id: "consent1",
             tenantId: "t1",
@@ -60,9 +61,13 @@ public enum UITestStub {
 
         func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
             let url = request.url ?? URL(filePath: "/")
-            let body = try lock.withLock { try answer(request.httpMethod ?? "GET", url.path(), request.httpBody) }
-            let response = HTTPURLResponse(url: url, statusCode: body == nil ? 404 : 200, httpVersion: nil, headerFields: nil)
-            return (body ?? Data("{}".utf8), response ?? HTTPURLResponse())
+            let method = request.httpMethod ?? "GET"
+            let (status, body) = try lock.withLock {
+                try jobs.answer(method, url.path(), request.httpBody)
+                    ?? answer(method, url.path(), request.httpBody).map { (200, $0) } ?? (404, Data("{}".utf8))
+            }
+            let response = HTTPURLResponse(url: url, statusCode: status, httpVersion: nil, headerFields: nil)
+            return (body, response ?? HTTPURLResponse())
         }
 
         private func answer(_ method: String, _ path: String, _ body: Data?) throws -> Data? {
@@ -79,7 +84,6 @@ public enum UITestStub {
             case (_, "/token"): return try encoder.encode(StubTokens(accessToken: token))
             case (_, "/logout"): return Data("{}".utf8)
             case (_, "/v1/units"): return try encoder.encode(StubAnswer(data: page(Self.units)))
-            case (_, "/v1/jobs"): return try encoder.encode(StubAnswer(data: page(Self.jobs)))
             case (_, "/v1/preferences"): return try encoder.encode(StubAnswer(data: Self.preferences))
             case (_, "/v1/notifications"): return try encoder.encode(StubAnswer(data: page(notifications)))
             case ("POST", "/v1/notifications/mark-all-read"):
@@ -348,34 +352,6 @@ public enum UITestStub {
                 activeAlertCount: 0
             )
         }
-
-        private static let jobs = [
-            JobsListResultItem.summary(
-                JobSummary(
-                    id: "j1",
-                    version: 1,
-                    status: .assigned,
-                    createdAt: day,
-                    dueAt: day,
-                    type: .reactive,
-                    origin: .clientRequest,
-                    unitId: "u1",
-                    requestedSlot: Slot(startAt: day, endAt: day),
-                    scheduledSlot: nil,
-                    assignmentId: "a1",
-                    preferredSlots: [],
-                    followUpOfJobId: nil,
-                    followUpClass: nil,
-                    severity: .normal,
-                    displayStatus: .assigned,
-                    assignmentAcknowledgement: nil,
-                    technicianMembershipId: "m1",
-                    accessValidFrom: nil,
-                    accessValidUntil: nil,
-                    eventSummary: JobEventSummary(count: 0, customerVisible: 0, notes: 0, latest: nil)
-                )
-            )
-        ]
     }
 }
 

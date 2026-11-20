@@ -24,12 +24,22 @@ public struct Card<Content: View>: View {
 }
 
 extension View {
-    /// The cards of a detail screen in a scroll view on the grouped background.
+    /// The cards of a detail screen in a scroll view on the grouped background, under a navigation bar of that solid
+    /// colour: text scrolled under the bar's translucent material is below the contrast the accessibility audit asks for.
     public func cardScreen() -> some View {
         ScrollView {
             VStack(spacing: 16) { self }.padding(16)
         }
         .background(Color.groupedBackground)
+        .solidNavigationBar()
+    }
+
+    private func solidNavigationBar() -> some View {
+        #if os(iOS)
+        toolbarBackground(Color.groupedBackground, for: .navigationBar).toolbarBackground(.visible, for: .navigationBar)
+        #else
+        self
+        #endif
     }
 }
 

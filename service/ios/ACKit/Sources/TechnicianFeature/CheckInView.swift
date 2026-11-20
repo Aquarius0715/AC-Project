@@ -1,0 +1,187 @@
+import ACKit
+import ACShared
+import SwiftUI
+
+/// Check in at site (DD-T13): the phone's fix and the unit's QR label, or a manual check-in with a reason.
+struct CheckInView: View {
+    @Bindable var model: JobDetailModel
+    let close: () -> Void
+    @State private var isScanning = false
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                Card(tr("How")) {
+                    HStack {
+                        method(.locationQr, tr("Location + unit QR"), id: "checkIn.method.qr")
+                        method(.manual, tr("Manual (reason)"), id: "checkIn.method.manual")
+                    }
+                }
+                if model.checkIn.method == .locationQr {
+                    Card(tr("Your location")) { location }
+                    Card(tr("Scanned unit QR")) { qr }
+                } else {
+                    Card(tr("Reason (required)")) {
+                        TextField(tr("No GPS signal in the basement plant room"), text: $model.checkIn.reason, axis: .vertical)
+                            .lineLimit(3...6)
+                            .textFieldStyle(.roundedBorder)
+                            .accessibilityIdentifier("checkIn.reason")
+                        error(.reason)
+                    }
+                }
+                Card {
+                    Text(verbatim: tr("Arrival must be inside your work window. Checking in records the arrival and starts the work."))
+                        .font(.footnote)
+                    if let refusal = model.refusal { Text(verbatim: refusal).accessibilityIdentifier("checkIn.refusal") }
+                    HStack {
+                        Button(tr("Check in & start")) {
+                            Task { if await model.submitCheckIn() { close() } }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(model.isSending)
+                        .accessibilityIdentifier("checkIn.submit")
+                        Button(tr("Cancel"), action: close).secondaryAction().accessibilityIdentifier("checkIn.cancel")
+                    }
+                }
+            }
+            .cardScreen()
+            .navigationTitle(Text(verbatim: tr("Check in at site")))
+            .inlineTitle()
+            .sheet(isPresented: $isScanning) { scanner }
+        }
+    }
+
+    private func method(_ method: JobsCheckInInputMethod, _ title: String, id: String) -> some View {
+        Group {
+            if model.checkIn.method == method {
+                Button(title) { model.checkIn.method = method }.buttonStyle(.borderedProminent)
+            } else {
+                Button(title) { model.checkIn.method = method }.secondaryAction()
+            }
+        }
+        .accessibilityIdentifier(id)
+        .accessibilityAddTraits(model.checkIn.method == method ? .isSelected : [])
+    }
+
+    @ViewBuilder private var location: some View {
+        let label: String =
+            if model.isLocating { tr("Locating…") } else if model.checkIn.position == nil { tr("Get my location") } else {
+                tr("Locate again")
+            }
+        Button {
+            Task { await model.locate() }
+        } label: {
+            Label(label, systemImage: "location")
+        }
+        .secondaryAction()
+        .disabled(model.isLocating)
+        .accessibilityIdentifier("checkIn.locate")
+        Text(verbatim: model.checkIn.positionHint).font(.footnote).accessibilityIdentifier("checkIn.positionHint")
+        error(.position)
+    }
+
+    @ViewBuilder private var qr: some View {
+        // a field that grows: one line is clipped at the larger text sizes
+        TextField(tr("Scan the unit’s QR label"), text: $model.checkIn.qr, axis: .vertical)
+            .lineLimit(1...3)
+            .textFieldStyle(.roundedBorder)
+            .codeEntry()
+            .accessibilityIdentifier("checkIn.qr")
+        if QRScanner.isAvailable {
+            Button {
+                isScanning = true
+            } label: {
+                Label(tr("Scan"), systemImage: "qrcode.viewfinder")
+            }
+            .secondaryAction()
+            .accessibilityIdentifier("checkIn.scan")
+        }
+        error(.qr)
+    }
+
+    private var scanner: some View {
+        NavigationStack {
+            QRScanner { code in
+                model.checkIn.qr = code
+                isScanning = false
+            }
+            .ignoresSafeArea()
+            .navigationTitle(Text(verbatim: tr("Scan the unit’s QR label")))
+            .inlineTitle()
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button(tr("Cancel")) { isScanning = false } }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func error(_ field: CheckInField) -> some View {
+        if let text = model.checkInErrors[field] {
+            Label {
+                Text(verbatim: text)
+            } icon: {
+                Image(systemName: "exclamationmark.circle").foregroundStyle(.red)
+            }
+            .accessibilityIdentifier("checkIn.error.\(field.rawValue)")
+        }
+    }
+}
+
+/// Can't make this time: the reason for the coordinator and, optionally, a time the technician could do instead.
+struct CantMakeView: View {
+    @Bindable var model: JobDetailModel
+    let close: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                Card(tr("Reason (required)")) {
+                    TextField(tr("Medical appointment on that morning"), text: $model.cantMake.reason, axis: .vertical)
+                        .lineLimit(3...6)
+                        .textFieldStyle(.roundedBorder)
+                        .accessibilityIdentifier("cantMake.reason")
+                    if let error = model.cantMakeError {
+                        Text(verbatim: error).accessibilityIdentifier("cantMake.error")
+                    }
+                }
+                Card {
+                    Toggle(isOn: offersTime) { Text(verbatim: tr("A time you could do instead (optional)")) }
+                        .accessibilityIdentifier("cantMake.offer")
+                    if let date = model.cantMake.date {
+                        DatePicker(
+                            selection: Binding(get: { date }, set: { model.cantMake.date = $0 }),
+                            displayedComponents: .date
+                        ) { Text(verbatim: tr("Date")) }
+                        Picker(selection: $model.cantMake.window) {
+                            ForEach(CantMakeForm.windows, id: \.self) { Text(verbatim: $0).tag($0) }
+                        } label: {
+                            Text(verbatim: tr("Window"))
+                        }
+                        Text(verbatim: tr("Times in {zone}.", ["zone": Localizer.timeZone.identifier])).font(.footnote)
+                    }
+                }
+                Card {
+                    Text(verbatim: tr("Your coordinator reassigns the job or proposes a new time — the client must approve any change."))
+                        .font(.footnote)
+                    if let refusal = model.refusal { Text(verbatim: refusal).accessibilityIdentifier("cantMake.refusal") }
+                    HStack {
+                        Button(tr("Send to coordinator")) {
+                            Task { if await model.sendCantMake() { close() } }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(model.isSending)
+                        .accessibilityIdentifier("cantMake.send")
+                        Button(tr("Cancel"), action: close).secondaryAction().accessibilityIdentifier("cantMake.cancel")
+                    }
+                }
+            }
+            .cardScreen()
+            .navigationTitle(Text(verbatim: tr("Can’t make this time")))
+            .inlineTitle()
+        }
+    }
+
+    private var offersTime: Binding<Bool> {
+        Binding(get: { model.cantMake.date != nil }, set: { model.cantMake.date = $0 ? Date() : nil })
+    }
+}

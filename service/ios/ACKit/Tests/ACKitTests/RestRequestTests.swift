@@ -49,6 +49,14 @@ import Testing
         #expect(request(Ops.SummariesGet.routes, ["kind": .string(value), "filters": .object([:])]) == nil)
     }
 
+    @Test func numbersAreWrittenAsJavaScriptWritesThem() {
+        // whole numbers without a fraction (the web's String(n)); a fraction, and a number too large for one, as they are
+        #expect(RestRequest.number(50) == "50")
+        #expect(RestRequest.number(-3) == "-3")
+        #expect(RestRequest.number(1.5) == "1.5")
+        #expect(RestRequest.number(1e16) == String(1e16))
+    }
+
     @Test func dotsInsideAValueStayOneEncodedSegment() throws {
         #expect(try #require(request(Ops.UnitsGet.routes, ["id": .string("../x")])).path == "/v1/units/..%2Fx")
         #expect(try #require(request(Ops.UnitsGet.routes, ["id": .string("%2e%2e")])).path == "/v1/units/%252e%252e")
