@@ -56,13 +56,16 @@ extension XCTestCase {
                 // above the keyboard when it is up: a swipe on it does not move the screen
                 if keyboard.exists { drag(app, from: 0.35, to: 0.1) } else { app.swipeUp() }
             } else if element.frame.minY < top {
-                app.swipeDown()
+                // a short, slow pull: a swipe down on a sheet scrolled to its top closes the sheet
+                drag(app, from: 0.45, to: 0.6)
             } else {
                 break
             }
         }
-        XCTAssertTrue(element.isHittable, "\(element) is on the screen")
-        element.tap()
+        // a field that grows is not always reported hittable (iOS 26) while it is on the screen: it is tapped where it is
+        let isShown = element.exists && element.frame.minY >= window.minY && element.frame.maxY <= window.maxY
+        XCTAssertTrue(element.isHittable || isShown, "\(element) is on the screen")
+        if element.isHittable { element.tap() } else { element.coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: 0.2)).tap() }
     }
 
     /// Types into a field as a person does: taps it (again, on its first line, when the first tap did not give it the
