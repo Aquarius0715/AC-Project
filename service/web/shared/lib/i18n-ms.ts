@@ -1090,7 +1090,6 @@ export const ms: Record<string, string> = {
   "Not in a property": "Bukan dalam premis",
   "{n} unit": "{n} unit",
   "{n} units": "{n} unit",
-  "{n} AC": "{n} AC",
   "{n} ACs": "{n} AC",
   "No properties yet": "Belum ada premis",
   "HQ registers your homes and offices with their rooms and air conditioners; they appear here once set up.": "HQ mendaftarkan rumah dan pejabat anda dengan bilik dan penyaman udaranya; ia dipaparkan di sini sebaik sahaja disediakan.",

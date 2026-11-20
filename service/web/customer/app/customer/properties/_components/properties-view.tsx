@@ -29,12 +29,11 @@ export interface PropertiesLive {
   summary: { kind: "home" | "office"; floors: string[]; rooms: number; inRooms: number; unassigned: number; edited: string } | null;
   mode: "single" | "group"; selectedUnits: string[];
 }
-const kindLabel: Record<string, string> = { home: "Home", office: "Office", floor: "Floor", area: "Area", room: "Room", space: "Space" };
+const kindLabel: Record<TreeProperty["kind"] | TreeSpace["kind"], string> = { home: "Home", office: "Office", floor: "Floor", area: "Area", room: "Room", space: "Space" };
 const powerLabel: Record<PowerState, string> = { on: "Running", off: "Stopped", unknown: "Unknown" };
-// “2 units”, “1 AC” in the display language
+// “2 units”, “1 unit” in the display language
 const unitsText = (t: T, n: number) => t(n === 1 ? "{n} unit" : "{n} units", { n });
-const acsText = (t: T, n: number) => t(n === 1 ? "{n} AC" : "{n} ACs", { n });
-const kind = (t: T, k: string) => t(kindLabel[k] ?? k);
+const kind = (t: T, k: TreeProperty["kind"] | TreeSpace["kind"]) => t(kindLabel[k]);
 
 /** Units & locations (FR-C02) in API mode: the structure is read only (HQ manages it) except renaming; a room lists its
 air conditioners, and owners can send one change to several of them (Group control, FR-C14). */
@@ -81,7 +80,7 @@ export function PropertiesView({ live }: Readonly<{ live: PropertiesLive }>) {
         </Card>
         {/* the old panel stays until the new one arrives: dimmed and busy, so it does not read as the clicked location's */}
         <div aria-busy={isPendingTarget} className={cx("flex min-w-0 flex-col gap-4 transition-opacity", isChosen && "order-first @min-[880px]:order-none", isPendingTarget && "opacity-60")}>
-          {live.filter ? <FilteredUnits live={live} clear={() => { go({}); }} /> : sel && <Panel live={live} sel={sel} rename={setRenaming} go={go} isPending={isNavPending} />}
+          {live.filter ? <FilteredUnits live={live} f={live.filter} clear={() => { go({}); }} /> : sel && <Panel live={live} sel={sel} rename={setRenaming} go={go} isPending={isNavPending} />}
         </div>
       </div>
       {renaming && <RenameModal r={renaming} onClose={() => { setRenaming(null); }} />}
@@ -150,15 +149,13 @@ function UnitRows({ units }: Readonly<{ units: (RoomUnit & { place: string })[] 
   );
 }
 
-const connLabel: Record<string, string> = { online: "Online", offline: "Offline", unknown: "Unknown", connecting: "Connecting", error: "Error" };
-function FilteredUnits({ live, clear }: Readonly<{ live: PropertiesLive; clear: () => void }>) {
+const connLabel: Record<Connection, string> ={ online: "Online", offline: "Offline", unknown: "Unknown", connecting: "Connecting", error: "Error" };
+function FilteredUnits({ live, f, clear }: Readonly<{ live: PropertiesLive; f: NonNullable<PropertiesLive["filter"]>; clear: () => void }>) {
   const t = useT();
   // “left on” check (IR798): an owner turns the running ACs off from this list, unticking those that should keep running,
   // instead of opening each AC's own screen
   const [isTurningOff, setIsTurningOff] = useState(false);
-  const f = live.filter;
-  if (!f) return null;
-  const label = [f.search && t("“{q}”", { q: f.search }), f.powerState && t("Power: {state}", { state: t(powerLabel[f.powerState]) }), f.connections.length > 0 && t("Connection: {states}", { states: f.connections.map((c) => t(connLabel[c] ?? c)).join(", ") })].filter(Boolean).join(" · ");
+  const label = [f.search && t("“{q}”", { q: f.search }), f.powerState && t("Power: {state}", { state: t(powerLabel[f.powerState]) }), f.connections.length > 0 && t("Connection: {states}", { states: f.connections.map((c) => t(connLabel[c])).join(", ") })].filter(Boolean).join(" · ");
   const isRunningList = live.owner && f.powerState === "on" && f.connections.length === 0 && !f.search;
   const canTurnOff = isRunningList && live.units.length >= 2;
   // the panel stays once opened: the ACs it turned off leave the re-read list, and its results must not vanish with them
@@ -231,7 +228,8 @@ function Panel({ live, sel, rename, go, isPending }: Readonly<{ live: Properties
         action={<Btn size="sm" onClick={() => { rename({ kind: "space", id: s.id, version: s.version, name: s.name, where: t("{name} · {kind} in {property}", { name: s.name, kind: kind(t, s.kind), property: p.name }) }); }}><Icon name="edit" />{t("Rename")}</Btn>}>
         {canGroup && (
           <div className="mb-3 flex flex-wrap items-center gap-2">
-            <span className="text-xs text-muted-foreground">{t("{acs} in {space} ·", { acs: acsText(t, direct.length), space: s.name })}</span>
+            {/* Group control needs two ACs or more, so the count is always plural */}
+            <span className="text-xs text-muted-foreground">{t("{acs} in {space} ·", { acs: t("{n} ACs", { n: direct.length }), space: s.name })}</span>
             {(["single", "group"] as const).map((m) => {
               const isLoading = isPending && chosen === m && mode !== m;
               return <Plain key={m} type="button" aria-pressed={shownMode === m} aria-busy={isLoading} onClick={() => { setChosen(m); go({ spaceId: s.id, mode: m === "group" ? "group" : null }); }}
