@@ -21,6 +21,11 @@ step "UI tests (stub)"
 # the first available iPhone simulator of the installed runtime: the runner's and a Mac's differ
 device=$(xcrun simctl list devices available | sed -n 's/^ *\(iPhone [^(]*\) (.*/\1/p' | sed 's/ *$//' | head -n 1)
 [ -n "$device" ] || { echo "no iPhone simulator is installed" >&2; exit 1; }
+# booted and left a moment first: a fresh simulator's first-boot banners ("Ready for Apple Intelligence") would cover
+# the app in the first test's accessibility audit
+xcrun simctl boot "$device" 2>/dev/null || true
+xcrun simctl bootstatus "$device" -b >/dev/null
+sleep 20
 # each app's log stays out of the way unless its tests fail: then its failures are printed (xcodebuild -quiet prints none)
 log=$(mktemp)
 trap 'rm -f "$log"' EXIT
