@@ -105,6 +105,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 0.654.0 (2026-11-16): IR811: from Turn off running ACs, one link opens an after-hours rule with the same ACs.
 0.657.0 (2026-11-16): IR814: a customer pins ACs to the Overview from their pages (this browser only).
 0.658.0 (2026-11-16): IR815: Energy & cost opens on the AC that used the most in the period.
+0.676.0 (2026-11-20): IR860 (DEC-112): the iOS apps' foundation: Keycloak public clients ac-customer-ios and ac-technician-ios (PKCE), the Core API accepts their tokens, and the shared test environment publishes the gateway's /v1/ on web-edge port 3205.
 0.675.0 (2026-11-19): IR859: an HQ installation job shows the HQ request badge on the technician overview and the contractor's Jobs, job offer and Job history screens (it read Client request).
 0.674.0 (2026-11-19): IR858: the technician's Refrigerant dialog refuses an emptied kilogram field instead of recording it as 0 kg.
 0.673.0 (2026-11-18): IR857: the portal keeps port 3204 behind web-edge (the server's environment file names no PORTAL_WEB_PORT).
