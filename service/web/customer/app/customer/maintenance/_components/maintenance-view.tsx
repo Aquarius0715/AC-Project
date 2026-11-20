@@ -149,15 +149,15 @@ function JobDetail({ d, open, onDone, onFail }: Readonly<{ d: Detail; open: (m: 
         </div>
       )}
       {d.declined && <div className="mt-3"><Banner tone="warn">{d.declined}</Banner></div>}
-      {d.proposal && (
+      {proposal && (
         <div className="mt-3 rounded-xl border border-[#f5c473] bg-[#fff8ec] p-4">
-          <div className="flex flex-wrap items-center justify-between gap-2"><b className="text-[14px]">{d.proposal.title}</b><Badge tone="warn">{t("Reply by {when}", { when: d.proposal.replyBy })}</Badge></div>
-          <div className="my-2 text-xl font-bold">{d.proposal.when}</div>
-          <SummaryList items={[[t("Who comes"), d.proposal.who], [t("Message"), `“${d.proposal.message}”`]]} />
+          <div className="flex flex-wrap items-center justify-between gap-2"><b className="text-[14px]">{proposal.title}</b><Badge tone="warn">{t("Reply by {when}", { when: proposal.replyBy })}</Badge></div>
+          <div className="my-2 text-xl font-bold">{proposal.when}</div>
+          <SummaryList items={[[t("Who comes"), proposal.who], [t("Message"), `“${proposal.message}”`]]} />
           <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
             <span className="mr-auto text-[11px] text-warn">{t("Accepting books this time. Declining keeps your request open.")}</span>
             <Btn variant="danger" disabled={pending} onClick={() => { open("decline"); }}>{t("Decline…")}</Btn>
-            <Btn variant="primary" disabled={pending} onClick={() => { if (!proposal) { return; } run(() => respondProposal(j.id, j.version, proposal.id, { decision: "accept" }), t("Time accepted"), () => { onDone(t("Time accepted — {when} is booked; the technician confirms it next.", { when: proposal.when })); }, onFail); }}><Icon name="check" />{t("Accept this time")}</Btn>
+            <Btn variant="primary" disabled={pending} onClick={() => { run(() => respondProposal(j.id, j.version, proposal.id, { decision: "accept" }), t("Time accepted"), () => { onDone(t("Time accepted — {when} is booked; the technician confirms it next.", { when: proposal.when })); }, onFail); }}><Icon name="check" />{t("Accept this time")}</Btn>
           </div>
         </div>
       )}
