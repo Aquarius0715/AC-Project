@@ -104,6 +104,20 @@ struct JobDetailView: View {
             }
             .linkAction()
             .accessibilityIdentifier("job.unit")
+            NavigationLink {
+                AlertsView(model: AlertsModel(unitId: work.job.unitId, jobId: work.job.id, alertId: nil, client: model.client))
+            } label: {
+                Label(tr("Alert evidence"), systemImage: "exclamationmark.bubble")
+            }
+            .linkAction()
+            .accessibilityIdentifier("job.alerts")
+            NavigationLink {
+                ControlView(model: ControlModel(unitId: work.job.unitId, jobId: work.job.id, client: model.client))
+            } label: {
+                Label(tr("Diagnostics"), systemImage: "stethoscope")
+            }
+            .linkAction()
+            .accessibilityIdentifier("job.diagnostics")
         }
     }
 
