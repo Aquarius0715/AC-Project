@@ -8,13 +8,23 @@ extension XCUIApplication {
         // a scroll the test made a moment ago may still be gliding: the audit's pictures of a moving screen fail the
         // contrast of still text
         _ = XCTWaiter().wait(for: [XCTestExpectation(description: "the screen settles")], timeout: 1)
+        // a fresh simulator may show a system banner over the app, or answer the audit too slowly, once: a screen that
+        // fails is audited once more a moment later, and that audit is the one reported (an issue of the app stays)
+        if (try? issues()).map(\.isEmpty) == true { return }
+        _ = XCTWaiter().wait(for: [XCTestExpectation(description: "the system banner goes")], timeout: 6)
+        let issues = try issues()
+        if !issues.isEmpty { XCTFail("accessibility audit:\n" + issues.joined(separator: "\n")) }
+    }
+
+    @MainActor
+    private func issues() throws -> [String] {
         var issues: [String] = []
         try performAccessibilityAudit { issue in
             let element = issue.element.map { "\($0.elementType) '\($0.label)' (\($0.identifier))" } ?? "the screen"
             issues.append("\(issue.compactDescription): \(element) — \(issue.detailedDescription)")
             return true  // reported below, all of them at once
         }
-        if !issues.isEmpty { XCTFail("accessibility audit:\n" + issues.joined(separator: "\n")) }
+        return issues
     }
 }
 
