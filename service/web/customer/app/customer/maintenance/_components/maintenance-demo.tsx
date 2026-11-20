@@ -100,6 +100,7 @@ const rated = new Set<string>();
 function Detail({ j, onClose, open }: Readonly<{ j: Job; onClose: () => void; open: (m: "decline" | "other" | "rate" | "problem" | "cancel" | "note") => void }>) {
   const toast = useToast();
   const p = j.proposal;
+  const notes = j.notes ?? [];
   return (
     <Card title={j.id} sub={`${j.unit} — ${j.origin === "plan" ? "periodic inspection" : j.symptom.slice(0, 40)}`} action={<div className="flex items-center gap-2"><JobStatusBadge s={j.status} client /><Btn size="sm" variant="ghost" aria-label="Close" onClick={onClose}><Icon name="close" /></Btn></div>} className="self-start">
       <SummaryList items={[
@@ -148,7 +149,7 @@ function Detail({ j, onClose, open }: Readonly<{ j: Job; onClose: () => void; op
       {j.status !== "completed" && j.status !== "cancelled" && (
         <>
           <p className="mt-4 text-[13px] font-bold">Notes to coordinator</p>
-          {(j.notes ?? []).length === 0 ? <p className="text-xs text-muted-foreground">No notes yet.</p> : <ul className="mt-1 flex flex-col gap-1 text-[13px]">{(j.notes ?? []).map((n, i) => <li key={i}><span className="text-muted-foreground">You · {n.at} — </span>“{n.text}”</li>)}</ul>}
+          {notes.length === 0 ? <p className="text-xs text-muted-foreground">No notes yet.</p> : <ul className="mt-1 flex flex-col gap-1 text-[13px]">{notes.map((n, i) => <li key={i}><span className="text-muted-foreground">You · {n.at} — </span>“{n.text}”</li>)}</ul>}
         </>
       )}
       <p className="mt-4 text-[13px] font-bold">History</p>
