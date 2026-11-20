@@ -102,7 +102,7 @@ struct JobDetailView: View {
             } label: {
                 Label(tr("Unit"), systemImage: "air.conditioner.horizontal")
             }
-            .secondaryAction()
+            .linkAction()
             .accessibilityIdentifier("job.unit")
         }
     }
@@ -115,7 +115,7 @@ struct JobDetailView: View {
                 } label: {
                     Label(tr("Open the work report"), systemImage: "doc.text")
                 }
-                .secondaryAction()
+                .linkAction()
                 .accessibilityIdentifier("job.report")
             } else {
                 Text(verbatim: tr("The report opens when you check in at the site."))

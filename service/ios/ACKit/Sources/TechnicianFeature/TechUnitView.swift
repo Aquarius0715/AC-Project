@@ -135,8 +135,13 @@ struct TechUnitView: View {
                         }
                     }
                 }
-                .chartLegend(.visible)
+                // the lines are named below in the body colour: the chart's own legend is grey, below the audit's contrast
+                .chartLegend(.hidden)
                 .frame(height: 200)
+                // one element that says what it shows: the axis labels the chart draws are no elements of their own
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(Text(verbatim: model.chartTitle))
+                .accessibilityValue(Text(verbatim: model.lines.compactMap { $0.count ?? $0.cut }.joined(separator: " · ")))
                 .accessibilityIdentifier("unit.chart")
             }
             ForEach(model.lines, id: \.metric) { line in

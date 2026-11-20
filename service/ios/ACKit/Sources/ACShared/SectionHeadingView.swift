@@ -19,6 +19,12 @@ extension View {
         buttonStyle(.bordered).tint(.primary)
     }
 
+    /// A link to another screen shown as a secondary button: its words in the body colour too (iOS 26 draws a link's
+    /// label in the accent colour, below the contrast the accessibility audit asks for on the button's grey).
+    public func linkAction() -> some View {
+        secondaryAction().foregroundStyle(.primary)
+    }
+
     /// A pushed detail screen without the tab bar: the bar's translucent background over the screen's last lines is
     /// below the contrast the accessibility audit asks for.
     public func hideTabBar() -> some View {
