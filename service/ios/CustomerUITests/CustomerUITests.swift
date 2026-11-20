@@ -58,7 +58,7 @@ final class CustomerUITests: XCTestCase {
         XCTAssertEqual(app.staticTexts["temperature.value"].label, "24°C")
         XCTAssertEqual(app.staticTexts["review.summary"].label, "1 change: Set temperature 26°C → 24°C")
         tapScrolling(app.buttons["review.send"], in: app)
-        let send = app.alerts.buttons["send.confirm"]
+        let send = app.alerts.buttons["send.confirm"].firstMatch  // iOS 26 shows an alert button as two elements
         XCTAssertTrue(send.waitForExistence(timeout: 5))
         send.tap()
         let outcome = app.staticTexts["outcome"]
@@ -93,7 +93,7 @@ final class CustomerUITests: XCTestCase {
         let power = app.switches["power"]
         XCTAssertEqual(power.value as? String, "1")
         power.switches.firstMatch.tap()
-        let confirm = app.buttons["power.confirm"]
+        let confirm = app.buttons["power.confirm"].firstMatch  // iOS 26 shows a dialog button as two elements
         XCTAssertTrue(confirm.waitForExistence(timeout: 5))
         XCTAssertEqual(confirm.label, "Power OFF")
         confirm.tap()
