@@ -8,6 +8,7 @@ final class TechnicianUITests: XCTestCase {
     }
 
     /// The app in a display language (English unless the test says otherwise: the device's own may be any).
+    @MainActor
     private func launch(_ environment: [String: String], language: String = "en") -> XCUIApplication {
         let app = XCUIApplication()
         app.launchEnvironment = environment
