@@ -102,6 +102,42 @@ final class CustomerUITests: XCTestCase {
     }
 
     @MainActor
+    func testNotificationsAreReadAndMarkedReadAllAtOnce() throws {
+        let app = launch(["AC_UI_TEST": "stub"])
+        app.buttons["signIn.button"].tap()
+        app.tabBars.buttons["Notifications"].firstMatch.tap()
+        let cleaning = app.buttons["notification.n1"]
+        XCTAssertTrue(cleaning.waitForExistence(timeout: 5))
+        XCTAssertTrue(cleaning.label.contains("Filter cleaning due on Living room AC"), cleaning.label)
+        XCTAssertTrue(cleaning.label.contains("Cleaning due. Not a fault."), cleaning.label)
+        XCTAssertTrue(app.buttons["notification.n2"].label.contains("Work completed — Bedroom AC"))
+        try app.audit()
+        keepScreenshot("notifications", of: app)
+        app.buttons["notifications.markAll"].firstMatch.tap()
+        XCTAssertTrue(wait(for: app.staticTexts["notifications.message"], label: "2 notifications marked as read"))
+        XCTAssertFalse(app.buttons["notifications.markAll"].exists, "nothing left unread")
+    }
+
+    @MainActor
+    func testHomeOrAwayIsReportedOnceSwitchedOn() throws {
+        let app = launch(["AC_UI_TEST": "stub"])
+        app.buttons["signIn.button"].tap()
+        app.tabBars.buttons["Location"].firstMatch.tap()
+        let grant = app.buttons["consent.grant"]
+        XCTAssertTrue(grant.waitForExistence(timeout: 5), "the switch needs the location consent first")
+        XCTAssertFalse(app.switches["presence.switch"].exists)
+        try app.audit()
+        grant.tap()
+        let toggle = app.switches["presence.switch"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 5))
+        XCTAssertEqual(toggle.value as? String, "0")
+        try app.audit()
+        toggle.switches.firstMatch.tap()
+        XCTAssertTrue(wait(for: app.staticTexts["presence.line"], label: "Arrived at Home A — 1 automation ran."))
+        keepScreenshot("presence", of: app)
+    }
+
+    @MainActor
     func testTheDevicesLanguageIsShown() {
         let app = launch(["AC_UI_TEST": "stub", "AC_UI_TEST_ROLE": "other"], language: "ja")
         XCTAssertTrue(app.buttons["signIn.button"].waitForExistence(timeout: 5))
@@ -120,6 +156,51 @@ final class CustomerUITests: XCTestCase {
         let message = app.staticTexts["signIn.message"]
         XCTAssertTrue(message.waitForExistence(timeout: 5))
         XCTAssertEqual(message.label, "This account is not for this app — sign in with another account")
+    }
+
+    /// The app signed in to the running stack as customer-a (a session a run before kept is signed out first).
+    @MainActor
+    private func liveSignedIn() throws -> XCUIApplication {
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["AC_UI_LIVE"] == "1", "the dev stack's live test (TEST_RUNNER_AC_UI_LIVE=1)")
+        let app = launch([:])
+        // (the list may be long: its last row, Sign out, is loaded once scrolled to)
+        if app.navigationBars["Air conditioners"].waitForExistence(timeout: 3) { tapScrolling(app.buttons["signOut"], in: app) }
+        XCTAssertTrue(app.buttons["signIn.button"].waitForExistence(timeout: 10))
+        app.buttons["signIn.button"].tap()
+        LiveSignIn.signIn(user: "customer-a")
+        XCTAssertTrue(app.navigationBars["Air conditioners"].waitForExistence(timeout: 20))
+        return app
+    }
+
+    /// The phone's real location services against the running stack: run with the simulator's location at a pin of
+    /// customer-a's and its location permission granted "Always" (README, Checks). Nothing but home or away is kept.
+    @MainActor
+    func testLivePresenceIsReportedToTheDevStack() throws {
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["AC_UI_LIVE_PRESENCE"] == "1", "needs a pin and the simulator's location set")
+        let app = try liveSignedIn()
+        app.tabBars.buttons["Location"].firstMatch.tap()
+        // the account's consent as it was: granted for the run, withdrawn again after it when it was not
+        let grant = app.buttons["consent.grant"]
+        let wasGranted = !grant.waitForExistence(timeout: 10)
+        if !wasGranted { grant.tap() }
+        let toggle = app.switches["presence.switch"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 10))
+        if toggle.value as? String == "1" { toggle.switches.firstMatch.tap() }
+        toggle.switches.firstMatch.tap()
+        let line = app.staticTexts["presence.line"]
+        XCTAssertTrue(line.waitForExistence(timeout: 30))
+        let said = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label CONTAINS 'Home A' OR label CONTAINS 'nothing changed'"),
+            object: line
+        )
+        XCTAssertEqual(XCTWaiter().wait(for: [said], timeout: 30), .completed, line.label)
+        keepScreenshot("live-presence", of: app)
+        toggle.switches.firstMatch.tap()
+        if !wasGranted {
+            app.buttons["consent.withdraw"].tap()
+            app.buttons["consent.withdraw.confirm"].firstMatch.tap()
+            XCTAssertTrue(app.buttons["consent.grant"].waitForExistence(timeout: 10))
+        }
     }
 
     @MainActor

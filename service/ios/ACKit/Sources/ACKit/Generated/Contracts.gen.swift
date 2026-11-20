@@ -1407,6 +1407,116 @@ public enum Connection: String, Codable, Sendable, Equatable, CaseIterable {
   case error = "error"
 }
 
+public struct Consent: Codable, Sendable, Equatable {
+  public var id: String
+  public var tenantId: String
+  public var version: Double
+  public var createdAt: String
+  public var updatedAt: String
+  public var membershipId: String
+  public var granted: Bool
+  public var grantedAt: String?
+  public var revokedAt: String?
+
+  public init(id: String, tenantId: String, version: Double, createdAt: String, updatedAt: String, membershipId: String, granted: Bool, grantedAt: String?, revokedAt: String?) {
+    self.id = id
+    self.tenantId = tenantId
+    self.version = version
+    self.createdAt = createdAt
+    self.updatedAt = updatedAt
+    self.membershipId = membershipId
+    self.granted = granted
+    self.grantedAt = grantedAt
+    self.revokedAt = revokedAt
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case purpose
+    case id
+    case tenantId
+    case version
+    case createdAt
+    case updatedAt
+    case membershipId
+    case granted
+    case grantedAt
+    case revokedAt
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    try Constant.expect("location_automation", in: c, at: .purpose)
+    id = try c.decode(String.self, forKey: .id)
+    tenantId = try c.decode(String.self, forKey: .tenantId)
+    version = try c.decode(Double.self, forKey: .version)
+    createdAt = try c.decode(String.self, forKey: .createdAt)
+    updatedAt = try c.decode(String.self, forKey: .updatedAt)
+    membershipId = try c.decode(String.self, forKey: .membershipId)
+    granted = try c.decode(Bool.self, forKey: .granted)
+    grantedAt = try c.decode(String?.self, forKey: .grantedAt)
+    revokedAt = try c.decode(String?.self, forKey: .revokedAt)
+  }
+
+  public func encode(to encoder: any Encoder) throws {
+    var c = encoder.container(keyedBy: CodingKeys.self)
+    try c.encode("location_automation", forKey: .purpose)
+    try c.encode(id, forKey: .id)
+    try c.encode(tenantId, forKey: .tenantId)
+    try c.encode(version, forKey: .version)
+    try c.encode(createdAt, forKey: .createdAt)
+    try c.encode(updatedAt, forKey: .updatedAt)
+    try c.encode(membershipId, forKey: .membershipId)
+    try c.encode(granted, forKey: .granted)
+    try c.encode(grantedAt, forKey: .grantedAt)
+    try c.encode(revokedAt, forKey: .revokedAt)
+  }
+}
+
+public struct ConsentsGetInput: Codable, Sendable, Equatable {
+
+  public init() {
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case purpose
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    try Constant.expect("location_automation", in: c, at: .purpose)
+  }
+
+  public func encode(to encoder: any Encoder) throws {
+    var c = encoder.container(keyedBy: CodingKeys.self)
+    try c.encode("location_automation", forKey: .purpose)
+  }
+}
+
+public struct ConsentsUpdateInput: Codable, Sendable, Equatable {
+  public var granted: Bool
+
+  public init(granted: Bool) {
+    self.granted = granted
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case purpose
+    case granted
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    try Constant.expect("location_automation", in: c, at: .purpose)
+    granted = try c.decode(Bool.self, forKey: .granted)
+  }
+
+  public func encode(to encoder: any Encoder) throws {
+    var c = encoder.container(keyedBy: CodingKeys.self)
+    try c.encode("location_automation", forKey: .purpose)
+    try c.encode(granted, forKey: .granted)
+  }
+}
+
 public enum ControlAvailability: Codable, Sendable, Equatable {
   case available(ControlAvailabilityAvailable)
   case blocked(ControlAvailabilityBlocked)

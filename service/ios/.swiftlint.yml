@@ -80,7 +80,12 @@ line_length:
 type_body_length: { warning: 300, error: 400 }
 file_length: { warning: 500, error: 700 }
 function_body_length: { warning: 50, error: 80 }
-cyclomatic_complexity: { warning: 12, error: 20 }
+cyclomatic_complexity:
+  warning: 12
+  error: 20
+  # a switch over an enum's cases is a table the compiler checks for every case (a title per template, a word per
+  # state): counted per case, it would push the table into a dictionary with a fallback no case can reach
+  ignores_case_statements: true
 identifier_name:
   min_length: 1                 # Go's convention, as CLAUDE.md asks: short names in short scopes (c, i, id, ok)
   excluded: []

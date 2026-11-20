@@ -1,14 +1,16 @@
 import ACShared
 import SwiftUI
 
-/// The Customer app (DEC-112): the sign-in, then the customer's ACs.
+/// The Customer app (DEC-112): the sign-in, then the customer's ACs, notifications and home-or-away location.
 public struct CustomerRoot: View {
     let session: SessionModel
+    let presence: PresenceModel
     let web: WebSignIn?
 
     /// `web` replaces the provider's page (the stubbed UI tests).
-    public init(session: SessionModel, web: WebSignIn? = nil) {
+    public init(session: SessionModel, presence: PresenceModel, web: WebSignIn? = nil) {
         self.session = session
+        self.presence = presence
         self.web = web
     }
 
@@ -20,10 +22,21 @@ public struct CustomerRoot: View {
     @ViewBuilder private var content: some View {
         switch session.state {
         case .signedIn:
-            UnitsView(model: UnitsModel(client: session.client), session: session)
-                .task { await session.applyPreferences() }
+            TabView {
+                UnitsView(model: UnitsModel(client: session.client), session: session)
+                    .tabItem { Label(tr("Air conditioners"), systemImage: "air.conditioner.horizontal") }
+                NotificationsView(model: NotificationsModel(client: session.client))
+                    .tabItem { Label(tr("Notifications"), systemImage: "bell") }
+                PresenceView(model: presence)
+                    .tabItem { Label(tr("Location"), systemImage: "location") }
+            }
+            .task {
+                await session.applyPreferences()
+                await presence.resume()
+            }
         case .signedOut, .signingIn:
             SignInView(title: tr("Customer"), model: session, web: web)
+                .task { await presence.pause() }
         }
     }
 }

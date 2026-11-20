@@ -37,10 +37,23 @@ extension XCTestCase {
     /// Scrolls the screen until the element can be tapped, then taps it: as a person scrolls to a button below the fold.
     @MainActor
     func tapScrolling(_ element: XCUIElement, in app: XCUIApplication) {
-        // hittable is not enough: an element at the very bottom is under the home indicator, which takes the tap
-        let bottom = app.windows.firstMatch.frame.maxY - 100
-        for _ in 0..<5 where !(element.exists && element.isHittable && element.frame.maxY < bottom) {
-            app.swipeUp()
+        // hittable is not enough: an element at the very bottom is under the home indicator, one at the very top under
+        // the navigation bar, and either takes the tap
+        let window = app.windows.firstMatch.frame
+        let top = window.minY + 120
+        let bottom = window.maxY - 100
+        for _ in 0..<6 {
+            guard element.exists else {
+                app.swipeUp()
+                continue
+            }
+            if element.frame.maxY > bottom {
+                app.swipeUp()
+            } else if element.frame.minY < top {
+                app.swipeDown()
+            } else {
+                break
+            }
         }
         XCTAssertTrue(element.isHittable, "\(element) is on the screen")
         element.tap()

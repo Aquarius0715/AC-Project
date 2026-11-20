@@ -1,0 +1,16 @@
+{
+  "CustomerApp": {
+    "NSLocationWhenInUseUsageDescription": {
+      "en": "Your position is compared with the map pins of your homes and offices; only home or away is kept.",
+      "ms": "Kedudukan anda dibandingkan dengan pin peta rumah dan pejabat anda; hanya di rumah atau keluar disimpan.",
+      "ja": "現在地を住宅・事業所の地図ピンと照らし合わせます。保存されるのは在宅か外出かだけです。",
+      "id": "Posisi Anda dibandingkan dengan pin peta rumah dan kantor Anda; hanya di rumah atau pergi yang disimpan."
+    },
+    "NSLocationAlwaysAndWhenInUseUsageDescription": {
+      "en": "Arriving at and leaving your homes and offices is reported also while the app is closed; only home or away is kept.",
+      "ms": "Ketibaan di dan keluar dari rumah dan pejabat anda dilaporkan walaupun aplikasi ditutup; hanya di rumah atau keluar disimpan.",
+      "ja": "アプリを閉じていても、住宅・事業所への到着と出発を報告します。保存されるのは在宅か外出かだけです。",
+      "id": "Tiba di dan meninggalkan rumah serta kantor Anda dilaporkan juga saat aplikasi ditutup; hanya di rumah atau pergi yang disimpan."
+    }
+  }
+}

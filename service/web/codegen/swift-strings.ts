@@ -72,7 +72,7 @@ const unescaped = (literal: string) =>
 
 const keys = new Set<string>();
 for (const file of swiftFiles(ios)) {
-  for (const match of readFileSync(file, "utf8").matchAll(/\btr\("((?:[^"\\]|\\.)*)"/g)) keys.add(unescaped(match[1] ?? ""));
+  for (const match of readFileSync(file, "utf8").matchAll(/\btr\(\s*"((?:[^"\\]|\\.)*)"/g)) keys.add(unescaped(match[1] ?? ""));
 }
 for (const texts of Object.values(actionTexts)) for (const text of Object.values(texts)) keys.add(text);
 const mine = new Map(Object.entries(own));
@@ -127,7 +127,30 @@ const errorTexts = [
   "",
 ].join("\n");
 
+// the texts of an app's Info.plist (the location prompts): their own catalog per app, in the four languages
+const plistTexts = z
+  .record(z.string(), z.record(z.string(), z.object({ en: z.string().min(1), ms: z.string().min(1), ja: z.string().min(1), id: z.string().min(1) })))
+  .parse(JSON.parse(readFileSync(path.join(ios, "infoplist.json"), "utf8")));
+const plistCatalog = (texts: Record<string, Record<string, string>>) => ({
+  sourceLanguage: "en",
+  strings: Object.fromEntries(
+    Object.entries(texts)
+      .toSorted(([a], [b]) => a.localeCompare(b, "en"))
+      .map(([key, values]) => [
+        key,
+        {
+          extractionState: "manual",
+          localizations: Object.fromEntries(
+            [...new Map(Object.entries(values))].map(([l, value]) => [l, { stringUnit: { state: "translated", value } }]),
+          ),
+        },
+      ]),
+  ),
+  version: "1.0",
+});
+
 const files: [string, string][] = [
+  ...Object.entries(plistTexts).map(([app, texts]): [string, string] => [path.join(ios, app, "InfoPlist.xcstrings"), `${JSON.stringify(plistCatalog(texts), null, 2)}\n`]),
   [path.join(ios, "Shared", "Localizable.xcstrings"), `${JSON.stringify(catalog, null, 2)}\n`],
   [path.join(ios, "ACKit", "Sources", "ACShared", "Generated", "ErrorTexts.gen.swift"), errorTexts],
 ];

@@ -1,8 +1,28 @@
 {
+  "Allow location “Always” so that arriving and leaving are reported while the app is closed.": {
+    "id": "Izinkan lokasi “Selalu” agar tiba dan pergi dilaporkan saat aplikasi ditutup.",
+    "ja": "アプリを閉じている間も到着と出発を報告するには、位置情報を「常に」許可してください。",
+    "ms": "Benarkan lokasi “Sentiasa” supaya ketibaan dan keluar dilaporkan semasa aplikasi ditutup."
+  },
+  "Location automations cannot run until you grant it again. Manual control and schedules are unaffected.": {
+    "id": "Otomasi lokasi tidak dapat berjalan sampai Anda memberikannya lagi. Kontrol manual dan jadwal tidak terpengaruh.",
+    "ja": "もう一度同意するまで、位置情報の自動化は動きません。手動操作とスケジュールには影響しません。",
+    "ms": "Automasi lokasi tidak boleh berjalan sehingga anda memberikannya semula. Kawalan manual dan jadual tidak terjejas."
+  },
+  "Location is off for this app — allow it in Settings, or switch this off.": {
+    "id": "Lokasi nonaktif untuk aplikasi ini — izinkan di Pengaturan, atau matikan ini.",
+    "ja": "このアプリの位置情報はオフです — 「設定」で許可するか、このスイッチをオフにしてください。",
+    "ms": "Lokasi dimatikan untuk aplikasi ini — benarkan dalam Tetapan, atau matikan ini."
+  },
   "No connection — check the network and try again": {
     "id": "Tidak ada koneksi — periksa jaringan dan coba lagi",
     "ja": "接続できません — ネットワークを確認して、もう一度お試しください",
     "ms": "Tiada sambungan — semak rangkaian dan cuba lagi"
+  },
+  "None of your homes or offices has a map pin yet — HQ sets them.": {
+    "id": "Belum ada rumah atau kantor Anda yang memiliki pin peta — HQ yang menetapkannya.",
+    "ja": "住宅・事業所にまだ地図ピンがありません — HQ が設定します。",
+    "ms": "Belum ada rumah atau pejabat anda yang mempunyai pin peta — HQ menetapkannya."
   },
   "The sign-in did not complete — try again": {
     "id": "Proses masuk tidak selesai — coba lagi",
@@ -18,5 +38,15 @@
     "id": "Akun ini bukan untuk aplikasi ini — masuk dengan akun lain",
     "ja": "このアカウントはこのアプリでは使えません — 別のアカウントでサインインしてください",
     "ms": "Akaun ini bukan untuk aplikasi ini — log masuk dengan akaun lain"
+  },
+  "This phone’s position is not precise enough to send — it is tried again at the next crossing.": {
+    "id": "Posisi ponsel ini tidak cukup akurat untuk dikirim — dicoba lagi pada perlintasan berikutnya.",
+    "ja": "この電話の位置が送信できるほど正確ではありません — 次に範囲を出入りしたときに再試行します。",
+    "ms": "Kedudukan telefon ini tidak cukup tepat untuk dihantar — ia dicuba lagi pada lintasan seterusnya."
+  },
+  "Your phone reports arriving and leaving your homes and offices, also while the app is closed. Its position is compared with their map pins, and only home or away is kept.": {
+    "id": "Ponsel Anda melaporkan tiba dan meninggalkan rumah serta kantor Anda, juga saat aplikasi ditutup. Posisinya dibandingkan dengan pin peta, dan hanya di rumah atau pergi yang disimpan.",
+    "ja": "アプリを閉じていても、住宅・事業所への到着と出発をこの電話が報告します。位置は地図ピンと照らし合わせ、保存されるのは在宅か外出かだけです。",
+    "ms": "Telefon anda melaporkan ketibaan dan keluar dari rumah dan pejabat anda, walaupun aplikasi ditutup. Kedudukannya dibandingkan dengan pin peta, dan hanya di rumah atau keluar disimpan."
   }
 }

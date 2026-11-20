@@ -70,6 +70,9 @@ sh scripts/check.sh                       # before a push: web lint/typecheck/Vi
 sh service/ios/scripts/check.sh           # iOS: SwiftLint, swift-format, unit tests at 100 %, both apps' UI tests (needs Xcode)
 TEST_RUNNER_AC_UI_LIVE=1 xcodebuild -project service/ios/AC.xcodeproj -scheme CustomerApp test \
   -destination 'platform=iOS Simulator,name=iPhone 15'   # an app's UI tests with its live sign-in to the running stack
+# the live geofence report also needs a pin on a customer-a property, and the simulator at it with the permission:
+#   xcrun simctl privacy "iPhone 15" grant location-always com.pradita.ac.customer
+#   xcrun simctl location "iPhone 15" set <latitude>,<longitude>; then TEST_RUNNER_AC_UI_LIVE_PRESENCE=1 as well
 ```
 
 GitHub Actions run the same: `.github/workflows/ci.yml` (seven parallel jobs) and `.github/workflows/e2e.yml` (the

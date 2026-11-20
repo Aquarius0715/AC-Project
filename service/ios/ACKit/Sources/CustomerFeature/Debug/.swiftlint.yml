@@ -1,0 +1,3 @@
+# The UI tests' stand-ins (Debug builds only): test support, held to the tests' rules (CLAUDE.md 4.2) — a stub's routes
+# and its answers stay in one place.
+disabled_rules: [file_length, type_body_length, function_body_length, cyclomatic_complexity]

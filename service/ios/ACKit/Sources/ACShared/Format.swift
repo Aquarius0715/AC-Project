@@ -11,6 +11,15 @@ public enum Format {
         return date.formatted(style)
     }
 
+    /// "1 Dec 2026": the day of an instant (a reminder's due day), in the display language and time zone.
+    public static func date(_ instant: String, timeZone: TimeZone = Localizer.timeZone) -> String {
+        guard let date = parse(instant) else { return instant }
+        var style = Date.FormatStyle(date: .abbreviated, time: .omitted)
+        style.locale = Locale(identifier: Localizer.language.rawValue)
+        style.timeZone = timeZone
+        return date.formatted(style)
+    }
+
     /// An ISO 8601 instant with or without fractional seconds (the Core API writes milliseconds when it has them).
     public static func parse(_ instant: String) -> Date? {
         let fractional = Date.ISO8601FormatStyle(includingFractionalSeconds: true)

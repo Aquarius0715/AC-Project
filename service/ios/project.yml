@@ -52,6 +52,21 @@ targets:
   CustomerApp:
     templates: [App]
     templateAttributes: { display_name: AC Customer, client_id: ac-customer-ios, scheme: ac-customer }
+    info:
+      path: CustomerApp/Info.plist
+      properties:
+        CFBundleDisplayName: AC Customer
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        CFBundleLocalizations: [en, ms, ja, id]
+        ACCoreAPIURL: $(AC_CORE_API_URL)
+        ACIssuerURL: $(AC_ISSUER_URL)
+        ACClientID: ac-customer-ios
+        ACRedirectURI: ac-customer://oauth/callback
+        NSAppTransportSecurity: { NSAllowsLocalNetworking: true }
+        # the geofence (DEC-109): the texts of the permission prompts, in four languages in CustomerApp/InfoPlist.xcstrings
+        NSLocationWhenInUseUsageDescription: Your position is compared with the map pins of your homes and offices; only home or away is kept.
+        NSLocationAlwaysAndWhenInUseUsageDescription: Arriving at and leaving your homes and offices is reported also while the app is closed; only home or away is kept.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.pradita.ac.customer
