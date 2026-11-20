@@ -34,28 +34,173 @@ public enum UITestStub {
         func clear() { lock.withLock { stored = nil } }
     }
 
-    struct Transport: HTTPTransport {
+    final class Transport: HTTPTransport, @unchecked Sendable {
         let role: String
+        // the AC the stub's commands change: one UI test drives one app, the lock only keeps the type honest
+        private let lock = NSLock()
+        private var observed = ObservedState(power: true, celsius: 26, mode: .cool, fanLevel: .mid, observedAt: day)
+        private var commands: [String: Command] = [:]
+        private var version = 1.0
+
+        init(role: String) {
+            self.role = role
+        }
 
         func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
             let url = request.url ?? URL(filePath: "/")
-            let body = try answer(url.path())
+            let body = try lock.withLock { try answer(request.httpMethod ?? "GET", url.path(), request.httpBody) }
             let response = HTTPURLResponse(url: url, statusCode: body == nil ? 404 : 200, httpVersion: nil, headerFields: nil)
             return (body ?? Data("{}".utf8), response ?? HTTPURLResponse())
         }
 
-        private func answer(_ path: String) throws -> Data? {
+        private func answer(_ method: String, _ path: String, _ body: Data?) throws -> Data? {
             let encoder = JSONEncoder()
             // the discovery is under the app's own issuer (…/realms/ac), the other endpoints are the stub's
             if path.hasSuffix("/.well-known/openid-configuration") { return try encoder.encode(StubEndpoints()) }
-            switch path {
-            case "/token": return try encoder.encode(StubTokens(accessToken: token))
-            case "/logout": return Data("{}".utf8)
-            case "/v1/units": return try encoder.encode(StubAnswer(data: page(Self.units)))
-            case "/v1/jobs": return try encoder.encode(StubAnswer(data: page(Self.jobs)))
+            if path.hasPrefix("/v1/units/") { return try encoder.encode(StubAnswer(data: detail(String(path.dropFirst(10))))) }
+            if path.hasPrefix("/v1/commands/") { return try encoder.encode(StubAnswer(data: acknowledge(String(path.dropFirst(13))))) }
+            switch (method, path) {
+            case (_, "/token"): return try encoder.encode(StubTokens(accessToken: token))
+            case (_, "/logout"): return Data("{}".utf8)
+            case (_, "/v1/units"): return try encoder.encode(StubAnswer(data: page(Self.units)))
+            case (_, "/v1/jobs"): return try encoder.encode(StubAnswer(data: page(Self.jobs)))
+            case (_, "/v1/preferences"): return try encoder.encode(StubAnswer(data: Self.preferences))
+            case ("GET", "/v1/commands"):
+                return try encoder.encode(StubAnswer(data: page(commands.values.sorted { $0.id > $1.id })))
+            case ("POST", "/v1/commands"):
+                let input = try JSONDecoder().decode(CommandsCreateInput.self, from: body ?? Data())
+                return try encoder.encode(StubAnswer(data: create(input)))
             default: return nil
             }
         }
+
+        /// A command the AC has not answered yet; the first commands.get answers it (the AC takes every setting).
+        private func create(_ input: CommandsCreateInput) -> Command {
+            let id = "c\(commands.count + 1)"
+            let command = Command(
+                id: id,
+                tenantId: "t1",
+                version: 1,
+                createdAt: Self.day,
+                updatedAt: Self.day,
+                unitId: input.unitId,
+                actorMembershipId: "m1",
+                action: Self.commandAction(input.action),
+                diagnosticRunId: nil,
+                jobId: nil,
+                reason: nil,
+                status: .sent,
+                delivery: .sent,
+                requestedAt: Self.day,
+                sentAt: Self.day,
+                acknowledgedAt: nil,
+                expiresAt: "2026-12-01T00:00:30Z",
+                failureCode: nil,
+                correlationId: id,
+                source: .ui
+            )
+            commands[id] = command
+            return command
+        }
+
+        private func acknowledge(_ id: String) -> Command? {
+            guard var command = commands[id] else { return nil }
+            if command.status == .sent {
+                command.status = .acknowledged
+                command.acknowledgedAt = Self.day
+                commands[id] = command
+                apply(command.action)
+            }
+            return command
+        }
+
+        private func apply(_ action: CommandAction) {
+            switch action {
+            case let .setPower(change): observed.power = change.power
+            case let .setTemperature(change): observed.celsius = change.celsius
+            case let .setMode(change): observed.mode = change.mode
+            case let .setFan(change): observed.fanLevel = change.fanLevel
+            default: break
+            }
+            version += 1
+        }
+
+        private static func commandAction(_ action: UnitAction) -> CommandAction {
+            switch action {
+            case let .setPower(change): .setPower(change)
+            case let .setTemperature(change): .setTemperature(change)
+            case let .setMode(change): .setMode(change)
+            case let .setFan(change): .setFan(change)
+            case let .ventilate(change): .ventilate(change)
+            }
+        }
+
+        private func detail(_ id: String) -> UnitDetail? {
+            guard let unit = Self.units.first(where: { $0.id == id }) else { return nil }
+            let isLiving = id == "u1"
+            return UnitDetail(
+                id: unit.id,
+                tenantId: unit.tenantId,
+                version: version,
+                createdAt: unit.createdAt,
+                updatedAt: unit.updatedAt,
+                customerOrgId: unit.customerOrgId,
+                propertyId: unit.propertyId,
+                spaceId: unit.spaceId,
+                displayName: unit.displayName,
+                modelId: unit.modelId,
+                installState: unit.installState,
+                installedAt: unit.installedAt,
+                serviceScope: unit.serviceScope,
+                warrantyEndsAt: unit.warrantyEndsAt,
+                alertPolicyIds: unit.alertPolicyIds,
+                archived: unit.archived,
+                capabilityVersion: unit.capabilityVersion,
+                iotModelId: nil,
+                iotModelVersion: nil,
+                connection: unit.connection,
+                observedState: isLiving ? observed : unit.observedState,
+                observedRestriction: nil,
+                lastSeenAt: Self.day,
+                effectivePowerState: isLiving ? (observed.power == true ? .on : .off) : unit.effectivePowerState,
+                latestMeasurements: [],
+                activeAlertCount: 0,
+                capabilities: Self.capability,
+                iotModel: nil,
+                effectiveControlPolicy: .unrestricted(EffectiveControlPolicyUnrestricted()),
+                controlAvailability: .available(ControlAvailabilityAvailable()),
+                components: [],
+                pendingCommands: [],
+                pendingCommandIds: [],
+                location: UnitDetailLocation(pathLabels: ["Home A", "Living room"], address: nil, accessInstructions: nil)
+            )
+        }
+
+        private static let capability = Capability(
+            id: "cap1",
+            tenantId: "t1",
+            version: 1,
+            createdAt: day,
+            updatedAt: day,
+            manufacturer: "Daikin",
+            model: "FTKF",
+            control: true,
+            modeControl: true,
+            fanControl: true,
+            temperature: CapabilityTemperature(min: 16, max: 30, step: 1),
+            modes: [.cool, .dry, .fan],
+            fanLevels: [.low, .mid, .high],
+            ventilation: false,
+            ventilationLevels: []
+        )
+
+        private static let preferences = Preferences(
+            locale: .en,
+            timezone: "Asia/Kuala_Lumpur",
+            monthlyReportEmail: false,
+            twoFactorEnabled: false,
+            pinnedUnitIds: []
+        )
 
         private var token: String {
             let claims = ["tenant_id": "t1", "membership_id": "m1", "role": role]

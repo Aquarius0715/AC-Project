@@ -16,11 +16,22 @@ public final class SessionModel {
     }
 
     public private(set) var state: State
+    /// The display language the screens show; it changes when the membership's preferences are read.
+    public private(set) var language = Localizer.language
     public let client: CoreClient
     let authenticator: Authenticator
     let callbackScheme: String
 
-    public init(configuration: AppConfiguration, store: any SessionStore, transport: any HTTPTransport = URLSessionTransport()) {
+    /// Where the membership's display language and time zone go (the app's Localizer; a test's recorder).
+    let display: @MainActor (DisplayLanguage, TimeZone) -> Void
+
+    public init(
+        configuration: AppConfiguration,
+        store: any SessionStore,
+        transport: any HTTPTransport = URLSessionTransport(),
+        display: @escaping @MainActor (DisplayLanguage, TimeZone) -> Void = SessionModel.show
+    ) {
+        self.display = display
         // the session that ends by itself (refused, the refresh failed) is shown as signed out with the reason
         let ended = Ended()
         let authenticator = Authenticator(
@@ -55,6 +66,36 @@ public final class SessionModel {
         } catch {
             state = .signedOut(message: ErrorText.of(error))
         }
+    }
+
+    /// The membership's display language and time zone (preferences.get), once signed in; unreadable preferences keep
+    /// the device's, as the web apps show the defaults.
+    public func applyPreferences() async {
+        guard case .signedIn = state, let preferences = try? await client.call(Ops.PreferencesGet.self, Empty()).data else { return }
+        let language = Self.language(preferences.locale)
+        display(language, TimeZone(identifier: preferences.timezone) ?? .current)
+        self.language = language
+    }
+
+    /// The app's display: the language and time zone of every screen.
+    public static func show(_ language: DisplayLanguage, in timeZone: TimeZone) {
+        Localizer.use(language, timeZone: timeZone)
+    }
+
+    /// The display language of a membership's locale: the contract's four are the apps' four.
+    static func language(_ locale: CoreLocale) -> DisplayLanguage {
+        switch locale {
+        case .en: .en
+        case .ms: .ms
+        case .ja: .ja
+        case .id: .id
+        }
+    }
+
+    /// The signed-in membership.
+    public var membershipId: String? {
+        if case let .signedIn(claims) = state { return claims.membershipId }
+        return nil
     }
 
     public func signOut() async {

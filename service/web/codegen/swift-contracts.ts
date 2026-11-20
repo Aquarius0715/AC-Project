@@ -62,6 +62,8 @@ const pending = new Set<string>(); // being written: a reference while writing i
 // TypeScript keeps one type for one set of literals: MaintenanceJob['type'] in JobSummary and in JobHistorySnapshot is
 // the same union, so it is the same Swift enum (named where it is met first)
 const enums = new Map<ts.Type, string>();
+// the same for an object written once and met in two places: UnitAction's members are Command.action's too
+const objects = new Map<ts.Type, string>();
 
 const isNull = (t: ts.Type) => (t.flags & (ts.TypeFlags.Null | ts.TypeFlags.Undefined)) !== 0;
 const isStringLiteral = (t: ts.Type): t is ts.StringLiteralType => t.isStringLiteral();
@@ -70,12 +72,17 @@ const isNumber = (t: ts.Type) => (t.flags & ts.TypeFlags.Number) !== 0 || t.isNu
 const isBooleanLike = (t: ts.Type) => (t.flags & (ts.TypeFlags.Boolean | ts.TypeFlags.BooleanLiteral)) !== 0;
 const isObject = (t: ts.Type) => (t.flags & ts.TypeFlags.Object) !== 0 || t.isIntersection();
 
-/** The alias name a type was written with (Alert, Page<…>), or null for an anonymous type. */
+// contract names that are Swift's, Foundation's or SwiftUI's own (Range, Locale, Measurement, Notification, Alert): in an
+// app that imports those, the bare name would be either; the Swift type is Core… (CoreAlert, CoreLocale)
+const PLATFORM_NAMES = new Set(["Alert", "Locale", "Measurement", "Notification", "Range"]);
+const swiftName = (name: string) => (PLATFORM_NAMES.has(name) ? `Core${name}` : name);
+
+/** The Swift name of the alias a type was written with (Alert → CoreAlert, Page<…>), or null for an anonymous type. */
 function aliasName(t: ts.Type): string | null {
   const alias = t.aliasSymbol;
   const declaration = alias?.declarations?.[0];
   // only the contract's own aliases name a Swift type; TypeScript's (Record, Pick, Omit…) describe a shape
-  return alias && declaration?.getSourceFile() === source ? alias.name : null;
+  return alias && declaration?.getSourceFile() === source ? swiftName(alias.name) : null;
 }
 
 /** A literal field of an object: its JSON value, written as a constant. */
@@ -120,11 +127,13 @@ function single(t: ts.Type, place: string, name: string, generics: Generics): st
 }
 
 function union(members: ts.Type[], whole: ts.Type, place: string, name: string, generics: Generics): string {
-  const own = aliasName(whole) ?? name;
+  // Mode|null is the same enum as Mode: the union without null is the one TypeScript keeps for the alias
+  const plain = checker.getNonNullableType(whole);
+  const own = aliasName(plain) ?? aliasName(whole) ?? name;
   if (members.every((m) => isStringLiteral(m))) {
-    const known = enums.get(whole);
+    const known = enums.get(plain);
     if (known) return known;
-    enums.set(whole, own);
+    enums.set(plain, own);
     return stringEnum(members.filter((m) => isStringLiteral(m)), own);
   }
   if (members.every((m) => isBooleanLike(m))) return "Bool"; // boolean is true|false
@@ -184,7 +193,10 @@ function objectType(t: ts.Type, place: string, name: string, generics: Generics)
     genericStruct(t);
     return `${alias}<${args.map((a, i) => swiftType(a, `${place}<${String(i)}>`, `${name}Item`, generics)).join(", ")}>`;
   }
+  const known = objects.get(t);
+  if (known) return known;
   const own = alias ?? name;
+  objects.set(t, own);
   if (!declarations.has(own) && !pending.has(own)) {
     pending.add(own);
     declarations.set(own, struct(own, "", checker.getPropertiesOfType(t).map((p) => fieldOf(p, own, generics))));
@@ -196,14 +208,16 @@ function objectType(t: ts.Type, place: string, name: string, generics: Generics)
 /** A generic alias (Page<T>) is declared once, with Swift generic parameters for its own. */
 function genericStruct(t: ts.Type) {
   const alias = t.aliasSymbol;
-  if (!alias || declarations.has(alias.name) || pending.has(alias.name)) return;
+  if (!alias) return;
+  const name = swiftName(alias.name);
+  if (declarations.has(name) || pending.has(name)) return;
   const declared = checker.getDeclaredTypeOfSymbol(alias);
   const parameters = (alias.declarations ?? []).flatMap((d) => (ts.isTypeAliasDeclaration(d) ? [...(d.typeParameters ?? [])] : []));
   const generics = new Map<ts.Type, string>(parameters.map((p) => [checker.getTypeAtLocation(p), p.name.text]));
-  pending.add(alias.name);
+  pending.add(name);
   const parameterList = `<${[...generics.values()].map((g) => `${g}: Codable & Sendable & Equatable`).join(", ")}>`;
-  declarations.set(alias.name, struct(alias.name, parameterList, checker.getPropertiesOfType(declared).map((p) => fieldOf(p, alias.name, generics))));
-  pending.delete(alias.name);
+  declarations.set(name, struct(name, parameterList, checker.getPropertiesOfType(declared).map((p) => fieldOf(p, name, generics))));
+  pending.delete(name);
 }
 
 function decodeLine(f: Field): string {
@@ -231,9 +245,18 @@ function struct(name: string, parameters: string, fields: Field[]): string {
   if (ordered.length > 0) lines.push("", "  enum CodingKeys: String, CodingKey {", ...ordered.map((f) => `    case ${escaped(f.json)}`), "  }");
   lines.push("", "  public init(from decoder: any Decoder) throws {");
   if (ordered.length > 0) lines.push("    let c = try decoder.container(keyedBy: CodingKeys.self)");
-  lines.push(...ordered.map((f) => decodeLine(f)), "  }", "", "  public func encode(to encoder: any Encoder) throws {");
-  if (ordered.length > 0) lines.push("    var c = encoder.container(keyedBy: CodingKeys.self)");
-  lines.push(...ordered.map((f) => encodeLine(f)), "  }", "}");
+  // a type without fields still writes {}: an encoder refuses a value that writes nothing
+  const container = ordered.length > 0 ? "    var c = encoder.container(keyedBy: CodingKeys.self)" : "    _ = encoder.container(keyedBy: NoKeys.self)";
+  lines.push(
+    ...ordered.map((f) => decodeLine(f)),
+    "  }",
+    "",
+    "  public func encode(to encoder: any Encoder) throws {",
+    container,
+    ...ordered.map((f) => encodeLine(f)),
+    "  }",
+    "}",
+  );
   return lines.join("\n");
 }
 

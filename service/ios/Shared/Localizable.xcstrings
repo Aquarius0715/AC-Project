@@ -1,6 +1,121 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    " · by a restriction": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": " · oleh sekatan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": " · 利用制限による操作"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": " · oleh pembatasan"
+          }
+        }
+      }
+    },
+    " · by an automation": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": " · oleh automasi"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": " · 自動化による操作"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": " · oleh otomasi"
+          }
+        }
+      }
+    },
+    " · by someone else": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": " · oleh orang lain"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": " · 他の人が操作"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": " · oleh orang lain"
+          }
+        }
+      }
+    },
+    " · by you": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": " · oleh anda"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": " · あなたが操作"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": " · oleh Anda"
+          }
+        }
+      }
+    },
+    " · technician test run": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": " · ujian oleh juruteknik"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": " · 技術者のテスト運転"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": " · uji coba teknisi"
+          }
+        }
+      }
+    },
     "{field} — {problem}": {
       "extractionState": "manual",
       "localizations": {
@@ -254,6 +369,52 @@
         }
       }
     },
+    "{result}. The AC keeps its confirmed setting; check it and send again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{result}. AC kekal pada tetapan yang disahkan; semak dan hantar semula."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{result}。エアコンは確定済みの設定のままです。確認してからもう一度送ってください。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{result}. AC tetap pada pengaturan yang dikonfirmasi; periksa lalu kirim lagi."
+          }
+        }
+      }
+    },
+    "{s} s left": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "tinggal {s} s"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "残り {s} 秒"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "tersisa {s} dtk"
+          }
+        }
+      }
+    },
     "A capability for this manufacturer and model exists already": {
       "extractionState": "manual",
       "localizations": {
@@ -323,6 +484,29 @@
         }
       }
     },
+    "a service restriction limits this setting": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "sekatan perkhidmatan mengehadkan tetapan ini"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "サービス利用制限により、この設定は変更できません"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "pembatasan layanan membatasi pengaturan ini"
+          }
+        }
+      }
+    },
     "Accepted": {
       "extractionState": "manual",
       "localizations": {
@@ -342,6 +526,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Diterima"
+          }
+        }
+      }
+    },
+    "acknowledged by device": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "disahkan oleh peranti"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "デバイスが受け付けました"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dikonfirmasi perangkat"
           }
         }
       }
@@ -461,6 +668,52 @@
         }
       }
     },
+    "another command is still waiting for this AC": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "arahan lain masih menunggu untuk AC ini"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このエアコンに別のコマンドがまだ待機中です"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "perintah lain masih menunggu AC ini"
+          }
+        }
+      }
+    },
+    "another command was still running": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "arahan lain masih berjalan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "別のコマンドを実行中でした"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "perintah lain masih berjalan"
+          }
+        }
+      }
+    },
     "Another device already has this MQTT node ID": {
       "extractionState": "manual",
       "localizations": {
@@ -530,6 +783,29 @@
         }
       }
     },
+    "Apply restriction: {policy}": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kenakan sekatan: {policy}"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "制限を適用: {policy}"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terapkan pembatasan: {policy}"
+          }
+        }
+      }
+    },
     "Assigned": {
       "extractionState": "manual",
       "localizations": {
@@ -572,6 +848,52 @@
           "stringUnit": {
             "state": "translated",
             "value": "Setidaknya satu keanggotaan aktif harus mempertahankan “Ubah pengguna & peran” — berikan kepada keanggotaan HQ lain lebih dulu, lalu ubah yang ini"
+          }
+        }
+      }
+    },
+    "Cancel": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Batal"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "キャンセル"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Batal"
+          }
+        }
+      }
+    },
+    "cancelled": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dibatalkan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "キャンセル済み"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dibatalkan"
           }
         }
       }
@@ -622,6 +944,29 @@
         }
       }
     },
+    "Command history": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sejarah arahan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "コマンド履歴"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riwayat perintah"
+          }
+        }
+      }
+    },
     "Completed": {
       "extractionState": "manual",
       "localizations": {
@@ -641,6 +986,52 @@
           "stringUnit": {
             "state": "translated",
             "value": "Selesai"
+          }
+        }
+      }
+    },
+    "Confirm command": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sahkan arahan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "コマンドの確認"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Konfirmasi perintah"
+          }
+        }
+      }
+    },
+    "Confirmed setting": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tetapan disahkan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "確認済みの設定"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pengaturan terkonfirmasi"
           }
         }
       }
@@ -691,6 +1082,52 @@
         }
       }
     },
+    "Controls disabled while offline": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kawalan dimatikan semasa di luar talian"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "オフライン中は操作できません"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kontrol dinonaktifkan saat offline"
+          }
+        }
+      }
+    },
+    "Cool": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sejuk"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "冷房"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dingin"
+          }
+        }
+      }
+    },
     "Customer": {
       "extractionState": "manual",
       "localizations": {
@@ -710,6 +1147,52 @@
           "stringUnit": {
             "state": "translated",
             "value": "Pelanggan"
+          }
+        }
+      }
+    },
+    "Dismiss": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tutup"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "閉じる"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tutup"
+          }
+        }
+      }
+    },
+    "Dry": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kering"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "除湿"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kering"
           }
         }
       }
@@ -756,6 +1239,144 @@
           "stringUnit": {
             "state": "translated",
             "value": "Error"
+          }
+        }
+      }
+    },
+    "failed": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "gagal"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "失敗"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "gagal"
+          }
+        }
+      }
+    },
+    "Failed": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gagal"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "失敗"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gagal"
+          }
+        }
+      }
+    },
+    "Fan": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kipas"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "送風"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kipas"
+          }
+        }
+      }
+    },
+    "Fan → {fan}": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kipas → {fan}"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "風量 → {fan}"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kipas → {fan}"
+          }
+        }
+      }
+    },
+    "Fan speed": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kelajuan kipas"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "風量"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kecepatan kipas"
+          }
+        }
+      }
+    },
+    "High": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tinggi"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "強"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tinggi"
           }
         }
       }
@@ -825,6 +1446,52 @@
           "stringUnit": {
             "state": "translated",
             "value": "HQ belum menetapkan lokasi tempat ini — check-in manual dengan alasan"
+          }
+        }
+      }
+    },
+    "HQ is checking this AC": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HQ sedang menyemak AC ini"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本部がこのエアコンを確認中です"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HQ sedang memeriksa AC ini"
+          }
+        }
+      }
+    },
+    "Humidity": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kelembapan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "湿度"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kelembapan"
           }
         }
       }
@@ -921,6 +1588,144 @@
         }
       }
     },
+    "Low": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rendah"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "弱"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rendah"
+          }
+        }
+      }
+    },
+    "Lower the temperature": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turunkan suhu"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "温度を下げる"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turunkan suhu"
+          }
+        }
+      }
+    },
+    "Mid": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sederhana"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "中"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sedang"
+          }
+        }
+      }
+    },
+    "missing": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "tiada"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "欠測"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "hilang"
+          }
+        }
+      }
+    },
+    "Mode": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mod"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "モード"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mode"
+          }
+        }
+      }
+    },
+    "Mode → {mode}": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mod → {mode}"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "モード → {mode}"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mode → {mode}"
+          }
+        }
+      }
+    },
     "No ACs in your account yet.": {
       "extractionState": "manual",
       "localizations": {
@@ -940,6 +1745,98 @@
           "stringUnit": {
             "state": "translated",
             "value": "Belum ada AC di akun Anda."
+          }
+        }
+      }
+    },
+    "no answer from the AC in time": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "tiada jawapan daripada AC tepat pada masanya"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "時間内にエアコンから応答がありませんでした"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "tidak ada jawaban dari AC tepat waktu"
+          }
+        }
+      }
+    },
+    "No answer yet — checking the result…": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Belum ada jawapan — menyemak keputusan…"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "まだ応答がありません — 結果を確認しています…"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Belum ada jawaban — memeriksa hasil…"
+          }
+        }
+      }
+    },
+    "No change yet": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Belum ada perubahan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "まだ変更はありません"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Belum ada perubahan"
+          }
+        }
+      }
+    },
+    "No commands for this AC yet": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Belum ada arahan untuk AC ini"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このエアコンへのコマンドはまだありません"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Belum ada perintah untuk AC ini"
           }
         }
       }
@@ -967,6 +1864,29 @@
         }
       }
     },
+    "no device response (expired)": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "tiada respons peranti (tamat tempoh)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "デバイスの応答なし（期限切れ）"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "perangkat tidak merespons (kedaluwarsa)"
+          }
+        }
+      }
+    },
     "No jobs yet": {
       "extractionState": "manual",
       "localizations": {
@@ -986,6 +1906,75 @@
           "stringUnit": {
             "state": "translated",
             "value": "Belum ada pekerjaan"
+          }
+        }
+      }
+    },
+    "no recent measurement": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "tiada ukuran terkini"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最近の測定値なし"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "tidak ada pengukuran terbaru"
+          }
+        }
+      }
+    },
+    "Not sent: {reason}": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak dihantar: {reason}"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "送信できませんでした: {reason}"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak terkirim: {reason}"
+          }
+        }
+      }
+    },
+    "observed {at}": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "diperhatikan {at}"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "観測: {at}"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "diamati {at}"
           }
         }
       }
@@ -1128,6 +2117,29 @@
         }
       }
     },
+    "Only {name} changes. The result shows after the device acknowledges.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hanya {name} berubah. Keputusan dipaparkan selepas peranti mengesahkan."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "変更されるのは {name} のみです。結果はデバイスが受け付けたあとに表示されます。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hanya {name} yang berubah. Hasil ditampilkan setelah perangkat mengonfirmasi."
+          }
+        }
+      }
+    },
     "Only a failed or skipped device can be retried": {
       "extractionState": "manual",
       "localizations": {
@@ -1243,6 +2255,52 @@
         }
       }
     },
+    "Power": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kuasa"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "電源"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Daya"
+          }
+        }
+      }
+    },
+    "Power off": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Matikan kuasa"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "電源オフ"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Daya mati"
+          }
+        }
+      }
+    },
     "Power unknown": {
       "extractionState": "manual",
       "localizations": {
@@ -1289,6 +2347,98 @@
         }
       }
     },
+    "Raise the temperature": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Naikkan suhu"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "温度を上げる"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Naikkan suhu"
+          }
+        }
+      }
+    },
+    "REMOTE CONTROL": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "KAWALAN JAUH"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "遠隔操作"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "KONTROL JARAK JAUH"
+          }
+        }
+      }
+    },
+    "Remote control is paused while HQ checks this AC’s restriction state. Try again later.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kawalan jauh dijeda semasa HQ menyemak status sekatan AC ini. Cuba lagi kemudian."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本部がこのエアコンの利用制限の状態を確認しているため、遠隔操作を一時停止しています。しばらくしてからもう一度お試しください。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kontrol jarak jauh dijeda selama HQ memeriksa status pembatasan AC ini. Coba lagi nanti."
+          }
+        }
+      }
+    },
+    "Remove restriction": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tarik balik sekatan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "制限を解除"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hapus pembatasan"
+          }
+        }
+      }
+    },
     "Repair": {
       "extractionState": "manual",
       "localizations": {
@@ -1308,6 +2458,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Perbaikan"
+          }
+        }
+      }
+    },
+    "requested": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "diminta"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "依頼済み"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "diminta"
           }
         }
       }
@@ -1335,6 +2508,29 @@
         }
       }
     },
+    "Review & send": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Semak & hantar"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "確認して送信"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tinjau & kirim"
+          }
+        }
+      }
+    },
     "Rework requested": {
       "extractionState": "manual",
       "localizations": {
@@ -1354,6 +2550,213 @@
           "stringUnit": {
             "state": "translated",
             "value": "Pengerjaan ulang diminta"
+          }
+        }
+      }
+    },
+    "Room temperature (measured)": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Suhu bilik (diukur)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "室温（実測）"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Suhu ruangan (terukur)"
+          }
+        }
+      }
+    },
+    "Send to {name}": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hantar ke {name}"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{name} に送信"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kirim ke {name}"
+          }
+        }
+      }
+    },
+    "Service restriction active — payment-related: this AC is kept off until the release is confirmed.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sekatan perkhidmatan aktif — berkaitan bayaran: AC ini kekal dimatikan sehingga pelepasan disahkan."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "サービス利用制限中（支払い関連）: 解除が確認されるまで、このエアコンはオフのままです。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pembatasan layanan aktif — terkait pembayaran: AC ini dimatikan sampai pencabutan dikonfirmasi."
+          }
+        }
+      }
+    },
+    "Set fan {level}": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tetapkan kipas {level}"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "風量を {level} に設定"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Atur kipas {level}"
+          }
+        }
+      }
+    },
+    "Set mode {mode}": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tetapkan mod {mode}"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "モードを {mode} に設定"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Atur mode {mode}"
+          }
+        }
+      }
+    },
+    "Set temperature": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tetapkan suhu"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "温度を設定"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Atur suhu"
+          }
+        }
+      }
+    },
+    "Set temperature {celsius}°C": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tetapkan suhu {celsius}°C"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "温度を {celsius}°C に設定"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Atur suhu {celsius}°C"
+          }
+        }
+      }
+    },
+    "Set temperature {from}°C → {to}°C": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tetapkan suhu {from}°C → {to}°C"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "温度を {from}°C → {to}°C に設定"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Atur suhu {from}°C → {to}°C"
+          }
+        }
+      }
+    },
+    "Set ventilation {level}": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tetapkan pengudaraan {level}"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "換気を {level} に設定"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Atur ventilasi {level}"
           }
         }
       }
@@ -1427,6 +2830,29 @@
         }
       }
     },
+    "stale": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "lapuk"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "古いデータ"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "usang"
+          }
+        }
+      }
+    },
     "Submitted": {
       "extractionState": "manual",
       "localizations": {
@@ -1446,6 +2872,52 @@
           "stringUnit": {
             "state": "translated",
             "value": "Diserahkan"
+          }
+        }
+      }
+    },
+    "suspect": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "diragui"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "要確認"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "meragukan"
+          }
+        }
+      }
+    },
+    "Target: {name} only · you will confirm before sending": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sasaran: {name} sahaja · anda akan mengesahkan sebelum menghantar"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "対象: {name} のみ · 送信前に確認します"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Target: hanya {name} · Anda akan mengonfirmasi sebelum mengirim"
           }
         }
       }
@@ -1473,6 +2945,29 @@
         }
       }
     },
+    "Temperature limit — cooling setpoint ≥ {value} °C": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Had suhu — suhu tetapan penyejukan ≥ {value} °C"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "温度の制限 — 冷房の設定温度は {value} °C 以上"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Batas suhu — setpoint pendinginan ≥ {value} °C"
+          }
+        }
+      }
+    },
     "The 24-hour undo period for this import has ended": {
       "extractionState": "manual",
       "localizations": {
@@ -1492,6 +2987,75 @@
           "stringUnit": {
             "state": "translated",
             "value": "Masa pembatalan 24 jam untuk impor ini telah berakhir"
+          }
+        }
+      }
+    },
+    "the AC refused it": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AC menolaknya"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "エアコンが受け付けませんでした"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AC menolaknya"
+          }
+        }
+      }
+    },
+    "the AC reported a fault": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AC melaporkan kerosakan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "エアコンが異常を報告しました"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AC melaporkan kerusakan"
+          }
+        }
+      }
+    },
+    "the AC was offline": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AC berada di luar talian"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "エアコンがオフラインでした"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AC sedang offline"
           }
         }
       }
@@ -1745,6 +3309,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Layanan masuk tidak tersedia — coba lagi sebentar lagi"
+          }
+        }
+      }
+    },
+    "this AC changed — reload and try again": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AC ini telah berubah — muat semula dan cuba lagi"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このエアコンが変更されました。再読み込みしてもう一度お試しください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AC ini berubah — muat ulang dan coba lagi"
           }
         }
       }
@@ -2738,6 +4325,29 @@
         }
       }
     },
+    "Undo": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Buat asal"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "元に戻す"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Urungkan"
+          }
+        }
+      }
+    },
     "Units still use this model — change their model first": {
       "extractionState": "manual",
       "localizations": {
@@ -2757,6 +4367,52 @@
           "stringUnit": {
             "state": "translated",
             "value": "Unit masih memakai model ini — ubah model mereka lebih dulu"
+          }
+        }
+      }
+    },
+    "waiting for device": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "menunggu peranti"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "デバイスの応答待ち"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "menunggu perangkat"
+          }
+        }
+      }
+    },
+    "Waiting for the AC to confirm… The result shows only after it acknowledges.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Menunggu AC mengesahkan… Keputusan dipaparkan hanya selepas ia mengakui."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "エアコンの確認を待っています… 結果はエアコンが受け付けてから表示されます。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Menunggu AC mengonfirmasi… Hasil ditampilkan hanya setelah AC menerimanya."
           }
         }
       }

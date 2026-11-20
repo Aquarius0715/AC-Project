@@ -105,6 +105,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 0.654.0 (2026-11-16): IR811: from Turn off running ACs, one link opens an after-hours rule with the same ACs.
 0.657.0 (2026-11-16): IR814: a customer pins ACs to the Overview from their pages (this browser only).
 0.658.0 (2026-11-16): IR815: Energy & cost opens on the AC that used the most in the period.
+0.678.0 (2026-11-20): IR862 (DEC-112): AC Customer controls an AC (power after a confirmation; setpoint, mode and fan reviewed and sent; each command followed until the AC answers; undo; command history) and shows the membership's language and time zone; the contract names the failure codes of a command (CommandFailureCode: DEVICE_REJECTED, which the API already wrote).
 0.677.0 (2026-11-20): IR861 (DEC-112): the iOS apps' project: service/ios (ACKit package, two SwiftUI apps from project.yml), Swift contract types, operations and texts generated from the contract, the catalog and the web dictionaries, tests at 100 % of lines and functions with UI tests and the accessibility audit, CI job ios.
 0.676.0 (2026-11-20): IR860 (DEC-112): the iOS apps' foundation: Keycloak public clients ac-customer-ios and ac-technician-ios (PKCE), the Core API accepts their tokens, and the shared test environment publishes the gateway's /v1/ on web-edge port 3205.
 0.675.0 (2026-11-19): IR859: an HQ installation job shows the HQ request badge on the technician overview and the contractor's Jobs, job offer and Job history screens (it read Client request).

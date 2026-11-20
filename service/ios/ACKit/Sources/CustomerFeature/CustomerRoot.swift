@@ -13,13 +13,15 @@ public struct CustomerRoot: View {
     }
 
     public var body: some View {
-        content.tint(Brand.primary)
+        // the membership's language rebuilds the screens in it once preferences.get has answered
+        content.tint(Brand.primary).id(session.language)
     }
 
     @ViewBuilder private var content: some View {
         switch session.state {
         case .signedIn:
             UnitsView(model: UnitsModel(client: session.client), session: session)
+                .task { await session.applyPreferences() }
         case .signedOut, .signingIn:
             SignInView(title: tr("Customer"), model: session, web: web)
         }
@@ -42,15 +44,17 @@ struct UnitsView: View {
                     Text(verbatim: message).foregroundStyle(.red).accessibilityIdentifier("units.message")
                 }
                 ForEach(model.units.value ?? []) { unit in
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(verbatim: unit.name).font(.headline)
-                        HStack(spacing: 8) {
-                            Text(verbatim: unit.power)
-                            Text(verbatim: unit.connection)
+                    NavigationLink(value: unit.id) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(verbatim: unit.name).font(.headline)
+                            HStack(spacing: 8) {
+                                Text(verbatim: unit.power)
+                                Text(verbatim: unit.connection)
+                            }
+                            .font(.subheadline)
                         }
-                        .font(.subheadline)
+                        .accessibilityElement(children: .combine)
                     }
-                    .accessibilityElement(children: .combine)
                     .accessibilityIdentifier("unit.\(unit.id)")
                 }
                 if case .loaded([]) = model.units {
@@ -65,6 +69,9 @@ struct UnitsView: View {
             .inlineTitle()
             .refreshable { await model.load() }
             .task { await model.load() }
+            .navigationDestination(for: String.self) { id in
+                UnitDetailView(model: UnitControlModel(unitId: id, client: session.client, me: session.membershipId))
+            }
         }
     }
 }

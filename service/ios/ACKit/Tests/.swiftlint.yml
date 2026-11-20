@@ -1,0 +1,2 @@
+# The tests (CLAUDE.md 4.2: tests are not held to the size limits): a case's data and its expectations stay together.
+disabled_rules: [file_length, type_body_length, function_body_length]

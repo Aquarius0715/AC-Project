@@ -8,6 +8,7 @@ final class TechnicianUITests: XCTestCase {
     }
 
     /// The app in a display language (English unless the test says otherwise: the device's own may be any).
+    @MainActor
     private func launch(_ environment: [String: String], language: String = "en") -> XCUIApplication {
         let app = XCUIApplication()
         app.launchEnvironment = environment
@@ -56,11 +57,17 @@ final class TechnicianUITests: XCTestCase {
     func testLiveSignInToTheDevStack() throws {
         try XCTSkipUnless(ProcessInfo.processInfo.environment["AC_UI_LIVE"] == "1", "the dev stack's live test (TEST_RUNNER_AC_UI_LIVE=1)")
         let app = launch([:])
+        // a session a run before kept in the Keychain: signed out first, so the sign-in is this run's
+        // (the list may be long: its last row, Sign out, is loaded once scrolled to)
+        if app.navigationBars["Jobs"].waitForExistence(timeout: 3) { tapScrolling(app.buttons["signOut"], in: app) }
+        XCTAssertTrue(app.buttons["signIn.button"].waitForExistence(timeout: 10))
         app.buttons["signIn.button"].tap()
         LiveSignIn.signIn(user: "tech-external-a")
         XCTAssertTrue(app.navigationBars["Jobs"].waitForExistence(timeout: 20))
+        // the Core API took the list's query: a refusal would show its line instead of the rows (sort=name, 2026-11-20)
+        XCTAssertFalse(app.staticTexts["jobs.message"].waitForExistence(timeout: 3), "the list shows a refusal")
         XCTAssertTrue(app.cells.firstMatch.waitForExistence(timeout: 20))
-        app.buttons["signOut"].tap()
+        tapScrolling(app.buttons["signOut"], in: app)
         XCTAssertTrue(app.buttons["signIn.button"].waitForExistence(timeout: 10))
     }
 }

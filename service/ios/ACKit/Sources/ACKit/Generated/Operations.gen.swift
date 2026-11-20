@@ -10,7 +10,7 @@ public enum Ops {}
 extension Ops {
 public enum AlertsAcknowledge: CoreOperation {
   public typealias Input = ACKit.AlertsAcknowledgeInput
-  public typealias Result = ACKit.Alert
+  public typealias Result = ACKit.CoreAlert
   public static let name = "alerts.acknowledge"
   public static let isWrite = true
   public static let routes: [CoreRoute] = [.init(method: .post, path: "/v1/alerts/{alertId}/acknowledge")]
@@ -32,7 +32,7 @@ public enum AlertsEvidence: CoreOperation {
 extension Ops {
 public enum AlertsGet: CoreOperation {
   public typealias Input = ACKit.AlertsGetInput
-  public typealias Result = ACKit.Alert
+  public typealias Result = ACKit.CoreAlert
   public static let name = "alerts.get"
   public static let isWrite = false
   public static let routes: [CoreRoute] = [.init(method: .get, path: "/v1/alerts/{id}")]
@@ -43,7 +43,7 @@ public enum AlertsGet: CoreOperation {
 extension Ops {
 public enum AlertsList: CoreOperation {
   public typealias Input = ACKit.Query
-  public typealias Result = ACKit.Page<ACKit.Alert>
+  public typealias Result = ACKit.Page<ACKit.CoreAlert>
   public static let name = "alerts.list"
   public static let isWrite = false
   public static let routes: [CoreRoute] = [.init(method: .get, path: "/v1/alerts")]
@@ -54,7 +54,7 @@ public enum AlertsList: CoreOperation {
 extension Ops {
 public enum AlertsResolve: CoreOperation {
   public typealias Input = ACKit.AlertsResolveInput
-  public typealias Result = ACKit.Alert
+  public typealias Result = ACKit.CoreAlert
   public static let name = "alerts.resolve"
   public static let isWrite = true
   public static let routes: [CoreRoute] = [.init(method: .post, path: "/v1/alerts/{alertId}/resolve")]
@@ -428,7 +428,7 @@ public enum JobsSubmit: CoreOperation {
 extension Ops {
 public enum NotificationsList: CoreOperation {
   public typealias Input = ACKit.Query
-  public typealias Result = ACKit.Page<ACKit.Notification>
+  public typealias Result = ACKit.Page<ACKit.CoreNotification>
   public static let name = "notifications.list"
   public static let isWrite = false
   public static let routes: [CoreRoute] = [.init(method: .get, path: "/v1/notifications")]
@@ -450,7 +450,7 @@ public enum NotificationsMarkAllRead: CoreOperation {
 extension Ops {
 public enum NotificationsMarkRead: CoreOperation {
   public typealias Input = ACKit.NotificationsMarkReadInput
-  public typealias Result = ACKit.Notification
+  public typealias Result = ACKit.CoreNotification
   public static let name = "notifications.markRead"
   public static let isWrite = true
   public static let routes: [CoreRoute] = [.init(method: .post, path: "/v1/notifications/{id}/mark-read")]
