@@ -17,6 +17,23 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/ops"
 )
 
+// testClient is an HTTP client with a transport of its own. With http.DefaultTransport the parallel tests would share
+// one pool, and every httptest.Server.Close closes that pool's idle connections, which breaks a request another test
+// is just sending on one ("connection broken: http: CloseIdleConnections called").
+func testClient(t *testing.T) *http.Client {
+	t.Helper()
+
+	transport := new(http.Transport)
+	t.Cleanup(transport.CloseIdleConnections)
+
+	return &http.Client{
+		Timeout:       5 * time.Second,
+		Transport:     transport,
+		CheckRedirect: nil,
+		Jar:           nil,
+	}
+}
+
 // TestFetchWaitingReadsTheRequestedCommands: the internal query is called with the token and the tenant, and its rows
 // come back as the waiting commands; a refused token, a bad answer and a dead API are errors.
 func TestFetchWaitingReadsTheRequestedCommands(t *testing.T) {
@@ -49,7 +66,7 @@ func TestFetchWaitingReadsTheRequestedCommands(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := &http.Client{Timeout: 5 * time.Second, Transport: nil, CheckRedirect: nil, Jar: nil}
+	client := testClient(t)
 
 	got, err := fetchWaiting(t.Context(), client, srv.URL, testToken, "t1")
 	if err != nil || len(got) != 1 || got[0].ID != commandID {
@@ -100,7 +117,7 @@ func TestDemoClockFollowsTheScenarioClock(t *testing.T) {
 
 	clock := &demoClock{
 		api: srv.URL,
-		c:   &http.Client{Timeout: 5 * time.Second, Transport: nil, CheckRedirect: nil, Jar: nil},
+		c:   testClient(t),
 		mu:  sync.Mutex{},
 		off: 0,
 	}
@@ -150,7 +167,7 @@ func TestSendReportsRefusals(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := &http.Client{Timeout: 5 * time.Second, Transport: nil, CheckRedirect: nil, Jar: nil}
+	client := testClient(t)
 
 	trigger := iotbridge.Trigger{
 		EventID:     uuid.New(),
