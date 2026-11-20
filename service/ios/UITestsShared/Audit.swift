@@ -61,15 +61,27 @@ extension XCTestCase {
         let top = window.minY + 120
         // the on-screen keyboard, when it is up, covers the screen's lower part as the home indicator does
         let keyboard = app.keyboards.firstMatch
-        let bottom = keyboard.exists ? keyboard.frame.minY - 20 : window.maxY - 100
+        var bottom: CGFloat { keyboard.exists ? keyboard.frame.minY : window.maxY - 100 }
+        // a tap on anything but a field puts the keyboard away first, as a person does: on iOS 26 its Done bar floats
+        // over the content just above it
+        let done = { app.buttons.matching(identifier: "keyboard.done").allElementsBoundByIndex.first { $0.isHittable } }
+        if keyboard.exists, ![.textField, .textView].contains(element.elementType), let button = done() {
+            button.tap()
+            _ = XCTWaiter().wait(
+                for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: keyboard)],
+                timeout: 2
+            )
+        }
         for _ in 0..<6 {
             guard element.exists else {
                 app.swipeUp()
                 continue
             }
             if element.frame.maxY > bottom {
-                // above the keyboard when it is up: a swipe on it does not move the screen
-                if keyboard.exists { drag(app, from: 0.35, to: 0.1) } else { app.swipeUp() }
+                // the keyboard covers it: put away first with its Done button (a drag above it can start on a field,
+                // which selects text instead of scrolling)
+                // the screen under a sheet keeps its own Done button: the one that can be tapped is the sheet's
+                if keyboard.exists, let button = done() { button.tap() } else { app.swipeUp() }
             } else if element.frame.minY < top {
                 // a short, slow pull: a swipe down on a sheet scrolled to its top closes the sheet
                 drag(app, from: 0.45, to: 0.6)
@@ -99,6 +111,16 @@ extension XCTestCase {
         if !hasFocus() { field.coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: 0.2)).tap() }
         XCTAssertTrue(hasFocus(), "\(field) has the keyboard focus")
         field.typeText(text)
+    }
+
+    /// Replaces a field's text: the cursor to its end, every character deleted, then the new text typed (a tap puts the
+    /// cursor where it lands, so deleting a few characters could take the wrong ones).
+    @MainActor
+    func replace(_ text: String, in field: XCUIElement, in app: XCUIApplication) {
+        let old = (field.value as? String) ?? ""
+        type("", into: field, in: app)
+        field.coordinate(withNormalizedOffset: CGVector(dx: 0.98, dy: 0.5)).tap()
+        field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: old.count) + text)
     }
 
     /// A drag on the screen from one height to another (fractions of the window, from the top).

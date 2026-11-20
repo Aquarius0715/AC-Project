@@ -3,7 +3,7 @@ import ACKit
 import Foundation
 
 /// The alert of the UI tests' AC u1 (AC_UI_TEST=stub): open, then acknowledged and resolved as the Core API would; its
-/// one evidence candidate; and the technician's session, who may resolve alerts.
+/// one evidence candidate; and the technician's session, who may resolve alerts and run diagnostics.
 final class StubAlerts {
     private var alert = StubUnitData.alert
 
@@ -58,7 +58,7 @@ final class StubAlerts {
                 organizationName: "HQ",
                 organizationId: "o1",
                 customerId: nil,
-                permissions: [.alertResolve],
+                permissions: [.alertResolve, .controlDiagnose],
                 generation: 1,
                 viewEpoch: 1,
                 issuedAt: StubUnitData.at(3600),

@@ -9,13 +9,28 @@ step() { printf '\n== %s\n' "$1"; }
 sh scripts/tools.sh
 sources="ACKit/Sources ACKit/Tests ACKit/Package.swift CustomerApp TechnicianApp CustomerUITests TechnicianUITests UITestsShared"
 
-step "SwiftLint"
-.tools/swiftlint/swiftlint lint --strict --quiet
-step "swift-format"
-# shellcheck disable=SC2086 # the source list is split on purpose
-swift format lint --strict -r $sources
-step "unit tests and coverage"
-sh scripts/coverage.sh
+part=${1:-all}
+case "$part" in all | lint | unit | ui) ;; *) echo "usage: check.sh [all | lint | unit | ui <scheme> [k/n]]" >&2; exit 2 ;; esac
+
+if [ "$part" = all ] || [ "$part" = lint ]; then
+  step "SwiftLint"
+  .tools/swiftlint/swiftlint lint --strict --quiet
+  step "swift-format"
+  # shellcheck disable=SC2086 # the source list is split on purpose
+  swift format lint --strict -r $sources
+fi
+if [ "$part" = all ] || [ "$part" = unit ]; then
+  step "unit tests and coverage"
+  sh scripts/coverage.sh
+fi
+[ "$part" = all ] || [ "$part" = ui ] || { echo "iOS $part checks passed"; exit 0; }
+# the UI tests: both apps, or one (CI runs each, and the Technician's in two halves, as parallel jobs)
+schemes="CustomerApp TechnicianApp"
+shard=""
+if [ "$part" = ui ]; then
+  schemes=${2:?"check.sh ui <scheme> [k/n]"}
+  shard=${3:-}
+fi
 step "UI tests (stub)"
 .tools/xcodegen/xcodegen/bin/xcodegen generate --spec project.yml --quiet
 # the first available iPhone simulator of the installed runtimes (the runner's and a Mac's differ) that Xcode also offers
@@ -38,8 +53,18 @@ trap 'rm -f "$log"' EXIT
 # each app's result bundle (screenshots, the screen recording, the element tree of a failure) is kept in results/, which
 # CI uploads when a test fails: a runner's iOS may differ from this Mac's, and its log says only which check failed
 rm -rf results && mkdir -p results
-for scheme in CustomerApp TechnicianApp; do
-  if ! xcodebuild -project AC.xcodeproj -scheme "$scheme" -destination "platform=iOS Simulator,id=$device_id" test \
+# one of n groups of an app's tests (k/n): its test methods in file order, every n-th from the k-th
+only=""
+if [ -n "$shard" ]; then
+  k=${shard%/*}
+  n=${shard#*/}
+  target=$(echo "$schemes" | sed 's/App$//')UITests
+  only=$(grep -o 'func test[A-Za-z0-9]*' "$target/$target.swift" | sed 's/func //' |
+    awk -v k="$k" -v n="$n" -v t="$target" '(NR - 1) % n == k - 1 { printf "-only-testing:%s/%s/%s ", t, t, $0 }')
+fi
+for scheme in $schemes; do
+  # shellcheck disable=SC2086 # the -only-testing options are split on purpose
+  if ! xcodebuild -project AC.xcodeproj -scheme "$scheme" -destination "platform=iOS Simulator,id=$device_id" test $only \
     -resultBundlePath "results/$scheme.xcresult" >"$log" 2>&1; then
     grep -E "error:|Test Case .* failed|accessibility audit|^(Contrast|Dynamic Type|Hit area|Text clipped|Element)" "$log" || tail -n 60 "$log"
     echo "$scheme: UI tests failed on $device" >&2

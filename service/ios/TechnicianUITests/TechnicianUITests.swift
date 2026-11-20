@@ -79,7 +79,7 @@ final class TechnicianUITests: XCTestCase {
                 label: "The scanned QR label is not this job's unit — scan the label on this AC, or check in manually with a reason"
             )
         )
-        type(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 2) + "u1", into: qr, in: app)
+        replace("ac-unit:u1", in: qr, in: app)
         tapScrolling(submit, in: app)
         XCTAssertTrue(wait(for: app.staticTexts["job.note"], label: "Checked in — the job has started"))
         XCTAssertTrue(app.staticTexts["In progress"].exists || app.navigationBars.staticTexts.firstMatch.label.contains("In progress"))
@@ -229,6 +229,33 @@ final class TechnicianUITests: XCTestCase {
         scrollToTop(app)
         try app.audit()
         keepScreenshot("alert-resolved", of: app)
+    }
+
+    @MainActor
+    func testADiagnosticCommandAndATestRunAreSentForTheJob() throws {
+        let app = openJob()
+        tapScrolling(app.buttons["job.diagnostics"], in: app)
+        let send = app.buttons["control.send"]
+        XCTAssertTrue(send.waitForExistence(timeout: 5))
+        try app.audit()
+        keepScreenshot("control", of: app)
+        tapScrolling(send, in: app)
+        XCTAssertTrue(wait(for: app.staticTexts["control.error.reason"], label: "Reason is required (1–1000 characters)"))
+        type("Check the compressor starts", into: field("control.reason", in: app), in: app)
+        tapScrolling(send, in: app)
+        XCTAssertTrue(wait(for: app.staticTexts["control.note"], label: "dc1 sent — waiting for the device"))
+        XCTAssertTrue(app.descendants(matching: .any)["control.history.dc1"].waitForExistence(timeout: 5))
+
+        type("Cooling for five minutes", into: field("control.run.reason", in: app), in: app)
+        tapScrolling(app.buttons["control.run.submit"], in: app)
+        XCTAssertTrue(wait(for: app.staticTexts["control.note"], label: "Test run requested — waiting for the start acknowledgement"))
+        XCTAssertTrue(
+            app.staticTexts["End acknowledged — test run completed"].waitForExistence(timeout: 10),
+            "stopped only after the end acknowledgement"
+        )
+        scrollToTop(app)
+        try app.audit()
+        keepScreenshot("control-run", of: app)
     }
 
     @MainActor

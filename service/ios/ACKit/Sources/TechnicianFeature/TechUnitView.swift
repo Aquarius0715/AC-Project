@@ -72,6 +72,19 @@ struct TechUnitView: View {
                 rows(model.periodEvents, empty: tr("No alert or device events in this period."), id: "unit.events")
             }
         }
+        Card(tr("Diagnostic control")) {
+            if let job = model.controlJob {
+                NavigationLink {
+                    ControlView(model: ControlModel(unitId: model.unitId, jobId: job, client: model.client))
+                } label: {
+                    Label(tr("Diagnostics"), systemImage: "stethoscope")
+                }
+                .linkAction()
+                .accessibilityIdentifier("unit.diagnostics")
+            } else {
+                Text(verbatim: tr("Diagnostic control opens for a job you are assigned to on this AC (assigned or in progress)."))
+            }
+        }
         Card(tr("Open alerts ({n})", ["n": String(model.openAlerts.count)])) {
             if model.openAlerts.isEmpty { Text(verbatim: tr("No open alerts.")).accessibilityIdentifier("unit.alerts.empty") }
             ForEach(model.openAlerts) { row in

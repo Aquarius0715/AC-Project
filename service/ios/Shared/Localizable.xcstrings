@@ -553,6 +553,29 @@
         }
       }
     },
+    "{id} sent — waiting for the device": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{id} dihantar — menunggu peranti"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{id} を送信しました — デバイスの応答待ち"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{id} terkirim — menunggu perangkat"
+          }
+        }
+      }
+    },
     "{kind} · no policy — it resolves only with a reason": {
       "extractionState": "manual",
       "localizations": {
@@ -1312,6 +1335,75 @@
         }
       }
     },
+    "1–1000 characters": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1–1000 aksara"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1～1000文字"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1–1000 karakter"
+          }
+        }
+      }
+    },
+    "1–15 minutes": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1–15 minit"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1～15分"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1–15 menit"
+          }
+        }
+      }
+    },
+    "1–15 minutes only. Reason required. Cannot start during firmware updates or an unfinished command.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1–15 minit sahaja. Sebab diperlukan. Tidak boleh bermula semasa kemas kini perisian tegar atau arahan yang belum selesai."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1～15分のみです。理由が必要です。ファームウェアの更新中や、完了していないコマンドがあるときは開始できません。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hanya 1–15 menit. Alasan wajib. Tidak dapat dimulai saat pembaruan firmware atau perintah yang belum selesai."
+          }
+        }
+      }
+    },
     "1h": {
       "extractionState": "manual",
       "localizations": {
@@ -1634,6 +1726,29 @@
         }
       }
     },
+    "A test run lasts 1–15 minutes": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Larian ujian berlangsung 1–15 minit"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "テスト運転は 1～15 分です"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uji coba berlangsung 1–15 menit"
+          }
+        }
+      }
+    },
     "A time you could do instead (optional)": {
       "extractionState": "manual",
       "localizations": {
@@ -1818,6 +1933,29 @@
         }
       }
     },
+    "Acked": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diakui"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "受付済み"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diakui"
+          }
+        }
+      }
+    },
     "Acknowledge": {
       "extractionState": "manual",
       "localizations": {
@@ -1860,6 +1998,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Diakui"
+          }
+        }
+      }
+    },
+    "acknowledged {time}": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "diakui {time}"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{time} に確認済み"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "diakui {time}"
           }
         }
       }
@@ -1929,6 +2090,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Belum diakui siapa pun."
+          }
+        }
+      }
+    },
+    "Action": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tindakan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "動作"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aksi"
           }
         }
       }
@@ -3474,6 +3658,29 @@
         }
       }
     },
+    "Capability v{version} allows: {list}.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Versi keupayaan v{version} membenarkan: {list}."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "機能 v{version} で許可: {list}。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kemampuan v{version} mengizinkan: {list}."
+          }
+        }
+      }
+    },
     "Capability version": {
       "extractionState": "manual",
       "localizations": {
@@ -3911,6 +4118,29 @@
         }
       }
     },
+    "Command history — this job": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sejarah arahan — kerja ini"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "コマンド履歴 — この作業"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riwayat perintah — pekerjaan ini"
+          }
+        }
+      }
+    },
     "Completed": {
       "extractionState": "manual",
       "localizations": {
@@ -4325,6 +4555,29 @@
         }
       }
     },
+    "Connection: {state}.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sambungan: {state}."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "接続: {state}。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Koneksi: {state}."
+          }
+        }
+      }
+    },
     "Connectivity": {
       "extractionState": "manual",
       "localizations": {
@@ -4367,6 +4620,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kontaktor"
+          }
+        }
+      }
+    },
+    "Control is blocked right now ({reason}) — commands and test runs wait until it clears.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kawalan disekat sekarang ({reason}) — arahan dan larian ujian menunggu sehingga ia dikosongkan."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "現在、操作がブロックされています（{reason}）— 解除されるまでコマンドとテスト運転は待機します。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kontrol sedang diblokir ({reason}) — perintah dan uji coba menunggu sampai dibuka."
           }
         }
       }
@@ -4551,6 +4827,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Daya saat ini tidak diketahui · mengubahnya akan mengirim perintah itu"
+          }
+        }
+      }
+    },
+    "Current unit state": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keadaan semasa unit"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ユニットの現在の状態"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Status unit saat ini"
           }
         }
       }
@@ -5199,6 +5498,144 @@
         }
       }
     },
+    "Diagnostic commands and test runs belong to a job you are assigned to, inside its work window — open diagnostic control from the unit or the job.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arahan diagnostik dan larian ujian dimiliki oleh kerja yang ditugaskan kepada anda, dalam tetingkap kerjanya — buka kawalan diagnostik daripada unit atau kerja."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "診断コマンドとテスト運転は、割り当てられた作業の作業時間内で行います — ユニットまたは作業から診断操作を開いてください。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Perintah diagnostik dan uji coba milik pekerjaan yang ditugaskan kepada Anda, di dalam jendela pekerjaannya — buka kontrol diagnostik dari unit atau pekerjaan."
+          }
+        }
+      }
+    },
+    "Diagnostic control": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kawalan diagnostik"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "診断操作"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kontrol diagnostik"
+          }
+        }
+      }
+    },
+    "Diagnostic control needs “Run test runs” on an assigned job. Ask HQ if you should have it.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kawalan diagnostik memerlukan “Jalankan ujian” pada kerja yang ditugaskan. Tanya HQ jika anda sepatutnya memilikinya."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "診断操作には、割り当てられた作業での「試運転の実行」が必要です。必要な場合は本部にご相談ください。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kontrol diagnostik memerlukan “Jalankan uji coba” pada pekerjaan yang ditugaskan. Tanyakan HQ jika Anda seharusnya memilikinya."
+          }
+        }
+      }
+    },
+    "Diagnostic control opens at {time}, when your work window starts.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kawalan diagnostik dibuka pada {time}, apabila tetingkap kerja anda bermula."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "診断操作は、作業時間が始まる {time} に開きます。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kontrol diagnostik terbuka pukul {time}, saat jendela pekerjaan Anda dimulai."
+          }
+        }
+      }
+    },
+    "Diagnostic control opens for a job you are assigned to on this AC (assigned or in progress).": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kawalan diagnostik dibuka untuk kerja yang ditugaskan kepada anda pada AC ini (ditugaskan atau sedang berjalan)."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "診断操作は、このエアコンで割り当てられた作業（割り当て済みまたは作業中）で開きます。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kontrol diagnostik terbuka untuk pekerjaan yang ditugaskan kepada Anda pada AC ini (ditugaskan atau sedang berjalan)."
+          }
+        }
+      }
+    },
+    "Diagnostics": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diagnostik"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "診断"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diagnostik"
+          }
+        }
+      }
+    },
     "Dismiss": {
       "extractionState": "manual",
       "localizations": {
@@ -5218,6 +5655,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tutup"
+          }
+        }
+      }
+    },
+    "Done": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selesai"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "完了"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selesai"
           }
         }
       }
@@ -5406,6 +5866,29 @@
         }
       }
     },
+    "Duration (min)": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tempoh (min)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "時間（分）"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Durasi (mnt)"
+          }
+        }
+      }
+    },
     "e.g. Confirmed on site that airflow is restored after filter cleaning.": {
       "extractionState": "manual",
       "localizations": {
@@ -5521,6 +6004,98 @@
         }
       }
     },
+    "End acknowledged — test run completed": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tamat diakui — larian ujian selesai"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "終了を受け付けました — テスト運転は完了しました"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Akhir dikonfirmasi — uji coba selesai"
+          }
+        }
+      }
+    },
+    "End action": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tindakan tamat"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "終了時の動作"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aksi akhir"
+          }
+        }
+      }
+    },
+    "End blocked — authorization ended before the end time": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tamat disekat — kebenaran tamat sebelum masa tamat"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "終了がブロックされました — 終了時刻の前に権限が終了しました"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Akhir diblokir — otorisasi berakhir sebelum waktu akhir"
+          }
+        }
+      }
+    },
+    "End requested {time} — awaiting device response": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tamat diminta {time} — menunggu respons peranti"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{time} に終了を依頼 — デバイスの応答待ち"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Akhir diminta {time} — menunggu respons perangkat"
+          }
+        }
+      }
+    },
     "Ended {time} · {range}": {
       "extractionState": "manual",
       "localizations": {
@@ -5540,6 +6115,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Berakhir {time} · {range}"
+          }
+        }
+      }
+    },
+    "ends {time}": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "tamat {time}"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{time} に終了"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "berakhir {time}"
           }
         }
       }
@@ -5862,6 +6460,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Gagal"
+          }
+        }
+      }
+    },
+    "failed: {reason}": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "gagal: {reason}"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "失敗：{reason}"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "gagal: {reason}"
           }
         }
       }
@@ -7729,6 +8350,29 @@
         }
       }
     },
+    "min {celsius} °C": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "min {celsius} °C"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下限 {celsius} °C"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "min {celsius} °C"
+          }
+        }
+      }
+    },
     "missed heartbeats — the values are frozen and not shown as live": {
       "extractionState": "manual",
       "localizations": {
@@ -8028,6 +8672,29 @@
         }
       }
     },
+    "Newest first · the device's acknowledgement is the only proof a setting changed": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terbaharu dahulu · pengakuan peranti adalah satu-satunya bukti tetapan berubah"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新しい順 · 設定が変わった証拠になるのは、デバイスの受付だけです"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terbaru dulu · konfirmasi perangkat adalah satu-satunya bukti pengaturan berubah"
+          }
+        }
+      }
+    },
     "no — ask a user with “Resolve alerts”": {
       "extractionState": "manual",
       "localizations": {
@@ -8166,6 +8833,29 @@
         }
       }
     },
+    "no assignment": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "tiada tugasan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "割り当てなし"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "tidak ada penugasan"
+          }
+        }
+      }
+    },
     "No change yet": {
       "extractionState": "manual",
       "localizations": {
@@ -8208,6 +8898,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Belum ada perintah untuk AC ini"
+          }
+        }
+      }
+    },
+    "No commands for this job yet.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Belum ada arahan untuk kerja ini."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この作業へのコマンドはまだありません。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Belum ada perintah untuk pekerjaan ini."
           }
         }
       }
@@ -8346,6 +9059,75 @@
           "stringUnit": {
             "state": "translated",
             "value": "perangkat tidak merespons (kedaluwarsa)"
+          }
+        }
+      }
+    },
+    "No end command is needed.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tiada arahan tamat diperlukan."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "終了コマンドは不要です。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak perlu perintah akhir."
+          }
+        }
+      }
+    },
+    "No end command was sent; the unit may still be running.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tiada arahan tamat dihantar; unit mungkin masih berjalan."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "終了コマンドは送信されていません。ユニットはまだ運転中の可能性があります。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak ada perintah akhir yang dikirim; unit mungkin masih berjalan."
+          }
+        }
+      }
+    },
+    "No end response — the end was not confirmed": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tiada respons tamat — tamat tidak disahkan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "終了の応答なし — 終了は確認されませんでした"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak ada respons akhir — akhir tidak dikonfirmasi"
           }
         }
       }
@@ -8718,6 +9500,29 @@
         }
       }
     },
+    "No response": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tiada respons"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "応答なし"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak ada respons"
+          }
+        }
+      }
+    },
     "No work window": {
       "extractionState": "manual",
       "localizations": {
@@ -8833,6 +9638,29 @@
         }
       }
     },
+    "Normal diagnostic action": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tindakan diagnostik biasa"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通常の診断操作"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aksi diagnostik normal"
+          }
+        }
+      }
+    },
     "Not accepted": {
       "extractionState": "manual",
       "localizations": {
@@ -8902,6 +9730,29 @@
         }
       }
     },
+    "Not confirmed: {reason} · the unit may still be running; check it on site.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak disahkan: {reason} · unit mungkin masih berjalan; periksanya di tapak."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "確認できませんでした：{reason} · ユニットはまだ運転中の可能性があります。現場で確認してください。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak terkonfirmasi: {reason} · unit mungkin masih berjalan; periksa di lokasi."
+          }
+        }
+      }
+    },
     "Not done": {
       "extractionState": "manual",
       "localizations": {
@@ -8921,6 +9772,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tidak dilakukan"
+          }
+        }
+      }
+    },
+    "Not done: {reason} · no end command is needed.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak dilakukan: {reason} · tiada arahan tamat diperlukan."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "実行されませんでした：{reason} · 終了コマンドは不要です。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak dilakukan: {reason} · tidak perlu perintah akhir."
           }
         }
       }
@@ -9063,6 +9937,29 @@
         }
       }
     },
+    "Not sent; your entries are kept. Try again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak dihantar; entri anda disimpan. Cuba lagi."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "送信されませんでした。入力内容は残っています。もう一度お試しください。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak terkirim; isian Anda tetap tersimpan. Coba lagi."
+          }
+        }
+      }
+    },
     "Not sent; your reason is kept. Try again.": {
       "extractionState": "manual",
       "localizations": {
@@ -9174,6 +10071,52 @@
           "stringUnit": {
             "state": "translated",
             "value": "Belum dimulai"
+          }
+        }
+      }
+    },
+    "Not supported by this AC": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak disokong oleh AC ini"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このエアコンは対応していません"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak didukung oleh AC ini"
+          }
+        }
+      }
+    },
+    "Not valid": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak sah"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "無効"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak valid"
           }
         }
       }
@@ -9450,6 +10393,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Waktu di lokasi"
+          }
+        }
+      }
+    },
+    "One end command ({action}) sent. Not shown as Stopped until the device confirms; a browser timer is not proof.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Satu arahan tamat ({action}) dihantar. Tidak dipaparkan sebagai Berhenti sehingga peranti mengesahkan; pemasa pelayar bukan bukti."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "終了コマンド（{action}）を1回送信しました。デバイスが確認するまで「停止」とは表示されません。ブラウザのタイマーは証拠になりません。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Satu perintah akhir ({action}) terkirim. Tidak ditampilkan sebagai Berhenti sampai perangkat mengonfirmasi; timer peramban bukan bukti."
           }
         }
       }
@@ -9822,6 +10788,52 @@
         }
       }
     },
+    "Outside your assignment or work window, or your role has no diagnostic permission.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Di luar tugasan atau tetingkap kerja anda, atau peranan anda tiada kebenaran diagnostik."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "割り当てまたは作業時間の外か、ロールに診断の権限がありません。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Di luar penugasan atau jendela pekerjaan Anda, atau peran Anda tidak memiliki izin diagnostik."
+          }
+        }
+      }
+    },
+    "Outside your work window {window} — diagnostic commands can’t be sent now.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Di luar tetingkap kerja anda {window} — arahan diagnostik tidak boleh dihantar sekarang."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "作業時間 {window} の外です — 今は診断コマンドを送信できません。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Di luar jendela pekerjaan Anda {window} — perintah diagnostik tidak dapat dikirim sekarang."
+          }
+        }
+      }
+    },
     "Part (catalog)": {
       "extractionState": "manual",
       "localizations": {
@@ -10094,6 +11106,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "rencana berkala"
+          }
+        }
+      }
+    },
+    "Permission, work window, capability and restriction are checked again just before sending. The setting changes only after the device acknowledges the command.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kebenaran, tetingkap kerja, keupayaan dan sekatan disemak semula sejurus sebelum menghantar. Tetapan berubah hanya selepas peranti mengakui arahan."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "送信の直前に、権限、作業時間、機能、利用制限を再確認します。設定が変わるのは、デバイスがコマンドを受け付けたあとです。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Izin, jendela pekerjaan, kemampuan, dan pembatasan diperiksa lagi tepat sebelum pengiriman. Pengaturan baru berubah setelah perangkat mengonfirmasi perintah."
           }
         }
       }
@@ -10443,6 +11478,29 @@
         }
       }
     },
+    "power off only": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "matikan kuasa sahaja"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "電源オフのみ"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "hanya daya mati"
+          }
+        }
+      }
+    },
     "Power ON": {
       "extractionState": "manual",
       "localizations": {
@@ -10788,6 +11846,29 @@
         }
       }
     },
+    "Reason is required (1–1000 characters)": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sebab diperlukan (1–1000 aksara)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "理由が必要です（1～1000文字）"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alasan wajib diisi (1–1000 karakter)"
+          }
+        }
+      }
+    },
     "Reason: {reason}": {
       "extractionState": "manual",
       "localizations": {
@@ -11083,6 +12164,52 @@
           "stringUnit": {
             "state": "translated",
             "value": "Register"
+          }
+        }
+      }
+    },
+    "Rejected": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ditolak"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "却下"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ditolak"
+          }
+        }
+      }
+    },
+    "rejected by the device": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ditolak oleh peranti"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "デバイスが拒否しました"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ditolak perangkat"
           }
         }
       }
@@ -11455,6 +12582,29 @@
         }
       }
     },
+    "Required": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diperlukan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "必須"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wajib diisi"
+          }
+        }
+      }
+    },
     "Reschedule requested": {
       "extractionState": "manual",
       "localizations": {
@@ -11635,6 +12785,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Terselesaikan {time} — {reason}."
+          }
+        }
+      }
+    },
+    "Restriction active — {restriction} applies to diagnostics too.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sekatan aktif — {restriction} juga terpakai pada diagnostik."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "利用制限中 — {restriction} は診断にも適用されます。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pembatasan aktif — {restriction} berlaku juga untuk diagnostik."
           }
         }
       }
@@ -11938,6 +13111,29 @@
         }
       }
     },
+    "Room": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bilik"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "部屋"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ruangan"
+          }
+        }
+      }
+    },
     "Room temperature (measured)": {
       "extractionState": "manual",
       "localizations": {
@@ -11957,6 +13153,52 @@
           "stringUnit": {
             "state": "translated",
             "value": "Suhu ruangan (terukur)"
+          }
+        }
+      }
+    },
+    "Running": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Berjalan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "稼働中"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Berjalan"
+          }
+        }
+      }
+    },
+    "Running — ends {end} (start acknowledged {start})": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Berjalan — tamat {end} (permulaan diakui {start})"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "運転中 — {end} に終了（開始は {start} に受付済み）"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Berjalan — berakhir {end} (awal dikonfirmasi {start})"
           }
         }
       }
@@ -12536,6 +13778,29 @@
         }
       }
     },
+    "Setpoint": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Titik set"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "設定温度"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Titik setel"
+          }
+        }
+      }
+    },
     "Showing the latest {n} of {total} readings — earlier readings in this period are not loaded.": {
       "extractionState": "manual",
       "localizations": {
@@ -12881,6 +14146,29 @@
         }
       }
     },
+    "Start action": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tindakan mula"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "開始時の動作"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aksi awal"
+          }
+        }
+      }
+    },
     "Start job (check in)": {
       "extractionState": "manual",
       "localizations": {
@@ -12904,6 +14192,29 @@
         }
       }
     },
+    "Start not acknowledged — the test run did not start": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Permulaan tidak diakui — larian ujian tidak bermula"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "開始が受け付けられませんでした — テスト運転は始まっていません"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Awal tidak dikonfirmasi — uji coba tidak dimulai"
+          }
+        }
+      }
+    },
     "Started": {
       "extractionState": "manual",
       "localizations": {
@@ -12923,6 +14234,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dimulai"
+          }
+        }
+      }
+    },
+    "Starting — waiting for the device": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bermula — menunggu peranti"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "開始中 — デバイスの応答待ち"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Memulai — menunggu perangkat"
           }
         }
       }
@@ -13502,6 +14836,98 @@
         }
       }
     },
+    "test run 1–15 min": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "larian ujian 1–15 min"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "テスト運転 1～15 分"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "uji coba 1–15 mnt"
+          }
+        }
+      }
+    },
+    "test run end ({action})": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "tamat larian ujian ({action})"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "テスト運転の終了（{action}）"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "akhir uji coba ({action})"
+          }
+        }
+      }
+    },
+    "Test run requested — waiting for the start acknowledgement": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Larian ujian diminta — menunggu pengakuan permulaan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "テスト運転を依頼しました — 開始の受付待ち"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uji coba diminta — menunggu konfirmasi awal"
+          }
+        }
+      }
+    },
+    "test run start ({action}, {n} min)": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "permulaan larian ujian ({action}, {n} min)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "テスト運転の開始（{action}、{n} 分）"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "awal uji coba ({action}, {n} mnt)"
+          }
+        }
+      }
+    },
     "The 24-hour undo period for this import has ended": {
       "extractionState": "manual",
       "localizations": {
@@ -13590,6 +15016,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "AC sedang offline"
+          }
+        }
+      }
+    },
+    "The active restriction does not allow this action (for example a setpoint below its minimum).": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sekatan aktif tidak membenarkan tindakan ini (contohnya titik set di bawah minimumnya)."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有効な利用制限により、この操作はできません（例: 下限より低い設定温度）。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pembatasan aktif tidak mengizinkan aksi ini (misalnya titik setel di bawah minimumnya)."
           }
         }
       }
@@ -13755,6 +15204,29 @@
         }
       }
     },
+    "The device confirmed {action}.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Peranti mengesahkan {action}."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "デバイスが {action} を確認しました。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Perangkat mengonfirmasi {action}."
+          }
+        }
+      }
+    },
     "the device cover was opened while powered": {
       "extractionState": "manual",
       "localizations": {
@@ -13774,6 +15246,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "penutup perangkat dibuka saat menyala"
+          }
+        }
+      }
+    },
+    "The device is not reachable (connection or power signal), so nothing was sent.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Peranti tidak dapat dicapai (sambungan atau isyarat kuasa), jadi tiada apa-apa dihantar."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "デバイスに接続できない（接続または電力信号）ため、何も送信されませんでした。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Perangkat tidak dapat dijangkau (koneksi atau sinyal daya), jadi tidak ada yang dikirim."
           }
         }
       }
@@ -14257,6 +15752,167 @@
           "stringUnit": {
             "state": "translated",
             "value": "Nama penanda tangan wajib diisi"
+          }
+        }
+      }
+    },
+    "The start command ({action}) was sent; the run starts when the device acknowledges it.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arahan mula ({action}) telah dihantar; larian bermula apabila peranti mengakuinya."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "開始コマンド（{action}）を送信しました。デバイスが受け付けると、運転が始まります。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Perintah mulai ({action}) telah dikirim; uji coba dimulai saat perangkat mengonfirmasinya."
+          }
+        }
+      }
+    },
+    "The test run ends {n} min after it started. The end command ({action}) is sent at {time}.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ujian tamat {n} min selepas ia bermula. Arahan tamat ({action}) dihantar pada {time}."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "テスト運転は、開始の {n} 分後に終了します。終了コマンド（{action}）は {time} に送信されます。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uji coba berakhir {n} mnt setelah dimulai. Perintah akhir ({action}) dikirim pukul {time}."
+          }
+        }
+      }
+    },
+    "The unit is busy: a firmware update or an unfinished command must finish first.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unit sedang sibuk: kemas kini perisian tegar atau arahan yang belum selesai mesti selesai dahulu."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ユニットが処理中です。ファームウェアの更新や、完了していないコマンドが終わるまで待ってください。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unit sibuk: pembaruan firmware atau perintah yang belum selesai harus selesai lebih dulu."
+          }
+        }
+      }
+    },
+    "The unit may still be running; check it on site.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unit mungkin masih berjalan; periksanya di tapak."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ユニットはまだ運転中の可能性があります。現場で確認してください。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unit mungkin masih berjalan; periksa di lokasi."
+          }
+        }
+      }
+    },
+    "the unit must be reconciled after a restriction": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "unit mesti diselaraskan selepas sekatan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "利用制限のあと、ユニットを同期する必要があります"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "unit harus direkonsiliasi setelah pembatasan"
+          }
+        }
+      }
+    },
+    "The unit must be reconciled after a restriction before it can be controlled.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unit mesti diselaraskan selepas sekatan sebelum boleh dikawal."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "利用制限のあと、ユニットを同期してからでないと操作できません。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unit harus direkonsiliasi setelah pembatasan sebelum dapat dikontrol."
+          }
+        }
+      }
+    },
+    "The unit or job changed; the page now shows the latest version.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unit atau kerja telah berubah; halaman kini memaparkan versi terkini."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ユニットまたは作業が変更されました。ページは最新の版を表示しています。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unit atau pekerjaan berubah; halaman kini menampilkan versi terbaru."
           }
         }
       }
@@ -15894,6 +17550,29 @@
         }
       }
     },
+    "Unknown": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak diketahui"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不明"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak diketahui"
+          }
+        }
+      }
+    },
     "unnamed": {
       "extractionState": "manual",
       "localizations": {
@@ -16147,6 +17826,29 @@
         }
       }
     },
+    "Waiting": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Menunggu"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "待機中"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Menunggu"
+          }
+        }
+      }
+    },
     "waiting for device": {
       "extractionState": "manual",
       "localizations": {
@@ -16189,6 +17891,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Menunggu AC mengonfirmasi… Hasil ditampilkan hanya setelah AC menerimanya."
+          }
+        }
+      }
+    },
+    "waiting for the device": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "menunggu peranti"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "デバイスの応答待ち"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "menunggu perangkat"
           }
         }
       }
@@ -16285,6 +18010,29 @@
         }
       }
     },
+    "What the test run should show": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apa yang patut ditunjukkan oleh larian ujian"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "テスト運転で確認したいこと"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apa yang harus ditunjukkan uji coba"
+          }
+        }
+      }
+    },
     "What to do (required)": {
       "extractionState": "manual",
       "localizations": {
@@ -16327,6 +18075,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mengapa pelanggan tidak dapat menandatangani"
+          }
+        }
+      }
+    },
+    "Why this command is needed for the diagnosis": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mengapa arahan ini diperlukan untuk diagnosis"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "診断にこのコマンドが必要な理由"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mengapa perintah ini diperlukan untuk diagnosis"
           }
         }
       }
@@ -17385,6 +19156,52 @@
           "stringUnit": {
             "state": "translated",
             "value": "Jendela pekerjaan Anda berakhir, atau HQ atau koordinator Anda mengubah penugasan, jadi detail pekerjaan dan unit tidak lagi ditampilkan kepada Anda."
+          }
+        }
+      }
+    },
+    "Your work window has ended.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tetingkap kerja anda telah tamat."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "作業時間が終了しました。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jendela pekerjaan Anda telah berakhir."
+          }
+        }
+      }
+    },
+    "Your work window has not started.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tetingkap kerja anda belum bermula."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "作業時間がまだ始まっていません。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jendela pekerjaan Anda belum dimulai."
           }
         }
       }

@@ -292,24 +292,50 @@ jobs:
   # The iOS apps (DEC-112): SwiftLint, swift-format, the package's unit tests at 100 % of lines and functions, and both apps'
   # UI tests against the stub, on a GitHub-hosted Mac (the lab server's runners are Linux; a pull request job never runs
   # there). The tools are the releases service/ios/scripts/tools.sh pins, checked by their SHA-256.
-  ios:
-    name: iOS (lint, unit tests, UI tests)
+  # the iOS checks as parallel jobs (service/ios/scripts/check.sh by part): the lint, the unit tests with their coverage,
+  # the Customer app's UI tests and the Technician app's in two halves; ios below is the required check over them
+  ios-part:
+    name: "iOS: ${{ matrix.name }}"
     runs-on: macos-26
-    timeout-minutes: 45
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: lint, part: lint, results: none }
+          - { name: unit tests, part: unit, results: none }
+          - { name: Customer UI tests, part: ui CustomerApp, results: customer }
+          - { name: Technician UI tests 1/2, part: ui TechnicianApp 1/2, results: technician-1 }
+          - { name: Technician UI tests 2/2, part: ui TechnicianApp 2/2, results: technician-2 }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false } # no later step pushes or fetches with the job's token
       - name: Xcode and simulators
         run: xcodebuild -version && xcrun simctl list runtimes
-      - run: sh service/ios/scripts/check.sh
+      - name: check.sh ${{ matrix.part }}
+        env: { PART: "${{ matrix.part }}" }
+        run: |
+          # shellcheck disable=SC2086 # the part's words are the script's arguments
+          sh service/ios/scripts/check.sh $PART
       # a failed UI test's screenshots, recording and element tree, to read with Xcode or xcresulttool
-      - if: failure()
+      - if: failure() && matrix.results != 'none'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: ios-ui-test-results
+          name: ios-ui-test-results-${{ matrix.results }}
           path: service/ios/results/
           retention-days: 7
           if-no-files-found: ignore
+
+  ios:
+    name: iOS (lint, unit tests, UI tests)
+    if: always()
+    needs: [ios-part]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: every iOS part passed
+        env: { RESULT: "${{ needs.ios-part.result }}" }
+        run: test "$RESULT" = success
 
   docs:
     name: Design document validators

@@ -44,6 +44,7 @@ public enum UITestStub {
         private var notifications = Transport.inbox
         private let jobs = StubJobs()
         private let alerts = StubAlerts()
+        private let diagnostics = StubDiagnostics()
         private var consent = Consent(
             id: "consent1",
             tenantId: "t1",
@@ -65,6 +66,7 @@ public enum UITestStub {
             let method = request.httpMethod ?? "GET"
             let (status, body) = try lock.withLock {
                 try alerts.answer(method, url.path(), url.query(), request.httpBody)
+                    ?? diagnostics.answer(method, url.path(), url.query(), request.httpBody)
                     ?? jobs.answer(method, url.path(), request.httpBody)
                     ?? answer(method, url.path(), request.httpBody).map { (200, $0) } ?? (404, Data("{}".utf8))
             }
