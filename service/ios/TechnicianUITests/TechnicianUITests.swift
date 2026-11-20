@@ -21,10 +21,12 @@ final class TechnicianUITests: XCTestCase {
         let app = launch(["AC_UI_TEST": "stub"])
         XCTAssertTrue(app.staticTexts["Technician"].waitForExistence(timeout: 5))
         try app.audit()
+        keepScreenshot("sign-in", of: app)
         app.buttons["signIn.button"].tap()
         XCTAssertTrue(app.staticTexts["Repair"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Assigned"].exists)
         try app.audit()
+        keepScreenshot("jobs", of: app)
         app.buttons["signOut"].tap()
         XCTAssertTrue(app.buttons["signIn.button"].waitForExistence(timeout: 5))
     }
@@ -38,6 +40,7 @@ final class TechnicianUITests: XCTestCase {
         let message = app.staticTexts["signIn.message"]
         XCTAssertTrue(message.waitForExistence(timeout: 5))
         XCTAssertEqual(message.label, "このアカウントはこのアプリでは使えません — 別のアカウントでサインインしてください")
+        keepScreenshot("sign-in-ja-refused", of: app)
     }
 
     @MainActor

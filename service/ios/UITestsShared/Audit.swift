@@ -12,3 +12,14 @@ extension XCUIApplication {
         }
     }
 }
+
+extension XCTestCase {
+    /// A screenshot kept in the test's result (`-resultBundlePath`), for a reviewer to see the screen the test checked.
+    @MainActor
+    func keepScreenshot(_ name: String, of app: XCUIApplication) {
+        let shot = XCTAttachment(screenshot: app.screenshot())
+        shot.name = name
+        shot.lifetime = .keepAlways
+        add(shot)
+    }
+}

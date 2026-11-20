@@ -21,12 +21,14 @@ final class CustomerUITests: XCTestCase {
         let app = launch(["AC_UI_TEST": "stub"])
         XCTAssertTrue(app.staticTexts["Customer"].waitForExistence(timeout: 5))
         try app.audit()
+        keepScreenshot("sign-in", of: app)
         app.buttons["signIn.button"].tap()
         XCTAssertTrue(app.staticTexts["Living room AC"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Bedroom AC"].exists)
         XCTAssertTrue(app.staticTexts["On"].exists)
         XCTAssertTrue(app.staticTexts["Offline"].exists)
         try app.audit()
+        keepScreenshot("units", of: app)
         app.buttons["signOut"].tap()
         XCTAssertTrue(app.buttons["signIn.button"].waitForExistence(timeout: 5))
     }
@@ -40,6 +42,7 @@ final class CustomerUITests: XCTestCase {
         let message = app.staticTexts["signIn.message"]
         XCTAssertTrue(message.waitForExistence(timeout: 5))
         XCTAssertEqual(message.label, "このアカウントはこのアプリでは使えません — 別のアカウントでサインインしてください")
+        keepScreenshot("sign-in-ja-refused", of: app)
     }
 
     @MainActor
