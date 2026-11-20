@@ -23,8 +23,11 @@ public final class UnitsModel {
     /// Reads the ACs again; a failed read keeps the rows shown before, with the refusal's line.
     public func load() async {
         units = await units.after { () async throws(CoreError) in
-            let page = try await client.call(Ops.UnitsList.self, Query(limit: 100, sort: QuerySort(field: .name, direction: .asc)))
-            return page.data.items.filter { !$0.archived }.map(Self.row)
+            // units.list sorts by no name (the API refuses sort=name): the rows are put in order here, as a person reads them
+            let page = try await client.call(Ops.UnitsList.self, Query(limit: 100))
+            return page.data.items.filter { !$0.archived }.map(Self.row).sorted {
+                $0.name.localizedStandardCompare($1.name) == .orderedAscending
+            }
         }
     }
 

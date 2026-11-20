@@ -350,3 +350,237 @@ extension LaunchTests {
         }
     }
 }
+
+@Suite struct WordsTests {
+    private let day = "2026-11-20T00:00:00Z"
+
+    private func command(
+        _ action: CommandAction,
+        _ status: CommandStatus = .acknowledged,
+        failure: CommandFailureCode? = nil,
+        source: CommandSource = .ui,
+        actor: String = "m1"
+    )
+        -> Command
+    {
+        Command(
+            id: "c1",
+            tenantId: "t1",
+            version: 1,
+            createdAt: day,
+            updatedAt: day,
+            unitId: "u1",
+            actorMembershipId: actor,
+            action: action,
+            diagnosticRunId: nil,
+            jobId: nil,
+            reason: nil,
+            status: status,
+            delivery: .sent,
+            requestedAt: day,
+            sentAt: nil,
+            acknowledgedAt: nil,
+            expiresAt: day,
+            failureCode: failure,
+            correlationId: "c1",
+            source: source
+        )
+    }
+
+    @Test func settingsAndCommandsInWords() {
+        #expect(Words.celsius(24) == "24")
+        #expect(Words.celsius(24.5) == "24.5")
+        #expect(Mode.allCases.map(Words.mode) == ["Cool", "Dry", "Fan"])
+        #expect(Fan.allCases.map(Words.fan) == ["Low", "Mid", "High"])
+        #expect(Words.action(.setPower(UnitActionSetPower(power: true))) == "Set power ON")
+        #expect(Words.action(.setPower(UnitActionSetPower(power: false))) == "Set power OFF")
+        #expect(Words.action(.setTemperature(UnitActionSetTemperature(celsius: 24))) == "Set temperature 24°C")
+        #expect(Words.action(.setMode(UnitActionSetMode(mode: .dry))) == "Set mode DRY")
+        #expect(Words.action(.setFan(UnitActionSetFan(fanLevel: .high))) == "Set fan HIGH")
+        #expect(Words.action(.ventilate(UnitActionVentilate(level: .low))) == "Set ventilation LOW")
+    }
+
+    @Test func historyCommandsIncludeTheRestrictionsOwn() {
+        let limit = RestrictionPolicy.temperatureLimit(RestrictionPolicyTemperatureLimit(minimumCoolingSetpoint: 26))
+        let apply = CommandAction.applyRestriction(CommandActionApplyRestriction(restrictionId: "r1", rulesVersion: "v1", policy: limit))
+        #expect(Words.command(apply) == "Apply restriction: Temperature limit — cooling setpoint ≥ 26 °C")
+        let off = CommandAction.applyRestriction(
+            CommandActionApplyRestriction(restrictionId: "r1", rulesVersion: "v1", policy: .powerOff(RestrictionPolicyPowerOff()))
+        )
+        #expect(Words.command(off) == "Apply restriction: Power off")
+        #expect(
+            Words.command(.removeRestriction(CommandActionRemoveRestriction(restrictionId: "r1", rulesVersion: "v1")))
+                == "Remove restriction"
+        )
+        for action: CommandAction in [
+            .setPower(UnitActionSetPower(power: true)), .setTemperature(UnitActionSetTemperature(celsius: 20)),
+            .setMode(UnitActionSetMode(mode: .fan)), .setFan(UnitActionSetFan(fanLevel: .low)),
+            .ventilate(UnitActionVentilate(level: .mid)),
+        ] {
+            #expect(!Words.command(action).isEmpty)
+        }
+    }
+
+    @Test func statesAndFailuresInWords() {
+        #expect(CommandStatus.allCases.map(Words.status).count == 6)
+        #expect(Words.status(.expired) == "no device response (expired)")
+        #expect(Words.failure(.deviceRejected) == "the AC refused it")
+        #expect(Words.failure(.timeout) == "no answer from the AC in time")
+        #expect(Words.failure(.offline) == "the AC was offline")
+        #expect(Words.failure(.unavailable) == "the AC reported a fault")
+        #expect(Words.failure(.conflict) == "another command was still running")
+    }
+
+    @Test func historyLineSaysWhoSentIt() {
+        let power = CommandAction.setPower(UnitActionSetPower(power: true))
+        #expect(Words.history(command(power), me: "m1") == "Set power ON — acknowledged by device · by you")
+        #expect(Words.history(command(power, actor: "m2"), me: "m1") == "Set power ON — acknowledged by device · by someone else")
+        #expect(Words.history(command(power), me: nil) == "Set power ON — acknowledged by device")
+        #expect(Words.history(command(power, source: .group), me: "m1") == "Set power ON — acknowledged by device · by you")
+        #expect(
+            Words.history(command(power, source: .diagnostic), me: "m1") == "Set power ON — acknowledged by device · technician test run"
+        )
+        #expect(
+            Words.history(command(power, .failed, failure: .timeout), me: nil) == "Set power ON — failed: no answer from the AC in time"
+        )
+        #expect(Words.history(command(power, .expired, failure: .timeout), me: nil) == "Set power ON — no device response (expired)")
+    }
+
+    @Test func readingsKeepTheirQuality() throws {
+        let base = """
+            {"id":"m1","tenantId":"t1","version":1,"createdAt":"x","updatedAt":"x","boundaryId":null,"qualityReason":null,"rawUnit":null,
+             "unitId":"u1","sensorId":"s1","metric":"METRIC","value":VALUE,"unit":"UNIT","observedAt":"x","receivedAt":"x",
+             "origin":"measured","quality":"QUALITY","isDemo":true,"sequence":1,"eventId":"e1"}
+            """
+        func reading(_ metric: String, _ value: String, _ unit: String, _ quality: String = "valid") throws -> String? {
+            let text = base.replacingOccurrences(of: "METRIC", with: metric).replacingOccurrences(of: "VALUE", with: value)
+                .replacingOccurrences(of: "UNIT", with: unit).replacingOccurrences(of: "QUALITY", with: quality)
+            return Words.reading(try JSONDecoder().decode(CoreMeasurement.self, from: Data(text.utf8)))
+        }
+        #expect(try reading("temperature", "28", "°C") == "28.0 °C")
+        #expect(try reading("humidity", "60.04", "%", "stale") == "60.0 % (stale)")
+        #expect(try reading("co2", "812.6", "ppm", "suspect") == "813 ppm (suspect)")
+        #expect(try reading("pm25", "12", "µg/m³", "missing") == "12 µg/m³ (missing)")
+        #expect(try reading("power", "0.75", "kW") == "0.75 kW")
+        #expect(try reading("temperature", "null", "°C") == nil)
+    }
+}
+
+@MainActor @Suite struct SessionPreferencesTests {
+    private let discovery = #"{"authorization_endpoint":"http://kc.test/auth","token_endpoint":"http://kc.test/token"}"#
+
+    private func session(
+        _ answers: [StubTransport.Answer],
+        shown: @escaping @MainActor (DisplayLanguage, TimeZone) -> Void
+    ) throws -> SessionModel {
+        let info: [String: Any] = [
+            "ACCoreAPIURL": "http://core.test", "ACIssuerURL": "http://kc.test", "ACClientID": "ac-customer-ios",
+            "ACRedirectURI": "ac-customer://oauth/callback",
+        ]
+        let access = jwt(["tenant_id": "t1", "membership_id": "m1", "role": "client"])
+        let tokens = #"{"access_token":"\#(access)","refresh_token":"r1","expires_in":300}"#
+        return SessionModel(
+            configuration: try AppConfiguration(info: info, role: "client"),
+            store: MemoryStore(),
+            transport: StubTransport([.http(200, discovery), .http(200, tokens)] + answers),
+            display: shown
+        )
+    }
+
+    private func signIn(_ session: SessionModel) async {
+        await session.signIn { url, _ in
+            let state = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first { $0.name == "state" }?.value ?? ""
+            return URL(string: "ac-customer://oauth/callback?code=c&state=\(state)") ?? url
+        }
+    }
+
+    @Test func membershipsLanguageAndTimeZoneAreShownAfterSignIn() async throws {
+        var shown: [(DisplayLanguage, String)] = []
+        let preferences = #"""
+            {"data":{"locale":"ja","timezone":"Asia/Tokyo","currency":"MYR","monthlyReportEmail":false,
+             "twoFactorEnabled":false,"pinnedUnitIds":[]},
+             "meta":{"correlationId":"c"}}
+            """#
+        let session = try session([.http(200, preferences)]) { shown.append(($0, $1.identifier)) }
+        #expect(session.membershipId == nil)
+        await session.applyPreferences()
+        #expect(shown.isEmpty, "signed out: nothing to read")
+        await signIn(session)
+        #expect(session.membershipId == "m1")
+        await session.applyPreferences()
+        #expect(shown.map(\.0) == [.ja])
+        #expect(shown.map(\.1) == ["Asia/Tokyo"])
+        #expect(session.language == .ja)
+    }
+
+    @Test func unreadablePreferencesKeepTheDevicesChoice() async throws {
+        var shown = 0
+        let session = try session([.http(503, "down")]) { _, _ in shown += 1 }
+        await signIn(session)
+        await session.applyPreferences()
+        #expect(shown == 0)
+    }
+
+    @Test func unknownTimeZoneIsTheDevicesOne() async throws {
+        var zones: [TimeZone] = []
+        let preferences = #"""
+            {"data":{"locale":"en","timezone":"Mars/Olympus","currency":"MYR","monthlyReportEmail":false,
+             "twoFactorEnabled":false,"pinnedUnitIds":[]},
+             "meta":{"correlationId":"c"}}
+            """#
+        let session = try session([.http(200, preferences)]) { _, zone in zones.append(zone) }
+        await signIn(session)
+        await session.applyPreferences()
+        #expect(zones == [.current])
+    }
+}
+
+@Suite struct LocalizerTimeZoneTests {
+    @Test func timesFollowTheChosenTimeZone() {
+        // the app's own setting is Launch's; this reads it without changing it
+        #expect(Localizer.timeZone.identifier.isEmpty == false)
+        #expect(Format.dateTime("2026-12-01T01:00:00Z") == Format.dateTime("2026-12-01T01:00:00Z", timeZone: Localizer.timeZone))
+    }
+}
+
+extension SessionPreferencesTests {
+    @Test func everyLocaleOfTheContractIsADisplayLanguage() {
+        for locale in CoreLocale.allCases { #expect(SessionModel.language(locale).rawValue == locale.rawValue) }
+    }
+
+    @Test func appShowsTheChosenLanguageAndTimeZone() {
+        // the app's own display, back to the device's afterwards (the other tests set their own with Localizer.with)
+        let zone = TimeZone(identifier: "Asia/Tokyo") ?? .current
+        SessionModel.show(.en, in: zone)
+        #expect(Localizer.timeZone == zone)
+        SessionModel.show(.preferred(), in: .current)
+    }
+}
+
+extension SessionPreferencesTests {
+    /// The app's own display (no recorder): preferences that name the display already shown, so no other test sees a
+    /// change while they run side by side.
+    @Test func appsDisplayTakesThePreferences() async throws {
+        let info: [String: Any] = [
+            "ACCoreAPIURL": "http://core.test", "ACIssuerURL": "http://kc.test", "ACClientID": "ac-customer-ios",
+            "ACRedirectURI": "ac-customer://oauth/callback",
+        ]
+        let access = jwt(["tenant_id": "t1", "membership_id": "m1", "role": "client"])
+        let tokens = #"{"access_token":"\#(access)","refresh_token":"r1","expires_in":300}"#
+        let language = Localizer.language.rawValue
+        let zone = Localizer.timeZone.identifier
+        let preferences = #"""
+            {"data":{"locale":"\#(language)","timezone":"\#(zone)","currency":"MYR","monthlyReportEmail":false,"twoFactorEnabled":false,
+             "pinnedUnitIds":[]},"meta":{"correlationId":"c"}}
+            """#
+        let session = SessionModel(
+            configuration: try AppConfiguration(info: info, role: "client"),
+            store: MemoryStore(),
+            transport: StubTransport([.http(200, discovery), .http(200, tokens), .http(200, preferences)])
+        )
+        await signIn(session)
+        await session.applyPreferences()
+        #expect(Localizer.language.rawValue == language)
+        #expect(Localizer.timeZone.identifier == zone)
+    }
+}

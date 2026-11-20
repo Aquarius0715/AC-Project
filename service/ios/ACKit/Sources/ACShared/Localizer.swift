@@ -19,10 +19,11 @@ public enum DisplayLanguage: String, CaseIterable, Sendable {
 }
 
 /// Where the texts are looked up: the app's String Catalog (service/ios/Shared/Localizable.xcstrings, generated from the
-/// web apps' dictionaries), in the chosen display language.
+/// web apps' dictionaries), in the chosen display language; and the time zone the times are shown in. Before sign-in the
+/// device chooses both; after it the membership's preferences do (preferences.get, FR-X01), as on the web.
 public enum Localizer {
     private static let state = OSAllocatedUnfairLock(
-        initialState: (language: DisplayLanguage.preferred(), table: table(.preferred(), in: .main))
+        initialState: (language: DisplayLanguage.preferred(), table: table(.preferred(), in: .main), timeZone: TimeZone.current)
     )
 
     /// A language for one task and the tasks it starts (the tests: each sees its own, while they run in parallel).
@@ -36,10 +37,13 @@ public enum Localizer {
         try $scoped.withValue((language, table(language, in: bundle)), operation: body)
     }
 
-    /// Chooses the display language; a language the app's bundle has no texts for shows the keys (English), never
-    /// another language's texts.
-    public static func use(_ language: DisplayLanguage, in bundle: Bundle = .main) {
-        state.withLock { $0 = (language, table(language, in: bundle)) }
+    /// The time zone the times are shown in.
+    public static var timeZone: TimeZone { state.withLock { $0.timeZone } }
+
+    /// Chooses the display language and time zone; a language the app's bundle has no texts for shows the keys
+    /// (English), never another language's texts.
+    public static func use(_ language: DisplayLanguage, timeZone: TimeZone = .current, in bundle: Bundle = .main) {
+        state.withLock { $0 = (language, table(language, in: bundle), timeZone) }
     }
 
     private static func table(_ language: DisplayLanguage, in bundle: Bundle) -> Bundle? {

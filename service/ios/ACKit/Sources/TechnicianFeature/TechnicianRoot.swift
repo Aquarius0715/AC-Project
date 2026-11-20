@@ -13,13 +13,15 @@ public struct TechnicianRoot: View {
     }
 
     public var body: some View {
-        content.tint(Brand.primary)
+        // the membership's language rebuilds the screens in it once preferences.get has answered
+        content.tint(Brand.primary).id(session.language)
     }
 
     @ViewBuilder private var content: some View {
         switch session.state {
         case .signedIn:
             JobsView(model: JobsModel(client: session.client), session: session)
+                .task { await session.applyPreferences() }
         case .signedOut, .signingIn:
             SignInView(title: tr("Technician"), model: session, web: web)
         }

@@ -20,8 +20,9 @@ import Testing
         let rows = try #require(model.units.value)
         #expect(!rows.isEmpty)
         #expect(rows.allSatisfy { !$0.name.isEmpty && !$0.power.isEmpty && !$0.connection.isEmpty })
+        #expect(rows.map(\.name) == rows.map(\.name).sorted { $0.localizedStandardCompare($1) == .orderedAscending }, "by name")
         let asked = try #require(await transport.requests.first?.url)
-        #expect(query(asked.path() + "?" + (asked.query() ?? "")).values == ["limit": ["100"], "sort": ["name:asc"]])
+        #expect(query(asked.path() + "?" + (asked.query() ?? "")).values == ["limit": ["100"]])
     }
 
     @Test func rowSaysTheACsPowerAndConnection() throws {

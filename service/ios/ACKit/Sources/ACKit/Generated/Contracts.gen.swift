@@ -4,14 +4,14 @@
 import Foundation
 
 public struct AirSeries: Codable, Sendable, Equatable {
-  public var items: [Measurement]
+  public var items: [CoreMeasurement]
   public var nextCursor: String?
   public var total: Double
   public var snapshotVersion: Double
   public var allergenObservation: AllergenObservation?
   public var buckets: [SeriesBucket]?
 
-  public init(items: [Measurement], nextCursor: String?, total: Double, snapshotVersion: Double, allergenObservation: AllergenObservation?, buckets: [SeriesBucket]?) {
+  public init(items: [CoreMeasurement], nextCursor: String?, total: Double, snapshotVersion: Double, allergenObservation: AllergenObservation?, buckets: [SeriesBucket]?) {
     self.items = items
     self.nextCursor = nextCursor
     self.total = total
@@ -31,7 +31,7 @@ public struct AirSeries: Codable, Sendable, Equatable {
 
   public init(from decoder: any Decoder) throws {
     let c = try decoder.container(keyedBy: CodingKeys.self)
-    items = try c.decode([Measurement].self, forKey: .items)
+    items = try c.decode([CoreMeasurement].self, forKey: .items)
     nextCursor = try c.decode(String?.self, forKey: .nextCursor)
     total = try c.decode(Double.self, forKey: .total)
     snapshotVersion = try c.decode(Double.self, forKey: .snapshotVersion)
@@ -48,145 +48,6 @@ public struct AirSeries: Codable, Sendable, Equatable {
     try c.encode(allergenObservation, forKey: .allergenObservation)
     try c.encode(buckets, forKey: .buckets)
   }
-}
-
-public struct Alert: Codable, Sendable, Equatable {
-  public var id: String
-  public var tenantId: String
-  public var version: Double
-  public var createdAt: String
-  public var updatedAt: String
-  public var unitId: String
-  public var policyId: String?
-  public var type: AlertType
-  public var severity: Severity
-  public var status: AlertStatus
-  public var causeCode: AlertCauseCode
-  public var evidenceKind: AlertEvidenceKind
-  public var evidenceText: String
-  public var observedAt: String
-  public var evidenceIds: [String]
-  public var detectedAt: String
-  public var acknowledgedAt: String?
-  public var resolvedAt: String?
-  public var resolutionReason: String?
-  public var previousAlertId: String?
-  public var deliveryFailures: [DeliveryFailure]
-  public var rule: AlertRule?
-
-  public init(id: String, tenantId: String, version: Double, createdAt: String, updatedAt: String, unitId: String, policyId: String?, type: AlertType, severity: Severity, status: AlertStatus, causeCode: AlertCauseCode, evidenceKind: AlertEvidenceKind, evidenceText: String, observedAt: String, evidenceIds: [String], detectedAt: String, acknowledgedAt: String?, resolvedAt: String?, resolutionReason: String?, previousAlertId: String?, deliveryFailures: [DeliveryFailure], rule: AlertRule?) {
-    self.id = id
-    self.tenantId = tenantId
-    self.version = version
-    self.createdAt = createdAt
-    self.updatedAt = updatedAt
-    self.unitId = unitId
-    self.policyId = policyId
-    self.type = type
-    self.severity = severity
-    self.status = status
-    self.causeCode = causeCode
-    self.evidenceKind = evidenceKind
-    self.evidenceText = evidenceText
-    self.observedAt = observedAt
-    self.evidenceIds = evidenceIds
-    self.detectedAt = detectedAt
-    self.acknowledgedAt = acknowledgedAt
-    self.resolvedAt = resolvedAt
-    self.resolutionReason = resolutionReason
-    self.previousAlertId = previousAlertId
-    self.deliveryFailures = deliveryFailures
-    self.rule = rule
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case id
-    case tenantId
-    case version
-    case createdAt
-    case updatedAt
-    case unitId
-    case policyId
-    case type
-    case severity
-    case status
-    case causeCode
-    case evidenceKind
-    case evidenceText
-    case observedAt
-    case evidenceIds
-    case detectedAt
-    case acknowledgedAt
-    case resolvedAt
-    case resolutionReason
-    case previousAlertId
-    case deliveryFailures
-    case rule
-  }
-
-  public init(from decoder: any Decoder) throws {
-    let c = try decoder.container(keyedBy: CodingKeys.self)
-    id = try c.decode(String.self, forKey: .id)
-    tenantId = try c.decode(String.self, forKey: .tenantId)
-    version = try c.decode(Double.self, forKey: .version)
-    createdAt = try c.decode(String.self, forKey: .createdAt)
-    updatedAt = try c.decode(String.self, forKey: .updatedAt)
-    unitId = try c.decode(String.self, forKey: .unitId)
-    policyId = try c.decode(String?.self, forKey: .policyId)
-    type = try c.decode(AlertType.self, forKey: .type)
-    severity = try c.decode(Severity.self, forKey: .severity)
-    status = try c.decode(AlertStatus.self, forKey: .status)
-    causeCode = try c.decode(AlertCauseCode.self, forKey: .causeCode)
-    evidenceKind = try c.decode(AlertEvidenceKind.self, forKey: .evidenceKind)
-    evidenceText = try c.decode(String.self, forKey: .evidenceText)
-    observedAt = try c.decode(String.self, forKey: .observedAt)
-    evidenceIds = try c.decode([String].self, forKey: .evidenceIds)
-    detectedAt = try c.decode(String.self, forKey: .detectedAt)
-    acknowledgedAt = try c.decode(String?.self, forKey: .acknowledgedAt)
-    resolvedAt = try c.decode(String?.self, forKey: .resolvedAt)
-    resolutionReason = try c.decode(String?.self, forKey: .resolutionReason)
-    previousAlertId = try c.decode(String?.self, forKey: .previousAlertId)
-    deliveryFailures = try c.decode([DeliveryFailure].self, forKey: .deliveryFailures)
-    rule = try c.decode(AlertRule?.self, forKey: .rule)
-  }
-
-  public func encode(to encoder: any Encoder) throws {
-    var c = encoder.container(keyedBy: CodingKeys.self)
-    try c.encode(id, forKey: .id)
-    try c.encode(tenantId, forKey: .tenantId)
-    try c.encode(version, forKey: .version)
-    try c.encode(createdAt, forKey: .createdAt)
-    try c.encode(updatedAt, forKey: .updatedAt)
-    try c.encode(unitId, forKey: .unitId)
-    try c.encode(policyId, forKey: .policyId)
-    try c.encode(type, forKey: .type)
-    try c.encode(severity, forKey: .severity)
-    try c.encode(status, forKey: .status)
-    try c.encode(causeCode, forKey: .causeCode)
-    try c.encode(evidenceKind, forKey: .evidenceKind)
-    try c.encode(evidenceText, forKey: .evidenceText)
-    try c.encode(observedAt, forKey: .observedAt)
-    try c.encode(evidenceIds, forKey: .evidenceIds)
-    try c.encode(detectedAt, forKey: .detectedAt)
-    try c.encode(acknowledgedAt, forKey: .acknowledgedAt)
-    try c.encode(resolvedAt, forKey: .resolvedAt)
-    try c.encode(resolutionReason, forKey: .resolutionReason)
-    try c.encode(previousAlertId, forKey: .previousAlertId)
-    try c.encode(deliveryFailures, forKey: .deliveryFailures)
-    try c.encode(rule, forKey: .rule)
-  }
-}
-
-public enum AlertCauseCode: String, Codable, Sendable, Equatable, CaseIterable {
-  case windowOpen = "window_open"
-  case insulationLoss = "insulation_loss"
-  case unknown = "unknown"
-}
-
-public enum AlertEvidenceKind: String, Codable, Sendable, Equatable, CaseIterable {
-  case demoObservation = "demo_observation"
-  case inferred = "inferred"
-  case inspection = "inspection"
 }
 
 public struct AlertRule: Codable, Sendable, Equatable {
@@ -337,21 +198,6 @@ public struct AlertsResolveInput: Codable, Sendable, Equatable {
     try c.encode(resolutionReason, forKey: .resolutionReason)
     try c.encode(resolutionEvidenceIds, forKey: .resolutionEvidenceIds)
   }
-}
-
-public enum AlertStatus: String, Codable, Sendable, Equatable, CaseIterable {
-  case `open` = "open"
-  case acknowledged = "acknowledged"
-  case resolved = "resolved"
-}
-
-public enum AlertType: String, Codable, Sendable, Equatable, CaseIterable {
-  case sensor = "sensor"
-  case quality = "quality"
-  case maintenance = "maintenance"
-  case tamper = "tamper"
-  case reconciliationRequired = "reconciliation_required"
-  case restrictionBypass = "restriction_bypass"
 }
 
 public struct AllergenObservation: Codable, Sendable, Equatable {
@@ -1290,11 +1136,11 @@ public struct Command: Codable, Sendable, Equatable {
 }
 
 public enum CommandAction: Codable, Sendable, Equatable {
-  case setPower(CommandActionSetPower)
-  case setTemperature(CommandActionSetTemperature)
-  case setMode(CommandActionSetMode)
-  case setFan(CommandActionSetFan)
-  case ventilate(CommandActionVentilate)
+  case setPower(UnitActionSetPower)
+  case setTemperature(UnitActionSetTemperature)
+  case setMode(UnitActionSetMode)
+  case setFan(UnitActionSetFan)
+  case ventilate(UnitActionVentilate)
   case applyRestriction(CommandActionApplyRestriction)
   case removeRestriction(CommandActionRemoveRestriction)
 
@@ -1303,11 +1149,11 @@ public enum CommandAction: Codable, Sendable, Equatable {
   public init(from decoder: any Decoder) throws {
     let c = try decoder.container(keyedBy: Tag.self)
     switch try c.decode(String.self, forKey: .kind) {
-    case "set_power": self = .setPower(try CommandActionSetPower(from: decoder))
-    case "set_temperature": self = .setTemperature(try CommandActionSetTemperature(from: decoder))
-    case "set_mode": self = .setMode(try CommandActionSetMode(from: decoder))
-    case "set_fan": self = .setFan(try CommandActionSetFan(from: decoder))
-    case "ventilate": self = .ventilate(try CommandActionVentilate(from: decoder))
+    case "set_power": self = .setPower(try UnitActionSetPower(from: decoder))
+    case "set_temperature": self = .setTemperature(try UnitActionSetTemperature(from: decoder))
+    case "set_mode": self = .setMode(try UnitActionSetMode(from: decoder))
+    case "set_fan": self = .setFan(try UnitActionSetFan(from: decoder))
+    case "ventilate": self = .ventilate(try UnitActionVentilate(from: decoder))
     case "apply_restriction": self = .applyRestriction(try CommandActionApplyRestriction(from: decoder))
     case "remove_restriction": self = .removeRestriction(try CommandActionRemoveRestriction(from: decoder))
     default: throw DecodingError.dataCorruptedError(forKey: .kind, in: c, debugDescription: "unknown CommandAction")
@@ -1392,146 +1238,17 @@ public struct CommandActionRemoveRestriction: Codable, Sendable, Equatable {
   }
 }
 
-public struct CommandActionSetFan: Codable, Sendable, Equatable {
-  public var fanLevel: Fan
-
-  public init(fanLevel: Fan) {
-    self.fanLevel = fanLevel
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case kind
-    case fanLevel
-  }
-
-  public init(from decoder: any Decoder) throws {
-    let c = try decoder.container(keyedBy: CodingKeys.self)
-    try Constant.expect("set_fan", in: c, at: .kind)
-    fanLevel = try c.decode(Fan.self, forKey: .fanLevel)
-  }
-
-  public func encode(to encoder: any Encoder) throws {
-    var c = encoder.container(keyedBy: CodingKeys.self)
-    try c.encode("set_fan", forKey: .kind)
-    try c.encode(fanLevel, forKey: .fanLevel)
-  }
-}
-
-public struct CommandActionSetMode: Codable, Sendable, Equatable {
-  public var mode: Mode
-
-  public init(mode: Mode) {
-    self.mode = mode
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case kind
-    case mode
-  }
-
-  public init(from decoder: any Decoder) throws {
-    let c = try decoder.container(keyedBy: CodingKeys.self)
-    try Constant.expect("set_mode", in: c, at: .kind)
-    mode = try c.decode(Mode.self, forKey: .mode)
-  }
-
-  public func encode(to encoder: any Encoder) throws {
-    var c = encoder.container(keyedBy: CodingKeys.self)
-    try c.encode("set_mode", forKey: .kind)
-    try c.encode(mode, forKey: .mode)
-  }
-}
-
-public struct CommandActionSetPower: Codable, Sendable, Equatable {
-  public var power: Bool
-
-  public init(power: Bool) {
-    self.power = power
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case kind
-    case power
-  }
-
-  public init(from decoder: any Decoder) throws {
-    let c = try decoder.container(keyedBy: CodingKeys.self)
-    try Constant.expect("set_power", in: c, at: .kind)
-    power = try c.decode(Bool.self, forKey: .power)
-  }
-
-  public func encode(to encoder: any Encoder) throws {
-    var c = encoder.container(keyedBy: CodingKeys.self)
-    try c.encode("set_power", forKey: .kind)
-    try c.encode(power, forKey: .power)
-  }
-}
-
-public struct CommandActionSetTemperature: Codable, Sendable, Equatable {
-  public var celsius: Double
-
-  public init(celsius: Double) {
-    self.celsius = celsius
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case kind
-    case celsius
-  }
-
-  public init(from decoder: any Decoder) throws {
-    let c = try decoder.container(keyedBy: CodingKeys.self)
-    try Constant.expect("set_temperature", in: c, at: .kind)
-    celsius = try c.decode(Double.self, forKey: .celsius)
-  }
-
-  public func encode(to encoder: any Encoder) throws {
-    var c = encoder.container(keyedBy: CodingKeys.self)
-    try c.encode("set_temperature", forKey: .kind)
-    try c.encode(celsius, forKey: .celsius)
-  }
-}
-
-public struct CommandActionVentilate: Codable, Sendable, Equatable {
-  public var level: Fan
-
-  public init(level: Fan) {
-    self.level = level
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case kind
-    case level
-  }
-
-  public init(from decoder: any Decoder) throws {
-    let c = try decoder.container(keyedBy: CodingKeys.self)
-    try Constant.expect("ventilate", in: c, at: .kind)
-    level = try c.decode(Fan.self, forKey: .level)
-  }
-
-  public func encode(to encoder: any Encoder) throws {
-    var c = encoder.container(keyedBy: CodingKeys.self)
-    try c.encode("ventilate", forKey: .kind)
-    try c.encode(level, forKey: .level)
-  }
-}
-
 public enum CommandDelivery: String, Codable, Sendable, Equatable, CaseIterable {
   case sent = "sent"
   case notSent = "not_sent"
 }
 
 public enum CommandFailureCode: String, Codable, Sendable, Equatable, CaseIterable {
-  case validation = "VALIDATION"
-  case unauthenticated = "UNAUTHENTICATED"
-  case forbidden = "FORBIDDEN"
-  case notFound = "NOT_FOUND"
-  case conflict = "CONFLICT"
-  case offline = "OFFLINE"
+  case deviceRejected = "DEVICE_REJECTED"
   case timeout = "TIMEOUT"
-  case rateLimited = "RATE_LIMITED"
+  case offline = "OFFLINE"
   case unavailable = "UNAVAILABLE"
+  case conflict = "CONFLICT"
 }
 
 public struct CommandsCreateInput: Codable, Sendable, Equatable {
@@ -1753,6 +1470,497 @@ public struct ControlAvailabilityBlocked: Codable, Sendable, Equatable {
     var c = encoder.container(keyedBy: CodingKeys.self)
     try c.encode("blocked", forKey: .state)
     try c.encode("control.reconciliation_required", forKey: .reasonKey)
+  }
+}
+
+public struct CoreAlert: Codable, Sendable, Equatable {
+  public var id: String
+  public var tenantId: String
+  public var version: Double
+  public var createdAt: String
+  public var updatedAt: String
+  public var unitId: String
+  public var policyId: String?
+  public var type: CoreAlertType
+  public var severity: Severity
+  public var status: CoreAlertStatus
+  public var causeCode: CoreAlertCauseCode
+  public var evidenceKind: CoreAlertEvidenceKind
+  public var evidenceText: String
+  public var observedAt: String
+  public var evidenceIds: [String]
+  public var detectedAt: String
+  public var acknowledgedAt: String?
+  public var resolvedAt: String?
+  public var resolutionReason: String?
+  public var previousAlertId: String?
+  public var deliveryFailures: [DeliveryFailure]
+  public var rule: AlertRule?
+
+  public init(id: String, tenantId: String, version: Double, createdAt: String, updatedAt: String, unitId: String, policyId: String?, type: CoreAlertType, severity: Severity, status: CoreAlertStatus, causeCode: CoreAlertCauseCode, evidenceKind: CoreAlertEvidenceKind, evidenceText: String, observedAt: String, evidenceIds: [String], detectedAt: String, acknowledgedAt: String?, resolvedAt: String?, resolutionReason: String?, previousAlertId: String?, deliveryFailures: [DeliveryFailure], rule: AlertRule?) {
+    self.id = id
+    self.tenantId = tenantId
+    self.version = version
+    self.createdAt = createdAt
+    self.updatedAt = updatedAt
+    self.unitId = unitId
+    self.policyId = policyId
+    self.type = type
+    self.severity = severity
+    self.status = status
+    self.causeCode = causeCode
+    self.evidenceKind = evidenceKind
+    self.evidenceText = evidenceText
+    self.observedAt = observedAt
+    self.evidenceIds = evidenceIds
+    self.detectedAt = detectedAt
+    self.acknowledgedAt = acknowledgedAt
+    self.resolvedAt = resolvedAt
+    self.resolutionReason = resolutionReason
+    self.previousAlertId = previousAlertId
+    self.deliveryFailures = deliveryFailures
+    self.rule = rule
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case id
+    case tenantId
+    case version
+    case createdAt
+    case updatedAt
+    case unitId
+    case policyId
+    case type
+    case severity
+    case status
+    case causeCode
+    case evidenceKind
+    case evidenceText
+    case observedAt
+    case evidenceIds
+    case detectedAt
+    case acknowledgedAt
+    case resolvedAt
+    case resolutionReason
+    case previousAlertId
+    case deliveryFailures
+    case rule
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    id = try c.decode(String.self, forKey: .id)
+    tenantId = try c.decode(String.self, forKey: .tenantId)
+    version = try c.decode(Double.self, forKey: .version)
+    createdAt = try c.decode(String.self, forKey: .createdAt)
+    updatedAt = try c.decode(String.self, forKey: .updatedAt)
+    unitId = try c.decode(String.self, forKey: .unitId)
+    policyId = try c.decode(String?.self, forKey: .policyId)
+    type = try c.decode(CoreAlertType.self, forKey: .type)
+    severity = try c.decode(Severity.self, forKey: .severity)
+    status = try c.decode(CoreAlertStatus.self, forKey: .status)
+    causeCode = try c.decode(CoreAlertCauseCode.self, forKey: .causeCode)
+    evidenceKind = try c.decode(CoreAlertEvidenceKind.self, forKey: .evidenceKind)
+    evidenceText = try c.decode(String.self, forKey: .evidenceText)
+    observedAt = try c.decode(String.self, forKey: .observedAt)
+    evidenceIds = try c.decode([String].self, forKey: .evidenceIds)
+    detectedAt = try c.decode(String.self, forKey: .detectedAt)
+    acknowledgedAt = try c.decode(String?.self, forKey: .acknowledgedAt)
+    resolvedAt = try c.decode(String?.self, forKey: .resolvedAt)
+    resolutionReason = try c.decode(String?.self, forKey: .resolutionReason)
+    previousAlertId = try c.decode(String?.self, forKey: .previousAlertId)
+    deliveryFailures = try c.decode([DeliveryFailure].self, forKey: .deliveryFailures)
+    rule = try c.decode(AlertRule?.self, forKey: .rule)
+  }
+
+  public func encode(to encoder: any Encoder) throws {
+    var c = encoder.container(keyedBy: CodingKeys.self)
+    try c.encode(id, forKey: .id)
+    try c.encode(tenantId, forKey: .tenantId)
+    try c.encode(version, forKey: .version)
+    try c.encode(createdAt, forKey: .createdAt)
+    try c.encode(updatedAt, forKey: .updatedAt)
+    try c.encode(unitId, forKey: .unitId)
+    try c.encode(policyId, forKey: .policyId)
+    try c.encode(type, forKey: .type)
+    try c.encode(severity, forKey: .severity)
+    try c.encode(status, forKey: .status)
+    try c.encode(causeCode, forKey: .causeCode)
+    try c.encode(evidenceKind, forKey: .evidenceKind)
+    try c.encode(evidenceText, forKey: .evidenceText)
+    try c.encode(observedAt, forKey: .observedAt)
+    try c.encode(evidenceIds, forKey: .evidenceIds)
+    try c.encode(detectedAt, forKey: .detectedAt)
+    try c.encode(acknowledgedAt, forKey: .acknowledgedAt)
+    try c.encode(resolvedAt, forKey: .resolvedAt)
+    try c.encode(resolutionReason, forKey: .resolutionReason)
+    try c.encode(previousAlertId, forKey: .previousAlertId)
+    try c.encode(deliveryFailures, forKey: .deliveryFailures)
+    try c.encode(rule, forKey: .rule)
+  }
+}
+
+public enum CoreAlertCauseCode: String, Codable, Sendable, Equatable, CaseIterable {
+  case windowOpen = "window_open"
+  case insulationLoss = "insulation_loss"
+  case unknown = "unknown"
+}
+
+public enum CoreAlertEvidenceKind: String, Codable, Sendable, Equatable, CaseIterable {
+  case demoObservation = "demo_observation"
+  case inferred = "inferred"
+  case inspection = "inspection"
+}
+
+public enum CoreAlertStatus: String, Codable, Sendable, Equatable, CaseIterable {
+  case `open` = "open"
+  case acknowledged = "acknowledged"
+  case resolved = "resolved"
+}
+
+public enum CoreAlertType: String, Codable, Sendable, Equatable, CaseIterable {
+  case sensor = "sensor"
+  case quality = "quality"
+  case maintenance = "maintenance"
+  case tamper = "tamper"
+  case reconciliationRequired = "reconciliation_required"
+  case restrictionBypass = "restriction_bypass"
+}
+
+public enum CoreLocale: String, Codable, Sendable, Equatable, CaseIterable {
+  case id = "id"
+  case en = "en"
+  case ms = "ms"
+  case ja = "ja"
+}
+
+public struct CoreMeasurement: Codable, Sendable, Equatable {
+  public var id: String
+  public var tenantId: String
+  public var version: Double
+  public var createdAt: String
+  public var updatedAt: String
+  public var boundaryId: EnergyBoundaryId?
+  public var qualityReason: MeasurementIssue?
+  public var rawUnit: String?
+  public var unitId: String
+  public var sensorId: String
+  public var metric: Metric
+  public var value: Double?
+  public var unit: UnitSymbol
+  public var observedAt: String
+  public var receivedAt: String
+  public var origin: EvidenceCandidateOrigin
+  public var quality: Quality
+  public var sequence: Double
+  public var eventId: String
+
+  public init(id: String, tenantId: String, version: Double, createdAt: String, updatedAt: String, boundaryId: EnergyBoundaryId?, qualityReason: MeasurementIssue?, rawUnit: String?, unitId: String, sensorId: String, metric: Metric, value: Double?, unit: UnitSymbol, observedAt: String, receivedAt: String, origin: EvidenceCandidateOrigin, quality: Quality, sequence: Double, eventId: String) {
+    self.id = id
+    self.tenantId = tenantId
+    self.version = version
+    self.createdAt = createdAt
+    self.updatedAt = updatedAt
+    self.boundaryId = boundaryId
+    self.qualityReason = qualityReason
+    self.rawUnit = rawUnit
+    self.unitId = unitId
+    self.sensorId = sensorId
+    self.metric = metric
+    self.value = value
+    self.unit = unit
+    self.observedAt = observedAt
+    self.receivedAt = receivedAt
+    self.origin = origin
+    self.quality = quality
+    self.sequence = sequence
+    self.eventId = eventId
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case isDemo
+    case id
+    case tenantId
+    case version
+    case createdAt
+    case updatedAt
+    case boundaryId
+    case qualityReason
+    case rawUnit
+    case unitId
+    case sensorId
+    case metric
+    case value
+    case unit
+    case observedAt
+    case receivedAt
+    case origin
+    case quality
+    case sequence
+    case eventId
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    try Constant.expect(true, in: c, at: .isDemo)
+    id = try c.decode(String.self, forKey: .id)
+    tenantId = try c.decode(String.self, forKey: .tenantId)
+    version = try c.decode(Double.self, forKey: .version)
+    createdAt = try c.decode(String.self, forKey: .createdAt)
+    updatedAt = try c.decode(String.self, forKey: .updatedAt)
+    boundaryId = try c.decode(EnergyBoundaryId?.self, forKey: .boundaryId)
+    qualityReason = try c.decode(MeasurementIssue?.self, forKey: .qualityReason)
+    rawUnit = try c.decode(String?.self, forKey: .rawUnit)
+    unitId = try c.decode(String.self, forKey: .unitId)
+    sensorId = try c.decode(String.self, forKey: .sensorId)
+    metric = try c.decode(Metric.self, forKey: .metric)
+    value = try c.decode(Double?.self, forKey: .value)
+    unit = try c.decode(UnitSymbol.self, forKey: .unit)
+    observedAt = try c.decode(String.self, forKey: .observedAt)
+    receivedAt = try c.decode(String.self, forKey: .receivedAt)
+    origin = try c.decode(EvidenceCandidateOrigin.self, forKey: .origin)
+    quality = try c.decode(Quality.self, forKey: .quality)
+    sequence = try c.decode(Double.self, forKey: .sequence)
+    eventId = try c.decode(String.self, forKey: .eventId)
+  }
+
+  public func encode(to encoder: any Encoder) throws {
+    var c = encoder.container(keyedBy: CodingKeys.self)
+    try c.encode(true, forKey: .isDemo)
+    try c.encode(id, forKey: .id)
+    try c.encode(tenantId, forKey: .tenantId)
+    try c.encode(version, forKey: .version)
+    try c.encode(createdAt, forKey: .createdAt)
+    try c.encode(updatedAt, forKey: .updatedAt)
+    try c.encode(boundaryId, forKey: .boundaryId)
+    try c.encode(qualityReason, forKey: .qualityReason)
+    try c.encode(rawUnit, forKey: .rawUnit)
+    try c.encode(unitId, forKey: .unitId)
+    try c.encode(sensorId, forKey: .sensorId)
+    try c.encode(metric, forKey: .metric)
+    try c.encode(value, forKey: .value)
+    try c.encode(unit, forKey: .unit)
+    try c.encode(observedAt, forKey: .observedAt)
+    try c.encode(receivedAt, forKey: .receivedAt)
+    try c.encode(origin, forKey: .origin)
+    try c.encode(quality, forKey: .quality)
+    try c.encode(sequence, forKey: .sequence)
+    try c.encode(eventId, forKey: .eventId)
+  }
+}
+
+public struct CoreNotification: Codable, Sendable, Equatable {
+  public var id: String
+  public var tenantId: String
+  public var version: Double
+  public var createdAt: String
+  public var updatedAt: String
+  public var sourceAlertId: String?
+  public var type: NotificationType
+  public var recipientMembershipId: String
+  public var scopeVersionAtCreation: Double
+  public var target: Target
+  public var templateKey: CoreNotificationTemplateKey
+  public var params: CoreNotificationParams
+  public var channel: Channel
+  public var deliveryState: CoreNotificationDeliveryState
+  public var severity: Severity
+  public var occurredAt: String
+  public var readAt: String?
+  public var targetOpen: Bool
+
+  public init(id: String, tenantId: String, version: Double, createdAt: String, updatedAt: String, sourceAlertId: String?, type: NotificationType, recipientMembershipId: String, scopeVersionAtCreation: Double, target: Target, templateKey: CoreNotificationTemplateKey, params: CoreNotificationParams, channel: Channel, deliveryState: CoreNotificationDeliveryState, severity: Severity, occurredAt: String, readAt: String?, targetOpen: Bool) {
+    self.id = id
+    self.tenantId = tenantId
+    self.version = version
+    self.createdAt = createdAt
+    self.updatedAt = updatedAt
+    self.sourceAlertId = sourceAlertId
+    self.type = type
+    self.recipientMembershipId = recipientMembershipId
+    self.scopeVersionAtCreation = scopeVersionAtCreation
+    self.target = target
+    self.templateKey = templateKey
+    self.params = params
+    self.channel = channel
+    self.deliveryState = deliveryState
+    self.severity = severity
+    self.occurredAt = occurredAt
+    self.readAt = readAt
+    self.targetOpen = targetOpen
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case id
+    case tenantId
+    case version
+    case createdAt
+    case updatedAt
+    case sourceAlertId
+    case type
+    case recipientMembershipId
+    case scopeVersionAtCreation
+    case target
+    case templateKey
+    case params
+    case channel
+    case deliveryState
+    case severity
+    case occurredAt
+    case readAt
+    case targetOpen
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    id = try c.decode(String.self, forKey: .id)
+    tenantId = try c.decode(String.self, forKey: .tenantId)
+    version = try c.decode(Double.self, forKey: .version)
+    createdAt = try c.decode(String.self, forKey: .createdAt)
+    updatedAt = try c.decode(String.self, forKey: .updatedAt)
+    sourceAlertId = try c.decode(String?.self, forKey: .sourceAlertId)
+    type = try c.decode(NotificationType.self, forKey: .type)
+    recipientMembershipId = try c.decode(String.self, forKey: .recipientMembershipId)
+    scopeVersionAtCreation = try c.decode(Double.self, forKey: .scopeVersionAtCreation)
+    target = try c.decode(Target.self, forKey: .target)
+    templateKey = try c.decode(CoreNotificationTemplateKey.self, forKey: .templateKey)
+    params = try c.decode(CoreNotificationParams.self, forKey: .params)
+    channel = try c.decode(Channel.self, forKey: .channel)
+    deliveryState = try c.decode(CoreNotificationDeliveryState.self, forKey: .deliveryState)
+    severity = try c.decode(Severity.self, forKey: .severity)
+    occurredAt = try c.decode(String.self, forKey: .occurredAt)
+    readAt = try c.decode(String?.self, forKey: .readAt)
+    targetOpen = try c.decode(Bool.self, forKey: .targetOpen)
+  }
+
+  public func encode(to encoder: any Encoder) throws {
+    var c = encoder.container(keyedBy: CodingKeys.self)
+    try c.encode(id, forKey: .id)
+    try c.encode(tenantId, forKey: .tenantId)
+    try c.encode(version, forKey: .version)
+    try c.encode(createdAt, forKey: .createdAt)
+    try c.encode(updatedAt, forKey: .updatedAt)
+    try c.encode(sourceAlertId, forKey: .sourceAlertId)
+    try c.encode(type, forKey: .type)
+    try c.encode(recipientMembershipId, forKey: .recipientMembershipId)
+    try c.encode(scopeVersionAtCreation, forKey: .scopeVersionAtCreation)
+    try c.encode(target, forKey: .target)
+    try c.encode(templateKey, forKey: .templateKey)
+    try c.encode(params, forKey: .params)
+    try c.encode(channel, forKey: .channel)
+    try c.encode(deliveryState, forKey: .deliveryState)
+    try c.encode(severity, forKey: .severity)
+    try c.encode(occurredAt, forKey: .occurredAt)
+    try c.encode(readAt, forKey: .readAt)
+    try c.encode(targetOpen, forKey: .targetOpen)
+  }
+}
+
+public enum CoreNotificationDeliveryState: String, Codable, Sendable, Equatable, CaseIterable {
+  case failed = "failed"
+  case queued = "queued"
+  case preview = "preview"
+  case simulated = "simulated"
+}
+
+public struct CoreNotificationParams: Codable, Sendable, Equatable {
+  public var targetName: String
+  public var at: String
+  public var status: String
+  public var reason: String?
+  public var amountMinor: Double?
+  public var currency: Currency?
+  public var method: PaymentMethod?
+  public var message: String?
+
+  public init(targetName: String, at: String, status: String, reason: String?, amountMinor: Double?, currency: Currency?, method: PaymentMethod?, message: String?) {
+    self.targetName = targetName
+    self.at = at
+    self.status = status
+    self.reason = reason
+    self.amountMinor = amountMinor
+    self.currency = currency
+    self.method = method
+    self.message = message
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case targetName
+    case at
+    case status
+    case reason
+    case amountMinor
+    case currency
+    case method
+    case message
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    targetName = try c.decode(String.self, forKey: .targetName)
+    at = try c.decode(String.self, forKey: .at)
+    status = try c.decode(String.self, forKey: .status)
+    reason = try c.decode(String?.self, forKey: .reason)
+    amountMinor = try c.decode(Double?.self, forKey: .amountMinor)
+    currency = try c.decode(Currency?.self, forKey: .currency)
+    method = try c.decode(PaymentMethod?.self, forKey: .method)
+    message = try c.decode(String?.self, forKey: .message)
+  }
+
+  public func encode(to encoder: any Encoder) throws {
+    var c = encoder.container(keyedBy: CodingKeys.self)
+    try c.encode(targetName, forKey: .targetName)
+    try c.encode(at, forKey: .at)
+    try c.encode(status, forKey: .status)
+    try c.encode(reason, forKey: .reason)
+    try c.encode(amountMinor, forKey: .amountMinor)
+    try c.encode(currency, forKey: .currency)
+    try c.encode(method, forKey: .method)
+    try c.encode(message, forKey: .message)
+  }
+}
+
+public enum CoreNotificationTemplateKey: String, Codable, Sendable, Equatable, CaseIterable {
+  case quality = "quality"
+  case payment = "payment"
+  case restriction = "restriction"
+  case scheduleChange = "schedule_change"
+  case reportReturn = "report_return"
+  case completion = "completion"
+  case paymentReminder = "payment_reminder"
+  case inquiry = "inquiry"
+  case jobUpdate = "job_update"
+  case deviceOperation = "device_operation"
+  case certificateExpiry = "certificate_expiry"
+  case warrantyExpiring = "warranty_expiring"
+  case alert = "alert"
+  case invite = "invite"
+}
+
+public struct CoreRange: Codable, Sendable, Equatable {
+  public var from: String
+  public var to: String
+
+  public init(from: String, to: String) {
+    self.from = from
+    self.to = to
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case from
+    case to
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    from = try c.decode(String.self, forKey: .from)
+    to = try c.decode(String.self, forKey: .to)
+  }
+
+  public func encode(to encoder: any Encoder) throws {
+    var c = encoder.container(keyedBy: CodingKeys.self)
+    try c.encode(from, forKey: .from)
+    try c.encode(to, forKey: .to)
   }
 }
 
@@ -2101,15 +2309,15 @@ public struct DeviceEvent: Codable, Sendable, Equatable {
   public var customerOrgIdAtOccurrence: String
   public var alertIds: [String]
   public var deviceId: String
-  public var eventType: DeviceEventEventType
-  public var recovery: DeviceEventRecovery?
+  public var eventType: EvidenceCandidateEventType
+  public var recovery: DeviceRecovery?
   public var evidenceSource: DeviceEventEvidenceSource
   public var sequence: Double
   public var occurredAt: String
   public var restoredAt: String?
   public var responseNotes: [DeviceEventResponseNotes]
 
-  public init(id: String, tenantId: String, version: Double, createdAt: String, updatedAt: String, bindingId: String?, unitIdAtOccurrence: String, customerOrgIdAtOccurrence: String, alertIds: [String], deviceId: String, eventType: DeviceEventEventType, recovery: DeviceEventRecovery?, evidenceSource: DeviceEventEvidenceSource, sequence: Double, occurredAt: String, restoredAt: String?, responseNotes: [DeviceEventResponseNotes]) {
+  public init(id: String, tenantId: String, version: Double, createdAt: String, updatedAt: String, bindingId: String?, unitIdAtOccurrence: String, customerOrgIdAtOccurrence: String, alertIds: [String], deviceId: String, eventType: EvidenceCandidateEventType, recovery: DeviceRecovery?, evidenceSource: DeviceEventEvidenceSource, sequence: Double, occurredAt: String, restoredAt: String?, responseNotes: [DeviceEventResponseNotes]) {
     self.id = id
     self.tenantId = tenantId
     self.version = version
@@ -2161,8 +2369,8 @@ public struct DeviceEvent: Codable, Sendable, Equatable {
     customerOrgIdAtOccurrence = try c.decode(String.self, forKey: .customerOrgIdAtOccurrence)
     alertIds = try c.decode([String].self, forKey: .alertIds)
     deviceId = try c.decode(String.self, forKey: .deviceId)
-    eventType = try c.decode(DeviceEventEventType.self, forKey: .eventType)
-    recovery = try c.decode(DeviceEventRecovery?.self, forKey: .recovery)
+    eventType = try c.decode(EvidenceCandidateEventType.self, forKey: .eventType)
+    recovery = try c.decode(DeviceRecovery?.self, forKey: .recovery)
     evidenceSource = try c.decode(DeviceEventEvidenceSource.self, forKey: .evidenceSource)
     sequence = try c.decode(Double.self, forKey: .sequence)
     occurredAt = try c.decode(String.self, forKey: .occurredAt)
@@ -2192,128 +2400,10 @@ public struct DeviceEvent: Codable, Sendable, Equatable {
   }
 }
 
-public enum DeviceEventEventType: String, Codable, Sendable, Equatable, CaseIterable {
-  case tamper = "tamper"
-  case communicationLost = "communication_lost"
-  case powerLost = "power_lost"
-  case restored = "restored"
-  case operationFailed = "operation_failed"
-}
-
 public enum DeviceEventEvidenceSource: String, Codable, Sendable, Equatable, CaseIterable {
   case heartbeat = "heartbeat"
   case powerSignal = "power_signal"
   case tamperSignal = "tamper_signal"
-}
-
-public enum DeviceEventRecovery: Codable, Sendable, Equatable {
-  case connection(DeviceEventRecoveryConnection)
-  case power(DeviceEventRecoveryPower)
-  case tamper(DeviceEventRecoveryTamper)
-
-  private enum Tag: String, CodingKey { case axis }
-
-  public init(from decoder: any Decoder) throws {
-    let c = try decoder.container(keyedBy: Tag.self)
-    switch try c.decode(String.self, forKey: .axis) {
-    case "connection": self = .connection(try DeviceEventRecoveryConnection(from: decoder))
-    case "power": self = .power(try DeviceEventRecoveryPower(from: decoder))
-    case "tamper": self = .tamper(try DeviceEventRecoveryTamper(from: decoder))
-    default: throw DecodingError.dataCorruptedError(forKey: .axis, in: c, debugDescription: "unknown DeviceEventRecovery")
-    }
-  }
-
-  public func encode(to encoder: any Encoder) throws {
-    switch self {
-    case .connection(let value): try value.encode(to: encoder)
-    case .power(let value): try value.encode(to: encoder)
-    case .tamper(let value): try value.encode(to: encoder)
-    }
-  }
-}
-
-public struct DeviceEventRecoveryConnection: Codable, Sendable, Equatable {
-  public var sourceEventId: String
-
-  public init(sourceEventId: String) {
-    self.sourceEventId = sourceEventId
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case axis
-    case value
-    case sourceEventId
-  }
-
-  public init(from decoder: any Decoder) throws {
-    let c = try decoder.container(keyedBy: CodingKeys.self)
-    try Constant.expect("connection", in: c, at: .axis)
-    try Constant.expect("online", in: c, at: .value)
-    sourceEventId = try c.decode(String.self, forKey: .sourceEventId)
-  }
-
-  public func encode(to encoder: any Encoder) throws {
-    var c = encoder.container(keyedBy: CodingKeys.self)
-    try c.encode("connection", forKey: .axis)
-    try c.encode("online", forKey: .value)
-    try c.encode(sourceEventId, forKey: .sourceEventId)
-  }
-}
-
-public struct DeviceEventRecoveryPower: Codable, Sendable, Equatable {
-  public var sourceEventId: String
-
-  public init(sourceEventId: String) {
-    self.sourceEventId = sourceEventId
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case axis
-    case value
-    case sourceEventId
-  }
-
-  public init(from decoder: any Decoder) throws {
-    let c = try decoder.container(keyedBy: CodingKeys.self)
-    try Constant.expect("power", in: c, at: .axis)
-    try Constant.expect("on", in: c, at: .value)
-    sourceEventId = try c.decode(String.self, forKey: .sourceEventId)
-  }
-
-  public func encode(to encoder: any Encoder) throws {
-    var c = encoder.container(keyedBy: CodingKeys.self)
-    try c.encode("power", forKey: .axis)
-    try c.encode("on", forKey: .value)
-    try c.encode(sourceEventId, forKey: .sourceEventId)
-  }
-}
-
-public struct DeviceEventRecoveryTamper: Codable, Sendable, Equatable {
-  public var sourceEventId: String
-
-  public init(sourceEventId: String) {
-    self.sourceEventId = sourceEventId
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case axis
-    case value
-    case sourceEventId
-  }
-
-  public init(from decoder: any Decoder) throws {
-    let c = try decoder.container(keyedBy: CodingKeys.self)
-    try Constant.expect("tamper", in: c, at: .axis)
-    try Constant.expect("clear", in: c, at: .value)
-    sourceEventId = try c.decode(String.self, forKey: .sourceEventId)
-  }
-
-  public func encode(to encoder: any Encoder) throws {
-    var c = encoder.container(keyedBy: CodingKeys.self)
-    try c.encode("tamper", forKey: .axis)
-    try c.encode("clear", forKey: .value)
-    try c.encode(sourceEventId, forKey: .sourceEventId)
-  }
 }
 
 public struct DeviceEventResponseNotes: Codable, Sendable, Equatable {
@@ -2361,12 +2451,12 @@ public struct DeviceOperation: Codable, Sendable, Equatable {
   public var kind: DeviceOperationKind
   public var status: DeviceOperationStatus
   public var targetVersion: String?
-  public var failureCode: CommandFailureCode?
+  public var failureCode: ErrorCode?
   public var startedAt: String?
   public var finishedAt: String?
   public var expiresAt: String
 
-  public init(id: String, tenantId: String, version: Double, createdAt: String, updatedAt: String, bindingId: String?, unitIdAtOccurrence: String, customerOrgIdAtOccurrence: String, deviceId: String, kind: DeviceOperationKind, status: DeviceOperationStatus, targetVersion: String?, failureCode: CommandFailureCode?, startedAt: String?, finishedAt: String?, expiresAt: String) {
+  public init(id: String, tenantId: String, version: Double, createdAt: String, updatedAt: String, bindingId: String?, unitIdAtOccurrence: String, customerOrgIdAtOccurrence: String, deviceId: String, kind: DeviceOperationKind, status: DeviceOperationStatus, targetVersion: String?, failureCode: ErrorCode?, startedAt: String?, finishedAt: String?, expiresAt: String) {
     self.id = id
     self.tenantId = tenantId
     self.version = version
@@ -2418,7 +2508,7 @@ public struct DeviceOperation: Codable, Sendable, Equatable {
     kind = try c.decode(DeviceOperationKind.self, forKey: .kind)
     status = try c.decode(DeviceOperationStatus.self, forKey: .status)
     targetVersion = try c.decode(String?.self, forKey: .targetVersion)
-    failureCode = try c.decode(CommandFailureCode?.self, forKey: .failureCode)
+    failureCode = try c.decode(ErrorCode?.self, forKey: .failureCode)
     startedAt = try c.decode(String?.self, forKey: .startedAt)
     finishedAt = try c.decode(String?.self, forKey: .finishedAt)
     expiresAt = try c.decode(String.self, forKey: .expiresAt)
@@ -2456,6 +2546,116 @@ public enum DeviceOperationStatus: String, Codable, Sendable, Equatable, CaseIte
   case queued = "queued"
   case running = "running"
   case succeeded = "succeeded"
+}
+
+public enum DeviceRecovery: Codable, Sendable, Equatable {
+  case connection(DeviceRecoveryConnection)
+  case power(DeviceRecoveryPower)
+  case tamper(DeviceRecoveryTamper)
+
+  private enum Tag: String, CodingKey { case axis }
+
+  public init(from decoder: any Decoder) throws {
+    let c = try decoder.container(keyedBy: Tag.self)
+    switch try c.decode(String.self, forKey: .axis) {
+    case "connection": self = .connection(try DeviceRecoveryConnection(from: decoder))
+    case "power": self = .power(try DeviceRecoveryPower(from: decoder))
+    case "tamper": self = .tamper(try DeviceRecoveryTamper(from: decoder))
+    default: throw DecodingError.dataCorruptedError(forKey: .axis, in: c, debugDescription: "unknown DeviceRecovery")
+    }
+  }
+
+  public func encode(to encoder: any Encoder) throws {
+    switch self {
+    case .connection(let value): try value.encode(to: encoder)
+    case .power(let value): try value.encode(to: encoder)
+    case .tamper(let value): try value.encode(to: encoder)
+    }
+  }
+}
+
+public struct DeviceRecoveryConnection: Codable, Sendable, Equatable {
+  public var sourceEventId: String
+
+  public init(sourceEventId: String) {
+    self.sourceEventId = sourceEventId
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case axis
+    case value
+    case sourceEventId
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    try Constant.expect("connection", in: c, at: .axis)
+    try Constant.expect("online", in: c, at: .value)
+    sourceEventId = try c.decode(String.self, forKey: .sourceEventId)
+  }
+
+  public func encode(to encoder: any Encoder) throws {
+    var c = encoder.container(keyedBy: CodingKeys.self)
+    try c.encode("connection", forKey: .axis)
+    try c.encode("online", forKey: .value)
+    try c.encode(sourceEventId, forKey: .sourceEventId)
+  }
+}
+
+public struct DeviceRecoveryPower: Codable, Sendable, Equatable {
+  public var sourceEventId: String
+
+  public init(sourceEventId: String) {
+    self.sourceEventId = sourceEventId
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case axis
+    case value
+    case sourceEventId
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    try Constant.expect("power", in: c, at: .axis)
+    try Constant.expect("on", in: c, at: .value)
+    sourceEventId = try c.decode(String.self, forKey: .sourceEventId)
+  }
+
+  public func encode(to encoder: any Encoder) throws {
+    var c = encoder.container(keyedBy: CodingKeys.self)
+    try c.encode("power", forKey: .axis)
+    try c.encode("on", forKey: .value)
+    try c.encode(sourceEventId, forKey: .sourceEventId)
+  }
+}
+
+public struct DeviceRecoveryTamper: Codable, Sendable, Equatable {
+  public var sourceEventId: String
+
+  public init(sourceEventId: String) {
+    self.sourceEventId = sourceEventId
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case axis
+    case value
+    case sourceEventId
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    try Constant.expect("tamper", in: c, at: .axis)
+    try Constant.expect("clear", in: c, at: .value)
+    sourceEventId = try c.decode(String.self, forKey: .sourceEventId)
+  }
+
+  public func encode(to encoder: any Encoder) throws {
+    var c = encoder.container(keyedBy: CodingKeys.self)
+    try c.encode("tamper", forKey: .axis)
+    try c.encode("clear", forKey: .value)
+    try c.encode(sourceEventId, forKey: .sourceEventId)
+  }
 }
 
 public struct DevicesAddResponseNoteInput: Codable, Sendable, Equatable {
@@ -3235,6 +3435,7 @@ public struct Empty: Codable, Sendable, Equatable {
   }
 
   public func encode(to encoder: any Encoder) throws {
+    _ = encoder.container(keyedBy: NoKeys.self)
   }
 }
 
@@ -3245,7 +3446,7 @@ public struct EnergyBaseline: Codable, Sendable, Equatable {
   public var createdAt: String
   public var updatedAt: String
   public var unitIds: [String]
-  public var period: Range
+  public var period: CoreRange
   public var method: QueryFiltersMethod
   public var baselineKWh: Double?
   public var quality: BaselineQuality
@@ -3254,7 +3455,7 @@ public struct EnergyBaseline: Codable, Sendable, Equatable {
   public var assumptions: String
   public var source: String
 
-  public init(id: String, tenantId: String, version: Double, createdAt: String, updatedAt: String, unitIds: [String], period: Range, method: QueryFiltersMethod, baselineKWh: Double?, quality: BaselineQuality, boundaryId: EnergyBoundaryId, boundary: String, assumptions: String, source: String) {
+  public init(id: String, tenantId: String, version: Double, createdAt: String, updatedAt: String, unitIds: [String], period: CoreRange, method: QueryFiltersMethod, baselineKWh: Double?, quality: BaselineQuality, boundaryId: EnergyBoundaryId, boundary: String, assumptions: String, source: String) {
     self.id = id
     self.tenantId = tenantId
     self.version = version
@@ -3296,7 +3497,7 @@ public struct EnergyBaseline: Codable, Sendable, Equatable {
     createdAt = try c.decode(String.self, forKey: .createdAt)
     updatedAt = try c.decode(String.self, forKey: .updatedAt)
     unitIds = try c.decode([String].self, forKey: .unitIds)
-    period = try c.decode(Range.self, forKey: .period)
+    period = try c.decode(CoreRange.self, forKey: .period)
     method = try c.decode(QueryFiltersMethod.self, forKey: .method)
     baselineKWh = try c.decode(Double?.self, forKey: .baselineKWh)
     quality = try c.decode(BaselineQuality.self, forKey: .quality)
@@ -3331,7 +3532,7 @@ public enum EnergyBoundaryId: String, Codable, Sendable, Equatable, CaseIterable
 }
 
 public struct EnergySummary: Codable, Sendable, Equatable {
-  public var period: Range
+  public var period: CoreRange
   public var unitIds: [String]
   public var totals: EnergySummaryTotals
   public var currency: Currency
@@ -3345,7 +3546,7 @@ public struct EnergySummary: Codable, Sendable, Equatable {
   public var coverage: Double?
   public var qualityWarnings: [String]
 
-  public init(period: Range, unitIds: [String], totals: EnergySummaryTotals, currency: Currency, baselineRef: EnergySummaryBaselineRef?, factorRef: EnergySummaryFactorRef?, baselineSnapshot: EnergyBaseline?, factorSnapshot: EmissionFactor?, tariffVersion: String, boundaryId: EnergyBoundaryId, boundary: String, coverage: Double?, qualityWarnings: [String]) {
+  public init(period: CoreRange, unitIds: [String], totals: EnergySummaryTotals, currency: Currency, baselineRef: EnergySummaryBaselineRef?, factorRef: EnergySummaryFactorRef?, baselineSnapshot: EnergyBaseline?, factorSnapshot: EmissionFactor?, tariffVersion: String, boundaryId: EnergyBoundaryId, boundary: String, coverage: Double?, qualityWarnings: [String]) {
     self.period = period
     self.unitIds = unitIds
     self.totals = totals
@@ -3379,7 +3580,7 @@ public struct EnergySummary: Codable, Sendable, Equatable {
 
   public init(from decoder: any Decoder) throws {
     let c = try decoder.container(keyedBy: CodingKeys.self)
-    period = try c.decode(Range.self, forKey: .period)
+    period = try c.decode(CoreRange.self, forKey: .period)
     unitIds = try c.decode([String].self, forKey: .unitIds)
     totals = try c.decode(EnergySummaryTotals.self, forKey: .totals)
     currency = try c.decode(Currency.self, forKey: .currency)
@@ -3524,29 +3725,29 @@ public struct EnergySummaryTotals: Codable, Sendable, Equatable {
 }
 
 public enum ErrorCode: String, Codable, Sendable, Equatable, CaseIterable {
+  case timeout = "TIMEOUT"
+  case offline = "OFFLINE"
+  case unavailable = "UNAVAILABLE"
+  case conflict = "CONFLICT"
   case validation = "VALIDATION"
   case unauthenticated = "UNAUTHENTICATED"
   case forbidden = "FORBIDDEN"
   case notFound = "NOT_FOUND"
-  case conflict = "CONFLICT"
-  case offline = "OFFLINE"
-  case timeout = "TIMEOUT"
   case rateLimited = "RATE_LIMITED"
-  case unavailable = "UNAVAILABLE"
 }
 
 public struct EvidenceCandidate: Codable, Sendable, Equatable {
   public var id: String
   public var kind: EvidenceCandidateKind
   public var observedAt: String
-  public var metric: EvidenceCandidateMetric?
+  public var metric: Metric?
   public var value: Double?
-  public var unit: EvidenceCandidateUnit?
+  public var unit: UnitSymbol?
   public var origin: EvidenceCandidateOrigin?
-  public var quality: EvidenceCandidateQuality?
+  public var quality: Quality?
   public var eventType: EvidenceCandidateEventType?
 
-  public init(id: String, kind: EvidenceCandidateKind, observedAt: String, metric: EvidenceCandidateMetric?, value: Double?, unit: EvidenceCandidateUnit?, origin: EvidenceCandidateOrigin?, quality: EvidenceCandidateQuality?, eventType: EvidenceCandidateEventType?) {
+  public init(id: String, kind: EvidenceCandidateKind, observedAt: String, metric: Metric?, value: Double?, unit: UnitSymbol?, origin: EvidenceCandidateOrigin?, quality: Quality?, eventType: EvidenceCandidateEventType?) {
     self.id = id
     self.kind = kind
     self.observedAt = observedAt
@@ -3575,11 +3776,11 @@ public struct EvidenceCandidate: Codable, Sendable, Equatable {
     id = try c.decode(String.self, forKey: .id)
     kind = try c.decode(EvidenceCandidateKind.self, forKey: .kind)
     observedAt = try c.decode(String.self, forKey: .observedAt)
-    metric = try c.decode(EvidenceCandidateMetric?.self, forKey: .metric)
+    metric = try c.decode(Metric?.self, forKey: .metric)
     value = try c.decode(Double?.self, forKey: .value)
-    unit = try c.decode(EvidenceCandidateUnit?.self, forKey: .unit)
+    unit = try c.decode(UnitSymbol?.self, forKey: .unit)
     origin = try c.decode(EvidenceCandidateOrigin?.self, forKey: .origin)
-    quality = try c.decode(EvidenceCandidateQuality?.self, forKey: .quality)
+    quality = try c.decode(Quality?.self, forKey: .quality)
     eventType = try c.decode(EvidenceCandidateEventType?.self, forKey: .eventType)
   }
 
@@ -3611,42 +3812,10 @@ public enum EvidenceCandidateKind: String, Codable, Sendable, Equatable, CaseIte
   case deviceEvent = "device_event"
 }
 
-public enum EvidenceCandidateMetric: String, Codable, Sendable, Equatable, CaseIterable {
-  case temperature = "temperature"
-  case humidity = "humidity"
-  case co2 = "co2"
-  case pm25 = "pm25"
-  case power = "power"
-  case vibration = "vibration"
-  case refrigerantPressure = "refrigerant_pressure"
-  case compressorCycles = "compressor_cycles"
-  case airflowDrop = "airflow_drop"
-  case heartbeatGap = "heartbeat_gap"
-}
-
 public enum EvidenceCandidateOrigin: String, Codable, Sendable, Equatable, CaseIterable {
   case inspection = "inspection"
   case measured = "measured"
   case estimated = "estimated"
-}
-
-public enum EvidenceCandidateQuality: String, Codable, Sendable, Equatable, CaseIterable {
-  case valid = "valid"
-  case missing = "missing"
-  case stale = "stale"
-  case suspect = "suspect"
-}
-
-public enum EvidenceCandidateUnit: String, Codable, Sendable, Equatable, CaseIterable {
-  case c = "°C"
-  case value1 = "%"
-  case ppm = "ppm"
-  case gM = "µg/m³"
-  case kW = "kW"
-  case mmS = "mm/s"
-  case kPa = "kPa"
-  case cyclesH = "cycles/h"
-  case min = "min"
 }
 
 public enum Fan: String, Codable, Sendable, Equatable, CaseIterable {
@@ -4001,12 +4170,12 @@ public struct IoTModel: Codable, Sendable, Equatable {
 }
 
 public struct IoTModelSensors: Codable, Sendable, Equatable {
-  public var boundaryId: SensorBoundaryId?
+  public var boundaryId: EnergyBoundaryId?
   public var metric: Metric
   public var unit: UnitSymbol
   public var staleAfterSeconds: Double
 
-  public init(boundaryId: SensorBoundaryId?, metric: Metric, unit: UnitSymbol, staleAfterSeconds: Double) {
+  public init(boundaryId: EnergyBoundaryId?, metric: Metric, unit: UnitSymbol, staleAfterSeconds: Double) {
     self.boundaryId = boundaryId
     self.metric = metric
     self.unit = unit
@@ -4022,7 +4191,7 @@ public struct IoTModelSensors: Codable, Sendable, Equatable {
 
   public init(from decoder: any Decoder) throws {
     let c = try decoder.container(keyedBy: CodingKeys.self)
-    boundaryId = try c.decode(SensorBoundaryId?.self, forKey: .boundaryId)
+    boundaryId = try c.decode(EnergyBoundaryId?.self, forKey: .boundaryId)
     metric = try c.decode(Metric.self, forKey: .metric)
     unit = try c.decode(UnitSymbol.self, forKey: .unit)
     staleAfterSeconds = try c.decode(Double.self, forKey: .staleAfterSeconds)
@@ -5101,13 +5270,13 @@ public struct JobSummary: Codable, Sendable, Equatable {
   public var followUpClass: MaintenanceJobFollowUpClass?
   public var severity: Severity
   public var displayStatus: JobDisplayStatus
-  public var assignmentAcknowledgement: JobSummaryAssignmentAcknowledgement?
+  public var assignmentAcknowledgement: AssignmentAcknowledgement?
   public var technicianMembershipId: String?
   public var accessValidFrom: String?
   public var accessValidUntil: String?
   public var eventSummary: JobEventSummary
 
-  public init(id: String, version: Double, status: JobStatus, createdAt: String, dueAt: String, type: MaintenanceJobType, origin: JobOrigin, unitId: String, requestedSlot: Slot, scheduledSlot: Slot?, assignmentId: String?, preferredSlots: [Slot], followUpOfJobId: String?, followUpClass: MaintenanceJobFollowUpClass?, severity: Severity, displayStatus: JobDisplayStatus, assignmentAcknowledgement: JobSummaryAssignmentAcknowledgement?, technicianMembershipId: String?, accessValidFrom: String?, accessValidUntil: String?, eventSummary: JobEventSummary) {
+  public init(id: String, version: Double, status: JobStatus, createdAt: String, dueAt: String, type: MaintenanceJobType, origin: JobOrigin, unitId: String, requestedSlot: Slot, scheduledSlot: Slot?, assignmentId: String?, preferredSlots: [Slot], followUpOfJobId: String?, followUpClass: MaintenanceJobFollowUpClass?, severity: Severity, displayStatus: JobDisplayStatus, assignmentAcknowledgement: AssignmentAcknowledgement?, technicianMembershipId: String?, accessValidFrom: String?, accessValidUntil: String?, eventSummary: JobEventSummary) {
     self.id = id
     self.version = version
     self.status = status
@@ -5177,7 +5346,7 @@ public struct JobSummary: Codable, Sendable, Equatable {
     followUpClass = try c.decode(MaintenanceJobFollowUpClass?.self, forKey: .followUpClass)
     severity = try c.decode(Severity.self, forKey: .severity)
     displayStatus = try c.decode(JobDisplayStatus.self, forKey: .displayStatus)
-    assignmentAcknowledgement = try c.decode(JobSummaryAssignmentAcknowledgement?.self, forKey: .assignmentAcknowledgement)
+    assignmentAcknowledgement = try c.decode(AssignmentAcknowledgement?.self, forKey: .assignmentAcknowledgement)
     technicianMembershipId = try c.decode(String?.self, forKey: .technicianMembershipId)
     accessValidFrom = try c.decode(String?.self, forKey: .accessValidFrom)
     accessValidUntil = try c.decode(String?.self, forKey: .accessValidUntil)
@@ -5210,19 +5379,6 @@ public struct JobSummary: Codable, Sendable, Equatable {
     try c.encode(accessValidUntil, forKey: .accessValidUntil)
     try c.encode(eventSummary, forKey: .eventSummary)
   }
-}
-
-public enum JobSummaryAssignmentAcknowledgement: String, Codable, Sendable, Equatable, CaseIterable {
-  case pending = "pending"
-  case cantMake = "cant_make"
-  case accepted = "accepted"
-}
-
-public enum Locale: String, Codable, Sendable, Equatable, CaseIterable {
-  case id = "id"
-  case en = "en"
-  case ms = "ms"
-  case ja = "ja"
 }
 
 public struct MaintenanceJob: Codable, Sendable, Equatable {
@@ -5425,128 +5581,7 @@ public enum MaintenanceJobType: String, Codable, Sendable, Equatable, CaseIterab
   case installation = "installation"
 }
 
-public struct Measurement: Codable, Sendable, Equatable {
-  public var id: String
-  public var tenantId: String
-  public var version: Double
-  public var createdAt: String
-  public var updatedAt: String
-  public var boundaryId: SensorBoundaryId?
-  public var qualityReason: MeasurementQualityReason?
-  public var rawUnit: String?
-  public var unitId: String
-  public var sensorId: String
-  public var metric: Metric
-  public var value: Double?
-  public var unit: UnitSymbol
-  public var observedAt: String
-  public var receivedAt: String
-  public var origin: MeasurementOrigin
-  public var quality: Quality
-  public var sequence: Double
-  public var eventId: String
-
-  public init(id: String, tenantId: String, version: Double, createdAt: String, updatedAt: String, boundaryId: SensorBoundaryId?, qualityReason: MeasurementQualityReason?, rawUnit: String?, unitId: String, sensorId: String, metric: Metric, value: Double?, unit: UnitSymbol, observedAt: String, receivedAt: String, origin: MeasurementOrigin, quality: Quality, sequence: Double, eventId: String) {
-    self.id = id
-    self.tenantId = tenantId
-    self.version = version
-    self.createdAt = createdAt
-    self.updatedAt = updatedAt
-    self.boundaryId = boundaryId
-    self.qualityReason = qualityReason
-    self.rawUnit = rawUnit
-    self.unitId = unitId
-    self.sensorId = sensorId
-    self.metric = metric
-    self.value = value
-    self.unit = unit
-    self.observedAt = observedAt
-    self.receivedAt = receivedAt
-    self.origin = origin
-    self.quality = quality
-    self.sequence = sequence
-    self.eventId = eventId
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case isDemo
-    case id
-    case tenantId
-    case version
-    case createdAt
-    case updatedAt
-    case boundaryId
-    case qualityReason
-    case rawUnit
-    case unitId
-    case sensorId
-    case metric
-    case value
-    case unit
-    case observedAt
-    case receivedAt
-    case origin
-    case quality
-    case sequence
-    case eventId
-  }
-
-  public init(from decoder: any Decoder) throws {
-    let c = try decoder.container(keyedBy: CodingKeys.self)
-    try Constant.expect(true, in: c, at: .isDemo)
-    id = try c.decode(String.self, forKey: .id)
-    tenantId = try c.decode(String.self, forKey: .tenantId)
-    version = try c.decode(Double.self, forKey: .version)
-    createdAt = try c.decode(String.self, forKey: .createdAt)
-    updatedAt = try c.decode(String.self, forKey: .updatedAt)
-    boundaryId = try c.decode(SensorBoundaryId?.self, forKey: .boundaryId)
-    qualityReason = try c.decode(MeasurementQualityReason?.self, forKey: .qualityReason)
-    rawUnit = try c.decode(String?.self, forKey: .rawUnit)
-    unitId = try c.decode(String.self, forKey: .unitId)
-    sensorId = try c.decode(String.self, forKey: .sensorId)
-    metric = try c.decode(Metric.self, forKey: .metric)
-    value = try c.decode(Double?.self, forKey: .value)
-    unit = try c.decode(UnitSymbol.self, forKey: .unit)
-    observedAt = try c.decode(String.self, forKey: .observedAt)
-    receivedAt = try c.decode(String.self, forKey: .receivedAt)
-    origin = try c.decode(MeasurementOrigin.self, forKey: .origin)
-    quality = try c.decode(Quality.self, forKey: .quality)
-    sequence = try c.decode(Double.self, forKey: .sequence)
-    eventId = try c.decode(String.self, forKey: .eventId)
-  }
-
-  public func encode(to encoder: any Encoder) throws {
-    var c = encoder.container(keyedBy: CodingKeys.self)
-    try c.encode(true, forKey: .isDemo)
-    try c.encode(id, forKey: .id)
-    try c.encode(tenantId, forKey: .tenantId)
-    try c.encode(version, forKey: .version)
-    try c.encode(createdAt, forKey: .createdAt)
-    try c.encode(updatedAt, forKey: .updatedAt)
-    try c.encode(boundaryId, forKey: .boundaryId)
-    try c.encode(qualityReason, forKey: .qualityReason)
-    try c.encode(rawUnit, forKey: .rawUnit)
-    try c.encode(unitId, forKey: .unitId)
-    try c.encode(sensorId, forKey: .sensorId)
-    try c.encode(metric, forKey: .metric)
-    try c.encode(value, forKey: .value)
-    try c.encode(unit, forKey: .unit)
-    try c.encode(observedAt, forKey: .observedAt)
-    try c.encode(receivedAt, forKey: .receivedAt)
-    try c.encode(origin, forKey: .origin)
-    try c.encode(quality, forKey: .quality)
-    try c.encode(sequence, forKey: .sequence)
-    try c.encode(eventId, forKey: .eventId)
-  }
-}
-
-public enum MeasurementOrigin: String, Codable, Sendable, Equatable, CaseIterable {
-  case inspection = "inspection"
-  case measured = "measured"
-  case estimated = "estimated"
-}
-
-public enum MeasurementQualityReason: String, Codable, Sendable, Equatable, CaseIterable {
+public enum MeasurementIssue: String, Codable, Sendable, Equatable, CaseIterable {
   case unitMismatch = "unit_mismatch"
   case nonFinite = "non_finite"
   case outOfRange = "out_of_range"
@@ -5572,185 +5607,77 @@ public enum Mode: String, Codable, Sendable, Equatable, CaseIterable {
   case fan = "fan"
 }
 
-public struct Notification: Codable, Sendable, Equatable {
-  public var id: String
-  public var tenantId: String
-  public var version: Double
-  public var createdAt: String
-  public var updatedAt: String
-  public var sourceAlertId: String?
-  public var type: NotificationType
-  public var recipientMembershipId: String
-  public var scopeVersionAtCreation: Double
-  public var target: Target
-  public var templateKey: NotificationTemplateKey
-  public var params: NotificationParams
-  public var channel: Channel
-  public var deliveryState: NotificationDeliveryState
-  public var severity: Severity
-  public var occurredAt: String
-  public var readAt: String?
-  public var targetOpen: Bool
+public enum NextAction: Codable, Sendable, Equatable {
+  case none(NextActionNone)
+  case followUp(NextActionFollowUp)
 
-  public init(id: String, tenantId: String, version: Double, createdAt: String, updatedAt: String, sourceAlertId: String?, type: NotificationType, recipientMembershipId: String, scopeVersionAtCreation: Double, target: Target, templateKey: NotificationTemplateKey, params: NotificationParams, channel: Channel, deliveryState: NotificationDeliveryState, severity: Severity, occurredAt: String, readAt: String?, targetOpen: Bool) {
-    self.id = id
-    self.tenantId = tenantId
-    self.version = version
-    self.createdAt = createdAt
-    self.updatedAt = updatedAt
-    self.sourceAlertId = sourceAlertId
-    self.type = type
-    self.recipientMembershipId = recipientMembershipId
-    self.scopeVersionAtCreation = scopeVersionAtCreation
-    self.target = target
-    self.templateKey = templateKey
-    self.params = params
-    self.channel = channel
-    self.deliveryState = deliveryState
-    self.severity = severity
-    self.occurredAt = occurredAt
-    self.readAt = readAt
-    self.targetOpen = targetOpen
+  private enum Tag: String, CodingKey { case kind }
+
+  public init(from decoder: any Decoder) throws {
+    let c = try decoder.container(keyedBy: Tag.self)
+    switch try c.decode(String.self, forKey: .kind) {
+    case "none": self = .none(try NextActionNone(from: decoder))
+    case "follow_up": self = .followUp(try NextActionFollowUp(from: decoder))
+    default: throw DecodingError.dataCorruptedError(forKey: .kind, in: c, debugDescription: "unknown NextAction")
+    }
+  }
+
+  public func encode(to encoder: any Encoder) throws {
+    switch self {
+    case .none(let value): try value.encode(to: encoder)
+    case .followUp(let value): try value.encode(to: encoder)
+    }
+  }
+}
+
+public struct NextActionFollowUp: Codable, Sendable, Equatable {
+  public var date: String
+  public var note: String
+
+  public init(date: String, note: String) {
+    self.date = date
+    self.note = note
   }
 
   enum CodingKeys: String, CodingKey {
-    case id
-    case tenantId
-    case version
-    case createdAt
-    case updatedAt
-    case sourceAlertId
-    case type
-    case recipientMembershipId
-    case scopeVersionAtCreation
-    case target
-    case templateKey
-    case params
-    case channel
-    case deliveryState
-    case severity
-    case occurredAt
-    case readAt
-    case targetOpen
+    case kind
+    case date
+    case note
   }
 
   public init(from decoder: any Decoder) throws {
     let c = try decoder.container(keyedBy: CodingKeys.self)
-    id = try c.decode(String.self, forKey: .id)
-    tenantId = try c.decode(String.self, forKey: .tenantId)
-    version = try c.decode(Double.self, forKey: .version)
-    createdAt = try c.decode(String.self, forKey: .createdAt)
-    updatedAt = try c.decode(String.self, forKey: .updatedAt)
-    sourceAlertId = try c.decode(String?.self, forKey: .sourceAlertId)
-    type = try c.decode(NotificationType.self, forKey: .type)
-    recipientMembershipId = try c.decode(String.self, forKey: .recipientMembershipId)
-    scopeVersionAtCreation = try c.decode(Double.self, forKey: .scopeVersionAtCreation)
-    target = try c.decode(Target.self, forKey: .target)
-    templateKey = try c.decode(NotificationTemplateKey.self, forKey: .templateKey)
-    params = try c.decode(NotificationParams.self, forKey: .params)
-    channel = try c.decode(Channel.self, forKey: .channel)
-    deliveryState = try c.decode(NotificationDeliveryState.self, forKey: .deliveryState)
-    severity = try c.decode(Severity.self, forKey: .severity)
-    occurredAt = try c.decode(String.self, forKey: .occurredAt)
-    readAt = try c.decode(String?.self, forKey: .readAt)
-    targetOpen = try c.decode(Bool.self, forKey: .targetOpen)
+    try Constant.expect("follow_up", in: c, at: .kind)
+    date = try c.decode(String.self, forKey: .date)
+    note = try c.decode(String.self, forKey: .note)
   }
 
   public func encode(to encoder: any Encoder) throws {
     var c = encoder.container(keyedBy: CodingKeys.self)
-    try c.encode(id, forKey: .id)
-    try c.encode(tenantId, forKey: .tenantId)
-    try c.encode(version, forKey: .version)
-    try c.encode(createdAt, forKey: .createdAt)
-    try c.encode(updatedAt, forKey: .updatedAt)
-    try c.encode(sourceAlertId, forKey: .sourceAlertId)
-    try c.encode(type, forKey: .type)
-    try c.encode(recipientMembershipId, forKey: .recipientMembershipId)
-    try c.encode(scopeVersionAtCreation, forKey: .scopeVersionAtCreation)
-    try c.encode(target, forKey: .target)
-    try c.encode(templateKey, forKey: .templateKey)
-    try c.encode(params, forKey: .params)
-    try c.encode(channel, forKey: .channel)
-    try c.encode(deliveryState, forKey: .deliveryState)
-    try c.encode(severity, forKey: .severity)
-    try c.encode(occurredAt, forKey: .occurredAt)
-    try c.encode(readAt, forKey: .readAt)
-    try c.encode(targetOpen, forKey: .targetOpen)
+    try c.encode("follow_up", forKey: .kind)
+    try c.encode(date, forKey: .date)
+    try c.encode(note, forKey: .note)
   }
 }
 
-public enum NotificationDeliveryState: String, Codable, Sendable, Equatable, CaseIterable {
-  case failed = "failed"
-  case queued = "queued"
-  case preview = "preview"
-  case simulated = "simulated"
-}
+public struct NextActionNone: Codable, Sendable, Equatable {
 
-public struct NotificationParams: Codable, Sendable, Equatable {
-  public var targetName: String
-  public var at: String
-  public var status: String
-  public var reason: String?
-  public var amountMinor: Double?
-  public var currency: NotificationParamsCurrency?
-  public var method: NotificationParamsMethod?
-  public var message: String?
-
-  public init(targetName: String, at: String, status: String, reason: String?, amountMinor: Double?, currency: NotificationParamsCurrency?, method: NotificationParamsMethod?, message: String?) {
-    self.targetName = targetName
-    self.at = at
-    self.status = status
-    self.reason = reason
-    self.amountMinor = amountMinor
-    self.currency = currency
-    self.method = method
-    self.message = message
+  public init() {
   }
 
   enum CodingKeys: String, CodingKey {
-    case targetName
-    case at
-    case status
-    case reason
-    case amountMinor
-    case currency
-    case method
-    case message
+    case kind
   }
 
   public init(from decoder: any Decoder) throws {
     let c = try decoder.container(keyedBy: CodingKeys.self)
-    targetName = try c.decode(String.self, forKey: .targetName)
-    at = try c.decode(String.self, forKey: .at)
-    status = try c.decode(String.self, forKey: .status)
-    reason = try c.decode(String?.self, forKey: .reason)
-    amountMinor = try c.decode(Double?.self, forKey: .amountMinor)
-    currency = try c.decode(NotificationParamsCurrency?.self, forKey: .currency)
-    method = try c.decode(NotificationParamsMethod?.self, forKey: .method)
-    message = try c.decode(String?.self, forKey: .message)
+    try Constant.expect("none", in: c, at: .kind)
   }
 
   public func encode(to encoder: any Encoder) throws {
     var c = encoder.container(keyedBy: CodingKeys.self)
-    try c.encode(targetName, forKey: .targetName)
-    try c.encode(at, forKey: .at)
-    try c.encode(status, forKey: .status)
-    try c.encode(reason, forKey: .reason)
-    try c.encode(amountMinor, forKey: .amountMinor)
-    try c.encode(currency, forKey: .currency)
-    try c.encode(method, forKey: .method)
-    try c.encode(message, forKey: .message)
+    try c.encode("none", forKey: .kind)
   }
-}
-
-public enum NotificationParamsCurrency: String, Codable, Sendable, Equatable, CaseIterable {
-  case myr = "MYR"
-  case usd = "USD"
-}
-
-public enum NotificationParamsMethod: String, Codable, Sendable, Equatable, CaseIterable {
-  case demoCreditCard = "demo_credit_card"
-  case demoDebitCard = "demo_debit_card"
 }
 
 public struct NotificationsMarkAllReadInput: Codable, Sendable, Equatable {
@@ -5824,23 +5751,6 @@ public struct NotificationsMarkReadInput: Codable, Sendable, Equatable {
   }
 }
 
-public enum NotificationTemplateKey: String, Codable, Sendable, Equatable, CaseIterable {
-  case quality = "quality"
-  case payment = "payment"
-  case restriction = "restriction"
-  case scheduleChange = "schedule_change"
-  case reportReturn = "report_return"
-  case completion = "completion"
-  case paymentReminder = "payment_reminder"
-  case inquiry = "inquiry"
-  case jobUpdate = "job_update"
-  case deviceOperation = "device_operation"
-  case certificateExpiry = "certificate_expiry"
-  case warrantyExpiring = "warranty_expiring"
-  case alert = "alert"
-  case invite = "invite"
-}
-
 public enum NotificationType: String, Codable, Sendable, Equatable, CaseIterable {
   case quality = "quality"
   case payment = "payment"
@@ -5861,11 +5771,11 @@ public enum NotificationType: String, Codable, Sendable, Equatable, CaseIterable
 public struct ObservedState: Codable, Sendable, Equatable {
   public var power: Bool?
   public var celsius: Double?
-  public var mode: ObservedStateMode?
-  public var fanLevel: ObservedStateFanLevel?
+  public var mode: Mode?
+  public var fanLevel: Fan?
   public var observedAt: String?
 
-  public init(power: Bool?, celsius: Double?, mode: ObservedStateMode?, fanLevel: ObservedStateFanLevel?, observedAt: String?) {
+  public init(power: Bool?, celsius: Double?, mode: Mode?, fanLevel: Fan?, observedAt: String?) {
     self.power = power
     self.celsius = celsius
     self.mode = mode
@@ -5885,8 +5795,8 @@ public struct ObservedState: Codable, Sendable, Equatable {
     let c = try decoder.container(keyedBy: CodingKeys.self)
     power = try c.decode(Bool?.self, forKey: .power)
     celsius = try c.decode(Double?.self, forKey: .celsius)
-    mode = try c.decode(ObservedStateMode?.self, forKey: .mode)
-    fanLevel = try c.decode(ObservedStateFanLevel?.self, forKey: .fanLevel)
+    mode = try c.decode(Mode?.self, forKey: .mode)
+    fanLevel = try c.decode(Fan?.self, forKey: .fanLevel)
     observedAt = try c.decode(String?.self, forKey: .observedAt)
   }
 
@@ -5898,18 +5808,6 @@ public struct ObservedState: Codable, Sendable, Equatable {
     try c.encode(fanLevel, forKey: .fanLevel)
     try c.encode(observedAt, forKey: .observedAt)
   }
-}
-
-public enum ObservedStateFanLevel: String, Codable, Sendable, Equatable, CaseIterable {
-  case low = "low"
-  case mid = "mid"
-  case high = "high"
-}
-
-public enum ObservedStateMode: String, Codable, Sendable, Equatable, CaseIterable {
-  case cool = "cool"
-  case dry = "dry"
-  case fan = "fan"
 }
 
 public struct Offer: Codable, Sendable, Equatable {
@@ -6062,11 +5960,11 @@ public struct Part: Codable, Sendable, Equatable {
   public var catalogCode: String?
   public var source: PartSource
   public var lotSerial: String?
-  public var replacesComponentKey: PartReplacesComponentKey?
+  public var replacesComponentKey: ComponentKey?
   public var oldPartDisposal: PartOldPartDisposal?
   public var receiptAttachmentId: String?
 
-  public init(name: String, quantity: Double, catalogCode: String?, source: PartSource, lotSerial: String?, replacesComponentKey: PartReplacesComponentKey?, oldPartDisposal: PartOldPartDisposal?, receiptAttachmentId: String?) {
+  public init(name: String, quantity: Double, catalogCode: String?, source: PartSource, lotSerial: String?, replacesComponentKey: ComponentKey?, oldPartDisposal: PartOldPartDisposal?, receiptAttachmentId: String?) {
     self.name = name
     self.quantity = quantity
     self.catalogCode = catalogCode
@@ -6095,7 +5993,7 @@ public struct Part: Codable, Sendable, Equatable {
     catalogCode = try c.decode(String?.self, forKey: .catalogCode)
     source = try c.decode(PartSource.self, forKey: .source)
     lotSerial = try c.decode(String?.self, forKey: .lotSerial)
-    replacesComponentKey = try c.decode(PartReplacesComponentKey?.self, forKey: .replacesComponentKey)
+    replacesComponentKey = try c.decode(ComponentKey?.self, forKey: .replacesComponentKey)
     oldPartDisposal = try c.decode(PartOldPartDisposal?.self, forKey: .oldPartDisposal)
     receiptAttachmentId = try c.decode(String?.self, forKey: .receiptAttachmentId)
   }
@@ -6216,38 +6114,15 @@ public enum PartOldPartDisposal: String, Codable, Sendable, Equatable, CaseItera
   case returned = "returned"
 }
 
-public enum PartReplacesComponentKey: String, Codable, Sendable, Equatable, CaseIterable {
-  case sensor = "sensor"
-  case fan = "fan"
-  case mounting = "mounting"
-  case refrigerantPiping = "refrigerant_piping"
-  case vacuumLeakTest = "vacuum_leak_test"
-  case electricalConnection = "electrical_connection"
-  case drainage = "drainage"
-  case testRun = "test_run"
-  case customerHandover = "customer_handover"
-  case filter = "filter"
-  case evaporatorCoil = "evaporator_coil"
-  case blowerMotor = "blower_motor"
-  case blowerFan = "blower_fan"
-  case drainPipe = "drain_pipe"
-  case drainPan = "drain_pan"
-  case outlet = "outlet"
-  case louver = "louver"
-  case condenserCoil = "condenser_coil"
-  case compressor = "compressor"
-  case blade = "blade"
-  case refrigerantPipe = "refrigerant_pipe"
-  case thermostat = "thermostat"
-  case capacitor = "capacitor"
-  case contactor = "contactor"
-  case wiring = "wiring"
-}
-
 public enum PartSource: String, Codable, Sendable, Equatable, CaseIterable {
   case vanStock = "van_stock"
   case hqWarehouse = "hq_warehouse"
   case boughtLocally = "bought_locally"
+}
+
+public enum PaymentMethod: String, Codable, Sendable, Equatable, CaseIterable {
+  case demoCreditCard = "demo_credit_card"
+  case demoDebitCard = "demo_debit_card"
 }
 
 public enum Permission: String, Codable, Sendable, Equatable, CaseIterable {
@@ -6293,13 +6168,13 @@ public enum Permission: String, Codable, Sendable, Equatable, CaseIterable {
 }
 
 public struct Preferences: Codable, Sendable, Equatable {
-  public var locale: Locale
+  public var locale: CoreLocale
   public var timezone: String
   public var monthlyReportEmail: Bool
   public var twoFactorEnabled: Bool
   public var pinnedUnitIds: [String]
 
-  public init(locale: Locale, timezone: String, monthlyReportEmail: Bool, twoFactorEnabled: Bool, pinnedUnitIds: [String]) {
+  public init(locale: CoreLocale, timezone: String, monthlyReportEmail: Bool, twoFactorEnabled: Bool, pinnedUnitIds: [String]) {
     self.locale = locale
     self.timezone = timezone
     self.monthlyReportEmail = monthlyReportEmail
@@ -6319,7 +6194,7 @@ public struct Preferences: Codable, Sendable, Equatable {
   public init(from decoder: any Decoder) throws {
     let c = try decoder.container(keyedBy: CodingKeys.self)
     try Constant.expect("MYR", in: c, at: .currency)
-    locale = try c.decode(Locale.self, forKey: .locale)
+    locale = try c.decode(CoreLocale.self, forKey: .locale)
     timezone = try c.decode(String.self, forKey: .timezone)
     monthlyReportEmail = try c.decode(Bool.self, forKey: .monthlyReportEmail)
     twoFactorEnabled = try c.decode(Bool.self, forKey: .twoFactorEnabled)
@@ -6338,12 +6213,12 @@ public struct Preferences: Codable, Sendable, Equatable {
 }
 
 public struct PreferencesUpdateInput: Codable, Sendable, Equatable {
-  public var locale: Locale
+  public var locale: CoreLocale
   public var timezone: String
   public var monthlyReportEmail: Bool?
   public var pinnedUnitIds: [String]?
 
-  public init(locale: Locale, timezone: String, monthlyReportEmail: Bool? = nil, pinnedUnitIds: [String]? = nil) {
+  public init(locale: CoreLocale, timezone: String, monthlyReportEmail: Bool? = nil, pinnedUnitIds: [String]? = nil) {
     self.locale = locale
     self.timezone = timezone
     self.monthlyReportEmail = monthlyReportEmail
@@ -6359,7 +6234,7 @@ public struct PreferencesUpdateInput: Codable, Sendable, Equatable {
 
   public init(from decoder: any Decoder) throws {
     let c = try decoder.container(keyedBy: CodingKeys.self)
-    locale = try c.decode(Locale.self, forKey: .locale)
+    locale = try c.decode(CoreLocale.self, forKey: .locale)
     timezone = try c.decode(String.self, forKey: .timezone)
     monthlyReportEmail = try c.decodeIfPresent(Bool.self, forKey: .monthlyReportEmail)
     pinnedUnitIds = try c.decodeIfPresent([String].self, forKey: .pinnedUnitIds)
@@ -7044,33 +6919,6 @@ public enum QuerySortField: String, Codable, Sendable, Equatable, CaseIterable {
   case from = "from"
 }
 
-public struct Range: Codable, Sendable, Equatable {
-  public var from: String
-  public var to: String
-
-  public init(from: String, to: String) {
-    self.from = from
-    self.to = to
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case from
-    case to
-  }
-
-  public init(from decoder: any Decoder) throws {
-    let c = try decoder.container(keyedBy: CodingKeys.self)
-    from = try c.decode(String.self, forKey: .from)
-    to = try c.decode(String.self, forKey: .to)
-  }
-
-  public func encode(to encoder: any Encoder) throws {
-    var c = encoder.container(keyedBy: CodingKeys.self)
-    try c.encode(from, forKey: .from)
-    try c.encode(to, forKey: .to)
-  }
-}
-
 public struct RefrigerantRecord: Codable, Sendable, Equatable {
   public var refrigerant: RefrigerantRecordRefrigerant
   public var cylinderId: String
@@ -7515,7 +7363,7 @@ public enum Role: String, Codable, Sendable, Equatable, CaseIterable {
 }
 
 public struct Sensor: Codable, Sendable, Equatable {
-  public var boundaryId: SensorBoundaryId?
+  public var boundaryId: EnergyBoundaryId?
   public var id: String
   public var deviceId: String
   public var metric: Metric
@@ -7523,7 +7371,7 @@ public struct Sensor: Codable, Sendable, Equatable {
   public var staleAfterSeconds: Double
   public var calibratedAt: String?
 
-  public init(boundaryId: SensorBoundaryId?, id: String, deviceId: String, metric: Metric, unit: UnitSymbol, staleAfterSeconds: Double, calibratedAt: String?) {
+  public init(boundaryId: EnergyBoundaryId?, id: String, deviceId: String, metric: Metric, unit: UnitSymbol, staleAfterSeconds: Double, calibratedAt: String?) {
     self.boundaryId = boundaryId
     self.id = id
     self.deviceId = deviceId
@@ -7545,7 +7393,7 @@ public struct Sensor: Codable, Sendable, Equatable {
 
   public init(from decoder: any Decoder) throws {
     let c = try decoder.container(keyedBy: CodingKeys.self)
-    boundaryId = try c.decode(SensorBoundaryId?.self, forKey: .boundaryId)
+    boundaryId = try c.decode(EnergyBoundaryId?.self, forKey: .boundaryId)
     id = try c.decode(String.self, forKey: .id)
     deviceId = try c.decode(String.self, forKey: .deviceId)
     metric = try c.decode(Metric.self, forKey: .metric)
@@ -7564,11 +7412,6 @@ public struct Sensor: Codable, Sendable, Equatable {
     try c.encode(staleAfterSeconds, forKey: .staleAfterSeconds)
     try c.encode(calibratedAt, forKey: .calibratedAt)
   }
-}
-
-public enum SensorBoundaryId: String, Codable, Sendable, Equatable, CaseIterable {
-  case acInputElectricity = "ac_input_electricity"
-  case wholeBuildingElectricity = "whole_building_electricity"
 }
 
 public struct SeriesBucket: Codable, Sendable, Equatable {
@@ -7609,7 +7452,7 @@ public struct Session: Codable, Sendable, Equatable {
   public var scopeVersion: Double
   public var userId: String
   public var role: Role
-  public var clientRole: SessionClientRole?
+  public var clientRole: ClientRole?
   public var displayName: String
   public var organizationName: String
   public var organizationId: String
@@ -7620,7 +7463,7 @@ public struct Session: Codable, Sendable, Equatable {
   public var issuedAt: String
   public var expiresAt: String
 
-  public init(tenantId: String, membershipId: String, scopeVersion: Double, userId: String, role: Role, clientRole: SessionClientRole?, displayName: String, organizationName: String, organizationId: String, customerId: String?, permissions: [Permission], generation: Double, viewEpoch: Double, issuedAt: String, expiresAt: String) {
+  public init(tenantId: String, membershipId: String, scopeVersion: Double, userId: String, role: Role, clientRole: ClientRole?, displayName: String, organizationName: String, organizationId: String, customerId: String?, permissions: [Permission], generation: Double, viewEpoch: Double, issuedAt: String, expiresAt: String) {
     self.tenantId = tenantId
     self.membershipId = membershipId
     self.scopeVersion = scopeVersion
@@ -7663,7 +7506,7 @@ public struct Session: Codable, Sendable, Equatable {
     scopeVersion = try c.decode(Double.self, forKey: .scopeVersion)
     userId = try c.decode(String.self, forKey: .userId)
     role = try c.decode(Role.self, forKey: .role)
-    clientRole = try c.decode(SessionClientRole?.self, forKey: .clientRole)
+    clientRole = try c.decode(ClientRole?.self, forKey: .clientRole)
     displayName = try c.decode(String.self, forKey: .displayName)
     organizationName = try c.decode(String.self, forKey: .organizationName)
     organizationId = try c.decode(String.self, forKey: .organizationId)
@@ -7693,11 +7536,6 @@ public struct Session: Codable, Sendable, Equatable {
     try c.encode(issuedAt, forKey: .issuedAt)
     try c.encode(expiresAt, forKey: .expiresAt)
   }
-}
-
-public enum SessionClientRole: String, Codable, Sendable, Equatable, CaseIterable {
-  case owner = "owner"
-  case member = "member"
 }
 
 public enum Severity: String, Codable, Sendable, Equatable, CaseIterable {
@@ -8020,9 +7858,9 @@ public enum SpaceKind: String, Codable, Sendable, Equatable, CaseIterable {
 
 public struct SummariesGetInput: Codable, Sendable, Equatable {
   public var kind: SummariesGetInputKind
-  public var filters: SummariesGetInputFilters?
+  public var filters: QueryFilters?
 
-  public init(kind: SummariesGetInputKind, filters: SummariesGetInputFilters?) {
+  public init(kind: SummariesGetInputKind, filters: QueryFilters?) {
     self.kind = kind
     self.filters = filters
   }
@@ -8035,310 +7873,13 @@ public struct SummariesGetInput: Codable, Sendable, Equatable {
   public init(from decoder: any Decoder) throws {
     let c = try decoder.container(keyedBy: CodingKeys.self)
     kind = try c.decode(SummariesGetInputKind.self, forKey: .kind)
-    filters = try c.decode(SummariesGetInputFilters?.self, forKey: .filters)
+    filters = try c.decode(QueryFilters?.self, forKey: .filters)
   }
 
   public func encode(to encoder: any Encoder) throws {
     var c = encoder.container(keyedBy: CodingKeys.self)
     try c.encode(kind, forKey: .kind)
     try c.encode(filters, forKey: .filters)
-  }
-}
-
-public struct SummariesGetInputFilters: Codable, Sendable, Equatable {
-  public var search: String?
-  public var period: String?
-  public var origin: JobOrigin?
-  public var proposalPending: Bool?
-  public var currentOnly: Bool?
-  public var contractorOrgId: String?
-  public var statementId: String?
-  public var campaignId: String?
-  public var modelId: String?
-  public var expiringWithinDays: Double?
-  public var coverage: QueryFiltersCoverage?
-  public var customerId: String?
-  public var propertyId: String?
-  public var spaceId: String?
-  public var unitId: String?
-  public var unitIds: [String]?
-  public var jobId: String?
-  public var contractId: String?
-  public var invoiceId: String?
-  public var restrictionId: String?
-  public var organizationId: String?
-  public var membershipId: String?
-  public var kind: String?
-  public var status: String?
-  public var statuses: [String]?
-  public var overdueOnly: Bool?
-  public var includeDescendants: Bool?
-  public var connections: [Connection]?
-  public var powerState: QueryFiltersPowerState?
-  public var unassignedOnly: Bool?
-  public var bound: Bool?
-  public var withoutDevice: Bool?
-  public var severity: Severity?
-  public var enabled: Bool?
-  public var unreadOnly: Bool?
-  public var from: String?
-  public var to: String?
-  public var date: String?
-  public var qualification: QualificationCode?
-  public var activeOnly: Bool?
-  public var actorId: String?
-  public var targetKind: String?
-  public var targetId: String?
-  public var action: String?
-  public var correlationId: String?
-  public var result: QueryFiltersResult?
-  public var method: QueryFiltersMethod?
-  public var boundaryId: String?
-  public var region: String?
-  public var year: Double?
-  public var subjectType: QueryFiltersSubjectType?
-  public var role: Role?
-  public var type: QueryFiltersType?
-  public var clientRole: ClientRole?
-  public var partnerRole: PartnerRole?
-  public var code: QueryFiltersCode?
-
-  public init(search: String? = nil, period: String? = nil, origin: JobOrigin? = nil, proposalPending: Bool? = nil, currentOnly: Bool? = nil, contractorOrgId: String? = nil, statementId: String? = nil, campaignId: String? = nil, modelId: String? = nil, expiringWithinDays: Double? = nil, coverage: QueryFiltersCoverage? = nil, customerId: String? = nil, propertyId: String? = nil, spaceId: String? = nil, unitId: String? = nil, unitIds: [String]? = nil, jobId: String? = nil, contractId: String? = nil, invoiceId: String? = nil, restrictionId: String? = nil, organizationId: String? = nil, membershipId: String? = nil, kind: String? = nil, status: String? = nil, statuses: [String]? = nil, overdueOnly: Bool? = nil, includeDescendants: Bool? = nil, connections: [Connection]? = nil, powerState: QueryFiltersPowerState? = nil, unassignedOnly: Bool? = nil, bound: Bool? = nil, withoutDevice: Bool? = nil, severity: Severity? = nil, enabled: Bool? = nil, unreadOnly: Bool? = nil, from: String? = nil, to: String? = nil, date: String? = nil, qualification: QualificationCode? = nil, activeOnly: Bool? = nil, actorId: String? = nil, targetKind: String? = nil, targetId: String? = nil, action: String? = nil, correlationId: String? = nil, result: QueryFiltersResult? = nil, method: QueryFiltersMethod? = nil, boundaryId: String? = nil, region: String? = nil, year: Double? = nil, subjectType: QueryFiltersSubjectType? = nil, role: Role? = nil, type: QueryFiltersType? = nil, clientRole: ClientRole? = nil, partnerRole: PartnerRole? = nil, code: QueryFiltersCode? = nil) {
-    self.search = search
-    self.period = period
-    self.origin = origin
-    self.proposalPending = proposalPending
-    self.currentOnly = currentOnly
-    self.contractorOrgId = contractorOrgId
-    self.statementId = statementId
-    self.campaignId = campaignId
-    self.modelId = modelId
-    self.expiringWithinDays = expiringWithinDays
-    self.coverage = coverage
-    self.customerId = customerId
-    self.propertyId = propertyId
-    self.spaceId = spaceId
-    self.unitId = unitId
-    self.unitIds = unitIds
-    self.jobId = jobId
-    self.contractId = contractId
-    self.invoiceId = invoiceId
-    self.restrictionId = restrictionId
-    self.organizationId = organizationId
-    self.membershipId = membershipId
-    self.kind = kind
-    self.status = status
-    self.statuses = statuses
-    self.overdueOnly = overdueOnly
-    self.includeDescendants = includeDescendants
-    self.connections = connections
-    self.powerState = powerState
-    self.unassignedOnly = unassignedOnly
-    self.bound = bound
-    self.withoutDevice = withoutDevice
-    self.severity = severity
-    self.enabled = enabled
-    self.unreadOnly = unreadOnly
-    self.from = from
-    self.to = to
-    self.date = date
-    self.qualification = qualification
-    self.activeOnly = activeOnly
-    self.actorId = actorId
-    self.targetKind = targetKind
-    self.targetId = targetId
-    self.action = action
-    self.correlationId = correlationId
-    self.result = result
-    self.method = method
-    self.boundaryId = boundaryId
-    self.region = region
-    self.year = year
-    self.subjectType = subjectType
-    self.role = role
-    self.type = type
-    self.clientRole = clientRole
-    self.partnerRole = partnerRole
-    self.code = code
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case search
-    case period
-    case origin
-    case proposalPending
-    case currentOnly
-    case contractorOrgId
-    case statementId
-    case campaignId
-    case modelId
-    case expiringWithinDays
-    case coverage
-    case customerId
-    case propertyId
-    case spaceId
-    case unitId
-    case unitIds
-    case jobId
-    case contractId
-    case invoiceId
-    case restrictionId
-    case organizationId
-    case membershipId
-    case kind
-    case status
-    case statuses
-    case overdueOnly
-    case includeDescendants
-    case connections
-    case powerState
-    case unassignedOnly
-    case bound
-    case withoutDevice
-    case severity
-    case enabled
-    case unreadOnly
-    case from
-    case to
-    case date
-    case qualification
-    case activeOnly
-    case actorId
-    case targetKind
-    case targetId
-    case action
-    case correlationId
-    case result
-    case method
-    case boundaryId
-    case region
-    case year
-    case subjectType
-    case role
-    case type
-    case clientRole
-    case partnerRole
-    case code
-  }
-
-  public init(from decoder: any Decoder) throws {
-    let c = try decoder.container(keyedBy: CodingKeys.self)
-    search = try c.decodeIfPresent(String.self, forKey: .search)
-    period = try c.decodeIfPresent(String.self, forKey: .period)
-    origin = try c.decodeIfPresent(JobOrigin.self, forKey: .origin)
-    proposalPending = try c.decodeIfPresent(Bool.self, forKey: .proposalPending)
-    currentOnly = try c.decodeIfPresent(Bool.self, forKey: .currentOnly)
-    contractorOrgId = try c.decodeIfPresent(String.self, forKey: .contractorOrgId)
-    statementId = try c.decodeIfPresent(String.self, forKey: .statementId)
-    campaignId = try c.decodeIfPresent(String.self, forKey: .campaignId)
-    modelId = try c.decodeIfPresent(String.self, forKey: .modelId)
-    expiringWithinDays = try c.decodeIfPresent(Double.self, forKey: .expiringWithinDays)
-    coverage = try c.decodeIfPresent(QueryFiltersCoverage.self, forKey: .coverage)
-    customerId = try c.decodeIfPresent(String.self, forKey: .customerId)
-    propertyId = try c.decodeIfPresent(String.self, forKey: .propertyId)
-    spaceId = try c.decodeIfPresent(String.self, forKey: .spaceId)
-    unitId = try c.decodeIfPresent(String.self, forKey: .unitId)
-    unitIds = try c.decodeIfPresent([String].self, forKey: .unitIds)
-    jobId = try c.decodeIfPresent(String.self, forKey: .jobId)
-    contractId = try c.decodeIfPresent(String.self, forKey: .contractId)
-    invoiceId = try c.decodeIfPresent(String.self, forKey: .invoiceId)
-    restrictionId = try c.decodeIfPresent(String.self, forKey: .restrictionId)
-    organizationId = try c.decodeIfPresent(String.self, forKey: .organizationId)
-    membershipId = try c.decodeIfPresent(String.self, forKey: .membershipId)
-    kind = try c.decodeIfPresent(String.self, forKey: .kind)
-    status = try c.decodeIfPresent(String.self, forKey: .status)
-    statuses = try c.decodeIfPresent([String].self, forKey: .statuses)
-    overdueOnly = try c.decodeIfPresent(Bool.self, forKey: .overdueOnly)
-    includeDescendants = try c.decodeIfPresent(Bool.self, forKey: .includeDescendants)
-    connections = try c.decodeIfPresent([Connection].self, forKey: .connections)
-    powerState = try c.decodeIfPresent(QueryFiltersPowerState.self, forKey: .powerState)
-    unassignedOnly = try c.decodeIfPresent(Bool.self, forKey: .unassignedOnly)
-    bound = try c.decodeIfPresent(Bool.self, forKey: .bound)
-    withoutDevice = try c.decodeIfPresent(Bool.self, forKey: .withoutDevice)
-    severity = try c.decodeIfPresent(Severity.self, forKey: .severity)
-    enabled = try c.decodeIfPresent(Bool.self, forKey: .enabled)
-    unreadOnly = try c.decodeIfPresent(Bool.self, forKey: .unreadOnly)
-    from = try c.decodeIfPresent(String.self, forKey: .from)
-    to = try c.decodeIfPresent(String.self, forKey: .to)
-    date = try c.decodeIfPresent(String.self, forKey: .date)
-    qualification = try c.decodeIfPresent(QualificationCode.self, forKey: .qualification)
-    activeOnly = try c.decodeIfPresent(Bool.self, forKey: .activeOnly)
-    actorId = try c.decodeIfPresent(String.self, forKey: .actorId)
-    targetKind = try c.decodeIfPresent(String.self, forKey: .targetKind)
-    targetId = try c.decodeIfPresent(String.self, forKey: .targetId)
-    action = try c.decodeIfPresent(String.self, forKey: .action)
-    correlationId = try c.decodeIfPresent(String.self, forKey: .correlationId)
-    result = try c.decodeIfPresent(QueryFiltersResult.self, forKey: .result)
-    method = try c.decodeIfPresent(QueryFiltersMethod.self, forKey: .method)
-    boundaryId = try c.decodeIfPresent(String.self, forKey: .boundaryId)
-    region = try c.decodeIfPresent(String.self, forKey: .region)
-    year = try c.decodeIfPresent(Double.self, forKey: .year)
-    subjectType = try c.decodeIfPresent(QueryFiltersSubjectType.self, forKey: .subjectType)
-    role = try c.decodeIfPresent(Role.self, forKey: .role)
-    type = try c.decodeIfPresent(QueryFiltersType.self, forKey: .type)
-    clientRole = try c.decodeIfPresent(ClientRole.self, forKey: .clientRole)
-    partnerRole = try c.decodeIfPresent(PartnerRole.self, forKey: .partnerRole)
-    code = try c.decodeIfPresent(QueryFiltersCode.self, forKey: .code)
-  }
-
-  public func encode(to encoder: any Encoder) throws {
-    var c = encoder.container(keyedBy: CodingKeys.self)
-    try c.encodeIfPresent(search, forKey: .search)
-    try c.encodeIfPresent(period, forKey: .period)
-    try c.encodeIfPresent(origin, forKey: .origin)
-    try c.encodeIfPresent(proposalPending, forKey: .proposalPending)
-    try c.encodeIfPresent(currentOnly, forKey: .currentOnly)
-    try c.encodeIfPresent(contractorOrgId, forKey: .contractorOrgId)
-    try c.encodeIfPresent(statementId, forKey: .statementId)
-    try c.encodeIfPresent(campaignId, forKey: .campaignId)
-    try c.encodeIfPresent(modelId, forKey: .modelId)
-    try c.encodeIfPresent(expiringWithinDays, forKey: .expiringWithinDays)
-    try c.encodeIfPresent(coverage, forKey: .coverage)
-    try c.encodeIfPresent(customerId, forKey: .customerId)
-    try c.encodeIfPresent(propertyId, forKey: .propertyId)
-    try c.encodeIfPresent(spaceId, forKey: .spaceId)
-    try c.encodeIfPresent(unitId, forKey: .unitId)
-    try c.encodeIfPresent(unitIds, forKey: .unitIds)
-    try c.encodeIfPresent(jobId, forKey: .jobId)
-    try c.encodeIfPresent(contractId, forKey: .contractId)
-    try c.encodeIfPresent(invoiceId, forKey: .invoiceId)
-    try c.encodeIfPresent(restrictionId, forKey: .restrictionId)
-    try c.encodeIfPresent(organizationId, forKey: .organizationId)
-    try c.encodeIfPresent(membershipId, forKey: .membershipId)
-    try c.encodeIfPresent(kind, forKey: .kind)
-    try c.encodeIfPresent(status, forKey: .status)
-    try c.encodeIfPresent(statuses, forKey: .statuses)
-    try c.encodeIfPresent(overdueOnly, forKey: .overdueOnly)
-    try c.encodeIfPresent(includeDescendants, forKey: .includeDescendants)
-    try c.encodeIfPresent(connections, forKey: .connections)
-    try c.encodeIfPresent(powerState, forKey: .powerState)
-    try c.encodeIfPresent(unassignedOnly, forKey: .unassignedOnly)
-    try c.encodeIfPresent(bound, forKey: .bound)
-    try c.encodeIfPresent(withoutDevice, forKey: .withoutDevice)
-    try c.encodeIfPresent(severity, forKey: .severity)
-    try c.encodeIfPresent(enabled, forKey: .enabled)
-    try c.encodeIfPresent(unreadOnly, forKey: .unreadOnly)
-    try c.encodeIfPresent(from, forKey: .from)
-    try c.encodeIfPresent(to, forKey: .to)
-    try c.encodeIfPresent(date, forKey: .date)
-    try c.encodeIfPresent(qualification, forKey: .qualification)
-    try c.encodeIfPresent(activeOnly, forKey: .activeOnly)
-    try c.encodeIfPresent(actorId, forKey: .actorId)
-    try c.encodeIfPresent(targetKind, forKey: .targetKind)
-    try c.encodeIfPresent(targetId, forKey: .targetId)
-    try c.encodeIfPresent(action, forKey: .action)
-    try c.encodeIfPresent(correlationId, forKey: .correlationId)
-    try c.encodeIfPresent(result, forKey: .result)
-    try c.encodeIfPresent(method, forKey: .method)
-    try c.encodeIfPresent(boundaryId, forKey: .boundaryId)
-    try c.encodeIfPresent(region, forKey: .region)
-    try c.encodeIfPresent(year, forKey: .year)
-    try c.encodeIfPresent(subjectType, forKey: .subjectType)
-    try c.encodeIfPresent(role, forKey: .role)
-    try c.encodeIfPresent(type, forKey: .type)
-    try c.encodeIfPresent(clientRole, forKey: .clientRole)
-    try c.encodeIfPresent(partnerRole, forKey: .partnerRole)
-    try c.encodeIfPresent(code, forKey: .code)
   }
 }
 
@@ -8569,11 +8110,11 @@ public struct TelemetrySeriesInput: Codable, Sendable, Equatable {
 }
 
 public struct TelemetrySummary: Codable, Sendable, Equatable {
-  public var measurements: [Measurement]
+  public var measurements: [CoreMeasurement]
   public var asOf: String
   public var energy: EnergySummary?
 
-  public init(measurements: [Measurement], asOf: String, energy: EnergySummary?) {
+  public init(measurements: [CoreMeasurement], asOf: String, energy: EnergySummary?) {
     self.measurements = measurements
     self.asOf = asOf
     self.energy = energy
@@ -8587,7 +8128,7 @@ public struct TelemetrySummary: Codable, Sendable, Equatable {
 
   public init(from decoder: any Decoder) throws {
     let c = try decoder.container(keyedBy: CodingKeys.self)
-    measurements = try c.decode([Measurement].self, forKey: .measurements)
+    measurements = try c.decode([CoreMeasurement].self, forKey: .measurements)
     asOf = try c.decode(String.self, forKey: .asOf)
     energy = try c.decode(EnergySummary?.self, forKey: .energy)
   }
@@ -8639,7 +8180,7 @@ public struct TelemetrySummaryInput: Codable, Sendable, Equatable {
 
 public struct TimeOnSite: Codable, Sendable, Equatable {
   public var arrivedAt: String?
-  public var checkInMethod: TimeOnSiteCheckInMethod?
+  public var checkInMethod: JobsCheckInInputMethod?
   public var checkInReason: String?
   public var distanceMeters: Double?
   public var startedAt: String?
@@ -8647,7 +8188,7 @@ public struct TimeOnSite: Codable, Sendable, Equatable {
   public var finishedAt: String?
   public var onSiteMinutes: Double?
 
-  public init(arrivedAt: String?, checkInMethod: TimeOnSiteCheckInMethod?, checkInReason: String?, distanceMeters: Double?, startedAt: String?, pauses: [TimeOnSitePauses], finishedAt: String?, onSiteMinutes: Double?) {
+  public init(arrivedAt: String?, checkInMethod: JobsCheckInInputMethod?, checkInReason: String?, distanceMeters: Double?, startedAt: String?, pauses: [TimeOnSitePauses], finishedAt: String?, onSiteMinutes: Double?) {
     self.arrivedAt = arrivedAt
     self.checkInMethod = checkInMethod
     self.checkInReason = checkInReason
@@ -8672,7 +8213,7 @@ public struct TimeOnSite: Codable, Sendable, Equatable {
   public init(from decoder: any Decoder) throws {
     let c = try decoder.container(keyedBy: CodingKeys.self)
     arrivedAt = try c.decode(String?.self, forKey: .arrivedAt)
-    checkInMethod = try c.decode(TimeOnSiteCheckInMethod?.self, forKey: .checkInMethod)
+    checkInMethod = try c.decode(JobsCheckInInputMethod?.self, forKey: .checkInMethod)
     checkInReason = try c.decode(String?.self, forKey: .checkInReason)
     distanceMeters = try c.decode(Double?.self, forKey: .distanceMeters)
     startedAt = try c.decode(String?.self, forKey: .startedAt)
@@ -8692,11 +8233,6 @@ public struct TimeOnSite: Codable, Sendable, Equatable {
     try c.encode(finishedAt, forKey: .finishedAt)
     try c.encode(onSiteMinutes, forKey: .onSiteMinutes)
   }
-}
-
-public enum TimeOnSiteCheckInMethod: String, Codable, Sendable, Equatable, CaseIterable {
-  case locationQr = "location_qr"
-  case manual = "manual"
 }
 
 public struct TimeOnSitePauses: Codable, Sendable, Equatable {
@@ -8908,7 +8444,7 @@ public struct UnitDetail: Codable, Sendable, Equatable {
   public var observedRestriction: UnitDetailObservedRestriction?
   public var lastSeenAt: String?
   public var effectivePowerState: EffectivePowerState
-  public var latestMeasurements: [Measurement]
+  public var latestMeasurements: [CoreMeasurement]
   public var activeAlertCount: Double
   public var capabilities: Capability
   public var iotModel: IoTModel?
@@ -8919,7 +8455,7 @@ public struct UnitDetail: Codable, Sendable, Equatable {
   public var pendingCommandIds: [String]
   public var location: UnitDetailLocation
 
-  public init(id: String, tenantId: String, version: Double, createdAt: String, updatedAt: String, customerOrgId: String, propertyId: String, spaceId: String?, displayName: String, modelId: String, installState: UnitDetailInstallState, installedAt: String?, serviceScope: [UnitDetailServiceScope], warrantyEndsAt: String?, alertPolicyIds: [String], archived: Bool, capabilityVersion: Double, iotModelId: String?, iotModelVersion: Double?, connection: Connection, observedState: ObservedState, observedRestriction: UnitDetailObservedRestriction?, lastSeenAt: String?, effectivePowerState: EffectivePowerState, latestMeasurements: [Measurement], activeAlertCount: Double, capabilities: Capability, iotModel: IoTModel?, effectiveControlPolicy: EffectiveControlPolicy, controlAvailability: ControlAvailability, components: [ComponentKey], pendingCommands: [Command], pendingCommandIds: [String], location: UnitDetailLocation) {
+  public init(id: String, tenantId: String, version: Double, createdAt: String, updatedAt: String, customerOrgId: String, propertyId: String, spaceId: String?, displayName: String, modelId: String, installState: UnitDetailInstallState, installedAt: String?, serviceScope: [UnitDetailServiceScope], warrantyEndsAt: String?, alertPolicyIds: [String], archived: Bool, capabilityVersion: Double, iotModelId: String?, iotModelVersion: Double?, connection: Connection, observedState: ObservedState, observedRestriction: UnitDetailObservedRestriction?, lastSeenAt: String?, effectivePowerState: EffectivePowerState, latestMeasurements: [CoreMeasurement], activeAlertCount: Double, capabilities: Capability, iotModel: IoTModel?, effectiveControlPolicy: EffectiveControlPolicy, controlAvailability: ControlAvailability, components: [ComponentKey], pendingCommands: [Command], pendingCommandIds: [String], location: UnitDetailLocation) {
     self.id = id
     self.tenantId = tenantId
     self.version = version
@@ -9021,7 +8557,7 @@ public struct UnitDetail: Codable, Sendable, Equatable {
     observedRestriction = try c.decode(UnitDetailObservedRestriction?.self, forKey: .observedRestriction)
     lastSeenAt = try c.decode(String?.self, forKey: .lastSeenAt)
     effectivePowerState = try c.decode(EffectivePowerState.self, forKey: .effectivePowerState)
-    latestMeasurements = try c.decode([Measurement].self, forKey: .latestMeasurements)
+    latestMeasurements = try c.decode([CoreMeasurement].self, forKey: .latestMeasurements)
     activeAlertCount = try c.decode(Double.self, forKey: .activeAlertCount)
     capabilities = try c.decode(Capability.self, forKey: .capabilities)
     iotModel = try c.decode(IoTModel?.self, forKey: .iotModel)
@@ -9224,13 +8760,13 @@ public struct UnitSummary: Codable, Sendable, Equatable {
   public var iotModelVersion: Double?
   public var connection: Connection
   public var observedState: ObservedState
-  public var observedRestriction: UnitSummaryObservedRestriction?
+  public var observedRestriction: UnitDetailObservedRestriction?
   public var lastSeenAt: String?
   public var effectivePowerState: EffectivePowerState
-  public var latestMeasurements: [Measurement]
+  public var latestMeasurements: [CoreMeasurement]
   public var activeAlertCount: Double
 
-  public init(id: String, tenantId: String, version: Double, createdAt: String, updatedAt: String, customerOrgId: String, propertyId: String, spaceId: String?, displayName: String, modelId: String, installState: UnitDetailInstallState, installedAt: String?, serviceScope: [UnitDetailServiceScope], warrantyEndsAt: String?, alertPolicyIds: [String], archived: Bool, capabilityVersion: Double, iotModelId: String?, iotModelVersion: Double?, connection: Connection, observedState: ObservedState, observedRestriction: UnitSummaryObservedRestriction?, lastSeenAt: String?, effectivePowerState: EffectivePowerState, latestMeasurements: [Measurement], activeAlertCount: Double) {
+  public init(id: String, tenantId: String, version: Double, createdAt: String, updatedAt: String, customerOrgId: String, propertyId: String, spaceId: String?, displayName: String, modelId: String, installState: UnitDetailInstallState, installedAt: String?, serviceScope: [UnitDetailServiceScope], warrantyEndsAt: String?, alertPolicyIds: [String], archived: Bool, capabilityVersion: Double, iotModelId: String?, iotModelVersion: Double?, connection: Connection, observedState: ObservedState, observedRestriction: UnitDetailObservedRestriction?, lastSeenAt: String?, effectivePowerState: EffectivePowerState, latestMeasurements: [CoreMeasurement], activeAlertCount: Double) {
     self.id = id
     self.tenantId = tenantId
     self.version = version
@@ -9313,10 +8849,10 @@ public struct UnitSummary: Codable, Sendable, Equatable {
     iotModelVersion = try c.decode(Double?.self, forKey: .iotModelVersion)
     connection = try c.decode(Connection.self, forKey: .connection)
     observedState = try c.decode(ObservedState.self, forKey: .observedState)
-    observedRestriction = try c.decode(UnitSummaryObservedRestriction?.self, forKey: .observedRestriction)
+    observedRestriction = try c.decode(UnitDetailObservedRestriction?.self, forKey: .observedRestriction)
     lastSeenAt = try c.decode(String?.self, forKey: .lastSeenAt)
     effectivePowerState = try c.decode(EffectivePowerState.self, forKey: .effectivePowerState)
-    latestMeasurements = try c.decode([Measurement].self, forKey: .latestMeasurements)
+    latestMeasurements = try c.decode([CoreMeasurement].self, forKey: .latestMeasurements)
     activeAlertCount = try c.decode(Double.self, forKey: .activeAlertCount)
   }
 
@@ -9349,43 +8885,6 @@ public struct UnitSummary: Codable, Sendable, Equatable {
     try c.encode(effectivePowerState, forKey: .effectivePowerState)
     try c.encode(latestMeasurements, forKey: .latestMeasurements)
     try c.encode(activeAlertCount, forKey: .activeAlertCount)
-  }
-}
-
-public struct UnitSummaryObservedRestriction: Codable, Sendable, Equatable {
-  public var restrictionId: String
-  public var rulesVersion: String
-  public var policy: RestrictionPolicy
-  public var observedAt: String
-
-  public init(restrictionId: String, rulesVersion: String, policy: RestrictionPolicy, observedAt: String) {
-    self.restrictionId = restrictionId
-    self.rulesVersion = rulesVersion
-    self.policy = policy
-    self.observedAt = observedAt
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case restrictionId
-    case rulesVersion
-    case policy
-    case observedAt
-  }
-
-  public init(from decoder: any Decoder) throws {
-    let c = try decoder.container(keyedBy: CodingKeys.self)
-    restrictionId = try c.decode(String.self, forKey: .restrictionId)
-    rulesVersion = try c.decode(String.self, forKey: .rulesVersion)
-    policy = try c.decode(RestrictionPolicy.self, forKey: .policy)
-    observedAt = try c.decode(String.self, forKey: .observedAt)
-  }
-
-  public func encode(to encoder: any Encoder) throws {
-    var c = encoder.container(keyedBy: CodingKeys.self)
-    try c.encode(restrictionId, forKey: .restrictionId)
-    try c.encode(rulesVersion, forKey: .rulesVersion)
-    try c.encode(policy, forKey: .policy)
-    try c.encode(observedAt, forKey: .observedAt)
   }
 }
 
@@ -9583,18 +9082,18 @@ public struct WorkReport: Codable, Sendable, Equatable {
   public var authorId: String
   public var installation: InstallationCheck?
   public var items: [InspectionItem]
-  public var measurements: [Measurement]
+  public var measurements: [CoreMeasurement]
   public var parts: [Part]
   public var refrigerant: [RefrigerantRecord]
   public var signOff: SignOff?
   public var workText: String
-  public var nextAction: WorkReportNextAction?
+  public var nextAction: NextAction?
   public var attachmentRefs: [Attachment]
   public var submittedAt: String?
   public var acceptedAt: String?
   public var reviewHistory: [Review]
 
-  public init(id: String, tenantId: String, version: Double, createdAt: String, updatedAt: String, reviewAvailability: ReviewAvailability, jobId: String, authorId: String, installation: InstallationCheck?, items: [InspectionItem], measurements: [Measurement], parts: [Part], refrigerant: [RefrigerantRecord], signOff: SignOff?, workText: String, nextAction: WorkReportNextAction?, attachmentRefs: [Attachment], submittedAt: String?, acceptedAt: String?, reviewHistory: [Review]) {
+  public init(id: String, tenantId: String, version: Double, createdAt: String, updatedAt: String, reviewAvailability: ReviewAvailability, jobId: String, authorId: String, installation: InstallationCheck?, items: [InspectionItem], measurements: [CoreMeasurement], parts: [Part], refrigerant: [RefrigerantRecord], signOff: SignOff?, workText: String, nextAction: NextAction?, attachmentRefs: [Attachment], submittedAt: String?, acceptedAt: String?, reviewHistory: [Review]) {
     self.id = id
     self.tenantId = tenantId
     self.version = version
@@ -9652,12 +9151,12 @@ public struct WorkReport: Codable, Sendable, Equatable {
     authorId = try c.decode(String.self, forKey: .authorId)
     installation = try c.decode(InstallationCheck?.self, forKey: .installation)
     items = try c.decode([InspectionItem].self, forKey: .items)
-    measurements = try c.decode([Measurement].self, forKey: .measurements)
+    measurements = try c.decode([CoreMeasurement].self, forKey: .measurements)
     parts = try c.decode([Part].self, forKey: .parts)
     refrigerant = try c.decode([RefrigerantRecord].self, forKey: .refrigerant)
     signOff = try c.decode(SignOff?.self, forKey: .signOff)
     workText = try c.decode(String.self, forKey: .workText)
-    nextAction = try c.decode(WorkReportNextAction?.self, forKey: .nextAction)
+    nextAction = try c.decode(NextAction?.self, forKey: .nextAction)
     attachmentRefs = try c.decode([Attachment].self, forKey: .attachmentRefs)
     submittedAt = try c.decode(String?.self, forKey: .submittedAt)
     acceptedAt = try c.decode(String?.self, forKey: .acceptedAt)
@@ -9698,10 +9197,10 @@ public struct WorkReportDraft: Codable, Sendable, Equatable {
   public var parts: [Part]
   public var refrigerant: [RefrigerantRecord]
   public var workText: String
-  public var nextAction: WorkReportDraftNextAction?
+  public var nextAction: NextAction?
   public var attachmentIds: [String]
 
-  public init(jobId: String, reportId: String? = nil, installation: InstallationCheck? = nil, items: [InspectionItemInput], measurements: [InspectionMeasurementInput], parts: [Part], refrigerant: [RefrigerantRecord], workText: String, nextAction: WorkReportDraftNextAction?, attachmentIds: [String]) {
+  public init(jobId: String, reportId: String? = nil, installation: InstallationCheck? = nil, items: [InspectionItemInput], measurements: [InspectionMeasurementInput], parts: [Part], refrigerant: [RefrigerantRecord], workText: String, nextAction: NextAction?, attachmentIds: [String]) {
     self.jobId = jobId
     self.reportId = reportId
     self.installation = installation
@@ -9737,7 +9236,7 @@ public struct WorkReportDraft: Codable, Sendable, Equatable {
     parts = try c.decode([Part].self, forKey: .parts)
     refrigerant = try c.decode([RefrigerantRecord].self, forKey: .refrigerant)
     workText = try c.decode(String.self, forKey: .workText)
-    nextAction = try c.decode(WorkReportDraftNextAction?.self, forKey: .nextAction)
+    nextAction = try c.decode(NextAction?.self, forKey: .nextAction)
     attachmentIds = try c.decode([String].self, forKey: .attachmentIds)
   }
 
@@ -9753,151 +9252,5 @@ public struct WorkReportDraft: Codable, Sendable, Equatable {
     try c.encode(workText, forKey: .workText)
     try c.encode(nextAction, forKey: .nextAction)
     try c.encode(attachmentIds, forKey: .attachmentIds)
-  }
-}
-
-public enum WorkReportDraftNextAction: Codable, Sendable, Equatable {
-  case none(WorkReportDraftNextActionNone)
-  case followUp(WorkReportDraftNextActionFollowUp)
-
-  private enum Tag: String, CodingKey { case kind }
-
-  public init(from decoder: any Decoder) throws {
-    let c = try decoder.container(keyedBy: Tag.self)
-    switch try c.decode(String.self, forKey: .kind) {
-    case "none": self = .none(try WorkReportDraftNextActionNone(from: decoder))
-    case "follow_up": self = .followUp(try WorkReportDraftNextActionFollowUp(from: decoder))
-    default: throw DecodingError.dataCorruptedError(forKey: .kind, in: c, debugDescription: "unknown WorkReportDraftNextAction")
-    }
-  }
-
-  public func encode(to encoder: any Encoder) throws {
-    switch self {
-    case .none(let value): try value.encode(to: encoder)
-    case .followUp(let value): try value.encode(to: encoder)
-    }
-  }
-}
-
-public struct WorkReportDraftNextActionFollowUp: Codable, Sendable, Equatable {
-  public var date: String
-  public var note: String
-
-  public init(date: String, note: String) {
-    self.date = date
-    self.note = note
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case kind
-    case date
-    case note
-  }
-
-  public init(from decoder: any Decoder) throws {
-    let c = try decoder.container(keyedBy: CodingKeys.self)
-    try Constant.expect("follow_up", in: c, at: .kind)
-    date = try c.decode(String.self, forKey: .date)
-    note = try c.decode(String.self, forKey: .note)
-  }
-
-  public func encode(to encoder: any Encoder) throws {
-    var c = encoder.container(keyedBy: CodingKeys.self)
-    try c.encode("follow_up", forKey: .kind)
-    try c.encode(date, forKey: .date)
-    try c.encode(note, forKey: .note)
-  }
-}
-
-public struct WorkReportDraftNextActionNone: Codable, Sendable, Equatable {
-
-  public init() {
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case kind
-  }
-
-  public init(from decoder: any Decoder) throws {
-    let c = try decoder.container(keyedBy: CodingKeys.self)
-    try Constant.expect("none", in: c, at: .kind)
-  }
-
-  public func encode(to encoder: any Encoder) throws {
-    var c = encoder.container(keyedBy: CodingKeys.self)
-    try c.encode("none", forKey: .kind)
-  }
-}
-
-public enum WorkReportNextAction: Codable, Sendable, Equatable {
-  case none(WorkReportNextActionNone)
-  case followUp(WorkReportNextActionFollowUp)
-
-  private enum Tag: String, CodingKey { case kind }
-
-  public init(from decoder: any Decoder) throws {
-    let c = try decoder.container(keyedBy: Tag.self)
-    switch try c.decode(String.self, forKey: .kind) {
-    case "none": self = .none(try WorkReportNextActionNone(from: decoder))
-    case "follow_up": self = .followUp(try WorkReportNextActionFollowUp(from: decoder))
-    default: throw DecodingError.dataCorruptedError(forKey: .kind, in: c, debugDescription: "unknown WorkReportNextAction")
-    }
-  }
-
-  public func encode(to encoder: any Encoder) throws {
-    switch self {
-    case .none(let value): try value.encode(to: encoder)
-    case .followUp(let value): try value.encode(to: encoder)
-    }
-  }
-}
-
-public struct WorkReportNextActionFollowUp: Codable, Sendable, Equatable {
-  public var date: String
-  public var note: String
-
-  public init(date: String, note: String) {
-    self.date = date
-    self.note = note
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case kind
-    case date
-    case note
-  }
-
-  public init(from decoder: any Decoder) throws {
-    let c = try decoder.container(keyedBy: CodingKeys.self)
-    try Constant.expect("follow_up", in: c, at: .kind)
-    date = try c.decode(String.self, forKey: .date)
-    note = try c.decode(String.self, forKey: .note)
-  }
-
-  public func encode(to encoder: any Encoder) throws {
-    var c = encoder.container(keyedBy: CodingKeys.self)
-    try c.encode("follow_up", forKey: .kind)
-    try c.encode(date, forKey: .date)
-    try c.encode(note, forKey: .note)
-  }
-}
-
-public struct WorkReportNextActionNone: Codable, Sendable, Equatable {
-
-  public init() {
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case kind
-  }
-
-  public init(from decoder: any Decoder) throws {
-    let c = try decoder.container(keyedBy: CodingKeys.self)
-    try Constant.expect("none", in: c, at: .kind)
-  }
-
-  public func encode(to encoder: any Encoder) throws {
-    var c = encoder.container(keyedBy: CodingKeys.self)
-    try c.encode("none", forKey: .kind)
   }
 }

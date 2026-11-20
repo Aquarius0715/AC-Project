@@ -26,3 +26,7 @@ enum Constant {
         }
     }
 }
+
+/// The coding keys of a type without fields (`Empty`, the input of an operation that takes nothing): it still encodes as
+/// `{}`, since an encoder refuses a value that writes nothing.
+enum NoKeys: CodingKey {}

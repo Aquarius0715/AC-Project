@@ -70,7 +70,13 @@ opt_in_rules:
   - accessibility_trait_for_button
   - non_overridable_class_declaration
   - no_empty_block
-line_length: { warning: 140, error: 140, ignores_comments: false }
+line_length:
+  warning: 140
+  error: 140
+  ignores_comments: false
+  # a display text is one string literal: the generator collects tr("…") keys whole (codegen/swift-strings.ts), and a
+  # sentence cut over lines reads worse; a line with a string literal of 80 characters or more is not measured
+  excluded_lines_patterns: ['"[^"]{80,}"']
 type_body_length: { warning: 300, error: 400 }
 file_length: { warning: 500, error: 700 }
 function_body_length: { warning: 50, error: 80 }

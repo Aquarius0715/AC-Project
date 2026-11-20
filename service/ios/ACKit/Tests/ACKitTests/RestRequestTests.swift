@@ -191,3 +191,10 @@ import Testing
         #expect(try RestRequest.of(Bare.self, "x") == nil)
     }
 }
+
+extension RestRequestTests {
+    @Test func operationThatTakesNothingSendsNoInput() throws {
+        #expect(try RestRequest.of(Ops.PreferencesGet.self, Empty()) == RestRequest(method: .get, path: "/v1/preferences", body: nil))
+        #expect(try JSONEncoder().encode(Empty()) == Data("{}".utf8))
+    }
+}
