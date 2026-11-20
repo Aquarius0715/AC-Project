@@ -150,6 +150,8 @@ export function actionMessage(r: ActionFailure, t: T = translator("en")): string
     const text = lookup(fieldText, key);
     return text ? t(text, { field: name }) : t("{field} — {problem}", { field: name, problem: humanize(key).toLowerCase() });
   }
+  if (r.messageKey === "errors.automation_proposal_changed") return t("The suggestion changed. Review the latest suggestions before approving.");
+  if (r.messageKey === "errors.automation_proposal_timing") return t("This schedule is running or waiting to be evaluated. Try again after it finishes.");
   if (r.messageKey === "error.versionConflict") return t("Someone changed this in the meantime — the screen now shows the latest version");
   // the write limit per member (IR375): how long to wait, as the implementation contracts ask for RATE_LIMITED
   if (r.code === "RATE_LIMITED") {

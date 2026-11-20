@@ -53,6 +53,11 @@
  "auth.previewPasswordReset": [
   "demoEmail"
  ],
+ "automations.approveStartProposal": [
+  "id",
+  "proposalId",
+  "weekday"
+ ],
  "automations.delete": [
   "id"
  ],
@@ -99,6 +104,7 @@
   "phase",
   "unitIds"
  ],
+ "automations.startProposals": [],
  "baselines.delete": [
   "id",
   "reason"

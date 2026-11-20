@@ -97,7 +97,7 @@ func TestRESTRoutesResolve(t *testing.T) {
 		}
 	}
 
-	if routes != 256 { // IR827 POST /v1/payments/checkout, IR826 POST /v1/presence
-		t.Fatalf("%d routes, want 256", routes)
+	if routes != 258 {
+		t.Fatalf("%d routes, want 258", routes)
 	}
 }

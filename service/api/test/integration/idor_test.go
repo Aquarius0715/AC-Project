@@ -1108,6 +1108,8 @@ func TestForeignTargets(t *testing.T) {
 
 	// every operation a role other than admin may call is above, or takes no foreign target
 	exempt := map[string]string{
+		listStartProposals:            "lists only the caller’s own customer; no target",
+		approveStartProposal:          "cross-customer approval is refused in the proposal integration test",
 		"auth.previewPasswordReset":   "public demo read of the demo e-mail's reset preview",
 		"demo.advanceClock":           "demo panel; no target",
 		"demo.reset":                  "demo panel; no target",

@@ -662,7 +662,7 @@ func TestCatalogShape(t *testing.T) {
 
 	if len(
 		Catalog,
-	) != 234 {
+	) != 236 {
 		// IR827 payments.startCheckout, IR826 presence.report,
 		// IR657 members.delete,
 		// IR656 baselines.delete + factors.delete + mrv.deleteDraft,

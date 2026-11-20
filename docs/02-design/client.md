@@ -1,6 +1,6 @@
 ---
 document_id: DD-C
-version: 0.38.0
+version: 0.39.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -28,7 +28,7 @@ Always validate route parameters (values in URLs) as untrusted input. “Service
 | DD-C01 / FR-C01 | `/customer` / `Overview` | `units.list`, `properties.list`, `spaces.list`, `summaries.get`, `alerts.list`, `automations.list`, `automations.nextRuns`, `consents.get`, `baselines.list`, `energy.summary`, `telemetry.series` | Filter by property and period. Store filters in the URL and summarize only permitted units | Distinguish missing data from 0. Show update time for old values |
 | DD-C02 / FR-C02 | `/customer/properties` / `PropertyExplorer` | `properties.list`, `spaces.list`, `units.list`, `locations.rename` | Read-only tree property→floor/area→room→units; rename a location only (1–120 characters, unique among siblings). HQ creates, moves, and deletes the structure | No add/move/delete controls. Deleted URLs show not-found. Breadcrumbs return to parent levels |
 | DD-C03 / FR-C03 | `/customer/units/:id` / `UnitControl` | `units.get`, `commands.create`, `commands.get`, `locations.rename`, `units.setAlertPolicies`, `policies.list`, `commands.list`, `units.list` | Build temperature min/max/step, mode, and fan options from capabilities. Mutate after confirmation. Show room temperature separately from settings | Show rejection, expiry, and failure reasons. Recheck state before manual retry |
-| DD-C04 / FR-C04 | `/customer/automations` / `AutomationEditor` | `automations.list`, `automations.save`, `automations.simulate`, `automations.fire`, `automations.nextRuns`, `units.list`, `units.get`, `automations.delete`, `properties.list`, `spaces.list`, `preferences.get` | Require at least one weekday, start/end times, timezone, target units, and actions. Explicitly confirm overnight settings | Warn on overlapping conditions and show priorities. Reject triggered automation under restrictions and show the reason |
+| DD-C04 / FR-C04 | `/customer/automations` / `AutomationEditor` | `automations.list`, `automations.startProposals`, `automations.approveStartProposal`, `automations.save`, `automations.simulate`, `automations.fire`, `automations.nextRuns`, `units.list`, `units.get`, `automations.delete`, `properties.list`, `spaces.list`, `preferences.get` | Require at least one weekday, start/end times, timezone, target units, and actions. Explicitly confirm overnight settings | Warn on overlapping conditions and show priorities. Reject triggered automation under restrictions and show the reason |
 | DD-C05 / FR-C05 | `/customer/automations` / `AutomationEditor` | `automations.save`, `automations.simulate`, `automations.fire`, `consents.get`, `consents.update`, `units.list`, `units.get`, `presence.report` | Change fields by condition type (discriminated union). Explain the purpose of location consent. The demo does not collect real location; users enter arrival/departure events | If consent is denied or location unavailable, use manual or scheduled control. Clearly label lifestyle-pattern inference as a demo |
 | DD-C06 / FR-C06 | `/customer/energy` / `EnergyExplorer` | `energy.summary`, `baselines.list`, `units.list` | Require start<end and at most 366 days (provisional). Show currency, tariff version, comparison period, and data reliability | Show usable data coverage when data is missing. Do not treat estimated replacements as measurements |
 | DD-C07 / FR-C07 | `/customer/air-quality` / `AirQuality` | `telemetry.series`, `units.get`, `units.list`, `ventilation.log`, `ventilation.list`, `properties.list`, `spaces.list` | Select metric and period. Log a manual ventilation (method, 1–240 minutes); no device command | Show “Unsupported” when no sensor exists. A log does not imply CO₂ fell |
@@ -170,7 +170,7 @@ Scope: FR-C03 / Main display pattern: **UI-DETAIL**. Service boundary: `units.ge
 
 **Source mapping**: SRC-06 BIZ-14 → FR-C04 → DD-C04. Source category: original company requirements SRC-06 + design additions. Design additions: weekdays and time-overlap rules. Field types, required status, defaults, and action order are implementation proposals.
 
-Scope: FR-C04 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `automations.list, automations.save, automations.simulate, automations.fire, automations.nextRuns, units.list, units.get, automations.delete, properties.list, spaces.list, preferences.get`.
+Scope: FR-C04 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `automations.list, automations.startProposals, automations.approveStartProposal, automations.save, automations.simulate, automations.fire, automations.nextRuns, units.list, units.get, automations.delete, properties.list, spaces.list, preferences.get`.
 
 **Initial view and prerequisites**: Target units support schedule control, and a timezone can be fixed for display and storage. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
@@ -197,8 +197,13 @@ Scope: FR-C04 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 3. Save timezone, start/end actions, and enabled in Automation. Creation alone does not send a Command. The equipment scheduler job evaluates demo-clock start/end occurrences internally, rechecks owner permissions at trigger time, and creates Commands, once per occurrence (IR214). When another schedule of the AC starts in the same minute as one ends and its start would run, the end is not sent; the ended rule's last run says it was superseded (IR504). Screens do not call automations.fire for these triggers (IR54). The editor previews an unsaved schedule with automations.nextRuns draft; Delete (⋯ menu, confirmation) is automations.delete and keeps the rule's Commands (IR214).
 4. Queries to update: `automations / next-run preview / audit`。
 5. Delete (`automations.delete`, Figma 03g–03i): the owner confirms in a dialog; the rule leaves the list and the screen shows the removed state. As with disabling, its scheduled events create no new Commands.
+6. Schedule suggestions show the affected AC and weekday, old and proposed start, end time, and confirmed dates. The
+   app reads them through `automations.startProposals`. Each card requires explicit approval through
+   `automations.approveStartProposal` with the displayed rule version. A stale version refreshes the proposals for
+   review. Approval saves the chosen weekday and sends no command. Full automation is Coming Soon.
+
 7. After-hours preset (IR811). `automationId=new&preset=off&unitIds=…` opens a new rule named “Switch off after hours” with those ACs: the first is the target, the rest go under Also apply, up to 50. It starts on weekdays at 19:00 with Power OFF, ends at 23:00 with the end action left to choose (never assumed), and is saved off. The Running list's Turn off panel links to it with the ACs still ticked. Closing the editor drops `preset` and `unitIds`, so a later Create starts blank.
-6. Several ACs in one rule (IR802). The API already took 1–50 `unitIds`, but the editor offered one Target AC only, so "the office off at 19:00" took one rule per AC.
+8. Several ACs in one rule (IR802). The API already took 1–50 `unitIds`, but the editor offered one Target AC only, so "the office off at 19:00" took one rule per AC.
    - Under Target AC, a folded "Also apply to other ACs" lists the other ACs with their place, with "All ACs in {property}" and Clear. It opens by itself when the rule already has more.
    - The setting and value lists offer only the actions every chosen AC supports (`commonActionOptions`). An action that one of them does not take reads "Not supported by every chosen AC".
    - Step 3 says "Action for {n} ACs". The card keeps "(+n more ACs)". The list header no longer says "each rule controls one AC".

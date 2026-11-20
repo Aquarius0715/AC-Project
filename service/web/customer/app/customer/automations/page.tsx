@@ -13,6 +13,8 @@ import type { ApiUnitDetail } from "@ac/web/lib/units";
 import { consentCard, ruleCard, triggerOf, type ApiAutomation, type ApiConsent, type ApiOccurrence, type Caps } from "@ac/web/lib/clientAutomations";
 import { AutomationsDemo } from "./_components/automations-demo";
 import { AutomationsView, type AutomationsLive } from "./_components/automations-view";
+import type { StartProposal } from "@ac/web/lib/contracts.gen";
+import { parseStartProposals } from "./start-proposals";
 import { orNull, recover } from "@ac/web/lib/promises";
 
 export default async function CustomerAutomationsPage({ searchParams }: Readonly<PageProps<"/customer/automations">>) {
@@ -22,13 +24,14 @@ export default async function CustomerAutomationsPage({ searchParams }: Readonly
   const editing = typeof sp.automationId === "string" && sp.automationId ? sp.automationId : null;
   // preset=off&unitIds=…: a new after-hours rule for those ACs, from the Running list (IR811)
   const presetIds = editing === "new" && sp.preset === "off" && typeof sp.unitIds === "string" ? sp.unitIds.split(",").filter(Boolean) : [];
-  const [prefs, rules, units, properties, spaces, consent, display] = await Promise.all([
+  const [prefs, rules, units, properties, spaces, consent, display, proposals] = await Promise.all([
     coreOp<{ timezone: string }>("preferences.get", {}), coreAll<ApiAutomation>("automations.list"), coreAll<ApiUnitRow>("units.list"),
     coreAll<ApiPropertyRow>("properties.list"), coreAll<ApiSpaceRow>("spaces.list"),
     recover(coreOp<ApiConsent>("consents.get", { purpose: "location_automation" }), (error: unknown) => {
       if (error instanceof CoreError && error.error.code === "NOT_FOUND") return null; // no consent record: location rules unavailable
       throw error;
     }), coreDisplay(),
+    editing ? [] : coreOp<StartProposal[]>("automations.startProposals", {}).then(parseStartProposals),
   ]);
   const i = i18nOf(display);
   const propertyName = new Map(properties.map((p) => [p.id, p.name]));
@@ -51,6 +54,7 @@ export default async function CustomerAutomationsPage({ searchParams }: Readonly
   }
   const live: AutomationsLive = {
     rules,
+    proposals,
     acs,
     caps,
     editing,

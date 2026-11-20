@@ -432,7 +432,7 @@ func parseExtras(raw json.RawMessage, kind, conditionType string) ([]extraCondit
 // value in range. Each carries its own fields only.
 func extraError(extra extraCondition, kind string) string {
 	switch extra.Type {
-	case "weekday":
+	case condWeekday:
 		if kind == kindSchedule {
 			return "errors.weekday_on_schedule"
 		}
@@ -858,17 +858,9 @@ func (m Automations) save(
 		automationID, prev, version = cur.ID, call.ExpectedVersion, cur.Version+1
 	}
 
-	for _, unitID := range input.UnitIDs {
-		_, err := call.Tx.Exec(
-			ctx,
-			`INSERT INTO control.automation_units (tenant_id, automation_id, unit_id) VALUES
-				(current_setting('app.tenant_id')::uuid, $1, $2)`,
-			automationID,
-			unitID,
-		)
-		if err != nil {
-			return Automation{}, apperr.Wrap(err, "insert control.automation_units")
-		}
+	err = linkAutomationUnits(ctx, call, automationID, input.UnitIDs)
+	if err != nil {
+		return Automation{}, err
 	}
 
 	call.Audit(
@@ -882,6 +874,28 @@ func (m Automations) save(
 	)
 
 	return m.load(ctx, call, automationID, false)
+}
+
+func linkAutomationUnits(
+	ctx context.Context,
+	call *ops.Call,
+	automationID uuid.UUID,
+	unitIDs []uuid.UUID,
+) error {
+	for _, unitID := range unitIDs {
+		_, err := call.Tx.Exec(
+			ctx,
+			`INSERT INTO control.automation_units (tenant_id, automation_id, unit_id) VALUES
+				(current_setting('app.tenant_id')::uuid, $1, $2)`,
+			automationID,
+			unitID,
+		)
+		if err != nil {
+			return apperr.Wrap(err, "insert control.automation_units")
+		}
+	}
+
+	return nil
 }
 
 // checkAutomationUnits checks a rule's units: the caller's own, not archived, and able to take every action of the
@@ -985,7 +999,7 @@ func ruleDefinition(call *ops.Call, input *AutomationInput) ([]byte, error) {
 
 		if _, bad := occurrences(def, loc, call.Now.In(loc), checkDays); bad {
 			return nil, apperr.Fields(
-				map[string]string{"startLocal": "errors.local_time_invalid"},
+				map[string]string{fieldStartLocal: "errors.local_time_invalid"},
 			)
 		}
 	}
@@ -1002,13 +1016,30 @@ func insertAutomation(
 	input *AutomationInput,
 	raw []byte,
 ) (uuid.UUID, error) {
+	return insertAutomationOwned(
+		ctx,
+		call,
+		input,
+		raw,
+		call.Principal.MembershipID,
+		call.Principal.UserID,
+	)
+}
+
+func insertAutomationOwned(
+	ctx context.Context,
+	call *ops.Call,
+	input *AutomationInput,
+	raw []byte,
+	owner, creator uuid.UUID,
+) (uuid.UUID, error) {
 	var automationID uuid.UUID
 
 	err := call.Tx.QueryRow(ctx, `INSERT INTO control.automations (tenant_id, customer_org_id, kind, name,
 		owner_membership_id, created_by_user_id, timezone, enabled, priority,
 		definition, created_at, updated_at) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5, $6, $7, $8,
 		$9, $10, $10) RETURNING id`,
-		call.Principal.OrgID, input.Kind, input.Name, call.Principal.MembershipID, call.Principal.UserID, input.Timezone,
+		call.Principal.OrgID, input.Kind, input.Name, owner, creator, input.Timezone,
 		input.Enabled,
 		input.Priority, raw, call.Now).
 		Scan(&automationID)
@@ -1322,6 +1353,8 @@ func (m Automations) delete(
 // RegisterAutomations binds automations.save / list / nextRuns / delete and the away/home presence report.
 func RegisterAutomations(reg *ops.Registry, automations Automations) {
 	ops.Register(reg, "automations.save", automations.save)
+	ops.Register(reg, "automations.startProposals", automations.startProposals)
+	ops.Register(reg, "automations.approveStartProposal", automations.approveStartProposal)
 	ops.Register(reg, "automations.list", automations.list)
 	ops.Register(reg, "automations.nextRuns", automations.nextRuns)
 	ops.Register(reg, "automations.delete", automations.delete)
