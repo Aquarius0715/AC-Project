@@ -1,0 +1,14 @@
+{
+    "data": {
+        "items": [],
+        "nextCursor": null,
+        "total": 0,
+        "snapshotVersion": 1
+    },
+    "meta": {
+        "correlationId": "01a1f9ea-d683-78c0-806d-84cdf6e5fc15",
+        "eventCursor": 108587,
+        "operation": "parts.list",
+        "snapshotAt": "2026-09-27T03:21:23.829704094Z"
+    }
+}

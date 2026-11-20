@@ -1,0 +1,91 @@
+{
+    "data": {
+        "id": "c5828d81-f4d3-47ed-9872-aa17f5e18abd",
+        "tenantId": "820cc6b6-9ea8-5d18-8b10-5c8c1d126814",
+        "version": 1,
+        "createdAt": "2026-09-27T03:21:23.815353Z",
+        "updatedAt": "2026-09-27T03:21:23.815353Z",
+        "reviewAvailability": {
+            "allowed": false,
+            "reason": "permission_denied"
+        },
+        "jobId": "f0000000-0000-4000-8000-000000000863",
+        "authorId": "241b7f77-d897-5e7d-941f-85b6d4eded17",
+        "installation": null,
+        "items": [
+            {
+                "id": "cf20fb57-d84c-460d-9b05-3e4b47a3bfb5",
+                "componentGroup": "indoor",
+                "componentKey": "filter",
+                "result": "attention",
+                "reason": "Clogged",
+                "evidenceIds": [],
+                "authorId": "241b7f77-d897-5e7d-941f-85b6d4eded17",
+                "observedAt": "2026-09-27T03:21:23.815353802Z"
+            },
+            {
+                "id": "ce9a5db0-2b70-4d67-9374-23f6d9997515",
+                "componentGroup": "indoor",
+                "componentKey": "evaporator_coil",
+                "result": "normal",
+                "reason": null,
+                "evidenceIds": [],
+                "authorId": "241b7f77-d897-5e7d-941f-85b6d4eded17",
+                "observedAt": "2026-09-27T03:21:23.815353802Z"
+            }
+        ],
+        "measurements": [
+            {
+                "id": "9a663e59-2814-4cad-8bfe-5934da6896d0",
+                "tenantId": "820cc6b6-9ea8-5d18-8b10-5c8c1d126814",
+                "version": 1,
+                "createdAt": "2026-09-27T03:21:23.815353802Z",
+                "updatedAt": "2026-09-27T03:21:23.815353802Z",
+                "boundaryId": null,
+                "qualityReason": null,
+                "rawUnit": null,
+                "unitId": "e841ee95-3171-54d5-be91-1f2301bdb701",
+                "sensorId": "ce9a5db0-2b70-4d67-9374-23f6d9997515",
+                "componentKey": "evaporator_coil",
+                "metric": "temperature",
+                "value": 12.5,
+                "unit": "°C",
+                "observedAt": "2026-09-27T01:40:00Z",
+                "receivedAt": "2026-09-27T03:21:23.815353802Z",
+                "origin": "inspection",
+                "quality": "valid",
+                "isDemo": true,
+                "sequence": 1,
+                "eventId": "9a663e59-2814-4cad-8bfe-5934da6896d0"
+            }
+        ],
+        "parts": [
+            {
+                "name": "Filter F-200",
+                "quantity": 1,
+                "catalogCode": null,
+                "source": "van_stock",
+                "lotSerial": null,
+                "replacesComponentKey": "filter",
+                "oldPartDisposal": "disposed_on_site",
+                "receiptAttachmentId": null
+            }
+        ],
+        "refrigerant": [],
+        "signOff": null,
+        "workText": "Cleaned the filter (fixture).",
+        "nextAction": {
+            "kind": "none"
+        },
+        "attachmentRefs": [],
+        "submittedAt": null,
+        "acceptedAt": null,
+        "reviewHistory": []
+    },
+    "meta": {
+        "correlationId": "01a1f9ea-d680-7d8b-91bd-c01a82bb8a6a",
+        "eventCursor": 108587,
+        "operation": "reports.get",
+        "snapshotAt": "2026-09-27T03:21:23.827170927Z"
+    }
+}

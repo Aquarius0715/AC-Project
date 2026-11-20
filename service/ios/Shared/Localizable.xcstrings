@@ -139,6 +139,75 @@
         }
       }
     },
+    "— no result": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "— tiada keputusan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "— 結果なし"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "— tidak ada hasil"
+          }
+        }
+      }
+    },
+    "— Select result": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "— Pilih keputusan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "— 結果を選択"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "— Pilih hasil"
+          }
+        }
+      }
+    },
+    "“{name}” was not added — only JPEG/PNG up to 5 MiB, max {max} photos. Saved text and photos are kept.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“{name}” tidak ditambah — hanya JPEG/PNG sehingga 5 MiB, maksimum {max} foto. Teks dan foto yang disimpan dikekalkan."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「{name}」は追加されませんでした — JPEG/PNG の 5 MiB 以下で、最大 {max} 枚です。保存済みのテキストと写真は残っています。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“{name}” tidak ditambahkan — hanya JPEG/PNG hingga 5 MiB, maksimal {max} foto. Teks dan foto yang tersimpan dipertahankan."
+          }
+        }
+      }
+    },
     "{celsius}°C is very cold for cooling: a lower setting does not cool the room faster, it runs longer and uses more power. 24–26°C is a common comfortable range.": {
       "extractionState": "manual",
       "localizations": {
@@ -553,6 +622,52 @@
         }
       }
     },
+    "{n} in van": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{n} dalam van"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "車載 {n} 個"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{n} di van"
+          }
+        }
+      }
+    },
+    "{n} issues block submit — they are listed above Submit report.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{n} isu menyekat penghantaran — semuanya disenaraikan di atas Hantar laporan."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "問題 {n} 件が提出を妨げています — 「報告書を提出」の上に表示されています。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{n} masalah menghalangi penyerahan — tercantum di atas Serahkan laporan."
+          }
+        }
+      }
+    },
     "{n} min": {
       "extractionState": "manual",
       "localizations": {
@@ -641,6 +756,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "{n} jeda"
+          }
+        }
+      }
+    },
+    "{name} reading is not a number": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bacaan {name} bukan nombor"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{name} の測定値が数値ではありません"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bacaan {name} bukan angka"
           }
         }
       }
@@ -760,6 +898,52 @@
         }
       }
     },
+    "{where} has no result": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{where} tiada keputusan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{where} に結果がありません"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{where} belum memiliki hasil"
+          }
+        }
+      }
+    },
+    "{where} needs a reason": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{where} memerlukan sebab"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{where} に理由が必要です"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{where} memerlukan alasan"
+          }
+        }
+      }
+    },
     "1 alert": {
       "extractionState": "manual",
       "localizations": {
@@ -779,6 +963,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "1 peringatan"
+          }
+        }
+      }
+    },
+    "1 issue blocks submit — it is listed above Submit report.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 isu menyekat penghantaran — ia disenaraikan di atas Hantar laporan."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "問題 1 件が提出を妨げています — 「報告書を提出」の上に表示されています。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 masalah menghalangi penyerahan — tercantum di atas Serahkan laporan."
           }
         }
       }
@@ -875,6 +1082,29 @@
         }
       }
     },
+    "A follow-up needs a future date and a note": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Susulan memerlukan tarikh akan datang dan nota"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "フォローアップには、未来の日付とメモが必要です"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tindak lanjut memerlukan tanggal di masa depan dan catatan"
+          }
+        }
+      }
+    },
     "A payment of a cause invoice is in progress — wait for it to be confirmed or to fail": {
       "extractionState": "manual",
       "localizations": {
@@ -940,6 +1170,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "pembatasan layanan membatasi pengaturan ini"
+          }
+        }
+      }
+    },
+    "A site photo (JPEG/PNG, ≤5 MiB) is required when the customer is not available": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Foto tapak (JPEG/PNG, ≤5 MiB) diperlukan apabila pelanggan tiada"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "顧客が不在の場合は、現場の写真（JPEG/PNG、5 MiB 以下）が必要です"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Foto lokasi (JPEG/PNG, ≤5 MiB) wajib bila pelanggan tidak ada"
           }
         }
       }
@@ -1151,6 +1404,167 @@
         }
       }
     },
+    "Add": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tambah"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "追加"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tambah"
+          }
+        }
+      }
+    },
+    "Add a photo of the {part}": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tambah foto {part}"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{part}の写真を追加してください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tambahkan foto {part}"
+          }
+        }
+      }
+    },
+    "Add part": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tambah alat ganti"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "部品を追加"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tambah suku cadang"
+          }
+        }
+      }
+    },
+    "Add photo": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tambah foto"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "写真を追加"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tambah foto"
+          }
+        }
+      }
+    },
+    "Add photos": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tambah foto"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "写真を追加"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tambahkan foto"
+          }
+        }
+      }
+    },
+    "Add reading": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tambah bacaan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "測定値を追加"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tambah bacaan"
+          }
+        }
+      }
+    },
+    "Added": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ditambah"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "追加済み"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ditambahkan"
+          }
+        }
+      }
+    },
     "Air conditioners": {
       "extractionState": "manual",
       "localizations": {
@@ -1354,6 +1768,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Unit yang diimpor kini memiliki telemetri, pekerjaan, atau riwayat lain — impor tidak dapat dibatalkan lagi"
+          }
+        }
+      }
+    },
+    "An installation needs the customer’s sign-off": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pemasangan memerlukan tandatangan pelanggan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "設置にはお客様のサインが必要です"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Instalasi memerlukan persetujuan pelanggan"
           }
         }
       }
@@ -1726,6 +2163,29 @@
         }
       }
     },
+    "Ask the customer to sign in the box": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Minta pelanggan menandatangani dalam kotak"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "顧客に、枠の中に署名してもらってください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Minta pelanggan menandatangani di kotak"
+          }
+        }
+      }
+    },
     "ask your contractor or HQ to extend or reassign": {
       "extractionState": "manual",
       "localizations": {
@@ -1887,6 +2347,29 @@
         }
       }
     },
+    "Attention": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Perhatian"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "要注意"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Perhatian"
+          }
+        }
+      }
+    },
     "awaiting quality review (read-only)": {
       "extractionState": "manual",
       "localizations": {
@@ -1929,6 +2412,75 @@
           "stringUnit": {
             "state": "translated",
             "value": "di bawah"
+          }
+        }
+      }
+    },
+    "Blower fan": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kipas peniup"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "送風ファン"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kipas blower"
+          }
+        }
+      }
+    },
+    "Blower motor": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Motor peniup"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "送風モーター"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Motor blower"
+          }
+        }
+      }
+    },
+    "Bought locally": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dibeli secara tempatan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "現地で購入"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dibeli lokal"
           }
         }
       }
@@ -2094,6 +2646,29 @@
         }
       }
     },
+    "Capacitor": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kapasitor"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "コンデンサー"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kapasitor"
+          }
+        }
+      }
+    },
     "Certificate expiring — {name}": {
       "extractionState": "manual",
       "localizations": {
@@ -2113,6 +2688,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sertifikat akan kedaluwarsa — {name}"
+          }
+        }
+      }
+    },
+    "Charged (kg)": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diisi (kg)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "充填（kg）"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diisi (kg)"
           }
         }
       }
@@ -2255,6 +2853,29 @@
         }
       }
     },
+    "Choose a catalog part or name it": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pilih alat ganti katalog atau namakannya"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "カタログの部品を選ぶか、名前を入力してください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pilih suku cadang katalog atau beri nama"
+          }
+        }
+      }
+    },
     "Cleaning due ({days} days since the last cleaning, run time unknown). Not a fault.": {
       "extractionState": "manual",
       "localizations": {
@@ -2343,6 +2964,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Pembersihan jatuh tempo. Bukan gangguan."
+          }
+        }
+      }
+    },
+    "Clear": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kosongkan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "クリア"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bersihkan"
           }
         }
       }
@@ -2485,6 +3129,29 @@
         }
       }
     },
+    "Compressor": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pemampat"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "コンプレッサー"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kompresor"
+          }
+        }
+      }
+    },
     "Compressor cycles": {
       "extractionState": "manual",
       "localizations": {
@@ -2508,6 +3175,29 @@
         }
       }
     },
+    "Condenser coil": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gegelung pemeluwap"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "凝縮器コイル"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Koil kondensor"
+          }
+        }
+      }
+    },
     "Confirm command": {
       "extractionState": "manual",
       "localizations": {
@@ -2527,6 +3217,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Konfirmasi perintah"
+          }
+        }
+      }
+    },
+    "Confirm that the installed model is the registered one": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sahkan bahawa model yang dipasang ialah model yang didaftarkan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "設置した機種が登録された機種であることを確認してください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Konfirmasi bahwa model yang dipasang adalah yang terdaftar"
           }
         }
       }
@@ -2596,6 +3309,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Koneksi tidak diketahui"
+          }
+        }
+      }
+    },
+    "Contactor": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Penyentuh"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "コンタクター"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kontaktor"
           }
         }
       }
@@ -2734,6 +3470,98 @@
           "stringUnit": {
             "state": "translated",
             "value": "Pelanggan"
+          }
+        }
+      }
+    },
+    "Customer handover": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Serah kepada pelanggan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "お客様への引き渡し"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Serah terima pelanggan"
+          }
+        }
+      }
+    },
+    "Customer not available": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pelanggan tiada"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "顧客は不在"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pelanggan tidak ada"
+          }
+        }
+      }
+    },
+    "Customer sign-off": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pengesahan pelanggan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "顧客の確認サイン"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Persetujuan pelanggan"
+          }
+        }
+      }
+    },
+    "Cylinder ID": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ID silinder"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "シリンダー ID"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ID tabung"
           }
         }
       }
@@ -3175,6 +4003,121 @@
         }
       }
     },
+    "Draft saved": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Draf disimpan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下書きを保存しました"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Draf disimpan"
+          }
+        }
+      }
+    },
+    "draft v{version}": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "draf v{version}"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下書き v{version}"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "draf v{version}"
+          }
+        }
+      }
+    },
+    "Drain pan": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dulang saliran"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ドレンパン"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bak penampung"
+          }
+        }
+      }
+    },
+    "Drain pipe": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paip saliran"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ドレン配管"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pipa pembuangan"
+          }
+        }
+      }
+    },
+    "Drainage": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saliran"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ドレン排水"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Drainase"
+          }
+        }
+      }
+    },
     "Dry": {
       "extractionState": "manual",
       "localizations": {
@@ -3194,6 +4137,52 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kering"
+          }
+        }
+      }
+    },
+    "Electrical": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elektrik"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "電気系統"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kelistrikan"
+          }
+        }
+      }
+    },
+    "Electrical connection": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sambungan elektrik"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "電気接続"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sambungan listrik"
           }
         }
       }
@@ -3244,6 +4233,52 @@
         }
       }
     },
+    "Enter the serial number of the installed unit": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Masukkan nombor siri unit yang dipasang"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "設置したユニットのシリアル番号を入力してください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Masukkan nomor seri unit yang dipasang"
+          }
+        }
+      }
+    },
+    "Equipment check": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Semakan peralatan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "機器確認"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pemeriksaan peralatan"
+          }
+        }
+      }
+    },
     "Error": {
       "extractionState": "manual",
       "localizations": {
@@ -3290,6 +4325,29 @@
         }
       }
     },
+    "Evaporator coil": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gegelung penyejat"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "蒸発器コイル"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Koil evaporator"
+          }
+        }
+      }
+    },
     "Expired": {
       "extractionState": "manual",
       "localizations": {
@@ -3332,6 +4390,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kedaluwarsa {date}"
+          }
+        }
+      }
+    },
+    "Fail": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gagal"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不合格"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gagal"
           }
         }
       }
@@ -3428,6 +4509,29 @@
         }
       }
     },
+    "Fan blade": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bilah kipas"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ファンブレード"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bilah kipas"
+          }
+        }
+      }
+    },
     "Fan speed": {
       "extractionState": "manual",
       "localizations": {
@@ -3447,6 +4551,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kecepatan kipas"
+          }
+        }
+      }
+    },
+    "Filter": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Penapis"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "フィルター"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filter"
           }
         }
       }
@@ -3516,6 +4643,52 @@
           "stringUnit": {
             "state": "translated",
             "value": "Pembaruan firmware mulai {date}, pukul {from}–{to} waktu lokal. AC dapat restart sekitar 2 menit."
+          }
+        }
+      }
+    },
+    "Follow-up date": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tarikh lawatan susulan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "フォローアップの日付"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tanggal tindak lanjut"
+          }
+        }
+      }
+    },
+    "Follow-up visit": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lawatan susulan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "フォローアップの訪問"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kunjungan tindak lanjut"
           }
         }
       }
@@ -3819,6 +4992,29 @@
         }
       }
     },
+    "HQ warehouse": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gudang HQ"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本部の倉庫"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gudang HQ"
+          }
+        }
+      }
+    },
     "Humidity": {
       "extractionState": "manual",
       "localizations": {
@@ -3861,6 +5057,75 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sedang berjalan"
+          }
+        }
+      }
+    },
+    "Indoor": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dalaman"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "室内"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dalam ruangan"
+          }
+        }
+      }
+    },
+    "Indoor unit": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unit dalaman"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "室内機"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unit dalam ruangan"
+          }
+        }
+      }
+    },
+    "Initial result is always empty — normal is never preselected. Attention, not inspected and not applicable need a reason.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keputusan awal sentiasa kosong — normal tidak pernah dipilih terlebih dahulu. Perhatian, tidak diperiksa dan tidak berkenaan memerlukan sebab."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最初の結果は常に空です — 「正常」は事前に選ばれません。「要注意」「未点検」「対象外」には理由が必要です。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hasil awal selalu kosong — normal tidak pernah dipilih sebelumnya. Perhatian, tidak diperiksa, dan tidak berlaku memerlukan alasan."
           }
         }
       }
@@ -4072,6 +5337,52 @@
         }
       }
     },
+    "Kilograms, 0 or more": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kilogram, 0 atau lebih"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "キログラム、0 以上"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kilogram, 0 atau lebih"
+          }
+        }
+      }
+    },
+    "Leak check": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Semakan kebocoran"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "漏れ確認"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uji kebocoran"
+          }
+        }
+      }
+    },
     "Left {name} — {n} automations ran.": {
       "extractionState": "manual",
       "localizations": {
@@ -4160,6 +5471,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Peringatan terkait"
+          }
+        }
+      }
+    },
+    "Linked item": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Item berkaitan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "対象の項目"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Butir terkait"
           }
         }
       }
@@ -4417,6 +5751,29 @@
         }
       }
     },
+    "Louver": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Louver"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ルーバー"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kisi-kisi"
+          }
+        }
+      }
+    },
     "Low": {
       "extractionState": "manual",
       "localizations": {
@@ -4578,6 +5935,29 @@
         }
       }
     },
+    "Metric": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Metrik"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "指標"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Metrik"
+          }
+        }
+      }
+    },
     "Mid": {
       "extractionState": "manual",
       "localizations": {
@@ -4624,6 +6004,29 @@
         }
       }
     },
+    "Missing": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tiada"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未追加"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Belum ada"
+          }
+        }
+      }
+    },
     "Mode": {
       "extractionState": "manual",
       "localizations": {
@@ -4666,6 +6069,52 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mode → {mode}"
+          }
+        }
+      }
+    },
+    "Mounting": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pemasangan unit"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "据付"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pemasangan"
+          }
+        }
+      }
+    },
+    "Name plate": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plat nama"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "銘板"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pelat nama"
           }
         }
       }
@@ -4877,6 +6326,29 @@
         }
       }
     },
+    "No customer sign-off yet — the report can still be submitted; the reviewer sees “not signed”.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Belum ada pengesahan pelanggan — laporan masih boleh dihantar; penyemak melihat “belum ditandatangani”."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "顧客の確認サインがまだありません — 報告書は提出できますが、レビュー担当者には「未署名」と表示されます。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Belum ada persetujuan pelanggan — laporan masih dapat diserahkan; peninjau melihat “belum ditandatangani”."
+          }
+        }
+      }
+    },
     "no device response (expired)": {
       "extractionState": "manual",
       "localizations": {
@@ -4965,6 +6437,75 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tidak ada notifikasi"
+          }
+        }
+      }
+    },
+    "No parts used.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tiada alat ganti digunakan."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用した部品はありません。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak ada suku cadang dipakai."
+          }
+        }
+      }
+    },
+    "No photos.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tiada foto."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "写真はありません。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak ada foto."
+          }
+        }
+      }
+    },
+    "No readings yet. Record each measurement with its unit and the component it belongs to — an unmeasured value is left empty, never 0.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Belum ada bacaan. Rekod setiap ukuran dengan unitnya dan komponen yang berkaitan — nilai yang tidak diukur dibiarkan kosong, bukan 0."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "測定値はまだありません。測定ごとに、単位と対象の部品を記録してください — 測定していない値は、0 ではなく空にします。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Belum ada bacaan. Catat setiap pengukuran dengan satuan dan komponennya — nilai yang tidak diukur dibiarkan kosong, tidak pernah 0."
           }
         }
       }
@@ -5084,6 +6625,29 @@
         }
       }
     },
+    "None": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tiada"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "なし"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak ada"
+          }
+        }
+      }
+    },
     "None of your homes or offices has a map pin yet — HQ sets them.": {
       "extractionState": "manual",
       "localizations": {
@@ -5103,6 +6667,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Belum ada rumah atau kantor Anda yang memiliki pin peta — HQ yang menetapkannya."
+          }
+        }
+      }
+    },
+    "Normal": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Normal"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正常"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Normal"
           }
         }
       }
@@ -5130,6 +6717,29 @@
         }
       }
     },
+    "Not applicable": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak berkenaan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "対象外"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak berlaku"
+          }
+        }
+      }
+    },
     "not checked in": {
       "extractionState": "manual",
       "localizations": {
@@ -5153,6 +6763,75 @@
         }
       }
     },
+    "Not done": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak dibuat"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未実施"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak dilakukan"
+          }
+        }
+      }
+    },
+    "Not in the catalog…": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tiada dalam katalog…"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "カタログにない…"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak ada di katalog…"
+          }
+        }
+      }
+    },
+    "Not inspected": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak diperiksa"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未点検"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak diperiksa"
+          }
+        }
+      }
+    },
     "Not sent: {reason}": {
       "extractionState": "manual",
       "localizations": {
@@ -5172,6 +6851,52 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tidak terkirim: {reason}"
+          }
+        }
+      }
+    },
+    "Not signed": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Belum ditandatangani"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未署名"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Belum ditandatangani"
+          }
+        }
+      }
+    },
+    "not started": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "belum dimulakan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未開始"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "belum dimulai"
           }
         }
       }
@@ -5521,6 +7246,29 @@
         }
       }
     },
+    "Open the work report": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Buka laporan kerja"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "作業報告を開く"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Buka laporan kerja"
+          }
+        }
+      }
+    },
     "opens {time} (read-only until then)": {
       "extractionState": "manual",
       "localizations": {
@@ -5586,6 +7334,190 @@
           "stringUnit": {
             "state": "translated",
             "value": "Unit atau ruang lain ditambahkan ke tempat yang diimpor — impor tidak dapat dibatalkan lagi"
+          }
+        }
+      }
+    },
+    "Outdoor": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Luaran"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "室外"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Luar ruangan"
+          }
+        }
+      }
+    },
+    "Outdoor unit": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unit luaran"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "室外機"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unit luar ruangan"
+          }
+        }
+      }
+    },
+    "Outlet": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saluran keluar"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "吹出口"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lubang keluar"
+          }
+        }
+      }
+    },
+    "Part (catalog)": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alat ganti (katalog)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "部品（カタログ）"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Suku cadang (katalog)"
+          }
+        }
+      }
+    },
+    "Part {n} ({name}) needs a quantity of 1–999": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alat ganti {n} ({name}) memerlukan kuantiti 1–999"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "部品 {n}（{name}）の数量は 1～999 にしてください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Suku cadang {n} ({name}) memerlukan jumlah 1–999"
+          }
+        }
+      }
+    },
+    "Part name": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nama alat ganti"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "部品名"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nama suku cadang"
+          }
+        }
+      }
+    },
+    "Parts & refrigerant": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alat ganti & bahan pendingin"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "部品と冷媒"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Suku cadang & refrigeran"
+          }
+        }
+      }
+    },
+    "Pass": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lulus"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "合格"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lulus"
           }
         }
       }
@@ -5751,6 +7683,75 @@
         }
       }
     },
+    "Photo {name} added — sign-off cleared": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Foto {name} ditambah — pengesahan dikosongkan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "写真 {name} を追加しました — 確認サインは解除されました"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Foto {name} ditambahkan — persetujuan dihapus"
+          }
+        }
+      }
+    },
+    "Photo {name} is {state} — remove or retry it": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Foto {name} {state} — buang atau cuba lagi"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "写真 {name} は {state} です — 削除するか、再試行してください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Foto {name} {state} — hapus atau coba lagi"
+          }
+        }
+      }
+    },
+    "Photos (JPEG/PNG, ≤5 MiB, ≤{max})": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Foto (JPEG/PNG, ≤5 MiB, ≤{max})"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "写真（JPEG/PNG、5 MiB 以下、最大 {max} 枚）"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Foto (JPEG/PNG, ≤5 MiB, ≤{max})"
+          }
+        }
+      }
+    },
     "PM2.5": {
       "extractionState": "manual",
       "localizations": {
@@ -5793,6 +7794,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Daya"
+          }
+        }
+      }
+    },
+    "Power draw": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Penggunaan kuasa"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "消費電力"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Daya terpakai"
           }
         }
       }
@@ -5912,6 +7936,75 @@
         }
       }
     },
+    "processing": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "sedang diproses"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "処理中"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "diproses"
+          }
+        }
+      }
+    },
+    "Qty": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kuantiti"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "数量"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jml"
+          }
+        }
+      }
+    },
+    "Quantity must be 1–999": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kuantiti mestilah 1–999"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "数量は 1～999 にしてください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jumlah harus 1–999"
+          }
+        }
+      }
+    },
     "Raise the temperature": {
       "extractionState": "manual",
       "localizations": {
@@ -5958,6 +8051,52 @@
         }
       }
     },
+    "Readings": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bacaan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "測定値"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bacaan"
+          }
+        }
+      }
+    },
+    "Reason (required for {result})": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sebab (diperlukan untuk {result})"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "理由（{result} の場合は必須）"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alasan (wajib untuk {result})"
+          }
+        }
+      }
+    },
     "Reason (required)": {
       "extractionState": "manual",
       "localizations": {
@@ -5981,6 +8120,29 @@
         }
       }
     },
+    "Reason: {reason}": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sebab: {reason}"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "理由: {reason}"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alasan: {reason}"
+          }
+        }
+      }
+    },
     "Received": {
       "extractionState": "manual",
       "localizations": {
@@ -6000,6 +8162,121 @@
           "stringUnit": {
             "state": "translated",
             "value": "Diterima"
+          }
+        }
+      }
+    },
+    "Recovered (kg)": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diperoleh semula (kg)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "回収（kg）"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dipulihkan (kg)"
+          }
+        }
+      }
+    },
+    "Refrigerant": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bahan pendingin"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "冷媒"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refrigeran"
+          }
+        }
+      }
+    },
+    "Refrigerant ({kind}) — cylinder {id}": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bahan pendingin ({kind}) — silinder {id}"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "冷媒（{kind}）— シリンダー {id}"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refrigeran ({kind}) — tabung {id}"
+          }
+        }
+      }
+    },
+    "Refrigerant pipe": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paip bahan pendingin"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "冷媒配管"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pipa refrigeran"
+          }
+        }
+      }
+    },
+    "Refrigerant piping": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paip bahan penyejuk"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "冷媒配管"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Perpipaan refrigeran"
           }
         }
       }
@@ -6119,6 +8396,29 @@
         }
       }
     },
+    "Remove": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Buang"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "削除"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hapus"
+          }
+        }
+      }
+    },
     "Remove restriction": {
       "extractionState": "manual",
       "localizations": {
@@ -6165,6 +8465,52 @@
         }
       }
     },
+    "Replace": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ganti"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "置き換え"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ganti"
+          }
+        }
+      }
+    },
+    "Replaces checklist item (optional)": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Menggantikan item senarai semak (pilihan)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "交換するチェックリストの項目（任意）"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Menggantikan butir daftar periksa (opsional)"
+          }
+        }
+      }
+    },
     "report draft open": {
       "extractionState": "manual",
       "localizations": {
@@ -6184,6 +8530,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "draf laporan terbuka"
+          }
+        }
+      }
+    },
+    "Report v{version} submitted": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Laporan v{version} dihantar"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "報告書 v{version} を提出しました"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Laporan v{version} diserahkan"
           }
         }
       }
@@ -6303,6 +8672,29 @@
         }
       }
     },
+    "Result of {item}": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keputusan {item}"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{item} の結果"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hasil {item}"
+          }
+        }
+      }
+    },
     "Resume rework": {
       "extractionState": "manual",
       "localizations": {
@@ -6391,6 +8783,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dikembalikan untuk pengerjaan ulang"
+          }
+        }
+      }
+    },
+    "Returned for rework — “{reason}”. Resume to continue as a new draft version; the returned version stays as it was.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dikembalikan untuk kerja semula — “{reason}”. Sambung untuk meneruskan sebagai versi draf baharu; versi yang dikembalikan kekal seperti asal."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "やり直しのため差し戻されました —「{reason}」。再開すると新しい下書きの版で続けられます。差し戻された版はそのまま残ります。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dikembalikan untuk pengerjaan ulang — “{reason}”. Lanjutkan sebagai versi draf baru; versi yang dikembalikan tetap seperti semula."
           }
         }
       }
@@ -6506,6 +8921,75 @@
           "stringUnit": {
             "state": "translated",
             "value": "Suhu ruangan (terukur)"
+          }
+        }
+      }
+    },
+    "Save draft": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Simpan draf"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下書きを保存"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Simpan draf"
+          }
+        }
+      }
+    },
+    "Save sign-off": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Simpan pengesahan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "確認サインを保存"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Simpan persetujuan"
+          }
+        }
+      }
+    },
+    "Say why the customer could not sign": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nyatakan mengapa pelanggan tidak dapat menandatangani"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "顧客が署名できなかった理由を入力してください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jelaskan mengapa pelanggan tidak dapat menandatangani"
           }
         }
       }
@@ -6671,6 +9155,29 @@
         }
       }
     },
+    "Sensor": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Penderia"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "センサー"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sensor"
+          }
+        }
+      }
+    },
     "Sent as its own command": {
       "extractionState": "manual",
       "localizations": {
@@ -6713,6 +9220,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Terkirim ke koordinator Anda"
+          }
+        }
+      }
+    },
+    "Serial number": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nombor siri"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "シリアル番号"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nomor seri"
           }
         }
       }
@@ -6947,6 +9477,29 @@
         }
       }
     },
+    "Sign here": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tandatangan di sini"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ここに署名"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tanda tangan di sini"
+          }
+        }
+      }
+    },
     "Sign in": {
       "extractionState": "manual",
       "localizations": {
@@ -6989,6 +9542,121 @@
           "stringUnit": {
             "state": "translated",
             "value": "Keluar"
+          }
+        }
+      }
+    },
+    "Sign-off saved for this report version": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pengesahan disimpan untuk versi laporan ini"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この報告書の版に確認サインを保存しました"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Persetujuan disimpan untuk versi laporan ini"
+          }
+        }
+      }
+    },
+    "Signature": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tandatangan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "署名"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tanda tangan"
+          }
+        }
+      }
+    },
+    "Signature pad": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pad tandatangan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "署名パッド"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Panel tanda tangan"
+          }
+        }
+      }
+    },
+    "Signed · {name} · {time}": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ditandatangani · {name} · {time}"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "署名済み · {name} · {time}"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ditandatangani · {name} · {time}"
+          }
+        }
+      }
+    },
+    "Signer name": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nama penandatangan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "署名者の名前"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nama penanda tangan"
           }
         }
       }
@@ -7039,6 +9707,29 @@
         }
       }
     },
+    "Site photo (JPEG/PNG)": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Foto tapak (JPEG/PNG)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "現場の写真（JPEG/PNG）"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Foto lokasi (JPEG/PNG)"
+          }
+        }
+      }
+    },
     "Someone changed this in the meantime — the screen now shows the latest version": {
       "extractionState": "manual",
       "localizations": {
@@ -7058,6 +9749,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Seseorang telah mengubah ini — layar kini menampilkan versi terbaru"
+          }
+        }
+      }
+    },
+    "Source": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sumber"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "調達元"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sumber"
           }
         }
       }
@@ -7177,6 +9891,98 @@
         }
       }
     },
+    "Stock is deducted from your van when the report is accepted. Refrigerant amounts are kept per unit for leak-check and regulatory logs.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stok ditolak daripada van anda apabila laporan diterima. Jumlah bahan pendingin disimpan bagi setiap unit untuk log semakan kebocoran dan peraturan."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在庫は、報告書が承諾されたときに車載分から差し引かれます。冷媒の量は、漏れ確認と法令上の記録のため、ユニットごとに保存されます。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stok dikurangi dari van Anda saat laporan diterima. Jumlah refrigeran disimpan per unit untuk log uji kebocoran dan regulasi."
+          }
+        }
+      }
+    },
+    "Submit": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hantar"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "提出"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Serahkan"
+          }
+        }
+      }
+    },
+    "Submit report": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hantar laporan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "報告書を提出"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Serahkan laporan"
+          }
+        }
+      }
+    },
+    "Submit report v{version}?": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hantar laporan v{version}?"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "報告書 v{version} を提出しますか？"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Serahkan laporan v{version}?"
+          }
+        }
+      }
+    },
     "Submitted": {
       "extractionState": "manual",
       "localizations": {
@@ -7246,6 +10052,52 @@
         }
       }
     },
+    "Submitted versions become read-only; the quality review by your company or HQ follows.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Versi yang dihantar menjadi baca sahaja; semakan kualiti oleh syarikat anda atau HQ menyusul."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "提出した版は読み取り専用になり、このあと貴社または本部による品質レビューが行われます。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Versi yang diserahkan menjadi hanya-baca; tinjauan kualitas oleh perusahaan Anda atau HQ menyusul."
+          }
+        }
+      }
+    },
+    "Submitted versions become read-only. A report returned for rework continues as a new draft version. Saving again clears the sign-off.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Versi yang dihantar menjadi baca sahaja. Laporan yang dikembalikan untuk kerja semula disambung sebagai versi draf baharu. Menyimpan semula mengosongkan pengesahan."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "提出した版は読み取り専用になります。やり直しのため差し戻された報告書は、新しい下書きの版で続けます。もう一度保存すると、確認サインは解除されます。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Versi yang diserahkan menjadi hanya-baca. Laporan yang dikembalikan untuk pengerjaan ulang dilanjutkan sebagai versi draf baru. Menyimpan lagi menghapus persetujuan."
+          }
+        }
+      }
+    },
     "suspect": {
       "extractionState": "manual",
       "localizations": {
@@ -7265,6 +10117,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "meragukan"
+          }
+        }
+      }
+    },
+    "Take photo": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ambil foto"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "写真を撮る"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ambil foto"
           }
         }
       }
@@ -7453,6 +10328,29 @@
         }
       }
     },
+    "Test run": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Larian ujian"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "テスト運転"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uji coba"
+          }
+        }
+      }
+    },
     "The 24-hour undo period for this import has ended": {
       "extractionState": "manual",
       "localizations": {
@@ -7568,6 +10466,29 @@
         }
       }
     },
+    "The cylinder ID is required": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ID silinder diperlukan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "シリンダー ID は必須です"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ID tabung wajib diisi"
+          }
+        }
+      }
+    },
     "The device is offline — try again when it is back online": {
       "extractionState": "manual",
       "localizations": {
@@ -7587,6 +10508,75 @@
           "stringUnit": {
             "state": "translated",
             "value": "Perangkat offline — coba lagi saat kembali online"
+          }
+        }
+      }
+    },
+    "The draft is kept.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Draf dikekalkan."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下書きは残っています。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Draf dipertahankan."
+          }
+        }
+      }
+    },
+    "The installed model is {model}": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Model yang dipasang ialah {model}"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "設置した機種は {model} です"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Model yang dipasang adalah {model}"
+          }
+        }
+      }
+    },
+    "The installed unit against the register": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unit yang dipasang berbanding daftar"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "設置したユニットと登録内容の照合"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unit yang dipasang dibandingkan dengan register"
           }
         }
       }
@@ -7729,6 +10719,52 @@
         }
       }
     },
+    "The report is not readable now ({reason}).": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Laporan tidak boleh dibaca sekarang ({reason})."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "報告書を現在は読み取れません（{reason}）。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Laporan tidak dapat dibaca saat ini ({reason})."
+          }
+        }
+      }
+    },
+    "The report opens when you check in at the site.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Laporan dibuka apabila anda daftar masuk di tapak."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "現場でチェックインすると、報告書が開きます。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Laporan terbuka saat Anda check-in di lokasi."
+          }
+        }
+      }
+    },
     "The request took too long — check whether the change was saved, then try again": {
       "extractionState": "manual",
       "localizations": {
@@ -7867,6 +10903,52 @@
         }
       }
     },
+    "The sign-off is bound to this report version; saving the draft again clears it.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pengesahan terikat kepada versi laporan ini; menyimpan draf semula mengosongkannya."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "確認サインはこの報告書の版に紐づいています。下書きをもう一度保存すると解除されます。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Persetujuan terikat pada versi laporan ini; menyimpan draf lagi menghapusnya."
+          }
+        }
+      }
+    },
+    "The signer's name is required": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nama penandatangan diperlukan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "署名者の名前が必要です"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nama penanda tangan wajib diisi"
+          }
+        }
+      }
+    },
     "The visit time was agreed with the client; accept it or say you can’t make it.": {
       "extractionState": "manual",
       "localizations": {
@@ -7955,6 +11037,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Jendela pekerjaan telah berakhir — minta koordinator Anda menjadwalkan ulang."
+          }
+        }
+      }
+    },
+    "Thermostat": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Termostat"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "サーモスタット"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Termostat"
           }
         }
       }
@@ -9362,6 +12467,29 @@
         }
       }
     },
+    "unnamed": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "tanpa nama"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "名称なし"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "tanpa nama"
+          }
+        }
+      }
+    },
     "Unread": {
       "extractionState": "manual",
       "localizations": {
@@ -9408,6 +12536,29 @@
         }
       }
     },
+    "Unsaved changes": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Perubahan belum disimpan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未保存の変更"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Perubahan belum disimpan"
+          }
+        }
+      }
+    },
     "Use this device’s location": {
       "extractionState": "manual",
       "localizations": {
@@ -9427,6 +12578,75 @@
           "stringUnit": {
             "state": "translated",
             "value": "Gunakan lokasi perangkat ini"
+          }
+        }
+      }
+    },
+    "Vacuum and leak test": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ujian vakum dan kebocoran"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "真空引き・リークテスト"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vakum dan uji kebocoran"
+          }
+        }
+      }
+    },
+    "Value": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nilai"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "値"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nilai"
+          }
+        }
+      }
+    },
+    "Van stock": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stok van"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "車載在庫"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stok van"
           }
         }
       }
@@ -9569,6 +12789,52 @@
         }
       }
     },
+    "What to do (required)": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apa yang perlu dilakukan (diperlukan)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "対応内容（必須）"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apa yang harus dilakukan (wajib)"
+          }
+        }
+      }
+    },
+    "Why the customer could not sign": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mengapa pelanggan tidak dapat menandatangani"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "顧客が署名できなかった理由"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mengapa pelanggan tidak dapat menandatangani"
+          }
+        }
+      }
+    },
     "Window": {
       "extractionState": "manual",
       "localizations": {
@@ -9634,6 +12900,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "jendela berakhir dalam {n} mnt"
+          }
+        }
+      }
+    },
+    "Wiring insulation": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Penebat pendawaian"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "配線の絶縁"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Isolasi kabel"
           }
         }
       }
@@ -9749,6 +13038,98 @@
           "stringUnit": {
             "state": "translated",
             "value": "Pekerjaan dijeda"
+          }
+        }
+      }
+    },
+    "Work performed & next action (10–4000 characters)": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kerja yang dilakukan & tindakan seterusnya (10–4000 aksara)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "実施した作業と次の対応（10～4000文字）"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pekerjaan yang dilakukan & tindakan berikutnya (10–4000 karakter)"
+          }
+        }
+      }
+    },
+    "Work performed must be 10–4000 characters": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kerja yang dilakukan mestilah 10–4000 aksara"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "実施した作業は10～4000文字で入力してください"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pekerjaan yang dilakukan harus 10–4000 karakter"
+          }
+        }
+      }
+    },
+    "Work report": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Laporan kerja"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "作業報告書"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Laporan pekerjaan"
+          }
+        }
+      }
+    },
+    "Work report — {version}": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Laporan kerja — {version}"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "作業報告書 — {version}"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Laporan pekerjaan — {version}"
           }
         }
       }

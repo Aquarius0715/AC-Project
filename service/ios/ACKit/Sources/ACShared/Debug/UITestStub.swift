@@ -336,7 +336,7 @@ public enum UITestStub {
                 modelId: "m1",
                 installState: .installed,
                 installedAt: nil,
-                serviceScope: [],
+                serviceScope: [.indoor],  // the technician's checklist: the indoor group
                 warrantyEndsAt: nil,
                 alertPolicyIds: [],
                 archived: false,

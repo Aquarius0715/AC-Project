@@ -98,6 +98,94 @@ final class TechnicianUITests: XCTestCase {
         XCTAssertTrue(wait(for: app.staticTexts["job.note"], label: "Work resumed"))
     }
 
+    /// The stub's job accepted and checked in manually: the work report can be opened.
+    @MainActor
+    private func startedJob() -> XCUIApplication {
+        let app = openJob()
+        XCTAssertTrue(app.buttons["job.accept"].waitForExistence(timeout: 5))
+        app.buttons["job.accept"].tap()
+        XCTAssertTrue(wait(for: app.staticTexts["job.note"], label: "Assignment accepted"))
+        tapScrolling(app.buttons["job.checkIn"], in: app)
+        XCTAssertTrue(app.buttons["checkIn.method.manual"].waitForExistence(timeout: 5))
+        app.buttons["checkIn.method.manual"].tap()
+        type("No GPS signal in the plant room", into: field("checkIn.reason", in: app), in: app)
+        tapScrolling(app.buttons["checkIn.submit"], in: app)
+        XCTAssertTrue(wait(for: app.staticTexts["job.note"], label: "Checked in — the job has started"))
+        return app
+    }
+
+    /// Chooses a result in a checklist row's menu.
+    @MainActor
+    private func choose(_ result: String, for key: String, in app: XCUIApplication) {
+        tapScrolling(app.buttons["report.result.\(key)"], in: app)
+        let option = app.buttons[result].firstMatch
+        XCTAssertTrue(option.waitForExistence(timeout: 5))
+        option.tap()
+    }
+
+    @MainActor
+    func testAReportIsFilledSignedAndSubmitted() throws {
+        let app = startedJob()
+        tapScrolling(app.buttons["job.report"], in: app)
+        let submit = app.buttons["report.submit"]
+        XCTAssertTrue(submit.waitForExistence(timeout: 5))
+        try app.audit()
+        keepScreenshot("report-new", of: app)
+
+        // a submit first lists what blocks it: every empty result and the work text
+        tapScrolling(submit, in: app)
+        XCTAssertTrue(wait(for: app.staticTexts["report.issues"], label: "9 issues block submit — they are listed above Submit report."))
+
+        for key in ["evaporator_coil", "blower_motor", "blower_fan", "drain_pipe", "drain_pan", "outlet", "louver"] {
+            choose("Normal", for: key, in: app)
+        }
+        choose("Attention", for: "filter", in: app)
+        type("Clogged with dust", into: field("report.reason.filter", in: app), in: app)
+        tapScrolling(app.buttons["report.reading.add"], in: app)
+        type("12.5", into: field("report.reading.value", in: app), in: app)
+
+        tapScrolling(app.buttons["report.part.add"], in: app)
+        let catalog = app.buttons["part.catalog"]
+        XCTAssertTrue(catalog.waitForExistence(timeout: 5))
+        catalog.tap()
+        app.buttons["Filter F-200 · F200 · 4 in van"].firstMatch.tap()
+        app.buttons["part.save"].tap()
+        XCTAssertTrue(app.staticTexts["Filter F-200 × 1 · Van stock"].waitForExistence(timeout: 5))
+
+        type("Cleaned the filter and checked the drain.", into: field("report.workText", in: app), in: app)
+        tapScrolling(app.buttons["report.save"], in: app)
+        XCTAssertTrue(wait(for: app.staticTexts["report.note"], label: "Draft saved"))
+
+        // the customer signs on the phone
+        tapScrolling(app.buttons["report.signOff"], in: app)
+        type("Ms Tan", into: field("signOff.name", in: app), in: app)
+        let pad = app.descendants(matching: .any)["signOff.pad"]
+        XCTAssertTrue(pad.waitForExistence(timeout: 5))
+        tapScrolling(pad, in: app)  // above the keyboard; the tap is a dot of the signature
+        pad.coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: 0.6))
+            .press(
+                forDuration: 0.1,
+                thenDragTo: pad.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.3)),
+                withVelocity: .slow,
+                thenHoldForDuration: 0.1
+            )
+        tapScrolling(app.buttons["signOff.save"], in: app)
+        XCTAssertTrue(wait(for: app.staticTexts["report.note"], label: "Sign-off saved for this report version"))
+        XCTAssertTrue(app.staticTexts["report.signed"].label.hasPrefix("Signed · Ms Tan · "))
+
+        tapScrolling(submit, in: app)
+        let confirm = app.buttons["report.submit.confirm"].firstMatch
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5))
+        confirm.tap()
+        // the version signed is the one submitted: nothing was saved after the sign-off
+        XCTAssertTrue(wait(for: app.staticTexts["report.note"], label: "Report v1 submitted"))
+        XCTAssertTrue(app.staticTexts["report.signed"].label.hasPrefix("Signed · Ms Tan · "), "the sign-off is kept")
+        XCTAssertFalse(submit.exists, "a submitted version is read-only")
+        scrollToTop(app)
+        try app.audit()
+        keepScreenshot("report-submitted", of: app)
+    }
+
     @MainActor
     func testCantMakeIsSentWithItsReason() throws {
         let app = openJob()
@@ -197,5 +285,60 @@ final class TechnicianUITests: XCTestCase {
         keepScreenshot("live-job-paused", of: app)
         tapScrolling(pause, in: app)
         XCTAssertTrue(wait(for: app.staticTexts["job.note"], label: "Work resumed"))
+    }
+
+    /// A job assigned to tech-internal-a in the dev stack (inserted for the check): accepted, checked in, its report
+    /// filled, saved, signed and submitted against the Core API.
+    @MainActor
+    func testLiveReportIsSavedSignedAndSubmitted() throws {
+        guard let jobId = ProcessInfo.processInfo.environment["AC_UI_LIVE_REPORT"] else {
+            throw XCTSkip("the dev stack's live report (TEST_RUNNER_AC_UI_LIVE_REPORT=<job id>)")
+        }
+        let app = launch([:])
+        if app.navigationBars["Jobs"].waitForExistence(timeout: 3) { tapScrolling(app.buttons["signOut"], in: app) }
+        XCTAssertTrue(app.buttons["signIn.button"].waitForExistence(timeout: 10))
+        app.buttons["signIn.button"].tap()
+        LiveSignIn.signIn(user: "tech-internal-a")
+        let row = app.buttons["job.\(jobId)"]
+        XCTAssertTrue(row.waitForExistence(timeout: 20))
+        tapScrolling(row, in: app)
+        XCTAssertTrue(app.buttons["job.accept"].waitForExistence(timeout: 20))
+        app.buttons["job.accept"].tap()
+        XCTAssertTrue(wait(for: app.staticTexts["job.note"], label: "Assignment accepted"))
+        tapScrolling(app.buttons["job.checkIn"], in: app)
+        XCTAssertTrue(app.buttons["checkIn.method.manual"].waitForExistence(timeout: 5))
+        app.buttons["checkIn.method.manual"].tap()
+        type("No GPS signal in the plant room", into: field("checkIn.reason", in: app), in: app)
+        tapScrolling(app.buttons["checkIn.submit"], in: app)
+        XCTAssertTrue(wait(for: app.staticTexts["job.note"], label: "Checked in — the job has started"))
+        tapScrolling(app.buttons["job.report"], in: app)
+        XCTAssertTrue(app.buttons["report.submit"].waitForExistence(timeout: 10))
+        let keys = [
+            "filter", "evaporator_coil", "blower_motor", "blower_fan", "drain_pipe", "drain_pan", "outlet", "louver", "condenser_coil",
+            "compressor", "fan", "blade", "refrigerant_pipe", "thermostat", "sensor", "capacitor", "contactor", "wiring",
+        ]
+        for key in keys { choose("Normal", for: key, in: app) }
+        type("Cleaned the filters and checked every component.", into: field("report.workText", in: app), in: app)
+        tapScrolling(app.buttons["report.save"], in: app)
+        XCTAssertTrue(wait(for: app.staticTexts["report.note"], label: "Draft saved"))
+        tapScrolling(app.buttons["report.signOff"], in: app)
+        type("Ms Tan", into: field("signOff.name", in: app), in: app)
+        let pad = app.descendants(matching: .any)["signOff.pad"]
+        tapScrolling(pad, in: app)
+        pad.coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: 0.6))
+            .press(
+                forDuration: 0.1,
+                thenDragTo: pad.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.3)),
+                withVelocity: .slow,
+                thenHoldForDuration: 0.1
+            )
+        tapScrolling(app.buttons["signOff.save"], in: app)
+        XCTAssertTrue(wait(for: app.staticTexts["report.note"], label: "Sign-off saved for this report version"))
+        tapScrolling(app.buttons["report.submit"], in: app)
+        let confirm = app.buttons["report.submit.confirm"].firstMatch
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5))
+        confirm.tap()
+        XCTAssertTrue(wait(for: app.staticTexts["report.note"], label: "Report v1 submitted"))
+        keepScreenshot("live-report-submitted", of: app)
     }
 }
