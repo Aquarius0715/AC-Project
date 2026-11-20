@@ -89,6 +89,12 @@ describe("Jobs view", () => {
     expect(within(link("job-3 · Office")).getByText("Client request")).toBeTruthy();
   });
 
+  it("badges an HQ installation job as HQ's request, not the client's (IR859)", () => {
+    render(<JobsView live={live({ rows: [row({ id: "job-4", title: "job-4 · New unit", origin: "hq_request" })], total: 1 })} />);
+    expect(within(link("job-4 · New unit")).getByText("HQ request")).toBeTruthy();
+    expect(screen.queryByText("Client request")).toBeNull();
+  });
+
   it("tells a company without jobs from an empty tab", () => {
     const view = render(<JobsView live={live({ rows: [], total: 0, tabs: [{ id: "all", label: "All", count: 0 }] })} />);
     expect(screen.getByText("No jobs yet")).toBeTruthy();

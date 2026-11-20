@@ -1,13 +1,35 @@
 "use client"
 
-import type { ComponentProps } from "react"
+import { useEffect, useRef, useState, type ComponentProps, type RefObject } from "react"
 import { cn } from "cn"
 
+/** Whether the element is wider than its box, so it scrolls sideways: such a region takes the keyboard focus (tabIndex 0) and so can be scrolled without a pointer (axe scrollable-region-focusable); one that fits stays out of the tab order. */
+export function useOverflows<E extends HTMLElement>(): [RefObject<E | null>, boolean] {
+  const ref = useRef<E>(null)
+  const [overflows, setOverflows] = useState(false)
+  useEffect(() => {
+    const el = ref.current
+    const check = () => { if (el) setOverflows(el.scrollWidth > el.clientWidth + 1) }
+    const observer = new ResizeObserver(check)
+    if (el) {
+      check()
+      observer.observe(el)
+      for (const child of el.children) observer.observe(child)
+    }
+    return () => { observer.disconnect() }
+  }, [])
+  return [ref, overflows]
+}
+
 function Table({ className, ...props }: ComponentProps<"table">) {
+  const [ref, overflows] = useOverflows<HTMLDivElement>()
   return (
     <div
+      ref={ref}
       data-slot="table-container"
       className="relative w-full overflow-x-auto"
+      // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a box that scrolls sideways must take the focus so the keyboard can scroll it (WCAG 2.1.1, axe scrollable-region-focusable); it does only while it overflows
+      tabIndex={overflows ? 0 : undefined}
     >
       <table
         data-slot="table"

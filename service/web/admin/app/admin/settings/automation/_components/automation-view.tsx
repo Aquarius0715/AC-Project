@@ -42,12 +42,12 @@ function unitGroups(live: { customers: { id: string; name: string }[]; propertie
     .toSorted((a, b) => a.label.localeCompare(b.label)); // a customer's properties together
 }
 
-/** “Select all (n)” / “Clear” for one customer › property group of the unit picker. */
+/** “Select all (n)” / “Clear” for one customer › property group of the unit picker; 44 px on a touch screen (IR618). */
 function GroupToggle({ ids, chosen, group, onToggle }: Readonly<{ ids: string[]; chosen: string[]; group: string; onToggle: (ids: string[], on: boolean) => void }>) {
   const t = useT();
   const isAll = ids.every((id) => chosen.includes(id));
   return (
-    <Plain type="button" aria-label={t(isAll ? "Clear the units of {group}" : "Select all units of {group}", { group })} className="font-semibold text-primary hover:underline" onClick={() => { onToggle(ids, !isAll); }}>
+    <Plain type="button" touch aria-label={t(isAll ? "Clear the units of {group}" : "Select all units of {group}", { group })} className="font-semibold text-primary hover:underline" onClick={() => { onToggle(ids, !isAll); }}>
       {t(isAll ? "Clear" : "Select all ({n})", { n: ids.length })}
     </Plain>
   );

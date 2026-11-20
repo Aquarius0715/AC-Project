@@ -216,6 +216,8 @@ describe("part and refrigerant checks", () => {
     expect(refrigerantErrors("CYL-R32-0182", "0.4", "0.6")).toStrictEqual({});
     expect(refrigerantErrors(" ", "-1", "x")).toStrictEqual({ cylinder: "The cylinder ID is required", recovered: "Kilograms, 0 or more", charged: "Kilograms, 0 or more" });
     expect(refrigerantErrors("CYL", "0", "0")).toStrictEqual({}); // nothing recovered or charged is a valid line
+    // an emptied field is not 0 kg: Number("") is 0, and the regulatory log would record an amount nobody gave (R1077)
+    expect(refrigerantErrors("CYL", "", " ")).toStrictEqual({ recovered: "Kilograms, 0 or more", charged: "Kilograms, 0 or more" });
     expect(refrigerantErrors(" ", "0", "0", translator("ms")).cylinder).toBe("ID silinder diperlukan");
   });
 });

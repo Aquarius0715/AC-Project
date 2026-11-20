@@ -25,7 +25,7 @@ export function FilterCareTab({ f, owner, focus = null, onRequest, onRequestAll,
   // several overdue filters: one request for all of them instead of a Request cleaning per row (UI/UX loop R140)
   const overdue = overdueRows(f.lines);
   // an alert's Book cleaning names its AC: the area holding it starts open, so its row can be shown
-  const [open, setOpen] = useState<string[]>(() => f.lines.filter((l) => l.kind === "group" && l.group.rows.some((r) => r.unitId === focus)).map((l) => (l.kind === "group" ? l.group.key : "")));
+  const [open, setOpen] = useState<string[]>(() => f.lines.flatMap((l) => (l.kind === "group" && l.group.rows.some((r) => r.unitId === focus) ? l.group.key : [])));
   const [edit, setEdit] = useState(false);
   const [pending, run] = useAction();
   // brought into view once, on arrival; later re-renders (a Mark cleaned elsewhere) must not pull the page back

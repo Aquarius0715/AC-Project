@@ -13,6 +13,7 @@ export default defineConfig({
   // few seconds here and more on a busy CI runner, where the default 5 s timed out
   test: {
     environment: "jsdom", include: ["**/*.test.{ts,tsx}"], exclude: ["**/node_modules/**", "**/.next/**"], testTimeout: 30_000,
+    setupFiles: ["lib/tests/setup-dom.ts"],
     // `npx vitest run --coverage --coverage.include=<files>`: the review loop measures the area it reads (off by default);
     // the table goes to the terminal only, so no report files are left for the linters to read
     coverage: { provider: "v8", reporter: ["text"], reportsDirectory: "coverage" },

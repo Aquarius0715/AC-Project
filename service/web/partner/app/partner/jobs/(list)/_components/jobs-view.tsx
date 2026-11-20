@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Badge, Banner, cx, EmptyState, Page, PageHead, Select, Tabs, Plain } from "@ac/web/components/ui";
 import { OriginBadge } from "@ac/web/components/JobBits";
+import { originOf } from "@ac/web/lib/origin";
 import { useT } from "@ac/web/components/I18n";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import type { TabId } from "@ac/web/lib/partnerJobs";
@@ -44,7 +45,7 @@ export function JobsView({ live }: Readonly<{ live: JobsLive }>) {
             <div className="hidden grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_120px_16px] gap-3 border-b border-line px-1 pb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground @3xl:grid"><span>{t("Job")}</span><span>{t("Technician")}</span><span>{t("Slot / deadline")}</span><span>{t("Status")}</span><span /></div>
             {live.rows.map((j) => (
               <Link key={j.id} href={j.href} className="grid grid-cols-1 gap-2 border-b border-line px-1 py-3 last:border-0 hover:bg-surface2/60 @3xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_120px_16px] @3xl:items-center @3xl:gap-3">
-                <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><b className="text-[13px]">{j.title}</b>{j.origin && <OriginBadge origin={j.origin === "periodic_plan" ? "plan" : "request"} />}</div><div className="text-xs text-muted-foreground">{j.line}</div></div>
+                <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><b className="text-[13px]">{j.title}</b>{j.origin && <OriginBadge origin={originOf(j.origin)} />}</div><div className="text-xs text-muted-foreground">{j.line}</div></div>
                 {/* on a narrow card the column headings are hidden, so each value names itself (UI/UX loop R8) */}
                 <div className="text-xs"><div className={CARD_LABEL}>{t("Technician")}</div><b className={cx(j.tech.tone && toneText[j.tech.tone])}>{j.tech.name}</b><div className={cx("text-muted-foreground", j.tech.subTone && toneText[j.tech.subTone])}>{j.tech.sub}</div></div>
                 <div className="text-xs"><div className={CARD_LABEL}>{t("Slot / deadline")}</div><b className={cx(j.slot.tone && toneText[j.slot.tone])}>{j.slot.main}</b><div className="text-muted-foreground">{j.slot.sub}</div></div>

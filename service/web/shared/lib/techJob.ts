@@ -244,7 +244,8 @@ export function partErrors(label: string, qty: string, t: T = en): Partial<Recor
 /** Refrigerant's fields and checks: the cylinder, and the kilograms recovered and charged, 0 or more (IR625). */
 export type RefrigerantField = "cylinder" | "recovered" | "charged";
 export const REFRIGERANT_FIELDS: RefrigerantField[] = ["cylinder", "recovered", "charged"];
-const kg = (v: string) => Number.isFinite(Number(v)) && Number(v) >= 0;
+// an empty field is refused, not read as 0 kg (Number("") is 0)
+const kg = (v: string) => v.trim() !== "" && Number.isFinite(Number(v)) && Number(v) >= 0;
 export function refrigerantErrors(cylinder: string, recovered: string, charged: string, t: T = en): Partial<Record<RefrigerantField, string>> {
   const e: Partial<Record<RefrigerantField, string>> = {};
   if (!cylinder.trim()) e.cylinder = t("The cylinder ID is required");

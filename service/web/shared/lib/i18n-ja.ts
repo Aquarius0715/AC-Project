@@ -1048,7 +1048,6 @@ export const ja: Record<string, string> = {
   "Not in a property": "施設に属していない",
   "{n} unit": "{n} ユニット",
   "{n} units": "{n} ユニット",
-  "{n} AC": "エアコン {n} 台",
   "{n} ACs": "エアコン {n} 台",
   "No properties yet": "まだ物件がありません",
   "HQ registers your homes and offices with their rooms and air conditioners; they appear here once set up.": "本部が、お客様の住宅やオフィスを、部屋とエアコンとともに登録します。設定が済むとここに表示されます。",

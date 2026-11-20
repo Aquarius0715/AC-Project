@@ -170,7 +170,7 @@ func newLiveFixture(t *testing.T) *liveFixture {
 	nodes := iotbridge.NewNodeRegistry()
 	nodes.Set(devices)
 
-	httpc := &http.Client{Timeout: 5 * time.Second, Transport: nil, CheckRedirect: nil, Jar: nil}
+	httpc := testClient(t)
 	clock := &demoClock{api: "", c: httpc, mu: sync.Mutex{}, off: 0}
 	handler := newLiveHandler(clock, httpc, srv.URL, nodes)
 	broker := &fakeBroker{Client: nil, mu: sync.Mutex{}, published: map[string][]string{}}
