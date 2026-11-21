@@ -228,6 +228,79 @@ import Testing
         #expect(JobsModel.row(.history(past), now: Date(), names: [:])?.isPast == true)
     }
 
+    private func counts(scheduled: Double, overdue: Double) -> SummaryCounts {
+        SummaryCounts(
+            total: 3,
+            online: 0,
+            offline: 0,
+            unknown: 0,
+            powerOn: 0,
+            powerOff: 0,
+            powerUnknown: 0,
+            alertCount: 0,
+            offerCount: 0,
+            activeCount: 0,
+            reviewCount: 0,
+            scheduledCount: scheduled,
+            inProgressCount: 0,
+            overdueCount: overdue,
+            assignedCount: 3
+        )
+    }
+
+    @Test func theOverviewHasItsTilesAlertsAndReports() async throws {
+        var other = assigned("j3", status: .submitted)
+        other.unitId = "u2"
+        var done = assigned("j4", status: .completed)
+        done.unitId = "u3"
+        let items: [JobsListResultItem] = [
+            .summary(assigned("j1")), .summary(assigned("j2", status: .inProgress)), .summary(other), .summary(done),
+        ]
+        let jobs = Page(items: items, nextCursor: nil, total: 4, snapshotVersion: 1)
+        let units = Page(items: [unit("u1", "Living room AC")], nextCursor: nil, total: 1, snapshotVersion: 1)
+        var onDone = alert("a-done", severity: .critical)
+        onDone.unitId = "u3"
+        var onOther = alert("a-other", severity: .normal, status: .acknowledged)
+        onOther.unitId = "u2"
+        let open = Page(
+            items: [alert("a-old", detected: "2026-09-27T03:00:00Z"), alert("a-new"), alert("a-crit", severity: .critical), onDone],
+            nextCursor: nil,
+            total: 4,
+            snapshotVersion: 1
+        )
+        let acknowledged = Page(items: [onOther, alert("a-res", status: .resolved)], nextCursor: nil, total: 2, snapshotVersion: 1)
+        let summary = Summary(kind: .technician, counts: counts(scheduled: 1, overdue: 0), asOf: now)
+        let (model, transport) = model([
+            try answer(jobs), try answer(units), try answer(summary), try answer(open), try answer(acknowledged),
+        ])
+        await model.load()
+        #expect(model.tiles.map(\.value) == ["3", "1", "0"])
+        #expect(model.tiles.map(\.sub) == ["in your assignments", "j1", "No overdue jobs"])
+        #expect(
+            model.alerts.map(\.id) == ["a-crit", "a-new", "a-old", "a-other"],
+            "worst first, newest first, only units with a current job"
+        )
+        #expect(
+            model.alerts[0].jobId == "j1" && model.alerts[0].sub.hasPrefix("Living room AC · open · ")
+                && model.alerts[3].sub.hasPrefix("unit · acknowledged · ")
+        )
+        #expect(
+            model.reports.map(\.badge) == ["Draft", "Submitted"] && model.reports[0].title == "j2 · Living room AC"
+                && model.reports[1].title == "j3 · Unit"
+        )
+        #expect(model.reports.map(\.sub) == ["draft in progress", "awaiting quality review · read-only"])
+        let asked = await transport.requests.compactMap(\.url)
+        #expect(asked[2].path() == "/v1/summaries/technician")
+        #expect(query(asked[3].path() + "?" + (asked[3].query() ?? "")).values["status"] == ["open"])
+    }
+
+    @Test func theTilesNameTheOverdueAndAReworkIsAReport() async throws {
+        let tiles = OverviewWords.tiles(counts(scheduled: 0, overdue: 2), [])
+        #expect(tiles.map(\.sub) == ["in your assignments", "No jobs waiting to start", "past the due date"])
+        let rework = OverviewWords.reports([assigned("j1", status: .reworkRequested)], names: [:])
+        #expect(rework.map(\.badge) == ["Rework"] && rework[0].sub == "returned — resume as a new version")
+    }
+
     @Test func failedLoadSaysWhy() async {
         let (model, _) = model([.failure(URLError(.timedOut))])
         await model.load()

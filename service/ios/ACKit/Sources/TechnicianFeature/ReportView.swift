@@ -8,6 +8,14 @@ struct ReportView: View {
     @State private var model: ReportModel
     @State private var sheet: Sheet?
     @State private var isConfirmingSubmit = false
+    @State private var shown: ShownPhoto?
+
+    /// A report photo opened full size.
+    struct ShownPhoto: Identifiable {
+        let id: String
+        let name: String
+        let data: Data
+    }
     @State private var picked: PhotosPickerItem?
     @State private var pickedFor: PhotoTarget?
     @State private var isTakingPhoto = false
@@ -38,6 +46,7 @@ struct ReportView: View {
             PartsCard(model: model) { sheet = $0 }
             WorkTextCard(model: model)
             photosCard
+            versionsCard
             signOffCard
             if model.isEditable { submitCard }
         }
@@ -46,6 +55,19 @@ struct ReportView: View {
         .inlineTitle()
         .hideTabBar()
         .task { await model.load() }
+        .sheet(item: $shown) { photo in
+            NavigationStack {
+                PhotoImage(data: photo.data, name: photo.name)
+                    .accessibilityIdentifier("report.photo.view")
+                    .navigationTitle(Text(verbatim: photo.name))
+                    .inlineTitle()
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button(tr("Close")) { shown = nil }.accessibilityIdentifier("report.photo.close")
+                        }
+                    }
+            }
+        }
         .sheet(item: $sheet) { sheet in
             switch sheet {
             case .part: PartSheet(model: model) { self.sheet = nil }
@@ -151,7 +173,17 @@ struct ReportView: View {
             if photos.isEmpty { Text(verbatim: tr("No photos.")) }
             ForEach(photos, id: \.id) { photo in
                 HStack {
-                    Label(photo.name, systemImage: "photo")
+                    Button {
+                        Task {
+                            if let data = await model.photoData(photo.id, isImage: PhotoImage.isImage) {
+                                shown = ShownPhoto(id: photo.id, name: photo.name, data: data)
+                            }
+                        }
+                    } label: {
+                        Label(photo.name, systemImage: "photo")
+                    }
+                    .linkAction()
+                    .accessibilityIdentifier("report.photo.open.\(photo.id)")
                     Spacer()
                     if model.isEditable {
                         Button(tr("Remove")) { model.removePhoto(photo.id) }
@@ -162,6 +194,23 @@ struct ReportView: View {
             }
             if model.isEditable, model.photos.count < ReportModel.maxPhotos {
                 add(tr("Add photos"), PhotoTarget(), id: "report.photo.add")
+            }
+        }
+    }
+
+    @ViewBuilder private var versionsCard: some View {
+        let rows = model.versionRows
+        if !rows.isEmpty {
+            Card(tr("Versions & autosave")) {
+                ForEach(rows, id: \.title) { row in
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(verbatim: "\(row.title) · \(row.badge)").font(.headline)
+                        Text(verbatim: row.sub).font(.subheadline)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("report.version")
+                }
             }
         }
     }

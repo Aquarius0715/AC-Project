@@ -23,6 +23,10 @@ public final class JobsModel {
     }
 
     public private(set) var jobs: Loadable<[Row]> = .loading
+    /// The overview over the list: the tiles, the open alerts on the assigned units and the reports by state.
+    public private(set) var tiles: [OverviewWords.Tile] = []
+    public private(set) var alerts: [OverviewWords.Row] = []
+    public private(set) var reports: [OverviewWords.Row] = []
     let client: CoreClient
 
     public init(client: CoreClient) {
@@ -51,8 +55,26 @@ public final class JobsModel {
             let units = try? await client.call(Ops.UnitsList.self, Query(limit: 100)).data.items
             let names = Dictionary((units ?? []).map { ($0.id, $0.displayName) }) { first, _ in first }
             let rows = answer.data.items.compactMap { Self.row($0, now: now, names: names) }
+            let open: [JobSummary] = answer.data.items.compactMap { item in
+                if case let .summary(job) = item { job } else { nil }
+            }
+            await overview(open, names: names)
             return rows.filter { !$0.isPast } + rows.filter(\.isPast)
         }
+    }
+
+    /// The tiles, alerts and reports; a part the Core API does not answer stays empty.
+    private func overview(_ jobs: [JobSummary], names: [String: String]) async {
+        let summary = try? await client.call(Ops.SummariesGet.self, SummariesGetInput(kind: .technician, filters: nil))
+        tiles = summary.map { OverviewWords.tiles($0.data.counts, jobs) } ?? []
+        // each unresolved status on its own: one list of every status puts resolved alerts before open ones (IR711)
+        var unresolved: [CoreAlert] = []
+        for status in ["open", "acknowledged"] {
+            let query = Query(limit: 100, sort: QuerySort(field: .severity, direction: .desc), filters: QueryFilters(status: status))
+            unresolved += (try? await client.call(Ops.AlertsList.self, query).data.items) ?? []
+        }
+        alerts = OverviewWords.alerts(unresolved, names: names, jobs: jobs)
+        reports = OverviewWords.reports(jobs, names: names)
     }
 
     static func row(_ item: JobsListResultItem, now: Date, names: [String: String]) -> Row? {

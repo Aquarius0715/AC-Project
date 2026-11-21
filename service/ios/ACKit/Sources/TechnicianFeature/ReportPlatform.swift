@@ -112,8 +112,33 @@ struct SignaturePad: UIViewRepresentable {
         .pngData()
     }
 }
+
+/// A report photo full size, from its bytes.
+struct PhotoImage: View {
+    let data: Data
+    /// The photo's file name, its label.
+    let name: String
+
+    static func isImage(_ data: Data) -> Bool { UIImage(data: data) != nil }
+
+    var body: some View {
+        if let image = UIImage(data: data) {
+            Image(uiImage: image).resizable().scaledToFit().accessibilityLabel(Text(verbatim: name))
+        }
+    }
+}
 #else
 import PencilKit
+
+struct PhotoImage: View {
+    let data: Data
+    /// The photo's file name, its label.
+    let name: String
+
+    static func isImage(_ data: Data) -> Bool { !data.isEmpty }
+
+    var body: some View { EmptyView() }
+}
 
 /// The package's tests build for macOS: the screens' iOS pieces are stand-ins there.
 enum PhotoEncoding {

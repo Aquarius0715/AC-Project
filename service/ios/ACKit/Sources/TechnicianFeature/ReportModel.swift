@@ -111,6 +111,7 @@ public final class ReportModel {
         let draftOpen = job.draftReportRef.map { $0.reportVersion == read?.version } ?? false
         isEditable = canWork && job.status == .inProgress
         report = isEditable ? (draftOpen ? read : nil) : read
+        reviews = read?.reviewHistory ?? []
         draft = ReportDraft(report, components: Self.components(job, unit), isInstallation: job.type == .installation)
         if isEditable {
             parts = (try? await client.call(Ops.PartsList.self, Query(limit: 100)).data.items) ?? []
@@ -124,6 +125,9 @@ public final class ReportModel {
         (report?.attachmentRefs ?? []).filter { $0.id != report?.signOff?.signatureAttachmentId }
     }
 
+    /// The reviews of the versions read (the last report's history).
+    public private(set) var reviews: [Review] = []
+
     public var isSignedOff: Bool { report?.signOff != nil }
 
     /// The issues that block the submit, once a submit was tried.
@@ -135,6 +139,72 @@ public final class ReportModel {
     public var versionText: String {
         guard let report else { return tr("not started") }
         return isEditable ? tr("draft v{version}", ["version": String(Int(report.version))]) : "v\(Int(report.version))"
+    }
+
+    /// One saved version as the versions card shows it.
+    public struct VersionRow: Equatable, Sendable {
+        public let title: String
+        public let sub: String
+        public let badge: String
+    }
+
+    /// The open draft (its results and photos) and every submitted version, newest first, with its review (the web
+    /// workspace's versions card, techJob.ts versionRows).
+    public var versionRows: [VersionRow] {
+        var rows: [VersionRow] = []
+        if isEditable, let report {
+            let version = String(Int(report.version))
+            let results = draft.items.filter { $0.result != nil }.count
+            let photos = photos.filter { $0.status == .ready }.count
+            let counts = [
+                results == 1 ? tr("1 result") : tr("{n} results", ["n": String(results)]),
+                photos == 1 ? tr("1 photo") : tr("{n} photos", ["n": String(photos)]),
+            ]
+            rows.append(
+                VersionRow(
+                    title: tr("Draft v{version} · saved {time}", ["version": version, "time": Format.dateTime(report.updatedAt)]),
+                    sub: counts.joined(separator: " · "),
+                    badge: tr("Draft")
+                )
+            )
+        }
+        for ref in job.reportRefs.reversed() {
+            let version = String(Int(ref.reportVersion))
+            guard let review = reviews.last(where: { $0.reportVersion == ref.reportVersion }) else {
+                let title = tr("v{version} · {state}", ["version": version, "state": tr("submitted")])
+                rows.append(VersionRow(title: title, sub: tr("awaiting quality review"), badge: tr("Submitted")))
+                continue
+            }
+            let isAccepted = review.decision == .accept
+            let state = isAccepted ? tr("accepted") : tr("returned")
+            let reason = review.reason.map { " — \($0)" } ?? ""
+            rows.append(
+                VersionRow(
+                    title: tr("v{version} · {state}", ["version": version, "state": state]),
+                    sub: Format.dateTime(review.occurredAt) + reason,
+                    badge: isAccepted ? tr("Accepted") : tr("Returned")
+                )
+            )
+        }
+        return rows
+    }
+
+    /// The bytes of a report photo (attachments.getContent of the shown version), or nil with the reason in
+    /// `photoError`; `isImage` tells whether the bytes show as an image.
+    public func photoData(_ id: String, isImage: (Data) -> Bool = { !$0.isEmpty }) async -> Data? {
+        guard let report else { return nil }
+        let input = AttachmentsGetContentInput(jobId: job.id, reportId: report.id, reportVersion: report.version, attachmentId: id)
+        do {
+            let content = try await client.call(Ops.AttachmentsGetContent.self, input).data
+            guard let data = Data(base64Encoded: content.bytes), isImage(data) else {
+                photoError = tr("The photo could not be shown.")
+                return nil
+            }
+            return data
+        } catch {
+            photoError = ErrorText.of(error)
+            return nil
+        }
     }
 
     /// HQ's reason for the last return, if it gave one (the rework banner).

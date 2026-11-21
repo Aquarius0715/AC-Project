@@ -34,6 +34,11 @@
     "ja": "写真を撮る",
     "ms": "Ambil foto"
   },
+  "The photo could not be shown.": {
+    "id": "Foto tidak dapat ditampilkan.",
+    "ja": "写真を表示できませんでした。",
+    "ms": "Foto tidak dapat dipaparkan."
+  },
   "The sign-in did not complete — try again": {
     "id": "Proses masuk tidak selesai — coba lagi",
     "ja": "サインインが完了しませんでした — もう一度お試しください",

@@ -27,8 +27,14 @@ final class TechnicianUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Living room AC"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Not accepted"].exists)
         XCTAssertTrue(app.staticTexts["jobs.answer"].exists, "the new assignment is announced over the list")
+        XCTAssertTrue(app.descendants(matching: .any)["overview.tiles"].waitForExistence(timeout: 5), "the summary's tiles")
         try app.audit()
         keepScreenshot("jobs", of: app)
+        // the open alert on the job's unit, under the list; it opens the job
+        tapScrolling(app.buttons["overview.al1"], in: app)
+        XCTAssertTrue(app.buttons["job.unit"].waitForExistence(timeout: 5))
+        app.navigationBars.buttons.firstMatch.tap()
+        scrollToTop(app)
         app.buttons["signOut"].tap()
         XCTAssertTrue(app.buttons["signIn.button"].waitForExistence(timeout: 5))
     }
@@ -155,6 +161,8 @@ final class TechnicianUITests: XCTestCase {
         type("Cleaned the filter and checked the drain.", into: field("report.workText", in: app), in: app)
         tapScrolling(app.buttons["report.save"], in: app)
         XCTAssertTrue(wait(for: app.staticTexts["report.note"], label: "Draft saved"))
+        let version = app.descendants(matching: .any)["report.version"].firstMatch
+        XCTAssertTrue(version.exists && version.label.hasPrefix("Draft v1 · saved "), "the saved draft in the versions card")
 
         // the customer signs on the phone
         tapScrolling(app.buttons["report.signOff"], in: app)
