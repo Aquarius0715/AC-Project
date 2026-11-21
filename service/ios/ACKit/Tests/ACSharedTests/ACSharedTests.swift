@@ -37,6 +37,14 @@ import Testing
         Localizer.with(.ms, in: localized) { #expect(tr("Sign in") == "Sign in") }
     }
 
+    @Test func placeholdersAreFilledOnceAsOnTheWeb() {
+        // a value is never read for placeholders (a unit named "{b}"), whatever order the values come in
+        #expect(tr("{a} and {b}", ["a": "{b}", "b": "{a}"]) == "{b} and {a}")
+        #expect(tr("{a}{a} {unknown}", ["a": "x"]) == "xx {unknown}")
+        let device = tr("Device {serial} under a restriction ({restriction})", ["serial": "{restriction}", "restriction": "Power off"])
+        #expect(device == "Device {restriction} under a restriction (Power off)")
+    }
+
     @Test func taskSeesItsOwnLanguage() {
         // the app's own choice is Launch's (LaunchTests); a test that needs a language sets its own
         #expect(Localizer.with(.ms) { Localizer.language } == .ms)
