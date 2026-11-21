@@ -32,7 +32,9 @@ public enum Format {
     /// "27 Sep 2026, 09:05 – 12:35": a span from one instant to another (the web's span), the day once when both are
     /// on it.
     public static func span(_ from: String, _ to: String, timeZone: TimeZone = Localizer.timeZone) -> String {
-        guard let start = parse(from), let end = parse(to), start <= end else { return "\(dateTime(from)) – \(dateTime(to))" }
+        guard let start = parse(from), let end = parse(to), start <= end else {
+            return "\(dateTime(from, timeZone: timeZone)) – \(dateTime(to, timeZone: timeZone))"
+        }
         var style = Date.IntervalFormatStyle(date: .abbreviated, time: .shortened)
         style.locale = Locale(identifier: Localizer.language.rawValue)
         style.timeZone = timeZone

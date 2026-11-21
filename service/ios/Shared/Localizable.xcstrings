@@ -11179,6 +11179,29 @@
         }
       }
     },
+    "No unread notifications": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tiada pemberitahuan belum dibaca"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未読の通知はありません"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak ada notifikasi yang belum dibaca"
+          }
+        }
+      }
+    },
     "No work window": {
       "extractionState": "manual",
       "localizations": {

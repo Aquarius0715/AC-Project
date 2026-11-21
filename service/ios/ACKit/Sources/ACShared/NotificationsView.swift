@@ -36,8 +36,8 @@ public struct NotificationsView: View {
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("notification.\(row.id)")
                 }
-                if case .loaded = model.notifications, model.rows.isEmpty {
-                    Card { Text(verbatim: tr("No notifications")) }
+                if let empty = model.emptyText {
+                    Card { Text(verbatim: empty) }
                 }
             }
             .cardScreen()

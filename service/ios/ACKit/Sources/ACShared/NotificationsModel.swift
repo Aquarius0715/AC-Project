@@ -40,6 +40,12 @@ public final class NotificationsModel {
         return filter == .all ? all : all.filter { !$0.isRead }
     }
 
+    /// What the list says when the loaded filter has no rows, as the web says it: under Unread, that nothing is unread.
+    public var emptyText: String? {
+        guard case .loaded = notifications, rows.isEmpty else { return nil }
+        return filter == .unread ? tr("No unread notifications") : tr("No notifications")
+    }
+
     public var unreadCount: Int { (notifications.value ?? []).filter { !$0.isRead }.count }
 
     /// Marks one read (opening it); one that changed meanwhile shows its latest state.
