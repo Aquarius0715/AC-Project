@@ -38,13 +38,13 @@ const defaults: ApiDefaultPolicy = {
   ],
   ruleSettings: [{ id: "s-1", version: 4, ruleKey: "gap", customerId: "c-1", enabled: false, changedByMembershipId: "m-1", reason: null, updatedAt: "2026-09-10T02:00:00Z" }],
 };
-const names: Record<string, string> = { "u-1": "Bedroom AC", "u-2": "Office AC" };
+const names = new Map([["u-1", "Bedroom AC"], ["u-2", "Office AC"]]);
 const live = (list: ApiAlertPolicy[], over: Partial<Live> = {}): Live => ({
   count: list.length + 1, owner: true, customerId: "c-1", membershipId: "m-1", timezone: "Asia/Kuala_Lumpur",
-  defaults: { id: defaults.id, ...defaultRuleRows(defaults, "c-1", "m-1") }, cards: policyCards(list, (id) => names[id]), list, editor: null, ...over,
+  defaults: { id: defaults.id, ...defaultRuleRows(defaults, "c-1", "m-1") }, cards: policyCards(list, (id) => names.get(id)), list, editor: null, ...over,
 });
 const editing = (p: ApiAlertPolicy | null, over: Partial<Live> = {}): Live =>
-  live(p ? [p] : [], { editor: { policy: p, form: policyForm(p), attached: p ? p.unitIds.map((id) => names[id] ?? "AC") : [] }, ...over });
+  live(p ? [p] : [], { editor: { policy: p, form: policyForm(p), attached: p ? p.unitIds.map((id) => names.get(id) ?? "AC") : [] }, ...over });
 const onDone = vi.fn<(text: string) => void>();
 const onFail = vi.fn<(f: ActionFailure) => void>();
 const show = (p: Live) => render(<PoliciesLive p={p} onDone={onDone} onFail={onFail} />);
@@ -75,7 +75,6 @@ describe("PoliciesLive list", () => {
     expect(screen.queryByText("Only the account owner can change this.")).toBeNull();
     fireEvent.click(screen.getByRole("switch", { name: "Heartbeat gap" }));
     await waitFor(() => { expect(onDone).toHaveBeenCalledWith("Default rule “Heartbeat gap” switched on for all your ACs."); });
-    expect(actions.setDefaultRule).toHaveBeenCalledWith("dp-1", "gap", "c-1", true, 4);
 
     fireEvent.click(screen.getByRole("switch", { name: "CO₂ high" }));
     expect(within(dialog()).getByText("Turn off “CO₂ high” for all your ACs?")).toBeTruthy();
@@ -84,7 +83,8 @@ describe("PoliciesLive list", () => {
     fireEvent.click(screen.getByRole("switch", { name: "CO₂ high" }));
     fireEvent.keyDown(dialog(), { key: "Escape" });
     await waitFor(() => { expect(screen.queryByRole("dialog")).toBeNull(); });
-    expect(actions.setDefaultRule).toHaveBeenCalledTimes(1);
+    // only the switch-on was sent, at the setting's version
+    expect(actions.setDefaultRule).toHaveBeenCalledExactlyOnceWith("dp-1", "gap", "c-1", true, 4);
 
     fireEvent.click(screen.getByRole("switch", { name: "CO₂ high" }));
     fireEvent.click(within(dialog()).getByRole("button", { name: "Turn off" }));
@@ -108,7 +108,7 @@ describe("PoliciesLive list", () => {
 
     show(live([], { customerId: null }));
     fireEvent.click(screen.getByRole("switch", { name: "Heartbeat gap" }));
-    expect(actions.setDefaultRule).toHaveBeenCalledTimes(1);
+    expect(actions.setDefaultRule).toHaveBeenCalledOnce();
   });
 
   it("without a default policy and own policies the list says how to add one", () => {
@@ -232,8 +232,8 @@ describe("PolicyEditor", () => {
     expect(sentence()).toContain("Recover when it rises above");
     expect(screen.getByText("Recovery 31 °C is above the 30 °C limit · unit fixed to °C for this metric")).toBeTruthy();
 
-    for (const [group, subject] of [["Humidity", "humidity"], ["Power", "power"], ["Air quality", "CO₂"]] as const) {
-      fireEvent.click(screen.getByRole("button", { name: new RegExp(`^${group}`) }));
+    for (const [group, subject] of [[/^Humidity/, "humidity"], [/^Power/, "power"], [/^Air quality/, "CO₂"]] as const) {
+      fireEvent.click(button(group));
       expect(sentence()).toContain(`Alert when ${subject} is`);
     }
     fireEvent.click(button("PM2.5 (µg/m³)"));
