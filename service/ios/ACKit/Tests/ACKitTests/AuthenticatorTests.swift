@@ -21,7 +21,7 @@ import Testing
     }
 
     private func authenticator(
-        _ transport: StubTransport,
+        _ transport: any HTTPTransport,
         store: MemoryStore = MemoryStore(),
         now: Date? = nil,
         signedOut: (@Sendable () async -> Void)? = nil
@@ -232,6 +232,45 @@ import Testing
         #expect(await ended.value == 0)
     }
 
+    @Test(arguments: [200, 400])
+    func signOutWhileARefreshWaitsStaysSignedOut(status: Int) async throws {
+        let renewed = jwt(["tenant_id": "t1", "membership_id": "m1", "role": "technician", "v": "2"])
+        let store = MemoryStore(signedIn(expiresAt: start))
+        let transport = HeldTokenTransport(discovery: discovery, status: status, token: tokens(renewed, refresh: "r2"))
+        let ended = Counter()
+        let auth = authenticator(transport, store: store) { await ended.add() }
+        let call = Task { try await auth.credentials() }
+        while await !transport.isHeld { await Task.yield() }
+        await auth.signOut()
+        await transport.release()
+        await #expect(throws: CoreError.self) { try await call.value }
+        // the provider's answer came after the sign-out: it neither signs the user back in nor reports a refusal
+        #expect(await !auth.isSignedIn)
+        #expect(store.load() == nil)
+        #expect(store.saves == 0)
+        #expect(await ended.value == 0)
+    }
+
+    @Test func signInAgainWhileAnOldRefreshWaitsKeepsTheNewSession() async throws {
+        let store = MemoryStore(signedIn(expiresAt: start))
+        let transport = HeldTokenTransport(discovery: discovery, status: 400, token: #"{"error":"invalid_grant"}"#)
+        let auth = authenticator(transport, store: store)
+        let call = Task { try await auth.credentials() }
+        while await !transport.isHeld { await Task.yield() }
+        await auth.signOut()
+        let pending = try await auth.begin()
+        await transport.answerNextTokenWith(tokens(technician, refresh: "r3"))
+        try await auth.complete(
+            pending,
+            callback: try #require(URL(string: "ac-technician://oauth/callback?code=c1&state=\(pending.state)"))
+        )
+        await transport.release()
+        await #expect(throws: CoreError.self) { try await call.value }
+        // the old session's refused refresh does not end the session signed in since
+        #expect(await auth.isSignedIn)
+        #expect(store.load()?.refreshToken == "r3")
+    }
+
     @Test func tokenEndpointOutOfReachKeepsTheSession() async throws {
         let store = MemoryStore(signedIn(expiresAt: start))
         let auth = authenticator(StubTransport([.http(200, discovery), .failure(URLError(.timedOut))]), store: store)
@@ -287,6 +326,51 @@ import Testing
         #expect(configuration.callbackScheme == "ac-technician")
         let relative = OIDCConfiguration(issuer: issuer, clientId: "c", redirectURI: URL(string: "oauth/callback") ?? redirect)
         #expect(relative.callbackScheme.isEmpty)
+    }
+}
+
+/// Holds the answer to the first refresh until the test releases it, so that a sign-out (or a new sign-in) comes while
+/// the refresh waits; the endpoints, the logout and the code exchanges answer at once.
+private actor HeldTokenTransport: HTTPTransport {
+    let discovery: String
+    let status: Int
+    let token: String
+    private var exchange = ""
+    private var held: CheckedContinuation<Void, Never>?
+    private var refreshSeen = false
+
+    init(discovery: String, status: Int, token: String) {
+        self.discovery = discovery
+        self.status = status
+        self.token = token
+    }
+
+    var isHeld: Bool { held != nil }
+
+    func answerNextTokenWith(_ body: String) {
+        exchange = body
+    }
+
+    func release() {
+        held?.resume()
+        held = nil
+    }
+
+    func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        let url = request.url ?? URL(filePath: "/")
+        let form = request.httpBody.flatMap { String(bytes: $0, encoding: .utf8) } ?? ""
+        var answer = (status: 200, body: "")
+        if url.lastPathComponent == "openid-configuration" {
+            answer.body = discovery
+        } else if form.contains("grant_type=refresh_token"), !refreshSeen {
+            refreshSeen = true
+            await withCheckedContinuation { held = $0 }
+            answer = (status, token)
+        } else if url.lastPathComponent == "token" {
+            answer.body = exchange
+        }
+        let response = HTTPURLResponse(url: url, statusCode: answer.status, httpVersion: nil, headerFields: nil)
+        return (Data(answer.body.utf8), response ?? HTTPURLResponse())
     }
 }
 
