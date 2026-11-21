@@ -106,9 +106,10 @@ describe("PoliciesLive list", () => {
     expect(onDone).not.toHaveBeenCalled();
     cleanup();
 
+    actions.setDefaultRule.mockClear();
     show(live([], { customerId: null }));
     fireEvent.click(screen.getByRole("switch", { name: "Heartbeat gap" }));
-    expect(actions.setDefaultRule).toHaveBeenCalledOnce();
+    expect(actions.setDefaultRule).not.toHaveBeenCalled();
   });
 
   it("without a default policy and own policies the list says how to add one", () => {
@@ -126,6 +127,11 @@ describe("PoliciesLive list", () => {
     fireEvent.click(screen.getByRole("switch", { name: "Policy p-1" }));
     await waitFor(() => { expect(onDone).toHaveBeenCalledWith("“Policy p-1” switched off."); });
     expect(actions.savePolicy).toHaveBeenCalledWith(toggledInput(p, false), 3);
+    // spelled out, so a fault in toggledInput itself fails here too
+    // (attaching is its own operation: the save carries no unitIds)
+    const saved = actions.savePolicy.mock.calls[0]?.[0];
+    expect(saved).toMatchObject({ id: "p-1", name: "Policy p-1", enabled: false, channels: ["inApp", "email"], metric: "temperature", threshold: 30, recoveryThreshold: 28 });
+    expect(saved).not.toHaveProperty("unitIds");
     cleanup();
 
     actions.savePolicy.mockResolvedValueOnce({ ok: false, ...refused });
@@ -317,6 +323,10 @@ describe("PolicyEditor", () => {
     fireEvent.click(button("Delete policy"));
     fireEvent.click(within(dialog()).getByRole("button", { name: "Delete policy" }));
     await waitFor(() => { expect(onDone).toHaveBeenCalledWith("“Policy p-3” deleted."); });
+    // the list then shows: its heading takes the focus (this also uses up the pending focus, so no other test sees it)
+    cleanup();
+    show(live([]));
+    expect(document.activeElement?.id).toBe("your-policies");
   });
 
   it("without the customer account the editor says saving is not possible and sends nothing", () => {
