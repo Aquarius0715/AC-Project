@@ -2,6 +2,7 @@
 
 【各回の手順】
 0. 【最初に】開いている PR を確認する（`gh pr list --state open --author @me`）。1 件でもあれば、この回は新しい PR を出さない：
+   - 例外：下書きの `release/ios` → main の PR（#621、マージの時期はユーザーが決める）は数えない。触らない・更新しない。
    - main ブランチ保護が「最新の main を取り込んだブランチのみマージ可」なので、複数の PR を同時に開くと 1 件マージされるたびに残りが BEHIND になり、
      CI が無駄に回り直す。PR は 1 件ずつ、マージされてから次を出す。
    - その PR が `BEHIND` なら `gh pr update-branch <番号>`、CI が落ちていれば原因を直して push する（直せなければ記録して終了）。
@@ -10,6 +11,7 @@
    - 開いている PR が 0 件なら、通常どおり手順 1 へ進む。
 0b. 前の回が途中で打ち切られた跡を確認する（再起動、kill、予算切れで起こる）：メインツリーの `git status` と `git branch --no-merged origin/main`、
    `git worktree list`、review-log.md の末尾（記録が書かれていない回の番号）。
+     iOS の回のブランチ（`review/r<番号>-ios`）は `git branch --no-merged origin/release/ios` で見る（main には入らないので、main との比較では残って見える）。
    - 未コミットの変更・PR のないブランチがあれば、その続きから再開する（領域を選び直さない）。壊れていて続けられなければ理由を記録に書いて捨てる。
    - 記録のない回があれば、その回が何をしていたか（ブランチ名 r<番号>、`.review-loop-logs/` の最後のログ）を 1 行で記録する。
    - 開始時の `review/r<番号>` ブランチが残っていても、変更がなければそのまま使ってよい。
@@ -19,8 +21,14 @@
      gateway、worker、iot-bridge、platform 配下の共通パッケージ、schema.sql とマイグレーション
    - service/web：shared（lib・components）、customer / partner / technician / admin の各アプリ（BFF・DAL・画面）
    - scripts、CI（.github/workflows）、docker / compose / deploy
+   - service/ios（2026-11-22 ユーザー指示で対象に追加）：ACKit の ACKit（Auth・Keychain・CoreClient）、ACShared（共通部品・Debug のスタブ）、
+     CustomerFeature、TechnicianFeature（モデルと画面）、両アプリ（CustomerApp / TechnicianApp）、UI テスト（*UITests、UITestsShared）、
+     service/ios/scripts と project.yml、生成器（service/web/codegen/swift*.ts、operations.json、strings.json）。下の【iOS の回】に従う。
    - 【必須】まず下の未レビュー一覧を上から見て、review-log.md に「新たに読んだ」と記録のない最初の項目を、この回の領域にする。
      一覧に残りがある間は、上の領域リストや「前回問題があったもの」より優先する（他の領域を選ぶなら、その理由を記録に 1 行書く）。
+     ⓪ service/ios（まだ一度も読んでいない。①〜⑤と交互に 1 回ずつ：前の回が iOS でなければ iOS を選ぶ）を次の順に：
+        ACKit（Auth、CoreClient、Keychain）→ ACShared（Debug を除く）→ CustomerFeature → TechnicianFeature の Jobs・CheckIn・Report・Unit・
+        Alerts・Diagnostics・Devices・Overview → 両アプリと UI テスト → scripts と生成器（1 回 5〜9 ファイル・千行以内）
      ① service/api/internal/ops：changes, client, domains, forcedelete, internalcaller, query, readcheck, rest（1 回 3〜4 ファイル）
      ② server/crossdomain.go, server/unitdetail.go
      ③ modules/devices の iot_models.go, model_register.go（DEC-105）、modules/monitoring/escalation.go、iotbridge/dispatch.go
@@ -81,7 +89,7 @@
      check.sh のログは `.review-loop-logs/` 内の絶対パスに書く。
    - 非対話の実行では `$?` が拒否される。check.sh は `sh scripts/check.sh > $LOG 2>&1` で実行し、ログ末尾の「all checks passed」の有無で成否を判定して、その旨を記録に書く。
 5. PR を作る：
-   - origin/main から作業ブランチを切る（PR を積み重ねない）
+   - origin/main から作業ブランチを切る（PR を積み重ねない）。iOS の回は origin/release/ios から切り、release/ios に出す（【iOS の回】）
    - ブランチ全体の差分をレビューし、指摘がなくなるまで修正→再チェック→再レビューを繰り返す
    - 指摘ゼロになってから push し、`gh pr create`（本文にレビューループが指摘なしで終わったことを書く）
    - push は `git push origin <ブランチ名>` の形で行う（`-u` は付けない。非対話の実行では `git push -u origin …` が許可に一致せず止まる）。
@@ -91,6 +99,25 @@
    - 書き方：review-log.md と PR 本文は、ツール呼び出しやファイルを見ていない読み手が分かるように、要点（何が壊れていて、どう直したか）を
      最初に書き、その回だけで作った略語や呼び名を使わない。
    - 最後のメッセージに、その回の要約（領域・結果・PR・次の回にやること）を自己完結で書く。
+
+【iOS の回】（service/ios は release/ios にだけある。main へのマージ時期はユーザーが決める）
+- ブランチは origin/release/ios から `review/r<番号>-ios` を切り（`git switch -c review/r<番号>-ios origin/release/ios`）、PR は
+  `gh pr create --base release/ios` で出す。release/ios も必須チェックが通ると自動マージされる。main 向けの修正（Go・Web）を見つけたら、
+  同じ PR に混ぜず、記録に書いて main 向けの回で直す。
+- 観点は手順 2 に加えて：force unwrap / force cast / force try、`Any` の使用、理由のない `swiftlint:disable`、生成物（Generated/、
+  Localizable.xcstrings）の手編集、`tr("…")` を通らない表示テキスト、Codable の厳密さ（必須フィールド・リテラル）、Keychain と
+  Info.plist の型付きの読み取り、@MainActor と Sendable、Task の取り消しとリーク、サインイン（PKCE・トークンの更新と破棄）、
+  送信失敗時に下書きを端末に残すこと（自動再送しない）、Web 版（service/web/technician・customer）や docs/02-design との食い違い、a11y。
+- 確認：直している間は `sh service/ios/scripts/check.sh lint` と `sh service/ios/scripts/check.sh unit`（単体テストとカバレッジ、数分）を回す。
+  カバレッジは scripts/coverage.sh が手書きコードの行と関数で 100 % を要求する（足りなければ落ちる）。記録の「カバレッジ:」行には
+  モジュールごとの TOTAL 行を書く。行を通すだけで結果を確かめていないテストも A として直す。
+  最後に `sh scripts/check.sh`（release/ios のブランチでは iOS の段＝lint・単体・両アプリの UI テストも含む、約 15 分）を通す。
+- UI テストのビルドで Xcode が Shared/Localizable.xcstrings を書き換えることがある：check.sh が「not current: Shared/Localizable.xcstrings」で
+  落ちたら `npm --prefix service/web run gen:swift` で作り直す（手で直さない）。表示テキストを足したら strings.json に 4 言語をそろえる。
+- 整形は `swift format -i -r <ファイル>`、Simulator が固まったら `xcrun simctl shutdown all`。非対話の実行で許可されていなければ、
+  ブランチをローカルに残して記録に理由を書く。
+- 実機（iPhone）への配布、TestFlight、署名（DEVELOPMENT_TEAM）は扱わない（2026-11-22 ユーザー：TestFlight はやらない）。
+- 仕様（DD-T01〜T16、FR-C・FR-T のモバイル行、IR860〜）は docs/02-design、Web 版は service/web/technician/app/technician/**。
 
 【作業を最後まで終える】
 - 普通の障害は原因を調べ、再試行するか別の方法で進める：CI のタイムアウト、不安定なテスト、lint の指摘、`gh` の一時エラー、
