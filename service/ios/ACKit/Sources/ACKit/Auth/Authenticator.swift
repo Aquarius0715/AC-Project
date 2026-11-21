@@ -147,18 +147,28 @@ public actor Authenticator: CredentialSource {
 
     /// A new access token. The session ends only when the provider refuses the refresh (or the new token names another
     /// membership); a provider the phone cannot reach (no network when the token expires) keeps it for the next call.
+    /// An answer that comes after the session was signed out (or replaced by a new sign-in) is not kept: it would sign the
+    /// user back in, or end the newer session.
     private func refresh() async -> Result<StoredSession, CoreError> {
         guard let current = session, let refreshToken = current.refreshToken else {
             await refused()
             return .failure(Self.unauthenticated)
         }
         let form = ["grant_type": "refresh_token", "client_id": configuration.clientId, "refresh_token": refreshToken]
-        let answer: TokenResponse
+        let answered: Result<TokenResponse, SignInError>
         do {
-            answer = try await token(try await discovered(), form)
-        } catch .unavailable {
-            return .failure(CoreError.local(.unavailable, "error.unavailable"))
+            answered = .success(try await token(try await discovered(), form))
         } catch {
+            answered = .failure(error)
+        }
+        guard session == current else { return .failure(Self.unauthenticated) }
+        let answer: TokenResponse
+        switch answered {
+        case let .success(tokens):
+            answer = tokens
+        case .failure(.unavailable):
+            return .failure(CoreError.local(.unavailable, "error.unavailable"))
+        case .failure:
             await refused()
             return .failure(Self.unauthenticated)
         }
