@@ -1,6 +1,9 @@
 import XCTest
 
 extension XCUIApplication {
+    /// The height of the blur over the tab bar's top edge (iOS 26).
+    static let tabBarBlur: CGFloat = 40
+
     /// The accessibility audit of the screen shown (contrast, labels, hit areas, Dynamic Type…), as jsx-a11y strict is for
     /// the web apps: every issue fails the test, named with its element so the failure says what to fix.
     @MainActor
@@ -19,7 +22,13 @@ extension XCUIApplication {
     @MainActor
     private func issues() throws -> [String] {
         var issues: [String] = []
-        let window = windows.firstMatch.frame
+        var window = windows.firstMatch.frame
+        // iOS 26 blurs what scrolls under its floating tab bar, and a band above it: what lies there is behind the bar,
+        // as an element the edge cuts off, and its contrast is checked once it is scrolled above
+        let tabBar = tabBars.firstMatch
+        if tabBar.exists, tabBar.frame.minY > window.minY {
+            window.size.height = tabBar.frame.minY - Self.tabBarBlur - window.minY
+        }
         try performAccessibilityAudit { issue in
             // an element the screen's edge cuts off is judged by the part that shows: its contrast is checked once it is
             // scrolled into view

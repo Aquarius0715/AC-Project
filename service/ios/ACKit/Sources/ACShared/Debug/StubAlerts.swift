@@ -21,6 +21,25 @@ final class StubAlerts {
                     StubAlertAnswer(data: Page(items: items, nextCursor: nil, total: Double(items.count), snapshotVersion: 1))
                 )
             )
+        case ("GET", "/v1/summaries/technician"):
+            let counts = SummaryCounts(
+                total: 2,
+                online: 2,
+                offline: 0,
+                unknown: 0,
+                powerOn: 1,
+                powerOff: 1,
+                powerUnknown: 0,
+                alertCount: 1,
+                offerCount: 0,
+                activeCount: 1,
+                reviewCount: 0,
+                scheduledCount: 1,
+                inProgressCount: 1,
+                overdueCount: 0,
+                assignedCount: 2
+            )
+            return (200, try encoder.encode(StubAlertAnswer(data: Summary(kind: .technician, counts: counts, asOf: StubUnitData.at(0)))))
         case ("GET", "/v1/alerts/al1"):
             return (200, try encoder.encode(StubAlertAnswer(data: alert)))
         case ("GET", "/v1/alerts/al1/evidence"):

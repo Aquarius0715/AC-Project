@@ -462,6 +462,65 @@ import Testing
         await model.load()
         #expect(model.returnReason == "Add the coil photo")
     }
+
+    // MARK: - Versions and photos
+
+    private func review(_ version: Double, _ decision: ReviewDecision, reason: String? = nil) -> Review {
+        Review(reviewerUserId: "hq", reportVersion: version, decision: decision, reason: reason, occurredAt: "2026-09-27T01:00:00Z")
+    }
+
+    @Test func theVersionsAreTheDraftAndEachSubmittedOneWithItsReview() async throws {
+        let read = try saved {
+            $0.version = 3
+            $0.reviewHistory = [review(1, .return, reason: "Add the coil photo"), review(2, .accept)]
+        }
+        let refs = [1, 2, 4].map { ReportRef(reportId: reportId, reportVersion: Double($0)) }
+        let (model, _) = try model(
+            [read, try partsAnswer],
+            job: try job {
+                $0.draftReportRef = ReportRef(reportId: reportId, reportVersion: 3)
+                $0.reportRefs = refs
+            }
+        )
+        await model.load()
+        let rows = model.versionRows
+        #expect(rows.map(\.badge) == ["Draft", "Submitted", "Accepted", "Returned"])
+        #expect(rows[0].title.hasPrefix("Draft v3 · saved ") && rows[0].sub.hasSuffix("photos") && rows[0].sub.contains("result"))
+        #expect(rows[1].title == "v4 · submitted" && rows[1].sub == "awaiting quality review")
+        #expect(rows[2].title == "v2 · accepted" && rows[3].title == "v1 · returned" && rows[3].sub.hasSuffix(" — Add the coil photo"))
+    }
+
+    @Test func oneResultAndOnePhotoAreSingular() async throws {
+        let one = try saved {
+            $0.version = 1
+            $0.attachmentRefs = [photo("p1")]
+        }
+        let (model, _) = try model([one, try partsAnswer])
+        await model.load()
+        model.edit { draft in
+            for index in draft.items.indices { draft.items[index].result = index == 0 ? .attention : nil }
+        }
+        #expect(model.versionRows.first?.sub == "1 result · 1 photo")
+    }
+
+    @Test func aPhotoIsReadForTheShownVersion() async throws {
+        let (model, transport) = try await loaded(then: [
+            try answer(BlobContent(name: "p.jpg", mime: .imageJpeg, size: 3, bytes: Data([1, 2, 3]).base64EncodedString())),
+            try answer(BlobContent(name: "p.jpg", mime: .imageJpeg, size: 3, bytes: "not base64!")),
+            refusal(404, "NOT_FOUND", "error.notFound"),
+            try answer(BlobContent(name: "p.txt", mime: .imageJpeg, size: 3, bytes: Data([1, 2, 3]).base64EncodedString())),
+        ])
+        #expect(await model.photoData("a1") == Data([1, 2, 3]))
+        let asked = await transport.requests[2].url
+        #expect(asked?.path() == "/v1/jobs/f0000000-0000-4000-8000-000000000863/reports/\(reportId)/attachments/a1/content")
+        #expect(asked?.query() == "reportVersion=1")
+        #expect(await model.photoData("a1") == nil && model.photoError == "The photo could not be shown.")
+        #expect(await model.photoData("a1") == nil && model.photoError != "The photo could not be shown.")
+        #expect(await model.photoData("a1", isImage: { _ in false }) == nil && model.photoError == "The photo could not be shown.")
+        let (empty, _) = try self.model([try partsAnswer], job: try job { $0.draftReportRef = nil })
+        await empty.load()
+        #expect(await empty.photoData("a1") == nil && empty.versionRows.isEmpty)
+    }
 }
 
 private struct StubDraftBody: Decodable {

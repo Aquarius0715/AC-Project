@@ -66,9 +66,23 @@ struct JobsView: View {
                         .accessibilityIdentifier("jobs.answer")
                     }
                 }
+                if !model.tiles.isEmpty {
+                    Card {
+                        Facts(rows: model.tiles.map { ($0.label, "\($0.value) · \($0.sub)") }).accessibilityIdentifier("overview.tiles")
+                    }
+                }
                 let jobs = model.jobs.value ?? []
                 section(tr("Open jobs"), jobs.filter { !$0.isPast })
                 section(tr("Job history"), jobs.filter(\.isPast))
+                if case .loaded = model.jobs {
+                    overviewSection(
+                        tr("Alerts on my units ({n})", ["n": String(model.alerts.count)]),
+                        model.alerts,
+                        empty: tr("No open alerts on your units."),
+                        note: tr("Only units in your assignments. Finishing a job does not resolve its alert.")
+                    )
+                    overviewSection(tr("My reports"), model.reports, empty: tr("No drafts, returned or submitted reports."), note: nil)
+                }
                 if case .loaded([]) = model.jobs {
                     Card { Text(verbatim: tr("Jobs assigned to you appear here. Past assignments stay in their job history.")) }
                 }
@@ -85,6 +99,28 @@ struct JobsView: View {
             }
             .refreshable { await model.load() }
             .task { await model.load() }
+        }
+    }
+
+    private func overviewSection(_ title: String, _ rows: [OverviewWords.Row], empty: String, note: String?) -> some View {
+        Card(title) {
+            if rows.isEmpty { Text(verbatim: empty) }
+            ForEach(rows) { row in
+                NavigationLink(value: row.jobId) {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(verbatim: row.title).font(.headline)
+                            Text(verbatim: "\(row.badge) · \(row.sub)").font(.subheadline)
+                        }
+                        .multilineTextAlignment(.leading)
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.right").accessibilityHidden(true)
+                    }
+                    .foregroundStyle(.primary)
+                }
+                .accessibilityIdentifier("overview.\(row.id)")
+            }
+            if let note { Text(verbatim: note).font(.footnote) }
         }
     }
 
