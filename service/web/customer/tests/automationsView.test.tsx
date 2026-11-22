@@ -92,6 +92,19 @@ describe("AutomationsView list", () => {
     fireEvent.click(screen.getAllByRole("button", { name: "Edit" })[0] ?? document.body);
     expect(patch).toHaveBeenLastCalledWith({ automationId: "r-sched" });
   });
+
+  it("deletes a rule at its version from its menu and says what still runs", async () => {
+    render(<AutomationsView live={live()} />);
+    fireEvent.click(screen.getByRole("button", { name: "More for Weekday pre-cool" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Delete" }));
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByText("“Weekday pre-cool” will no longer run.")).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Delete automation" }));
+    await vi.waitFor(() => { expect(actions.deleteAutomation.mock.calls).toStrictEqual([["r-sched", 3]]); });
+    expect(await screen.findByText("Automation deleted")).toBeTruthy();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(runs.toasts).toStrictEqual(["“Weekday pre-cool” deleted"]);
+  });
 });
 
 describe("AutomationsView editor", () => {
@@ -141,6 +154,129 @@ describe("AutomationsView editor", () => {
     expect(within(dialog).getByText("Test result — simulation only")).toBeTruthy();
     expect(actions.testEvent.mock.calls[0]?.[0]).toBe(UNIT);
     expect(runs.toasts).toStrictEqual(["Simulated — no command was sent"]);
+  });
+
+  it("applies a rule to more ACs: a property's, one more and Clear, saved after the primary", async () => {
+    const study = { id: "u-2", name: "Study AC", path: "Home", property: "Home" };
+    const office = { id: "u-3", name: "Office AC", path: "Office", property: "Office" };
+    render(<AutomationsView live={live({ editing: "r-loc", acs: [ac, study, office], caps: { [UNIT]: caps, "u-2": caps, "u-3": caps } })} />);
+    expect(screen.getByText("Also apply to other ACs")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Clear" })).toHaveProperty("disabled", true);
+    fireEvent.click(screen.getByRole("button", { name: "All ACs in Home (2)" }));
+    expect(screen.getByText("Also apply to 1 other AC")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "All ACs in Home (2)" })).toHaveProperty("disabled", true);
+    fireEvent.click(screen.getByRole("checkbox", { name: "Office AC · Office" }));
+    expect(screen.getByText("Also apply to 2 other ACs")).toBeTruthy();
+    expect(screen.getByText("Action for 3 ACs")).toBeTruthy();
+    fireEvent.click(screen.getByRole("checkbox", { name: "Office AC · Office" }));
+    fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+    expect(screen.getByText("Also apply to other ACs")).toBeTruthy();
+    fireEvent.click(screen.getByRole("checkbox", { name: "Study AC · Home" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save automation" }));
+    await vi.waitFor(() => { expect(actions.saveAutomation).toHaveBeenCalledOnce(); });
+    expect(actions.saveAutomation.mock.calls[0]?.[0]).toMatchObject({ unitIds: [UNIT, "u-2"] });
+  });
+
+  it("refuses an action another chosen AC cannot take, sending nothing", () => {
+    const fan = { id: "u-3", name: "Fan unit", path: "Office", property: "Office" };
+    render(<AutomationsView live={live({ editing: "r-loc", acs: [ac, fan], caps: { [UNIT]: caps, "u-3": { ...caps, control: false } } })} />);
+    fireEvent.click(screen.getByRole("checkbox", { name: "Fan unit · Office" }));
+    expect(within(screen.getByRole("combobox", { name: "Action — setting" })).getByRole("option", { name: "Power ON (not supported)" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Save automation" }));
+    expect(screen.getByText("Not supported by every chosen AC — choose another action")).toBeTruthy();
+    expect(actions.saveAutomation).not.toHaveBeenCalled();
+  });
+
+  it("changes the action: a temperature starts at 24 °C and takes another value; power by its choice", async () => {
+    render(<AutomationsView live={live({ editing: "r-loc" })} />);
+    const setting = screen.getByRole("combobox", { name: "Action — setting" });
+    fireEvent.change(setting, { target: { value: "temp" } });
+    const value = screen.getByRole("combobox", { name: "Action — value" });
+    expect(value).toHaveProperty("value", "temp:24");
+    fireEvent.change(value, { target: { value: "temp:26" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save automation" }));
+    await vi.waitFor(() => { expect(actions.saveAutomation).toHaveBeenCalledOnce(); });
+    expect(actions.saveAutomation.mock.calls[0]?.[0]).toMatchObject({ action: { kind: "set_temperature", celsius: 26 } });
+    fireEvent.change(setting, { target: { value: "power" } });
+    fireEvent.click(within(screen.getByRole("group", { name: "Action — value" })).getByRole("button", { name: "OFF" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save automation" }));
+    await vi.waitFor(() => { expect(actions.saveAutomation).toHaveBeenCalledTimes(2); });
+    expect(actions.saveAutomation.mock.calls[1]?.[0]).toMatchObject({ action: { kind: "set_power", power: false } });
+  });
+
+  it("adds an outdoor temperature condition, refuses a value out of range under it, and removes it", async () => {
+    render(<AutomationsView live={live({ editing: "r-sched" })} />);
+    fireEvent.click(screen.getByRole("button", { name: "Add condition" }));
+    expect(screen.queryByRole("button", { name: "Weekdays" })).toBeNull(); // a schedule has its own days
+    expect(screen.getByRole("button", { name: "Occupancy Coming soon" })).toHaveProperty("disabled", true);
+    fireEvent.click(screen.getByRole("button", { name: "Outdoor temperature" }));
+    const celsius = screen.getByRole("textbox", { name: "Outdoor temperature °C" });
+    fireEvent.change(celsius, { target: { value: "200" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save automation" }));
+    expect(screen.getByText("−50 to 100 °C")).toBeTruthy();
+    expect(actions.saveAutomation).not.toHaveBeenCalled();
+    fireEvent.change(celsius, { target: { value: "31" } });
+    fireEvent.change(screen.getByDisplayValue("≥"), { target: { value: "lte" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save automation" }));
+    await vi.waitFor(() => { expect(actions.saveAutomation).toHaveBeenCalledOnce(); });
+    expect(actions.saveAutomation.mock.calls[0]?.[0]).toMatchObject({ onlyIf: [{ type: "weather", metric: "temperature", operator: "lte", value: 31 }] });
+    fireEvent.click(screen.getByRole("button", { name: "Remove Outdoor temperature" }));
+    expect(screen.queryByRole("textbox", { name: "Outdoor temperature °C" })).toBeNull();
+  });
+
+  it("on a presence rule adds weekdays and outdoor temperature, then has no more types, and saves the days chosen", async () => {
+    const presence: ApiAutomation = { ...base, id: "r-pre", version: 2, name: "Room empty stop", unitIds: [UNIT], enabled: true, kind: "event", condition: { type: "occupancy", occupied: false }, action: { kind: "set_power", power: false } };
+    render(<AutomationsView live={live({ editing: "r-pre", rules: [presence] })} />);
+    expect(screen.getByRole("combobox", { name: "Room" })).toHaveProperty("value", "empty");
+    fireEvent.click(screen.getByRole("button", { name: "Add condition" }));
+    expect(screen.queryByRole("button", { name: /^Occupancy/ })).toBeNull(); // the trigger's own type
+    fireEvent.click(screen.getByRole("button", { name: "Weekdays" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add condition" }));
+    fireEvent.click(screen.getByRole("button", { name: "Outdoor temperature" }));
+    expect(screen.getByRole("button", { name: "Add condition" })).toHaveProperty("disabled", true);
+    expect(screen.getByText("No more condition types for this trigger")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Mon" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sun" }));
+    fireEvent.change(screen.getByRole("combobox", { name: "Room" }), { target: { value: "occupied" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save automation" }));
+    await vi.waitFor(() => { expect(actions.saveAutomation).toHaveBeenCalledOnce(); });
+    expect(actions.saveAutomation.mock.calls[0]?.[0]).toMatchObject({
+      condition: { type: "occupancy", occupied: true },
+      onlyIf: [{ type: "weekday", weekdays: [2, 3, 4, 5, 7] }, { type: "weather", metric: "temperature", operator: "gte", value: 30 }],
+    });
+  });
+
+  it("checks a schedule's days and overnight end before it saves them", async () => {
+    render(<AutomationsView live={live({ editing: "r-sched" })} />);
+    fireEvent.click(screen.getByRole("button", { name: "Wed" }));
+    fireEvent.change(screen.getAllByRole("combobox", { name: "Hour" })[1] ?? document.body, { target: { value: "06" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save automation" }));
+    expect(screen.getByText("Choose at least one weekday")).toBeTruthy();
+    expect(screen.getByText("The end is before the start — tick “Ends next day” for an overnight schedule")).toBeTruthy();
+    expect(screen.getByText("Fix the schedule to preview")).toBeTruthy();
+    expect(actions.saveAutomation).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Mon" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /^Ends next day/ }));
+    expect(screen.getByText("06:00 next day")).toBeTruthy();
+    expect(screen.getByText("None in the next weeks")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Save automation" }));
+    await vi.waitFor(() => { expect(actions.saveAutomation).toHaveBeenCalledOnce(); });
+    expect(actions.saveAutomation.mock.calls[0]?.[0]).toMatchObject({ weekdays: [1], startLocal: "18:00", endLocal: "06:00", endsNextDay: true });
+  });
+
+  it("in a location rule grants the missing consent at its version and saves the event chosen", async () => {
+    const withdrawn = { id: "c-1", version: 9, granted: false, grantedAt: null, revokedAt: "2026-09-12T00:00:00Z" };
+    render(<AutomationsView live={live({ editing: "r-loc", consent: { version: 9, ...consentCard(withdrawn, 1, 0) } })} />);
+    expect(screen.getByRole("textbox", { name: /^Place/ })).toHaveProperty("value", "Home");
+    fireEvent.click(screen.getByRole("button", { name: "Grant" }));
+    await vi.waitFor(() => { expect(actions.updateConsent.mock.calls).toStrictEqual([[true, 9]]); });
+    expect(runs.toasts).toStrictEqual(["Location consent granted"]);
+    fireEvent.change(screen.getByRole("combobox", { name: "Event" }), { target: { value: "departure" } });
+    expect(screen.getByText("Save first — the test runs your saved automations for this AC")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Test / Simulate" })).toHaveProperty("disabled", true);
+    fireEvent.click(screen.getByRole("button", { name: "Save automation" }));
+    await vi.waitFor(() => { expect(actions.saveAutomation).toHaveBeenCalledOnce(); });
+    expect(actions.saveAutomation.mock.calls[0]?.[0]).toMatchObject({ condition: { type: "location", event: "departure" } });
   });
 
   it("tests a schedule with its preview without calling the Core API", () => {
