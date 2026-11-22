@@ -12,10 +12,13 @@ public actor StubTransport: HTTPTransport {
     public private(set) var requests: [URLRequest] = []
     /// Waits this long before answering, so that calls can overlap.
     let delay: Duration
+    /// Holds every request until the test opens it (an overlap that does not depend on timing).
+    let gate: Gate?
 
-    public init(_ answers: [Answer], delay: Duration = .zero) {
+    public init(_ answers: [Answer], delay: Duration = .zero, gate: Gate? = nil) {
         self.answers = answers
         self.delay = delay
+        self.gate = gate
     }
 
     /// Adds answers after the ones still queued (a screen's later reads).
@@ -25,6 +28,7 @@ public actor StubTransport: HTTPTransport {
 
     public func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
         requests.append(request)
+        await gate?.pass()
         if delay > .zero { try await Task.sleep(for: delay) }
         guard !answers.isEmpty else { throw URLError(.cannotConnectToHost) }
         switch answers.removeFirst() {
@@ -39,6 +43,39 @@ public actor StubTransport: HTTPTransport {
 }
 
 /// Fixed credentials; counts the refusals.
+/// A door the stand-ins wait at until the test opens it; once open, everyone passes.
+public actor Gate {
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+    private var isOpen = false
+    /// How many still pass before it holds (a screen's first reads).
+    private var free: Int
+
+    public init(after free: Int = 0) {
+        self.free = free
+    }
+
+    public func pass() async {
+        guard !isOpen else { return }
+        guard free == 0 else {
+            free -= 1
+            return
+        }
+        await withCheckedContinuation { waiters.append($0) }
+    }
+
+    public func open() {
+        isOpen = true
+        for waiter in waiters { waiter.resume() }
+        waiters = []
+    }
+
+    /// Waits (yielding, no clock) until `count` wait at the gate; gives up after many turns, and the test's
+    /// expectations then fail instead of hanging.
+    public func until(_ count: Int = 1) async {
+        for _ in 0..<100_000 where waiters.count < count { await Task.yield() }
+    }
+}
+
 public actor FixedCredentials: CredentialSource {
     public private(set) var refusals = 0
     let result: Result<Credentials, CoreError>
