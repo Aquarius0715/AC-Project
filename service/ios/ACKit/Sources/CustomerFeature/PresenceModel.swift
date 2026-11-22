@@ -88,6 +88,10 @@ public final class PresenceModel {
     let settings: any PresenceSettings
     private var names: [String: String] = [:]
     private var watching: Task<Void, Never>?
+    /// Counts the starts and stops: a start that waited (for the permission, the pins, the report or the monitor) while
+    /// the switch went off, the user signed out or a later start began goes no further.
+    private var run = 0
+    private var isStarting = false
 
     /// The coarsest fix worth sending: the Core API refuses coarser ones (errors.position_inaccurate).
     static let maxAccuracy = 100.0
@@ -104,7 +108,7 @@ public final class PresenceModel {
     /// At launch (also when the phone starts the app in the background for a crossing): watching again if it was on.
     /// Already watching (the app's start and the signed-in screen both resume) asks nothing again.
     public func resume() async {
-        if isOn, watching == nil { await start() }
+        if isOn, watching == nil, !isStarting { await start() }
     }
 
     public var isConsentGranted: Bool { consent?.granted ?? false }
@@ -143,23 +147,27 @@ public final class PresenceModel {
         if on {
             await start()
         } else {
-            watching?.cancel()
-            watching = nil
-            await location.stop()
-            line = nil
+            await pause()
         }
     }
 
     /// Stops watching without changing the switch (signed out: the next sign-in watches that account's places).
     public func pause() async {
+        run += 1
+        isStarting = false
         watching?.cancel()
         watching = nil
-        await location.stop()
         line = nil
+        await location.stop()
     }
 
     private func start() async {
+        run += 1
+        let mine = run
+        isStarting = true
+        defer { if run == mine { isStarting = false } }
         permission = await location.requestAlways()
+        guard run == mine else { return }
         switch permission {
         case .denied, .notDetermined:
             line = tr("Location is off for this app — allow it in Settings, or switch this off.")
@@ -171,18 +179,25 @@ public final class PresenceModel {
         do {
             fences = try await geofences()
         } catch {
-            line = ErrorText.of(error)
+            if run == mine { line = ErrorText.of(error) }
             return
         }
+        guard run == mine else { return }
         guard !fences.isEmpty else {
             line = tr("None of your homes or offices has a map pin yet — HQ sets them.")
             return
         }
         await report()
+        guard run == mine else { return }
         if permission == .whenInUse {
             line = tr("Allow location “Always” so that arriving and leaving are reported while the app is closed.")
         }
         let crossings = await location.watch(fences)
+        guard run == mine else {
+            // stopped while the circles were set up: they are removed again, unless a later start set up its own
+            if !isStarting, watching == nil { await location.stop() }
+            return
+        }
         watching?.cancel()
         watching = Task { [weak self] in
             for await _ in crossings {
@@ -208,21 +223,27 @@ public final class PresenceModel {
     }
 
     /// Reports the phone's position now; a fix too coarse or none at all is not sent.
+    /// What it came to is not said once the switch went off meanwhile.
     func report() async {
+        let mine = run
+        let said = await reported()
+        if run == mine { line = said }
+    }
+
+    private func reported() async -> String {
         guard let fix = await location.fix(), fix.accuracyMeters <= Self.maxAccuracy else {
-            line = tr("This phone’s position is not precise enough to send — it is tried again at the next crossing.")
-            return
+            return tr("This phone’s position is not precise enough to send — it is tried again at the next crossing.")
         }
         let input = PresenceReportInput(latitude: fix.latitude, longitude: fix.longitude, accuracyMeters: fix.accuracyMeters)
         do {
             let result = try await client.call(Ops.PresenceReport.self, input).data
-            line = Self.text(result, names: names) ?? tr("Location sent · nothing changed.")
+            return Self.text(result, names: names) ?? tr("Location sent · nothing changed.")
         } catch  where error.error.messageKey == "errors.consent_required" {
-            line = tr(
+            return tr(
                 "Location automations need your consent. It is used only for arrival/departure automations: your device’s location is compared with the map pins of your homes and offices, and only home or away is kept."
             )
         } catch {
-            line = tr("This device’s location could not be sent — the next one is tried in a moment.")
+            return tr("This device’s location could not be sent — the next one is tried in a moment.")
         }
     }
 

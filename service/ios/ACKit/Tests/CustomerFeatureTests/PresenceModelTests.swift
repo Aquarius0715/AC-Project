@@ -14,16 +14,23 @@ actor ScriptedLocation: LocationSource {
     private(set) var watched: [[Geofence]] = []
     private(set) var stops = 0
     private var crossings: AsyncStream<String>.Continuation?
+    /// How long asking for the permission and starting to watch take (a prompt on the screen, the system's monitor).
+    let hold: Duration
 
-    init(_ permission: LocationPermission = .always, fixes: [Fix?] = [ScriptedLocation.home]) {
+    init(_ permission: LocationPermission = .always, fixes: [Fix?] = [ScriptedLocation.home], hold: Duration = .zero) {
         given = permission
         self.fixes = fixes
+        self.hold = hold
     }
 
     static let home = Fix(latitude: 3.139, longitude: 101.6869, accuracyMeters: 10, at: Date(timeIntervalSince1970: 0))
 
     func permission() async -> LocationPermission { given }
-    func requestAlways() async -> LocationPermission { given }
+
+    func requestAlways() async -> LocationPermission {
+        try? await Task.sleep(for: hold)
+        return given
+    }
 
     func fix() async -> Fix? {
         defer { next += 1 }
@@ -32,6 +39,7 @@ actor ScriptedLocation: LocationSource {
 
     func watch(_ fences: [Geofence]) async -> AsyncStream<String> {
         watched.append(fences)
+        try? await Task.sleep(for: hold)
         let (stream, continuation) = AsyncStream<String>.makeStream()
         crossings = continuation
         return stream
@@ -117,9 +125,10 @@ final class Switch: PresenceSettings, @unchecked Sendable {
     private func model(
         _ answers: [StubTransport.Answer],
         location: ScriptedLocation = ScriptedLocation(),
-        on: Bool = false
+        on: Bool = false,
+        delay: Duration = .zero
     ) -> (PresenceModel, StubTransport) {
-        let transport = StubTransport(answers)
+        let transport = StubTransport(answers, delay: delay)
         let base = URL(string: "http://core.test") ?? URL(filePath: "/")
         let client = CoreClient(baseURL: base, transport: transport, credentials: FixedCredentials())
         return (PresenceModel(client: client, location: location, settings: Switch(on)), transport)
@@ -177,6 +186,91 @@ final class Switch: PresenceSettings, @unchecked Sendable {
         await model.resume()
         await model.resume()
         #expect(await location.watched.count == 1)
+        #expect(await transport.requests.count == 2)
+    }
+
+    @Test func theAppAndTheScreenResumingTogetherStartOnce() async throws {
+        let location = ScriptedLocation(hold: .milliseconds(200))
+        let (model, transport) = model([try properties, try result(nil)], location: location, on: true)
+        async let atLaunch: Void = model.resume()
+        async let onScreen: Void = model.resume()
+        _ = await (atLaunch, onScreen)
+        #expect(await location.watched.count == 1)
+        #expect(await transport.requests.count == 2, "one read of the pins and one report")
+        #expect(model.line == "Location sent · nothing changed.")
+    }
+
+    /// Waits (in real time: the stand-ins sleep) until `done` holds.
+    private func until(_ done: () async -> Bool) async throws {
+        for _ in 0..<500 where !(await done()) { try await Task.sleep(for: .milliseconds(2)) }
+        #expect(await done())
+    }
+
+    @Test(arguments: [true, false])
+    func offWhileThePermissionIsAskedStartsNothing(signedOut: Bool) async throws {
+        let location = ScriptedLocation(hold: .milliseconds(200))
+        let (model, transport) = model([try properties, try result(nil)], location: location)
+        let starting = Task { await model.set(true) }
+        try await until { model.isOn }
+        if signedOut { await model.pause() } else { await model.set(false) }
+        await starting.value
+        #expect(await transport.requests.isEmpty, "no pins read and no position sent")
+        #expect(await location.watched.isEmpty)
+        #expect(model.line == nil)
+    }
+
+    @Test func offWhileThePinsAreReadSendsNothing() async throws {
+        let location = ScriptedLocation()
+        let (model, transport) = model([try properties, try result(nil)], location: location, delay: .milliseconds(200))
+        let starting = Task { await model.set(true) }
+        try await until { await transport.requests.count == 1 }
+        await model.set(false)
+        await starting.value
+        #expect(await transport.requests.count == 1, "no position sent")
+        #expect(await location.watched.isEmpty)
+        #expect(model.line == nil)
+        let (failing, _) = self.model([.failure(URLError(.timedOut))], location: ScriptedLocation(), delay: .milliseconds(200))
+        let failed = Task { await failing.set(true) }
+        try await until { failing.isOn }
+        await failing.set(false)
+        await failed.value
+        #expect(failing.line == nil, "the switched-off start does not say why the pins could not be read")
+    }
+
+    @Test func offWhileThePositionIsSentSaysNothingAndWatchesNothing() async throws {
+        let location = ScriptedLocation()
+        let (model, transport) = model([try properties, try result(.arrival)], location: location, delay: .milliseconds(200))
+        let starting = Task { await model.set(true) }
+        try await until { await transport.requests.count == 2 }
+        await model.set(false)
+        await starting.value
+        #expect(model.line == nil, "the arrival is not said under a switch that is off")
+        #expect(await location.watched.isEmpty)
+    }
+
+    @Test func offWhileTheCirclesAreSetUpWatchesNothing() async throws {
+        let location = ScriptedLocation(hold: .milliseconds(200))
+        let (model, transport) = model([try properties, try result(nil), try result(.arrival)], location: location)
+        let starting = Task { await model.set(true) }
+        try await until { await location.watched.count == 1 }
+        await model.set(false)
+        await starting.value
+        #expect(await location.stops == 2, "stopped by the switch and again once the circles were set up")
+        await location.cross("p1")
+        for _ in 0..<50 { await Task.yield() }
+        #expect(await transport.requests.count == 2, "a crossing after the switch went off reports nothing")
+        #expect(model.line == nil)
+    }
+
+    @Test func switchedOnAgainWhileStartingTheLaterStartWins() async throws {
+        let location = ScriptedLocation(hold: .milliseconds(200))
+        let (model, transport) = model([try properties, try result(nil)], location: location)
+        let first = Task { await model.set(true) }
+        try await until { model.isOn }
+        await model.set(true)
+        await first.value
+        #expect(await location.watched.count == 1)
+        #expect(await location.stops == 0, "the earlier start leaves the later one's circles alone")
         #expect(await transport.requests.count == 2)
     }
 

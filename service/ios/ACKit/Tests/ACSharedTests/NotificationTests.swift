@@ -186,8 +186,8 @@ import Testing
         .http(status, #"{"code":"\#(code)","messageKey":"error.x","fieldErrors":{},"correlationId":"c","retryAfterSeconds":null}"#)
     }
 
-    private func model(_ answers: [StubTransport.Answer]) -> (NotificationsModel, StubTransport) {
-        let transport = StubTransport(answers)
+    private func model(_ answers: [StubTransport.Answer], delay: Duration = .zero) -> (NotificationsModel, StubTransport) {
+        let transport = StubTransport(answers, delay: delay)
         let base = URL(string: "http://core.test") ?? URL(filePath: "/")
         return (NotificationsModel(client: CoreClient(baseURL: base, transport: transport, credentials: FixedCredentials())), transport)
     }
@@ -273,6 +273,34 @@ import Testing
         await failed.load()
         await failed.markAllRead()
         #expect(failed.note == "The request took too long — check whether the change was saved, then try again")
+    }
+
+    @Test func aSecondTapWhileAMarkRunsSendsNothing() async throws {
+        let marked = NotificationTextTests().notice(.completion, readAt: "2026-11-20T02:00:00Z")
+        let (one, slow) = model([try page(), try answer(marked), try page(true)], delay: .milliseconds(200))
+        await one.load()
+        let row = try #require(one.rows.first)
+        #expect(!one.isWriting)
+        let first = Task { await one.markRead(row) }
+        for _ in 0..<100 where !one.isWriting { await Task.yield() }
+        #expect(one.isWriting, "the rows and Mark all as read are disabled while the mark runs")
+        await one.markRead(row)
+        await one.markAllRead()
+        await first.value
+        #expect(!one.isWriting)
+        #expect(await slow.requests.count == 3, "one mark and its reload, nothing for the second tap")
+        #expect(one.note == nil && one.unreadCount == 0)
+
+        let markedAll = try answer(NotificationsMarked(markedIds: ["n1"], skippedIds: []))
+        let (all, slowAll) = model([try page(), markedAll, try page(true)], delay: .milliseconds(200))
+        await all.load()
+        let firstAll = Task { await all.markAllRead() }
+        for _ in 0..<100 where !all.isWriting { await Task.yield() }
+        await all.markAllRead()
+        await all.markRead(row)
+        await firstAll.value
+        #expect(await slowAll.requests.count == 3, "one write and its reload")
+        #expect(all.note == "1 notification marked as read", "the second tap does not say 0 marked")
     }
 
     @Test func dayOfAnInstant() {

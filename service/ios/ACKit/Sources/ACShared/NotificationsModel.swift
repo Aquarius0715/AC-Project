@@ -21,6 +21,9 @@ public final class NotificationsModel {
     /// What the last mark came to, when it says something the list does not.
     public private(set) var note: String?
     public var filter: Filter = .all
+    /// A mark is being sent: the rows and "Mark all as read" are disabled, as the web disables its button while pending,
+    /// so that a second tap does not send the same ids again (and then say "0 marked") or a stale version.
+    public private(set) var isWriting = false
     let client: CoreClient
 
     public init(client: CoreClient) {
@@ -50,7 +53,9 @@ public final class NotificationsModel {
 
     /// Marks one read (opening it); one that changed meanwhile shows its latest state.
     public func markRead(_ row: Row) async {
-        guard !row.isRead else { return }
+        guard !row.isRead, !isWriting else { return }
+        isWriting = true
+        defer { isWriting = false }
         do {
             _ = try await client.call(
                 Ops.NotificationsMarkRead.self,
@@ -67,7 +72,9 @@ public final class NotificationsModel {
     /// Marks every listed unread notification read in one write.
     public func markAllRead() async {
         let ids = (notifications.value ?? []).filter { !$0.isRead }.map(\.id)
-        guard !ids.isEmpty else { return }
+        guard !ids.isEmpty, !isWriting else { return }
+        isWriting = true
+        defer { isWriting = false }
         do {
             let marked = try await client.call(Ops.NotificationsMarkAllRead.self, NotificationsMarkAllReadInput(ids: ids)).data
             let count = marked.markedIds.count
