@@ -39,12 +39,18 @@ public struct CheckInForm: Sendable, Equatable {
     /// The longest reason the Core API takes.
     static let maxReason = 1000
 
+    /// A reason's length as the Core API counts it: the trimmed text's code points (Go's utf8.RuneCountInString), not
+    /// its characters, so a letter with a combining mark counts as two.
+    static func length(of reason: String) -> Int {
+        reason.trimmingCharacters(in: .whitespacesAndNewlines).unicodeScalars.count
+    }
+
     /// The form's own checks (techJob.ts checkInErrors): a location check-in needs a fix good enough to tell 200 m and
     /// the scanned label; a manual one a reason of 1–1000 characters. How far the fix is from the site is the server's to
     /// say.
     public var errors: [CheckInField: String] {
         if method == .manual {
-            let count = reason.trimmingCharacters(in: .whitespacesAndNewlines).count
+            let count = Self.length(of: reason)
             guard count < 1 || count > Self.maxReason else { return [:] }
             return [.reason: tr("A reason is required for a manual check-in (1–1000 characters)")]
         }
@@ -101,7 +107,7 @@ public struct CantMakeForm: Sendable, Equatable {
     public static let windows = ["08:00-10:00", "10:00-12:00", "12:00-14:00", "14:00-16:00", "16:00-18:00"]
 
     public var error: String? {
-        let count = reason.trimmingCharacters(in: .whitespacesAndNewlines).count
+        let count = CheckInForm.length(of: reason)
         return count < 1 || count > CheckInForm.maxReason ? tr("Tell your coordinator why (1–1000 characters)") : nil
     }
 

@@ -37,6 +37,10 @@ import Testing
         #expect(form.errors == missing)
         form.reason = String(repeating: "x", count: 1001)
         #expect(form.errors == missing)
+        form.reason = String(repeating: "e\u{301}", count: 600)
+        #expect(form.errors == missing, "600 letters with a combining mark are 1200 code points, as the Core API counts")
+        form.reason = " " + String(repeating: "x", count: 1000) + "\n"
+        #expect(form.errors.isEmpty, "1000 code points after trimming")
         form.reason = "No GPS signal in the basement plant room"
         #expect(form.errors.isEmpty, "a manual check-in needs neither a fix nor a label")
     }
@@ -67,6 +71,8 @@ import Testing
         #expect(form.error == "Tell your coordinator why (1–1000 characters)")
         form.reason = String(repeating: "x", count: 1001)
         #expect(form.error != nil)
+        form.reason = String(repeating: "e\u{301}", count: 600)
+        #expect(form.error != nil, "counted in code points, as the Core API counts")
         form.reason = "Medical appointment"
         #expect(form.error == nil)
     }
