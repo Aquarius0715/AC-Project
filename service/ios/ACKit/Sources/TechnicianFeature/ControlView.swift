@@ -22,7 +22,8 @@ struct ControlView: View {
                 Card(tr("This page isn’t available")) {
                     Text(verbatim: tr("The page doesn’t exist, or your account can’t open it. Nothing was navigated automatically."))
                 }
-            case nil: ProgressView()
+            // a failed first read shows only its message, not a spinner that never ends
+            case nil: if case .loading = model.content { ProgressView() }
             }
         }
         .cardScreen()
