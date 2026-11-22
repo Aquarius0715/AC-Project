@@ -55,7 +55,7 @@ export function AutomationsDemo() {
   const formTitle = edit === "new" ? "Create automation" : "Edit automation";
   return (
     <Page>
-      <PageHead title="Your automations" sub={`${String(list.length)} automations · ${String(onCount)} on · each rule controls one AC · checked again when it runs`} action={<Btn variant="primary" onClick={() => { open("new"); }}><Icon name="add" /> Create automation</Btn>} />
+      <PageHead title="Your automations" sub={`${String(list.length)} automations · ${String(onCount)} on · checked again when it runs`} action={<Btn variant="primary" onClick={() => { open("new"); }}><Icon name="add" /> Create automation</Btn>} />
       <Card>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div><div className="flex items-center gap-1.5 font-bold"><Icon name="location" />Location consent — for arrival/departure automations only</div><div className="text-xs text-muted-foreground">{consent ? "Granted Sep 10, 2026 · used only by 2 location automations · demo location events (no real GPS history)." : "Withdrawn — location automations are paused. Schedule automations are unaffected."}</div></div>
