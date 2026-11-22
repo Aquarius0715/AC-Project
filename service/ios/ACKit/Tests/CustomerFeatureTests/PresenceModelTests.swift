@@ -170,7 +170,8 @@ final class Switch: PresenceSettings, @unchecked Sendable {
         await model.set(true)
         #expect(model.line == "Location sent · nothing changed.")
         await location.cross("p2")
-        for _ in 0..<50 where model.line == "Location sent · nothing changed." { await Task.yield() }
+        // the report goes through other actors, which yields alone do not move on: poll with a bound instead
+        for _ in 0..<1000 where model.line == "Location sent · nothing changed." { try await Task.sleep(for: .milliseconds(5)) }
         #expect(model.line == "Left Office — 2 automations ran.")
         #expect(await transport.requests.count == 3)
     }
@@ -203,8 +204,10 @@ final class Switch: PresenceSettings, @unchecked Sendable {
         let atLaunch = Task { await model.resume() }
         await asking.until()
         let onScreen = Task { await model.resume() }
-        for _ in 0..<100 { await Task.yield() }
+        await asking.until(2)
+        #expect(await asking.waiting == 1, "the screen's resume asks nothing while the launch's start waits")
         await asking.open()
+        await onScreen.value
         await atLaunch.value
         await onScreen.value
         #expect(await location.watched.count == 1)

@@ -42,13 +42,14 @@ public actor StubTransport: HTTPTransport {
     }
 }
 
-/// Fixed credentials; counts the refusals.
 /// A door the stand-ins wait at until the test opens it; once open, everyone passes.
 public actor Gate {
     private var waiters: [CheckedContinuation<Void, Never>] = []
     private var isOpen = false
     /// How many still pass before it holds (a screen's first reads).
     private var free: Int
+    /// How many wait at it now.
+    public var waiting: Int { waiters.count }
 
     public init(after free: Int = 0) {
         self.free = free
@@ -76,6 +77,7 @@ public actor Gate {
     }
 }
 
+/// Fixed credentials; counts the refusals.
 public actor FixedCredentials: CredentialSource {
     public private(set) var refusals = 0
     let result: Result<Credentials, CoreError>
