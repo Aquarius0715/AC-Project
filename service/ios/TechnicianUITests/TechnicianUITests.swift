@@ -162,7 +162,9 @@ final class TechnicianUITests: XCTestCase {
         tapScrolling(app.buttons["report.save"], in: app)
         XCTAssertTrue(wait(for: app.staticTexts["report.note"], label: "Draft saved"))
         let version = app.descendants(matching: .any)["report.version"].firstMatch
-        XCTAssertTrue(version.exists && version.label.hasPrefix("Draft v1 · saved "), "the saved draft in the versions card")
+        // the versions card is redrawn from the reread report after the note shows, so wait for it as well
+        let saved = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label BEGINSWITH %@", "Draft v1 · saved "), object: version)
+        XCTAssertEqual(XCTWaiter().wait(for: [saved], timeout: 15), .completed, "the saved draft in the versions card: \(version.label)")
 
         // the customer signs on the phone
         tapScrolling(app.buttons["report.signOff"], in: app)
