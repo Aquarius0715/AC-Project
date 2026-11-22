@@ -148,8 +148,8 @@ func TestRequestsThatCannotBeSent(t *testing.T) {
 	}
 }
 
-// TestAdminRefusalDropsTheToken: an admin call answered 401 (the token was ended early) clears the cached token, so the
-// next call fetches a new one.
+// TestAdminRefusalDropsTheToken: an admin call answered 401 (the token was ended early) ends with that status and
+// clears the cached token (TestKeycloakEndSessions checks that a cleared token is fetched again).
 func TestAdminRefusalDropsTheToken(t *testing.T) {
 	t.Parallel()
 
