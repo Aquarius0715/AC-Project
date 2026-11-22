@@ -83,6 +83,43 @@ func (f *fakeRealm) logout(writer http.ResponseWriter, req *http.Request) {
 	writer.WriteHeader(status)
 }
 
+// testClient is an HTTP client with a transport of its own. With http.DefaultTransport the parallel tests would share
+// one pool, and every httptest.Server.Close closes that pool's idle connections, which breaks a request another test
+// is just sending on one ("connection broken: http: CloseIdleConnections called").
+func testClient(t *testing.T) *http.Client {
+	t.Helper()
+
+	transport := new(http.Transport)
+	t.Cleanup(transport.CloseIdleConnections)
+
+	return &http.Client{
+		Timeout:       5 * time.Second,
+		Transport:     transport,
+		CheckRedirect: nil,
+		Jar:           nil,
+	}
+}
+
+// TestKeycloakDefaultClient: without a client of its own, Keycloak uses a client with the timeout on the default
+// transport, and a client it is given is used as it is.
+func TestKeycloakDefaultClient(t *testing.T) {
+	t.Parallel()
+
+	keycloak := newTestKeycloak("http://127.0.0.1", testSecret, nil, nil)
+
+	got := keycloak.client()
+	if got.Timeout != clientTimeout || got.Transport != nil {
+		t.Errorf("default client: timeout %v, transport %v", got.Timeout, got.Transport)
+	}
+
+	own := testClient(t)
+	keycloak.Client = own
+
+	if keycloak.client() != own {
+		t.Error("the given client is not used")
+	}
+}
+
 // newTestKeycloak is a client of the fake realm at base with the given secret, clock and HTTP client.
 func newTestKeycloak(base, secret string, now func() time.Time, client *http.Client) *Keycloak {
 	return &Keycloak{
@@ -133,7 +170,7 @@ func TestKeycloakEndSessions(t *testing.T) {
 	defer srv.Close()
 
 	now := time.Date(2026, 10, 12, 0, 0, 0, 0, time.UTC)
-	keycloak := newTestKeycloak(srv.URL, testSecret, func() time.Time { return now }, nil)
+	keycloak := newTestKeycloak(srv.URL, testSecret, func() time.Time { return now }, testClient(t))
 	ctx := t.Context()
 
 	endOK(ctx, t, keycloak, "09f7f651-9f19-5407-b222-8730fe8fd5c3", "a user")
@@ -172,7 +209,7 @@ func TestKeycloakEndSessions(t *testing.T) {
 		t.Error("no subject passes")
 	}
 
-	if newTestKeycloak(srv.URL, "wrong", nil, nil).EndSessions(ctx, "u-1") == nil {
+	if newTestKeycloak(srv.URL, "wrong", nil, testClient(t)).EndSessions(ctx, "u-1") == nil {
 		t.Error("a wrong client secret passes")
 	}
 	// the service's own HTTP client and the wall clock
@@ -203,7 +240,7 @@ func TestKeycloakTokenAnswers(t *testing.T) {
 			}),
 		)
 
-		keycloak := newTestKeycloak(srv.URL, testSecret, nil, nil)
+		keycloak := newTestKeycloak(srv.URL, testSecret, nil, testClient(t))
 		keycloak.TokenURL = srv.URL + "/token"
 
 		if keycloak.EndSessions(t.Context(), "u-1") == nil {
@@ -246,7 +283,7 @@ func TestKeycloakNamesItsPublicAddress(t *testing.T) {
 			}),
 		)
 
-		keycloak := newTestKeycloak(srv.URL, testSecret, nil, nil)
+		keycloak := newTestKeycloak(srv.URL, testSecret, nil, testClient(t))
 		keycloak.PublicURL = public
 		keycloak.ClientID = ""
 		keycloak.ClientSecret = ""
@@ -329,7 +366,7 @@ func setupAt(t *testing.T, public, host, redirect string) (string, string) {
 
 	defer srv.Close()
 
-	keycloak := newTestKeycloak(srv.URL, testSecret, nil, nil)
+	keycloak := newTestKeycloak(srv.URL, testSecret, nil, testClient(t))
 	keycloak.PublicURL = public
 
 	err := keycloak.SendSetup(t.Context(), "subject-1", Account{
@@ -399,7 +436,7 @@ func TestAdminTokensAreKeptPerAddress(t *testing.T) {
 
 	defer srv.Close()
 
-	keycloak := newTestKeycloak(srv.URL, testSecret, nil, nil)
+	keycloak := newTestKeycloak(srv.URL, testSecret, nil, testClient(t))
 	keycloak.PublicURL = "http://192.0.2.10:8281"
 
 	send := func(host string) {

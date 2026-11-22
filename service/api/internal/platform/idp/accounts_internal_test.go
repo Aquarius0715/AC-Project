@@ -93,7 +93,7 @@ func newAccountsKeycloak(t *testing.T) (*Keycloak, *accountsRealm) {
 		ClientID:     testClientID,
 		ClientSecret: "s",
 		PublicURL:    "",
-		Client:       nil,
+		Client:       testClient(t),
 		Now:          nil,
 		mu:           sync.Mutex{},
 		tokens:       nil,
