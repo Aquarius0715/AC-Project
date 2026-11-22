@@ -186,8 +186,8 @@ import Testing
         .http(status, #"{"code":"\#(code)","messageKey":"error.x","fieldErrors":{},"correlationId":"c","retryAfterSeconds":null}"#)
     }
 
-    private func model(_ answers: [StubTransport.Answer]) -> (NotificationsModel, StubTransport) {
-        let transport = StubTransport(answers)
+    private func model(_ answers: [StubTransport.Answer], gate: Gate? = nil) -> (NotificationsModel, StubTransport) {
+        let transport = StubTransport(answers, gate: gate)
         let base = URL(string: "http://core.test") ?? URL(filePath: "/")
         return (NotificationsModel(client: CoreClient(baseURL: base, transport: transport, credentials: FixedCredentials())), transport)
     }
@@ -273,6 +273,38 @@ import Testing
         await failed.load()
         await failed.markAllRead()
         #expect(failed.note == "The request took too long — check whether the change was saved, then try again")
+    }
+
+    @Test func aSecondTapWhileAMarkRunsSendsNothing() async throws {
+        let marked = NotificationTextTests().notice(.completion, readAt: "2026-11-20T02:00:00Z")
+        let marking = Gate(after: 1)
+        let (one, slow) = model([try page(), try answer(marked), try page(true)], gate: marking)
+        await one.load()
+        let row = try #require(one.rows.first)
+        #expect(!one.isWriting)
+        let first = Task { await one.markRead(row) }
+        await marking.until()
+        #expect(one.isWriting, "the rows and Mark all as read are disabled while the mark runs")
+        await one.markRead(row)
+        await one.markAllRead()
+        await marking.open()
+        await first.value
+        #expect(!one.isWriting)
+        #expect(await slow.requests.count == 3, "one mark and its reload, nothing for the second tap")
+        #expect(one.note == nil && one.unreadCount == 0)
+
+        let markedAll = try answer(NotificationsMarked(markedIds: ["n1"], skippedIds: []))
+        let markingAll = Gate(after: 1)
+        let (all, slowAll) = model([try page(), markedAll, try page(true)], gate: markingAll)
+        await all.load()
+        let firstAll = Task { await all.markAllRead() }
+        await markingAll.until()
+        await all.markAllRead()
+        await all.markRead(row)
+        await markingAll.open()
+        await firstAll.value
+        #expect(await slowAll.requests.count == 3, "one write and its reload")
+        #expect(all.note == "1 notification marked as read", "the second tap does not say 0 marked")
     }
 
     @Test func dayOfAnInstant() {

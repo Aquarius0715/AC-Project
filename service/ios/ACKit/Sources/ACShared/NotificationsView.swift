@@ -21,6 +21,7 @@ public struct NotificationsView: View {
                     if model.unreadCount > 0 {
                         Button(tr("Mark all as read")) { Task { await model.markAllRead() } }
                             .secondaryAction()
+                            .disabled(model.isWriting)
                             .accessibilityIdentifier("notifications.markAll")
                     }
                     if let message = model.notifications.message ?? model.note {
@@ -34,6 +35,7 @@ public struct NotificationsView: View {
                         Card { label(row) }
                     }
                     .buttonStyle(.plain)
+                    .disabled(model.isWriting)
                     .accessibilityIdentifier("notification.\(row.id)")
                 }
                 if let empty = model.emptyText {
