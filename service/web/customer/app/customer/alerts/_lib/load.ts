@@ -21,12 +21,19 @@ export async function loadAlerts(sp: Record<string, string | string[] | undefine
   const tab = one(sp.tab) === "policies" ? "policies" as const : "alerts" as const;
   const severity = oneOf(["critical", "warning", "normal"] as const, one(sp.severity) ?? "", null);
   const isUnreadOnly = one(sp.unreadOnly) === "true";
-  const unitId = one(sp.unitId);
+  const asked = one(sp.unitId);
+  const unitsRead = coreAll<Unit>("units.list");
+  // only a unit of this customer filters the alerts: an unknown unitId would empty the list while the Unit select says
+  // "All units"
+  const alertsRead = unitsRead.then((units) => {
+    const unitId = units.find((u) => u.id === asked)?.id;
+    return coreAll<ApiAlert>("alerts.list", severity || unitId ? { filters: { ...(severity && { severity }), ...(unitId && { unitId }) } } : {});
+  });
   const [now, me, alerts, notes, summary, units, properties, spaces, policies, defaults, prefs, display] = await Promise.all([
     coreNow(), corePrincipal(),
-    coreAll<ApiAlert>("alerts.list", severity || unitId ? { filters: { ...(severity && { severity }), ...(unitId && { unitId }) } } : {}), coreAll<AlertNote>("notifications.list"),
+    alertsRead, coreAll<AlertNote>("notifications.list"),
     coreOp<{ counts: { alertCount: number } }>("summaries.get", { kind: "customer", filters: {} }),
-    coreAll<Unit>("units.list"), coreAll<{ id: string; name: string }>("properties.list"), coreAll<{ id: string; name: string; parentSpaceId: string | null }>("spaces.list"),
+    unitsRead, coreAll<{ id: string; name: string }>("properties.list"), coreAll<{ id: string; name: string; parentSpaceId: string | null }>("spaces.list"),
     coreAll<ApiAlertPolicy>("policies.list", { filters: { kind: "alert" } }), coreAll<ApiDefaultPolicy>("policies.list", { filters: { kind: "default_alert" } }),
     orNull(coreOp<{ timezone: string }>("preferences.get", {})), coreDisplay(),
   ]);
@@ -40,7 +47,7 @@ export async function loadAlerts(sp: Record<string, string | string[] | undefine
   return {
     now: now.toISOString(),
     unreadOnly: isUnreadOnly,
-    unitId: units.find((u) => u.id === unitId)?.id ?? null,
+    unitId: units.find((u) => u.id === asked)?.id ?? null,
     units: units.map((u) => ({ id: u.id, name: u.displayName, place: place.get(u.id)?.place ?? "" })).toSorted((a, b) => a.name.localeCompare(b.name)),
     alertCount: summary.counts.alertCount,
     total: all.length,
