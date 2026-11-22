@@ -43,7 +43,8 @@ struct PresenceView: View {
         if !model.hasConsentRecord {
             Text(verbatim: tr("No location consent record exists for your account — location automations cannot be used."))
         } else if model.isConsentGranted {
-            Button(tr("Withdraw consent")) { isWithdrawing = true }.secondaryAction().accessibilityIdentifier("consent.withdraw")
+            Button(tr("Withdraw consent")) { isWithdrawing = true }.secondaryAction().disabled(model.isSavingConsent)
+                .accessibilityIdentifier("consent.withdraw")
         } else if model.consent != nil {
             Text(
                 verbatim: tr(
@@ -53,6 +54,7 @@ struct PresenceView: View {
             .font(.subheadline)
             Button(tr("Grant consent")) { Task { await model.setConsent(true) } }
                 .buttonStyle(.borderedProminent)
+                .disabled(model.isSavingConsent)
                 .accessibilityIdentifier("consent.grant")
         }
     }

@@ -24,6 +24,12 @@ public final class UnitControlModel {
         public let isBad: Bool
     }
 
+    /// The command a send is waiting for, and its seconds to answer.
+    public struct Waiting: Equatable, Sendable {
+        public let commandId: String
+        public let seconds: Int
+    }
+
     /// What the model's capabilities allow (the web's controlLayout): nothing on a model that only measures.
     public struct Layout: Equatable, Sendable {
         public let control: Bool
@@ -39,8 +45,9 @@ public final class UnitControlModel {
     public private(set) var mode: Mode = .cool
     public private(set) var fan: Fan = .mid
     public private(set) var isSending = false
-    /// The seconds the AC has to answer the command being followed (IR806).
-    public private(set) var answerSeconds: Int?
+    /// The command being followed and the seconds the AC has to answer it (IR806); the screen starts its countdown
+    /// again for each command.
+    public private(set) var waiting: Waiting?
     public var outcome: Outcome?
 
     let client: CoreClient
@@ -157,8 +164,10 @@ public final class UnitControlModel {
 
     // MARK: - choosing
 
-    public func lower() { change(setpoint: setpoint - step) }
-    public func raise() { change(setpoint: setpoint + step) }
+    /// One step down; from above the range (an AC that reports more than its model's highest), to the highest.
+    public func lower() { change(setpoint: min(setpoint - step, maximum)) }
+    /// One step up; from below the range (a restriction just requested on a colder AC), to the lowest.
+    public func raise() { change(setpoint: max(setpoint + step, minimum)) }
 
     private func change(setpoint value: Double) {
         guard value >= minimum, value <= maximum else { return }
@@ -247,7 +256,7 @@ public final class UnitControlModel {
         }
         if isAllOk, !isUndo { outcome?.undo = Self.undo(actions, before: before) }
         isSending = false
-        answerSeconds = nil
+        waiting = nil
         await load()
     }
 
@@ -262,7 +271,7 @@ public final class UnitControlModel {
             outcome = Outcome(text: tr("Not sent: {reason}", ["reason": Words.refusal(error)]), isOk: false, undo: [])
             return false
         }
-        answerSeconds = Self.answerSeconds(created)
+        waiting = Waiting(commandId: created.id, seconds: Self.answerSeconds(created))
         guard let answered = await follow(created) else {
             // the command was sent; only its answer could not be read, so it is never "not sent" (IR728)
             let text = tr(

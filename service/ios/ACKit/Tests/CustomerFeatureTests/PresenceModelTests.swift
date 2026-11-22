@@ -417,6 +417,29 @@ extension PresenceModelTests {
         #expect(await location.stops == 1)
     }
 
+    /// A second tap of "Grant consent" while the first is saved sends nothing: it would send the version already used and
+    /// come back as "Someone changed this in the meantime".
+    @Test func aSecondTapWhileTheConsentIsSavedSendsNothing() async throws {
+        let saving = Gate(after: 1)
+        let (model, transport) = model([try answer(consent(granted: false)), try answer(consent(granted: true, version: 5))], gate: saving)
+        await model.loadConsent()
+        #expect(!model.isSavingConsent)
+        let first = Task { await model.setConsent(true) }
+        await saving.until()
+        #expect(model.isSavingConsent, "Grant consent and Withdraw consent are disabled while it is saved")
+        // the second tap runs on its own: had it sent a request, that would wait at the gate too and the count say so
+        let second = Task { await model.setConsent(true) }
+        await saving.until(2)
+        #expect(await saving.waiting == 1, "only the first tap's update waits")
+        await saving.open()
+        await first.value
+        await second.value
+        #expect(!model.isSavingConsent)
+        #expect(await transport.requests.count == 2, "the read and one update, nothing for the second tap")
+        #expect(model.line == "Location consent granted")
+        #expect(model.isConsentGranted)
+    }
+
     @Test func withdrawingWhileOffChangesNothingElse() async throws {
         let (model, _) = model([try answer(consent(granted: true)), try answer(consent(granted: false, version: 5))])
         await model.loadConsent()
@@ -454,6 +477,7 @@ extension PresenceModelTests {
         await model.setConsent(true)
         #expect(model.line == "Someone changed this in the meantime — the screen now shows the latest version")
         #expect(!model.isConsentGranted)
+        #expect(!model.isSavingConsent, "a refused change can be tried again")
     }
 
     @Test func reportWithoutTheConsentSaysWhatItIsFor() async throws {
