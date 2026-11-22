@@ -162,7 +162,10 @@ final class TechnicianUITests: XCTestCase {
         tapScrolling(app.buttons["report.save"], in: app)
         XCTAssertTrue(wait(for: app.staticTexts["report.note"], label: "Draft saved"))
         let version = app.descendants(matching: .any)["report.version"].firstMatch
-        XCTAssertTrue(version.exists && version.label.hasPrefix("Draft v1 · saved "), "the saved draft in the versions card")
+        // any draft version: when typing is slow (a loaded machine), autosave has already saved v1 and v2 before this save
+        let isSaved = NSPredicate(format: "label MATCHES %@", "(?s)Draft v[0-9]+ · saved .*")
+        let saved = XCTNSPredicateExpectation(predicate: isSaved, object: version)
+        XCTAssertEqual(XCTWaiter().wait(for: [saved], timeout: 15), .completed, "the saved draft in the versions card: \(version.label)")
 
         // the customer signs on the phone
         tapScrolling(app.buttons["report.signOff"], in: app)

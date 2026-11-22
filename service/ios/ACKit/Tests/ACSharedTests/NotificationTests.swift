@@ -211,6 +211,21 @@ import Testing
         #expect(query(asked.path() + "?" + (asked.query() ?? "")).values == ["limit": ["100"], "sort": ["occurredAt:desc"]])
     }
 
+    @Test func theEmptyListSaysWhatTheFilterFoundAsOnTheWeb() async throws {
+        let none = Page<CoreNotification>(items: [], nextCursor: nil, total: 0, snapshotVersion: 1)
+        let (model, _) = model([try page(true), try answer(none)])
+        #expect(model.emptyText == nil, "nothing is said while the list loads")
+        await model.load()
+        #expect(model.emptyText == nil, "the list has rows")
+        model.filter = .unread
+        #expect(model.rows.isEmpty)
+        #expect(model.emptyText == "No unread notifications")
+        await model.load()
+        #expect(model.emptyText == "No unread notifications")
+        model.filter = .all
+        #expect(model.emptyText == "No notifications")
+    }
+
     @Test func readingOneMarksItWithItsVersion() async throws {
         let marked = NotificationTextTests().notice(.completion, readAt: "2026-11-20T02:00:00Z")
         let (model, transport) = model([try page(), try answer(marked), try page(true)])

@@ -25,6 +25,17 @@ import Testing
             #expect(Format.span("soon", "later") == "soon – later")
         }
     }
+
+    @Test func aBackwardsSpanKeepsItsTimeZone() {
+        let kiritimati = TimeZone(identifier: "Pacific/Kiritimati") ?? .gmt
+        Localizer.with(.en) {
+            // 01:05Z is 9:05 in Kuala Lumpur (+08:00) and 15:05 in Kiritimati (+14:00); 04:35Z is 12:35 and 18:35
+            let here = Format.span("2026-12-01T04:35:00Z", "2026-12-01T01:05:00Z", timeZone: malaysia)
+            #expect(here.contains("12:35") && here.contains("9:05"), "\(here)")
+            let there = Format.span("2026-12-01T04:35:00Z", "2026-12-01T01:05:00Z", timeZone: kiritimati)
+            #expect(there.contains("6:35") && there.contains("3:05") && !there.contains("9:05"), "\(there)")
+        }
+    }
 }
 
 @Suite struct ContextKeyTests {
