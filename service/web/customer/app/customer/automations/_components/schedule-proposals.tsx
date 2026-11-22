@@ -16,16 +16,19 @@ interface Props {
 export function ScheduleProposals({ proposals, units, rules }: Readonly<Props>) {
   const t = useT();
   const [pending, run] = useAction();
+  // a proposal is shown only while its AC is listed and its rule is still at the proposal's version (an archived AC or
+  // a rule changed since hides it), so the empty text follows the cards shown, not the API's count
+  const shown = proposals.map((proposal) => {
+    const unit = units.find((item) => item.id === proposal.unitId);
+    const rule = rules.find((item) => item.id === proposal.automationId && item.version === proposal.version);
+    return unit && rule ? { proposal, unit, rule } : null;
+  }).filter((item) => item !== null);
 
   return (
     <section aria-labelledby="schedule-proposals-heading" className="flex flex-col gap-3">
       <h2 id="schedule-proposals-heading" className="text-base font-semibold">{t("Schedule suggestions")}</h2>
-      {proposals.length === 0 && <p className="text-sm text-muted-foreground">{t("No schedule suggestions yet.")}</p>}
-      {proposals.map((proposal) => {
-        const unit = units.find((item) => item.id === proposal.unitId);
-        const rule = rules.find((item) => item.id === proposal.automationId && item.version === proposal.version);
-        if (!unit || !rule) return null;
-
+      {shown.length === 0 && <p className="text-sm text-muted-foreground">{t("No schedule suggestions yet.")}</p>}
+      {shown.map(({ proposal, unit, rule }) => {
         const day = t(dayLong[proposal.weekday - 1] ?? "");
         const approve = () => {
           run(() => approveStartProposal({
