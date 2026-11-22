@@ -65,6 +65,8 @@ describe("AutomationsDemo", () => {
     press("Review");
     expect(within(dialog()).getByText("Location consent is withdrawn — grant it to use location triggers")).toBeTruthy();
     press("Cancel");
+    expect(screen.getByText("6 automations · 4 on · checked again when it runs")).toBeTruthy(); // nothing added
+    expect(screen.queryByText("Arrive")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Grant consent" }));
     expect(toast).toHaveBeenLastCalledWith("Location consent granted", "ok");
     expect(screen.queryByText("Paused — consent withdrawn")).toBeNull();
@@ -82,6 +84,8 @@ describe("AutomationsDemo", () => {
     press("Save automation");
     expect(screen.getByText("Set temperature 27°C")).toBeTruthy();
     expect(screen.getByText("Kitchen AC")).toBeTruthy();
+    expect(screen.getByText("Weekday pre-cool")).toBeTruthy(); // the name kept
+    expect(screen.getByText("Set temperature 25°C")).toBeTruthy(); // Vacation mode unchanged
     fireEvent.click(screen.getByRole("switch", { name: "Toggle Hot afternoon pre-cool" }));
     expect(screen.getByText("6 automations · 5 on · checked again when it runs")).toBeTruthy();
   });
