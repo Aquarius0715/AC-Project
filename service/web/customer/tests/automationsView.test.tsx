@@ -112,13 +112,17 @@ describe("AutomationsView editor", () => {
 
   it("saves an edited schedule at its version and returns to the list with the next run", async () => {
     preview.data = [{ automationId: null, phase: "schedule_start", at: "2026-09-16T10:00:00Z", action: { kind: "set_power", power: true } }];
-    render(<AutomationsView live={live({ editing: "r-sched" })} />);
+    const view = render(<AutomationsView live={live({ editing: "r-sched" })} />);
     fireEvent.change(screen.getByRole("textbox", { name: "Name" }), { target: { value: "Evening pre-cool" } });
     fireEvent.click(screen.getByRole("button", { name: "Save automation" }));
     await vi.waitFor(() => { expect(patch).toHaveBeenLastCalledWith({ automationId: null, preset: null, unitIds: null }); });
     const [input, version] = actions.saveAutomation.mock.calls[0] ?? [];
     expect(version).toBe(3);
     expect(input).toMatchObject({ id: "r-sched", name: "Evening pre-cool" });
+    view.rerender(<AutomationsView live={live()} />); // the URL left the editor: the list shows the saved notice
+    expect(screen.getByText(/^“Weekday pre-cool” saved · next run .+ \(Asia\/Kuala_Lumpur\)\. Saving sends no command now\.$/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+    expect(screen.queryByText("Automation saved")).toBeNull();
   });
 
   it("shows the Core API's field refusal under its field and stays in the editor", async () => {
