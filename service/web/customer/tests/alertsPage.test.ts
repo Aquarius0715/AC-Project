@@ -158,8 +158,15 @@ describe("the alerts page", () => {
     expect(live.rows.map((a) => a.id)).toStrictEqual(["a-1"]);
     vi.clearAllMocks();
     const other = await open({ severity: "loud", unitId: "u-gone" });
-    expect(alertsInput()).toStrictEqual({ filters: { unitId: "u-gone" } });
-    expect(other).toMatchObject({ severity: null, unitId: null });
+    expect(alertsInput()).toStrictEqual({});
+    expect(other).toMatchObject({ severity: null, unitId: null, total: 2 });
+  });
+
+  it("an unknown unitId does not filter the alerts the Unit select labels as all units", async () => {
+    answer({ alerts: [alert("a-1", "u-1"), alert("a-2", "u-2")] });
+    const live = await open({ severity: "warning", unitId: "u-gone" });
+    expect(alertsInput()).toStrictEqual({ filters: { severity: "warning" } });
+    expect(live).toMatchObject({ unitId: null, total: 2 });
   });
 
   it("opens the editor for policyId=new and an own policy, not for an unknown id; a member sees the policies read-only", async () => {
