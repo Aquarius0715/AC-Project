@@ -159,6 +159,65 @@ import Testing
         #expect(!model.isPowerLocked)
     }
 
+    /// A restriction just requested finds the AC below its lowest setpoint: "+" goes to that lowest setpoint at once (it
+    /// did nothing while the setpoint stayed below it, though the button was enabled).
+    @Test func raisingFromBelowTheRestrictionGoesToItsLowest() async throws {
+        let detail = try unit {
+            $0.observedState.celsius = 20
+            $0.effectiveControlPolicy = .restricted(
+                EffectiveControlPolicyRestricted(
+                    phase: .requested,
+                    policy: .temperatureLimit(RestrictionPolicyTemperatureLimit(minimumCoolingSetpoint: 25))
+                )
+            )
+        }
+        let model = model([try answer(detail), try noCommands])
+        await model.load()
+        #expect(model.setpoint == 20)
+        #expect(model.canRaise)
+        #expect(!model.canLower)
+        model.raise()
+        #expect(model.setpoint == 25)
+        #expect(model.changes == [.setTemperature(UnitActionSetTemperature(celsius: 25))])
+        model.raise()
+        #expect(model.setpoint == 26, "from the lowest setpoint on, one step at a time")
+    }
+
+    /// An AC that reports a setpoint above its model's highest: "−" goes to that highest setpoint.
+    @Test func loweringFromAboveTheRangeGoesToItsHighest() async throws {
+        let detail = try unit { $0.observedState.celsius = 33 }
+        let model = model([try answer(detail), try noCommands])
+        await model.load()
+        #expect(!model.canRaise)
+        model.lower()
+        #expect(model.setpoint == model.maximum)
+        #expect(model.changes == [.setTemperature(UnitActionSetTemperature(celsius: model.maximum))])
+    }
+
+    /// Each command of a send is waited for on its own: the wait names the command being followed, so the screen's
+    /// countdown starts again for the next one (the web keys its wait banner by the command id).
+    @Test func eachCommandOfASendHasItsOwnWait() async throws {
+        let detail = try unit()
+        let recorder = WaitRecorder()
+        let base = URL(string: "http://core.test") ?? URL(filePath: "/")
+        let answers = [
+            try answer(detail), try noCommands,
+            try answer(detail), try answer(command(.sent, id: "c1")), try answer(command(.acknowledged, id: "c1")),
+            try answer(detail), try answer(command(.sent, id: "c2")), try answer(command(.acknowledged, id: "c2")),
+            try answer(detail), try noCommands,
+        ]
+        let client = CoreClient(baseURL: base, transport: StubTransport(answers), credentials: FixedCredentials())
+        let model = UnitControlModel(unitId: "u1", client: client, me: "m1") { _ in await recorder.note() }
+        recorder.model = model
+        await model.load()
+        #expect(model.waiting == nil)
+        model.lower()
+        model.choose(mode: .dry)
+        await model.sendChanges()
+        #expect(recorder.seen == ["c1", "c2"])
+        #expect(model.waiting == nil, "no wait is shown once the send is over")
+    }
+
     @Test func powerOffRestrictionLocksThePower() async throws {
         let detail = try unit {
             $0.effectiveControlPolicy = .restricted(
@@ -336,5 +395,15 @@ extension UnitControlFailureTests {
     /// The unit of the fixture as it is.
     nonisolated static func unchanged(_: inout UnitDetail) {
         // the fixture's unit, online (unit(_:) sets it)
+    }
+}
+
+/// Notes, at each wait between polls, which command the model says it is waiting for.
+@MainActor private final class WaitRecorder {
+    weak var model: UnitControlModel?
+    private(set) var seen: [String] = []
+
+    func note() {
+        seen.append(model?.waiting?.commandId ?? "none")
     }
 }

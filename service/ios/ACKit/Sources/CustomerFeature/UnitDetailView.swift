@@ -265,7 +265,8 @@ struct UnitDetailView: View {
 
     @ViewBuilder private var state: some View {
         if model.isSending {
-            WaitingText(seconds: model.answerSeconds ?? 30)
+            // a new countdown for each command of the send (the web keys its wait banner by the command id)
+            WaitingText(seconds: model.waiting?.seconds ?? 30).id(model.waiting?.commandId)
         } else if let outcome = model.outcome {
             VStack(alignment: .leading, spacing: 8) {
                 Label {

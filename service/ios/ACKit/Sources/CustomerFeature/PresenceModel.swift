@@ -82,6 +82,8 @@ public final class PresenceModel {
     public private(set) var consent: Consent?
     /// Whether the account has a consent record at all (without one, location automations cannot be used).
     public private(set) var hasConsentRecord = true
+    /// True while a grant or withdrawal is saved: a second tap would send the version already used (a conflict).
+    public private(set) var isSavingConsent = false
 
     let client: CoreClient
     let location: any LocationSource
@@ -128,7 +130,9 @@ public final class PresenceModel {
 
     /// Grants or withdraws the consent; withdrawing also stops this phone's reports (they need it).
     public func setConsent(_ granted: Bool) async {
-        guard let version = consent?.version else { return }
+        guard !isSavingConsent, let version = consent?.version else { return }
+        isSavingConsent = true
+        defer { isSavingConsent = false }
         do {
             consent = try await client.call(Ops.ConsentsUpdate.self, ConsentsUpdateInput(granted: granted), expectedVersion: Int(version))
                 .data
