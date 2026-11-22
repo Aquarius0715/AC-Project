@@ -105,12 +105,16 @@ public struct CantMakeForm: Sendable, Equatable {
         return count < 1 || count > CheckInForm.maxReason ? tr("Tell your coordinator why (1–1000 characters)") : nil
     }
 
-    /// The other time in the display time zone (NFR-08), or nil when none is offered.
-    public func slot(in timeZone: TimeZone = Localizer.timeZone) -> Slot? {
+    /// The other time in the display time zone (NFR-08), or nil when none is offered. The day is the one the date
+    /// picker showed, in the phone's time zone (`pickedIn`), which can differ from the membership's: the web's date
+    /// field is a day too, and its window is in the display time zone.
+    public func slot(in timeZone: TimeZone = Localizer.timeZone, pickedIn picker: TimeZone = .current) -> Slot? {
         guard let date else { return nil }
+        var pickerCalendar = Calendar(identifier: .gregorian)
+        pickerCalendar.timeZone = picker
+        let day = pickerCalendar.dateComponents([.year, .month, .day], from: date)
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = timeZone
-        let day = calendar.dateComponents([.year, .month, .day], from: date)
         let instants = window.split(separator: "-").compactMap { time -> String? in
             let parts = time.split(separator: ":").compactMap { Int($0) }
             guard parts.count == 2 else { return nil }
