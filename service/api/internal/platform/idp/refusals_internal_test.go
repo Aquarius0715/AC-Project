@@ -93,7 +93,7 @@ func newScriptedKeycloak(t *testing.T, script map[string]reply) (*Keycloak, *scr
 		ClientID:     testClientID,
 		ClientSecret: "s",
 		PublicURL:    "",
-		Client:       nil,
+		Client:       testClient(t),
 		Now:          nil,
 		mu:           sync.Mutex{},
 		tokens:       nil,
