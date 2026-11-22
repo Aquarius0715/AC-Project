@@ -318,6 +318,11 @@ final class TechnicianUITests: XCTestCase {
         let banner = app.staticTexts["job.banner"]
         XCTAssertTrue(banner.label.contains("“Medical appointment”"), banner.label)
         XCTAssertFalse(app.buttons["job.accept"].exists, "the answer is given")
+        // back on the list, the job is read again: it no longer asks for an answer
+        app.navigationBars.buttons.firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["Can’t make it"].waitForExistence(timeout: 5), "the list shows the answer")
+        XCTAssertFalse(app.staticTexts["Not accepted"].exists)
+        XCTAssertFalse(app.staticTexts["jobs.answer"].exists, "no new assignment is announced")
     }
 
     @MainActor

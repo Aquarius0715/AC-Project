@@ -19,7 +19,8 @@ struct AlertsView: View {
             switch model.content.value {
             case .alerts?: alertCards
             case let .unavailable(title, text)?: Card(title) { Text(verbatim: text).accessibilityIdentifier("alerts.unavailable") }
-            case nil: ProgressView()
+            // a failed first read shows only its message, not a spinner that never ends
+            case nil: if case .loading = model.content { ProgressView() }
             }
         }
         .cardScreen()
