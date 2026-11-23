@@ -108,7 +108,7 @@ describe("AutomationsDemo", () => {
     press("Review");
     press("Save automation");
     expect(screen.queryByText("No automations yet")).toBeNull();
-    expect(screen.getByText("1 automations · 1 on · checked again when it runs")).toBeTruthy();
+    expect(screen.getByText("1 automation · 1 on · checked again when it runs")).toBeTruthy();
   });
 
   it("a schedule rule runs at the hour picked", () => {

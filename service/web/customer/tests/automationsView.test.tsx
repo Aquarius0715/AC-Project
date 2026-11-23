@@ -105,8 +105,12 @@ describe("AutomationsView list", () => {
     const turnedOff = { ...arrival, enabled: false, disabledReason: "consent_revoked" as const };
     render(<AutomationsView live={live({ rules: [off, turnedOff], cards: [ruleCard(off, ac, null, false), ruleCard(turnedOff, ac, null, false)], consent: { version: 9, ...consentCard(withdrawn, 1, 1) } })} />);
     expect(screen.getByText(/^Withdrawn .+ 1 location automation was turned off/).closest(".rounded-2xl")?.className).toContain("border-warn");
-    expect(screen.getByRole("button", { name: "Grant consent" }).className).toContain("bg-primary "); // the remedy is primary (IR619)
-    const stateOf = (name: string) => within(screen.getByRole("switch", { name }).closest(".text-xs") ?? document.body);
+    expect(screen.getByRole("button", { name: "Grant consent" }).className).toContain("bg-primary text-primary-foreground"); // the remedy is primary (IR619)
+    const stateOf = (name: string) => {
+      const row = screen.getByRole("switch", { name }).closest(".text-xs"); // the state text beside the rule's switch
+      if (!(row instanceof HTMLElement)) throw new TypeError(`no state beside ${name}`);
+      return within(row);
+    };
     expect(stateOf("Switch Weekday pre-cool on").getByText("Off").className).toContain("text-muted-foreground");
     expect(stateOf("Switch Arrive home on").getByText("Disabled").className).toContain("text-warn");
     expect(screen.queryByText("presence switch")).toBeNull(); // no presence switch without consent
@@ -352,7 +356,7 @@ describe("AutomationsView editor", () => {
     expect(screen.getByText("“Weekday pre-cool” saved · off — switch it on to run it. Saving sends no command now.")).toBeTruthy();
   });
 
-  it("saves from the test result, and Back to edit closes it without saving", async () => {
+  it("the test result closes with Back to edit or Escape without saving, and its Save saves at the rule's version", async () => {
     render(<AutomationsView live={live({ editing: "r-loc" })} />);
     fireEvent.click(screen.getByRole("button", { name: "Test / Simulate" }));
     fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Back to edit" }));
