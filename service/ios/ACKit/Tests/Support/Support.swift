@@ -64,6 +64,11 @@ public actor Gate {
         await withCheckedContinuation { waiters.append($0) }
     }
 
+    /// Lets the next `count` pass while the ones waiting stay held (a later call that overtakes an earlier one).
+    public func allow(_ count: Int) {
+        free += count
+    }
+
     public func open() {
         isOpen = true
         for waiter in waiters { waiter.resume() }

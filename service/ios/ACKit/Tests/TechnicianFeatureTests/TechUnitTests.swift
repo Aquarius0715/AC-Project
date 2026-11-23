@@ -394,6 +394,37 @@ func alert(
         #expect(query(requests[9].path() + "?" + (requests[9].query() ?? "")).values["cursor"] == ["p2"])
     }
 
+    @Test func aPeriodChosenWhileTheFirstIsReadShowsOnlyItsOwnLines() async throws {
+        let gate = Gate(after: 8)
+        let transport = StubTransport(
+            [
+                try text("units.get.technician"), try page([alert("a1")]), try page([CoreAlert]()), try page([CoreAlert]()),
+                try text("jobs.list.technician"), try text("telemetry.series.day"), try text("devices.list"), try text("devices.events"),
+                // the week's read, which overtakes the hour's, then the hour's late answers
+                try text("telemetry.series.day"), try text("devices.list"), try page([DeviceEvent]()),
+                try text("telemetry.series.hour"), try text("devices.list"), try text("devices.events"),
+            ],
+            gate: gate
+        )
+        let client = CoreClient(
+            baseURL: URL(string: "http://core.test") ?? URL(filePath: "/"),
+            transport: transport,
+            credentials: FixedCredentials()
+        )
+        let model = TechUnitModel(unitId: "e841ee95-3171-54d5-be91-1f2301bdb701", jobId: "j1", client: client)
+        await model.load()
+        let hour = Task { await model.show(.hour) }
+        await gate.until()
+        await gate.allow(3)
+        await model.show(.week)
+        #expect(model.lines.first?.points.count == 255)
+        await gate.open()
+        await hour.value
+        #expect(model.period == .week)
+        #expect(model.lines.first?.points.count == 255, "the hour's 60 readings are dropped")
+        #expect(await transport.requests.count == 12, "the stale read stops before the device events")
+    }
+
     @Test func anUnreadableSeriesIsAnEmptyLine() async throws {
         let (model, transport) = try await loaded()
         await transport.queue([.failure(URLError(.timedOut)), .failure(URLError(.timedOut))])

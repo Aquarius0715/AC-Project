@@ -192,6 +192,17 @@ private func candidate(
             AlertWords.problem(reason: "Fixed", picked: (0...20).map(String.init), policyless: false) == "Pick at most 20 evidence records"
         )
         #expect(AlertWords.problem(reason: "Fixed", picked: [], policyless: false) == nil)
+        // the Core API counts code points: 1000 is the most, and a thumbs-up with a skin tone is two of them
+        #expect(AlertWords.problem(reason: String(repeating: "a", count: 1000), picked: [], policyless: false) == nil)
+        #expect(
+            AlertWords.problem(reason: String(repeating: "a", count: 1001), picked: [], policyless: false)
+                == "A resolution reason is required (1–1000 characters)."
+        )
+        #expect(
+            AlertWords.problem(reason: String(repeating: "👍🏽", count: 501), picked: [], policyless: false)
+                == "A resolution reason is required (1–1000 characters).",
+            "501 characters on screen, 1002 code points"
+        )
     }
 
     @Test func eachRefusalInWords() {
@@ -366,6 +377,33 @@ private func candidate(
         model.pick("x", true)
         await model.select("a2")
         #expect(model.selected?.id == "a2" && model.reason.isEmpty && model.picked.isEmpty && model.candidates == nil)
+    }
+
+    @Test func anotherAlertChosenWhileTheFirstOnesEvidenceIsReadShowsOnlyItsOwn() async throws {
+        let gate = Gate(after: 7)
+        let transport = StubTransport(
+            try reads([alert("a1"), alert("a2"), alert("a3")])
+                + [try page([candidate(.detection)]), try page([candidate(.deviceEvent, event: .restored)])],
+            gate: gate
+        )
+        let client = CoreClient(
+            baseURL: URL(string: "http://core.test") ?? URL(filePath: "/"),
+            transport: transport,
+            credentials: FixedCredentials()
+        )
+        let model = AlertsModel(unitId: "u1", jobId: "j1", alertId: nil, client: client)
+        await model.load()
+        let first = Task { await model.select("a2") }
+        await gate.until()
+        #expect(model.candidates == nil, "the earlier alert's evidence is not offered for this one")
+        // a3 overtakes a2: its evidence arrives first
+        await gate.allow(1)
+        await model.select("a3")
+        #expect(model.candidates?.map(\.id) == ["c-detection-measured"])
+        await gate.open()
+        await first.value
+        #expect(model.selected?.id == "a3")
+        #expect(model.candidates?.map(\.id) == ["c-detection-measured"], "a2's late answer is dropped")
     }
 
     @Test func anAlertIsAcknowledgedWithItsVersion() async throws {

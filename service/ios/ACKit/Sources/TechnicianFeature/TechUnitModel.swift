@@ -124,22 +124,31 @@ public final class TechUnitModel {
         return Set((metrics + [metric]).compactMap(unitOf)).count <= 2
     }
 
+    /// Counts the chart's reads: only the latest one's answers are shown (a period or metric chosen while an earlier
+    /// read is still out would otherwise end with the earlier lines under the later title).
+    private var seriesRead = 0
+
     private func loadSeries() async {
         guard let unit else { return }
+        seriesRead += 1
+        let read = seriesRead
+        let period = period
         let range = period.range(now: now)
         var lines: [SeriesLine] = []
         for metric in metrics {
             let symbol = unit.latestMeasurements.first { $0.metric == metric }?.unit.rawValue ?? Checklist.unit(metric).rawValue
-            lines.append(await line(metric, unit: symbol, from: range.from, to: range.to))
+            lines.append(await line(metric, unit: symbol, period: period, from: range.from, to: range.to))
         }
+        guard read == seriesRead else { return }
         self.lines = lines
-        events = await deviceEvents(from: range.from, to: range.to)
+        let events = await deviceEvents(from: range.from, to: range.to)
+        guard read == seriesRead else { return }
+        self.events = events
     }
 
     /// A metric over the period: a day or a week as its 5- or 60-minute averages (IR605), an hour as its latest
     /// readings, up to 4 pages of 100 (IR598); an unreadable series is an empty line.
-    private func line(_ metric: Metric, unit: String, from: Date, to: Date) async -> SeriesLine {
-        let period = period
+    private func line(_ metric: Metric, unit: String, period: SeriesPeriod, from: Date, to: Date) async -> SeriesLine {
         let empty = UnitWords.line(metric, unit: unit, period: period, SeriesReadings(points: [], total: 0, complete: true))
         let range = (from: from.ISO8601Format(), to: to.addingTimeInterval(1).ISO8601Format())
         if let minutes = period.bucketMinutes {
@@ -170,20 +179,26 @@ public final class TechUnitModel {
             let query = Query(cursor: cursor, limit: 100, sort: QuerySort(field: .observedAt, direction: .desc))
             let input = TelemetrySeriesInput(from: range.from, to: range.to, unitIds: [unitId], metric: metric, query: query)
             guard let series = try? await client.call(Ops.TelemetrySeries.self, input).data else {
-                return page == 0 ? empty : line(metric, unit, readings, total)
+                return page == 0 ? empty : line(metric, unit, period, readings, total)
             }
             readings += series.items
             if page == 0 { total = Int(series.total) }
             cursor = series.nextCursor
             if cursor == nil { break }
         }
-        return line(metric, unit, readings, total)
+        return line(metric, unit, period, readings, total)
     }
 
     /// The most pages of an hour's readings the chart reads.
     static let hourPages = 4
 
-    private func line(_ metric: Metric, _ unit: String, _ readings: [CoreMeasurement], _ total: Int) -> SeriesLine {
+    private func line(
+        _ metric: Metric,
+        _ unit: String,
+        _ period: SeriesPeriod,
+        _ readings: [CoreMeasurement],
+        _ total: Int
+    ) -> SeriesLine {
         // stale, suspect and missing readings are not plotted
         let points = readings.compactMap { reading in
             reading.quality == .valid ? zip(Format.parse(reading.observedAt), reading.value).map { (at: $0, value: $1) } : nil
