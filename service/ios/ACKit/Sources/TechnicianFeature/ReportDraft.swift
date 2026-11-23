@@ -281,6 +281,18 @@ public struct ReportIssue: Sendable, Equatable {
 extension ReportDraft {
     /// The coarsest a reason, a note and the work text may be: the Core API's limits.
     static let workText = 10...4000
+    /// The longest a name (a part, a signer), a code (a cylinder), a serial and a reason or a note may be, in code points
+    /// after trimming (maintenance maxNameLength, maxCodeLength, maxSerialLength, maxReasonLength; the web caps the
+    /// same fields with maxLength). A longer one would have every save of the draft refused.
+    static let maxName = 120
+    static let maxCode = 64
+    static let maxSerial = 80
+    static let maxReason = 1000
+
+    /// "Part name: up to 120 characters": the refusal of a text over its limit.
+    static func tooLong(_ field: String, _ limit: Int) -> String {
+        tr("{field}: up to {n} characters", ["field": field, "n": String(limit)])
+    }
 
     public func issues(photos: [Attachment], now: Date, signedOff: Bool) -> [ReportIssue] {
         var out: [ReportIssue] = []
@@ -291,6 +303,8 @@ extension ReportDraft {
                 out.append(ReportIssue(key: item.key, group: item.group, text: tr("{where} has no result", ["where": place])))
             } else if item.result != .normal, item.reason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 out.append(ReportIssue(key: item.key, group: item.group, text: tr("{where} needs a reason", ["where": place])))
+            } else if CheckInForm.length(of: item.reason) > Self.maxReason {
+                out.append(ReportIssue(key: item.key, group: item.group, text: Self.tooLong(place, Self.maxReason)))
             }
         }
         for reading in readings where !reading.value.trimmingCharacters(in: .whitespaces).isEmpty && Self.value(reading.value) == nil {
@@ -304,6 +318,8 @@ extension ReportDraft {
             let isFuture = Format.parse("\(date)T00:00:00Z").map { $0 > now } ?? false
             if !isFuture || note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 out.append(ReportIssue(key: nil, group: nil, text: tr("A follow-up needs a future date and a note")))
+            } else if CheckInForm.length(of: note) > Self.maxReason {
+                out.append(ReportIssue(key: nil, group: nil, text: Self.tooLong(tr("What to do (required)"), Self.maxReason)))
             }
         }
         for (index, part) in parts.enumerated() where part.quantity < 1 || part.quantity > 999 {
@@ -336,6 +352,8 @@ extension ReportDraft {
         if !installation.confirmed { texts.append(tr("Confirm that the installed model is the registered one")) }
         if installation.serial.trimmingCharacters(in: .whitespaces).isEmpty {
             texts.append(tr("Enter the serial number of the installed unit"))
+        } else if CheckInForm.length(of: installation.serial) > maxSerial {
+            texts.append(tooLong(tr("Serial number"), maxSerial))
         }
         let added = Set(photos.filter { $0.status == .ready }.compactMap(\.tag))
         for tag in AttachmentTag.allCases where !added.contains(tag) {

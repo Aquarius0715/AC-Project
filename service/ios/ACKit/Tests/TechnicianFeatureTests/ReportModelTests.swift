@@ -362,6 +362,24 @@ import Testing
                 == "A site photo (JPEG/PNG, ≤5 MiB) is required when the customer is not available"
         )
         #expect(ReportModel.signOffError(name: "Ms Tan", signature: nil, absentReason: "Away", sitePhoto: photo) == nil)
+        // the Core API's limits, in code points: the signer's name 120, the reason 1000
+        let accent = "e\u{301}"
+        #expect(
+            ReportModel.signOffError(name: String(repeating: accent, count: 61), signature: Data([1]), absentReason: nil, sitePhoto: nil)
+                == "Signer name: up to 120 characters"
+        )
+        #expect(
+            ReportModel.signOffError(name: String(repeating: "a", count: 120), signature: Data([1]), absentReason: nil, sitePhoto: nil)
+                == nil
+        )
+        #expect(
+            ReportModel.signOffError(name: "Ms Tan", signature: nil, absentReason: String(repeating: accent, count: 501), sitePhoto: photo)
+                == "Why the customer could not sign: up to 1000 characters"
+        )
+        #expect(
+            ReportModel.signOffError(name: "Ms Tan", signature: nil, absentReason: String(repeating: "a", count: 1000), sitePhoto: photo)
+                == nil
+        )
     }
 
     @Test func theCustomerSignsTheSavedVersion() async throws {

@@ -31,6 +31,7 @@ public struct PartForm: Sendable, Equatable {
         guard isChecked else { return nil }
         let label = (picked(catalog)?.name ?? name).trimmingCharacters(in: .whitespaces)
         if label.isEmpty { return tr("Choose a catalog part or name it") }
+        if CheckInForm.length(of: label) > ReportDraft.maxName { return ReportDraft.tooLong(tr("Part name"), ReportDraft.maxName) }
         return (1...999).contains(quantity) ? nil : tr("Quantity must be 1–999")
     }
 
@@ -74,6 +75,7 @@ public struct RefrigerantForm: Sendable, Equatable {
 
     public var error: String? {
         if cylinder.trimmingCharacters(in: .whitespaces).isEmpty { return tr("The cylinder ID is required") }
+        if CheckInForm.length(of: cylinder) > ReportDraft.maxCode { return ReportDraft.tooLong(tr("Cylinder ID"), ReportDraft.maxCode) }
         return Self.kilograms(recovered) == nil || Self.kilograms(charged) == nil ? tr("Kilograms, 0 or more") : nil
     }
 

@@ -348,9 +348,13 @@ public final class ReportModel {
 
     static func signOffError(name: String, signature: Data?, absentReason: String?, sitePhoto: NewPhoto?) -> String? {
         if name.isEmpty { return tr("The signer's name is required") }
+        if CheckInForm.length(of: name) > ReportDraft.maxName { return ReportDraft.tooLong(tr("Signer name"), ReportDraft.maxName) }
         if signature != nil { return nil }
         guard let absentReason else { return tr("Ask the customer to sign in the box") }
         if absentReason.isEmpty { return tr("Say why the customer could not sign") }
+        if CheckInForm.length(of: absentReason) > ReportDraft.maxReason {
+            return ReportDraft.tooLong(tr("Why the customer could not sign"), ReportDraft.maxReason)
+        }
         guard let sitePhoto, sitePhoto.data.count <= maxBytes else {
             return tr("A site photo (JPEG/PNG, ≤5 MiB) is required when the customer is not available")
         }

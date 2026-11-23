@@ -186,6 +186,35 @@ func photo(_ id: String, status: AttachmentStatus = .ready, tag: AttachmentTag? 
         #expect(draft.issues(photos: [], now: now, signedOff: true).map(\.text).contains("A follow-up needs a future date and a note"))
     }
 
+    /// The Core API's limits on the texts, counted in code points after trimming: one over is listed, the limit is not.
+    @Test func aTextOverTheCoreAPIsLimitIsListed() throws {
+        let now = try #require(Format.parse("2026-09-27T02:00:00Z"))
+        let accent = "e\u{301}"  // one character, two code points
+        var draft = ReportDraft(nil, components: Checklist.components(scope: [.installation]), isInstallation: true)
+        for index in draft.items.indices { draft.items[index].result = .normal }
+        draft.items[0].result = .attention
+        draft.items[1].result = .attention
+        draft.items[0].reason = " " + String(repeating: "a", count: 1000) + " "
+        draft.items[1].reason = String(repeating: accent, count: 501)
+        draft.workText = "Installed and tested the unit."
+        draft.next = .followUp(date: "2026-10-01", note: String(repeating: accent, count: 501))
+        draft.installation = ReportDraft.Installation(confirmed: true, serial: String(repeating: "S", count: 81))
+        let photos = AttachmentTag.allCases.map { photo($0.rawValue, tag: $0) }
+        let texts = draft.issues(photos: photos, now: now, signedOff: true).map(\.text)
+        #expect(
+            texts == [
+                "Serial number: up to 80 characters", "Installation › Refrigerant piping: up to 1000 characters",
+                "What to do (required): up to 1000 characters",
+            ]
+        )
+        let piping = try #require(draft.issues(photos: photos, now: now, signedOff: true).dropFirst().first)
+        #expect(piping.key == .refrigerantPiping && piping.group == .installation)
+        draft.items[1].reason = String(repeating: "a", count: 1000)
+        draft.next = .followUp(date: "2026-10-01", note: String(repeating: "a", count: 1000))
+        draft.installation?.serial = " " + String(repeating: "S", count: 80) + " "
+        #expect(draft.issues(photos: photos, now: now, signedOff: true).isEmpty)
+    }
+
     @Test func anInstallationNeedsItsEquipmentPhotosAndSignOff() throws {
         let now = try #require(Format.parse("2026-09-27T02:00:00Z"))
         var draft = ReportDraft(nil, components: Checklist.components(scope: [.installation]), isInstallation: true)
@@ -244,6 +273,12 @@ func photo(_ id: String, status: AttachmentStatus = .ready, tag: AttachmentTag? 
         #expect(named.name == "Gasket" && named.catalogCode == nil && named.oldPartDisposal == nil && named.source == .boughtLocally)
         form.quantity = 1000
         #expect(form.error(catalog: catalog) == "Quantity must be 1–999")
+        form.quantity = 1
+        form.name = " " + String(repeating: "e\u{301}", count: 61)
+        #expect(form.error(catalog: catalog) == "Part name: up to 120 characters", "122 code points")
+        #expect(form.part(catalog: catalog) == nil)
+        form.name = String(repeating: "a", count: 120)
+        #expect(form.error(catalog: catalog) == nil)
     }
 
     @Test func aCatalogPartSaysItsVanStock() {
@@ -274,5 +309,9 @@ func photo(_ id: String, status: AttachmentStatus = .ready, tag: AttachmentTag? 
                     leakCheckMethod: nil
                 )
         )
+        form.cylinder = String(repeating: "C", count: 65)
+        #expect(form.error == "Cylinder ID: up to 64 characters" && form.record == nil)
+        form.cylinder = " " + String(repeating: "C", count: 64) + " "
+        #expect(form.error == nil)
     }
 }

@@ -1,4 +1,9 @@
 {
+  "{field}: up to {n} characters": {
+    "id": "{field}: paling banyak {n} karakter",
+    "ja": "{field}：{n} 文字までです",
+    "ms": "{field}: paling banyak {n} aksara"
+  },
   "Allow location “Always” so that arriving and leaving are reported while the app is closed.": {
     "id": "Izinkan lokasi “Selalu” agar tiba dan pergi dilaporkan saat aplikasi ditutup.",
     "ja": "アプリを閉じている間も到着と出発を報告するには、位置情報を「常に」許可してください。",

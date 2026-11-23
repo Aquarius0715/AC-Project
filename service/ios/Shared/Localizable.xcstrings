@@ -507,6 +507,29 @@
         }
       }
     },
+    "{field}: up to {n} characters": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{field}: paling banyak {n} aksara"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{field}：{n} 文字までです"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{field}: paling banyak {n} karakter"
+          }
+        }
+      }
+    },
     "{group} · {n} components": {
       "extractionState": "manual",
       "localizations": {
