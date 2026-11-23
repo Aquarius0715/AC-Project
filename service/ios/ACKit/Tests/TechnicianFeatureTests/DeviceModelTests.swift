@@ -398,6 +398,12 @@ import Testing
 
         await model.calibrate()
         #expect(model.fieldErrors == ["referenceValue": "Not valid", "measuredValue": "Not valid"])
+        model.reference = "nan"
+        model.measured = "-inf"
+        let sent = await transport.requests.count
+        await model.calibrate()
+        #expect(model.fieldErrors == ["referenceValue": "Not valid", "measuredValue": "Not valid"])
+        #expect(await transport.requests.count == sent, "a value JSON cannot carry is not sent")
         model.reference = " 24.0 "
         model.measured = "24.4"
         await transport.queue([.http(200, "{}")] + (try read()))
@@ -416,6 +422,35 @@ import Testing
         requests = await transport.requests
         let bind = try JSONDecoder().decode(StubBind.self, from: try #require(requests[requests.count - 10].httpBody))
         #expect(bind.unitId == "bedroom" && bind.jobId == "j2" && bind.reason == "Moved to the bedroom")
+    }
+
+    @Test func theReasonAndTheNoteAreCountedAsTheCoreAPICountsThem() async throws {
+        // the Core API counts code points (utf8.RuneCountInString); "👍🏽" is one character of two
+        let (model, transport) = try await loaded()
+        let row = try #require(model.eventRows.first)
+        let before = await transport.requests.count
+        model.bindReason = String(repeating: "👍🏽", count: 501)
+        await model.bind()
+        #expect(model.fieldErrors == ["reason": "1–1000 characters"])
+        model.noteText = " " + String(repeating: "👍🏽", count: 501) + " "
+        await model.addNote(to: row)
+        #expect(model.fieldErrors == ["responseNote": "1–1000 characters"])
+        #expect(await transport.requests.count == before, "nothing the Core API refuses is sent")
+
+        model.noteText = String(repeating: "👍🏽", count: 500)
+        await transport.queue([try DeviceAnswers.answer(try tamper())] + (try read()))
+        await model.addNote(to: row)
+        #expect(model.fieldErrors.isEmpty && model.noteText.isEmpty)
+        let noted = await transport.requests.count
+        #expect(noted > before)
+
+        model.bindReason = String(repeating: "👍🏽", count: 500)
+        await transport.queue([.http(200, "{}")] + (try read()))
+        await model.bind()
+        #expect(model.fieldErrors["reason"] == nil)
+        let bound = await transport.requests
+        let bind = try JSONDecoder().decode(StubBind.self, from: try #require(bound[noted].httpBody))
+        #expect(bind.reason == String(repeating: "👍🏽", count: 500))
     }
 
     @Test func notesAndAlertsOfTheEvents() async throws {
